@@ -57,6 +57,28 @@ class Mesh3D:
     def volumes(self) -> np.ndarray:
         return np.abs(np.linalg.det(self._edge_matrix())) / 6.0
 
+    def dihedral_angles(self) -> np.ndarray:
+        """(T, 6) interior dihedral angles in degrees, one per edge.
+
+        Interpolation accuracy on a tetrahedron is governed by the MAXIMUM angle,
+        not the minimum: slender elements are harmless as long as they do not
+        flatten. Face normals are turned outward by pointing each away from the
+        vertex it faces, so the angles come out interior rather than mixed.
+        """
+        p = self.nodes[self.tets]
+        opposite = [(1, 2, 3), (0, 2, 3), (0, 1, 3), (0, 1, 2)]
+        n = np.empty((self.num_tets, 4, 3))
+        for i, (a, b, c) in enumerate(opposite):
+            nv = np.cross(p[:, b] - p[:, a], p[:, c] - p[:, a])
+            nv /= np.linalg.norm(nv, axis=1)[:, None]
+            inward = np.einsum("td,td->t", nv, p[:, i] - p[:, a]) > 0
+            nv[inward] *= -1.0
+            n[:, i] = nv
+        ang = [180.0 - np.degrees(np.arccos(np.clip(
+                   np.einsum("td,td->t", n[:, i], n[:, j]), -1.0, 1.0)))
+               for i in range(4) for j in range(i + 1, 4)]
+        return np.stack(ang, axis=1)
+
     def faces(self):
         """(unique sorted faces, how many tetrahedra each belongs to)."""
         if self._faces is None:

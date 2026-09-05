@@ -147,6 +147,19 @@ def check_mesh(nx=4, ny=3, nz=3):
     assert n_over == 0 and n_bf == expect_bf, "mesh is not conforming"
     assert V - E + F - T == 1, "Euler characteristic wrong for a ball"
 
+    # Quality is refinement-invariant because the subdivision is self-similar: the
+    # constant in the interpolation estimate is the same at every level, which is
+    # what lets a convergence rate be read off at face value.
+    ranges = []
+    for m in (1, 2, 4):
+        a = box_mesh(A_BOX, B_BOX, C_BOX, 5 * m, 4 * m, 3 * m).dihedral_angles()
+        ranges.append((a.min(), a.max()))
+    print(f"  dihedral angles {ranges[0][0]:.4f} to {ranges[0][1]:.4f} degrees, "
+          f"identical at every refinement level: "
+          f"{all(np.allclose(r, ranges[0]) for r in ranges)}")
+    assert all(np.allclose(r, ranges[0]) for r in ranges), "quality drifts under refinement"
+    assert ranges[0][1] < 179.0, "flat element — the maximum-angle condition fails"
+
 
 def check_whitney_identities(nx=3, ny=3, nz=2, tol=1e-11):
     """Exact identities of the discrete complex, whatever the mesh or coefficient.
