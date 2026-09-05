@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "galerkin"
+version = "0.1.0"
+description = "A finite-element engine for electromagnetics, built milestone by milestone against analytical solutions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
+
+[project.optional-dependencies]
+# The answer key lives in its own package so the engine never imports what grades
+# it. tests/test_independence.py enforces that separation.
+test = [
+    "pytest",
+    "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol",
+]
+figures = ["matplotlib>=3.7"]
+
+[tool.setuptools.packages.find]
+include = ["galerkin*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: convergence studies that take more than a few seconds"]

@@ -27,6 +27,8 @@ galerkin/
   assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
   gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
+tests/
+  # pytest suite grading M1-M3b against `refsol`, the answer-key package
 examples/
   coax_convergence.py        # M1 validation: coaxial cable + convergence study
   waveguide_convergence.py   # M2 validation 1: plane wave in a guide + convergence
@@ -38,6 +40,25 @@ examples/
   mesh_io.py                 # M3b: Gmsh reader gates — fixtures, round trip, physics
   visualize*.py              # Figure generation for each milestone
 ```
+
+## Tests
+
+The engine is graded against [galerkin-refsol](https://github.com/FieldAlgo/galerkin-refsol),
+a separate package holding the closed-form and published reference solutions. It
+lives in its own repository on purpose: a solver that ships its own idea of the
+right answer can agree with itself forever. `tests/test_independence.py` enforces
+that the engine never imports it, and that the engine's only dependencies stay
+numpy and scipy.
+
+```bash
+pip install -e '.[test]'
+pytest                      # everything, about fifteen minutes
+pytest -m "not slow"        # the fast gates, about two minutes
+```
+
+The examples keep their own analytical solutions so they run without the test
+extra; two tests check those independent implementations against refsol so the
+pair cannot drift apart.
 
 ## Run
 
@@ -91,6 +112,22 @@ the convergence rate is the lie detector.
   HE21 one degenerate group; run on the same mesh it returns a single doubly
   degenerate LP11 at 1.1848846, and misses HE11 by 1.5%. The vector solver
   resolves all three, spanning 6.3e-2 in n_eff.
+
+  Graded against `refsol.fiber.vector_modes` on its own weakly-guiding fibre
+  (a = 4 um, 1.45/1.44, 1.55 um, V = 2.756, where the three LP11 constituents lie
+  within 2e-5 of one another): HE11 4.3e-6, TE01 8.8e-6, TM01 5.5e-6, HE21 7.4e-6,
+  at orders **1.99 / 1.90 / 2.11 / 1.97**.
+
+- **M3a against a published benchmark** — Hadley's dielectric-corner problems
+  (`refsol.benchmarks.DIELECTRIC_CORNERS`, quoted to ±1e-8), a unit square with a
+  square core in one corner, PEC on two sides and PMC on the other two. At a
+  48×48 mesh the four cases land 4.0e-5, 6.3e-5, 9.5e-6 and 7.1e-6 from the
+  published values, converging at orders 2.09, 2.01 and 2.44.
+
+  The fourth case does not reach second order: it converges at about **order 1**.
+  Its high-index region wraps a re-entrant dielectric corner, and the field
+  singularity there is exactly what Hadley's paper exists to treat. That is
+  recorded and pinned by its own test rather than averaged into the others.
 
   That measurement has one dangerous confound: a mesh without rotational
   symmetry splits the *degenerate* HE11 and HE21 pairs too, and the artefact
