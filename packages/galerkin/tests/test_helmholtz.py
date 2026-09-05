@@ -1,13 +1,61 @@
-"""M2.5: a PML must beat the first-order absorbing boundary and keep rate 2."""
+"""M2 and M2.5: frequency-domain waves.
+
+A guided plane wave with an exact absorbing condition, scattering off a cylinder
+against the partial-wave series, and the PML that replaces the first-order
+absorbing boundary.
+"""
 
 import numpy as np
 import pytest
 
-from galerkin import (annulus_mesh, assemble_stiffness, assemble_mass,
-                      assemble_boundary_mass, solve_dirichlet, radial_pml_coeffs)
+from galerkin import (rectangle_mesh, annulus_mesh, assemble_stiffness,
+                      assemble_mass, assemble_boundary_mass, solve_dirichlet,
+                      l2_error, radial_pml_coeffs)
 from conftest import assert_second_order, rate
 
-A_CYL, K_WAVE = 1.0, np.pi
+L, H, K_WAVE = 1.0, 0.5, 4.0 * np.pi
+A_CYL, R_OUT, K_SCAT = 1.0, 4.0, np.pi
+
+
+def test_guided_plane_wave_converges_at_second_order():
+    """The absorbing condition is EXACT for u = exp(-ikx), so nothing but the
+    discretization error is left and the rate must be a clean 2."""
+    exact = lambda x, y: np.exp(-1j * K_WAVE * x)
+    errors = []
+    for nx in (16, 32, 64):
+        mesh = rectangle_mesh(L, H, nx, max(2, nx // 4))
+        A = (assemble_stiffness(mesh) - K_WAVE ** 2 * assemble_mass(mesh)
+             + 1j * K_WAVE * assemble_boundary_mass(
+                 mesh, mesh.boundary_edges["right"])).tocsr()
+        u = solve_dirichlet(A, np.zeros(mesh.num_nodes, dtype=complex),
+                            {tuple(mesh.boundary["left"]): 1.0 + 0j})
+        errors.append(l2_error(mesh, u, exact))
+    assert_second_order(errors, name="guided plane wave")
+
+
+def test_cylinder_scattering_matches_the_partial_wave_series(refsol):
+    mesh = annulus_mesh(A_CYL, R_OUT, 64, 342)
+    B = assemble_boundary_mass(mesh, mesh.boundary_edges["outer"])
+    gamma = 1j * K_SCAT - 1.0 / (2.0 * R_OUT)
+    A = (assemble_stiffness(mesh) - K_SCAT ** 2 * assemble_mass(mesh)
+         - gamma * B).tocsr()
+    inner = mesh.boundary["inner"]
+    x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
+    g = -refsol.scattering.incident(x[inner], y[inner], K_SCAT)
+    u_s = solve_dirichlet(A, np.zeros(mesh.num_nodes, dtype=complex),
+                          {tuple(inner): g})
+
+    r = np.hypot(x, y)
+    sel = r < 0.6 * R_OUT
+    ex = refsol.scattering.scattered(x[sel], y[sel], K_SCAT, A_CYL, kind="pec_tm")
+    rel = np.linalg.norm(u_s[sel] - ex) / np.linalg.norm(ex)
+    # The first-order absorbing boundary, not the mesh, sets this floor; M2.5
+    # replaces it with a PML and the error drops by two orders of magnitude.
+    assert rel < 0.05, f"{rel:.3%} off the series solution"
+
+
+# ------------------------------- M2.5: the cylindrical PML -------------------
+
 R0, D_PML = 3.0, 1.0
 R_END = R0 + D_PML
 
@@ -15,7 +63,7 @@ R_END = R0 + D_PML
 def _error(mesh, u_s, refsol, r_max=2.4):
     x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
     sel = np.hypot(x, y) < r_max
-    ex = refsol.scattering.scattered(x[sel], y[sel], K_WAVE, A_CYL, kind="pec_tm")
+    ex = refsol.scattering.scattered(x[sel], y[sel], K_SCAT, A_CYL, kind="pec_tm")
     return np.linalg.norm(u_s[sel] - ex) / np.linalg.norm(ex)
 
 
@@ -23,19 +71,19 @@ def _solve(n_r, n_theta, pml, refsol):
     r_out = R_END if pml else 4.0
     mesh = annulus_mesh(A_CYL, r_out, n_r, n_theta)
     if pml:
-        Lam, beta = radial_pml_coeffs(mesh, K_WAVE, R0, D_PML)
+        Lam, beta = radial_pml_coeffs(mesh, K_SCAT, R0, D_PML)
         A = (assemble_stiffness(mesh, Lam)
-             - K_WAVE ** 2 * assemble_mass(mesh, beta)).tocsr()
+             - K_SCAT ** 2 * assemble_mass(mesh, beta)).tocsr()
         outer = {tuple(mesh.boundary["outer"]): 0.0 + 0j}
     else:
-        gamma = 1j * K_WAVE - 1.0 / (2.0 * r_out)
-        A = (assemble_stiffness(mesh) - K_WAVE ** 2 * assemble_mass(mesh)
+        gamma = 1j * K_SCAT - 1.0 / (2.0 * r_out)
+        A = (assemble_stiffness(mesh) - K_SCAT ** 2 * assemble_mass(mesh)
              - gamma * assemble_boundary_mass(
                  mesh, mesh.boundary_edges["outer"])).tocsr()
         outer = {}
     inner = mesh.boundary["inner"]
     x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
-    g = -refsol.scattering.incident(x[inner], y[inner], K_WAVE)
+    g = -refsol.scattering.incident(x[inner], y[inner], K_SCAT)
     u = solve_dirichlet(A, np.zeros(mesh.num_nodes, dtype=complex),
                         {tuple(inner): g, **outer})
     return mesh, u

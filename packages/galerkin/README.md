@@ -29,7 +29,16 @@ galerkin/
   gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 tests/
-  # pytest suite grading M1-M3b against `refsol`, the answer-key package
+  test_electrostatics.py   # M1   coax potential and field
+  test_helmholtz.py        # M2   guided wave, cylinder scattering, and the PML
+  test_edge_elements.py    # M3-prep waveguide cutoffs, and the nodal counter-example
+  test_slab_modes.py       # M3a  the 1D limit, where the polarizations separate
+  test_fiber_modes.py      # M3a  step-index fibre vector modes
+  test_hadley.py           # M3a  dielectric corners and the rib waveguide family
+  test_cavity_modes.py     # M3b  3D cavity, structured and unstructured
+  test_mesh_io.py          # M3b  the Gmsh reader
+  test_interop.py          #      meshes built by meshine and gmshio
+  test_independence.py     #      the engine never imports its own answer key
 examples/
   coax_convergence.py        # M1 validation: coaxial cable + convergence study
   waveguide_convergence.py   # M2 validation 1: plane wave in a guide + convergence
@@ -118,6 +127,16 @@ the convergence rate is the lie detector.
   (a = 4 um, 1.45/1.44, 1.55 um, V = 2.756, where the three LP11 constituents lie
   within 2e-5 of one another): HE11 4.3e-6, TE01 8.8e-6, TM01 5.5e-6, HE21 7.4e-6,
   at orders **1.99 / 1.90 / 2.11 / 1.97**.
+
+- **M3a in the 1D limit** — a planar SOI slab (220 nm, λ = 1.55) against
+  `refsol.slab.modes`. Modelled as a narrow strip, where the side walls select
+  the polarization: electric walls leave only the TE family, magnetic walls only
+  TM. Both converge at order **2.00 / 1.98** to 2.851739 and 2.056288.
+
+  Worth recording which direction limits it: the TE field varies only across the
+  slab, yet its error is governed by the mesh *along* the strip — the Whitney
+  basis couples the two directions through each triangle's diagonal, so refining
+  the obvious direction alone stalls at 3.6e-4.
 
 - **M3a against a published benchmark** — Hadley's dielectric-corner problems
   (`refsol.benchmarks.DIELECTRIC_CORNERS`, quoted to ±1e-8), a unit square with a
@@ -208,10 +227,14 @@ the convergence rate is the lie detector.
   (pure numpy/scipy, planar) and [gmshio](https://github.com/FieldAlgo/gmshio)
   (runs the Gmsh executable as a separate process).
 
-  On a meshine mesh of Hadley's **rib waveguide** (`refsol.benchmarks.RIB_WAVEGUIDES`,
-  quoted to ±3e-6) the quasi-TE index comes out **4.8e-5** from the published
-  value. Re-entrant dielectric corners where the rib meets the slab, not the
-  reference, set that floor.
+  All eight of Hadley's **rib waveguides** (`refsol.benchmarks.RIB_WAVEGUIDES`,
+  quoted to ±3e-6, slab thickness 0 to 0.7 µm) come out within **1.2e-4** of the
+  published quasi-TE indices on a meshine mesh. Re-entrant dielectric corners
+  where the rib meets the slab, not the reference, set that floor.
+
+  A per-case tolerance can be met while the family is wrong, so the trend is
+  gated separately: the published indices rise monotonically across the eight by
+  2.08e-3 in total, and that spread is reproduced to 9.4e-5.
 
   On a gmshio mesh of the unit cube the cluster means land within **5.1e-3** and
   nothing spurious appears between the analytic resonances. The strict

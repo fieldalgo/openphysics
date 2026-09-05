@@ -6,6 +6,7 @@ External meshers hand back the same five things, whatever built them:
     triangles       (T, 3)      2D          | tetrahedra (T, 4)   3D
     regions         (T,)  index into        | region_names        the names
     boundary_edges  {name: (E, 2)}          | boundary_faces {name: (F, 3)}
+    boundary_nodes  {name: (n,)}            | the same, when the mesher supplies it
 
 so one duck-typed adapter takes any of them. Verified against
 `meshine` (pure numpy/scipy, planar) and `gmshio` (drives the Gmsh executable
@@ -75,16 +76,33 @@ def from_mesher(source) -> Mesh | Mesh3D:
         if names is not None and regions.max(initial=-1) >= len(names):
             raise ValueError("a region index points past the end of region_names")
 
+    # Prefer the mesher's own node sets when it supplies them; otherwise derive
+    # them from the tagged facets, which is the same set for a watertight mesh.
+    given_nodes = _get(source, "boundary_nodes")
+    given_nodes = given_nodes if isinstance(given_nodes, dict) else None
+
+    def _boundary(facets):
+        derived = {k: np.unique(np.asarray(v, dtype=int)) for k, v in facets.items()}
+        if given_nodes is None:
+            return derived
+        out = {}
+        for k, v in given_nodes.items():
+            v = np.unique(np.asarray(v, dtype=int))
+            if k in derived and not np.array_equal(v, derived[k]):
+                raise ValueError(
+                    f"boundary_nodes['{k}'] disagrees with the tagged facets — "
+                    "the source mesh is not watertight on that tag")
+            out[k] = v
+        return out or derived
+
     if tets is not None:
-        faces = _get(source, "boundary_faces") or {}
-        boundary = {k: np.unique(np.asarray(v, dtype=int))
-                    for k, v in faces.items()}
         if nodes.shape[1] != 3:
             raise ValueError("a tetrahedral mesh needs (N, 3) nodes")
-        return Mesh3D(nodes, tets, boundary, regions=regions, region_names=names)
+        faces = _get(source, "boundary_faces") or {}
+        return Mesh3D(nodes, tets, _boundary(faces),
+                      regions=regions, region_names=names)
 
     edges = _get(source, "boundary_edges") or {}
     boundary_edges = {k: np.asarray(v, dtype=int) for k, v in edges.items()}
-    boundary = {k: np.unique(v) for k, v in boundary_edges.items()}
-    return Mesh(nodes[:, :2], tris, boundary, boundary_edges,
+    return Mesh(nodes[:, :2], tris, _boundary(boundary_edges), boundary_edges,
                 regions=regions, region_names=names)
