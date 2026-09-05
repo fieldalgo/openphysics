@@ -3,3 +3,9 @@ __pycache__/
 *.npz
 *.png
 .DS_Store
+
+# packaging / tooling artefacts
+*.egg-info/
+build/
+dist/
+.pytest_cache/

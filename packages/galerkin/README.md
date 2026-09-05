@@ -64,10 +64,14 @@ that the engine never imports it, and that the engine's only dependencies stay
 numpy and scipy.
 
 ```bash
-pip install -e '.[test]'
-pytest                      # everything, about fifteen minutes
-pytest -m "not slow"        # the fast gates, about two minutes
+pip install -e .            # the engine alone: numpy and scipy
+pip install -e '.[test]'    # plus the answer key and the meshers
+pytest                      # everything
+pytest -m "not slow"        # the fast gates, about a minute
 ```
+
+An editable install puts `galerkin` on the path, so the tests and examples run
+without `PYTHONPATH=.`.
 
 The examples keep their own analytical solutions so they run without the test
 extra; two tests check those independent implementations against refsol so the
