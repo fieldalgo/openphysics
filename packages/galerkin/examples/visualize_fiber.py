@@ -129,3 +129,70 @@ ax.annotate("mesh-induced splitting of the\ndegenerate pairs: 1e-14 —\n"
 fig.savefig("fiber_modes.png", dpi=160, bbox_inches="tight")
 plt.close(fig)
 print("saved: fiber_modes.png")
+
+
+# ============================================================================
+# Second figure: the dielectric interface. E normal to a material boundary is
+# discontinuous — eps E_r is what stays continuous, so E_r jumps by n_co^2/n_cl^2.
+# A nodal (fully continuous) vector element cannot represent that at all; edge
+# elements represent it exactly, and this is the whole reason M3a uses them.
+# ============================================================================
+from scipy.special import jv, kv                                    # noqa: E402
+
+nef = exact["TM01"][0]
+u = K0 * A_CORE * np.sqrt(N_CO ** 2 - nef ** 2)
+w = K0 * A_CORE * np.sqrt(nef ** 2 - N_CL ** 2)
+# E_z = J_0(ur/a) inside, (J_0(u)/K_0(w)) K_0(wr/a) outside; E_r ~ -dE_z/dr / kappa^2,
+# and K_0' = -K_1 supplies the sign that keeps E_r from flipping across the boundary.
+f_in = lambda rr: jv(1, u * rr / A_CORE) / u
+f_out = lambda rr: -(jv(0, u) / kv(0, w)) * kv(1, w * rr / A_CORE) / w
+
+Et = eval_edge_field(space, et[3])                                  # TM01
+Er = np.abs(Et[:, 0] * np.cos(th_c) + Et[:, 1] * np.sin(th_c))
+srt = np.argsort(r_c)
+r_s, Er_s = r_c[srt], Er[srt]
+scale = np.interp(0.5, r_s, Er_s) / f_in(0.5)                       # one global scale
+
+fig2, (bx, cx) = plt.subplots(1, 2, figsize=(12.6, 4.6),
+                              gridspec_kw={"width_ratios": [1.25, 1]})
+
+sel = r_s < 3.0
+bx.plot(r_s[sel], Er_s[sel] / scale, ".", ms=2.6, color=BLUE, alpha=0.35,
+        label="M3a FEM, one value per element")
+rr = np.linspace(1e-3, 0.99999, 300)
+bx.plot(rr, f_in(rr), color=INK, lw=2, label="exact (core branch)")
+rr = np.linspace(1.00001, 3.0, 300)
+bx.plot(rr, f_out(rr), color=INK, lw=2, ls=(0, (5, 2)),
+        label="exact (cladding branch)")
+bx.axvline(A_CORE, color=ORANGE, lw=1.3, ls=":")
+bx.annotate(f"eps E_r is what stays continuous, so |E_r| jumps\n"
+            f"by n_co²/n_cl² = {N_CO**2/N_CL**2:.2f} at the core boundary\n"
+            f"(measured {f_out(1.0)/f_in(1.0):.4f})",
+            (1.0, f_out(1.0)), xytext=(1.42, f_out(1.0) * 0.80),
+            fontsize=9.5, color=ORANGE,
+            arrowprops=dict(arrowstyle="->", color=ORANGE, lw=1.2))
+bx.set_xlabel("radius r / a"); bx.set_ylabel("|E_r|  (TM01, normalised)")
+bx.set_title("The radial field is discontinuous at the dielectric interface",
+             fontsize=12.5)
+bx.legend(frameon=False, fontsize=9)
+
+zoom = (r_s > 0.82) & (r_s < 1.20)
+cx.plot(r_s[zoom], Er_s[zoom] / scale, "o", ms=3.4, mfc="none", mec=BLUE,
+        mew=1.0, alpha=0.5)
+rr = np.linspace(0.82, 0.99999, 200); cx.plot(rr, f_in(rr), color=INK, lw=2)
+rr = np.linspace(1.00001, 1.20, 200); cx.plot(rr, f_out(rr), color=INK, lw=2,
+                                              ls=(0, (5, 2)))
+cx.axvline(A_CORE, color=ORANGE, lw=1.3, ls=":")
+cx.set_xlabel("radius r / a")
+cx.set_title("Zoom on the jump — the FEM lands on both branches",
+             fontsize=12.5)
+cx.annotate("a fully continuous (nodal) vector element cannot\n"
+            "represent this step at all — which is exactly why the\n"
+            "transverse field has to live in H(curl)",
+            (0.03, 0.97), xycoords="axes fraction", ha="left", va="top",
+            fontsize=8.8, color=MUTED)
+
+fig2.tight_layout()
+fig2.savefig("fiber_interface.png", dpi=160, bbox_inches="tight")
+plt.close(fig2)
+print("saved: fiber_interface.png")

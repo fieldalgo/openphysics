@@ -50,7 +50,7 @@ import numpy as np
 from scipy.optimize import brentq, toms748
 from scipy.special import jv, jvp, ive, kve
 
-__all__ = ["FiberModes", "solve_fiber", "solve_lp"]
+__all__ = ["FiberModes", "solve_fiber", "solve_lp", "cutoff_V"]
 
 
 # ----------------------------------------------------------------------------
@@ -78,15 +78,20 @@ def _clad_logderiv(l, W, X=np.inf, kind="K"):
     The first is the E_z branch (PEC forces E_z(R) = 0), the second the H_z
     branch (PEC forces E_phi(R) = 0 which, given E_z(R) = 0, is h'(R) = 0).
     """
-    if not np.isfinite(X):
-        return _kve_d(l, W) / kve(l, W)
+    W = np.asarray(W, dtype=float)
+    X = np.asarray(X, dtype=float)
+    inf_res = _kve_d(l, W) / kve(l, W)
+    fin = np.isfinite(X)
+    if not np.any(fin):
+        return inf_res
     # tau = e^{2(W - X)} <= 1 folds the growing I_l branch in without overflow.
-    tau = np.exp(2.0 * (W - X))
-    cX = ive(l, X) if kind == "K" else _ive_d(l, X)
-    dX = kve(l, X) if kind == "K" else _kve_d(l, X)
+    Xs = np.where(fin, X, W + 1.0)      # dummy keeps the arithmetic finite
+    tau = np.exp(2.0 * (W - Xs))
+    cX = ive(l, Xs) if kind == "K" else _ive_d(l, Xs)
+    dX = kve(l, Xs) if kind == "K" else _kve_d(l, Xs)
     num = _kve_d(l, W) * cX - tau * _ive_d(l, W) * dX
     den = kve(l, W) * cX - tau * ive(l, W) * dX
-    return num / den
+    return np.where(fin, num / den, inf_res)
 
 
 # ----------------------------------------------------------------------------
@@ -142,17 +147,31 @@ def _char_lp(b, V, l):
 # Bracketing + polishing
 # ----------------------------------------------------------------------------
 
-def _roots_in_b(f, n_scan=200001, lo=1e-12, hi=1.0 - 1e-13, polish="brentq"):
-    """All sign-change roots of f on b in (lo, hi).
+def _scan_grid(n_lin=40001, n_log=4000, lo=1e-13, hi=1.0 - 1e-14):
+    """Composite bracketing grid on b in (0, 1).
 
-    A uniform scan is safe here: the multiplied characteristic functions are
-    smooth on (0,1) and each guided mode of a given (l, family) is separated by
-    O(1) in b for the V we care about. n_scan is set far above the mode count.
+    Uniform in the bulk, geometric towards both endpoints: modes crowd towards
+    b -> 0 just above cutoff and towards b -> 1 deep in the guided regime, and a
+    purely uniform grid can merge two sign changes into one interval there.
     """
-    bs = np.linspace(lo, hi, n_scan)
+    return np.unique(np.concatenate([
+        np.geomspace(lo, 1e-3, n_log),
+        np.linspace(1e-3, 1.0 - 1e-3, n_lin),
+        1.0 - np.geomspace(1e-14, 1e-3, n_log)[::-1],
+        [hi]]))
+
+
+def _roots_in_b(f, grid=None, polish="brentq"):
+    """All sign-change roots of f on b in (0, 1).
+
+    The multiplied characteristic functions are pole-free on (0, 1), so every
+    sign change is a genuine mode; the grid's only job is to separate
+    neighbouring modes into brackets.
+    """
+    bs = _scan_grid() if grid is None else grid
     with np.errstate(all="ignore"):
-        fs = np.asarray([f(x) for x in bs], dtype=float) if not _vectorizable(f) \
-            else np.asarray(f(bs), dtype=float)
+        fs = np.asarray(f(bs), dtype=float) if _vectorizable(f) \
+            else np.asarray([f(x) for x in bs], dtype=float)
     ok = np.isfinite(fs)
     idx = np.where(ok[:-1] & ok[1:] & (np.sign(fs[:-1]) * np.sign(fs[1:]) < 0))[0]
     out = []
@@ -196,11 +215,12 @@ class FiberModes:
         """[(label, l, b, n_eff)] sorted by decreasing n_eff."""
         V, nc, ncl = self.V, self.n_co, self.n_cl
         out = []
-        # l = 0: the two decoupled families
+        # l = 0: the two decoupled families. m counts from the MOST confined
+        # root downwards (m = 1 is the largest b), the standard convention.
         for fam, f in (("TE", _char_te), ("TM", _char_tm)):
-            for m, b in enumerate(
-                    _roots_in_b(lambda x, f=f: f(x, V, nc, ncl, R_over_a),
-                                polish=polish), start=1):
+            rts = _roots_in_b(lambda x, f=f: f(x, V, nc, ncl, R_over_a),
+                              polish=polish)
+            for m, b in enumerate(np.sort(rts)[::-1], start=1):
                 out.append((f"{fam}0{m}", 0, b, self.neff(b)))
         # l >= 1: hybrid HE/EH, classified below
         for l in range(1, l_max + 1):
@@ -236,6 +256,34 @@ class FiberModes:
         s = jvp(l, U, 1) / (U * jv(l, U)) + _clad_logderiv(l, W, X, "I") / W
         return "HE" if s < 0 else "EH"
 
+    # -- PEC-truncated domain ---------------------------------------------
+    def mode_truncated(self, family, l, b_inf, R_over_a, span=0.25):
+        """n_eff of the same mode when the cladding is cut off by a PEC wall at R.
+
+        Solves the *same* characteristic equation with the cladding radial
+        function replaced by the exact PEC-terminated combination, so this is
+        the number a FEM computation on a disc of radius R converges to — the
+        truncation error is isolated from the discretization error.
+        Bracketed around the infinite-cladding root, expanding until it brackets.
+        """
+        V, nc, ncl = self.V, self.n_co, self.n_cl
+        if family == "TE":
+            f = lambda x: _char_te(x, V, nc, ncl, R_over_a)
+        elif family == "TM":
+            f = lambda x: _char_tm(x, V, nc, ncl, R_over_a)
+        else:
+            f = lambda x: _char_vector(x, V, l, nc, ncl, R_over_a)
+        d = 1e-9
+        while d < span:
+            lo, hi = max(b_inf - d, 1e-12), min(b_inf + d, 1 - 1e-13)
+            with np.errstate(all="ignore"):
+                flo, fhi = f(lo), f(hi)
+            if np.isfinite(flo) and np.isfinite(fhi) and flo * fhi < 0:
+                b = brentq(f, lo, hi, xtol=1e-16, rtol=8.9e-16, maxiter=200)
+                return b, self.neff(b)
+            d *= 3.0
+        return np.nan, np.nan
+
     # -- scalar LP comparison ---------------------------------------------
     def lp_modes(self, l_max=6):
         out = []
@@ -268,3 +316,30 @@ if __name__ == "__main__":
     print()
     for lab, l, b, ne in F.lp_modes():
         print(f"{lab:8s} {l:2d} {b:18.12f} {ne:18.12f}")
+
+
+def cutoff_V(family, l, m, n_co, n_cl, Vmax=30.0):
+    """Exact vector cutoff V (where b -> 0) — the contrast-dependent formulae.
+
+    TE0m, TM0m : J_0(V) = 0
+    EH_lm      : J_l(V) = 0
+    HE_1m      : J_1(V) = 0  (m >= 2);  HE_11 has no cutoff (V = 0)
+    HE_lm, l>=2: [(n_co^2/n_cl^2) + 1] J_{l-1}(V) = (V/(l-1)) J_l(V)
+                 -> reduces to V J_0(V) = 0 when n_co -> n_cl, i.e. the familiar
+                    scalar LP cutoff, but moves to larger V at high contrast.
+    """
+    from scipy.special import jn_zeros
+    if family in ("TE", "TM"):
+        return jn_zeros(0, m)[m - 1]
+    if family == "EH":
+        return jn_zeros(l, m)[m - 1]
+    if family == "HE" and l == 1:
+        return 0.0 if m == 1 else jn_zeros(1, m - 1)[m - 2]
+    r = (n_co / n_cl) ** 2
+    g = lambda V: (r + 1.0) * jv(l - 1, V) - V * jv(l, V) / (l - 1)
+    zs = jn_zeros(l - 1, m + 3)
+    lo = 1e-6 if m == 1 else zs[m - 2]
+    xs = np.linspace(lo + 1e-9, min(zs[m - 1] - 1e-9, Vmax), 20000)
+    fs = g(xs)
+    i = np.where(np.sign(fs[:-1]) * np.sign(fs[1:]) < 0)[0]
+    return brentq(g, xs[i[0]], xs[i[0] + 1], xtol=1e-15) if len(i) else np.nan
