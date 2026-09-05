@@ -41,13 +41,54 @@ import scipy.sparse.linalg as spla
 from scipy.optimize import brentq
 from scipy.special import jv, jvp, kv, kvp
 
+import scipy.sparse as sp
+
 from galerkin import (disk_mesh, solve_modes, assemble_stiffness, assemble_mass,
-                      eval_edge_field)
+                      assemble_edge_grad, assemble_edge_mass, assemble_curlcurl,
+                      eval_edge_field, EdgeSpace, rectangle_mesh)
 
 A_CORE, N_CO, N_CL = 1.0, 1.5, 1.0
 V_NUM = 3.5
 K0 = V_NUM / (A_CORE * np.sqrt(N_CO ** 2 - N_CL ** 2))
 R_DOM = 6.0          # PEC truncation radius; the cladding field is ~1e-7 by here
+
+
+# --------------------------------------------------- Whitney identity gate ---
+def check_whitney_identities(nx=9, ny=5, tol=1e-11):
+    """Exact algebraic identities the assembly must satisfy, whatever the mesh.
+
+    The gradient of a nodal hat function lies *exactly* in the Whitney edge space:
+    its dof on the edge (lo -> hi) is the circulation phi(hi) - phi(lo), so the
+    node-to-edge incidence matrix C is a discrete gradient. Then, with any
+    per-element coefficient c,
+
+        G(c) = M_t(c) C          S(c) C = 0          K(c) = C^T M_t(c) C
+
+    hold to round-off. They tie the new edge-nodal coupling matrix to the edge
+    mass, the curl-curl and the nodal stiffness at once, and any orientation-sign
+    or coefficient-placement error breaks them immediately — which is worth more
+    than the eigenvalues, because a sign error there still yields a plausible
+    spectrum.
+    """
+    mesh = rectangle_mesh(1.0, 0.6, nx, ny)
+    space = EdgeSpace(mesh)
+    rng_c = 0.5 + np.arange(mesh.num_triangles) % 7      # a varied coefficient
+    lo, hi = space.edges[:, 0], space.edges[:, 1]
+    e = np.arange(space.num_edges)
+    C = sp.coo_matrix((np.r_[np.ones(len(e)), -np.ones(len(e))],
+                       (np.r_[e, e], np.r_[hi, lo])),
+                      shape=(space.num_edges, mesh.num_nodes)).tocsr()
+
+    G, Mt = assemble_edge_grad(space, rng_c), assemble_edge_mass(space, rng_c)
+    S, K = assemble_curlcurl(space, rng_c), assemble_stiffness(mesh, rng_c)
+    d = [("G - M_t C", abs(G - Mt @ C).max(), abs(G).max()),
+         ("S C", abs(S @ C).max(), abs(S).max()),
+         ("K - C^T M_t C", abs(K - (C.T @ Mt @ C)).max(), abs(K).max())]
+    print("Whitney identities (edge/nodal assembly consistency):")
+    for name, v, scale in d:
+        print(f"  ||{name}||_max = {v:.2e}   (relative to {scale:.2e}: {v/scale:.1e})")
+        assert v < tol * scale, f"identity {name} violated: {v/scale:.3e} relative"
+    return d
 
 
 # ---------------------------------------------------------------- analytic ---
@@ -133,6 +174,7 @@ def solve_scalar(n_r, n_theta, num_modes=6):
 
 # -------------------------------------------------------------------- main ---
 def main():
+    check_whitney_identities()
     exact = exact_modes()
     print(f"step-index fibre: n_co={N_CO} n_cl={N_CL} a={A_CORE} "
           f"k0={K0:.6f} V={V_NUM}  (PEC wall at r={R_DOM}a)")
