@@ -38,6 +38,7 @@ tests/
   test_cavity_modes.py     # M3b  3D cavity, structured and unstructured
   test_mesh_io.py          # M3b  the Gmsh reader
   test_interop.py          #      meshes built by meshine and gmshio
+  test_pipeline.py         #      the two end-to-end example pipelines
   test_independence.py     #      the engine never imports its own answer key
 examples/
   coax_convergence.py        # M1 validation: coaxial cable + convergence study
@@ -47,6 +48,8 @@ examples/
   waveguide_modes.py         # M3-prep: waveguide cutoff eigenmodes (Nedelec vs nodal)
   fiber_modes.py             # M3a: step-index fibre modes vs the exact vector dispersion relation
   cavity_modes.py            # M3b: rectangular PEC cavity spectrum, 3D
+  rib_waveguide_scalar.py    # end-to-end: meshine -> galerkin P1 -> refsol Hadley
+  rib_waveguide_vector.py    # the same chain with the M3a vector solver
   mesh_io.py                 # M3b: Gmsh reader gates — fixtures, round trip, physics
   visualize*.py              # Figure generation for each milestone
 ```
@@ -235,6 +238,27 @@ the convergence rate is the lie detector.
   A per-case tolerance can be met while the family is wrong, so the trend is
   gated separately: the published indices rise monotonically across the eight by
   2.08e-3 in total, and that spread is reproduced to 9.4e-5.
+
+- **The pipeline end to end.** `examples/rib_waveguide_scalar.py` and
+  `examples/rib_waveguide_vector.py` run the whole chain — meshine builds the
+  mesh, galerkin assembles and solves, refsol grades — differing only in the
+  solver. The scalar model settles about **+2.5e-4 above** Hadley's quasi-TE
+  value, missing the polarisation terms at the air interface; the vector solver
+  approaches from **below**, reaching −3.6e-5 at h = 0.035 with the observed
+  order climbing 0.90 → 1.77 → 2.34.
+
+  Hadley's stated ±3e-6 is **not reached**, and the reason was measured rather
+  than assumed. It is not the computational window (widening 18 → 34 µm moves
+  n_eff by 1e-6), not the geometry, and not the reference. Extrapolating the
+  second-order tail puts it at h ≈ 0.010 with the far field refined to match —
+  a mesh meshine can build but not quickly, since it re-triangulates every point
+  each refinement round. The mesher's speed is the limit.
+
+  One trap worth recording: refining only near the rib while holding the
+  far-field element size fixed makes the observed order *decay* (1.77, 1.06,
+  0.70) and stall near −4e-5, because the mode extends past the graded region.
+  A stalling order under refinement is the signature of a floor, not of a
+  singularity — a singularity holds a constant fractional order.
 
   On a gmshio mesh of the unit cube the cluster means land within **5.1e-3** and
   nothing spurious appears between the analytic resonances. The strict
