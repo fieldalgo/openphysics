@@ -26,6 +26,7 @@ galerkin/
   mesh3d.py       # M3b: Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
+  gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
 examples/
   coax_convergence.py        # M1 validation: coaxial cable + convergence study
   waveguide_convergence.py   # M2 validation 1: plane wave in a guide + convergence
@@ -34,6 +35,7 @@ examples/
   waveguide_modes.py         # M3-prep: waveguide cutoff eigenmodes (Nedelec vs nodal)
   fiber_modes.py             # M3a: step-index fibre modes vs the exact vector dispersion relation
   cavity_modes.py            # M3b: rectangular PEC cavity spectrum, 3D
+  mesh_io.py                 # M3b: Gmsh reader gates — fixtures, round trip, physics
   visualize*.py              # Figure generation for each milestone
 ```
 
@@ -47,6 +49,7 @@ PYTHONPATH=. python3 examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
 PYTHONPATH=. python3 examples/waveguide_modes.py         # M3-prep eigenmodes
 PYTHONPATH=. python3 examples/fiber_modes.py            # M3a step-index fibre
 PYTHONPATH=. python3 examples/cavity_modes.py           # M3b 3D cavity
+PYTHONPATH=.:examples python3 examples/mesh_io.py       # M3b Gmsh reader
 PYTHONPATH=.:examples python3 examples/visualize.py      # figures
 PYTHONPATH=.:examples python3 examples/visualize_fiber.py  # M3a figure
 PYTHONPATH=.:examples python3 examples/visualize_cavity.py # M3b figure
@@ -147,16 +150,26 @@ the convergence rate is the lie detector.
   of those two situations a mesh is in decides whether a measured splitting may
   be read as physics at all.
 
+- **M3b Gmsh input**. Gmsh is GPL, so it is never linked: it is run as a separate
+  executable and `gmsh.py` reads the file it writes. ASCII formats 2.2 and 4.1,
+  tetrahedra and triangles, physical groups as boundary tags, non-contiguous node
+  tags remapped; binary files and higher-order elements are refused rather than
+  mis-read. Gated three ways — fixtures transcribed by hand from the format
+  documentation, a round trip that preserves every boundary tag, and the cavity
+  spectrum recomputed on the read-back mesh, which drifts by **1.4e-14**.
+
+  Not yet run against a file produced by Gmsh itself: the executable is not
+  installable in the development container. That is the first thing to close.
+
 ## Next
 
-- **M3b, remaining**: unstructured mesh input via Gmsh, run as a separate
-  executable so no GPL code is linked. Gmsh is not installable in the current
-  development container, so a reader will have to be gated on the documented
-  ASCII formats plus an end-to-end physics check rather than on real Gmsh output.
 - **MFEM** as the production core, under consideration for the point where
   problem sizes outgrow a pure-Python direct solve. The 3D sparse factorization
   here is comfortable to about 25k edge dofs on four cores; beyond that it wants
   iterative solvers with an auxiliary-space preconditioner.
+- **Dielectric-loaded and open 3D problems**: the tensor-coefficient path exists
+  in 3D (`assemble_stiffness_3d` takes (T,3,3) tensors), so the M2.5 PML carries
+  over; what is missing is a 3D validation case with an analytical answer.
 - **Beyond electromagnetics**: the assembly core is physics-neutral. Anisotropic
   steady heat conduction with convective (Robin) boundaries already runs on the
   M1 routines unchanged; elasticity needs a vector nodal space, transient
