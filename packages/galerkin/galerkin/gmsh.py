@@ -22,13 +22,20 @@ second-order mesh would be worse than refusing it.
 Element type codes used here: 1 = 2-node line, 2 = 3-node triangle,
 4 = 4-node tetrahedron, 15 = 1-node point.
 
-Honest limitation
------------------
-The Gmsh executable is not available in the development container, so this reader
-is gated on hand-written fixtures transcribed from the format documentation and
-on a round trip that ends in a physics check (a cavity spectrum computed on a
-mesh that has been written out and read back). It has not yet been run against a
-file produced by Gmsh itself.
+When to use this rather than `gmshio`
+------------------------------------
+This module is the dependency-free path: it parses a file someone already has.
+The companion package `gmshio` goes further — it writes the .geo, runs Gmsh, and
+returns arrays — and `galerkin.from_mesher` adapts its output. Use `gmshio` to
+generate; use this to read a file that arrived some other way, or to stay free of
+any dependency at all.
+
+Gating
+------
+Hand-written fixtures transcribed from the format documentation, a round trip
+through the writer below that ends in a physics check, and — since a Gmsh
+executable became available — files that Gmsh itself wrote in both formats,
+cross-checked against gmshio's independent parser for identical connectivity.
 """
 
 from __future__ import annotations

@@ -138,7 +138,8 @@ def exact_modes():
 # --------------------------------------------------------------------- FEM ---
 def fibre_mesh(n_r, n_theta, r_dom=R_DOM):
     mesh = disk_mesh((A_CORE, 2.5, r_dom), n_r, n_theta)
-    return mesh, mesh.by_layer([N_CO ** 2, N_CL ** 2, N_CL ** 2])
+    return mesh, mesh.by_region({"layer0": N_CO ** 2, "layer1": N_CL ** 2,
+                                 "layer2": N_CL ** 2})
 
 
 def solve_vector(n_r, n_theta, num_modes=10, r_dom=R_DOM):

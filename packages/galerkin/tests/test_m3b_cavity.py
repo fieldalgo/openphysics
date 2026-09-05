@@ -144,3 +144,77 @@ def test_the_example_agrees_with_the_answer_key(refsol):
             f"k^2={k_ref:.6f}: example says multiplicity {mult_mine}, refsol "
             f"says {mult_ref}")
         assert sorted(labels_mine) == sorted(labels_ref)
+
+
+# --------------------------------------------------------------------------
+# The same cavity on a mesh galerkin did not build: gmshio writes a .geo, runs
+# the Gmsh executable as a separate process, and hands back arrays.
+# --------------------------------------------------------------------------
+gmshio = pytest.importorskip("gmshio")
+
+
+def _has_gmsh():
+    try:
+        gmshio.find_gmsh()
+        return True
+    except Exception:
+        return False
+
+
+needs_gmsh = pytest.mark.skipif(not _has_gmsh(),
+                                reason="the gmsh executable is not installed")
+
+
+def _unstructured_cavity(lc, nev=16, sigma=None):
+    from gmshio import geo, generate, to_fem3d
+    from galerkin import from_mesher
+
+    mesh = from_mesher(to_fem3d(generate(geo.box_cavity(1.0, 1.0, 1.0, lc=lc),
+                                         dim=3)))
+    space = EdgeSpace3D(mesh)
+    S = assemble_curlcurl_3d(space)
+    M = assemble_edge_mass_3d(space)
+    free = np.setdiff1d(np.arange(space.num_edges), space.boundary_edge_ids())
+    vals = np.sort(spla.eigsh(S[free][:, free].tocsc(), k=nev,
+                              M=M[free][:, free].tocsc(), sigma=sigma,
+                              which="LM", v0=np.ones(len(free)),
+                              ncv=min(len(free), max(6 * nev, 100)),
+                              maxiter=50000, return_eigenvectors=False))
+    scale = np.abs(vals).max()
+    return mesh, np.sort(vals[np.abs(vals) > 1e-6 * scale])
+
+
+@needs_gmsh
+def test_unstructured_cavity_matches_the_analytic_spectrum(refsol):
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+                                                             n_max=3))
+    mesh, vals = _unstructured_cavity(0.11, sigma=1.3 * exact[0][0])
+    assert abs(mesh.volumes().sum() - 1.0) < 1e-9
+
+    at, errors = 0, []
+    for k2, mult, _ in exact:
+        errors.append(abs(vals[at:at + mult].mean() - k2) / k2)
+        at += mult
+    assert max(errors) < 2e-2, f"cluster-mean errors {errors}"
+
+    flat = [k for k, mult, _ in exact for _ in range(mult)]
+    for value in vals[:len(flat)]:
+        assert min(abs(value - k) / k for k in flat) < 0.06, (
+            f"{value:.4f} falls between the analytic resonances — spurious")
+
+
+@needs_gmsh
+@pytest.mark.slow
+def test_unstructured_cavity_improves_under_refinement(refsol):
+    """Gmsh's `lc` is a target size, not a uniform halving, so two meshes in this
+    sequence are not nested and a fitted order would be measuring the mesher as
+    much as the solver. The strict second-order ladder is the structured test
+    above; what is asserted here is that refinement monotonically helps."""
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+                                                             n_max=3))
+    first = []
+    for lc in (0.25, 0.16, 0.11):
+        _, vals = _unstructured_cavity(lc, sigma=1.3 * exact[0][0])
+        first.append(abs(vals[:exact[0][1]].mean() - exact[0][0]) / exact[0][0])
+    assert first[0] > first[1] > first[2], f"not converging: {first}"
+    assert first[-1] < 1e-2, f"finest unstructured mesh still {first[-1]:.2e} off"

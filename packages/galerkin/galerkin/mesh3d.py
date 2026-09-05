@@ -27,13 +27,18 @@ import numpy as np
 
 class Mesh3D:
     def __init__(self, nodes: np.ndarray, tets: np.ndarray,
-                 boundary: dict[str, np.ndarray] | None = None):
+                 boundary: dict[str, np.ndarray] | None = None,
+                 regions: np.ndarray | None = None,
+                 region_names: list[str] | None = None):
         self.nodes = np.asarray(nodes, dtype=float)
         self.tets = np.asarray(tets, dtype=int)
         self.boundary = {k: np.asarray(v, dtype=int)
                          for k, v in (boundary or {}).items()}
+        self.regions = (None if regions is None
+                        else np.asarray(regions, dtype=int))
+        self.region_names = list(region_names) if region_names is not None else None
         self._faces = None
-        self._fix_orientation()
+        self._fix_orientation()   # reorders vertices only, so regions stays aligned
 
     @property
     def num_nodes(self) -> int:
@@ -56,6 +61,22 @@ class Mesh3D:
 
     def volumes(self) -> np.ndarray:
         return np.abs(np.linalg.det(self._edge_matrix())) / 6.0
+
+    def by_region(self, values) -> np.ndarray:
+        """Per-tetrahedron coefficient array from one value per material region.
+
+        values: a {region name: value} mapping, or a sequence indexed by region id.
+        """
+        if self.regions is None:
+            raise ValueError("this mesh carries no region information")
+        if isinstance(values, dict):
+            if self.region_names is None:
+                raise ValueError("this mesh has no region names to look up")
+            missing = set(self.region_names) - set(values)
+            if missing:
+                raise KeyError(f"no value given for region(s) {sorted(missing)}")
+            values = [values[name] for name in self.region_names]
+        return np.asarray(values)[self.regions]
 
     def dihedral_angles(self) -> np.ndarray:
         """(T, 6) interior dihedral angles in degrees, one per edge.
@@ -132,4 +153,6 @@ def box_mesh(lx: float, ly: float, lz: float,
         "y0": nid(II, 0, KK2),  "y1": nid(II, ny, KK2),
         "z0": nid(II2, JJ2, 0), "z1": nid(II2, JJ2, nz),
     }
-    return Mesh3D(nodes, np.concatenate(tets), boundary)
+    return Mesh3D(nodes, np.concatenate(tets), boundary,
+                  regions=np.zeros(6 * nx * ny * nz, dtype=int),
+                  region_names=["domain"])

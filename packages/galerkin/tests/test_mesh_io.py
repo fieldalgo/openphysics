@@ -140,3 +140,81 @@ def test_round_trip_preserves_the_physics():
 
     drift = np.abs(spectrum(back)[:4] - spectrum(direct)[:4]).max()
     assert drift < 1e-9, f"connectivity or orientation damaged: drift {drift:.2e}"
+
+
+# --------------------------------------------------------------------------
+# Until the Gmsh executable was available, this reader was gated only on
+# hand-written fixtures and a round trip through galerkin's own writer. Those
+# check the format as documented; they cannot check the format as Gmsh actually
+# writes it. These do.
+# --------------------------------------------------------------------------
+gmshio = pytest.importorskip("gmshio")
+
+
+def _gmsh_or_skip():
+    try:
+        return gmshio.find_gmsh()
+    except Exception:
+        pytest.skip("the gmsh executable is not installed")
+
+
+@pytest.mark.parametrize("fmt,version", [("msh2", "2.2"), ("msh4", "4.1")])
+def test_reads_a_file_gmsh_actually_wrote(fmt, version):
+    import subprocess
+    from gmshio import geo
+
+    exe = _gmsh_or_skip()
+    with tempfile.TemporaryDirectory() as d:
+        geo_path = os.path.join(d, "cavity.geo")
+        msh_path = os.path.join(d, "cavity.msh")
+        with open(geo_path, "w") as fh:
+            fh.write(geo.box_cavity(1.0, 0.8, 0.6, lc=0.3))
+        proc = subprocess.run([exe, "-3", geo_path, "-o", msh_path,
+                               "-format", fmt, "-v", "1"],
+                              capture_output=True, text=True, timeout=300)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+
+        with open(msh_path) as fh:
+            header = fh.readline(), fh.readline()
+        assert header[1].split()[0].startswith(version), (
+            f"asked gmsh for {version}, it wrote {header[1].strip()}")
+
+        mesh = read_msh(msh_path)
+
+    assert mesh.num_tets > 0 and mesh.num_nodes > 0
+    assert abs(mesh.volumes().sum() - 1.0 * 0.8 * 0.6) < 1e-9, (
+        "volume wrong — nodes or connectivity mis-parsed")
+    assert (mesh.volumes() > 0).all()
+    assert "pec" in mesh.boundary, (
+        f"physical group lost; got {sorted(mesh.boundary)}")
+    # the tagged surface must be the whole boundary of the box
+    assert set(np.unique(mesh.boundary_faces()).tolist()) == \
+        set(mesh.boundary["pec"].tolist())
+
+
+def test_our_reader_agrees_with_gmshio_on_the_same_file():
+    """Two independent parsers of the same bytes: galerkin's dependency-free
+    reader and gmshio's. They must produce the same mesh."""
+    import subprocess
+    from gmshio import geo, read_msh as gmshio_read, to_fem3d
+    from galerkin import from_mesher
+
+    exe = _gmsh_or_skip()
+    with tempfile.TemporaryDirectory() as d:
+        geo_path = os.path.join(d, "cavity.geo")
+        msh_path = os.path.join(d, "cavity.msh")
+        with open(geo_path, "w") as fh:
+            fh.write(geo.box_cavity(1.0, 0.8, 0.6, lc=0.35))
+        subprocess.run([exe, "-3", geo_path, "-o", msh_path, "-v", "1"],
+                       capture_output=True, text=True, timeout=300, check=True)
+        ours = read_msh(msh_path)
+        theirs = from_mesher(to_fem3d(gmshio_read(msh_path)))
+
+    assert ours.num_nodes == theirs.num_nodes
+    assert ours.num_tets == theirs.num_tets
+    assert np.allclose(np.sort(ours.nodes, axis=0), np.sort(theirs.nodes, axis=0))
+    assert abs(ours.volumes().sum() - theirs.volumes().sum()) < 1e-12
+    assert np.array_equal(
+        np.unique(np.sort(ours.tets, axis=1), axis=0),
+        np.unique(np.sort(theirs.tets, axis=1), axis=0)), \
+        "the two readers disagree on connectivity"

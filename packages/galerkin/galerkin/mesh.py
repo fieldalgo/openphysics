@@ -5,8 +5,10 @@ The minimum a FEM mesh needs:
   - triangles: (T, 3)  node indices of each triangle (counter-clockwise)
   - boundary:  {tag: node-index array}  node sets for boundary conditions
   - boundary_edges: {tag: (E, 2) node pairs}  for Robin/Neumann edge integrals
-  - element_layer:   (T,) material-layer index per triangle, when the generator
-                     built the mesh from distinct material regions
+  - regions:         (T,) material-region index per triangle, and
+  - region_names:    the name of each region, so a material table can be written
+                     by name rather than by position. External meshers hand back
+                     exactly this pair; galerkin.from_mesher adapts them.
 
 Structured meshes for rectangles, annuli and layered disks are generated
 in-house so the validation problems run without an external mesher (Gmsh etc.).
@@ -21,15 +23,17 @@ class Mesh:
     def __init__(self, nodes: np.ndarray, triangles: np.ndarray,
                  boundary: dict[str, np.ndarray],
                  boundary_edges: dict[str, np.ndarray] | None = None,
-                 element_layer: np.ndarray | None = None):
+                 regions: np.ndarray | None = None,
+                 region_names: list[str] | None = None):
         self.nodes = np.asarray(nodes, dtype=float)
         self.triangles = np.asarray(triangles, dtype=int)
         self.boundary = {k: np.asarray(v, dtype=int) for k, v in boundary.items()}
         self.boundary_edges = {k: np.asarray(v, dtype=int)
                                for k, v in (boundary_edges or {}).items()}
-        self.element_layer = (None if element_layer is None
-                              else np.asarray(element_layer, dtype=int))
-        self._fix_orientation()   # reorders vertices only, so element_layer stays aligned
+        self.regions = (None if regions is None
+                        else np.asarray(regions, dtype=int))
+        self.region_names = list(region_names) if region_names is not None else None
+        self._fix_orientation()   # reorders vertices only, so regions stays aligned
 
     @property
     def num_nodes(self) -> int:
@@ -48,11 +52,21 @@ class Mesh:
         flipped = cross < 0
         self.triangles[flipped] = self.triangles[flipped][:, [0, 2, 1]]
 
-    def by_layer(self, values) -> np.ndarray:
-        """Per-triangle coefficient array from one value per material layer."""
-        if self.element_layer is None:
-            raise ValueError("this mesh carries no element_layer information")
-        return np.asarray(values)[self.element_layer]
+    def by_region(self, values) -> np.ndarray:
+        """Per-triangle coefficient array from one value per material region.
+
+        values: a {region name: value} mapping, or a sequence indexed by region id.
+        """
+        if self.regions is None:
+            raise ValueError("this mesh carries no region information")
+        if isinstance(values, dict):
+            if self.region_names is None:
+                raise ValueError("this mesh has no region names to look up")
+            missing = set(self.region_names) - set(values)
+            if missing:
+                raise KeyError(f"no value given for region(s) {sorted(missing)}")
+            values = [values[name] for name in self.region_names]
+        return np.asarray(values)[self.regions]
 
     def areas(self) -> np.ndarray:
         p = self.nodes[self.triangles]
@@ -131,7 +145,7 @@ def annulus_mesh(r_inner: float, r_outer: float, n_r: int, n_theta: int) -> Mesh
     return Mesh(nodes, np.array(tris), boundary, boundary_edges)
 
 
-def disk_mesh(r_layers, n_r, n_theta: int) -> Mesh:
+def disk_mesh(r_layers, n_r, n_theta: int, region_names=None) -> Mesh:
     """Structured triangulation of a disk built from concentric material layers.
 
     r_layers: increasing outer radii of the layers, e.g. (a, R) for a fibre core
@@ -151,7 +165,8 @@ def disk_mesh(r_layers, n_r, n_theta: int) -> Mesh:
     their largest angle stays near 90 degrees, and interpolation accuracy is
     governed by the maximum angle, not the minimum one.
 
-    Boundary tag: 'outer'.
+    Boundary tag: 'outer'. Regions are the layers, named 'layer0', 'layer1', ...
+    unless region_names is given.
     """
     r_layers = np.atleast_1d(np.asarray(r_layers, dtype=float))
     n_r = np.broadcast_to(np.atleast_1d(np.asarray(n_r, dtype=int)),
@@ -191,10 +206,12 @@ def disk_mesh(r_layers, n_r, n_theta: int) -> Mesh:
                       np.stack([n00, n11, n10], axis=-1)], axis=2)  # (K, n_theta, 2, 3)
 
     triangles = np.concatenate([fan, bands.reshape(-1, 3)])
-    element_layer = np.concatenate([np.full(n_theta, band_layer[0]),
-                                    np.repeat(band_layer[1:], 2 * n_theta)])
+    regions = np.concatenate([np.full(n_theta, band_layer[0]),
+                              np.repeat(band_layer[1:], 2 * n_theta)])
 
     outer = nid(n_rings, it)
     boundary = {"outer": outer}
     boundary_edges = {"outer": np.stack([outer, nid(n_rings, itp)], axis=1)}
-    return Mesh(nodes, triangles, boundary, boundary_edges, element_layer)
+    names = (list(region_names) if region_names is not None
+             else [f"layer{i}" for i in range(len(r_layers))])
+    return Mesh(nodes, triangles, boundary, boundary_edges, regions, names)

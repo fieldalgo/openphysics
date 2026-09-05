@@ -27,6 +27,7 @@ galerkin/
   assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
   gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
+  interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 tests/
   # pytest suite grading M1-M3b against `refsol`, the answer-key package
 examples/
@@ -195,8 +196,28 @@ the convergence rate is the lie detector.
   documentation, a round trip that preserves every boundary tag, and the cavity
   spectrum recomputed on the read-back mesh, which drifts by **1.4e-14**.
 
-  Not yet run against a file produced by Gmsh itself: the executable is not
-  installable in the development container. That is the first thing to close.
+  Now gated on files Gmsh itself wrote, in both formats, cross-checked against
+  `gmshio`'s independent parser for identical connectivity — the limitation this
+  entry used to record is closed.
+
+- **Meshes built elsewhere.** `galerkin.from_mesher` adapts any object exposing
+  `nodes`, `triangles` or `tetrahedra`, `regions`, `region_names` and boundary
+  edges or faces, and `Mesh.by_region({"core": ..., "clad": ...})` turns region
+  names into a per-element material array. Verified against two meshers, neither
+  a dependency of the engine: [meshine](https://github.com/FieldAlgo/meshine)
+  (pure numpy/scipy, planar) and [gmshio](https://github.com/FieldAlgo/gmshio)
+  (runs the Gmsh executable as a separate process).
+
+  On a meshine mesh of Hadley's **rib waveguide** (`refsol.benchmarks.RIB_WAVEGUIDES`,
+  quoted to ±3e-6) the quasi-TE index comes out **4.8e-5** from the published
+  value. Re-entrant dielectric corners where the rib meets the slab, not the
+  reference, set that floor.
+
+  On a gmshio mesh of the unit cube the cluster means land within **5.1e-3** and
+  nothing spurious appears between the analytic resonances. The strict
+  second-order ladder stays on the structured meshes galerkin builds itself:
+  Gmsh's `lc` is a target size, so two meshes in a refinement sequence are not
+  nested and a fitted order would measure the mesher as much as the solver.
 
 ## Next
 

@@ -23,6 +23,7 @@ from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d,
                      assemble_edge_mass_3d, assemble_edge_grad_3d,
                      eval_edge_field_3d)
 from .gmsh import read_msh, write_msh
+from .interop import from_mesher
 from .waveguide import assemble_mode_system, solve_modes
 from .postprocess import element_gradient, l2_error
 

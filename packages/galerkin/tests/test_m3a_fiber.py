@@ -21,7 +21,7 @@ ORDER = ("HE11", "TE01", "TM01", "HE21")
 def solve(scale):
     mesh = disk_mesh((A, 2 * A, R_DOM), (4 * scale, 4 * scale, 16 * scale),
                      32 * scale)
-    eps = mesh.by_layer([N1 ** 2, N2 ** 2, N2 ** 2])
+    eps = mesh.by_region([N1 ** 2, N2 ** 2, N2 ** 2])
     n_eff, space, et, ez = solve_modes(mesh, eps, K0, n_target=N1, num_modes=10)
     guided = np.sort(n_eff[(n_eff > N2) & (n_eff < N1)])[::-1]
     assert len(guided) >= 6, f"expected 6 guided mode fields, found {len(guided)}"
@@ -75,7 +75,7 @@ def test_scalar_solver_cannot_split_lp11(refsol):
     from galerkin import assemble_stiffness, assemble_mass
 
     mesh = disk_mesh((A, 2 * A, R_DOM), (8, 8, 32), 64)
-    eps = mesh.by_layer([N1 ** 2, N2 ** 2, N2 ** 2])
+    eps = mesh.by_region([N1 ** 2, N2 ** 2, N2 ** 2])
     K = assemble_stiffness(mesh, 1.0)
     free = np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary["outer"])
     A_op = (K - K0 ** 2 * assemble_mass(mesh, eps))[free][:, free].tocsc()
