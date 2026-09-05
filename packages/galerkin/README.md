@@ -88,6 +88,25 @@ the convergence rate is the lie detector.
   symmetry, and the measured artificial splitting is **1.2e-14** — twelve orders
   of magnitude below the physical splitting it could have been confused with.
 
+  The second confound is the PEC wall itself: an open fibre has none, and the
+  bias it introduces does *not* shrink under mesh refinement, so a convergence
+  rate measured against exact infinite-cladding values is only honest if that
+  bias is far below the discretization error. Measured by holding the mesh size
+  fixed and moving the wall from 6a to 8a: **8.6e-9**, four thousand times below
+  the 3.5e-5 discretization error at the finest mesh.
+
+  Two further checks are permanent gates in `examples/fiber_modes.py`:
+
+  - the assembly satisfies the exact Whitney identities G(c) = M_t(c) C,
+    S(c) C = 0 and K(c) = C^T M_t(c) C, where C is the node-to-edge incidence
+    (discrete gradient) matrix — relative residuals 1.3e-15, 3.9e-15, 4.2e-16.
+    An orientation-sign error still yields a plausible spectrum; it cannot
+    survive these.
+  - the radial field of TM01 steps by exactly n_co²/n_cl² = **2.2500** across the
+    core boundary and the FEM element values land on both exact Bessel branches
+    (`fiber_interface.png`). That discontinuity is the physical reason the
+    transverse field has to live in H(curl).
+
 ## Next
 
 - **M3b**: 3D Maxwell (tetrahedral Nédélec, cavity eigenmodes; MFEM under

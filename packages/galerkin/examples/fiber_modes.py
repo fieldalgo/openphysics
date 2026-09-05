@@ -136,17 +136,41 @@ def exact_modes():
 
 
 # --------------------------------------------------------------------- FEM ---
-def fibre_mesh(n_r, n_theta):
-    mesh = disk_mesh((A_CORE, 2.5, R_DOM), n_r, n_theta)
+def fibre_mesh(n_r, n_theta, r_dom=R_DOM):
+    mesh = disk_mesh((A_CORE, 2.5, r_dom), n_r, n_theta)
     return mesh, mesh.by_layer([N_CO ** 2, N_CL ** 2, N_CL ** 2])
 
 
-def solve_vector(n_r, n_theta, num_modes=10):
-    mesh, eps = fibre_mesh(n_r, n_theta)
+def solve_vector(n_r, n_theta, num_modes=10, r_dom=R_DOM):
+    mesh, eps = fibre_mesh(n_r, n_theta, r_dom)
     n_eff, space, et, ez = solve_modes(mesh, eps, K0, n_target=N_CO,
                                        num_modes=num_modes)
     keep = (n_eff > N_CL) & (n_eff < N_CO)          # guided window
     return mesh, space, n_eff[keep], et[keep], ez[keep]
+
+
+def guided(n_eff):
+    return np.sort(n_eff[(n_eff > N_CL) & (n_eff < N_CO)])[::-1]
+
+
+def check_truncation(n_theta=128, tol=1e-7):
+    """How much does the PEC wall itself move the answer?
+
+    An open fibre has no wall; putting one at a finite radius perturbs every
+    effective index, and that bias does NOT shrink under mesh refinement — so a
+    convergence rate measured against the exact infinite-cladding values is only
+    honest if the truncation bias sits well below the discretization error.
+    Measured directly: keep the mesh size fixed and push the wall further out.
+    """
+    out = []
+    for r in (R_DOM, R_DOM + 2.0):
+        nr = (16, 24, int(round(16 * (r - 2.5))))       # same h in the cladding
+        ne = solve_vector(nr, n_theta, r_dom=r)[2]
+        out.append(guided(ne)[[0, 2, 3, 4]])
+    shift = np.abs(out[1] - out[0]).max()
+    print(f"PEC wall moved {R_DOM}a -> {R_DOM + 2.0}a: max n_eff shift {shift:.2e}")
+    assert shift < tol, f"computational domain too small: truncation bias {shift:.2e}"
+    return shift
 
 
 def solve_scalar(n_r, n_theta, num_modes=6):
@@ -175,6 +199,7 @@ def solve_scalar(n_r, n_theta, num_modes=6):
 # -------------------------------------------------------------------- main ---
 def main():
     check_whitney_identities()
+    check_truncation()
     exact = exact_modes()
     print(f"step-index fibre: n_co={N_CO} n_cl={N_CL} a={A_CORE} "
           f"k0={K0:.6f} V={V_NUM}  (PEC wall at r={R_DOM}a)")
