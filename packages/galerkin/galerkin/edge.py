@@ -53,11 +53,25 @@ class EdgeSpace:
     def num_edges(self) -> int:
         return len(self.edges)
 
-    def boundary_edge_ids(self, node_set: np.ndarray) -> np.ndarray:
-        """Global ids of edges whose both endpoints lie in node_set (PEC walls)."""
-        s = set(np.asarray(node_set).tolist())
-        mask = np.array([(a in s) and (b in s) for a, b in self.edges])
-        return np.where(mask)[0]
+    def boundary_edge_ids(self, node_set: np.ndarray | None = None) -> np.ndarray:
+        """Global ids of edges lying ON the boundary (n x E = 0 constrains these).
+
+        Boundary membership is topology, not node membership: an edge belongs to
+        the boundary when exactly one triangle owns it. "Both endpoints are
+        boundary nodes" is a different and wrong test — the diagonal of a corner
+        cell joins two boundary nodes while running through the interior, and
+        constraining it over-determines the problem. On a plain nx x ny rectangle
+        exactly two such diagonals exist, one at each of two opposite corners.
+
+        node_set: restrict to edges with both endpoints in this set, so a PEC
+                  condition can be applied to some walls only.
+        """
+        count = np.bincount(self.tri_edges.ravel(), minlength=self.num_edges)
+        ids = np.where(count == 1)[0]
+        if node_set is not None:
+            keep = np.isin(self.edges[ids], np.asarray(node_set, dtype=int)).all(axis=1)
+            ids = ids[keep]
+        return ids
 
 
 def _tri_grads(mesh: Mesh):

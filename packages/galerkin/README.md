@@ -70,7 +70,7 @@ the convergence rate is the lie detector.
   second-order convergence (rate 1.98) down to **0.029%**. Tensor-coefficient
   assembly verified against the isotropic path with an identity tensor (1e-16)
 - **M3-prep waveguide cutoffs** (1×0.5 PEC): first six eigenvalues within
-  2.5e-3, TE10 rate **2.00**, curl kernel exactly at zero; the same problem
+  6.9e-4, TE10 rate **2.00**, curl kernel exactly at zero; the same problem
   discretized with nodal vector P1 produces spurious eigenvalues — a numerical
   demonstration of why edge elements exist
 - **M3a step-index fiber** (n_co = 1.5, n_cl = 1.0, V = 3.5, PEC wall at 6a):
