@@ -10,6 +10,7 @@ Currently covers 2D electromagnetics; designed to grow into a multiphysics core.
 - **M3-prep**: Nédélec edge elements — waveguide eigenmodes ∇×∇×E = k_c²E in H(curl)
 - **M3a**: Dielectric waveguide cross-section mode solver — mixed transverse
   Nédélec / longitudinal nodal formulation, effective indices and vector mode profiles
+- **M3b**: 3D Maxwell — tetrahedral Nédélec edge elements, rectangular cavity eigenmodes
 
 ## Layout
 
@@ -22,6 +23,9 @@ galerkin/
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: numbering, signs, curl-curl, mass, edge-nodal coupling
   waveguide.py    # M3a: mixed edge/nodal vector mode solver, A x = -beta^2 B x
+  mesh3d.py       # M3b: Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
+  edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
 examples/
   coax_convergence.py        # M1 validation: coaxial cable + convergence study
   waveguide_convergence.py   # M2 validation 1: plane wave in a guide + convergence
@@ -29,6 +33,7 @@ examples/
   cylinder_scattering_pml.py # M2.5: first-order ABC vs PML convergence comparison
   waveguide_modes.py         # M3-prep: waveguide cutoff eigenmodes (Nedelec vs nodal)
   fiber_modes.py             # M3a: step-index fibre modes vs the exact vector dispersion relation
+  cavity_modes.py            # M3b: rectangular PEC cavity spectrum, 3D
   visualize*.py              # Figure generation for each milestone
 ```
 
@@ -41,8 +46,10 @@ PYTHONPATH=. python3 examples/cylinder_scattering.py     # M2 scattering
 PYTHONPATH=. python3 examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
 PYTHONPATH=. python3 examples/waveguide_modes.py         # M3-prep eigenmodes
 PYTHONPATH=. python3 examples/fiber_modes.py            # M3a step-index fibre
+PYTHONPATH=. python3 examples/cavity_modes.py           # M3b 3D cavity
 PYTHONPATH=.:examples python3 examples/visualize.py      # figures
 PYTHONPATH=.:examples python3 examples/visualize_fiber.py  # M3a figure
+PYTHONPATH=.:examples python3 examples/visualize_cavity.py # M3b figure
 ```
 
 ## Validation results (2026-09-05)
@@ -107,11 +114,49 @@ the convergence rate is the lie detector.
     (`fiber_interface.png`). That discontinuity is the physical reason the
     transverse field has to live in H(curl).
 
+- **M3b rectangular PEC cavity** (1.0 × 0.8 × 0.6, Kuhn tetrahedral mesh):
+  the first six resonances within **1.8e-3** of exact at h = 0.05, convergence
+  rates **1.98 / 2.00 / 1.91** on the non-degenerate modes.
+
+| mode | exact k² | FEM | rel err |
+|---|---|---|---|
+| TM110 | 25.2908613 | 25.2803032 | 4.2e-04 |
+| TE101 | 37.2851722 | 37.2478457 | 1.0e-03 |
+| TE011 | 42.8368247 | 42.8040753 | 7.7e-04 |
+| TE111/TM111 | 52.7064291 | 52.7548173 | 9.2e-04 |
+| TE111/TM111 | 52.7064291 | 52.7998679 | 1.8e-03 |
+| TM210 | 54.8996745 | 54.8290346 | 1.3e-03 |
+
+  Three structural gates run before any eigenvalue is believed:
+
+  - **the mesh**: every interior face shared by exactly two tetrahedra, boundary
+    face count exact, all volumes positive, Euler V − E + F − T = 1
+  - **the Whitney identities in 3D** — G(c) = M_t(c) C, S(c) C = 0,
+    K(c) = Cᵀ M_t(c) C — relative residuals 2.1e-16, 1.3e-16, 6.8e-16
+  - **discrete de Rham exactness**: the kernel of the discrete curl on the
+    PEC-constrained edge space has dimension exactly the number of interior nodes
+    (1, 4, 12, 24 on four meshes). That integer identity is the structural reason
+    no spurious mode can appear between the physical ones — and it is a much
+    sharper statement than "we did not see any"
+
+  One honest difference from M3a. The M3a disk mesh has an exact C_n rotational
+  symmetry and held its degenerate pairs together to 1.2e-14. The Kuhn
+  subdivision has a preferred diagonal and does **not**: the exactly-degenerate
+  TE111/TM111 pair comes out split. That split is a discretization artefact, and
+  the run measures it and gates it as one — it vanishes at rate **2.15**. Which
+  of those two situations a mesh is in decides whether a measured splitting may
+  be read as physics at all.
+
 ## Next
 
-- **M3b**: 3D Maxwell (tetrahedral Nédélec, cavity eigenmodes; MFEM under
-  consideration as the production core), unstructured mesh input via Gmsh
-  (run as a separate executable — GPL isolation)
+- **M3b, remaining**: unstructured mesh input via Gmsh, run as a separate
+  executable so no GPL code is linked. Gmsh is not installable in the current
+  development container, so a reader will have to be gated on the documented
+  ASCII formats plus an end-to-end physics check rather than on real Gmsh output.
+- **MFEM** as the production core, under consideration for the point where
+  problem sizes outgrow a pure-Python direct solve. The 3D sparse factorization
+  here is comfortable to about 25k edge dofs on four cores; beyond that it wants
+  iterative solvers with an auxiliary-space preconditioner.
 - **Beyond electromagnetics**: the assembly core is physics-neutral. Anisotropic
   steady heat conduction with convective (Robin) boundaries already runs on the
   M1 routines unchanged; elasticity needs a vector nodal space, transient
