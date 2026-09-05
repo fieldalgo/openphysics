@@ -71,10 +71,14 @@ def _tri_grads(mesh: Mesh):
     return grads, area
 
 
-def assemble_curlcurl(space: EdgeSpace) -> sp.csr_matrix:
-    """S_ee' = int (curl W_e)(curl W_e') dx — closed form since curls are constant."""
+def assemble_curlcurl(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
+    """S_ee' = int c (curl W_e)(curl W_e') dx — closed form since curls are constant.
+
+    coeff: scalar or per-triangle array (T,). For Maxwell this is 1/mu_r.
+    """
     mesh = space.mesh
     g, area = _tri_grads(mesh)
+    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (len(area),))
 
     # Local edge e = (i, j) = (e+1, e+2) mod 3
     i_loc = [1, 2, 0]
@@ -84,7 +88,7 @@ def assemble_curlcurl(space: EdgeSpace) -> sp.csr_matrix:
         for i, j in zip(i_loc, j_loc)], axis=1)      # (T, 3)
     curls = curls * space.signs
 
-    Se = area[:, None, None] * curls[:, :, None] * curls[:, None, :]
+    Se = (coeff * area)[:, None, None] * curls[:, :, None] * curls[:, None, :]
 
     te = space.tri_edges
     rows = np.repeat(te, 3, axis=1).ravel()
@@ -94,11 +98,17 @@ def assemble_curlcurl(space: EdgeSpace) -> sp.csr_matrix:
     return S.tocsr()
 
 
-def assemble_edge_mass(space: EdgeSpace) -> sp.csr_matrix:
-    """M_ee' = int W_e . W_e' dx — 3-point edge-midpoint rule (exact to degree 2)."""
+def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
+    """M_ee' = int c W_e . W_e' dx — 3-point edge-midpoint rule (exact to degree 2).
+
+    W_e . W_e' is quadratic in the barycentric coordinates and the midpoint rule
+    integrates degree 2 exactly, so this matrix is exact, not approximate.
+    coeff: scalar or per-triangle array (T,), e.g. a relative permittivity eps_r.
+    """
     mesh = space.mesh
     g, area = _tri_grads(mesh)
     T = len(area)
+    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (T,))
 
     # Quadrature points: edge midpoints. Barycentric values (3 points x 3 nodes)
     lam = 0.5 * (np.ones((3, 3)) - np.eye(3))   # point m: lambda_m = 0, others 1/2
@@ -114,7 +124,7 @@ def assemble_edge_mass(space: EdgeSpace) -> sp.csr_matrix:
     W *= space.signs[:, :, None, None]
 
     # M^e = (A/3) sum_qp W_e(qp) . W_e'(qp)
-    Me = np.einsum("teqd,tfqd->tef", W, W) * (area / 3.0)[:, None, None]
+    Me = np.einsum("teqd,tfqd->tef", W, W) * (coeff * area / 3.0)[:, None, None]
 
     te = space.tri_edges
     rows = np.repeat(te, 3, axis=1).ravel()
@@ -122,6 +132,38 @@ def assemble_edge_mass(space: EdgeSpace) -> sp.csr_matrix:
     M = sp.coo_matrix((Me.ravel(), (rows, cols)),
                       shape=(space.num_edges, space.num_edges))
     return M.tocsr()
+
+
+def assemble_edge_grad(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
+    """Coupling matrix G_en = int c W_e . grad phi_n dx, shape (num_edges, num_nodes).
+
+    This is the bridge between the H(curl) edge space and the H1 nodal space —
+    the block that couples the transverse and longitudinal field components of a
+    waveguide mode. It has a closed form: grad lambda is constant on a triangle
+    and int_T lambda_i dx = A/3, so for the local edge (i, j)
+
+        int_T W_ij . grad lambda_k dx = (A/3) (grad lambda_j - grad lambda_i) . grad lambda_k
+
+    coeff: scalar or per-triangle array (T,), e.g. 1/mu_r.
+    """
+    mesh = space.mesh
+    g, area = _tri_grads(mesh)
+    T = len(area)
+    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (T,))
+
+    i_loc = [1, 2, 0]
+    j_loc = [2, 0, 1]
+    Ge = np.empty((T, 3, 3))
+    for e, (i, j) in enumerate(zip(i_loc, j_loc)):
+        Ge[:, e, :] = np.einsum("td,tkd->tk", g[:, j, :] - g[:, i, :], g)
+    Ge *= (coeff * area / 3.0)[:, None, None]
+    Ge *= space.signs[:, :, None]
+
+    rows = np.repeat(space.tri_edges, 3, axis=1).ravel()
+    cols = np.tile(mesh.triangles, (1, 3)).ravel()
+    G = sp.coo_matrix((Ge.ravel(), (rows, cols)),
+                      shape=(space.num_edges, mesh.num_nodes))
+    return G.tocsr()
 
 
 def eval_edge_field(space: EdgeSpace, dofs: np.ndarray) -> np.ndarray:
