@@ -24,9 +24,9 @@ classifiers = [
 dependencies = ["numpy>=1.24"]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/gmshio"
-Repository = "https://github.com/FieldAlgo/gmshio"
-Issues = "https://github.com/FieldAlgo/gmshio/issues"
+Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/gmshio"
+Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/gmshio"
+Issues = "https://github.com/FieldAlgo/openphysics/issues"
 
 [project.optional-dependencies]
 test = ["pytest"]

@@ -24,21 +24,21 @@ classifiers = [
 ]
 dependencies = [
   "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
-  "meshine @ git+https://github.com/FieldAlgo/meshine",
-  "physmat @ git+https://github.com/FieldAlgo/physmat",
-  "galerkin @ git+https://github.com/FieldAlgo/galerkin",
+  "meshine>=0.1",
+  "physmat>=0.1",
+  "galerkin>=0.1",
 ]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics"
-Repository = "https://github.com/FieldAlgo/openphysics"
+Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/openphysics"
+Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/openphysics"
 Issues = "https://github.com/FieldAlgo/openphysics/issues"
 
 [project.optional-dependencies]
 # The base install is headless on purpose: a batch or an HPC user must not pull
 # a web stack to run a document.
 studio = ["fastapi>=0.100", "uvicorn>=0.20"]
-test = ["pytest", "httpx", "galerkin-refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
+test = ["pytest", "httpx", "galerkin-refsol>=0.1"]
 
 [project.scripts]
 openphysics = "openphysics.cli:main"
