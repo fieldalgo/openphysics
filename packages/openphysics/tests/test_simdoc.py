@@ -168,6 +168,16 @@ def test_a_scale_error_is_reported_without_making_the_document_invalid():
     assert Document.from_dict(copy.deepcopy(examples.SLAB_TE_CHECK)).notes == []
 
 
+def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
+    """A 220 nm film is 0.22 in micrometres and 2.2e-13 in metres; both are the same film."""
+    from simdoc.geometry import resolve_regions
+    base = copy.deepcopy(examples.SLAB_TE_CHECK)
+    for symbol, ratio in (("um", 1.0), ("m", 1e-6)):
+        d = _rescaled(base, symbol, ratio)
+        names = [n for n, _m, _g, _s, _e in resolve_regions(Document.from_dict(d))]
+        assert names == ["film", "background"], f"{symbol}: regions dropped -> {names}"
+
+
 def test_a_micrometre_document_still_reaches_physmat_unchanged():
     """The optical boundary factor is exactly 1.0 for um, so nothing moves."""
     doc = Document.from_dict(copy.deepcopy(examples.SOI_STRIP))

@@ -20,7 +20,18 @@ from meshine import Circle, Domain, box_sides
 
 from .schema import Document
 
-MIN_AREA = 1e-12
+#: A sliver smaller than this fraction of the domain is not a region. Dimensionless
+#: on purpose: an absolute area is a statement about the unit the document is written
+#: in, and the same 220 nm film is 0.22 in micrometres and 2.2e-13 in metres. The
+#: absolute form silently dropped every region of a small device written in a large
+#: unit, which the units block made legal for the first time.
+AREA_EPS = 1e-12
+
+
+def _min_area(doc: Document) -> float:
+    """The area below which a region is a sliver, in the document's own units."""
+    dom = doc.domain
+    return AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"])
 
 
 def shape_polygon(s: dict) -> Polygon:
@@ -40,19 +51,20 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
     clip = box(dom["xmin"], dom["ymin"], dom["xmax"], dom["ymax"])
     shapes = doc.shapes
     polys = [shape_polygon(s).intersection(clip) for s in shapes]
+    min_area = _min_area(doc)
     out = []
     for i, s in enumerate(shapes):
         later = [polys[j] for j in range(i + 1, len(shapes))]
         geom = polys[i].difference(unary_union(later)) if later else polys[i]
-        if geom.area < MIN_AREA:
+        if geom.area < min_area:
             continue
         exact = None
-        if s["type"] == "circle" and abs(geom.area - polys[i].area) < 1e-12 * max(1.0, polys[i].area) \
+        if s["type"] == "circle" and abs(geom.area - polys[i].area) < AREA_EPS * polys[i].area \
                 and clip.contains(shape_polygon(s)):
             exact = {"center": (s["cx"], s["cy"]), "r": s["r"]}
         out.append((s["name"], s["material"], geom, s.get("mesh_size"), exact))
     background = clip.difference(unary_union(polys)) if polys else clip
-    if background.area > MIN_AREA:
+    if background.area > min_area:
         out.append(("background", doc["geometry"]["background"]["material"], background,
                     doc["geometry"]["background"].get("mesh_size"), None))
     return out
@@ -79,6 +91,7 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
         return circle_lookup[key]
 
     regions = resolve_regions(doc)
+    min_area = _min_area(doc)
     exact_circles = {(rn): ex for rn, _m, _g, _s, ex in regions if ex}
 
     for name, material, geom, size, exact in regions:
@@ -88,7 +101,7 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
             continue
         parts = list(geom.geoms) if isinstance(geom, MultiPolygon) else [geom]
         for part in parts:
-            if part.area < MIN_AREA:
+            if part.area < min_area:
                 continue
             outer, holes = _rings(part)
             # holes that are exact circles of other shapes must use the same Circle object
