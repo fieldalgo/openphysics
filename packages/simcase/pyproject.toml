@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openphysics"
+name = "simcase"
 version = "0.1.0"
 description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
 readme = "README.md"
@@ -30,8 +30,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/openphysics"
-Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/openphysics"
+Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
+Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
 Issues = "https://github.com/FieldAlgo/openphysics/issues"
 
 [project.optional-dependencies]
@@ -41,12 +41,12 @@ studio = ["fastapi>=0.100", "uvicorn>=0.20"]
 test = ["pytest", "httpx", "galerkin-refsol>=0.1"]
 
 [project.scripts]
-openphysics = "openphysics.cli:main"
-openphysics-studio = "openphysics.studio.server:main"
-openphys = "openphysics.cli:main"
+simcase = "simcase.cli:main"
+simcase-studio = "simcase.studio.server:main"
+simcase-run = "simcase.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["openphysics*"]
+include = ["simcase*"]
 
 [tool.setuptools.package-data]
-"openphysics.studio" = ["static/*"]
+"simcase.studio" = ["static/*"]

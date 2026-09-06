@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-import openphysics
-from openphysics import FORMAT, examples
+import simcase
+from simcase import FORMAT, examples
 
-STUDIO = Path(openphysics.__file__).parent / "studio"
+STUDIO = Path(simcase.__file__).parent / "studio"
 
 
 @pytest.fixture(scope="module")
@@ -21,17 +21,17 @@ def client():
     pytest.importorskip("fastapi", reason="the studio extra is not installed")
     from fastapi.testclient import TestClient
 
-    from openphysics.studio import app
+    from simcase.studio import app
     return TestClient(app)
 
 
 # ---- the boundary ----------------------------------------------------------------
 
 def test_studio_uses_only_the_public_api():
-    """studio is an ordinary consumer of openphysics, so lifting it back out stays a move.
+    """studio is an ordinary consumer of simcase, so lifting it back out stays a move.
 
     A leak here is cheap to write and expensive to find later, so it is checked
-    rather than agreed: if the UI needs something openphysics does not export, the fix
+    rather than agreed: if the UI needs something simcase does not export, the fix
     is to export it on purpose, not to reach past this test.
     """
     leaks = []
@@ -40,16 +40,16 @@ def test_studio_uses_only_the_public_api():
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 leaks += [f"{path.name}: import {a.name}" for a in node.names
-                          if a.name.split(".")[0] == "openphysics" and a.name != "openphysics"]
+                          if a.name.split(".")[0] == "simcase" and a.name != "simcase"]
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                if node.module.split(".")[0] != "openphysics":
+                if node.module.split(".")[0] != "simcase":
                     continue
-                if node.module != "openphysics":
+                if node.module != "simcase":
                     leaks.append(f"{path.name}: from {node.module} import ...")
                     continue
-                leaks += [f"{path.name}: openphysics.{a.name} is not in openphysics.__all__"
-                          for a in node.names if a.name not in openphysics.__all__]
-    assert not leaks, "studio reached into openphysics internals:\n  " + "\n  ".join(leaks)
+                leaks += [f"{path.name}: simcase.{a.name} is not in simcase.__all__"
+                          for a in node.names if a.name not in simcase.__all__]
+    assert not leaks, "studio reached into simcase internals:\n  " + "\n  ".join(leaks)
 
 
 def test_the_page_is_packaged():
@@ -77,7 +77,7 @@ def test_materials_and_preview(client):
 
 def test_units_vocabulary_comes_from_the_engine(client):
     served = client.get("/api/units").json()
-    assert served == openphysics.unit_vocabulary()
+    assert served == simcase.unit_vocabulary()
     assert "length" in served["dimensions"] and "um" in served["symbols"]["length"]
 
 

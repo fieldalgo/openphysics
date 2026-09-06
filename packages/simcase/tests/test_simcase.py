@@ -11,9 +11,9 @@ from fractions import Fraction
 import physmat
 from meshine import TriMesh
 from refsol import benchmarks, fiber, slab
-from openphysics import Document, DocumentError, build_mesh, examples, run, solve_point
-from openphysics import units
-from openphysics.geometry import resolve_regions
+from simcase import Document, DocumentError, build_mesh, examples, run, solve_point
+from simcase import units
+from simcase.geometry import resolve_regions
 
 
 # ---- document handling ---------------------------------------------------------
@@ -180,7 +180,7 @@ def test_a_scale_error_is_reported_without_making_the_document_invalid():
 
 def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
     """A 220 nm film is 0.22 in micrometres and 2.2e-13 in metres; both are the same film."""
-    from openphysics.geometry import resolve_regions
+    from simcase.geometry import resolve_regions
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
     for symbol, ratio in (("um", 1.0), ("m", 1e-6)):
         d = _rescaled(base, symbol, ratio)
@@ -190,7 +190,7 @@ def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
 
 def test_a_named_shape_does_not_vanish_without_a_word():
     """A sliver is reported; a shape a later shape covered is not. Only one of them is a mistake."""
-    from openphysics.geometry import resolve_regions
+    from simcase.geometry import resolve_regions
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
     face = copy.deepcopy(base["geometry"]["shapes"][0])
 
@@ -217,7 +217,7 @@ def test_an_empty_mesh_is_refused_where_it_is_made(monkeypatch):
     gate in the consumer only covers emptiness the consumer can see, and meshine owns
     its own gate for the emptiness it can explain better than we can.
     """
-    import openphysics.runner as runner
+    import simcase.runner as runner
 
     empty = TriMesh(np.zeros((0, 2)), np.zeros((0, 3), dtype=int), np.zeros(0, dtype=int),
                     [], {}, {}, {})

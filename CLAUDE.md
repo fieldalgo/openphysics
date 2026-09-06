@@ -8,8 +8,8 @@ packages/galerkin-refsol/  analytic reference solutions for validation (import n
 packages/meshine/          2D quality mesher
 packages/gmshio/           Gmsh runner + MSH reader (3D meshes)
 packages/physmat/          materials: optical dispersion, refractiveindex.info reader
-packages/openphysics/      model document (JSON) + headless runner, plus the optional
-                           web UI in openphysics/studio/ (FastAPI + static/index.html)
+packages/simcase/      model document (JSON) + headless runner, plus the optional
+                           web UI in simcase/studio/ (FastAPI + static/index.html)
 ```
 
 Packages stay independent where it matters: separate PyPI names, versions, LICENSE, NOTICE and
@@ -32,11 +32,11 @@ README. They share one git history, one test run and one install.
 
     pip install numpy scipy matplotlib shapely fastapi uvicorn pyyaml pytest httpx
     pip install --no-deps -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
-                          -e packages/gmshio -e packages/physmat -e packages/openphysics
+                          -e packages/gmshio -e packages/physmat -e packages/simcase
 
 ## Run the UI
 
-    cd packages/openphysics && python -m openphysics.studio      -> http://127.0.0.1:8765
+    cd packages/simcase && python -m simcase.studio      -> http://127.0.0.1:8765
 
 ## Elsewhere
 

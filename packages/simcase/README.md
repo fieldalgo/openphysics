@@ -65,7 +65,7 @@ it lands. Boundaries: `pec` (field = 0) or `pmc` (natural).
 ## From Python
 
 ```python
-from openphysics import Document, run
+from simcase import Document, run
 doc = Document.load("model.json")
 res = run(doc)
 res.neff                 # (study points, modes)
@@ -77,7 +77,7 @@ res.save("out/")
 end can mesh without solving and a caching layer can redo only what changed:
 
 ```python
-from openphysics import build_mesh, solve_point, study_points
+from simcase import build_mesh, solve_point, study_points
 model = build_mesh(doc)                  # geometry -> mesh -> materials
 parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
@@ -85,7 +85,7 @@ result = solve_point(model, doc.sole_physics()[1])
 
 ## The browser UI
 
-`openphysics.studio` is the program part of the stack, and it is optional: a model
+`simcase.studio` is the program part of the stack, and it is optional: a model
 tree on the left, geometry / mesh / results views in the middle, a properties
 panel on the right, a log at the bottom. It edits the same document a script
 edits and asks a local server to mesh and run it with the same engine.
@@ -93,7 +93,7 @@ edits and asks a local server to mesh and run it with the same engine.
 ```bash
 pip install "openphysics[studio] @ git+https://github.com/FieldAlgo/openphysics"
 openphysics-studio                # http://127.0.0.1:8765, opens the browser
-python -m openphysics.studio --port 9000 --no-browser
+python -m simcase.studio --port 9000 --no-browser
 ```
 
 The base install stays headless — `fastapi` and `uvicorn` arrive only with the
@@ -141,7 +141,7 @@ Used by the page, usable by anything else.
 | GET | `/api/jobs/{id}` | status and log lines |
 | GET | `/api/jobs/{id}/result` | n_eff, group index, fields, mesh, timings |
 
-`openphysics.studio` may use only openphysics's public API — the names in
+`simcase.studio` may use only openphysics's public API — the names in
 `openphysics.__all__`, never a module underneath it. A test enforces that. It keeps
 the UI a consumer of the engine rather than a part of it, so it can be lifted
 back out into its own distribution as a move rather than a rewrite; when the UI
@@ -170,7 +170,7 @@ load an example -> edit the units and the physics -> mesh -> run -> results.
 ## Where this sits
 
 ```
-openphysics.studio ->  edits the document     (optional, pip install openphysics[studio])
+simcase.studio ->  edits the document     (optional, pip install openphysics[studio])
 script / CLI  ->  runs the document      openphysics.run
                      |-- meshine   geometry -> mesh
                      |-- physmat   material names -> eps(lambda)

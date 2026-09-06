@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "openphysics-studio",
+      "name": "simcase.studio",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "openphysics.studio"],
-      "cwd": "packages/openphysics",
+      "runtimeArgs": ["-m", "simcase.studio"],
+      "cwd": "packages/simcase",
       "port": 8765
     }
   ]

@@ -1,16 +1,16 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""openphysics — the model document and its headless runner.
+"""simcase — the model document and its headless runner.
 
-    from openphysics import Document, run
+    from simcase import Document, run
     doc = Document.load("model.json")     # geometry, materials, physics, mesh, study
     result = run(doc)                     # meshine -> physmat -> galerkin
     result.neff, result.group_index()
     result.save("out/")                   # summary.json, fields.npz, results.png
 
-    $ python -m openphysics example soi_strip > model.json
-    $ python -m openphysics run model.json
+    $ python -m simcase example soi_strip > model.json
+    $ python -m simcase run model.json
 
 The document is the contract between users, scripts and any future GUI: a
 GUI edits this file; the engine runs it.
