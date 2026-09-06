@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.npz
+*.png
+.DS_Store
+
+# packaging / tooling artefacts
+*.egg-info/
+build/
+dist/
+.pytest_cache/

@@ -1,0 +1,28 @@
+galerkin
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+A finite-element engine for electromagnetics.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this product except in compliance with the License. A copy of the License
+is distributed with this product in the file LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+THIRD-PARTY SOFTWARE
+
+This engine can read meshes produced by Gmsh (https://gmsh.info), which is
+licensed under the GNU General Public License v2 or later. Gmsh is NOT
+distributed with this package and is NOT linked into it. ``galerkin.gmsh`` is
+an independent parser for the published MSH 2.2 and 4.1 ASCII formats, written
+from the format description in the Gmsh reference manual; no Gmsh source code
+was copied. Gmsh, when used at all, is run as a separate executable and only
+the file it writes is read. The GPL therefore does not extend to this package
+or to any program that uses it.
+
+"Gmsh" is the name of that upstream project. This package is not affiliated
+with, endorsed by, or supported by the Gmsh project or its authors.
+
+The optional test dependencies ``refsol``, ``meshine`` and ``gmshio`` are
+separate FieldAlgo packages under Apache-2.0; they are not required at runtime.
