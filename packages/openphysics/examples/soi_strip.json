@@ -1,6 +1,9 @@
 {
   "simdoc": "0.2",
   "name": "SOI strip waveguide 500 x 220 nm",
+  "units": {
+    "length": "um"
+  },
   "geometry": {
     "domain": {
       "xmin": -1.5,

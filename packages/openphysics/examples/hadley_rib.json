@@ -1,6 +1,9 @@
 {
   "simdoc": "0.2",
   "name": "Hadley 2002 rib waveguide, slab 0.3 um",
+  "units": {
+    "length": "um"
+  },
   "geometry": {
     "domain": {
       "xmin": -9.0,

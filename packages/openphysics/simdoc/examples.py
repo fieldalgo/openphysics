@@ -6,6 +6,7 @@
 SOI_STRIP = {
     "simdoc": "0.2",
     "name": "SOI strip waveguide 500 x 220 nm",
+    "units": {"length": "um"},
     "geometry": {
         "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
         "background": {"material": "SiO2"},
@@ -22,6 +23,7 @@ SOI_STRIP = {
 SLAB_TE_CHECK = {
     "simdoc": "0.2",
     "name": "220 nm Si slab, TE check against refsol",
+    "units": {"length": "um"},
     "geometry": {
         "domain": {"xmin": -0.5, "xmax": 0.5, "ymin": -1.2, "ymax": 1.2},
         "background": {"material": "SiO2"},
@@ -38,6 +40,7 @@ SLAB_TE_CHECK = {
 HADLEY_RIB = {
     "simdoc": "0.2",
     "name": "Hadley 2002 rib waveguide, slab 0.3 um",
+    "units": {"length": "um"},
     "geometry": {
         "domain": {"xmin": -9.0, "xmax": 9.0, "ymin": -10.0, "ymax": 3.0},
         "background": {"material": "vacuum"},
@@ -57,6 +60,7 @@ HADLEY_RIB = {
 FIBER = {
     "simdoc": "0.2",
     "name": "step-index fiber a = 4 um, n1 = 1.45, n2 = 1.44",
+    "units": {"length": "um"},
     "geometry": {
         "domain": {"xmin": -20.0, "xmax": 20.0, "ymin": -20.0, "ymax": 20.0},
         "background": {"material": "clad"},

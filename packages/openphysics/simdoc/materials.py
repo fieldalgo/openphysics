@@ -1,12 +1,18 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Material names in the document -> physmat Material objects."""
+"""Material names in the document -> physmat Material objects.
+
+physmat is micrometre-native, so a document that supplies its own dispersion
+coefficients has them converted here: a Sellmeier C carries length squared and a
+validity range carries length, both in the document's units.
+"""
 
 from __future__ import annotations
 
 import physmat
 
+from . import units
 from .schema import Document, DocumentError
 
 
@@ -15,7 +21,12 @@ def resolve_material(doc: Document, name: str) -> physmat.Material:
     if custom is not None:
         if "sellmeier" in custom:
             s = custom["sellmeier"]
-            model = physmat.Sellmeier(s["B"], s["C"], s.get("A", 1.0), tuple(s.get("range_um", (0.0, float("inf")))), name)
+            um = units.to_micrometres(1.0, doc.scale)          # one document length, in um
+            rng = tuple(s.get("range", (0.0, float("inf"))))
+            model = physmat.Sellmeier([float(b) for b in s["B"]],
+                                      [float(c) * um ** 2 for c in s["C"]],
+                                      s.get("A", 1.0),
+                                      (rng[0] * um, rng[1] * um), name)
             return physmat.Material(name, model, custom.get("source", "document"))
         return physmat.Material(name, physmat.Constant(float(custom["n"]), float(custom.get("k", 0.0)), name),
                                 custom.get("source", "document"))

@@ -26,6 +26,7 @@ from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
 from .geometry import build_domain
+from . import units
 from .materials import material_table
 from .schema import Document
 
@@ -51,7 +52,8 @@ class MeshedModel:
         physics with no way to tell a lossy material from a lossless one, and
         its own guard against loss would never fire.
         """
-        lut = np.array([self.materials[n].eps(wavelength) for n in self.tri.region_names])
+        wl_um = units.to_micrometres(wavelength, self.doc.scale)
+        lut = np.array([self.materials[n].eps(wl_um) for n in self.tri.region_names])
         return lut[self.tri.regions]
 
 
@@ -192,6 +194,8 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
 
     doc.validate()
     say(doc.summary())
+    for note in doc.notes:
+        say(f"  warning: {note}")
 
     t0 = time.time()
     model = build_mesh(doc)
@@ -200,6 +204,16 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
     say(f"mesh: {tm.num_nodes} nodes, {tm.num_triangles} triangles, min angle {tm.min_angle():.1f} deg, {t_mesh:.2f} s")
     for r, m in model.materials.items():
         say(f"  {r}: {m.name}  [{m.source.split(';')[0]}]")
+
+    wl_um = units.to_micrometres(doc.sole_physics()[1]["wavelength"], doc.scale)
+    for region, material in model.materials.items():
+        try:
+            n = material.index(wl_um).real
+        except Exception:
+            continue                    # a diagnostic must not be what fails the run
+        note = units.implausible("refractive index", n)
+        if note:
+            say(f"  warning: material {material.name} in {region}: {note}")
 
     parameter, values = study_points(doc)
     neffs, fields = [], []

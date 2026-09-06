@@ -5,7 +5,12 @@
 
 A document is a JSON object with these sections (all lengths in micrometres):
 
-    simdoc     format version ("0.1")
+    units      the unit system the document's numbers are written in: one symbol
+               per SI base dimension it needs, e.g. {"length": "um"}. There is no
+               default. An absent dimension is SI, except where the physics
+               requires it, and there absence is an error -- so a document in
+               metres has to say so and cannot get metres by forgetting.
+    simdoc     format version
     name       free text
     geometry   rectangular domain, a background material, and an ordered list
                of shapes (rect / circle / polygon). Later shapes cut earlier
@@ -35,13 +40,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import units
+from .units import Scale, UnitError
+
 FORMAT = "0.2"
 DEFAULT_PHYSICS = "em1"
+
+#: base dimensions each physics needs a declared unit for
+PHYSICS_REQUIRES = {"em.modes2d": {"length"}}
 
 DEFAULTS: dict[str, Any] = {
     "simdoc": FORMAT,
     "name": "untitled",
-    "units": {"length": "um"},
     "geometry": {"domain": None, "background": {"material": "vacuum"}, "shapes": []},
     "materials": {},
     "physics": {DEFAULT_PHYSICS: {"type": "em.modes2d", "formulation": "scalar", "wavelength": 1.55,
@@ -63,6 +73,20 @@ class DocumentError(ValueError):
     pass
 
 
+def _reject_tagged_values(node, path: str = "") -> None:
+    """``[value, "unit"]`` is reserved for a future tagged quantity, so refuse it now."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            _reject_tagged_values(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(node, list):
+        if len(node) == 2 and isinstance(node[1], str) and isinstance(node[0], (int, float)):
+            raise DocumentError(
+                f"{path}: tagged quantities ([value, unit]) are reserved and not accepted in "
+                f"simdoc {FORMAT}; write a bare number in the units the document declares")
+        for i, v in enumerate(node):
+            _reject_tagged_values(v, f"{path}.{i}")
+
+
 def _merge(defaults: dict, given: dict) -> dict:
     out = copy.deepcopy(defaults)
     for k, v in given.items():
@@ -73,36 +97,19 @@ def _merge(defaults: dict, given: dict) -> dict:
     return out
 
 
-def _migrate(d: dict) -> dict:
-    """Bring an older document up to the current format.
-
-    0.1 held a single unnamed physics; 0.2 holds a map so a document can carry
-    more than one and a study or a coupling can name which.
-    """
-    if str(d.get("simdoc", FORMAT)) != "0.1":
-        return d
-    d = copy.deepcopy(d)
-    phys = d.get("physics")
-    if isinstance(phys, dict) and "type" in phys:
-        d["physics"] = {DEFAULT_PHYSICS: phys}
-    st = d.get("study")
-    if isinstance(st, dict) and isinstance(st.get("parameter"), str):
-        param = st["parameter"]
-        if param.startswith("physics.") and param.split(".")[1] not in d.get("physics", {}):
-            st["parameter"] = f"physics.{DEFAULT_PHYSICS}." + param[len("physics."):]
-    d["simdoc"] = FORMAT
-    return d
-
-
 @dataclass
 class Document:
     data: dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULTS))
+    #: resolved by validate(); the document's numbers mean nothing without it
+    scale: Scale = field(default=units.SI, init=False, repr=False)
+    #: magnitude warnings from validate(); a scale error is not an invalid document
+    notes: list[str] = field(default_factory=list, init=False, repr=False)
 
     # -- construction --------------------------------------------------------
 
     @classmethod
     def from_dict(cls, d: dict) -> "Document":
-        doc = cls(_merge(DEFAULTS, _migrate(d)))
+        doc = cls(_merge(DEFAULTS, d))
         doc.validate()
         return doc
 
@@ -157,6 +164,11 @@ class Document:
         d = self.data
         if str(d.get("simdoc")) != FORMAT:
             raise DocumentError(f"unsupported simdoc format {d.get('simdoc')!r}; this reader handles {FORMAT}")
+        try:
+            self.scale = units.resolve(d.get("units"))
+        except UnitError as exc:
+            raise DocumentError(str(exc)) from None
+        _reject_tagged_values(d)
         g = d["geometry"]
         dom = g.get("domain")
         if not dom or any(k not in dom for k in ("xmin", "xmax", "ymin", "ymax")):
@@ -208,6 +220,21 @@ class Document:
                 raise DocumentError(f"{where}.wavelength must be a positive number (use study.sweep for several)")
             if int(p["num_modes"]) < 1:
                 raise DocumentError(f"{where}.num_modes must be >= 1")
+        required = set()
+        for p in d["physics"].values():
+            required |= PHYSICS_REQUIRES.get(p["type"], set())
+        missing = sorted(required - self.scale.declared)
+        if missing:
+            raise DocumentError(
+                f"units is missing {missing}, which the physics in this document needs. "
+                f"An absent dimension means SI, and that is not assumed where it matters: say "
+                f"what the numbers are in, e.g. \"units\": {{\"length\": \"um\"}}.")
+        self.notes = []
+        for pname, p in d["physics"].items():
+            note = units.implausible("wavelength", self.scale.to_si(p["wavelength"], {"length": 1}))
+            if note:
+                self.notes.append(f"physics.{pname}.wavelength: {note}")
+
         m = d["mesh"]
         if m["size"] <= 0:
             raise DocumentError("mesh.size must be positive")

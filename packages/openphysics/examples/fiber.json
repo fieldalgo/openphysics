@@ -1,6 +1,9 @@
 {
   "simdoc": "0.2",
   "name": "step-index fiber a = 4 um, n1 = 1.45, n2 = 1.44",
+  "units": {
+    "length": "um"
+  },
   "geometry": {
     "domain": {
       "xmin": -20.0,
