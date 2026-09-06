@@ -1,0 +1,59 @@
+{
+  "openphysics": "0.2",
+  "name": "220 nm Si slab, TE check against refsol",
+  "units": {
+    "length": "um"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": -0.5,
+      "xmax": 0.5,
+      "ymin": -1.2,
+      "ymax": 1.2
+    },
+    "background": {
+      "material": "SiO2"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -0.5,
+        "y": 0.0,
+        "w": 1.0,
+        "h": 0.22,
+        "material": "Si",
+        "mesh_size": 0.01
+      }
+    ]
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "wavelength": 1.55,
+      "num_modes": 1,
+      "boundary": {
+        "left": "pmc",
+        "right": "pmc",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.25,
+    "grading": {
+      "center": [
+        0.0,
+        0.11
+      ],
+      "near": 0.01,
+      "far": 0.08,
+      "distance": 1.0
+    }
+  },
+  "study": {
+    "type": "single"
+  }
+}

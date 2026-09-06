@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openphysics"
+version = "0.1.0"
+description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Environment :: Web Environment",
+]
+dependencies = [
+  "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
+  "meshine @ git+https://github.com/FieldAlgo/meshine",
+  "physmat @ git+https://github.com/FieldAlgo/physmat",
+  "galerkin @ git+https://github.com/FieldAlgo/galerkin",
+]
+
+[project.urls]
+Homepage = "https://github.com/FieldAlgo/openphysics"
+Repository = "https://github.com/FieldAlgo/openphysics"
+Issues = "https://github.com/FieldAlgo/openphysics/issues"
+
+[project.optional-dependencies]
+# The base install is headless on purpose: a batch or an HPC user must not pull
+# a web stack to run a document.
+studio = ["fastapi>=0.100", "uvicorn>=0.20"]
+test = ["pytest", "httpx", "galerkin-refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
+
+[project.scripts]
+openphysics = "openphysics.cli:main"
+openphysics-studio = "openphysics.studio.server:main"
+openphys = "openphysics.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["openphysics*"]
+
+[tool.setuptools.package-data]
+"openphysics.studio" = ["static/*"]
