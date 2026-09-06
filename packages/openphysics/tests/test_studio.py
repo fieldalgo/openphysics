@@ -4,6 +4,7 @@
 """The optional browser UI: its HTTP API, and the boundary it must not cross."""
 
 import ast
+import copy
 import time
 from pathlib import Path
 
@@ -78,6 +79,41 @@ def test_units_vocabulary_comes_from_the_engine(client):
     served = client.get("/api/units").json()
     assert served == simdoc.unit_vocabulary()
     assert "length" in served["dimensions"] and "um" in served["symbols"]["length"]
+
+
+def _leaves(node, path=""):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from _leaves(v, f"{path}.{k}" if path else k)
+    else:
+        yield path, node
+
+
+def test_the_server_never_drops_the_units_declaration(client):
+    """Read the numbers out, write them back: that is where a unit system dies.
+
+    The declaration is the only thing that says what every other number means, and
+    it is the one field an editor has no reason to touch, so losing it turns a
+    document that meant nanometres into one that means metres with every number
+    still looking right. Commercial FEA loses units on exactly this path - the
+    export and scripting route, not the solver - so the studio checks it rather
+    than assuming it.
+    """
+    served = client.get("/api/examples/soi_strip").json()
+    assert served["units"] == {"length": "um"}
+
+    doc = dict(copy.deepcopy(examples.SLAB_TE_CHECK), units={"length": "nm"})
+    back = client.post("/api/validate", json={"doc": doc}).json()
+    assert back["ok"] and back["doc"]["units"] == {"length": "nm"}
+
+    sent, returned = dict(_leaves(doc)), dict(_leaves(back["doc"]))
+    assert not sent.keys() - returned.keys(), "the server dropped fields the page sent"
+    assert all(returned[k] == v for k, v in sent.items()), "the server altered a value it was given"
+
+    # The page edits whatever validate hands back and posts it again, so that loop
+    # has to be a fixed point: defaults are filled in once, never re-interpreted.
+    again = client.post("/api/validate", json={"doc": back["doc"]}).json()
+    assert again["doc"] == back["doc"]
 
 
 def test_validate_reports_errors(client):
