@@ -1,0 +1,32 @@
+physmat
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+Material properties for physics solvers.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this product except in compliance with the License. A copy of the License
+is distributed with this product in the file LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+THIRD-PARTY MATERIAL
+
+Embedded optical data (physmat/physmat/_tables.py and the dispersion-formula
+coefficients in physmat/physmat/library.py) is taken from the
+refractiveindex.info database, which is dedicated to the public domain under
+CC0 1.0 Universal:
+
+    https://github.com/polyanskiy/refractiveindex.info-database
+
+CC0 imposes no attribution requirement, but the database maintainer asks that
+users cite:
+
+    M. N. Polyanskiy, "Refractiveindex.info database of optical constants",
+    Sci. Data 11, 94 (2024). https://doi.org/10.1038/s41597-023-02898-2
+
+The original measurement for each record is credited individually in
+``physmat._tables.REFERENCES`` and in each ``Material.source`` string.
+
+This data is CC0 1.0, not Apache-2.0. Redistributing it under either set of
+terms is permitted; the Apache-2.0 grant in LICENSE covers the code only.
