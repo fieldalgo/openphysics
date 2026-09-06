@@ -1,0 +1,44 @@
+# Publish to PyPI with a Trusted Publisher: no API token is stored anywhere.
+# GitHub mints a short-lived OIDC token for this workflow and PyPI checks it
+# against the publisher registered for this repository, so the repository name,
+# the workflow filename and the environment below must all match what PyPI has.
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the sdist and the wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Check the metadata before anything is uploaded
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # required: this is what signs the upload
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
