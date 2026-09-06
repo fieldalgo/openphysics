@@ -38,7 +38,7 @@ Issues = "https://github.com/FieldAlgo/openphysics/issues"
 # The base install is headless on purpose: a batch or an HPC user must not pull
 # a web stack to run a document.
 studio = ["fastapi>=0.100", "uvicorn>=0.20"]
-test = ["pytest", "httpx", "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
+test = ["pytest", "httpx", "galerkin-refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
 
 [project.scripts]
 openphysics = "openphysics.cli:main"
