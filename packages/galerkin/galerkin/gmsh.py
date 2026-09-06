@@ -65,7 +65,7 @@ def _tokens(text: str):
 def _read_sections(path):
     """{section name: raw text} for a $Name ... $EndName file."""
     sections, name, buf = {}, None, []
-    with open(path, "r") as fh:
+    with open(path, "r", encoding="utf-8") as fh:
         for line in fh:
             s = line.strip()
             if s.startswith("$End"):
@@ -261,7 +261,7 @@ def write_msh(mesh, path, physical: dict[str, int] | None = None):
             for e in mesh.boundary_edges.get(name, []):
                 faces.append(e); face_tags.append(tag)
 
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write("$MeshFormat\n2.2 0 8\n$EndMeshFormat\n")
         fh.write(f"$PhysicalNames\n{len(physical) + 1}\n")
         fh.write(f'{dim} {vol_tag} "domain"\n')
