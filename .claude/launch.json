@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "openphysics-studio",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "openphysics.studio"],
+      "cwd": "packages/openphysics",
+      "port": 8765
+    }
+  ]
+}
