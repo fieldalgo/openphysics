@@ -1,0 +1,64 @@
+{
+  "simdoc": "0.1",
+  "name": "SOI strip waveguide 500 x 220 nm",
+  "geometry": {
+    "domain": {
+      "xmin": -1.5,
+      "xmax": 1.5,
+      "ymin": -1.2,
+      "ymax": 1.2
+    },
+    "background": {
+      "material": "SiO2"
+    },
+    "shapes": [
+      {
+        "name": "core",
+        "type": "rect",
+        "x": -0.25,
+        "y": 0.0,
+        "w": 0.5,
+        "h": 0.22,
+        "material": "Si",
+        "mesh_size": 0.02
+      }
+    ]
+  },
+  "physics": {
+    "type": "em.modes2d",
+    "formulation": "scalar",
+    "wavelength": 1.55,
+    "num_modes": 2,
+    "boundary": {
+      "left": "pec",
+      "right": "pec",
+      "top": "pec",
+      "bottom": "pec"
+    }
+  },
+  "mesh": {
+    "size": 0.25,
+    "grading": {
+      "center": [
+        0.0,
+        0.11
+      ],
+      "near": 0.02,
+      "far": 0.16,
+      "distance": 1.0
+    }
+  },
+  "study": {
+    "type": "sweep",
+    "parameter": "physics.wavelength",
+    "values": [
+      1.4,
+      1.45,
+      1.5,
+      1.55,
+      1.6,
+      1.65,
+      1.7
+    ]
+  }
+}

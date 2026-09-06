@@ -1,0 +1,81 @@
+{
+  "simdoc": "0.1",
+  "name": "Hadley 2002 rib waveguide, slab 0.3 um",
+  "geometry": {
+    "domain": {
+      "xmin": -9.0,
+      "xmax": 9.0,
+      "ymin": -10.0,
+      "ymax": 3.0
+    },
+    "background": {
+      "material": "vacuum"
+    },
+    "shapes": [
+      {
+        "name": "substrate",
+        "type": "rect",
+        "x": -9.0,
+        "y": -10.0,
+        "w": 18.0,
+        "h": 10.0,
+        "material": "n3.40"
+      },
+      {
+        "name": "slab",
+        "type": "rect",
+        "x": -9.0,
+        "y": 0.0,
+        "w": 18.0,
+        "h": 0.3,
+        "material": "n3.44",
+        "mesh_size": 0.1
+      },
+      {
+        "name": "rib",
+        "type": "rect",
+        "x": -1.5,
+        "y": 0.0,
+        "w": 3.0,
+        "h": 1.0,
+        "material": "n3.44",
+        "mesh_size": 0.1
+      }
+    ]
+  },
+  "materials": {
+    "n3.40": {
+      "n": 3.4
+    },
+    "n3.44": {
+      "n": 3.44
+    }
+  },
+  "physics": {
+    "type": "em.modes2d",
+    "formulation": "scalar",
+    "wavelength": 1.15,
+    "num_modes": 1,
+    "boundary": {
+      "left": "pec",
+      "right": "pec",
+      "top": "pec",
+      "bottom": "pec"
+    }
+  },
+  "mesh": {
+    "size": 0.6,
+    "grading": {
+      "center": [
+        0.0,
+        0.5
+      ],
+      "near": 0.1,
+      "far": 0.6,
+      "distance": 3.0
+    }
+  },
+  "study": {
+    "type": "single"
+  }
+}

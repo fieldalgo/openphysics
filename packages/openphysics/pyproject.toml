@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simdoc"
+version = "0.1.0"
+description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+  "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
+  "meshine @ git+https://github.com/FieldAlgo/meshine",
+  "physmat @ git+https://github.com/FieldAlgo/physmat",
+  "galerkin @ git+https://github.com/FieldAlgo/galerkin",
+]
+
+[project.urls]
+Homepage = "https://github.com/FieldAlgo/simdoc"
+Repository = "https://github.com/FieldAlgo/simdoc"
+Issues = "https://github.com/FieldAlgo/simdoc/issues"
+
+[project.optional-dependencies]
+test = ["pytest", "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
+
+[project.scripts]
+simdoc = "simdoc.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["simdoc*"]
