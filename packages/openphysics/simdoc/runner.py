@@ -1,7 +1,15 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Run a document end to end: geometry -> mesh -> materials -> physics -> study -> results."""
+"""Run a document end to end: geometry -> mesh -> materials -> physics -> study -> results.
+
+The pipeline is also available one stage at a time. ``build_mesh`` stops after
+geometry, meshing and material resolution and hands back a ``MeshedModel``;
+``solve_point`` takes that model and one physics setting. ``run`` is their
+composition over the study points. A GUI previewing a mesh, or a future caching
+layer that recomputes only what changed, uses the stages rather than repeating
+them.
+"""
 
 from __future__ import annotations
 
@@ -11,14 +19,65 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+import physmat
 
 from galerkin import Mesh
-from meshine import generate, shapes as mshapes
+from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
 from .geometry import build_domain
 from .materials import material_table
 from .schema import Document
+
+
+@dataclass
+class MeshedModel:
+    """Everything a document determines before any physics runs.
+
+    Depends only on the ``geometry``, ``mesh`` and ``materials`` sections, so it
+    survives any change to ``physics`` or ``study`` -- which is what makes it
+    worth caching.
+    """
+    doc: Document
+    tri: TriMesh                            # meshine output: regions, quality, boundary edges
+    mesh: Mesh                              # the same mesh as the solver wants it
+    region_materials: dict[str, str]        # region name -> material name
+    materials: dict[str, physmat.Material]  # region name -> resolved material
+
+    def eps_per_triangle(self, wavelength_um: float) -> np.ndarray:
+        """Relative permittivity of each triangle at one wavelength."""
+        lut = np.array([self.materials[n].eps(wavelength_um).real for n in self.tri.region_names])
+        return lut[self.tri.regions]
+
+
+def build_mesh(doc: Document) -> MeshedModel:
+    """Geometry -> mesh -> materials. The first stage of ``run``."""
+    doc.validate()
+    domain, namer, region_materials = build_domain(doc)
+    mcfg = doc["mesh"]
+    size_fn = None
+    if mcfg.get("grading"):
+        g = mcfg["grading"]
+        size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
+    tri = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
+    mesh = Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
+                boundary_edges=dict(tri.boundary_edges))
+    return MeshedModel(doc, tri, mesh, region_materials, material_table(doc, region_materials))
+
+
+def study_points(doc: Document) -> tuple[str | None, list]:
+    """(parameter path, values) for the study; (None, [None]) for a single point."""
+    study = doc["study"]
+    if study["type"] == "sweep":
+        return study["parameter"], list(study["values"])
+    return None, [None]
+
+
+def solve_point(model: MeshedModel, physics: dict) -> dict:
+    """One physics solve on an already meshed model."""
+    wl = physics["wavelength"]
+    return physics_em_modes2d.solve(model.mesh, model.eps_per_triangle(wl), wl, physics["boundary"],
+                                    int(physics["num_modes"]), physics["formulation"])
 
 
 @dataclass
@@ -117,6 +176,7 @@ class RunResult:
 
 
 def run(doc: Document, verbose: bool = True) -> RunResult:
+    """Compose the stages over every study point."""
     log: list[str] = []
 
     def say(msg):
@@ -126,40 +186,23 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
 
     doc.validate()
     say(doc.summary())
-    t0 = time.time()
-    domain, namer, region_materials = build_domain(doc)
-    mcfg = doc["mesh"]
-    size_fn = None
-    if mcfg.get("grading"):
-        g = mcfg["grading"]
-        size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
-    tm = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
-    t_mesh = time.time() - t0
-    say(f"mesh: {tm.num_nodes} nodes, {tm.num_triangles} triangles, min angle {tm.min_angle():.1f} deg, {t_mesh:.2f} s")
 
-    mesh = Mesh(tm.nodes, tm.triangles, boundary=dict(tm.boundary_nodes), boundary_edges=dict(tm.boundary_edges))
-    materials = material_table(doc, region_materials)
-    for r, m in materials.items():
+    t0 = time.time()
+    model = build_mesh(doc)
+    t_mesh = time.time() - t0
+    tm = model.tri
+    say(f"mesh: {tm.num_nodes} nodes, {tm.num_triangles} triangles, min angle {tm.min_angle():.1f} deg, {t_mesh:.2f} s")
+    for r, m in model.materials.items():
         say(f"  {r}: {m.name}  [{m.source.split(';')[0]}]")
 
-    study = doc["study"]
-    if study["type"] == "sweep":
-        parameter, values = study["parameter"], list(study["values"])
-    else:
-        parameter, values = None, [None]
-
-    phys = doc["physics"]
+    parameter, values = study_points(doc)
     neffs, fields = [], []
     t0 = time.time()
     for v in values:
         d = doc.copy()
         if parameter is not None:
             d.set_path(parameter, v)
-        p = d["physics"]
-        wl = p["wavelength"]
-        eps_lut = np.array([materials[n].eps(wl).real for n in tm.region_names])
-        eps_tri = eps_lut[tm.regions]
-        res = physics_em_modes2d.solve(mesh, eps_tri, wl, p["boundary"], int(p["num_modes"]), p["formulation"])
+        res = solve_point(model, d["physics"])
         neffs.append(res["neff"]); fields.append(res["fields"])
         tag = f"{parameter} = {v}: " if parameter else ""
         say(f"  {tag}n_eff = " + ", ".join(f"{n:.6f}" for n in res["neff"]) +
@@ -167,6 +210,6 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
     t_solve = time.time() - t0
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
 
-    return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, region_materials,
-                     parameter, values if parameter else [phys["wavelength"]], np.array(neffs), fields,
-                     {"mesh": t_mesh, "solve": t_solve}, log)
+    return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
+                     parameter, values if parameter else [doc["physics"]["wavelength"]],
+                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log)

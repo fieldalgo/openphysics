@@ -181,6 +181,11 @@ class Document:
                 self.get_path(st["parameter"])
             except KeyError:
                 raise DocumentError(f"study.parameter {st['parameter']!r} does not exist in the document") from None
+            if not st["parameter"].startswith("physics."):
+                raise DocumentError(
+                    f"study.parameter {st['parameter']!r} is not under 'physics.'. The mesh is built once for "
+                    "the whole study, so sweeping geometry, mesh or materials would solve every point on the "
+                    "first point's mesh. Only physics parameters may be swept.")
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]

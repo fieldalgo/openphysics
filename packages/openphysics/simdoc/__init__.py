@@ -14,11 +14,21 @@
 
 The document is the contract between users, scripts and any future GUI: a
 GUI edits this file; the engine runs it.
+
+``run`` is a composition of stages that are public in their own right, so a GUI
+can mesh without solving and a caching layer can redo only what changed:
+
+    model = build_mesh(doc)               # geometry -> mesh -> materials
+    parameter, values = study_points(doc)
+    result = solve_point(model, doc["physics"])
 """
 
 from . import examples
-from .runner import RunResult, run
+from .geometry import build_domain
+from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
 from .schema import FORMAT, Document, DocumentError
 
 __version__ = "0.1.0"
-__all__ = ["Document", "DocumentError", "FORMAT", "run", "RunResult", "examples", "__version__"]
+__all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
+           "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
+           "run", "RunResult"]
