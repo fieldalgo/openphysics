@@ -1,0 +1,8 @@
+# Build and tooling artefacts. Package-specific ignores stay in packages/<name>/.gitignore.
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.DS_Store

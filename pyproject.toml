@@ -1,0 +1,13 @@
+# Root configuration for the multiphysics monorepo.
+#
+# This file declares no distribution. Each package under packages/<name>/ has its own
+# pyproject.toml, its own PyPI name and its own version; this root exists so that one
+# pytest invocation covers the whole stack.
+#
+# pytest reads exactly one configuration file, so every marker any package uses must be
+# declared here.
+
+[tool.pytest.ini_options]
+testpaths = ["packages/galerkin/tests", "packages/galerkin-refsol/tests", "packages/meshine/tests",
+             "packages/gmshio/tests", "packages/physmat/tests", "packages/openphysics/tests"]
+markers = ["slow: convergence studies that take more than a few seconds"]
