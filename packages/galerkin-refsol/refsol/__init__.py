@@ -5,8 +5,8 @@
 electromagnetic / photonic solver validation.
 
 Independent of any particular solver. Intended as the common "answer key"
-for the FieldAlgo tools (galerkin FEM engine, wavebit RCWA/FDTD) and anyone
-else who wants to check a Maxwell solver against something trustworthy.
+for the FieldAlgo solvers and anyone else who wants to check a Maxwell solver
+against something trustworthy.
 
 Modules
 -------
