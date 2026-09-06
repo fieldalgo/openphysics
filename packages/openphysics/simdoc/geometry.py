@@ -18,7 +18,7 @@ from shapely.ops import unary_union
 
 from meshine import Circle, Domain, box_sides
 
-from .schema import Document
+from .schema import Document, DocumentError
 
 #: A sliver smaller than this fraction of the domain is not a region. Dimensionless
 #: on purpose: an absolute area is a statement about the unit the document is written
@@ -67,6 +67,11 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
     if background.area > min_area:
         out.append(("background", doc["geometry"]["background"]["material"], background,
                     doc["geometry"]["background"].get("mesh_size"), None))
+    if not out:
+        raise DocumentError(
+            f"geometry resolved to no regions: all {len(shapes)} shape(s) and the background are "
+            f"smaller than {min_area:g} square units, which is {AREA_EPS:g} of the domain. Either the "
+            f"shapes lie outside geometry.domain, or they are far smaller than the domain they sit in.")
     return out
 
 

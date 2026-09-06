@@ -178,6 +178,14 @@ def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
         assert names == ["film", "background"], f"{symbol}: regions dropped -> {names}"
 
 
+def test_an_empty_mesh_is_refused_where_it_is_made():
+    """An empty collection is a valid data structure and never a valid intermediate result."""
+    base = copy.deepcopy(examples.SLAB_TE_CHECK)
+    d = _rescaled(base, "m", 1e-6)                 # meshine's absolute tolerances still empty this
+    with pytest.raises(DocumentError, match="0 nodes and 0 triangles"):
+        build_mesh(Document.from_dict(d))
+
+
 def test_a_micrometre_document_still_reaches_physmat_unchanged():
     """The optical boundary factor is exactly 1.0 for um, so nothing moves."""
     doc = Document.from_dict(copy.deepcopy(examples.SOI_STRIP))

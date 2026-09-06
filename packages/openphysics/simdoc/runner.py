@@ -28,7 +28,7 @@ from . import physics_em_modes2d
 from .geometry import build_domain
 from . import units
 from .materials import material_table
-from .schema import Document
+from .schema import Document, DocumentError
 
 
 @dataclass
@@ -67,6 +67,12 @@ def build_mesh(doc: Document) -> MeshedModel:
         g = mcfg["grading"]
         size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
     tri = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
+    if tri.num_triangles == 0 or tri.num_nodes == 0:
+        raise DocumentError(
+            f"meshing produced {tri.num_nodes} nodes and {tri.num_triangles} triangles. An empty mesh is "
+            f"never a usable intermediate result, so it is refused here rather than in whatever reduction "
+            f"reaches it first. The usual cause is a mesh.size or a feature far from the scale of the "
+            f"units this document declares.")
     mesh = Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
                 boundary_edges=dict(tri.boundary_edges))
     return MeshedModel(doc, tri, mesh, region_materials, material_table(doc, region_materials))
