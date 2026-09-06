@@ -1,0 +1,27 @@
+gmshio
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+Gmsh runner and MSH 4.1 reader.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this product except in compliance with the License. A copy of the License
+is distributed with this product in the file LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+THIRD-PARTY SOFTWARE
+
+This package drives Gmsh (https://gmsh.info), which is licensed under the GNU
+General Public License v2 or later. Gmsh is NOT distributed with this package
+and is NOT linked into it: gmshio writes a .geo script, invokes the ``gmsh``
+command-line program as a separate process, and reads back the resulting .msh
+file. The GPL therefore does not extend to gmshio or to any program that uses
+it. Users must obtain and install Gmsh themselves under its own license.
+
+The MSH 4.1 parser is an independent implementation written from the published
+format description in the Gmsh reference manual. No Gmsh source code was
+copied.
+
+"Gmsh" is the name of that upstream project. This package is not affiliated
+with, endorsed by, or supported by the Gmsh project or its authors.
