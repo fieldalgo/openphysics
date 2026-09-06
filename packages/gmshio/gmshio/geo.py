@@ -26,12 +26,26 @@ import numpy as np
 
 Point2 = tuple[float, float]
 
+#: Two points closer than ``MERGE_EPS`` times the diagonal of the geometry's bounding
+#: box are the same point. Dimensionless on purpose: a .geo script is written in
+#: whatever unit its author chose, and an absolute merge distance means a different
+#: thing in each. The same 220 nm device is 0.22 in micrometres and 2.2e-13 in metres.
+MERGE_EPS = 1e-9
+
+#: How far along a segment, as a fraction of that segment's own length, a point must sit
+#: to count as strictly inside it. Separate from ``MERGE_EPS`` because a position along
+#: a segment is dimensionless while a merge distance is a length, and one constant
+#: cannot be right for both under a change of unit.
+PARAM_EPS = 1e-9
+
 
 class Geo:
     """Planar polygon tiling -> .geo text (built-in Gmsh kernel)."""
 
-    def __init__(self, tol: float = 1e-9):
-        self.tol = tol
+    def __init__(self, *, merge_eps: float = MERGE_EPS, param_eps: float = PARAM_EPS):
+        self.merge_eps = float(merge_eps)
+        self.param_eps = float(param_eps)
+        self.point_tol = 0.0                # a length; ``render`` derives it from the input
         self._regions: list[tuple[str, np.ndarray, float | None]] = []
         self._raw: list[str] = []
         self.default_lc: float = 0.1
@@ -61,6 +75,13 @@ class Geo:
         """
         if not self._regions:
             raise ValueError("no regions added")
+        diag = self.extent()
+        if not np.isfinite(diag) or diag <= 0.0:
+            raise ValueError(
+                "Geo.render: the geometry has no extent: the bounding box of every region "
+                "vertex has a zero diagonal, so every vertex is the same point. Nothing here "
+                "can be measured until the geometry has a finite extent.")
+        self.point_tol = self.merge_eps * diag
         pts, pt_lc = self._unique_points()
         seg_ids: dict[tuple[int, int], int] = {}
         seg_use: dict[int, int] = {}
@@ -71,7 +92,7 @@ class Geo:
             loop: list[int] = []
             for k in range(len(ids)):
                 a, b = ids[k], ids[(k + 1) % len(ids)]
-                for s, t in self._split_edge(pts, a, b):
+                for s, t in self._split_edge(pts, a, b, _name):
                     key = (min(s, t), max(s, t))
                     if key not in seg_ids:
                         seg_ids[key] = len(seg_ids) + 1
@@ -106,6 +127,16 @@ class Geo:
 
     # -- helpers -----------------------------------------------------------
 
+    def extent(self) -> float:
+        """Diagonal of the bounding box of every region vertex — the one length the
+        caller supplies that every tolerance here is measured against."""
+        lo = np.array([np.inf, np.inf])
+        hi = np.array([-np.inf, -np.inf])
+        for _name, verts, _lc in self._regions:
+            lo = np.minimum(lo, verts.min(axis=0))
+            hi = np.maximum(hi, verts.max(axis=0))
+        return float(np.hypot(*(hi - lo)))
+
     def _unique_points(self):
         pts: list[np.ndarray] = []
         lcs: list[float] = []
@@ -122,27 +153,36 @@ class Geo:
 
     def _find(self, pts, p, missing_ok: bool = False):
         for i, q in enumerate(pts):
-            if abs(q[0] - p[0]) <= self.tol and abs(q[1] - p[1]) <= self.tol:
+            if abs(q[0] - p[0]) <= self.point_tol and abs(q[1] - p[1]) <= self.point_tol:
                 return i
         if missing_ok:
             return None
         raise RuntimeError("internal: point not registered")
 
-    def _split_edge(self, pts, a: int, b: int) -> list[tuple[int, int]]:
+    def _split_edge(self, pts, a: int, b: int, region: str = "?") -> list[tuple[int, int]]:
         """Split segment a->b at every registered point lying strictly inside it."""
         pa, pb = pts[a], pts[b]
         d = pb - pa
         L2 = float(d @ d)
+        if L2 == 0:
+            raise ValueError(
+                f"Geo.render: region {region!r} has a zero-length edge. Two consecutive "
+                f"vertices fell within the merge distance {self.point_tol:g} "
+                f"({self.merge_eps:g} of the {self.extent():g}-unit bounding-box diagonal) and "
+                f"became one point. Either the polygon repeats a vertex, or the feature is "
+                f"finer than {self.merge_eps:g} of the geometry that contains it.")
         inside: list[tuple[float, int]] = []
         for i, q in enumerate(pts):
             if i in (a, b):
                 continue
             w = q - pa
+            # a perpendicular distance takes the length tolerance; the position along the
+            # segment below is dimensionless and takes the dimensionless one
             cross = abs(d[0] * w[1] - d[1] * w[0]) / np.sqrt(L2)
-            if cross > self.tol:
+            if cross > self.point_tol:
                 continue
             s = float(w @ d) / L2
-            if self.tol < s < 1 - self.tol:
+            if self.param_eps < s < 1 - self.param_eps:
                 inside.append((s, i))
         chain = [a] + [i for _, i in sorted(inside)] + [b]
         return list(zip(chain[:-1], chain[1:]))
@@ -153,9 +193,19 @@ def _num(x) -> str:
     return repr(float(x))
 
 
-def box_sides(xmin: float, xmax: float, ymin: float, ymax: float, tol: float = 1e-9
+def box_sides(xmin: float, xmax: float, ymin: float, ymax: float, eps: float = MERGE_EPS
               ) -> Callable[[Point2], str]:
-    """Boundary namer for a rectangular domain: left / right / bottom / top."""
+    """Boundary namer for a rectangular domain: left / right / bottom / top.
+
+    ``eps`` is a fraction of the box's own diagonal, not a distance. The same box is
+    6 x 4 written in micrometres and 6e-6 x 4e-6 written in metres; a fixed distance
+    names every edge of the second one "outer" and the solver loses its boundaries.
+
+    Deliberately a twin of ``meshine.box_sides``: gmshio must not import meshine
+    (Gmsh is GPL and stays isolated), so the two are kept identical by hand.
+    """
+    tol = eps * float(np.hypot(xmax - xmin, ymax - ymin))
+
     def namer(mid: Point2) -> str:
         x, y = mid
         if abs(x - xmin) <= tol:

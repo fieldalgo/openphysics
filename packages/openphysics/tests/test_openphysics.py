@@ -9,6 +9,7 @@ import pytest
 from fractions import Fraction
 
 import physmat
+from meshine import TriMesh
 from refsol import benchmarks, fiber, slab
 from openphysics import Document, DocumentError, build_mesh, examples, run, solve_point
 from openphysics import units
@@ -147,16 +148,25 @@ def _rescaled(doc_dict, symbol, ratio):
     return d
 
 
-def test_the_answer_does_not_depend_on_the_declared_unit():
+#: The same device written five ways; the number is document units per micrometre.
+#: Micrometres alone proves nothing here — it is the scale at which the absolute
+#: tolerances in the mesher happened to work. Metres and kilometres are the two that
+#: used to fail, and they failed differently: metres came back empty, kilometres raised.
+LENGTH_SCALES = [("um", 1.0), ("nm", 1e3), ("mm", 1e-3), ("m", 1e-6), ("km", 1e-9)]
+
+
+@pytest.mark.parametrize("symbol,ratio", LENGTH_SCALES[1:])
+def test_the_answer_does_not_depend_on_the_declared_unit(symbol, ratio):
     """The invariant is the dimensionless answer, not the mesh: connectivity may differ."""
+    assert ratio != 1.0, f"VACUOUS at {symbol}: the scale ratio is 1.0, so nothing was rescaled"
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
     base["study"] = {"type": "single"}
     in_um = run(Document.from_dict(base), verbose=False)
-    in_nm = run(Document.from_dict(_rescaled(base, "nm", 1000.0)), verbose=False)
+    other = run(Document.from_dict(_rescaled(base, symbol, ratio)), verbose=False)
     # Meshing at a different scale rounds differently, so the two runs discretize
     # slightly differently; the residual is that, not the unit change.
-    assert len(in_nm.mesh_triangles) == pytest.approx(len(in_um.mesh_triangles), rel=0.05)
-    assert in_nm.neff[0, 0] == pytest.approx(in_um.neff[0, 0], rel=1e-4)
+    assert len(other.mesh_triangles) == pytest.approx(len(in_um.mesh_triangles), rel=0.05)
+    assert other.neff[0, 0] == pytest.approx(in_um.neff[0, 0], rel=1e-4)
 
 
 def test_a_scale_error_is_reported_without_making_the_document_invalid():
@@ -197,12 +207,43 @@ def test_a_named_shape_does_not_vanish_without_a_word():
     assert doc.notes == [], "being covered by a later shape is what the booleans are for"
 
 
-def test_an_empty_mesh_is_refused_where_it_is_made():
-    """An empty collection is a valid data structure and never a valid intermediate result."""
-    base = copy.deepcopy(examples.SLAB_TE_CHECK)
-    d = _rescaled(base, "m", 1e-6)                 # meshine's absolute tolerances still empty this
+def test_an_empty_mesh_is_refused_where_it_is_made(monkeypatch):
+    """An empty collection is a valid data structure and never a valid intermediate result.
+
+    This gate used to be reachable with a real document: the metre-scale slab emptied
+    the mesh outright, because meshine's tolerances were absolute. They are relative
+    now and that document meshes (see the test below), so the gate is driven with a
+    mesher that returns nothing. It stays because this is a backstop, not the fix — a
+    gate in the consumer only covers emptiness the consumer can see, and meshine owns
+    its own gate for the emptiness it can explain better than we can.
+    """
+    import openphysics.runner as runner
+
+    empty = TriMesh(np.zeros((0, 2)), np.zeros((0, 3), dtype=int), np.zeros(0, dtype=int),
+                    [], {}, {}, {})
+    monkeypatch.setattr(runner, "generate", lambda *a, **k: empty)
     with pytest.raises(DocumentError, match="0 nodes and 0 triangles"):
-        build_mesh(Document.from_dict(d))
+        build_mesh(Document.from_dict(copy.deepcopy(examples.SLAB_TE_CHECK)))
+
+
+def test_the_metre_document_meshes_like_the_micrometre_one():
+    """The regression the gate above used to catch. A 220 nm film written in metres is
+    the same film; it now reaches the solver instead of arriving empty."""
+    base = copy.deepcopy(examples.SLAB_TE_CHECK)
+    meshes = {}
+    for symbol, ratio in (("um", 1.0), ("m", 1e-6)):
+        doc = Document.from_dict(_rescaled(base, symbol, ratio))
+        model = build_mesh(doc)
+        assert model.tri.num_triangles > 0 and model.tri.num_nodes > 0
+        meshes[symbol] = model.tri
+    um, m = meshes["um"], meshes["m"]
+    assert set(m.region_names) == set(um.region_names)
+    assert m.num_triangles == pytest.approx(um.num_triangles, rel=0.1)
+    # areas are compared as fractions of the mesh: an absolute area is a unit statement
+    for name in um.region_names:
+        assert m.region_area(name) / m.areas.sum() == \
+            pytest.approx(um.region_area(name) / um.areas.sum(), rel=1e-9), \
+            f"region {name!r} changed shape when the unit changed"
 
 
 def test_a_micrometre_document_still_reaches_physmat_unchanged():

@@ -31,6 +31,17 @@ from scipy.spatial import Delaunay, cKDTree
 from .geometry import Domain, Region, Segment, points_in_loops
 from .mesh import TriMesh
 
+#: A triangle is degenerate when twice its signed area is below ``AREA_EPS`` times its
+#: own longest edge squared — an area compared against an area built from the same
+#: triangle, so the test is identical at every scale and wherever the triangle sits.
+#: The form it replaces, ``1e-14 * max(1.0, max|P|**2)``, was absolute below unit scale:
+#: measured on a 220 nm film written in metres, it called 24.7% of the triangles
+#: degenerate, including near-equilateral ones with |2A| / h^2 = 0.33, and dropped them.
+#: The named region came out with zero area and no exception was raised. For reference,
+#: the smallest ratio any triangle reaches in this package's own test meshes is 2.2e-2,
+#: ten orders of magnitude above this threshold.
+AREA_EPS = 1e-12
+
 
 def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
              size_fn: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
@@ -111,7 +122,7 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
             continue
 
         # -- 3. bad triangles ----------------------------------------------------
-        region_id = _classify(P, simp, regions, keys)
+        region_id, _degenerate = _classify(P, simp, regions, keys)
         inside = region_id >= 0
         T = simp[inside]
         cc, R, amin, cent = _triangle_data(P, T)
@@ -165,9 +176,11 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     simp = tri.simplices.astype(np.int64)
     seg_arr = np.array([(s.a, s.b) for s in segs.values()], dtype=np.int64)
     keys = np.minimum(seg_arr[:, 0], seg_arr[:, 1]) * len(P) + np.maximum(seg_arr[:, 0], seg_arr[:, 1])
-    region_id = _classify(P, simp, regions, keys)
+    region_id, degenerate = _classify(P, simp, regions, keys)
     T = simp[region_id >= 0]
     rid = region_id[region_id >= 0]
+    if len(T) == 0:
+        _refuse_empty_mesh(P, simp, degenerate, domain, regions)
     T = _orient_ccw(P, T)
 
     mesh = _assemble(P, T, rid, regions, segs, on_segment)
@@ -178,6 +191,37 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
 
 # ---------------------------------------------------------------------------
 
+def _refuse_empty_mesh(P: np.ndarray, simp: np.ndarray, degenerate: np.ndarray,
+                       domain: Domain, regions: list[Region]) -> None:
+    """Refuse an empty mesh here, where the reason for it is still known.
+
+    An empty mesh is a valid data structure and never a valid mesh, so no caller is
+    written to check for one and the failure surfaces several frames away as a shape
+    error out of a numeric library. This stage can separate two causes that need
+    different fixes, and it is the only place that still holds the numbers to do it.
+    """
+    n_deg = int(degenerate.sum())
+    if n_deg == len(simp):
+        raise ValueError(
+            f"meshine.generate produced 0 triangles and 0 nodes: all {len(simp)} triangles of "
+            f"the final triangulation are degenerate. The {len(P)} mesh points span "
+            f"{domain.extent():g} units, and at that extent they are collapsed onto a line or "
+            f"a single point. This is a geometry problem, not a mesh-size one; check the "
+            f"region coordinates and the unit they are written in.")
+    raise ValueError(
+        f"meshine.generate produced 0 triangles and 0 nodes: of {len(simp)} triangles, "
+        f"{n_deg} are degenerate and none of the remaining {len(simp) - n_deg} has its centroid "
+        f"inside any of the {len(regions)} region(s) ({', '.join(sorted({r.name for r in regions}))}). "
+        f"The regions enclose no area the triangulation covers: check that every loop is a "
+        f"simple closed polygon and that each hole lies inside its own outer loop.")
+
+
+def _longest_edge_squared(p: np.ndarray) -> np.ndarray:
+    """(T,) squared length of the longest edge of each triangle in ``p`` of shape (T, 3, 2)."""
+    e0, e1, e2 = p[:, 2] - p[:, 1], p[:, 0] - p[:, 2], p[:, 1] - p[:, 0]
+    return np.maximum(np.maximum((e0 ** 2).sum(1), (e1 ** 2).sum(1)), (e2 ** 2).sum(1))
+
+
 def _edge_keys(simp: np.ndarray, n: int) -> np.ndarray:
     simp = simp.astype(np.int64)          # Qhull returns int32; min*n + max overflows past ~46k points
     e = np.vstack([simp[:, [0, 1]], simp[:, [1, 2]], simp[:, [2, 0]]])
@@ -185,8 +229,8 @@ def _edge_keys(simp: np.ndarray, n: int) -> np.ndarray:
 
 
 def _classify(P: np.ndarray, simp: np.ndarray, regions: list[Region],
-              seg_keys: np.ndarray | None = None) -> np.ndarray:
-    """Region id per triangle (-1 = outside every region / inside a hole).
+              seg_keys: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """(region id per triangle, degeneracy mask). Region -1 = outside every region / in a hole.
 
     Triangles that share a non-constrained edge belong to the same region, so
     connected components of the "adjacent across an unconstrained edge" graph
@@ -194,6 +238,10 @@ def _classify(P: np.ndarray, simp: np.ndarray, regions: list[Region],
     the largest triangle, whose centroid is safely inside — is tested against
     the region polygons. This keeps classification cheap even when the loops
     have thousands of vertices.
+
+    The degeneracy mask is returned as well as applied: it and "no centroid landed
+    in a region" are the two ways this stage can end up with nothing, and they call
+    for different fixes, so the caller needs to tell them apart.
     """
     from scipy.sparse import coo_matrix
     from scipy.sparse.csgraph import connected_components
@@ -204,7 +252,7 @@ def _classify(P: np.ndarray, simp: np.ndarray, regions: list[Region],
     p = P[simp]
     area2 = ((p[:, 1, 0] - p[:, 0, 0]) * (p[:, 2, 1] - p[:, 0, 1])
              - (p[:, 2, 0] - p[:, 0, 0]) * (p[:, 1, 1] - p[:, 0, 1]))
-    degenerate = np.abs(area2) <= 1e-14 * max(1.0, float(np.abs(P).max()) ** 2)
+    degenerate = np.abs(area2) <= AREA_EPS * _longest_edge_squared(p)
 
     e = np.vstack([simp[:, [0, 1]], simp[:, [1, 2]], simp[:, [2, 0]]])
     keys = np.minimum(e[:, 0], e[:, 1]) * n + np.maximum(e[:, 0], e[:, 1])
@@ -232,7 +280,7 @@ def _classify(P: np.ndarray, simp: np.ndarray, regions: list[Region],
         comp_region[hit] = r
     region_id = comp_region[labels]
     region_id[degenerate] = -1
-    return region_id
+    return region_id, degenerate
 
 
 def _triangle_data(P: np.ndarray, T: np.ndarray):

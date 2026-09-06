@@ -50,6 +50,12 @@ mesh = read_msh("model.msh")
 mesh.cells("triangle"), mesh.physical_tags("triangle"), mesh.cells_in("pec", "line")
 ```
 
+A `.geo` script is written in whatever unit its author chose, so `gmshio` holds no
+absolute length constant. Point merging and T-junction splitting in `Geo` are a
+dimensionless fraction of the geometry's own bounding-box diagonal, and `to_fem2d`
+judges planarity against the mesh's own in-plane extent, so the same geometry
+resolves to the same topology whether it is written in micrometres or kilometres.
+
 Ready-made geometries in `gmshio.geo`:
 
 | function | what | regions / boundaries |

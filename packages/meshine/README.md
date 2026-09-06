@@ -29,6 +29,15 @@ Shared edges and T-junctions between regions are resolved automatically.
 Circles are exact: nodes the refinement inserts on a circular boundary are
 projected onto the true circle, so a fiber core really is round.
 
+The mesher is never told what a length is, and there is no absolute length
+constant anywhere in the package. Point merging and boundary classification are
+a dimensionless fraction of the domain's own bounding-box diagonal, and the
+degeneracy test compares a triangle's area to its own edge lengths, so the same
+cross-section meshes to the same geometry whether it is written in micrometres
+or in kilometres. Triangle counts legally differ a little between scales,
+because refinement rounds differently; region areas, the angle bound and the
+boundary names do not.
+
 ```python
 from meshine import shapes
 d, namer = shapes.rib_waveguide(slab_thickness=0.3, size_core=0.1, size_far=0.5)   # Hadley 2002
@@ -71,6 +80,13 @@ minimum angle holds; edge lengths follow per-region sizes and a size function;
 fiber interface nodes lie on the true circle to 1e-12 with second-order area
 convergence; holes are left empty; and edge-midpoint quadrature of a smooth
 function converges at second order on a deliberately irregular mesh.
+
+Scale is checked separately: the same device written at five length scales
+spanning twelve decades gives the same region-area fractions, the same angle
+bound and the same boundary names, and each comparison fails as vacuous if its
+scale ratio turns out to be 1.0. An empty mesh is refused by `generate` with a
+message naming the count that was zero and which of the two causes it was,
+rather than returned for a reduction several frames later to trip over.
 
 `examples/compare_with_gmsh.py` draws the same rib waveguide meshed here and
 by Gmsh (through the `gmshio` package) side by side. Gmsh's Frontal-Delaunay
