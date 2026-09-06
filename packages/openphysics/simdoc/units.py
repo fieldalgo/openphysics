@@ -49,6 +49,16 @@ class UnitError(ValueError):
     """A unit declaration or a unit string that cannot be resolved."""
 
 
+def unit_vocabulary() -> dict[str, object]:
+    """What a document may declare: the base dimensions and their unit symbols.
+
+    Public because a front end needs the table to offer a choice, and a second
+    copy of it in a page or a form would drift away from this one.
+    """
+    return {"dimensions": list(BASE_DIMENSIONS),
+            "symbols": {d: sorted(BASE_UNITS[d]) for d in BASE_DIMENSIONS}}
+
+
 # ---------------------------------------------------------------------------
 # the declared system
 

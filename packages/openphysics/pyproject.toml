@@ -20,6 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
+  "Environment :: Web Environment",
 ]
 dependencies = [
   "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
@@ -34,10 +35,17 @@ Repository = "https://github.com/FieldAlgo/simdoc"
 Issues = "https://github.com/FieldAlgo/simdoc/issues"
 
 [project.optional-dependencies]
-test = ["pytest", "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
+# The base install is headless on purpose: a batch or an HPC user must not pull
+# a web stack to run a document.
+studio = ["fastapi>=0.100", "uvicorn>=0.20"]
+test = ["pytest", "httpx", "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
 
 [project.scripts]
 simdoc = "simdoc.cli:main"
+simdoc-studio = "simdoc.studio.server:main"
 
 [tool.setuptools.packages.find]
 include = ["simdoc*"]
+
+[tool.setuptools.package-data]
+"simdoc.studio" = ["static/*"]
