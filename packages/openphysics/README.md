@@ -1,7 +1,7 @@
-# simdoc — the model document and its headless runner
+# openphysics — the model document and its headless runner
 
 A COMSOL-style program is, underneath, a file that describes the model and an
-engine that runs the file. `simdoc` is that file format and that engine for the
+engine that runs the file. `openphysics` is that file format and that engine for the
 FieldAlgo stack: a JSON document holds geometry, materials, physics, mesh
 settings and the study; one command runs it through meshine (mesh), physmat
 (materials) and galerkin (FEM) and writes results. The browser UI that edits
@@ -9,10 +9,10 @@ the document is [an optional subpackage](#the-browser-ui) of the same install;
 the engine never depends on it.
 
 ```bash
-pip install git+https://github.com/FieldAlgo/simdoc      # pulls meshine, physmat, galerkin, refsol, shapely
-python -m simdoc example soi_strip > model.json
-python -m simdoc validate model.json
-python -m simdoc run model.json                          # -> model_results/
+pip install git+https://github.com/FieldAlgo/openphysics      # pulls meshine, physmat, galerkin, refsol, shapely
+python -m openphysics example soi_strip > model.json
+python -m openphysics validate model.json
+python -m openphysics run model.json                          # -> model_results/
 ```
 
 `model_results/` contains `summary.json` (n_eff per study point, group index,
@@ -23,7 +23,7 @@ mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 
 ```json
 {
-  "simdoc": "0.2",
+  "openphysics": "0.2",
   "name": "SOI strip waveguide 500 x 220 nm",
   "units": {"length": "um"},
   "geometry": {
@@ -65,7 +65,7 @@ it lands. Boundaries: `pec` (field = 0) or `pmc` (natural).
 ## From Python
 
 ```python
-from simdoc import Document, run
+from openphysics import Document, run
 doc = Document.load("model.json")
 res = run(doc)
 res.neff                 # (study points, modes)
@@ -77,7 +77,7 @@ res.save("out/")
 end can mesh without solving and a caching layer can redo only what changed:
 
 ```python
-from simdoc import build_mesh, solve_point, study_points
+from openphysics import build_mesh, solve_point, study_points
 model = build_mesh(doc)                  # geometry -> mesh -> materials
 parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
@@ -85,15 +85,15 @@ result = solve_point(model, doc.sole_physics()[1])
 
 ## The browser UI
 
-`simdoc.studio` is the program part of the stack, and it is optional: a model
+`openphysics.studio` is the program part of the stack, and it is optional: a model
 tree on the left, geometry / mesh / results views in the middle, a properties
 panel on the right, a log at the bottom. It edits the same document a script
 edits and asks a local server to mesh and run it with the same engine.
 
 ```bash
-pip install "simdoc[studio] @ git+https://github.com/FieldAlgo/simdoc"
-simdoc-studio                # http://127.0.0.1:8765, opens the browser
-python -m simdoc.studio --port 9000 --no-browser
+pip install "openphysics[studio] @ git+https://github.com/FieldAlgo/openphysics"
+openphysics-studio                # http://127.0.0.1:8765, opens the browser
+python -m openphysics.studio --port 9000 --no-browser
 ```
 
 The base install stays headless — `fastapi` and `uvicorn` arrive only with the
@@ -141,8 +141,8 @@ Used by the page, usable by anything else.
 | GET | `/api/jobs/{id}` | status and log lines |
 | GET | `/api/jobs/{id}/result` | n_eff, group index, fields, mesh, timings |
 
-`simdoc.studio` may use only simdoc's public API — the names in
-`simdoc.__all__`, never a module underneath it. A test enforces that. It keeps
+`openphysics.studio` may use only openphysics's public API — the names in
+`openphysics.__all__`, never a module underneath it. A test enforces that. It keeps
 the UI a consumer of the engine rather than a part of it, so it can be lifted
 back out into its own distribution as a move rather than a rewrite; when the UI
 needs something the engine does not export, the engine exports it on purpose.
@@ -170,8 +170,8 @@ load an example -> edit the units and the physics -> mesh -> run -> results.
 ## Where this sits
 
 ```
-simdoc.studio ->  edits the document     (optional, pip install simdoc[studio])
-script / CLI  ->  runs the document      simdoc.run
+openphysics.studio ->  edits the document     (optional, pip install openphysics[studio])
+script / CLI  ->  runs the document      openphysics.run
                      |-- meshine   geometry -> mesh
                      |-- physmat   material names -> eps(lambda)
                      |-- galerkin  assembly + eigenproblem

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>simdoc studio</title>
+<title>OpenPhysics studio</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { --bg:#f4f5f7; --panel:#ffffff; --line:#d9dce1; --ink:#1f2328; --muted:#6b7280; --accent:#2f6fed; --accent2:#0b7a5a; --warn:#b42318; }
@@ -70,7 +70,7 @@
 </head>
 <body>
 <header>
-  <span class="brand">simdoc studio<small>model editor for simdoc</small></span>
+  <span class="brand">OpenPhysics studio<small>model editor for OpenPhysics</small></span>
   <select id="exampleSel"></select>
   <button id="loadExample">Load example</button>
   <button id="openFile">Open…</button><input type="file" id="fileInput" accept=".json" hidden>
@@ -127,7 +127,7 @@
 <script>
 'use strict';
 // ------------------------------------------------------------------ state
-let doc = null;            // the simdoc document (plain object)
+let doc = null;            // the OpenPhysics document (plain object)
 let selected = 'model';    // tree node id
 let materials = [];        // physmat built-ins from the server
 let meshData = null, resultData = null, currentJob = null;
@@ -296,7 +296,7 @@ function sel(path, v, opts) { return `<select data-path="${path}">${opts.map(o =
 
 function renderProps() {
   const P = $('props'); let h = '';
-  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">simdoc ${doc.simdoc}, lengths in micrometres</div>`;
+  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">OpenPhysics format ${doc.openphysics}, lengths in micrometres</div>`;
   else if (selected === 'geometry') h = '<h3>Geometry</h3><div class="hint">Shapes are stacked in order: later shapes cut earlier ones; the background fills the rest. Select a shape or add one.</div>';
   else if (selected === 'geometry.domain') { const d = doc.geometry.domain; h = '<h3>Domain</h3>' + ['xmin', 'xmax', 'ymin', 'ymax'].map(k => row(k, num(`geometry.domain.${k}`, d[k]))).join(''); }
   else if (selected === 'geometry.background') { const b = doc.geometry.background; h = '<h3>Background</h3>' + row('material', `<select data-path="geometry.background.material">${materialOptions(b.material)}</select>`) + row('mesh size', num('geometry.background.mesh_size', b.mesh_size ?? '')) + matHint(b.material); }

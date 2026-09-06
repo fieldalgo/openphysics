@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simdoc"
+name = "openphysics"
 version = "0.1.0"
 description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
 readme = "README.md"
@@ -30,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/simdoc"
-Repository = "https://github.com/FieldAlgo/simdoc"
-Issues = "https://github.com/FieldAlgo/simdoc/issues"
+Homepage = "https://github.com/FieldAlgo/openphysics"
+Repository = "https://github.com/FieldAlgo/openphysics"
+Issues = "https://github.com/FieldAlgo/openphysics/issues"
 
 [project.optional-dependencies]
 # The base install is headless on purpose: a batch or an HPC user must not pull
@@ -41,11 +41,12 @@ studio = ["fastapi>=0.100", "uvicorn>=0.20"]
 test = ["pytest", "httpx", "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol"]
 
 [project.scripts]
-simdoc = "simdoc.cli:main"
-simdoc-studio = "simdoc.studio.server:main"
+openphysics = "openphysics.cli:main"
+openphysics-studio = "openphysics.studio.server:main"
+openphys = "openphysics.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["simdoc*"]
+include = ["openphysics*"]
 
 [tool.setuptools.package-data]
-"simdoc.studio" = ["static/*"]
+"openphysics.studio" = ["static/*"]

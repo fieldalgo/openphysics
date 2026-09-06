@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.2",
+  "openphysics": "0.2",
   "name": "SOI strip waveguide 500 x 220 nm",
   "units": {
     "length": "um"

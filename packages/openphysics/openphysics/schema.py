@@ -10,7 +10,7 @@ A document is a JSON object with these sections (all lengths in micrometres):
                default. An absent dimension is SI, except where the physics
                requires it, and there absence is an error -- so a document in
                metres has to say so and cannot get metres by forgetting.
-    simdoc     format version
+    openphysics     format version
     name       free text
     geometry   rectangular domain, a background material, and an ordered list
                of shapes (rect / circle / polygon). Later shapes cut earlier
@@ -50,7 +50,7 @@ DEFAULT_PHYSICS = "em1"
 PHYSICS_REQUIRES = {"em.modes2d": {"length"}}
 
 DEFAULTS: dict[str, Any] = {
-    "simdoc": FORMAT,
+    "openphysics": FORMAT,
     "name": "untitled",
     "geometry": {"domain": None, "background": {"material": "vacuum"}, "shapes": []},
     "materials": {},
@@ -82,7 +82,7 @@ def _reject_tagged_values(node, path: str = "") -> None:
         if len(node) == 2 and isinstance(node[1], str) and isinstance(node[0], (int, float)):
             raise DocumentError(
                 f"{path}: tagged quantities ([value, unit]) are reserved and not accepted in "
-                f"simdoc {FORMAT}; write a bare number in the units the document declares")
+                f"openphysics {FORMAT}; write a bare number in the units the document declares")
         for i, v in enumerate(node):
             _reject_tagged_values(v, f"{path}.{i}")
 
@@ -162,8 +162,8 @@ class Document:
 
     def validate(self) -> None:
         d = self.data
-        if str(d.get("simdoc")) != FORMAT:
-            raise DocumentError(f"unsupported simdoc format {d.get('simdoc')!r}; this reader handles {FORMAT}")
+        if str(d.get("openphysics")) != FORMAT:
+            raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
         try:
             self.scale = units.resolve(d.get("units"))
         except UnitError as exc:
@@ -261,7 +261,7 @@ class Document:
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
-        lines = [f"{self.data['name']}  (simdoc {FORMAT})",
+        lines = [f"{self.data['name']}  (openphysics {FORMAT})",
                  f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] um",
                  f"  background: {g['background']['material']}"]
         for s in g["shapes"]:

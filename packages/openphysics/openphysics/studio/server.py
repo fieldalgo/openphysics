@@ -1,13 +1,13 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""HTTP API around simdoc: validate, preview mesh, run in the background, fetch results.
+"""HTTP API around openphysics: validate, preview mesh, run in the background, fetch results.
 
 The browser page in ``static/`` is the only client for now; other front ends
 can use the same endpoints. Everything is JSON; arrays are sent as
 plain lists (fine for the mesh sizes a 2D study uses).
 
-Imports from simdoc are absolute and limited to ``simdoc.__all__`` on purpose:
+Imports from openphysics are absolute and limited to ``openphysics.__all__`` on purpose:
 this file is written as an ordinary consumer of the engine, not as a part of it.
 """
 
@@ -25,10 +25,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import physmat
-from simdoc import Document, DocumentError, build_mesh, examples, run, unit_vocabulary
+from openphysics import Document, DocumentError, build_mesh, examples, run, unit_vocabulary
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="simdoc studio", version="0.1.0")
+app = FastAPI(title="openphysics studio", version="0.1.0")
 
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
@@ -192,7 +192,7 @@ def main(argv=None):
 
     import uvicorn
 
-    ap = argparse.ArgumentParser(prog="simdoc-studio", description="browser UI for simdoc models")
+    ap = argparse.ArgumentParser(prog="openphysics-studio", description="browser UI for openphysics models")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
@@ -200,7 +200,7 @@ def main(argv=None):
     url = f"http://{args.host}:{args.port}/"
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    print(f"simdoc studio at {url}")
+    print(f"openphysics studio at {url}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

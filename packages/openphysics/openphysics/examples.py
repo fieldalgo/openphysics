@@ -4,7 +4,7 @@
 """Example documents (also used by the tests)."""
 
 SOI_STRIP = {
-    "simdoc": "0.2",
+    "openphysics": "0.2",
     "name": "SOI strip waveguide 500 x 220 nm",
     "units": {"length": "um"},
     "geometry": {
@@ -21,7 +21,7 @@ SOI_STRIP = {
 }
 
 SLAB_TE_CHECK = {
-    "simdoc": "0.2",
+    "openphysics": "0.2",
     "name": "220 nm Si slab, TE check against refsol",
     "units": {"length": "um"},
     "geometry": {
@@ -38,7 +38,7 @@ SLAB_TE_CHECK = {
 }
 
 HADLEY_RIB = {
-    "simdoc": "0.2",
+    "openphysics": "0.2",
     "name": "Hadley 2002 rib waveguide, slab 0.3 um",
     "units": {"length": "um"},
     "geometry": {
@@ -58,7 +58,7 @@ HADLEY_RIB = {
 }
 
 FIBER = {
-    "simdoc": "0.2",
+    "openphysics": "0.2",
     "name": "step-index fiber a = 4 um, n1 = 1.45, n2 = 1.44",
     "units": {"length": "um"},
     "geometry": {

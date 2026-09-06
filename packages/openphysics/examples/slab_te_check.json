@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.2",
+  "openphysics": "0.2",
   "name": "220 nm Si slab, TE check against refsol",
   "units": {
     "length": "um"

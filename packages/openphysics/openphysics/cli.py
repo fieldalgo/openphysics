@@ -1,7 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Command line:  simdoc run model.json [-o outdir]  |  simdoc validate model.json  |  simdoc example NAME"""
+"""Command line:  openphysics run model.json [-o outdir]  |  openphysics validate model.json  |  openphysics example NAME"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .schema import Document, DocumentError
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="simdoc", description="run a simulation model document")
+    ap = argparse.ArgumentParser(prog="openphysics", description="run a simulation model document")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="run a document end to end")
     r.add_argument("model")

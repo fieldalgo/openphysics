@@ -10,9 +10,9 @@ from fractions import Fraction
 
 import physmat
 from refsol import benchmarks, fiber, slab
-from simdoc import Document, DocumentError, build_mesh, examples, run, solve_point
-from simdoc import units
-from simdoc.geometry import resolve_regions
+from openphysics import Document, DocumentError, build_mesh, examples, run, solve_point
+from openphysics import units
+from openphysics.geometry import resolve_regions
 
 
 # ---- document handling ---------------------------------------------------------
@@ -170,7 +170,7 @@ def test_a_scale_error_is_reported_without_making_the_document_invalid():
 
 def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
     """A 220 nm film is 0.22 in micrometres and 2.2e-13 in metres; both are the same film."""
-    from simdoc.geometry import resolve_regions
+    from openphysics.geometry import resolve_regions
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
     for symbol, ratio in (("um", 1.0), ("m", 1e-6)):
         d = _rescaled(base, symbol, ratio)
@@ -180,7 +180,7 @@ def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
 
 def test_a_named_shape_does_not_vanish_without_a_word():
     """A sliver is reported; a shape a later shape covered is not. Only one of them is a mistake."""
-    from simdoc.geometry import resolve_regions
+    from openphysics.geometry import resolve_regions
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
     face = copy.deepcopy(base["geometry"]["shapes"][0])
 
@@ -232,7 +232,7 @@ def test_more_than_one_physics_is_rejected_for_now():
 
 
 @pytest.mark.parametrize("path,value,msg", [
-    ("simdoc", "9.9", "format"),
+    ("openphysics", "9.9", "format"),
     ("geometry.domain", {"xmin": 1, "xmax": 0, "ymin": 0, "ymax": 1}, "empty"),
     ("physics.em1.formulation", "magic", "formulation"),
     ("physics.em1.boundary.left", "open", "boundary"),

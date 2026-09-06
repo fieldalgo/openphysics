@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.2",
+  "openphysics": "0.2",
   "name": "Hadley 2002 rib waveguide, slab 0.3 um",
   "units": {
     "length": "um"
