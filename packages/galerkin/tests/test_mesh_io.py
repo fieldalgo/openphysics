@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3b: the Gmsh reader. A mis-parsed mesh still assembles and still returns
 eigenvalues, so the gate that matters is that the physics is unchanged."""
 

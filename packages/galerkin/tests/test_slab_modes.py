@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """The 1D limit: a planar slab waveguide, against refsol.slab.
 
 A slab has no structure across x, so it is the cheapest problem that still

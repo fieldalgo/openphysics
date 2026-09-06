@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M1 figures.
 
 1) coax_validation.png     — coaxial cable: potential + field, FEM vs analytical

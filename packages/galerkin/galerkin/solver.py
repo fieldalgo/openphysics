@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Dirichlet boundary conditions and linear solve.
 
 When boundary potentials are prescribed (V = g on Gamma_D), only interior

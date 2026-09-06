@@ -287,5 +287,15 @@ the convergence rate is the lie detector.
 
 ## License
 
-Not yet licensed for redistribution; a permissive license is planned at first
-public release.
+Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+Gmsh is a separate program under GPL-2.0-or-later. It is neither distributed
+with this engine nor linked into it: `galerkin.gmsh` is an independent parser
+for the published MSH ASCII formats, and Gmsh itself, when used at all, is run
+as a separate executable. The GPL therefore does not extend to `galerkin` or to
+code that uses it.
+
+This project is not affiliated with, endorsed by, or supported by the Gmsh
+project.

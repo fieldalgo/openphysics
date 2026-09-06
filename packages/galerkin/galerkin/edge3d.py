@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Lowest-order Nedelec (Whitney) edge elements on tetrahedra — 3D H(curl).
 
 The same idea as edge.py one dimension up, and the same reason for existing: the

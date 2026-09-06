@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """P1 (linear triangle) element assembly: stiffness, mass, boundary, load.
 
 Model problem (electrostatics):

@@ -8,7 +8,25 @@ version = "0.1.0"
 description = "A finite-element engine for electromagnetics, built milestone by milestone against analytical solutions"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
+
+[project.urls]
+Homepage = "https://github.com/FieldAlgo/galerkin"
+Repository = "https://github.com/FieldAlgo/galerkin"
+Issues = "https://github.com/FieldAlgo/galerkin/issues"
 
 [project.optional-dependencies]
 # The answer key lives in its own package so the engine never imports what grades

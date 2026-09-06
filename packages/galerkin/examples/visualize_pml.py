@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2.5 figures: ABC vs PML convergence + field decay inside the PML."""
 
 import numpy as np

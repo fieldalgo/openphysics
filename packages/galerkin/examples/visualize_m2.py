@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2 figures.
 
 1) scattering_field.png      — cylinder scattering: Re(u_total) and |u_total|

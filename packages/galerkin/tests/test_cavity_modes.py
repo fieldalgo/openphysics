@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3b: 3D Maxwell — a rectangular PEC cavity, graded against refsol.metallic.
 
 Three things are checked, in increasing order of how much they would cost to get

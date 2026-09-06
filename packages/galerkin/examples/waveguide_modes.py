@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3-prep: cutoff frequencies of a rectangular waveguide (2D Maxwell eigenproblem).
 
 Problem:  curl curl E = k_c^2 E   in Omega = [0,a] x [0,b],   n x E = 0 (PEC)

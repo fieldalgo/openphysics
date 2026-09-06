@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2 and M2.5: frequency-domain waves.
 
 A guided plane wave with an exact absorbing condition, scattering off a cylinder

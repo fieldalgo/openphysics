@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Triangle mesh data structure and simple structured mesh generators.
 
 The minimum a FEM mesh needs:

@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """End-to-end pipeline check: geometry -> mesh -> assembly -> eigenproblem -> reference.
 
     meshine (own mesher)  ->  galerkin P1 assembly  ->  scalar mode eigenproblem

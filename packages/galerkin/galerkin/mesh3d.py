@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Tetrahedral mesh data structure and a structured generator for boxes.
 
 The 3D counterpart of mesh.py. What changes going from triangles to tetrahedra:

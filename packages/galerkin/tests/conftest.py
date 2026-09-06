@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Shared helpers for the validation suite.
 
 Every test here grades galerkin against `refsol`, a separate package holding the

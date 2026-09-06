@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """One adapter, several meshers.
 
 `meshine` (pure numpy/scipy, planar) and `gmshio` (drives the Gmsh executable as

@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2 validation 1: plane wave travelling through a guide.
 
 Helmholtz:  laplace(u) + k^2 u = 0,  exact solution u = exp(-i k x)

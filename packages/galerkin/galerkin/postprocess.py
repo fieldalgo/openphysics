@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Post-processing: field evaluation and error measurement.
 
 E = -grad V. With P1 elements grad V is constant per triangle, so the field

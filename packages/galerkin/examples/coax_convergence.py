@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M1 validation: electrostatics of a coaxial cable cross-section.
 
 Inner conductor (radius a) at V = 1, outer conductor (radius b) at V = 0,

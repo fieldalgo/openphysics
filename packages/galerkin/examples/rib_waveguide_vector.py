@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """The same end-to-end pipeline with the full-vector M3a solver.
 
     meshine (own mesher)  ->  galerkin M3a mixed edge/nodal solver

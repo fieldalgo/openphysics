@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3a: full-vector modes of a step-index fibre, graded against refsol.fiber.
 
 The fibre is the one refsol tabulates: core radius 4 um, n_core 1.45, n_clad 1.44

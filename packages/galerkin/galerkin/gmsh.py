@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Read and write Gmsh .msh meshes — ASCII formats 2.2 and 4.1.
 
 Why a reader rather than a binding

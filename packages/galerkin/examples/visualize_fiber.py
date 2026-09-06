@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3a figures: vector mode profiles, the LP11 splitting, and n_eff convergence."""
 
 import numpy as np

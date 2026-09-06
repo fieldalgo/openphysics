@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3-prep: Nedelec edge elements on a PEC waveguide cross-section.
 
 The point of the milestone is not just that edge elements are accurate, but that

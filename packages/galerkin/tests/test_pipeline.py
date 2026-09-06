@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """The end-to-end pipeline itself: mesher -> engine -> reference.
 
 examples/rib_waveguide_scalar.py and examples/rib_waveguide_vector.py are wiring

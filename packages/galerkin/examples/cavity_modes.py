@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3b validation: resonant modes of a rectangular PEC cavity (3D Maxwell).
 
 Problem:  curl curl E = k^2 E  in  [0,a] x [0,b] x [0,c],   n x E = 0 on the walls

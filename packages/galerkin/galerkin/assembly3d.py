@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """P1 (linear tetrahedron) assembly: stiffness and mass.
 
 The 3D counterpart of assembly.py. On a linear tetrahedron the barycentric

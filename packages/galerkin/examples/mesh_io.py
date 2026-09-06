@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3b: reading meshes from Gmsh, without linking Gmsh.
 
 Gmsh is GPL, so it is run as a separate executable and only its output file is

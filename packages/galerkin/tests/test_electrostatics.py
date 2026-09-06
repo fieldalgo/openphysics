@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M1: electrostatics of a coaxial cable, graded against refsol.metallic."""
 
 import numpy as np

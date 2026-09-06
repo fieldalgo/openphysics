@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3b figures: cavity mode fields in 3D, the exact spectrum, and convergence."""
 
 import numpy as np

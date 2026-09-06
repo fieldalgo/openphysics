@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M3a against published benchmarks: Hadley (2002).
 
 Unit square, wavelength 1.5, a square core [0,0.5]^2 in one corner, PEC on two

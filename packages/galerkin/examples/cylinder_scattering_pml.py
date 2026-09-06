@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2.5: cylinder scattering revisited with a PML, compared against the ABC.
 
 Geometry: scatterer r=a -> physical region a..R0 -> PML R0..R_end (thickness d)

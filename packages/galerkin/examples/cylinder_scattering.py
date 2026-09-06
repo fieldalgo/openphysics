@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """M2 validation 2: plane-wave scattering off a cylinder (2D).
 
 An incident plane wave u_inc = exp(ikx) hits a sound-soft cylinder of radius a
