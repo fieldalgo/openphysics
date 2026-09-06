@@ -99,7 +99,7 @@ class RunResult:
 
     def group_index(self) -> np.ndarray | None:
         """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength."""
-        if self.parameter != "physics.wavelength" or len(self.values) < 2:
+        if self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
             return None
         wl = np.asarray(self.values, dtype=float)
         return self.neff - wl[:, None] * np.gradient(self.neff, wl, axis=0)
@@ -155,7 +155,8 @@ class RunResult:
         f = np.abs(self.fields[i][:, 0])
         ax.tricontourf(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles, f, levels=30, cmap="inferno")
         ax.set_aspect("equal")
-        label = f"{self.parameter} = {self.values[i]}" if self.parameter else f"lambda = {self.doc['physics']['wavelength']}"
+        pname, phys = self.doc.sole_physics()
+        label = f"{self.parameter} = {self.values[i]}" if self.parameter else f"lambda = {phys['wavelength']}"
         ax.set_title(f"|mode 1|, {label}: n_eff = {self.neff[i, 0]:.5f}")
         ax.set_xlabel("x (um)"); ax.set_ylabel("y (um)")
         if sweep:
@@ -169,7 +170,7 @@ class RunResult:
                 ax2.plot(self.values, ng[:, 0], "s--", color="C3", ms=4, label="n_g (mode 1)")
                 ax2.set_ylabel("group index", color="C3")
             ax.set_title("study")
-        fig.suptitle(f"{self.doc['name']}  ({self.doc['physics']['type']}, {self.doc['physics']['formulation']})")
+        fig.suptitle(f"{self.doc['name']}  ({pname}: {phys['type']}, {phys['formulation']})")
         fig.tight_layout()
         fig.savefig(path, dpi=130)
         plt.close(fig)
@@ -202,7 +203,7 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
         d = doc.copy()
         if parameter is not None:
             d.set_path(parameter, v)
-        res = solve_point(model, d["physics"])
+        res = solve_point(model, d.sole_physics()[1])
         neffs.append(res["neff"]); fields.append(res["fields"])
         tag = f"{parameter} = {v}: " if parameter else ""
         say(f"  {tag}n_eff = " + ", ".join(f"{n:.6f}" for n in res["neff"]) +
@@ -211,5 +212,5 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
 
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
-                     parameter, values if parameter else [doc["physics"]["wavelength"]],
+                     parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
                      np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log)

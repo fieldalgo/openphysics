@@ -24,13 +24,39 @@ def test_examples_validate_and_roundtrip(tmp_path):
         assert doc.summary()
 
 
+def test_reads_a_0_1_document_by_migrating_it():
+    """0.1 held one unnamed physics; it must still load, under the default name."""
+    old = copy.deepcopy(examples.SOI_STRIP)
+    old["simdoc"] = "0.1"
+    old["physics"] = copy.deepcopy(old["physics"]["em1"])          # unwrap, back to 0.1 shape
+    old["study"] = dict(old["study"], parameter="physics.wavelength")
+
+    doc = Document.from_dict(old)
+
+    assert doc["simdoc"] == "0.2"
+    assert list(doc["physics"]) == ["em1"]
+    assert doc["physics"]["em1"]["wavelength"] == 1.55
+    assert doc["study"]["parameter"] == "physics.em1.wavelength"
+    assert doc.get_path("physics.em1.wavelength") == 1.55           # the rewritten path resolves
+
+
+def test_more_than_one_physics_is_rejected_for_now():
+    d = copy.deepcopy(examples.SLAB_TE_CHECK)
+    d["physics"]["th1"] = copy.deepcopy(d["physics"]["em1"])
+    doc = Document.from_dict(d)
+    doc.validate()                                                 # two physics is a valid document
+    with pytest.raises(DocumentError, match="not implemented yet"):
+        doc.sole_physics()                                         # solving both is not
+
+
 @pytest.mark.parametrize("path,value,msg", [
     ("simdoc", "9.9", "format"),
     ("geometry.domain", {"xmin": 1, "xmax": 0, "ymin": 0, "ymax": 1}, "empty"),
-    ("physics.formulation", "magic", "formulation"),
-    ("physics.boundary.left", "open", "boundary"),
+    ("physics.em1.formulation", "magic", "formulation"),
+    ("physics.em1.boundary.left", "open", "boundary"),
     ("mesh.size", -1, "mesh.size"),
-    ("study", {"type": "sweep", "parameter": "physics.nope", "values": [1]}, "does not exist"),
+    ("study", {"type": "sweep", "parameter": "physics.em1.nope", "values": [1]}, "does not exist"),
+    ("study", {"type": "sweep", "parameter": "mesh.size", "values": [0.2]}, "not under 'physics.'"),
 ])
 def test_validation_errors(path, value, msg):
     doc = Document.from_dict(examples.SOI_STRIP)
@@ -106,7 +132,7 @@ def test_rib_scalar_is_near_hadley():
 def test_sweep_produces_group_index_and_saves(tmp_path):
     d = copy.deepcopy(examples.SOI_STRIP)
     d["study"]["values"] = [1.50, 1.55, 1.60]
-    d["physics"]["num_modes"] = 1
+    d["physics"]["em1"]["num_modes"] = 1
     res = run(Document.from_dict(d), verbose=False)
     assert res.neff.shape == (3, 1)
     assert np.all(np.diff(res.neff[:, 0]) < 0)                        # n_eff falls with wavelength
@@ -121,6 +147,6 @@ def test_sweep_produces_group_index_and_saves(tmp_path):
 
 def test_vector_formulation_not_yet_available():
     d = copy.deepcopy(examples.SLAB_TE_CHECK)
-    d["physics"]["formulation"] = "vector"
+    d["physics"]["em1"]["formulation"] = "vector"
     with pytest.raises(NotImplementedError, match="M3a"):
         run(Document.from_dict(d), verbose=False)

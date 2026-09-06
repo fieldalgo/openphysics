@@ -20,7 +20,7 @@ can mesh without solving and a caching layer can redo only what changed:
 
     model = build_mesh(doc)               # geometry -> mesh -> materials
     parameter, values = study_points(doc)
-    result = solve_point(model, doc["physics"])
+    result = solve_point(model, doc.sole_physics()[1])
 """
 
 from . import examples

@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.1",
+  "simdoc": "0.2",
   "name": "SOI strip waveguide 500 x 220 nm",
   "geometry": {
     "domain": {
@@ -25,15 +25,17 @@
     ]
   },
   "physics": {
-    "type": "em.modes2d",
-    "formulation": "scalar",
-    "wavelength": 1.55,
-    "num_modes": 2,
-    "boundary": {
-      "left": "pec",
-      "right": "pec",
-      "top": "pec",
-      "bottom": "pec"
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "wavelength": 1.55,
+      "num_modes": 2,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
     }
   },
   "mesh": {
@@ -50,7 +52,7 @@
   },
   "study": {
     "type": "sweep",
-    "parameter": "physics.wavelength",
+    "parameter": "physics.em1.wavelength",
     "values": [
       1.4,
       1.45,

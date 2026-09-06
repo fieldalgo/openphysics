@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.1",
+  "simdoc": "0.2",
   "name": "step-index fiber a = 4 um, n1 = 1.45, n2 = 1.44",
   "geometry": {
     "domain": {
@@ -32,15 +32,17 @@
     }
   },
   "physics": {
-    "type": "em.modes2d",
-    "formulation": "scalar",
-    "wavelength": 1.55,
-    "num_modes": 2,
-    "boundary": {
-      "left": "pec",
-      "right": "pec",
-      "top": "pec",
-      "bottom": "pec"
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "wavelength": 1.55,
+      "num_modes": 2,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
     }
   },
   "mesh": {

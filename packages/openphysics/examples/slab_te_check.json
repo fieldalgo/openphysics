@@ -1,5 +1,5 @@
 {
-  "simdoc": "0.1",
+  "simdoc": "0.2",
   "name": "220 nm Si slab, TE check against refsol",
   "geometry": {
     "domain": {
@@ -25,15 +25,17 @@
     ]
   },
   "physics": {
-    "type": "em.modes2d",
-    "formulation": "scalar",
-    "wavelength": 1.55,
-    "num_modes": 1,
-    "boundary": {
-      "left": "pmc",
-      "right": "pmc",
-      "top": "pec",
-      "bottom": "pec"
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "wavelength": 1.55,
+      "num_modes": 1,
+      "boundary": {
+        "left": "pmc",
+        "right": "pmc",
+        "top": "pec",
+        "bottom": "pec"
+      }
     }
   },
   "mesh": {

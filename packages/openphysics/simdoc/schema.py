@@ -12,12 +12,15 @@ A document is a JSON object with these sections (all lengths in micrometres):
                ones, the background fills whatever is left.
     materials  optional custom materials: {"myglass": {"n": 1.5, "k": 0}};
                any other material name is looked up in physmat.
-    physics    which solver and its settings. Currently "em.modes2d":
-               wavelength, formulation ("scalar"; "vector" arrives with M3a),
-               num_modes, boundary conditions per side ("pec" | "pmc").
+    physics    named physics, {"em1": {...}}. Each entry names its solver and
+               its settings. Currently "em.modes2d": wavelength, formulation
+               ("scalar"; "vector" arrives with M3a), num_modes, boundary
+               conditions per side ("pec" | "pmc"). The names are how a study
+               and (later) a coupling refer to one physics, so they are part of
+               the document, not an implementation detail.
     mesh       global size, optional per-shape sizes (on the shape), optional
                radial grading {center, near, far, distance}, min_angle.
-    study      {"type": "single"} or {"type": "sweep", "parameter": "physics.wavelength", "values": [...]}
+    study      {"type": "single"} or {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [...]}
     results    {"save_fields": true, "plots": true}
 
 The same file drives a script, a command line run, and (later) a GUI: the GUI
@@ -32,7 +35,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-FORMAT = "0.1"
+FORMAT = "0.2"
+DEFAULT_PHYSICS = "em1"
 
 DEFAULTS: dict[str, Any] = {
     "simdoc": FORMAT,
@@ -40,8 +44,10 @@ DEFAULTS: dict[str, Any] = {
     "units": {"length": "um"},
     "geometry": {"domain": None, "background": {"material": "vacuum"}, "shapes": []},
     "materials": {},
-    "physics": {"type": "em.modes2d", "formulation": "scalar", "wavelength": 1.55, "num_modes": 1,
-                "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}},
+    "physics": {DEFAULT_PHYSICS: {"type": "em.modes2d", "formulation": "scalar", "wavelength": 1.55,
+                                  "num_modes": 1,
+                                  "boundary": {"left": "pec", "right": "pec", "top": "pec",
+                                               "bottom": "pec"}}},
     "mesh": {"size": 0.2, "min_angle": 28.0, "grading": None},
     "study": {"type": "single"},
     "results": {"save_fields": True, "plots": True},
@@ -67,6 +73,27 @@ def _merge(defaults: dict, given: dict) -> dict:
     return out
 
 
+def _migrate(d: dict) -> dict:
+    """Bring an older document up to the current format.
+
+    0.1 held a single unnamed physics; 0.2 holds a map so a document can carry
+    more than one and a study or a coupling can name which.
+    """
+    if str(d.get("simdoc", FORMAT)) != "0.1":
+        return d
+    d = copy.deepcopy(d)
+    phys = d.get("physics")
+    if isinstance(phys, dict) and "type" in phys:
+        d["physics"] = {DEFAULT_PHYSICS: phys}
+    st = d.get("study")
+    if isinstance(st, dict) and isinstance(st.get("parameter"), str):
+        param = st["parameter"]
+        if param.startswith("physics.") and param.split(".")[1] not in d.get("physics", {}):
+            st["parameter"] = f"physics.{DEFAULT_PHYSICS}." + param[len("physics."):]
+    d["simdoc"] = FORMAT
+    return d
+
+
 @dataclass
 class Document:
     data: dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULTS))
@@ -75,7 +102,7 @@ class Document:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Document":
-        doc = cls(_merge(DEFAULTS, d))
+        doc = cls(_merge(DEFAULTS, _migrate(d)))
         doc.validate()
         return doc
 
@@ -115,6 +142,15 @@ class Document:
     def domain(self) -> dict:
         return self.data["geometry"]["domain"]
 
+    def sole_physics(self) -> tuple[str, dict]:
+        """The (name, settings) of the one physics, for the paths that assume one."""
+        items = list(self.data["physics"].items())
+        if len(items) != 1:
+            raise DocumentError(
+                f"this document declares {len(items)} physics ({', '.join(n for n, _ in items)}); "
+                "solving more than one, and coupling them, is not implemented yet")
+        return items[0]
+
     # -- validation ----------------------------------------------------------
 
     def validate(self) -> None:
@@ -151,18 +187,27 @@ class Document:
         for name, spec in d["materials"].items():
             if not isinstance(spec, dict) or "n" not in spec:
                 raise DocumentError(f"materials.{name}: custom material needs at least {{'n': value}}")
-        p = d["physics"]
-        if p["type"] not in PHYSICS_TYPES:
-            raise DocumentError(f"physics.type {p['type']!r} not supported ({sorted(PHYSICS_TYPES)})")
-        if p["formulation"] not in FORMULATIONS:
-            raise DocumentError(f"physics.formulation must be one of {sorted(FORMULATIONS)}")
-        for side in ("left", "right", "top", "bottom"):
-            if p["boundary"].get(side) not in BOUNDARY_TYPES:
-                raise DocumentError(f"physics.boundary.{side} must be one of {sorted(BOUNDARY_TYPES)}")
-        if not (isinstance(p["wavelength"], (int, float)) and p["wavelength"] > 0):
-            raise DocumentError("physics.wavelength must be a positive number (use study.sweep for several)")
-        if int(p["num_modes"]) < 1:
-            raise DocumentError("physics.num_modes must be >= 1")
+        if not isinstance(d["physics"], dict) or not d["physics"]:
+            raise DocumentError("physics must be a non-empty map of name -> settings, e.g. {'em1': {...}}")
+        for pname, p in d["physics"].items():
+            if not (isinstance(pname, str) and pname.isidentifier()):
+                raise DocumentError(f"physics name {pname!r} must be an identifier: a study or a coupling "
+                                    "refers to a physics by this name")
+            where = f"physics.{pname}"
+            if not isinstance(p, dict):
+                raise DocumentError(f"{where} must be a settings map; physics is keyed by name since 0.2, "
+                                    "so a setting now lives at physics.<name>.<setting>")
+            if p.get("type") not in PHYSICS_TYPES:
+                raise DocumentError(f"{where}.type {p.get('type')!r} not supported ({sorted(PHYSICS_TYPES)})")
+            if p["formulation"] not in FORMULATIONS:
+                raise DocumentError(f"{where}.formulation must be one of {sorted(FORMULATIONS)}")
+            for side in ("left", "right", "top", "bottom"):
+                if p["boundary"].get(side) not in BOUNDARY_TYPES:
+                    raise DocumentError(f"{where}.boundary.{side} must be one of {sorted(BOUNDARY_TYPES)}")
+            if not (isinstance(p["wavelength"], (int, float)) and p["wavelength"] > 0):
+                raise DocumentError(f"{where}.wavelength must be a positive number (use study.sweep for several)")
+            if int(p["num_modes"]) < 1:
+                raise DocumentError(f"{where}.num_modes must be >= 1")
         m = d["mesh"]
         if m["size"] <= 0:
             raise DocumentError("mesh.size must be positive")
@@ -195,8 +240,9 @@ class Document:
         for s in g["shapes"]:
             lines.append(f"  shape {s['name']}: {s['type']} of {s['material']}" +
                          (f", mesh {s['mesh_size']}" if "mesh_size" in s else ""))
-        lines.append(f"  physics: {p['type']} {p['formulation']}, lambda {p['wavelength']} um, {p['num_modes']} mode(s), "
-                     f"boundary {p['boundary']}")
+        for pname, ph in p.items():
+            lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} um, "
+                         f"{ph['num_modes']} mode(s), boundary {ph['boundary']}")
         lines.append(f"  mesh: size {m['size']}" + (f", grading {m['grading']}" if m.get("grading") else ""))
         lines.append(f"  study: {st['type']}" + (f" over {st['parameter']} x{len(st['values'])}" if st["type"] == "sweep" else ""))
         return "\n".join(lines)
