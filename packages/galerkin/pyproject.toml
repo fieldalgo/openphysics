@@ -33,7 +33,7 @@ Issues = "https://github.com/FieldAlgo/galerkin/issues"
 # it. tests/test_independence.py enforces that separation.
 test = [
     "pytest",
-    "refsol @ git+https://github.com/FieldAlgo/galerkin-refsol",
+    "galerkin-refsol @ git+https://github.com/FieldAlgo/galerkin-refsol",
     # meshers, exercised through galerkin.from_mesher. Neither is a runtime
     # dependency; gmshio additionally wants a `gmsh` executable on PATH
     # (pip install gmsh), which it runs as a separate process and never links.
