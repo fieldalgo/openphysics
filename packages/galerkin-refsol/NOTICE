@@ -1,0 +1,26 @@
+galerkin-refsol
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+Reference solutions and published benchmarks for validating the galerkin engine.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this product except in compliance with the License. A copy of the License
+is distributed with this product in the file LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+THIRD-PARTY MATERIAL
+
+The benchmark values in refsol/benchmarks.py are numerical results published in:
+
+    G. R. Hadley, "High-accuracy finite-difference equations for dielectric
+    waveguide analysis II: dielectric corners", J. Lightwave Technol. 20(7),
+    1210-1218 (2002). doi:10.1109/JLT.2002.800370
+
+They were cross-checked against the same values as tabulated in the benchmark
+documentation of the femwell project (GPL-3.0,
+https://github.com/HelgeGehring/femwell). Only the measured/computed values
+themselves are reproduced here -- no code, text, or other expressive content
+from femwell is included in or derived from this package, and this package is
+not a derivative work of femwell.
