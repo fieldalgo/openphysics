@@ -44,9 +44,14 @@ class MeshedModel:
     region_materials: dict[str, str]        # region name -> material name
     materials: dict[str, physmat.Material]  # region name -> resolved material
 
-    def eps_per_triangle(self, wavelength_um: float) -> np.ndarray:
-        """Relative permittivity of each triangle at one wavelength."""
-        lut = np.array([self.materials[n].eps(wavelength_um).real for n in self.tri.region_names])
+    def eps_per_triangle(self, wavelength: float) -> np.ndarray:
+        """Relative permittivity of each triangle at one wavelength.
+
+        Complex, loss included. Dropping the imaginary part here would leave the
+        physics with no way to tell a lossy material from a lossless one, and
+        its own guard against loss would never fire.
+        """
+        lut = np.array([self.materials[n].eps(wavelength) for n in self.tri.region_names])
         return lut[self.tri.regions]
 
 

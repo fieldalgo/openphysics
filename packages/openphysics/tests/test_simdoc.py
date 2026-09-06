@@ -9,7 +9,7 @@ import pytest
 
 import physmat
 from refsol import benchmarks, fiber, slab
-from simdoc import Document, DocumentError, examples, run
+from simdoc import Document, DocumentError, build_mesh, examples, run, solve_point
 from simdoc.geometry import resolve_regions
 
 
@@ -38,6 +38,17 @@ def test_reads_a_0_1_document_by_migrating_it():
     assert doc["physics"]["em1"]["wavelength"] == 1.55
     assert doc["study"]["parameter"] == "physics.em1.wavelength"
     assert doc.get_path("physics.em1.wavelength") == 1.55           # the rewritten path resolves
+
+
+def test_a_lossy_material_is_refused_rather_than_solved_lossless():
+    """The scalar path cannot do loss; it must say so instead of dropping Im(eps)."""
+    d = copy.deepcopy(examples.SLAB_TE_CHECK)
+    d["geometry"]["shapes"][0]["material"] = "Au"
+    doc = Document.from_dict(d)
+    model = build_mesh(doc)
+    assert np.iscomplexobj(model.eps_per_triangle(1.55))          # loss reaches the physics
+    with pytest.raises(NotImplementedError, match="lossy"):
+        solve_point(model, doc.sole_physics()[1])
 
 
 def test_more_than_one_physics_is_rejected_for_now():
