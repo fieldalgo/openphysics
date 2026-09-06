@@ -57,6 +57,14 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
         later = [polys[j] for j in range(i + 1, len(shapes))]
         geom = polys[i].difference(unary_union(later)) if later else polys[i]
         if geom.area < min_area:
+            if polys[i].area < min_area:
+                # It was already a sliver before any boolean: nothing occluded it, so this is
+                # the document's own scale. Dropping it silently leaves a named material out of
+                # a run that then converges on the wrong geometry.
+                doc.notes.append(
+                    f"geometry.shapes: {s['name']!r} covers {polys[i].area:g} square units, under "
+                    f"{AREA_EPS:g} of the domain, so it was dropped and contributes no material. "
+                    f"Check its size against the units this document declares.")
             continue
         exact = None
         if s["type"] == "circle" and abs(geom.area - polys[i].area) < AREA_EPS * polys[i].area \

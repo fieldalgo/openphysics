@@ -178,6 +178,25 @@ def test_a_region_is_a_sliver_relative_to_the_domain_not_absolutely():
         assert names == ["film", "background"], f"{symbol}: regions dropped -> {names}"
 
 
+def test_a_named_shape_does_not_vanish_without_a_word():
+    """A sliver is reported; a shape a later shape covered is not. Only one of them is a mistake."""
+    from simdoc.geometry import resolve_regions
+    base = copy.deepcopy(examples.SLAB_TE_CHECK)
+    face = copy.deepcopy(base["geometry"]["shapes"][0])
+
+    sliver = copy.deepcopy(base)
+    sliver["geometry"]["shapes"] = [dict(face, name="dopant", w=1e-7, h=1e-7), dict(face, name="film")]
+    doc = Document.from_dict(sliver)
+    assert "dopant" not in [n for n, *_ in resolve_regions(doc)]
+    assert any("dopant" in n for n in doc.notes), "a named region left the model in silence"
+
+    occluded = copy.deepcopy(base)
+    occluded["geometry"]["shapes"] = [dict(face, name="buried"), dict(face, name="cover")]
+    doc = Document.from_dict(occluded)
+    assert [n for n, *_ in resolve_regions(doc)] == ["cover", "background"]
+    assert doc.notes == [], "being covered by a later shape is what the booleans are for"
+
+
 def test_an_empty_mesh_is_refused_where_it_is_made():
     """An empty collection is a valid data structure and never a valid intermediate result."""
     base = copy.deepcopy(examples.SLAB_TE_CHECK)
