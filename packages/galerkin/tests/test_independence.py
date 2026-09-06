@@ -10,7 +10,7 @@ ENGINE = pathlib.Path(__file__).resolve().parent.parent / "galerkin"
 
 
 def _imported_modules(path):
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     out = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
