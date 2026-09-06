@@ -40,7 +40,7 @@ README. They share one git history, one test run and one install.
 
 ## Elsewhere
 
-Study notes, concept demos and experiments live in the sibling repository `../multiphysics-lab`
+Study notes, concept demos and experiments live in the sibling repository `../openphysics-lab`
 (personal account, never published). A path inside it is never public; everything in this
 repository ships with a product one day. When unsure where a file goes, it goes in the lab.
 
