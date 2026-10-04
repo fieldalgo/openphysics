@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openphysics"
+version = "0.0.1"
+description = "OpenPhysics - a multiphysics simulation suite (name reservation)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "FieldAlgo", email = "yonghakim@fieldalgo.com" }]
+keywords = ["multiphysics", "finite-element", "simulation", "photonics"]
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.urls]
+Homepage = "https://github.com/FieldAlgo/openphysics"
+Repository = "https://github.com/FieldAlgo/openphysics"
+Issues = "https://github.com/FieldAlgo/openphysics/issues"
+
+[tool.setuptools]
+packages = []
