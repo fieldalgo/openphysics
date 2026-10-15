@@ -115,3 +115,72 @@ def test_detected_private_mesh_mutation_stops_transfer(monkeypatch):
     with pytest.raises(workflow.WorkflowStageError,match='reference mesh changed') as e:
         workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert e.value.stage=='heat'
+
+
+@pytest.mark.parametrize('field,value',[('conductivity',0.),('conductivity',True),
+    ('young_modulus',-1.),('poisson_ratio',.5),('reference_temperature_k',-1.),
+    ('thermal_expansion_per_k',float('inf')),('body_force',[1.]),('plane','3d')])
+def test_invalid_material_input(field,value):
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);kw[field]=value
+    with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
+    assert e.value.stage=='input'
+
+
+def test_canonical_input_order_and_callback_copies():
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh)
+    first=workflow.solve_steady_thermoelasticity(mesh,**kw)
+    kw['thermal_dirichlet']=dict(reversed(list(kw['thermal_dirichlet'].items())))
+    kw['mechanical_dirichlet']=dict(reversed(list(kw['mechanical_dirichlet'].items())))
+    again=workflow.solve_steady_thermoelasticity(mesh,**kw)
+    assert first.manifest_json==again.manifest_json
+    body=np.zeros(2);kw['body_force']=body
+    def source(points):body[:]=100.;return np.zeros(len(points))
+    kw['heat_source']=source;result=workflow.solve_steady_thermoelasticity(mesh,**kw)
+    np.testing.assert_array_equal(result.mechanics.load_external,0.)
+    assert result.manifest['inputs']['body_force_n_m3']['value']==[0.,0.]
+
+
+def test_private_reference_is_identical_across_stages(monkeypatch):
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);seen=[]
+    heat=workflow.solve_steady_heat;freeze=workflow.freeze_temperature;mechanical=workflow.solve_thermoelasticity
+    def h(private,**args):seen.append(private);return heat(private,**args)
+    def t(private,temperature):seen.append(private);return freeze(private,temperature)
+    def m(private,snapshot,**args):seen.append(private);return mechanical(private,snapshot,**args)
+    monkeypatch.setattr(workflow,'solve_steady_heat',h);monkeypatch.setattr(workflow,'freeze_temperature',t)
+    monkeypatch.setattr(workflow,'solve_thermoelasticity',m)
+    r=workflow.solve_steady_thermoelasticity(mesh,**kw)
+    assert len(seen)==3 and all(x is r.reference_mesh for x in seen) and r.reference_mesh is not mesh
+
+
+@pytest.mark.parametrize('bad',['none','heat','mechanics'])
+def test_component_constraints(bad):
+    from galerkin.mesh import Mesh
+    base=rectangle_mesh(1,1,2,2);n=base.num_nodes
+    mesh=Mesh(np.concatenate([base.nodes,base.nodes+[2,0]]),np.concatenate([base.triangles,base.triangles+n]),
+              {k:np.concatenate([v,v+n]) for k,v in base.boundary.items()})
+    kw=arguments(mesh)
+    kw['mechanical_dirichlet']={(o+i,c):0. for o in [0,n] for i,c in [(0,0),(0,1),(2,1)]}
+    if bad=='heat':kw['thermal_dirichlet']={int(i):313.15 for i in base.boundary['left']}
+    if bad=='mechanics':del kw['mechanical_dirichlet'][(n+2,1)]
+    if bad=='none':
+        result=workflow.solve_steady_thermoelasticity(mesh,**kw)
+        np.testing.assert_allclose(result.mechanics.stress,0,atol=70e9*12e-6*20*1e-10)
+    else:
+        with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
+        assert e.value.stage==bad
+
+
+def test_manifest_failure_chained(monkeypatch):
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);cause=ValueError('injected canonical JSON error')
+    def fail(*a,**k):raise cause
+    monkeypatch.setattr(workflow.json,'dumps',fail)
+    with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
+    assert e.value.stage=='manifest' and e.value.__cause__ is cause
+
+
+def test_valid_numeric_temperature_is_not_authenticated_as_units_intent():
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh)
+    kw['thermal_dirichlet']={int(i):20. for i in mesh.boundary['left']}
+    r=workflow.solve_steady_thermoelasticity(mesh,**kw)
+    np.testing.assert_allclose(r.temperature_snapshot.temperature_k,20.)
+    assert r.manifest['authentication']=='not_certified'
