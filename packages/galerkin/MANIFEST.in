@@ -1,5 +1,7 @@
 include docs/cavity_solver.md
 include docs/eigenspace_reliability.md
 include docs/elasticity2d.md
-include examples/elasticity2d.py
 include docs/elasticity2d_independent_validation.md
+include examples/elasticity2d.py
+include tests/eigenspace_reliability_oracle.py
+include tests/elasticity2d_independent_oracle.py
