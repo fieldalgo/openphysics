@@ -24,6 +24,9 @@ See the [elasticity API, units and limitations](docs/elasticity2d.md) and the
 [English example](examples/elasticity2d.py). These files are included in the
 sdist. The example can run from the repository root or an unpacked galerkin
 sdist after installing the packages; it is not a simcase/Studio model.
+The separate [independent elasticity validation](docs/elasticity2d_independent_validation.md)
+documents polynomial manufactured fields, mixed boundaries and work/energy
+checks; its contract is also included byte-for-byte in the sdist.
 
 Vector modes retain complex transverse and longitudinal coefficients, including
 degenerate eigenspace directions. Read the [eigenspace reliability contract](docs/eigenspace_reliability.md)
