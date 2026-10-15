@@ -54,6 +54,9 @@ pinned build tools (`--no-isolation`). It checks metadata with `twine check --st
 checks LICENSE/NOTICE and Studio assets, and writes artifact SHA256 checksums.
 It also checks sdist LICENSE/NOTICE, README, build metadata and the Studio page,
 and requires the seven wheel identities and versions to match their sdists.
+The galerkin cavity solver document and simcase cavity document/JSON file example
+must also be present in their sdists and byte-identical to the checked-out files.
+A missing or stale document/example fails validation before installed-wheel tests.
 
 A temporary virtual environment outside the checkout then installs only those
 wheels and their declared dependencies, with pinned versions and the optional
