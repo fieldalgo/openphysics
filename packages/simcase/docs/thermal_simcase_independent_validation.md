@@ -1,5 +1,89 @@
 # Independent headless thermal document validation
 
+## Current final Linux status — 2026-10-16
+
+This current note supersedes present-tense status statements in the historical
+6080/4ec sections below. Those sections, equations, thresholds and failures are
+preserved as evidence for their exact candidates, not as the current result.
+
+The independent submission is branch
+`codex/openphysics-thermal-simcase-independent-validation` at
+**9b43ae368e89e7e840541d21201e56a311a465b3**, based on explicit producer
+**929ac8eb90d5598724ad066e7f8b8fc579ea8cd8** through a normal merge.
+This addendum changes documentation only. Against that producer, the submitted
+independent work added eight dedicated files and preserved all 232 producer
+blobs. This is the independent validator's evidence, not a producer test summary.
+
+In the reconstructed Work cloud Linux environment, the final dedicated source
+suite passed **139 tests**, and the actual sdist-to-wheel installed suite passed
+**139 tests** using `python -I`, copied tests outside the checkout and an external
+confcutdir. Each had zero failures/skips and one existing Starlette deprecation
+warning. The executable and six module origins (simcase, simcase.thermal,
+galerkin, galerkin.thermal, meshine, physmat) were checked inside the installed
+venv. Installed serializer and shipped HTML bytes were compared to exact Git
+blobs. The independent delayed-response Node suite passed **8 source + 8
+installed** checks, zero failures/skips. It executes the actual shipped script
+in a VM/DOM harness; it is not live-browser acceptance.
+
+The exact929 Linux reruns resolved the original five intentional corrupted-result
+save counterexamples and the later constructor/required-artifact checks.
+All nine raw arrays, both field flags, original K/f/reaction/heat balances,
+fixed convergence and SI gates, CLI exits, existing/replaced/foreign output
+protection and bounded two-writer checks remained enforced. An additional actual
+installed CLI run with save_fields=false exited zero, emitted model/summary/log
+without NPZ and agreed with the analytic 60 W/m balance. No tolerance relaxation
+or skip/xfail converted the old failures into passes.
+
+Seven sdists were built into seven wheels. Existing seven sdist asset gates and
+wheel runtime/static byte comparisons passed. The integrated
+`ci/check_distributions.py` command failed because **twine was unavailable**;
+full strict distribution validation is not claimed. No new dependency was
+installed. After environment recovery, the whole-root numerical suite was not
+repeated; these dedicated results do not certify a new complete combined build.
+
+The original scratch became unavailable despite the same hostname. Old
+unuploaded raw logs, venvs and uncommitted work were **not recovered**.
+Consequently “All original failure logs remain retained” below describes an
+observation at the historical run time, not current raw-log availability.
+Committed source, recorded counts and failure traces survived remotely.
+The exact929 source was reconstructed from verified remote blobs, and the
+results above are new executions with new logs. Compact evidence records
+commands, environment, hashes, counts and this loss limitation; neither that
+record nor a rerun is the missing original raw log. The historical initial
+cancelled CI and all old failures remain historical, not retroactive successes.
+
+Follow-up producer **94bd34b5711521d805bdce4bee17852895041344** changes only
+the producer fault-injection test and its English/Korean guide relative to929;
+production `simcase/thermal.py` is byte-identical, blob
+**7823d39f451cad1c6b53d2f8dde7899fd854321c**. The independent Linux review
+ran its stricter five fault cases in source and actual installed environments:
+**5 + 5 passed**. Selected original independent storage/CLI cases separately
+passed **34 + 34**, with 105 deselected per run, not a repeated139-case run.
+The new assertions require the intended injected error and completed replacement
+stage; a fixture rename/replace OSError must not count as cleanup acceptance.
+
+**Windows is unverified.** Two previously reported Windows failures have no
+established cause in this review: actual errno/winerror/stage evidence is needed.
+Linux execution and static inspection do not prove Windows support or a fix.
+GitHub Actions are prohibited by the current instruction: no enable, dispatch
+or rerun; Windows runner validation is stopped/unverified.
+
+A separate deterministic Linux interleaving diagnostic found a remaining
+pathname TOCTOU limit: replacing model.json after cleanup's ownership check
+but before its unlink deleted the foreign replacement in both source and
+installed runs. This schedules a second writer at the check/use gap; it does
+not diagnose the two Windows failures. Inode pinning and checks protect the
+tested already-replaced cases but do not make pathname operations atomic.
+No production fix is claimed. The supported fresh-output contract requires a
+caller-controlled exclusive output: do not allow another writer to modify it
+until save and any cleanup have completed. Preservation of replacements already
+observed before a check is distinct from preservation during a check/use race;
+the latter is not guaranteed. The bounded simultaneous-save test establishes
+exclusive fresh-target acquisition, not general concurrent-writer protection. Hostile races, crash recovery, thermal Studio UI
+and heat-to-mechanical coupling remain outside this acceptance claim.
+
+## Historical evidence begins below
+
 This dedicated suite checks the actual public Document/run/ThermalRunResult API,
 original weak algebra, saved numeric arrays, installed CLI and output ownership.
 It does not use a producer summary or existing thermal reference helper as its

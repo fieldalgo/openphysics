@@ -1,5 +1,27 @@
 # Headless 열전도 문서의 독립 검증
 
+## 현재 최종 Linux 상태 — 2026-10-16
+
+이 현재 안내는 아래 6080/4ec 역사 절의 현재형 상태 설명보다 우선합니다. 과거 절·수식·기준·실패는 해당 정확 후보의 근거로 보존하며 현재 결과로 소급하지 않습니다.
+
+독립 제출은 명시 생산 **929ac8eb90d5598724ad066e7f8b8fc579ea8cd8**를 정상 merge한 `codex/openphysics-thermal-simcase-independent-validation`의 **9b43ae368e89e7e840541d21201e56a311a465b3**입니다. 이 추가 안내는 문서만 변경합니다. 해당 생산 후보 대비 독립 제출은 전용 파일8개를 추가하고 생산232개 blob을 모두 보존했습니다. 아래는 생산 담당의 시험 요약이 아니라 독립 검증 담당의 실행 근거입니다.
+
+재구성한 Work cloud Linux에서 최종 전용 source **139개**, 실제 sdist→wheel installed **139개**가 통과했습니다. installed는 `python -I`, checkout 밖 복사 시험과 외부 confcutdir를 사용했습니다. 각각 실패·skip0, 기존 Starlette deprecation warning1개였습니다. 실행 파일과 simcase, simcase.thermal, galerkin, galerkin.thermal, meshine, physmat의6개 module origin이 설치 venv 안에 있는지 확인했습니다. 설치 serializer와 배포 HTML bytes를 정확 Git blob과 대조했습니다. 독립 지연 응답 Node는 **source8 + installed8** 통과, 실패·skip0입니다. 실제 배포 스크립트를 VM/DOM harness에서 실행한 것이며 실제 브라우저 수용 검증은 아닙니다.
+
+정확929 Linux 재실행에서 초기의 의도적 결과 손상 저장 반례5개와 후속 constructor·필수 artifact 검사가 해결됨을 확인했습니다. 원시 배열9개·두 field flag·원 K/f/반력/열수지·고정 수렴·SI 기준·CLI 종료·기존/교체/foreign 출력 보호·제한된 two-writer 검사를 유지했습니다. 추가 실제 installed CLI의 save_fields=false 실행은 exit0, NPZ 없이 model/summary/log만 생성하고 해석적60 W/m 열수지와 일치했습니다. 허용치 완화나 skip/xfail로 과거 실패를 통과로 바꾸지 않았습니다.
+
+sdist7개에서 wheel7개를 생성했습니다. 기존 sdist asset gate7개와 wheel runtime/static byte 비교는 통과했습니다. 통합 `ci/check_distributions.py`는 **twine 부재로 실패**했으므로 full strict 배포 검증 통과를 주장하지 않습니다. 새 의존성은 설치하지 않았습니다. 환경 복구 뒤 전체 root 수치시험은 반복하지 않았으며 이 전용 결과로 새 전체 결합 빌드를 인증하지 않습니다.
+
+같은 hostname이었지만 원 scratch에 접근할 수 없게 됐습니다. 옛 미업로드 raw log·venv·미commit 작업은 **미회수**입니다. 따라서 아래 “All original failure logs remain retained”와 이에 대응하는 번역은 과거 실행 당시 관측이며 현재 raw log 접근 가능성을 뜻하지 않습니다. 원격 commit 소스·기록된 카운트·실패 trace는 남았습니다. 원격 blob을 검증해 정확929 source를 재구성했고 위 결과는 새 로그를 생성한 새 실행입니다. 작은 근거 기록은 명령·환경·hash·카운트·소실 한계를 구분합니다. 그 기록이나 재실행은 사라진 원 raw log가 아닙니다. 초기 CI 취소와 모든 과거 실패도 소급 성공시키지 않습니다.
+
+후속 생산 **94bd34b5711521d805bdce4bee17852895041344**는929 대비 생산 fault-injection 시험과 한·영 guide만 변경합니다. 생산 `simcase/thermal.py`는 blob **7823d39f451cad1c6b53d2f8dde7899fd854321c**로 byte 동일합니다. 독립 Linux 리뷰에서 엄격해진 fault5개는 source·실제 installed **5 + 5개 통과**했습니다. 기존 독립 저장·CLI 선별 시험은 별도로 **34 + 34개 통과**, 각105개 deselected이며139개 전체 재실행이 아닙니다. 새 assertion은 의도한 주입 오류와 교체 완료 단계를 요구합니다. fixture rename/replace의 OSError를 cleanup 수용 통과로 세면 안 됩니다.
+
+**Windows는 미검증입니다.** 이전 보고된 Windows 실패2개의 원인은 이 리뷰에서 확정하지 않았으며 실제 errno/winerror/stage 근거가 필요합니다. Linux 실행과 정적 검토는 Windows 지원이나 수정 완료를 입증하지 않습니다. 최신 지시로 GitHub Actions 활성화·dispatch·재실행은 금지하며 Windows runner 검증은 중단·미검증입니다.
+
+별도의 결정론적 Linux interleaving 진단에서 pathname TOCTOU 한계를 확인했습니다. cleanup의 소유 확인 뒤 unlink 전에 model.json을 교체하면 source·installed 모두 foreign replacement를 삭제했습니다. 두 번째 writer를 check/use 간격에 스케줄링한 것이며 Windows 실패2개의 원인 진단은 아닙니다. inode pin과 검사는 이미 교체된 파일의 시험 사례를 보호하지만 pathname 작업을 원자적으로 만들지는 않습니다. 생산 수정 완료를 주장하지 않습니다. 지원하는 fresh-output 계약은 호출자가 배타적으로 통제하는 출력 경로를 요구합니다. save와 실패 시 cleanup이 모두 끝날 때까지 다른 writer가 출력을 변경하지 않도록 해야 합니다. 검사 전에 이미 관측한 교체의 보존과 check/use race 도중 교체의 보존은 다르며 후자는 보장하지 않습니다. 제한된 동시 save 시험은 새 target 획득의 배타성을 확인할 뿐 일반적인 외부 동시 writer 보호를 입증하지 않습니다. 적대적 race·crash recovery·thermal Studio UI·heat-to-mechanical 연성은 이 수용 주장의 범위 밖입니다.
+
+## 아래부터 역사적 근거
+
 [영문 원문](../../../thermal_simcase_independent_validation.md)
 
 아래 실행 수치·실패·미검증 서술은 영문 원문의 해당 후보 시점 기록이며 새 수용 결과를 뜻하지 않습니다.
