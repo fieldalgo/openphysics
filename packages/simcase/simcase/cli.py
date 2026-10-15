@@ -40,6 +40,13 @@ def main(argv=None) -> int:
         print(doc.summary())
         return 0
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
+    from .thermal import is_thermal, require_fresh_output
+    if is_thermal(doc.data):
+        try:
+            require_fresh_output(out)
+        except OSError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
     try:
         result = run(doc, verbose=not args.quiet)
     except (ValueError, RuntimeError) as exc:
@@ -47,7 +54,7 @@ def main(argv=None) -> int:
         return 1
     try:
         result.save(out)
-    except OSError as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     files = ["summary.json", "log.txt", "model.json"]

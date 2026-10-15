@@ -55,7 +55,7 @@ def index():
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
-                               if all(p.get("type") != "em.cavity3d" for p in data["physics"].values()))}
+                               if all(p.get("type") == "em.modes2d" for p in data["physics"].values()))}
 
 
 @app.get("/api/examples/{name}")
@@ -95,6 +95,8 @@ def material_preview(body: MaterialPreview):
 
 
 def _require_studio_physics(doc: Document):
+    if any(p.get('type') == 'thermal.steady2d' for p in doc['physics'].values()):
+        raise HTTPException(400, 'thermal.steady2d is headless Python/CLI only; Studio does not support heat input or results')
     if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
 
@@ -103,6 +105,8 @@ def _require_studio_physics(doc: Document):
 def validate(body: DocBody):
     try:
         doc = Document.from_dict(body.doc)
+        if any(p.get('type') == 'thermal.steady2d' for p in doc['physics'].values()):
+            return {'ok': False, 'error': 'Studio unsupported: thermal.steady2d is headless Python/CLI only'}
     except DocumentError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes}

@@ -69,7 +69,7 @@ DEFAULTS: dict[str, Any] = {
 
 SHAPE_TYPES = {"rect": {"x", "y", "w", "h"}, "circle": {"cx", "cy", "r"}, "polygon": {"points"}}
 BOUNDARY_TYPES = {"pec", "pmc"}
-PHYSICS_TYPES = {"em.modes2d", "em.cavity3d"}
+PHYSICS_TYPES = {"em.modes2d", "em.cavity3d", "thermal.steady2d"}
 FORMULATIONS = {"scalar", "vector"}
 
 
@@ -166,8 +166,13 @@ class Document:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Document":
+        if not isinstance(d, dict):
+            raise DocumentError('document: expected an object')
+        from .thermal import is_thermal, defaults as thermal_defaults
         defaults = DEFAULTS
-        if isinstance(d.get("physics"), dict) and any(
+        if is_thermal(d):
+            defaults = thermal_defaults()
+        elif isinstance(d.get("physics"), dict) and any(
                 isinstance(p, dict) and p.get("type") == "em.cavity3d"
                 for p in d["physics"].values()):
             defaults = copy.deepcopy(DEFAULTS)
@@ -238,6 +243,10 @@ class Document:
         except UnitError as exc:
             raise DocumentError(str(exc)) from None
         _reject_tagged_values(d)
+        from .thermal import is_thermal, validate_thermal
+        if is_thermal(d):
+            validate_thermal(self)
+            return
         if isinstance(d.get("physics"), dict) and any(
                 isinstance(p, dict) and p.get("type") == "em.cavity3d"
                 for p in d["physics"].values()):
@@ -371,6 +380,9 @@ class Document:
                     raise DocumentError("a scalar sweep cannot switch to vector; use a vector wavelength sweep")
 
     def summary(self) -> str:
+        from .thermal import is_thermal, thermal_summary
+        if is_thermal(self.data):
+            return thermal_summary(self)
         if any(p.get("type") == "em.cavity3d" for p in self.data["physics"].values()):
             from .cavity import cavity_summary
             return cavity_summary(self)
