@@ -168,6 +168,7 @@ def test_api_and_cli_preserve_existing_target(tmp_path, kind):
         target.write_bytes(b'keep')
     else:
         target.symlink_to(tmp_path/'absent')
+        original_link_text = os.readlink(target)
     r = run(Document.from_dict(model()), False)
     with pytest.raises(FileExistsError):
         r.save(target)
@@ -181,7 +182,7 @@ def test_api_and_cli_preserve_existing_target(tmp_path, kind):
     elif kind == 'file':
         assert target.read_bytes() == b'keep'
     else:
-        assert target.is_symlink() and os.readlink(target) == str(tmp_path/'absent')
+        assert target.is_symlink() and os.readlink(target) == original_link_text
         assert not (tmp_path/'absent').exists()
 
 
