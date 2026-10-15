@@ -84,12 +84,21 @@ time; finite near-target selection still needs separate physical acceptance.
 Profile a single worker, not the waiting parent. Keep its time/RSS separate from
 the uninstrumented baseline.
 
-**WIP reporting limitation:** on CPython 3.12.14, cProfile uses `sys.monitoring`
-while `sys.getprofile()` returns `None`. The current worker therefore incorrectly
-labels such a profiled run as `profiled=false`. The profile itself is collected,
-but this metadata flag needs correction and verification before relying on it.
-Keep the external cProfile command and its `.prof` artifact as explicit evidence
-of instrumentation; never merge its samples into an uninstrumented baseline.
+The worker detects the legacy `sys.getprofile()` hook and active events in
+`sys.monitoring.PROFILER_ID` (CPython 3.12+). It records the monitoring tool name,
+event mask and legacy hook state in `profiling`. A reserved monitoring tool with
+no enabled events is not marked active. This fixes cProfile detection on
+CPython 3.12, where the legacy hook alone returns `None`. It is not a universal
+detector for native/external profilers or tools using other monitoring slots;
+retain the actual profiling command and artifact as provenance.
+
+Summary `succeeded` counts all successful solves; `unprofiled_succeeded` and
+`profiled_succeeded` split that count. Time/RSS median/min/max use only successful
+samples without `profiled=true`; `failed` counts unsuccessful attempts, including
+timeouts. An all-profiled or all-failed group has null time/RSS statistics.
+Historical reports from the old tool can incorrectly label CPython 3.12 cProfile
+as false: the summarizer cannot repair missing provenance. Keep those reports
+separate based on their external commands, even after updating the tool.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
@@ -109,19 +118,104 @@ Run the full root test suite described in [README.md](README.md) separately from
 timing, so tests do not compete for benchmark CPU or memory. This tool supplements
 the existing fixed numerical acceptance gates and does not replace them.
 
-## Baseline collection status (WIP, 2026-10-15)
+## Inherited baseline evidence (2026-10-15)
 
-The clean source at `88ee02c2bfc49ebfa6df4b55260310790613ea2c` completed all
-24 default uninstrumented runs, with six returned modes each and a maximum
-relative residual of 2.01e-12. Within each condition the returned frequencies
-were identical across the three repetitions. At subdivision 16, median solve
-times were 13.0385 s (cube) and 12.8399 s (rectangle), with median process peak
-RSS of 625.19 and 628.38 MiB respectively. These observations used Linux x86-64,
-CPython 3.12.14, NumPy 2.5.4 and SciPy 1.18.1, one requested BLAS thread, an
-AMD EPYC 9V74 host, a four-CPU quota and a 32 GiB memory limit.
+The previous operator reported 24/24 default uninstrumented solves from clean
+source `88ee02c2bfc49ebfa6df4b55260310790613ea2c`, with six returned modes each,
+a maximum relative residual of 2.01e-12 and identical frequencies across the
+three repetitions of each condition. The successor has **not inspected those
+raw reports or profiles**; the following values are inherited reports, not
+independently reproduced measurements.
 
-One separate rectangle16 profile completed; it exposed the reporting limitation
-above. Profiling metadata repair, the complete range/scaling analysis, final
-optimization recommendations and the full source regression run remain pending.
-No solver optimization or performance improvement is claimed. Raw timings and
-profiles are external records, not package artifacts.
+| n=16, inherited report | Cube | Rectangle |
+| --- | ---: | ---: |
+| Solve median, seconds | 13.0385 | 12.8399 |
+| Solve min–max, seconds | 12.4931–13.8035 | 12.8333–14.1168 |
+| Process wall median, seconds | 13.3233 | 13.1404 |
+| Process lifetime peak RSS median, MiB | 625.1875 | 628.3828 |
+| Peak RSS min–max, MiB | 621.9688–626.4336 | 626.8477–628.4414 |
+| Total/free edge DOFs | 31024/26416 | 31024/26416 |
+| Tetrahedra | 24576 | 24576 |
+
+Reported environment: Linux x86-64, CPython 3.12.14, NumPy 2.5.4, SciPy 1.18.1,
+one requested BLAS/OpenMP thread, AMD EPYC 9V74, four-CPU quota, 32 GiB memory
+limit. The full eight-row ranges/scaling analysis remains pending access to
+the original results. No cross-machine speedup or memory reduction is claimed.
+
+The previous operator separately reported one rectangle n=16 cProfile:
+13.278 s total, 12.856 s cumulative in the solve, 7.962 s across two `splu`
+calls and 4.342 s in `eigsh`. The original metadata incorrectly said
+`profiled=false`; its command and profile artifact, rather than that flag,
+identify it as instrumented. These nested cumulative values must not be added.
+The original profile-analysis JSON was not produced after a metadata assertion
+failed. The uninstrumented 24-run report was not invalidated by that separate
+flag error.
+
+## Successor verification and limits
+
+The successor uses a separate checkout, environment and records directory on
+a host shared with other development sessions. Other numerical workloads can
+affect timing; exclusive load is not established. Verification is limited to
+metadata/CLI/summarizer checks, fresh cube/rectangle n=4 smoke solves and a
+separate rectangle n=4 profile. These are tool checks, **not a new baseline**.
+The environment has Python 3.12.14, NumPy 2.3.5 and SciPy 1.17.0, so the
+numerical-library versions also differ from the inherited timing environment.
+All six listed BLAS/OpenMP variables are requested as one thread before imports.
+
+The metadata checks cover real cProfile enable/disable, an inactive monitoring
+reservation, legacy-hook fallback, mixed success/error/timeout/profile summaries,
+CLI validation and overwrite refusal. Linux KiB and macOS bytes conversion are
+also checked with mocked resource values; this is not native macOS validation.
+
+The bounded fresh-worker check on clean source
+`2223528cc3f46f24471399e2288618751023f424` returned six modes for both n=4
+geometries, with 384 tetrahedra and 316 free edge DOFs. Maximum residuals were
+2.682e-13 (cube) and 5.282e-15 (rectangle). Both uninstrumented workers were
+marked false, and the separate rectangle n=4 cProfile worker was marked true
+with tool `cProfile` and active monitoring events. The report recorded unchanged
+source identity. Current visible limits were an eight-CPU quota and 8 GiB
+memory, with nine affinity CPUs; these differ from the inherited environment.
+
+The first smoke command printed two successful workers and exited zero, but a
+subsequent read saw only its first incomplete checkpoint. That file was retained
+and rejected as completed evidence. A bounded retry verified the final JSON in
+the same invocation, copied it to a separate final artifact, and confirmed both
+completed reports on a later read. A separate atomic-replace probe also passed.
+The original discrepancy has no established cause.
+
+At the code revision above, remote
+[CI 38727103372](https://github.com/fieldalgo/openphysics/actions/runs/38727103372)
+passed 498 source tests (zero skips, nine subtests), built/validated seven
+sdist-to-wheel distributions, passed 28 installed-wheel tests and eight Node
+tests. These checks used CI's pinned environment. The successor's local root
+suite instead reported 480 passed, nine failed and nine skipped: seven failures
+and seven skips required unavailable Gmsh, two skips required the unavailable RII
+database, and two CLI subprocesses could not import the uninstalled source
+packages. This local result is not a full pass. Local distribution validation
+was not run because twine/Gmsh were absent; no dependencies were installed.
+Package/build/CI inputs are unchanged by the benchmark-only code revision.
+
+## Recommendations and remaining analysis
+
+The inherited profile makes sparse factorization the first **candidate** for a
+future investigation. First inspect the original profile call tree, matrix
+dimensions/nonzero counts and factorization setup versus repeated solves.
+Then compare suitable preconditioned iterative shifted solves against sparse
+direct factorization on the same workloads and controlled machine. The cavity
+operator has a gradient nullspace and shifted systems need not be positive
+definite: do not assume conjugate gradients or a generic preconditioner applies.
+Any later method needs independent residual, nullspace exclusion, orthogonality,
+degenerate-subspace and convergence checks before accepting timing improvements.
+No iterative solver or preconditioner is implemented here.
+
+The n=16 factorization report does not establish asymptotic scaling or identify
+a memory owner. Recover all eight conditions and their raw samples before
+fitting trends or extending the workload. Separate import/process overhead from
+solver wall time; do not call lifetime RSS incremental factorization memory.
+A small-mesh profile verifies metadata but does not confirm the n=16 bottleneck.
+Keep profiling separate and establish phase memory attribution in a follow-up.
+
+The original raw results remain external records requiring transfer through
+an authorized private channel. Final baseline analysis remains pending that
+transfer; a fresh complete run is unnecessary unless the original data cannot
+be recovered and a controlled performance environment is explicitly available.
