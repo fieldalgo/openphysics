@@ -2,7 +2,7 @@
 
 ## Narrow Windows headless thermal gate
 
-`thermal-windows.yml` runs Python 3.12.14 on GitHub-hosted windows-2022. It
+`thermal-windows.yml` runs Python 3.12.10 on GitHub-hosted windows-2022. It
 builds four local wheels (galerkin, meshine, physmat, simcase), installs them
 without an index or dependency resolution into a consumer venv, and runs the
 dedicated heat document consumers plus selected shipped save/I/O tests outside

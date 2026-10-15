@@ -130,7 +130,7 @@ Kelvin, SI-suffixed thermal coefficients and explicit geometry length units.
 This rectangular steady-heat path has no thermal Studio forms, plots, Robin
 boundary or automatic thermoelastic coupling. Consult the contract for fresh
 output ownership, incomplete-output detection and platform validation limits.
-A separate Windows 2022 / Python 3.12.14 gate covers installed headless API/CLI
+A separate Windows 2022 / Python 3.12.10 gate covers installed headless API/CLI
 and selected save I/O only; it does not establish Windows full-regression or Gmsh support.
 
 Reproducible Linux validation, pinned optical data, and checks of installed
