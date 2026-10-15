@@ -37,6 +37,7 @@ from .tracking import ModeTracker, ModeTrackingError, tracking_settings
 
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
+    from .thermal import ThermalRunResult
 
 
 @dataclass
@@ -237,7 +238,7 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult:
+def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | ThermalRunResult:
     """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
     log: list[str] = []
 

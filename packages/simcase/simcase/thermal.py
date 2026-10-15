@@ -165,7 +165,8 @@ class _OwnedOutput:
             return False
 
     def finish(self):
-        if not self.unchanged() or any(not self.owns(p.name) for p in self.path.iterdir()):
+        if (not self.unchanged() or any(not self.owns(name) for name in self.files)
+                or any(not self.owns(p.name) for p in self.path.iterdir())):
             raise OSError('thermal output contains unexpected or replaced files; leaving it incomplete')
         if not self.owns('.incomplete'):
             raise OSError('thermal incomplete marker was replaced')

@@ -272,3 +272,14 @@ def test_thermal_cli_nonfinite_summary_exit1(tmp_path,capsys,monkeypatch):
     monkeypatch.setattr(cli,'run',lambda *a,**kw:r)
     assert main(['run',str(f),'-o',str(tmp_path/'bad')])==1
     assert not (tmp_path/'bad').exists() and 'Traceback' not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('name',['model.json','log.txt','fields.npz','summary.json','.incomplete'])
+def test_thermal_missing_owned_artifact_never_commits(tmp_path,monkeypatch,name):
+    r=run(Document.from_dict(model()),False);out=tmp_path/'out';original=_OwnedOutput.finish
+    def missing(self):
+        (self.path/name).unlink()
+        original(self)
+    monkeypatch.setattr(_OwnedOutput,'finish',missing)
+    with pytest.raises(OSError):r.save(out)
+    assert not out.exists()  # all remaining known files can safely be cleaned
