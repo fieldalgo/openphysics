@@ -43,7 +43,7 @@ def _number(value, path, positive=False, nonnegative=False, integer=False):
         valid = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
     except OverflowError:
         valid = False
-    if not valid or (positive and value <= 0) or (nonnegative and value < 0) or (integer and int(value) != value):
+    if not valid or (positive and value <= 0) or (nonnegative and value < 0) or (integer and not isinstance(value, int)):
         raise DocumentError(f'{path}: expected a finite ' + ('positive integer' if integer else
                             'positive number' if positive else 'nonnegative number' if nonnegative else 'number'))
 
@@ -133,6 +133,14 @@ class _OwnedOutput:
         self.path.mkdir()  # the losing concurrent writer never enters cleanup
         self.identity = _identity(self.path)
         self.files = {}
+        self.handles = []
+        # Pin the directory inode, including while its pathname is replaced.
+        self.handles.append(os.open(self.path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)))
+
+    def close(self):
+        for fd in self.handles:
+            os.close(fd)
+        self.handles.clear()
 
     def unchanged(self):
         try:
@@ -144,6 +152,8 @@ class _OwnedOutput:
         if not self.unchanged():
             raise OSError('thermal output target was replaced; refusing to write')
         with (self.path/name).open('xb') as stream:
+            # Keep the inode alive: unlink/recreate must never acquire our identity.
+            self.handles.append(os.dup(stream.fileno()))
             self.files[name] = (os.fstat(stream.fileno()).st_dev, os.fstat(stream.fileno()).st_ino)
             writer(stream)
 
@@ -162,6 +172,12 @@ class _OwnedOutput:
         (self.path/'.incomplete').unlink()
 
     def cleanup(self):
+        try:
+            self._cleanup()
+        except OSError:
+            pass  # keep the incomplete output; do not mask the original failure
+
+    def _cleanup(self):
         if not self.unchanged():
             return  # never touch a replaced target, even if it has familiar names
         safe = all(self.owns(p.name) for p in self.path.iterdir())
@@ -171,9 +187,10 @@ class _OwnedOutput:
                     (self.path/name).unlink()
                 except OSError:
                     safe = False
-        if safe and self.owns('.incomplete'):
+        if safe:
             try:
-                (self.path/'.incomplete').unlink()
+                if self.owns('.incomplete'):
+                    (self.path/'.incomplete').unlink()
                 if self.unchanged():
                     self.path.rmdir()  # only succeeds when empty
             except OSError:
@@ -217,20 +234,54 @@ class ThermalRunResult:
     @property
     def residual_w_per_m(self): return self.solution.residual
 
+    def _raw_arrays(self):
+        arrays = dict(nodes_m=np.asarray(self.mesh.nodes), triangles=np.asarray(self.mesh.triangles),
+                      temperature_k=np.asarray(self.temperature_k), heat_flux_w_m2=np.asarray(self.heat_flux_w_m2),
+                      load_w_per_m=np.asarray(self.load_w_per_m), reaction_w_per_m=np.asarray(self.reaction_w_per_m),
+                      residual_w_per_m=np.asarray(self.residual_w_per_m), dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
+                      dirichlet_temperature_k=np.asarray(self.dirichlet_temperature_k))
+        for key, a in arrays.items():
+            if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
+                raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
+        nodes, tris, fixed = arrays['nodes_m'], arrays['triangles'], arrays['dirichlet_node_ids']
+        if nodes.ndim != 2 or nodes.shape[1] != 2 or len(nodes) < 3:
+            raise ValueError('thermal nodes_m: expected nonempty (N,2) coordinates')
+        if tris.ndim != 2 or tris.shape[1] != 3 or not len(tris) or tris.dtype.kind not in 'iu':
+            raise ValueError('thermal triangles: expected integer (M,3) connectivity')
+        if fixed.ndim != 1 or not len(fixed) or fixed.dtype.kind not in 'iu':
+            raise ValueError('thermal dirichlet_node_ids: expected integer (D,) indices')
+        if np.any(tris < 0) or np.any(tris >= len(nodes)) or np.any(fixed < 0) or np.any(fixed >= len(nodes)):
+            raise ValueError('thermal raw connectivity/Dirichlet indices outside mesh')
+        if np.any(np.diff(fixed.astype(np.int64)) <= 0):
+            raise ValueError('thermal dirichlet_node_ids must be unique and sorted')
+        shapes = {'temperature_k': (len(nodes),), 'heat_flux_w_m2': (len(tris), 2),
+                  'load_w_per_m': (len(nodes),), 'reaction_w_per_m': (len(nodes),),
+                  'residual_w_per_m': (len(nodes),), 'dirichlet_temperature_k': (len(fixed),)}
+        for key, shape in shapes.items():
+            if arrays[key].shape != shape:
+                raise ValueError(f'thermal raw array {key}: expected shape {shape}')
+        v = nodes[tris][:, 1:]-nodes[tris][:, :1]
+        det = v[:, 0, 0]*v[:, 1, 1]-v[:, 0, 1]*v[:, 1, 0]
+        if not np.isfinite(det).all() or np.any(det <= 0):
+            raise ValueError('thermal triangles must be finite, nondegenerate and CCW')
+        if np.any(arrays['dirichlet_temperature_k'] < 0):
+            raise ValueError('thermal prescribed temperature must be nonnegative kelvin')
+        return arrays
+
     def summary(self):
+        arrays = self._raw_arrays()
         name, p = self.doc.sole_physics()
-        return {'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
+        result = {'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
                 'result_format': RESULT_FORMAT, 'field_layout': FIELD_LAYOUT,
                 'units': copy.deepcopy(self.doc['units']), 'mesh_length_unit': 'm',
-                'field_units': {'temperature_k': 'K', 'heat_flux_w_m2': 'W/m^2',
+                'field_units': {'nodes_m': 'm', 'triangles': '1', 'dirichlet_node_ids': '1',
+                                'dirichlet_temperature_k': 'K', 'temperature_k': 'K', 'heat_flux_w_m2': 'W/m^2',
                                 'load_w_per_m': 'W/m', 'reaction_w_per_m': 'W/m', 'residual_w_per_m': 'W/m'},
-                'field_locations': {'temperature_k': 'nodes', 'heat_flux_w_m2': 'triangle_centroids',
+                'field_locations': {'nodes_m': 'nodes', 'triangles': 'triangle_connectivity',
+                                    'dirichlet_node_ids': 'dirichlet_nodes', 'dirichlet_temperature_k': 'dirichlet_nodes',
+                                    'temperature_k': 'nodes', 'heat_flux_w_m2': 'triangle_centroids',
                                     'load_w_per_m': 'nodes', 'reaction_w_per_m': 'nodes', 'residual_w_per_m': 'nodes'},
-                'field_shapes': {'temperature_k': list(self.temperature_k.shape),
-                                 'heat_flux_w_m2': list(self.heat_flux_w_m2.shape),
-                                 'load_w_per_m': list(self.load_w_per_m.shape),
-                                 'reaction_w_per_m': list(self.reaction_w_per_m.shape),
-                                 'residual_w_per_m': list(self.residual_w_per_m.shape)},
+                'field_shapes': {key: list(a.shape) for key, a in arrays.items()},
                 'reaction_sign': 'inward; outward heat = -sum(reaction on unique Dirichlet nodes)',
                 'mesh': {'nodes': len(self.mesh.nodes), 'triangles': len(self.mesh.triangles),
                          'subdivisions': list(self.doc['mesh']['subdivisions'])},
@@ -241,6 +292,8 @@ class ThermalRunResult:
                 'temperature_min_k': float(self.temperature_k.min()),
                 'temperature_max_k': float(self.temperature_k.max()),
                 **self.diagnostics, 'timings_s': dict(self.timings)}
+        json.dumps(result, allow_nan=False)
+        return result
 
     def save(self, outdir):
         owned = _OwnedOutput(outdir)
@@ -251,21 +304,22 @@ class ThermalRunResult:
             owned.write('model.json', lambda f: f.write(json.dumps(self.doc.data, indent=2, allow_nan=False).encode()))
             owned.write('log.txt', lambda f: f.write(('\n'.join(self.log)+'\n').encode()))
             if self.doc['results']['save_fields']:
-                arrays = dict(nodes_m=self.mesh.nodes, triangles=self.mesh.triangles,
-                              temperature_k=self.temperature_k, heat_flux_w_m2=self.heat_flux_w_m2,
-                              load_w_per_m=self.load_w_per_m, reaction_w_per_m=self.reaction_w_per_m,
-                              residual_w_per_m=self.residual_w_per_m, dirichlet_node_ids=self.dirichlet_node_ids,
-                              dirichlet_temperature_k=self.dirichlet_temperature_k,
-                              result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT,
+                arrays = dict(self._raw_arrays(), result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT,
                               mesh_length_unit='m', metadata_json=encoded.decode())
                 if any(np.asarray(v).dtype.hasobject for v in arrays.values()):
                     raise ValueError('thermal raw arrays must not contain Python objects')
+                for key, value in arrays.items():
+                    a = np.asarray(value)
+                    if a.dtype.kind in 'iuf' and not np.isfinite(a).all():
+                        raise ValueError(f'thermal raw array {key} must be finite')
                 owned.write('fields.npz', lambda f: np.savez_compressed(f, **arrays))
             owned.write('summary.json', lambda f: f.write(encoded))
             owned.finish()
         except (OSError, ValueError, RuntimeError):
             owned.cleanup()
             raise
+        finally:
+            owned.close()
         return owned.path
 
 
