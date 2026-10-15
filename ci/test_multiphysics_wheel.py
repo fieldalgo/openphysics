@@ -93,8 +93,12 @@ def test_archived_english_elasticity_example_runs_with_installed_packages():
                                  for line in lines[1:]]
     assert all(a.shape == (2,) and np.isfinite(a).all() for a in (load, reaction, imbalance))
     assert load[1] < 0 and reaction[1] > 0
-    np.testing.assert_allclose(reaction, -load, rtol=1e-9, atol=1e-12)
-    assert np.linalg.norm(imbalance) <= 1e-9 * np.linalg.norm(load)
+    # Normalize by the nonzero applied-force scale. An absolute tolerance in
+    # N/m on the zero horizontal component is not a unit-independent balance gate.
+    force_scale = np.linalg.norm(load)
+    np.testing.assert_allclose(reaction / force_scale, -load / force_scale,
+                               rtol=1e-9, atol=1e-12)
+    assert np.linalg.norm(imbalance) / force_scale <= 1e-9
 
 
 def test_installed_vector_solver_and_complex_serialization(tmp_path):
