@@ -1,0 +1,2424 @@
+{
+  "archive_bytes": 3229404,
+  "archive_sha256": "3613eec5d396405118e565e3330820725cf4feb32ea3c5ccee4782e29b9bd459",
+  "base64_bytes": 4305872,
+  "chunks": [
+    {
+      "bytes": 48000,
+      "git_blob": "9927ac9dd6aa9a5fab14bfa7c9fed3f632b0dc7e",
+      "name": "chunk-000.b64",
+      "sha256": "d3dde93b0d1c8db5d027bf86752862de3ed660321746600d1c05dfb482daaae9"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "eb120d24191c1d84feec2b5a81ea4e93b0efca2a",
+      "name": "chunk-001.b64",
+      "sha256": "87611ade75c1165848226a5bbce8242498d4cc62251b9922b88b98f251852750"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "4e6ea31698340f10f237e4048aeda86b087bb3a3",
+      "name": "chunk-002.b64",
+      "sha256": "6011c7acbeeb1a78a7126d279dc872877528399d80d367d459cce71aed46a0b9"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "aaf1a49e75d39b85690af3bc926e7cfcd943de65",
+      "name": "chunk-003.b64",
+      "sha256": "06921a5d37a0c473dc2d5f1fe5373fa7ef29ee7e54f7735ebe97b1dd58e33b79"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "7d23a3a1ad7eaa60fa443fc2418e62a093ccbf7e",
+      "name": "chunk-004.b64",
+      "sha256": "7fdbb2d34a09bded14d14d2a1cdfb829b4997b384092443ed85022aaaa36b4df"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "7a1f9d9b56584f3db8cf7795710c8f7d6e1ceb2c",
+      "name": "chunk-005.b64",
+      "sha256": "61315817a0f2263412ea1283c8959953b27eac7b3d3e74d5ce50713dea310f7b"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "57f343a25ff8b08ec21fcee49e128ed7021fbda7",
+      "name": "chunk-006.b64",
+      "sha256": "97670462c03b1ab6b1418e9441fb9da3f4f4d8afe2c118c65e0fb5c1bf232b3f"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "6bd36a4b76f68cca3f58a4a3eb0f7cfae9ca4653",
+      "name": "chunk-007.b64",
+      "sha256": "ae89be234a241a8e8f33c36939133695e4b1e21af6bbb017024fbe8d0352e9b6"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "92791ce09f8b6367a04042a1d3755600ac04ba46",
+      "name": "chunk-008.b64",
+      "sha256": "2d566a258eb1fbfd31fd7b042969efd50a945c76fbe92c2ec4969096a5cb5f58"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "c5a84bc7ba42e848d94e6a654248cc68e45b26af",
+      "name": "chunk-009.b64",
+      "sha256": "392fc45d08870b9587305c9f252ae8f46c54e023745347f025c43c1e593660f5"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "f91af04d1da5e438c3b717e24653244214c076c6",
+      "name": "chunk-010.b64",
+      "sha256": "48c76bff7918cb6af27fda636555da045a346808d2d85c8c53eb5624c7c1ee86"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "105de8c483f68bd63d621a9154c610ca954b0cb9",
+      "name": "chunk-011.b64",
+      "sha256": "acdc50de9f136ae1ed45747131bff2b92088013a3e85fb49d3bb30fb15d79cd3"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "92fdac4d77655765f21f4ac6fda9b7f713c8fe95",
+      "name": "chunk-012.b64",
+      "sha256": "d25d8d4bef1c897922fdc384df44e4d450e50dff4d1e4aa59fda0d809e396c70"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "9ae4dfc3a442382e0e77b3ae0668fd126e8f16ca",
+      "name": "chunk-013.b64",
+      "sha256": "88103ffd8c2b7abab61603ccf6c6db5eeeac52e0bb62728b4d3cd5e42dffbfd3"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "9302e7d63d6a43dc3c520e9a6cdf13508bd7fd26",
+      "name": "chunk-014.b64",
+      "sha256": "2219f81ffb2e7609203f7748b3d39842a172f102f6cbb0eddfb31bb5769077dc"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b65029cc6a0b9cb9050e03449b6182b8d7af5de3",
+      "name": "chunk-015.b64",
+      "sha256": "a5cbf1b7461b8450b22718d6a1c326818f5ba69058686c7d8575b73960dbc473"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "c75010bc87cc1fbdf23e77559b5c080e438c00d8",
+      "name": "chunk-016.b64",
+      "sha256": "204b1a035bb4f73a11feaf3b95c01e2f3c75f999eb89239d8947f7b90fa631bf"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "d04d48697bd4ef48e5c2d990e1eedd2b46068409",
+      "name": "chunk-017.b64",
+      "sha256": "78bd46e10641917d15f1bdc146b5d55673327b0cf0dfb30a8a2cfda2352acd93"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b712bf2749ca93fa3665146c9e647e96dfa996b0",
+      "name": "chunk-018.b64",
+      "sha256": "153882a61d5147c14e197800f7d35e26d0f2a92d9bd95940391e426af5f44c06"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "906a78cfd59d328328cde3ae7d6f0581edb5f5f4",
+      "name": "chunk-019.b64",
+      "sha256": "a455948228c5ca63778d71d2822c65c21857d002c9580caf4704686ef7dc9234"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "fe631b4769a9c8617e7ac23492ce3e7cb8176985",
+      "name": "chunk-020.b64",
+      "sha256": "f4156b7feae525e2227e9f2f4c226ec197b970360eb7c5b04ead1e7599451174"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "50a6073d7ba43673934f3bc270e5197d1d4f7946",
+      "name": "chunk-021.b64",
+      "sha256": "0e76eea58913769cdfd701069b87701913442ebde2ddede2e267efc7bc1ccd50"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "920a896ac9b0ced539166bdf8d1eb03d51669648",
+      "name": "chunk-022.b64",
+      "sha256": "473e0ddc12d99b58218f32a28f4ca3c5529174f431b1d65ff00712fda2665827"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "bbf6d9462d35c63ef90b35aa4793e59bd7d1b9b8",
+      "name": "chunk-023.b64",
+      "sha256": "05b47a547e65fb82d125cd00f2c0c40a9a3561628ae6b86ae308e9bbd1a857dc"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "3f5a8ad4fd9e1d8d3b09117f93074e6628e0cf35",
+      "name": "chunk-024.b64",
+      "sha256": "73df2a0835510464c7240259a3bd60c2682abee57c302988a70b489c97ce9d0c"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "a5d9662f7658f911b0891bc79c4d8f116f3b0db7",
+      "name": "chunk-025.b64",
+      "sha256": "603cf709454a8e5d55b6bab44ab23f67b2c6db99e5d02be801b8cc798e96650d"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b4136f6a98713cb8ed3da9e4fb072291e74f962d",
+      "name": "chunk-026.b64",
+      "sha256": "70e35f6d5356e10e20f3f08ee234736c5c231b2fe144345f3845bbb85cfd361d"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "3a75dc576b5e5e1a86fb85d3f4e86d4428c7b5a6",
+      "name": "chunk-027.b64",
+      "sha256": "78e4b029903328cd3a530cfad0afeaacb34f70a12dc5d06c5d0931cf240344c7"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "8dbb8793ff1b9704eb3239ee088629beb97560e4",
+      "name": "chunk-028.b64",
+      "sha256": "ae7c969eedc0e416b8a862a0e9c0846178ccd183510711e78355236ea979b13d"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "8e07337c5a7c1f335244f3b0b95b6ac5a3037e7b",
+      "name": "chunk-029.b64",
+      "sha256": "12aa6a06dee0d3f5b8f2bc3da4a9a3b7cf9f367acedf2e1cd1daf5db83cd7f2f"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "bf5fcc1f76a9f9c6a9add72aa8c7e50139c979ac",
+      "name": "chunk-030.b64",
+      "sha256": "5d10ae2ecc5124beb33adf4adf1761eff2ad7c1308feb050541b001b1c1cef1c"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "6b62fd02cd6f381d408a1ae78120b337cb42ddd7",
+      "name": "chunk-031.b64",
+      "sha256": "8231029df45cffa57a80154b0f1abb671f9c52128bf3c2d1e2dd02239eb20093"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "90c31d097cae646890302414c6d901f89a07a636",
+      "name": "chunk-032.b64",
+      "sha256": "8954aaebc6e49614204c01f2691009bec787ab4985d0797ec5c9fb5a93f28250"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "f6df06acad4324751150bf01ed5a4ee199a65182",
+      "name": "chunk-033.b64",
+      "sha256": "37ac94a55be2dfa804d12d274196a4a6763e958a5a10e00a9774a346d734a769"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "88bd621bec34b06e253e72371a47fdfdca16189b",
+      "name": "chunk-034.b64",
+      "sha256": "d039d08c7a661219037c2fd1f8bd6961f428428983454081d836cdc817d92bd0"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "34e8aee2fd10dd11f9a5b24de0893813e7bf547a",
+      "name": "chunk-035.b64",
+      "sha256": "87f98bf8454fe11fcf121f895827b1dbd9e8a8db9320f75b43dbda6cbaa2f426"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "0ae1fa44ed721bb783cb65690e3c7c4d5618ed79",
+      "name": "chunk-036.b64",
+      "sha256": "e0b78aa17129ba2765f318a895dfbf38ee223793442aa8294a099abe64d3a7e4"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "d7810bdb61755a2cccac0b8fbd79aca03359ab26",
+      "name": "chunk-037.b64",
+      "sha256": "512286f6ee3a7c80b6258b956eacf97bf5ce588c7fed78621c716f45ab3ea312"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "fdb7949527802b6efa354d6bae939c0a55bbd8c9",
+      "name": "chunk-038.b64",
+      "sha256": "ca43ba671f497b64d5bda4c38fe645e8a1c1098a2cb1bc26aa9155a78aad37ef"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "4941391fab2850e3a7ad34458a29e5134c0eff3b",
+      "name": "chunk-039.b64",
+      "sha256": "a8197ef24d38b3c423eec650467cfb5c5412a88865e9d56d3dd00d92ea74a82d"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "a65baa1fafc66e2d4289f527d765b29eea7ddb91",
+      "name": "chunk-040.b64",
+      "sha256": "506ee2d6cb14e22dc73f50259c71dcef306cd7ed53e6b314947de2cf3400072f"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "0162d6e69a25db4abbf7cbee1a53a03e07896a89",
+      "name": "chunk-041.b64",
+      "sha256": "9fbba07315fbe25cdd1c696ad89905fb7bd77851d3b19a1a3abb08832cd3645c"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "72ece3263ce93acd3a868ee15e7184216201d4d1",
+      "name": "chunk-042.b64",
+      "sha256": "8907f24bfacafdc1f3db02aba61eb6e6aec4a2483e3930209b7a018e53da04f5"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "e567bd8638fe4ff6a8bbf2893af7cfe5a75200ee",
+      "name": "chunk-043.b64",
+      "sha256": "5dbe2d3907d6898157d27f728e4764d16edc670dd1d9ef6af1ab68ab4073fe58"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "736fac6297481e1823711a81365b53d78dde6160",
+      "name": "chunk-044.b64",
+      "sha256": "cd1bb0feb7a61093aab51d06a3bd728361def9c105177fc8b385acf68a3a485f"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "7dc54d8f2023a37c33b3d500160f775577c67cab",
+      "name": "chunk-045.b64",
+      "sha256": "933df30c0298dbe6cbf97065a59f2e1c335cfb0d9ff255c3931cb308e1600fdc"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "e2e90afa5b0db8924b5fa87c342b373177899099",
+      "name": "chunk-046.b64",
+      "sha256": "89311fd5fef22fd4ce820a0d04f2298f16ecf744280660685d461a18214e273a"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "10011e4cf3f54947aa165b5e243ba019dd5e8f30",
+      "name": "chunk-047.b64",
+      "sha256": "bb2a9bc2d6b2889c8e4d0911d8c5c7df03d396f653be9a5e8b965c3ca2ee248a"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "cf3857583c3e4e81861e3036ecc4a036307a7273",
+      "name": "chunk-048.b64",
+      "sha256": "76ac8f23d6b732c01acaacdee27e71def4fc6747078311a6774394d679d59411"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "9b65fc7aef43b964b4960f4146245fe9e0cc4693",
+      "name": "chunk-049.b64",
+      "sha256": "c9c7a05aaccfc1ad02597a6aa75a64f236c6060b5b155177f140efe3550cb727"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "30d826da3f3c79cbdd25d26793451f78382c0c7c",
+      "name": "chunk-050.b64",
+      "sha256": "db8ed3926204775a05ed9514f0043a3ba04003bafb33574e059a05b05ffaab23"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b569c675c7873740d9cb084950e9689276e34320",
+      "name": "chunk-051.b64",
+      "sha256": "786c3d099b535d368698f3c2978dcddef9d539dc812b8e293956587295442fe7"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "64633c392540a2add6ecd9fa969005386702fe1b",
+      "name": "chunk-052.b64",
+      "sha256": "6d360d69e9dbdf45b2930684915507f98d2439833f4effebd42c0bb9ac246ea5"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "3bf6969988cce8fd798f2794a6ec763708f5e964",
+      "name": "chunk-053.b64",
+      "sha256": "8918713f8f867241c89be5ff7087977618356f667079d3bdc64f69b0ac377170"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "3cbdef0b21f6d19fce64286e2a5efc35a415725e",
+      "name": "chunk-054.b64",
+      "sha256": "bfd5443bde3be413b90dfa4b51669964eb5a904752b53844c99487db72781001"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "ad7c56ea9e374ec4a272f068afc9115b8b66f95a",
+      "name": "chunk-055.b64",
+      "sha256": "de323f29cb91155121ae91cde07d223be75d9d28e936650e2a27add66c2e3fdf"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "82d6981b478d114629eff9426ba58a45944663c3",
+      "name": "chunk-056.b64",
+      "sha256": "c47256fed4949f8ba31cc7347eabe6a39c0746522f6b4d8c716bbe4d46c0947e"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "1a15332e9d4871cad40c4289b43dee71fd31144d",
+      "name": "chunk-057.b64",
+      "sha256": "1bdb4641fc860af9922f953c8ac5d4c008a17e5742ef5dd883baf29e1f86d3ce"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "441a64a902b5440a10d345de96391aa10824af3e",
+      "name": "chunk-058.b64",
+      "sha256": "3ce33cbb8903a255a8fb2549f443196a3afa78790c977d784f56166c92081d92"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "e2fddc058a745a0c44afe032576bac3004907ad3",
+      "name": "chunk-059.b64",
+      "sha256": "a52c502c24900fe7a66b14d95ae1dc99159c1f60e5f8957ccf7a77d2969242e3"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "fae6798a81cb1e467bff9f08f256043d73e374de",
+      "name": "chunk-060.b64",
+      "sha256": "c0f0c82928224dd905bea1afb10a879bae9132e8759a4125e5cac8dd95e597ee"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "ca0d242864164145bf73e20e9e4e9102a8d3f55e",
+      "name": "chunk-061.b64",
+      "sha256": "6012fdc81dd256f8c8a7ce756a0ae32d3031a51ddebf183f53abe9f6e259c47a"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b9b30952cbb4590b123558d6ed730f3913192992",
+      "name": "chunk-062.b64",
+      "sha256": "b6424b5076e54d9e6434d6d122dbbc23b1792c6e27b5a5ecc1146759e60d8abd"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "837372678ec22f164986c07865dc7c4874aae1b9",
+      "name": "chunk-063.b64",
+      "sha256": "0ad5f07fa641741830b505e7c415cda9ce583939551c932b1301d501a0e68c20"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "dae95d07335a5211a6bfadde740d2b9dd1613bd0",
+      "name": "chunk-064.b64",
+      "sha256": "575148188da0fb76ce71e12b46fe06fb7a28cf08acead641406e1364f56595e3"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "8c3cbc37d61ee63c08b372b2ddea2c048a3da7f0",
+      "name": "chunk-065.b64",
+      "sha256": "63ac52139ae856671a9d42acfa7f6c18cca829ac00fd3a6be4dce204eacbeaab"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "b66f9921fce526e96864ef48694182e9e73c9be6",
+      "name": "chunk-066.b64",
+      "sha256": "fe38bab958d9cda33bcdd940d1f8ac9c1f25a186c9fbeda96953a2e93299933b"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "6b0e3f4e1259b6a4cefb27979826dc7bf67b9ab2",
+      "name": "chunk-067.b64",
+      "sha256": "9d01682f16b47c3f538b951dae03f0fb5d91ecedb78bab13b09a74acfb1ce999"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "198accbba4575fbaae1b6d8ba973af2e42b30f5d",
+      "name": "chunk-068.b64",
+      "sha256": "6c10297d3d96aedbae43cfa339aa066811429bd9bed0c4fd86a4b908910b967f"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "e87b0b365481fac3487ae211229cf40d07b19c65",
+      "name": "chunk-069.b64",
+      "sha256": "6971a6d69bc2126d2ef665284ec5c798762989ed585446bdbb9ad0f9ab480d6e"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "eda209d43637238352eb586281fbf299c69c6cb8",
+      "name": "chunk-070.b64",
+      "sha256": "3ac83d62abe6eda39df051a5462b6ac5139848552be2b1228316b10d9c650513"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "9742918baf01ff657b86f231694fbbfbce83818c",
+      "name": "chunk-071.b64",
+      "sha256": "68498dc27bf0240082a4493b526c9c17bdbe85514979217550d22509419a182c"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "276fe6a36df1a0aa8c01010cfcf612b9fb035de8",
+      "name": "chunk-072.b64",
+      "sha256": "082bd0d81ac94831998f172f278b35751bfa88309871764483233681f63e3388"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "803deb007a3d5006b819325cf1ca0bc18e14aa66",
+      "name": "chunk-073.b64",
+      "sha256": "20d1e50d0985a558f059ee399546d446f79fd3184cf683ab973703a8c0a9cfc2"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "3ffc32437d950b493b6bd202a04396c487d60888",
+      "name": "chunk-074.b64",
+      "sha256": "7428c82b954969e836b114312593f9fdff4342f1d7f3e6cd8d16015d6bf4aab4"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "d171ab815347c4a588223f8f797a70b4ab120e30",
+      "name": "chunk-075.b64",
+      "sha256": "82c7586d7d7e5bc605f3549d9c36f03a0c8fb0836d4dfa24a96edbe1be672652"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "44367f78257265feccfd9c86a9892d3139b6b8db",
+      "name": "chunk-076.b64",
+      "sha256": "b21bdf5c14cce579cea26dd510b0c8dae365cd1950125c1a953b864775633c9b"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "93b75ee314b010012ffebf25640d61e64c133ac4",
+      "name": "chunk-077.b64",
+      "sha256": "1913a4edf5bb5cda6038ca1d5cd23cbd30a1ae14759640c3d77922bf7a49de8e"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "a94bd9a2c96c8ab0077d22bb6bb05054b4c41d97",
+      "name": "chunk-078.b64",
+      "sha256": "6bdea06b08abffcf54fd7b927888259e8cebbd583c741ce06de8bc2118ebcbe4"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "67d785c79e56d799392db59e24c4889e3c4aeeb7",
+      "name": "chunk-079.b64",
+      "sha256": "8f4ba1a4e192d0fd625fda0a286bda74b392400641af8ae693f78638ad239dc5"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "ffb92c29d212c112a264a9a31b75a59212aae1d8",
+      "name": "chunk-080.b64",
+      "sha256": "b44e3a4a23e15992f69d31279edbd059bc5cdb6090d41bbc76d62822624c0d48"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "9b5549022ef62022d330907a657bca9072d4092f",
+      "name": "chunk-081.b64",
+      "sha256": "ca8535906ee5e95dd3cf312eb7bab5f8f35feb3365cfd306720d5ee46f68adb1"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "dac03c45e4dd377a3777752398f8f6f081fe9c7e",
+      "name": "chunk-082.b64",
+      "sha256": "7e24793c8dcfa77b9032fe9d6a7ea10851d60f478ec63c54f86ec5da8a952228"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "ca3e5202d4bdde21e0155d7708ed698ec75b4fe3",
+      "name": "chunk-083.b64",
+      "sha256": "d82714a5242cb7eb9451ad8674f67e28a26d3e092a10c14039e7e325436fd300"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "679fde1c7d738db4d30f4e0d57000cd76b1779a2",
+      "name": "chunk-084.b64",
+      "sha256": "0104cff6a4a0462fb2d0e26aac8662e7595f3529d5b50e57f892916cd586a173"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "7a841e41b6527b0769039920b6636942b37cadd8",
+      "name": "chunk-085.b64",
+      "sha256": "31ee7b4673e43cc821d31734d7e466c2eb740163c7ddd8eb935f76b9a8fbbab3"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "af69294dc0c3c2749cdb6e27eca2ff8818a82c32",
+      "name": "chunk-086.b64",
+      "sha256": "a70139a6fea0c866bcd680be34355b270d10cff74ec2610c411b0f93ba3fb5b4"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "bee515a889cba4058f7fc03dc8f81a85ca2e33a6",
+      "name": "chunk-087.b64",
+      "sha256": "075b496b0010da773a124b154e9131c2fd9ef70320e1814d06818fe2ffeceec9"
+    },
+    {
+      "bytes": 48000,
+      "git_blob": "d62d16eca787853177c0f8707629060816d2593b",
+      "name": "chunk-088.b64",
+      "sha256": "e116004b35a2ac845c5f043aefa31242cd66aafd19ba7b063dcc79777127bd0a"
+    },
+    {
+      "bytes": 33872,
+      "git_blob": "a217d803f37a11fe85ad789347449894df5f3deb",
+      "name": "chunk-089.b64",
+      "sha256": "5ec05248745bf6b34d3e536f41038e6d1f4144a6c7073eea32567f9bed47514d"
+    }
+  ],
+  "format": "base64-encoded-git-archive-tar-gzip-v1",
+  "source_commit": "0bc4419f4cfaf9e1185872d14232f1644639fc72",
+  "tracked_files": {
+    ".claude/launch.json": {
+      "bytes": 232,
+      "git_blob": "e6d3ef510c7cb12ea96b5869a50e83ed20263c5d",
+      "mode": "100644",
+      "sha256": "2c9405186debfb2b2bf0aa13cc7a2aecafb4802a841fd7bcc5e80f076cd49a85"
+    },
+    ".gitattributes": {
+      "bytes": 19,
+      "git_blob": "6313b56c57848efce05faa7aa7e901ccfc2886ea",
+      "mode": "100644",
+      "sha256": "d60f352d0db1404c70afb4bb8b2ca3fd1c610572aa40720e8a0b7baa7885418c"
+    },
+    ".github/workflows/thermal-windows.yml": {
+      "bytes": 5750,
+      "git_blob": "7a95a5910bbcdb599ee8dc62a7cefeed79f3abb2",
+      "mode": "100644",
+      "sha256": "7a0c811bd40660e0944345caa2fb1541499b66c1da77e530d32c3e785985f123"
+    },
+    ".github/workflows/validate.yml": {
+      "bytes": 2549,
+      "git_blob": "c4ba71640f0d8305770702490d9bf9f1d6433d56",
+      "mode": "100644",
+      "sha256": "929fe2452c78132235f034b33b84be3216449ab47bb1b7edf38ef67f42bee1fc"
+    },
+    ".gitignore": {
+      "bytes": 174,
+      "git_blob": "5b1bde77359aec80cacff784a2423cdbe22c5011",
+      "mode": "100644",
+      "sha256": "e625c05413f5d12570f494ad75806a490d5b23b8028e348cf836bc65de356eab"
+    },
+    "CLAUDE.md": {
+      "bytes": 3350,
+      "git_blob": "f25aea260b8b690bf48583ede16c77924c9d229c",
+      "mode": "100644",
+      "sha256": "42a7664548ca56a0bbaad76878183a53f95877cd4a9802ad7e9ab4a8b4127374"
+    },
+    "README.ko.md": {
+      "bytes": 11559,
+      "git_blob": "18c28c09df7b19a16ba833547ba2d3d760d314c4",
+      "mode": "100644",
+      "sha256": "a95326eadbe4915dc8690fa723756fd840b18f1d1f7e848d532c8b674e806871"
+    },
+    "README.md": {
+      "bytes": 10480,
+      "git_blob": "061a9470fa8794c1f42fcbcf02a371cfb36ebe16",
+      "mode": "100644",
+      "sha256": "c1ff3241e5d592de2c0a0ea3f72b406a0d960fa58421bffa1bf1ce0a5c7e5bfb"
+    },
+    "ci/README.md": {
+      "bytes": 22662,
+      "git_blob": "d8a108be965b2c50ce376327c0156b0bd900d96b",
+      "mode": "100644",
+      "sha256": "6b96d780c6c55e2e32c378399aa27303f978e0d84cf6943806c7790fccf0e9a4"
+    },
+    "ci/benchmark_cavity.md": {
+      "bytes": 14925,
+      "git_blob": "6749187ae158ee153fef7cc69474125332f6e9b6",
+      "mode": "100644",
+      "sha256": "b91eaef7a429f5b0dd9894ba9d0498af0bb68f574e8d03c8f2c47397038d9339"
+    },
+    "ci/benchmark_cavity.py": {
+      "bytes": 13995,
+      "git_blob": "33143fc0f8629b0b58ef064dd1f92ca81b71d975",
+      "mode": "100644",
+      "sha256": "17f47a9fe19dbe6f9570cac86a1e0d18bf8f348bf331d964c4ba09f8aa7d016d"
+    },
+    "ci/benchmark_vector.md": {
+      "bytes": 6242,
+      "git_blob": "8975ebce4b0a4b50da98139221a28b078c174a4c",
+      "mode": "100644",
+      "sha256": "15d6223ca0dcb8c2b2b5057cc833b6572a5a8447ff038ced4f9c4ca172fcf140"
+    },
+    "ci/benchmark_vector.py": {
+      "bytes": 6534,
+      "git_blob": "9694927830734b5628c9d17de9d78385e96fe160",
+      "mode": "100644",
+      "sha256": "f7074a5b8270bdb46bb693ec4567d47a5c5e54dd3f888964d12c79aa5680b1fa"
+    },
+    "ci/cavity3d_alternating_manifest.json": {
+      "bytes": 6877,
+      "git_blob": "3e0bc1d13bbae37006625cdefaeb505635d0a2d3",
+      "mode": "100644",
+      "sha256": "7812a379fb5db4eb170774ffd86465bf9f75a34e59cd59336a2ff62440588b7a"
+    },
+    "ci/cavity3d_alternating_validation.md": {
+      "bytes": 5857,
+      "git_blob": "f10347307f3d038f8cc45e50b5fd7ee1df67eefe",
+      "mode": "100644",
+      "sha256": "f5ef30be77c6128d7e3f68ace0ed881bfd8cf1d6775a4bef83cbd1d6bad843bf"
+    },
+    "ci/cavity3d_convergence_diagnosis.md": {
+      "bytes": 7508,
+      "git_blob": "44bce649116ff5873ed583d1523387a7821c7a4f",
+      "mode": "100644",
+      "sha256": "2d3e41deb1fb09e540eaf35a2ee221019dbd47219857bd00bafbab28aedb3074"
+    },
+    "ci/cavity3d_convergence_diagnosis.py": {
+      "bytes": 7950,
+      "git_blob": "b9a03a267183b055d98400d1061cb333423962fa",
+      "mode": "100644",
+      "sha256": "252b27fc54efa5278303d69c3e8ff87355c51028c6004da9b7450fd7576d9dfb"
+    },
+    "ci/cavity3d_validation.md": {
+      "bytes": 16044,
+      "git_blob": "eae58aa26385979930dc37081989690a340405a8",
+      "mode": "100644",
+      "sha256": "c0d9edf25a4b02f5dd39848b77e3162927d30f82a476f6817a3635b6d44c79c7"
+    },
+    "ci/check_distributions.py": {
+      "bytes": 16933,
+      "git_blob": "febafe5a9ad125fee142c91b035fcafc0c6d2eca",
+      "mode": "100644",
+      "sha256": "ab0d976a8dda264989840f21001ab0c1998e1aefc914e87e1e0fb04eb8c43898"
+    },
+    "ci/fetch_rii.py": {
+      "bytes": 1777,
+      "git_blob": "e30577ddd3aced77dc0df4a5882ed2e499193d69",
+      "mode": "100644",
+      "sha256": "218b12bcbbb2fdf9bd6d316298d09ba4af46fdccee90e477552900c2182fd801"
+    },
+    "ci/locales/ko/pages/README.md": {
+      "bytes": 23174,
+      "git_blob": "c4d05c38f8816f10655cdc13d7f2d72382c57689",
+      "mode": "100644",
+      "sha256": "a2caaa92401fbacb4904c9b0e2081dd580f9926fc4be795f2e462ebfffe6f647"
+    },
+    "ci/locales/ko/pages/benchmark_cavity.md": {
+      "bytes": 16323,
+      "git_blob": "82b33bb58be0e9d18030bc5612408ad2b377abb3",
+      "mode": "100644",
+      "sha256": "6b4d50bf922d68e95e9e6e1572e60368edf811c5bd2712a3839579cfe88a0c1b"
+    },
+    "ci/locales/ko/pages/benchmark_vector.md": {
+      "bytes": 6791,
+      "git_blob": "451a8c4907928888ef4b8498c9df7fa99fb8697d",
+      "mode": "100644",
+      "sha256": "3333c878432181ef996e89b49d707f17c75348ba863b3141b36638133d180c4b"
+    },
+    "ci/requirements-py312-linux.txt": {
+      "bytes": 1236,
+      "git_blob": "7304989be7c6ff5a0956b0971c81cd45023e3bdd",
+      "mode": "100644",
+      "sha256": "64d5d79e9fcd04a6c543660aafaecb15bfa9060263cce450cb1fc1afb64cc0e5"
+    },
+    "ci/requirements-py312-windows-thermal.txt": {
+      "bytes": 509,
+      "git_blob": "04fb6e93d08578958c6cda7d4ed5a5180fb665e0",
+      "mode": "100644",
+      "sha256": "2b0a74c60ad0295148898f4151ad6f72c81663a9e04e5a19ebcfed7fbdd81686"
+    },
+    "ci/rii-revision.txt": {
+      "bytes": 41,
+      "git_blob": "47beaa024b5e83e000e9a67beb3e4abf22137e50",
+      "mode": "100644",
+      "sha256": "d767d250ccdd6cb47c93c80e246f7862f0c631206d7da32f535b42b743198052"
+    },
+    "ci/test_cavity_wheel.py": {
+      "bytes": 8011,
+      "git_blob": "e3cbb49dd6c21e80b1d8d1fd1d24d36ef7742968",
+      "mode": "100644",
+      "sha256": "59a440cf48094cd2e2427edeb6e8133cf020e9ee270ea1c473e7cb9164a0513c"
+    },
+    "ci/test_multiphysics_wheel.py": {
+      "bytes": 8057,
+      "git_blob": "87679470110646434d6315109588c81e6042efdf",
+      "mode": "100644",
+      "sha256": "1742e50ea0c4c4b52d31fbbcca3b5fbb52a513099a15634a6a8ad97d93bc2d59"
+    },
+    "ci/test_thermal_simcase_wheel.py": {
+      "bytes": 10129,
+      "git_blob": "5e2c335a17bef8e9687c9968ce40bbf47fba83de",
+      "mode": "100644",
+      "sha256": "10247b01157c9d537a87e75bede555bd470c37b05ee41a96c0a5bee735ab0f8d"
+    },
+    "ci/test_thermal_traction_wheel.py": {
+      "bytes": 13982,
+      "git_blob": "e925765863071800210dcc645768a34f1558187f",
+      "mode": "100644",
+      "sha256": "6c4dffdf22dc01920a6a13a36bff6f1b4eb3e41b424ae541a2c04d728fe493eb"
+    },
+    "ci/test_thermoelasticity_wheel.py": {
+      "bytes": 9886,
+      "git_blob": "a9532eab5d1edb2e1235e97eb299d0a3390a09e7",
+      "mode": "100644",
+      "sha256": "104d8487658165da532deeefa94a3777047a24674b1dc3ec74380acb6f5d7759"
+    },
+    "ci/wheel_smoke.py": {
+      "bytes": 2206,
+      "git_blob": "d19a648b2def7939d2c67e8452c0f01a7d348da0",
+      "mode": "100644",
+      "sha256": "d6f0f7d86e4353c0cb91c4e10c0779fdce1249ae0ec0e3bf7a9fa7e4c4c3362b"
+    },
+    "conftest.py": {
+      "bytes": 943,
+      "git_blob": "8de4d695e30c9dbfa0fa09d684b738cddef7e745",
+      "mode": "100644",
+      "sha256": "0a2d1399957b4cd338a5691f40849a3ffe857d2728404a7af5a71c93d026e73f"
+    },
+    "docs/README.md": {
+      "bytes": 6998,
+      "git_blob": "f70546ccfd0a8196094ef840cb6c3bf45546fa02",
+      "mode": "100644",
+      "sha256": "724a58906462f6f106c23548e0ac89550c47db28163c99292fdbe0b01ac50085"
+    },
+    "docs/locales/ko/pages/index.md": {
+      "bytes": 7720,
+      "git_blob": "fbbd7060f735ab2b36a1a496b667822218ff949a",
+      "mode": "100644",
+      "sha256": "d0567d6506243a4897a309b8d24088dcce67f530bc1f553afec2673102a827ae"
+    },
+    "packages/galerkin-refsol/.gitignore": {
+      "bytes": 56,
+      "git_blob": "a2ad9e6e051e7a0a5f132e72042303a5787c1df5",
+      "mode": "100644",
+      "sha256": "096e4f174323252995b244d95f12fffd8a8af63442f241a61c719a0df94963dc"
+    },
+    "packages/galerkin-refsol/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/galerkin-refsol/MANIFEST.in": {
+      "bytes": 117,
+      "git_blob": "2e21b3b4ae053f4747c6f091246c34c7b134a468",
+      "mode": "100644",
+      "sha256": "1e783a813c60abb41478627da0190530dbe146fe88a05c2fcebbf2d957bbdd35"
+    },
+    "packages/galerkin-refsol/NOTICE": {
+      "bytes": 1198,
+      "git_blob": "45736f0e65c93673a06a304a2a1576fb6950bab5",
+      "mode": "100644",
+      "sha256": "350741cf0dcfad011f6f2a1763e4d6889a34c3359d92d921e3c3955c77f19f2f"
+    },
+    "packages/galerkin-refsol/README.ko.md": {
+      "bytes": 8051,
+      "git_blob": "f1a61d08462723dc23f08240f74a77daf4b5befb",
+      "mode": "100644",
+      "sha256": "3a39879308a5ea592d5c151ca4b50dda26f0a60e9c3051cea76bf0f7f7115829"
+    },
+    "packages/galerkin-refsol/README.md": {
+      "bytes": 7863,
+      "git_blob": "6f54205acf8a8dd80a4b2dcfa12471861a090145",
+      "mode": "100644",
+      "sha256": "3fe3308feb820e6a7b9f632ba73442839fea410d6809c899bfa4f39ba2614191"
+    },
+    "packages/galerkin-refsol/examples/print_references.py": {
+      "bytes": 1203,
+      "git_blob": "2b8a7865dcdbb28579b0c5fb2087a36e4e08f149",
+      "mode": "100644",
+      "sha256": "58223dc0ed6560a404908f7fcfe8566e51cafa95bafd807ef6687e65320dd6ec"
+    },
+    "packages/galerkin-refsol/pyproject.toml": {
+      "bytes": 1182,
+      "git_blob": "0e3bc6a1d745ea69889899e1261b677405876cf7",
+      "mode": "100644",
+      "sha256": "99c4418ce7e1cb3d35f582e72627426d16e6b24882a0d4f820ceaecd74a1bfc6"
+    },
+    "packages/galerkin-refsol/refsol/__init__.py": {
+      "bytes": 1063,
+      "git_blob": "23fab1c70fd851205c6c054e3132825d89be0864",
+      "mode": "100644",
+      "sha256": "a3e4beddd802fbf9c78ceb7900c2b23412aca5dab3dc7b077c1481c78ec08218"
+    },
+    "packages/galerkin-refsol/refsol/benchmarks.py": {
+      "bytes": 3545,
+      "git_blob": "1240b4c65f30e6c8bbf95a7842e86f76dc6e0227",
+      "mode": "100644",
+      "sha256": "c91496a3099e2ec164c3b646bbeda84c66c3d7b1d51ace181389a5eb28c02069"
+    },
+    "packages/galerkin-refsol/refsol/cavity.py": {
+      "bytes": 3558,
+      "git_blob": "fd2bc2cc8786828d56073dff0e1e00c2c63018c8",
+      "mode": "100644",
+      "sha256": "26a699e48bd0c8969087947dc36c3e939753ce9b4f27d7d6f21efc2965eef96a"
+    },
+    "packages/galerkin-refsol/refsol/elasticity.py": {
+      "bytes": 3874,
+      "git_blob": "aedfbbd18ac6d4262bd4d09d5ca8cebfe7bdcf64",
+      "mode": "100644",
+      "sha256": "82daf48a710a6d3b0536ae3ab0255037aa18f9f90a7f2ae3a51ede5a6ccfb931"
+    },
+    "packages/galerkin-refsol/refsol/elasticity_traction.py": {
+      "bytes": 4969,
+      "git_blob": "967a1ff4eaf1189422cb741b3f0d0682bf51a3fe",
+      "mode": "100644",
+      "sha256": "846d0cc874c2e1978be598b966955666d20ad4549cc02c7780d1c485ba1c99f6"
+    },
+    "packages/galerkin-refsol/refsol/fiber.py": {
+      "bytes": 8071,
+      "git_blob": "0a89a6a0c522e2be40af77aca0c2f91dd21bd28a",
+      "mode": "100644",
+      "sha256": "a49c6f5fa16c4440b2ddf7386bdd9ec75c0f6aa0349454ca3584af1366c5c513"
+    },
+    "packages/galerkin-refsol/refsol/metallic.py": {
+      "bytes": 2692,
+      "git_blob": "66118c687e4060da15dcc40167f2a03c75539c57",
+      "mode": "100644",
+      "sha256": "7fed6d9612bc1079239ff439a373b7f039f8598123067efda04d03d4ebcc3f29"
+    },
+    "packages/galerkin-refsol/refsol/scattering.py": {
+      "bytes": 3698,
+      "git_blob": "d7d4d8d9a6044f5828a392a426265457ec6b47eb",
+      "mode": "100644",
+      "sha256": "f45e60b6b15b29ee3d397e7828f6512c7119a97260a8aae2c5641866aa66d82e"
+    },
+    "packages/galerkin-refsol/refsol/slab.py": {
+      "bytes": 4089,
+      "git_blob": "06454997d3d675ed81090d0b88767417e07a9b1f",
+      "mode": "100644",
+      "sha256": "3920ac7e2bbc3a5be9e2bd0d4d0efc987f216093bdaf3a11aeed1174e37620f5"
+    },
+    "packages/galerkin-refsol/refsol/thermal.py": {
+      "bytes": 2460,
+      "git_blob": "7b9477aa93464daf1f31681457fd41042d8bfedf",
+      "mode": "100644",
+      "sha256": "44b1d8587299bdc66c7d67dc8691f2b99093ee6cfccc72eb701fc3113f4ed9a9"
+    },
+    "packages/galerkin-refsol/refsol/thermal_boundary.py": {
+      "bytes": 3914,
+      "git_blob": "8f50ada586777e2a2dbac9f4a90275d65d17ad51",
+      "mode": "100644",
+      "sha256": "3ecd7735a3502d965a1154fae0d45fede6ba969e2d87f409d1d43df76badea4b"
+    },
+    "packages/galerkin-refsol/refsol/thermoelastic_traction.py": {
+      "bytes": 5801,
+      "git_blob": "4cf43cbe68402c9c31f7cc09177e2fcc63411eb0",
+      "mode": "100644",
+      "sha256": "efe49c2b19492b6bf8f2f8c094c54bf57384ecc0bbb17fc9d164b95faf413fcb"
+    },
+    "packages/galerkin-refsol/refsol/thermoelasticity.py": {
+      "bytes": 7348,
+      "git_blob": "6230c95e9e1177e5bad378f7d3d3d56ee2685ff8",
+      "mode": "100644",
+      "sha256": "50aaf48af45616a93f6c7e62490cb9de384a58d7f7e86ea9f2838127ca7fb8f7"
+    },
+    "packages/galerkin-refsol/tests/test_cavity_reference.py": {
+      "bytes": 2335,
+      "git_blob": "ed2962deca1b7cea193cb954e52cd4213887864a",
+      "mode": "100644",
+      "sha256": "b974737f5db6b53228b3eaebfc1d686c29be098ab274ea833ed8141adf8862fb"
+    },
+    "packages/galerkin-refsol/tests/test_elasticity_reference.py": {
+      "bytes": 2757,
+      "git_blob": "0b81e4130654acbdc7da12665383cc22b87da5a1",
+      "mode": "100644",
+      "sha256": "8ac751f535898fcfea21bb940d01727306c1e80efe2b0c84669e082e34033bb1"
+    },
+    "packages/galerkin-refsol/tests/test_elasticity_traction_reference.py": {
+      "bytes": 2270,
+      "git_blob": "07bb26d82f0efc3ecca94db206168673f79a310b",
+      "mode": "100644",
+      "sha256": "dcbe828f67853334125be56d18b43d738d1018232e4f655c1f1f983417599524"
+    },
+    "packages/galerkin-refsol/tests/test_fiber.py": {
+      "bytes": 2715,
+      "git_blob": "0fff40d37b1277ab4ce191e9812554e35e91ad82",
+      "mode": "100644",
+      "sha256": "07d24a3309327cc45df4671432e35870d463a98b76ed01d8432d42a6ea04a0f8"
+    },
+    "packages/galerkin-refsol/tests/test_metallic_scattering.py": {
+      "bytes": 2660,
+      "git_blob": "353321b08a3e1722aae27ec6c121da4802aba4c1",
+      "mode": "100644",
+      "sha256": "bf1016abd86a62d20615a0c65ca79f40698a91f551452694c044a874bc4bd538"
+    },
+    "packages/galerkin-refsol/tests/test_slab.py": {
+      "bytes": 2343,
+      "git_blob": "0317c6cb08175dd90e0beb7d981615490024bb04",
+      "mode": "100644",
+      "sha256": "31893e2de40fa1cb797c6ce5c17ce0624c1038202eacd3947630ecf7a42522bb"
+    },
+    "packages/galerkin-refsol/tests/test_thermal_boundary_reference.py": {
+      "bytes": 2782,
+      "git_blob": "5c6ef8c2fc28b2eab64ecbbeaa8ed0b4e27aeb60",
+      "mode": "100644",
+      "sha256": "001600beebcb46e7eb27cefddb3042afd8f4bd00c7386cb70448ff5bf3284cdb"
+    },
+    "packages/galerkin-refsol/tests/test_thermal_reference.py": {
+      "bytes": 2191,
+      "git_blob": "547aa732b5d4c7175326ac34970af6065d4670c4",
+      "mode": "100644",
+      "sha256": "1d1c72e9e711b679157c65c44ab84b99c6986f75baec0e8309d01ef4fe8461a9"
+    },
+    "packages/galerkin-refsol/tests/test_thermoelastic_traction_reference.py": {
+      "bytes": 3237,
+      "git_blob": "448e3d083c6c7d79203838993f59e6e6cb5045b1",
+      "mode": "100644",
+      "sha256": "84d4ba6d2e2ee0cf5368dee817f7499fb4c99d95f0d6fc03ce4ed7f0706299bf"
+    },
+    "packages/galerkin-refsol/tests/test_thermoelasticity_reference.py": {
+      "bytes": 1951,
+      "git_blob": "45503931d64076d2bcdf9a34dd9edd9c20a4061d",
+      "mode": "100644",
+      "sha256": "e66b7f5c7d8d0572b9a964ed9137c5dc2c146312c2b2980439d9a59bf2ca752c"
+    },
+    "packages/galerkin/.gitignore": {
+      "bytes": 114,
+      "git_blob": "c1de6276bba8730419290e5b3671c19b6bd7fc82",
+      "mode": "100644",
+      "sha256": "1491c9aa7d444022144a8168b424654ad4c97a8b5bcb3847d0f54894c607bca1"
+    },
+    "packages/galerkin/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/galerkin/MANIFEST.in": {
+      "bytes": 3165,
+      "git_blob": "b7d4b9aad2d99efc14f47c4a5d36ef9afc3e6c99",
+      "mode": "100644",
+      "sha256": "2a99dc8416b91570c069d33bfb4b6c53ffd5c9e960eb17842cbb66a6ab0fcee3"
+    },
+    "packages/galerkin/NOTICE": {
+      "bytes": 1348,
+      "git_blob": "06a575f1bf677f3bee398de525b5f8d3d9c07082",
+      "mode": "100644",
+      "sha256": "c56e186401fb0b3b95b85a9b0e6fb7d4a232a625e16b9b225884b906fcace53d"
+    },
+    "packages/galerkin/README.ko.md": {
+      "bytes": 24809,
+      "git_blob": "3c457e0effcd5853d7c293ed74fe866bdde25987",
+      "mode": "100644",
+      "sha256": "c0758eb98b98f8af19d188d3c00f0629d62157e7c5f6edb6370c1a1e1ab44c28"
+    },
+    "packages/galerkin/README.md": {
+      "bytes": 23993,
+      "git_blob": "9319f4f1ea66be2b861b7968fd4c4c777571d449",
+      "mode": "100644",
+      "sha256": "e856497417712bc9bbfa627cbb7be52df85336d8fbbf11d57079f45e24c6b227"
+    },
+    "packages/galerkin/docs/cavity_solver.md": {
+      "bytes": 11639,
+      "git_blob": "efa14fbb6dd7c9aa70bd25f7f5a277700f124029",
+      "mode": "100644",
+      "sha256": "672d04784e99fd8ac61e1a6411acb25c92356a945e8fc860a8b6eb51135969f0"
+    },
+    "packages/galerkin/docs/eigenspace_reliability.md": {
+      "bytes": 5351,
+      "git_blob": "abc9b51e7349d87a495de541088a8680dc827cb9",
+      "mode": "100644",
+      "sha256": "e3c308a781cc373feafdaf80f7e88b387778e9c98f02080f6fb08f3e5e3a9e91"
+    },
+    "packages/galerkin/docs/elasticity2d.md": {
+      "bytes": 11581,
+      "git_blob": "06d1bb8d73cca9dc2f7e344faaccc98c762cd08d",
+      "mode": "100644",
+      "sha256": "d35c93d7b9928eacbc9a5a15c642276922b9e1fcfc94eaafb0cdb78bd28b1446"
+    },
+    "packages/galerkin/docs/elasticity2d_independent_validation.md": {
+      "bytes": 10208,
+      "git_blob": "7672a5d53090f1f65284999a8ef440048931eed1",
+      "mode": "100644",
+      "sha256": "460052b46fbf5e7e42d2003ab7138aac62e1531cc31942d49f6a0b2e154abe96"
+    },
+    "packages/galerkin/docs/elasticity_traction.md": {
+      "bytes": 12751,
+      "git_blob": "d39b13ef059a58f076c01cdf71473cfb6d16afe3",
+      "mode": "100644",
+      "sha256": "e3125fa73cd83a2a846ddc831460a06ee858afca98d242e14c0679ab53687afb"
+    },
+    "packages/galerkin/docs/elasticity_traction_independent_validation.md": {
+      "bytes": 9328,
+      "git_blob": "b756eaa7ec5500de1d33c657a42ddfb9506214bf",
+      "mode": "100644",
+      "sha256": "b9614f24b75a7ae55e401d70e621fa36ce242c3e1f472f22ab219fec26592523"
+    },
+    "packages/galerkin/docs/locales/ko/pages/cavity_solver.md": {
+      "bytes": 11465,
+      "git_blob": "5db8a477fada653d4d25ae8028b9b2f5e137a022",
+      "mode": "100644",
+      "sha256": "38e8eea3a2edcee8e5b654a878220692d7b4b2c9ca74617a17327a10b3468ded"
+    },
+    "packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md": {
+      "bytes": 5671,
+      "git_blob": "32775bebb64c21318e3c6b005c4e853cea2ee950",
+      "mode": "100644",
+      "sha256": "fd86a4b77da9574c14d9cef77fb9ad714ace934b747fdfdd808b20b03c8b843d"
+    },
+    "packages/galerkin/docs/locales/ko/pages/elasticity2d.md": {
+      "bytes": 11686,
+      "git_blob": "5bb94866e304a39c88b9e65c78d22db7bb8ec120",
+      "mode": "100644",
+      "sha256": "993f977cae79e555f11305465ec1e6fc99e0a04a29e624394f1116c95ad99622"
+    },
+    "packages/galerkin/docs/locales/ko/pages/elasticity2d_independent_validation.md": {
+      "bytes": 10168,
+      "git_blob": "16e26d0c599b82237b37b96b8a25a7efac04b301",
+      "mode": "100644",
+      "sha256": "fb728da9c1e3a8088e5ed82adafb9c53bfebadcbf7e940614e7e79bcea64497c"
+    },
+    "packages/galerkin/docs/locales/ko/pages/elasticity_traction.md": {
+      "bytes": 13738,
+      "git_blob": "0ea31a83e56fc3ab58ab75878bddb8deca62bf7f",
+      "mode": "100644",
+      "sha256": "5686b10f8e73346a356f494617b793b7178a173f60054244fb52c2e89fb6d3c1"
+    },
+    "packages/galerkin/docs/locales/ko/pages/elasticity_traction_independent_validation.md": {
+      "bytes": 9180,
+      "git_blob": "ca809c4ac161fa7a5ad55d0225cd03b21e3adda2",
+      "mode": "100644",
+      "sha256": "3d71534734d9c45681283300f14953f82eb5d90eca0abd80847d5b9c233efae4"
+    },
+    "packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md": {
+      "bytes": 12252,
+      "git_blob": "523c5e43afd8a3c29bd359fbe9cc812bc85b25e5",
+      "mode": "100644",
+      "sha256": "44045c643b2dc7587843cbfb9f648b1d9a2384097db16814ba95cfdc6c27f276"
+    },
+    "packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md": {
+      "bytes": 8847,
+      "git_blob": "6fe0084c11b2883cc33b82a747175309a9978997",
+      "mode": "100644",
+      "sha256": "cd4f4f8b3b8e620086b68aaa52c9e09dd548316e61c461c7894a3748f7139c05"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md": {
+      "bytes": 10274,
+      "git_blob": "1246b449dd49b05bd9d8176bce35852fb83d5315",
+      "mode": "100644",
+      "sha256": "b721efd0a676a1a37bf6c8325b35266cefbd081d3ba3058288c4e453ad491949"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md": {
+      "bytes": 11622,
+      "git_blob": "453fbbc3f674b5fcb5b69aa3d4b35d5dd7a93671",
+      "mode": "100644",
+      "sha256": "0861eb04599a7306306773c0b633cd5e32eb857e5a279cd6e7de9ba0fd97f0a7"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_independent_validation.md": {
+      "bytes": 10421,
+      "git_blob": "52a64776d8e3d6aabad17993919137acd7f30346",
+      "mode": "100644",
+      "sha256": "bb93d0f5a36a8b65751d13bb40d86886fc61e5f6112be017c8205399072348be"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md": {
+      "bytes": 17855,
+      "git_blob": "7a8200b00b5894b23f438aa1ef2f5744ce83f9c6",
+      "mode": "100644",
+      "sha256": "f6ab48d8a3e21e17207b03256d2fdffbe770877d1290b703011be44dc4d88359"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md": {
+      "bytes": 15320,
+      "git_blob": "ef86be3417538a105cca7fd7d5fc41f819efc364",
+      "mode": "100644",
+      "sha256": "7fdb638e8ab1b145eae0d072da2b6dbd213feb646c218e13a3e9e1706abc39c4"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md": {
+      "bytes": 10115,
+      "git_blob": "5fc60545dc3d64838bbc83d8c0a7d76842014b6d",
+      "mode": "100644",
+      "sha256": "efa5ad96cbf60958a7e2dd254bec70ec17d72dd70c012d2bbc5457465da68f3d"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md": {
+      "bytes": 12483,
+      "git_blob": "de1b98799b909072d5ebadca4473c4d83dbbfc0e",
+      "mode": "100644",
+      "sha256": "1e12212bd9092177fed197a921d93a57fe06d5af03721e7115eb2e3767bdd401"
+    },
+    "packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md": {
+      "bytes": 16940,
+      "git_blob": "17925db10b4f8abdc13243c7e56fee3be0002b5a",
+      "mode": "100644",
+      "sha256": "e5ae0659739f0386a5bc654029990eaeb65eb4824e0f4f1fc14c58148b7791fe"
+    },
+    "packages/galerkin/docs/prescribed_temperature_thermoelasticity.md": {
+      "bytes": 10669,
+      "git_blob": "968762ac4f3ebec9811e6614e02f8603bcb694b4",
+      "mode": "100644",
+      "sha256": "861c59b3a1ca3bd3fd6b698053d36a72b7396664bb0bdb3f1e5d21955cb0e4a6"
+    },
+    "packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md": {
+      "bytes": 9035,
+      "git_blob": "08da50887201c055222f9113ed3714dc1b06fc6b",
+      "mode": "100644",
+      "sha256": "7d30aedaa400a12abd956512ebfaf84dcb7df1d303b09ada21802969be8dc60e"
+    },
+    "packages/galerkin/docs/thermal_flux_robin.md": {
+      "bytes": 9288,
+      "git_blob": "4ee39d5dc9a422ee5279983a9ac7c800add4ed06",
+      "mode": "100644",
+      "sha256": "ebe467f176dcc0b3c40a9fe71f02834bfa71189263bea9410c40959299fe2758"
+    },
+    "packages/galerkin/docs/thermal_flux_robin_independent_validation.md": {
+      "bytes": 11682,
+      "git_blob": "d7474e2549cd9e5f1f267501c9fb107fc0bdf34a",
+      "mode": "100644",
+      "sha256": "358c677b7b9e5d72389e54dde61ad12239d77087bfca4a7dc1a0dbdb17838ec0"
+    },
+    "packages/galerkin/docs/thermal_independent_validation.md": {
+      "bytes": 9319,
+      "git_blob": "2abcc3bb33caf7f71707aae498b8b89e711078be",
+      "mode": "100644",
+      "sha256": "aaa0bc8167bfca822407a75807d5c661f385a234603c8e071c66f9c499e0b6f8"
+    },
+    "packages/galerkin/docs/thermal_independent_validation_manifest.json": {
+      "bytes": 7823,
+      "git_blob": "ce1d30fb7c6bab0961ce5d589617419f578b6b38",
+      "mode": "100644",
+      "sha256": "88dbb468e9d2bc33bae0ba76b2c1aafd236a00dd7560c6ad629d222cedea3d47"
+    },
+    "packages/galerkin/docs/thermal_mechanical_independent_validation.md": {
+      "bytes": 17330,
+      "git_blob": "ac48edab0e56d262a6b814bd9fbd66560d780eea",
+      "mode": "100644",
+      "sha256": "33479663c7bb140ccb8525c1747975aadb49156870ee3a8487886c1bfdbab3de"
+    },
+    "packages/galerkin/docs/thermal_mechanical_workflow.md": {
+      "bytes": 14072,
+      "git_blob": "f25e3004ccf0e7f132301cb2023dc2e898bd416a",
+      "mode": "100644",
+      "sha256": "edb8a8a0b7e893fe677880e963bb096638f107de439cd73c66c0a709b3695f20"
+    },
+    "packages/galerkin/docs/thermal_steady2d.md": {
+      "bytes": 9823,
+      "git_blob": "7cebee429d7f0c076d62e6dbeb942976ce43cce0",
+      "mode": "100644",
+      "sha256": "e8474e8766e5e146a96f79a1771bd13346906764ee7e5795def9f6bf1070359d"
+    },
+    "packages/galerkin/docs/thermoelastic_traction.md": {
+      "bytes": 11236,
+      "git_blob": "15c3dfe1dd964d3d65075fd0568fbc839ad4339d",
+      "mode": "100644",
+      "sha256": "00135264a468f443b0302fa45615daccf0495141ebc3cb5c59b73c501450dff2"
+    },
+    "packages/galerkin/docs/thermoelastic_traction_independent_validation.md": {
+      "bytes": 16921,
+      "git_blob": "8a003e7056bdb74c9fea7ebedf92c7715a2884c6",
+      "mode": "100644",
+      "sha256": "f83a82e7589b3fce8cc7c27d6d9dd2d20fe8911fe8665354ec1a9da770d96171"
+    },
+    "packages/galerkin/examples/cavity_modes.py": {
+      "bytes": 15736,
+      "git_blob": "d7545fb7070665d5cf5b765180c8c282c22d9b4e",
+      "mode": "100644",
+      "sha256": "3649ab9ac0158068ae1a492cf7a90fc8575950d36fc6a469502af71fbbb226bb"
+    },
+    "packages/galerkin/examples/coax_convergence.py": {
+      "bytes": 2003,
+      "git_blob": "ad09dcb337361d2a7e6166b3d0686482ee3037b5",
+      "mode": "100644",
+      "sha256": "e6a124c901ce024445c2d4b05e10c8a3b35cdc16b60df9421d26739a9aa26ce0"
+    },
+    "packages/galerkin/examples/cylinder_scattering.py": {
+      "bytes": 2966,
+      "git_blob": "d2cacd40767fdc7b9fed6ac81f26c6177a48230f",
+      "mode": "100644",
+      "sha256": "a4e9d7b2d601924d16adbc867ed98f24332405a84f88e744b0272597fb2afd03"
+    },
+    "packages/galerkin/examples/cylinder_scattering_pml.py": {
+      "bytes": 2845,
+      "git_blob": "fc922ec77edfecdb24b3592b7a3629eed494ce14",
+      "mode": "100644",
+      "sha256": "f0acafa8bc189e114b6b8aa7e35afa2e40dfe5bc0cb8108be0bb47ca75c2fcf8"
+    },
+    "packages/galerkin/examples/elasticity2d.py": {
+      "bytes": 935,
+      "git_blob": "9e70f15337049fb683981b7253bf599d38ce3ee4",
+      "mode": "100644",
+      "sha256": "57d0573451d34a2121ca3a0b8a4dc43d055e5fe9a5cd19eca8d06c2a0f9e257c"
+    },
+    "packages/galerkin/examples/elasticity_traction.py": {
+      "bytes": 1073,
+      "git_blob": "ed94c66d5e2b2a64290e750cdc659b844d8e0878",
+      "mode": "100644",
+      "sha256": "757c32cba66613d9bb69f19d268fc36f031ec91e54650054f351fff5f668ccef"
+    },
+    "packages/galerkin/examples/fiber_modes.py": {
+      "bytes": 12777,
+      "git_blob": "c35af80bfbda3aa9859cf48d474c9635e45ffb25",
+      "mode": "100644",
+      "sha256": "21a53c45284eed50c22e9f00cb576f1ae176f2d90688ce17dec9bd5dbf6972cd"
+    },
+    "packages/galerkin/examples/mesh_io.py": {
+      "bytes": 6921,
+      "git_blob": "eb3f664816ca535f19f65e800c96ff2ecbb19ceb",
+      "mode": "100644",
+      "sha256": "9bcc43de2abb316e7cd607fa8c94b402fdefacb7103e477439cbbfe59f2514ed"
+    },
+    "packages/galerkin/examples/prescribed_temperature_thermoelasticity.py": {
+      "bytes": 1154,
+      "git_blob": "74a4c971357f5516b0571ad68ae5511c5b86d1e1",
+      "mode": "100644",
+      "sha256": "67f69b9796d4256046551ef3954c0a9ab792f09d412bf4db458ce35bf78c5814"
+    },
+    "packages/galerkin/examples/rib_waveguide_scalar.py": {
+      "bytes": 6998,
+      "git_blob": "77281004e648c91646ffa1b248ef75f922ec2521",
+      "mode": "100644",
+      "sha256": "a42b2efa76a2a0c9e3f2850208a3112f09fbf2725053b7965bffdc6583e408e5"
+    },
+    "packages/galerkin/examples/rib_waveguide_vector.py": {
+      "bytes": 8530,
+      "git_blob": "b2a6c05065d045968ed4d32d0033d69f75ceb364",
+      "mode": "100644",
+      "sha256": "fee39bca817fd8ca022e57a7bf949d4a0734b50d7adb22c17cdd87e8705b037c"
+    },
+    "packages/galerkin/examples/thermal_flux_robin.py": {
+      "bytes": 1243,
+      "git_blob": "0af7f452910479d768e86065c1c072cf21add7c2",
+      "mode": "100644",
+      "sha256": "caa73f63f775a405e83ca73e92003142f73c5f41f1afcf2a035603f416110364"
+    },
+    "packages/galerkin/examples/thermal_mechanical_workflow.py": {
+      "bytes": 1422,
+      "git_blob": "633399c1f9e8d3b516b2cd48918e9b2645450793",
+      "mode": "100644",
+      "sha256": "fdd465ce010a4523ef407853d903ad254c81dcdc2e245af679cb962f51ae0248"
+    },
+    "packages/galerkin/examples/thermal_steady2d.py": {
+      "bytes": 1036,
+      "git_blob": "d875833bb4fc32160b5b065e25c9356d71649e7f",
+      "mode": "100644",
+      "sha256": "5041f0027333f8addfefeedacd737b5a20b90289b726ae369c808ef2cfe6eb5d"
+    },
+    "packages/galerkin/examples/thermoelastic_traction.py": {
+      "bytes": 1687,
+      "git_blob": "eb5803a0ee18dd2af50a0f7c4eb557111aed6b6c",
+      "mode": "100644",
+      "sha256": "3b586a46db9afe321e6b0c78b28ba5b8784c7ca6a8e0ce6eee1d35b92a608745"
+    },
+    "packages/galerkin/examples/visualize.py": {
+      "bytes": 4780,
+      "git_blob": "e48303d4e0135ea4ea50e8138359accce7fc72c6",
+      "mode": "100644",
+      "sha256": "94301bdc5c21c14b507a32ad95dc36f4f292755cec8d5a5a074cd5412a1cc9f2"
+    },
+    "packages/galerkin/examples/visualize_cavity.py": {
+      "bytes": 5709,
+      "git_blob": "ed94b2122b9323ab4f681717e45028ecfa54847d",
+      "mode": "100644",
+      "sha256": "734ce9cca92e9c1ae4a7d4319f1d16135d9fd47728ba5a0139e29a7e6a1723f4"
+    },
+    "packages/galerkin/examples/visualize_fiber.py": {
+      "bytes": 9478,
+      "git_blob": "aa19a4684e202092947803a6cae0784ed64add08",
+      "mode": "100644",
+      "sha256": "f19cfe7e8499ee3ac5613734c92c3d0ca855b88904edd98f6d8fe3d54f8714ef"
+    },
+    "packages/galerkin/examples/visualize_m2.py": {
+      "bytes": 3712,
+      "git_blob": "931621bbd964f236f329c6c8e0448f2f3aef5929",
+      "mode": "100644",
+      "sha256": "d74bda9ef2f13c768cbbf612d152d7cc796c78a5dda4b2abf5ce50e289895c87"
+    },
+    "packages/galerkin/examples/visualize_modes.py": {
+      "bytes": 3922,
+      "git_blob": "1f27f8f0fae8cd758f068f4a86e2d5810f55583f",
+      "mode": "100644",
+      "sha256": "95e9b54f1410bfd3da9f72fce7287a86ffc3c5af5768e73f963e700ced1cebc8"
+    },
+    "packages/galerkin/examples/visualize_pml.py": {
+      "bytes": 2835,
+      "git_blob": "cf7a04644afed9e40ce1cb4497d08b53872f6944",
+      "mode": "100644",
+      "sha256": "bcdbe5e0ffc51ca2db9f66e48bf0b3e76a8b8b1d5e17a625c9d08d0ee27d623d"
+    },
+    "packages/galerkin/examples/waveguide_convergence.py": {
+      "bytes": 2331,
+      "git_blob": "395a889bcd7960029a856dd45c64460e030fe4e0",
+      "mode": "100644",
+      "sha256": "b133be80328c9dac2c838790e80040beb2c4feb55a7d5eee2947732091e62109"
+    },
+    "packages/galerkin/examples/waveguide_modes.py": {
+      "bytes": 6368,
+      "git_blob": "fe87d6cc08d04f84d74116d209e8c386d30d5a54",
+      "mode": "100644",
+      "sha256": "4b8e384b2d3e07cc873cfede266885da69ab0127b52e124f79940dea297c5b6d"
+    },
+    "packages/galerkin/galerkin/__init__.py": {
+      "bytes": 1506,
+      "git_blob": "98c43afd88f72263353d0327a4b5fa0079df139e",
+      "mode": "100644",
+      "sha256": "50e8d8aa52c519942932d19aae44bea563d96878203dcb79259a709d0f4fb380"
+    },
+    "packages/galerkin/galerkin/assembly.py": {
+      "bytes": 5258,
+      "git_blob": "83fd720640d7400709993504f66b46652ce40acf",
+      "mode": "100644",
+      "sha256": "d755c26cda88e45e69f4dc7ee030d51f5ff20b0898363126b622fbfee6ef2135"
+    },
+    "packages/galerkin/galerkin/assembly3d.py": {
+      "bytes": 2488,
+      "git_blob": "17269af3d713071b13f9df095f400ead3e530b9a",
+      "mode": "100644",
+      "sha256": "5638231ea6a32cb6e5fcce2ad1997994c583aa39d6ddd6a5bc1f058a1210ea29"
+    },
+    "packages/galerkin/galerkin/cavity.py": {
+      "bytes": 12451,
+      "git_blob": "3643567a15d5b92bc3d2ff513355e80cfe095a77",
+      "mode": "100644",
+      "sha256": "f99f43a68efd6df20e8b572589222c0608a01d4e8a02a318e16bd18582b63c4d"
+    },
+    "packages/galerkin/galerkin/edge.py": {
+      "bytes": 8657,
+      "git_blob": "42f99362b79ca09717b89f9b9f30a3a169513887",
+      "mode": "100644",
+      "sha256": "c2c2b8fe8a67dad49317c6f7c683799d6e0aff777c6de5891d21375d06e932aa"
+    },
+    "packages/galerkin/galerkin/edge3d.py": {
+      "bytes": 6410,
+      "git_blob": "6f02cfa54ea2d87536effca584420ed5bb2cb559",
+      "mode": "100644",
+      "sha256": "b448c6aee313e147ed07e18bbe6adf38eb7f8560be2821e3029315c2d22f088d"
+    },
+    "packages/galerkin/galerkin/elasticity.py": {
+      "bytes": 16563,
+      "git_blob": "747f02fddd97332a19e4942894c3139a6ff5c183",
+      "mode": "100644",
+      "sha256": "dcc2fac9ada94b443b130df9d6378df587106c7a95c270298aa5d4480a72690b"
+    },
+    "packages/galerkin/galerkin/gmsh.py": {
+      "bytes": 11039,
+      "git_blob": "fa812b832614619a892bee7b2d5c3983d41b6eec",
+      "mode": "100644",
+      "sha256": "d47a5b8928b7926efa1cb92fddadbd17f4b1d42ca932ed2cf7e5897a1286453b"
+    },
+    "packages/galerkin/galerkin/interop.py": {
+      "bytes": 4500,
+      "git_blob": "c8408e6fdfda32d88c7f13e1d70faddff5cb359d",
+      "mode": "100644",
+      "sha256": "fcf9e71b9346d8f426bb5a552cf1b4b4baac2fedd7dd51c1e376f7e7e9652975"
+    },
+    "packages/galerkin/galerkin/mesh.py": {
+      "bytes": 9934,
+      "git_blob": "ed52e208200f4ca4220a5ebfdeec8123a2951889",
+      "mode": "100644",
+      "sha256": "4b0bcb43e66cc666de8caa57654c7e25097ef178838471b66eac186707c2e907"
+    },
+    "packages/galerkin/galerkin/mesh3d.py": {
+      "bytes": 7024,
+      "git_blob": "eefcb5b035ce1f57d27c5ab4e0b789ef05753f50",
+      "mode": "100644",
+      "sha256": "aeb07c3eb5cd428f09db89d7eb37f1c77e1fcbc8968f3af7b457dc4f9407ecea"
+    },
+    "packages/galerkin/galerkin/pml.py": {
+      "bytes": 2428,
+      "git_blob": "8f80e1d3e36d87275091798acce8611e3d81937a",
+      "mode": "100644",
+      "sha256": "62029991c3ecf4b7da6126474df4492dabbc40ac1cc797bed6c63eb8520316d5"
+    },
+    "packages/galerkin/galerkin/postprocess.py": {
+      "bytes": 1452,
+      "git_blob": "1101d77ea24ed46182e2bab7d8feaf46e472e785",
+      "mode": "100644",
+      "sha256": "7f2b412cc39372dac47771851d8ba3f57d4744aeebb5228e85b768935e4d2d3f"
+    },
+    "packages/galerkin/galerkin/solver.py": {
+      "bytes": 1874,
+      "git_blob": "4b7ae273d4264f8f5390a4fafb87138a6ca84d42",
+      "mode": "100644",
+      "sha256": "2fcbabd025789c56881b5e7830e511cadf4443686d8fc7f33776f145dd635703"
+    },
+    "packages/galerkin/galerkin/thermal.py": {
+      "bytes": 16811,
+      "git_blob": "4633e03953d8f6369bdf0e7398d2ebd85b2b4684",
+      "mode": "100644",
+      "sha256": "a7aaab009f72641af41c3794f9460be96cf1a87646765bd7d61afaf398eb482c"
+    },
+    "packages/galerkin/galerkin/thermal_mechanical.py": {
+      "bytes": 12605,
+      "git_blob": "28ecea0150234cff77bcd3d7a0a2c39252a8caa1",
+      "mode": "100644",
+      "sha256": "77e196d31ffa99b396a54169794ece6a947d5bbc3db12a4bbaea8de85469d648"
+    },
+    "packages/galerkin/galerkin/thermoelasticity.py": {
+      "bytes": 14029,
+      "git_blob": "01fc1d0cd14ebe29e3c54543c87dca4b8e3567b8",
+      "mode": "100644",
+      "sha256": "331ad9285f48e5a83b212f0c5c193cd24bc92278a1a9e3e78a88c076131edeaf"
+    },
+    "packages/galerkin/galerkin/waveguide.py": {
+      "bytes": 7316,
+      "git_blob": "3997684e7e9dc1561f90a4299765f19c42dbd06b",
+      "mode": "100644",
+      "sha256": "f9da1326abf47b0d17badde39569e40ceffd10b59ecf3234ed72b8f1ed109594"
+    },
+    "packages/galerkin/pyproject.toml": {
+      "bytes": 1775,
+      "git_blob": "83d580066e07a0c8d986d066dcf7a271745037b8",
+      "mode": "100644",
+      "sha256": "40259f174687ad46e91bd132ff69787dcdbd3d10f58137f1948953ab80aad28c"
+    },
+    "packages/galerkin/tests/conftest.py": {
+      "bytes": 1547,
+      "git_blob": "d4e83d76c8f52d2ed6fbc199d7eb5011289eebae",
+      "mode": "100644",
+      "sha256": "2754b15fdd1ea2d23b11a8ce71ce0c1898626a7b328dcd51b704977042c16d33"
+    },
+    "packages/galerkin/tests/eigenspace_reliability_oracle.py": {
+      "bytes": 3428,
+      "git_blob": "2dd644c9c1e5cc8ce69a25412435375fa55bb66c",
+      "mode": "100644",
+      "sha256": "adfe4a5e2e3a490fded9727dd0aeef62c71907d87997c5af63fda2b07ea57b17"
+    },
+    "packages/galerkin/tests/elasticity2d_independent_oracle.py": {
+      "bytes": 3504,
+      "git_blob": "2e05499f3fcf77a5918032ed2fb81535331edc00",
+      "mode": "100644",
+      "sha256": "69ebe3033c676042977ab3942671bc1dda87908a784ceda4a8daa911c597b352"
+    },
+    "packages/galerkin/tests/test_cavity3d_mesh_validation.py": {
+      "bytes": 7731,
+      "git_blob": "959467547c5ec0c8d87f99abfb59b5635e611d13",
+      "mode": "100644",
+      "sha256": "3908d8a4904cd3327c5fae62d48665ee96fe05aeb1cfad1bf53209ee10525f0b"
+    },
+    "packages/galerkin/tests/test_cavity3d_validation.py": {
+      "bytes": 12776,
+      "git_blob": "3a0bce8912826c13edd542d4c8ae81041e742d44",
+      "mode": "100644",
+      "sha256": "93bcb3580c326a118a00fe2bf99a249c6136a6abc8b059b1038bb2f70889ad03"
+    },
+    "packages/galerkin/tests/test_cavity_modes.py": {
+      "bytes": 9545,
+      "git_blob": "df4c89ed89800cc68278ac2c38918331c0ce2cc6",
+      "mode": "100644",
+      "sha256": "e04fa98e35e598b52fa895f5383abdd9da7c4d5095ff4c755bc9d69f0f0901a2"
+    },
+    "packages/galerkin/tests/test_cavity_solver.py": {
+      "bytes": 17423,
+      "git_blob": "ad19a88791eb04c081d071c629405fb86d4e805b",
+      "mode": "100644",
+      "sha256": "a546fe4e246f58c574288de2619b688216ea7117d9d1674b26a1f74bdc04112f"
+    },
+    "packages/galerkin/tests/test_edge_elements.py": {
+      "bytes": 6518,
+      "git_blob": "643f8a6f1f1e703b0c9e2ef5fbd23796761bb844",
+      "mode": "100644",
+      "sha256": "7e10d544d5e58c0fd9b9e047c2e360322bf410c569f21531aa1ee7c30403b825"
+    },
+    "packages/galerkin/tests/test_eigenspace_reliability.py": {
+      "bytes": 7533,
+      "git_blob": "be909d9fc79006a6f796b6937bd5f0f9535b34a7",
+      "mode": "100644",
+      "sha256": "d161e597090578213ebf0db265d640afcc80a50e7d2432348ff0d7d0bd600d9c"
+    },
+    "packages/galerkin/tests/test_elasticity2d.py": {
+      "bytes": 10506,
+      "git_blob": "09e587547c8e9d62c798eff86bfe736ffc68b07e",
+      "mode": "100644",
+      "sha256": "e8140c96f45ff6035e8da86da17636145dbcb3af55764b0eb3db387ad74c124e"
+    },
+    "packages/galerkin/tests/test_elasticity2d_independent_validation.py": {
+      "bytes": 10406,
+      "git_blob": "c2765927f751fa0622be23878cee6a2899516bf2",
+      "mode": "100644",
+      "sha256": "75ef62de3b5ea0f8ef26e7be06a68bf9af8781c19d728931c5375e1486091f91"
+    },
+    "packages/galerkin/tests/test_elasticity_traction.py": {
+      "bytes": 12135,
+      "git_blob": "8fab424d021aebe869a5d308b826b5c42b76968e",
+      "mode": "100644",
+      "sha256": "4174ee0b04f526dc5c884022159b3ccd47c5ca2e60369a542e252c94d7e6385d"
+    },
+    "packages/galerkin/tests/test_electrostatics.py": {
+      "bytes": 1598,
+      "git_blob": "81f2bbe9e6c6e18c9376acbc42dd5fd06ff36d0a",
+      "mode": "100644",
+      "sha256": "7ef9fa60fd76c27cdd4292abb0a34f0df6483340daec2170e79f0ed7fa5fe0f3"
+    },
+    "packages/galerkin/tests/test_fiber_modes.py": {
+      "bytes": 4999,
+      "git_blob": "25c5943be0bcef789e91161c68705c894366f3c7",
+      "mode": "100644",
+      "sha256": "6213a46d4497da0f867555db47d03dd215586a3a1e17cdc2d07e835df18bec3a"
+    },
+    "packages/galerkin/tests/test_hadley.py": {
+      "bytes": 7148,
+      "git_blob": "e2c90cbb956dc76e6592bdbeffe368b1d875959f",
+      "mode": "100644",
+      "sha256": "fdd2b8256792480bc23abb09f9f97a0e834cfe9f0b1d4b250015aadf1ed1290a"
+    },
+    "packages/galerkin/tests/test_helmholtz.py": {
+      "bytes": 5635,
+      "git_blob": "7869111fb07cc866aa0b0a03eaff06e9cbd228f0",
+      "mode": "100644",
+      "sha256": "3dc88ceb6bdecf6260e8ceead502f965a4e02c3bcb0be654b32ccd392613fdfe"
+    },
+    "packages/galerkin/tests/test_independence.py": {
+      "bytes": 2231,
+      "git_blob": "a94ff620d18e0cce8cd5f8665ce12b03a0c984e1",
+      "mode": "100644",
+      "sha256": "c0a5f7178bf474016aceecb9a118fa92ac1c3cc114afb03cf3599bf9ee727045"
+    },
+    "packages/galerkin/tests/test_interop.py": {
+      "bytes": 4074,
+      "git_blob": "88a2071e6448b99fb918966865aea18a1a31633d",
+      "mode": "100644",
+      "sha256": "1abf68a9ede1420ebbb421c42d3bba31ebea5e51aef83b924c8abfb84b5a2420"
+    },
+    "packages/galerkin/tests/test_mesh_io.py": {
+      "bytes": 6892,
+      "git_blob": "097d8d97b06effec00a304d95978e722df7820f3",
+      "mode": "100644",
+      "sha256": "1cc925d501812ed7bacb6e6bc01e4dcd0680120b2667e6f2fde86a4797aa5e6b"
+    },
+    "packages/galerkin/tests/test_pipeline.py": {
+      "bytes": 3660,
+      "git_blob": "20314760892f2c96e7ba0384feeaafdb37899d6e",
+      "mode": "100644",
+      "sha256": "f20d8294290f216e5fa944350340ea74c54b57099eba832ba6b846a05bc74a50"
+    },
+    "packages/galerkin/tests/test_prescribed_temperature_thermoelasticity.py": {
+      "bytes": 17423,
+      "git_blob": "117a5b5773549d8444d87f576033c618ed86b087",
+      "mode": "100644",
+      "sha256": "761d49e4b400161c9c68a35edb80defff0b357ff713620da96801e8c7172feb3"
+    },
+    "packages/galerkin/tests/test_slab_modes.py": {
+      "bytes": 3913,
+      "git_blob": "7f0d5393f2326e7e5991ef1cb4a2417cfc870654",
+      "mode": "100644",
+      "sha256": "6bd02d1fbc2d7bb43fa9c7bde7ccf3446ab48a8ed7dbc4c5dced373db677f5da"
+    },
+    "packages/galerkin/tests/test_thermal_boundary.py": {
+      "bytes": 11186,
+      "git_blob": "8e5f16652afbd9987c14dc7d9e969bb37aeb5c97",
+      "mode": "100644",
+      "sha256": "703f23c1efeb3cf0c93da7115aa794476afe5c182cf41636e8eb1ab3cef89625"
+    },
+    "packages/galerkin/tests/test_thermal_boundary_convergence.py": {
+      "bytes": 10001,
+      "git_blob": "6413c2fe2d5058bacb3096805fcbfcc95fcf43ae",
+      "mode": "100644",
+      "sha256": "b41032688e842444ee3b12e21a962d825fde9be5ac82a5a4d44d12325295e81b"
+    },
+    "packages/galerkin/tests/test_thermal_flux_robin_independent_validation.py": {
+      "bytes": 17194,
+      "git_blob": "fe60c07cbcb8eb5a86592d3b856bc067ee39c6a1",
+      "mode": "100644",
+      "sha256": "6033d94c38afe04fdfc8b0ad30a3f407635cd457c613a5aa2fd8f365ee52e4ea"
+    },
+    "packages/galerkin/tests/test_thermal_independent_validation.py": {
+      "bytes": 9224,
+      "git_blob": "74c821475df36ac87070e21331b01161a5fa98e2",
+      "mode": "100644",
+      "sha256": "d13cc6fe1bcd5d47723846fc08c255529ad926a27710c988224fa7f08515a8ff"
+    },
+    "packages/galerkin/tests/test_thermal_mechanical_independent_validation.py": {
+      "bytes": 33716,
+      "git_blob": "fa277ca8dff7885e955581b4eabce2a20d1156b4",
+      "mode": "100644",
+      "sha256": "4299363b549c8dd65a5018b34f7773f23363be808f710a7cbca52d58cb5754c6"
+    },
+    "packages/galerkin/tests/test_thermal_mechanical_workflow.py": {
+      "bytes": 10383,
+      "git_blob": "87013ec31f1eab511e889cf308056174ddefb31a",
+      "mode": "100644",
+      "sha256": "2cab5fed195dbb64c2c489a8f23a5effb05f9a118c8f678497f05654c8b8bbfb"
+    },
+    "packages/galerkin/tests/test_thermal_mechanical_workflow_physics.py": {
+      "bytes": 14263,
+      "git_blob": "7af084bd321f877baa3eb830d5acf62d3c9b414e",
+      "mode": "100644",
+      "sha256": "420e3a1992be30de66cb59fe9f82cb8a009acc03add8826051ff8490742fe6ed"
+    },
+    "packages/galerkin/tests/test_thermal_steady2d.py": {
+      "bytes": 9120,
+      "git_blob": "2a8fd7184f5da620fc5629fc25dee2e12a805155",
+      "mode": "100644",
+      "sha256": "feb003d6a87af428fdea40691469bd959e7790ae98f2e2686c78b1b6abdc80c8"
+    },
+    "packages/galerkin/tests/test_thermoelastic_traction.py": {
+      "bytes": 10740,
+      "git_blob": "8bb5d2071c8ae29f0b43472df331798824c9f075",
+      "mode": "100644",
+      "sha256": "3fdc567e644d370fa7230e13c4dab819de5c6ecbfe5cdfadb6dda79e6b21c383"
+    },
+    "packages/galerkin/tests/test_thermoelastic_traction_convergence.py": {
+      "bytes": 7994,
+      "git_blob": "3bac5d48dab77642fe0cd388faf272c7b2f29920",
+      "mode": "100644",
+      "sha256": "d10b8e14fb5af654f4918c2aba045309d111710fa394341bcf3738f7ebfef950"
+    },
+    "packages/galerkin/tests/test_thermoelastic_traction_independent_validation.py": {
+      "bytes": 28592,
+      "git_blob": "3b1bc3291917a0256217ee65fdba0301b63b5853",
+      "mode": "100644",
+      "sha256": "e74c74f1684d346b412675b7dd79b9f30717f56b5ee6a3ec91838a8b05ab7286"
+    },
+    "packages/galerkin/tests/test_thermoelasticity_independent_validation.py": {
+      "bytes": 15703,
+      "git_blob": "34dbf085e527c11fc2af4bfb06035ec870ede2c6",
+      "mode": "100644",
+      "sha256": "76d8a13cc0add5f8a053a6570d39e279789be074e5d96b4014398f531d6db5f1"
+    },
+    "packages/galerkin/tests/test_traction_independent_validation.py": {
+      "bytes": 13936,
+      "git_blob": "8894d91dd043f32ec4a999471c21ed2961b5efc5",
+      "mode": "100644",
+      "sha256": "942d21520570d3a75f298e4f437c9233be08b8851e3b07ff46029b01e231677b"
+    },
+    "packages/galerkin/tests/thermal_flux_robin_independent_oracle.py": {
+      "bytes": 6899,
+      "git_blob": "94a2f7fa1f5071ccadd9db4c079fbdfe3c60ff71",
+      "mode": "100644",
+      "sha256": "7ed9af2a1232f2734ae295fd89a175d5e517a6da140c80b8ce78cd266aa5fb4e"
+    },
+    "packages/galerkin/tests/thermal_independent_oracle.py": {
+      "bytes": 4493,
+      "git_blob": "90258384a1c3e151140f831a9543ffd9edd59b75",
+      "mode": "100644",
+      "sha256": "dd4c82998c41266852bb4bdb8468fe3de80ee3a56d9e11b4e79bdb0bd4c77708"
+    },
+    "packages/galerkin/tests/thermal_mechanical_independent_oracle.py": {
+      "bytes": 6026,
+      "git_blob": "45aed77a2174198745375a82c0ff5e73e53a795e",
+      "mode": "100644",
+      "sha256": "ab20eb2b028ae4ce92f53cd434509a9a09f3127e401c9684251230fe70fb7327"
+    },
+    "packages/galerkin/tests/thermal_mechanical_workflow_oracle.py": {
+      "bytes": 2915,
+      "git_blob": "766e9aa80a983d44b70486cd4323c870f32eedaa",
+      "mode": "100644",
+      "sha256": "0f6340a86616bb9a308707ab818147904db41377dfe4227818cb835dfd298963"
+    },
+    "packages/galerkin/tests/thermoelastic_traction_independent_consumer.py": {
+      "bytes": 3278,
+      "git_blob": "03943dc23edca9e23a205828e9a68908d5d78fee",
+      "mode": "100644",
+      "sha256": "f771b55783624dc965788e9d8dba797152bc6377f3170407d8b32ddf2151249c"
+    },
+    "packages/galerkin/tests/thermoelastic_traction_independent_oracle.py": {
+      "bytes": 8666,
+      "git_blob": "8abef3679e69f44a016fff2aa879876f4d1a4899",
+      "mode": "100644",
+      "sha256": "2de8eeeec51fddfd4fa06c55963ecf01432b1ee8a7a4954f236c274db0528704"
+    },
+    "packages/galerkin/tests/thermoelasticity_independent_oracle.py": {
+      "bytes": 4163,
+      "git_blob": "4a9a906a230060102ad6c7eb39dbbebbc46685b8",
+      "mode": "100644",
+      "sha256": "0800f80e528bf9810ef53ac87122ca1806ee9da44718ce4a000cefae9f397625"
+    },
+    "packages/galerkin/tests/traction_independent_oracle.py": {
+      "bytes": 4203,
+      "git_blob": "5fa0b0a6e38d02507d22e2fccf8aecc8ae0e1149",
+      "mode": "100644",
+      "sha256": "40896ca80e991a34c70c19a61f826a73cb95cf0d70c4f2c22ed9406f4e8eec48"
+    },
+    "packages/gmshio/.gitignore": {
+      "bytes": 59,
+      "git_blob": "d51ad4a12f2a2961786b1eb092224113c3433f9e",
+      "mode": "100644",
+      "sha256": "399603bed540d1793ba8aa37fafb31a16f79c7787fa42ac76370510c6f137cf8"
+    },
+    "packages/gmshio/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/gmshio/MANIFEST.in": {
+      "bytes": 21,
+      "git_blob": "aed95031b69248fd39f09fc91f72d92d04c915cd",
+      "mode": "100644",
+      "sha256": "266998b1af00d042b0baf0ff7120adccfbb726d3ccf30a35dd9dbeaf892fe629"
+    },
+    "packages/gmshio/NOTICE": {
+      "bytes": 1232,
+      "git_blob": "405d52eedbeefc78991b47daac198f1a1b14dcac",
+      "mode": "100644",
+      "sha256": "3f854c9704b805074dc05d7d795beeebc26c1fe0ee607f7be3c0def9656f1345"
+    },
+    "packages/gmshio/README.ko.md": {
+      "bytes": 5328,
+      "git_blob": "1937eec254222758b27b8dfc7f523d32a672b029",
+      "mode": "100644",
+      "sha256": "f0175c33a97c8a890e01253bc48ad414e2a346cbadf1c9e461eca274543fdc86"
+    },
+    "packages/gmshio/README.md": {
+      "bytes": 4932,
+      "git_blob": "627dce6111cf9cf194651e18d6354607e25bd59f",
+      "mode": "100644",
+      "sha256": "c46df5f07e525713f9b12b31f9197218f5cc8f97fa6deda13790768a3cea79fa"
+    },
+    "packages/gmshio/examples/hadley_rib_mesh.png": {
+      "bytes": 593026,
+      "git_blob": "3643c2f49e796e76b751ab2511e8cb4f1ba0e289",
+      "mode": "100644",
+      "sha256": "9e05092b105c9dd8929e0e62f8936e5cd02b190d432fe42eb9d47b4051901eec"
+    },
+    "packages/gmshio/examples/hadley_rib_mesh.py": {
+      "bytes": 1498,
+      "git_blob": "a6da9cf5e7a3230a31f264452ecd51aeda6a0478",
+      "mode": "100644",
+      "sha256": "49f919ddbf131a95f939d019b49d266c01212fcbe69dbdce94753a271ac764b7"
+    },
+    "packages/gmshio/gmshio/__init__.py": {
+      "bytes": 860,
+      "git_blob": "a86289c9c848b8622bc0b53b8fdfa6a7d8a6defb",
+      "mode": "100644",
+      "sha256": "80ea4fc053e92ffa5331d1462b0138b438114a3a7a120df34c3519a1797e50d7"
+    },
+    "packages/gmshio/gmshio/fem.py": {
+      "bytes": 7389,
+      "git_blob": "8670c86b42db03385778fa61cafacb0ea955314c",
+      "mode": "100644",
+      "sha256": "1a91b91439ac09896218eb0c193ad4c8ac383152f6108bfd20a5c38bcf7f232f"
+    },
+    "packages/gmshio/gmshio/geo.py": {
+      "bytes": 14196,
+      "git_blob": "66cb2cbfc9bc17b2121b81f7711a941aec6fdae9",
+      "mode": "100644",
+      "sha256": "7c4a430282f152e7ab400b655eaffb3c98043074dc97a171978c9901dd1fb274"
+    },
+    "packages/gmshio/gmshio/mesh.py": {
+      "bytes": 4891,
+      "git_blob": "c8e16b3ea05d8b4c84aa15a5ee15010e357a4ee3",
+      "mode": "100644",
+      "sha256": "80aa55d42cc4d04d4166440e4e02af7b1ab7b3ccf8fc33368830f6f4c09cf5e6"
+    },
+    "packages/gmshio/gmshio/msh.py": {
+      "bytes": 5654,
+      "git_blob": "b4e37b5f59fffaa19e81c2d190d7cfb6b07edddc",
+      "mode": "100644",
+      "sha256": "91c0ecc4b7c00c91e34537389d46836ce0d69654e51f2a112f88069683f7e7d3"
+    },
+    "packages/gmshio/gmshio/run.py": {
+      "bytes": 4120,
+      "git_blob": "40710c8de8682bdbf45353692131357076fd58bb",
+      "mode": "100644",
+      "sha256": "e478001335db57c0b0dc62458c55dd536cb765830720fd8cb9494b94761272e3"
+    },
+    "packages/gmshio/pyproject.toml": {
+      "bytes": 1183,
+      "git_blob": "4856ff3497dbf5d360e15b04e41f6d83e49bb248",
+      "mode": "100644",
+      "sha256": "1f79c1d16ff64dec2f63ddbae04a33309290dbe8bc7efe09a90819007c933e4c"
+    },
+    "packages/gmshio/tests/data/unit_square.geo": {
+      "bytes": 298,
+      "git_blob": "54839a4181af5edcb0798b3a1e606e9d64c05fae",
+      "mode": "100644",
+      "sha256": "088bd2a908eb0327a09237b32a1fd28bd5e3cc4f4f5a215ea4f4f082fdd3ec2d"
+    },
+    "packages/gmshio/tests/data/unit_square.msh": {
+      "bytes": 2077,
+      "git_blob": "ae3a1500426a1b3c9e0131a91945af38b249c295",
+      "mode": "100644",
+      "sha256": "378193a6a6f69e2ca92ffe010ad237321aa56edfae9b0e6e91e1cfe845c47982"
+    },
+    "packages/gmshio/tests/test_generate.py": {
+      "bytes": 4382,
+      "git_blob": "f22179ea5db7ca1e69ea21d1610cb9f0e314fa38",
+      "mode": "100644",
+      "sha256": "6c32b80d342d6c3bfb74a7d99330f7f759bc73a68f5b483cd90077a44bd84fbd"
+    },
+    "packages/gmshio/tests/test_geo.py": {
+      "bytes": 1830,
+      "git_blob": "3c36ba198c906012a6830d597ea73790b15c18b2",
+      "mode": "100644",
+      "sha256": "b261c37e26b0bd8f9e645d8d66e3971bc5db0bf0412d055b84e48823ceae372d"
+    },
+    "packages/gmshio/tests/test_gmshio_scale.py": {
+      "bytes": 7750,
+      "git_blob": "3402baeaeebafefb49aa193f95a8ab03ae98784a",
+      "mode": "100644",
+      "sha256": "1dea86099292254097a95bc2e68bd6de287684a2308cae26590d7f6cca94247e"
+    },
+    "packages/gmshio/tests/test_msh.py": {
+      "bytes": 2184,
+      "git_blob": "e17993a2b0dedc5491f39f208af97e5988a337d9",
+      "mode": "100644",
+      "sha256": "c8013de00dec617ac0ee5440971b76457e0a07086005d9b6d710505deb0e28c7"
+    },
+    "packages/meshine/.gitignore": {
+      "bytes": 59,
+      "git_blob": "d51ad4a12f2a2961786b1eb092224113c3433f9e",
+      "mode": "100644",
+      "sha256": "399603bed540d1793ba8aa37fafb31a16f79c7787fa42ac76370510c6f137cf8"
+    },
+    "packages/meshine/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/meshine/MANIFEST.in": {
+      "bytes": 21,
+      "git_blob": "aed95031b69248fd39f09fc91f72d92d04c915cd",
+      "mode": "100644",
+      "sha256": "266998b1af00d042b0baf0ff7120adccfbb726d3ccf30a35dd9dbeaf892fe629"
+    },
+    "packages/meshine/NOTICE": {
+      "bytes": 388,
+      "git_blob": "349ea7b8738f20466fb3f866f14fb2d57d56de97",
+      "mode": "100644",
+      "sha256": "5860aa099749393d2b5d9f072a7cbf50e39a052a3c35f90ef871dfe82af71c5a"
+    },
+    "packages/meshine/README.ko.md": {
+      "bytes": 6229,
+      "git_blob": "7d971c1fc27f83e962d76ccf2332a9f8f2ea64dd",
+      "mode": "100644",
+      "sha256": "09b75c3d94c2ea06dd5c5d1be70088c9d502428756579a52303649f27f4c92c0"
+    },
+    "packages/meshine/README.md": {
+      "bytes": 5655,
+      "git_blob": "54221f54369a63e8dab6a9cb413de72d541818b8",
+      "mode": "100644",
+      "sha256": "00abd62673c33de6b6e70b2929f15894462ba518daa501ba4721831d91d44ba4"
+    },
+    "packages/meshine/examples/compare_with_gmsh.png": {
+      "bytes": 708391,
+      "git_blob": "ae8b1e44eaa457aab915556aea7db79ac7f3225a",
+      "mode": "100644",
+      "sha256": "b5a0843b1cb3b6f61ad8265fe7a2262236e5cd85fa994391b591546ac50fb2c2"
+    },
+    "packages/meshine/examples/compare_with_gmsh.py": {
+      "bytes": 3078,
+      "git_blob": "7396ee95c35c57542f981bd0200a19b9d53242ad",
+      "mode": "100644",
+      "sha256": "ad60a2b1f620b152b40927ea693ab6c590d16945b6e3c82bb3fb8a80ca331038"
+    },
+    "packages/meshine/meshine/__init__.py": {
+      "bytes": 972,
+      "git_blob": "8240097a42fdb90d1a466ccf60afe303da26f643",
+      "mode": "100644",
+      "sha256": "425543476cfa8ee92a908e8ece38db59efca16e46b99c81829b1346836ac92f6"
+    },
+    "packages/meshine/meshine/geometry.py": {
+      "bytes": 11109,
+      "git_blob": "a4808676a187b4eabbf65044b30fb2e4352890ec",
+      "mode": "100644",
+      "sha256": "5b1935e1d425955161f6af77d6ec8fb347f7decf4441af58b0dcb3a36e6b71c4"
+    },
+    "packages/meshine/meshine/mesh.py": {
+      "bytes": 3222,
+      "git_blob": "ec859d95e0cb40c6b3b148d034f13ae06d7b899d",
+      "mode": "100644",
+      "sha256": "7feb8fa4e7d325615d15e901bbb12ab0c29d87600178bcf1ab855fb533852fd8"
+    },
+    "packages/meshine/meshine/refine.py": {
+      "bytes": 18795,
+      "git_blob": "3709421825eb73a581c0ad9c220068841fab9dd1",
+      "mode": "100644",
+      "sha256": "94eb1913fccc77c9912e2b2bad42469e260c8b96cbd6a4ec4abbf8935c2b8d59"
+    },
+    "packages/meshine/meshine/shapes.py": {
+      "bytes": 2739,
+      "git_blob": "3d4da9ee4b4c0ae442370ac1215a447594002783",
+      "mode": "100644",
+      "sha256": "2be77ec4257a09f8066f5d56f0ec9f32513f8533c5e7167ceb4092a04461ffa1"
+    },
+    "packages/meshine/pyproject.toml": {
+      "bytes": 1190,
+      "git_blob": "aa73c514fac16453ea84b083631dc6020693770f",
+      "mode": "100644",
+      "sha256": "bc9902da987922e2afbf60c36b8ba2feb45b2f0d4ad9b82d1bbc0c852def430e"
+    },
+    "packages/meshine/tests/test_mesher.py": {
+      "bytes": 6888,
+      "git_blob": "c247adfbc04b84a902c1ee98fab29ac1d2fec22c",
+      "mode": "100644",
+      "sha256": "01ed801012f252677d10748b7c4b3d9ae570df3ca0017b59927ffb9d1e7703e2"
+    },
+    "packages/meshine/tests/test_meshine_scale.py": {
+      "bytes": 10015,
+      "git_blob": "9e566d508590a63f403f3ddc0407d24c21eb6bd7",
+      "mode": "100644",
+      "sha256": "449739b31e133e8feeec6deb5eb6c11f94eddfe9b1898a0f82207a8b0b92e845"
+    },
+    "packages/openphysics/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/openphysics/MANIFEST.in": {
+      "bytes": 21,
+      "git_blob": "aed95031b69248fd39f09fc91f72d92d04c915cd",
+      "mode": "100644",
+      "sha256": "266998b1af00d042b0baf0ff7120adccfbb726d3ccf30a35dd9dbeaf892fe629"
+    },
+    "packages/openphysics/README.ko.md": {
+      "bytes": 1039,
+      "git_blob": "4ddf5a9118f4bc6303302e28b023aadbc39bd245",
+      "mode": "100644",
+      "sha256": "9917ba946a34f40b9c547847fedf46186d92e50d183e2c86c510a4fe6a9077cc"
+    },
+    "packages/openphysics/README.md": {
+      "bytes": 932,
+      "git_blob": "5b2b9ba76ab7d88b7183adbd77305546220d9694",
+      "mode": "100644",
+      "sha256": "82cd04bc232db3f3efd10d73b03ce212229732ee0700d6df70e80b4bc7d84863"
+    },
+    "packages/openphysics/pyproject.toml": {
+      "bytes": 797,
+      "git_blob": "38466a3155d7c2932c059e2aa78ebd86c16799f3",
+      "mode": "100644",
+      "sha256": "4d18235db03364105a8db23f1d4a2f1e67d14bcfe4e94e03ad989e8048fba7d2"
+    },
+    "packages/physmat/.gitignore": {
+      "bytes": 59,
+      "git_blob": "d51ad4a12f2a2961786b1eb092224113c3433f9e",
+      "mode": "100644",
+      "sha256": "399603bed540d1793ba8aa37fafb31a16f79c7787fa42ac76370510c6f137cf8"
+    },
+    "packages/physmat/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/physmat/MANIFEST.in": {
+      "bytes": 21,
+      "git_blob": "aed95031b69248fd39f09fc91f72d92d04c915cd",
+      "mode": "100644",
+      "sha256": "266998b1af00d042b0baf0ff7120adccfbb726d3ccf30a35dd9dbeaf892fe629"
+    },
+    "packages/physmat/NOTICE": {
+      "bytes": 1306,
+      "git_blob": "872843306ada1fd9a4cc5845b97f2e08e6c0528c",
+      "mode": "100644",
+      "sha256": "6bd2a0980ed41067e6e99b4e306655b84919181f17b104cdac9460dc8f737a2b"
+    },
+    "packages/physmat/README.ko.md": {
+      "bytes": 5024,
+      "git_blob": "932b510d734ef6dd455daff7d99a554d2b7190a2",
+      "mode": "100644",
+      "sha256": "a6d0b71efba7d7e3c2bbfd4b78f539f3df3ef079a86bcf0d5ff9b1ffe47ff6f5"
+    },
+    "packages/physmat/README.md": {
+      "bytes": 4775,
+      "git_blob": "a518f63dc0b84d355397893b0c9ee0430aa8088b",
+      "mode": "100644",
+      "sha256": "068e085e9d4360e3d65afb239e640491ae0248106138b6d1db40074693b1544b"
+    },
+    "packages/physmat/examples/materials.png": {
+      "bytes": 123605,
+      "git_blob": "11292c0e7283e7338502abddf0b63e939570b6d9",
+      "mode": "100644",
+      "sha256": "c3323fd106a14066bb16d4d5b80b6cb773fccaf75f2928701babb9f2b0bd4d7e"
+    },
+    "packages/physmat/examples/plot_materials.py": {
+      "bytes": 2435,
+      "git_blob": "739fed33714da674dc0a21d6d1c551b5767b207f",
+      "mode": "100644",
+      "sha256": "ff69dcd8da0e542c3193083c660c7daef90da1f9abe41074348e9157747acadb"
+    },
+    "packages/physmat/physmat/__init__.py": {
+      "bytes": 1583,
+      "git_blob": "209fca9acbb57f572aa9c364f8900a5a2dcd30df",
+      "mode": "100644",
+      "sha256": "0c62528d7bd324b0b62d0e2437b6a484676548e31b0c271816dce499b387ac81"
+    },
+    "packages/physmat/physmat/_tables.py": {
+      "bytes": 14856,
+      "git_blob": "beabe55fdc8498b980237343182d13ed56eac291",
+      "mode": "100644",
+      "sha256": "b02b333f49d10f05ff9122ea4b7c2459cb6fa96ad30b8721d48e84faba9c0cc9"
+    },
+    "packages/physmat/physmat/dispersion.py": {
+      "bytes": 9590,
+      "git_blob": "74ef99cb7d31f985e5030f7de157cb0b2c46818c",
+      "mode": "100644",
+      "sha256": "b8ada245985895574af247b5531d5b1c537fa20717128e6f8c3e0f9feaa7dc01"
+    },
+    "packages/physmat/physmat/fit.py": {
+      "bytes": 3757,
+      "git_blob": "93f9af8b7cdcefde2b1abf1061b121e851788866",
+      "mode": "100644",
+      "sha256": "1f7ef77be437870a0c0129df1490e990175749c58a13e2ea79cccd6d4a72886d"
+    },
+    "packages/physmat/physmat/library.py": {
+      "bytes": 8955,
+      "git_blob": "a36d42e351fb4469a349edff9db291c68c6591fd",
+      "mode": "100644",
+      "sha256": "df4fa9202500afc9351d0ef17d585fe8334c23f2883df14acee64489577e1142"
+    },
+    "packages/physmat/physmat/material.py": {
+      "bytes": 2646,
+      "git_blob": "fcce9967c5725583c843332475084bfd4c68a72f",
+      "mode": "100644",
+      "sha256": "f80ea862233123ccdab2d53b64e9b38dcf3d7074a04827266bd66d7a3bbf8446"
+    },
+    "packages/physmat/physmat/rii.py": {
+      "bytes": 8081,
+      "git_blob": "8675811fc678e5351ffc6bd7ff37bdf2c7408198",
+      "mode": "100644",
+      "sha256": "6b5d7618f6f96633e0a2ae24c03f10f251aa8e4acd8b69504c35a73cdded2519"
+    },
+    "packages/physmat/pyproject.toml": {
+      "bytes": 1273,
+      "git_blob": "5cc1bd43a5d2372010503af298f6c848cdc67c18",
+      "mode": "100644",
+      "sha256": "1daab2ce83d2340b9091409af9916348ab6e22749905b026e4eeaf396454f4cf"
+    },
+    "packages/physmat/tests/test_physmat.py": {
+      "bytes": 8118,
+      "git_blob": "ffd9fc0a888aa493ad5c812d2a162be521c9f631",
+      "mode": "100644",
+      "sha256": "b97630282c6b348d6d55fa8babc3ace5ad7eecf650c3a11686afd4bbda9cdbc3"
+    },
+    "packages/physmat/tools/build_tables.py": {
+      "bytes": 2022,
+      "git_blob": "c006337e058cc06ef4e9c8676bc573d1888bcbf2",
+      "mode": "100644",
+      "sha256": "bca700be2e68f4a1a9e9af48da5a35747b3c133a0f72f58a7c87a792c105e968"
+    },
+    "packages/simcase/.gitignore": {
+      "bytes": 70,
+      "git_blob": "312ba21c31fab1ff3b12f102f1b6a5a9ff7d3f60",
+      "mode": "100644",
+      "sha256": "25c39ca5882a64f35503bd7c2a898d2c10b96b3ef084c61918ce94b234799a2c"
+    },
+    "packages/simcase/LICENSE": {
+      "bytes": 11358,
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "mode": "100644",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "packages/simcase/MANIFEST.in": {
+      "bytes": 651,
+      "git_blob": "f2082f4a45df913eec64bd8a2229b7b51c3635a9",
+      "mode": "100644",
+      "sha256": "b50e4600ccabb0c9b637d0f14358cb01e57129e75764d2992d230926b8394bb1"
+    },
+    "packages/simcase/NOTICE": {
+      "bytes": 376,
+      "git_blob": "37dd91a2d9a89decab4401577d9f490770ba474c",
+      "mode": "100644",
+      "sha256": "528c79ea865e2aca63235cd4f9b25d4c947ef509762a26f258ebe42c4965eb77"
+    },
+    "packages/simcase/README.ko.md": {
+      "bytes": 24297,
+      "git_blob": "4284e84addff8052a5108d43c66932998f178294",
+      "mode": "100644",
+      "sha256": "8de069fced30e9f8caae21fa92db70fd0f4a3e1100b5377b2882b00922ff30cf"
+    },
+    "packages/simcase/README.md": {
+      "bytes": 22648,
+      "git_blob": "72bac170c9372b2596f55f2b21633cc2c2f4ef76",
+      "mode": "100644",
+      "sha256": "9c248d81a55140586d67cb79080dd29e646ef2f4ff19e5ccbacb78b219d4f043"
+    },
+    "packages/simcase/docs/cavity3d.md": {
+      "bytes": 9718,
+      "git_blob": "9a17754d8e999f78698dd304846456dd028ab8b8",
+      "mode": "100644",
+      "sha256": "03c7c017a03e1ac0b6c5fbc97d1980ef3a59b57082609443a8a4799135a07738"
+    },
+    "packages/simcase/docs/geometry.png": {
+      "bytes": 57639,
+      "git_blob": "66cda5f2aeb56c89e12875bd72876d9e4de9ad1b",
+      "mode": "100644",
+      "sha256": "f24d422f55e935c437f0d2a168607f2bb6987643b8748e4ad02b4629e459a3d0"
+    },
+    "packages/simcase/docs/locales/ko/pages/cavity3d.md": {
+      "bytes": 10871,
+      "git_blob": "9f2b1413e04a477ad562612a9c9a66b57b51ade7",
+      "mode": "100644",
+      "sha256": "d55da99079a7cd89e4fb55c2b0a21fb7475cfde2bfbb5bdfda3af2fdcddb3814"
+    },
+    "packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md": {
+      "bytes": 17678,
+      "git_blob": "04a87c1f5fba74eee35ad4bf50578378cdab575c",
+      "mode": "100644",
+      "sha256": "6be83b69acfe5945639f46619c3ae5c75b4b0b653e00513bbac373c9dbbcdb3c"
+    },
+    "packages/simcase/docs/locales/ko/pages/thermal_steady2d.md": {
+      "bytes": 10445,
+      "git_blob": "90684cf6b2df5e9180dd215595d5d58182401f43",
+      "mode": "100644",
+      "sha256": "463fb549985fd0e980ae7fc6e10b3d6c00625f2fb6ebcfcd6c6770616f220959"
+    },
+    "packages/simcase/docs/mesh.png": {
+      "bytes": 476562,
+      "git_blob": "80bc417dab14449ef1c436c879dc710367be50b1",
+      "mode": "100644",
+      "sha256": "f27eadfce73d7890e29e25e867fed250370c0a1b74e6b75025fe2dd75f4d2b37"
+    },
+    "packages/simcase/docs/results.png": {
+      "bytes": 294229,
+      "git_blob": "2be3290b312858c429138dff466fe207db01ae53",
+      "mode": "100644",
+      "sha256": "7d2bc8e9c99fb2424ea7c9639772a27c790e782a87f4d92755fb76a544290b72"
+    },
+    "packages/simcase/docs/thermal_simcase_independent_validation.md": {
+      "bytes": 16113,
+      "git_blob": "47db0a5d4a6110b9f57dd84b11fe89ca97406ea9",
+      "mode": "100644",
+      "sha256": "50ad6ff93ef1d40c7082c8e95a600c781c9b4dc3a9284a1baa729768efd35589"
+    },
+    "packages/simcase/docs/thermal_steady2d.md": {
+      "bytes": 9156,
+      "git_blob": "b744325ccf0e6f1124e98f24dfaf8c4d6690ecd0",
+      "mode": "100644",
+      "sha256": "01a3777a2ae97e09ef83ff69bca912ee9a71e76f3f7949a2da1b83d73f35f63a"
+    },
+    "packages/simcase/examples/cavity_box.json": {
+      "bytes": 689,
+      "git_blob": "8b0906f37de2dd47c2acf948161285a4180d51d9",
+      "mode": "100644",
+      "sha256": "9e60182ee8778da207fe173ce883ea5ab6d8f7d6f99bd0ce3a43e12eb62d6a18"
+    },
+    "packages/simcase/examples/fiber.json": {
+      "bytes": 1069,
+      "git_blob": "0a53ce695b440064c71b1c61accd4c8edd635808",
+      "mode": "100644",
+      "sha256": "0a5358b5f30952aab11cb86f1a1af7f9961e971834fae17036dbb70560bb0f7a"
+    },
+    "packages/simcase/examples/hadley_rib.json": {
+      "bytes": 1442,
+      "git_blob": "2d5546254ceb1f0a7c02198013cfe7fa5930f802",
+      "mode": "100644",
+      "sha256": "9c63f91de503003b1da60bcdc755a1663b2ece81f7f0ebbe44ac32181526201e"
+    },
+    "packages/simcase/examples/slab_te_check.json": {
+      "bytes": 980,
+      "git_blob": "772d24f9a8c091c66c4749073ad6fb60f1b198b4",
+      "mode": "100644",
+      "sha256": "abd361ad465d6ab1ffdef4b1b7be20e9f181994277f6f41eb7986b99741d950b"
+    },
+    "packages/simcase/examples/soi_strip.json": {
+      "bytes": 1118,
+      "git_blob": "765c0fdad9e6f051160181d1cb8ea4b6d62b2d85",
+      "mode": "100644",
+      "sha256": "e38ba1bb66e7dcbad3a424b06c5150b7e889c4c3ea9ee55672c56bae567c0747"
+    },
+    "packages/simcase/examples/soi_strip_results.png": {
+      "bytes": 312726,
+      "git_blob": "5ced8a9ca714d124b8327848d56612bae572731f",
+      "mode": "100644",
+      "sha256": "f34a5f329102978bd5fc0a8bf1d7b72aea032cafe601e49d4d1b63cf84fd130d"
+    },
+    "packages/simcase/examples/thermal_mixed.json": {
+      "bytes": 672,
+      "git_blob": "522ad22ff90ca181fca547c80a39336214068c28",
+      "mode": "100644",
+      "sha256": "b5a5dae8dcee0b9d6781a655f0918069f0648be81b67502190475c989fa3c2c2"
+    },
+    "packages/simcase/examples/thermal_slab.json": {
+      "bytes": 652,
+      "git_blob": "ef7445802db7b965385d049728fbe91aa4a4ab64",
+      "mode": "100644",
+      "sha256": "e26afc6a50f59669609d13112206a8fa7659576e61279714906af8593a50b8ef"
+    },
+    "packages/simcase/examples/vector_fiber.json": {
+      "bytes": 1083,
+      "git_blob": "80a778dfb9986c12fda01b5f8e2f20ca7a6d71b9",
+      "mode": "100644",
+      "sha256": "65113c18054a89053410dc0ea370c5d6a943dfe14b971196758ac461748daba0"
+    },
+    "packages/simcase/examples/vector_slab.json": {
+      "bytes": 1105,
+      "git_blob": "b4f8dbcf91000e8a58cf835dc4aa8f04b992cff5",
+      "mode": "100644",
+      "sha256": "248552840fdfdf40591032a5cb05da00d6b1a9f2d1f73eb13d905107ad5d215a"
+    },
+    "packages/simcase/examples/vector_slab_sweep.json": {
+      "bytes": 1252,
+      "git_blob": "0cd28ec30e7cafc9a8e181ccc7d9321027322ddc",
+      "mode": "100644",
+      "sha256": "3457d88d7099bca9983945cf02a78aea9980d008ddd07e80b057c28f37b1d30a"
+    },
+    "packages/simcase/pyproject.toml": {
+      "bytes": 1657,
+      "git_blob": "8c788e4a86067886ba493a51ba206ec97977b0b4",
+      "mode": "100644",
+      "sha256": "246750a8c2175dd5646fbf81b605e871cdc61c160248c17ce5e2e5e3ceb23089"
+    },
+    "packages/simcase/simcase/__init__.py": {
+      "bytes": 1695,
+      "git_blob": "f29ef5f3f8c267200ec32bdd7a04eb29ac20cf89",
+      "mode": "100644",
+      "sha256": "7b4340e6322cbe144186da26d57d791e11af50aa3ffa7c81d980ba8db58d621c"
+    },
+    "packages/simcase/simcase/__main__.py": {
+      "bytes": 126,
+      "git_blob": "c3d3670e834f1b5f45d8ad8f2374cd394ec7578d",
+      "mode": "100644",
+      "sha256": "9b280deb31d3596dfd95e5e9a80b242ba89d17b4e8192115e8fc8033b58fc934"
+    },
+    "packages/simcase/simcase/cavity.py": {
+      "bytes": 10269,
+      "git_blob": "13a4c291a2a38e2d6f1b759ac8c797c9b27f2e5e",
+      "mode": "100644",
+      "sha256": "d4ef6ab9390e207fa391e550ef3e951366f65b6f19b40f57cf3db6a79499bf8c"
+    },
+    "packages/simcase/simcase/cli.py": {
+      "bytes": 2491,
+      "git_blob": "a0a7fedf343292411a61ee2f050604a0f6efd1c9",
+      "mode": "100644",
+      "sha256": "eebad2659f69563f77eaa393049a8635eeca4a5ec37908bd5621ae059c1b2b96"
+    },
+    "packages/simcase/simcase/examples.py": {
+      "bytes": 6189,
+      "git_blob": "944a34e63e1d97fd7ed1e56af073cc520ad11ab0",
+      "mode": "100644",
+      "sha256": "9da4c39521d11afc3f010e3de63c0fccae708eac99de11ce99006b830d8441cb"
+    },
+    "packages/simcase/simcase/fields.py": {
+      "bytes": 1371,
+      "git_blob": "19fab4c406db99a7322876041b254873aee55543",
+      "mode": "100644",
+      "sha256": "6de032fcb128978d67a55bbf3bdce04478532061daa63f8a1772dd8c673a8607"
+    },
+    "packages/simcase/simcase/geometry.py": {
+      "bytes": 5945,
+      "git_blob": "449b7bbad6353263832a0def65edb0f4ac0deee4",
+      "mode": "100644",
+      "sha256": "fb035690d477d538d3ab140ca8e2949506f065b6f0c1a853ffe89fab22ef02ae"
+    },
+    "packages/simcase/simcase/materials.py": {
+      "bytes": 1810,
+      "git_blob": "4f93a3f1294f2bfc47c393e774c1f40ca4918f8c",
+      "mode": "100644",
+      "sha256": "e8b242ac0f2602d93e1a8b435d31903d36e5ae187679a64463661c9d1dd76dd7"
+    },
+    "packages/simcase/simcase/physics_em_modes2d.py": {
+      "bytes": 5401,
+      "git_blob": "25e6a32f7fce0302f38649ec1a26b394106bda88",
+      "mode": "100644",
+      "sha256": "7a9c089c5ed49ca41a94a1d6abac1000d357cc0c55fc006d46480cad8ef9ca74"
+    },
+    "packages/simcase/simcase/runner.py": {
+      "bytes": 15502,
+      "git_blob": "d6c7fe40b7960ccda5b44f3e8235970ac3966650",
+      "mode": "100644",
+      "sha256": "937f7aaa71d3a6bf7bb6bd5ec9bf0786ac3b4dfc7c11f79eb74454b4481e3273"
+    },
+    "packages/simcase/simcase/schema.py": {
+      "bytes": 20176,
+      "git_blob": "4158018c59a5858f223c13be8e9c73de7d4d8ea5",
+      "mode": "100644",
+      "sha256": "2a7944ab7cab01709b79da5cda17f6d6d09d4178213cdb25b59f0b3faf09eb5e"
+    },
+    "packages/simcase/simcase/studio/__init__.py": {
+      "bytes": 870,
+      "git_blob": "31347f1de0aa6c93ea06d99e2376e06709266e6c",
+      "mode": "100644",
+      "sha256": "fc57a97bcbf6bae15e4778829a6e7706b066edca4a7e481cd0e9eb74e4549711"
+    },
+    "packages/simcase/simcase/studio/__main__.py": {
+      "bytes": 112,
+      "git_blob": "cac2a43673497fff0fc3422413febfc2b7723f2e",
+      "mode": "100644",
+      "sha256": "1409a1349cbb8586f6076f7c40ad801cc87b1c563b12ea1013ff895e7c75f6d7"
+    },
+    "packages/simcase/simcase/studio/server.py": {
+      "bytes": 7906,
+      "git_blob": "7ee310699d493a8c0f4aaaadbd09a38fe975ca4a",
+      "mode": "100644",
+      "sha256": "ecca7f0712f66dbe9fda6c386d35b1bcc614cfdb072b8bbcd599f03a1500b208"
+    },
+    "packages/simcase/simcase/studio/static/index.html": {
+      "bytes": 41694,
+      "git_blob": "225e3c05739b9f04201fc3754a1fb53ff2451180",
+      "mode": "100644",
+      "sha256": "1ace880c0d9b89b7b58ade0aadc2a7e7ea3bf037269097c6ce972591e45ec04e"
+    },
+    "packages/simcase/simcase/thermal.py": {
+      "bytes": 22710,
+      "git_blob": "7823d39f451cad1c6b53d2f8dde7899fd854321c",
+      "mode": "100644",
+      "sha256": "ec0bb6621be40596812a758d382114f7e529544f69ea92183f3dd861df3fec3c"
+    },
+    "packages/simcase/simcase/thermal_examples.py": {
+      "bytes": 872,
+      "git_blob": "15e33decc1c483e497eeb4f8f595e883b6fdd45e",
+      "mode": "100644",
+      "sha256": "4610c5d46c8fcadb96459f5ef93e085c09885c8172bb9647380cf2ada19a6150"
+    },
+    "packages/simcase/simcase/tracking.py": {
+      "bytes": 7222,
+      "git_blob": "c7e8017f8fd44c12541c5078ec49730a03bdfecb",
+      "mode": "100644",
+      "sha256": "39aaeeb531d1c80f1ffa5a51d6ad8664c38b165d2da23492ad16bae898ec014a"
+    },
+    "packages/simcase/simcase/units.py": {
+      "bytes": 13184,
+      "git_blob": "ffe5a43d8f30bbaaf63a8a8cfb0b3912f358a8d3",
+      "mode": "100644",
+      "sha256": "94e7bfd0d9a49f9439763f1cd51c45e414033bc2f30541d24e261bb63d41917d"
+    },
+    "packages/simcase/tests/studio_thermal.cjs": {
+      "bytes": 4628,
+      "git_blob": "2ad370af9b4526c4197bf967346da61e7aebb1c4",
+      "mode": "100644",
+      "sha256": "fe367aadcbe1034daceda334c7f4c7d18e603f18d5455b5552303c12dff1f988"
+    },
+    "packages/simcase/tests/studio_vector.cjs": {
+      "bytes": 8300,
+      "git_blob": "b4f79632d9adb647d6659c30de34626d5b4ca8ff",
+      "mode": "100644",
+      "sha256": "a728eebdbd5eee8e666560d964ecff33ec9d732b08d8c470d73be31864507f33"
+    },
+    "packages/simcase/tests/test_cavity3d.py": {
+      "bytes": 12506,
+      "git_blob": "1eab8346bf4ae8cd9c396b3c90c2707e41ec4263",
+      "mode": "100644",
+      "sha256": "52667a067383ae4fec768d36688974eabeae27c78e20dde2c0775b9bc94ae701"
+    },
+    "packages/simcase/tests/test_cavity3d_integration.py": {
+      "bytes": 6304,
+      "git_blob": "bf410ed44668a6eb1568bc1ebc43dc02974d5eae",
+      "mode": "100644",
+      "sha256": "de1f759d2076b1924a36dfc7e1598379f4b0fbdd917b9e2d86f81d11387403ec"
+    },
+    "packages/simcase/tests/test_cavity3d_persistence_validation.py": {
+      "bytes": 7774,
+      "git_blob": "6065b5694ff2d18001feaa293bd429b1e128acd9",
+      "mode": "100644",
+      "sha256": "42244b6e465b786f1ce0b2d1d3484ec83d0c9741c87da08b43df06881023a4b6"
+    },
+    "packages/simcase/tests/test_simcase.py": {
+      "bytes": 24432,
+      "git_blob": "d6cfbd19fa442d58e6eb80c351e366b26a054c91",
+      "mode": "100644",
+      "sha256": "5e19745ad4fa1ad7f0c3268411038e27d57f681f84e471c5d5b30d96c895b399"
+    },
+    "packages/simcase/tests/test_studio.py": {
+      "bytes": 10936,
+      "git_blob": "34ad16c9b333373d749baf62e263cb023619a6af",
+      "mode": "100644",
+      "sha256": "2546c02535b7e4da36610a246c8f28032c38073db3351a549534107b6e5c7e38"
+    },
+    "packages/simcase/tests/test_thermal.py": {
+      "bytes": 19249,
+      "git_blob": "3f37e066facbbd59642423554e2b238037d54015",
+      "mode": "100644",
+      "sha256": "3ad511976590ccc44d814fbd71906a6d4a2a2f72b9bdb66c53183e3c89a28888"
+    },
+    "packages/simcase/tests/test_thermal_simcase_independent_validation.py": {
+      "bytes": 22218,
+      "git_blob": "8741190996d9541dc71f7da38a0acc4b32f3cc49",
+      "mode": "100644",
+      "sha256": "15ac773bc89c1231916fce258832de0de5ee4365dbba11f38d5bea13d255836e"
+    },
+    "packages/simcase/tests/test_tracking.py": {
+      "bytes": 11129,
+      "git_blob": "abfa1ac867700cebbdccfc4f29eb4a727f82b585",
+      "mode": "100644",
+      "sha256": "0a95ef8b098ac7032bdb908a2c80b97ddd782770190042022a77bbfce49df3e7"
+    },
+    "packages/simcase/tests/test_vector.py": {
+      "bytes": 11018,
+      "git_blob": "e736b5a272b216ad4838a99ec285555565016d28",
+      "mode": "100644",
+      "sha256": "076e70a68ea5a7fea1265d51785afc53f0519ccf80aeee83e7635d47bc0627a9"
+    },
+    "packages/simcase/tests/test_vector_eigenspace_reliability.py": {
+      "bytes": 2526,
+      "git_blob": "13621ba5bcd7fa4fff1f479496da16ff8c0ef1ae",
+      "mode": "100644",
+      "sha256": "0aaca6aa78a8e954e5d63c09fca1a5250195355b5034e178401d7d0cfd267e98"
+    },
+    "packages/simcase/tests/test_vector_sweep.py": {
+      "bytes": 8684,
+      "git_blob": "67ded5d2ff5356458aeeea0799f2c38e538ca766",
+      "mode": "100644",
+      "sha256": "02733a3baa3f43aacaea66f90b59e704df419472c5ca77d431fb2e3ded13b57b"
+    },
+    "packages/simcase/tests/thermal_simcase_independent_oracle.py": {
+      "bytes": 9874,
+      "git_blob": "ccde80672bac1222d93ed85dbad0b85ef7661e92",
+      "mode": "100644",
+      "sha256": "324dbdaa17fc0baabaec344d82fee9d4c7ba813021ef37432e254a3c72eef123"
+    },
+    "packages/simcase/tests/thermal_simcase_independent_stale.cjs": {
+      "bytes": 7935,
+      "git_blob": "4383b3e3cc7f036e19e9ecf8b1ee80710495d899",
+      "mode": "100644",
+      "sha256": "fbc2ac8469fd6a15d3350260bf8dca8d6bad4a2a95fc53bbf69a292413c378cf"
+    },
+    "pyproject.toml": {
+      "bytes": 668,
+      "git_blob": "204252b60bf7b40a5df3d0df8178ac3999a83e67",
+      "mode": "100644",
+      "sha256": "ed6572ecdde1d6af8eb2e4abc2218c4650e9046bc96998c5c51c1beea2ef73b7"
+    }
+  },
+  "warning": "Transport root history only. Never merge this commit or branch into product, release or develop."
+}
