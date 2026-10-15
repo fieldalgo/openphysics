@@ -7,6 +7,10 @@ still declares Python >=3.10. `requirements-py312-linux.txt` pins the validation
 tools and their transitive dependencies, not the packages' runtime requirements.
 Review and update the pins deliberately, then rerun both source and wheel checks.
 
+Repeatable vector timing, memory and profiling commands are documented in
+[benchmark_vector.md](benchmark_vector.md). Performance measurements supplement
+the numerical checks; they are not CI timing gates.
+
 From the repository root, with a Python 3.12 virtual environment active:
 
 ```bash
