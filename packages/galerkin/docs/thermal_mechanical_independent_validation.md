@@ -7,7 +7,8 @@ This report covers the public Python workflow on explicit production candidate
 **48920cc066708784864c95eb5bae597b0e2a2abd**. Independent test code is fixed at
 **ecc924b80603426cd751cf3fc0fa62b25cedd976**. Preparation math and gates were frozen
 before inspecting this implementation. Producer checks are regression evidence,
-not the independent oracle. No production/refsol/original test/settings changes.
+not the independent oracle. The independent additions do not edit production/refsol/original tests/settings;
+the separately assigned follow-up below merges its producer-owned guard change.
 
 The workflow runs Dirichlet/insulated steady heat, exact same-mesh nodal-P1
 snapshot transfer, then prescribed-temperature mechanics. Robin, outward flux,
@@ -245,9 +246,19 @@ No new dependencies or GPL solver implementation sources were used.
   venv missing local simcase; installing the six existing local packages
   no-index/no-deps fixed the two targeted CLI checks (2pass). The original
   full-run result remains failed, not re-labelled as a clean whole run.
-  The owner assigned the guard correction separately; exact follow-up acceptance
-  is pending. Broad numerical reruns are unnecessary if production bytes stay
-  unchanged. Final combined full regression belongs to release review.
+  Exact follow-up **e2a1a26a2bb46aa9b0d3a860a34c55d5c960aa81** changes only
+  the producer-owned test_independence.py (blob a94ff620d18e0cce8cd5f8665ce12b03a0c984e1).
+  It is normally merged; source pytest collection observes **6 tests**, compared
+  with the old file’s actual2. Source guard **6pass/0fail/0skip** and installed
+  engine guard **6pass/0fail/0skip** include standard-library acceptance and
+  rejection probes for httpx/requests/refsol, retaining the separate refsol ban.
+  Installed ENGINE is explicitly bound to real site-packages during collection,
+  not an empty copied-test path. All **18 runtime Python modules** are directly
+  byte-identical between the verified source and original b413 wheel, including
+  the workflow; the independent oracle/test bytes also stay fixed. Consequently
+  numerical90, related226 and the whole run are not automatically repeated.
+  This target recovery is not a second clean whole-run result. The owner’s
+  separate final release combination/fullsource remains pending.
 
 Other original invocation failures are preserved: first explicit-file pytest
 selected package configuration and failed collection with ModuleNotFoundError

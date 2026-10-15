@@ -6,7 +6,8 @@
 workflow를 수용합니다. 이는 초기 **48920cc066708784864c95eb5bae597b0e2a2abd**의
 정상 후속입니다. 독립 시험 코드는 **ecc924b80603426cd751cf3fc0fa62b25cedd976**에
 고정했습니다. 구현을 보기 전에 독립 수학과 gate를 동결했으며 producer 검사는 회귀
-근거일 뿐 독립 oracle이 아닙니다. 생산/refsol/기존 시험/설정은 변경하지 않았습니다.
+근거일 뿐 독립 oracle이 아닙니다. 독립 추가 파일은 생산/refsol/기존 시험/설정을 수정하지 않았으며, 아래 별도 배정
+후속의 producer 소유 guard 변경만 정상 merge했습니다.
 
 범위는 Dirichlet·단열 정상 열전도, 같은 메시 nodal-P1의 정확 snapshot 복사,
 처방 온도 기계단계입니다. Robin·외향 flux·기계 traction·재메시·반복·피드백·과도열·
@@ -227,8 +228,16 @@ b413 wheel SHA256은
   1실패와, source venv에 local simcase를 설치하지 않아 난 cavity CLI2실패입니다.
   기존 로컬6패키지를 no-index/no-deps로 설치한 뒤 CLI 해당2개는 통과했습니다.
   원 전체 결과는 실패로 보존하며 깨끗한 전체 통과로 다시 표시하지 않습니다.
-  오너가 guard 수정을 별도 배정했으며 exact 후속 수용은 대기 중입니다. 생산 byte가
-  같으면 광범위 수치 재실행은 불필요하고 최종 결합 전체 회귀는 release 검토 범위입니다.
+  명시 후속 **e2a1a26a2bb46aa9b0d3a860a34c55d5c960aa81**는 producer 소유
+  test_independence.py 한 파일만 변경합니다(blob a94ff620d18e0cce8cd5f8665ce12b03a0c984e1).
+  정상 merge 후 source pytest collection에서 기존 실제2개 대비 **6개**를 관측했습니다.
+  Source guard **6pass/0fail/0skip**, 설치 engine guard **6pass/0fail/0skip**이며
+  표준 라이브러리 허용과 httpx/requests/refsol 거절 probe, 별도 refsol 금지를 유지합니다.
+  설치 검사는 빈 복사 시험 경로 대신 collection에서 ENGINE을 실제 site-packages로
+  명시 연결합니다. Workflow를 포함한 **runtime Python18모듈**이 source와 기존b413
+  wheel 사이에서 직접 byte-identical이며 독립 oracle/test byte도 고정했습니다. 따라서
+  수치90·관련226·전체를 자동 반복하지 않았습니다. 이 target 회복은 새로 깨끗한 전체
+  실행 결과가 아니며 오너의 별도 최종 release 결합/fullsource를 기다립니다.
 
 다른 최초 실행 오류도 보존했습니다. 첫 explicit-file pytest는 package 설정을 골라
 ModuleNotFoundError(galerkin) collection 오류가 났으며 root의 -c pyproject.toml로
