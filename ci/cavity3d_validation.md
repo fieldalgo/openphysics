@@ -175,8 +175,78 @@ invariant dihedral angles. Relative Whitney identity errors were at most
 6.8e-16. Kernel counts were exactly 1, 8, 27. Both independent analytic
 enumerations matched all 176 modes at index cap 4; cube counts were 3/2/6.
 
-The new public API, document units, complete returned-spectrum policy, independent
-wall traces, gradient overlaps, saved raw fields, and restoration remain
-unverified. Full pytest was not run: pytest is absent in this execution
-environment. The baseline commands above are direct Python checks and must not
-be reported as a full test-suite pass.
+These initial direct checks preceded API validation and pytest installation.
+The subsequent targeted results below describe the current evidence and failures;
+a full suite pass is not claimed.
+
+
+## Approved technical contract and executable tests
+
+The callable is
+`galerkin.solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`.
+Lengths and mesh coordinates are SI metres; frequencies are Hz. Selection is
+`near_target` in squared frequency and returns exactly the requested count on
+success. It can split a degenerate cluster. Results and saved metadata declare
+`cluster_completeness="not_certified"` and
+`mode_count_policy="exact_count_may_split_cluster"`.
+Saved data declare `field_layout="cavity3d-edge-v1"` and must load without pickle.
+With `save_fields=false`, raw edge/centroid arrays are omitted; spectra and
+search/normalization metadata remain available.
+
+Public solver rejection limits are residual 1e-8 and mass orthogonality 1e-7.
+The stricter independent benchmark limits in the table remain 1e-9 and 1e-8.
+The normalized coefficients obey Q* M_SI Q = I; edge coefficients have arbitrary
+normalization units m^-1/2 and centroid fields m^-3/2, rather than calibrated V/m.
+
+Run the new independent tests against a source checkout containing the approved
+API and simcase implementation. Select the root configuration explicitly when
+selecting package test files, to avoid package-local pytest discovery bypassing
+the root conftest path setup:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q \
+  packages/galerkin/tests/test_cavity3d_validation.py \
+  packages/simcase/tests/test_cavity3d_persistence_validation.py
+```
+
+The convergence fixture uses the original fixed shift sigma = 1.3 times the
+analytic fundamental k², expressed as target_frequency_hz. This stays away from
+the gradient kernel while retaining the complete reference clusters under test.
+It does not change the numerical gates or guarantee completeness for other targets.
+The raw restoration test reconstructs Mesh3D/EdgeSpace3D from saved primitive
+arrays, without requiring or inventing a product load API.
+
+## Measured candidate results (2026-10-15)
+
+Source base: `75df651457b8f78540e9050b27c276ab8b07aaf1`. The temporary test
+snapshot used exact changed blobs from core commit
+`163239a5ae03c05a1b8f49c78c2a1277c42ca3e6`, simcase commit
+`1837b46b4f533ca97279e29004ecba39b48b8044` and reference commit
+`ce74a783e0cf679e9e031360b6bd9d556346a575`. This was a component-source
+composition, not a single integrated Git commit or a built-wheel validation.
+Python 3.12, NumPy 2.3.5, SciPy 1.17.0, pytest 9.1.1 were used; the numerical
+library versions differ from the CI lock. No runtime dependency declaration changed.
+
+| Independent check | Observed result |
+|---|---|
+| Amplitude/refsol oracle and dense generalized nullity | Passed |
+| Raw eigenpair residual, mass orthogonality, gradient overlap, independent wall traces | Passed on the small cube and unequal-sided box fixtures |
+| Actual geometric scaling and degenerate subspace | Passed |
+| m/um/nm document representations and translated SI coordinates | Passed |
+| Saved raw array dtype/shape/value and restored residual/PEC/field | Passed |
+| Core required cluster metadata | Failed: cluster_completeness attribute absent |
+| Saved contract metadata | Failed: cluster_completeness value differs from contract; required layout/count-policy keys also absent on source inspection |
+| Cube n=4,8,16 complete-cluster convergence | Passed; mean orders 1.9184, 1.9568, 1.9836 |
+| Unequal box n=4,8,16 complete-cluster convergence | Failed: 111 cluster mean order 1.22837, below 1.8 |
+
+The failed unequal-box cluster's mean k² relative errors were 0.0038258485,
+0.0007879605 and 0.0003363018. Its width converged at order 2.05384, and its
+finest individual frequency accuracy was good; neither fact overrides the failed
+mean-order gate. The cube's finest maximum frequency error was 0.32417%; the
+unequal box's was 0.18691%. No tolerance or refinement ladder was relaxed.
+
+The finite-cutoff reference handoff's 17 dedicated tests were rerun on these
+sources after code review; this does not replace the independent amplitude/count
+checks above. Full source regression, CLI acceptance, build/wheel tests, and
+remote CI remain unrun by this validation task. Known failures require review
+before product acceptance can be claimed.
