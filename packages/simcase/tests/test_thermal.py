@@ -149,21 +149,47 @@ def test_thermal_existing_target_unchanged(tmp_path,kind):
 @pytest.mark.parametrize('mode',['ordinary','foreign','replaced','known_replaced','before_marker'])
 def test_thermal_partial_failure_safe_cleanup(tmp_path,monkeypatch,mode):
     r=run(Document.from_dict(model()),False);out=tmp_path/'heat';original=_OwnedOutput.write
-    moved=tmp_path/'moved'
+    moved=tmp_path/'moved';stages=[];fixture_error=None
     def failing(self,name,writer):
-        if mode=='before_marker':raise OSError('injected before marker')
+        nonlocal fixture_error
+        if mode=='before_marker':
+            stages.append('injected before marker');raise OSError('injected before marker')
         answer=original(self,name,writer)
         if name=='fields.npz':
-            if mode=='foreign':(out/'foreign.txt').write_text('do not remove')
-            if mode=='known_replaced':
-                replacement=tmp_path/'replacement.json';replacement.write_text('replacement')
-                replacement.replace(out/'model.json')
-            if mode=='replaced':
-                out.rename(moved);out.mkdir();(out/'foreign.txt').write_text('replacement directory')
-            raise OSError('injected after NPZ')
+            stages.append('NPZ written; starting fixture')
+            try:
+                if mode=='foreign':
+                    (out/'foreign.txt').write_text('do not remove');stages.append('foreign file written')
+                if mode=='known_replaced':
+                    replacement=tmp_path/'replacement.json';replacement.write_text('replacement')
+                    stages.append('file replace starting')
+                    replacement.replace(out/'model.json');stages.append('file replace completed')
+                    assert (out/'model.json').read_text()=='replacement'
+                if mode=='replaced':
+                    stages.append('directory rename starting')
+                    out.rename(moved);stages.append('directory rename completed')
+                    out.mkdir();stages.append('replacement directory created')
+                    (out/'foreign.txt').write_text('replacement directory');stages.append('replacement foreign file written')
+                stages.append('injected after NPZ')
+                raise OSError('injected after NPZ')
+            except OSError as exc:
+                fixture_error={'type':type(exc).__name__,'errno':exc.errno,
+                               'winerror':getattr(exc,'winerror',None),'message':str(exc),
+                               'stage':stages[-1],'stages':list(stages)}
+                raise
         return answer
     monkeypatch.setattr(_OwnedOutput,'write',failing)
-    with pytest.raises(OSError):r.save(out)
+    with pytest.raises(OSError) as caught:r.save(out)
+    expected='injected before marker' if mode=='before_marker' else 'injected after NPZ'
+    diagnostic={'mode':mode,'fixture_error':fixture_error,'stages':stages,
+                'caught':{'type':type(caught.value).__name__,'errno':caught.value.errno,
+                          'winerror':getattr(caught.value,'winerror',None),'message':str(caught.value)}}
+    print('THERMAL_CLEANUP_DIAGNOSTIC '+json.dumps(diagnostic,sort_keys=True),flush=True)
+    # OS fixture failures are not evidence of the intended post-replacement fault.
+    assert str(caught.value)==expected,diagnostic
+    assert stages[-1]==expected,diagnostic
+    if mode=='known_replaced':assert 'file replace completed' in stages,diagnostic
+    if mode=='replaced':assert 'replacement foreign file written' in stages,diagnostic
     if mode in ['ordinary','before_marker']:assert not out.exists()
     elif mode=='replaced':
         assert (out/'foreign.txt').read_text()=='replacement directory'
