@@ -103,23 +103,35 @@ finite-JSON validation still apply. Stored geometry is SI, not document units.
 
 The target must not exist, including an empty directory, existing file or dangling
 symlink. The CLI checks this before solving; save claims a fresh target with an
-exclusive mkdir. Concurrent writers have one winner, and a loser does not clean
-up the winner. The owner writes `.incomplete`, model/log and optional NPZ, then
-`summary.json` last; the marker is removed only on successful completion.
-Every recorded required artifact must still exist with its original identity at
-completion; a missing artifact cannot be committed as a successful result.
-A constructor handle-acquisition failure removes only the same owned empty target,
-preserves foreign/replaced targets, and keeps the original exception.
+exclusive mkdir. Competing fresh-save claims have one winner; a losing claim does
+not clean up the winner. This does not authorize another writer inside the output.
+The caller must prevent external writers from changing the output directory or
+its entries for the **entire save, including all failure cleanup**. This is a
+non-adversarial, caller-exclusive fresh-output contract.
 
-On failure, cleanup unlinks only files still identified as its own. It never
-recursively removes a directory, follows a replaced target, or deletes unexpected
-or replaced files. Created inodes are pinned through cleanup to avoid inode reuse
-being mistaken for ownership. If safe cleanup cannot finish, incomplete output
-is retained. Consumers should require both summary and absence of `.incomplete`.
-This is not an atomic multi-file transaction or a crash rollback guarantee.
+The owner writes `.incomplete`, model/log and optional NPZ, then `summary.json`
+last. Before removing the marker, finish checks recorded artifacts for presence
+and observed identity. Observed missing artifacts prevent completion. Constructor
+handle-acquisition failure attempts removal only of the observed same empty target
+and retains the original exception.
+
+Cleanup uses observed ownership checks and never recursively deletes a directory.
+A foreign/replaced file or target observed before a check is preserved. **The
+check and subsequent open/unlink are separate operations**: replacement between
+check and use is not protected atomically. An external writer can cause writes
+to a replaced target or deletion of a replacement during cleanup. Inode pins
+prevent reuse from being mistaken for identity; they do not eliminate this race.
+If cleanup cannot finish, incomplete output may remain. Consumers should require
+both summary and absence of `.incomplete` under the same exclusivity assumption.
+This is not atomic multi-file publication, adversarial race protection or crash
+rollback. Independent source/installed counterexamples demonstrate the check/use
+limitation; see the [independent report](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/thermal_simcase_independent_validation.md).
+That limitation is separate from the two unresolved Windows fixture-operation
+failures; it does not establish their cause.
 Ownership uses POSIX descriptors or Windows native handles through stdlib ctypes.
 On Windows, directory handles use `FILE_FLAG_BACKUP_SEMANTICS`; all native file
-opens share read/write/delete so pins permit rename and safe unlink. New files use
+opens request read/write/delete sharing; actual operation availability must be
+verified separately under the caller-exclusive contract. New files use
 `CREATE_NEW`. Platform-specific execution evidence must be checked separately.
 The Windows API contracts are documented by Microsoft:
 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)

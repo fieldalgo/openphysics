@@ -100,24 +100,33 @@ NPZ 전체를 생략하고 summary, model, log는 남깁니다. 이때도 원시
 
 대상 경로는 존재하지 않아야 합니다. 빈 디렉터리, 기존 파일, 끊어진 symlink도
 거절합니다. CLI는 해석 전에 검사하며, save는 배타적 mkdir로 새 대상을 확보합니다.
-동시 writer 중 하나만 성공하고 패자는 승자의 데이터를 정리하지 않습니다.
-소유 writer는 `.incomplete`, model/log 및 선택적 NPZ를 쓴 뒤 `summary.json`을
-마지막에 씁니다. 성공적으로 완료한 경우에만 marker를 제거합니다.
-완료 시 기록한 모든 필수 artifact가 원래 identity를 유지하며 존재해야 합니다.
-파일이 누락된 결과를 성공으로 확정하지 않습니다. 생성자의 handle 확보가 실패하면
-같은 소유권의 빈 target만 제거하고, 외부 파일이 있거나 교체된 target은 보존하며
-원래 예외를 유지합니다.
+동시에 새 저장을 시도하는 mkdir claim 중 하나만 성공하고 패자는 승자의 데이터를
+정리하지 않습니다. 이것은 다른 writer가 출력 안에 들어와도 된다는 뜻이 아닙니다.
+Caller는 **실패 cleanup을 포함한 save 전체가 끝날 때까지** 외부 writer가 출력
+디렉터리나 그 항목을 바꾸지 못하게 해야 합니다. 수용 범위는 비적대적인 caller-exclusive
+fresh-output 계약입니다.
 
-실패 시에는 여전히 본인 소유로 식별되는 파일만 unlink합니다. 디렉터리를 재귀적으로
-지우거나, 바뀐 대상을 따라가거나, 예상하지 못한 파일·교체 파일을 지우지 않습니다.
-inode 재사용을 소유권으로 오인하지 않도록 생성한 inode를 cleanup 동안 고정합니다.
-안전하게 정리를 마칠 수 없으면 미완료 출력을 남깁니다. 소비자는 summary가 있고
-`.incomplete`가 없는지 모두 확인해야 합니다. 이는 원자적 다중 파일 트랜잭션이나
-충돌·중단 후 rollback 보장이 아닙니다.
+소유 writer는 `.incomplete`, model/log 및 선택적 NPZ를 쓴 뒤 `summary.json`을
+마지막에 씁니다. Marker 제거 전에 finish가 기록한 artifact의 존재와 관측 identity를
+검사하며, 누락을 관측하면 완료하지 않습니다. 생성자의 handle 확보가 실패하면 관측상
+같은 빈 target만 제거를 시도하고 원래 예외를 유지합니다.
+
+Cleanup은 관측한 소유권을 검사하며 디렉터리를 재귀적으로 삭제하지 않습니다.
+검사 전에 관측한 외부·교체 파일이나 대상은 보존합니다. **검사와 뒤따르는 open/unlink는
+별개 연산**이므로 check/use 사이 교체에 대한 원자적 보호는 없습니다. 외부 writer가
+경합하면 바뀐 target에 쓰거나 cleanup 중 교체 파일을 삭제할 수 있습니다. Inode pin은
+재사용을 identity로 오인하는 문제를 막지만 이 race를 제거하지 않습니다. 정리를 마치지
+못하면 미완료 출력이 남을 수 있습니다. 소비자는 같은 배타적 사용 전제에서 summary가
+있고 `.incomplete`가 없는지 모두 확인해야 합니다. 원자적 다중 파일 게시·적대적 race
+보호·crash rollback 보장이 아닙니다. 독립 source/설치본의 실제 반례가 check/use 한계를
+보여줍니다. [독립 보고서](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md)를 참고하세요.
+이 한계는 원인이 미확정인 Windows fixture-operation 두 실패와 별개이며 그 원인을
+입증하지 않습니다.
 소유권 고정에는 POSIX descriptor 또는 표준 라이브러리 ctypes를 통한 Windows
 native handle을 사용합니다. Windows 디렉터리 handle은
 `FILE_FLAG_BACKUP_SEMANTICS`를 사용하며 모든 native 파일 열기는 read/write/delete를
-공유해 고정 중에도 rename과 안전한 unlink를 허용합니다. 새 파일에는 `CREATE_NEW`를
+공유를 요청합니다. 실제 연산 가능 여부는 caller-exclusive 계약 아래 별도로
+확인해야 합니다. 새 파일에는 `CREATE_NEW`를
 사용합니다. 플랫폼별 실제 실행 근거는 별도로 확인해야 합니다. Windows API 계약은
 Microsoft의 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)와
 [directory handles](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory)에 설명되어 있습니다.
