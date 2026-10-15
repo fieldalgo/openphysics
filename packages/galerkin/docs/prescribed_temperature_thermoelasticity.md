@@ -183,6 +183,8 @@ simcase or Studio integration is included. Boundary tags do not certify units
 or provenance. Callable body forces are integrated numerically, so highly
 oscillatory inputs require an independently adequate mesh/quadrature.
 
-Shared MANIFEST/README/CI remain release-owner files. New Python submodules are
-wheel-importable; adding this document/example to source-distribution asset
-manifests and release consumer gates is a release-owner follow-up proposal.
+This document and its English example are included in the source-distribution
+manifest and required byte-asset checks. Installed-wheel consumer checks are
+configured to execute the verified archived example with isolated Python.
+Inclusion and check configuration are not execution results; confirm actual
+build, installation and validation outcomes for the exact candidate.
