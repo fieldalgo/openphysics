@@ -111,8 +111,13 @@ or replaced files. Created inodes are pinned through cleanup to avoid inode reus
 being mistaken for ownership. If safe cleanup cannot finish, incomplete output
 is retained. Consumers should require both summary and absence of `.incomplete`.
 This is not an atomic multi-file transaction or a crash rollback guarantee.
-Directory inode pinning currently uses POSIX directory descriptors; portability
-of this save path to non-POSIX systems has not been validated.
+Ownership uses POSIX descriptors or Windows native handles through stdlib ctypes.
+On Windows, directory handles use `FILE_FLAG_BACKUP_SEMANTICS`; all native file
+opens share read/write/delete so pins permit rename and safe unlink. New files use
+`CREATE_NEW`. Platform-specific execution evidence must be checked separately.
+The Windows API contracts are documented by Microsoft:
+[CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
+and [directory handles](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory).
 
 CLI exit codes are 0 for success, 2 for invalid input, and 1 for solver/save
 failure (including finite-JSON rejection). Expected failures produce an error

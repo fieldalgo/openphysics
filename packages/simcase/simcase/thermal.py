@@ -8,6 +8,7 @@ import math
 import os
 from pathlib import Path
 import stat
+import sys
 import time
 
 import numpy as np
@@ -124,6 +125,60 @@ def _identity(path):
     return s.st_dev, s.st_ino
 
 
+def _windows_handle(path, *, create=False):
+    """Win32 sharing contract via stdlib only; callers own the returned handle.
+
+    CREATE_NEW is exclusive; FILE_SHARE_DELETE allows rename/unlink while pinned.
+    Directory/query handles require BACKUP_SEMANTICS. OPEN_REPARSE_POINT avoids
+    following a substituted junction/symlink. No third-party implementation used.
+    """
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    open_handle = kernel.CreateFileW
+    open_handle.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                            wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    open_handle.restype = wintypes.HANDLE
+    close_handle = kernel.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+    handle = open_handle(str(Path(path).absolute()), 0x40000000 if create else 0,
+                         0x00000007, None, 1 if create else 3,
+                         0x00000080 if create else 0x02200000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    def close():
+        if not close_handle(handle):
+            raise ctypes.WinError(ctypes.get_last_error())
+    return handle, close
+
+
+def _pin_directory(path):
+    if os.name == 'nt':
+        _, close = _windows_handle(path)
+        return close
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+    return lambda: os.close(fd)
+
+
+def _exclusive_stream(path):
+    if os.name != 'nt':
+        return Path(path).open('xb')
+    import msvcrt
+    handle, close = _windows_handle(path, create=True)
+    try:
+        fd = msvcrt.open_osfhandle(handle, os.O_WRONLY | os.O_BINARY)
+    except BaseException:
+        close()
+        raise
+    # open_osfhandle transfers native-handle ownership to the CRT descriptor.
+    try:
+        return os.fdopen(fd, 'wb')
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _OwnedOutput:
     """Exclusive directory ownership; no recursive deletion or rename transaction."""
     def __init__(self, path):
@@ -133,14 +188,33 @@ class _OwnedOutput:
         self.path.mkdir()  # the losing concurrent writer never enters cleanup
         self.identity = _identity(self.path)
         self.files = {}
+        self.file_closers = {}
         self.handles = []
         # Pin the directory inode, including while its pathname is replaced.
-        self.handles.append(os.open(self.path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)))
+        try:
+            self.handles.append(_pin_directory(self.path))
+            if not self.unchanged():
+                raise OSError('thermal output target changed during ownership acquisition')
+        except BaseException:
+            # Constructor runs before save's try: clean only this same empty target.
+            try:
+                if self.unchanged():
+                    self.path.rmdir()
+            except OSError:
+                pass
+            self.close()
+            raise
 
     def close(self):
-        for fd in self.handles:
-            os.close(fd)
+        error = None
+        for close in self.handles:
+            try:
+                close()
+            except OSError as exc:
+                error = error or exc
         self.handles.clear()
+        if error is not None and sys.exc_info()[0] is None:
+            raise error  # a close failure must not mask a primary save/pin failure
 
     def unchanged(self):
         try:
@@ -151,9 +225,15 @@ class _OwnedOutput:
     def write(self, name, writer):
         if not self.unchanged():
             raise OSError('thermal output target was replaced; refusing to write')
-        with (self.path/name).open('xb') as stream:
+        with _exclusive_stream(self.path/name) as stream:
             # Keep the inode alive: unlink/recreate must never acquire our identity.
-            self.handles.append(os.dup(stream.fileno()))
+            fd = os.dup(stream.fileno())
+            retained = [fd]
+            def close_file():
+                if retained:
+                    os.close(retained.pop())
+            self.file_closers[name] = close_file
+            self.handles.append(close_file)
             self.files[name] = (os.fstat(stream.fileno()).st_dev, os.fstat(stream.fileno()).st_ino)
             writer(stream)
 
@@ -171,6 +251,7 @@ class _OwnedOutput:
         if not self.owns('.incomplete'):
             raise OSError('thermal incomplete marker was replaced')
         (self.path/'.incomplete').unlink()
+        self.file_closers['.incomplete']()
 
     def cleanup(self):
         try:
@@ -181,19 +262,27 @@ class _OwnedOutput:
     def _cleanup(self):
         if not self.unchanged():
             return  # never touch a replaced target, even if it has familiar names
+        # Windows delete-pending files disappear only after their pins close.
+        # Releasing our detached old file never deletes a replacement pathname.
+        for name, close in self.file_closers.items():
+            if not self.owns(name):
+                close()
         safe = all(self.owns(p.name) for p in self.path.iterdir())
         for name in self.files:
             if name != '.incomplete' and self.owns(name):
                 try:
                     (self.path/name).unlink()
+                    self.file_closers[name]()
                 except OSError:
                     safe = False
         if safe:
             try:
                 if self.owns('.incomplete'):
                     (self.path/'.incomplete').unlink()
+                    self.file_closers['.incomplete']()
                 if self.unchanged():
                     self.path.rmdir()  # only succeeds when empty
+                    return
             except OSError:
                 pass
         if self.unchanged() and not (self.path/'.incomplete').exists():
