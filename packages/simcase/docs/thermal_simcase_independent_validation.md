@@ -74,7 +74,12 @@ but before its unlink deleted the foreign replacement in both source and
 installed runs. This schedules a second writer at the check/use gap; it does
 not diagnose the two Windows failures. Inode pinning and checks protect the
 tested already-replaced cases but do not make pathname operations atomic.
-No production fix is claimed. Hostile races, crash recovery, thermal Studio UI
+No production fix is claimed. The supported fresh-output contract requires a
+caller-controlled exclusive output: do not allow another writer to modify it
+until save and any cleanup have completed. Preservation of replacements already
+observed before a check is distinct from preservation during a check/use race;
+the latter is not guaranteed. The bounded simultaneous-save test establishes
+exclusive fresh-target acquisition, not general concurrent-writer protection. Hostile races, crash recovery, thermal Studio UI
 and heat-to-mechanical coupling remain outside this acceptance claim.
 
 ## Historical evidence begins below
