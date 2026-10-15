@@ -45,7 +45,11 @@ def main(argv=None) -> int:
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    result.save(out)
+    try:
+        result.save(out)
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     files = ["summary.json", "log.txt", "model.json"]
     if doc["results"].get("save_fields", True):
         files.append("fields.npz")

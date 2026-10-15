@@ -151,7 +151,15 @@ class CavityRunResult:
         }
 
     def save(self, outdir: str | Path) -> Path:
+        """Write a result without overwriting or mixing earlier result files."""
         outdir = Path(outdir)
+        reserved = ("summary.json", "model.json", "log.txt", "fields.npz", "results.png")
+        existing = [name for name in reserved
+                    if (outdir / name).exists() or (outdir / name).is_symlink()]
+        if existing:
+            raise FileExistsError(
+                f"cavity output already contains result paths: {', '.join(existing)}; "
+                "choose a fresh output directory")
         outdir.mkdir(parents=True, exist_ok=True)
         (outdir / "summary.json").write_text(json.dumps(self.summary(), indent=2), encoding="utf-8")
         (outdir / "log.txt").write_text("\n".join(self.log) + "\n", encoding="utf-8")

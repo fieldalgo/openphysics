@@ -134,6 +134,15 @@ mass orthogonality has maximum absolute error at most `1e-7`. Tiny numerical
 kernel eigenvalues are screened at `1e-8` times the analytic fundamental
 squared wavenumber in normalized box coordinates, independent of the target.
 
+Use a fresh output directory for each cavity run. Before writing any files,
+`save()` rejects a directory containing `summary.json`, `model.json`, `log.txt`,
+`fields.npz`, or `results.png` (including directories or dangling symlinks at
+those names). It raises `FileExistsError`; the CLI reports the error and exits
+with status 1. This also applies to the default `<model>_results` path: use
+`-o another_directory` for a repeated run. Existing results and unrelated user
+files are preserved. A directory containing only unrelated files is allowed.
+Do not write concurrent runs to the same directory.
+
 With `save_fields=false`, the NPZ file is omitted entirely. `summary.json` still
 retains frequencies, eigenvalues, residuals, normalization, SI units, target,
 requested/returned counts and both cluster/count policy fields.
