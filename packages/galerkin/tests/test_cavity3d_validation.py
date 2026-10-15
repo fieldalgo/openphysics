@@ -177,6 +177,13 @@ class IndependentOracleValidation(unittest.TestCase):
             boundary_nodes = np.unique([node for face, _ in faces for node in face])
             endpoints_on_wall = np.isin(edges[free], boundary_nodes).all(axis=1)
             self.assertTrue(np.any(endpoints_on_wall))
+            interior = np.setdiff1d(np.arange(len(mesh.nodes)), boundary_nodes)
+            row = np.arange(len(edges))
+            incidence = sp.coo_matrix(
+                (np.r_[-np.ones(len(edges)), np.ones(len(edges))],
+                 (np.r_[row, row], np.r_[edges[:, 0], edges[:, 1]])),
+                shape=(len(edges), len(mesh.nodes))).tocsr()[free][:, interior]
+            self.assertLessEqual(abs(k @ incidence).max() / abs(k).max(), 1e-11)
 
 
 class PublishedCavityAPIValidation(unittest.TestCase):
