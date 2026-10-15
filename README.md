@@ -20,9 +20,13 @@ The repository root is not an installable distribution.
 
 ## Install from this checkout
 
-Package metadata allows Python 3.10 or newer. Automated validation currently
-covers CPython 3.12.14 on Ubuntu 24.04; other Python versions and operating
-systems are outside that CI coverage. The `OS Independent` classifiers and
+Package metadata allows Python 3.10 or newer. Full automated regression covers
+CPython 3.12.14 on Ubuntu 24.04. The separate Windows 2022 / Python 3.12.10
+gate covers only installed headless heat API/CLI and selected save I/O; it is
+not full Windows regression or Gmsh validation. Other environments are outside
+these measured scopes. Windows save/cleanup acceptance remains incomplete;
+the narrow GitHub-runner verification is stopped, and Linux results do not
+establish Windows support. The `OS Independent` classifiers and
 `py3-none-any` wheels describe package metadata, not a tested platform matrix.
 The pinned validation environment in [ci/README.md](ci/README.md) targets Linux
 and Python 3.12; its dependency versions cannot be reused on Python 3.10/3.11.

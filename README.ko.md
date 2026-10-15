@@ -17,7 +17,7 @@
 
 ## 이 checkout에서 설치하기
 
-패키지 메타데이터는 Python 3.10 이상을 허용한다. 현재 자동 검증 범위는 Ubuntu 24.04의 CPython 3.12.14다. 다른 Python 버전·운영체제는 이 CI 범위에 포함되지 않는다. `OS Independent` 분류와 `py3-none-any` wheel은 패키지 메타데이터이며 시험한 플랫폼 목록을 뜻하지 않는다. [CI 안내](ci/README.md)의 고정 검증 환경은 Linux/Python 3.12용으로, 그 의존성 버전을 Python 3.10/3.11에 그대로 재사용할 수 없다.
+패키지 메타데이터는 Python 3.10 이상을 허용한다. 전체 자동 회귀 범위는 Ubuntu 24.04의 CPython 3.12.14다. 별도 Windows 2022 / Python 3.12.10 gate는 설치된 헤드리스 열전도 API/CLI와 선택한 저장 I/O만 다룬다. Windows 전체 회귀나 Gmsh 검증이 아니며 다른 환경은 이 실측 범위에 포함되지 않는다. Windows 저장·정리 수용검증은 미완료이며 좁은 GitHub runner 검증은 중단 상태다. Linux 결과가 Windows 지원을 입증하지 않는다. `OS Independent` 분류와 `py3-none-any` wheel은 패키지 메타데이터이며 시험한 플랫폼 목록을 뜻하지 않는다. [CI 안내](ci/README.md)의 고정 검증 환경은 Linux/Python 3.12용으로, 그 의존성 버전을 Python 3.10/3.11에 그대로 재사용할 수 없다.
 
 가상환경을 만들고 저장소 루트에서 실행한다.
 

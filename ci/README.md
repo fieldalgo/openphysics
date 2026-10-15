@@ -17,6 +17,10 @@ The Windows pytest/build transitive `colorama==0.4.6` is pinned separately; its
 upstream tag identifies BSD-3-Clause in pyproject metadata and LICENSE.txt.
 No runtime requirement or package version is changed. This gate does not certify
 Windows full regression, optical/Gmsh behavior or broader OS/Python support.
+Windows save/cleanup acceptance remains incomplete, with two shipped replacement
+cases unresolved in the last executed native-handle candidate. GitHub-runner
+verification is stopped. This retained workflow is a reproducibility definition,
+not a passing Windows support claim; Linux passes cannot substitute for it.
 Windows logs/JUnit/environment and four wheel checksums use the separate
 `windows-thermal-installed-and-io-<run_id>` artifact. Linux full source, all seven
 sdist-to-wheel/strict/metadata/byte/link gates and the existing 88 consumers remain
