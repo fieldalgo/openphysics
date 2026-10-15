@@ -280,4 +280,4 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
-현재 review snapshot은 Work cloud가 offline이므로 아직 실행되지 않았습니다. 이전 실측과 C의 원90/90/전용4/관련208/wrong17은 역사적 근거이지 새 결합 whole·설치 성공이 아닙니다. 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 구분해 보존합니다. GitHub Actions 조회·활성화·dispatch·재실행은 금지이며 Windows·twine strict는 미검증·미가용입니다. 현재 결합 결과는 승인된 cloud 환경에서 정확 source와 실제 archive로 검증해야 합니다.
+개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 비활성 상태이며 조회·활성화·dispatch·재실행을 하지 않습니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
