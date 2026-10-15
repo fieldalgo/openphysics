@@ -149,6 +149,12 @@ class Document:
     def domain(self) -> dict:
         return self.data["geometry"]["domain"]
 
+    @property
+    def length_unit(self) -> str:
+        """Label for document lengths, including a custom unit's size in metres."""
+        spec = self.data["units"]["length"]
+        return spec if isinstance(spec, str) else f"{spec['in_m']} m"
+
     def sole_physics(self) -> tuple[str, dict]:
         """The (name, settings) of the one physics, for the paths that assume one."""
         items = list(self.data["physics"].items())
@@ -261,15 +267,17 @@ class Document:
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
+        length = self.length_unit
         lines = [f"{self.data['name']}  (openphysics {FORMAT})",
-                 f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] um",
+                 f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] [{length}]",
                  f"  background: {g['background']['material']}"]
         for s in g["shapes"]:
             lines.append(f"  shape {s['name']}: {s['type']} of {s['material']}" +
-                         (f", mesh {s['mesh_size']}" if "mesh_size" in s else ""))
+                         (f", mesh {s['mesh_size']} [{length}]" if "mesh_size" in s else ""))
         for pname, ph in p.items():
-            lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} um, "
+            lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} [{length}], "
                          f"{ph['num_modes']} mode(s), boundary {ph['boundary']}")
-        lines.append(f"  mesh: size {m['size']}" + (f", grading {m['grading']}" if m.get("grading") else ""))
+        lines.append(f"  mesh: size {m['size']} [{length}]" +
+                     (f", grading {m['grading']} [{length}]" if m.get("grading") else ""))
         lines.append(f"  study: {st['type']}" + (f" over {st['parameter']} x{len(st['values'])}" if st["type"] == "sweep" else ""))
         return "\n".join(lines)

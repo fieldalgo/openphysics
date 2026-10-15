@@ -13,6 +13,7 @@ them.
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from dataclasses import dataclass, field
@@ -120,6 +121,7 @@ class RunResult:
     def summary(self) -> dict:
         out = {
             "name": self.doc["name"],
+            "units": copy.deepcopy(self.doc["units"]),
             "mesh": {"nodes": int(len(self.mesh_nodes)), "triangles": int(len(self.mesh_triangles)),
                      "regions": {n: self.region_materials[n] for n in self.region_names}},
             "study": {"parameter": self.parameter, "values": [float(v) for v in self.values]},
@@ -154,6 +156,8 @@ class RunResult:
         import matplotlib.pyplot as plt
 
         sweep = self.parameter is not None and len(self.values) > 1
+        length = self.doc.length_unit
+        value_unit = length if self.parameter is None or self.parameter.endswith(".wavelength") else None
         ncols = 3 if sweep else 2
         fig, axes = plt.subplots(1, ncols, figsize=(5.2 * ncols, 4.4))
         # mesh
@@ -161,7 +165,7 @@ class RunResult:
         ax.tripcolor(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles,
                      facecolors=self.mesh_regions.astype(float), cmap="Blues", edgecolors="k", linewidth=0.1, alpha=0.9)
         ax.set_aspect("equal"); ax.set_title(f"mesh: {len(self.mesh_triangles)} triangles")
-        ax.set_xlabel("x (um)"); ax.set_ylabel("y (um)")
+        ax.set_xlabel(f"x ({length})"); ax.set_ylabel(f"y ({length})")
         # field of the first mode at the middle study point
         i = len(self.values) // 2
         ax = axes[1]
@@ -170,13 +174,16 @@ class RunResult:
         ax.set_aspect("equal")
         pname, phys = self.doc.sole_physics()
         label = f"{self.parameter} = {self.values[i]}" if self.parameter else f"lambda = {phys['wavelength']}"
+        if value_unit is not None:
+            label += f" [{value_unit}]"
         ax.set_title(f"|mode 1|, {label}: n_eff = {self.neff[i, 0]:.5f}")
-        ax.set_xlabel("x (um)"); ax.set_ylabel("y (um)")
+        ax.set_xlabel(f"x ({length})"); ax.set_ylabel(f"y ({length})")
         if sweep:
             ax = axes[2]
             for j in range(self.neff.shape[1]):
                 ax.plot(self.values, self.neff[:, j], "o-", label=f"mode {j + 1}")
-            ax.set_xlabel(self.parameter); ax.set_ylabel("n_eff"); ax.legend(fontsize=8)
+            xlabel = f"{self.parameter} ({value_unit})" if value_unit is not None else self.parameter
+            ax.set_xlabel(xlabel); ax.set_ylabel("n_eff"); ax.legend(fontsize=8)
             ng = self.group_index()
             if ng is not None:
                 ax2 = ax.twinx()

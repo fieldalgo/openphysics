@@ -105,6 +105,7 @@ def test_the_server_never_drops_the_units_declaration(client):
     doc = dict(copy.deepcopy(examples.SLAB_TE_CHECK), units={"length": "nm"})
     back = client.post("/api/validate", json={"doc": doc}).json()
     assert back["ok"] and back["doc"]["units"] == {"length": "nm"}
+    assert "lambda 1.55 [nm]" in back["summary"]
 
     sent, returned = dict(_leaves(doc)), dict(_leaves(back["doc"]))
     assert not sent.keys() - returned.keys(), "the server dropped fields the page sent"
@@ -143,6 +144,7 @@ def test_run_job_roundtrip(client):
         time.sleep(0.1)
     assert st["status"] == "done", st
     res = client.get(f"/api/jobs/{job}/result").json()
+    assert res["summary"]["units"] == doc["units"]
     assert abs(res["neff"][0][0] - 2.8487) < 2e-3
     assert len(res["fields"][0][0]) == len(res["nodes"])
     assert any("n_eff" in line for line in st["log"])

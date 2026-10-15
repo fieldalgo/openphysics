@@ -25,6 +25,11 @@ The package and CLI are named `simcase`. The JSON version field remains
 mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 (mesh, mode, sweep), `log.txt`, and a copy of the document.
 
+Summaries, plot axes and Studio labels use the document's declared length unit,
+including numeric custom units. `summary.json` also carries the `units` declaration;
+coordinates and study values keep their document-unit numbers. Material database
+validity ranges remain in micrometres, the database's native unit.
+
 ## The document
 
 ```json
@@ -164,6 +169,13 @@ needs something the engine does not export, the engine exports it on purpose.
 ```bash
 # From the repository root after the development install in ../../README.md
 python -m pytest -q packages/simcase/tests
+```
+
+Studio canvas and DOM unit-label checks can also run with Node.js, without npm
+dependencies (they exercise the page script, not browser layout):
+
+```bash
+node --test packages/simcase/tests/studio_units.cjs
 ```
 
 Documents round-trip through JSON; malformed documents are rejected with
