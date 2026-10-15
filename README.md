@@ -5,7 +5,7 @@ package has its own distribution, version and dependencies.
 
 | Package | Current role |
 |---|---|
-| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes and 3D cavity elements |
+| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes and a 3D PEC box cavity solver |
 | [galerkin-refsol](packages/galerkin-refsol/README.md) | Independent analytical solutions and published benchmarks; imported as `refsol` |
 | [meshine](packages/meshine/README.md) | 2D triangle meshing for material regions |
 | [gmshio](packages/gmshio/README.md) | Gmsh executable runner, MSH 4.1 ASCII reader and FEM mesh adapters |
@@ -44,7 +44,7 @@ The studio is available at `http://127.0.0.1:8765`. CLI commands are `simcase`,
 `simcase-run` and `simcase-studio`; Python imports use `simcase`. The JSON format
 still uses the version field `"openphysics": "0.2"`.
 
-The document runner solves one lossless `em.modes2d` problem with PEC/PMC
+For 2D, the document runner solves one lossless `em.modes2d` problem with PEC/PMC
 boundaries. Scalar runs support physics-parameter sweeps. Full-vector runs
 support single study points and wavelength sweeps of resolved modes, an explicit
 exterior guiding threshold, complex field storage and component display in Studio.
@@ -52,7 +52,22 @@ Sweeps use electric-field overlap to track branches and reject missing,
 ambiguous or near-degenerate matches before reporting group index. See the
 `vector_slab`, `vector_fiber` and `vector_slab_sweep` examples and the
 [tracking contract](packages/simcase/README.md#tracked-vector-wavelength-sweeps).
-The FEM engine's 3D cavity routines remain a separate Python capability.
+A single `em.cavity3d` study solves a vacuum rectangular box with PEC on all six
+walls through the same document runner:
+
+```bash
+python -m simcase validate packages/simcase/examples/cavity_box.json
+python -m simcase run packages/simcase/examples/cavity_box.json -o cavity_results
+```
+
+Use a fresh output directory for each cavity run. The result contains frequencies
+in Hz, SI mesh coordinates, and mass-normalized edge coefficients and centroid
+fields in JSON/NPZ. The required frequency target selects a finite set of nearby
+modes; it does not certify the complete lowest spectrum or every degenerate
+partner. Studio supports 2D models only and rejects 3D mesh/run requests. See the
+[cavity document contract](packages/simcase/docs/cavity3d.md) and the reusable
+[Python cavity API](packages/galerkin/docs/cavity_solver.md).
+
 Coupled multiphysics, geometry sweeps and lossy mode solves are not implemented
 in the document runner.
 
