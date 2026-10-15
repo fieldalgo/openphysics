@@ -156,7 +156,8 @@ def test_thermal_partial_failure_safe_cleanup(tmp_path,monkeypatch,mode):
         if name=='fields.npz':
             if mode=='foreign':(out/'foreign.txt').write_text('do not remove')
             if mode=='known_replaced':
-                (out/'model.json').unlink();(out/'model.json').write_text('replacement')
+                replacement=tmp_path/'replacement.json';replacement.write_text('replacement')
+                replacement.replace(out/'model.json')
             if mode=='replaced':
                 out.rename(moved);out.mkdir();(out/'foreign.txt').write_text('replacement directory')
             raise OSError('injected after NPZ')
@@ -272,3 +273,42 @@ def test_thermal_cli_nonfinite_summary_exit1(tmp_path,capsys,monkeypatch):
     monkeypatch.setattr(cli,'run',lambda *a,**kw:r)
     assert main(['run',str(f),'-o',str(tmp_path/'bad')])==1
     assert not (tmp_path/'bad').exists() and 'Traceback' not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('name',['model.json','log.txt','fields.npz','summary.json','.incomplete'])
+def test_thermal_missing_owned_artifact_never_commits(tmp_path,monkeypatch,name):
+    r=run(Document.from_dict(model()),False);out=tmp_path/'out';original=_OwnedOutput.finish
+    def missing(self):
+        (self.path/name).unlink()
+        original(self)
+    monkeypatch.setattr(_OwnedOutput,'finish',missing)
+    with pytest.raises(OSError):r.save(out)
+    assert not out.exists()  # all remaining known files can safely be cleaned
+
+
+@pytest.mark.parametrize('mode',['empty','foreign','replaced'])
+def test_thermal_directory_pin_failure_safely_cleans_constructor(tmp_path,monkeypatch,mode):
+    import simcase.thermal as thermal
+    out=tmp_path/'out';moved=tmp_path/'moved'
+    def fail(path):
+        if mode=='foreign':(path/'foreign').write_text('keep')
+        if mode=='replaced':path.rename(moved);path.mkdir();(path/'foreign').write_text('keep')
+        raise OSError('original pin acquisition failure')
+    monkeypatch.setattr(thermal,'_pin_directory',fail)
+    r=run(Document.from_dict(model()),False)
+    with pytest.raises(OSError,match='original pin acquisition failure'):r.save(out)
+    if mode=='empty':assert not out.exists()
+    else:assert (out/'foreign').read_text()=='keep'
+
+
+@pytest.mark.skipif(__import__('os').name == 'nt', reason='DeleteFile pending-handle semantics differ; replacement is tested portably with replace')
+def test_thermal_posix_unlink_recreate_inode_reuse_regression(tmp_path,monkeypatch):
+    r=run(Document.from_dict(model()),False);out=tmp_path/'out';original=_OwnedOutput.write
+    def failing(self,name,writer):
+        original(self,name,writer)
+        if name=='fields.npz':
+            (out/'model.json').unlink();(out/'model.json').write_text('replacement')
+            raise OSError('original immediate unlink/recreate negative control')
+    monkeypatch.setattr(_OwnedOutput,'write',failing)
+    with pytest.raises(OSError):r.save(out)
+    assert (out/'model.json').read_text()=='replacement' and (out/'.incomplete').exists()

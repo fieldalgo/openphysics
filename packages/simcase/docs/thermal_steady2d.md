@@ -1,5 +1,7 @@
 # Headless steady heat in a rectangle
 
+[한국어](locales/ko/pages/thermal_steady2d.md)
+
 `thermal.steady2d` solves `-div(k grad T) = Q` in a single homogeneous
 2D rectangle of unit out-of-plane thickness. It uses the existing P1 thermal
 engine. This document describes the headless API and CLI; Studio rejects these
@@ -104,6 +106,10 @@ symlink. The CLI checks this before solving; save claims a fresh target with an
 exclusive mkdir. Concurrent writers have one winner, and a loser does not clean
 up the winner. The owner writes `.incomplete`, model/log and optional NPZ, then
 `summary.json` last; the marker is removed only on successful completion.
+Every recorded required artifact must still exist with its original identity at
+completion; a missing artifact cannot be committed as a successful result.
+A constructor handle-acquisition failure removes only the same owned empty target,
+preserves foreign/replaced targets, and keeps the original exception.
 
 On failure, cleanup unlinks only files still identified as its own. It never
 recursively removes a directory, follows a replaced target, or deletes unexpected
@@ -111,8 +117,13 @@ or replaced files. Created inodes are pinned through cleanup to avoid inode reus
 being mistaken for ownership. If safe cleanup cannot finish, incomplete output
 is retained. Consumers should require both summary and absence of `.incomplete`.
 This is not an atomic multi-file transaction or a crash rollback guarantee.
-Directory inode pinning currently uses POSIX directory descriptors; portability
-of this save path to non-POSIX systems has not been validated.
+Ownership uses POSIX descriptors or Windows native handles through stdlib ctypes.
+On Windows, directory handles use `FILE_FLAG_BACKUP_SEMANTICS`; all native file
+opens share read/write/delete so pins permit rename and safe unlink. New files use
+`CREATE_NEW`. Platform-specific execution evidence must be checked separately.
+The Windows API contracts are documented by Microsoft:
+[CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
+and [directory handles](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory).
 
 CLI exit codes are 0 for success, 2 for invalid input, and 1 for solver/save
 failure (including finite-JSON rejection). Expected failures produce an error
