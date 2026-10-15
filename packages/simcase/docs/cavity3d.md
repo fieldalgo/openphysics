@@ -162,16 +162,19 @@ With the cavity-enabled galerkin implementation, run from the repository root:
 python -m pytest -q packages/simcase/tests/test_cavity3d_integration.py
 ```
 
-The seven integration cases passed for simcase revision `cd4071a` combined with
-galerkin revision `3b850a8`. They exercise a translated cube, reference-frequency
+The seven integration cases passed for simcase revision `ba1c8a7` combined with
+galerkin revision `a660233` (and previously for `cd4071a` with `3b850a8`).
+They exercise a translated cube, reference-frequency
 smoke checks for its first two complete reference clusters, metre/mm/um/nm
 representations, real CLI execution with and without fields, and reconstruction
 from NPZ loaded with `allow_pickle=False`. Reassembled topology, centroid fields,
 PEC coefficients, free-edge residuals and mass orthogonality are checked. The
 coarse reference-frequency check is not a mesh-convergence acceptance gate.
 
-At galerkin revision `3b850a8`, the fixed rectangular-box 111-cluster mean
-convergence gate still fails: the last observed order is about 1.2284, below the
-required 1.8. Successful document execution and file reconstruction do not resolve
-that numerical limitation or certify overall feature acceptance. See the
+At the earlier galerkin revision `3b850a8`, the fixed rectangular-box 111-cluster
+mean convergence gate failed: the last observed order was about 1.2284, below the
+required 1.8. Revision `a660233` changes the cavity mesh to balance reflection
+directions; the product integration cases also pass with this mesh. Document
+execution and file reconstruction do not independently certify mesh convergence
+or overall feature acceptance. For numerical validation evidence, see the
 [engine's validation notes](../../galerkin/docs/cavity_solver.md).
