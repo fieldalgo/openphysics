@@ -108,3 +108,22 @@ VECTOR_SLAB_SWEEP["study"] = dict(type="sweep", parameter="physics.em1.wavelengt
 EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib": HADLEY_RIB,
             "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER,
             "vector_slab_sweep": VECTOR_SLAB_SWEEP}
+
+
+CAVITY_BOX = {
+    "openphysics": "0.2",
+    "name": "Vacuum PEC cube, modes near 250 MHz",
+    "units": {"length": "m"},
+    "geometry": {
+        "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1},
+        "background": {"material": "vacuum"},
+        "shapes": [],
+    },
+    "physics": {"em1": {"type": "em.cavity3d", "boundary": "pec", "search": "near_target",
+                         "target_frequency_hz": 250000000.0, "num_modes": 5}},
+    "mesh": {"subdivisions": [6, 6, 6]},
+    "study": {"type": "single"},
+    "results": {"save_fields": True, "plots": False},
+}
+
+EXAMPLES["cavity_box"] = CAVITY_BOX

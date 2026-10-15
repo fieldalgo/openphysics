@@ -18,6 +18,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import physmat
@@ -32,6 +33,10 @@ from .materials import material_table
 from .fields import VectorField
 from .schema import Document, DocumentError
 from .tracking import ModeTracker, ModeTrackingError, tracking_settings
+
+
+if TYPE_CHECKING:
+    from .cavity import CavityRunResult
 
 
 @dataclass
@@ -63,6 +68,8 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
+    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
+        raise DocumentError("build_mesh is a 2D stage; use run(document) for em.cavity3d")
     domain, namer, region_materials = build_domain(doc)
     mcfg = doc["mesh"]
     size_fn = None
@@ -91,6 +98,8 @@ def study_points(doc: Document) -> tuple[str | None, list]:
 
 def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
+    if physics.get("type") == "em.cavity3d":
+        raise DocumentError("solve_point is a 2D stage; use run(document) for em.cavity3d")
     wl = physics["wavelength"]
     return physics_em_modes2d.solve(model.mesh, model.eps_per_triangle(wl), wl, physics["boundary"],
                                     int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"))
@@ -223,8 +232,8 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult:
-    """Compose the stages over every study point."""
+def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult:
+    """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
     log: list[str] = []
 
     def say(msg):
@@ -233,6 +242,9 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
             print(msg)
 
     doc.validate()
+    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
+        from .cavity import run_cavity
+        return run_cavity(doc, verbose=verbose)
     say(doc.summary())
     for note in doc.notes:
         say(f"  warning: {note}")

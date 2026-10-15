@@ -13,7 +13,6 @@ from pathlib import Path
 from . import examples
 from .runner import run
 from .schema import Document, DocumentError
-from .tracking import ModeTrackingError
 
 
 def main(argv=None) -> int:
@@ -43,11 +42,20 @@ def main(argv=None) -> int:
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
     try:
         result = run(doc, verbose=not args.quiet)
-    except ModeTrackingError as exc:
+    except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    result.save(out)
-    print(f"results written to {out}/  (summary.json, fields.npz, results.png, log.txt, model.json)")
+    try:
+        result.save(out)
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    files = ["summary.json", "log.txt", "model.json"]
+    if doc["results"].get("save_fields", True):
+        files.append("fields.npz")
+    if doc["results"].get("plots", True):
+        files.append("results.png")
+    print(f"results written to {out}/  ({', '.join(files)})")
     return 0
 
 
