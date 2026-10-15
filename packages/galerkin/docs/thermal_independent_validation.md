@@ -143,3 +143,25 @@ Whole-environment status, skipped native prerequisites and installed-core result
 are reported separately in the manifest. No arbitrary geometry, transient,
 nonconstant/anisotropic conductivity, prescribed-flux or coupled physics claim is
 made by these tests.
+
+## Whole-environment run retained separately
+
+The full source run completed with **699 passed, 9 failed, 9 skipped**, nine
+subtests passed and one FastAPI/Starlette deprecation warning. It collected the
+preceding 43-case independent revision; the final two added metamorphic cases
+were separately covered by the final 45-case source and installed runs.
+Seven failures are Gmsh-dependent legacy optional-helper paths that proceed when
+find_gmsh returns None. Seven additional Gmsh tests and two local optical-database
+tests skipped. No native prerequisite was installed and those helpers were not
+modified in this independent branch. Two other failures were real cavity CLI
+subprocesses unable to import simcase: root conftest inserts source paths only
+in the parent process, while this private venv installed no simcase package.
+The original nine failures are retained; an explicit candidate-only PYTHONPATH
+rerun of the two subprocess cases is reported separately in the manifest.
+This run does not certify the whole environment as passing and does not replace
+the integration owner's exact remote CI.
+
+The two cavity CLI cases passed when rerun with the explicit candidate package
+paths inherited by subprocesses (2 passed, zero failures/skips). This is an
+environment-only correction with no product edit. It does not erase the first
+full-run failures, rerun the entire suite, or resolve the seven Gmsh failures.

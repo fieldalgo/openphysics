@@ -32,7 +32,30 @@
     "skipped": 0
   },
   "full_environment_run": {
-    "status": "running; collected preceding independent 43-test revision, two added metamorphic tests covered by final independent45"
+    "passed": 699,
+    "failed": 9,
+    "skipped": 9,
+    "subtests_passed": 9,
+    "warning_count": 1,
+    "scope": "candidate plus collected 43-test independent revision; final added two cases separately passed in source45 and installed45",
+    "failures": {
+      "missing_gmsh_and_legacy_optional_helpers": 7,
+      "cli_subprocess_missing_simcase_import_path": 2
+    },
+    "skips": {
+      "missing_gmsh": 7,
+      "missing_local_refractiveindex_database": 2
+    },
+    "recovery": {
+      "cli_only_rerun_with_explicit_candidate_pythonpath": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "whole_suite_not_rerun": true,
+      "seven_gmsh_failures_remain_unresolved": true
+    },
+    "performance": "runtime not a performance baseline"
   },
   "convergence": [
     {
@@ -170,15 +193,17 @@
     "sdist-build.log": "3436104b3fd7cc38fa4770eb01aeb8f0068c42f45a0eb74b81a41b5cf316d401",
     "thermal-math-probe.json": "ed25c0b25cec0149ffd07ecbca51275ad2f04c231c269f23e2cf121ecbdfb8b5",
     "independent-installed.log": "cd423997d1c2b88a156d00989107f5db812156142c487116bc5c2fadc98c2b70",
-    "independent-source.log": "70be13431e2e3428afa166b443a5d032b1ce4ee002a955c0dc948787e9b60115"
+    "independent-source.log": "70be13431e2e3428afa166b443a5d032b1ce4ee002a955c0dc948787e9b60115",
+    "full-source.log": "a1d722dc12da233d074acc4d677f6c68fd674f735f2e2283897d0052a0f615b2",
+    "full-source-collected-independent-test.py": "bcec1a4179d7de79e05b1955a248182452d9a8157f401be8fc93b2e94f9c7305"
   },
   "new_file_git_blobs": {
     "packages/galerkin/tests/thermal_independent_oracle.py": "90258384a1c3e151140f831a9543ffd9edd59b75",
     "packages/galerkin/tests/test_thermal_independent_validation.py": "74c821475df36ac87070e21331b01161a5fa98e2",
-    "packages/galerkin/docs/thermal_independent_validation.md": "a57be0ede0b991760d72c0556e5ae49cb65a0a0c"
+    "packages/galerkin/docs/thermal_independent_validation.md": "2abcc3bb33caf7f71707aae498b8b89e711078be"
   },
   "limits": [
-    "full source environment result pending",
+    "whole-environment run failed; no whole-suite success claim",
     "no new native dependencies or Gmsh repair",
     "no whole distribution/platform CI claim",
     "no variable conductivity/Robin/transient/coupled physics"
