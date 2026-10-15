@@ -164,3 +164,38 @@ runtime performs the arithmetic and solves. Source and installed-wheel results,
 full-suite environmental failures and unexecuted distribution gates must be
 reported separately; passing these cases alone does not certify all packaging,
 platforms, or physics models.
+
+## Installed artifact and negative controls
+
+A galerkin wheel built from its sdist with the existing build tools contains
+`elasticity.py` byte-identical to the inspected source. Running the twelve new
+independent tests outside the source tree with `python -I` imports galerkin
+from that wheel and gives **12 passed, zero failed/skipped**. The environment
+reuses already installed NumPy/SciPy/pytest tools; it is not a clean dependency
+resolver or a cross-platform compatibility certification.
+
+Three additional isolated processes deliberately corrupt the installed module
+in memory, leaving source/wheel bytes unchanged. They run the unchanged
+`polynomial-stress` convergence case with the same tolerances:
+
+| Injected implementation error | Observed rejection |
+|---|---|
+| Shear constitutive coefficient multiplied by .5 | Independent stress comparison fails; shear relative mismatch .5 |
+| Plane stress/strain selection exchanged | Independent stress comparison fails in normal components |
+| Supplied body force multiplied by -1 | Total load differs from direct force integral by relative 2 |
+
+Each process exits with one expected failed assertion. These failures are negative
+controls, not defects observed in the unmodified candidate. The injection wrapper
+may call the original routine to create the defective variant; no expected-value
+oracle calls that routine.
+
+The complete source run reports **564 passed, 7 failed, 9 skipped**, plus nine
+passed subtests and one existing FastAPI/Starlette deprecation warning. All seven
+failures require the missing Gmsh executable (unstructured cavities, mesh interop
+and mesh-file generation). Skips are seven Gmsh integration cases and two absent
+local refractiveindex.info database cases. This is not an all-green full-suite
+claim. The original candidate's remote CI result is a separate verification.
+No Gmsh skip helper, existing physics tolerance, packaging configuration or
+production/refsol implementation was changed to remove these environmental
+failures. Strict multi-package distribution/metadata validation was not rerun
+here; the wheel check above addresses this independent acceptance scope.
