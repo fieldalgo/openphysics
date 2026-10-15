@@ -79,3 +79,20 @@ def robin_only_slab(*, length, conductivity, left_h, right_h,
                   +left_outward/left_h+Q*L*L/(2*k))/(L/k+1/left_h+1/right_h)
         a = left_ambient+(F0-left_outward)/left_h
     return BoundarySlab(L, k, Q, a, F0/k)
+
+
+def sine_temperature(points):
+    """T=300+sin(pi*x)sin(pi*y), independently differentiated below."""
+    p=np.asarray(points);x,y=p[...,0],p[...,1]
+    return 300+np.sin(np.pi*x)*np.sin(np.pi*y)
+
+
+def sine_flux(points, conductivity=2.5):
+    p=np.asarray(points);x,y=p[...,0],p[...,1]
+    return -conductivity*np.pi*np.stack((np.cos(np.pi*x)*np.sin(np.pi*y),
+                                        np.sin(np.pi*x)*np.cos(np.pi*y)),axis=-1)
+
+
+def sine_source(points, conductivity=2.5):
+    p=np.asarray(points)
+    return 2*conductivity*np.pi**2*np.sin(np.pi*p[...,0])*np.sin(np.pi*p[...,1])

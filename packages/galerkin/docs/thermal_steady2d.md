@@ -6,7 +6,7 @@ homogeneous isotropic stationary conduction on a conforming P1 triangle mesh:
 ```text
 -div(k grad T) = Q,       q = -k grad T
 T = prescribed value on Dirichlet nodes
-q.n = 0 on the remaining boundary (natural insulation)
+q.n = 0 on unselected natural edges (insulation by default)
 ```
 
 It reuses `Mesh`, scalar P1 stiffness assembly, constant-load assembly, the
@@ -33,14 +33,16 @@ result = solve_steady_heat(
 | dirichlet | Mapping exterior integer node ID -> finite scalar temperature in K |
 | heat_source | Finite real scalar Q, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; default zero |
 
-Each connected component requires at least one prescribed temperature, otherwise
-the constant-temperature nullspace is rejected. No node is silently pinned,
+With the default insulated boundary, each connected component requires at least
+one prescribed temperature; the optional Robin extension can also anchor it. No node is silently pinned,
 no springs or least-squares regularization are added, and pure-Neumann heat
 problems are outside this API. Dirichlet data must be on the actual topological
 exterior boundary, not an interior node or a trusted boundary tag alone.
-All other boundary nodes/components of the scalar test space have natural
-insulation. Boundary node tags can be used to construct the mapping; there is
-no prescribed heat-flux/Robin boundary input in this MVP.
+Unselected natural edges have insulation. Boundary node tags can construct the
+Dirichlet mapping. Optional prescribed outward flux and Robin edge-tag inputs,
+including additional result fields and modified balance equations, are documented
+in [thermal_flux_robin.md](thermal_flux_robin.md). The equations below describe
+the default case without those inputs.
 
 All temperatures are specified in K; no Celsius conversion or reference
 temperature subtraction is inferred from user input. Finite negative source
@@ -185,7 +187,7 @@ separately for an exact candidate revision.
 
 ## Limits
 
-No transient heat capacity, Robin/radiation/prescribed-flux input, variable or
+No transient heat capacity, radiation input, variable or
 anisotropic conductivity, 3D, thermoelastic coupling, simcase or Studio support
 is included. Only existing NumPy/SciPy and original mathematical formulas are
 used. No third-party solver source or new runtime dependency is introduced.
