@@ -1,6 +1,11 @@
 # Rectangular PEC 111 doublet: signed-mean convergence diagnosis
 
-The original n=4,8,16 cluster-mean order gate **still fails**: 1.22837 is
+**Historical candidate analysis:** the source SHAs below identify the earlier
+uniform-diagonal core. For the subsequent alternating-mesh candidate, see
+[the independent revalidation](cavity3d_alternating_validation.md). The earlier
+failure and measurements are preserved; they do not describe the latest core.
+
+For that earlier candidate, the n=4,8,16 cluster-mean order gate **fails**: 1.22837 is
 below the fixed 1.8 threshold. These diagnostics neither change that test nor
 certify numerical acceptance. No solver or simcase implementation is modified.
 

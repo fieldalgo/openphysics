@@ -9,6 +9,11 @@ It does not define a new public solver, document schema, or persistence API.
 Product acceptance tests must use the separately approved interface and record
 the exact implementation commit they grade.
 
+Latest independently verified candidate: **27/27 unchanged tests passed**, plus
+3 independent returned-mesh tests. The fixed n=4,8,16 / >1.8 gate is unchanged.
+See [the alternating-mesh report](cavity3d_alternating_validation.md) and its
+exact source manifest. Results for earlier candidates below are historical.
+
 ## Analytic oracle and multiplicity
 
 For side lengths a, b, d in metres,
