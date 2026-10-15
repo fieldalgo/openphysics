@@ -2,6 +2,8 @@
 
 [영문 원문](../../../elasticity_traction.md)
 
+아래 실행 수치·실패·미검증 서술은 영문 원문의 해당 후보 시점 기록이며 새 수용 결과를 뜻하지 않습니다.
+
 기존 P1 벡터 절점 변위 공간의 `galerkin.elasticity.solve_elasticity`에 선택적 경계 traction을 추가합니다. 서브모듈을 명시적으로 import하며, 최상위 export나 simcase 통합은 추가하지 않습니다. [초기 안내서](../../../elasticity2d.md)의 정식화, plane 선택, engineering shear, 재료 범위와 locking 한계는 계속 적용됩니다. 0이 아닌 traction을 지원하지 않는다는 초기 안내서의 이전 설명은 이 문서로 대체합니다.
 
 ## API와 단위
