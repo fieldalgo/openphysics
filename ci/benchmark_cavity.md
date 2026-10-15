@@ -82,7 +82,14 @@ time; finite near-target selection still needs separate physical acceptance.
 ## Separate profiling
 
 Profile a single worker, not the waiting parent. Keep its time/RSS separate from
-the uninstrumented baseline; the worker marks `profiled=true` under cProfile.
+the uninstrumented baseline.
+
+**WIP reporting limitation:** on CPython 3.12.14, cProfile uses `sys.monitoring`
+while `sys.getprofile()` returns `None`. The current worker therefore incorrectly
+labels such a profiled run as `profiled=false`. The profile itself is collected,
+but this metadata flag needs correction and verification before relying on it.
+Keep the external cProfile command and its `.prof` artifact as explicit evidence
+of instrumentation; never merge its samples into an uninstrumented baseline.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
@@ -101,3 +108,20 @@ such attribution in a separate follow-up before choosing a memory optimization.
 Run the full root test suite described in [README.md](README.md) separately from
 timing, so tests do not compete for benchmark CPU or memory. This tool supplements
 the existing fixed numerical acceptance gates and does not replace them.
+
+## Baseline collection status (WIP, 2026-10-15)
+
+The clean source at `88ee02c2bfc49ebfa6df4b55260310790613ea2c` completed all
+24 default uninstrumented runs, with six returned modes each and a maximum
+relative residual of 2.01e-12. Within each condition the returned frequencies
+were identical across the three repetitions. At subdivision 16, median solve
+times were 13.0385 s (cube) and 12.8399 s (rectangle), with median process peak
+RSS of 625.19 and 628.38 MiB respectively. These observations used Linux x86-64,
+CPython 3.12.14, NumPy 2.5.4 and SciPy 1.18.1, one requested BLAS thread, an
+AMD EPYC 9V74 host, a four-CPU quota and a 32 GiB memory limit.
+
+One separate rectangle16 profile completed; it exposed the reporting limitation
+above. Profiling metadata repair, the complete range/scaling analysis, final
+optimization recommendations and the full source regression run remain pending.
+No solver optimization or performance improvement is claimed. Raw timings and
+profiles are external records, not package artifacts.
