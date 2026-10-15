@@ -1,0 +1,29 @@
+# OpenPhysics 문서
+
+[English](../../../README.md) | **한국어**
+
+[도구 개요·설치 안내](../../../../README.ko.md) · [영어 개요](../../../../README.md)
+
+영어 원문은 기존 패키지 경로에 유지한다. 완전한 한국어판은 각 패키지의 `docs/locales/ko/pages/<같은파일명>.md`, 패키지 개요는 `README.ko.md`에 둔다. 수식·API·단위·부호·실행 명령·검증 수치와 한계는 두 언어에서 같은 의미로 유지한다. 번역을 추가한 것은 수치 실험을 새로 실행하거나 새 합격 근거를 얻었다는 뜻이 아니다.
+
+아래 한국어판은 현재 작성 중이다. 실제 파일의 번역·원문 대조·링크 확인이 끝난 뒤 해당 페이지를 연결한다. 준비 중인 번역을 완료된 문서로 표시하지 않는다.
+
+## 현재 구현의 사용 계약과 검증 근거
+
+| 주제 | 영어 원문 | 한국어판 상태 |
+|---|---|---|
+| 3D PEC 공동 엔진 | [API·단위·수렴](../../../../packages/galerkin/docs/cavity_solver.md) | 작성 중 |
+| 공동 모델 문서·CLI | [입력·저장 장 계약](../../../../packages/simcase/docs/cavity3d.md) | 작성 중 |
+| 복소 벡터 고유공간 | [보존 방식·한계](../../../../packages/galerkin/docs/eigenspace_reliability.md) | 작성 중 |
+| 정적 탄성 | [평면 모델·구속](../../../../packages/galerkin/docs/elasticity2d.md) | 작성 중 |
+| 탄성 수용검증 | [독립 연속체 대조](../../../../packages/galerkin/docs/elasticity2d_independent_validation.md) | 작성 중 |
+| 경계 표면하중 | [하중·외향 법선](../../../../packages/galerkin/docs/elasticity_traction.md) | 작성 중 |
+| 표면하중 수용검증 | [독립 힘·일·수렴](../../../../packages/galerkin/docs/elasticity_traction_independent_validation.md) | 작성 중 |
+| 정상 열전도 | [Kelvin·열유속·경계 부호](../../../../packages/galerkin/docs/thermal_steady2d.md) | 작성 중 |
+| 열전도 수용검증 | [독립 source·설치본 근거](../../../../packages/galerkin/docs/thermal_independent_validation.md) | 작성 중 |
+| 처방 온도장 기계단계 | [Snapshot·3D 감소·에너지](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | 작성 중 |
+| 기계단계 수용검증 | [독립 원3D 재료 법칙](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | 작성 중 |
+
+패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
+
+화면 없는 열전도 문서 연결과 처방 열유속·Robin 경계는 별도의 개발 후보다. 검토·통합을 마친 뒤 실제 구현 범위에 맞는 사용·검증 문서를 두 언어로 연결한다. 번역 계획만으로 기능이 지원된다고 해석하지 않는다.
