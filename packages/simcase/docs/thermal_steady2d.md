@@ -1,5 +1,7 @@
 # Headless steady heat in a rectangle
 
+[한국어](locales/ko/pages/thermal_steady2d.md)
+
 `thermal.steady2d` solves `-div(k grad T) = Q` in a single homogeneous
 2D rectangle of unit out-of-plane thickness. It uses the existing P1 thermal
 engine. This document describes the headless API and CLI; Studio rejects these
@@ -104,6 +106,10 @@ symlink. The CLI checks this before solving; save claims a fresh target with an
 exclusive mkdir. Concurrent writers have one winner, and a loser does not clean
 up the winner. The owner writes `.incomplete`, model/log and optional NPZ, then
 `summary.json` last; the marker is removed only on successful completion.
+Every recorded required artifact must still exist with its original identity at
+completion; a missing artifact cannot be committed as a successful result.
+A constructor handle-acquisition failure removes only the same owned empty target,
+preserves foreign/replaced targets, and keeps the original exception.
 
 On failure, cleanup unlinks only files still identified as its own. It never
 recursively removes a directory, follows a replaced target, or deletes unexpected
