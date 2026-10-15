@@ -18,7 +18,8 @@ README. They share one git history, one test run and one install.
 
 ## Rules
 
-- Code, comments, docstrings, READMEs: English only. This repository is intended to go public.
+- Code, comments, docstrings, API identifiers and executable examples remain English.
+- User-facing READMEs, usage guides and validation explanations are maintained in English and complete Korean versions. Keep the existing English source paths; use README.ko.md for overviews and docs/locales/ko/pages/<same-name>.md for package documentation. Preserve equations, units, commands, numerical gates and limitations; translations do not imply new tests. Link languages through the documentation index, verify relative links and include both versions in source distributions. This follows the explicit user instruction of 2026-10-15.
 - Every new physics feature is validated against refsol (analytic) with a mesh-convergence check.
 - Run the whole suite from the repository root: `python -m pytest -q`. A single package is
   `python -m pytest -q packages/<name>/tests` — still the fast inner loop.
