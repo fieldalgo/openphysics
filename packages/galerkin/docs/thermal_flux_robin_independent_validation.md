@@ -12,6 +12,15 @@ this independent change. Production, original tests and shared configuration are
 unchanged. Initial-candidate evidence is distinct from a later final candidate,
 release integration, and complete coupled workflows.
 
+Follow-up candidate `f575a7187108800545a3e33903b3a37942df9183` has solver blob
+`4633e03953d8f6369bdf0e7398d2ebd85b2b4684`. Direct AST comparison after removing
+docstrings found the executable solver identical to the initial candidate. Its
+reference blob `8f50ada586777e2a2dbac9f4a90275d65d17ad51` retains every existing
+reference definition and adds only sine_temperature/sine_flux/sine_source. This
+oracle imports none of them. The final independent branch normally merges that
+follow-up, preserves the initial history, and rechecks related source and wheel
+consumption. No producer code is authored or corrected by this validation.
+
 ## Conservation and independently reconstructed operators
 
 Start with `q=-k*grad(T)`, `div(q)=Q`, and physical outward normal n:

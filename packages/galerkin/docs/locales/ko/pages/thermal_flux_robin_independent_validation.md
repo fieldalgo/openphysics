@@ -9,6 +9,14 @@
 이 변경은 전용 oracle/시험/보고와 한국어 문서 추가만 소유합니다. 생산·기존 시험·공유 설정은
 그대로입니다. 초기 후보 근거와 후속 최종 후보·release 통합·완전 연성 workflow는 구분합니다.
 
+후속 후보 `f575a7187108800545a3e33903b3a37942df9183`의 solver blob은
+`4633e03953d8f6369bdf0e7398d2ebd85b2b4684`입니다. docstring을 제거한 AST 직접
+비교에서 실행 solver는 초기 후보와 같았습니다. reference blob
+`8f50ada586777e2a2dbac9f4a90275d65d17ad51`은 기존 모든 정의를 유지하고
+sine_temperature/sine_flux/sine_source만 추가합니다. 본 oracle은 어느 것도 import하지
+않습니다. 최종 독립 branch는 이 후속 후보를 정상 merge하고 초기 이력을 보존하며
+관련 source·wheel 소비를 재검증합니다. 이 검증이 생산 코드를 작성·수정하지 않습니다.
+
 ## 보존식과 독립 복원 연산자
 
 `q=-k*grad(T)`, `div(q)=Q` 및 물리적 outward normal n에서 시작합니다.

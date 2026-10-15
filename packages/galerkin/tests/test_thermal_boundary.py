@@ -168,3 +168,30 @@ def test_disconnected_dirichlet_or_robin_per_component():
         solve_steady_heat(m,conductivity=2.,dirichlet={0:300.})
     r=solve_steady_heat(m,conductivity=2.,dirichlet={0:300.},convection={'second':(1.,350.)})
     np.testing.assert_array_equal(r.temperature,np.r_[np.full(n,300.),np.full(n,350.)])
+
+
+@pytest.mark.parametrize('data',[[],True,1.])
+@pytest.mark.parametrize('kind',['outward_flux','convection'])
+def test_condition_maps_required(data,kind):
+    with pytest.raises(ValueError):
+        solve_steady_heat(rectangle_mesh(1.,1.,1,1),conductivity=1.,dirichlet={0:300.},**{kind:data})
+
+
+@pytest.mark.parametrize('pair',[1.,(),(1.,),(1.,300.,0.),np.array([1.,300.])])
+def test_convection_pair_required(pair):
+    with pytest.raises(ValueError):
+        solve_steady_heat(rectangle_mesh(1.,1.,1,1),conductivity=1.,dirichlet={0:300.},convection={'right':pair})
+
+
+def test_small_positive_robin_and_dirichlet_limits():
+    m=rectangle_mesh(1.,1.,3,3)
+    # Positive support is not discarded by an arbitrary unitful threshold.
+    tiny=solve_steady_heat(m,conductivity=2.,dirichlet={},convection={'right':(1e-8,300.)})
+    np.testing.assert_array_equal(tiny.temperature,300.)
+    ref=solve_steady_heat(m,conductivity=2.,dirichlet=bc_left(m),outward_flux={'right':.7})
+    small=solve_steady_heat(m,conductivity=2.,dirichlet=bc_left(m),outward_flux={'right':.7},convection={'right':(1e-8,300.)})
+    np.testing.assert_allclose(small.temperature,ref.temperature,rtol=0,atol=1e-7)
+    large=solve_steady_heat(m,conductivity=2.,dirichlet=bc_left(m),convection={'right':(1e6,300.)})
+    assert np.max(abs(large.temperature[m.boundary['right']]-300.))<5e-5
+    quality_scale=sum(abs(large.reaction))+sum(abs(large.convective_outward))
+    assert abs(sum(large.reaction-large.convective_outward))/quality_scale<1e-10
