@@ -14,3 +14,7 @@ include tests/traction_independent_oracle.py
 include docs/thermal_independent_validation.md
 include docs/thermal_independent_validation_manifest.json
 include tests/thermal_independent_oracle.py
+include docs/prescribed_temperature_thermoelasticity.md
+include examples/prescribed_temperature_thermoelasticity.py
+include docs/prescribed_temperature_thermoelasticity_independent_validation.md
+include tests/thermoelasticity_independent_oracle.py

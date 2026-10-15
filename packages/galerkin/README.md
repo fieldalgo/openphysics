@@ -46,6 +46,17 @@ see the [traction guide](docs/elasticity_traction.md),
 These documents and examples are included in the sdist. Neither API adds
 transient analysis, thermoelastic coupling, simcase or Studio integration.
 
+The separate `galerkin.thermoelasticity` submodule is a static mechanical stage
+for an explicitly prescribed same-mesh nodal-P1 Kelvin field. See its
+[SI contract, immutable snapshot and physical 3D energy](docs/prescribed_temperature_thermoelasticity.md)
+and [English executable example](examples/prescribed_temperature_thermoelasticity.py),
+both included byte-for-byte in the sdist. Alpha is signed 1/K; displacement is
+m, stress Pa, load/reaction N/m and physical elastic energy J/m of thickness.
+It does not solve heat, automatically connect a heat result, validate a full
+sequential coupling workflow, or add simcase/Studio integration.
+The separate [independent mechanical-stage acceptance](docs/prescribed_temperature_thermoelasticity_independent_validation.md)
+and its original oracle/tests are also included unchanged in the sdist.
+
 ## Layout
 
 ```

@@ -95,6 +95,15 @@ Both English examples are also in the galerkin sdist. Heat load/reaction is W/m
 of out-of-plane thickness; mechanical load/reaction is N/m of thickness. These
 standalone APIs do not add transient heat, thermal expansion or coupled models.
 
+An additional [prescribed-temperature mechanical stage](packages/galerkin/docs/prescribed_temperature_thermoelasticity.md)
+uses `galerkin.thermoelasticity` and `refsol.thermoelasticity` with an explicitly
+supplied, immutable same-mesh nodal temperature field in Kelvin. Run the
+[English example](packages/galerkin/examples/prescribed_temperature_thermoelasticity.py)
+after installation. It reports physical three-dimensional elastic energy per
+thickness (J/m), including the plane-strain out-of-plane contribution. This
+stage does not solve heat, automatically connect a heat result, authenticate
+temperature provenance, or add simcase/Studio support.
+
 For standalone static 2D elasticity, use `galerkin.elasticity` and the independent
 `refsol.elasticity` submodule. The [elasticity contract](packages/galerkin/docs/elasticity2d.md)
 defines plane stress/strain, SI units, constraints and the near-incompressibility

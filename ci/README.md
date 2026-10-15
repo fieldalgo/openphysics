@@ -145,7 +145,39 @@ is relative 1e-9; component comparisons use relative 1e-9 and a dimensionless
 resultant as an absolute N/m accuracy promise. Source convergence, residual and
 independent force/moment/energy acceptance gates remain separate.
 
-## Installed steady heat and boundary traction
+## Installed prescribed-temperature mechanical stage
+
+`test_thermoelasticity_wheel.py` supplements the existing 58 installed consumers.
+The checker includes the prescribed-temperature contract and English example in
+the galerkin sdist and requires the automatically included
+`refsol/thermoelasticity.py` to match the source byte-for-byte. It executes the
+verified archived example outside the checkout with `python -I`.
+
+The additional consumers use an independently written original isotropic 3D law
+at E=70 GPa, nu=0.3, alpha=12e-6/K and delta T=20 K. Free plane stress has
+u=alpha*deltaT*(x,y), zero stress and zero physical energy. Free plane strain has
+u=(1+nu)*alpha*deltaT*(x,y), zero in-plane stress, sigma_zz=-16.8 MPa and
+2016 J/m physical elastic energy on a one-square-metre domain. Constrained
+uniform fields independently check consistent boundary reactions and physical
+energy. Cooling, negative/zero alpha, nonzero support work, reference-temperature
+shift, copied immutable snapshots, stale geometry/unit metadata, invalid Kelvin
+data and rigid modes supplement those cases. Error normalization uses nonzero
+eigenstrain or mechanical stress/force/energy scales, never absolute Kelvin
+temperature or the computed zero-energy answer.
+
+These are installation/contract consumers, not independent convergence acceptance
+or validation of a complete heat-to-mechanics workflow. The API accepts a supplied
+same-mesh nodal-P1 Kelvin field; it does not solve heat, automatically connect a
+heat result, authenticate provenance, or add simcase/Studio support. Dedicated
+independent acceptance remains a separate gate.
+The dedicated independent acceptance document, NumPy oracle and tests are
+included verbatim and required byte-for-byte in the galerkin sdist. Their
+historical candidate and harness-failure records remain unchanged. The six
+dedicated implementation/reference/test/doc/example blobs are identical in
+the original candidate, its production merge and this release combination;
+the final combined source CI separately validates the integrated tree.
+
+## Installed steady heat and boundary traction (existing gate)
 
 The existing 37 consumers, including the dimensionless force comparison, remain
 unchanged. `test_thermal_traction_wheel.py` adds 21 installed consumers. The checker

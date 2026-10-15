@@ -40,8 +40,14 @@ DOCUMENT_ASSETS = {
                  "tests/test_traction_independent_validation.py",
                  "docs/thermal_independent_validation.md",
                  "docs/thermal_independent_validation_manifest.json",
-                 "tests/thermal_independent_oracle.py", "tests/test_thermal_independent_validation.py"),
-    "galerkin-refsol": ("refsol/elasticity.py", "refsol/thermal.py", "refsol/elasticity_traction.py"),
+                 "tests/thermal_independent_oracle.py", "tests/test_thermal_independent_validation.py",
+                 "docs/prescribed_temperature_thermoelasticity.md",
+                 "examples/prescribed_temperature_thermoelasticity.py",
+                 "docs/prescribed_temperature_thermoelasticity_independent_validation.md",
+                 "tests/thermoelasticity_independent_oracle.py",
+                 "tests/test_thermoelasticity_independent_validation.py"),
+    "galerkin-refsol": ("refsol/elasticity.py", "refsol/thermal.py", "refsol/elasticity_traction.py",
+                       "refsol/thermoelasticity.py"),
     "simcase": ("docs/cavity3d.md", "examples/cavity_box.json",
                 "docs/geometry.png", "docs/results.png"),
 }
@@ -162,12 +168,14 @@ def main():
         shutil.copy2(ROOT / "ci" / "test_cavity_wheel.py", tests / "test_cavity_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_multiphysics_wheel.py", tests / "test_multiphysics_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_thermal_traction_wheel.py", tests / "test_thermal_traction_wheel.py")
+        shutil.copy2(ROOT / "ci" / "test_thermoelasticity_wheel.py", tests / "test_thermoelasticity_wheel.py")
         # Execute the verified archived example, not a source-tree copy.
         examples = work / "examples"
         examples.mkdir()
         galerkin_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin")
         with tarfile.open(galerkin_sdist) as archive:
-            for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py"):
+            for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
+                             "prescribed_temperature_thermoelasticity.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())

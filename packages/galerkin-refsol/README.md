@@ -14,6 +14,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 
 | module | contents | self-checks |
 |---|---|---|
+| `refsol.thermoelasticity` | Prescribed-Kelvin uniform free/constrained, compatible and sine fields; out-of-plane stress and physical elastic energy | Original three-dimensional law, no FEM imports |
 | `refsol.thermal` | Kelvin slab and steady sine manufactured fields; heat flux W/m^2 and source W/m^3 | Direct analytic derivatives, no engine imports |
 | `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
@@ -24,6 +25,14 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
+
+Explicitly import `refsol.thermoelasticity` for the prescribed-temperature
+mechanical-stage reference fields. Coordinates/displacement use m, T and Tref
+absolute K, signed alpha 1/K, E/stress Pa and energy density J/m^3. The original
+3D elastic law retains the plane-strain out-of-plane stress and energy; a free
+uniform plane-strain field can have zero in-plane stress and nonzero energy.
+This module is automatically included in sdists and wheels, with byte checks.
+It does not solve heat or certify a sequential heat-to-mechanics workflow.
 
 For steady heat, explicitly import `refsol.thermal`; `slab` returns temperature,
 heat flux and heat source for metre coordinates, Kelvin and conductivity W/(m K).
