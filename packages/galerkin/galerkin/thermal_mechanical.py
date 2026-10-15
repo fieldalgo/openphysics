@@ -105,21 +105,30 @@ def _isolated_mesh(mesh):
     boundary = tags(mesh.boundary, 1)
     edges = tags(mesh.boundary_edges, 2)
     # Geometry/connectivity were checked BEFORE Mesh can cast or flip triangles.
-    owned = Mesh(p, t.astype(np.int64, copy=True), boundary, edges,
-                 None if mesh.regions is None else np.array(mesh.regions, copy=True),
-                 copy.deepcopy(mesh.region_names))
+    regions = None if mesh.regions is None else np.array(mesh.regions, copy=True)
+    if regions is not None and (regions.shape != (len(t),) or regions.dtype.kind not in 'iu'):
+        raise ValueError('mesh.regions must be integer (M,) data when supplied')
+    if regions is not None and np.any(regions > np.iinfo(np.int64).max):
+        raise ValueError('mesh.regions exceeds integer representation')
+    names = copy.deepcopy(mesh.region_names)
+    if names is not None and (not isinstance(names, list) or any(not isinstance(v, str) for v in names)):
+        raise ValueError('mesh.region_names must be a list of strings when supplied')
+    owned = Mesh(p, t.astype(np.int64, copy=True), boundary, edges, regions, names)
     return owned
 
 
 def _mesh_state(mesh):
     return (mesh.nodes.copy(), mesh.triangles.copy(),
             {k: v.copy() for k, v in mesh.boundary.items()},
-            {k: v.copy() for k, v in mesh.boundary_edges.items()})
+            {k: v.copy() for k, v in mesh.boundary_edges.items()},
+            None if mesh.regions is None else mesh.regions.copy(), copy.deepcopy(mesh.region_names))
 
 
 def _check_mesh(mesh, state):
     if not (np.array_equal(mesh.nodes, state[0]) and np.array_equal(mesh.triangles, state[1])):
         raise ValueError('isolated reference mesh changed during workflow')
+    if not np.array_equal(mesh.regions, state[4]) or mesh.region_names != state[5]:
+        raise ValueError('isolated reference region metadata changed during workflow')
     for actual, expected in ((mesh.boundary, state[2]), (mesh.boundary_edges, state[3])):
         if set(actual) != set(expected) or any(not np.array_equal(actual[k], expected[k]) for k in expected):
             raise ValueError('isolated reference boundary data changed during workflow')
@@ -199,7 +208,11 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         if len(invalid):
             node = int(invalid[0])
             raise ValueError(f'nonfinite temperature transfer at node {node}: {raw[node]} K')
-        temperature = _real(raw, 'heat temperature_k')
+        with np.errstate(over='ignore', invalid='ignore'):
+            temperature = np.array(raw, dtype=float, copy=True)
+        invalid = np.flatnonzero(~np.isfinite(temperature))
+        if len(invalid):
+            raise ValueError(f'temperature transfer exceeds finite numeric range at node {int(invalid[0])}')
         minimum_node = int(np.argmin(temperature))
         if temperature[minimum_node] < 0:
             raise ValueError(f'temperature transfer requires nonnegative Kelvin; minimum {temperature[minimum_node]} K at node {minimum_node}')
@@ -218,7 +231,8 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
             'mesh': {'nodes': len(owned.nodes), 'triangles': len(owned.triangles),
                      'mesh_hash': snapshot.mesh_hash,
                      'boundary': {k: v.tolist() for k, v in state[2].items()},
-                     'boundary_edges': {k: v.tolist() for k, v in state[3].items()}},
+                     'boundary_edges': {k: v.tolist() for k, v in state[3].items()},
+                     'regions': None if state[4] is None else state[4].tolist(), 'region_names': state[5]},
             'transfer': {'policy': 'same_mesh_exact_nodal_P1_copy', 'schema_version': snapshot.schema_version,
                          'temperature_hash': snapshot.temperature_hash, 'snapshot_hash': snapshot.snapshot_hash},
             'stages': {'heat': 'completed', 'transfer': 'completed', 'mechanics': 'completed'},
