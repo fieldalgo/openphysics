@@ -11,7 +11,9 @@ so neither editable installs nor the root conftest can supply package code.
 import argparse
 import hashlib
 import os
+import posixpath
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -19,6 +21,7 @@ import tempfile
 import tarfile
 import venv
 import zipfile
+from urllib.parse import unquote, urlsplit
 
 from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 
@@ -26,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 DOCUMENT_ASSETS = {
     "galerkin": ("docs/cavity_solver.md",),
-    "simcase": ("docs/cavity3d.md", "examples/cavity_box.json"),
+    "simcase": ("docs/cavity3d.md", "examples/cavity_box.json",
+                "docs/geometry.png", "docs/results.png"),
 }
 
 
@@ -55,6 +59,21 @@ def check_sdist_assets(sdist):
             source = ROOT / "packages" / name / relative
             if archive.extractfile(files[relative]).read() != source.read_bytes():
                 raise RuntimeError(f"{sdist.name}: {relative} differs from the checked-out source")
+        for relative, member in files.items():
+            if not relative.endswith(".md"):
+                continue
+            text = archive.extractfile(member).read().decode("utf-8")
+            # Current package docs use inline links/images with unspaced targets.
+            # This is an archive-path check, not a general Markdown/network validator.
+            for destination in re.findall(r"!?\[[^\]]*\]\(([^\s)]+)\)", text):
+                url = urlsplit(destination)
+                if url.scheme or url.netloc or not url.path:
+                    continue
+                target = posixpath.normpath(posixpath.join(
+                    posixpath.dirname(relative), unquote(url.path)))
+                if target not in files:
+                    raise RuntimeError(
+                        f"{sdist.name}: {relative} links to missing archive file {destination}")
 
 
 def main():

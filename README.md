@@ -18,7 +18,14 @@ The repository root is not an installable distribution.
 
 ## Install from this checkout
 
-Run these commands from the repository root, using Python 3.10 or newer:
+Package metadata allows Python 3.10 or newer. Automated validation currently
+covers CPython 3.12.14 on Ubuntu 24.04; other Python versions and operating
+systems are outside that CI coverage. The `OS Independent` classifiers and
+`py3-none-any` wheels describe package metadata, not a tested platform matrix.
+The pinned validation environment in [ci/README.md](ci/README.md) targets Linux
+and Python 3.12; its dependency versions cannot be reused on Python 3.10/3.11.
+
+Run these commands from the repository root in a virtual environment:
 
 ```bash
 python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine -e packages/gmshio -e "packages/physmat[rii]" -e "packages/simcase[studio,test]"

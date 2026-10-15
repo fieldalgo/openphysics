@@ -63,7 +63,7 @@ examples/
 
 ## Tests
 
-The engine is graded against [galerkin-refsol](../galerkin-refsol/README.md),
+The engine is graded against [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin-refsol/README.md),
 a separate package holding the closed-form and published reference solutions. It
 shares this repository but stays an independent implementation: the reference
 package does not import the solver it grades. `tests/test_independence.py` enforces

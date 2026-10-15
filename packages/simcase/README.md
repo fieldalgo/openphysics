@@ -19,7 +19,11 @@ python -m simcase run model.json                          # -> model_results/
 The package and CLI are named `simcase`. The JSON version field remains
 `"openphysics": "0.2"`; it is not an import or distribution name. The separate
 `openphysics` distribution is only a name reservation. See the
-[repository setup](../../README.md) for the full development install.
+[repository setup](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/README.md)
+for the full development install. The editable paths above require a monorepo
+checkout; an individual sdist does not contain sibling packages or the repository
+root. When installing downloaded artifacts, pass their paths to pip together with
+local artifacts for the sibling dependencies.
 
 `model_results/` contains `summary.json` (declared units, n_eff per study point, group index,
 mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
