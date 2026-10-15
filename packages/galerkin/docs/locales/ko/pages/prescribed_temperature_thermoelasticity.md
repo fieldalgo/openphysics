@@ -2,6 +2,8 @@
 
 [영문 원문](../../../prescribed_temperature_thermoelasticity.md)
 
+현재 브랜치에 영문 파일이 아직 없는 경우에는 [고정 영문판](https://github.com/fieldalgo/openphysics/blob/0c9237b2dfcfabd59fa0d14091bbb1e7165eda80/packages/galerkin/docs/prescribed_temperature_thermoelasticity.md)을 참조합니다. 이 링크는 번역 원본이며 새 검증 결과가 아닙니다.
+
 아래 실행 수치·실패·미검증 서술은 영문 원문의 해당 후보 시점 기록이며 새 수용 결과를 뜻하지 않습니다.
 
 이 재사용 가능한 정적 기계 단계는 사용자가 명시한 절점 P1 절대 온도장을 받습니다. 열전도 solver를 호출하거나 열 결과를 자동 연결하거나 온도 출처를 인증하거나 완전한 순차 heat-to-mechanics workflow를 검증하지 않습니다. `galerkin.thermoelasticity`와 `refsol.thermoelasticity`에서 import하며 공용 package export는 필요하지 않습니다.
