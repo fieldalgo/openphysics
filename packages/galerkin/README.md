@@ -13,6 +13,11 @@ into a multiphysics core.
   Nédélec / longitudinal nodal formulation, effective indices and vector mode profiles
 - **M3b**: 3D Maxwell — tetrahedral Nédélec edge elements, rectangular cavity eigenmodes
 
+The public `solve_cavity_box` API provides SI frequencies and raw edge fields for
+a vacuum PEC box. See its [API and numerical contract](docs/cavity_solver.md),
+including near-target search limitations and the currently failing rectangular
+cluster-mean convergence gate.
+
 ## Layout
 
 ```
@@ -27,6 +32,7 @@ galerkin/
   mesh3d.py       # M3b: Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
+  cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 tests/
