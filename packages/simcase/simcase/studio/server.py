@@ -143,6 +143,8 @@ def _run_job(job_id: str, doc: Document):
             "fields": [f.T.tolist() for f in res.fields],   # per point: (modes, N)
             "timings": res.timings, "summary": res.summary(),
         }
+        if res.vector_fields is not None:
+            payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:
             _jobs[job_id].update(status="done", result=payload)
     except Exception as exc:  # report anything to the browser

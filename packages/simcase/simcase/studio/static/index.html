@@ -43,6 +43,7 @@
   .view > div.on { display:flex; }
   .toolbar { display:flex; gap:8px; align-items:center; padding:6px 10px; border-bottom:1px solid var(--line); color:var(--muted); flex-wrap:wrap; }
   .toolbar label { display:flex; align-items:center; gap:4px; }
+  .toolbar label[hidden] { display:none; }
   .toolbar select, .toolbar input { width:auto; }
   canvas.plot { flex:1; width:100%; height:100%; display:block; background:#fff; }
   .legend { position:absolute; right:12px; top:44px; background:rgba(255,255,255,.92); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; }
@@ -104,6 +105,10 @@
         <div class="toolbar">
           <label>point <select id="ptSel"></select></label>
           <label>mode <select id="modeSel"></select></label>
+          <label id="componentLabel" hidden>field <select id="componentSel">
+            <option value="magnitude">|E|</option><option value="0">|Ex|</option>
+            <option value="1">|Ey|</option><option value="2">|Ez|</option>
+          </select></label>
           <span id="resInfo">no results yet — press Run</span>
         </div>
         <div class="results-body">
@@ -225,18 +230,30 @@ function drawMesh() {
 }
 
 // ------------------------------------------------------------------ results view
+function vectorMagnitudes(field, mode, component) {
+  const re = field.real[mode], im = field.imag[mode];
+  return re.map((v, t) => component === 'magnitude'
+    ? Math.hypot(...v, ...im[t]) : Math.hypot(v[+component], im[t][+component]));
+}
 function drawField() {
   const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!resultData || !doc) return;
   const p = +$('ptSel').value || 0, m = +$('modeSel').value || 0;
-  const f = resultData.fields[p][m]; const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
-  let vmax = 0; for (const v of f) vmax = Math.max(vmax, Math.abs(v)); vmax = vmax || 1;
+  const vector = resultData.vector_fields?.[p], component = $('componentSel').value || 'magnitude';
+  const f = vector ? vectorMagnitudes(vector, m, component) : resultData.fields[p][m];
+  const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
+  // Vector components share the mode's |E| scale, so a small Ez stays small.
+  const scaleValues = vector ? vectorMagnitudes(vector, m, 'magnitude') : f;
+  let vmax = 0; for (const v of scaleValues) vmax = Math.max(vmax, Math.abs(v)); vmax = vmax || 1;
   const nodes = resultData.nodes, tris = resultData.triangles;
-  drawTriangles(ctx, T, nodes, tris, t => { const [a, b, c] = tris[t]; return cmap((Math.abs(f[a]) + Math.abs(f[b]) + Math.abs(f[c])) / (3 * vmax)); }, false);
+  drawTriangles(ctx, T, nodes, tris, t => { if (vector) return cmap(f[t] / vmax);
+    const [a, b, c] = tris[t]; return cmap((Math.abs(f[a]) + Math.abs(f[b]) + Math.abs(f[c])) / (3 * vmax)); }, false);
   ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
   drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
   const lab = `${studyLabel(resultData)} = ${resultData.values[p]}`;
-  $('resInfo').textContent = `|mode ${m + 1}| at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}`;
+  const fieldLabel = vector ? (component === 'magnitude' ? '|E|' : ['|Ex|', '|Ey|', '|Ez|'][+component]) : '|field|';
+  $('resInfo').textContent = `${fieldLabel}, mode ${m + 1} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}` +
+    (vector ? ' (relative amplitude, common |E| scale)' : '');
 }
 function drawSweep() {
   const cv = $('sweepCanvas'); const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
@@ -258,7 +275,7 @@ function drawSweep() {
     xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(X(x), Y(ys[i][j]), 3, 0, 7); ctx.fill(); }); }
 }
 function fillResultTable() {
-  if (!resultData) { $('resTable').innerHTML = ''; return; }
+  if (!resultData) { $('resTable').innerHTML = ''; $('componentLabel').hidden = true; return; }
   const nm = resultData.neff[0].length, ng = resultData.group_index;
   let h = '<table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${j + 1}</th>`).join('') + (ng ? '<th>n_g 1</th>' : '') + '</tr>';
   resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + (ng ? `<td>${ng[i][0].toFixed(4)}</td>` : '') + '</tr>'; });
@@ -270,6 +287,8 @@ function physKey() { return Object.keys(doc.physics)[0]; }
 let unitVocab = null;
 function unitSummary() { const u = doc.units || {}; const k = Object.keys(u); return k.length ? k.map(d => `${d} ${typeof u[d] === 'string' ? u[d] : 'custom'}`).join(', ') : 'none declared'; }
 function populateResultSelectors() {
+  $('componentLabel').hidden = !resultData.vector_fields;
+  $('componentSel').value = 'magnitude';
   $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${studyLabel(resultData)} = ${v}</option>`).join('');
   $('ptSel').value = Math.floor(resultData.values.length / 2);
   $('modeSel').innerHTML = resultData.neff[0].map((_, j) => `<option value="${j}">${j + 1}</option>`).join('');
@@ -326,8 +345,12 @@ function renderProps() {
     h += m.sellmeier ? `<div class="hint">Sellmeier dispersion. Edit B, C, A and range in the JSON tab. C uses squared document length; range uses ${lengthUnit()}.</div>` : row('n', num(`materials.${k}.n`, m.n)) + row('k', num(`materials.${k}.k`, m.k ?? 0));
     h += `<div class="actions"><button data-act="delmat" class="danger">delete</button></div>`; }
   else if (selected.startsWith('physics:')) { const pk = selected.slice(8), p = doc.physics[pk]; h = `<h3>Physics · ${pk}</h3>` + row('type', sel(`physics.${pk}.type`, p.type, ['em.modes2d'])) + row('formulation', sel(`physics.${pk}.formulation`, p.formulation, ['scalar', 'vector'])) +
-    row('wavelength', num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) + '<h3 style="margin-top:12px">Boundaries</h3>' +
-    ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join('') + '<div class="hint">scalar: exact for TE slab modes, approximate for 2D high-contrast cores. vector: waits for the galerkin M3a solver.</div>'; }
+    row(`wavelength (${lengthUnit()})`, num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) +
+    (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
+      '<div class="hint">Set the highest exterior cladding index at this wavelength (e.g. substrate or cover). Vector: lossless dielectrics, single study only. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
+      '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +
+    '<h3 style="margin-top:12px">Boundaries</h3>' +
+    ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join(''); }
   else if (selected === 'units') {
     const u = doc.units || {}; const dims = unitVocab ? unitVocab.dimensions : Object.keys(u);
     h = '<h3>Units</h3><div class="hint">What the numbers in this document mean. A dimension left at SI is SI; the physics still requires the ones it reads, so those cannot be left out.</div>';
@@ -343,8 +366,8 @@ function renderProps() {
     if (g) h += row('center x', num('mesh.grading.center.0', g.center[0])) + row('center y', num('mesh.grading.center.1', g.center[1])) + row('near', num('mesh.grading.near', g.near)) + row('far', num('mesh.grading.far', g.far)) + row('distance', num('mesh.grading.distance', g.distance));
     h += '<div class="hint">Per-shape sizes are set on each shape. Grading grows the size linearly from near (at center) to far (at distance).</div>'; }
   else if (selected === 'study') { const s = doc.study; h = '<h3>Study</h3>' + row('type', sel('study.type', s.type, ['single', 'sweep']));
-    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" value="${(s.values || []).join(', ')}">`) + '<div class="hint">parameter is a dotted path under physics, e.g. physics.em1.wavelength. The mesh is built once per study, so geometry and mesh cannot be swept. Sweeping the wavelength also gives the group index.</div>'; }
-  else if (selected === 'results') h = '<h3>Results</h3><div class="hint">Run writes n_eff per study point, the fields and (for wavelength sweeps) the group index. Use the selectors above the field view.</div>';
+    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" value="${(s.values || []).join(', ')}">`) + '<div class="hint">parameter is a dotted path under physics, e.g. physics.em1.wavelength. The mesh is built once per study, so geometry and mesh cannot be swept. Scalar wavelength sweeps also give the group index. Vector studies currently support a single point.</div>'; }
+  else if (selected === 'results') h = '<h3>Results</h3><div class="hint">Run writes n_eff per study point, the fields and (for scalar wavelength sweeps) the group index. Use the selectors above the field view.</div>';
   P.innerHTML = h;
   P.querySelectorAll('[data-path]').forEach(el => el.addEventListener('change', onPropChange));
   P.querySelectorAll('[data-kind="unit"]').forEach(el => el.addEventListener('change', e => {
@@ -416,6 +439,7 @@ $('fileInput').onchange = async e => { const f = e.target.files[0]; if (!f) retu
 $('applyJson').onclick = async () => { try { doc = JSON.parse($('json').value); selected = 'model'; meshData = resultData = null; refresh(); await doValidate(); } catch (err) { log('JSON error: ' + err.message, 'err'); } };
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $('ptSel').onchange = drawField; $('modeSel').onchange = drawField;
+$('componentSel').onchange = drawField;
 window.addEventListener('resize', redrawAll);
 
 (async function init() {

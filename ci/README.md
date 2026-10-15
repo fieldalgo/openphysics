@@ -1,7 +1,7 @@
 # Validation and distribution checks
 
 The root `validate.yml` workflow runs on pushes, pull requests and manual dispatch.
-It tests CPython 3.12.14 on Ubuntu 24.04. Python 3.10/3.11
+It tests CPython 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. Python 3.10/3.11
 and other operating systems remain outside this CI coverage; the package metadata
 still declares Python >=3.10. `requirements-py312-linux.txt` pins the validation
 tools and their transitive dependencies, not the packages' runtime requirements.
@@ -20,6 +20,7 @@ python ci/fetch_rii.py /tmp/openphysics-rii
 export PHYSMAT_RII_PATH=/tmp/openphysics-rii/database
 gmsh --version
 python -m pytest -q -ra
+node --test packages/simcase/tests/studio_vector.cjs
 python ci/check_distributions.py
 ```
 

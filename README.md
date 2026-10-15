@@ -44,11 +44,14 @@ The studio is available at `http://127.0.0.1:8765`. CLI commands are `simcase`,
 `simcase-run` and `simcase-studio`; Python imports use `simcase`. The JSON format
 still uses the version field `"openphysics": "0.2"`.
 
-The document runner currently solves one lossless scalar `em.modes2d` problem,
-with PEC/PMC boundaries and physics-parameter sweeps. The FEM engine's vector
-waveguide solver and 3D cavity routines are separate Python capabilities; they
-are not yet connected to the document runner or studio. Coupled multiphysics,
-geometry sweeps and lossy mode solves are not implemented in that runner.
+The document runner solves one lossless `em.modes2d` problem with PEC/PMC
+boundaries. Scalar runs support physics-parameter sweeps. Full-vector runs
+support single study points, an explicit exterior cladding index, complex field
+storage and component display in Studio; see the `vector_slab` and `vector_fiber`
+examples. Vector sweeps require mode tracking and are rejected for now.
+The FEM engine's 3D cavity routines remain a separate Python capability.
+Coupled multiphysics, geometry sweeps and lossy mode solves are not implemented
+in the document runner.
 
 ## Validate this checkout
 

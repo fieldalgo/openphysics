@@ -8,6 +8,7 @@ import copy
 import time
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import simcase
@@ -150,6 +151,32 @@ def test_run_job_roundtrip(client):
     assert len(res["fields"][0][0]) == len(res["nodes"])
     assert any("n_eff" in line for line in st["log"])
     assert client.get("/api/jobs/zzz").status_code == 404
+
+
+def test_vector_job_preserves_complex_components_and_uses_element_samples(client):
+    doc = copy.deepcopy(examples.VECTOR_SLAB)
+    doc["physics"]["em1"]["boundary"].update(left="pmc", right="pmc")
+    assert client.post("/api/validate", json={"doc": doc}).json()["ok"]
+    job = client.post("/api/run", json={"doc": doc}).json()["job"]
+    for _ in range(300):
+        status = client.get(f"/api/jobs/{job}").json()
+        if status["status"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    assert status["status"] == "done", status
+    res = client.get(f"/api/jobs/{job}/result").json()
+    assert res["fields"] == [] and res["group_index"] is None
+    assert res["summary"]["formulation"] == "vector"
+    field = res["vector_fields"][0]
+    assert field["components"] == ["Ex", "Ey", "Ez"]
+    assert field["location"] == "triangle_centroids"
+    E = np.array(field["real"]) + 1j * np.array(field["imag"])
+    assert E.shape == (1, len(res["triangles"]), 3)
+    assert np.max(abs(E[:, :, 2].imag)) > 0.1
+    assert abs(res["neff"][0][0] - 2.0562883300990773) < 1e-3
+    doc["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.5, 1.6])
+    rejected = client.post("/api/run", json={"doc": doc})
+    assert rejected.status_code == 400 and "mode tracking" in rejected.json()["detail"]
 
 
 def test_sellmeier_json_edit_roundtrip_and_validation(client):

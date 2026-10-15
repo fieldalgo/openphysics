@@ -93,7 +93,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
 
 
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
-                num_modes: int = 6, mu_r=1.0, pec_nodes=None):
+                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None):
     """Guided modes with effective index near n_target.
 
     n_target: shift-invert target for beta/k0 — the core index is the natural
@@ -101,6 +101,11 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     pec_nodes: nodes carrying n x E = 0; defaults to every boundary node. An open
               guide is truncated by putting this wall out where the evanescent
               cladding field has already died.
+    pec_edges: explicit global EdgeSpace edge ids for tangential E constraints.
+              If omitted, boundary edges with both endpoints in pec_nodes are
+              fixed, preserving the original API. Supply explicit ids for mixed
+              walls: a one-edge PMC wall can have two PEC corner nodes without
+              being a PEC edge. pec_nodes still constrains the nodal E_z values.
 
     Returns (n_eff, space, et, ez) sorted by descending effective index:
       n_eff (m,)      beta / k0
@@ -118,8 +123,11 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
         pec_nodes = np.unique(np.concatenate(
             [mesh.boundary[k] for k in mesh.boundary]))
     pec_nodes = np.asarray(pec_nodes, dtype=int)
+    if pec_edges is None:
+        pec_edges = space.boundary_edge_ids(pec_nodes)
+    pec_edges = np.asarray(pec_edges, dtype=int)
     fixed = np.unique(np.concatenate(
-        [space.boundary_edge_ids(pec_nodes), n_e + pec_nodes]))
+        [pec_edges, n_e + pec_nodes]))
     free = np.setdiff1d(np.arange(n_e + n_n), fixed)
 
     A, B = A[free][:, free].tocsc(), B[free][:, free].tocsc()

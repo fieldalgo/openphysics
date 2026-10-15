@@ -3,6 +3,8 @@
 
 """Example documents (also used by the tests)."""
 
+import copy
+
 SOI_STRIP = {
     "openphysics": "0.2",
     "name": "SOI strip waveguide 500 x 220 nm",
@@ -75,4 +77,28 @@ FIBER = {
     "study": {"type": "single"},
 }
 
-EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib": HADLEY_RIB, "fiber": FIBER}
+VECTOR_SLAB = {
+    "openphysics": "0.2",
+    "name": "220 nm dielectric slab, vector TE",
+    "units": {"length": "um"},
+    "geometry": {
+        "domain": {"xmin": -0.05, "xmax": 0.05, "ymin": -1.5, "ymax": 1.72},
+        "background": {"material": "clad"},
+        "shapes": [{"name": "film", "type": "rect", "x": -0.05, "y": 0.0,
+                    "w": 0.1, "h": 0.22, "material": "film", "mesh_size": 0.012}],
+    },
+    "materials": {"film": {"n": 3.48}, "clad": {"n": 1.444}},
+    "physics": {"em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55,
+                         "num_modes": 1, "n_cladding": 1.444,
+                         "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}}},
+    "mesh": {"size": 0.06, "grading": {"center": [0.0, 0.11], "near": 0.012,
+                                       "far": 0.06, "distance": 1.0}},
+    "study": {"type": "single"},
+}
+
+VECTOR_FIBER = copy.deepcopy(FIBER)
+VECTOR_FIBER["name"] = "step-index fiber, full vector modes"
+VECTOR_FIBER["physics"]["em1"].update(formulation="vector", n_cladding=1.44, num_modes=6)
+
+EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib": HADLEY_RIB,
+            "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER}

@@ -25,6 +25,7 @@ can mesh without solving and a caching layer can redo only what changed:
 
 from . import examples
 from .geometry import build_domain
+from .fields import VectorField
 from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
 from .schema import FORMAT, Document, DocumentError
 from .units import unit_vocabulary
@@ -32,4 +33,4 @@ from .units import unit_vocabulary
 __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "unit_vocabulary"]
+           "run", "RunResult", "VectorField", "unit_vocabulary"]

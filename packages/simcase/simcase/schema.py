@@ -20,8 +20,9 @@ A document is a JSON object with these sections (lengths use its declared unit):
                any other material name is looked up in physmat.
     physics    named physics, {"em1": {...}}. Each entry names its solver and
                its settings. Currently "em.modes2d": wavelength, formulation
-               ("scalar"; the existing M3a vector solver is not yet connected), num_modes, boundary
-               conditions per side ("pec" | "pmc"). The names are how a study
+               ("scalar" or single-study "vector"), num_modes, boundary
+               conditions per side ("pec" | "pmc"), and explicit n_cladding for
+               vector modes. The names are how a study
                and (later) a coupling refer to one physics, so they are part of
                the document, not an implementation detail.
     mesh       global size, optional per-shape sizes (on the shape), optional
@@ -280,7 +281,15 @@ class Document:
                     raise DocumentError(f"{where}.boundary.{side} must be one of {sorted(BOUNDARY_TYPES)}")
             if not (isinstance(p["wavelength"], (int, float)) and p["wavelength"] > 0):
                 raise DocumentError(f"{where}.wavelength must be a positive number (use study.sweep for several)")
-            if int(p["num_modes"]) < 1:
+            if p["formulation"] == "vector":
+                for key in ("wavelength", "n_cladding", "num_modes"):
+                    value = p.get(key)
+                    _material_number(value, f"{where}.{key}")
+                    if value <= 0:
+                        raise DocumentError(f"{where}.{key} must be positive")
+                if p["num_modes"] != int(p["num_modes"]):
+                    raise DocumentError(f"{where}.num_modes must be an integer")
+            elif int(p["num_modes"]) < 1:
                 raise DocumentError(f"{where}.num_modes must be >= 1")
         required = set()
         for p in d["physics"].values():
@@ -309,6 +318,9 @@ class Document:
         if st["type"] not in ("single", "sweep"):
             raise DocumentError("study.type must be 'single' or 'sweep'")
         if st["type"] == "sweep":
+            if any(p["formulation"] == "vector" for p in d["physics"].values()):
+                raise DocumentError("vector modes currently require study.type 'single'; "
+                                    "vector sweeps need mode tracking before group index can be reported")
             if "parameter" not in st or "values" not in st or len(st["values"]) == 0:
                 raise DocumentError("study.sweep needs 'parameter' (dotted path) and non-empty 'values'")
             try:
@@ -320,6 +332,13 @@ class Document:
                     f"study.parameter {st['parameter']!r} is not under 'physics.'. The mesh is built once for "
                     "the whole study, so sweeping geometry, mesh or materials would solve every point on the "
                     "first point's mesh. Only physics parameters may be swept.")
+            for value in st["values"]:
+                candidate = self.copy()
+                candidate.set_path(st["parameter"], value)
+                if any(isinstance(p, dict) and p.get("formulation") == "vector"
+                       for p in candidate["physics"].values()):
+                    raise DocumentError("vector modes currently require study.type 'single'; "
+                                        "vector sweeps need mode tracking before group index can be reported")
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]

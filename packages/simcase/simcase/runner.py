@@ -29,6 +29,7 @@ from . import physics_em_modes2d
 from .geometry import build_domain
 from . import units
 from .materials import material_table
+from .fields import VectorField
 from .schema import Document, DocumentError
 
 
@@ -91,7 +92,7 @@ def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
     wl = physics["wavelength"]
     return physics_em_modes2d.solve(model.mesh, model.eps_per_triangle(wl), wl, physics["boundary"],
-                                    int(physics["num_modes"]), physics["formulation"])
+                                    int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"))
 
 
 @dataclass
@@ -105,15 +106,16 @@ class RunResult:
     parameter: str | None
     values: list
     neff: np.ndarray            # (n_points, num_modes)
-    fields: list[np.ndarray]    # per point: (N, num_modes)
+    fields: list[np.ndarray]    # scalar per point: (N, num_modes); empty for vector
     timings: dict[str, float] = field(default_factory=dict)
     log: list[str] = field(default_factory=list)
+    vector_fields: list[VectorField] | None = None
 
     # -- derived -----------------------------------------------------------
 
     def group_index(self) -> np.ndarray | None:
         """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength."""
-        if self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
+        if self.vector_fields is not None or self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
             return None
         wl = np.asarray(self.values, dtype=float)
         return self.neff - wl[:, None] * np.gradient(self.neff, wl, axis=0)
@@ -129,6 +131,12 @@ class RunResult:
             "timings_s": {k: round(v, 3) for k, v in self.timings.items()},
         }
         ng = self.group_index()
+        if self.vector_fields is not None:
+            physics = self.doc.sole_physics()[1]
+            out.update(formulation="vector", field_representation="vector-edge-nodal-v1",
+                       normalization="max_centroid_magnitude", amplitude_unit="relative",
+                       n_cladding=physics["n_cladding"], requested_modes=physics["num_modes"],
+                       returned_modes=int(self.neff.shape[1]))
         if ng is not None:
             out["group_index"] = ng.tolist()
         return out
@@ -142,10 +150,17 @@ class RunResult:
         (outdir / "log.txt").write_text("\n".join(self.log) + "\n", encoding="utf-8")
         self.doc.save(outdir / "model.json")
         if self.doc["results"].get("save_fields", True):
-            np.savez_compressed(outdir / "fields.npz", nodes=self.mesh_nodes, triangles=self.mesh_triangles,
-                                regions=self.mesh_regions, region_names=np.array(self.region_names),
-                                values=np.asarray(self.values, dtype=float), neff=self.neff,
-                                fields=np.stack(self.fields))
+            arrays = dict(nodes=self.mesh_nodes, triangles=self.mesh_triangles, regions=self.mesh_regions,
+                          region_names=np.array(self.region_names), values=np.asarray(self.values, dtype=float),
+                          neff=self.neff)
+            if self.vector_fields is None:
+                arrays["fields"] = np.stack(self.fields)
+            else:
+                arrays.update(field_representation="vector-edge-nodal-v1", edges=self.vector_fields[0].edges,
+                              vector_transverse=np.stack([f.transverse for f in self.vector_fields]),
+                              vector_longitudinal=np.stack([f.longitudinal for f in self.vector_fields]),
+                              vector_electric=np.stack([f.electric for f in self.vector_fields]))
+            np.savez_compressed(outdir / "fields.npz", **arrays)
         if self.doc["results"].get("plots", True):
             self.plot(outdir / "results.png")
         return outdir
@@ -169,8 +184,13 @@ class RunResult:
         # field of the first mode at the middle study point
         i = len(self.values) // 2
         ax = axes[1]
-        f = np.abs(self.fields[i][:, 0])
-        ax.tricontourf(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles, f, levels=30, cmap="inferno")
+        if self.vector_fields is None:
+            f = np.abs(self.fields[i][:, 0])
+            ax.tricontourf(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles, f, levels=30, cmap="inferno")
+        else:
+            f = np.linalg.norm(self.vector_fields[i].electric[:, 0, :], axis=1)
+            ax.tripcolor(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles,
+                         facecolors=f, shading="flat", cmap="inferno")
         ax.set_aspect("equal")
         pname, phys = self.doc.sole_physics()
         label = f"{self.parameter or 'lambda'} = {self.values[i]}{value_unit}"
@@ -228,13 +248,21 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
 
     parameter, values = study_points(doc)
     neffs, fields = [], []
+    vector_fields = [] if doc.sole_physics()[1]["formulation"] == "vector" else None
     t0 = time.time()
     for v in values:
         d = doc.copy()
         if parameter is not None:
             d.set_path(parameter, v)
         res = solve_point(model, d.sole_physics()[1])
-        neffs.append(res["neff"]); fields.append(res["fields"])
+        neffs.append(res["neff"])
+        if vector_fields is None:
+            fields.append(res["fields"])
+        else:
+            vector_fields.append(res["vector_field"])
+            requested = int(d.sole_physics()[1]["num_modes"])
+            if len(res["neff"]) < requested:
+                say(f"  warning: requested {requested} modes; found {len(res['neff'])} in the guided interval")
         value_unit = f" {doc.length_unit}" if parameter and parameter.endswith(".wavelength") else ""
         tag = f"{parameter} = {v}{value_unit}: " if parameter else ""
         say(f"  {tag}n_eff = " + ", ".join(f"{n:.6f}" for n in res["neff"]) +
@@ -244,4 +272,4 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
 
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
-                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log)
+                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields)

@@ -509,8 +509,8 @@ def test_sweep_produces_group_index_and_saves(tmp_path):
     assert s["study"]["values"] == [1.5, 1.55, 1.6] and len(s["group_index"]) == 3
 
 
-def test_vector_formulation_not_yet_available():
+def test_vector_formulation_requires_an_explicit_cladding_index():
     d = copy.deepcopy(examples.SLAB_TE_CHECK)
     d["physics"]["em1"]["formulation"] = "vector"
-    with pytest.raises(NotImplementedError, match="M3a"):
+    with pytest.raises(DocumentError, match="n_cladding"):
         run(Document.from_dict(d), verbose=False)

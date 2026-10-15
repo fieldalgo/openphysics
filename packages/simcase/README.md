@@ -72,12 +72,76 @@ existing dotted path under `physics.`. Geometry, mesh and material sweeps are
 rejected because the mesh is built once. Sweeping a wavelength also yields the
 group index.
 
-Physics today: `em.modes2d` with the `scalar` formulation (exact for TE slab
-modes, an approximation for 2D high-contrast cores). The `vector` formulation
-is accepted in a document but raises a clear error when run: galerkin already
-has the M3a vector solver, and connecting it to this runner remains to be done.
-Lossy materials are also rejected by the scalar path. Boundaries: `pec`
-(field = 0) or `pmc` (natural).
+Physics today: lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
+an approximation for 2D high-contrast cores) or full `vector` for a single
+study point. Lossy materials are rejected in both paths. Scalar boundaries are
+`pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
+and Ez; PMC is natural. These are different field conditions: changing only the
+formulation of a scalar slab can select a different polarization.
+
+### Vector single-point studies
+
+```bash
+python -m simcase example vector_slab > vector.json
+python -m simcase run vector.json -o vector_results
+```
+
+`vector_slab` is a 220 nm dielectric slab with electric side walls, selecting
+the TE family. Change its left/right boundaries to `pmc` for the TM family.
+`vector_fiber` requests six fields, including degenerate partners.
+
+The physics entry requires `"formulation": "vector"` and a finite positive
+`n_cladding`. This dimensionless number is the user-specified lower bound of
+the guided-mode search interval at the selected wavelength. For a simple
+asymmetric slab use the larger substrate/cover index; for a fiber use the
+exterior cladding index. More general structures can have slab/radiation
+channels with a higher effective index and need a correspondingly chosen bound.
+The upper bound is the largest material index in the mesh. There is no automatic
+inference from the smallest material index.
+
+Only isotropic, nonmagnetic dielectrics with real, finite, positive permittivity
+are supported. Modes are searched near the maximum index, filtered to the open
+interval `(n_cladding, n_max)` and sorted by descending n_eff. If fewer than
+`num_modes` are found, the result contains that actual count and a log warning;
+zero modes is an error. This is a bounded search, not proof that all guided
+modes were found. A finite PEC/PMC computational wall is not an open boundary:
+check domain padding as well as mesh convergence for your geometry.
+
+Vector studies currently require `"study": {"type": "single"}`. Sweeps are
+rejected during validation: sorting by index does not track mode identity across
+crossings or degeneracies, so it cannot yet justify a vector group index.
+
+`RunResult.fields` retains its original nodal scalar layout for scalar results
+and is empty for vector results. Vector data is in `RunResult.vector_fields`,
+one public `VectorField` object per study point:
+
+| Attribute | Shape | Meaning |
+|---|---|---|
+| `edges` | `(edges, 2)` | Node pairs, oriented from lower to higher node index |
+| `transverse` | `(edges, modes)` | Transverse electric-field line integrals in document length units |
+| `longitudinal` | `(nodes, modes)` | Complex Ez, including its phase relative to Ex/Ey |
+| `electric` | `(triangles, modes, 3)` | Complex Ex/Ey/Ez at triangle centroids |
+
+Each mode has one common scale: maximum centroid `|E| = 1`. Amplitudes are
+relative, not V/m or normalized power. All components share this scale; Ez is
+in quadrature with the transverse field for these lossless modes. Centroid
+values stay per element, preserving interface discontinuities. Raw edge/nodal
+coefficients retain the finite-element field for reconstruction elsewhere.
+
+Vector `fields.npz` contains `edges`, `vector_transverse`, `vector_longitudinal`
+and `vector_electric`; the three field arrays have an extra leading study-point
+axis. They load with `numpy.load(..., allow_pickle=False)`. The scalar `fields`
+key is absent for vector data. `field_representation="vector-edge-nodal-v1"`
+in the archive and summary identifies this layout. Summary metadata includes
+the requested/returned mode counts, normalization and declared coordinate units.
+The model JSON format remains `"openphysics": "0.2"`.
+
+Studio receives `vector_fields` with `location="triangle_centroids"`, component
+names and separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point.
+The existing scalar HTTP `fields` layout is unchanged; for vectors it is empty.
+Select `|E|`, `|Ex|`, `|Ey|` or `|Ez|` to display magnitudes on a common |E|
+color scale. The saved PNG displays |E|; the archive preserves complex components.
+`VectorField.to_dict()` produces the same JSON-safe display samples.
 
 ### Custom optical materials
 
@@ -160,7 +224,8 @@ document.
   triangle counts, minimum angle and mean quality.
 - Run: a background job whose log streams back, then the mode field (selectable
   study point and mode), an n_eff-vs-parameter chart and a table with the group
-  index.
+  index for scalar wavelength sweeps. Vector single-point results add a field
+  component selector and report relative amplitudes.
 - JSON tab: edit the document by hand and apply.
 
 The page is a single HTML file with no build step and no external libraries
