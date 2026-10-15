@@ -143,7 +143,7 @@ def error_metrics(m,r,plane,kind,order):
     dg=gu[:,None]-gradient
     ds=state['sigma']-exact['sigma']
     tangent=original_3d(de,np.zeros_like(theta),plane)
-    values=[np.sum(du*du,axis=-1),np.sum(dg*dg,axis=(-2,-1)),np.sum(ds*ds,axis=(-2,-1)),2*tangent['energy'],dt**2,np.sum(dgt*dgt,axis=-1)]
+    values=[np.sum(du*du,axis=-1),np.sum(dg*dg,axis=(-2,-1)),np.sum(ds*ds,axis=(-2,-1)),2*tangent['energy'],dt**2,np.sum(dgt*dgt,axis=-1),de[...,0]**2+de[...,1]**2+.5*de[...,2]**2]
     norms=np.array([np.sqrt(np.sum(w*v)) for v in values])
     return norms,np.sum(w*exact['energy'])
 
@@ -162,15 +162,17 @@ def test_thermoelasticity_independent_convergence(plane,kind):
         r=solve(m,t,plane,bc,body_force=body);audit(m,r,plane,body)
         errors,energy=error_metrics(m,r,plane,kind,8)
         errors10,_=error_metrics(m,r,plane,kind,10)
-        np.testing.assert_allclose(errors[:4],errors10[:4],rtol=.01)
+        indices=[0,1,2,3,6] if kind=='linear' else list(range(7))
+        np.testing.assert_allclose(errors[indices],errors10[indices],rtol=.01)
         _,e12=error_metrics(m,r,plane,kind,12);_,e16=error_metrics(m,r,plane,kind,16)
         assert abs(e12-e16)<1e-8*max(e16,E0*(20*ALPHA0)**2)
-        if kind=='linear':assert max(errors[4:])<1e-10
+        if kind=='linear':assert max(errors[4:6])<1e-10
         history.append(errors);energy_errors.append(abs(r.physical_elastic_energy-energy)/max(energy,E0*(20*ALPHA0)**2))
-    count=4 if kind=='linear' else 6
-    rates=np.log2(np.array(history[:-1])[:,:count]/np.array(history[1:])[:,:count])
+    indices=[0,1,2,3,6] if kind=='linear' else list(range(7))
+    gates=np.array([1.8,.9,.9,.9,1.8,.9,.9])[indices]
+    rates=np.log2(np.array(history[:-1])[:,indices]/np.array(history[1:])[:,indices])
     print(plane,kind,'errors',np.array(history),'rates',rates,'energy',energy_errors)
-    assert np.all(rates>=np.array([1.8,.9,.9,.9,1.8,.9])[:count])
+    assert np.all(rates>=gates)
     assert np.all(np.diff(energy_errors)<0)
     assert energy_errors[-1]<=.02
 

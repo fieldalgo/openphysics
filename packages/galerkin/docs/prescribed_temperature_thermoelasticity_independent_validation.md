@@ -151,3 +151,12 @@ checkout, installs the local wheel without dependencies or an index, and runs
 `python -I -m pytest --confcutdir=. -q`. Existing environment dependencies are
 reused in a dedicated venv; this is not a clean-room dependency installation.
 Shared-host timings are execution metadata, not performance baselines.
+
+Local whole-root regression on the first 37-case submitted suite passed
+657 tests and 9 subtests, with 16 optional-environment skips and one existing
+dependency deprecation warning. The final same-case suite additionally records
+an explicit strain norm and compares all nonlinear interpolation norms between
+quadrature orders. Its initial development run exposed an exact-temperature
+assertion accidentally including the new nonzero strain-error column (35 passes,
+two harness failures); restricting that check to temperature and its gradient
+retained all original thresholds. Source revalidation passed all 37 cases.
