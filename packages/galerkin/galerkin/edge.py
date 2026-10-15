@@ -46,8 +46,17 @@ class EdgeSpace:
         hi = loc.max(axis=2)
         key = np.stack([lo, hi], axis=2).reshape(-1, 2)   # (3T, 2)
 
-        uniq, inv = np.unique(key, axis=0, return_inverse=True)
-        self.edges = uniq                            # (E, 2)  global: low -> high
+        # Sort integer columns directly: np.unique(axis=0) uses a slower
+        # structured-row sort. Keep exactly its lexicographic edge numbering,
+        # without packing node ids into an integer that could overflow.
+        order = np.lexsort((key[:, 1], key[:, 0]))
+        ordered = key[order]
+        first = np.empty(len(key), dtype=bool)
+        first[:1] = True
+        first[1:] = np.any(ordered[1:] != ordered[:-1], axis=1)
+        inv = np.empty(len(key), dtype=int)
+        inv[order] = np.cumsum(first) - 1
+        self.edges = ordered[first]                  # (E, 2)  global: low -> high
         self.tri_edges = inv.reshape(-1, 3)          # (T, 3)  global edge ids
         # +1 when the local direction (i -> j) matches the global (lo -> hi)
         self.signs = np.where(loc[:, :, 0] == lo, 1.0, -1.0)  # (T, 3)

@@ -65,3 +65,43 @@ convergence, physical field reconstruction and Maxwell residuals, units,
 dispersion, mixed boundaries, and conservative tracking failures. Keep solver
 tolerances, candidate counts and tracking thresholds fixed during performance
 work unless the numerical contract is separately reviewed and validated.
+
+## Edge numbering measurement (2026-10-15)
+
+The 2D `EdgeSpace` constructor sorts the two integer endpoint columns directly,
+then labels adjacent unique pairs and maps them back to each triangle. This
+preserves the previous lexicographic numbering and orientation signs without
+NumPy's structured-row sorting overhead. It does not pack node ids into a
+single integer, change the eigenproblem, or change solver/tracking tolerances.
+
+The comparison below used the solver at `44d0339` before this optimization and
+the same solver with the new constructor. The benchmark tool was introduced in
+`d84268f`; uncommitted tool/document changes account for the baseline report's
+dirty flag. Linux x86-64, CPython 3.12.14, NumPy 2.5.4, SciPy 1.18.1 and Shapely
+2.2.0 were used, with a four-CPU quota, 32 GiB memory limit and one BLAS thread.
+Each case had three fresh-process runs and 21 separate topology constructions
+per run. Values below are medians. Runs were collected sequentially, so the
+whole-run comparison also includes machine-load and timing variation.
+
+| Case | Triangles | Topology before (ms) | Topology after (ms) | Ratio | Run before (s) | Run after (s) |
+|---|---:|---:|---:|---:|---:|---:|
+| TE sweep | 1,381 | 1.780 | 0.405 | 4.40 | 0.6210 | 0.6203 |
+| TM sweep | 1,381 | 1.774 | 0.403 | 4.40 | 1.1685 | 1.2036 |
+| Two-mode sweep | 1,381 | 1.773 | 0.451 | 3.93 | 0.4160 | 0.3792 |
+| Single TE | 1,381 | 1.771 | 0.450 | 3.94 | 0.1217 | 0.1159 |
+| Fiber | 1,792 | 2.248 | 0.538 | 4.17 | 0.2371 | 0.2460 |
+| Hadley | 8,284 | 12.531 | 2.648 | 4.73 | 1.8987 | 1.8842 |
+| Fine TE sweep | 5,509 | 7.669 | 1.795 | 4.27 | 6.7156 | 6.9678 |
+
+The improvement is established for topology construction; these samples do not
+establish a consistent whole-run speedup. Eigensolving dominates the tested
+sweeps. For example, fine TE run times ranged from 6.539–6.755 s before and
+6.526–7.353 s after. Median process peak RSS ranged from 92.0–131.8 MiB before
+and 91.6–133.1 MiB after; this is not evidence of a memory reduction.
+
+All repetitions had exactly equal effective indices, group indices and tracking
+evidence before/after. The first-run snapshots of all seven cases had exactly
+equal edge maps and transverse, longitudinal and centroid electric arrays.
+Tests additionally verify physical field reconstruction and zero curl after
+node/triangle reordering, including empty topology. These measurements describe
+this environment and these inputs, not a performance guarantee.
