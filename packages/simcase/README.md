@@ -1,5 +1,9 @@
 # simcase — the model document and its headless runner
 
+[English](README.md) | [한국어](README.ko.md)
+
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+
 A COMSOL-style program is, underneath, a file that describes the model and an
 engine that runs the file. `simcase` implements that file format and engine for the
 FieldAlgo stack: a JSON document holds geometry, materials, physics, mesh

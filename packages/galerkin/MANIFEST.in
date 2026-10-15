@@ -18,3 +18,4 @@ include docs/prescribed_temperature_thermoelasticity.md
 include examples/prescribed_temperature_thermoelasticity.py
 include docs/prescribed_temperature_thermoelasticity_independent_validation.md
 include tests/thermoelasticity_independent_oracle.py
+include README.ko.md

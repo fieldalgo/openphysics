@@ -6,3 +6,4 @@ include docs/thermal_steady2d.md
 include examples/thermal_slab.json
 include examples/thermal_mixed.json
 include tests/studio_thermal.cjs
+include README.ko.md

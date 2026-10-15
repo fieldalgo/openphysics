@@ -1,5 +1,9 @@
 # openphysics
 
+[English](README.md) | [한국어](README.ko.md)
+
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+
 Name reservation for the OpenPhysics suite.
 
 This distribution is intentionally empty. OpenPhysics is developed as six packages, each

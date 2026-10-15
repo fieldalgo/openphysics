@@ -1,5 +1,9 @@
 # galerkin-refsol — reference solutions for validating galerkin
 
+[English](README.md) | [한국어](README.ko.md)
+
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+
 Closed-form solutions and published high-accuracy benchmarks used as the
 answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
 FEM engine. It is a separate package in the same monorepo;

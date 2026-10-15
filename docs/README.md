@@ -25,3 +25,15 @@ English source documents remain at their existing package paths. Complete Korean
 Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
 Headless thermal documents and prescribed-flux/Robin boundaries are separate development candidates until reviewed and integrated. Their new manuals and acceptance reports will appear in both languages when the corresponding implementation is accepted. Do not infer feature support from a planned translation.
+
+## Package overviews: complete Korean counterparts
+
+| Package | English | 한국어 |
+|---|---|---|
+| galerkin | [English](../packages/galerkin/README.md) | [한국어](../packages/galerkin/README.ko.md) |
+| galerkin-refsol | [English](../packages/galerkin-refsol/README.md) | [한국어](../packages/galerkin-refsol/README.ko.md) |
+| meshine | [English](../packages/meshine/README.md) | [한국어](../packages/meshine/README.ko.md) |
+| gmshio | [English](../packages/gmshio/README.md) | [한국어](../packages/gmshio/README.ko.md) |
+| physmat | [English](../packages/physmat/README.md) | [한국어](../packages/physmat/README.ko.md) |
+| simcase | [English](../packages/simcase/README.md) | [한국어](../packages/simcase/README.ko.md) |
+| openphysics | [English](../packages/openphysics/README.md) | [한국어](../packages/openphysics/README.ko.md) |

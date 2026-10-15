@@ -1,5 +1,7 @@
 # OpenPhysics
 
+**English** | [한국어](README.ko.md) · [Documentation / 문서](docs/README.md)
+
 A simulation suite with six implementation packages in one repository. Each
 package has its own distribution, version and dependencies.
 
@@ -128,6 +130,8 @@ Kelvin, SI-suffixed thermal coefficients and explicit geometry length units.
 This rectangular steady-heat path has no thermal Studio forms, plots, Robin
 boundary or automatic thermoelastic coupling. Consult the contract for fresh
 output ownership, incomplete-output detection and platform validation limits.
+A separate Windows 2022 / Python 3.12.14 gate covers installed headless API/CLI
+and selected save I/O only; it does not establish Windows full-regression or Gmsh support.
 
 Reproducible Linux validation, pinned optical data, and checks of installed
 wheel/sdist artifacts are documented in [ci/README.md](ci/README.md).

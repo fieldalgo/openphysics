@@ -6,14 +6,14 @@
 
 | 패키지 | 현재 역할 |
 |---|---|
-| [galerkin](packages/galerkin/README.md) | 2D 전자기 FEM, 벡터 도파로 모드, 정상 열전도, 정적 2D 탄성, 3D PEC 직육면체 공동 해석 |
-| [galerkin-refsol](packages/galerkin-refsol/README.md) | 독립 해석해와 발표된 벤치마크. Python에서는 `refsol`로 import |
-| [meshine](packages/meshine/README.md) | 재료 영역을 위한 2D 삼각형 메시 생성 |
-| [gmshio](packages/gmshio/README.md) | 외부 Gmsh 실행, MSH 4.1 ASCII 읽기, FEM 메시 어댑터 |
-| [physmat](packages/physmat/README.md) | 광학 분산·재료 데이터와 Drude–Lorentz 피팅 |
-| [simcase](packages/simcase/README.md) | JSON 모델 문서, 화면 없는 실행기, 선택 설치하는 브라우저 Studio |
+| [galerkin](packages/galerkin/README.ko.md) | 2D 전자기 FEM, 벡터 도파로 모드, 정상 열전도, 정적 2D 탄성, 3D PEC 직육면체 공동 해석 |
+| [galerkin-refsol](packages/galerkin-refsol/README.ko.md) | 독립 해석해와 발표된 벤치마크. Python에서는 `refsol`로 import |
+| [meshine](packages/meshine/README.ko.md) | 재료 영역을 위한 2D 삼각형 메시 생성 |
+| [gmshio](packages/gmshio/README.ko.md) | 외부 Gmsh 실행, MSH 4.1 ASCII 읽기, FEM 메시 어댑터 |
+| [physmat](packages/physmat/README.ko.md) | 광학 분산·재료 데이터와 Drude–Lorentz 피팅 |
+| [simcase](packages/simcase/README.ko.md) | JSON 모델 문서, 화면 없는 실행기, 선택 설치하는 브라우저 Studio |
 
-일곱 번째 배포인 [openphysics](packages/openphysics/README.md)는 이름 예약용 `0.0.1`이다. 해석 엔진을 포함하지 않으며 전체 도구를 설치하지도 않는다. 저장소 루트 자체는 설치할 수 있는 배포 패키지가 아니다. 위 패키지 README의 한국어판은 문서 색인에 완료 여부를 표시하며 순차적으로 연결한다.
+일곱 번째 배포인 [openphysics](packages/openphysics/README.ko.md)는 이름 예약용 `0.0.1`이다. 해석 엔진을 포함하지 않으며 전체 도구를 설치하지도 않는다. 저장소 루트 자체는 설치할 수 있는 배포 패키지가 아니다. 일곱 패키지의 완전한 한국어 README를 제공한다. 개별 사용·검증 안내의 번역 상태는 문서 색인에서 구분한다.
 
 ## 이 checkout에서 설치하기
 
@@ -72,6 +72,10 @@ python packages/galerkin/examples/elasticity2d.py
 ```
 
 계약과 [영어 출력 예제](packages/galerkin/examples/elasticity2d.py)는 galerkin sdist에도 포함된다. 이 API에는 simcase/Studio나 열 연성 연결이 없다. [벡터 고유공간 설명](packages/galerkin/docs/eigenspace_reliability.md)은 복소 장 보존과 축퇴 기저 신뢰성의 한계를 설명한다.
+
+## 헤드리스 정상 열전도 문서
+
+별도 [thermal.steady2d 계약](packages/simcase/docs/thermal_steady2d.md)은 명시적 길이 단위·절대 Kelvin·SI 계수를 갖는 직사각형 정상 열전도를 설명한다. [슬랩](packages/simcase/examples/thermal_slab.json)과 [혼합 열원](packages/simcase/examples/thermal_mixed.json) JSON 예제를 제공한다. 열 Studio UI·그림·Robin 경계·자동 열탄성 연성을 추가하지 않는다. 새 출력 경로 소유권과 불완전 출력 판별·플랫폼 한계는 계약을 참고한다. Windows2022/Python3.12.14의 별도 gate는 설치된 헤드리스 API/CLI와 선택된 저장 I/O만 검사한다. Windows 전체 회귀나 Gmsh 지원으로 해석하지 않는다.
 
 ## Checkout 검증하기
 

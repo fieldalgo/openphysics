@@ -27,3 +27,15 @@
 패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
 
 화면 없는 열전도 문서 연결과 처방 열유속·Robin 경계는 별도의 개발 후보다. 검토·통합을 마친 뒤 실제 구현 범위에 맞는 사용·검증 문서를 두 언어로 연결한다. 번역 계획만으로 기능이 지원된다고 해석하지 않는다.
+
+## 패키지 개요: 전체 한국어판
+
+| 패키지 | English | 한국어 |
+|---|---|---|
+| galerkin | [English](../../../../packages/galerkin/README.md) | [한국어](../../../../packages/galerkin/README.ko.md) |
+| galerkin-refsol | [English](../../../../packages/galerkin-refsol/README.md) | [한국어](../../../../packages/galerkin-refsol/README.ko.md) |
+| meshine | [English](../../../../packages/meshine/README.md) | [한국어](../../../../packages/meshine/README.ko.md) |
+| gmshio | [English](../../../../packages/gmshio/README.md) | [한국어](../../../../packages/gmshio/README.ko.md) |
+| physmat | [English](../../../../packages/physmat/README.md) | [한국어](../../../../packages/physmat/README.ko.md) |
+| simcase | [English](../../../../packages/simcase/README.md) | [한국어](../../../../packages/simcase/README.ko.md) |
+| openphysics | [English](../../../../packages/openphysics/README.md) | [한국어](../../../../packages/openphysics/README.ko.md) |

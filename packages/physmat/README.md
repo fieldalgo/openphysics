@@ -1,5 +1,9 @@
 # physmat — material properties for physics solvers
 
+[English](README.md) | [한국어](README.ko.md)
+
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+
 Optical dispersion first (complex refractive index and permittivity versus
 wavelength), with a slot for the thermal and mechanical constants a
 multiphysics solver will need later. Independent of any solver: numpy + scipy,

@@ -1,5 +1,9 @@
 # gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh
 
+[English](README.md) | [한국어](README.ko.md)
+
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+
 Writes `.geo` scripts, runs the `gmsh` command-line program as a separate
 process, and reads the resulting MSH 4.1 file into numpy arrays that a
 finite-element code can use directly: node coordinates, consistently oriented
