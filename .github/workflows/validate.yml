@@ -43,12 +43,16 @@ jobs:
       - name: Fetch pinned RII database
         run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
       - name: Run all Python tests including RII and convergence studies
+        id: source_tests
         env:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
         run: python -m pytest -q -ra --junitxml=.validation/source-tests.xml
       - name: Build sdists and validate installed wheels
+        # Preserve a failing source gate while collecting independent package evidence.
+        if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: python ci/check_distributions.py
       - name: Check Studio vector rendering
+        if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: node --test packages/simcase/tests/studio_vector.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
