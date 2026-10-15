@@ -1,7 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 """Independent document-unit and raw-field restoration tests for cavity3d."""
-import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -136,7 +135,6 @@ class IndependentCavityPersistenceValidation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             result.save(directory)
             summary = json.loads((Path(directory) / "summary.json").read_text())
-            metadata(self, summary)
             np.testing.assert_allclose(summary["frequencies_hz"], result.frequencies_hz,
                                        rtol=1e-12, atol=0)
             path = Path(directory) / "fields.npz"
@@ -145,6 +143,8 @@ class IndependentCavityPersistenceValidation(unittest.TestCase):
                     for key in ("edge_coefficients", "electric_field"):
                         self.assertNotIn(key, data.files)
             self.assertFalse(Document.load(Path(directory) / "model.json")["results"]["save_fields"])
+            # Check raw-array omission even when a separate metadata gate fails.
+            metadata(self, summary)
 
 
 if __name__ == "__main__":
