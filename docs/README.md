@@ -56,3 +56,8 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [benchmark_vector](../ci/benchmark_vector.md) | [한국어](../ci/locales/ko/pages/benchmark_vector.md) |
 
 These pages describe this checkout. Actions is disabled and two Windows failures remain unresolved; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
+
+| English | 한국어 |
+|---|---|
+| [thermal_mechanical_workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
+| [thermal_mechanical_independent_validation](../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |

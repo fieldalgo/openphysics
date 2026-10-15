@@ -58,3 +58,8 @@
 | [benchmark_vector](../../../../ci/benchmark_vector.md) | [한국어](../../../../ci/locales/ko/pages/benchmark_vector.md) |
 
 이 문서들은 이 checkout을 설명합니다. Actions는 비활성화돼 있고 Windows 두 실패는 미확정이며 Linux 결과가 Windows 수용을 뜻하지 않습니다. 독립 Robin API와 헤드리스 JSON 계약은 별개입니다.
+
+| English | 한국어 |
+|---|---|
+| [thermal_mechanical_workflow](../../../../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
+| [thermal_mechanical_independent_validation](../../../../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |

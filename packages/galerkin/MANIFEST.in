@@ -43,3 +43,7 @@ include examples/thermal_mechanical_workflow.py
 include tests/test_thermal_mechanical_workflow.py
 include tests/test_thermal_mechanical_workflow_physics.py
 include tests/thermal_mechanical_workflow_oracle.py
+include docs/thermal_mechanical_independent_validation.md
+include docs/locales/ko/pages/thermal_mechanical_independent_validation.md
+include tests/test_thermal_mechanical_independent_validation.py
+include tests/thermal_mechanical_independent_oracle.py

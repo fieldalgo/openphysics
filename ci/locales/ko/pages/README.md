@@ -235,7 +235,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 75개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 79개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -265,3 +265,11 @@ oracle을 추가하거나 모든 producer 사례를 반복하지 않습니다. s
 guard는 패키지 tree 밖으로 무조건 복사하지 않습니다. `ENGINE` 경로가 실제 engine
 모듈을 가리키지 않으면 빈 디렉터리 scan이 내용 없이 통과할 수 있습니다. source guard
 실행·명시적 installed-ENGINE 확인·wheel module byte 검사는 서로 다른 범위입니다.
+
+명시적 workflow의 독립 EN/KO 보고·원 oracle·시험은 원문 그대로 필수 source 자산입니다.
+설치 검사는 기존 299개 사례를 유지하고 원래 90개 독립 workflow suite를 추가하며
+물리 공식을 복제한 시험이나 gate 변경을 하지 않습니다. 실제 실행의 개수·실패·선택적
+skip을 보고해야 합니다. 검증한 sdist의 영어 workflow 예제도 checkout 밖에서 설치
+wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험이 실제 engine
+파일을 scan합니다. 설치 module origin과 wheel module byte는 별도로 확인합니다.
+이 배포 검사가 schema/CLI/Studio 지원이나 열역학적 완전 연성을 인증하지는 않습니다.

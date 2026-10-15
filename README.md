@@ -168,3 +168,5 @@ is stopped with two unresolved failures; Linux results do not establish Windows
 acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
 
 This checkout includes standalone outward-flux/Robin heat boundaries; see [contract](packages/galerkin/docs/thermal_flux_robin.md) and [independent acceptance](packages/galerkin/docs/thermal_flux_robin_independent_validation.md). Headless JSON does not accept these boundaries. The contracts and validation reports describe the implemented and measured scope.
+
+The explicit Python-only [steady heat→mechanics workflow](packages/galerkin/docs/thermal_mechanical_workflow.md) connects same-mesh heat and prescribed-temperature mechanics through an immutable nodal-P1 Kelvin copy. Its [independent report](packages/galerkin/docs/thermal_mechanical_independent_validation.md) separates measured acceptance from implementation. It adds no JSON/CLI/Studio integration, persistence, Robin/flux/traction workflow, transient feedback or thermodynamic coupling.

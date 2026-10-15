@@ -204,3 +204,15 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 계약과 독립 보고는 구현과 실제 수용검증 범위를 구분합니다.
 헤드리스 simcase JSON 계약은 여전히 flux/Robin 경계를 거부합니다. 독립 API 확장은
 Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니다.
+
+## 명시적 단방향 열전도–기계 workflow
+
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`는 Dirichlet·단열 정상
+열전도를 명시적으로 풀고 정확한 nodal-P1 Kelvin 장을 고정한 뒤 같은 격리 기준
+메시에서 처방 온도 기계단계를 실행합니다. [한영 구현 계약](docs/locales/ko/pages/thermal_mechanical_workflow.md),
+[영어 예제](examples/thermal_mechanical_workflow.py),
+[독립 수용 보고](docs/locales/ko/pages/thermal_mechanical_independent_validation.md)를 참고하세요.
+명시적 m/K 선언이 필요하며 단위 변환을 추론하지 않습니다. 이 Python 전용 정상
+단방향 연산은 JSON/CLI/Studio·저장 계약, Robin/flux/traction workflow, 과도 피드백이나
+열역학적 완전 연성을 추가하지 않습니다. 불변 전달이 callback이나 반환 후 가변 결과를
+인증하지 않습니다. 계약은 열 W/m·기계 N/m·물리적 에너지 J/m를 구분합니다.

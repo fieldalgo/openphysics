@@ -369,3 +369,17 @@ Robin convection; see [boundary contract](docs/thermal_flux_robin.md),
 The contract and independent report distinguish implementation from measured acceptance.
 The headless simcase JSON contract still rejects flux/Robin boundaries; the
 standalone extension does not enable them in Studio or add automatic coupling.
+
+## Explicit one-way thermal–mechanical workflow
+
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity` explicitly solves
+steady Dirichlet/insulated heat, freezes the exact nodal-P1 Kelvin field, and
+runs prescribed-temperature mechanics on the same isolated reference mesh.
+See the [EN/KO implementation contract](docs/thermal_mechanical_workflow.md),
+[English example](examples/thermal_mechanical_workflow.py) and
+[independent acceptance report](docs/thermal_mechanical_independent_validation.md).
+Inputs require explicit m/K declarations; no unit conversion is inferred.
+This Python-only, steady one-way operation adds no JSON/CLI/Studio or persistence
+contract, Robin/flux/traction workflow, transient feedback or thermodynamic
+coupling. Immutable transfer does not certify callbacks or mutable results after
+return. The contract separates heat W/m, mechanical N/m and physical energy J/m.

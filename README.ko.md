@@ -101,3 +101,5 @@ python -m pytest -q packages/simcase/tests
 GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.
 
 이 checkout에는 독립 API의 외향 열유속·Robin 열 경계가 포함됩니다. [계약](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md)과 [독립 수용검증](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요. 헤드리스 JSON은 이 경계를 받지 않습니다. 계약과 검증 보고는 구현 범위와 실측 범위를 구분합니다.
+
+명시적 Python 전용 [정상 열전도→기계 workflow](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md)는 같은 메시 열전도와 처방 온도 기계단계를 불변 nodal-P1 Kelvin 복사로 연결합니다. [독립 보고](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md)는 실측 수용과 구현 범위를 구분합니다. JSON/CLI/Studio 연결·저장·Robin/flux/traction workflow·과도 피드백·열역학적 완전 연성을 추가하지 않습니다.

@@ -27,7 +27,11 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-DOCUMENT_ASSETS = {'galerkin': ('galerkin/thermal_mechanical.py',
+DOCUMENT_ASSETS = {'galerkin': ('docs/thermal_mechanical_independent_validation.md',
+              'docs/locales/ko/pages/thermal_mechanical_independent_validation.md',
+              'tests/test_thermal_mechanical_independent_validation.py',
+              'tests/thermal_mechanical_independent_oracle.py',
+              'galerkin/thermal_mechanical.py',
               'docs/thermal_mechanical_workflow.md',
               'docs/locales/ko/pages/thermal_mechanical_workflow.md',
               'examples/thermal_mechanical_workflow.py',
@@ -225,7 +229,9 @@ def main():
         for package, filenames in (
             ("simcase", ("thermal_simcase_independent_oracle.py",
                          "test_thermal_simcase_independent_validation.py")),
-            ("galerkin", ("thermal_flux_robin_independent_oracle.py",
+            ("galerkin", ("thermal_mechanical_independent_oracle.py",
+                          "test_thermal_mechanical_independent_validation.py",
+                          "thermal_flux_robin_independent_oracle.py",
                           "test_thermal_flux_robin_independent_validation.py")),
         ):
             for filename in filenames:
@@ -236,7 +242,8 @@ def main():
         galerkin_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin")
         with tarfile.open(galerkin_sdist) as archive:
             for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
-                             "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py"):
+                             "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
+                             "thermal_mechanical_workflow.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
@@ -247,6 +254,7 @@ def main():
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
+        run(python, "-I", examples / "thermal_mechanical_workflow.py", cwd=work, env=env)
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)

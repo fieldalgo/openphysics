@@ -276,7 +276,7 @@ All seven Korean package READMEs and received Korean guide counterparts are
 required byte assets. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 75 entries.
+are likewise required. The current required-byte list contains 79 entries.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
@@ -313,3 +313,13 @@ or rerun every producer case. The source engine dependency guard is not copied
 blindly outside its package tree: its `ENGINE` path must point to actual engine
 modules, or an empty-directory scan could pass vacuously. Source guard execution,
 explicit installed-ENGINE checks and wheel module-byte checks have separate scopes.
+
+The explicit workflow's independent EN/KO report, original oracle and test are
+required verbatim source assets. Installed checks retain all 299 existing cases
+and add the original 90-case independent workflow suite without mirroring its
+physics formulas or changing gates. Counts, failures and optional skips must be
+reported from the actual execution. The verified sdist English workflow example
+is also run with installed wheels under `python -I`, outside the checkout.
+The guard stays in source; its six tests scan actual engine files. Installed
+module origins and wheel module bytes are checked separately. This packaging
+check does not add schema/CLI/Studio support or certify thermodynamic coupling.
