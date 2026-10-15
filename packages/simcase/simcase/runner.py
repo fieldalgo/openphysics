@@ -18,6 +18,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import physmat
@@ -32,6 +33,10 @@ from .materials import material_table
 from .fields import VectorField
 from .schema import Document, DocumentError
 from .tracking import ModeTracker, ModeTrackingError, tracking_settings
+
+
+if TYPE_CHECKING:
+    from .cavity import CavityRunResult
 
 
 @dataclass
@@ -227,8 +232,8 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult:
-    """Compose the stages over every study point."""
+def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult:
+    """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
     log: list[str] = []
 
     def say(msg):
