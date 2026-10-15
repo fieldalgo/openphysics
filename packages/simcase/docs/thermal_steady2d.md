@@ -141,3 +141,8 @@ fields-disabled saves, existing targets, partial failures, replaced files and
 directories, concurrent writers, CLI errors and stale Studio replies.
 These gates do not replace full package/installed regression checks. No thermal
 plot, performance baseline or unsupported boundary/material model is claimed.
+
+Failure-injection checks record OS errno/winerror/message and fixture stages.
+They require the intended post-NPZ injected error after replacement has completed;
+an OS rename/replace refusal is a fixture-precondition failure, not successful
+cleanup protection or proof that cleanup deleted a replacement.
