@@ -250,3 +250,26 @@ sources after code review; this does not replace the independent amplitude/count
 checks above. Full source regression, CLI acceptance, build/wheel tests, and
 remote CI remain unrun by this validation task. Known failures require review
 before product acceptance can be claimed.
+
+
+## Actual implementation candidate rerun (2026-10-15)
+
+The original handoff results above remain historical. A fresh exact-file snapshot
+used core `3b850a8d7e303fd45a6b77f85571d45ab7c51114`, simcase
+`cd4071a5685fcdf6d21d19c5d382461685c2e501`, validation
+`db9367e90518bd92f5f72fbd87fd65b58fcd069c` and reference
+`ce74a783e0cf679e9e031360b6bd9d556346a575`, against the same base.
+The unchanged independent tests plus the 17 reference tests gave **26 passed,
+1 failed**, no skips. The one failure is still the rectangular 111 mean-order
+gate. The earlier three metadata failures are resolved on these actual sources.
+
+The NPZ metadata assertions after summary validation now execute and pass:
+cluster completeness, exact-count policy, layout identifier, coordinate/frequency
+units and normalization agree between JSON and NPZ loaded without pickle.
+The raw-array restoration and save_fields=false checks also pass.
+
+The signed-average and continuum-subspace diagnosis is reproduced by
+[cavity3d_convergence_diagnosis.py](cavity3d_convergence_diagnosis.py) and explained
+in [the diagnosis](cavity3d_convergence_diagnosis.md). It retains the failure and
+identifies the finite-mesh signed cancellation; it does not introduce an automatic
+replacement acceptance rule. Tool/environment differences from CI are unchanged.
