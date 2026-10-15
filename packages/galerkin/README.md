@@ -32,6 +32,17 @@ Vector modes retain complex transverse and longitudinal coefficients, including
 degenerate eigenspace directions. Read the [eigenspace reliability contract](docs/eigenspace_reliability.md)
 before converting fields to real values; this does not add subspace tracking.
 
+The standalone `galerkin.thermal` API solves homogeneous isotropic steady 2D
+conduction in Kelvin, with volumetric sources and natural insulation. Read the
+[heat contract and boundary signs](docs/thermal_steady2d.md) and run the
+[English heat example](examples/thermal_steady2d.py) after installing the packages.
+Static elasticity additionally accepts global Cartesian boundary tractions:
+see the [traction guide](docs/elasticity_traction.md),
+[English traction example](examples/elasticity_traction.py) and
+[independent acceptance](docs/elasticity_traction_independent_validation.md).
+These documents and examples are included in the sdist. Neither API adds
+transient analysis, thermoelastic coupling, simcase or Studio integration.
+
 ## Layout
 
 ```

@@ -5,3 +5,9 @@ include docs/elasticity2d_independent_validation.md
 include examples/elasticity2d.py
 include tests/eigenspace_reliability_oracle.py
 include tests/elasticity2d_independent_oracle.py
+include docs/thermal_steady2d.md
+include examples/thermal_steady2d.py
+include docs/elasticity_traction.md
+include examples/elasticity_traction.py
+include docs/elasticity_traction_independent_validation.md
+include tests/traction_independent_oracle.py
