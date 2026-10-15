@@ -4,6 +4,7 @@
 """Example documents (also used by the tests)."""
 
 import copy
+from .thermal_examples import THERMAL_SLAB, THERMAL_MIXED
 
 SOI_STRIP = {
     "openphysics": "0.2",
@@ -127,3 +128,6 @@ CAVITY_BOX = {
 }
 
 EXAMPLES["cavity_box"] = CAVITY_BOX
+
+# These examples are deliberately excluded from the optional Studio.
+EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED)
