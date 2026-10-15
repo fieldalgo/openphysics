@@ -136,6 +136,54 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
             assert str(arrays["mesh_length_unit"]) == "m"
 
 
+def test_cavity_reused_output_rejected_without_mixing_results(tmp_path):
+    out = _result(True).save(tmp_path / "output")
+    (out / "notes.txt").write_text("user notes")
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    second = _result(False)
+    second.cavity.frequencies_hz *= 2
+    with pytest.raises(FileExistsError, match="fresh output directory"):
+        second.save(out)
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+
+
+@pytest.mark.parametrize("name", ["summary.json", "model.json", "log.txt", "fields.npz", "results.png"])
+def test_cavity_rejects_reserved_output_symlink_before_writing(tmp_path, name):
+    out = tmp_path / "output"
+    out.mkdir()
+    missing_target = tmp_path / "user-target"
+    (out / name).symlink_to(missing_target)
+    with pytest.raises(FileExistsError, match="fresh output directory"):
+        _result(False).save(out)
+    assert list(out.iterdir()) == [out / name]
+    assert (out / name).is_symlink() and not missing_target.exists()
+
+
+def test_cavity_save_preserves_unrelated_files(tmp_path):
+    (tmp_path / "notes.txt").write_text("user notes")
+    _result(False).save(tmp_path)
+    assert (tmp_path / "notes.txt").read_text() == "user notes"
+    assert not (tmp_path / "fields.npz").exists()
+
+
+def test_cavity_cli_reused_default_output_reports_error(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "box.json"
+    result = _result(True)
+    result.doc.save(path)
+    monkeypatch.setattr("simcase.cli.run", lambda *args, **kwargs: result)
+    assert main(["run", str(path)]) == 0
+    capsys.readouterr()
+    out = tmp_path / "box_results"
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    result = _result(False)
+    result.doc.save(path)
+    assert main(["run", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert "fresh output directory" in captured.err
+    assert "results written" not in captured.out
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+
+
 def test_cavity_cli_validation_and_solver_failure(tmp_path, monkeypatch, capsys):
     path = tmp_path / "box.json"
     Document.from_dict(cavity_document()).save(path)
