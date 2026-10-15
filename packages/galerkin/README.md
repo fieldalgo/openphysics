@@ -2,7 +2,7 @@
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.
-Currently covers 2D electromagnetics and 3D cavity eigenmodes; designed to grow
+Currently covers 2D electromagnetics, static 2D elasticity and 3D cavity eigenmodes; designed to grow
 into a multiphysics core.
 
 - **M1**: Electrostatics — ∇·(ε∇V) = −ρ (P1 elements)
@@ -17,6 +17,17 @@ The public `solve_cavity_box` API provides SI frequencies and raw edge fields fo
 a vacuum PEC box. See its [API and numerical contract](docs/cavity_solver.md),
 including near-target search limitations and the alternating-mesh repair of the
 rectangular cluster-mean convergence gate.
+
+The standalone `galerkin.elasticity` submodule solves homogeneous isotropic,
+small-strain static P1 elasticity with explicit plane stress or plane strain.
+See the [elasticity API, units and limitations](docs/elasticity2d.md) and the
+[English example](examples/elasticity2d.py). These files are included in the
+sdist. The example can run from the repository root or an unpacked galerkin
+sdist after installing the packages; it is not a simcase/Studio model.
+
+Vector modes retain complex transverse and longitudinal coefficients, including
+degenerate eigenspace directions. Read the [eigenspace reliability contract](docs/eigenspace_reliability.md)
+before converting fields to real values; this does not add subspace tracking.
 
 ## Layout
 

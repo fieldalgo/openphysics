@@ -2,7 +2,7 @@
 
 Closed-form solutions and published high-accuracy benchmarks used as the
 answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
-electromagnetic FEM engine. It is a separate package in the same monorepo;
+FEM engine. It is a separate package in the same monorepo;
 the grader never imports the code it grades. It depends only on numpy and scipy.
 
 A numerical solver is software that can be plausibly wrong. This package is
@@ -14,6 +14,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 
 | module | contents | self-checks |
 |---|---|---|
+| `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge) and exact vector modes TE/TM/HE/EH | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field | closed forms |
@@ -21,6 +22,25 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
+
+For static 2D elasticity, explicitly import `refsol.elasticity`. Its coordinates
+and displacement use metres, E and stress use Pa, body force uses N/m^3, and
+strain is ordered `(epsilon_xx, epsilon_yy, gamma_xy)` with engineering shear.
+For example, uniaxial extension with free lateral traction in plane stress:
+
+```python
+from refsol.elasticity import affine
+
+field = affine([[0., 0.], [1., 1.]], [[1e-3, 0.], [0., -0.3e-3]],
+               young_modulus=70e9, poisson_ratio=0.3, plane="stress")
+print(field.displacement)  # metres
+print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
+```
+
+The reference module is included in both the sdist and wheel. It imports no FEM
+engine. The separate [engine contract](https://github.com/fieldalgo/openphysics/blob/a292ae15707b3713f0464b4d126be765b4c205ae/packages/galerkin/docs/elasticity2d.md)
+describes boundary constraints, per-thickness loads and locking limitations.
+It is a repository link requiring network access and repository permission.
 
 ```python
 from refsol import fiber, slab, scattering, benchmarks
