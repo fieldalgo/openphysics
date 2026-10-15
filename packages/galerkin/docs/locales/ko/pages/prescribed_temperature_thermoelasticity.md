@@ -21,7 +21,7 @@ result = solve_thermoelasticity(
 
 이 예제의 지지는 원래 절점 순서를 유지한 `rectangle_mesh(1., 1., nx, ny)`를 가정합니다. 완전한 실행 예제는 `examples/prescribed_temperature_thermoelasticity.py`입니다. 좌표·변위는 m, Young 계수·응력은 Pa, 변형률은 무차원이고 alpha는 부호를 가질 수 있는 1/K입니다. T는 K 단위의 유한 비음수 실수 `(N,)` 배열, Tref는 유한 비음수 실수 스칼라 K입니다. 냉각, alpha=0과 음수 alpha를 허용합니다. 유한한 E>0, -1<nu<0.5와 명시적 plane=`"stress"` 또는 `"strain"`이 필요합니다. 섭씨 변환, 스칼라 온도 broadcast 또는 단위 추론은 없습니다.
 
-체적력은 유한한 2성분 벡터 또는 `(Q,2)` 좌표를 받아 `(Q,2)` 힘 밀도 N/m^3를 반환하는 callable입니다. 탄성 체적 하중과 같은 축당 6점 Duffy 구적법으로 적분합니다. 메시는 벡터 절점 변위를 갖는 삼각형이며 DOF 순서는 `[ux0, uy0, ux1, uy1, ...]`입니다. Dirichlet는 외곽 `(node, component)`를 변위 m에 대응시킵니다. 성분은 0=x, 1=y입니다. 나머지 성분에는 **총 열탄성 natural traction이 0**입니다. 이 버전은 명시적 traction과 압력을 지원하지 않습니다.
+체적력은 유한한 2성분 벡터 또는 `(Q,2)` 좌표를 받아 `(Q,2)` 힘 밀도 N/m^3를 반환하는 callable입니다. 탄성 체적 하중과 같은 축당 6점 Duffy 구적법으로 적분합니다. 메시는 벡터 절점 변위를 갖는 삼각형이며 DOF 순서는 `[ux0, uy0, ux1, uy1, ...]`입니다. Dirichlet는 외곽 `(node, component)`를 변위 m에 대응시킵니다. 성분은 0=x, 1=y입니다. 적용한 traction 매핑이 없으면 나머지 성분에는 **총 열탄성 natural traction이 0**입니다. 선택적인 전역 Cartesian total-traction 매핑은 [traction 계약](thermoelastic_traction.md)을 참고하세요. 스칼라 pressure 전용·로컬 프레임·follower API는 없지만 고정 경계에서 전역 Pa callback `lambda points_m, normals: -p * normals`는 유효합니다.
 
 하중·반력은 면외 두께당 선하중 N/m입니다. 실제 두께(m)를 곱하면 N입니다. 물리적 탄성에너지는 J/m이며 두께를 곱하면 J입니다. 이 힘의 모멘트는 N, 즉 두께당 모멘트입니다. 열 등가 하중은 약형의 기여 항이며 추가적인 물리적 외력이 아닙니다. 체적 하중과 지지 반력을 구분해 보고합니다.
 
@@ -89,6 +89,6 @@ lambda=E nu/[(1+nu)(1-2nu)]는 원래 3D Lamé 상수입니다. 물리적 열변
 
 ## 한계와 배포 통합
 
-균일 등방 선형 소변형, 정적 삼각형 P1 변위, 상수 재료·alpha와 명시적으로 처방한 같은 메시의 절점 P1 T만 지원합니다. 근접 비압축성 평면변형률은 locking이 생길 수 있으며 nu가 .5에 접근할 때 입력 검증만으로 해결되지 않습니다. 비선형·대변형·접촉·동적·3D·열전도, 명시적 traction·압력, 온도 의존 재료, 교차 메시 전달, simcase·Studio 통합은 포함하지 않습니다. 경계 태그는 단위나 출처를 인증하지 않습니다. callable 체적력은 수치 적분하므로 강하게 진동하는 입력에는 적절한 메시·구적을 독립적으로 확인해야 합니다.
+균일 등방 선형 소변형, 정적 삼각형 P1 변위, 상수 재료·alpha와 명시적으로 처방한 같은 메시의 절점 P1 T만 지원합니다. 근접 비압축성 평면변형률은 locking이 생길 수 있으며 nu가 .5에 접근할 때 입력 검증만으로 해결되지 않습니다. 비선형·대변형·접촉·동적·3D·열전도, 스칼라 pressure 전용·로컬 프레임·follower API, 온도 의존 재료, 교차 메시 전달, simcase·Studio 통합은 포함하지 않습니다. 경계 태그는 단위나 출처를 인증하지 않습니다. callable 체적력은 수치 적분하므로 강하게 진동하는 입력에는 적절한 메시·구적을 독립적으로 확인해야 합니다.
 
 공용 MANIFEST/README/CI는 릴리스 담당 소유입니다. 새 Python 서브모듈은 wheel에서 import할 수 있으며 이 문서·예제를 sdist 자산 manifest와 릴리스 소비자 기준에 추가하는 것은 릴리스 담당의 후속 제안입니다.

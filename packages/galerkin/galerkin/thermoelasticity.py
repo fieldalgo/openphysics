@@ -220,7 +220,9 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     Pa vectors or (points_m, outward_normals)->(Q,2) callbacks. It is TOTAL
     physical sigma*n; never adjust it by thermal traction. None/{} keeps zero
     TOTAL natural traction. Prescribed components retain applied line loads in
-    reactions/support work. Pressure and cross-mesh interpolation are unsupported. Near-incompressible plane-strain P1 locking remains possible.
+    reactions/support work. No dedicated scalar-pressure keyword, local-frame traction API, or follower
+    geometry update is provided. A global Pa callback returning -p*normal is valid
+    on the fixed reference boundary. Cross-mesh interpolation is unsupported. Near-incompressible plane-strain P1 locking remains possible.
     """
     p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
     _verify_snapshot(temperature_snapshot,p,t)

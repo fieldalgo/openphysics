@@ -24,7 +24,9 @@ Cartesian x/y입니다. `body_force`는 유한 실수 상수 `(2,)` N/m³ 또는
 `callback(points_m)->(Q,2)` N/m³입니다. `traction`은 `None`, `{}`, 또는
 `mesh.boundary_edges` 태그를 전역 Cartesian 유한 실수 `(2,)` Pa 벡터나 순수
 `callback(points_m, outward_normals)->(Q,2)` Pa로 매핑합니다. 좌표와 단위 법선의
-shape는 `(Q,2)`입니다. 스칼라 pressure나 법선/접선 성분 API는 없습니다.
+shape는 `(Q,2)`입니다. 스칼라 pressure 전용 키워드·로컬 법선/접선 프레임 API·follower 형상 하중은 없습니다.
+그러나 고정 기준 경계에서 Pa 단위 스칼라 p에 대해
+`lambda points_m, normals: -p * normals` 같은 전역 Cartesian Pa callback은 유효합니다.
 벡터 `(8e6,3e6)`는 에지 각도와 관계없이 x/y 성분입니다.
 Callback은 결정적이어야 하며 메시/snapshot/입력을 변경하면 안 됩니다.
 평가 순서와 batch 분할은 공개 계약이 아닙니다. 동시 입력 변경은 지원하지 않습니다.
@@ -191,6 +193,7 @@ Tref로 정규화하지 않습니다. Norm 구적8/10은 측정된 0이 아닌 �
 invalid/callback/중복/stale 대조는 수렴과 별개입니다. 카운트나 연속체 진단만으로 설치본,
 전체 회귀, 독립 수용 또는 플랫폼 지원을 입증하지 않습니다.
 
-열/workflow 확장, pressure, traction 저장, schema/CLI/Studio, feedback, transient,
+열/workflow 확장, pressure 전용·로컬 프레임·follower API, traction 저장,
+schema/CLI/Studio, feedback, transient,
 비선형, 큰 변형, 일반 3D 또는 locking 개선은 추가하지 않습니다.
 Windows와 release 통합에는 각각 실제 근거가 필요합니다.

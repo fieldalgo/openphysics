@@ -24,8 +24,10 @@ Cartesian x/y. `body_force` is a finite real constant `(2,)` N/m³ or pure
 `callback(points_m)->(Q,2)` N/m³. `traction` is `None`, `{}`, or a mapping from
 `mesh.boundary_edges` tags to global Cartesian finite real `(2,)` vectors in Pa,
 or pure `callback(points_m, outward_normals)->(Q,2)` in Pa. Points and unit
-normals have shape `(Q,2)`. No scalar pressure or normal/tangent component API
-is provided. A vector `(8e6,3e6)` means x/y components, regardless of edge angle.
+normals have shape `(Q,2)`. No dedicated scalar-pressure keyword, local-frame normal/tangent API or
+follower-geometry loading is provided. A global Cartesian Pa callback such as
+`lambda points_m, normals: -p * normals` is valid for scalar p in Pa on the
+fixed reference boundary. A vector `(8e6,3e6)` means x/y components, regardless of edge angle.
 Callbacks must be deterministic and must not mutate mesh/snapshot/inputs.
 Evaluation order and batching are not public contracts. No concurrent input
 mutation is supported. Callback exceptions propagate; invalid values raise
@@ -204,6 +206,7 @@ Reference derivative checks and invalid/callback/duplicate/stale controls are
 separate from convergence. A count or continuum diagnostic alone does not
 establish installed, full regression, independent acceptance or platform support.
 
-No heat/workflow extension, pressure, traction persistence, schema/CLI/Studio,
+No heat/workflow extension, dedicated pressure/local-frame/follower API,
+traction persistence, schema/CLI/Studio,
 feedback, transient, nonlinear, large strain, general 3D or locking remediation
 is added. Windows and release integration require their own actual evidence.
