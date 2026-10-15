@@ -249,3 +249,19 @@ Work cloud는 현재 가용 Linux/Python 3.12.14, numpy 2.3.5, scipy 1.17.0으�
 보존 pinned CI 환경이 아닙니다. Gmsh와 명시적 RII database가 없으므로 실제 skip을
 기록합니다. twine이 없어 strict 검사는 기존 도구가 가용해지지 않는 한 미실행입니다.
 Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 계속 비활성 상태입니다.
+
+## 명시적 workflow의 source 재현 자산
+
+정상 열전도→기계단계 workflow 모듈·EN/KO 안내·영어 예제와 원 producer 시험
+`test_thermal_mechanical_workflow.py`, `test_thermal_mechanical_workflow_physics.py`,
+helper `thermal_mechanical_workflow_oracle.py`를 명시적 byte 검사 sdist 자산으로
+포함합니다. 안내의 `packages/galerkin/...` 물리 명령은 저장소 루트용입니다. 풀어 놓은
+galerkin sdist는 `tests/`와 `examples/`가 있는 패키지 루트이며 모노레포의
+`packages/galerkin/` 구조가 아닙니다. helper 포함은 원시험의 import를 보존하지만
+포함 자체가 새 시험 결과는 아닙니다.
+
+설치 검증은 원 독립 수용 suite와 검증한 archive의 영어 예제를 사용합니다. 중복 물리
+oracle을 추가하거나 모든 producer 사례를 반복하지 않습니다. source의 engine 의존성
+guard는 패키지 tree 밖으로 무조건 복사하지 않습니다. `ENGINE` 경로가 실제 engine
+모듈을 가리키지 않으면 빈 디렉터리 scan이 내용 없이 통과할 수 있습니다. source guard
+실행·명시적 installed-ENGINE 확인·wheel module byte 검사는 서로 다른 범위입니다.

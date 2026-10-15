@@ -36,3 +36,10 @@ include docs/thermal_flux_robin_independent_validation.md
 include examples/thermal_flux_robin.py
 include tests/thermal_flux_robin_independent_oracle.py
 include tests/test_thermal_flux_robin_independent_validation.py
+include galerkin/thermal_mechanical.py
+include docs/thermal_mechanical_workflow.md
+include docs/locales/ko/pages/thermal_mechanical_workflow.md
+include examples/thermal_mechanical_workflow.py
+include tests/test_thermal_mechanical_workflow.py
+include tests/test_thermal_mechanical_workflow_physics.py
+include tests/thermal_mechanical_workflow_oracle.py

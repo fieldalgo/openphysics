@@ -27,7 +27,14 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-DOCUMENT_ASSETS = {'galerkin': ('docs/cavity_solver.md',
+DOCUMENT_ASSETS = {'galerkin': ('galerkin/thermal_mechanical.py',
+              'docs/thermal_mechanical_workflow.md',
+              'docs/locales/ko/pages/thermal_mechanical_workflow.md',
+              'examples/thermal_mechanical_workflow.py',
+              'tests/test_thermal_mechanical_workflow.py',
+              'tests/test_thermal_mechanical_workflow_physics.py',
+              'tests/thermal_mechanical_workflow_oracle.py',
+              'docs/cavity_solver.md',
               'docs/eigenspace_reliability.md',
               'docs/elasticity2d.md',
               'docs/elasticity2d_independent_validation.md',

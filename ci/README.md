@@ -295,3 +295,21 @@ numpy 2.3.5 and scipy 1.17.0, not the retained pinned CI environment. Gmsh and
 an explicit RII database are unavailable; record actual skips. Twine is absent,
 so its strict check is unexecuted unless an existing tool becomes available.
 Do not infer Windows acceptance from Linux results. Actions remains disabled.
+
+## Explicit workflow source reproduction assets
+
+The steady heat-to-mechanics workflow module, EN/KO guide and English example,
+plus the original producer test files `test_thermal_mechanical_workflow.py`,
+`test_thermal_mechanical_workflow_physics.py` and their
+`thermal_mechanical_workflow_oracle.py` helper are explicit byte-checked sdist
+assets. The guide's `packages/galerkin/...` physics commands are repository-root
+commands; an extracted galerkin sdist has a package root with `tests/` and
+`examples/`, not the monorepo's `packages/galerkin/` layout. Including the helper
+preserves the producer tests' imports; inclusion alone is not a new test result.
+
+Installed validation uses the original independent acceptance suite and the
+verified archived English example. It does not add a duplicate physics oracle
+or rerun every producer case. The source engine dependency guard is not copied
+blindly outside its package tree: its `ENGINE` path must point to actual engine
+modules, or an empty-directory scan could pass vacuously. Source guard execution,
+explicit installed-ENGINE checks and wheel module-byte checks have separate scopes.
