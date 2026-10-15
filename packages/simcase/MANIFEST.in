@@ -7,3 +7,5 @@ include examples/thermal_slab.json
 include examples/thermal_mixed.json
 include tests/studio_thermal.cjs
 include README.ko.md
+include docs/locales/ko/pages/cavity3d.md
+include docs/locales/ko/pages/thermal_steady2d.md

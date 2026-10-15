@@ -11,7 +11,7 @@ English source documents remain at their existing package paths. Complete Korean
 | Topic | English source | Korean status |
 |---|---|---|
 | 3D PEC cavity engine | [API, units and convergence](../packages/galerkin/docs/cavity_solver.md) | In preparation |
-| Cavity document and CLI | [Input and saved fields](../packages/simcase/docs/cavity3d.md) | In preparation |
+| Cavity document and CLI | [Input and saved fields](../packages/simcase/docs/cavity3d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
 | Complex vector eigenspaces | [Preservation and limits](../packages/galerkin/docs/eigenspace_reliability.md) | In preparation |
 | Static elasticity | [Plane models and constraints](../packages/galerkin/docs/elasticity2d.md) | In preparation |
 | Elasticity acceptance | [Independent continuum checks](../packages/galerkin/docs/elasticity2d_independent_validation.md) | In preparation |
@@ -37,3 +37,9 @@ Headless thermal documents and prescribed-flux/Robin boundaries are separate dev
 | physmat | [English](../packages/physmat/README.md) | [한국어](../packages/physmat/README.ko.md) |
 | simcase | [English](../packages/simcase/README.md) | [한국어](../packages/simcase/README.ko.md) |
 | openphysics | [English](../packages/openphysics/README.md) | [한국어](../packages/openphysics/README.ko.md) |
+
+## Headless thermal review candidate / 헤드리스 열전도 검토 후보
+
+| English | 한국어 | Scope / 범위 |
+|---|---|---|
+| [Contract](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; Windows save/independent acceptance remain separate gates / 헤드리스 전용·Windows 저장 및 독립수용은 별도 gate |

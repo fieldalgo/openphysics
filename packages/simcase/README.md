@@ -413,3 +413,10 @@ the Linux full regression gate.
 Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Copyright 2026 Yongha Kim (FieldAlgo)
+
+## Documentation languages / 문서 언어
+
+| Topic / 주제 | English | 한국어 |
+|---|---|---|
+| Cavity / 공동 | [English](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
+| Headless heat / 헤드리스 열전도 | [English](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |

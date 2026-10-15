@@ -85,6 +85,24 @@ jobs:
                   cwd=work, stdout=log, stderr=subprocess.STDOUT, text=True)
           print((output / 'windows-installed.log').read_text())
           raise SystemExit(result.returncode)
+      - name: Source target-protection fixture from the same consumer file
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          output = root / '.validation-windows-thermal'
+          context = json.loads((output / 'consumer-work.json').read_text())
+          # Root conftest selects this exact checkout for API imports; CLI stays
+          # isolated and consumes the wheels built from the same checkout.
+          with (output / 'windows-source-target.log').open('w') as log:
+              result = subprocess.run([context['python'], '-I', '-m', 'pytest', '-q', '-ra',
+                  '--confcutdir', str(root), '-k', 'api_and_cli_preserve_existing_target',
+                  '--junitxml=' + str(output / 'windows-source-target-tests.xml'),
+                  str(root / 'ci' / 'test_thermal_simcase_wheel.py')],
+                  cwd=root, stdout=log, stderr=subprocess.STDOUT, text=True)
+          print((output / 'windows-source-target.log').read_text())
+          raise SystemExit(result.returncode)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

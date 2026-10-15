@@ -242,9 +242,12 @@ also required sdist assets. The manifest is a historical record for candidate
 `aaf948ae38aa82907ca16ef7cdeed75dfa7484ba`; its candidate, environment and failure
 fields remain verbatim. The six thermal implementation, reference, document,
 example and original-test blobs in recovery
-`3102c32874e89c300f21647291db57626c000982` and this packaged combination are
-identical to that inspected candidate. This preserves the acceptance evidence
-for the unchanged thermal implementation; final combined CI separately checks
-interactions. It does not relabel the historical 699 passed / 9 failed / 9 skipped
+`3102c32874e89c300f21647291db57626c000982` and the historical integrated
+`0a44797f73cf67bab14429c982144f0e0e4338aa` / `6cdfa6ca40ac7b7313d3768e3b7ac59c71338e9f`
+trees are identical to that inspected candidate. This preserves acceptance
+evidence for that unchanged historical thermal implementation. Later thermal
+extensions require their own independent acceptance and Dirichlet regression;
+the historical manifest does not certify changed implementation blobs. Final
+combined CI separately checks interactions. It does not relabel the historical 699 passed / 9 failed / 9 skipped
 whole-environment run as passing. The independently reported installed 45 and
 original-pair 84 results have their own scopes in that manifest.

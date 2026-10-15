@@ -48,7 +48,7 @@ python -m simcase validate packages/simcase/examples/cavity_box.json
 python -m simcase run packages/simcase/examples/cavity_box.json -o cavity_results
 ```
 
-공동 해석마다 새 출력 디렉터리를 사용한다. JSON/NPZ 결과에는 Hz 주파수, SI 메시 좌표, 질량 정규화된 에지 계수와 요소 중심 장이 들어간다. 필수 주파수 target은 그 주변의 유한 후보 집합을 선택한다. 전체 최저 스펙트럼이나 모든 축퇴 짝을 찾았다고 보증하지 않는다. Studio는 2D 모델만 지원하며 3D 메시·실행 요청을 명시적으로 거절한다. [공동 문서 계약](packages/simcase/docs/cavity3d.md)과 재사용 가능한 [Python 공동 API](packages/galerkin/docs/cavity_solver.md)를 참고한다.
+공동 해석마다 새 출력 디렉터리를 사용한다. JSON/NPZ 결과에는 Hz 주파수, SI 메시 좌표, 질량 정규화된 에지 계수와 요소 중심 장이 들어간다. 필수 주파수 target은 그 주변의 유한 후보 집합을 선택한다. 전체 최저 스펙트럼이나 모든 축퇴 짝을 찾았다고 보증하지 않는다. Studio는 2D 모델만 지원하며 3D 메시·실행 요청을 명시적으로 거절한다. [공동 문서 계약](packages/simcase/docs/locales/ko/pages/cavity3d.md)과 재사용 가능한 [Python 공동 API](packages/galerkin/docs/cavity_solver.md)를 참고한다.
 
 문서 실행기에는 다중물리 연성, 형상 sweep, 손실 모드 해석을 구현하지 않았다.
 
@@ -75,7 +75,7 @@ python packages/galerkin/examples/elasticity2d.py
 
 ## 헤드리스 정상 열전도 문서
 
-별도 [thermal.steady2d 계약](packages/simcase/docs/thermal_steady2d.md)은 명시적 길이 단위·절대 Kelvin·SI 계수를 갖는 직사각형 정상 열전도를 설명한다. [슬랩](packages/simcase/examples/thermal_slab.json)과 [혼합 열원](packages/simcase/examples/thermal_mixed.json) JSON 예제를 제공한다. 열 Studio UI·그림·Robin 경계·자동 열탄성 연성을 추가하지 않는다. 새 출력 경로 소유권과 불완전 출력 판별·플랫폼 한계는 계약을 참고한다. Windows2022/Python3.12.10의 별도 gate는 설치된 헤드리스 API/CLI와 선택된 저장 I/O만 검사한다. Windows 전체 회귀나 Gmsh 지원으로 해석하지 않는다.
+별도 [thermal.steady2d 계약](packages/simcase/docs/locales/ko/pages/thermal_steady2d.md)은 명시적 길이 단위·절대 Kelvin·SI 계수를 갖는 직사각형 정상 열전도를 설명한다. [슬랩](packages/simcase/examples/thermal_slab.json)과 [혼합 열원](packages/simcase/examples/thermal_mixed.json) JSON 예제를 제공한다. 열 Studio UI·그림·Robin 경계·자동 열탄성 연성을 추가하지 않는다. 새 출력 경로 소유권과 불완전 출력 판별·플랫폼 한계는 계약을 참고한다. Windows2022/Python3.12.10의 별도 gate는 설치된 헤드리스 API/CLI와 선택된 저장 I/O만 검사한다. Windows 전체 회귀나 Gmsh 지원으로 해석하지 않는다.
 
 ## Checkout 검증하기
 

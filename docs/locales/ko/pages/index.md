@@ -13,7 +13,7 @@
 | 주제 | 영어 원문 | 한국어판 상태 |
 |---|---|---|
 | 3D PEC 공동 엔진 | [API·단위·수렴](../../../../packages/galerkin/docs/cavity_solver.md) | 작성 중 |
-| 공동 모델 문서·CLI | [입력·저장 장 계약](../../../../packages/simcase/docs/cavity3d.md) | 작성 중 |
+| 공동 모델 문서·CLI | [입력·저장 장 계약](../../../../packages/simcase/docs/cavity3d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
 | 복소 벡터 고유공간 | [보존 방식·한계](../../../../packages/galerkin/docs/eigenspace_reliability.md) | 작성 중 |
 | 정적 탄성 | [평면 모델·구속](../../../../packages/galerkin/docs/elasticity2d.md) | 작성 중 |
 | 탄성 수용검증 | [독립 연속체 대조](../../../../packages/galerkin/docs/elasticity2d_independent_validation.md) | 작성 중 |
@@ -39,3 +39,9 @@
 | physmat | [English](../../../../packages/physmat/README.md) | [한국어](../../../../packages/physmat/README.ko.md) |
 | simcase | [English](../../../../packages/simcase/README.md) | [한국어](../../../../packages/simcase/README.ko.md) |
 | openphysics | [English](../../../../packages/openphysics/README.md) | [한국어](../../../../packages/openphysics/README.ko.md) |
+
+## Headless thermal review candidate / 헤드리스 열전도 검토 후보
+
+| English | 한국어 | Scope / 범위 |
+|---|---|---|
+| [Contract](../../../../packages/simcase/docs/thermal_steady2d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; Windows save/independent acceptance remain separate gates / 헤드리스 전용·Windows 저장 및 독립수용은 별도 gate |
