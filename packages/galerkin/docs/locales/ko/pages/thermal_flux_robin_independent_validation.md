@@ -16,6 +16,9 @@
 sine_temperature/sine_flux/sine_source만 추가합니다. 본 oracle은 어느 것도 import하지
 않습니다. 최종 독립 branch는 이 후속 후보를 정상 merge하고 초기 이력을 보존하며
 관련 source·wheel 소비를 재검증합니다. 이 검증이 생산 코드를 작성·수정하지 않습니다.
+최종 후보 관련 source는292통과(독립55+기존 생산/기본/역사 검사237), 최종 wheel
+독립 실행은55통과입니다. runtime 음성 대조는 최종 source10/10·그 wheel10/10에서
+검출합니다. 이 개수는 아래 초기 후보 개수와 구분합니다.
 
 ## 보존식과 독립 복원 연산자
 

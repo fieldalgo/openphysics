@@ -19,7 +19,11 @@ reference blob `8f50ada586777e2a2dbac9f4a90275d65d17ad51` retains every existing
 reference definition and adds only sine_temperature/sine_flux/sine_source. This
 oracle imports none of them. The final independent branch normally merges that
 follow-up, preserves the initial history, and rechecks related source and wheel
-consumption. No producer code is authored or corrected by this validation.
+consumption. No producer code is authored or corrected by this validation. Final-candidate
+related source execution passes292 cases (55 independent plus237 unchanged
+producer/default/historical checks); final-wheel independent execution passes55.
+Runtime negative controls reject10/10 on final source and10/10 on its wheel.
+These counts are distinct from the initial-candidate counts below.
 
 ## Conservation and independently reconstructed operators
 
