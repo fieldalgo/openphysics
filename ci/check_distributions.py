@@ -229,7 +229,7 @@ def main():
         galerkin_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin")
         with tarfile.open(galerkin_sdist) as archive:
             for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
-                             "prescribed_temperature_thermoelasticity.py"):
+                             "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
@@ -239,6 +239,7 @@ def main():
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
+        run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)
