@@ -1,3 +1,4 @@
+# Narrow installed thermal API/CLI and save ownership only.
 name: Windows headless thermal save
 
 on:
