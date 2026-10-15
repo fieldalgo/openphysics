@@ -190,11 +190,80 @@ def _quadrature():
     return bary, weights
 
 
+def _traction_load(mesh, p, triangles, traction):
+    """Consistent Cartesian nodal line load, N/m of out-of-plane thickness."""
+    load = np.zeros((len(p), 2))
+    if traction is None:
+        return load.ravel()
+    if not isinstance(traction, Mapping):
+        raise ValueError("traction must map boundary edge tags to vectors or callables")
+    if not traction:
+        return load.ravel()
+    if not isinstance(mesh.boundary_edges, Mapping):
+        raise ValueError("traction requires mesh.boundary_edges")
+    owners = {}
+    for tri in triangles:
+        for a, b, c in ((tri[0], tri[1], tri[2]), (tri[1], tri[2], tri[0]),
+                        (tri[2], tri[0], tri[1])):
+            owners.setdefault(tuple(sorted((int(a), int(b)))), []).append(int(c))
+    selected, seen = [], set()
+    # Validate the complete selection before evaluating any user callbacks.
+    for tag, field in traction.items():
+        if not isinstance(tag, str) or tag not in mesh.boundary_edges:
+            raise ValueError(f"traction tag {tag!r} has no boundary_edges definition")
+        edges = np.asarray(mesh.boundary_edges[tag])
+        if (edges.ndim != 2 or edges.shape[1] != 2 or not len(edges)
+                or edges.dtype.kind not in "iu"):
+            raise ValueError(f"boundary_edges[{tag!r}] must be nonempty integer (E, 2)")
+        if np.any(edges < 0) or np.any(edges >= len(p)):
+            raise ValueError(f"boundary_edges[{tag!r}] index out of range")
+        opposite = []
+        for a, b in edges:
+            key = tuple(sorted((int(a), int(b))))
+            if a == b:
+                raise ValueError("traction edge must have nonzero length")
+            if key not in owners or len(owners[key]) != 1:
+                raise ValueError("traction edges must be exterior triangle edges with one owner")
+            if key in seen:
+                raise ValueError("duplicate traction edge within or between selected tags")
+            seen.add(key)
+            opposite.append(owners[key][0])
+        selected.append((edges, np.asarray(opposite), field))
+    z, w = np.polynomial.legendre.leggauss(4)
+    s, weights = (z+1)/2, w/2
+    shape = np.column_stack([1-s, s])
+    for edges, opposite, field in selected:
+        tangent = p[edges[:, 1]]-p[edges[:, 0]]
+        length = np.linalg.norm(tangent, axis=1)
+        normals = np.column_stack([tangent[:, 1], -tangent[:, 0]]) / length[:, None]
+        # Point away from the unique owning triangle, including into holes.
+        inward = np.einsum("ed,ed->e", normals, p[opposite]-p[edges[:, 0]]) > 0
+        normals[inward] *= -1
+        points = np.einsum("qa,ead->eqd", shape, p[edges])
+        if callable(field):
+            value = _real(field(points.reshape(-1, 2),
+                                np.repeat(normals, len(weights), axis=0)), "traction callable")
+            if value.shape != (points.shape[0]*points.shape[1], 2):
+                raise ValueError("traction callable must return shape (Q, 2)")
+            value = value.reshape(points.shape)
+        else:
+            value = _real(field, "traction vector")
+            if value.shape != (2,):
+                raise ValueError("constant traction must be a global Cartesian vector of shape (2,)")
+            value = np.broadcast_to(value, points.shape)
+        fe = np.einsum("qa,q,eqd,e->ead", shape, weights, value, length)
+        np.add.at(load, edges.ravel(), fe.reshape(-1, 2))
+    if not np.all(np.isfinite(load)):
+        raise ValueError("assembled traction load exceeds floating-point range")
+    return load.ravel()
+
+
 @dataclass
 class ElasticityResult:
     """Nodal displacement (m), element engineering strain and stress (Pa).
 
-    load and reaction have shape (N,2), units N/m of out-of-plane thickness.
+    load (body plus boundary traction) and reaction have shape (N,2),
+    units N/m of out-of-plane thickness.
     reaction is zero at free DOFs, and K*u-load at prescribed DOFs.
     residual is K*u-load at ALL DOFs, with the same units.
     """
@@ -208,12 +277,18 @@ class ElasticityResult:
 
 
 def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
-                     body_force=(0., 0.)):
-    """Solve -div(sigma)=body_force with zero unconstrained traction.
+                     body_force=(0., 0.), traction=None):
+    """Solve -div(sigma)=body_force with optional prescribed boundary traction.
 
     body_force: constant (2,) or callable accepting (Q,2) coordinates in m
     and returning exactly (Q,2), in N/m^3. Dirichlet: mapping from
     (node, component=0|1) to scalar displacement in m. E and nu are homogeneous.
+    traction: {boundary_edges tag: global (2,) vector in Pa, or
+    callable(points, outward_normals)->(Q,2)}. None/{} keeps zero traction.
+    All line loads, including those on prescribed displacement components,
+    enter load; their support reactions are computed from the original K*u-load.
+    Duplicate selected edges and interior edges are rejected. See
+    ../docs/elasticity_traction.md for overlap, quadrature and units.
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
     """
@@ -243,6 +318,9 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     np.add.at(load, dofs.ravel(), fe.ravel())
     if not np.all(np.isfinite(load)):
         raise ValueError("assembled body force exceeds floating-point range")
+    load += _traction_load(mesh, p, t, traction)
+    if not np.all(np.isfinite(load)):
+        raise ValueError("total body and traction load exceeds floating-point range")
     free = np.setdiff1d(np.arange(len(load)), fixed)
     u = np.zeros_like(load)
     u[fixed] = values
