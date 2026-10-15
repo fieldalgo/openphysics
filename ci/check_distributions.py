@@ -24,11 +24,37 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
+DOCUMENT_ASSETS = {
+    "galerkin": ("docs/cavity_solver.md",),
+    "simcase": ("docs/cavity3d.md", "examples/cavity_box.json"),
+}
 
 
 def run(*args, cwd, env=None):
     print("+", " ".join(map(str, args)), flush=True)
     subprocess.run(list(map(str, args)), cwd=cwd, env=env, check=True)
+
+
+def check_sdist_assets(sdist):
+    """Require usable README links/examples, with the exact checked-out contents."""
+    name, _ = parse_sdist_filename(sdist.name)
+    with tarfile.open(sdist) as archive:
+        # Strip the distribution-root component; no filesystem extraction occurs.
+        files = {p.name.split("/", 1)[1]: p for p in archive.getmembers()
+                 if p.isfile() and "/" in p.name}
+        required = {"LICENSE", "README.md", "pyproject.toml", "PKG-INFO"}
+        if name != "openphysics":
+            required.add("NOTICE")
+        if name == "simcase":
+            required.add("simcase/studio/static/index.html")
+        document_assets = DOCUMENT_ASSETS.get(name, ())
+        required.update(document_assets)
+        if missing := required - files.keys():
+            raise RuntimeError(f"{sdist.name} is missing {sorted(missing)}")
+        for relative in document_assets:
+            source = ROOT / "packages" / name / relative
+            if archive.extractfile(files[relative]).read() != source.read_bytes():
+                raise RuntimeError(f"{sdist.name}: {relative} differs from the checked-out source")
 
 
 def main():
@@ -54,18 +80,7 @@ def main():
         raise RuntimeError("wheel/sdist package identities and versions must match the seven packages")
     run(sys.executable, "-m", "twine", "check", "--strict", *wheels, *sdists, cwd=ROOT)
     for sdist in sdists:
-        name, _ = parse_sdist_filename(sdist.name)
-        with tarfile.open(sdist) as archive:
-            # Strip the one distribution-root component; no extraction is needed.
-            names = {p.name.split("/", 1)[1] for p in archive.getmembers()
-                     if p.isfile() and "/" in p.name}
-            required = {"LICENSE", "README.md", "pyproject.toml", "PKG-INFO"}
-            if name != "openphysics":
-                required.add("NOTICE")
-            if name == "simcase":
-                required.add("simcase/studio/static/index.html")
-            if missing := required - names:
-                raise RuntimeError(f"{sdist.name} is missing {sorted(missing)}")
+        check_sdist_assets(sdist)
     for wheel in wheels:
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
