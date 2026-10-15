@@ -116,7 +116,7 @@ Scalar string/number metadata accompanies these arrays: field layout
 `cavity3d-edge-v1`, `mesh_length_unit`, `frequency_unit`,
 `eigenvalue_unit`, `edge_coefficient_unit`, `electric_field_unit`, normalization
 `electric_mass_orthonormal_si`, `search`, `target_frequency_hz`, and
-`requested_modes`, `edge_orientation="low_node_index_to_high_node_index"`,
+`requested_modes`, `returned_modes`, `edge_orientation="low_node_index_to_high_node_index"`,
 `electric_field_location="tetrahedron_centroid"`, and
 `cluster_completeness="not_certified"` and
 `mode_count_policy="exact_count_may_split_cluster"`.

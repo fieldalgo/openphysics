@@ -12,7 +12,6 @@ numerical convergence and spectral-completeness validation.
 import copy
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 
@@ -83,6 +82,7 @@ def test_real_cavity_saved_fields_reconstruct_after_document_translation(solved_
         np.testing.assert_allclose(residuals, arrays["relative_residuals"], atol=1e-11)
         np.testing.assert_allclose(arrays["frequencies_hz"], summary["frequencies_hz"], rtol=0, atol=0)
         assert str(arrays["field_layout"]) == summary["field_layout"] == "cavity3d-edge-v1"
+        assert int(arrays["returned_modes"]) == summary["returned_modes"] == 5
         assert str(arrays["cluster_completeness"]) == summary["cluster_completeness"] == "not_certified"
         assert str(arrays["mode_count_policy"]) == summary["mode_count_policy"] == "exact_count_may_split_cluster"
 

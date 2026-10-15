@@ -128,6 +128,7 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
             assert str(arrays["cluster_completeness"]) == "not_certified"
             assert str(arrays["mode_count_policy"]) == "exact_count_may_split_cluster"
             assert str(arrays["field_layout"]) == "cavity3d-edge-v1"
+            assert int(arrays["returned_modes"]) == summary["returned_modes"] == 1
             assert arrays["electric_field"].shape == (1, 1, 3)
             assert arrays["edge_coefficients"].shape == (2, 1)
             np.testing.assert_array_equal(arrays["pec_edge_ids"], [1])

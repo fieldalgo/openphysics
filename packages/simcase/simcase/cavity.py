@@ -169,7 +169,7 @@ class CavityRunResult:
                 frequency_unit="Hz", eigenvalue_unit="m^-2", edge_coefficient_unit="m^-1/2",
                 electric_field_unit="m^-3/2", normalization="electric_mass_orthonormal_si",
                 search=c.search, target_frequency_hz=c.target_frequency_hz,
-                requested_modes=c.requested_modes,
+                requested_modes=c.requested_modes, returned_modes=len(c.frequencies_hz),
                 edge_orientation="low_node_index_to_high_node_index",
                 electric_field_location="tetrahedron_centroid",
                 cluster_completeness=c.cluster_completeness,
