@@ -159,7 +159,7 @@ def test_thermal_mechanical_independent_uniform(plane,kind,theta,alpha):
         for x,normal,coord in [(0.,[-1.,0.],0),(1.,[1.,0.],0),(0.,[0.,-1.],1),(1.,[0.,1.],1)]:
             ids=np.flatnonzero(nodes[:,coord]==x);ids=ids[np.argsort(nodes[ids,1-coord])]
             for a,b in zip(ids[:-1],ids[1:]):local[[a,b]]+=(sigma[:2,:2]@normal)/(2*n)
-        assert_scaled(r.mechanics.reaction,local,E0*max(abs(alpha)*20,1e-4),1e-9)
+        assert_scaled(r.mechanics.reaction,local,E0*max(abs(alpha)*20,1e-4))
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -174,6 +174,8 @@ def test_thermal_mechanical_independent_all_three_intervals(plane,kind):
         m=solve_thermoelasticity(mesh,snap,reference_temperature_k=TREF0,thermal_expansion_per_k=ALPHA0,young_modulus=E0,poisson_ratio=NU0,plane=plane,dirichlet=cfg['mechanical_dirichlet'],body_force=cfg['body_force'])
         error=norms(mesh,r.mechanics.displacement,r.heat.temperature,kind,plane,align=kind=='linear')
         pre=norms(mesh,m.displacement,ih,kind,plane,align=kind=='linear')
+        pre10=norms(mesh,m.displacement,ih,kind,plane,10,align=kind=='linear')
+        for key in ('u_L2','u_H1','strain','stress','energy_norm'):assert abs(pre[key]-pre10[key])<.01*pre[key]
         quad10=norms(mesh,r.mechanics.displacement,r.heat.temperature,kind,plane,10,align=kind=='linear')
         keys=['u_L2','u_H1','strain','stress','energy_norm']+(['T_L2','T_H1','flux'] if kind=='sine' else [])
         for key in keys:assert abs(error[key]-quad10[key])<.01*error[key],(n,key,error,quad10)
@@ -197,6 +199,9 @@ def test_thermal_mechanical_independent_all_three_intervals(plane,kind):
         else:
             _,wr,pr,_=triangle_rule(np.array([[[0.,0.],[1.,0.],[1.,1.]],[[0.,0.],[1.,1.],[0.,1.]]]),16)
             ref=float(np.sum(wr*exact_fields(pr,kind,plane)['state']['energy']))
+            _,w12,p12,_=triangle_rule(np.array([[[0.,0.],[1.,0.],[1.,1.]],[[0.,0.],[1.,1.],[0.,1.]]]),12)
+            ref12=float(np.sum(w12*exact_fields(p12,kind,plane)['state']['energy']))
+            assert abs(ref-ref12)<=1e-8*E0*(ALPHA0*30)**2
             energy_errors.append(abs(r.mechanics.physical_elastic_energy-ref)/ref)
         collected.append(error);prescribed.append(pre);bounds.append([lhs,rhs])
     all_rates={}
@@ -425,3 +430,56 @@ def test_thermal_mechanical_independent_actual_body_only_omission():
         return real(m,cold,**kw)
     with patch.object(workflow,'solve_thermoelasticity',wrong):r=workflow.solve_steady_thermoelasticity(mesh,**cfg)
     with pytest.raises(AssertionError):audit(mesh,r,cfg)
+
+
+@pytest.mark.parametrize('kind',['shape','float','bool','overflow','names'])
+def test_thermal_mechanical_independent_region_preflight(kind):
+    mesh=square();cfg=config(mesh,'uniform','stress')
+    if kind=='shape':mesh.regions=np.zeros(len(mesh.triangles)-1,dtype=int)
+    elif kind=='float':mesh.regions=np.zeros(len(mesh.triangles),dtype=float)
+    elif kind=='bool':mesh.regions=np.zeros(len(mesh.triangles),dtype=bool)
+    elif kind=='overflow':mesh.regions=np.full(len(mesh.triangles),2**63,dtype=np.uint64)
+    else:mesh.region_names=[3]
+    with patch.object(workflow,'solve_steady_heat') as heat:
+        with pytest.raises(workflow.WorkflowStageError) as err:workflow.solve_steady_thermoelasticity(mesh,**cfg)
+        assert err.value.stage=='input';heat.assert_not_called()
+
+
+@pytest.mark.parametrize('kind',['regions','region_names'])
+def test_thermal_mechanical_independent_region_capture_and_mutation(kind):
+    mesh=square();mesh.regions=np.zeros(len(mesh.triangles),dtype=int);mesh.region_names=['solid']
+    cfg=config(mesh,'uniform','stress');real=workflow.solve_steady_heat
+    def caller_mutation(m,**kw):
+        mesh.regions[:]=3;mesh.region_names[0]='changed'
+        return real(m,**kw)
+    with patch.object(workflow,'solve_steady_heat',caller_mutation):r=workflow.solve_steady_thermoelasticity(mesh,**cfg)
+    assert r.manifest['mesh']['regions']==[0]*len(mesh.triangles) and r.manifest['mesh']['region_names']==['solid']
+    def owned_mutation(m,**kw):
+        h=real(m,**kw)
+        if kind=='regions':m.regions[:]=7
+        else:m.region_names[0]='owned_changed'
+        return h
+    with patch.object(workflow,'solve_steady_heat',owned_mutation):
+        with pytest.raises(workflow.WorkflowStageError) as err:workflow.solve_steady_thermoelasticity(mesh,**cfg)
+        assert err.value.stage=='heat'
+
+
+def test_thermal_mechanical_independent_transfer_numeric_range():
+    mesh=square();cfg=config(mesh,'uniform','stress');real=workflow.solve_steady_heat
+    def overflowing(*args,**kw):
+        h=real(*args,**kw);t=h.temperature.astype(np.longdouble);t[3]=np.finfo(np.longdouble).max if np.finfo(np.longdouble).max>np.finfo(float).max else np.inf
+        return replace(h,temperature=t)
+    with patch.object(workflow,'solve_steady_heat',overflowing),patch.object(workflow,'solve_thermoelasticity') as mech:
+        with pytest.raises(workflow.WorkflowStageError) as err:workflow.solve_steady_thermoelasticity(mesh,**cfg)
+        assert err.value.stage=='transfer' and 'node 3' in str(err.value);mech.assert_not_called()
+
+
+def test_thermal_mechanical_independent_same_owned_mesh_at_each_stage():
+    mesh=square();cfg=config(mesh,'uniform','stress');seen=[]
+    heat,freeze,mech=workflow.solve_steady_heat,workflow.freeze_temperature,workflow.solve_thermoelasticity
+    def h(m,**kw):seen.append(m);return heat(m,**kw)
+    def f(m,t):seen.append(m);return freeze(m,t)
+    def s(m,t,**kw):seen.append(m);return mech(m,t,**kw)
+    with patch.object(workflow,'solve_steady_heat',h),patch.object(workflow,'freeze_temperature',f),patch.object(workflow,'solve_thermoelasticity',s):r=workflow.solve_steady_thermoelasticity(mesh,**cfg)
+    assert len(seen)==3 and all(m is r.reference_mesh for m in seen) and seen[0] is not mesh
+    assert r.mechanics.temperature_snapshot is r.temperature_snapshot
