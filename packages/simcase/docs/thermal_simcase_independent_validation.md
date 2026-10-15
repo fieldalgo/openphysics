@@ -131,3 +131,49 @@ Whole-source, additional boundary/CLI controls and final artifact inspection are
 reported separately once complete. No unfinished stage or failed initial
 candidate is labelled green. This suite covers headless heat documents, not
 thermal plotting, Studio heat UI or heat-to-mechanical coupling.
+
+## Explicit Linux reacceptance candidate 4ec9da9
+
+Candidate4ec9da9fcba661958a12f37bc445a543cb4ffc1c is a direct child of6080.
+It is normally merged into the independent branch, preserving the original
+failed candidate and dedicated tests. Read-only production delta contains the
+thermal serializer, inline Studio script, public thermal document and producer
+tests. The independent suite reads the new document's nine-array metadata
+vocabulary; physical shape, finiteness and numerical thresholds are unchanged.
+
+The original106 Python cases now pass on Linux, including all five original
+save-state counterexamples. All three identical actual-script stale-response
+cases pass. Thus the original failures are fixed **for this exact Linux
+candidate**, without retroactively passing6080. An expanded134-case suite adds
+all-nine metadata verification, nine nonfinite arrays under both field flags,
+CCW/index/unique IDs/value-shape/bool/integer controls and preservation of a
+replaced previously owned file. It reports131pass/3fail: the remaining failures
+are in the candidate's disclosed pending storage work, not numerical convergence.
+
+The three concrete remaining checks are:
+
+1. Inject OSError from os.open on the freshly created directory during ownership
+   construction. Expected cleanup of the empty exclusively owned target; actual
+   empty directory remains without an incomplete marker.
+2. Remove model.json after summary is written but before finish. Expected
+   refusal because a required owned artifact is missing; actual save succeeds
+   and removes the marker.
+3. Do the same for fields.npz when save_fields=true. Actual save also succeeds
+   despite the absent mandatory raw archive.
+
+No skip/xfail/tolerance relaxation hides these checks. The current directory-fd
+and dup pinning design is POSIX-specific; Linux results do not establish Windows
+support. Portable handles, constructor-failure cleanup and required-owned-file
+checks are separately pending producer changes. Their later exact blobs require
+new source/installed storage and metadata/CLI tests. The suite does not select a
+moving branch head or assume later candidates pass because4ec improved.
+
+For the original6080 evidence, the first full-root run collected the then-current
+96 independent cases before the final10 controls were added:875pass/5fail/
+16optional skips plus9subtests. All106 were separately run in source and actual
+installed venvs:101pass/5fail. Whole-test collection is not misreported as
+including those later10. Existing Studio vector tests8pass are distinct from
+the independent stale-response tests3fail on6080. Initial independent-branch CI
+38742590017 was cancelled by normal branch-merge workflow concurrency, not
+reported as a green run. All earlier test/environment errors remain described
+above. The original raw/module/ownership evidence applies only to6080.

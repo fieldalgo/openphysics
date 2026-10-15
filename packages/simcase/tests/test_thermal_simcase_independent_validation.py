@@ -70,10 +70,11 @@ def test_independent_saved_numeric_raw_and_metadata(tmp_path):
     assert json.loads(arrays['metadata_json'].item())==summary
     raw={key:arrays[key] for key in answer.UNITS};answer.validate_actual_raw(raw)
     for key,value in answer.result_arrays(result).items():np.testing.assert_array_equal(raw[key],value)
-    for key in ('temperature_k','heat_flux_w_m2','load_w_per_m','reaction_w_per_m','residual_w_per_m'):
+    for key in answer.UNITS:
         assert summary['field_units'][key]==answer.UNITS[key]
         assert summary['field_shapes'][key]==list(raw[key].shape)
-        assert summary['field_locations'][key]==('triangle_centroids' if key=='heat_flux_w_m2' else 'nodes')
+        location = 'triangle_centroids' if key=='heat_flux_w_m2' else 'triangle_connectivity' if key=='triangles' else 'dirichlet_nodes' if key.startswith('dirichlet_') else 'nodes'
+        assert summary['field_locations'][key]==location
     assert set(p.name for p in out.iterdir())=={'fields.npz','model.json','summary.json','log.txt'}
     assert json.loads((out/'model.json').read_text())==result.doc.data
     corrupt={key:value.copy() for key,value in raw.items()};corrupt['residual_w_per_m'][0]+=1
@@ -301,3 +302,72 @@ def test_independent_cli_expected_runtime_exit_one(tmp_path,stage):
     done=subprocess.run([sys.executable,'-I','-c',script,'run',str(model),'-o',str(target),'-q'],capture_output=True,text=True)
     assert done.returncode==1 and 'independent '+stage+' injection' in done.stderr
     assert 'Traceback' not in done.stderr and 'results written' not in done.stdout and not target.exists()
+
+
+def test_independent_constructor_failure_does_not_leave_unmarked_target(tmp_path,monkeypatch):
+    import simcase.thermal as thermal
+    target=tmp_path/'constructor-failed';original=thermal.os.open
+    def failed(path,*args,**kwargs):
+        if Path(path)==target:raise OSError('independent constructor handle injection')
+        return original(path,*args,**kwargs)
+    result=actual();monkeypatch.setattr(thermal.os,'open',failed)
+    with pytest.raises(OSError,match='constructor handle injection'):result.save(target)
+    assert not target.exists(),'empty exclusively created target must be cleaned after constructor failure'
+
+
+@pytest.mark.parametrize('missing',['model.json','fields.npz'])
+def test_independent_missing_required_owned_file_cannot_complete(tmp_path,monkeypatch,missing):
+    import simcase.thermal as thermal
+    original=thermal._OwnedOutput.write;target=tmp_path/'missing-required'
+    def remove_required(owner,name,writer):
+        value=original(owner,name,writer)
+        if name=='summary.json':(target/missing).unlink()
+        return value
+    monkeypatch.setattr(thermal._OwnedOutput,'write',remove_required)
+    with pytest.raises(OSError):actual().save(target)
+    assert not (target/'summary.json').exists() or (target/'.incomplete').exists()
+
+
+def test_independent_replaced_owned_file_is_preserved(tmp_path,monkeypatch):
+    import simcase.thermal as thermal
+    original=thermal._OwnedOutput.write;target=tmp_path/'replaced-file'
+    def replace_owned(owner,name,writer):
+        value=original(owner,name,writer)
+        if name=='fields.npz':
+            (target/'model.json').unlink();(target/'model.json').write_bytes(b'external replacement')
+            raise OSError('independent owned file replaced')
+        return value
+    monkeypatch.setattr(thermal._OwnedOutput,'write',replace_owned)
+    with pytest.raises(OSError,match='owned file replaced'):actual().save(target)
+    assert (target/'model.json').read_bytes()==b'external replacement'
+    assert (target/'.incomplete').exists() and not (target/'summary.json').exists()
+
+
+@pytest.mark.parametrize('key',list(answer.UNITS))
+@pytest.mark.parametrize('fields',[True,False])
+def test_independent_all_raw_nonfinite_refused(key,fields,tmp_path):
+    result=actual(fields=fields)
+    owners={'nodes_m':(result.mesh,'nodes'),'triangles':(result.mesh,'triangles'),
+            'dirichlet_node_ids':(result,'dirichlet_node_ids'),
+            'dirichlet_temperature_k':(result,'dirichlet_temperature_k')}
+    properties={'temperature_k':'temperature','heat_flux_w_m2':'heat_flux','load_w_per_m':'load','reaction_w_per_m':'reaction','residual_w_per_m':'residual'}
+    owner,name=owners[key] if key in owners else (result.solution,properties[key])
+    changed=np.asarray(getattr(owner,name),dtype=float).copy();changed.flat[-1]=np.inf;setattr(owner,name,changed)
+    with pytest.raises(ValueError):result.save(tmp_path/'nonfinite')
+    assert not (tmp_path/'nonfinite'/'summary.json').exists()
+
+
+@pytest.mark.parametrize('damage',['clockwise','out_of_range','duplicate_fixed','fixed_value_shape','bool_flux','float_subdivisions'])
+def test_independent_additional_raw_and_input_refusals(tmp_path,damage):
+    if damage=='float_subdivisions':
+        data=answer.document();data['mesh']['subdivisions']=[4.,4]
+        with pytest.raises(DocumentError):Document.from_dict(data)
+        return
+    result=actual()
+    if damage=='clockwise':result.mesh.triangles[0]=result.mesh.triangles[0,::-1]
+    elif damage=='out_of_range':result.mesh.triangles[0,0]=len(result.mesh_nodes_m)
+    elif damage=='duplicate_fixed':result.dirichlet_node_ids[-1]=result.dirichlet_node_ids[-2]
+    elif damage=='fixed_value_shape':result.dirichlet_temperature_k=result.dirichlet_temperature_k[:,None]
+    else:result.solution.heat_flux=np.ones(result.heat_flux_w_m2.shape,dtype=bool)
+    with pytest.raises(ValueError):result.save(tmp_path/'invalid-structure')
+    assert not (tmp_path/'invalid-structure'/'summary.json').exists()
