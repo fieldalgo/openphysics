@@ -20,7 +20,7 @@ A document is a JSON object with these sections (lengths use its declared unit):
                any other material name is looked up in physmat.
     physics    named physics, {"em1": {...}}. Each entry names its solver and
                its settings. Currently "em.modes2d": wavelength, formulation
-               ("scalar" or single-study "vector"), num_modes, boundary
+               ("scalar" or "vector"), num_modes, boundary
                conditions per side ("pec" | "pmc"), and explicit n_cladding for
                vector modes. The names are how a study
                and (later) a coupling refer to one physics, so they are part of
@@ -45,6 +45,7 @@ from typing import Any
 
 from . import units
 from .units import Scale, UnitError
+from .tracking import tracking_settings
 
 FORMAT = "0.2"
 DEFAULT_PHYSICS = "em1"
@@ -318,27 +319,44 @@ class Document:
         if st["type"] not in ("single", "sweep"):
             raise DocumentError("study.type must be 'single' or 'sweep'")
         if st["type"] == "sweep":
-            if any(p["formulation"] == "vector" for p in d["physics"].values()):
-                raise DocumentError("vector modes currently require study.type 'single'; "
-                                    "vector sweeps need mode tracking before group index can be reported")
-            if "parameter" not in st or "values" not in st or len(st["values"]) == 0:
+            if (not isinstance(st.get("parameter"), str) or
+                    not isinstance(st.get("values"), list) or not st["values"]):
                 raise DocumentError("study.sweep needs 'parameter' (dotted path) and non-empty 'values'")
             try:
                 self.get_path(st["parameter"])
-            except KeyError:
+            except (KeyError, TypeError):
                 raise DocumentError(f"study.parameter {st['parameter']!r} does not exist in the document") from None
             if not st["parameter"].startswith("physics."):
                 raise DocumentError(
                     f"study.parameter {st['parameter']!r} is not under 'physics.'. The mesh is built once for "
                     "the whole study, so sweeping geometry, mesh or materials would solve every point on the "
                     "first point's mesh. Only physics parameters may be swept.")
+            vector_names = [name for name, p in d["physics"].items() if p["formulation"] == "vector"]
+            if vector_names:
+                if len(d["physics"]) != 1 or st["parameter"] != f"physics.{vector_names[0]}.wavelength":
+                    raise DocumentError("vector sweeps support only the wavelength of one fixed physics entry")
+                if len(st["values"]) < 3:
+                    raise DocumentError("vector wavelength sweeps need at least 3 values for group index")
+                for i, value in enumerate(st["values"]):
+                    _material_number(value, f"study.values[{i}]")
+                    if value <= 0:
+                        raise DocumentError("vector sweep wavelengths must be positive")
+                pairs = list(zip(st["values"], st["values"][1:]))
+                if not (all(a < b for a, b in pairs) or all(a > b for a, b in pairs)):
+                    raise DocumentError("vector sweep wavelengths must be strictly monotone (no duplicates)")
+                try:
+                    tracking_settings(int(d["physics"][vector_names[0]]["num_modes"]), st.get("tracking"))
+                except (ValueError, OverflowError) as exc:
+                    raise DocumentError(str(exc)) from None
+                return
+            if "tracking" in st:
+                raise DocumentError("study.tracking is only supported for vector wavelength sweeps")
             for value in st["values"]:
                 candidate = self.copy()
                 candidate.set_path(st["parameter"], value)
                 if any(isinstance(p, dict) and p.get("formulation") == "vector"
                        for p in candidate["physics"].values()):
-                    raise DocumentError("vector modes currently require study.type 'single'; "
-                                        "vector sweeps need mode tracking before group index can be reported")
+                    raise DocumentError("a scalar sweep cannot switch to vector; use a vector wavelength sweep")
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]

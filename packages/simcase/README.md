@@ -73,13 +73,13 @@ rejected because the mesh is built once. Sweeping a wavelength also yields the
 group index.
 
 Physics today: lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
-an approximation for 2D high-contrast cores) or full `vector` for a single
-study point. Lossy materials are rejected in both paths. Scalar boundaries are
+an approximation for 2D high-contrast cores) or full `vector` for single points
+and tracked wavelength sweeps. Lossy materials are rejected in both paths. Scalar boundaries are
 `pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
 and Ez; PMC is natural. These are different field conditions: changing only the
 formulation of a scalar slab can select a different polarization.
 
-### Vector single-point studies
+### Vector fields and single-point studies
 
 ```bash
 python -m simcase example vector_slab > vector.json
@@ -107,9 +107,8 @@ zero modes is an error. This is a bounded search, not proof that all guided
 modes were found. A finite PEC/PMC computational wall is not an open boundary:
 check domain padding as well as mesh convergence for your geometry.
 
-Vector studies currently require `"study": {"type": "single"}`. Sweeps are
-rejected during validation: sorting by index does not track mode identity across
-crossings or degeneracies, so it cannot yet justify a vector group index.
+Use `"study": {"type": "single"}` for an independent point. Wavelength sweeps
+require the resolved-mode tracking contract below; other vector sweeps are rejected.
 
 `RunResult.fields` retains its original nodal scalar layout for scalar results
 and is empty for vector results. Vector data is in `RunResult.vector_fields`,
@@ -142,6 +141,90 @@ The existing scalar HTTP `fields` layout is unchanged; for vectors it is empty.
 Select `|E|`, `|Ex|`, `|Ey|` or `|Ez|` to display magnitudes on a common |E|
 color scale. The saved PNG displays |E|; the archive preserves complex components.
 `VectorField.to_dict()` produces the same JSON-safe display samples.
+
+### Tracked vector wavelength sweeps
+
+```bash
+python -m simcase example vector_slab_sweep > sweep.json
+python -m simcase run sweep.json -o sweep_results
+```
+
+For vector physics, the sweep parameter must be exactly
+`physics.<name>.wavelength`. Supply at least three finite positive values in
+strictly increasing or decreasing order; unequal spacing is supported. The
+mesh, materials, boundary conditions, requested mode count and `n_cladding`
+remain fixed. Material dispersion is evaluated at each wavelength. The fixed
+`n_cladding` must bound the exterior/slab radiation channels over the **whole
+interval**, including dispersive claddings. A conservative upper envelope may
+exclude weakly guided modes; the starting wavelength's cladding value alone
+may admit unwanted exterior modes later.
+
+The first point seeds `num_modes` branches in descending n_eff order. Subsequent
+points search extra guided candidates and match those branches by a global
+one-to-one assignment that maximizes the sum of squared normalized overlaps:
+
+```text
+<E_a,E_b> = transverse_a^H M_edge transverse_b + Ez_a^H M_node Ez_b
+score(a,b) = |<E_a,E_b>|^2 / (<E_a,E_a> <E_b,E_b>)
+```
+
+The mass matrices use the original fixed mesh and the physical raw field
+coefficients. This is an electric L2 continuity metric, not a power or energy
+overlap. One common complex phase aligns each matched field with its predecessor;
+all raw coefficients and centroid components receive that phase. Distinct
+eigenfields are not mixed. Result columns retain the initial branch identities,
+so later rows need not be sorted by n_eff.
+
+Optional settings live under `study.tracking`:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `search_modes` | `max(2*num_modes, num_modes+4)` | Guided candidate budget; integer greater than `num_modes` |
+| `min_overlap` | `0.8` | Minimum selected squared normalized overlap, in `(0,1]` |
+| `min_margin` | `0.1` | Minimum full-assignment score gap, in `(0,1]` |
+| `degeneracy_tolerance` | `1e-5` | Non-negative absolute n_eff separation tolerance |
+
+For each selected match, the margin compares the best total assignment score
+with the best complete assignment that excludes that match. If no alternative
+exists, the margin is `null`. Settings are numerical diagnostics, not error
+bounds. In particular, the degeneracy tolerance should reflect the mesh's index
+accuracy; reducing it does not resolve a physically degenerate pair.
+
+A sweep raises `ModeTrackingError` when it cannot retain the requested count,
+overlap is weak, assignment is ambiguous, or a selected candidate has a
+near-degenerate partner (including an unselected candidate). A selected mode at
+the last rank of a saturated candidate search also fails: increase `search_modes`
+to check for an unseen partner. The search is bounded, not an exhaustive spectral
+proof. Degenerate-subspace transport and continuation through cutoff are not
+implemented. For example, the fiber's two HE11 partners are intentionally
+rejected by the default tracker even when only one is requested; inspect them
+with independent single studies.
+
+Tracking failures identify the wavelength, reason and a next action. Numerical
+solver failures retain the wavelength and underlying reason. The CLI exits
+nonzero without writing a new result; Studio reports a failed job with no result
+and clears previous displayed fields. No partial group-index array, padded
+missing mode or arbitrary branch through a degeneracy is returned.
+
+After every point succeeds, `group_index()` computes
+`n_g = n_eff - wavelength * d(n_eff)/d(wavelength)` on each tracked column,
+using second-order finite differences including the endpoints. The existing
+scalar derivative behavior is unchanged. **Check both mesh/domain and wavelength
+spacing convergence.** High endpoint overlap cannot rule out an avoided crossing
+or cutoff between sparse samples and does not certify a derivative's accuracy.
+
+`RunResult.mode_tracking` and `summary.json.mode_tracking` contain
+`method="electric-l2-assignment-v1"`, resolved settings and a record per point:
+candidate count, selected one-based candidate ranks, overlaps and assignment
+margins. At the seed point overlaps/margins are `null`. Candidate ranks are not
+branch identities. Studio receives this metadata in `summary`, shows branch
+labels and overlap, and displays n_g for every tracked branch.
+
+The vector field layout remains `vector-edge-nodal-v1`, now with one entry per
+sweep point and a constant tracked mode count. NPZ adds `group_index` and a
+Unicode scalar `mode_tracking_json` (parse with `json.loads(str(array))`). Raw
+complex fields, samples and neff all share the tracked column order. These
+tracking additions are absent from scalar and vector-single results.
 
 ### Custom optical materials
 
@@ -222,10 +305,10 @@ document.
   edits to JSON, without adding a constant `n` or `k`.
 - Generate mesh: meshine through the server, drawn by region, with node and
   triangle counts, minimum angle and mean quality.
-- Run: a background job whose log streams back, then the mode field (selectable
-  study point and mode), an n_eff-vs-parameter chart and a table with the group
-  index for scalar wavelength sweeps. Vector single-point results add a field
-  component selector and report relative amplitudes.
+- Run: a background job, then the mode field (selectable study point and mode),
+  an n_eff-vs-parameter chart and a group-index table for wavelength sweeps.
+  Vector results add a component selector and relative amplitudes; tracked
+  sweeps identify branches and display their overlap and group indices.
 - JSON tab: edit the document by hand and apply.
 
 The page is a single HTML file with no build step and no external libraries

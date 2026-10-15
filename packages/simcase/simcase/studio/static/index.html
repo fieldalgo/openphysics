@@ -66,6 +66,7 @@
   .results-body { flex:1; display:grid; grid-template-columns: 1fr 340px; min-height:0; }
   .results-body .side { overflow:auto; border-left:1px solid var(--line); }
   .results-body .side table { font-size:11px; }
+  .result-table-scroll { max-width:100%; overflow-x:auto; margin-bottom:8px; }
   .split { display:flex; flex-direction:column; min-height:0; }
 </style>
 </head>
@@ -252,7 +253,10 @@ function drawField() {
   drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
   const lab = `${studyLabel(resultData)} = ${resultData.values[p]}`;
   const fieldLabel = vector ? (component === 'magnitude' ? '|E|' : ['|Ex|', '|Ey|', '|Ez|'][+component]) : '|field|';
-  $('resInfo').textContent = `${fieldLabel}, mode ${m + 1} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}` +
+  const tracking = resultData.summary.mode_tracking, point = tracking?.points[p];
+  const identity = tracking ? `tracked branch ${m + 1}` : `mode ${m + 1}`;
+  const match = point ? (point.overlaps === null ? ', seed point' : `, overlap ${point.overlaps[m].toFixed(3)}`) : '';
+  $('resInfo').textContent = `${fieldLabel}, ${identity} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}${match}` +
     (vector ? ' (relative amplitude, common |E| scale)' : '');
 }
 function drawSweep() {
@@ -275,11 +279,17 @@ function drawSweep() {
     xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(X(x), Y(ys[i][j]), 3, 0, 7); ctx.fill(); }); }
 }
 function fillResultTable() {
-  if (!resultData) { $('resTable').innerHTML = ''; $('componentLabel').hidden = true; return; }
+  if (!resultData) {
+    $('resTable').innerHTML = ''; $('componentLabel').hidden = true;
+    $('ptSel').innerHTML = ''; $('modeSel').innerHTML = ''; $('componentSel').value = 'magnitude';
+    $('resInfo').textContent = 'no results available'; return;
+  }
   const nm = resultData.neff[0].length, ng = resultData.group_index;
-  let h = '<table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${j + 1}</th>`).join('') + (ng ? '<th>n_g 1</th>' : '') + '</tr>';
-  resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + (ng ? `<td>${ng[i][0].toFixed(4)}</td>` : '') + '</tr>'; });
-  h += '</table>';
+  const tracked = !!resultData.summary.mode_tracking, ngCount = ng ? (tracked ? nm : 1) : 0;
+  let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
+  resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}</td>`).join('') + '</tr>'; });
+  h += '</table></div>';
+  if (tracked) h += '<div class="hint" style="margin:0 10px">Branch numbers follow the modes seeded at the first wavelength. Refine the wavelength spacing to check group-index accuracy.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
   $('resTable').innerHTML = h;
 }
@@ -291,7 +301,7 @@ function populateResultSelectors() {
   $('componentSel').value = 'magnitude';
   $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${studyLabel(resultData)} = ${v}</option>`).join('');
   $('ptSel').value = Math.floor(resultData.values.length / 2);
-  $('modeSel').innerHTML = resultData.neff[0].map((_, j) => `<option value="${j}">${j + 1}</option>`).join('');
+  $('modeSel').innerHTML = resultData.neff[0].map((_, j) => `<option value="${j}">${resultData.summary.mode_tracking ? 'branch ' : ''}${j + 1}</option>`).join('');
 }
 
 // ------------------------------------------------------------------ tree
@@ -347,7 +357,7 @@ function renderProps() {
   else if (selected.startsWith('physics:')) { const pk = selected.slice(8), p = doc.physics[pk]; h = `<h3>Physics · ${pk}</h3>` + row('type', sel(`physics.${pk}.type`, p.type, ['em.modes2d'])) + row('formulation', sel(`physics.${pk}.formulation`, p.formulation, ['scalar', 'vector'])) +
     row(`wavelength (${lengthUnit()})`, num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) +
     (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
-      '<div class="hint">Set the highest exterior cladding index at this wavelength (e.g. substrate or cover). Vector: lossless dielectrics, single study only. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
+      '<div class="hint">Set the exterior guiding threshold (e.g. the highest substrate or cover index), valid throughout the study. Vector: lossless dielectrics, single points or wavelength sweeps of isolated modes. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
       '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +
     '<h3 style="margin-top:12px">Boundaries</h3>' +
     ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join(''); }
@@ -366,8 +376,8 @@ function renderProps() {
     if (g) h += row('center x', num('mesh.grading.center.0', g.center[0])) + row('center y', num('mesh.grading.center.1', g.center[1])) + row('near', num('mesh.grading.near', g.near)) + row('far', num('mesh.grading.far', g.far)) + row('distance', num('mesh.grading.distance', g.distance));
     h += '<div class="hint">Per-shape sizes are set on each shape. Grading grows the size linearly from near (at center) to far (at distance).</div>'; }
   else if (selected === 'study') { const s = doc.study; h = '<h3>Study</h3>' + row('type', sel('study.type', s.type, ['single', 'sweep']));
-    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" value="${(s.values || []).join(', ')}">`) + '<div class="hint">parameter is a dotted path under physics, e.g. physics.em1.wavelength. The mesh is built once per study, so geometry and mesh cannot be swept. Scalar wavelength sweeps also give the group index. Vector studies currently support a single point.</div>'; }
-  else if (selected === 'results') h = '<h3>Results</h3><div class="hint">Run writes n_eff per study point, the fields and (for scalar wavelength sweeps) the group index. Use the selectors above the field view.</div>';
+    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" value="${(s.values || []).join(', ')}">`) + '<div class="hint">The mesh is fixed throughout the study. Scalar studies can sweep physics parameters. Vector studies can sweep only wavelength, with at least three finite positive values in strictly increasing or decreasing order. Isolated modes are tracked between points; missing, ambiguous or nearly degenerate modes stop the run. Advanced study.tracking settings are available in JSON. Refine wavelength spacing to check group-index accuracy.</div>'; }
+  else if (selected === 'results') h = '<h3>Results</h3><div class="hint">Run writes n_eff and fields per study point. Wavelength sweeps also report group index; vector sweeps require successful mode tracking at every point. Branch numbers follow the first point, and field info reports overlap with the preceding point. Use the point, mode and component selectors above the field view.</div>';
   P.innerHTML = h;
   P.querySelectorAll('[data-path]').forEach(el => el.addEventListener('change', onPropChange));
   P.querySelectorAll('[data-kind="unit"]').forEach(el => el.addEventListener('change', e => {
@@ -421,6 +431,7 @@ async function doMesh() { status('meshing…'); $('meshBtn').disabled = true; tr
   catch (e) { log('mesh failed: ' + e.message, 'err'); status('mesh failed'); } finally { $('meshBtn').disabled = false; } }
 async function doRun() {
   status('running…'); $('runBtn').disabled = true;
+  resultData = null; fillResultTable(); drawField(); drawSweep();
   try { const r = await api.post('/api/run', { doc }); currentJob = r.job; $('jobInfo').textContent = `job ${r.job}`; let shown = 0;
     while (true) { await new Promise(res => setTimeout(res, 500)); const j = await api.get(`/api/jobs/${currentJob}`);
       for (; shown < j.log.length; shown++) log(j.log[shown]);

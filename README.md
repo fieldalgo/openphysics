@@ -46,9 +46,12 @@ still uses the version field `"openphysics": "0.2"`.
 
 The document runner solves one lossless `em.modes2d` problem with PEC/PMC
 boundaries. Scalar runs support physics-parameter sweeps. Full-vector runs
-support single study points, an explicit exterior cladding index, complex field
-storage and component display in Studio; see the `vector_slab` and `vector_fiber`
-examples. Vector sweeps require mode tracking and are rejected for now.
+support single study points and wavelength sweeps of resolved modes, an explicit
+exterior guiding threshold, complex field storage and component display in Studio.
+Sweeps use electric-field overlap to track branches and reject missing,
+ambiguous or near-degenerate matches before reporting group index. See the
+`vector_slab`, `vector_fiber` and `vector_slab_sweep` examples and the
+[tracking contract](packages/simcase/README.md#tracked-vector-wavelength-sweeps).
 The FEM engine's 3D cavity routines remain a separate Python capability.
 Coupled multiphysics, geometry sweeps and lossy mode solves are not implemented
 in the document runner.

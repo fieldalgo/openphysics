@@ -100,5 +100,11 @@ VECTOR_FIBER = copy.deepcopy(FIBER)
 VECTOR_FIBER["name"] = "step-index fiber, full vector modes"
 VECTOR_FIBER["physics"]["em1"].update(formulation="vector", n_cladding=1.44, num_modes=6)
 
+VECTOR_SLAB_SWEEP = copy.deepcopy(VECTOR_SLAB)
+VECTOR_SLAB_SWEEP["name"] = "220 nm dielectric slab, tracked vector TE wavelength sweep"
+VECTOR_SLAB_SWEEP["study"] = dict(type="sweep", parameter="physics.em1.wavelength",
+                                values=[1.45, 1.50, 1.55, 1.60, 1.65])
+
 EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib": HADLEY_RIB,
-            "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER}
+            "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER,
+            "vector_slab_sweep": VECTOR_SLAB_SWEEP}

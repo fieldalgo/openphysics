@@ -31,6 +31,7 @@ from . import units
 from .materials import material_table
 from .fields import VectorField
 from .schema import Document, DocumentError
+from .tracking import ModeTracker, ModeTrackingError, tracking_settings
 
 
 @dataclass
@@ -110,15 +111,19 @@ class RunResult:
     timings: dict[str, float] = field(default_factory=dict)
     log: list[str] = field(default_factory=list)
     vector_fields: list[VectorField] | None = None
+    mode_tracking: dict | None = None
 
     # -- derived -----------------------------------------------------------
 
     def group_index(self) -> np.ndarray | None:
         """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength."""
-        if self.vector_fields is not None or self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
+        if self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
+            return None
+        if self.vector_fields is not None and self.mode_tracking is None:
             return None
         wl = np.asarray(self.values, dtype=float)
-        return self.neff - wl[:, None] * np.gradient(self.neff, wl, axis=0)
+        order = 2 if self.mode_tracking is not None else 1
+        return self.neff - wl[:, None] * np.gradient(self.neff, wl, axis=0, edge_order=order)
 
     def summary(self) -> dict:
         out = {
@@ -139,6 +144,8 @@ class RunResult:
                        returned_modes=int(self.neff.shape[1]))
         if ng is not None:
             out["group_index"] = ng.tolist()
+        if self.mode_tracking is not None:
+            out["mode_tracking"] = copy.deepcopy(self.mode_tracking)
         return out
 
     # -- output ------------------------------------------------------------
@@ -160,6 +167,8 @@ class RunResult:
                               vector_transverse=np.stack([f.transverse for f in self.vector_fields]),
                               vector_longitudinal=np.stack([f.longitudinal for f in self.vector_fields]),
                               vector_electric=np.stack([f.electric for f in self.vector_fields]))
+                if self.mode_tracking is not None:
+                    arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
             np.savez_compressed(outdir / "fields.npz", **arrays)
         if self.doc["results"].get("plots", True):
             self.plot(outdir / "results.png")
@@ -249,12 +258,30 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
     parameter, values = study_points(doc)
     neffs, fields = [], []
     vector_fields = [] if doc.sole_physics()[1]["formulation"] == "vector" else None
+    tracker, tracking = None, None
+    if vector_fields is not None and parameter is not None:
+        requested = int(doc.sole_physics()[1]["num_modes"])
+        settings = tracking_settings(requested, doc["study"].get("tracking"))
+        tracker = ModeTracker(model.mesh, requested, settings)
+        tracking = dict(method="electric-l2-assignment-v1", settings=settings, points=[])
+        say("vector sweep: tracking resolved modes by electric L2 overlap; check wavelength-step convergence")
     t0 = time.time()
     for v in values:
         d = doc.copy()
         if parameter is not None:
             d.set_path(parameter, v)
-        res = solve_point(model, d.sole_physics()[1])
+        physics = d.sole_physics()[1]
+        if tracker is not None:
+            physics = dict(physics, num_modes=tracker.settings["search_modes"])
+            location = f"wavelength {v:g} {doc.length_unit}"
+            try:
+                res = solve_point(model, physics)
+            except (ValueError, RuntimeError) as exc:
+                raise ModeTrackingError(f"vector sweep at {location}: {exc}") from exc
+            res["neff"], res["vector_field"], evidence = tracker.step(res["neff"], res["vector_field"], location)
+            tracking["points"].append(evidence)
+        else:
+            res = solve_point(model, physics)
         neffs.append(res["neff"])
         if vector_fields is None:
             fields.append(res["fields"])
@@ -272,4 +299,4 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
 
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
-                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields)
+                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking)

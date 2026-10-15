@@ -198,7 +198,7 @@ def test_vector_input_contract_rejects_invalid_numbers(key, value):
 
 
 @pytest.mark.parametrize("target", ["wavelength", "formulation", "physics_map"])
-def test_vector_sweep_is_rejected_before_meshing(target):
+def test_invalid_vector_sweep_is_rejected_before_meshing(target):
     d = copy.deepcopy(examples.VECTOR_SLAB)
     d["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.5, 1.6])
     if target != "wavelength":
@@ -207,7 +207,8 @@ def test_vector_sweep_is_rejected_before_meshing(target):
         d["study"] = dict(type="sweep", parameter="physics.em1.formulation", values=["scalar", "vector"])
         if target == "physics_map":
             d["study"] = dict(type="sweep", parameter="physics.em1", values=[vector_settings])
-    with pytest.raises(DocumentError, match="mode tracking"):
+    message = "at least 3" if target == "wavelength" else "cannot switch to vector"
+    with pytest.raises(DocumentError, match=message):
         Document.from_dict(d)
 
 

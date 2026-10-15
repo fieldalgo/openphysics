@@ -176,7 +176,7 @@ def test_vector_job_preserves_complex_components_and_uses_element_samples(client
     assert abs(res["neff"][0][0] - 2.0562883300990773) < 1e-3
     doc["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.5, 1.6])
     rejected = client.post("/api/run", json={"doc": doc})
-    assert rejected.status_code == 400 and "mode tracking" in rejected.json()["detail"]
+    assert rejected.status_code == 400 and "at least 3" in rejected.json()["detail"]
 
 
 def test_sellmeier_json_edit_roundtrip_and_validation(client):
@@ -192,3 +192,52 @@ def test_sellmeier_json_edit_roundtrip_and_validation(client):
     assert not bad["ok"] and "materials.glass.sellmeier" in bad["error"]
     assert client.post("/api/run", json={"doc": doc}).status_code == 400
     assert client.post("/api/mesh", json={"doc": doc}).status_code == 400
+
+
+def _finished_job(client, doc):
+    response = client.post("/api/run", json={"doc": doc})
+    assert response.status_code == 200, response.json()
+    job = response.json()["job"]
+    for _ in range(600):
+        status = client.get(f"/api/jobs/{job}").json()
+        if status["status"] in ("done", "error"):
+            return job, status
+        time.sleep(0.05)
+    pytest.fail("vector sweep job did not complete")
+
+
+def test_tracked_vector_sweep_api_returns_branches_fields_and_group_indices(client):
+    doc = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
+    doc["physics"]["em1"]["num_modes"] = 2
+    doc["study"]["values"] = [1.20, 1.25, 1.30]
+    job, status = _finished_job(client, doc)
+    assert status["status"] == "done", status
+    result = client.get(f"/api/jobs/{job}/result").json()
+    assert np.shape(result["neff"]) == np.shape(result["group_index"]) == (3, 2)
+    assert np.isfinite(result["group_index"]).all()
+    assert len(result["vector_fields"]) == 3 and result["fields"] == []
+    points = result["summary"]["mode_tracking"]["points"]
+    assert points[0]["overlaps"] is None
+    assert all(len(p["candidate_ranks"]) == 2 for p in points)
+    assert min(points[1]["overlaps"]) > 0.8
+    assert abs(result["neff"][1][0] - 2.9965406807) < 0.002
+
+
+@pytest.mark.parametrize("failure", ["degenerate", "cutoff"])
+def test_vector_tracking_errors_have_wavelength_and_no_result(client, failure):
+    doc = copy.deepcopy(examples.VECTOR_FIBER if failure == "degenerate" else examples.VECTOR_SLAB)
+    doc["physics"]["em1"]["num_modes"] = 1 if failure == "degenerate" else 2
+    doc["study"] = dict(type="sweep", parameter="physics.em1.wavelength",
+                        values=[1.5, 1.55, 1.6] if failure == "degenerate" else [1.25, 1.35, 1.45])
+    job, status = _finished_job(client, doc)
+    assert status["status"] == "error" and not status["has_result"]
+    assert failure in status["error"] and "wavelength" in status["error"] and "um" in status["error"]
+    assert client.get(f"/api/jobs/{job}/result").status_code == 409
+
+
+def test_vector_sweep_rejects_path_beyond_numeric_leaf_with_http_400(client):
+    doc = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
+    doc["study"]["parameter"] = "physics.em1.wavelength.extra"
+    response = client.post("/api/run", json={"doc": doc})
+    assert response.status_code == 400
+    assert "does not exist" in response.json()["detail"]
