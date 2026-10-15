@@ -24,7 +24,7 @@ English source documents remain at their existing package paths. Complete Korean
 
 Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
-Headless thermal documents and prescribed-flux/Robin boundaries are separate development candidates until reviewed and integrated. Their new manuals and acceptance reports will appear in both languages when the corresponding implementation is accepted. Do not infer feature support from a planned translation.
+This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/README.md) for Work-cloud Linux results, disabled Actions and unresolved Windows verification.
 
 ## Package overviews: complete Korean counterparts
 
@@ -38,13 +38,13 @@ Headless thermal documents and prescribed-flux/Robin boundaries are separate dev
 | simcase | [English](../packages/simcase/README.md) | [한국어](../packages/simcase/README.ko.md) |
 | openphysics | [English](../packages/openphysics/README.md) | [한국어](../packages/openphysics/README.ko.md) |
 
-## Headless thermal review candidate / 헤드리스 열전도 검토 후보
+## Headless thermal implementation contract
 
 | English | 한국어 | Scope / 범위 |
 |---|---|---|
-| [Contract](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; Windows save/independent acceptance remain separate gates / 헤드리스 전용·Windows 저장 및 독립수용은 별도 gate |
+| [Contract](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; consult the contract and independent report for measured scope and ownership limits |
 
-## Review candidates and development validation
+## Implementation contracts and validation reports
 
 | English | 한국어 |
 |---|---|
@@ -55,4 +55,4 @@ Headless thermal documents and prescribed-flux/Robin boundaries are separate dev
 | [benchmark_cavity](../ci/benchmark_cavity.md) | [한국어](../ci/locales/ko/pages/benchmark_cavity.md) |
 | [benchmark_vector](../ci/benchmark_vector.md) | [한국어](../ci/locales/ko/pages/benchmark_vector.md) |
 
-These pages exist in this review candidate; they do not establish final develop acceptance. Actions is disabled and two Windows failures remain unresolved.
+These pages describe this checkout. Actions is disabled and two Windows failures remain unresolved; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
