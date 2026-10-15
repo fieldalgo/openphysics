@@ -28,7 +28,9 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 DOCUMENT_ASSETS = {
-    "galerkin": ("docs/cavity_solver.md",),
+    "galerkin": ("docs/cavity_solver.md", "docs/eigenspace_reliability.md",
+                 "docs/elasticity2d.md", "examples/elasticity2d.py"),
+    "galerkin-refsol": ("refsol/elasticity.py",),
     "simcase": ("docs/cavity3d.md", "examples/cavity_box.json",
                 "docs/geometry.png", "docs/results.png"),
 }
@@ -147,6 +149,15 @@ def main():
         for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
             shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
         shutil.copy2(ROOT / "ci" / "test_cavity_wheel.py", tests / "test_cavity_wheel.py")
+        shutil.copy2(ROOT / "ci" / "test_multiphysics_wheel.py", tests / "test_multiphysics_wheel.py")
+        # Execute the verified archived example, not a source-tree copy.
+        examples = work / "examples"
+        examples.mkdir()
+        galerkin_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin")
+        with tarfile.open(galerkin_sdist) as archive:
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == "examples/elasticity2d.py")
+            (examples / "elasticity2d.py").write_bytes(archive.extractfile(member).read())
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)

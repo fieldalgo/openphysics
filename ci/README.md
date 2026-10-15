@@ -59,6 +59,10 @@ must also be present in their sdists and byte-identical to the checked-out files
 A missing or stale document/example fails validation before installed-wheel tests.
 The two screenshots linked by the simcase README must also be present and
 byte-identical in its sdist; these user documents are not runtime wheel assets.
+The galerkin eigenspace and static-elasticity contracts and English elasticity
+example must be byte-identical in its sdist. The reference elasticity module is
+also required byte-for-byte in the refsol sdist; it is automatically packaged
+Python code, so no additional refsol manifest entry is needed.
 All included Markdown files are checked for inline relative link/image targets
 against regular archive members, including percent-decoded paths and fragments.
 Current package docs use unspaced inline targets. Reference-style links, Markdown
@@ -87,6 +91,16 @@ cavity candidates are integrated, this extension must be tested on a checkout
 combining those candidates with these CI changes.
 This complements the full source suite; it does not rerun every physics test
 against the wheels or exercise browser layout.
+
+The additional `test_multiphysics_wheel.py` consumer requires installed
+`galerkin.elasticity` and `refsol.elasticity`. It checks plane stress and plane
+strain against a direct uniaxial closed form, rejects unconstrained rigid modes,
+and runs the actual English example read from the verified sdist using isolated
+Python imports. It also checks complex vector solver outputs and exact NPZ/JSON
+preservation, including deterministic non-real phase controls. These checks add
+no convergence or completeness claim and do not change existing acceptance
+thresholds. Missing modules and examples fail instead of skipping. Static
+elasticity has no simcase/Studio or thermal-coupling integration in this gate.
 
 Artifacts default to `.validation/dist/`; use `--output /absolute/empty/directory`
 to choose another location. A nonempty output is rejected to avoid stale files.

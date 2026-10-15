@@ -5,7 +5,7 @@ package has its own distribution, version and dependencies.
 
 | Package | Current role |
 |---|---|
-| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes and a 3D PEC box cavity solver |
+| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes, static 2D elasticity and a 3D PEC box cavity solver |
 | [galerkin-refsol](packages/galerkin-refsol/README.md) | Independent analytical solutions and published benchmarks; imported as `refsol` |
 | [meshine](packages/meshine/README.md) | 2D triangle meshing for material regions |
 | [gmshio](packages/gmshio/README.md) | Gmsh executable runner, MSH 4.1 ASCII reader and FEM mesh adapters |
@@ -77,6 +77,22 @@ partner. Studio supports 2D models only and rejects 3D mesh/run requests. See th
 
 Coupled multiphysics, geometry sweeps and lossy mode solves are not implemented
 in the document runner.
+
+## Standalone elasticity and vector fields
+
+For standalone static 2D elasticity, use `galerkin.elasticity` and the independent
+`refsol.elasticity` submodule. The [elasticity contract](packages/galerkin/docs/elasticity2d.md)
+defines plane stress/strain, SI units, constraints and the near-incompressibility
+limit. From the repository root after installation:
+
+```bash
+python packages/galerkin/examples/elasticity2d.py
+```
+
+The contract and [English example](packages/galerkin/examples/elasticity2d.py) are
+also included in the galerkin sdist. This API has no simcase/Studio or thermal
+coupling integration. The [vector eigenspace notes](packages/galerkin/docs/eigenspace_reliability.md)
+explain complex-field preservation and the limits of degenerate-basis reliability.
 
 ## Validate this checkout
 
