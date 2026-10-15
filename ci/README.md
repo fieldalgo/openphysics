@@ -276,7 +276,7 @@ All seven Korean package READMEs and received Korean guide counterparts are
 required byte assets. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 68 entries.
+are likewise required. The current required-byte list contains 75 entries.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
