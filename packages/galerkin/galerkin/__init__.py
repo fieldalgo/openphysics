@@ -29,5 +29,6 @@ from .gmsh import read_msh, write_msh
 from .interop import from_mesher
 from .waveguide import assemble_mode_system, solve_modes
 from .postprocess import element_gradient, l2_error
+from .cavity import CavityResult, solve_cavity_box
 
 __version__ = "0.1.0"
