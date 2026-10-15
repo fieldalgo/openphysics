@@ -304,18 +304,26 @@ def test_independent_cli_expected_runtime_exit_one(tmp_path,stage):
     assert 'Traceback' not in done.stderr and 'results written' not in done.stdout and not target.exists()
 
 
-def test_independent_constructor_failure_does_not_leave_unmarked_target(tmp_path,monkeypatch):
+@pytest.mark.parametrize('mode',['empty','foreign','replaced'])
+def test_independent_constructor_failure_does_not_leave_unmarked_target(tmp_path,monkeypatch,mode):
     import simcase.thermal as thermal
     target=tmp_path/'constructor-failed';original=thermal.os.open
     def failed(path,*args,**kwargs):
-        if Path(path)==target:raise OSError('independent constructor handle injection')
+        if Path(path)==target:
+            if mode=='foreign':(target/'foreign').write_bytes(b'preserved external file')
+            elif mode=='replaced':
+                target.rename(tmp_path/'moved-owner');target.mkdir();(target/'foreign').write_bytes(b'preserved replacement')
+            raise OSError('independent constructor handle injection')
         return original(path,*args,**kwargs)
     result=actual();monkeypatch.setattr(thermal.os,'open',failed)
     with pytest.raises(OSError,match='constructor handle injection'):result.save(target)
-    assert not target.exists(),'empty exclusively created target must be cleaned after constructor failure'
+    if mode=='empty':assert not target.exists(),'empty exclusively created target must be cleaned after constructor failure'
+    else:
+        expected=b'preserved external file' if mode=='foreign' else b'preserved replacement'
+        assert (target/'foreign').read_bytes()==expected and not (target/'summary.json').exists()
 
 
-@pytest.mark.parametrize('missing',['model.json','fields.npz'])
+@pytest.mark.parametrize('missing',['model.json','log.txt','fields.npz','summary.json','.incomplete'])
 def test_independent_missing_required_owned_file_cannot_complete(tmp_path,monkeypatch,missing):
     import simcase.thermal as thermal
     original=thermal._OwnedOutput.write;target=tmp_path/'missing-required'

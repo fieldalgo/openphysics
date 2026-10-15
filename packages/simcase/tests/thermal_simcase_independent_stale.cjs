@@ -57,3 +57,55 @@ test('late validation cannot replace imported thermal document',async()=>{
   await validating.catch(()=>{});
   assert.equal(p.run('Object.values(doc.physics)[0].type'),'thermal.steady2d','stale validation must not replace newer raw document');
 });
+
+test('late job error cannot replace headless status after file import',async()=>{
+  const p=page(),late=deferred(),ready=deferred();
+  p.ctx.post=async()=>({job:'old-job'});
+  p.ctx.get=async()=>{ready.resolve();return late.promise;};p.run('api.post=post;api.get=get;');
+  const running=p.run('doRun()');await ready.promise;
+  await p.element('fileInput').onchange({target:{files:[{name:'heat.json',text:async()=>JSON.stringify(thermal)}]}});
+  const before=p.element('status').textContent;
+  late.resolve({status:'error',error:'obsolete EM failure',log:['obsolete EM log']});await running;
+  assert.equal(p.element('status').textContent,before);
+  assert(!p.element('log').children.some(x=>String(x.textContent).includes('obsolete EM')));
+  assert.equal(p.run('currentJob'),null);assert.equal(p.run('resultData'),null);
+});
+
+test('late progress is ignored after JSON edit invalidates the old job',async()=>{
+  const p=page(),late=deferred(),ready=deferred();let count=0;
+  p.ctx.post=async()=>({job:'old-job'});
+  p.ctx.get=async()=>{if(count++===0){ready.resolve();return late.promise;}return {status:'error',error:'stop old loop',log:[]};};
+  p.run('api.post=post;api.get=get;');const running=p.run('doRun()');await ready.promise;
+  const text=JSON.stringify(thermal);p.element('json').value=text;p.element('json').oninput();
+  late.resolve({status:'running',log:['obsolete progress message']});await running;
+  assert.equal(p.element('json').value,text);
+  assert(!p.element('log').children.some(x=>String(x.textContent).includes('obsolete progress')));
+  assert.equal(p.run('currentJob'),null);assert.equal(p.run('meshData'),null);assert.equal(p.run('resultData'),null);
+});
+
+test('late validation error cannot overwrite newer thermal capability status',async()=>{
+  const p=page(),late=deferred(),ready=deferred();
+  p.ctx.post=async()=>{ready.resolve();return late.promise;};p.run('api.post=post;');
+  const validating=p.run('doValidate()');await ready.promise;await applyThermal(p);
+  const status=p.element('status').textContent;
+  late.resolve({ok:false,error:'obsolete validation error'});await validating;
+  assert.equal(p.element('status').textContent,status);
+  assert(!p.element('log').children.some(x=>String(x.textContent).includes('obsolete validation')));
+});
+
+test('late example response cannot overwrite a newer thermal JSON apply',async()=>{
+  const p=page(),late=deferred(),ready=deferred();
+  p.ctx.get=async()=>{ready.resolve();return late.promise;};p.run('api.get=get;');
+  const loading=p.run("loadExample('old-example')");await ready.promise;await applyThermal(p);
+  late.resolve(em);await loading;
+  assert.equal(p.run('Object.values(doc.physics)[0].type'),'thermal.steady2d');
+  assert.equal(p.run('resultData'),null);assert.equal(p.run('meshData'),null);
+});
+
+test('late file text cannot replace a newer thermal JSON apply',async()=>{
+  const p=page(),late=deferred(),ready=deferred();
+  const loading=p.element('fileInput').onchange({target:{files:[{name:'old-em.json',text:()=>{ready.resolve();return late.promise;}}]}});
+  await ready.promise;await applyThermal(p);late.resolve(JSON.stringify(em));await loading;
+  assert.equal(p.run('Object.values(doc.physics)[0].type'),'thermal.steady2d');
+  assert.equal(JSON.parse(p.element('json').value).name,thermal.name);
+});
