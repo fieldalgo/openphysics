@@ -112,9 +112,11 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
       et    (m, n_e)  edge dofs of E_t  -> use eval_edge_field(space, et[i])
       ez    (m, n_n)  nodal values with E_z = 1j * ez[i]
 
-    The factor of i is physical, not bookkeeping: in a guided mode the longitudinal
-    component sits in quadrature with the transverse one. The relative magnitude of
-    et and ez is scaled correctly, so |E_z|/|E_t| is meaningful.
+    Both coefficient arrays are complex, preserving the eigensolver's full span.
+    The factor of i follows the variable transformation above. For a real basis,
+    the longitudinal component sits in quadrature with the transverse one; a
+    complex combination of degenerate modes need not have that componentwise
+    phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
     """
     A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r)
     n_e, n_n = space.num_edges, mesh.num_nodes
@@ -145,13 +147,17 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     keep = keep[np.argsort(beta2[keep])[::-1]]
 
     n_eff = np.sqrt(beta2[keep]) / k0
-    et = np.zeros((len(keep), n_e))
-    ez = np.zeros((len(keep), n_n))
+    et = np.zeros((len(keep), n_e), dtype=complex)
+    ez = np.zeros((len(keep), n_n), dtype=complex)
     for i, j in enumerate(keep):
         v = vecs[:, j]
-        v = v * np.exp(-1j * np.angle(v[np.argmax(np.abs(v))]))  # fix ARPACK's phase
-        x = np.zeros(n_e + n_n)
-        x[free] = v.real
+        pivot = v[np.argmax(np.abs(v))]
+        v = v * (pivot.conjugate() / abs(pivot))  # fix ARPACK's phase
+        # A real pencil can return complex bases of a degenerate eigenspace.
+        # Taking real parts column by column can collapse independent directions.
+        # Preserve each eigenvector; do not mix nearby, distinct eigenpairs.
+        x = np.zeros(n_e + n_n, dtype=complex)
+        x[free] = v
         et[i] = x[:n_e] / np.sqrt(beta2[j])   # e_t = beta E_t  ->  E_t
         ez[i] = x[n_e:]
     return n_eff, space, et, ez
