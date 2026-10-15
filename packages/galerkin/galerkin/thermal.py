@@ -247,7 +247,8 @@ class SteadyHeatResult:
     """temperature (N,) K, heat_flux (M,2) W/m^2, nodal forces (N,) W/m.
 
     reaction is residual=(K+H)*T-system_rhs on fixed nodes, zero on free nodes.
-    Positive reaction injects heat; outward integrated heat is -reaction.
+    Positive reaction injects heat; the Dirichlet thermostat outward contribution
+    is -reaction. Total outward heat also includes prescribed and convective terms.
     All nodal heat rates are per unit out-of-plane thickness, not watts.
     """
     temperature: np.ndarray
