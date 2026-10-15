@@ -54,14 +54,17 @@ def index():
 
 @app.get("/api/examples")
 def list_examples():
-    return {"examples": sorted(examples.EXAMPLES)}
+    return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
+                               if all(p.get("type") != "em.cavity3d" for p in data["physics"].values()))}
 
 
 @app.get("/api/examples/{name}")
 def get_example(name: str):
     if name not in examples.EXAMPLES:
         raise HTTPException(404, f"no example {name}")
-    return Document.from_dict(examples.EXAMPLES[name]).data
+    doc = Document.from_dict(examples.EXAMPLES[name])
+    _require_studio_physics(doc)
+    return doc.data
 
 
 @app.get("/api/materials")
@@ -91,6 +94,11 @@ def material_preview(body: MaterialPreview):
             "source": m.source}
 
 
+def _require_studio_physics(doc: Document):
+    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+        raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
+
+
 @app.post("/api/validate")
 def validate(body: DocBody):
     try:
@@ -110,6 +118,7 @@ def units():
 def mesh_preview(body: DocBody):
     try:
         doc = Document.from_dict(body.doc)
+        _require_studio_physics(doc)
         model = build_mesh(doc)
     except (DocumentError, ValueError, RuntimeError) as exc:
         raise HTTPException(400, str(exc))
@@ -159,6 +168,7 @@ def start_run(body: DocBody):
         doc = Document.from_dict(body.doc)
     except DocumentError as exc:
         raise HTTPException(400, str(exc))
+    _require_studio_physics(doc)
     job_id = uuid.uuid4().hex[:8]
     with _jobs_lock:
         _jobs[job_id] = {"status": "running", "log": [], "result": None, "error": None}

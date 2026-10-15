@@ -69,7 +69,7 @@ DEFAULTS: dict[str, Any] = {
 
 SHAPE_TYPES = {"rect": {"x", "y", "w", "h"}, "circle": {"cx", "cy", "r"}, "polygon": {"points"}}
 BOUNDARY_TYPES = {"pec", "pmc"}
-PHYSICS_TYPES = {"em.modes2d"}
+PHYSICS_TYPES = {"em.modes2d", "em.cavity3d"}
 FORMULATIONS = {"scalar", "vector"}
 
 
@@ -166,7 +166,13 @@ class Document:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Document":
-        doc = cls(_merge(DEFAULTS, d))
+        defaults = DEFAULTS
+        if isinstance(d.get("physics"), dict) and any(
+                isinstance(p, dict) and p.get("type") == "em.cavity3d"
+                for p in d["physics"].values()):
+            defaults = copy.deepcopy(DEFAULTS)
+            defaults.update(physics={}, mesh={}, results={"save_fields": True, "plots": False})
+        doc = cls(_merge(defaults, d))
         doc.validate()
         return doc
 
@@ -232,6 +238,12 @@ class Document:
         except UnitError as exc:
             raise DocumentError(str(exc)) from None
         _reject_tagged_values(d)
+        if isinstance(d.get("physics"), dict) and any(
+                isinstance(p, dict) and p.get("type") == "em.cavity3d"
+                for p in d["physics"].values()):
+            from .cavity import validate_cavity
+            validate_cavity(self)
+            return
         g = d["geometry"]
         dom = g.get("domain")
         if not dom or any(k not in dom for k in ("xmin", "xmax", "ymin", "ymax")):
@@ -359,6 +371,9 @@ class Document:
                     raise DocumentError("a scalar sweep cannot switch to vector; use a vector wavelength sweep")
 
     def summary(self) -> str:
+        if any(p.get("type") == "em.cavity3d" for p in self.data["physics"].values()):
+            from .cavity import cavity_summary
+            return cavity_summary(self)
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
         length = self.length_unit
         lines = [f"{self.data['name']}  (openphysics {FORMAT})",

@@ -25,6 +25,14 @@ The package and CLI are named `simcase`. The JSON version field remains
 mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 (mesh, mode, sweep), `log.txt`, and a copy of the document.
 
+## Vacuum PEC cavity documents
+
+The feature branch adds a single-study `em.cavity3d` document and SI JSON/NPZ
+output contract. The matching engine integration is pending; see the
+[cavity input and result contract](docs/cavity3d.md) for supported settings,
+search limitations and the distinction between input units and SI output.
+The existing 2D workflow below remains available.
+
 ## The document
 
 ```json

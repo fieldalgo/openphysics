@@ -63,6 +63,8 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
+    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+        raise DocumentError("build_mesh is a 2D stage; use run(document) for em.cavity3d")
     domain, namer, region_materials = build_domain(doc)
     mcfg = doc["mesh"]
     size_fn = None
@@ -91,6 +93,8 @@ def study_points(doc: Document) -> tuple[str | None, list]:
 
 def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
+    if physics.get("type") == "em.cavity3d":
+        raise DocumentError("solve_point is a 2D stage; use run(document) for em.cavity3d")
     wl = physics["wavelength"]
     return physics_em_modes2d.solve(model.mesh, model.eps_per_triangle(wl), wl, physics["boundary"],
                                     int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"))
@@ -233,6 +237,9 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
             print(msg)
 
     doc.validate()
+    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+        from .cavity import run_cavity
+        return run_cavity(doc, verbose=verbose)
     say(doc.summary())
     for note in doc.notes:
         say(f"  warning: {note}")

@@ -23,6 +23,7 @@ can mesh without solving and a caching layer can redo only what changed:
     result = solve_point(model, doc.sole_physics()[1])
 """
 
+from .cavity import CavityRunResult
 from . import examples
 from .geometry import build_domain
 from .fields import VectorField
@@ -34,4 +35,4 @@ from .units import unit_vocabulary
 __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "VectorField", "ModeTrackingError", "unit_vocabulary"]
+           "run", "RunResult", "CavityRunResult", "VectorField", "ModeTrackingError", "unit_vocabulary"]
