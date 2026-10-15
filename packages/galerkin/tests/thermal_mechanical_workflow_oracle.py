@@ -63,4 +63,3 @@ def geometry(mesh,order=8):
     det=np.linalg.det(vertices[:,1:]-vertices[:,:1])
     grad=np.linalg.inv(np.concatenate([np.ones((*vertices.shape[:2],1)),vertices],axis=-1))[:,1:,:].swapaxes(1,2)
     return bary,det[:,None]*weights,np.einsum('qn,tnd->tqd',bary,vertices),grad
-
