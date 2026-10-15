@@ -52,12 +52,25 @@ explicit path, local tests retain their optional cached-database behavior.
 `openphysics` name reservation. Each wheel is built from its sdist, using the
 pinned build tools (`--no-isolation`). It checks metadata with `twine check --strict`,
 checks LICENSE/NOTICE and Studio assets, and writes artifact SHA256 checksums.
+It also checks sdist LICENSE/NOTICE, README, build metadata and the Studio page,
+and requires the seven wheel identities and versions to match their sdists.
 
 A temporary virtual environment outside the checkout then installs only those
 wheels and their declared dependencies, with pinned versions and the optional
 Studio, test, RII and Gmsh extras. It checks import locations, absence of editable
 installs, all CLI entry points, a scalar slab run and saved results, and the
 existing Studio API and Gmsh integration tests. No source `conftest.py` is copied.
+The dedicated `test_cavity_wheel.py` additionally requires the cavity-enabled
+galerkin and simcase candidates. From installed wheels it reproduces the public
+API example and the `cavity_box` CLI workflow, checks JSON/NPZ SI metadata and
+field reconstruction with `allow_pickle=False`, checks spectral-only output,
+safe rejection of a reused output directory and unsupported plotting, and
+confirms that Studio hides and rejects 3D models.
+An absent cavity API fails this gate; it is not skipped. These consumer checks
+do not certify the numerical mesh-convergence or complete-cluster acceptance
+criteria, which remain separate source/independent validation gates. Until the
+cavity candidates are integrated, this extension must be tested on a checkout
+combining those candidates with these CI changes.
 This complements the full source suite; it does not rerun every physics test
 against the wheels or exercise browser layout.
 
@@ -66,6 +79,9 @@ to choose another location. A nonempty output is rejected to avoid stale files.
 CI uploads artifacts and JUnit reports even after failures. These are validation
 artifacts, not a published release. Build reproducibility here means pinned inputs
 and repeatable checks, not byte-identical archives across machines.
+The distribution and Node steps also run after a failed source test step, provided
+that source testing started and the job was not cancelled. Source failure still
+fails the job; independent package evidence must not hide a failed physics gate.
 
 ## Preparing a release
 

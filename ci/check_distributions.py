@@ -16,10 +16,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
 import venv
 import zipfile
 
-from packaging.utils import parse_wheel_filename
+from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
@@ -46,7 +47,25 @@ def main():
     sdists = sorted(output.glob("*.tar.gz"))
     if len(wheels) != len(PACKAGES) or len(sdists) != len(PACKAGES):
         raise RuntimeError("expected one sdist and one wheel per package")
+    expected = {canonicalize_name(name) for name in PACKAGES}
+    wheel_ids = {parse_wheel_filename(p.name)[:2] for p in wheels}
+    sdist_ids = {parse_sdist_filename(p.name) for p in sdists}
+    if wheel_ids != sdist_ids or {name for name, _ in wheel_ids} != expected:
+        raise RuntimeError("wheel/sdist package identities and versions must match the seven packages")
     run(sys.executable, "-m", "twine", "check", "--strict", *wheels, *sdists, cwd=ROOT)
+    for sdist in sdists:
+        name, _ = parse_sdist_filename(sdist.name)
+        with tarfile.open(sdist) as archive:
+            # Strip the one distribution-root component; no extraction is needed.
+            names = {p.name.split("/", 1)[1] for p in archive.getmembers()
+                     if p.isfile() and "/" in p.name}
+            required = {"LICENSE", "README.md", "pyproject.toml", "PKG-INFO"}
+            if name != "openphysics":
+                required.add("NOTICE")
+            if name == "simcase":
+                required.add("simcase/studio/static/index.html")
+            if missing := required - names:
+                raise RuntimeError(f"{sdist.name} is missing {sorted(missing)}")
     for wheel in wheels:
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
@@ -93,6 +112,7 @@ def main():
         tests.mkdir()
         for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
             shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
+        shutil.copy2(ROOT / "ci" / "test_cavity_wheel.py", tests / "test_cavity_wheel.py")
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)
