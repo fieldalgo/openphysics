@@ -57,6 +57,17 @@ and requires the seven wheel identities and versions to match their sdists.
 The galerkin cavity solver document and simcase cavity document/JSON file example
 must also be present in their sdists and byte-identical to the checked-out files.
 A missing or stale document/example fails validation before installed-wheel tests.
+The two screenshots linked by the simcase README must also be present and
+byte-identical in its sdist; these user documents are not runtime wheel assets.
+All included Markdown files are checked for inline relative link/image targets
+against regular archive members, including percent-decoded paths and fragments.
+Current package docs use unspaced inline targets. Reference-style links, Markdown
+parsing beyond that syntax, fragment-anchor existence, and external URL reachability
+are outside this check. Cross-package/root links use explicit repository URLs at a
+known integrated revision; they require network access and repository permission
+while this repository is private. A passing check does not certify fully offline
+documentation. Neither a wheel nor a single sdist is a monorepo checkout: editable
+`packages/...` setup commands require the repository root.
 
 A temporary virtual environment outside the checkout then installs only those
 wheels and their declared dependencies, with pinned versions and the optional

@@ -1,2 +1,4 @@
 include docs/cavity3d.md
+include docs/geometry.png
+include docs/results.png
 include examples/cavity_box.json

@@ -177,4 +177,4 @@ required 1.8. Revision `a660233` changes the cavity mesh to balance reflection
 directions; the product integration cases also pass with this mesh. Document
 execution and file reconstruction do not independently certify mesh convergence
 or overall feature acceptance. For numerical validation evidence, see the
-[engine's validation notes](../../galerkin/docs/cavity_solver.md).
+[engine's validation notes](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/docs/cavity_solver.md).
