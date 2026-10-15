@@ -1,0 +1,55 @@
+{
+  "scope": "Private temporary cloud text transport only. Do not merge into product.",
+  "files": [
+    {
+      "original_blob": "3643c2f49e796e76b751ab2511e8cb4f1ba0e289",
+      "original_bytes": 593026,
+      "transport_file": "3643c2f49e796e76b751ab2511e8cb4f1ba0e289.b64",
+      "path": "packages/gmshio/examples/hadley_rib_mesh.png",
+      "transport_blob": "3426b4a3bff83c5ae8c9405b9cd8687066310b7c"
+    },
+    {
+      "original_blob": "ae8b1e44eaa457aab915556aea7db79ac7f3225a",
+      "original_bytes": 708391,
+      "transport_file": "ae8b1e44eaa457aab915556aea7db79ac7f3225a.b64",
+      "path": "packages/meshine/examples/compare_with_gmsh.png",
+      "transport_blob": "a60dcd372f544b17f42eef7187072091bfde101a"
+    },
+    {
+      "original_blob": "11292c0e7283e7338502abddf0b63e939570b6d9",
+      "original_bytes": 123605,
+      "transport_file": "11292c0e7283e7338502abddf0b63e939570b6d9.b64",
+      "path": "packages/physmat/examples/materials.png",
+      "transport_blob": "e357e2ce6f45c897c783d2cbbb30cd80515a4760"
+    },
+    {
+      "original_blob": "66cda5f2aeb56c89e12875bd72876d9e4de9ad1b",
+      "original_bytes": 57639,
+      "transport_file": "66cda5f2aeb56c89e12875bd72876d9e4de9ad1b.b64",
+      "path": "packages/simcase/docs/geometry.png",
+      "transport_blob": "5bac702d2a1da7e6787b9ff050ad823d807e8389"
+    },
+    {
+      "original_blob": "80bc417dab14449ef1c436c879dc710367be50b1",
+      "original_bytes": 476562,
+      "transport_file": "80bc417dab14449ef1c436c879dc710367be50b1.b64",
+      "path": "packages/simcase/docs/mesh.png",
+      "transport_blob": "f0eb0827ad98a517e8f0b5b0f4c91c3858af638a"
+    },
+    {
+      "original_blob": "2be3290b312858c429138dff466fe207db01ae53",
+      "original_bytes": 294229,
+      "transport_file": "2be3290b312858c429138dff466fe207db01ae53.b64",
+      "path": "packages/simcase/docs/results.png",
+      "transport_blob": "fd793683793f86b68174ce36354a23beb83f051d"
+    },
+    {
+      "original_blob": "5ced8a9ca714d124b8327848d56612bae572731f",
+      "original_bytes": 312726,
+      "transport_file": "5ced8a9ca714d124b8327848d56612bae572731f.b64",
+      "path": "packages/simcase/examples/soi_strip_results.png",
+      "transport_blob": "fab7ca6f4da8b4073a23eee19092dd938be10f45"
+    }
+  ],
+  "source_sha": "6cdfa6ca40ac7b7313d3768e3b7ac59c71338e9f"
+}
