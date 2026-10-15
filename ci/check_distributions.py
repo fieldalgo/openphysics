@@ -29,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 DOCUMENT_ASSETS = {
     "galerkin": ("docs/cavity_solver.md", "docs/eigenspace_reliability.md",
-                 "docs/elasticity2d.md", "examples/elasticity2d.py"),
+                 "docs/elasticity2d.md", "docs/elasticity2d_independent_validation.md",
+                 "examples/elasticity2d.py"),
     "galerkin-refsol": ("refsol/elasticity.py",),
     "simcase": ("docs/cavity3d.md", "examples/cavity_box.json",
                 "docs/geometry.png", "docs/results.png"),
