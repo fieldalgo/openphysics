@@ -15,7 +15,8 @@ A document is a JSON object with these sections (lengths use its declared unit):
     geometry   rectangular domain, a background material, and an ordered list
                of shapes (rect / circle / polygon). Later shapes cut earlier
                ones, the background fills whatever is left.
-    materials  optional custom materials: {"myglass": {"n": 1.5, "k": 0}};
+    materials  optional custom constants {"myglass": {"n": 1.5, "k": 0}}
+               or Sellmeier models {"myglass": {"sellmeier": {"B": [...], "C": [...]}}};
                any other material name is looked up in physmat.
     physics    named physics, {"em1": {...}}. Each entry names its solver and
                its settings. Currently "em.modes2d": wavelength, formulation
@@ -36,6 +37,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -97,6 +99,59 @@ def _merge(defaults: dict, given: dict) -> dict:
     return out
 
 
+def _material_number(value, path: str) -> None:
+    try:
+        finite = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise DocumentError(f"{path}: expected a finite number")
+
+
+def _validate_material(spec, path: str) -> None:
+    if not isinstance(spec, dict):
+        raise DocumentError(f"{path}: custom material must be an object with n or sellmeier")
+    if "source" in spec and not isinstance(spec["source"], str):
+        raise DocumentError(f"{path}.source: expected a string")
+    if "sellmeier" not in spec:
+        if "n" not in spec:
+            raise DocumentError(f"{path}: custom material needs n or sellmeier")
+        for key in ("n", "k"):
+            value = spec.get(key, 0.0)
+            _material_number(value, f"{path}.{key}")
+            if value < 0:
+                raise DocumentError(f"{path}.{key}: must be non-negative")
+        return
+    if "n" in spec or "k" in spec:
+        raise DocumentError(f"{path}: choose either n/k or sellmeier; mixing them would ignore n/k")
+    path += ".sellmeier"
+    model = spec["sellmeier"]
+    if not isinstance(model, dict):
+        raise DocumentError(f"{path}: expected an object with B and C arrays")
+    if "range_um" in model:
+        raise DocumentError(f"{path}.range_um: not supported; use range in the document's length unit")
+    unknown = set(model) - {"B", "C", "A", "range"}
+    if unknown:
+        raise DocumentError(f"{path}: unknown keys {sorted(unknown)}")
+    for key in ("B", "C"):
+        values = model.get(key)
+        if not isinstance(values, (list, tuple)) or not values:
+            raise DocumentError(f"{path}.{key}: expected a non-empty array")
+        for i, value in enumerate(values):
+            _material_number(value, f"{path}.{key}[{i}]")
+    if len(model["B"]) != len(model["C"]):
+        raise DocumentError(f"{path}: B and C must have the same length")
+    _material_number(model.get("A", 1.0), f"{path}.A")
+    if "range" in model:
+        bounds = model["range"]
+        if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+            raise DocumentError(f"{path}.range: expected [minimum, maximum] in the document's length unit")
+        for i, value in enumerate(bounds):
+            _material_number(value, f"{path}.range[{i}]")
+        if not 0 <= bounds[0] < bounds[1]:
+            raise DocumentError(f"{path}.range: require 0 <= minimum < maximum")
+
+
 @dataclass
 class Document:
     data: dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULTS))
@@ -149,6 +204,12 @@ class Document:
     def domain(self) -> dict:
         return self.data["geometry"]["domain"]
 
+    @property
+    def length_unit(self) -> str:
+        """Display the declared unit without rescaling any document values."""
+        declaration = self.data["units"]["length"]
+        return declaration if isinstance(declaration, str) else f"{declaration['in_m']} m"
+
     def sole_physics(self) -> tuple[str, dict]:
         """The (name, settings) of the one physics, for the paths that assume one."""
         items = list(self.data["physics"].items())
@@ -196,9 +257,10 @@ class Document:
                 raise DocumentError(f"shape {s['name']}: polygon needs >= 3 points")
         if "material" not in g["background"]:
             raise DocumentError("geometry.background needs a material")
+        if not isinstance(d["materials"], dict):
+            raise DocumentError("materials must be an object mapping names to material definitions")
         for name, spec in d["materials"].items():
-            if not isinstance(spec, dict) or "n" not in spec:
-                raise DocumentError(f"materials.{name}: custom material needs at least {{'n': value}}")
+            _validate_material(spec, f"materials.{name}")
         if not isinstance(d["physics"], dict) or not d["physics"]:
             raise DocumentError("physics must be a non-empty map of name -> settings, e.g. {'em1': {...}}")
         for pname, p in d["physics"].items():
@@ -261,15 +323,16 @@ class Document:
 
     def summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
+        length = self.length_unit
         lines = [f"{self.data['name']}  (openphysics {FORMAT})",
-                 f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] um",
+                 f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] {length}",
                  f"  background: {g['background']['material']}"]
         for s in g["shapes"]:
             lines.append(f"  shape {s['name']}: {s['type']} of {s['material']}" +
-                         (f", mesh {s['mesh_size']}" if "mesh_size" in s else ""))
+                         (f", mesh {s['mesh_size']} {length}" if "mesh_size" in s else ""))
         for pname, ph in p.items():
-            lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} um, "
+            lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} {length}, "
                          f"{ph['num_modes']} mode(s), boundary {ph['boundary']}")
-        lines.append(f"  mesh: size {m['size']}" + (f", grading {m['grading']}" if m.get("grading") else ""))
+        lines.append(f"  mesh: size {m['size']} {length}" + (f", grading {m['grading']} ({length})" if m.get("grading") else ""))
         lines.append(f"  study: {st['type']}" + (f" over {st['parameter']} x{len(st['values'])}" if st["type"] == "sweep" else ""))
         return "\n".join(lines)

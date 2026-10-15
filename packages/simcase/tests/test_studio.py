@@ -105,6 +105,7 @@ def test_the_server_never_drops_the_units_declaration(client):
     doc = dict(copy.deepcopy(examples.SLAB_TE_CHECK), units={"length": "nm"})
     back = client.post("/api/validate", json={"doc": doc}).json()
     assert back["ok"] and back["doc"]["units"] == {"length": "nm"}
+    assert "lambda 1.55 nm," in back["summary"]
 
     sent, returned = dict(_leaves(doc)), dict(_leaves(back["doc"]))
     assert not sent.keys() - returned.keys(), "the server dropped fields the page sent"
@@ -128,6 +129,7 @@ def test_mesh_preview(client):
     r = client.post("/api/mesh", json={"doc": examples.FIBER})
     assert r.status_code == 200
     m = r.json()
+    assert m["units"] == examples.FIBER["units"]
     assert m["stats"]["triangles"] == len(m["triangles"]) > 500
     assert set(m["region_names"]) == {"core", "background"}
     assert m["stats"]["min_angle"] >= 28 - 1e-6
@@ -143,7 +145,23 @@ def test_run_job_roundtrip(client):
         time.sleep(0.1)
     assert st["status"] == "done", st
     res = client.get(f"/api/jobs/{job}/result").json()
+    assert res["summary"]["units"] == doc["units"]
     assert abs(res["neff"][0][0] - 2.8487) < 2e-3
     assert len(res["fields"][0][0]) == len(res["nodes"])
     assert any("n_eff" in line for line in st["log"])
     assert client.get("/api/jobs/zzz").status_code == 404
+
+
+def test_sellmeier_json_edit_roundtrip_and_validation(client):
+    doc = copy.deepcopy(examples.SLAB_TE_CHECK)
+    doc["units"] = {"length": "nm"}
+    doc["materials"] = {"glass": {"sellmeier": {"B": [1.0], "C": [10000.0], "range": [500, 2000]}}}
+    back = client.post("/api/validate", json={"doc": doc}).json()
+    assert back["ok"], back
+    assert back["doc"]["materials"] == doc["materials"]
+    assert client.post("/api/validate", json={"doc": back["doc"]}).json()["doc"] == back["doc"]
+    doc["materials"]["glass"]["sellmeier"]["C"].append(20000.0)
+    bad = client.post("/api/validate", json={"doc": doc}).json()
+    assert not bad["ok"] and "materials.glass.sellmeier" in bad["error"]
+    assert client.post("/api/run", json={"doc": doc}).status_code == 400
+    assert client.post("/api/mesh", json={"doc": doc}).status_code == 400

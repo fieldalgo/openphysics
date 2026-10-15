@@ -21,7 +21,7 @@ The package and CLI are named `simcase`. The JSON version field remains
 `openphysics` distribution is only a name reservation. See the
 [repository setup](../../README.md) for the full development install.
 
-`model_results/` contains `summary.json` (n_eff per study point, group index,
+`model_results/` contains `summary.json` (declared units, n_eff per study point, group index,
 mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 (mesh, mode, sweep), `log.txt`, and a copy of the document.
 
@@ -54,6 +54,11 @@ number in the document is then a bare number in that system, and a dimension
 the physics requires but the document does not name is an error rather than a
 silent metre. `physics` is a map of named physics, and a sweep parameter names
 one of them.
+CLI summaries, saved plots and Studio geometry/mesh/result labels use the declared
+length unit, including numeric declarations such as `{"length": {"in_m": 1e-10}}`.
+This changes labels, not the stored numbers: changing a declaration alone
+reinterprets the model, so rescale its dimensional inputs when changing units.
+Built-in material previews use physmat's native micrometres and label them as such.
 The schema can represent multiple entries, but the current runner requires
 exactly one and rejects coupled or multiple-physics runs.
 
@@ -73,6 +78,33 @@ is accepted in a document but raises a clear error when run: galerkin already
 has the M3a vector solver, and connecting it to this runner remains to be done.
 Lossy materials are also rejected by the scalar path. Boundaries: `pec`
 (field = 0) or `pmc` (natural).
+
+### Custom optical materials
+
+A custom material is either a constant `{"n": 1.5, "k": 0}` (finite,
+non-negative `n` and `k`; `k` defaults to zero), or a Sellmeier model:
+
+```json
+{"glass": {"source": "coefficient reference", "sellmeier": {
+  "A": 1.0, "B": [0.7, 0.4], "C": [0.01, 0.04], "range": [0.5, 2.0]
+}}}
+```
+
+This example is a `materials` entry for a document in `um`. The formula is
+`n² = A + sum(B[i] * wavelength² / (wavelength² - C[i]))`. `A` (default 1) and
+`B` are dimensionless; `C` is in the document's length unit squared, and the
+optional validity `range` is in its length unit. In `nm`, the same `C` is
+`[10000, 40000]` and the range is `[500, 2000]`. The resolver converts these
+quantities to physmat's micrometre convention once at the material boundary.
+
+`B` and `C` must be non-empty finite numeric arrays of equal length; `A` must be
+finite. A supplied range needs two finite bounds with `0 <= minimum < maximum`;
+omitting it leaves the range unbounded. `source` is an optional string.
+Sellmeier requires no `n` or `k`: mixing either with `sellmeier` is an error,
+because it would silently discard the constant value. Remove a placeholder
+`n` from older workaround documents. The old `range_um` spelling is rejected;
+use `range` expressed in the declared length unit. Malformed models fail during
+document validation, before meshing or running.
 
 ## From Python
 
@@ -121,7 +153,9 @@ document.
   node shows an editable form; every edit updates the geometry view and the JSON
   tab immediately, and the validator's magnitude warnings show up next to it.
 - Materials: physmat's built-ins with their source and validity range, plus
-  document-level constant materials.
+  document-level constant materials. Custom Sellmeier models can be entered in
+  the JSON tab; their tree/property entries identify the model and direct coefficient
+  edits to JSON, without adding a constant `n` or `k`.
 - Generate mesh: meshine through the server, drawn by region, with node and
   triangle counts, minimum angle and mean quality.
 - Run: a background job whose log streams back, then the mode field (selectable

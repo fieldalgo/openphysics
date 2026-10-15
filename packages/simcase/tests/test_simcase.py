@@ -14,6 +14,8 @@ from refsol import benchmarks, fiber, slab
 from simcase import Document, DocumentError, build_mesh, examples, run, solve_point
 from simcase import units
 from simcase.geometry import resolve_regions
+from simcase.materials import resolve_material
+from simcase.runner import RunResult
 
 
 # ---- document handling ---------------------------------------------------------
@@ -331,6 +333,145 @@ def test_untouched_circle_stays_exact():
 
 
 # ---- end to end against references --------------------------------------------
+
+
+@pytest.mark.parametrize("declaration,ratio,label", [
+    ("um", 1.0, "um"), ("nm", 1e3, "nm"), ("m", 1e-6, "m"),
+    ({"in_m": 1e-10}, 1e4, "1e-10 m"),
+])
+def test_document_and_saved_results_display_the_declared_unit(declaration, ratio, label, tmp_path, monkeypatch):
+    import matplotlib.pyplot as plt
+
+    doc = Document.from_dict(_rescaled(examples.SLAB_TE_CHECK, declaration, ratio))
+    original = copy.deepcopy(doc.data)
+    wl = doc["physics"]["em1"]["wavelength"]
+    summary = doc.summary()
+    assert f"lambda {wl} {label}," in summary
+    assert f"mesh: size {doc['mesh']['size']} {label}" in summary
+    assert summary.splitlines()[1].endswith(f" {label}")
+    assert f"mesh {doc.shapes[0]['mesh_size']} {label}" in summary
+
+    # Inspect the figure that is actually saved, using a minimal triangular field.
+    res = RunResult(doc, np.array([[0., 0.], [ratio, 0.], [0., ratio]]),
+                    np.array([[0, 1, 2]]), np.array([0]), ["core"], {"core": "Si"},
+                    None, [wl], np.array([[2.8]]), [np.array([[0.], [1.], [0.5]])])
+    captured = []
+    close = plt.close
+    monkeypatch.setattr(plt, "close", lambda fig=None: captured.append(fig) if hasattr(fig, "axes") else close(fig))
+    out = res.save(tmp_path / "out")
+    fig = captured[-1]
+    try:
+        assert [ax.get_xlabel() for ax in fig.axes] == [f"x ({label})"] * 2
+        assert [ax.get_ylabel() for ax in fig.axes] == [f"y ({label})"] * 2
+        assert f"lambda = {wl} {label}:" in fig.axes[1].get_title()
+        assert fig.axes[0].get_xlim()[1] >= ratio
+        saved = json.loads((out / "summary.json").read_text())
+        assert saved["units"] == {"length": declaration}
+        assert saved["study"]["values"] == [wl]
+        assert json.loads((out / "model.json").read_text()) == original
+        assert doc.data == original
+        saved["units"]["length"] = "km"
+        snapshot = res.summary()
+        snapshot["units"]["length"] = "km"
+        assert doc["units"]["length"] == declaration
+    finally:
+        close(fig)
+
+
+@pytest.mark.parametrize("parameter,values,expected", [
+    ("physics.em1.wavelength", [1500, 1600], "physics.em1.wavelength (nm)"),
+    ("physics.em1.num_modes", [1, 2], "physics.em1.num_modes"),
+])
+def test_sweep_plot_labels_only_length_parameters_with_a_length_unit(parameter, values, expected, tmp_path, monkeypatch):
+    import matplotlib.pyplot as plt
+
+    doc = Document.from_dict(_rescaled(examples.SLAB_TE_CHECK, "nm", 1e3))
+    res = RunResult(doc, np.array([[0., 0.], [1., 0.], [0., 1.]]),
+                    np.array([[0, 1, 2]]), np.array([0]), ["core"], {"core": "Si"},
+                    parameter, values, np.array([[2.8], [2.7]]), [np.array([[0.], [1.], [0.5]])] * 2)
+    captured = []
+    close = plt.close
+    monkeypatch.setattr(plt, "close", lambda fig=None: captured.append(fig) if hasattr(fig, "axes") else close(fig))
+    res.plot(tmp_path / "sweep.png")
+    fig = captured[-1]
+    try:
+        assert fig.axes[2].get_xlabel() == expected
+        title = fig.axes[1].get_title()
+        assert f"{parameter} = {values[1]}" in title
+        assert (" nm:" in title) == parameter.endswith(".wavelength")
+    finally:
+        close(fig)
+
+
+@pytest.mark.parametrize("declaration,ratio", LENGTH_SCALES + [({"in_m": 1e-10}, 1e4)])
+def test_sellmeier_without_n_roundtrips_and_preserves_physical_dispersion(declaration, ratio, tmp_path):
+    d = _rescaled(examples.SLAB_TE_CHECK, declaration, ratio)
+    d["materials"] = {"glass": {"source": "test reference", "sellmeier": {
+        "B": [0.7, 0.4], "C": [0.01 * ratio**2, 0.04 * ratio**2], "A": 1.2,
+        "range": [0.5 * ratio, 2.0 * ratio]}}}
+    doc = Document.from_dict(d)
+    doc.save(tmp_path / "material.json")
+    again = Document.load(tmp_path / "material.json")
+    assert again.data == doc.data
+    mat = resolve_material(again, "glass")
+    wavelengths = np.array([0.5, 1.0, 1.55, 2.0])
+    expected = np.sqrt(1.2 + 0.7 * wavelengths**2 / (wavelengths**2 - 0.01)
+                       + 0.4 * wavelengths**2 / (wavelengths**2 - 0.04))
+    actual = mat.index(units.to_micrometres(wavelengths * ratio, again.scale))
+    np.testing.assert_allclose(actual, expected, rtol=1e-13)
+    assert mat.source == "test reference"
+    with pytest.raises(physmat.OutOfRange):
+        mat.index(units.to_micrometres(2.1 * ratio, again.scale))
+
+
+def test_minimal_sellmeier_uses_default_a_and_unbounded_range():
+    d = copy.deepcopy(examples.SLAB_TE_CHECK)
+    d["materials"] = {"glass": {"sellmeier": {"B": [1.0], "C": [0.01]}}}
+    mat = resolve_material(Document.from_dict(d), "glass")
+    assert mat.n(3.0) == pytest.approx(np.sqrt(1 + 9 / 8.99))
+
+
+@pytest.mark.parametrize("spec,message", [
+    (None, "custom material must be an object"), ({}, "needs n or sellmeier"),
+    ({"n": True}, "finite number"), ({"n": -1}, "non-negative"),
+    ({"n": 1.5, "k": float("nan")}, "finite number"),
+    ({"sellmeier": None}, "expected an object"),
+    ({"sellmeier": {}}, "non-empty array"),
+    ({"sellmeier": {"B": [], "C": []}}, "non-empty array"),
+    ({"sellmeier": {"B": [1], "C": [0, 1]}}, "same length"),
+    ({"sellmeier": {"B": [True], "C": [0]}}, "finite number"),
+    ({"sellmeier": {"B": ["1"], "C": [0]}}, "finite number"),
+    ({"sellmeier": {"B": [1], "C": [float("inf")]}}, "finite number"),
+    ({"sellmeier": {"B": [1], "C": [0], "A": None}}, "finite number"),
+    ({"sellmeier": {"B": [1], "C": [0], "range": [1]}}, "minimum, maximum"),
+    ({"sellmeier": {"B": [1], "C": [0], "range": [2, 1]}}, "minimum < maximum"),
+    ({"sellmeier": {"B": [1], "C": [0], "range": [-1, 2]}}, "minimum < maximum"),
+    ({"sellmeier": {"B": [1], "C": [0], "range": [0, float("inf")]}}, "finite number"),
+    ({"sellmeier": {"B": [1], "C": [0], "range_um": [0, 2]}}, "use range"),
+    ({"sellmeier": {"B": [1], "C": [0], "a": 1}}, "unknown keys"),
+    ({"n": 1.5, "sellmeier": {"B": [1], "C": [0]}}, "mixing"),
+    ({"k": 0.1, "sellmeier": {"B": [1], "C": [0]}}, "mixing"),
+    ({"source": 123, "sellmeier": {"B": [1], "C": [0]}}, "expected a string"),
+])
+def test_invalid_custom_materials_fail_at_document_validation(spec, message):
+    d = copy.deepcopy(examples.SLAB_TE_CHECK)
+    d["materials"] = {"glass": spec}
+    with pytest.raises(DocumentError, match=message) as error:
+        Document.from_dict(d)
+    assert "materials.glass" in str(error.value)
+
+
+@pytest.mark.parametrize("declaration,ratio", [("um", 1.0), ("nm", 1e3), ("m", 1e-6)])
+def test_sellmeier_slab_matches_refsol_across_units(declaration, ratio):
+    d = _rescaled(examples.SLAB_TE_CHECK, declaration, ratio)
+    d["materials"] = {"film": {"sellmeier": {"B": [11.0], "C": [0.01 * ratio**2],
+                                          "range": [ratio, 2 * ratio]}}}
+    d["geometry"]["shapes"][0]["material"] = "film"
+    res = run(Document.from_dict(d), verbose=False)
+    n_film = np.sqrt(1 + 11 * 1.55**2 / (1.55**2 - 0.01))
+    n_clad = physmat.get("SiO2").n(1.55)
+    exact = slab.modes(n_film, n_clad, n_clad, 0.22, 1.55, "TE")[0]
+    assert abs(res.neff[0, 0] - exact) < 1.5e-3
 
 def test_slab_te_matches_refsol_through_the_whole_chain():
     doc = Document.from_dict(examples.SLAB_TE_CHECK)

@@ -142,6 +142,16 @@ async function errText(r) { try { const j = await r.json(); return j.detail || J
 
 function log(msg, cls) { const el = document.createElement('div'); if (cls) el.className = cls; el.textContent = msg; $('log').appendChild(el); $('log').scrollTop = 1e9; }
 function status(s) { $('status').textContent = s; }
+function lengthUnit(units = doc?.units) {
+  const length = units?.length;
+  if (typeof length === 'string') return length;
+  if (length && typeof length.in_m === 'number') return `${length.in_m} m`;
+  return 'undeclared';
+}
+function studyLabel(data) {
+  const path = data.parameter;
+  return (path || 'λ') + (!path || path.endsWith('.wavelength') ? ` (${lengthUnit(data.summary.units)})` : '');
+}
 
 // ------------------------------------------------------------------ colours
 function hashColor(name) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const hue = h % 360; return `hsl(${hue} 55% 62%)`; }
@@ -158,11 +168,11 @@ function transformFor(dom, W, H, margin = 30) {
   const cx = (dom.xmin + dom.xmax) / 2, cy = (dom.ymin + dom.ymax) / 2;
   return { s, X: x => W / 2 + (x - cx) * s, Y: y => H / 2 - (y - cy) * s };
 }
-function drawAxes(ctx, T, dom, W, H) {
+function drawAxes(ctx, T, dom, W, H, unit = lengthUnit()) {
   ctx.strokeStyle = '#9aa1ab'; ctx.lineWidth = 1; ctx.strokeRect(T.X(dom.xmin), T.Y(dom.ymax), (dom.xmax - dom.xmin) * T.s, (dom.ymax - dom.ymin) * T.s);
   ctx.fillStyle = '#6b7280'; ctx.font = '11px system-ui';
-  ctx.textAlign = 'center'; ctx.fillText(`x: ${dom.xmin} … ${dom.xmax} um`, W / 2, H - 8);
-  ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`y: ${dom.ymin} … ${dom.ymax} um`, 0, 0); ctx.restore();
+  ctx.textAlign = 'center'; ctx.fillText(`x: ${dom.xmin} … ${dom.xmax} ${unit}`, W / 2, H - 8);
+  ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`y: ${dom.ymin} … ${dom.ymax} ${unit}`, 0, 0); ctx.restore();
 }
 
 // ------------------------------------------------------------------ geometry view
@@ -209,7 +219,7 @@ function drawMesh() {
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
   const cols = meshData.region_names.map(n => hashColor(meshData.region_materials[n] || n));
   drawTriangles(ctx, T, meshData.nodes, meshData.triangles, t => cols[meshData.regions[t]], meshData.triangles.length < 40000);
-  drawAxes(ctx, T, dom, W, H);
+  drawAxes(ctx, T, dom, W, H, lengthUnit(meshData.units));
   $('meshLegend').innerHTML = meshData.region_names.map((n, i) => `<div><i style="background:${cols[i]}"></i>${n} (${meshData.region_materials[n]})</div>`).join('');
   const s = meshData.stats; $('meshInfo').textContent = `${s.nodes} nodes, ${s.triangles} triangles, min angle ${s.min_angle}°, mean quality ${s.quality_mean}`;
 }
@@ -224,8 +234,8 @@ function drawField() {
   const nodes = resultData.nodes, tris = resultData.triangles;
   drawTriangles(ctx, T, nodes, tris, t => { const [a, b, c] = tris[t]; return cmap((Math.abs(f[a]) + Math.abs(f[b]) + Math.abs(f[c])) / (3 * vmax)); }, false);
   ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
-  drawAxes(ctx, T, dom, W, H);
-  const lab = resultData.parameter ? `${resultData.parameter} = ${resultData.values[p]}` : `λ = ${doc.physics[physKey()].wavelength}`;
+  drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
+  const lab = `${studyLabel(resultData)} = ${resultData.values[p]}`;
   $('resInfo').textContent = `|mode ${m + 1}| at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}`;
 }
 function drawSweep() {
@@ -239,7 +249,7 @@ function drawSweep() {
   const X = x => m.l + (x - xs[0]) / (xs[xs.length - 1] - xs[0]) * (W - m.l - m.r), Y = y => H - m.b - (y - ymin) / (ymax - ymin) * (H - m.t - m.b);
   ctx.strokeStyle = '#9aa1ab'; ctx.strokeRect(m.l, m.t, W - m.l - m.r, H - m.t - m.b);
   ctx.fillStyle = '#6b7280'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(resultData.parameter || '', W / 2, H - 8); ctx.fillText(xs[0], X(xs[0]), H - m.b + 14); ctx.fillText(xs[xs.length - 1], X(xs[xs.length - 1]), H - m.b + 14);
+  ctx.fillText(studyLabel(resultData), W / 2, H - 8); ctx.fillText(xs[0], X(xs[0]), H - m.b + 14); ctx.fillText(xs[xs.length - 1], X(xs[xs.length - 1]), H - m.b + 14);
   ctx.textAlign = 'right'; ctx.fillText(ymin.toFixed(4), m.l - 4, Y(ymin) + 4); ctx.fillText(ymax.toFixed(4), m.l - 4, Y(ymax) + 4);
   ctx.textAlign = 'left'; ctx.fillText('n_eff', m.l + 4, m.t - 6);
   const palette = ['#2f6fed', '#e8590c', '#0b7a5a', '#8e44ad'];
@@ -250,7 +260,7 @@ function drawSweep() {
 function fillResultTable() {
   if (!resultData) { $('resTable').innerHTML = ''; return; }
   const nm = resultData.neff[0].length, ng = resultData.group_index;
-  let h = '<table class="res"><tr><th>' + (resultData.parameter || 'λ') + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${j + 1}</th>`).join('') + (ng ? '<th>n_g 1</th>' : '') + '</tr>';
+  let h = '<table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${j + 1}</th>`).join('') + (ng ? '<th>n_g 1</th>' : '') + '</tr>';
   resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + (ng ? `<td>${ng[i][0].toFixed(4)}</td>` : '') + '</tr>'; });
   h += '</table>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
@@ -260,7 +270,7 @@ function physKey() { return Object.keys(doc.physics)[0]; }
 let unitVocab = null;
 function unitSummary() { const u = doc.units || {}; const k = Object.keys(u); return k.length ? k.map(d => `${d} ${typeof u[d] === 'string' ? u[d] : 'custom'}`).join(', ') : 'none declared'; }
 function populateResultSelectors() {
-  $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${resultData.parameter ? v : 'λ ' + doc.physics[physKey()].wavelength}</option>`).join('');
+  $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${studyLabel(resultData)} = ${v}</option>`).join('');
   $('ptSel').value = Math.floor(resultData.values.length / 2);
   $('modeSel').innerHTML = resultData.neff[0].map((_, j) => `<option value="${j}">${j + 1}</option>`).join('');
 }
@@ -276,7 +286,7 @@ function buildTree() {
   const add = document.createElement('div'); add.className = 'add'; add.innerHTML = '<button>+ shape</button>'; add.querySelector('button').onclick = addShape; t.appendChild(add);
   node('units', `Units · ${unitSummary()}`, 0, '⊛');
   node('materials', 'Materials', 0, '▾');
-  Object.keys(doc.materials).forEach(k => node(`material:${k}`, `${k} · n=${doc.materials[k].n}`, 1, '◈'));
+  Object.keys(doc.materials).forEach(k => node(`material:${k}`, `${k} · ${doc.materials[k].sellmeier ? 'Sellmeier' : 'n=' + doc.materials[k].n}`, 1, '◈'));
   const addm = document.createElement('div'); addm.className = 'add'; addm.innerHTML = '<button>+ custom material</button>'; addm.querySelector('button').onclick = addMaterial; t.appendChild(addm);
   Object.keys(doc.physics).forEach(k => node(`physics:${k}`, `Physics ${k} · ${doc.physics[k].type}`, 0, '∿')); node('mesh', 'Mesh', 0, '△'); node('study', `Study · ${doc.study.type}`, 0, '⇶'); node('results', 'Results', 0, '▤');
 }
@@ -296,7 +306,7 @@ function sel(path, v, opts) { return `<select data-path="${path}">${opts.map(o =
 
 function renderProps() {
   const P = $('props'); let h = '';
-  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">OpenPhysics format ${doc.openphysics}, lengths in micrometres</div>`;
+  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">OpenPhysics format ${doc.openphysics}, lengths in ${lengthUnit()}</div>`;
   else if (selected === 'geometry') h = '<h3>Geometry</h3><div class="hint">Shapes are stacked in order: later shapes cut earlier ones; the background fills the rest. Select a shape or add one.</div>';
   else if (selected === 'geometry.domain') { const d = doc.geometry.domain; h = '<h3>Domain</h3>' + ['xmin', 'xmax', 'ymin', 'ymax'].map(k => row(k, num(`geometry.domain.${k}`, d[k]))).join(''); }
   else if (selected === 'geometry.background') { const b = doc.geometry.background; h = '<h3>Background</h3>' + row('material', `<select data-path="geometry.background.material">${materialOptions(b.material)}</select>`) + row('mesh size', num('geometry.background.mesh_size', b.mesh_size ?? '')) + matHint(b.material); }
@@ -311,7 +321,10 @@ function renderProps() {
   }
   else if (selected === 'materials') h = '<h3>Materials</h3><div class="hint">Names not defined here are looked up in physmat (' + materials.length + ' built-ins with dispersion). Add a custom constant material with + custom material.</div>' +
     '<div class="hint">' + materials.map(m => `<b>${m.name}</b> ${m.range_um[0]}–${m.range_um[1] ?? '∞'} um`).join('<br>') + '</div>';
-  else if (selected.startsWith('material:')) { const k = selected.slice(9), m = doc.materials[k]; h = `<h3>Custom material</h3>` + row('name', `<input type="text" data-kind="matname" data-old="${k}" value="${k}">`) + row('n', num(`materials.${k}.n`, m.n)) + row('k', num(`materials.${k}.k`, m.k ?? 0)) + `<div class="actions"><button data-act="delmat" class="danger">delete</button></div>`; }
+  else if (selected.startsWith('material:')) { const k = selected.slice(9), m = doc.materials[k];
+    h = `<h3>Custom material</h3>` + row('name', `<input type="text" data-kind="matname" data-old="${k}" value="${k}">`);
+    h += m.sellmeier ? `<div class="hint">Sellmeier dispersion. Edit B, C, A and range in the JSON tab. C uses squared document length; range uses ${lengthUnit()}.</div>` : row('n', num(`materials.${k}.n`, m.n)) + row('k', num(`materials.${k}.k`, m.k ?? 0));
+    h += `<div class="actions"><button data-act="delmat" class="danger">delete</button></div>`; }
   else if (selected.startsWith('physics:')) { const pk = selected.slice(8), p = doc.physics[pk]; h = `<h3>Physics · ${pk}</h3>` + row('type', sel(`physics.${pk}.type`, p.type, ['em.modes2d'])) + row('formulation', sel(`physics.${pk}.formulation`, p.formulation, ['scalar', 'vector'])) +
     row('wavelength', num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) + '<h3 style="margin-top:12px">Boundaries</h3>' +
     ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join('') + '<div class="hint">scalar: exact for TE slab modes, approximate for 2D high-contrast cores. vector: waits for the galerkin M3a solver.</div>'; }
@@ -345,7 +358,7 @@ function renderProps() {
   P.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', onAction));
 }
 function matHint(name) { const m = materials.find(x => x.name === name || x.aliases.includes(name)); if (m) return `<div class="hint">${m.source}<br>valid ${m.range_um[0]}–${m.range_um[1] ?? '∞'} um</div>`;
-  if (doc.materials[name]) return `<div class="hint">custom constant material</div>`; return `<div class="hint" style="color:#b42318">unknown material</div>`; }
+  if (doc.materials[name]) return `<div class="hint">custom ${doc.materials[name].sellmeier ? 'Sellmeier' : 'constant'} material</div>`; return `<div class="hint" style="color:#b42318">unknown material</div>`; }
 
 function setPath(obj, path, value) { const parts = path.split('.'); let o = obj; for (const p of parts.slice(0, -1)) o = o[p]; const last = parts[parts.length - 1];
   if (value === '' || value === null) delete o[last]; else o[last] = value; }

@@ -114,7 +114,8 @@ def mesh_preview(body: DocBody):
     except (DocumentError, ValueError, RuntimeError) as exc:
         raise HTTPException(400, str(exc))
     tm, region_materials = model.tri, model.region_materials
-    return {"nodes": tm.nodes.tolist(), "triangles": tm.triangles.tolist(), "regions": tm.regions.tolist(),
+    return {"units": doc["units"],
+            "nodes": tm.nodes.tolist(), "triangles": tm.triangles.tolist(), "regions": tm.regions.tolist(),
             "region_names": tm.region_names, "region_materials": region_materials,
             "stats": {"nodes": tm.num_nodes, "triangles": tm.num_triangles, "min_angle": round(tm.min_angle(), 2),
                       "quality_mean": round(float(tm.quality().mean()), 3)},
