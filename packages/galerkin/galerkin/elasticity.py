@@ -8,13 +8,12 @@ No scalar or edge finite-element space is used here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from collections.abc import Mapping
-import warnings
+from typing import Mapping
 
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-from scipy.sparse.linalg import MatrixRankWarning, spsolve
+from scipy.sparse.linalg import splu
 from scipy.spatial import cKDTree
 
 from .mesh import Mesh
@@ -249,12 +248,10 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     u[fixed] = values
     if len(free):
         rhs = load[free]-k[free][:, fixed] @ values
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", MatrixRankWarning)
-            try:
-                u[free] = spsolve(k[free][:, free], rhs)
-            except (MatrixRankWarning, RuntimeError) as exc:
-                raise ValueError("singular or ill-conditioned constrained elasticity system") from exc
+        try:
+            u[free] = splu(k[free][:, free].tocsc()).solve(rhs)
+        except RuntimeError as exc:
+            raise ValueError("singular or ill-conditioned constrained elasticity system") from exc
     residual = k @ u-load
     if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
         raise ValueError("nonfinite elasticity solution; check geometry and material scaling")
