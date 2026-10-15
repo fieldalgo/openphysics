@@ -2,8 +2,9 @@
 
 This branch adds the product contract for one `em.cavity3d` study: a vacuum
 rectangular box with perfect electric conductor (PEC) conditions on all six
-faces. Engine integration is pending confirmation of the public galerkin API;
-the input and serialization tests alone do not validate a physical solve.
+faces. The public API contract is defined below. End-to-end engine validation remains
+pending on this branch; input and serialization tests alone do not validate a
+physical solve.
 
 ## Input
 
@@ -13,7 +14,7 @@ The example is `examples/cavity_box.json`, also available from
 ```bash
 python -m simcase example cavity_box > cavity.json
 python -m simcase validate cavity.json
-# Available after the matching galerkin cavity API is integrated:
+# Requires the matching galerkin cavity API:
 python -m simcase run cavity.json -o cavity_results
 ```
 
@@ -60,7 +61,7 @@ Studio does not list this example and rejects cavity mesh/run requests.
 ## Search and failure semantics
 
 The requested modes are positive Maxwell modes found near the specified target.
-The proposed engine contract ranks candidates by distance in squared frequency
+The engine contract ranks candidates by distance in squared frequency
 (or equivalently vacuum wavenumber squared), then returns the selected modes
 in ascending frequency. This is a bounded candidate search, not a guarantee of
 the lowest modes or of a complete spectral interval. In particular, a target
@@ -111,23 +112,31 @@ but **all cavity result coordinates and dimensional arrays are SI**. Output
 | `edge_coefficients` | `(E, K)` | Edge integrals in m^-1/2 under SI mass normalization |
 | `electric_field` | `(K, T, 3)` | Electric field at tetrahedron centroids, m^-3/2 |
 
-Scalar string/number metadata accompanies these arrays: field representation
-`cavity-edge-tetrahedron-v1`, `mesh_length_unit`, `frequency_unit`,
+Scalar string/number metadata accompanies these arrays: field layout
+`cavity3d-edge-v1`, `mesh_length_unit`, `frequency_unit`,
 `eigenvalue_unit`, `edge_coefficient_unit`, `electric_field_unit`, normalization
 `electric_mass_orthonormal_si`, `search`, `target_frequency_hz`, and
 `requested_modes`, `edge_orientation="low_node_index_to_high_node_index"`,
 `electric_field_location="tetrahedron_centroid"`, and
-`cluster_completeness="not_assessed; requested count may cut a cluster"`.
+`cluster_completeness="not_certified"` and
+`mode_count_policy="exact_count_may_split_cluster"`.
 The six local edges follow galerkin's tetrahedral order `(0,1)`, `(0,2)`,
 `(0,3)`, `(1,2)`, `(1,3)`, `(2,3)`; signs map these local directions to the
 stored global directions. Cavity output has no `neff` or triangle/nodal-scalar arrays.
 
-The proposed normalization is `q.T @ M_SI @ q = I` for the vacuum electric mass
+The normalization is `q.T @ M_SI @ q = I` for the vacuum electric mass
 matrix. The fields therefore have arbitrary normalized amplitude, **not V/m**.
 Raw edge integrals and centroid fields are different arrays with different
 units; neither may be interpreted as nodal values. Residuals apply to free
-edges of the PEC-reduced generalized eigenproblem; final engine documentation
-must specify their exact norm definition and acceptance tolerance.
+edges of the PEC-reduced generalized eigenproblem: `||S q - lambda M q||_2 /
+(||S q||_2 + |lambda| ||M q||_2)`, with failure limit `1e-8`. Selected-mode
+mass orthogonality has maximum absolute error at most `1e-7`. Tiny numerical
+kernel eigenvalues are screened at `1e-8` times the analytic fundamental
+squared wavenumber in normalized box coordinates, independent of the target.
+
+With `save_fields=false`, the NPZ file is omitted entirely. `summary.json` still
+retains frequencies, eigenvalues, residuals, normalization, SI units, target,
+requested/returned counts and both cluster/count policy fields.
 
 Equivalent length-unit declarations require rescaling every domain coordinate.
 For example, the metre cube can be expressed with maxima `1000` in `"mm"` and

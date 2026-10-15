@@ -118,19 +118,28 @@ class CavityRunResult:
     def frequencies_hz(self):
         return self.cavity.frequencies_hz
 
+    @property
+    def cluster_completeness(self):
+        return self.cavity.cluster_completeness
+
+    @property
+    def mode_count_policy(self):
+        return self.cavity.mode_count_policy
+
     def summary(self) -> dict:
         c = self.cavity
         return {
             "name": self.doc["name"], "physics_type": "em.cavity3d",
             "units": copy.deepcopy(self.doc["units"]),
             "mesh_length_unit": "m", "frequency_unit": "Hz", "eigenvalue_unit": "m^-2",
-            "field_representation": "cavity-edge-tetrahedron-v1",
+            "field_layout": "cavity3d-edge-v1",
             "normalization": "electric_mass_orthonormal_si",
             "edge_coefficient_unit": "m^-1/2", "electric_field_unit": "m^-3/2",
             "amplitude": "arbitrary normalized; not V/m",
             "edge_orientation": "low_node_index_to_high_node_index",
             "electric_field_location": "tetrahedron_centroid",
-            "cluster_completeness": "not_assessed; requested count may cut a cluster",
+            "cluster_completeness": c.cluster_completeness,
+            "mode_count_policy": c.mode_count_policy,
             "mesh": {"nodes": len(c.mesh.nodes), "tetrahedra": len(c.mesh.tets),
                      "edges": len(c.space.edges), "subdivisions": self.doc["mesh"]["subdivisions"]},
             "study": {"type": "single"}, "boundary": "pec", "material": "vacuum",
@@ -156,20 +165,25 @@ class CavityRunResult:
                 frequencies_hz=c.frequencies_hz, eigenvalues_m2=c.eigenvalues_m2,
                 edge_coefficients=c.edge_coefficients, electric_field=c.electric_field,
                 relative_residuals=c.relative_residuals,
-                field_representation="cavity-edge-tetrahedron-v1", mesh_length_unit="m",
+                field_layout="cavity3d-edge-v1", mesh_length_unit="m",
                 frequency_unit="Hz", eigenvalue_unit="m^-2", edge_coefficient_unit="m^-1/2",
                 electric_field_unit="m^-3/2", normalization="electric_mass_orthonormal_si",
                 search=c.search, target_frequency_hz=c.target_frequency_hz,
                 requested_modes=c.requested_modes,
                 edge_orientation="low_node_index_to_high_node_index",
                 electric_field_location="tetrahedron_centroid",
-                cluster_completeness="not_assessed; requested count may cut a cluster")
+                cluster_completeness=c.cluster_completeness,
+                mode_count_policy=c.mode_count_policy)
         return outdir
 
 
 def run_cavity(doc: Document, *, verbose: bool = True) -> CavityRunResult:
-    from galerkin import solve_cavity_box
+    import galerkin
 
+    solve_cavity_box = getattr(galerkin, "solve_cavity_box", None)
+    if solve_cavity_box is None:
+        raise RuntimeError("em.cavity3d requires a matching cavity-enabled galerkin build "
+                           "providing solve_cavity_box")
     doc.validate()
     p = doc.sole_physics()[1]
     dom = doc.domain

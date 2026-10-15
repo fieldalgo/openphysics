@@ -95,7 +95,8 @@ def _result(save_fields=True):
         pec_edge_ids=np.array([1]), frequencies_hz=np.array([2e8]), eigenvalues_m2=np.array([17.57]),
         relative_residuals=np.array([1e-12]), edge_coefficients=np.array([[1.], [0.]]),
         electric_field=np.array([[[1., 0., 0.]]]), search="near_target", target_frequency_hz=2.5e8,
-        requested_modes=1,
+        requested_modes=1, cluster_completeness="not_certified",
+        mode_count_policy="exact_count_may_split_cluster",
     )
     return CavityRunResult(Document.from_dict(data), cavity, {"mesh_and_solve": 0.1}, ["fixture"])
 
@@ -110,6 +111,9 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
     assert summary["electric_field_unit"] == "m^-3/2"
     assert summary["frequencies_hz"] == result.frequencies_hz.tolist()
     assert summary["relative_residuals"] == [1e-12]
+    assert summary["field_layout"] == "cavity3d-edge-v1"
+    assert summary["cluster_completeness"] == result.cluster_completeness == "not_certified"
+    assert summary["mode_count_policy"] == result.mode_count_policy == "exact_count_may_split_cluster"
     assert "neff" not in summary and "triangles" not in summary["mesh"]
     assert Document.load(out / "model.json").data == result.doc.data
     assert not (out / "results.png").exists()
@@ -121,7 +125,9 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
             assert arrays["tet_edges"].shape == arrays["edge_signs"].shape == (1, 6)
             assert str(arrays["edge_orientation"]) == "low_node_index_to_high_node_index"
             assert str(arrays["electric_field_location"]) == "tetrahedron_centroid"
-            assert "not_assessed" in str(arrays["cluster_completeness"])
+            assert str(arrays["cluster_completeness"]) == "not_certified"
+            assert str(arrays["mode_count_policy"]) == "exact_count_may_split_cluster"
+            assert str(arrays["field_layout"]) == "cavity3d-edge-v1"
             assert arrays["electric_field"].shape == (1, 1, 3)
             assert arrays["edge_coefficients"].shape == (2, 1)
             np.testing.assert_array_equal(arrays["pec_edge_ids"], [1])
@@ -163,3 +169,51 @@ def test_studio_rejects_cavity_before_starting_a_2d_job():
             assert response.status_code == 400
             assert "Studio supports 2D only" in response.json()["detail"]
         assert client.get("/api/examples/cavity_box").status_code == 400
+
+
+def test_cavity_guards_preserve_2d_multiphysics_mesh_preview():
+    data = copy.deepcopy(examples.SLAB_TE_CHECK)
+    data["physics"]["second"] = copy.deepcopy(data["physics"]["em1"])
+    doc = Document.from_dict(data)
+    model = build_mesh(doc)
+    assert model.tri.num_triangles > 0
+
+
+@pytest.mark.parametrize("unit,ratio", [("m", 1), ("mm", 1000), ("um", 1e6), ("nm", 1e9)])
+def test_cavity_adapter_converts_lengths_and_translation_to_si(unit, ratio, monkeypatch):
+    import galerkin
+    from simcase import run
+    data = cavity_document()
+    data["units"] = {"length": unit, "time": "ns"}
+    data["geometry"]["domain"] = {
+        "xmin": ratio * 2, "xmax": ratio * 3,
+        "ymin": ratio * -3, "ymax": ratio * -1,
+        "zmin": ratio * 4, "zmax": ratio * 7,
+    }
+    captured = {}
+    expected = _result().cavity
+    original_nodes = expected.mesh.nodes.copy()
+    def solve(lengths_m, subdivisions, **kwargs):
+        captured.update(lengths_m=lengths_m, subdivisions=subdivisions, **kwargs)
+        return expected
+    monkeypatch.setattr(galerkin, "solve_cavity_box", solve, raising=False)
+    result = run(Document.from_dict(data), verbose=False)
+    np.testing.assert_allclose(captured["lengths_m"], [1, 2, 3], atol=1e-14)
+    assert captured["subdivisions"] == [6, 6, 6]
+    assert captured["target_frequency_hz"] == 250000000.0
+    assert captured["num_modes"] == 5
+    np.testing.assert_allclose(result.cavity.mesh.nodes, original_nodes + [2, -3, 4], atol=1e-14)
+    assert result.summary()["units"] == {"length": unit, "time": "ns"}
+    assert result.summary()["mesh_length_unit"] == "m"
+
+
+def test_cavity_cli_reports_missing_engine_api_without_a_traceback(tmp_path, monkeypatch, capsys):
+    import galerkin
+    monkeypatch.delattr(galerkin, "solve_cavity_box", raising=False)
+    path = tmp_path / "box.json"
+    Document.from_dict(cavity_document()).save(path)
+    assert main(["run", str(path), "-o", str(tmp_path / "output")]) == 1
+    error = capsys.readouterr().err
+    assert "matching cavity-enabled galerkin build" in error
+    assert "Traceback" not in error
+    assert not (tmp_path / "output").exists()

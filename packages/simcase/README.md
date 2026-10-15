@@ -28,7 +28,7 @@ mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 ## Vacuum PEC cavity documents
 
 The feature branch adds a single-study `em.cavity3d` document and SI JSON/NPZ
-output contract. The matching engine integration is pending; see the
+output contract. End-to-end engine validation is pending on this branch; see the
 [cavity input and result contract](docs/cavity3d.md) for supported settings,
 search limitations and the distinction between input units and SI output.
 The existing 2D workflow below remains available.

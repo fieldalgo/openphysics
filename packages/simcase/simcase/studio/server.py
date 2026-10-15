@@ -95,7 +95,7 @@ def material_preview(body: MaterialPreview):
 
 
 def _require_studio_physics(doc: Document):
-    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
 
 

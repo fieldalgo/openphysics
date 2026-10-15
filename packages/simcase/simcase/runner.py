@@ -63,7 +63,7 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
-    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise DocumentError("build_mesh is a 2D stage; use run(document) for em.cavity3d")
     domain, namer, region_materials = build_domain(doc)
     mcfg = doc["mesh"]
@@ -237,7 +237,7 @@ def run(doc: Document, verbose: bool = True) -> RunResult:
             print(msg)
 
     doc.validate()
-    if doc.sole_physics()[1]["type"] == "em.cavity3d":
+    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         from .cavity import run_cavity
         return run_cavity(doc, verbose=verbose)
     say(doc.summary())
