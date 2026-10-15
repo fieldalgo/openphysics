@@ -133,6 +133,22 @@ def test_cli_rejects_unsupported_plotting(tmp_path, cavity_example):
     assert not output.exists()
 
 
+def test_cli_refuses_existing_results_without_changing_files(tmp_path, cavity_example):
+    model = tmp_path / "cavity.json"
+    model.write_text(json.dumps(cavity_example), encoding="utf-8")
+    # Exercise the documented default output folder on both invocations.
+    cli("run", model, "-q")
+    output = tmp_path / "cavity_results"
+    (output / "notes.txt").write_text("consumer notes", encoding="utf-8")
+    before = {p.name: p.read_bytes() for p in output.iterdir()}
+    document = copy.deepcopy(cavity_example)
+    document["results"]["save_fields"] = False
+    model.write_text(json.dumps(document), encoding="utf-8")
+    completed = cli("run", model, "-q", check=False)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    assert {p.name: p.read_bytes() for p in output.iterdir()} == before
+
+
 def test_installed_studio_explicitly_rejects_3d(cavity_example):
     from fastapi.testclient import TestClient
     from simcase.studio import app

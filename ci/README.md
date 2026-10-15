@@ -63,8 +63,9 @@ existing Studio API and Gmsh integration tests. No source `conftest.py` is copie
 The dedicated `test_cavity_wheel.py` additionally requires the cavity-enabled
 galerkin and simcase candidates. From installed wheels it reproduces the public
 API example and the `cavity_box` CLI workflow, checks JSON/NPZ SI metadata and
-field reconstruction with `allow_pickle=False`, checks spectral-only output and
-unsupported plotting, and confirms that Studio hides and rejects 3D models.
+field reconstruction with `allow_pickle=False`, checks spectral-only output,
+safe rejection of a reused output directory and unsupported plotting, and
+confirms that Studio hides and rejects 3D models.
 An absent cavity API fails this gate; it is not skipped. These consumer checks
 do not certify the numerical mesh-convergence or complete-cluster acceptance
 criteria, which remain separate source/independent validation gates. Until the
