@@ -155,10 +155,10 @@ gmshio = pytest.importorskip("gmshio")
 
 
 def _gmsh_or_skip():
-    try:
-        return gmshio.find_gmsh()
-    except Exception:
+    exe = gmshio.find_gmsh()
+    if exe is None:
         pytest.skip("the gmsh executable is not installed")
+    return exe
 
 
 @pytest.mark.parametrize("fmt,version", [("msh2", "2.2"), ("msh4", "4.1")])
