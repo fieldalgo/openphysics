@@ -41,7 +41,8 @@ exterior boundary, not an interior node or a trusted boundary tag alone.
 Unselected natural edges have insulation. Boundary node tags can construct the
 Dirichlet mapping. Optional prescribed outward flux and Robin edge-tag inputs,
 including additional result fields and modified balance equations, are documented
-in [thermal_flux_robin.md](thermal_flux_robin.md). The equations below describe
+in the source-tree guide `docs/thermal_flux_robin.md`. Distribution inclusion of
+that guide/example is a separate release step. The equations below describe
 the default case without those inputs.
 
 All temperatures are specified in K; no Celsius conversion or reference
