@@ -137,3 +137,10 @@ python -m twine check --strict .validation/simcase/*
 Version changes, ownership checks, trusted-publisher registration and actual
 publication are separate release tasks. The validation workflow needs only
 read access to repository contents and does not request an OIDC upload token.
+
+The archived elasticity example's printed reaction and imbalance checks use the
+nonzero applied-load vector norm as a force scale. The total balance tolerance
+is relative 1e-9; component comparisons use relative 1e-9 and a dimensionless
+1e-12 zero-component floor. This avoids treating roundoff in a zero horizontal
+resultant as an absolute N/m accuracy promise. Source convergence, residual and
+independent force/moment/energy acceptance gates remain separate.
