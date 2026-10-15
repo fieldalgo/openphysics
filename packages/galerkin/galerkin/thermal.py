@@ -138,11 +138,115 @@ def _source_load(mesh, p, t, area, source):
     return load
 
 
+def _boundary_samples(mesh, p, t, prescribed, outward_flux, convection):
+    """Validate selected exterior identities before sampling four-point rules."""
+    owners = {}
+    for cell, tri in enumerate(t):
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            owners.setdefault(tuple(sorted((int(tri[a]), int(tri[b])))), []).append(cell)
+    x, w = np.polynomial.legendre.leggauss(4)
+    x, w = (x+1)/2, w/2
+    shape = np.column_stack((1-x, x))
+    samples = []
+    for kind, data in (("outward_flux", outward_flux), ("convection", convection)):
+        if data is None:
+            continue
+        if not isinstance(data, Mapping):
+            raise ValueError(f"{kind} must map boundary edge tags to conditions")
+        seen = set()
+        for tag, condition in data.items():
+            if tag not in mesh.boundary_edges:
+                raise ValueError(f"unknown boundary edge tag {tag!r}")
+            edges = np.asarray(mesh.boundary_edges[tag])
+            if (edges.ndim != 2 or edges.shape[1] != 2 or not len(edges)
+                    or edges.dtype.kind not in "iu"):
+                raise ValueError("selected boundary edges must be nonempty integer (E,2)")
+            normals = []
+            for a, b in edges:
+                if a == b or a < 0 or b < 0 or a >= len(p) or b >= len(p):
+                    raise ValueError("invalid boundary edge node indices")
+                key = tuple(sorted((int(a), int(b))))
+                if key in seen:
+                    raise ValueError(f"duplicate {kind} edge, including reversed/tag duplicates")
+                seen.add(key)
+                cells = owners.get(key, [])
+                if len(cells) != 1:
+                    raise ValueError("selected edge must have exactly one incident triangle")
+                if int(a) in prescribed and int(b) in prescribed:
+                    raise ValueError("natural condition overlaps a fully Dirichlet edge")
+                v = p[b]-p[a]
+                length = np.linalg.norm(v)
+                if not np.isfinite(length) or length <= 0:
+                    raise ValueError("boundary edge must have finite positive length")
+                n = np.array([v[1], -v[0]])/length
+                if n@(p[t[cells[0]]].mean(axis=0)-(p[a]+p[b])/2) > 0:
+                    n = -n
+                normals.append(n)
+            points = np.einsum("qa,ead->eqd", shape, p[edges])
+            normal = np.repeat(np.asarray(normals), len(w), axis=0)
+            def evaluate(value, name):
+                if callable(value):
+                    out = _real(value(points.reshape(-1, 2).copy(), normal.copy()), name)
+                    if out.shape != (len(edges)*len(w),):
+                        raise ValueError(f"{name} callback must return exactly shape (Q,)")
+                    return out.reshape(len(edges), len(w))
+                out = _real(value, name)
+                if out.shape != ():
+                    raise ValueError(f"{name} constant must be scalar")
+                return np.full(points.shape[:2], float(out))
+            if kind == "outward_flux":
+                values = (evaluate(condition, "outward flux"),)
+            else:
+                if not isinstance(condition, (tuple, list)) or len(condition) != 2:
+                    raise ValueError("convection condition must be a pair (h, ambient_temperature)")
+                h = evaluate(condition[0], "convection h")
+                ambient = evaluate(condition[1], "ambient temperature")
+                if np.any(h < 0):
+                    raise ValueError("convection h must be nonnegative")
+                values = (h, ambient)
+            length = np.linalg.norm(p[edges[:, 1]]-p[edges[:, 0]], axis=1)
+            samples.append((kind, edges, shape, length[:, None]*w, values))
+    return samples
+
+
+def _boundary_system(samples, n, labels, anchors, constrained):
+    # Pick a useful absolute offset for Robin-only components. Any positive
+    # sampled h anchors discretely; no unit-dependent artificial cutoff.
+    for kind, edges, shape, weights, values in samples:
+        if kind != "convection":
+            continue
+        h, ambient = values
+        for e, q in np.argwhere(h > 0):
+            c = labels[edges[e, 0]]
+            if not constrained[c]:
+                anchors[c] = ambient[e, q]
+                constrained[c] = True
+    G, B, shifted_B = np.zeros((3, n))
+    rows, cols, entries = [], [], []
+    for kind, edges, shape, weights, values in samples:
+        if kind == "outward_flux":
+            local = np.einsum("eq,qa,eq->ea", weights, shape, values[0])
+            np.add.at(G, edges.ravel(), local.ravel())
+        else:
+            h, ambient = values
+            local_h = np.einsum("eq,qa,qb,eq->eab", weights, shape, shape, h)
+            local_b = np.einsum("eq,qa,eq->ea", weights, shape, h*ambient)
+            local_shift = np.einsum("eq,qa,eq->ea", weights, shape,
+                                    h*(ambient-anchors[labels[edges[:, 0]]][:, None]))
+            np.add.at(B, edges.ravel(), local_b.ravel())
+            np.add.at(shifted_B, edges.ravel(), local_shift.ravel())
+            rows.extend(np.repeat(edges, 2, axis=1).ravel())
+            cols.extend(np.tile(edges, (1, 2)).ravel())
+            entries.extend(local_h.ravel())
+    H = coo_matrix((entries, (rows, cols)), shape=(n, n)).tocsr()
+    return H, G, B, shifted_B
+
+
 @dataclass
 class SteadyHeatResult:
     """temperature (N,) K, heat_flux (M,2) W/m^2, nodal forces (N,) W/m.
 
-    reaction is residual=K*T-load on fixed nodes, zero on free nodes.
+    reaction is residual=(K+H)*T-system_rhs on fixed nodes, zero on free nodes.
     Positive reaction injects heat; outward integrated heat is -reaction.
     All nodal heat rates are per unit out-of-plane thickness, not watts.
     """
@@ -151,15 +255,24 @@ class SteadyHeatResult:
     load: np.ndarray
     reaction: np.ndarray
     residual: np.ndarray
+    prescribed_outward_load: np.ndarray | None = None
+    ambient_load: np.ndarray | None = None
+    convective_outward: np.ndarray | None = None
+    system_rhs: np.ndarray | None = None
 
 
-def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0):
-    """Solve -div(k grad T)=Q with prescribed node->K and insulation elsewhere.
+def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
+                      outward_flux=None, convection=None):
+    """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
 
     conductivity is finite scalar k>0 in W/(m K). heat_source is scalar Q
     or a callback receiving (Q,2) metre coordinates and returning (Q,) W/m^3.
     dirichlet maps exterior integer node indices to scalar temperatures in K;
-    every disconnected mesh component requires at least one prescribed node.
+    every disconnected component requires Dirichlet or positive Robin support.
+    outward_flux maps edge tags to g; convection maps tags to (h, ambient).
+    q.n = g+h*(T-ambient), h>=0. Boundary scalars or callbacks
+    (points_m, outward_normals)->(Q,) use W/m^2, W/(m^2 K), K respectively.
+    Untagged natural edges are insulated. See docs/thermal_flux_robin.md.
     """
     k = _real(conductivity, "conductivity")
     if k.shape != () or k <= 0:
@@ -183,34 +296,45 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0):
         if not constrained[component]:
             anchors[component] = value
             constrained[component] = True
+    samples = _boundary_samples(mesh, p, t, prescribed, outward_flux, convection)
+    H, G, B, shifted_B = _boundary_system(samples, len(p), labels, anchors, constrained)
     missing = np.flatnonzero(~constrained)
     if len(missing):
-        raise ValueError(f"each connected component requires Dirichlet data; missing {missing.tolist()}")
+        raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
     stiffness = assemble_stiffness(mesh, float(k))
     load = _source_load(mesh, p, t, area, heat_source)
-    if not np.all(np.isfinite(stiffness.data)) or not np.all(np.isfinite(load)):
+    system = stiffness+H
+    rhs = load+B-G
+    shifted_rhs = load+shifted_B-G
+    if not all(np.all(np.isfinite(a)) for a in
+               (stiffness.data, H.data, load, G, B, shifted_B, rhs, shifted_rhs)):
         raise ValueError("assembled heat system exceeds floating-point range")
     shifted_bc = {(node,): value-anchors[labels[node]] for node, value in prescribed.items()}
     try:
-        increment = solve_dirichlet(stiffness, load, shifted_bc)
+        increment = solve_dirichlet(system, shifted_rhs, shifted_bc)
     except RuntimeError as exc:
         raise ValueError("singular or ill-conditioned constrained heat system") from exc
     temperature = increment+anchors[labels]
-    # Constant temperature is an exact null mode in each component. Evaluate
-    # derivatives/residuals before adding the large absolute-temperature offset.
-    residual = stiffness@increment-load
+    # K annihilates constants; H does not. shifted_B integrates h*(ambient-offset).
+    # Evaluate derivatives and convection before restoring absolute temperature.
+    convective = H@increment-shifted_B
+    residual = stiffness@increment+convective-load+G
     flux = -float(k)*element_gradient(mesh, increment)
-    if not all(np.all(np.isfinite(a)) for a in (temperature, residual, flux)):
+    if not all(np.all(np.isfinite(a)) for a in (temperature, residual, flux, convective)):
         raise ValueError("nonfinite heat solution, residual or heat flux")
     fixed = np.array(sorted(prescribed), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)
-    scale = max(np.linalg.norm(abs(stiffness)@abs(increment)+abs(load), np.inf),
+    scale = max(np.linalg.norm(abs(system)@abs(increment)+abs(shifted_rhs), np.inf),
                 np.finfo(float).tiny)
     if len(free) and np.linalg.norm(residual[free], np.inf) > 1e-10*scale:
         raise ValueError("heat solve failed the normalized free residual tolerance")
     reaction = np.zeros(len(p))
     reaction[fixed] = residual[fixed]
-    balance_scale = max(np.sum(abs(load))+np.sum(abs(reaction)), np.finfo(float).tiny)
-    if abs(np.sum(load+reaction)) > 1e-10*balance_scale:
-        raise ValueError("heat solve failed the normalized heat balance tolerance")
-    return SteadyHeatResult(temperature, flux, load, reaction, residual)
+    for component in range(count):
+        nodes = labels == component
+        balance_scale = max(sum(np.sum(abs(a[nodes])) for a in
+                                (load, reaction, G, convective)), np.finfo(float).tiny)
+        if abs(np.sum((load+reaction-G-convective)[nodes])) > 1e-10*balance_scale:
+            raise ValueError("heat solve failed the normalized component heat balance tolerance")
+    return SteadyHeatResult(temperature, flux, load, reaction, residual,
+                            G, B, convective, rhs)
