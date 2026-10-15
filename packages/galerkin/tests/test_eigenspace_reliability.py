@@ -5,6 +5,7 @@
 
 import numpy as np
 import pytest
+from scipy.optimize import linear_sum_assignment
 
 from galerkin import disk_mesh, solve_modes
 from galerkin.assembly import assemble_mass
@@ -73,9 +74,19 @@ def test_eigenspace_reliability_phase_order_and_complex_basis(monkeypatch):
     a, b, free = pencil(mesh, eps, space)
     beta = 2*np.pi/1.5*neff
     x = np.concatenate((et*beta[:, None], ez), axis=1)[:, free].T
-    order = np.argsort((-(1.45*2*np.pi/1.5)**2+1/captured['nu']).real)
-    # Compare every returned column to its actual ARPACK input, up to phase.
-    raw = captured['vecs'][:, order]
+    # Equal eigenvalues have no unique column order: sorting lambda ascending
+    # and sorting -lambda descending can reverse ties. Match actual columns
+    # bijectively, then require preservation up to phase, not only equal spans.
+    vectors = captured['vecs']
+    overlap = abs(vectors.conj().T @ x)
+    overlap /= np.linalg.norm(vectors, axis=0)[:, None]*np.linalg.norm(x, axis=0)[None, :]
+    raw_ids, output_ids = linear_sum_assignment(-overlap)
+    assert len(output_ids) == x.shape[1] == vectors.shape[1]
+    order = np.empty(x.shape[1], dtype=int)
+    order[output_ids] = raw_ids
+    raw = vectors[:, order]
+    expected_beta2 = -(-(1.45*2*np.pi/1.5)**2+1/captured['nu'][order]).real
+    np.testing.assert_allclose(beta**2, expected_beta2, rtol=1e-13, atol=0)
     for u, v in zip(x.T, raw.T):
         c = np.vdot(v, u)/np.vdot(v, v)
         assert np.linalg.norm(u-c*v) < 1e-12*np.linalg.norm(u)
