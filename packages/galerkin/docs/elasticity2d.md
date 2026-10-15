@@ -95,7 +95,8 @@ component 0 is x, component 1 is y. Nonzero values are supported. Indices must
 be integers (not booleans), and nodes must be on the geometric boundary,
 including hole boundaries. It does not depend on the names in `mesh.boundary`.
 Boundary node tags are merely a convenient way to construct the mapping.
-On all unconstrained boundary components, the corresponding traction is zero.
+Without an applied traction mapping, the corresponding traction is zero on all
+unconstrained boundary components.
 Prescribing only x leaves the y traction zero there unless a boundary load is
 provided. Nonzero global Cartesian boundary traction is supported through the
 optional `traction` mapping; see the [traction guide](elasticity_traction.md)
