@@ -174,3 +174,15 @@ do not promise an absolute N/m or W/m accuracy floor across unit changes.
 The independent source force/moment/work, convergence and error-injection gates
 remain distinct requirements. No new platform matrix, dependency or publication
 is introduced by these distribution checks.
+
+The independent heat document, JSON acceptance manifest, oracle and tests are
+also required sdist assets. The manifest is a historical record for candidate
+`aaf948ae38aa82907ca16ef7cdeed75dfa7484ba`; its candidate, environment and failure
+fields remain verbatim. The six thermal implementation, reference, document,
+example and original-test blobs in recovery
+`3102c32874e89c300f21647291db57626c000982` and this packaged combination are
+identical to that inspected candidate. This preserves the acceptance evidence
+for the unchanged thermal implementation; final combined CI separately checks
+interactions. It does not relabel the historical 699 passed / 9 failed / 9 skipped
+whole-environment run as passing. The independently reported installed 45 and
+original-pair 84 results have their own scopes in that manifest.

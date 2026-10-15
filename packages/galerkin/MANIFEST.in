@@ -11,3 +11,6 @@ include docs/elasticity_traction.md
 include examples/elasticity_traction.py
 include docs/elasticity_traction_independent_validation.md
 include tests/traction_independent_oracle.py
+include docs/thermal_independent_validation.md
+include docs/thermal_independent_validation_manifest.json
+include tests/thermal_independent_oracle.py
