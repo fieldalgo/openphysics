@@ -30,7 +30,9 @@ PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simc
 DOCUMENT_ASSETS = {
     "galerkin": ("docs/cavity_solver.md", "docs/eigenspace_reliability.md",
                  "docs/elasticity2d.md", "docs/elasticity2d_independent_validation.md",
-                 "examples/elasticity2d.py"),
+                 "examples/elasticity2d.py", "tests/eigenspace_reliability_oracle.py",
+                 "tests/elasticity2d_independent_oracle.py",
+                 "tests/test_elasticity2d_independent_validation.py"),
     "galerkin-refsol": ("refsol/elasticity.py",),
     "simcase": ("docs/cavity3d.md", "examples/cavity_box.json",
                 "docs/geometry.png", "docs/results.png"),

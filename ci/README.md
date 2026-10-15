@@ -59,10 +59,14 @@ must also be present in their sdists and byte-identical to the checked-out files
 A missing or stale document/example fails validation before installed-wheel tests.
 The two screenshots linked by the simcase README must also be present and
 byte-identical in its sdist; these user documents are not runtime wheel assets.
-The galerkin eigenspace and static-elasticity contracts and English elasticity
-example must be byte-identical in its sdist. The reference elasticity module is
+The galerkin eigenspace contract, both static-elasticity contracts and English
+elasticity example must be byte-identical in its sdist. The reference module is
 also required byte-for-byte in the refsol sdist; it is automatically packaged
 Python code, so no additional refsol manifest entry is needed.
+The independent elasticity test and its helper, and the eigenspace test helper,
+must also match the checkout in the sdist. Setuptools already includes the test
+files; the manifest explicitly includes their otherwise omitted helper modules.
+These are source-validation assets and are not runtime wheel modules.
 All included Markdown files are checked for inline relative link/image targets
 against regular archive members, including percent-decoded paths and fragments.
 Current package docs use unspaced inline targets. Reference-style links, Markdown
@@ -133,3 +137,10 @@ python -m twine check --strict .validation/simcase/*
 Version changes, ownership checks, trusted-publisher registration and actual
 publication are separate release tasks. The validation workflow needs only
 read access to repository contents and does not request an OIDC upload token.
+
+The archived elasticity example's printed reaction and imbalance checks use the
+nonzero applied-load vector norm as a force scale. The total balance tolerance
+is relative 1e-9; component comparisons use relative 1e-9 and a dimensionless
+1e-12 zero-component floor. This avoids treating roundoff in a zero horizontal
+resultant as an absolute N/m accuracy promise. Source convergence, residual and
+independent force/moment/energy acceptance gates remain separate.
