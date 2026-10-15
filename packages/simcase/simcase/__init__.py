@@ -12,7 +12,7 @@
     $ python -m simcase example soi_strip > model.json
     $ python -m simcase run model.json
 
-The document is the contract between users, scripts and any future GUI: a
+The document is the contract between users, scripts and the optional studio: a
 GUI edits this file; the engine runs it.
 
 ``run`` is a composition of stages that are public in their own right, so a GUI

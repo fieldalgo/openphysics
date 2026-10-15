@@ -1,8 +1,9 @@
-# galerkin — a 2D electromagnetic FEM engine (FieldAlgo project)
+# galerkin — an electromagnetic FEM engine (FieldAlgo project)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.
-Currently covers 2D electromagnetics; designed to grow into a multiphysics core.
+Currently covers 2D electromagnetics and 3D cavity eigenmodes; designed to grow
+into a multiphysics core.
 
 - **M1**: Electrostatics — ∇·(ε∇V) = −ρ (P1 elements)
 - **M2**: Frequency-domain waves — ∇²u + k²u = 0 (complex arithmetic, absorbing boundaries)
@@ -56,22 +57,23 @@ examples/
 
 ## Tests
 
-The engine is graded against [galerkin-refsol](https://github.com/FieldAlgo/galerkin-refsol),
+The engine is graded against [galerkin-refsol](../galerkin-refsol/README.md),
 a separate package holding the closed-form and published reference solutions. It
-lives in its own repository on purpose: a solver that ships its own idea of the
-right answer can agree with itself forever. `tests/test_independence.py` enforces
+shares this repository but stays an independent implementation: the reference
+package does not import the solver it grades. `tests/test_independence.py` enforces
 that the engine never imports it, and that the engine's only dependencies stay
 numpy and scipy.
 
 ```bash
-pip install -e .            # the engine alone: numpy and scipy
-pip install -e '.[test]'    # plus the answer key and the meshers
-pytest                      # everything
-pytest -m "not slow"        # the fast gates, about a minute
+# From the repository root
+python -m pip install -e packages/galerkin   # engine only: numpy and scipy
+# Install the full local test stack using ../../README.md, then:
+python -m pytest -q packages/galerkin/tests
+python -m pytest -q packages/galerkin/tests -m "not slow"
 ```
 
-An editable install puts `galerkin` on the path, so the tests and examples run
-without `PYTHONPATH=.`.
+Run all commands from the repository root. An editable install puts `galerkin`
+on the path, so the tests and examples run without `PYTHONPATH=.`.
 
 The examples keep their own analytical solutions so they run without the test
 extra; two tests check those independent implementations against refsol so the
@@ -80,20 +82,22 @@ pair cannot drift apart.
 ## Run
 
 ```bash
-PYTHONPATH=. python3 examples/coax_convergence.py        # M1 validation
-PYTHONPATH=. python3 examples/waveguide_convergence.py   # M2 convergence
-PYTHONPATH=. python3 examples/cylinder_scattering.py     # M2 scattering
-PYTHONPATH=. python3 examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
-PYTHONPATH=. python3 examples/waveguide_modes.py         # M3-prep eigenmodes
-PYTHONPATH=. python3 examples/fiber_modes.py            # M3a step-index fibre
-PYTHONPATH=. python3 examples/cavity_modes.py           # M3b 3D cavity
-PYTHONPATH=.:examples python3 examples/mesh_io.py       # M3b Gmsh reader
-PYTHONPATH=.:examples python3 examples/visualize.py      # figures
-PYTHONPATH=.:examples python3 examples/visualize_fiber.py  # M3a figure
-PYTHONPATH=.:examples python3 examples/visualize_cavity.py # M3b figure
+python packages/galerkin/examples/coax_convergence.py        # M1 validation
+python packages/galerkin/examples/waveguide_convergence.py   # M2 convergence
+python packages/galerkin/examples/cylinder_scattering.py     # M2 scattering
+python packages/galerkin/examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
+python packages/galerkin/examples/waveguide_modes.py         # M3-prep eigenmodes
+python packages/galerkin/examples/fiber_modes.py            # M3a step-index fibre
+python packages/galerkin/examples/cavity_modes.py           # M3b 3D cavity
+python packages/galerkin/examples/mesh_io.py       # M3b Gmsh reader
+python packages/galerkin/examples/visualize.py      # figures
+python packages/galerkin/examples/visualize_fiber.py  # M3a figure
+python packages/galerkin/examples/visualize_cavity.py # M3b figure
 ```
 
 ## Validation results (2026-09-05)
+
+These are historical measurements from the date above, not a fresh test report.
 
 Every milestone is gated on agreement with an analytical solution plus the
 theoretical convergence rate. A solver is software that can be plausibly wrong;

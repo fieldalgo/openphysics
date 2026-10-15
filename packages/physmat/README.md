@@ -73,8 +73,9 @@ local copy of the database.
 ## Self-checks
 
 ```bash
-pip install pytest pyyaml
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e "packages/physmat[rii]"
+python -m pytest -q packages/physmat/tests
 ```
 
 Checked against published values (fused-silica n_d = 1.4585, Si n(1.55) =

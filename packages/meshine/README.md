@@ -68,8 +68,9 @@ rib cross-section takes about a second.
 ## Self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/meshine
+python -m pytest -q packages/meshine/tests
 ```
 
 Checked properties: polygonal region areas reproduced to 1e-9; every triangle

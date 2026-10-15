@@ -1,9 +1,9 @@
 # galerkin-refsol — reference solutions for validating galerkin
 
 Closed-form solutions and published high-accuracy benchmarks used as the
-answer key for the [galerkin](https://github.com/FieldAlgo/galerkin)
-electromagnetic FEM engine. Kept in its own repository so that the grader
-never imports the code it grades; depends only on numpy and scipy.
+answer key for the [galerkin](../galerkin/README.md)
+electromagnetic FEM engine. It is a separate package in the same monorepo;
+the grader never imports the code it grades. It depends only on numpy and scipy.
 
 A numerical solver is software that can be plausibly wrong. This package is
 the part that does not depend on the discretization.
@@ -41,14 +41,16 @@ benchmarks.rib_neff(0.3)   # 3.412492
 ## Run the self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/galerkin-refsol
+python -m pytest -q packages/galerkin-refsol/tests
 ```
 
 ## Use from galerkin
 
 ```bash
-pip install git+https://github.com/FieldAlgo/galerkin-refsol
+# From the repository root
+python -m pip install -e packages/galerkin-refsol
 ```
 
 Suggested validation order for a vector mode solver: step-index fiber

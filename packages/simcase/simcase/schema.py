@@ -3,7 +3,7 @@
 
 """The model document: everything a simulation needs, as plain data.
 
-A document is a JSON object with these sections (all lengths in micrometres):
+A document is a JSON object with these sections (lengths use its declared unit):
 
     units      the unit system the document's numbers are written in: one symbol
                per SI base dimension it needs, e.g. {"length": "um"}. There is no
@@ -19,7 +19,7 @@ A document is a JSON object with these sections (all lengths in micrometres):
                any other material name is looked up in physmat.
     physics    named physics, {"em1": {...}}. Each entry names its solver and
                its settings. Currently "em.modes2d": wavelength, formulation
-               ("scalar"; "vector" arrives with M3a), num_modes, boundary
+               ("scalar"; the existing M3a vector solver is not yet connected), num_modes, boundary
                conditions per side ("pec" | "pmc"). The names are how a study
                and (later) a coupling refer to one physics, so they are part of
                the document, not an implementation detail.
@@ -28,7 +28,7 @@ A document is a JSON object with these sections (all lengths in micrometres):
     study      {"type": "single"} or {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [...]}
     results    {"save_fields": true, "plots": true}
 
-The same file drives a script, a command line run, and (later) a GUI: the GUI
+The same file drives a script, a command line run, and the optional studio: the GUI
 is an editor for this document, nothing more.
 """
 

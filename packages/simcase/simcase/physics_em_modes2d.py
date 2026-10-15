@@ -7,9 +7,9 @@ Scalar formulation (P1 nodal):   (k0^2 M_eps - K) phi = beta^2 M phi,  n_eff = b
     Exact for TE modes of slab-like (1D) structures, an approximation for
     2D high-contrast cores. Boundary "pec" -> phi = 0, "pmc" -> natural (Neumann).
 
-Vector formulation: provided by the galerkin M3a mode solver once it lands;
-    this module raises a clear error until then so documents can already
-    request it.
+Vector formulation: galerkin already provides the M3a mode solver, but it is
+    not yet connected to this document runner. Documents can request it;
+    this module raises a clear error instead of silently using scalar modes.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from galerkin import Mesh, assemble_mass, assemble_stiffness
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
           num_modes: int = 1, formulation: str = "scalar"):
     if formulation == "vector":
-        raise NotImplementedError("physics.formulation 'vector' needs the galerkin M3a mode solver; use 'scalar'")
+        raise NotImplementedError("physics.formulation 'vector' is not yet connected to the existing galerkin M3a mode solver; use 'scalar'")
     if np.iscomplexobj(eps_tri) and np.abs(eps_tri.imag).max() > 0:
         raise NotImplementedError("lossy materials (Im eps != 0) need the complex eigensolver; not in the scalar path yet")
     eps_tri = np.real(eps_tri)

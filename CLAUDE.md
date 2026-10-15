@@ -1,6 +1,7 @@
 # OpenPhysics
 
-A multiphysics simulation suite. One repository, six packages, each its own PyPI distribution.
+A multiphysics simulation suite. One repository, six implementation packages,
+each its own PyPI distribution, plus the empty `openphysics` name reservation.
 
 ```
 packages/galerkin/         FEM engine (layers 3-6)
@@ -36,12 +37,19 @@ README. They share one git history, one test run and one install.
 
 ## Run the UI
 
-    cd packages/simcase && python -m simcase.studio      -> http://127.0.0.1:8765
+From the repository root after installing the packages:
+
+    python -m simcase.studio      -> http://127.0.0.1:8765
 
 ## Elsewhere
 
 Study notes, concept demos and experiments live in the sibling repository `../openphysics-lab`
-(personal account, never published). A path inside it is never public; everything in this
-repository ships with a product one day. When unsure where a file goes, it goes in the lab.
+(private, never published). Public implementation and validation material stays in this
+repository; research experiments stay in the lab.
 
-Background, decisions and validation values: Claude Project "FieldAlgo".
+Current private roadmap, decisions and session progress live in
+`~/project/fieldalgo/hq`. Read its `AGENTS.md` and `ROADMAP.md`; the current
+inventory and follow-up work are in `work/openphysics-baseline.md`.
+Claude Project "FieldAlgo" is historical context, not the current progress record.
+Public implementation and validation facts belong with the code; private plans
+and session handoffs belong in HQ.

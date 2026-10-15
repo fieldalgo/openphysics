@@ -13,7 +13,8 @@ depends on numpy alone.
 ## Install
 
 ```bash
-pip install git+https://github.com/FieldAlgo/gmshio
+# From the repository root
+python -m pip install -e packages/gmshio
 # plus a gmsh executable, one of:
 pip install gmsh            # PyPI wheel ships the program
 # or a system package / download from https://gmsh.info, or set GMSH_EXECUTABLE
@@ -67,8 +68,9 @@ Ready-made geometries in `gmshio.geo`:
 ## Self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/gmshio
+python -m pytest -q packages/gmshio/tests
 ```
 
 The tests check what a solver relies on rather than the reader against
