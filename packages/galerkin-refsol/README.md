@@ -14,6 +14,8 @@ The Python package name is `refsol` (`from refsol import fiber`).
 
 | module | contents | self-checks |
 |---|---|---|
+| `refsol.thermal` | Kelvin slab and steady sine manufactured fields; heat flux W/m^2 and source W/m^3 | Direct analytic derivatives, no engine imports |
+| `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge) and exact vector modes TE/TM/HE/EH | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation |
@@ -22,6 +24,14 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
+
+For steady heat, explicitly import `refsol.thermal`; `slab` returns temperature,
+heat flux and heat source for metre coordinates, Kelvin and conductivity W/(m K).
+For boundary-loaded elasticity, explicitly import `refsol.elasticity_traction`.
+Its traction vectors use global Cartesian Pa; integrated mechanical load is N/m
+of out-of-plane thickness. Both modules are automatically included as Python
+code in sdists and wheels. The installed distribution checks verify their bytes
+and public imports. They do not implement a coupled thermoelastic model.
 
 For static 2D elasticity, explicitly import `refsol.elasticity`. Its coordinates
 and displacement use metres, E and stress use Pa, body force uses N/m^3, and

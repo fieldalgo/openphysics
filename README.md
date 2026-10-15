@@ -5,7 +5,7 @@ package has its own distribution, version and dependencies.
 
 | Package | Current role |
 |---|---|
-| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes, static 2D elasticity and a 3D PEC box cavity solver |
+| [galerkin](packages/galerkin/README.md) | 2D electromagnetic FEM, vector waveguide modes, steady heat conduction, static 2D elasticity and a 3D PEC box cavity solver |
 | [galerkin-refsol](packages/galerkin-refsol/README.md) | Independent analytical solutions and published benchmarks; imported as `refsol` |
 | [meshine](packages/meshine/README.md) | 2D triangle meshing for material regions |
 | [gmshio](packages/gmshio/README.md) | Gmsh executable runner, MSH 4.1 ASCII reader and FEM mesh adapters |
@@ -78,7 +78,22 @@ partner. Studio supports 2D models only and rejects 3D mesh/run requests. See th
 Coupled multiphysics, geometry sweeps and lossy mode solves are not implemented
 in the document runner.
 
-## Standalone elasticity and vector fields
+## Standalone heat, elasticity and vector fields
+
+Steady homogeneous isotropic 2D conduction uses `galerkin.thermal` and the
+independent `refsol.thermal`. See the [Kelvin/heat-flux contract](packages/galerkin/docs/thermal_steady2d.md).
+Static elasticity supports [global Cartesian boundary traction](packages/galerkin/docs/elasticity_traction.md),
+with [independent traction validation](packages/galerkin/docs/elasticity_traction_independent_validation.md).
+After installation, run from the repository root:
+
+```bash
+python packages/galerkin/examples/thermal_steady2d.py
+python packages/galerkin/examples/elasticity_traction.py
+```
+
+Both English examples are also in the galerkin sdist. Heat load/reaction is W/m
+of out-of-plane thickness; mechanical load/reaction is N/m of thickness. These
+standalone APIs do not add transient heat, thermal expansion or coupled models.
 
 For standalone static 2D elasticity, use `galerkin.elasticity` and the independent
 `refsol.elasticity` submodule. The [elasticity contract](packages/galerkin/docs/elasticity2d.md)

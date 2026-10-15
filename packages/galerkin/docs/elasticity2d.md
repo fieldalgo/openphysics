@@ -64,7 +64,7 @@ thickness parameter is accepted. This avoids hiding a length factor in loads.
 | Prescribed/result displacement | scalar per `(node,component)`; result `(N,2)` | m |
 | body_force | constant `(2,)`, or callback `(Q,2)->(Q,2)` | N/m^3 |
 | stiffness matrix, internal | `(2N,2N)` | N/m^2 |
-| result.load | assembled consistent nodal force `(N,2)` | N/m of thickness |
+| result.load | total consistent body and boundary nodal load `(N,2)` | N/m of thickness |
 | result.reaction | support force ON the body, `(N,2)` | N/m of thickness |
 | result.residual | `K*u-load` at all DOFs, `(N,2)` | N/m of thickness |
 | `0.5*u.T*K*u`, if reconstructed | energy per thickness | J/m = N |
@@ -95,10 +95,14 @@ component 0 is x, component 1 is y. Nonzero values are supported. Indices must
 be integers (not booleans), and nodes must be on the geometric boundary,
 including hole boundaries. It does not depend on the names in `mesh.boundary`.
 Boundary node tags are merely a convenient way to construct the mapping.
-On all unconstrained boundary components, the corresponding traction is zero.
-Prescribing only x leaves the y traction zero at that boundary. Applied nonzero
-tractions, point forces, periodic constraints and multipoint constraints are
-not supported. Interior prescribed displacement is rejected in this first API.
+Without an applied traction mapping, the corresponding traction is zero on all
+unconstrained boundary components.
+Prescribing only x leaves the y traction zero there unless a boundary load is
+provided. Nonzero global Cartesian boundary traction is supported through the
+optional `traction` mapping; see the [traction guide](elasticity_traction.md)
+for tags, callable normals, consistent integration and loads on prescribed DOFs.
+Point forces, periodic constraints and multipoint constraints are not supported.
+Interior prescribed displacement is rejected in this first API.
 
 A body-force callback receives all quadrature coordinates as a real `(Q,2)`
 array and must return a finite real array of exactly the same shape. The

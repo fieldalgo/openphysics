@@ -144,3 +144,45 @@ is relative 1e-9; component comparisons use relative 1e-9 and a dimensionless
 1e-12 zero-component floor. This avoids treating roundoff in a zero horizontal
 resultant as an absolute N/m accuracy promise. Source convergence, residual and
 independent force/moment/energy acceptance gates remain separate.
+
+## Installed steady heat and boundary traction
+
+The existing 37 consumers, including the dimensionless force comparison, remain
+unchanged. `test_thermal_traction_wheel.py` adds 21 installed consumers. The checker
+copies the two new English examples from their byte-verified sdists, alongside
+the existing elasticity example, and executes them outside the checkout with
+`python -I`. New contracts, examples and independent acceptance helpers/tests
+must match their checked-out bytes in the galerkin sdist; both new refsol modules
+must match the refsol sdist and import from the installed environment.
+
+Heat consumers use Kelvin and direct slab/constant-source mixed-insulation
+closed forms. They check q in W/m^2, heat load/reaction in W/m of thickness,
+outward heat equal to minus reaction, constant/callback source agreement,
+constant-temperature offsets, and explicit invalid/nullspace rejection. One
+small 8-to-16 mesh interval checks the existing regular-solution P1 order margins
+against an independently integrated quadratic closed form. It does not replace
+the independent multi-interval source convergence and quadrature acceptance.
+Heat balance divides by the sum of absolute loads and reactions, rather than
+their potentially zero signed sum. Zero-scale conditions are tested separately.
+
+Traction consumers check both plane models against direct uniaxial/shear formulas,
+consistent linear edge loads, outward callback normals under edge reversal,
+retained applied loads on prescribed DOFs, duplicate/interior edge rejection,
+and None/empty-mapping regression. Mechanical balance uses a nonzero force norm;
+energy/work comparisons use their own nonzero energy scale. These comparisons
+do not promise an absolute N/m or W/m accuracy floor across unit changes.
+The independent source force/moment/work, convergence and error-injection gates
+remain distinct requirements. No new platform matrix, dependency or publication
+is introduced by these distribution checks.
+
+The independent heat document, JSON acceptance manifest, oracle and tests are
+also required sdist assets. The manifest is a historical record for candidate
+`aaf948ae38aa82907ca16ef7cdeed75dfa7484ba`; its candidate, environment and failure
+fields remain verbatim. The six thermal implementation, reference, document,
+example and original-test blobs in recovery
+`3102c32874e89c300f21647291db57626c000982` and this packaged combination are
+identical to that inspected candidate. This preserves the acceptance evidence
+for the unchanged thermal implementation; final combined CI separately checks
+interactions. It does not relabel the historical 699 passed / 9 failed / 9 skipped
+whole-environment run as passing. The independently reported installed 45 and
+original-pair 84 results have their own scopes in that manifest.
