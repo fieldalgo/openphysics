@@ -2,7 +2,7 @@
 
 [English](README.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
 COMSOL 형태의 프로그램은 본질적으로 모델을 설명하는 파일과 이를 실행하는 엔진입니다. `simcase`는 FieldAlgo 스택을 위한 해당 파일 형식과 엔진을 구현합니다. JSON 문서는 형상·재료·물리·메시 설정·study를 담고, 한 명령이 meshine(메시), physmat(재료), galerkin(FEM)을 거쳐 결과를 기록합니다. 문서를 편집하는 브라우저 UI는 같은 설치의 [선택적 하위 패키지](#브라우저-ui)이며 엔진은 이에 의존하지 않습니다.
 
@@ -242,3 +242,10 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 |---|---|---|
 | Cavity / 공동 | [English](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
 | Headless heat / 헤드리스 열전도 | [English](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |
+
+저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
+교체에 대한 보호는 시험하지만, 소유권 검사와 unlink 사이의 외부 교체는 안전을
+보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.
+이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
+원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
+GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.

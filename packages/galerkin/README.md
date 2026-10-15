@@ -2,7 +2,7 @@
 
 [English](README.md) | [한국어](README.ko.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.
@@ -338,11 +338,12 @@ the convergence rate is the lie detector.
 - **Dielectric-loaded and open 3D problems**: the tensor-coefficient path exists
   in 3D (`assemble_stiffness_3d` takes (T,3,3) tensors), so the M2.5 PML carries
   over; what is missing is a 3D validation case with an analytical answer.
-- **Beyond electromagnetics**: the assembly core is physics-neutral. Anisotropic
-  steady heat conduction with convective (Robin) boundaries already runs on the
-  M1 routines unchanged; elasticity needs a vector nodal space, transient
-  problems a time integrator, and Stokes a P2 space. M3a's two-field block
-  system is the pattern every coupled multiphysics problem reuses.
+- **Beyond electromagnetics**: the low-level assembly can represent anisotropic
+  coefficients. The public steady-heat API currently accepts homogeneous
+  isotropic conductivity, including prescribed outward flux and Robin boundaries.
+  Static elasticity provides its own vector nodal space. Transient problems need
+  time integration and Stokes needs a P2 space. The M3a two-field block system
+  illustrates an assembly pattern; it does not certify automatic coupling.
 
 ## License
 
@@ -358,3 +359,13 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
+
+## Review candidate: thermal boundary extension
+
+The standalone isotropic `galerkin.thermal` API adds prescribed outward flux and
+Robin convection; see [boundary contract](docs/thermal_flux_robin.md),
+[English example](examples/thermal_flux_robin.py), and
+[independent acceptance](docs/thermal_flux_robin_independent_validation.md).
+This review candidate is not a published release or final develop acceptance.
+The headless simcase JSON contract still rejects flux/Robin boundaries; the
+standalone extension does not enable them in Studio or add automatic coupling.

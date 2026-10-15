@@ -1,5 +1,11 @@
 # Validation and distribution checks
 
+[한국어](locales/ko/pages/README.md)
+
+GitHub Actions is currently disabled by user instruction. Do not enable, dispatch
+or rerun it. Workflow commands below describe retained definitions, not current
+GitHub-runner execution. Current verification runs only in the Work cloud.
+
 ## Narrow Windows headless thermal gate
 
 `thermal-windows.yml` runs Python 3.12.10 on GitHub-hosted windows-2022. It
@@ -58,7 +64,7 @@ python ci/fetch_rii.py /tmp/openphysics-rii
 export PHYSMAT_RII_PATH=/tmp/openphysics-rii/database
 gmsh --version
 python -m pytest -q -ra
-node --test packages/simcase/tests/studio_vector.cjs
+node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
 python ci/check_distributions.py
 ```
 
@@ -255,3 +261,37 @@ the historical manifest does not certify changed implementation blobs. Final
 combined CI separately checks interactions. It does not relabel the historical 699 passed / 9 failed / 9 skipped
 whole-environment run as passing. The independently reported installed 45 and
 original-pair 84 results have their own scopes in that manifest.
+
+Output ownership requires exclusive caller control until save and cleanup finish.
+Protection against replacements observed before cleanup is tested; a foreign
+replacement between an ownership check and unlink is not guaranteed safe.
+Hostile filesystem races and atomic rollback are outside acceptance. Do not let
+another writer mutate the output during this interval. Windows save verification
+is stopped with two unresolved failures; Linux results do not establish Windows
+acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
+
+## Combined review candidate: packaged independent acceptance
+
+All seven Korean package READMEs and received Korean guide counterparts are
+required byte assets. The standalone outward-flux/Robin contract, example,
+independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
+The headless independent EN/KO report, oracle, test and stale-state Node file
+are likewise required. The current required-byte list contains 68 entries.
+The installed suite preserves the original 105 consumers and adds the original
+headless and Robin independent Python acceptance files without editing their
+thresholds; report actual counts and skips for each execution. The Node command
+runs 22 tests (existing vector 8, thermal guards 6, independent stale guards 8).
+These are distinct scopes, not a single physics certification count.
+
+The current Robin implementation and thermal contract differ from aaf. The
+six-blob identity statement above applies only to historical 0a/6cdf trees.
+The historical JSON and frozen English acceptance documents remain unchanged;
+Robin has its own independent acceptance and Dirichlet regression. Headless JSON
+still rejects flux/Robin and does not gain thermal Studio UI or automatic coupling.
+The candidate awaits owner review and final integration; it is not published.
+
+Work-cloud checks use the available Linux/Python 3.12.14 environment with
+numpy 2.3.5 and scipy 1.17.0, not the retained pinned CI environment. Gmsh and
+an explicit RII database are unavailable; record actual skips. Twine is absent,
+so its strict check is unexecuted unless an existing tool becomes available.
+Do not infer Windows acceptance from Linux results. Actions remains disabled.

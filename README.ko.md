@@ -92,3 +92,12 @@ python -m pytest -q packages/simcase/tests
 시험은 해석해, 메시 위상·스케일, FEM 수렴, 재료 모델, 문서 실행과 Studio HTTP API를 포함한다. 선택 도구나 데이터가 없으면 일부 통합 시험은 skip한다. 부분 시험 통과만으로 그 통합을 실제 시험했다고 볼 수 없다. 브라우저 상호작용과 패키지 릴리스 절차는 별도로 확인한다.
 
 패키지 README의 과거 수치 측정은 원래 명시한 날짜의 기록이다. 이 한국어판을 추가했다는 사실이 새로운 시험 실행이나 새로운 수치 합격을 뜻하지 않는다.
+
+저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
+교체에 대한 보호는 시험하지만, 소유권 검사와 unlink 사이의 외부 교체는 안전을
+보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.
+이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
+원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
+GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.
+
+검토 후보에는 독립 API의 외향 열유속·Robin 열 경계가 포함됩니다. [계약](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md)과 [독립 수용검증](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요. 헤드리스 JSON은 이 경계를 받지 않습니다. 후보 통합과 최종 수용은 아직 대기 중입니다.

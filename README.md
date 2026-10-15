@@ -158,3 +158,13 @@ workflows are separate checks.
 
 Historical numerical measurements in package READMEs retain their stated dates;
 they are not reports from a new test run.
+
+Output ownership requires exclusive caller control until save and cleanup finish.
+Protection against replacements observed before cleanup is tested; a foreign
+replacement between an ownership check and unlink is not guaranteed safe.
+Hostile filesystem races and atomic rollback are outside acceptance. Do not let
+another writer mutate the output during this interval. Windows save verification
+is stopped with two unresolved failures; Linux results do not establish Windows
+acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
+
+The review candidate includes standalone outward-flux/Robin heat boundaries; see [contract](packages/galerkin/docs/thermal_flux_robin.md) and [independent acceptance](packages/galerkin/docs/thermal_flux_robin_independent_validation.md). Headless JSON does not accept these boundaries. Candidate integration and final acceptance remain pending.

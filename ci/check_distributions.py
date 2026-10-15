@@ -51,12 +51,30 @@ DOCUMENT_ASSETS = {'galerkin': ('docs/cavity_solver.md',
               'docs/prescribed_temperature_thermoelasticity_independent_validation.md',
               'tests/thermoelasticity_independent_oracle.py',
               'tests/test_thermoelasticity_independent_validation.py',
-              'README.ko.md'),
+              'README.ko.md',
+              'docs/locales/ko/pages/cavity_solver.md',
+              'docs/locales/ko/pages/eigenspace_reliability.md',
+              'docs/locales/ko/pages/elasticity2d.md',
+              'docs/locales/ko/pages/elasticity2d_independent_validation.md',
+              'docs/locales/ko/pages/elasticity_traction.md',
+              'docs/locales/ko/pages/elasticity_traction_independent_validation.md',
+              'docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md',
+              'docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md',
+              'docs/locales/ko/pages/thermal_flux_robin.md',
+              'docs/locales/ko/pages/thermal_flux_robin_independent_validation.md',
+              'docs/locales/ko/pages/thermal_independent_validation.md',
+              'docs/locales/ko/pages/thermal_steady2d.md',
+              'docs/thermal_flux_robin.md',
+              'docs/thermal_flux_robin_independent_validation.md',
+              'examples/thermal_flux_robin.py',
+              'tests/thermal_flux_robin_independent_oracle.py',
+              'tests/test_thermal_flux_robin_independent_validation.py'),
  'galerkin-refsol': ('refsol/elasticity.py',
                      'refsol/thermal.py',
                      'refsol/elasticity_traction.py',
                      'refsol/thermoelasticity.py',
-                     'README.ko.md'),
+                     'README.ko.md',
+                     'refsol/thermal_boundary.py'),
  'simcase': ('docs/cavity3d.md',
              'examples/cavity_box.json',
              'docs/geometry.png',
@@ -67,7 +85,12 @@ DOCUMENT_ASSETS = {'galerkin': ('docs/cavity_solver.md',
              'tests/studio_thermal.cjs',
              'README.ko.md',
              'docs/locales/ko/pages/cavity3d.md',
-             'docs/locales/ko/pages/thermal_steady2d.md'),
+             'docs/locales/ko/pages/thermal_steady2d.md',
+             'docs/locales/ko/pages/thermal_simcase_independent_validation.md',
+             'docs/thermal_simcase_independent_validation.md',
+             'tests/thermal_simcase_independent_oracle.py',
+             'tests/test_thermal_simcase_independent_validation.py',
+             'tests/thermal_simcase_independent_stale.cjs'),
  'meshine': ('README.ko.md',),
  'gmshio': ('README.ko.md',),
  'physmat': ('README.ko.md',),
@@ -191,6 +214,15 @@ def main():
         shutil.copy2(ROOT / "ci" / "test_thermal_traction_wheel.py", tests / "test_thermal_traction_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_thermoelasticity_wheel.py", tests / "test_thermoelasticity_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_thermal_simcase_wheel.py", tests / "test_thermal_simcase_wheel.py")
+        # Preserve the independent acceptance files verbatim in the installed suite.
+        for package, filenames in (
+            ("simcase", ("thermal_simcase_independent_oracle.py",
+                         "test_thermal_simcase_independent_validation.py")),
+            ("galerkin", ("thermal_flux_robin_independent_oracle.py",
+                          "test_thermal_flux_robin_independent_validation.py")),
+        ):
+            for filename in filenames:
+                shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
         # Execute the verified archived example, not a source-tree copy.
         examples = work / "examples"
         examples.mkdir()

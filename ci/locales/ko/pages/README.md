@@ -2,7 +2,9 @@
 
 [English original](../../../README.md)
 
-번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`의 영문 문서입니다.
+기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
+
+GitHub Actions는 사용자 지시로 비활성화돼 있습니다. 활성화·dispatch·재실행을 하지 않습니다. 아래 workflow 명령은 보존한 정의이며 현재 GitHub runner에서 실행했다는 뜻이 아닙니다. 현재 검증은 Work cloud 안에서만 수행합니다.
 
 루트 `validate.yml` workflow는 push·pull request·수동 dispatch에서 실행됩니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11과
@@ -28,7 +30,7 @@ python ci/fetch_rii.py /tmp/openphysics-rii
 export PHYSMAT_RII_PATH=/tmp/openphysics-rii/database
 gmsh --version
 python -m pytest -q -ra
-node --test packages/simcase/tests/studio_vector.cjs
+node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
 python ci/check_distributions.py
 ```
 
@@ -189,8 +191,61 @@ edge 하중, edge 반전에서 외향 콜백 법선, 처방 DOF에도 남는 적
 독립 열 문서, JSON 수용 manifest, oracle와 시험도 필수 sdist 자산입니다. manifest는
 후보 `aaf948ae38aa82907ca16ef7cdeed75dfa7484ba`의 과거 기록이며 후보·환경·실패 필드를
 원문 그대로 유지합니다. recovery `3102c32874e89c300f21647291db57626c000982`와
-이 package 결합의 여섯 thermal 구현·reference·문서·예제·원래 시험 blob은 검사한 후보와
-동일합니다. 따라서 바뀌지 않은 열 구현의 수용 증거를 보존하며 최종 결합 CI가 상호작용을
-별도 검사합니다. 과거 전체 환경 run의 699 passed / 9 failed / 9 skipped를 통과로
-다시 분류하지 않습니다. 독립 보고된 설치 45개와 원래 쌍 84개 결과의 범위는 해당
-manifest에 각각 따로 있습니다.
+과거 통합 `0a44797f73cf67bab14429c982144f0e0e4338aa` /
+`6cdfa6ca40ac7b7313d3768e3b7ac59c71338e9f` tree의 여섯 thermal 구현·reference·문서·예제·원래 시험 blob만
+검사한 후보와 동일합니다. 이후 열 확장은 별도 독립 수용과 Dirichlet 회귀가 필요하며
+역사적 manifest는 바뀐 구현 blob을 인증하지 않습니다. 최종 결합 검증은 상호작용을 별도로
+검사합니다. 과거 전체 환경 run의 699 passed / 9 failed / 9 skipped를 통과로
+다시 분류하지 않습니다. 독립 보고된 설치 45개와 원래 쌍 84개는 각각의 범위입니다.
+
+## 좁은 Windows 헤드리스 열전도 gate
+
+`thermal-windows.yml`은 GitHub-hosted windows-2022의 Python 3.12.10을 정의합니다.
+네 로컬 wheel(galerkin, meshine, physmat, simcase)을 빌드하고 index·의존성 해석 없이
+consumer venv에 설치합니다. checkout 밖 `python -I`로 전용 열 문서 consumer와
+선택된 저장 I/O 시험을 실행하도록 정의했습니다. API/CLI 저장, 수치 raw 출력,
+기존 파일·디렉터리·끊어진 링크, 부분 실패, 파일·디렉터리 교체와 동시 소유권을 다룹니다.
+실패는 skip하지 않습니다. consumer venv는 system-site-packages로 고정 job 의존성을
+재사용하므로 clean-room 의존성 설치가 아닙니다.
+
+Windows 요구는 Linux exact version의 최소 부분집합입니다. pytest/build 전이 의존성
+`colorama==0.4.6`은 별도 pin이며 upstream tag의 pyproject와 LICENSE.txt에서
+BSD-3-Clause를 확인했습니다. runtime 요구나 패키지 버전은 바꾸지 않았습니다.
+Windows 전체 회귀·광학/Gmsh·다른 OS/Python 지원을 인증하지 않습니다.
+마지막 native-handle 후보에서 기존 교체 시험 두 개가 미해결이며 Windows 저장·정리
+수용은 미완료입니다. GitHub runner 검증은 중단됐습니다. 보존 workflow는 재현 정의이지
+Windows 합격 주장이 아니고 Linux 결과가 이를 대신하지 않습니다. Windows log/JUnit/
+환경·네 wheel checksum은 별도 `windows-thermal-installed-and-io-<run_id>` artifact입니다.
+Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88 consumer는
+유지되며 Node는 shipped `studio_thermal.cjs`도 실행하도록 정의했습니다.
+
+새 headless consumer는 독립 SI slab·부호 있는 혼합 열원 폐형식, 모서리 구속,
+수치 version/units/shape와 검증 archive JSON 예제를 검사합니다. 유한요소 smoke의
+오차 범위는 해석적 열원 곡률과 cell 크기에서 정하며 summary 자기비교가 아닙니다.
+독립 수렴·소유권 수용을 대체하지 않습니다. 플랫폼 검증과 실패는 실제 exact 후보의
+실행 근거로 판단해야 하며 workflow 존재만으로 추정하지 않습니다.
+
+저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
+교체 보호는 시험하지만 소유권 검사와 unlink 사이의 외부 교체는 안전을 보장하지 않습니다.
+적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. 이 동안 다른 writer가
+출력을 바꾸면 안 됩니다. Windows 두 실패의 원인은 미확정이며 Actions는 비활성화돼 있습니다.
+
+## 결합 검토 후보의 배포 독립 수용
+
+한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
+독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
+원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
+필수입니다. 현재 필수 byte 목록은 68개입니다. 설치 시험은 기존 consumer 105개를
+유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
+각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
+독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
+
+현재 Robin 구현과 열 계약은 aaf에서 변경됐으므로 여섯 blob 동일성은 과거 0a/6cdf에만
+해당합니다. 역사적 JSON과 동결 영어 수용 문서는 불변입니다. Robin은 별도 독립 수용과
+Dirichlet 회귀가 연결됩니다. headless JSON은 여전히 flux/Robin을 거부하고 열 Studio UI나
+자동 연성을 추가하지 않습니다. 오너 검토와 최종 통합 대기 후보이며 게시된 릴리스가 아닙니다.
+
+Work cloud는 현재 가용 Linux/Python 3.12.14, numpy 2.3.5, scipy 1.17.0으로 검증하며
+보존 pinned CI 환경이 아닙니다. Gmsh와 명시적 RII database가 없으므로 실제 skip을
+기록합니다. twine이 없어 strict 검사는 기존 도구가 가용해지지 않는 한 미실행입니다.
+Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 계속 비활성 상태입니다.

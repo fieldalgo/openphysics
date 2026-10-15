@@ -2,7 +2,7 @@
 
 [English](README.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
 해석해 검증을 먼저 수행하는 방식으로 단계별 개발한 순수 Python(numpy + scipy.sparse) 유한요소 솔버 엔진입니다. 현재 2D 전자기, 정적 2D 탄성, 3D 공진기 고유모드를 다루며 다중물리 코어로 확장하도록 설계했습니다.
 
@@ -182,7 +182,7 @@ Hadley의 명시 정확도 ±3e-6에는 **도달하지 못했습니다**. 원인
 
 - **MFEM**은 문제 규모가 순수 Python 직접해법의 범위를 넘을 때의 생산 코어로 검토 중입니다. 이 3D 희소 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없으며, 그 이후에는 보조 공간 전처리기를 쓰는 반복 솔버가 필요합니다.
 - **유전체 충전 및 열린 3D 문제**: 3D 텐서 계수 경로가 있으므로(`assemble_stiffness_3d`가 (T,3,3) 텐서를 받음) M2.5 PML을 옮길 수 있습니다. 부족한 것은 해석해를 갖는 3D 검증 사례입니다.
-- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 대류(Robin) 경계를 갖는 이방성 정상 열전도는 M1 루틴을 바꾸지 않고 이미 실행됩니다. 탄성에는 벡터 절점 공간, 과도 문제에는 시간 적분기, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템이 각 연성 다중물리 문제에서 재사용하는 패턴입니다.
+- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 과도 문제에는 시간 적분기, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템이 각 연성 다중물리 문제에서 재사용하는 패턴입니다.
 
 ## 라이선스
 
@@ -194,3 +194,13 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 
 이 프로젝트는 Gmsh 프로젝트와 제휴하지 않으며 그 프로젝트의 보증이나 지원을 받지 않습니다.
 
+
+## 검토 후보: 열 경계 확장
+
+독립 등방성 `galerkin.thermal` API는 처방 외향 열유속과 Robin 대류를 추가합니다.
+[경계 계약](docs/locales/ko/pages/thermal_flux_robin.md),
+[영어 예제](examples/thermal_flux_robin.py),
+[독립 수용검증](docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요.
+이 검토 후보는 게시된 릴리스나 최종 develop 수용이 아닙니다.
+헤드리스 simcase JSON 계약은 여전히 flux/Robin 경계를 거부합니다. 독립 API 확장은
+Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니다.

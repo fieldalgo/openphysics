@@ -2,7 +2,7 @@
 
 [English](README.md) | [한국어](README.ko.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 Optical dispersion first (complex refractive index and permittivity versus
 wavelength), with a slot for the thermal and mechanical constants a

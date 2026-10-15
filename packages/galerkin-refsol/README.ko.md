@@ -2,7 +2,7 @@
 
 [English](README.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
 [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md) FEM 엔진의 정답지로 사용하는 폐형식 해와 출판된 고정밀 벤치마크입니다. 같은 모노레포 안의 별도 패키지이며, 평가자는 평가 대상 코드를 import하지 않습니다. numpy와 scipy에만 의존합니다.
 
@@ -100,3 +100,5 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 `refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과입니다. 출처는 [NOTICE](NOTICE)를 참조하세요.
 
+
+`refsol.thermal_boundary`는 처방 외향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 외향 열유속은 W/m^2, 대류 h는 W/(m^2 K)입니다. 두 배포 아카이브에 포함되며 이 독립 참조 모듈이 헤드리스 JSON schema를 확장하지는 않습니다.

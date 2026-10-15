@@ -2,7 +2,7 @@
 
 [English](README.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/codex/openphysics-thermal-simcase-release-check/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
 우선 광학 분산(파장에 따른 복소 굴절률 및 유전율)을 제공하며, 향후 다중물리 솔버에 필요한 열·기계 상수를 담을 자리도 갖추고 있습니다. 솔버와 독립적입니다. numpy + scipy를 사용하며 refractiveindex.info 데이터베이스를 읽을 때는 PyYAML도 사용합니다.
 

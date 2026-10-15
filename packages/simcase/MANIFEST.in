@@ -9,3 +9,8 @@ include tests/studio_thermal.cjs
 include README.ko.md
 include docs/locales/ko/pages/cavity3d.md
 include docs/locales/ko/pages/thermal_steady2d.md
+include docs/locales/ko/pages/thermal_simcase_independent_validation.md
+include docs/thermal_simcase_independent_validation.md
+include tests/thermal_simcase_independent_oracle.py
+include tests/test_thermal_simcase_independent_validation.py
+include tests/thermal_simcase_independent_stale.cjs
