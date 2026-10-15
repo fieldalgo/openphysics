@@ -72,14 +72,29 @@ def peak_rss():
                 rss_method="worker resource.getrusage(RUSAGE_SELF).ru_maxrss")
 
 
+def profiling_state():
+    # CPython 3.12 cProfile uses monitoring instead of the legacy profile hook.
+    legacy_hook = sys.getprofile() is not None
+    monitoring = getattr(sys, "monitoring", None)
+    tool = None
+    events = 0
+    if monitoring is not None:
+        tool = monitoring.get_tool(monitoring.PROFILER_ID)
+        events = monitoring.get_events(monitoring.PROFILER_ID)
+    return dict(profiled=legacy_hook or bool(events),
+                profiling=dict(legacy_hook_active=legacy_hook,
+                               monitoring_profiler_tool=tool,
+                               monitoring_profiler_events=events))
+
+
 def worker(case, subdivision, modes, target):
     inputs = dict(lengths_m=CASES[case], subdivisions=[subdivision] * 3,
                   num_modes=modes, target_frequency_hz=target)
     sample = dict(case=case, subdivision=subdivision, inputs=inputs,
                   input_sha256=hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest(),
                   pid=os.getpid(), parent_pid=os.getppid(),
-                  profiled=sys.getprofile() is not None,
                   thread_environment={key: os.environ.get(key) for key in THREADS})
+    sample.update(profiling_state())
     start = None
     try:
         # This source benchmark must not silently use an editable install elsewhere.
@@ -164,9 +179,12 @@ def summarize(runs):
     summaries = []
     for case, subdivision in sorted({(r["case"], r["subdivision"]) for r in runs}):
         selected = [r for r in runs if (r["case"], r["subdivision"]) == (case, subdivision)]
-        good = [r for r in selected if r["status"] == "ok"]
+        successful = [r for r in selected if r["status"] == "ok"]
+        good = [r for r in successful if not r.get("profiled", False)]
         summary = dict(case=case, subdivision=subdivision, attempted=len(selected),
-                       succeeded=len(good), failed=len(selected) - len(good))
+                       succeeded=len(successful), failed=len(selected) - len(successful),
+                       unprofiled_succeeded=len(good),
+                       profiled_succeeded=len(successful) - len(good))
         for metric in ("solve_wall_seconds", "subprocess_wall_seconds", "peak_rss_mib"):
             values = [r[metric] for r in good if r.get(metric) is not None]
             summary[metric] = (dict(median=statistics.median(values), min=min(values), max=max(values))
