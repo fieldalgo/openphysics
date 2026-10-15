@@ -52,6 +52,9 @@ geometry sweeps and lossy mode solves are not implemented in that runner.
 
 ## Validate this checkout
 
+Reproducible Linux validation, pinned optical data, and checks of installed
+wheel/sdist artifacts are documented in [ci/README.md](ci/README.md).
+
 ```bash
 python -m pytest -q
 python -m pytest -q -m "not slow"
