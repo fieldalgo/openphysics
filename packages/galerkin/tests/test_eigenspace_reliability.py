@@ -89,6 +89,7 @@ def test_eigenspace_reliability_phase_order_and_complex_basis(monkeypatch):
     np.testing.assert_allclose(beta**2, expected_beta2, rtol=1e-13, atol=0)
     for u, v in zip(x.T, raw.T):
         c = np.vdot(v, u)/np.vdot(v, v)
+        np.testing.assert_allclose(abs(c), 1.0, rtol=1e-12, atol=0)
         assert np.linalg.norm(u-c*v) < 1e-12*np.linalg.norm(u)
 
     # Build an exact common-eigenvalue input fixture from the observed pair's
