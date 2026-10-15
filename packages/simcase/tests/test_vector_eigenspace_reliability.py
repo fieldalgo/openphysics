@@ -33,7 +33,7 @@ def test_vector_eigenspace_reliability_adapter_and_saved_complex_span(tmp_path):
     assert np.linalg.eigvalsh(g/norm)[0] > 1e-8
     d = copy.deepcopy(examples.VECTOR_FIBER)
     d['physics']['em1'].update(wavelength=1.5, num_modes=2)
-    d['results'].update(plots=False, save_fields=True)
+    d.setdefault('results', {}).update(plots=False, save_fields=True)
     doc = Document.from_dict(d)
     names = [f'region{i}' for i in range(3)]
     materials = dict(zip(names, ['core', 'clad', 'clad']))
