@@ -1,10 +1,10 @@
 # Vacuum PEC box document and results
 
-This branch adds the product contract for one `em.cavity3d` study: a vacuum
-rectangular box with perfect electric conductor (PEC) conditions on all six
-faces. The public API contract is defined below. End-to-end engine validation remains
-pending on this branch; input and serialization tests alone do not validate a
-physical solve.
+The product contract supports one `em.cavity3d` study: a vacuum rectangular
+box with perfect electric conductor (PEC) conditions on all six faces. The
+public API contract is defined below. Actual engine integration checks cover
+CLI execution, unit conversion and saved-field reconstruction; these checks
+are separate from the engine's numerical convergence acceptance.
 
 ## Input
 
@@ -144,3 +144,25 @@ the same subdivisions and target in Hz. The physical SI output should then be
 unchanged. Changing the physical box size without changing the target changes
 the search problem as well as the spectrum; scale the target inversely when
 comparing geometrically similar mode sets.
+
+## Integration validation and numerical limitation
+
+With the cavity-enabled galerkin implementation, run from the repository root:
+
+```bash
+python -m pytest -q packages/simcase/tests/test_cavity3d_integration.py
+```
+
+The seven integration cases passed for simcase revision `cd4071a` combined with
+galerkin revision `3b850a8`. They exercise a translated cube, reference-frequency
+smoke checks for its first two complete reference clusters, metre/mm/um/nm
+representations, real CLI execution with and without fields, and reconstruction
+from NPZ loaded with `allow_pickle=False`. Reassembled topology, centroid fields,
+PEC coefficients, free-edge residuals and mass orthogonality are checked. The
+coarse reference-frequency check is not a mesh-convergence acceptance gate.
+
+At galerkin revision `3b850a8`, the fixed rectangular-box 111-cluster mean
+convergence gate still fails: the last observed order is about 1.2284, below the
+required 1.8. Successful document execution and file reconstruction do not resolve
+that numerical limitation or certify overall feature acceptance. See the
+[engine's validation notes](../../galerkin/docs/cavity_solver.md).
