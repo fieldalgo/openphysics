@@ -383,3 +383,7 @@ This Python-only, steady one-way operation adds no JSON/CLI/Studio or persistenc
 contract, Robin/flux/traction workflow, transient feedback or thermodynamic
 coupling. Immutable transfer does not certify callbacks or mutable results after
 return. The contract separates heat W/m, mechanical N/m and physical energy J/m.
+
+## Prescribed-temperature total mechanical traction
+
+The [total-traction contract](docs/thermoelastic_traction.md), [English example](examples/thermoelastic_traction.py) and [independent report](docs/thermoelastic_traction_independent_validation.md) describe optional global Cartesian Pa loads on the frozen-temperature mechanical stage. The prescribed mapping is total physical `sigma*n`; do not add/subtract thermal traction. Body, line, thermal loads and constrained reactions remain separately accounted for. Legacy18 positional result construction remains valid; new load fields default to None. There is no dedicated scalar-pressure/local-frame/follower API, but `lambda points_m, normals: -p * normals` is a valid global Pa callback on the fixed reference boundary. This does not extend the heat workflow, JSON/CLI/Studio or persistence.

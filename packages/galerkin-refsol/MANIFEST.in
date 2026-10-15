@@ -1,1 +1,3 @@
 include README.ko.md
+include refsol/thermoelastic_traction.py
+include tests/test_thermoelastic_traction_reference.py
