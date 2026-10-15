@@ -139,8 +139,34 @@ independently reproduced measurements.
 
 Reported environment: Linux x86-64, CPython 3.12.14, NumPy 2.5.4, SciPy 1.18.1,
 one requested BLAS/OpenMP thread, AMD EPYC 9V74, four-CPU quota, 32 GiB memory
-limit. The full eight-row ranges/scaling analysis remains pending access to
-the original results. No cross-machine speedup or memory reduction is claimed.
+limit. The archived operator's recorded command output was subsequently recovered
+without restarting its session. It contains all eight group summaries below and
+the original baseline JSON digest
+`dca2d01105934093269c3e5c5b6210ad5f2cdc327c29e68d08f32efb8dec6fb8`.
+This recovers the printed medians/ranges, not the raw 24-sample JSON or binary
+profile; sample-level audit and original artifact transfer remain pending.
+No cross-machine speedup or memory reduction is claimed.
+
+| Geometry | n | Free edge DOFs | Solve seconds: median [min, max] | Process median, s | Worker lifetime RSS MiB: median [min, max] |
+| --- | ---: | ---: | --- | ---: | --- |
+| Cube | 4 | 316 | 0.0316 [0.0271, 0.0331] | 0.3455 | 66.3125 [65.3438, 66.5352] |
+| Cube | 8 | 3032 | 0.2548 [0.2268, 0.2808] | 0.5634 | 80.8359 [80.7930, 81.1445] |
+| Cube | 12 | 10836 | 2.3142 [2.0294, 2.3908] | 2.6945 | 166.1484 [166.0078, 167.3359] |
+| Cube | 16 | 26416 | 13.0385 [12.4931, 13.8035] | 13.3233 | 625.1875 [621.9688, 626.4336] |
+| Rectangle | 4 | 316 | 0.0309 [0.0273, 0.0343] | 0.3843 | 66.0273 [65.6641, 66.4336] |
+| Rectangle | 8 | 3032 | 0.2490 [0.2345, 0.2641] | 0.5915 | 81.1641 [79.6836, 81.3789] |
+| Rectangle | 12 | 10836 | 2.2943 [2.1346, 2.3477] | 2.6291 | 166.7148 [166.6250, 167.1484] |
+| Rectangle | 16 | 26416 | 12.8399 [12.8333, 14.1168] | 13.1404 | 628.3828 [626.8477, 628.4414] |
+
+The printed summary reports zero frequency differences between repetitions and
+maximum relative residuals below 2.01e-12. Over n=8 to n=16, free DOFs grow by
+about 8.7 times, solve medians by about 51 times, and lifetime RSS by about
+7.7 times for either geometry. These are observed ratios on these inputs,
+not an asymptotic complexity fit, a solver-only memory measurement, or evidence
+of an optimization. The small n=4 process time is dominated by work outside the
+solver call. Combined with the separately reported factorization profile below,
+the larger cases motivate studying factorization memory/time before choosing
+an iterative method; such a replacement still needs the existing physical gates.
 
 The previous operator separately reported one rectangle n=16 cProfile:
 13.278 s total, 12.856 s cumulative in the solve, 7.962 s across two `splu`
