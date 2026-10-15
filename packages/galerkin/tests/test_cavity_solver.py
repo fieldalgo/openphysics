@@ -11,7 +11,7 @@ import scipy.linalg as la
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (CavityResult, solve_cavity_box, box_mesh, EdgeSpace3D,
+from galerkin import (CavityResult, solve_cavity_box,
                       assemble_curlcurl_3d, assemble_edge_mass_3d,
                       eval_edge_field_3d)
 import galerkin.cavity as cavity
@@ -29,8 +29,7 @@ def _amplitude_spectrum(lengths, n_max=4):
     return np.sort(values)
 
 
-def _constrained_system(lengths, n):
-    space = EdgeSpace3D(box_mesh(*lengths, n, n, n))
+def _constrained_system(space):
     free = np.setdiff1d(np.arange(space.num_edges), space.boundary_edge_ids())
     stiffness = assemble_curlcurl_3d(space)[free][:, free].tocsc()
     mass = assemble_edge_mass_3d(space)[free][:, free].tocsc()
@@ -102,13 +101,13 @@ def test_independent_transverse_amplitude_count_matches_refsol(lengths, refsol):
                                            (4, 210e6, 6), (4, 450e6, 5)])
 def test_near_target_matches_complete_discrete_spectrum(n, target, count):
     lengths = (1, .8, .6)
-    _, _, stiffness, mass = _constrained_system(lengths, n)
+    result = solve_cavity_box(lengths, (n, n, n), num_modes=count, target_frequency_hz=target)
+    _, _, stiffness, mass = _constrained_system(result.space)
     values = la.eigvalsh(stiffness.toarray(), mass.toarray())
     assert np.count_nonzero(abs(values) < 1e-7) == (n - 1)**3
     physical = values[values > 1e-7]
     sigma = (2 * np.pi * target / C0)**2
     expected = np.sort(physical[np.argsort(abs(physical - sigma))[:count]])
-    result = solve_cavity_box(lengths, (n, n, n), num_modes=count, target_frequency_hz=target)
     np.testing.assert_allclose(result.eigenvalues_m2, expected, rtol=1e-10, atol=1e-10)
     if target == 450e6:
         assert result.eigenvalues_m2.min() > physical[0] * 1.5
@@ -138,6 +137,100 @@ def test_interior_edge_between_wall_nodes_remains_free():
     _check_result(result)
     with pytest.raises(RuntimeError, match="physical degrees of freedom"):
         solve_cavity_box((1, 1, 1), (1, 1, 1), num_modes=2, target_frequency_hz=210e6)
+
+
+@pytest.mark.parametrize("cells", [(2, 2, 2), (2, 3, 4), (3, 3, 3), (4, 4, 4)])
+def test_alternating_mesh_is_conforming_and_preserves_cells_and_reflections(cells):
+    lengths = np.array([1., .8, .6])
+    result = solve_cavity_box(lengths, cells, num_modes=1, target_frequency_hz=240e6)
+    mesh = result.mesh
+    assert mesh.num_nodes == np.prod(np.array(cells) + 1)
+    assert mesh.num_tets == 6 * np.prod(cells)
+    np.testing.assert_allclose(mesh.volumes(), np.prod(lengths)/(6*np.prod(cells)), rtol=1e-13)
+    grid = np.rint(mesh.nodes / lengths * cells).astype(int)
+    local = grid[mesh.tets]
+    lower = local.min(axis=1)
+    assert np.all(local.max(axis=1) - lower == 1)
+    _, per_cell = np.unique(lower, axis=0, return_counts=True)
+    np.testing.assert_array_equal(per_cell, np.full(np.prod(cells), 6))
+    faces = np.concatenate([mesh.tets[:, face] for face in
+                            ([0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3])])
+    faces, counts = np.unique(np.sort(faces, axis=1), axis=0, return_counts=True)
+    assert set(counts) == {1, 2}
+    nx, ny, nz = cells
+    assert np.count_nonzero(counts == 1) == 4 * (nx*ny + nx*nz + ny*nz)
+    wall_faces = grid[faces[counts == 1]]
+    on_wall = np.zeros(len(wall_faces), dtype=bool)
+    for axis in range(3):
+        on_wall |= np.all(wall_faces[:, :, axis] == 0, axis=1)
+        on_wall |= np.all(wall_faces[:, :, axis] == cells[axis], axis=1)
+    assert on_wall.all()
+    assert mesh.num_nodes - result.space.num_edges + len(faces) - mesh.num_tets == 1
+    topology = set(map(tuple, np.sort(mesh.tets, axis=1)))
+    for axis, n in enumerate(cells):
+        if n % 2 == 0:
+            reflected = grid.copy()
+            reflected[:, axis] = n - reflected[:, axis]
+            ids = np.ravel_multi_index(reflected.T, tuple(np.array(cells) + 1))
+            assert set(map(tuple, np.sort(ids[mesh.tets], axis=1))) == topology
+
+
+def _analytic_111_overlap(result, quadrature_order=5):
+    """Integrate with the exact two-dimensional transverse standing-wave space.
+
+    Tensor Gauss integration mapped to a tetrahedron is independent of the
+    assembly and centroid evaluator. Both analytic vectors have unit L2 norm.
+    Singular values compare subspaces, without assigning TE/TM labels to a
+    possibly rotated or split discrete doublet.
+    """
+    mesh, space = result.mesh, result.space
+    lengths = mesh.nodes.max(axis=0)
+    wavevector = np.pi / lengths
+    amplitudes = la.null_space(wavevector[None, :]) * np.sqrt(8 / np.prod(lengths))
+    points = mesh.nodes[mesh.tets]
+    affine = np.concatenate([np.ones((mesh.num_tets, 4, 1)), points], axis=2)
+    gradients = np.linalg.inv(affine)[:, 1:, :].transpose(0, 2, 1)
+    jacobian = abs(np.linalg.det(points[:, 1:] - points[:, :1]))
+    local_edges = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
+    coefficients = result.edge_coefficients[space.tet_edges, 3:5] * space.signs[:, :, None]
+    gauss, weights = np.polynomial.legendre.leggauss(quadrature_order)
+    gauss, weights = (gauss + 1)/2, weights/2
+    overlap = np.zeros((2, 2))
+    for i, j, k in product(range(quadrature_order), repeat=3):
+        s, t, u = gauss[[i, j, k]]
+        bary = np.array([(1-s)*(1-t)*(1-u), s, (1-s)*t, (1-s)*(1-t)*u])
+        position = np.einsum("i,tij->tj", bary, points)
+        sn, cs = np.sin(position * wavevector), np.cos(position * wavevector)
+        factors = np.column_stack([cs[:, 0]*sn[:, 1]*sn[:, 2],
+                                   sn[:, 0]*cs[:, 1]*sn[:, 2],
+                                   sn[:, 0]*sn[:, 1]*cs[:, 2]])
+        exact = factors[:, :, None] * amplitudes[None, :, :]
+        basis = np.stack([bary[a]*gradients[:, b] - bary[b]*gradients[:, a]
+                          for a, b in local_edges], axis=1)
+        numerical = np.einsum("ted,tek->tdk", basis, coefficients)
+        weight = weights[i]*weights[j]*weights[k]*(1-s)**2*(1-t)*jacobian
+        overlap += np.einsum("tdi,tdj,t->ij", numerical, exact, weight)
+    return la.svdvals(overlap)
+
+
+def test_111_eigenspace_and_expanded_search_keep_both_polarizations():
+    lengths = (1, .8, .6)
+    target = C0/(2*np.pi) * np.sqrt(1.3 * _amplitude_spectrum(lengths)[0])
+    errors = []
+    for n in (4, 8):
+        result = solve_cavity_box(lengths, (n,)*3, num_modes=5, target_frequency_hz=target)
+        singular = _analytic_111_overlap(result)
+        assert np.max(singular) <= 1 + 1e-9
+        errors.append(np.sqrt(np.maximum(1 - np.mean(singular**2), 0)))
+    assert singular.min() > .95
+    assert errors[-1] < errors[0]
+    # A second quadrature order rules out integration error explaining the overlap.
+    np.testing.assert_allclose(_analytic_111_overlap(result, 6), singular, atol=1e-9, rtol=0)
+    expanded = solve_cavity_box(lengths, (8,)*3, num_modes=11, target_frequency_hz=target)
+    np.testing.assert_allclose(expanded.eigenvalues_m2[:5], result.eigenvalues_m2, rtol=1e-10)
+    mass = assemble_edge_mass_3d(result.space)
+    cross = result.edge_coefficients[:, 3:5].T @ mass @ expanded.edge_coefficients[:, 3:5]
+    assert la.svdvals(cross).min() > 1 - 1e-8
 
 
 @pytest.mark.parametrize("scale", [1e-9, 1e-6, 1e3])

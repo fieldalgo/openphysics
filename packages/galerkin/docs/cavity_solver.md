@@ -13,13 +13,13 @@ print(result.frequencies_hz)
 ```
 
 This API solves a vacuum rectangular box starting at `(0, 0, 0)`, with a perfect
-electric conductor on all six walls. It uses the existing Kuhn box mesh (six
-tetrahedra per Cartesian cell) and lowest-order Nedelec edge elements. It has no
+electric conductor on all six walls. It uses a conforming alternating Kuhn mesh (six
+tetrahedra per Cartesian cell) and the existing lowest-order Nedelec edge elements. It has no
 material, loss, open-boundary, arbitrary-CAD or sweep options.
 
-**Validation status:** the fixed rectangular-box cluster-mean convergence gate
-below currently fails. Passing algebraic residual checks does not certify mesh
-accuracy. The solver is not yet accepted against all declared numerical gates.
+The fixed cube and rectangular-box convergence gates below pass with the
+alternating mesh. Algebraic residuals and continuum discretization error are
+checked separately; a small residual alone does not certify mesh accuracy.
 
 ## Arguments and search
 
@@ -97,6 +97,22 @@ while retaining spectral results and their normalization/search metadata.
 
 ## Numerical method and failure policy
 
+The mesh starts with `box_mesh` vertices and its six-tetrahedron Kuhn cell
+pattern. Within cell `(i,j,k)`, reflect each local coordinate whose cell index is
+odd. This alternates the body diagonals without changing vertices, Cartesian
+cell counts, tetrahedron counts, or tetrahedron shapes. Shared faces use the same
+tangential parities and therefore identical diagonals. Even subdivision counts
+restore reflection symmetry across the corresponding box mid-plane. Odd counts
+are also conforming, though they need not have that global reflection symmetry.
+No eigenvalue, reference answer, target or requested mode count affects the mesh.
+
+This mesh family avoids a single preferred body diagonal throughout the box.
+It changes discretization errors rather than correcting computed eigenvalues.
+The public `box_mesh` generator itself is unchanged. Consumers must use the
+returned mesh and topology, rather than assuming the cavity has that generator's
+original connectivity. A rectangular 111 doublet can still split: the rectangular
+box's reflection symmetries do not enforce its accidental polarization degeneracy.
+
 The free-edge generalized problem is `S q = k2 M q`. For this simply connected
 PEC box, the gradient nullspace has dimension `(nx-1)*(ny-1)*(nz-1)`. Let C map
 interior nodal potentials (zero on the boundary) to free-edge circulations,
@@ -135,7 +151,7 @@ quality checks raise `RuntimeError` with no partial result. A target at a discre
 eigenvalue can make the shifted factorization singular; choose a nearby target.
 No silent count reduction, zero padding or tolerance relaxation is performed.
 
-## Reproducible validation and current limitation
+## Reproducible validation and convergence repair
 
 From the repository root, with the local test dependencies installed:
 
@@ -152,25 +168,48 @@ in a low-target sparse search, full PEC zeros, SI reassembly and reconstruction,
 physical scaling and degenerate subspaces, and injected numerical failures.
 
 The fixed convergence sequence is `n=4,8,16` in every direction, target squared
-wave number `1.3 * analytic_fundamental`, comparing complete clusters. At n=16:
+wave number `1.3 * analytic_fundamental`, comparing complete clusters. With the
+alternating mesh, at n=16:
 
 | Box (m) | Cluster multiplicities | Last mean k² error orders | Maximum individual f error |
 | --- | --- | --- | --- |
-| `(1,1,1)` | `3,2,6` | `1.9184, 1.9568, 1.9836` | `0.3242%` |
-| `(1,.8,.6)` | `1,1,1,2` | `1.9865, 2.0441, 1.9357, 1.2284` | `0.1869%` |
+| `(1,1,1)` | `3,2,6` | `2.0880, 1.9627, 2.0639` | `0.1657%` |
+| `(1,.8,.6)` | `1,1,1,2` | `1.9393, 2.0296, 1.9988, 1.8929` | `0.1881%` |
 
-The rectangular 111 doublet fails the fixed final cluster-mean order **>1.8**
-gate. Its signed relative mean errors are `-0.0038258485`, `+0.0007879605`,
-`+0.0003363018`. The sign change and cancellation in the mean merit investigation;
-small individual frequency errors or residuals do not replace this failed gate.
-The test remains a failure, without skip/xfail or changed meshes/tolerances.
-The rectangular cluster width contracts at order `2.0538`; the cube cluster
-widths also pass their fixed checks (an unsplit doublet is at roundoff).
+All mean errors decrease at every step and the final orders exceed the unchanged
+**1.8** gate. The rectangular 111 cluster width contracts at order `2.0103`;
+all three cube widths are at roundoff (relative width at most `2.1e-14`).
+The rectangular 111 signed mean relative errors are `+0.0066232970`,
+`+0.0025322041`, `+0.0006818301`.
 
-For diagnosis, the n=4 projected sparse eigenvalues agree with the complete
-dense generalized spectrum to `4.7e-14` relative; its nullity is exactly 27.
-The two individual rectangular 111 eigenvalue errors contract at orders
-`2.2708` and `1.9130` over n=8 to n=16, approaching the exact value from opposite
-sides. This isolates the observed failure to the cluster-mean discretization
-behavior on this mesh sequence, rather than a missing mode or a changed projected
-eigenproblem. These diagnostics do not turn the fixed mean-order gate into a pass.
+The original parallel-diagonal Kuhn mesh failed this exact gate: its rectangular
+111 signed mean errors were `-0.0038258485`, `+0.0007879605`, `+0.0003363018`,
+giving final order **1.2284**. The negative/positive individual errors converged
+at orders `2.2708` and `1.9130`; cancellation in their mean obscured the expected
+rate on this fixed sequence. The repair changes the actual mesh family, with no
+hidden refinement, spectral correction, tolerance change, skip or xfail. The
+original fixed convergence test body is retained unchanged.
+
+Separate diagnostics distinguish selection and eigensolver error from this mesh
+error. At n=4 both mesh families agree with the complete dense generalized
+spectrum within `4.7e-14` relative and both have exactly 27 gradient modes. Raising
+the requested count from 5 to 11 leaves the first five values unchanged within
+`6.7e-16` and preserves the 111 mass-normalized eigenspace to roundoff.
+
+An independent volume quadrature compares the 111 field subspace with the exact
+standing waves. Their amplitude vectors are perpendicular to `(pi/a,pi/b,pi/c)`
+and normalized by `sqrt(8/(a*b*c))`. The comparison uses both singular values of
+the continuous L2 overlap, rather than assigning unique TE/TM vectors. At n=8:
+
+| Mesh | Two overlap singular values | Relative subspace projection error |
+| --- | --- | --- |
+| Parallel diagonals | `0.98605, 0.97110` | `0.20576` |
+| Alternating diagonals | `0.98928, 0.98206` | `0.16866` |
+
+At n=4 the alternating values are `0.95618, 0.92750` (parallel:
+`0.93536, 0.86931`), confirming both polarizations even on the coarse mesh.
+Five-point tensor Gauss quadrature under a tetrahedral Duffy map is checked
+against six-point quadrature at absolute tolerance `1e-9`. The projection error
+is `sqrt(1 - mean(singular_values**2))`. These checks, raw Maxwell residuals,
+mesh conformity/reflection tests and the fixed spectral gates are complementary;
+none is substituted for another.

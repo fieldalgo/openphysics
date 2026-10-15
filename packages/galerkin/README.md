@@ -15,8 +15,8 @@ into a multiphysics core.
 
 The public `solve_cavity_box` API provides SI frequencies and raw edge fields for
 a vacuum PEC box. See its [API and numerical contract](docs/cavity_solver.md),
-including near-target search limitations and the currently failing rectangular
-cluster-mean convergence gate.
+including near-target search limitations and the alternating-mesh repair of the
+rectangular cluster-mean convergence gate.
 
 ## Layout
 

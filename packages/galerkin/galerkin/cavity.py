@@ -95,12 +95,32 @@ def _gradient_space(space, free, mass):
     return incidence, mass_gradient, factor
 
 
+def _cavity_mesh(lengths, cells):
+    """Alternate Kuhn diagonals without changing cells, vertices or tet shapes.
+
+    Reflect local coordinates along axis a whenever the cell index on a is odd.
+    Two cells sharing a face have the same tangential parities, hence the same
+    face diagonal: this is a conforming triangulation. Even subdivision counts
+    restore coordinate-reflection symmetry across the box. No refinement or
+    spectral information enters the mesh construction.
+    """
+    base = box_mesh(*lengths, *cells)
+    shape = tuple(n + 1 for n in cells)
+    grid = np.stack(np.unravel_index(base.tets, shape), axis=-1)
+    lower = grid.min(axis=1)[:, None, :]
+    local = grid - lower
+    reflected = lower + np.where(lower % 2, 1 - local, local)
+    tets = (reflected[:, :, 0] * shape[1] + reflected[:, :, 1]) * shape[2] + reflected[:, :, 2]
+    return Mesh3D(base.nodes, tets, base.boundary, base.regions, base.region_names)
+
+
 def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
                      target_frequency_hz) -> CavityResult:
     """Solve a vacuum rectangular box with PEC on all six walls.
 
     lengths_m: three finite positive SI lengths. The box starts at the origin.
-    subdivisions: three positive integers; each cell becomes six tetrahedra.
+    subdivisions: three positive integers; each cell becomes six tetrahedra,
+        with Kuhn diagonals reflected according to the cell's coordinate parity.
     num_modes: number of individual eigenpairs, including multiplicities.
     target_frequency_hz: required finite positive search target in Hz.
 
@@ -133,7 +153,7 @@ def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
             or not np.isfinite(reciprocal_lengths).all()):
         raise ValueError("box lengths and target exceed the supported floating-point range")
 
-    normalized_mesh = box_mesh(*normalized_lengths, *cells)
+    normalized_mesh = _cavity_mesh(normalized_lengths, cells)
     space = EdgeSpace3D(normalized_mesh)
     pec = space.boundary_edge_ids()
     free = np.setdiff1d(np.arange(space.num_edges), pec)
