@@ -120,6 +120,15 @@ explain complex-field preservation and the limits of degenerate-basis reliabilit
 
 ## Validate this checkout
 
+Headless JSON/API/CLI heat documents use the separate
+[`thermal.steady2d` contract](packages/simcase/docs/thermal_steady2d.md).
+The [slab](packages/simcase/examples/thermal_slab.json) and
+[mixed-source](packages/simcase/examples/thermal_mixed.json) JSON examples specify
+Kelvin, SI-suffixed thermal coefficients and explicit geometry length units.
+This rectangular steady-heat path has no thermal Studio forms, plots, Robin
+boundary or automatic thermoelastic coupling. Consult the contract for fresh
+output ownership, incomplete-output detection and platform validation limits.
+
 Reproducible Linux validation, pinned optical data, and checks of installed
 wheel/sdist artifacts are documented in [ci/README.md](ci/README.md).
 

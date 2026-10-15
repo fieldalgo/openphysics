@@ -1,5 +1,35 @@
 # Validation and distribution checks
 
+## Narrow Windows headless thermal gate
+
+`thermal-windows.yml` runs Python 3.12.14 on GitHub-hosted windows-2022. It
+builds four local wheels (galerkin, meshine, physmat, simcase), installs them
+without an index or dependency resolution into a consumer venv, and runs the
+dedicated heat document consumers plus selected shipped save/I/O tests outside
+the checkout with `python -I`. The selected tests exercise actual API/CLI saves,
+numeric raw output, existing files/directories/dangling links, partial failures,
+file/directory replacement and concurrent ownership. Failures are not skipped.
+The consumer venv reuses the pinned job dependencies through system-site-packages;
+this is not a clean-room dependency installation.
+
+The Windows requirements reuse a minimal subset of the Linux exact versions.
+The Windows pytest/build transitive `colorama==0.4.6` is pinned separately; its
+upstream tag identifies BSD-3-Clause in pyproject metadata and LICENSE.txt.
+No runtime requirement or package version is changed. This gate does not certify
+Windows full regression, optical/Gmsh behavior or broader OS/Python support.
+Windows logs/JUnit/environment and four wheel checksums use the separate
+`windows-thermal-installed-and-io-<run_id>` artifact. Linux full source, all seven
+sdist-to-wheel/strict/metadata/byte/link gates and the existing 88 consumers remain
+required. The Linux Node step also runs the shipped `studio_thermal.cjs` guards.
+
+The headless heat consumer adds independent SI slab and signed mixed-source
+closed forms, unique corner constraints, numeric version/units/shape checks and
+verified archived JSON examples. Its finite-element smoke bounds use analytic
+source curvature and cell size, not summary-to-summary comparisons. These
+installation checks do not replace independent convergence/ownership acceptance.
+The save implementation's platform validation and any observed failures must
+be assessed from the exact candidate's CI, rather than inferred from this workflow.
+
 The root `validate.yml` workflow runs on pushes, pull requests and manual dispatch.
 It tests CPython 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. Python 3.10/3.11
 and other operating systems remain outside this CI coverage; the package metadata

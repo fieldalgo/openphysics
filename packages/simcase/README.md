@@ -387,6 +387,23 @@ script / CLI  ->  runs the document      simcase.run
                      '-- refsol    references (tests)
 ```
 
+## Headless steady heat
+
+The separate [thermal.steady2d contract](docs/thermal_steady2d.md) describes
+homogeneous rectangular steady heat documents with explicit geometry length
+units and absolute Kelvin. The [slab](examples/thermal_slab.json) and
+[mixed-source](examples/thermal_mixed.json) examples are included byte-for-byte
+in the sdist alongside that contract. After installation, run
+`simcase validate thermal_slab.json` and
+`simcase run thermal_slab.json -o fresh_heat_results` using the example file.
+The output target must be fresh, including no dangling symlink. Numeric SI NPZ
+arrays use a dedicated result version/layout and load with `allow_pickle=False`;
+support heat reaction is inward and signed outward heat is its negative.
+This headless path does not add thermal Studio UI, plots, flux/Robin boundaries
+or automatic thermoelastic coupling. Read the contract's save ownership and
+platform limits; narrow Windows save validation is tracked separately from
+the Linux full regression gate.
+
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).

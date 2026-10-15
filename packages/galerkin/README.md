@@ -59,6 +59,12 @@ and its original oracle/tests are also included unchanged in the sdist.
 
 ## Layout
 
+For a headless JSON/API/CLI wrapper around the standalone steady heat solver,
+see the [simcase thermal document contract](https://github.com/fieldalgo/openphysics/blob/4ec9da9fcba661958a12f37bc445a543cb4ffc1c/packages/simcase/docs/thermal_steady2d.md).
+The wrapper handles explicit length units, Kelvin inputs and numeric SI result
+files; this does not add a thermal Studio interface or automatic heat-to-mechanics
+workflow to this engine.
+
 ```
 galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators

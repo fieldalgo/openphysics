@@ -119,7 +119,9 @@ def test_numeric_npz_versions_units_shapes_and_physical_sign(tmp_path):
         analytic = 280.+35*x/.03+1e5*x*(.03-x)/(2*12.5)
         assert np.max(abs(arrays['temperature_k']-analytic)) < 1e5*np.hypot(.03/32,.02/16)**2/12.5
         metadata = json.loads(str(arrays['metadata_json']))
-        assert metadata['field_units'] == {'temperature_k': 'K', 'heat_flux_w_m2': 'W/m^2',
+        assert metadata['field_units'] == {'nodes_m': 'm', 'triangles': '1',
+            'dirichlet_node_ids': '1', 'dirichlet_temperature_k': 'K',
+            'temperature_k': 'K', 'heat_flux_w_m2': 'W/m^2',
             'load_w_per_m': 'W/m', 'reaction_w_per_m': 'W/m', 'residual_w_per_m': 'W/m'}
         for name in ('temperature_k', 'heat_flux_w_m2', 'load_w_per_m', 'reaction_w_per_m', 'residual_w_per_m'):
             assert metadata['field_shapes'][name] == list(shapes[name])
@@ -199,3 +201,16 @@ def test_cli_success_and_invalid_plots_exit_codes(tmp_path):
     for command in ('validate', 'run'):
         completed = cli(command, path)
         assert completed.returncode == 2, completed.stderr
+
+
+@pytest.mark.parametrize('filename,source', [('thermal_slab.json', 0.), ('thermal_mixed.json', 1e5)])
+def test_verified_archived_json_api_and_cli(tmp_path, filename, source):
+    path = Path(__file__).resolve().parents[1]/'examples'/filename
+    doc = Document.load(path)
+    assert doc['units'] == {'length': 'mm', 'temperature': 'K'}
+    check_physics(run(doc, False), source)
+    completed = cli('run', path, '-o', tmp_path/'fresh', '-q')
+    assert completed.returncode == 0, completed.stderr
+    with np.load(tmp_path/'fresh/fields.npz', allow_pickle=False) as arrays:
+        scale = 12.5*35*.02/.03+abs(source)*.03*.02
+        close(-arrays['reaction_w_per_m'].sum(), source*.03*.02, scale)
