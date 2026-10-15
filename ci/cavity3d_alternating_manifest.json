@@ -1,0 +1,197 @@
+{
+  "scope": "Vacuum rectangular PEC cavity: exact source component composition, not an integrated commit",
+  "base_commit": "75df651457b8f78540e9050b27c276ab8b07aaf1",
+  "components": {
+    "core": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55",
+    "simcase": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b",
+    "validation": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "pytest": "9.1.1",
+    "OPENBLAS_NUM_THREADS": 1,
+    "OMP_NUM_THREADS": 1
+  },
+  "changed_files": [
+    {
+      "path": "packages/galerkin/README.md",
+      "mode": "100644",
+      "blob_sha": "d281e7fdb02e4dedbe4b910d4b22ea3bf4e29101",
+      "source_commit": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55"
+    },
+    {
+      "path": "packages/galerkin/docs/cavity_solver.md",
+      "mode": "100644",
+      "blob_sha": "efa14fbb6dd7c9aa70bd25f7f5a277700f124029",
+      "source_commit": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55"
+    },
+    {
+      "path": "packages/galerkin/galerkin/__init__.py",
+      "mode": "100644",
+      "blob_sha": "98c43afd88f72263353d0327a4b5fa0079df139e",
+      "source_commit": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55"
+    },
+    {
+      "path": "packages/galerkin/galerkin/cavity.py",
+      "mode": "100644",
+      "blob_sha": "3643567a15d5b92bc3d2ff513355e80cfe095a77",
+      "source_commit": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55"
+    },
+    {
+      "path": "packages/galerkin/tests/test_cavity_solver.py",
+      "mode": "100644",
+      "blob_sha": "ad19a88791eb04c081d071c629405fb86d4e805b",
+      "source_commit": "a660233cc224ccf9b7f8c121b4dc0ded9271bb55"
+    },
+    {
+      "path": "packages/simcase/README.md",
+      "mode": "100644",
+      "blob_sha": "7c7c6df4a78a259f00adc94af0d1c94103ef6327",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/docs/cavity3d.md",
+      "mode": "100644",
+      "blob_sha": "3d723dc05da7f5a9033ee38a414ba1e17066ffd6",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/examples/cavity_box.json",
+      "mode": "100644",
+      "blob_sha": "8b0906f37de2dd47c2acf948161285a4180d51d9",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/__init__.py",
+      "mode": "100644",
+      "blob_sha": "54103678b270dd592ed3a870cb39fe7d81865c7d",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/cavity.py",
+      "mode": "100644",
+      "blob_sha": "13a4c291a2a38e2d6f1b759ac8c797c9b27f2e5e",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/cli.py",
+      "mode": "100644",
+      "blob_sha": "a7958ba77e0dda8c5fb91f4060824cfdd7e946fc",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/examples.py",
+      "mode": "100644",
+      "blob_sha": "85dfe0f89e7b67b511457b235ca204cb6311f61d",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/runner.py",
+      "mode": "100644",
+      "blob_sha": "d610e57fff74fb1bcd73bbf35a152f7d2209e3c9",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/schema.py",
+      "mode": "100644",
+      "blob_sha": "15d687c32f79787295b39cbfa4c886b5308ef5b7",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/simcase/studio/server.py",
+      "mode": "100644",
+      "blob_sha": "70493d4162e333aeb3b63de682b7a671e44b395a",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/tests/test_cavity3d.py",
+      "mode": "100644",
+      "blob_sha": "1eab8346bf4ae8cd9c396b3c90c2707e41ec4263",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "packages/simcase/tests/test_cavity3d_integration.py",
+      "mode": "100644",
+      "blob_sha": "bf410ed44668a6eb1568bc1ebc43dc02974d5eae",
+      "source_commit": "1747aaffc6d1b9b0adec53c1b2166864a472ec6b"
+    },
+    {
+      "path": "ci/cavity3d_convergence_diagnosis.md",
+      "mode": "100644",
+      "blob_sha": "7219615fe18574171880f67d348a62d422e137f3",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "ci/cavity3d_convergence_diagnosis.py",
+      "mode": "100644",
+      "blob_sha": "b9a03a267183b055d98400d1061cb333423962fa",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "ci/cavity3d_validation.md",
+      "mode": "100644",
+      "blob_sha": "2cde38eaad1fc63d25ab01b392bc4b7a0c6bfad6",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "packages/galerkin-refsol/refsol/__init__.py",
+      "mode": "100644",
+      "blob_sha": "23fab1c70fd851205c6c054e3132825d89be0864",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "packages/galerkin-refsol/refsol/cavity.py",
+      "mode": "100644",
+      "blob_sha": "fd2bc2cc8786828d56073dff0e1e00c2c63018c8",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "packages/galerkin-refsol/tests/test_cavity_reference.py",
+      "mode": "100644",
+      "blob_sha": "ed2962deca1b7cea193cb954e52cd4213887864a",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "packages/galerkin/tests/test_cavity3d_validation.py",
+      "mode": "100644",
+      "blob_sha": "3a0bce8912826c13edd542d4c8ae81041e742d44",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    },
+    {
+      "path": "packages/simcase/tests/test_cavity3d_persistence_validation.py",
+      "mode": "100644",
+      "blob_sha": "6065b5694ff2d18001feaa293bd429b1e128acd9",
+      "source_commit": "076a25df74e6581b933577bc0ceebb9d0992cf82"
+    }
+  ],
+  "additional_audit": {
+    "path": "packages/galerkin/tests/test_cavity3d_mesh_validation.py",
+    "blob_sha": "959467547c5ec0c8d87f99abfb59b5635e611d13"
+  },
+  "results": {
+    "unchanged_independent_and_reference_tests": {
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    "additional_mesh_tests": {
+      "passed": 3,
+      "failed": 0,
+      "subtests_passed": 9
+    },
+    "rectangle_111_last_signed_mean_order": 1.8929094460879885,
+    "fixed_threshold": 1.8,
+    "fixed_meshes": [
+      4,
+      8,
+      16
+    ]
+  },
+  "limitations": [
+    "No integrated-commit CI/wheel/full-source verification by this task",
+    "NumPy/SciPy versions differ from CI lock",
+    "Historical failures remain historical; acceptance gates unchanged"
+  ]
+}
