@@ -137,7 +137,24 @@ let doc = null;            // the OpenPhysics document (plain object)
 let selected = 'model';    // tree node id
 let materials = [];        // physmat built-ins from the server
 let meshData = null, resultData = null, currentJob = null;
+let documentRevision = 0;
 const $ = id => document.getElementById(id);
+
+function isHeadlessThermal(data = doc) {
+  return Object.values(data?.physics || {}).some(p => p?.type === 'thermal.steady2d');
+}
+function clearResultViews() {
+  meshData = resultData = null; currentJob = null;
+  $('ptSel').innerHTML = $('modeSel').innerHTML = '';
+  $('componentLabel').hidden = true; $('jobInfo').textContent = '';
+  fillResultTable(); drawField(); drawSweep();
+  const cv = $('meshCanvas'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+}
+function invalidateDocument() {
+  documentRevision += 1; clearResultViews();
+  $('runBtn').disabled = $('meshBtn').disabled = isHeadlessThermal();
+  return documentRevision;
+}
 
 const api = {
   async get(url) { const r = await fetch(url); if (!r.ok) throw new Error(await errText(r)); return r.json(); },
@@ -387,7 +404,7 @@ function renderProps() {
     meshData = null; refresh();
   }));
   P.querySelectorAll('[data-kind="matname"]').forEach(el => el.addEventListener('change', renameMaterial));
-  P.querySelectorAll('[data-kind="grading"]').forEach(el => el.addEventListener('change', e => { doc.mesh.grading = e.target.value === 'on' ? { center: [0, 0], near: doc.mesh.size / 5, far: doc.mesh.size, distance: 1 } : null; refresh(); }));
+  P.querySelectorAll('[data-kind="grading"]').forEach(el => el.addEventListener('change', e => { invalidateDocument(); doc.mesh.grading = e.target.value === 'on' ? { center: [0, 0], near: doc.mesh.size / 5, far: doc.mesh.size, distance: 1 } : null; refresh(); }));
   P.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', onAction));
 }
 function matHint(name) { const m = materials.find(x => x.name === name || x.aliases.includes(name)); if (m) return `<div class="hint">${m.source}<br>valid ${m.range_um[0]}–${m.range_um[1] ?? '∞'} um</div>`;
@@ -396,6 +413,7 @@ function matHint(name) { const m = materials.find(x => x.name === name || x.alia
 function setPath(obj, path, value) { const parts = path.split('.'); let o = obj; for (const p of parts.slice(0, -1)) o = o[p]; const last = parts[parts.length - 1];
   if (value === '' || value === null) delete o[last]; else o[last] = value; }
 function onPropChange(e) {
+  invalidateDocument();
   const el = e.target, path = el.dataset.path; let v = el.value;
   if (el.dataset.kind === 'list') v = v.split(/[,\s]+/).filter(Boolean).map(Number);
   else if (el.dataset.kind === 'points') v = v.split(';').map(s => s.trim()).filter(Boolean).map(s => s.split(',').map(Number));
@@ -407,9 +425,10 @@ function onPropChange(e) {
   if (path === 'study.type' && v === 'sweep' && !doc.study.values) { doc.study.parameter = `physics.${physKey()}.wavelength`; doc.study.values = [1.5, 1.55, 1.6]; }
   meshData = null; refresh();
 }
-function renameMaterial(e) { const old = e.target.dataset.old, nw = e.target.value.trim(); if (!nw || nw === old || doc.materials[nw]) return; doc.materials[nw] = doc.materials[old]; delete doc.materials[old];
+function renameMaterial(e) { const old = e.target.dataset.old, nw = e.target.value.trim(); if (!nw || nw === old || doc.materials[nw]) return; invalidateDocument(); doc.materials[nw] = doc.materials[old]; delete doc.materials[old];
   doc.geometry.shapes.forEach(s => { if (s.material === old) s.material = nw; }); if (doc.geometry.background.material === old) doc.geometry.background.material = nw; selected = `material:${nw}`; refresh(); }
 function onAction(e) {
+  invalidateDocument();
   const act = e.target.dataset.act;
   if (selected.startsWith('shape:')) { const i = +selected.split(':')[1], arr = doc.geometry.shapes;
     if (act === 'del') { arr.splice(i, 1); selected = 'geometry'; }
@@ -422,22 +441,66 @@ function onAction(e) {
 // ------------------------------------------------------------------ tabs, refresh, io
 function showTab(name) { document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('.view > div').forEach(d => d.classList.toggle('on', d.id === `tab-${name}`)); redrawAll(); }
-function redrawAll() { drawGeometry(); drawMesh(); drawField(); drawSweep(); }
-function refresh() { buildTree(); renderProps(); $('json').value = JSON.stringify(doc, null, 2); redrawAll(); }
+function redrawAll() {
+  if (isHeadlessThermal()) {
+    for (const id of ['geoCanvas', 'meshCanvas', 'fieldCanvas', 'sweepCanvas']) {
+      const cv = $(id); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    }
+    return;
+  }
+  drawGeometry(); drawMesh(); drawField(); drawSweep();
+}
+function refresh() {
+  $('json').value = JSON.stringify(doc, null, 2);
+  if (isHeadlessThermal()) {
+    clearResultViews(); $('tree').innerHTML = ''; $('props').textContent = 'thermal.steady2d is headless Python/CLI only; Studio does not support heat input or results.';
+    $('runBtn').disabled = $('meshBtn').disabled = true;
+    status('headless thermal document unsupported in Studio'); redrawAll(); return;
+  }
+  $('runBtn').disabled = $('meshBtn').disabled = false;
+  buildTree(); renderProps(); redrawAll();
+}
 
-async function loadExample(name) { doc = await api.get(`/api/examples/${name}`); selected = 'model'; meshData = resultData = null; fillResultTable(); refresh(); log(`loaded example ${name}`); }
-async function doValidate() { const r = await api.post('/api/validate', { doc }); if (r.ok) { doc = r.doc; refresh(); log('valid:\n' + r.summary); (r.notes || []).forEach(n => log('warning: ' + n, 'err')); status('valid'); } else { log('invalid: ' + r.error, 'err'); status('invalid document'); } return r.ok; }
-async function doMesh() { status('meshing…'); $('meshBtn').disabled = true; try { meshData = await api.post('/api/mesh', { doc }); showTab('mesh'); status(`mesh: ${meshData.stats.triangles} triangles`); log(`mesh: ${meshData.stats.nodes} nodes, ${meshData.stats.triangles} triangles, min angle ${meshData.stats.min_angle}°`); }
-  catch (e) { log('mesh failed: ' + e.message, 'err'); status('mesh failed'); } finally { $('meshBtn').disabled = false; } }
+async function loadExample(name) {
+  const revision = invalidateDocument(), data = await api.get(`/api/examples/${name}`);
+  if (revision !== documentRevision) return;
+  doc = data; selected = 'model'; refresh(); log(`loaded example ${name}`);
+}
+async function doValidate() {
+  if (isHeadlessThermal()) { invalidateDocument(); refresh(); return false; }
+  const revision = documentRevision, r = await api.post('/api/validate', { doc });
+  if (revision !== documentRevision) return false;
+  if (r.ok) { doc = r.doc; refresh(); log('valid:\n' + r.summary); (r.notes || []).forEach(n => log('warning: ' + n, 'err')); status('valid'); }
+  else { invalidateDocument(); log('invalid: ' + r.error, 'err'); status('invalid document'); }
+  return r.ok;
+}
+async function doMesh() {
+  if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
+  const revision = invalidateDocument(); status('meshing…'); $('meshBtn').disabled = true;
+  try { const data = await api.post('/api/mesh', { doc }); if (revision !== documentRevision) return;
+    meshData = data; showTab('mesh'); status(`mesh: ${meshData.stats.triangles} triangles`); log(`mesh: ${meshData.stats.nodes} nodes, ${meshData.stats.triangles} triangles, min angle ${meshData.stats.min_angle}°`); }
+  catch (e) { if (revision === documentRevision) { log('mesh failed: ' + e.message, 'err'); status('mesh failed'); } }
+  finally { if (revision === documentRevision) $('meshBtn').disabled = false; }
+}
 async function doRun() {
+  if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
+  const revision = invalidateDocument();
   status('running…'); $('runBtn').disabled = true;
-  resultData = null; fillResultTable(); drawField(); drawSweep();
-  try { const r = await api.post('/api/run', { doc }); currentJob = r.job; $('jobInfo').textContent = `job ${r.job}`; let shown = 0;
-    while (true) { await new Promise(res => setTimeout(res, 500)); const j = await api.get(`/api/jobs/${currentJob}`);
+  try { const r = await api.post('/api/run', { doc }); if (revision !== documentRevision) return;
+    const job = r.job; currentJob = job; $('jobInfo').textContent = `job ${job}`; let shown = 0;
+    while (revision === documentRevision && currentJob === job) {
+      await new Promise(res => setTimeout(res, 500));
+      if (revision !== documentRevision || currentJob !== job) return;
+      const j = await api.get(`/api/jobs/${job}`);
+      if (revision !== documentRevision || currentJob !== job) return;
       for (; shown < j.log.length; shown++) log(j.log[shown]);
-      if (j.status === 'done') { resultData = await api.get(`/api/jobs/${currentJob}/result`); populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
+      if (j.status === 'done') { const data = await api.get(`/api/jobs/${job}/result`);
+        if (revision !== documentRevision || currentJob !== job) return;
+        if (data.summary?.physics_type === 'thermal.steady2d') throw new Error('Studio cannot render headless thermal results');
+        resultData = data; populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
       if (j.status === 'error') { log(j.error, 'err'); status('run failed'); break; } } }
-  catch (e) { log('run failed: ' + e.message, 'err'); status('run failed'); } finally { $('runBtn').disabled = false; }
+  catch (e) { if (revision === documentRevision) { log('run failed: ' + e.message, 'err'); status('run failed'); } }
+  finally { if (revision === documentRevision) $('runBtn').disabled = false; }
 }
 
 $('loadExample').onclick = () => loadExample($('exampleSel').value);
@@ -446,8 +509,12 @@ $('meshBtn').onclick = doMesh;
 $('runBtn').onclick = doRun;
 $('download').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' })); a.download = (doc.name || 'model').replace(/[^\w.-]+/g, '_') + '.json'; a.click(); };
 $('openFile').onclick = () => $('fileInput').click();
-$('fileInput').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { doc = JSON.parse(await f.text()); selected = 'model'; meshData = resultData = null; refresh(); await doValidate(); log(`opened ${f.name}`); } catch (err) { log('could not open: ' + err.message, 'err'); } };
-$('applyJson').onclick = async () => { try { doc = JSON.parse($('json').value); selected = 'model'; meshData = resultData = null; refresh(); await doValidate(); } catch (err) { log('JSON error: ' + err.message, 'err'); } };
+$('fileInput').onchange = async e => { const f = e.target.files[0]; if (!f) return; const revision = invalidateDocument();
+  try { const data = JSON.parse(await f.text()); if (revision !== documentRevision) return;
+    doc = data; selected = 'model'; refresh(); await doValidate(); log(`opened ${f.name}`); }
+  catch (err) { if (revision === documentRevision) log('could not open: ' + err.message, 'err'); } };
+$('applyJson').onclick = async () => { invalidateDocument(); try { doc = JSON.parse($('json').value); selected = 'model'; refresh(); await doValidate(); } catch (err) { log('JSON error: ' + err.message, 'err'); } };
+$('json').oninput = () => invalidateDocument();
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $('ptSel').onchange = drawField; $('modeSel').onchange = drawField;
 $('componentSel').onchange = drawField;
