@@ -4,7 +4,6 @@
 """Vacuum PEC box resonances near a specified frequency, with SI output."""
 
 from dataclasses import dataclass
-from numbers import Integral, Real
 
 import numpy as np
 import scipy.linalg as la
@@ -49,7 +48,8 @@ class CavityResult:
 
 
 def _positive_real(value, name):
-    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+    if (isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, float, np.integer, np.floating))):
         raise ValueError(f"{name} must be a finite positive number")
     try:
         value = float(value)
@@ -61,7 +61,8 @@ def _positive_real(value, name):
 
 
 def _positive_integer(value, name):
-    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral) or value <= 0:
+    if (isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, np.integer)) or value <= 0):
         raise ValueError(f"{name} must be a positive integer")
     return int(value)
 

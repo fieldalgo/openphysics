@@ -26,7 +26,8 @@ accuracy. The solver is not yet accepted against all declared numerical gates.
 `solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`
 returns a `CavityResult`.
 
-- `lengths_m`: three finite, strictly positive real lengths in metres.
+- `lengths_m`: three finite, strictly positive real lengths in metres
+  (Python or NumPy numeric scalars).
 - `subdivisions`: three strictly positive integers.
 - `num_modes`: strictly positive integer, counting individual eigenvectors and
   retaining repeated eigenvalues. Booleans are not accepted as numeric inputs.
@@ -165,3 +166,11 @@ small individual frequency errors or residuals do not replace this failed gate.
 The test remains a failure, without skip/xfail or changed meshes/tolerances.
 The rectangular cluster width contracts at order `2.0538`; the cube cluster
 widths also pass their fixed checks (an unsplit doublet is at roundoff).
+
+For diagnosis, the n=4 projected sparse eigenvalues agree with the complete
+dense generalized spectrum to `4.7e-14` relative; its nullity is exactly 27.
+The two individual rectangular 111 eigenvalue errors contract at orders
+`2.2708` and `1.9130` over n=8 to n=16, approaching the exact value from opposite
+sides. This isolates the observed failure to the cluster-mean discretization
+behavior on this mesh sequence, rather than a missing mode or a changed projected
+eigenproblem. These diagnostics do not turn the fixed mean-order gate into a pass.
