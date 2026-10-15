@@ -100,4 +100,4 @@ python -m pytest -q packages/simcase/tests
 원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
 GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.
 
-검토 후보에는 독립 API의 외향 열유속·Robin 열 경계가 포함됩니다. [계약](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md)과 [독립 수용검증](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요. 헤드리스 JSON은 이 경계를 받지 않습니다. 후보 통합과 최종 수용은 아직 대기 중입니다.
+이 checkout에는 독립 API의 외향 열유속·Robin 열 경계가 포함됩니다. [계약](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md)과 [독립 수용검증](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요. 헤드리스 JSON은 이 경계를 받지 않습니다. 계약과 검증 보고는 구현 범위와 실측 범위를 구분합니다.

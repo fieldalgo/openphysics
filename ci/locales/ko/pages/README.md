@@ -230,7 +230,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. 이 동안 다른 writer가
 출력을 바꾸면 안 됩니다. Windows 두 실패의 원인은 미확정이며 Actions는 비활성화돼 있습니다.
 
-## 결합 검토 후보의 배포 독립 수용
+## 배포본의 독립 수용
 
 한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
@@ -243,7 +243,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 현재 Robin 구현과 열 계약은 aaf에서 변경됐으므로 여섯 blob 동일성은 과거 0a/6cdf에만
 해당합니다. 역사적 JSON과 동결 영어 수용 문서는 불변입니다. Robin은 별도 독립 수용과
 Dirichlet 회귀가 연결됩니다. headless JSON은 여전히 flux/Robin을 거부하고 열 Studio UI나
-자동 연성을 추가하지 않습니다. 오너 검토와 최종 통합 대기 후보이며 게시된 릴리스가 아닙니다.
+자동 연성을 추가하지 않습니다. 배포 검증이 릴리스를 게시하거나 플랫폼 지원을 확대하지는 않습니다.
 
 Work cloud는 현재 가용 Linux/Python 3.12.14, numpy 2.3.5, scipy 1.17.0으로 검증하며
 보존 pinned CI 환경이 아닙니다. Gmsh와 명시적 RII database가 없으므로 실제 skip을

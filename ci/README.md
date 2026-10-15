@@ -270,7 +270,7 @@ another writer mutate the output during this interval. Windows save verification
 is stopped with two unresolved failures; Linux results do not establish Windows
 acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
 
-## Combined review candidate: packaged independent acceptance
+## Packaged independent acceptance
 
 All seven Korean package READMEs and received Korean guide counterparts are
 required byte assets. The standalone outward-flux/Robin contract, example,
@@ -288,7 +288,7 @@ six-blob identity statement above applies only to historical 0a/6cdf trees.
 The historical JSON and frozen English acceptance documents remain unchanged;
 Robin has its own independent acceptance and Dirichlet regression. Headless JSON
 still rejects flux/Robin and does not gain thermal Studio UI or automatic coupling.
-The candidate awaits owner review and final integration; it is not published.
+Distribution validation does not publish a release or expand platform support.
 
 Work-cloud checks use the available Linux/Python 3.12.14 environment with
 numpy 2.3.5 and scipy 1.17.0, not the retained pinned CI environment. Gmsh and

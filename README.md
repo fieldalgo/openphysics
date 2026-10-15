@@ -167,4 +167,4 @@ another writer mutate the output during this interval. Windows save verification
 is stopped with two unresolved failures; Linux results do not establish Windows
 acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
 
-The review candidate includes standalone outward-flux/Robin heat boundaries; see [contract](packages/galerkin/docs/thermal_flux_robin.md) and [independent acceptance](packages/galerkin/docs/thermal_flux_robin_independent_validation.md). Headless JSON does not accept these boundaries. Candidate integration and final acceptance remain pending.
+This checkout includes standalone outward-flux/Robin heat boundaries; see [contract](packages/galerkin/docs/thermal_flux_robin.md) and [independent acceptance](packages/galerkin/docs/thermal_flux_robin_independent_validation.md). Headless JSON does not accept these boundaries. The contracts and validation reports describe the implemented and measured scope.

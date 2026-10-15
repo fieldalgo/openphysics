@@ -195,12 +195,12 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 이 프로젝트는 Gmsh 프로젝트와 제휴하지 않으며 그 프로젝트의 보증이나 지원을 받지 않습니다.
 
 
-## 검토 후보: 열 경계 확장
+## 정상 열전도 경계 계약
 
 독립 등방성 `galerkin.thermal` API는 처방 외향 열유속과 Robin 대류를 추가합니다.
 [경계 계약](docs/locales/ko/pages/thermal_flux_robin.md),
 [영어 예제](examples/thermal_flux_robin.py),
 [독립 수용검증](docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요.
-이 검토 후보는 게시된 릴리스나 최종 develop 수용이 아닙니다.
+계약과 독립 보고는 구현과 실제 수용검증 범위를 구분합니다.
 헤드리스 simcase JSON 계약은 여전히 flux/Robin 경계를 거부합니다. 독립 API 확장은
 Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니다.

@@ -360,12 +360,12 @@ code that uses it.
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
 
-## Review candidate: thermal boundary extension
+## Steady heat boundary contract
 
 The standalone isotropic `galerkin.thermal` API adds prescribed outward flux and
 Robin convection; see [boundary contract](docs/thermal_flux_robin.md),
 [English example](examples/thermal_flux_robin.py), and
 [independent acceptance](docs/thermal_flux_robin_independent_validation.md).
-This review candidate is not a published release or final develop acceptance.
+The contract and independent report distinguish implementation from measured acceptance.
 The headless simcase JSON contract still rejects flux/Robin boundaries; the
 standalone extension does not enable them in Studio or add automatic coupling.
