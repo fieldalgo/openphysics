@@ -453,3 +453,37 @@ asset/link checks and validates all 14 checksums and configured runtime wheel
 bytes. It does not replace twine strict, installed execution, independent physics
 or verification of the exact source commit. Never present a configured command
 or historical baseline as a new candidate pass.
+
+## Steady boundary contract and independent distribution gates
+
+The published boundary helper and its original test, the English/Korean usage
+and independent-report pages, and all four original independent acceptance files
+are required byte assets. The existing steady engine module is additionally
+required and checked in wheel bytes because the independent installed consumer
+requires its exact identity. The current inventory is 147 assets: the retained
+P1 136, two boundary contract assets, eight published documentation/acceptance
+assets and one steady engine source. Counts describe configuration, not passes.
+
+A separate steady boundary preflight runs the original contract and independent
+source entry points before the unchanged P1 preflight and whole suite. Failure
+fails the job and leaves later stages unexecuted. Successful preflights do not
+replace the whole suite. Required completion checks and main run preservation
+remain unchanged.
+
+The original independent oracle/cases/consumer are extracted from the verified
+simcase sdist and run outside the checkout using `python -I`,
+`--expected-installed-root` and `--expected-module-hashes`. The original contract
+test is also consumed by installed pytest. The hash manifest includes all six
+identities required by the steady consumer; there are 13 configured runtime
+modules including existing transient and dispatch identities. Standalone
+unittest, installed pytest, preflight and whole-source counts are separate.
+Existing transient independent 17/headless 9/full archived convergence and
+Windows regressions remain intact.
+
+These connections require a combined boundary-enabled schema/runtime candidate.
+Published draft documents and defined tests do not certify current API/CLI,
+build, installed or platform success. New schema tests, runtime examples/tests
+and Windows files are added only after their exact published paths are reviewed;
+no unposted path is required here. Inspect the exact combined CI and artifacts.
+The retained-artifact audit command above applies to this inventory without
+repeating numerical consumers. No package publication is performed.
