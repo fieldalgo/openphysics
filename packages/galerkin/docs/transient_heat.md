@@ -214,3 +214,7 @@ from a finite-mesh weak thermostat reaction and must be reported separately.
 
 See the [validation guide](transient_heat_validation.md) for the fixed
 gates, independent algebra/reference boundaries and reproduction.
+
+## Separate headless document adapter
+
+Rectangular `thermal.transient2d` JSON/API/CLI and saved histories are provided by a separate simcase adapter. Its [input, result and save contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient2d.md) is online documentation in another package and requires network access. This engine function's arbitrary callbacks/mesh support are not the serialized document scope. Documents use uniform/affine initial fields and side-constant/requested-time samples while retaining initial agreement, no projection and finite K/no clamp. No Studio, restart, transient flux/Robin or automatic coupling is added. Engine acceptance is distinct from headless source/installed/save/CI acceptance.

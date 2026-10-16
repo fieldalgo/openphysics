@@ -249,3 +249,7 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
 원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
 GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거가 필요합니다.
+
+## Headless 과도 열전도
+
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Studio는 이 문서를 거절하고 오래된 광학 상태를 지웁니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.

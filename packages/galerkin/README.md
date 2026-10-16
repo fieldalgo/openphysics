@@ -370,8 +370,9 @@ Dirichlet values, insulated edges and complete temperature/flux histories are
 documented in the [transient contract](docs/transient_heat.md),
 [validation guide](docs/transient_heat_validation.md) and
 [independent acceptance](docs/transient_heat_independent_validation.md).
-This separate Python API does not add transient flux/Robin, JSON/CLI/Studio,
-persistence or automatic heat-to-mechanics coupling.
+The engine itself adds no transient flux/Robin, Studio, restart or automatic
+heat-to-mechanics coupling. A separate simcase adapter provides rectangular
+headless documents and saved histories.
 
 ## Steady heat boundary contract
 
@@ -400,3 +401,7 @@ return. The contract separates heat W/m, mechanical N/m and physical energy J/m.
 ## Prescribed-temperature total mechanical traction
 
 The [total-traction contract](docs/thermoelastic_traction.md), [English example](examples/thermoelastic_traction.py) and [independent report](docs/thermoelastic_traction_independent_validation.md) describe optional global Cartesian Pa loads on the frozen-temperature mechanical stage. The prescribed mapping is total physical `sigma*n`; do not add/subtract thermal traction. Body, line, thermal loads and constrained reactions remain separately accounted for. Legacy18 positional result construction remains valid; new load fields default to None. There is no dedicated scalar-pressure/local-frame/follower API, but `lambda points_m, normals: -p * normals` is a valid global Pa callback on the fixed reference boundary. This does not extend the heat workflow, JSON/CLI/Studio or persistence.
+
+## Transient headless documents
+
+A separate simcase adapter supplies rectangular `thermal.transient2d` JSON/API/CLI and saved histories. The [input, time-axis and save contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient2d.md) is online documentation in another package and requires network access. The engine retains initial agreement, no projection, finite K/no clamp and the Nt initial-frame versus Nt-1 rate distinction. This adds no Studio, restart, transient flux/Robin or automatic coupling; acceptance requires exact combined source/installed/CI evidence.

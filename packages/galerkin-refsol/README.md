@@ -142,3 +142,7 @@ is distinct from continuum PDE convergence; see the
 [reference overview](docs/overview.md).
 
 `refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.
+
+## Reference boundary for transient headless documents
+
+The rectangular simcase `thermal.transient2d` path adapts the existing transient engine; it is not a new physical reference. Its [document contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient2d.md) is online documentation in a separate package and requires network access. Engine reference/convergence passes are separate from serialization, CLI, save and installed acceptance; independent consumers must derive their own truth. Studio, transient flux/Robin, automatic coupling and restart remain unsupported.
