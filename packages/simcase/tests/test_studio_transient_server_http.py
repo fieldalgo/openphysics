@@ -359,4 +359,3 @@ def test_malformed_public_summary_cannot_publish(http_client, monkeypatch, fault
     assert state["status"] == "error" and state["has_result"] is False
     assert http_client.get("/api/jobs/"+job+"/result").status_code == 409
     assert server._thermal_jobs._active == server._thermal_jobs._reserved_bytes == 0
-
