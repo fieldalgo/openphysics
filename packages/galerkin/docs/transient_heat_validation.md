@@ -2,9 +2,13 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat_validation.md) · [Usage](transient_heat.md)
 
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
 ## Execution boundary
 
-**Initial submission (d21): source and static review only.** Python parsing,
+**Historical initial submission (d21): source and static review only.** Python parsing,
 imports, compilation and collection had not been executed at that submission.
 That historical status is retained; no earlier numerical pass is inferred.
 
@@ -28,10 +32,11 @@ The same Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1 source environment
 used BLAS/OMP/MKL1; no test count or tolerance was reduced. No solver fix or
 test rerun was needed. The d21 snapshot did not separately run test bodies.
 
-The fixed temporal/PDE spatial/5% separation gates, complete source regression,
-installed sdist/wheel proof, independent acceptance and platform tests remain
-unexecuted. These small controls are not complete physical acceptance.
-The commands below remain reproduction instructions for the pending stages.
+At that historical checkpoint, the fixed temporal/PDE spatial/5% separation gates,
+complete source regression, installed sdist/wheel proof, independent acceptance and
+platform tests were unexecuted. The 70 small controls are not complete physical
+acceptance. Use the exact current CI evidence to assess the present checkout;
+the commands below define reproduction, not a new pass result.
 
 ## Truth boundaries and algebra
 
@@ -149,14 +154,25 @@ small reference checks. They are not a claim that every independent wrong
 variant has already been injected or rejected. Such designated mutation runs
 and independent physical proof are pending. Existing gates remain unchanged.
 
-## Future reproduction and packaging boundary
+## Reproduction and packaging boundary
 
 From a repository root with its existing dependencies available:
 
-```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q packages/galerkin/tests/test_transient_heat.py packages/galerkin-refsol/tests/test_transient_heat_reference.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python packages/galerkin/examples/transient_heat_convergence.py
-python -m pytest -q
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+subprocess.run([sys.executable, "-m", "pytest", "-q", "packages/galerkin/tests/test_transient_heat.py",
+                "packages/galerkin-refsol/tests/test_transient_heat_reference.py"], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "packages/galerkin/examples/transient_heat_convergence.py"], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=True)
 ```
 
 The convergence program asserts the fixed temporal/spatial/separation gates
@@ -164,9 +180,4 @@ before producing a successful combined JSON report; it does not print a
 predetermined pass. It retains all requested history, so the n64 companion
 needs substantial memory. No wall time is a dedicated-host performance baseline.
 
-Later installed checks must build actual sdist->wheel artifacts, verify
-installed package origins/source bytes and EN/KO/example inclusion, then run
-outside-source contract/physical consumers. No build/install or distribution
-inclusion has been verified here. No shared release helper/manifest was changed.
-Windows, independent acceptance, complete regression and release integration
-require their own actual evidence. No Actions or deployment result is implied.
+The current manifests and distribution helper wire EN/KO pages, the example, original tests, independent consumers and runtime modules into inclusion and byte checks. The helper builds real sdist→wheel artifacts, verifies installed origins/source bytes, and runs the verified archive's independent `--suite all` consumer and full English convergence example. An implemented gate is distinct from a successful build/install run. Establish inclusion, installed and numerical success from the exact current CI exits, logs and artifacts. The narrow Windows save gate is not full transient-physics acceptance; release success is separate.

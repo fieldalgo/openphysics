@@ -2,7 +2,11 @@
 
 [English](../../../transient_heat_independent_validation.md)
 
-## 상태: 수용 파일 작성, 실행 대기
+## 현재 checkout과 근거
+
+이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+
+## 과거 등록과 현재 재현
 
 2026-10-16. 이 보고서는 정확한 초기 생산 후보
 `d21e083d9723eec71ab5e32777ecd331d75cd981`을 대상으로 한다.
@@ -11,15 +15,9 @@
 독립 수용 브랜치 `codex/openphysics-transient-heat-independent-validation`은
 이 정확한 후보에서 생성했다. 초기 코드 체크포인트는
 `55afd565b9f6feea38896dc567eef574adf21371`이다.
-생산 코드, 생산 담당 시험, refsol, 기존 시험과 공용 release 설정은 변경하지 않았다.
+그 과거 제출은 생산 코드·생산 담당 시험·refsol·기존 시험·공용 release 설정을 변경하지 않았습니다.
 
-**이번 제출에 대해 Python parse/compile, collection, NumPy 진단, source 시험,
-설치 consumer, runtime 음성대조, PDE 수렴, 전체회귀 또는 Windows 시험을
-실행하지 않았다.** 현재 배정은 커넥터를 통한 원문·코드 작업을 승인하고
-새 shell probe/시험은 명시적으로 제외한다. 환경 가용 표시만으로 실행이
-승인되는 것은 아니다. 통과 횟수, 측정 차수, artifact hash 또는 clean-whole
-성공 주장은 없다. Actions 조회/실행/활성화, PC계산, 새 cloud, 다른 scratch,
-예약, PR, 배포 또는 통합도 하지 않았다.
+**과거 제출 근거:** 원 d21 독립 수용 제출에서는 Python parse/compile·collection·NumPy 진단·source/설치 시험·runtime 음성대조·PDE 수렴·전체 회귀·Windows 시험을 실행하지 않았습니다. 통과 수·측정 차수·artifact hash·clean-whole 주장은 없었습니다. 이는 과거 한계이며 현재 실행 제한이 아닙니다. Actions는 활성화돼 있고 현재 checkout 결과는 정확한 CI 근거가 필요합니다.
 
 신규 생산 모듈을 읽기 전에 독립 사전등록
 `d42b43360bcaff9fe1d98c44105b15ab74ceec90`에서 수치 계약을 고정했다.
@@ -174,7 +172,7 @@ frame 회전·평행이동에서는 flux를 벡터로 변환한다.
 T/BC/initial의 공통 상수 shift는 q/storage/reaction을 보존하고
 H를 선형으로 바꾼다. 단위/출처 인증이나 DMP를 약속하지 않는다.
 
-| Actor 범주 | 작성된 검출 기준; 실행 대기 |
+| Actor 범주 | 작성된 검출 기준; 실행은 정확한 CI로 확인 |
 |---|---|
 | Runtime 질량 조립 변형 | row-sum lumped M은 독립 n8 BE-product 비교에서 실패해야 함; 자체 일관 wrong residual만으로 충분하지 않음 |
 | Runtime 잘못된 reduced solve | 독립 old/new/both M_FC 누락 자유해를 splu actor로 주입; 원 전체계 자유잔차 거절과 예상 step/cause 확인 |
@@ -191,14 +189,22 @@ clamp/f0 누락/copy 누락/anchor 부재 거절/stale dt/부호·storage 오류
 
 ## 재현 대기열, source와 설치 근거
 
-아래 명령은 대기열이며 **실행된 명령/결과가 아니다**.
-환경 가용 확인과 명시 수치 실행 승인을 받은 뒤에만 저장소 루트와 본인
-격리 venv에서 실행한다. 기존 의존성만 사용하며 전역 설치, 새 의존성,
-다른 담당 scratch는 사용하지 않는다. 모든 수치 thread는1이다.
+아래 명령은 재현 절차이며 측정 결과가 아닙니다. 기존 의존성을 갖춘 격리 환경의 저장소 루트에서 실행하고 정확한 source·환경 근거를 기록합니다. 첫 예시는 이식 가능한 Python이고 artifact/consumer 명령은 명시적으로 POSIX 셸용입니다. 수치 thread는 1로 설정합니다.
 
-```bash
-export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1
-python -m pytest -c pyproject.toml -q -s packages/galerkin/tests/test_transient_heat_independent_validation.py
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+subprocess.run([sys.executable, "-m", "pytest", "-c", "pyproject.toml", "-q", "-s",
+                "packages/galerkin/tests/test_transient_heat_independent_validation.py"],
+               cwd=root, env=env, check=True)
 ```
 
 정확한 checkout commit, dirty/비승인 파일 감사, host/OS/Python, 버전/module origin,
@@ -240,15 +246,13 @@ core는 PDE를 제외한 명시적 진단이며 전체 수용을 대신할 수 �
 python -m pytest -q
 ```
 
-공용 release manifest/문서 색인은 변경하지 않는다.
-새 문서·standalone consumer를 이미 배포/설치된 asset이라고 주장하지 않는다.
-release 협의에서 포함 여부와 EN/KO 색인 링크를 별도로 확인해야 한다.
+현재 manifest·문서 색인·배포 helper는 이 보고서, 원 oracle/cases/wrapper/consumer·runtime 모듈·예제를 archive/byte/origin 검사에 연결합니다. Helper는 격리 archive consumer를 `--suite all`로 실행하고 전체 수렴 예제를 실행합니다. 이는 구현된 검증이며 artifact 실행 성공 근거는 아닙니다. 정확한 CI 종료값과 artifact를 확인해야 합니다.
 후속 생산 SHA는 원 blob 비교와 영향별 재검증이 필요하며,
 동일 코드라는 이유로 전체 시험을 자동 반복하지 않는다.
 
-## 근거의 한계와 다음 작업
+## 과거 d21 근거의 한계
 
-| 범위 | 현재 결과 |
+| 범위 | 원 d21 제출 결과 |
 |---|---|
 | 후보 API/source 읽기 | 완료; 정확한 모듈 blob 기록 |
 | 수용 oracle/cases/consumer 및 EN/KO 보고 | 작성; 정적검토만 수행 |
@@ -258,8 +262,4 @@ release 협의에서 포함 여부와 EN/KO 색인 링크를 별도로 확인해
 | 전체회귀/artifact/build/배포/Windows | 미실행 |
 | Actions | 조회·실행·활성화 없음 |
 
-원 수치 실패를 통과로 바꾸지 않았다. 원문만 제출한 이번 작업은 후보 수용,
-배포 준비 완료 또는 develop 통합을 의미하지 않는다.
-다음은 정확한 원문과 보고서 검토, 환경 확인 뒤 실제 실행 승인,
-최초 실행 근거 보존, source와 격리 설치 gate 수행이다.
-실패를 평가한 뒤 오너가 통합 여부를 결정한다.
+원 수치 실패를 통과로 바꾸지 않습니다. 표는 과거 source-only 제출을 기록하며 현재 checkout의 CI 상태가 아닙니다. 최초 실패와 정확한 근거를 보존하고 main 통합·릴리스 전에 현재 source·설치·독립·플랫폼 결과를 각각 평가해야 합니다.

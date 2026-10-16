@@ -2,7 +2,11 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat_independent_validation.md)
 
-## Status: acceptance files written; execution pending
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
+## Historical registration and current reproduction
 
 2026-10-16. This report covers exact initial production candidate
 `d21e083d9723eec71ab5e32777ecd331d75cd981`, whose
@@ -12,17 +16,9 @@ The independent acceptance branch is
 `codex/openphysics-transient-heat-independent-validation`, created at that
 exact candidate. Its initial code checkpoint is
 `55afd565b9f6feea38896dc567eef574adf21371`.
-Production code, producer tests, refsol, existing tests and shared release
-configuration are unchanged.
+That historical submission changed no production code, producer tests, refsol, existing tests or shared release configuration.
 
-**No Python parse/compile, collection, NumPy diagnostic, source test, installed
-consumer, runtime negative, PDE convergence, whole regression or Windows
-test was executed for this submission.** The current assignment authorizes
-connector source/code work and expressly excludes new shell probes/tests.
-An environment availability display is not execution authorization.
-There is no pass count, measured order, artifact hash or clean-whole claim.
-No Actions query/execute/enable, PC computation, new cloud, other scratch,
-schedule, PR, deployment or integration was performed.
+**Historical submission evidence:** no Python parse/compile, collection, NumPy diagnostic, source/installed test, runtime negative, PDE convergence, whole regression or Windows test was executed for the original d21 acceptance submission. It supplied no pass count, measured order, artifact hash or clean-whole claim. These are historical limits, not current execution restrictions; Actions is enabled and present-checkout results require exact CI evidence.
 
 The numerical contract was frozen before reading the new producer module:
 independent preregistration `d42b43360bcaff9fe1d98c44105b15ab74ceec90`.
@@ -184,7 +180,7 @@ and explicit mm-to-m representation are compared to the same physical problem.
 Constant T/BC/initial shift preserves q/storage/reaction and shifts H linearly.
 No units/provenance authentication or DMP is promised.
 
-| Actor category | Authored discriminator; execution pending |
+| Actor category | Authored discriminator; check exact CI for execution |
 |---|---|
 | Runtime mass assembly mutation | row-sum lumped M must fail independent n8 BE-product comparison; self-consistent wrong residual alone is insufficient |
 | Runtime wrong reduced solve | independent omitted old/new/both M_FC free solution injected through splu actor; original-system free-residual rejection with expected step/cause |
@@ -202,15 +198,22 @@ the frozen lab contains additional matrix actors.
 
 ## Planned reproduction, source and installed evidence
 
-The commands below are a queue, **not executed commands/results**.
-Run only after environment availability confirmation and explicit numerical
-execution authorization, from the repository root with an own isolated venv.
-Use existing dependencies; no global install, new dependency or alternate
-worker scratch. Set all numerical threads to1.
+The commands below are reproduction instructions, not measured results. Run from the repository root in an isolated environment with the existing dependencies. Record exact source and environment evidence. The first example is portable Python; the artifact/consumer snippets explicitly use a POSIX shell. Set numerical threads to 1.
 
-```bash
-export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1
-python -m pytest -c pyproject.toml -q -s packages/galerkin/tests/test_transient_heat_independent_validation.py
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+subprocess.run([sys.executable, "-m", "pytest", "-c", "pyproject.toml", "-q", "-s",
+                "packages/galerkin/tests/test_transient_heat_independent_validation.py"],
+               cwd=root, env=env, check=True)
 ```
 
 Preserve exact checked-out commit, dirty/unapproved-file audit, host/OS/Python,
@@ -254,15 +257,13 @@ regression and one final whole-root run separately:
 python -m pytest -q
 ```
 
-Shared release manifests/documentation indexes are unchanged. These new docs
-and standalone test consumers are not claimed shipped/installed assets.
-Release coordination must verify inclusion and EN/KO index links separately.
+Current manifests, documentation indexes and the distribution helper connect these reports, original oracle/cases/wrapper/consumer, runtime modules and example to archive/byte/origin checks. The helper runs the isolated archived consumer with `--suite all` and the complete convergence example. This is implemented verification, not evidence of a successful artifact run; inspect exact CI exits and artifacts.
 Subsequent producer SHAs require original blob comparison and impact-specific
 retesting; identical code does not justify automatic whole-run repetition.
 
-## Evidence boundary and next work
+## Historical d21 evidence boundary
 
-| Scope | Current result |
+| Scope | Original d21 submission result |
 |---|---|
 | Candidate API/source reading | completed; exact module blob recorded |
 | Acceptance oracle/cases/consumer and EN/KO report | written; static review only |
@@ -272,9 +273,4 @@ retesting; identical code does not justify automatic whole-run repetition.
 | Whole regression/artifact/build/deployment/Windows | unexecuted |
 | Actions | no query, execution or activation |
 
-No original numerical failure was replaced by a pass. No candidate acceptance,
-release readiness or develop integration follows from this source-only
-submission. Next: reviewer reads exact source and report; obtain actual
-execution authorization after environment check; preserve first-run evidence;
-complete source and isolated-installed gates, then assess failures before
-owner integration.
+No original numerical failure is replaced by a pass. The table records the historical source-only submission, not the current checkout's CI status. Preserve first-run failures and exact evidence; assess current source, installed, independent and platform results separately before main integration or release.

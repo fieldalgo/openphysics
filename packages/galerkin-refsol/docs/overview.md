@@ -2,6 +2,10 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
 [English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Closed-form solutions and published high-accuracy benchmarks used as the
@@ -136,12 +140,12 @@ Hadley (2002); see [NOTICE](../NOTICE) for their provenance.
 
 `refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.
 
-## Transient heat candidate references
+## Transient heat references
 
-Import `refsol.transient_heat` explicitly for `uniform_insulated`, `moving_affine`, `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and `backward_euler_amplitude`. The module uses NumPy/stdlib without engine imports. Coordinates/time/temperature are m/s/K, conductivity W/(m K), volumetric heat capacity J/(m³ K), source W/m³ and flux W/m². Dense matrices and modes target small reference meshes; a semidiscrete BE product is distinct from a continuum PDE solution. These references do not certify physical temperature validity or a maximum principle, and independent acceptance must derive its own truth.
+Explicitly import `refsol.transient_heat`; it provides `uniform_insulated`, `moving_affine`, `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and `backward_euler_amplitude`. The module uses NumPy/stdlib without engine imports. Coordinates/time/temperature are m/s/K, conductivity W/(m K), volumetric heat capacity J/(m³ K), source W/m³ and flux W/m². Dense matrices and modes target small reference meshes; a semidiscrete BE product is distinct from a continuum PDE solution. These references do not certify physical temperature validity or a maximum principle, and independent acceptance must derive its own truth.
 
 The fixed-P1, consistent-mass, backward-Euler engine API with constant isotropic materials, time-dependent Dirichlet values and insulation is documented here:
 
-[Usage](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat_independent_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md))
+[Usage](../../galerkin/docs/transient_heat.md) ([한국어](../../galerkin/docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](../../galerkin/docs/transient_heat_validation.md) ([한국어](../../galerkin/docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](../../galerkin/docs/transient_heat_independent_validation.md) ([한국어](../../galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md))
 
-These exact-revision links refer to the authored candidate and require network access. Implementation and acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation, including distribution inclusion, still require separate evidence. This is not release or integration acceptance. No JSON/CLI/Studio or automatic heat-to-mechanics connection is provided.
+The historical b2 snapshot's 70 small source passes are separate from acceptance of this checkout. Current manifests/helper wire documentation, original tests, independent consumers and runtime byte checks. Establish actual full temporal/PDE, independent, distribution and installed success from the exact current CI exits and artifacts. Implementation or gate wiring alone is not release or integration acceptance. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is provided.

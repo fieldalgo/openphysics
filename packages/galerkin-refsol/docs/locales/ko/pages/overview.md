@@ -2,6 +2,10 @@
 
 [English](../../../overview.md) | **한국어**
 
+## 현재 checkout과 근거
+
+이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
 [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md) FEM 엔진의 정답지로 사용하는 폐형식 해와 출판된 고정밀 벤치마크입니다. 같은 모노레포 안의 별도 패키지이며, 평가자는 평가 대상 코드를 import하지 않습니다. numpy와 scipy에만 의존합니다.
@@ -105,12 +109,12 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 `refsol.thermoelastic_traction`는 원래3D 구성 법칙의 `uniform_combined`, `polynomial_manufactured`, `parent_state`, `traction_from_stress`를 NumPy/표준 라이브러리만으로 제공하며 engine을 import하지 않습니다. 좌표·변위는 m, 온도는 K, 응력·전체 표면하중은 Pa, 체적력은 N/m^3, 힘·반력은 N/m, 물리적 에너지는 J/m입니다. 처방 온도장 기계 참조이며 열 해석이나 출처 인증이 아닙니다.
 
-## 과도 열전도 후보 참조
+## 과도 열전도 참조
 
 `refsol.transient_heat`를 명시적으로 import해 `uniform_insulated`, `moving_affine`, `sine_manufactured`, 소형 dense `p1_matrices`, `smallest_dirichlet_mode`, `backward_euler_amplitude`를 사용합니다. 이 모듈은 engine import 없이 NumPy/표준 라이브러리를 사용합니다. 좌표·시간·온도는 m/s/K, 열전도율은 W/(m K), 체적열용량은 J/(m³ K), source는 W/m³, flux는 W/m²입니다. Dense 행렬과 mode는 작은 참조 메시용이며 semidiscrete BE product는 연속체 PDE 해와 구분합니다. 이 참조는 물리 온도 유효성이나 최대 원리를 인증하지 않으며 독립 수용은 자체 정답을 도출해야 합니다.
 
 상수 등방 재료, 시간변 Dirichlet 값과 단열을 사용하는 고정 P1·일관 질량·후진 Euler 엔진 API는 다음 문서에 설명돼 있습니다.
 
-[사용법](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat.md) ([English](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat.md)) · [생산 검증 계약](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat_validation.md)) · [독립 검증 보고](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/95d6f39365d9b5b73318414bd4b489f191e42149/packages/galerkin/docs/transient_heat_independent_validation.md))
+[사용법](../../../../../galerkin/docs/locales/ko/pages/transient_heat.md) ([English](../../../../../galerkin/docs/transient_heat.md)) · [생산 검증 계약](../../../../../galerkin/docs/locales/ko/pages/transient_heat_validation.md) ([English](../../../../../galerkin/docs/transient_heat_validation.md)) · [독립 검증 보고](../../../../../galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](../../../../../galerkin/docs/transient_heat_independent_validation.md))
 
-이 정확 revision 링크는 작성 후보를 가리키며 네트워크 접근이 필요합니다. 구현과 수용 파일은 제출됐습니다. 생산 담당의 사용/검증 페이지에 소형 source 시험 70개 통과가 기록돼 있으며, 전체 시간/PDE·독립 수용·배포 포함·빌드·설치 검증은 별도 근거가 필요합니다. 릴리스나 통합 수용이 아니며 JSON/CLI/Studio 또는 자동 열→기계 연결을 제공하지 않습니다.
+과거 b2 snapshot의 소형 source 70개 통과와 현재 checkout의 수용은 별개입니다. 현재 manifest/helper에는 문서·원 시험·독립 consumer·runtime byte 검사가 연결돼 있습니다. 실제 전체 시간/PDE·독립·배포·설치 성공은 정확한 현재 CI의 종료값과 artifact로 확인해야 합니다. 구현이나 gate 연결만으로 릴리스·통합 수용을 뜻하지 않습니다. JSON/CLI/Studio·저장·자동 열→기계 연결은 제공하지 않습니다.

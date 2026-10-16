@@ -2,6 +2,10 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
 [English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
@@ -341,7 +345,7 @@ the convergence rate is the lie detector.
 - **Beyond electromagnetics**: the low-level assembly can represent anisotropic
   coefficients. The public steady-heat API currently accepts homogeneous
   isotropic conductivity, including prescribed outward flux and Robin boundaries.
-  Static elasticity provides its own vector nodal space. This candidate's transient
+  Static elasticity provides its own vector nodal space. The transient
   heat submodule below uses backward Euler; other transient physics needs its own
   time integration, and Stokes needs a P2 space. The M3a two-field block system
   illustrates an assembly pattern; it does not certify automatic coupling.
@@ -389,10 +393,10 @@ return. The contract separates heat W/m, mechanical N/m and physical energy J/m.
 
 The [total-traction contract](thermoelastic_traction.md), [English example](../examples/thermoelastic_traction.py) and [independent report](thermoelastic_traction_independent_validation.md) describe optional global Cartesian Pa loads on the frozen-temperature mechanical stage. The prescribed mapping is total physical `sigma*n`; do not add/subtract thermal traction. Body, line, thermal loads and constrained reactions remain separately accounted for. Legacy18 positional result construction remains valid; new load fields default to None. There is no dedicated scalar-pressure/local-frame/follower API, but `lambda points_m, normals: -p * normals` is a valid global Pa callback on the fixed reference boundary. This does not extend the heat workflow, JSON/CLI/Studio or persistence.
 
-## Transient heat candidate Python submodule
+## Transient heat Python submodule
 
 Import `galerkin.transient_heat.solve_transient_heat` explicitly. It uses fixed conforming P1 triangles, consistent mass and backward Euler, constant isotropic conductivity/volumetric heat capacity, fixed Dirichlet nodes with time-dependent temperatures, and insulation elsewhere. Coordinates, time and temperature are m, s and K. Finite negative Kelvin is allowed by the linear mathematical API; no clamping, physical-temperature certification or discrete maximum principle is promised. The separate heat-to-mechanics transfer still rejects negative K.
 
 [Usage](transient_heat.md) ([한국어](locales/ko/pages/transient_heat.md)) · [Producer validation contract](transient_heat_validation.md) ([한국어](locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](transient_heat_independent_validation.md) ([한국어](locales/ko/pages/transient_heat_independent_validation.md))
 
-Implementation and acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. Fixed verification gates are not measured pass results; this is not release or integration acceptance. No Robin/flux, JSON/CLI/Studio, persistence or automatic thermal–mechanical connection is added.
+The historical b2 snapshot's 70 small source passes are separate from acceptance of this checkout. Current manifests/helper wire documentation, original tests, independent consumers and runtime byte checks. Establish actual full temporal/PDE, independent, distribution and installed success from the exact current CI exits and artifacts. Implementation or gate wiring alone is not release or integration acceptance. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is provided.

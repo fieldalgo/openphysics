@@ -2,9 +2,13 @@
 
 [English](../../../transient_heat_validation.md) · [사용법](transient_heat.md)
 
+## 현재 checkout과 근거
+
+이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+
 ## 실행 경계
 
-**최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
+**과거 최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
 parse/import/compile과 collection은 미실행이었습니다. 그 역사적 상태를 보존하며
 이전 수치 통과를 추론하지 않습니다.
 
@@ -28,9 +32,10 @@ source 환경에서 BLAS/OMP/MKL1을 사용했으며 시험 수나 허용치를 
 솔버 수정이나 시험 재실행은 필요하지 않았습니다. d21 snapshot의 시험 본문을 별도로
 실행한 것은 아닙니다.
 
-고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀, 설치 sdist/wheel 증명,
-독립 수용과 플랫폼 시험은 계속 미실행입니다. 소형 대조가 완전한 물리 수용을 뜻하지
-않습니다. 아래 명령은 미완료 단계의 재현 지침으로 유지됩니다.
+그 과거 체크포인트에서는 고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀,
+설치 sdist/wheel 증명, 독립 수용과 플랫폼 시험이 미실행이었습니다. 소형 대조 70개는
+완전한 물리 수용이 아닙니다. 현재 checkout은 정확한 현재 CI 근거로 평가해야 하며,
+아래 명령은 재현 절차이지 새 통과 결과가 아닙니다.
 
 ## 정답 경계와 대수
 
@@ -143,22 +148,29 @@ Producer 계약 파일은 기본 계약, 원래 계 감사와 소형 reference �
 모든 독립 wrong variant를 이미 주입·거절했다는 주장이 아닙니다. 지정 mutation 실행과
 독립 물리 증명은 미완료입니다. 기존 gate는 변경하지 않습니다.
 
-## 향후 재현과 배포 경계
+## 재현과 배포 경계
 
 기존 의존성을 사용할 수 있는 저장소 루트에서 실행합니다.
 
-```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q packages/galerkin/tests/test_transient_heat.py packages/galerkin-refsol/tests/test_transient_heat_reference.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python packages/galerkin/examples/transient_heat_convergence.py
-python -m pytest -q
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+subprocess.run([sys.executable, "-m", "pytest", "-q", "packages/galerkin/tests/test_transient_heat.py",
+                "packages/galerkin-refsol/tests/test_transient_heat_reference.py"], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "packages/galerkin/examples/transient_heat_convergence.py"], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=True)
 ```
 
 수렴 프로그램은 고정 시간/공간/분리 gate를 assert한 뒤 성공한 결합 JSON 보고서를
 만들며 정해 놓은 통과를 출력하지 않습니다. 요청 history를 모두 보존하므로 n64
 companion에 상당한 메모리가 필요합니다. 실행 시간은 전용 호스트 성능 기준선이 아닙니다.
 
-후속 설치 검사는 실제 sdist->wheel artifact를 만들고 설치 패키지 출처/source 바이트와
-EN/KO·예제 포함을 확인한 뒤 source 밖 계약/물리 consumer를 실행해야 합니다.
-현재 build/install 또는 배포 포함을 검증하지 않았습니다. 공유 release helper/manifest를
-변경하지 않았습니다. Windows, 독립 수용, 전체 회귀와 release 통합에는 각각 실제
-근거가 필요합니다. Actions나 배포 결과를 의미하지 않습니다.
+현재 MANIFEST와 배포 helper는 EN/KO 페이지·예제·원 시험·독립 consumer 및 runtime 모듈의 포함과 byte 검사를 연결합니다. Helper는 실제 sdist→wheel을 만들고 설치 출처/source byte를 확인하며, 검증한 archive의 독립 `--suite all` consumer와 전체 영어 수렴 예제를 실행하도록 구현돼 있습니다. 이 gate의 구현은 실제 build/install 성공과 다릅니다. 정확한 현재 CI의 종료값·로그·artifact로 포함·설치·수치 성공을 확인해야 합니다. Windows의 좁은 저장 gate는 과도 열전도 전체 물리 수용이 아니며, 릴리스 성공도 별도입니다.

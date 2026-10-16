@@ -2,7 +2,11 @@
 
 [English](../../../transient_heat.md) · [검증](transient_heat_validation.md)
 
-**최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
+## 현재 checkout과 근거
+
+이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+
+**과거 최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
 parse/import/compile과 collection은 미실행이었습니다. 그 역사적 상태를 보존하며
 이전 수치 통과를 추론하지 않습니다.
 
@@ -26,9 +30,10 @@ source 환경에서 BLAS/OMP/MKL1을 사용했으며 시험 수나 허용치를 
 솔버 수정이나 시험 재실행은 필요하지 않았습니다. d21 snapshot의 시험 본문을 별도로
 실행한 것은 아닙니다.
 
-고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀, 설치 sdist/wheel 증명,
-독립 수용과 플랫폼 시험은 계속 미실행입니다. 소형 대조가 완전한 물리 수용을 뜻하지
-않습니다. 아래 명령은 미완료 단계의 재현 지침으로 유지됩니다.
+그 과거 체크포인트에서는 고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀,
+설치 sdist/wheel 증명, 독립 수용과 플랫폼 시험이 미실행이었습니다. 소형 대조 70개는
+완전한 물리 수용이 아닙니다. 현재 checkout은 정확한 현재 CI 근거로 평가해야 하며,
+아래 명령은 재현 절차이지 새 통과 결과가 아닙니다.
 
 ## 명시적 하위 모듈과 최소 사용법
 
@@ -195,5 +200,5 @@ maximum principle을 주장하면 안 됩니다. 복원한 셀 flux는 H(div)-co
 아닙니다. 직접 경계 법선 적분은 일반적으로 유한 메시의 약형 thermostat reaction과
 다르므로 별도로 보고해야 합니다.
 
-고정된 미실행 gate, 독립 대수/reference 경계와 재현은
+고정 gate, 독립 대수/reference 경계와 재현은
 [검증 가이드](transient_heat_validation.md)를 보세요.
