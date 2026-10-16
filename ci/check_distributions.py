@@ -28,7 +28,8 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/thermal.py"),
+RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/thermal.py",
+                         "galerkin/transient_thermal_mechanical.py"),
                          "galerkin-refsol": ("refsol/transient_heat.py",),
                          "simcase": ("simcase/steady_boundary_contract.py",
                                      "simcase/schema.py", "simcase/transient_thermal_contract.py",
@@ -39,6 +40,12 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/th
 STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
                           "simcase/studio/static/thermal.js")
 DOCUMENT_ASSETS = {'galerkin': (
+              'galerkin/transient_thermal_mechanical.py',
+              'docs/transient_thermal_mechanical.md',
+              'docs/locales/ko/pages/transient_thermal_mechanical.md',
+              'examples/transient_thermal_mechanical.py',
+              'tests/test_transient_thermal_mechanical.py',
+              'tests/test_transient_thermal_mechanical_physics.py',
               'galerkin/thermal.py',
               'galerkin/transient_heat.py',
               'docs/transient_heat.md',
@@ -364,6 +371,7 @@ def main():
         tests.mkdir()
         for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
             shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
+        shutil.copy2(ROOT / "ci" / "test_transient_thermomechanical_wheel.py", tests / "test_transient_thermomechanical_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_cavity_wheel.py", tests / "test_cavity_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_multiphysics_wheel.py", tests / "test_multiphysics_wheel.py")
         shutil.copy2(ROOT / "ci" / "test_thermal_traction_wheel.py", tests / "test_thermal_traction_wheel.py")
@@ -406,7 +414,7 @@ def main():
             for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
                              "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
                              "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
-                             "transient_heat_convergence.py"):
+                             "transient_heat_convergence.py", "transient_thermal_mechanical.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
@@ -435,6 +443,7 @@ def main():
                 (examples / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
         run(python, "-I", examples / "thermal_mechanical_workflow.py", cwd=work, env=env)
+        run(python, "-I", examples / "transient_thermal_mechanical.py", cwd=work, env=env)
         run(python, "-I", examples / "thermoelastic_traction.py", cwd=work, env=env)
         run(python, "-I", tests / "thermoelastic_traction_independent_consumer.py", cwd=work, env=env)
         # No source conftest is copied; test_studio finds static files via simcase.__file__.

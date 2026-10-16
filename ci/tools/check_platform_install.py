@@ -147,6 +147,7 @@ def main():
         tests = work / "tests"
         tests.mkdir()
         copies = {
+            ROOT / "ci" / "test_transient_thermomechanical_wheel.py": tests / "test_transient_thermomechanical_wheel.py",
             ROOT / "ci" / "test_platform_install.py": tests / "test_platform_install.py",
             ROOT / "ci" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
             ROOT / "packages/simcase/tests/test_simcase.py": tests / "original_scalar.py",
@@ -172,6 +173,7 @@ def main():
             "--confcutdir", tests, "--basetemp", output / "consumer-files",
             "--junitxml=" + str(output / "installed-tests.xml"),
             tests / "test_thermal_simcase_wheel.py",
+            tests / "test_transient_thermomechanical_wheel.py",
             tests / "test_msh.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
