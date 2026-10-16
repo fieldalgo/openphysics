@@ -375,6 +375,9 @@ class ThermalRunResult:
         self.doc.validate()
         if self._canonical_document() != self._document_json:
             raise ValueError('thermal result document normalization changed after the solve')
+        return self.doc
+
+    def _validate_mesh_snapshot(self):
         for current, captured in (
                 (self.mesh.nodes, self._nodes_snapshot),
                 (self.mesh.triangles, self._triangles_snapshot),
@@ -383,7 +386,6 @@ class ThermalRunResult:
             a = np.asarray(current)
             if a.dtype != captured.dtype or not np.array_equal(a, captured):
                 raise ValueError('thermal result mesh or prescribed data changed after the solve')
-        return self.doc
 
     @property
     def result_format(self): return self._result_format
@@ -442,6 +444,7 @@ class ThermalRunResult:
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
+        self._validate_mesh_snapshot()
         nodes, tris, fixed = arrays['nodes_m'], arrays['triangles'], arrays['dirichlet_node_ids']
         if nodes.ndim != 2 or nodes.shape[1] != 2 or len(nodes) < 3:
             raise ValueError('thermal nodes_m: expected nonempty (N,2) coordinates')
