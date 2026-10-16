@@ -669,3 +669,27 @@ failures, hidden/visible invalidation and the existing owned-process cleanup.
 empty visible result after each obsolete read. Existing steady browser checks
 remain mandatory. Configured browser scenarios still require exact CI execution;
 a syntax check or Node fixture is not native-browser acceptance.
+
+
+## Transient Studio resource workload artifacts
+
+After the preserved steady resource observation succeeds, Linux runs the exact
+transient wrapper once with the same successful-job condition:
+
+```text
+python ci/tools/run_transient_resource_workloads.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/transient-resource-observation
+```
+
+The existing always-upload of `.validation/` retains
+`transient-resource-observation/workload-summary.json`, each workload's stdout
+and stderr, generated input documents and each `*-observation/instrumented-report.json`
+with raw HTTP evidence. The small, medium and near-raw-candidate workloads use
+separate fresh processes. The near workload also supplies the over-budget actor
+and requires its 413 refusal before solve; completed capture requires each of
+13 public getters exactly once. Preserve failed or partial stages and original
+exit codes. An absent stage after earlier failure is not a successful measurement.
+These are instrumented workload observations, not physical acceptance, maximum
+capacity, RSS bounds, leak proof or dedicated performance baselines. Review the
+exact source commit, all three exits, getter counts, raw responses and accounting
+reports separately from source/installed/browser/platform gates. No extra CI
+run is created by this step, and the existing steady observation remains intact.
