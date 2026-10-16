@@ -424,5 +424,5 @@ Protection against replacements observed before cleanup is tested; a foreign
 replacement between an ownership check and unlink is not guaranteed safe.
 Hostile filesystem races and atomic rollback are outside acceptance. Do not let
 another writer mutate the output during this interval. Windows save verification
-is stopped with two unresolved failures; Linux results do not establish Windows
-acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
+remains incomplete with two unresolved historical failures; Linux results do not establish Windows
+acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required for acceptance.

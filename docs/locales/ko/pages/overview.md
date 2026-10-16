@@ -126,7 +126,7 @@ Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. �
 전체 회귀시험 범위 밖입니다. Windows 2022 / Python 3.12.10의 좁은 저장 I/O
 검증은 두 실패의 원인이 미확정인 채 미완료 상태이며, Linux 결과로 Windows 수용을
 대신하지 않습니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며
-검증된 플랫폼 목록이 아닙니다. GitHub Actions는 현재 비활성화돼 있고 검증은 별도로 수행합니다.
+검증된 플랫폼 목록이 아닙니다. GitHub Actions는 활성화돼 있습니다. 과거 클라우드 결과는 원래 snapshot의 근거이며 새 커밋은 정확한 workflow 결과를 확인해야 합니다.
 
 ## 문서와 기여
 

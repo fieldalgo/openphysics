@@ -14,8 +14,8 @@ OpenPhysics는 개발 중인 프로젝트입니다. [패키지 개요](overview.
 
 [개요·설치 안내](overview.md)에 따라 저장소 루트에서 설치·실행하세요.
 고정한 Linux 검증 환경, 선택 도구·데이터와 격리 배포 검사는
-[ci 한국어 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따릅니다. GitHub Actions는
-현재 비활성화돼 있으므로 기여 과정에서 활성화하거나 실행하지 마세요.
+[ci 한국어 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따릅니다. GitHub Actions는 활성화돼 있으며 push·pull request에서 실행됩니다.
+기여 검증 시 정확한 workflow 결과와 artifact를 확인하세요.
 직접 수행한 검사의 정확한 명령, 종료값, 실패와 선택 기능 skip을 기록하세요.
 
 물리 기능 변경에는 독립 해석해와 메시 수렴 검사가 필요합니다. 기존 수치 기준을

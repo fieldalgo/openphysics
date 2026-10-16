@@ -4,7 +4,7 @@
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-GitHub Actions는 사용자 지시로 비활성화돼 있습니다. 활성화·dispatch·재실행을 하지 않습니다. 아래 workflow 명령은 보존한 정의이며 현재 GitHub runner에서 실행했다는 뜻이 아닙니다. 현재 검증은 Work cloud 안에서만 수행합니다.
+2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. 기존 Linux 패키지·좁은 Windows workflow는 push·pull request·수동 dispatch에서 사용할 수 있습니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
 
 루트 `validate.yml` workflow는 push·pull request·수동 dispatch에서 실행됩니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11과
@@ -228,7 +228,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
 교체 보호는 시험하지만 소유권 검사와 unlink 사이의 외부 교체는 안전을 보장하지 않습니다.
 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. 이 동안 다른 writer가
-출력을 바꾸면 안 됩니다. Windows 두 실패의 원인은 미확정이며 Actions는 비활성화돼 있습니다.
+출력을 바꾸면 안 됩니다. 이전 Windows 두 실패의 원인은 미확정입니다. Actions는 활성화됐으며 새 runner 근거가 필요합니다.
 
 ## 배포본의 독립 수용
 
@@ -248,7 +248,7 @@ Dirichlet 회귀가 연결됩니다. headless JSON은 여전히 flux/Robin을 �
 Work cloud는 현재 가용 Linux/Python 3.12.14, numpy 2.3.5, scipy 1.17.0으로 검증하며
 보존 pinned CI 환경이 아닙니다. Gmsh와 명시적 RII database가 없으므로 실제 skip을
 기록합니다. twine이 없어 strict 검사는 기존 도구가 가용해지지 않는 한 미실행입니다.
-Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 계속 비활성 상태입니다.
+Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 활성화돼 있으므로 정확한 workflow 결과를 확인합니다.
 
 ## 명시적 workflow의 source 재현 자산
 
@@ -280,4 +280,4 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
-개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 비활성 상태이며 조회·활성화·dispatch·재실행을 하지 않습니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
+개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 활성화돼 있으며 새 workflow 결과와 이 과거 실측은 구분해야 합니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.

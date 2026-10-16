@@ -47,5 +47,5 @@ From the repository root after installing the packages:
 Use `develop` as the integration branch. Read CONTRIBUTING.md and SECURITY.md
 before submitting changes or reporting vulnerabilities. Keep implementation and
 validation contracts with the code; do not commit private plans, credentials,
-research records or session handoffs. GitHub Actions is disabled; do not enable
-or dispatch workflows.
+research records or session handoffs. GitHub Actions is enabled with owner approval. Use the retained validation
+workflows and record exact commits, command exits and artifacts.

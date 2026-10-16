@@ -248,4 +248,4 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.
 이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
 원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
-GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.
+GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거가 필요합니다.

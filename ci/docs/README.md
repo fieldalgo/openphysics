@@ -2,9 +2,11 @@
 
 [한국어](locales/ko/pages/README.md)
 
-GitHub Actions is currently disabled by user instruction. Do not enable, dispatch
-or rerun it. Workflow commands below describe retained definitions, not current
-GitHub-runner execution. Current verification runs only in the Work cloud.
+GitHub Actions is enabled with owner approval as of 2026-10-16. The retained
+Linux package and narrow Windows workflows may run on pushes, pull requests
+and manual dispatch. Check each exact run, exit status and artifact; enabling
+CI does not itself establish acceptance. Earlier Work-cloud results retain
+their original source, environment and scope.
 
 ## Narrow Windows headless thermal gate
 
@@ -24,9 +26,9 @@ upstream tag identifies BSD-3-Clause in pyproject metadata and LICENSE.txt.
 No runtime requirement or package version is changed. This gate does not certify
 Windows full regression, optical/Gmsh behavior or broader OS/Python support.
 Windows save/cleanup acceptance remains incomplete, with two shipped replacement
-cases unresolved in the last executed native-handle candidate. GitHub-runner
-verification is stopped. This retained workflow is a reproducibility definition,
-not a passing Windows support claim; Linux passes cannot substitute for it.
+cases unresolved in the last executed native-handle candidate. Fresh GitHub-runner
+evidence is required. This workflow is a reproducibility definition, not a
+passing Windows support claim; Linux passes cannot substitute for it.
 Windows logs/JUnit/environment and four wheel checksums use the separate
 `windows-thermal-installed-and-io-<run_id>` artifact. Linux full source, all seven
 sdist-to-wheel/strict/metadata/byte/link gates and the existing 88 consumers remain
@@ -266,8 +268,8 @@ Protection against replacements observed before cleanup is tested; a foreign
 replacement between an ownership check and unlink is not guaranteed safe.
 Hostile filesystem races and atomic rollback are outside acceptance. Do not let
 another writer mutate the output during this interval. Windows save verification
-is stopped with two unresolved failures; Linux results do not establish Windows
-acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
+remains incomplete with two unresolved historical failures; Linux results do not establish Windows
+acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required for acceptance.
 
 ## Packaged independent acceptance
 
@@ -293,7 +295,7 @@ Work-cloud checks use the available Linux/Python 3.12.14 environment with
 numpy 2.3.5 and scipy 1.17.0, not the retained pinned CI environment. Gmsh and
 an explicit RII database are unavailable; record actual skips. Twine is absent,
 so its strict check is unexecuted unless an existing tool becomes available.
-Do not infer Windows acceptance from Linux results. Actions remains disabled.
+Do not infer Windows acceptance from Linux results. Actions is enabled; inspect the exact workflow result.
 
 ## Explicit workflow source reproduction assets
 
@@ -329,4 +331,4 @@ The required byte inventory now contains92 entries: the existing79 plus13 exact 
 
 The new Python API applies total physical `sigma*n` on the prescribed-temperature mechanical stage. There is no scalar-pressure keyword/local-frame/follower API; global Pa `-p*normal` callbacks on fixed reference geometry are valid. The one-way heat workflow and JSON/CLI/Studio remain unchanged. Producer reproduction commands use the repository root; extracted sdists have package-local `tests/` and `examples/` paths. Both original test files and required oracle/reference sources are shipped explicitly.
 
-Individual candidate measurements90/90/isolated4/related208/wrong17 do not establish a combined whole or installed result. The independent report preserves the original whole1385pass/7CLI-environment failures/16skip/+9subtests and target7 recovery as distinct evidence. New results must identify the exact source and real archives, actual failures and optional skips. GitHub Actions is disabled; no query/enable/dispatch/rerun is permitted. Linux results cannot establish Windows acceptance, and core metadata parsing does not substitute for unavailable twine strict checks.
+Individual candidate measurements90/90/isolated4/related208/wrong17 do not establish a combined whole or installed result. The independent report preserves the original whole1385pass/7CLI-environment failures/16skip/+9subtests and target7 recovery as distinct evidence. New results must identify the exact source and real archives, actual failures and optional skips. GitHub Actions is enabled; distinguish new workflow results from these historical measurements. Linux results cannot establish Windows acceptance, and core metadata parsing does not substitute for unavailable twine strict checks.

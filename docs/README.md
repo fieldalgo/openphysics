@@ -55,7 +55,7 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [benchmark_cavity](../ci/docs/benchmark_cavity.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_cavity.md) |
 | [benchmark_vector](../ci/docs/benchmark_vector.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
-These pages describe this checkout. Actions is disabled and two Windows failures remain unresolved; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
+These pages describe this checkout. Actions is enabled; the last recorded Windows run has two unresolved failures; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
 
 ## Explicit steady heat-to-mechanics workflow
 
