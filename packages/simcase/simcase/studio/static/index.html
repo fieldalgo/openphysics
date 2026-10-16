@@ -224,6 +224,7 @@ function drawThermalViews() {
     // A hidden tab has zero layout size. Do not rasterize it or let its
     // transform error prevent the visible tab from committing.
     if(fieldVisible) {
+      try {
       const model=ThermalStudio.viewModel(payload,field);
       if(!current())return;
       ThermalStudio.draw(fieldCanvas,model,{current});
@@ -238,6 +239,13 @@ function drawThermalViews() {
         const value=ThermalStudio.sample(model,T.inverse(event.clientX-rect.left,event.clientY-rect.top));
         if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')';
       };
+      } catch(error) {
+        if(!current())return;
+        fieldCanvas.getContext('2d').clearRect(0,0,fieldCanvas.width,fieldCanvas.height);
+        fieldCanvas.onmousemove=null;
+        $('resInfo').textContent=field+' — view error: '+error.message;
+        status(field+' — view error: '+error.message);log(error.message,'err');
+      }
     } else fieldCanvas.onmousemove=null;
     if(meshVisible) {
       if(!current())return;

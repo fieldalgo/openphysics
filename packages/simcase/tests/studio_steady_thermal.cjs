@@ -263,7 +263,7 @@ test('actual F capability shape: v1-only allowed, bad/unconfigured limits fail c
   assert.ok(T.capability(value));
   delete value[T.TYPE].limits;assert.equal(T.capability(value),null);
 });
-test('unmeasured or absent run-enabled keeps validated JSON from starting a job',async()=>{
+test('absent run-enabled keeps validated JSON from starting a job',async()=>{
   let runs=0;const c=T.createController({request:async(method,url,body)=>{
     if(url==='/api/capabilities'){const value=cap();delete value[T.TYPE].run_enabled;return value;}
     if(url.endsWith('/validate'))return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};
@@ -276,3 +276,26 @@ test('unmeasured or absent run-enabled keeps validated JSON from starting a job'
 test('settled wire rejects nested coordinates and runs independently of measurement',()=>{const p=payload();assert.equal(T.validatePayload(p).display_length_in_m,1);p.coordinates={raw_unit:'m',display_unit:'m',display_length_in_m:1};assert.throws(()=>T.validatePayload(p));assert.equal(T.capability(cap()).run_enabled,true);assert.equal(T.capability(cap()).resource_policy,'candidate-unmeasured');});
 
 test('shipped result panel shows physical diagnostics and collapsible metadata',()=>{const p=page();p.run("renderThermalSummary({arrays:{temperature_k:[-2,4],nodes_m:[[],[],[]],triangles:[[]]},summary:{diagnostics:{source_heat_w_per_m:60,outward_heat_w_per_m:60,normalized_heat_balance_defect:0}}})");const host=p.element('resTable');assert.equal(host.children[0].children.length,5);assert.equal(host.children[1].children[0].textContent,'Full result metadata');assert.equal(host.children[0].children[0].children[1].textContent,'-2 … 4');});
+
+test('shipped page current derived overflow clears only field; stale render cannot clear newer view',async()=>{
+  const p=page(),wire=payload();wire.arrays.heat_flux_w_m2=[[Number.MAX_VALUE,Number.MAX_VALUE],[0,1]];
+  p.run('globalThis.wire='+JSON.stringify(wire)+';thermalSupported=()=>true;'
+    +'thermalController.result=()=>wire;globalThis.renderSeq=0;'
+    +'thermalController.renderToken=field=>({seq:++renderSeq,field});'
+    +'thermalController.renderCurrent=t=>t.seq===renderSeq;');
+  p.element('thermalField').value='temperature_k';p.run('drawThermalViews()');await tick();
+  assert.ok(p.element('fieldCanvas').onmousemove);
+  p.element('fieldCanvas').getContext('2d').clearRect=()=>p.element('fieldCanvas').calls.push(['clear']);
+  p.element('thermalField').value='magnitude';p.run('drawThermalViews()');await tick();
+  assert.ok(p.element('fieldCanvas').calls.some(x=>x[0]==='clear'));
+  assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.match(p.element('resInfo').textContent,/magnitude.*view error.*overflow/);
+  assert.equal(p.run('thermalController.result()===wire'),true);
+  assert.match(p.element('meshInfo').textContent,/Actual result mesh/);
+  const clears=p.element('fieldCanvas').calls.filter(x=>x[0]==='clear').length;
+  p.element('thermalField').value='magnitude';p.run('drawThermalViews()');
+  p.element('thermalField').value='temperature_k';p.run('drawThermalViews()');await tick();
+  assert.equal(p.element('fieldCanvas').calls.filter(x=>x[0]==='clear').length,clears);
+  assert.match(p.element('resInfo').textContent,/temperature_k/);
+  assert.doesNotMatch(p.element('resInfo').textContent,/view error/);
+});
