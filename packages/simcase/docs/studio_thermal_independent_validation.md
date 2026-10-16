@@ -1,214 +1,147 @@
-# Independent steady thermal Studio acceptance
+# Independent steady thermal Studio validation
 
 [한국어](locales/ko/pages/studio_thermal_independent_validation.md)
 
-## Evidence level
+## Current scope and evidence
 
-Prepared against main `6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`.
-The implementation at this base refuses heat in generic Studio endpoints and has
-no dedicated steady thermal endpoint. This document defines prospective
-acceptance, not an implemented endpoint or a measured pass. The separate
-steady-boundary independent assets are required when the features are combined;
-they are referenced, not duplicated or replaced here.
+This feature checkout implements JSON-first steady thermal validation and
+execution, typed HTTP results and independent acceptance tests. The reviewed
+candidate is `14063f8a010639ca016d9d8b5e864e9e2339d366` (PR11), based on main
+`6e9be99a10fba77d329063da973401f26d4ed0b5`. This is a candidate validation
+contract, not a claim that Studio has landed on main.
 
-No Python parse/compile, collection, HTTP, solver, source/installed suite,
-browser, Node or platform execution was performed during preparation.
-Ten top-level test functions plus parameterized cases are definitions only.
-Neither synthetic wire fixtures nor TestClient definitions prove rendering,
-package installation or platform support.
+Reported CI status: the Studio preflight step succeeded; final exact-candidate
+source and isolated-installed acceptance are still pending. No complete
+numerical, browser, resource or three-platform acceptance is claimed here.
+This documentation update ran no tests. A preflight subset, synthetic fixture,
+TestClient check or Node VM result cannot substitute for the remaining evidence.
 
-## Scope and preserved boundaries
+See [the Studio guide](thermal_studio.md) for use and
+[the validation guide](../../../ci/docs/README.md) for environment/distribution
+requirements. Intermediate implementation reviews are historical and do not
+define the current runtime or its acceptance status.
 
-The target is additive JSON-first steady validation/run, followed by the actual
-result mesh, nodal P1 temperature in K and triangle-constant flux in W/m².
-The accepted design uses capabilities plus dedicated /api/thermal/validate and
-/api/thermal/run routes, existing job/status/result routes and strict typed
-steady result data. Generic optical behavior and generic heat refusal remain.
-Transient UI, mesh-only thermal preview, a new solver, saving endpoints,
-coupling and material extensions are excluded.
+## What the HTTP suite checks
 
-The tests use public Document/run/ThermalRunResult and HTTP. No production
-assembly, private raw arrays or refsol helper supplies a correct answer.
-The existing independent steady boundary Elements/model/audit/slab assets are
-dependencies; the numerical oracle and its fixed thresholds remain unchanged.
+`test_studio_thermal_acceptance.py` consumes public
+`Document`, `run`, `ThermalRunResult` and the actual HTTP application.
+It exercises `/api/capabilities`, `/api/thermal/validate`,
+`/api/thermal/run` and the existing job status/result routes.
+Generic optical behavior and generic validate/mesh/run heat refusal remain.
+Transient UI, thermal mesh-only preview, a new solver, coupling, material
+extensions and saving endpoints are outside this scope.
 
-## Physical expectations
+Positive HTTP cases use the real public solver and audit returned arrays with
+the existing independent `Elements/model/audit/slab` assets. Those assets
+derive triangle gradients, original stiffness actions and consistent exterior
+edge integrals without production assembly or refsol helpers as truth.
+Summary metadata is checked for consistency; its totals never generate the
+expected physics.
 
-The linear unit-square model has k=2, source0, left300 K, right outward g=2 W/m²,
-h=4 W/(m² K), ambient290 K. T=300-7x and q=(14,0).
-Integrated G=2,C=12 and inward thermostat reaction14 W/m give total outward0.
-The coordinates may have a nonzero origin; x in the formula is relative to the
-left edge. Equivalent m/mm/um documents retain the same physical SI arrays.
+## Analytic cases and unchanged gates
 
-The quadratic slab has L=.03 m,H=.02 m,k=12.5,Q=100000 W/m³,left300 K,
-right g=100,h=20,ambient290. T=a+b x-Qx²/(2k), where
-b=(QL-g-h(a-Ta)+hQL²/(2k))/(k+hL). Source is60 W/m of depth.
-Source-driven Robin-only and zero-h-with-opposite-positive-anchor families use
-independently derived left/right outward flux and ambient data. Empty D is valid
-for Robin-only v2, without a hidden fixed node.
+- **Linear additive cooling:** unit square, k=2 W/(m K), Q=0,
+  left300 K, right g=2 W/m², h=4 W/(m² K), ambient290 K.
+  With x relative to the left edge, T=300−7x K and q=(14,0) W/m².
+  Integrated prescribed G=2, convective C=12 and inward thermostat reaction14
+  W/m give right outward14, left thermostat outward−14 and total outward0.
+- **Quadratic source:** L=.03 m, H=.02 m, k=12.5 W/(m K),
+  Q=100000 W/m³, a=300 K, right g=100, h=20, ambient290.
+  T=a+bx−Qx²/(2k), where
+  b=(QL−g−h(a−Ta)+hQL²/(2k))/(k+hL). Integrated source is60 W/m of depth.
+- **Robin-only and h=0 control:** the independent slab families derive ambient
+  values from left/right outward fluxes. Empty Dirichlet arrays are valid for
+  v2 with positive Robin anchoring; h=0 on one side retains the opposite
+  positive anchor. No hidden fixed node is introduced.
+- **SI equivalence:** m/mm/um documents describe the same physical rectangle,
+  including origin(.1,.2)m. Coordinates stay in metres and field units do not
+  change with the display length unit.
 
-Original element actions reconstruct K,H,fQ,G,B from coordinates and exterior
-edge incidence. The returned field contract is:
-rhs=fQ+B-G, C=HT-B, residual=(K+H)T-rhs, fixed reaction=residual,
-free reaction0 and total outward=sum(G+C-reaction)=sum(fQ).
-load_w_per_m is source only. A metadata or summary total never defines truth.
+The oracle reconstructs K,H,fQ,G,B and checks
+`rhs=fQ+B−G`, `C=HT−B`, `residual=(K+H)T−rhs`,
+fixed reaction=residual, free reaction0 and
+`sum(G+C−reaction)=sum(fQ)`. `load_w_per_m` remains source-only.
+Rates are W/m of depth, not W or mechanical N/m.
 
-Fixed subdivisions8/16/32/64 preserve last-two temperature L2 orders>=1.8 and
-cell-flux L2 orders>=.9. Gauss8/10 error differences must be<1%; finest relative
-domain flux L2<=2%. Normalized algebra checks use1e-10 and SI invariance1e-9.
-These are original gates, not adjustable Studio preview tolerances. A resource
-refusal must be reported rather than converted into a smaller mesh or a skip.
+The quadratic HTTP case runs subdivisions **8/16/32/64 sequentially**.
+The last two intervals require temperature L2 order **>=1.8** and cell-flux L2
+order **>=.9**. Independent Gauss8/10 error differences must be **<1%**;
+finest relative domain flux L2 must be **<=2%**.
+Normalized algebra/conservation checks retain **1e-10** and SI invariance
+**1e-9**. These gates and fixtures are unchanged. Domain flux L2 is distinct
+from a boundary-normal-gradient measurement.
 
-## Wire contract and rejection controls
+## Typed wire and negative controls
 
-The draft binding expects studio-thermal-steady-v1 plus thermal.steady2d,
-paired headless result/layout IDs, echoed job/result/revision/sequence,
-an arrays mapping and copied summary metadata. Exact field bindings must be
-checked against the explicit server candidate before execution. This draft is
-not evidence that a particular implementation already uses these keys.
+The wire uses `payload_format="studio-thermal-steady-v1"`,
+`kind="thermal.steady2d"`, paired headless result/layout IDs,
+top-level `display_length_in_m`, `arrays`, `summary` and
+`job/result_id/client_revision/request_seq` identity.
+Nested `coordinates` metadata is not accepted.
+The display factor must be finite positive and agree with the declared length;
+`run_enabled=true` means configured policy/public API availability, not a
+performance guarantee.
 
-V1 carries exactly nine raw physical/geometry quantities; v2 carries exactly
-thirteen. Numeric scalars must be finite real nonbool; connectivity/fixed IDs
-must be safe integer, in range and sorted/unique where required. Shapes,
-units and locations are exact. Temperature is(N,), flux(M,2), coordinates(N,2)
-and triangles(M,3). The independent N5/M4 synthetic fixture detects node/cell
-confusion without claiming a physical solver test.
+V1 has exactly nine raw quantities: nodes, triangles, temperature, cell flux,
+source load, reaction, residual, Dirichlet IDs and prescribed temperatures.
+V2 adds `prescribed_outward_load_w_per_m`, `ambient_load_w_per_m`,
+`convective_outward_w_per_m` and `system_rhs_w_per_m`, giving thirteen.
+Absence of new boundary keys retains v1; presence of either mapping, even empty,
+selects v2. Empty D is accepted only where the version/physics contract permits.
 
-Prepared negative payloads alter layout, W/m units, flux shape, NaN/infinity,
-bool temperature, invalid/fractional indices, missing v2 fields and extra time
-data. The client-side audit must reject them before a numerical comparison.
-A second group corrupts an actual public result through a deliberate subclass
-actor using captured public properties only. The server must produce job error,
-has_result=false and no result payload. This is malformed-result injection,
-not a substitute numerical implementation. Its run hook must be bound to the
-actual server's public producer call after source review.
+The consumer checks exact field sets, shapes, units and locations:
+temperature(N,), flux(M,2), nodes(N,2), triangles(M,3) and fixed arrays(D,).
+Numeric values must be finite real nonbool. Connectivity/fixed IDs are safe
+integers in range; fixed IDs are sorted unique. Metadata dimensions are exact
+integer lists, not equal-valued floats/bools. Response identity is typed and
+matched to the accepted request.
 
-Absence of new headless boundary keys remains v1; presence of either mapping,
-even empty, selects v2 with unchanged physics where appropriate.
-The dedicated routes refuse optical/transient inputs and malformed envelopes;
-generic validate/mesh/run retain heat refusal. Existing unrelated optical tests
-remain authoritative. Strict duplicate/NaN/unknown/counter input rejection is
-separate from headless physical validity.
+Twenty malformed-wire controls cover layout/unit/shape, NaN/infinity/bool,
+invalid/fractional indices, missing/extra fields, display scale/declaration,
+obsolete coordinates and metadata/identity types. The independent N5/M4 fixture
+tests parser distinctions and is not a solver result.
+Six separate actors corrupt an actual public result's layout, units, shape,
+finite values, dtype or indices through captured public properties.
+The worker's public `server.run` binding is the injection point.
+Required outcome: job error, `has_result=false`, result request409;
+no malformed payload is published. These actors are not replacement solvers.
 
-The public-export AST test inspects Studio Python consumers: imports from
-simcase must be in __all__, no direct galerkin/refsol/private simcase numerical
-imports or _raw_arrays calls. Runtime resource retention/peak measurements and
-frontend revision/render truth tables are separately required evidence; this
-physics suite does not certify them.
+Dedicated routes reject unsupported optical/transient documents and malformed
+envelopes, including duplicate keys, nonfinite JSON, unknown keys and invalid
+counters. The public-export AST check rejects private numerical imports and
+`_raw_arrays` calls in Studio consumers.
 
-## Execution and outstanding work
+## Reproduce and interpret results
 
-After exact server/adapter binding and combination, run from repository root:
+From the repository root in the configured validation environment:
 
 ```sh
 python -m pytest -q packages/simcase/tests/test_studio_thermal_acceptance.py
 ```
 
-Positive HTTP tests use the actual public solver, bounded polling and independent
-returned-array audits. They do not read a summary to generate expected physics.
-The suite does not duplicate the whole repository run; coordinated exact CI
-must preserve existing steady boundary/transient/generic Studio gates.
+For the separate shipped-script/page-handler Node checks:
 
-Still unverified: exact wire names and producer injection point, execution and
-collection, malformed-result behavior, physical HTTP convergence, installed
-origin/archive consumption, actual Canvas behavior, Windows/macOS and final
-integration. Existing steady-boundary C11/CLI/installed acceptance is a separate
-feature result and must be confirmed from its exact CI logs.
+```sh
+node --test packages/simcase/tests/studio_steady_thermal.cjs
+```
 
-## Early exact server binding
+HTTP tests poll real asynchronous jobs with a bounded timeout. Each current
+result is fully received/audited before the next run. Admission/publication may
+evict oldest released terminal done/error records;300s TTL is a maximum,
+active and optical records are preserved and evicted IDs return404.
+Do not reset the store, wait out TTL, reduce meshes or skip a resource refusal.
+Short status polling waits are not retention workarounds.
 
-Source review now binds these tests to server/adapter commit
-533c5e8c3f50d05f52323588e81b4997500e00e5. The worker calls public server.run;
-the malformed-public-result injection point is therefore confirmed.
-The wire uses top-level display_length_in_m, arrays, summary and identity
-(kind,job,result_id,client_revision,request_seq). Nested coordinates metadata
-is obsolete and rejected by the independent consumer.
+Record the exact commit, command/exit, environment, failures/skips, original
+convergence JSON and source/installed origins/hashes. Review the coordinated
+exact CI rather than start duplicate whole-suite runs. Keep existing
+steady-boundary, transient and generic Studio gates.
 
-The consumer now checks finite positive display scale against the declared
-m/mm/um or explicit in_m length, exact metadata field sets and echoed status/
-result identities. Additional malformed cases cover boolean/zero/nonfinite
-display scales and a declaration/scale mismatch. The malformed-layout result
-actor changes summary.field_layout as well as the public field_layout property:
-the early adapter reads the summary pair, so changing only the property would
-not exercise the intended rejection. This was a test-definition correction;
-neither producer guards nor physical gates changed. A missing UNITS import
-introduced during binding was found statically and corrected before execution.
-
-The required resource policy evicts oldest terminal done/error records under
-admission/publication pressure, preserves active and optical jobs, makes evicted
-IDs404, and treats300s TTL as a maximum retention time. The original meshes
-8/16/32/64 must run sequentially without store reset, reduced meshes, TTL waits
-or skips. Existing short polling waits observe real asynchronous job progress;
-they are not retention workarounds. run_enabled=true advertises valid configured
-policy and public API availability, not measured performance.
-
-The early533 source still lacks run_enabled and refuses admission after two
-retained terminal records until TTL expiry; a producer follow-up is expected.
-No acceptance is granted to that early resource behavior and the tests do not
-hide it. All exact HTTP/physics/installed/CI results remain unexecuted here.
-Later producer changes require a separate source-delta review and exact combined
-CI. The separate writer-fixture correction does not enter this branch.
-
-## Follow-up exact binding decision
-
-Static review of f8506b7490b52105c37a55e656dc8f23baa98647 supersedes the
-early533 pending-resource observations above. Server source is unchanged
-(blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b); the adapter is now
-blob4fd5633340ca945aff9c3fb878aeb40a2f6c106e.
-
-The adapter captures public result_format/field_layout and requires equality
-with the summary pair, preserves the same top-level display factor and
-arrays/summary/identity, checks array shape/dtype/finite bounds before copies,
-and publishes only strict encoded data. The existing malformed layout, unit,
-shape, nonfinite, bool and index actors still target the consumed values.
-
-Capabilities now expose run_enabled from public result API availability under
-the validated resource configuration. Admission/publication make room by evicting
-oldest released done/error records; active leases are excluded. Thermal records
-are separate from optical records, TTL remains a maximum and evicted IDs404.
-This statically resolves the early two-terminal admission issue without resets,
-TTL waits, reduced mesh sequences or skipped tests.
-
-No further independent test or physical-gate change was needed for this source
-binding. Static scope is approved with no confirmed binding blocker found.
-Actual HTTP/source/installed execution, malformed-result rejection and resource
-behavior still require exact integrated CI. This is not a measured performance,
-browser or platform acceptance.
-
-## Landed steady-boundary and resumed Studio review
-
-The steady-boundary independent oracle and cases on main
-49ff59874af3c5140d0e8126b1feb18964953e7e have blobs
-8957c5663e4dfacb62331c46c215f5872732c6bc and
-963e6850099c1b5ffe458c9bd31b373327546f04, respectively: the previously reviewed
-mathematics, fixtures and gates are unchanged. Their imports are now present
-on the landed base rather than an unpublished dependency.
-
-Reviewed server/adapter submission c762c4e5fdb9700978a24f639e694630477b8679:
-server remains blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b; adapter is
-blob6ecec32a623d7f92ba6f4543d46b3fb1d3bd8170. Its stricter log/error status
-byte accounting does not alter physical payload fields or the public run hook.
-
-The sequential HTTP mesh loop fully receives and audits each current result
-before submitting the next. Eviction of older terminal results therefore does
-not change the expected arrays or require fetching old job IDs. n64 uses4225
-nodes/8192 cells, within configured10201/20000 limits; v2 has83340 raw scalars
-for the quadratic left-side D=65. These are static size facts, not measured
-encoding capacity or peak-memory guarantees. Admission/publication pressure
-may evict old released done/error records before300s; active/optical records
-remain separate. No reset, TTL sleep, skip or reduced mesh was introduced.
-
-Static inspection found a gap in the independent consumer: Python equality
-would accept float metadata dimensions such as5.0 as equal to integer5.
-The consumer now explicitly requires list dimensions of exact int type, excluding
-bool, and checks mapping forms, unit keys and safe integer/nonempty response
-identity. Five new malformed controls cover float/bool dimensions and float/
-bool/empty identities. The previous fifteen malformed-wire controls and six
-malformed-public-result actors remain unchanged; the physical expected values,
-four meshes and every numerical tolerance remain unchanged.
-
-Conditional static approval: no confirmed main49ff/Fc762 binding blocker found.
-The new metadata assertion gap was a consumer test-definition issue, not a
-confirmed production defect. No Python parse/pytest/HTTP/solver/installed/browser
-or platform execution was performed. Exact combined Studio source/installed
-CI, including real repeated runs and all negative controls, is still required.
+Still required for final acceptance: completed exact source and
+isolated-installed results, all physical/negative controls, distribution/origin
+audits, resource/lifetime evidence and supported-platform checks.
+Frontend revision/render ownership, actual Canvas behavior and measured
+resource/serialization limits are separate evidence; this physics suite alone
+does not certify them. A universal wheel or another OS pass is not platform
+validation. Prior headless steady-boundary acceptance does not establish Studio
+HTTP or rendering acceptance.
