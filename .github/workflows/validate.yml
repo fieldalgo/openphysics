@@ -91,14 +91,21 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
+  installed-platforms:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    uses: ./.github/workflows/platform-install.yml
+
   tests:
     name: tests
-    needs: linux-py312
+    needs: [linux-py312, installed-platforms]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require complete Linux validation
+      - name: Require complete Linux and installed-platform validation
         env:
           VALIDATION_RESULT: ${{ needs.linux-py312.result }}
-        run: test "$VALIDATION_RESULT" = success
+          PLATFORM_RESULT: ${{ needs.installed-platforms.result }}
+        run: |
+          test "$VALIDATION_RESULT" = success
+          test "$PLATFORM_RESULT" = success

@@ -1,11 +1,7 @@
 name: Platform installed packages
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

@@ -54,6 +54,13 @@ pull requests and explicit manual dispatch. Check each exact run, exit status an
 CI does not itself establish acceptance. Earlier Work-cloud results retain
 their original source, environment and scope.
 
+`platform-install.yml` is a reusable workflow called by `validate.yml`, so the
+existing required `tests` aggregate waits for both full Linux acceptance and
+every installed-platform matrix job. A failed or skipped platform prevents that
+aggregate from passing. This preserves the existing protection names and avoids
+an independent, non-blocking platform workflow. It also supports explicit manual
+dispatch; a standalone manual run does not replace PR validation.
+
 ## Narrow Windows headless thermal gate
 
 `thermal-windows.yml` runs Python 3.12.10 on GitHub-hosted windows-2022. It

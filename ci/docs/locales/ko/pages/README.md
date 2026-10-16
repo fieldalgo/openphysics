@@ -41,6 +41,12 @@ python -X utf8 ci/tools/check_platform_install.py
 수용을 주장하기 전에 정확 커밋의 세 OS 작업과 artifact를 확인합니다.
 패키지 metadata 최소 버전과 별개로 Python 3.10/3.11은 이 CI 검증표 범위 밖입니다.
 
+`platform-install.yml`은 `validate.yml`이 호출하는 재사용 workflow입니다.
+기존 필수 `tests` 집계가 전체 Linux 수용과 설치 플랫폼의 모든 작업을 기다리며,
+플랫폼 하나가 실패하거나 skip되면 집계도 통과하지 않습니다. 기존 보호 규칙의
+검사 이름을 유지하면서 플랫폼 검사가 병합에 필수로 작용합니다. 명시적 수동
+dispatch도 지원하지만 독립 수동 실행은 PR 검증을 대체하지 않습니다.
+
 ## 현재 checkout과 근거
 
 이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.

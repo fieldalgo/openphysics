@@ -66,8 +66,8 @@ OS or a universal wheel; inspect the exact run and retain failures and artifacts
 
 Use `main` as the only trunk and default branch. Branch from current `origin/main`
 and open a PR to `main`. Every change, including documentation, requires the
-`tests` completion check, `windows-py312-thermal`, and all three
-`platform-install` matrix checks from GitHub Actions.
+`tests` completion check (full Linux plus all three installed-platform checks)
+and `windows-py312-thermal` from GitHub Actions.
 Land green PRs using GitHub Rebase and merge, with no required approving review;
 record the resulting main SHA because GitHub creates new commit IDs. Rebase and
 rerun manually only for conflicts. Do not push directly to main, force-push shared
