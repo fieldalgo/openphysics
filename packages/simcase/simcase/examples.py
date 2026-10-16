@@ -131,3 +131,19 @@ EXAMPLES["cavity_box"] = CAVITY_BOX
 
 # These examples are deliberately excluded from the optional Studio.
 EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED)
+
+TRANSIENT_THERMAL_UNIFORM = {
+    'openphysics': '0.2', 'name': 'Insulated constant-source transient heat',
+    'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
+    'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
+    'materials': {},
+    'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 2.5,
+                         'volumetric_heat_capacity_j_m3k': 4.,
+                         'initial_temperature_k': 300., 'dirichlet_temperature_k': {},
+                         'heat_source_w_m3': 8.}},
+    'mesh': {'subdivisions': [4, 4]},
+    'study': {'type': 'transient', 'time_s': [0., .1, .3]},
+    'results': {'save_fields': True, 'plots': False},
+}
+EXAMPLES['transient_thermal_uniform'] = TRANSIENT_THERMAL_UNIFORM
+
