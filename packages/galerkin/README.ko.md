@@ -223,7 +223,7 @@ Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니�
 
 [사용법](docs/locales/ko/pages/transient_heat.md) ([English](docs/transient_heat.md)) · [생산 검증 계약](docs/locales/ko/pages/transient_heat_validation.md) ([English](docs/transient_heat_validation.md)) · [독립 검증 보고](docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](docs/transient_heat_independent_validation.md))
 
-구현과 수용 파일은 제출됐지만 수치·빌드·설치 검사는 미실행입니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.
+구현과 수용 파일은 제출됐습니다. 생산 담당의 사용/검증 페이지에 소형 source 시험 70개 통과가 기록돼 있으며, 전체 시간/PDE·독립 수용·빌드·설치 검증은 별도 근거가 필요합니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.
 
 ## 처방 온도장의 전체 기계 표면하중
 

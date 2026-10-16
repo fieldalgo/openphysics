@@ -391,7 +391,7 @@ Import `galerkin.transient_heat.solve_transient_heat` explicitly. It uses fixed 
 
 [Usage](docs/transient_heat.md) ([한국어](docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](docs/transient_heat_validation.md) ([한국어](docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](docs/transient_heat_independent_validation.md) ([한국어](docs/locales/ko/pages/transient_heat_independent_validation.md))
 
-Implementation and acceptance files are submitted, but numerical, build and installed checks are unexecuted. Fixed verification gates are not measured pass results; this is not release or integration acceptance. No Robin/flux, JSON/CLI/Studio, persistence or automatic thermal–mechanical connection is added.
+Implementation and acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. Fixed verification gates are not measured pass results; this is not release or integration acceptance. No Robin/flux, JSON/CLI/Studio, persistence or automatic thermal–mechanical connection is added.
 
 ## Prescribed-temperature total mechanical traction
 

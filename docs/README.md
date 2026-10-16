@@ -72,7 +72,7 @@ The explicit `galerkin.transient_heat.solve_transient_heat` submodule implements
 | [transient_heat_validation](../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
 | [transient_heat_independent_validation](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
 
-Implementation and independent acceptance files are submitted; numerical, build and installed validation remain unexecuted. These links describe this checkout, not a validated release or integration acceptance. The validation pages distinguish fixed gates from observed results.
+Implementation and independent acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. These links describe this checkout, not a validated release or integration acceptance. The validation pages distinguish fixed gates from observed results.
 
 | English | 한국어 |
 |---|---|
