@@ -7,14 +7,16 @@ OpenPhysics는 개발 중인 프로젝트입니다. [패키지 개요](overview.
 유일한 개발 줄기이자 기본 브랜치이며 pull request의 대상입니다. 기능 브랜치에는
 아직 수용 검증을 통과하지 않은 작업이 있을 수 있습니다.
 
-재현 가능한 버그나 변경 제안은 이슈로 등록하세요. 커밋, Python·운영체제 버전,
-입력 단위, 최소 예제, 기대 결과와 실제 결과를 포함하세요. 첨부 전에 인증정보,
-개인정보와 기밀 모델을 제거하세요. 보안 취약점은
+의심되는 버그, 정확도·연구 질문과 변경 제안을 환영합니다. 기존 이슈를 먼저
+검색하고 가장 가까운 양식을 사용하세요. 확인된 관찰, 정확한 버전/커밋,
+Python·운영체제 버전과 기대 동작을 적고 모르는 근거는 솔직하게 표시하세요.
+완전한 재현 예제나 확정 결함은 도움이 되지만 이슈 등록의 필수 조건은 아닙니다.
+main 동작과 PR 후보 동작을 구분하고 첨부 전에 인증정보·개인정보·기밀 모델을 제거하세요. 보안 취약점은
 [보안 안내](security.md)의 비공개 경로로 신고하세요.
 
 [개요·설치 안내](overview.md)에 따라 저장소 루트에서 설치·실행하세요.
 고정한 Linux 검증 환경, 선택 도구·데이터와 격리 배포 검사는
-[ci 한국어 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따릅니다. GitHub Actions는 활성화돼 있으며 push·pull request에서 실행됩니다.
+[ci 한국어 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따릅니다. GitHub Actions는 main push·Ready PR·명시적 수동 dispatch에서 실행됩니다.
 기여 검증 시 정확한 workflow 결과와 artifact를 확인하세요.
 직접 수행한 검사의 정확한 명령, 종료값, 실패와 선택 기능 skip을 기록하세요.
 
@@ -33,10 +35,23 @@ OpenPhysics는 개발 중인 프로젝트입니다. [패키지 개요](overview.
 
 ## 브랜치와 릴리스
 
+PR은 draft로 엽니다. 브랜치 push와 draft PR에는 검증 실행기를 배정하지 않습니다.
+적절한 로컬 또는 원격 환경에서 관련 검사를 수행하고 변경을 검토한 뒤 Ready로
+전환합니다. 검토와 관련 검증을 마친 Ready PR은 모든 필수 검사를 유지하는 자동
+Rebase and merge를 사용합니다.
+
+main 검증은 고정 workflow/ref 그룹, `queue: max`, 취소 비활성화를 사용합니다.
+다른 ref는 `queue: single`로 이전 실행을 대체합니다. Actions 대기열과 PR 병합
+큐는 별개입니다.
+
+경로·임시 디렉터리·subprocess·정리를 이식 가능하게 구현하세요. 전체 Linux
+수용과 Linux·macOS·Windows 설치 배포 검증을 구분하고, 다른 OS의 통과나
+universal wheel에서 플랫폼 지원을 추론하지 마세요. 정확한 실행·실패·artifact를 보존합니다.
+
 `main`이 유일한 개발 줄기이자 기본 브랜치입니다. 최신 `origin/main`에서 기능
 브랜치를 만들어 push하고 `main` 대상 PR을 엽니다. 공유·제출한 이력은 보존하고
 다시 적용해야 한다면 새 브랜치를 사용합니다. 문서를 포함한 모든 변경은 GitHub
-Actions의 `tests` 완료 검사(Linux source·배포·Studio)와 `windows-py312-thermal`이
+Actions의 `tests` 완료 검사(Linux source·배포·Studio와 세 설치 플랫폼)와 `windows-py312-thermal`이
 성공해야 합니다. 배지뿐 아니라 정확한 후보의 로그와 artifact도 검토합니다.
 
 초록 PR은 GitHub **Rebase and merge**로 반영합니다. 직접 push·merge 커밋·squash·
