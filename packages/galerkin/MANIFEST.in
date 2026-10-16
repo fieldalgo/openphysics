@@ -18,7 +18,8 @@ include docs/prescribed_temperature_thermoelasticity.md
 include examples/prescribed_temperature_thermoelasticity.py
 include docs/prescribed_temperature_thermoelasticity_independent_validation.md
 include tests/thermoelasticity_independent_oracle.py
-include README.ko.md
+include docs/overview.md
+include docs/locales/ko/pages/overview.md
 include docs/locales/ko/pages/cavity_solver.md
 include docs/locales/ko/pages/eigenspace_reliability.md
 include docs/locales/ko/pages/elasticity2d.md

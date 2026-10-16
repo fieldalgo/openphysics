@@ -5,10 +5,10 @@
 
 Why a reader rather than a binding
 ----------------------------------
-Gmsh is GPL. Linking its library into this engine would make the engine GPL too,
-so Gmsh is never linked: it is run as a separate executable and this module reads
-the file it writes. Parsing a published file format creates no derivative work,
-which is the whole point of the arrangement.
+Gmsh is separately licensed under the GPL. This engine does not link or bundle
+its library: when used, Gmsh runs as a separate executable and this module reads
+the file it writes. The reader implements the published ASCII file formats;
+see the package NOTICE for the integration boundary and upstream attribution.
 
     gmsh -3 cavity.geo -o cavity.msh -format msh2     # or the default 4.1
     mesh = read_msh("cavity.msh")

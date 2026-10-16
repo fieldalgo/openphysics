@@ -1,6 +1,6 @@
 # galerkin-refsol — galerkin 검증용 참조해
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
@@ -94,11 +94,11 @@ python -m pip install -e packages/galerkin-refsol
 
 ## 라이선스
 
-Apache License 2.0 — [LICENSE](LICENSE), [NOTICE](NOTICE)를 참조하세요.
+Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-`refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과입니다. 출처는 [NOTICE](NOTICE)를 참조하세요.
+`refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과입니다. 출처는 [NOTICE](../../../../NOTICE)를 참조하세요.
 
 
 `refsol.thermal_boundary`는 처방 외향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 외향 열유속은 W/m^2, 대류 h는 W/(m^2 K)입니다. 두 배포 아카이브에 포함되며 이 독립 참조 모듈이 헤드리스 JSON schema를 확장하지는 않습니다.

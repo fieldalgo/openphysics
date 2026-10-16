@@ -73,8 +73,8 @@ Setuptools가 시험 파일은 이미 포함하며 manifest는 원래 누락되�
 fragment를 포함해 archive의 일반 파일과 대조합니다. 현재 package 문서는 공백 없는
 inline target을 사용합니다. reference-style link, 그 문법을 넘는 Markdown parsing,
 fragment anchor의 존재와 외부 URL 도달성은 이 검사 범위 밖입니다. package 간·root
-링크는 알려진 통합 revision의 명시적 repository URL을 사용하며, 저장소가 private인
-동안 network 접근과 repository 권한이 필요합니다. 검사 통과가 완전한 오프라인 문서를
+링크는 알려진 통합 revision의 명시적 repository URL을 사용하며 network 접근이
+필요합니다. 검사 통과가 완전한 오프라인 문서를
 인증하지는 않습니다. wheel이나 단일 sdist는 monorepo checkout이 아니므로 editable
 `packages/...` 설치 명령에는 저장소 루트가 필요합니다.
 
