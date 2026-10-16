@@ -44,6 +44,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'docs/locales/ko/pages/transient_heat_independent_validation.md',
               'examples/transient_heat_convergence.py',
               'tests/test_transient_heat.py',
+               'tests/test_transient_heat_tiny_domain.py',
               'tests/test_transient_heat_independent_validation.py',
               'tests/transient_heat_independent_oracle.py',
               'tests/transient_heat_independent_cases.py',
@@ -347,7 +348,8 @@ def main():
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
             # Preserve new original acceptance files from the verified archive.
-            for filename in ("test_thermoelastic_traction.py",
+            for filename in ("test_transient_heat_tiny_domain.py",
+                             "test_thermoelastic_traction.py",
                              "test_thermoelastic_traction_convergence.py",
                              "test_thermoelastic_traction_independent_validation.py",
                              "thermoelastic_traction_independent_oracle.py",
