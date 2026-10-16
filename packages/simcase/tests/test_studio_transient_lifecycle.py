@@ -392,8 +392,8 @@ def test_released_pin_drops_its_own_raw_and_encoded_references(isolated_store):
     assert jobs._retained_bytes() == 0
 
 
-@pytest.mark.parametrize("stage", ["slice", "encode", "response", "disconnect"])
-def test_actual_read_permit_and_pin_finally_on_independent_failure_stage(isolated_store, stage):
+def test_actual_read_permit_pin_caller_finally_unit_control(isolated_store):
+    """Unit control only; this does not execute a producer encode or send path."""
     life = isolated_store
     jobs = life.jobs
     lease = attach_cache_record(life)
@@ -405,7 +405,7 @@ def test_actual_read_permit_and_pin_finally_on_independent_failure_stage(isolate
         with pytest.raises(RuntimeError, match="injected"):
             try:
                 assert pin.payload == b"{}"
-                raise RuntimeError("injected " + stage)
+                raise RuntimeError("injected caller-finally unit control")
             finally:
                 pin.release()
                 permit.release()
