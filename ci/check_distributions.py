@@ -30,7 +30,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
                          "galerkin-refsol": ("refsol/transient_heat.py",),
-                         "simcase": ("simcase/schema.py", "simcase/transient_thermal_contract.py",
+                         "simcase": ("simcase/steady_boundary_contract.py",
+                                     "simcase/schema.py", "simcase/transient_thermal_contract.py",
                                      "simcase/transient_thermal.py", "simcase/runner.py",
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
                                      "simcase/thermal.py", "simcase/studio/server.py") }
@@ -126,6 +127,8 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
  'simcase': (
+              'simcase/steady_boundary_contract.py',
+              'tests/test_steady_boundary_contract.py',
               'simcase/schema.py',
               'simcase/transient_thermal_contract.py',
               'simcase/transient_thermal.py',
@@ -331,7 +334,8 @@ def main():
         # Run original headless contract/runtime/Studio/save tests from the verified sdist.
         simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
         with tarfile.open(simcase_sdist) as archive:
-            for filename in ("test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
+            for filename in ("test_steady_boundary_contract.py",
+                             "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
                              "test_studio_transient.py", "test_transient_headless_windows.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
