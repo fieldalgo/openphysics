@@ -4,11 +4,15 @@
 
 ## Availability and scope
 
-This is the transient Studio integration contract. The documentation base
-provides steady Studio and headless transient API/JSON/CLI/save; it does not yet
-provide this transient UI. Use the exact integrated implementation and inspect
-its CI artifacts before treating the workflow below as available or validated.
-No new runtime, browser, platform or capacity result is claimed here.
+This is the transient Studio integration contract. Shared admission/retention
+primitives and a typed transient JavaScript module are submitted, but the
+dedicated transient HTTP routes and shipped-page integration are incomplete
+in the reviewed checkout. Steady Studio and the headless transient API/JSON/CLI/
+save remain available through their existing interfaces. Do not treat the
+workflow below as an executable browser path until the matching server routes,
+page wiring and explicit capability are integrated. Implementation, runtime
+tests, exact CI and main acceptance are distinct. No new runtime, browser,
+platform or capacity result is claimed here.
 The [headless transient guide](thermal_transient2d.md) defines existing input and
 saved-history behavior; [steady Studio](thermal_studio.md) remains separate.
 
@@ -21,7 +25,7 @@ There is no new solver, interpolation, downsampling, transient flux/Robin,
 arbitrary geometry/material expansion, restart, coupling, cancel/delete/save or
 NPZ endpoint. A view change never reruns the solver or modifies its document.
 
-## User workflow
+## User workflow after integration
 
 After installing matching runtime packages and the optional Studio extra, start
 from the repository root:
