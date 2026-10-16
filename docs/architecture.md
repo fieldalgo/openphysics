@@ -67,7 +67,9 @@ repository; separate historical package repositories are not needed to use them.
   plus the documented steady heat-to-mechanics workflow.
 - **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
   documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
-  automatically become document features.
+  automatically become document features. The [steady boundary contract](../packages/simcase/docs/thermal_steady_boundary2d.md)
+  adds side-constant outward flux/convection and v2 raw fields; documents omitting
+  both new keys retain v1.
 - **Studio:** a local browser interface for 2D optical models. It rejects 3D
   models and does not yet provide thermal or structural forms and plots.
 

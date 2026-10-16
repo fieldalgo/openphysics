@@ -30,7 +30,7 @@ English is the repository default. READMEs and contribution/security entry point
 
 Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/docs/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
-This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, enabled Actions and the measured scope of Windows verification.
+This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Steady rectangular JSON accepts side-constant outward flux and convection through the [boundary document contract](../packages/simcase/docs/thermal_steady_boundary2d.md); transient flux/Robin remains unsupported. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, enabled Actions and the measured scope of Windows verification.
 
 ## Package overviews: complete Korean counterparts
 
@@ -49,6 +49,8 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | English | 한국어 | Scope |
 |---|---|---|
 | [Contract](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; consult the contract and independent report for measured scope and ownership limits |
+| [Steady boundary JSON/API/CLI](../packages/simcase/docs/thermal_steady_boundary2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md) | Side-constant flux/convection, v1/v2 and saved numeric fields |
+| [Steady boundary independent acceptance](../packages/simcase/docs/steady_boundary_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/steady_boundary_independent_validation.md) | Analytic/element checks and fixed convergence gates; inspect exact execution evidence |
 
 ## Implementation contracts and validation reports
 
@@ -61,7 +63,7 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [benchmark_cavity](../ci/docs/benchmark_cavity.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_cavity.md) |
 | [benchmark_vector](../ci/docs/benchmark_vector.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
-These pages describe this checkout. Actions is enabled. The narrow Windows gate at `636a23a` passed 36 installed and 3 source cases ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)); this is not full Windows regression or macOS acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
+These pages describe this checkout. Actions is enabled. The narrow Windows gate at `636a23a` passed 36 installed and 3 source cases ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)); this is not full Windows regression or macOS acceptance. The older Windows result does not validate the newer steady boundary JSON extension; inspect its exact CI artifacts separately.
 
 ## Explicit steady heat-to-mechanics workflow
 

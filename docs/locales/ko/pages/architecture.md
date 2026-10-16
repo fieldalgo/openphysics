@@ -66,7 +66,9 @@ flowchart TB
   처방 온도 열탄성 모델과 문서화된 정상 열전도→기계 workflow를 포함합니다.
 - **`simcase`의 JSON / CLI:** 무손실 `em.modes2d`, `em.cavity3d`와 문서화된
   `thermal.steady2d`와 직사각형 `thermal.transient2d` 부분집합을 지원합니다. Python 전용 확장이 자동으로
-  문서 입력 기능에 연결되지는 않습니다.
+  문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)은
+  변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
+  생략한 기존 문서는 v1을 유지합니다.
 - **Studio:** 2D 광학 모델용 로컬 브라우저 화면입니다. 3D 모델을 거부하며,
   열·구조 입력 화면과 결과 그래프는 아직 제공하지 않습니다.
 
