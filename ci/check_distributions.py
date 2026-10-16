@@ -38,7 +38,8 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/th
                                      "simcase/thermal.py", "simcase/studio/server.py",
                                      "simcase/studio/thermal_api.py") }
 STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
-                          "simcase/studio/static/thermal.js")
+                          "simcase/studio/static/thermal.js",
+                          "simcase/studio/static/transient_thermal.js")
 DOCUMENT_ASSETS = {'galerkin': (
               'galerkin/transient_thermal_mechanical.py',
               'docs/transient_thermal_mechanical.md',
@@ -149,6 +150,12 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/test_studio_transient_server_http.py',
               'tests/studio_transient_lifecycle_fixtures.py',
               'tests/test_studio_transient_lifecycle.py',
+              'simcase/studio/static/transient_thermal.js',
+              'tests/studio_transient_thermal.cjs',
+              'tests/studio_transient_independent_fixtures.py',
+              'tests/test_studio_transient_thermal_acceptance.py',
+              'docs/thermal_transient_studio.md',
+              'docs/locales/ko/pages/thermal_transient_studio.md',
               'docs/thermal_studio.md',
               'docs/locales/ko/pages/thermal_studio.md',
               'docs/studio_thermal_independent_validation.md',
@@ -408,10 +415,19 @@ def main():
                              "test_studio_transient_server_http.py",
                              "studio_transient_lifecycle_fixtures.py",
                              "test_studio_transient_lifecycle.py",
+                             "studio_transient_independent_fixtures.py",
+                             "test_studio_transient_thermal_acceptance.py",
+                             "transient_headless_independent_cases.py",
+                             "transient_headless_independent_oracle.py",
                              "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
                 (tests / filename).write_bytes(archive.extractfile(member).read())
+        # Hash the verified archived Studio consumer and its complete oracle closure.
+        studio_consumer_files = ["studio_transient_independent_fixtures.py","test_studio_transient_thermal_acceptance.py","transient_headless_independent_cases.py","transient_headless_independent_oracle.py"]
+        (output / "transient-studio-consumer-assets.json").write_text(
+            json.dumps({name: hashlib.sha256((tests / name).read_bytes()).hexdigest()
+                        for name in studio_consumer_files}, indent=2) + "\n", encoding="utf-8")
         # Execute the verified archived example, not a source-tree copy.
         examples = work / "examples"
         examples.mkdir()
@@ -533,14 +549,17 @@ def main():
             + "    (target / Path(relative).name).write_bytes(data)\n",
             encoding="utf-8")
         run(python, "-I", copy_resources, static, cwd=work, env=env)
+        node_tests = []
         with tarfile.open(simcase_sdist) as archive:
-            relative = "tests/studio_steady_thermal.cjs"
-            member = next(p for p in archive.getmembers()
-                          if p.isfile() and p.name.split("/", 1)[-1] == relative)
-            node_test = node_root / relative
-            node_test.write_bytes(archive.extractfile(member).read())
+            for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs"):
+                relative = "tests/" + filename
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == relative)
+                node_test = node_root / relative
+                node_test.write_bytes(archive.extractfile(member).read())
+                node_tests.append(str(node_test))
         with (output / "studio-installed-node.tap").open("w", encoding="utf-8") as log:
-            subprocess.run(["node", "--test", str(node_test)], cwd=work, env=env,
+            subprocess.run(["node", "--test", *node_tests], cwd=work, env=env,
                            stdout=log, stderr=subprocess.STDOUT, check=True)
         # Small real-browser E2E uses these installed wheels, never source imports.
         browser_model = work / "studio-browser-model.json"
