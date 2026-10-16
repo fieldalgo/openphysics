@@ -12,7 +12,7 @@ const T=require('../simcase/studio/static/thermal.js');
 const copy=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 function cap(){return {capability_format:'studio-capabilities-v1','thermal.steady2d':{
-  supported:true,run_enabled:true,validate:'/api/thermal/validate',run:'/api/thermal/run',input:'json',mesh_preview:false,
+  supported:true,run_enabled:true,resource_policy:'candidate-unmeasured',validate:'/api/thermal/validate',run:'/api/thermal/run',input:'json',mesh_preview:false,
   mesh_from_result:true,time_navigation:false,result_formats:Object.keys(T.PAIRS),
   field_layouts:Object.values(T.PAIRS),fields:['temperature_k','heat_flux_w_m2'],
   limits:{request_bytes:1048576,max_nodes:10201,max_triangles:20000,payload_bytes:16777216,active_jobs:1,terminal_jobs:2,terminal_bytes:33554432,ttl_seconds:300,log_bytes:65536,error_bytes:4096,metadata_bytes:65536,status_bytes:131072}}};}
@@ -34,7 +34,7 @@ function payload({v2=true,D=0,revision=0,sequence=1}={}){
     summary.field_shapes[k]=cols?[arrays[k].length,cols]:[arrays[k].length];
   }
   return {payload_format:'studio-thermal-steady-v1',kind:T.TYPE,job:'job1',result_id:'res1',
-    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,coordinates:{raw_unit:'m',display_unit:'m',display_length_in_m:1}};
+    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,display_length_in_m:1};
 }
 function canvas(W=200,H=160){
   const calls=[],ctx=new Proxy({createImageData:(w,h)=>({width:w,height:h,data:new Uint8ClampedArray(w*h*4)}),
@@ -55,7 +55,7 @@ function page({visibility=false}={}){
       return {width:activeTab===tab?320:0,height:activeTab===tab?240:0,left:0,top:0};};
     return value;}
   const context=vm.createContext({document:{getElementById:element,querySelectorAll:selector=>selector==='.view > div'?panels:[],
-    createElement:()=>({click(){}})},window:{addEventListener(){},devicePixelRatio:1},
+    createElement:()=>({textContent:'',children:[],appendChild(x){this.children.push(x);},click(){}})},window:{addEventListener(){},devicePixelRatio:1},
     Uint8ClampedArray,console,URL:{createObjectURL:()=>''},Blob:function(){},
     setTimeout:cb=>cb(),fetch:(...args)=>{requests.push(args);return new Promise(()=>{});}});
   vm.runInContext(script,context);
@@ -85,7 +85,7 @@ test('malformed payload refuses '+mutation,()=>{
   if(mutation==='missing')delete p.arrays.ambient_load_w_per_m;
   if(mutation==='extra')p.arrays.neff=[1];
   if(mutation==='owner')p.job='other';
-  if(mutation==='display')p.coordinates.display_length_in_m=0;
+  if(mutation==='display')p.display_length_in_m=0;
   assert.throws(()=>T.validatePayload(p,{job:'job1',result_id:'res1',client_revision:0,request_seq:1}));
 });
 test('nodal P1 interpolation differs from flat-cell flux, no nodal averaging',()=>{
@@ -98,7 +98,7 @@ test('nodal P1 interpolation differs from flat-cell flux, no nodal averaging',()
   assert.deepEqual(p.arrays.temperature_k,[0,1,2,3]);
 });
 test('raw negative constant K and explicit length conversion remain unchanged',()=>{
-  const p=payload();p.arrays.temperature_k.fill(-10);p.coordinates.display_length_in_m=.001;p.coordinates.display_unit='mm';p.summary.units.length='mm';
+  const p=payload();p.arrays.temperature_k.fill(-10);p.display_length_in_m=.001;p.summary.units.length='mm';
   const accepted=T.validatePayload(p),m=T.viewModel(accepted);
   assert.equal(m.min,-10);assert.equal(m.max,-10);assert.equal(m.nodes[1][0],1000);
   assert.deepEqual(accepted.arrays.nodes_m[1],[1,0]);assert.equal(m.lengthLabel,'mm');
@@ -272,3 +272,7 @@ test('unmeasured or absent run-enabled keeps validated JSON from starting a job'
   await c.loadCapability();assert.equal(await c.validate(doc()),true);
   assert.equal(await c.run(),false);assert.equal(runs,0);
 });
+
+test('settled wire rejects nested coordinates and runs independently of measurement',()=>{const p=payload();assert.equal(T.validatePayload(p).display_length_in_m,1);p.coordinates={raw_unit:'m',display_unit:'m',display_length_in_m:1};assert.throws(()=>T.validatePayload(p));assert.equal(T.capability(cap()).run_enabled,true);assert.equal(T.capability(cap()).resource_policy,'candidate-unmeasured');});
+
+test('shipped result panel shows physical diagnostics and collapsible metadata',()=>{const p=page();p.run("renderThermalSummary({arrays:{temperature_k:[-2,4],nodes_m:[[],[],[]],triangles:[[]]},summary:{diagnostics:{source_heat_w_per_m:60,outward_heat_w_per_m:60,normalized_heat_balance_defect:0}}})");const host=p.element('resTable');assert.equal(host.children[0].children.length,5);assert.equal(host.children[1].children[0].textContent,'Full result metadata');assert.equal(host.children[0].children[0].children[1].textContent,'-2 … 4');});

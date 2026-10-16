@@ -97,7 +97,7 @@
   function validatePayload(input, expected) {
     finiteJSON(input);
     const allowed=['payload_format','kind','job','result_id','client_revision','request_seq',
-      'result_format','field_layout','arrays','summary','coordinates'];
+      'result_format','field_layout','arrays','summary','display_length_in_m'];
     if(!object(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('unknown wire field');
     if(['neff','group_index','wavelength','modes','parameter','time_s'].some(k=>k in (input.summary||{})))
       fail('optical/transient summary keys are unsupported');
@@ -148,19 +148,16 @@
       if (!finite(det)||det<=0) fail('CCW nondegenerate geometry');
     }
     if (ids.some((v,i)=>!integer(v)||v>=N||(i&&v<=ids[i-1]))) fail('unique sorted fixed IDs');
-    const coordinates=input.coordinates;
-    if(!object(coordinates)||Object.keys(coordinates).length!==3||coordinates.raw_unit!=='m'
-        ||!finite(coordinates.display_length_in_m)||coordinates.display_length_in_m<=0)
+    if(!finite(input.display_length_in_m)||input.display_length_in_m<=0)
       fail('display length conversion');
     const declared=s.units?.length;
     const label=typeof declared==='string' ? declared
       : object(declared)&&Object.keys(declared).length===1&&finite(declared.in_m)&&declared.in_m>0
         ? String(declared.in_m)+' m' : null;
-    if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m'
-        ||JSON.stringify(coordinates.display_unit)!==JSON.stringify(declared))fail('explicit length/K units');
+    if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m')fail('explicit length/K units');
     // Copy the validated finite summary; no backend text is interpreted as HTML.
     const summary = clone(s);
-    return Object.freeze({...input, arrays, summary, display_length_in_m:coordinates.display_length_in_m,lengthLabel:label});
+    return Object.freeze({...input, arrays, summary, lengthLabel:label});
   }
 
   class Ownership {

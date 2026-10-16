@@ -205,7 +205,7 @@ const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalS
   onResult: result => {
     $('ptSel').innerHTML = $('modeSel').innerHTML = '';
     $('componentLabel').hidden = true; $('thermalControls').hidden = false;
-    $('resTable').textContent = JSON.stringify(result.summary,null,2);
+    renderThermalSummary(result);
     showTab('results'); drawThermalViews();
   }
 });
@@ -384,8 +384,30 @@ function drawSweep() {
     xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i][j])) : ctx.moveTo(X(x), Y(ys[i][j]))); ctx.stroke();
     xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(X(x), Y(ys[i][j]), 3, 0, 7); ctx.fill(); }); }
 }
+function renderThermalSummary(result) {
+  const host=$('resTable');host.textContent='';
+  const add=(parent,tag,text)=>{const el=document.createElement(tag);el.textContent=text;parent.appendChild(el);return el;};
+  const table=add(host,'table','');
+  const row=(name,value)=>{const tr=add(table,'tr','');add(tr,'th',name);add(tr,'td',value);};
+  const temps=result.arrays.temperature_k;
+  let lo=Infinity,hi=-Infinity;for(const v of temps){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  row('Temperature range [K]',lo+' … '+hi);
+  row('Result mesh',result.arrays.nodes_m.length+' nodes, '+result.arrays.triangles.length+' cells');
+  // Preserve the server's named balance quantities without inferring a different sign convention.
+  const quantities=(object,prefix='')=>{
+    for(const [key,value] of Object.entries(object)) {
+      if(value&&typeof value==='object'&&!Array.isArray(value)&&!key.startsWith('field_')) quantities(value,prefix+key+'.');
+      else if(/source|outward|balance/i.test(key)&&typeof value==='number')
+        row((prefix+key).replaceAll('_',' '),String(value));
+    }
+  };
+  quantities(result.summary);
+  const details=add(host,'details','');add(details,'summary','Full result metadata');
+  add(details,'pre',JSON.stringify(result.summary,null,2));
+}
+
 function fillResultTable() {
-  if (thermalController?.result() && thermalSupported()) { $('resTable').textContent=JSON.stringify(thermalController.result().summary,null,2); return; }
+  if (thermalController?.result() && thermalSupported()) { renderThermalSummary(thermalController.result()); return; }
   if (!resultData) {
     $('resTable').innerHTML = ''; $('componentLabel').hidden = true;
     $('ptSel').innerHTML = ''; $('modeSel').innerHTML = ''; $('componentSel').value = 'magnitude';
