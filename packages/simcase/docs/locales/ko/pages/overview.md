@@ -225,9 +225,15 @@ script / CLI  ->  runs the document      simcase.run
 
 ## 헤드리스 정상 열전도
 
-별도 [thermal.steady2d 계약](../../../thermal_steady2d.md)은 명시적 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. [슬랩](../../../../examples/thermal_slab.json)과 [혼합 열원](../../../../examples/thermal_mixed.json) 예제는 계약과 함께 sdist에 byte 동일하게 포함됩니다. 설치 후 예제 파일에 `simcase validate thermal_slab.json`, `simcase run thermal_slab.json -o fresh_heat_results`를 실행하세요. 출력 경로는 새 경로여야 하며 끊어진 symlink도 없어야 합니다. 수치 SI NPZ 배열에는 전용 결과 버전/구성이 있고 `allow_pickle=False`로 읽습니다. 지지점 열반력은 안쪽 방향이며 부호 있는 바깥쪽 열은 그 음수입니다.
+별도 [thermal.steady2d 계약](../../../thermal_steady2d.md)은 명시적 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. [슬랩](../../../../examples/thermal_slab.json)과 [혼합 열원](../../../../examples/thermal_mixed.json) 예제는 계약과 함께 sdist에 byte 동일하게 포함됩니다. 설치 후 예제 파일에 `simcase validate thermal_slab.json`, `simcase run thermal_slab.json -o fresh_heat_results`를 실행하세요. 출력 경로는 새 경로여야 하며 끊어진 symlink도 없어야 합니다. 수치 SI NPZ 배열에는 전용 결과 버전/구성이 있고 `allow_pickle=False`로 읽습니다. 지지점 열반력은 안쪽 방향이며 그 음수가 thermostat 외향 기여입니다.
+Flux·대류가 있으면 전체 외향 열량에는 해당 경계 기여도 포함합니다.
 
-이 헤드리스 경로는 열전도 Studio UI, 그림, flux/Robin 경계, 자동 열탄성 연성을 추가하지 않습니다. 저장 소유권과 플랫폼 한계는 계약을 읽으세요. 좁은 Windows 저장 검증은 Linux 전체 회귀 gate와 별도로 추적합니다.
+[정상 경계 확장](thermal_steady_boundary2d.md) 후보는 변 상수 외향 flux·대류,
+v2 metadata와 raw 배열 13개를 추가하며 기존 문서는 v1을 유지합니다.
+CLI 예제는 `thermal_boundary`이며 Dirichlet이 비어 있으면 양수 Robin 구속이
+필요합니다. 입력 Kelvin은 비음수이고 유한한 음수 계산 온도는 clamp하지 않습니다.
+P2 수치·설치 수용은 미완료입니다. 열전도 Studio UI·그림·과도 flux/Robin·
+자동 열탄성 연성은 추가하지 않습니다. 저장 소유권과 플랫폼 한계는 계약을 읽으세요. 좁은 Windows 저장 검증은 Linux 전체 회귀 gate와 별도로 추적합니다.
 
 ## 라이선스
 

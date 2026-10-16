@@ -2,16 +2,21 @@
 
 [English](../../../thermal_steady_boundary2d.md)
 
-## 계약과 구현 상태
+## 구현과 검증 상태
 
-이 페이지는 `thermal.steady2d`의 경계 확장 입출력 계약을 설명합니다.
-[기존 정상 열전도 가이드](thermal_steady2d.md)는 기존 headless 경로를 설명합니다.
-문서 기준 `6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`의 공개 reader/runtime에는
-이 확장이 아직 구현되지 않았습니다. 독립 경계 helper
-`1c408be05e8f103e8436502610e03c763493d200`는 입력·메시 검사를 구현하며,
-공개 JSON/CLI 해석·저장은 구현하지 않습니다. Runtime과 schema 연결은 별도입니다.
-아래 예제는 계약 예제이며 성공 실행을 관측한 결과가 아닙니다.
-이 초안은 새로운 source·설치본·CI·플랫폼 수용을 주장하지 않습니다.
+이 페이지는 `thermal.steady2d` 경계 확장 후보를 설명합니다.
+Schema 후보 `4bd15626fe37c306eb6265f1db1b308c6b580460`은
+`Document.from_dict`, JSON 읽기, 검증과 문서 summary를 구현합니다.
+Runtime 후보 `11f2d2ba893a7c103effc9025f75fea615a636f6`은
+기존 열 엔진을 이용한 `run(Document)`, `ThermalRunResult`, CLI 분기와
+JSON/NPZ 저장을 구현합니다. 이는 제출된 구현이며 main에 이미 포함됐다는 주장이
+아닙니다. 두 후보를 결합한 정확한 checkout을 사용하세요.
+[기존 가이드](thermal_steady2d.md)는 원래 v1 계약을 보존합니다.
+
+P2 수치·설치본 수용은 미완료입니다. 독립·플랫폼 시험은 별도로 제출됐으며
+시험이 있다는 사실이 통과 결과는 아닙니다. 아래 예제는 재현 절차와 해석적 기대값이며
+이 문서 작성 중 측정한 결과가 아닙니다. 정확한 결합 후보의 CI·artifact·플랫폼
+결과를 확인한 뒤 수용 여부를 판단하세요.
 
 ## 입력과 지원 범위
 
@@ -87,29 +92,89 @@ B_e = h*Ta*ell/2 * [1,1]
 ## 계약 예제
 
 단위 정사각형의 선형 정답은 T=300-7x K, qx=14 W/m²입니다.
-오른쪽 g=2, h*(T-Ta)=12이고 왼쪽 thermostat은 -14 W/m를 기여합니다.
+내장 `thermal_boundary` 예제는 h=4 W/(m² K), Ta=290 K입니다.
+오른쪽 T=293 K, g=2, h*(T-Ta)=12이고 왼쪽 thermostat은 -14 W/m를 기여합니다.
 이는 해석적 기대값이며 측정값이 아닙니다.
 
 ```json
 {
   "openphysics": "0.2",
-  "name": "Steady additive boundary contract",
+  "name": "Steady additive outward flux and convection",
   "units": {"length": "m", "temperature": "K"},
   "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
   "materials": {},
-  "physics": {"heat": {
+  "physics": {"heat1": {
     "type": "thermal.steady2d",
     "conductivity_w_mk": 2,
     "heat_source_w_m3": 0,
     "dirichlet_temperature_k": {"left": 300},
     "outward_flux_w_m2": {"right": 2},
-    "convection": {"right": {"h_w_m2k": 1, "ambient_temperature_k": 281}}
+    "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}}
   }},
   "mesh": {"subdivisions": [8, 8]},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
 ```
+
+## API·CLI·출력 파일
+
+결합 checkout의 일치하는 패키지를 설치한 뒤 저장소 루트에서 다음 portable
+Python 예제를 실행합니다. CLI subprocess에도 같은 interpreter를 사용하고,
+UTF-8을 명시하며 새 임시 경로를 선택합니다. 재현 절차이며 이 문서 작성 중
+실행하지 않았습니다.
+
+```python
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+from simcase import Document, ThermalRunResult, run
+
+env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    env[key] = "1"
+with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
+    root = Path(directory)
+    model = root / "thermal_boundary.json"
+    example = subprocess.run(
+        [sys.executable, "-m", "simcase", "example", "thermal_boundary"],
+        check=True, capture_output=True, text=True, encoding="utf-8", env=env,
+    )
+    model.write_text(example.stdout, encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "simcase", "validate", str(model)],
+        check=True, env=env,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "simcase", "run", str(model),
+         "-o", str(root / "cli_results")],
+        check=True, env=env,
+    )
+    document = Document.load(model)
+    result = run(document, verbose=False)
+    assert isinstance(result, ThermalRunResult)
+    summary = result.summary()
+    result.save(root / "api_results")
+    assert summary["result_format"] == "thermal.steady2d-result-v2"
+    json.dumps(summary, allow_nan=False)
+```
+
+Context가 끝나면 임시 출력을 제거합니다. 결과를 보존하려면 호출자가 소유하고
+아직 존재하지 않는 영구 경로를 선택하세요. CLI 종료 코드는 성공 0,
+잘못된 입력 2, solver/save 또는 기존 대상 실패 1입니다.
+열 PNG를 생성하지 않습니다. Studio는 열 문서를 거절하고 오래된 광학 상태를
+지우며 headless 지원이 Studio 지원을 뜻하지 않습니다.
+
+`summary()`는 JSON-safe dictionary를 반환합니다. `result_format`,
+`field_layout`, `boundary_enabled`는 캡처한 layout을 식별합니다.
+공개 배열 속성 이름은 아래와 같지만 `nodes_m`는 `mesh_nodes_m`,
+`triangles`는 `mesh_triangles`입니다. `dirichlet_node_ids`,
+`dirichlet_temperature_k`는 공개 result attribute입니다.
+온도에 광학 유효굴절률이나 모드 정규화를 붙이지 않습니다.
 
 ## 버전과 원시 필드 계약
 
@@ -119,21 +184,42 @@ B_e = h*Ta*ell/2 * [1,1]
 비어 있지 않은 값으로 버전을 추론하지 마세요. Null은 잘못된 입력입니다.
 입력 형식은 0.2를 유지합니다.
 
-기존 배열 9개의 단위와 의미는 유지합니다. V2는 shape (N,), 단위 W/m의
-절점 배열 4개를 추가합니다.
-
-| 배열 | 의미 |
-| --- | --- |
-| `prescribed_outward_load_w_per_m` | G |
-| `ambient_load_w_per_m` | B |
-| `convective_outward_w_per_m` | C |
-| `system_rhs_w_per_m` | fQ+B-G |
+| NPZ 배열 | Shape | 위치 / 의미 | 단위 |
+| --- | --- | --- | --- |
+| `nodes_m` | (N,2) | 절점, SI 좌표 | m |
+| `triangles` | (M,3) | 정수 CCW 연결 정보 | 1 |
+| `temperature_k` | (N,) | 절점 | K |
+| `heat_flux_w_m2` | (M,2) | 삼각형 중심, -k grad(T) | W/m² |
+| `load_w_per_m` | (N,) | 절점, 열원 fQ만 | W/m |
+| `reaction_w_per_m` | (N,) | 절점, 내향 thermostat 반력 | W/m |
+| `residual_w_per_m` | (N,) | 절점, A*T-rhs | W/m |
+| `dirichlet_node_ids` | (D,) | 정렬·중복 없는 지정 정수 ID | 1 |
+| `dirichlet_temperature_k` | (D,) | 대응하는 지정값 | K |
+| `prescribed_outward_load_w_per_m` | (N,) | 절점, G; v2만 | W/m |
+| `ambient_load_w_per_m` | (N,) | 절점, B; v2만 | W/m |
+| `convective_outward_w_per_m` | (N,) | 절점, C; v2만 | W/m |
+| `system_rhs_w_per_m` | (N,) | 절점, fQ+B-G; v2만 | W/m |
 
 Robin만으로 고정하면 두 Dirichlet 배열의 shape은 (0,)이며 node ID는 정수입니다.
 전체 residual은 위 A와 rhs를 사용합니다. 소비자는 `allow_pickle=False`로
 읽고 format/layout, 단위, shape, 유한한 수치 타입과 metadata를 검사해야 합니다.
-누락된 v2 필드에 임의의 0을 채우면 안 됩니다. 이 초안을 완성하기 전에
-정확한 공개 result 속성·summary 진단·저장 metadata를 runtime 후보와 대조해야 합니다.
+누락된 v2 필드에 임의의 0을 채우면 안 됩니다. Summary metadata에는 `field_units`, `field_locations`, `field_shapes`,
+`mesh_length_unit="m"`, 원래 문서 단위, 경계 매핑, 고정 절점 수,
+온도 극값과 mesh/solve 시간이 있습니다. NPZ에는 Unicode scalar
+`result_format`, `field_layout`, `mesh_length_unit`, `metadata_json`도
+저장하며 metadata JSON은 summary와 같습니다. Python object 배열은 없습니다.
+
+V2 진단은 `source_heat_w_per_m`, `prescribed_outward_heat_w_per_m`,
+`convective_outward_heat_w_per_m`, `thermostat_outward_heat_w_per_m`,
+`outward_heat_w_per_m`, `heat_balance_defect_w_per_m`,
+`normalized_heat_balance_defect`, `free_residual_max_w_per_m`입니다.
+부호 있는 defect는 전체 외향 열량에서 열원을 뺀 값입니다.
+정규화 defect는 그 절댓값을 절점 열원·반력·G·C 기여의 절댓값 합으로 나누며
+양의 부동소수점 하한을 사용합니다. 자유 residual 최대값은 W/m 차원량이며
+자유 절점이 없으면 0입니다. V2에는 v1의 `normalized_free_residual` 진단을
+게시하지 않습니다. K만 사용하는 정규화는 Robin 엔진의 guard가 아닙니다.
+Summary 검사가 엔진의 원래 물리 residual·열수지 guard나 독립 수용을
+대체하지 않습니다. 진단 scale 후속 변경은 정확한 SHA에서 검토해야 합니다.
 
 ## 형상·수명·검증 한계
 
@@ -145,11 +231,24 @@ Tolerance가 extent의 절반에 도달하거나 side-edge 분류가 겹치거�
 얻습니다. 큰 원점·아주 짧은 edge는 좌표 정밀도 부족으로 거절할 수 있습니다.
 형상 guard를 완화하는 대신 더 작은 좌표 원점을 선택하세요.
 
-Runtime은 저장 metadata를 원래 계산에 결속하고
-[새 출력 소유권 계약](thermal_steady2d.md#출력-소유권과-실패)을 유지해야 합니다.
-출력 옵션은 실행 전에 정합니다. Fields 비활성 저장도 raw·유한 JSON 검사가
-필요하며 원자적 게시·적대적 writer 보호·crash rollback을 뜻하지 않습니다.
-정확한 snapshot 강제 여부는 실제 runtime 검토가 남아 있습니다.
+Runtime은 입력 문서를 복사하고 canonical JSON, 메시 절점·삼각형과
+지정 데이터를 캡처합니다. Summary/save는 name/results 옵션을 포함한
+`result.doc`의 일반적인 실행 후 값 변경을 거절하며 키 순서만 바뀐 것은
+무관합니다. 출력 옵션은 실행 전에 정하세요. 저장 model은 캡처한 계산을
+설명하며 caller 원래 입력 변경은 격리됩니다. 이는 일관성 검사이며
+암호학적 인증·권한 검증이 아닙니다. Run/capture 중 동시 변경은 지원하지
+않습니다. 추가 snapshot 변경은 실제 runtime 후속 검토가 필요합니다.
+
+저장은 [새 출력 소유권 계약](thermal_steady2d.md#출력-소유권과-실패)을
+유지합니다. 새 대상에 `.incomplete`, `model.json`, UTF-8 `log.txt`,
+선택적 `fields.npz`를 쓰고 `summary.json`을 마지막에 씁니다.
+`save_fields=false`는 NPZ만 생략하며 raw 유한성·shape·연결 정보·CCW와
+유한 JSON 검사를 생략하지 않습니다. 전체 해는 메모리에 유지됩니다.
+비유한 reduction/JSON은 NaN/Infinity로 내보내지 않고 거절합니다.
+저장·정리 전체에 caller 독점이 필요하며 check/use 교체 race,
+원자적 게시·crash rollback은 보장 밖입니다. Windows hard-link 기능과
+실제 Windows/macOS 실행은 별도로 평가해야 합니다. 기존 소유권 실패도
+근거로 보존합니다.
 
 n8/16/32/64 마지막 두 구간의 온도 L2 차수 >=1.8, flux 차수 >=0.9,
 정규화 residual·열수지 1e-10, SI 상사성 1e-9를 유지합니다. 기존 구적과 독립
