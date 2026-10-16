@@ -186,3 +186,31 @@ float/bool차원과float/bool/emptyidentity음성5개를추가했다.
 metadata틈은독립consumer시험정의문제이며확정생산결함이아니다.
 Pythonparse/pytest/HTTP/solver/installed/browser/플랫폼실행은없었다.
 실제반복run과전음성을포함한정확결합Studio source/installedCI가여전히필요하다.
+
+## 최신main 검토와 다른 담당 시험 blocker
+
+main6e9be99a10fba77d329063da973401f26d4ed0b5는검토된P2oracle
+blob8957c5663e4dfacb62331c46c215f5872732c6bc와cases
+blob963e6850099c1b5ffe458c9bd31b373327546f04를유지한다.
+main49ff이후변경은검증/플랫폼기반·공개지침이며수치oracle가아니다.
+이base에독립HTTP/엄격metadata fixture나원물리gate의추가코드수정은불필요하다.
+공개지침과Linux/macOS/Windows설치검사는정확통합검증에계속포함된다.
+
+F c762c4e5fdb9700978a24f639e694630477b8679의wire/resource소스는
+원8/16/32/64순차실행과맞는다. 현재payload를수신·감사한뒤다음admission이
+이전terminal을회수하므로소유중인현재기대배열을바꾸지않는다.
+새반복실행실측이아닌소스수준판정이다.
+store reset/보관대기sleep/skip/허용치변경은추가하지않았다.
+
+별도B767cc8dbaeccd4a7cf85c828971d5324abdbd863에서확정시험정의
+blocker를발견했다. tests/studio_steady_thermal.cjs307행의즉시실행함수는
+load("p3JS")/load("p3NodeTests")를호출하지만파일에load선언/import가없다.
+통상Node에서HTTP mock문자열구성중ReferenceError가발생해
+검증/실행동작에도달하지못한다.
+14–18행기존cap()로JSON.stringify(cap())를사용하면동일capability를제공한다.
+이는타담당최소정정권고이며생산UI/수치계약/본독립suite변경이아니다.
+
+이finding에Node/HTTP/수치실행은없었다.
+원B소스를보존하고정정된exact후보의조율된Node실행이필요하다.
+전체통합수용은이정정과정확독립source/installed/물리/metadata결과대기이다.
+추가전체CI나수동dispatch는시작하지않았다.
