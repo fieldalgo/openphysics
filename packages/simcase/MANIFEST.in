@@ -63,3 +63,7 @@ include docs/thermal_studio.md
 include docs/locales/ko/pages/thermal_studio.md
 include docs/studio_thermal_independent_validation.md
 include docs/locales/ko/pages/studio_thermal_independent_validation.md
+
+include tests/test_studio_transient_server_http.py
+include tests/studio_transient_lifecycle_fixtures.py
+include tests/test_studio_transient_lifecycle.py
