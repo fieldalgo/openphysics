@@ -42,12 +42,18 @@ function canvas(W=200,H=160){
     {get:(o,k)=>o[k]||(()=>{})});
   return {width:W,height:H,calls,getContext:()=>ctx,getBoundingClientRect:()=>({width:W,height:H,left:0,top:0})};
 }
-function page(){
-  const elements=new Map(),requests=[];
+function page({visibility=false}={}){
+  const elements=new Map(),requests=[];let activeTab='geometry';
+  const panels=['geometry','mesh','results','json'].map(name=>({id:'tab-'+name,classList:{toggle(cls,on){if(on)activeTab=name;}}}));
   function element(id){if(!elements.has(id))elements.set(id,Object.assign(canvas(320,240),{
     value:'',hidden:false,innerHTML:'',textContent:'',children:[],appendChild(x){this.children.push(x);},
-    querySelectorAll:()=>[],click(){if(this.onclick)return this.onclick();}}));return elements.get(id);}
-  const context=vm.createContext({document:{getElementById:element,querySelectorAll:()=>[],
+    querySelectorAll:()=>[],click(){if(this.onclick)return this.onclick();}}));
+    const value=elements.get(id);
+    if(visibility&&['fieldCanvas','meshCanvas','sweepCanvas','geoCanvas'].includes(id))value.getBoundingClientRect=()=>{
+      const tab=id==='meshCanvas'?'mesh':id==='geoCanvas'?'geometry':'results';
+      return {width:activeTab===tab?320:0,height:activeTab===tab?240:0,left:0,top:0};};
+    return value;}
+  const context=vm.createContext({document:{getElementById:element,querySelectorAll:selector=>selector==='.view > div'?panels:[],
     createElement:()=>({click(){}})},window:{addEventListener(){},devicePixelRatio:1},
     Uint8ClampedArray,console,URL:{createObjectURL:()=>''},Blob:function(){},
     setTimeout:cb=>cb(),fetch:(...args)=>{requests.push(args);return new Promise(()=>{});}});
@@ -222,4 +228,30 @@ test('finite huge flux arrows and constant high Kelvin stay finite in display',(
 test('nonfinite metadata is rejected, never converted to JSON null',()=>{
   const value=payload();value.summary.normalized_heat_balance_defect=Infinity;
   assert.throws(()=>T.validatePayload(value),/nonfinite JSON metadata/);
+});
+
+test('shipped page zero-size hidden canvases: Results/Mesh switch and stale render ownership',async()=>{
+  const p=page({visibility:true}),wire=payload();
+  p.run('globalThis.fetch=async(url,options)=>({ok:true,json:async()=>{'
+    +'if(url==="/api/capabilities")return '+JSON.stringify(cap())+';'
+    +'if(url==="/api/thermal/validate"){const e=JSON.parse(options.body);return {ok:true,doc:e.doc,client_revision:e.client_revision,request_seq:e.request_seq};}'
+    +'if(url==="/api/thermal/run"){globalThis.accepted=JSON.parse(options.body);return {job:"job1",result_id:"res1",client_revision:accepted.client_revision,request_seq:accepted.request_seq};}'
+    +'const id={job:"job1",result_id:"res1",client_revision:accepted.client_revision,request_seq:accepted.request_seq};'
+    +'return url.endsWith("/result")?{...'+JSON.stringify(wire)+',...id}:{...id,status:"done",log:[]};}})');
+  await p.run('thermalController.loadCapability()');p.element('json').value=JSON.stringify(doc());
+  await p.element('applyJson').onclick();await p.run('doRun()');await tick();
+  assert.equal(p.element('meshCanvas').getBoundingClientRect().width,0);
+  assert.ok(p.element('fieldCanvas').calls.some(x=>x[0]==='pixels'));
+  assert.doesNotMatch(p.element('status').textContent,/canvas too small/);
+  p.run("showTab('mesh')");await tick();
+  assert.equal(p.element('fieldCanvas').getBoundingClientRect().width,0);
+  assert.match(p.element('meshInfo').textContent,/Actual result mesh/);
+  assert.ok(p.element('meshCanvas').calls.some(x=>x[0]==='move'));
+  assert.equal(p.element('fieldCanvas').onmousemove,null);
+  const count=p.element('meshCanvas').calls.length;
+  // Schedule an obsolete mesh render, then switch before its microtask commits.
+  p.run("drawThermalViews();showTab('results')");await tick();
+  assert.equal(p.element('meshCanvas').calls.length,count);
+  assert.ok(p.element('fieldCanvas').onmousemove);
+  assert.doesNotMatch(p.element('status').textContent,/canvas too small/);
 });

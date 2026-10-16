@@ -214,24 +214,37 @@ function drawThermalViews() {
   if (!payload || !thermalSupported()) return;
   const field=$('thermalField').value || 'temperature_k', token=thermalController.renderToken(field);
   Promise.resolve().then(()=>{
-    if(!thermalController.renderCurrent(token))return;
-    const model=ThermalStudio.viewModel(payload,field);
     const current=()=>thermalController.renderCurrent(token);
     if(!current())return;
-    ThermalStudio.draw($('fieldCanvas'),model,{current});
-    if(!current())return;
-    ThermalStudio.draw($('meshCanvas'),ThermalStudio.viewModel(payload),{meshOnly:true,current});
-    if(!current())return;
-    $('meshInfo').textContent='Actual result mesh — '+payload.arrays.nodes_m.length+' nodes, '+payload.arrays.triangles.length+' cells; axes '+payload.lengthLabel;
-    $('meshLegend').textContent='';
-    $('resInfo').textContent=model.field+' ['+model.unit+'], raw '+model.min+' … '+model.max+'; no physical normalization';
-    const sweep=$('sweepCanvas');sweep.getContext('2d').clearRect(0,0,sweep.width,sweep.height);
-    $('fieldCanvas').onmousemove = event => {
+    const fieldCanvas=$('fieldCanvas'),meshCanvas=$('meshCanvas');
+    const fieldRect=fieldCanvas.getBoundingClientRect(),meshRect=meshCanvas.getBoundingClientRect();
+    const fieldVisible=fieldRect.width>0&&fieldRect.height>0;
+    const meshVisible=meshRect.width>0&&meshRect.height>0;
+    // A hidden tab has zero layout size. Do not rasterize it or let its
+    // transform error prevent the visible tab from committing.
+    if(fieldVisible) {
+      const model=ThermalStudio.viewModel(payload,field);
       if(!current())return;
-      const rect=$('fieldCanvas').getBoundingClientRect(),T=ThermalStudio.transform(model,rect.width,rect.height);
-      const value=ThermalStudio.sample(model,T.inverse(event.clientX-rect.left,event.clientY-rect.top));
-      if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')';
-    };
+      ThermalStudio.draw(fieldCanvas,model,{current});
+      if(!current())return;
+      $('resInfo').textContent=model.field+' ['+model.unit+'], raw '+model.min+' … '+model.max+'; no physical normalization';
+      const sweep=$('sweepCanvas');sweep.getContext('2d').clearRect(0,0,sweep.width,sweep.height);
+      fieldCanvas.onmousemove = event => {
+        if(!current())return;
+        const rect=fieldCanvas.getBoundingClientRect();
+        if(rect.width<=0||rect.height<=0)return;
+        const T=ThermalStudio.transform(model,rect.width,rect.height);
+        const value=ThermalStudio.sample(model,T.inverse(event.clientX-rect.left,event.clientY-rect.top));
+        if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')';
+      };
+    } else fieldCanvas.onmousemove=null;
+    if(meshVisible) {
+      if(!current())return;
+      ThermalStudio.draw(meshCanvas,ThermalStudio.viewModel(payload),{meshOnly:true,current});
+      if(!current())return;
+      $('meshInfo').textContent='Actual result mesh — '+payload.arrays.nodes_m.length+' nodes, '+payload.arrays.triangles.length+' cells; axes '+payload.lengthLabel;
+      $('meshLegend').textContent='';
+    }
   }).catch(error=>{if(thermalController.renderCurrent(token)){status(error.message);log(error.message,'err');}});
 }
 
