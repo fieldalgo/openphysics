@@ -6,7 +6,7 @@ Output directories require caller-exclusive access through save and cleanup.
 Observed replacements are preserved; this is not atomic protection against
 external writers replacing a pathname between an ownership check and use.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import copy
 import json
 import time
@@ -43,12 +43,34 @@ class TransientThermalRunResult:
 
     No interpolation, clamping, normalization or initial projection is applied.
     Full history memory remains O(Nt*(N+M)); save makes validation copies.
-    Public metadata is mutable, so all arrays/JSON are revalidated before save.
+    Arrays are structurally revalidated before save, not re-solved or certified.
+    The copied document is bound to its construction-time JSON snapshot: later
+    value edits, including name/results, are refused. Set options before run.
+    This detects ordinary document mutation, not hostile object reconstruction.
     """
     doc: object
     solution: object
     timings: dict
     log: tuple
+    _document_json: str = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self):
+        # Keep the existing input-lifetime guarantee for direct construction too.
+        doc = self.doc.copy()
+        doc.validate()
+        object.__setattr__(self, 'doc', doc)
+        object.__setattr__(self, '_document_json', self._current_document_json())
+
+    def _current_document_json(self):
+        try:
+            return json.dumps(self.doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError('transient result document must remain finite JSON') from exc
+
+    def _validate_document_snapshot(self):
+        # No re-interpretation of old solver histories using a newer model.
+        if self._current_document_json() != self._document_json:
+            raise ValueError('transient result document changed after run; rerun the model')
 
     def __getattr__(self, name):
         if name in _FIELD_SPEC:
@@ -106,6 +128,7 @@ class TransientThermalRunResult:
         return arrays
 
     def _summary(self, arrays):
+        self._validate_document_snapshot()
         self.doc.validate()
         name, p = self.doc.sole_physics()
         if p['type'] != PHYSICS:
@@ -172,11 +195,11 @@ class TransientThermalRunResult:
             arrays = self._raw_arrays()
             summary = self._summary(arrays)
             encoded = json.dumps(summary, indent=2, allow_nan=False).encode('utf-8')
-            model = json.dumps(self.doc.data, indent=2, allow_nan=False).encode('utf-8')
+            model = json.dumps(json.loads(self._document_json), indent=2, allow_nan=False).encode('utf-8')
             log = ('\n'.join(self.log)+'\n').encode('utf-8')
             owned.write('model.json', lambda f: f.write(model))
             owned.write('log.txt', lambda f: f.write(log))
-            if self.doc['results']['save_fields']:
+            if summary['save_fields']:
                 arrays.update(result_format=np.asarray(RESULT_FORMAT), field_layout=np.asarray(FIELD_LAYOUT),
                               mesh_length_unit=np.asarray('m'), metadata_json=np.asarray(encoded.decode('utf-8')))
                 if any(a.dtype.hasobject for a in arrays.values()):
