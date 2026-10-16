@@ -4,32 +4,22 @@
 
 ## Availability
 
-**Implementation candidate; integration and acceptance pending.** This guide describes the combined checkout
-`b584d50df6ef024e6600c611fe24d9467034c890` (Draft PR 11), which includes
-the dedicated server routes, typed capture/encoding, JSON-first UI and matching
-headless runtime together. The frontend contribution is
-`767cc8dbaeccd4a7cf85c828971d5324abdbd863`; evaluate the combined checkout,
-not an earlier standalone documentation or UI branch.
-The steady headless boundary contract landed in main
-`49ff59874af3c5140d0e8126b1feb18964953e7e`; that does not land or accept
-this dedicated Studio feature. These submitted implementations are not a claim
-of official main Studio support.
-No integrated CI, actual-browser or resource measurement result is available
-for this documentation update.
+This checkout implements JSON-first steady heat in Studio: dedicated validation
+and run routes, typed SI results, the actual result mesh, nodal Kelvin and cell
+heat-flux views. It uses the existing homogeneous rectangle/P1 headless solver
+with constant isotropic k and source, side Dirichlet, insulation and constant
+outward-flux/Robin conditions. Existing optical behavior and generic-route heat
+guards remain; transient UI, pre-solve mesh preview, arbitrary geometry,
+automatic coupling and new result-saving endpoints are outside this interface.
 
-The top-level wire envelope, public result/layout ID checks, `run_enabled`
-and oldest-terminal reclamation below are implemented in this combined candidate.
-`run_enabled=true` means valid configured limits and supported public API,
-**not completed performance measurement**.
-`resource_policy="candidate-unmeasured"` remains a separate declaration.
-
-The implemented candidate scope is JSON-first `thermal.steady2d`: homogeneous rectangle/P1,
-constant isotropic k and source, prescribed side temperatures, insulation and
-the separately integrated constant outward-flux/Robin contract.
-There is no transient UI, mesh-only preview, new solver, result-saving endpoint,
-arbitrary geometry or automatic coupling. Existing optical behavior remains.
-The [headless steady guide](thermal_steady2d.md) remains the starting point for
-model units and the existing Python/CLI workflow.
+Implementation is separate from validation and release status. Inspect the
+exact checkout's CI results and artifacts for source, installed-platform,
+browser and resource evidence. This page does not assert a new pass or release.
+`run_enabled=true` indicates valid configured limits and public API availability,
+not completed performance measurement. Resource policy remains
+`candidate-unmeasured`; configured limits are not a capacity or performance
+guarantee. See the [headless steady guide](thermal_steady2d.md) for model units
+and Python/CLI use.
 
 ## Start and user flow
 
@@ -41,8 +31,8 @@ python -m pip install -e "packages/simcase[studio]"
 python -m simcase.studio --no-browser
 ```
 
-Open the printed localhost address. These existing startup commands do not
-supply missing server/frontend code or bypass capability checks.
+Open the printed localhost address. Startup does not bypass capability checks
+or configured resource limits.
 
 1. Open a complete steady heat JSON document or paste it into the JSON editor.
    Apply it explicitly. A thermal form-based material/boundary editor is outside
@@ -231,6 +221,6 @@ and resource measurements remain separate from HTTP/Node/installed checks.
 
 Preserve n8/16/32/64 final-two L2 temperature order >=1.8 and flux order >=0.9,
 normalized residual/balance 1e-10 and SI similarity 1e-9. Studio refusals do not
-waive physics gates. No new numerical, HTTP, Node, installed, browser or platform
-tests were executed for this draft. Linux passes do not imply Windows/macOS
+waive physics gates. Numerical, HTTP, Node, installed, browser and platform acceptance each require
+observed execution on the exact checkout. Linux passes do not imply Windows/macOS
 passes; test definitions do not imply execution, acceptance or main integration.
