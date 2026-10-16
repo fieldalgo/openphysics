@@ -8,8 +8,9 @@
 route, typed SI결과, 실제 결과 메시, 절점 Kelvin과 요소 열유속 표시를 제공합니다.
 기존 균질 직사각형/P1 headless solver를 사용하며 상수 등방 k·열원,
 변 Dirichlet·단열·상수 외향 flux/Robin조건을 다룹니다. 기존 광학동작과
-generic-route 열 guard는 유지합니다. 과도 UI·해석 전 메시 preview·임의 형상·
-자동 연성·새 결과저장 endpoint는 이 인터페이스 범위 밖입니다.
+generic-route 열 guard는 유지합니다. 이 정상열 인터페이스는 과도 문서와 시간/history
+선택을 제외하며 별도 [과도 Studio 가이드](thermal_transient_studio.md)를 참조하세요.
+해석 전 메시 preview·임의 형상·자동 연성·새 결과저장 endpoint는 범위 밖입니다.
 
 구현과 검증·release상태는 별개입니다. Source·설치 플랫폼·browser·자원 근거는
 정확한 checkout의 CI결과·artifact에서 확인하세요. 이 페이지는 새로운 통과나
@@ -109,9 +110,10 @@ physics를 거절합니다. 열 status/result route에는 field/time selector를
 
 ## Route 경계와 회복
 
-서버 후보는 다음 전용 route를 구현하며 아직 수용된 main 기능은 아닙니다.
+이 checkout은 다음 전용 정상열 route를 구현합니다. 위에서 설명한 대로 구현과
+정확한 checkout의 검증은 별개입니다.
 
-| Route | 후보 동작 |
+| Route | 정상열 동작 |
 | --- | --- |
 | `GET /api/capabilities` | 버전 있는 정상열 capability·설정 자원 정책 |
 | `POST /api/thermal/validate` | 엄격 JSON envelope·공개 문서 검증·preflight |
@@ -122,8 +124,10 @@ physics를 거절합니다. 열 status/result route에는 field/time selector를
 기존 `/api/validate`는 열 `ok=false`를 유지하며 generic `/api/mesh`,
 `/api/run`은 열/공진기 실행 거절을 유지합니다. 기존 공진기 schema 검증과
 실행은 별개입니다. 열 지원은 generic 광학 guard 제거 대신 전용 route를 사용해야
-합니다. 과도 문서·시간/history selector는 미지원입니다. Capability가 없거나
-잘못되면 열 동작을 비활성화하되 기존 광학 시작을 막지 않습니다.
+합니다. 이 정상열 endpoint는 과도 문서·시간/history selector를 거절하며,
+별도 [과도 Studio 인터페이스](thermal_transient_studio.md)가 해당 전용 route와
+view를 정의합니다. 정상열 capability가 없거나 잘못되면 정상열 동작을 비활성화하되
+기존 광학 시작을 막지 않습니다.
 
 오류는 잘못된 입력400, 논리 검증실패200+`ok=false`, 요청/자원 제한413/429,
 만료/알 수 없는 결과404, 아직 제공할 수 없는 running/error결과409를 구분합니다.
