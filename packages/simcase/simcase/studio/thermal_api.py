@@ -182,7 +182,7 @@ class ThermalInput:
         return {"client_revision": self.client_revision, "request_seq": self.request_seq}
 
 
-async def read_request(request, limits, *, for_run):
+async def read_request(request, limits, *, for_run, preflight=None, runtime_check=None):
     """Read ASGI chunks with an application cap, not Content-Length trust."""
     tags = {}
     try:
@@ -219,8 +219,8 @@ async def read_request(request, limits, *, for_run):
             raise ThermalAPIError("invalid_envelope", "expected exactly doc, client_revision and request_seq")
         tags = {"client_revision": _counter(raw["client_revision"], "client_revision"),
                 "request_seq": _counter(raw["request_seq"], "request_seq")}
-        _preflight(raw["doc"], limits)
-        if for_run and not runtime_available():
+        (preflight or _preflight)(raw["doc"], limits)
+        if for_run and not (runtime_check or runtime_available)():
             raise ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
         try:
             doc = Document.from_dict(raw["doc"])
@@ -388,17 +388,66 @@ class ThermalJobs:
         self._active = 0
         self._reserved_bytes = 0
         self._pending = 0
+        self._retired = {}
+        self._snapshots = {}
+        self.ingress = AdmissionGate("ingress_capacity_exceeded")
+        self.read_encoder = AdmissionGate("read_capacity_exceeded")
 
     def _expire(self):
         now = self._clock()
         for job, rec in list(self._records.items()):
             if (rec["lease"].released and rec["terminal_at"] is not None
                     and now-rec["terminal_at"] >= self.limits.ttl_seconds):
-                del self._records[job]
+                self._discard(job)
+
+    @staticmethod
+    def _record_bytes(rec):
+        return len(rec["status_bytes"])+len(rec["result"] or b"")+rec.get("raw_bytes", 0)
+
+    def _discard(self, job):
+        rec = self._records.pop(job)
+        if rec.get("pins", 0):
+            self._retired[id(rec)] = rec
 
     def _retained_bytes(self):
-        return sum(len(rec["status_bytes"])+len(rec["result"] or b"")
-                   for rec in self._records.values() if rec["lease"].released)
+        live = (rec for rec in self._records.values() if rec["lease"].released)
+        return sum(self._record_bytes(rec) for rec in live)+sum(
+            self._record_bytes(rec) for rec in self._retired.values())+sum(len(v) for v in self._snapshots.values())
+
+    def pin(self, job, *, result=False, result_id=None):
+        """Pin one immutable terminal record until transport/reader finally."""
+        with self._lock:
+            self._expire()
+            rec = self._records.get(job)
+            if rec is None:
+                raise ThermalAPIError("unknown_job", "unknown or expired thermal job", 404)
+            if result_id is not None and result_id != rec["identity"]["result_id"]:
+                raise ThermalAPIError("stale_result", "result identity does not match", 409,
+                                      tags=dict(rec["identity"]))
+            if result and (rec["status"] != "done" or rec["result"] is None):
+                raise ThermalAPIError("result_not_ready", "thermal result is not available", 409,
+                                      tags=dict(rec["identity"]))
+            # Running status is a small snapshot, not a reference to mutable rec.
+            if not rec["lease"].released:
+                if not result:
+                    payload = rec["status_bytes"]
+                    self._make_room(len(payload), 0)
+                    pin = RecordPin(self, None, payload)
+                    self._snapshots[id(pin)] = payload
+                    return pin
+                raise ThermalAPIError("result_not_ready", "terminal publication pending", 409)
+            rec["pins"] = rec.get("pins", 0)+1
+            return RecordPin(self, rec, rec["result"] if result else rec["status_bytes"])
+
+    def _unpin_snapshot(self, pin):
+        with self._lock:
+            self._snapshots.pop(id(pin), None)
+
+    def _unpin(self, rec):
+        with self._lock:
+            rec["pins"] -= 1
+            if rec["pins"] == 0:
+                self._retired.pop(id(rec), None)
 
     def _make_room(self, byte_count, slots, *, released_reservation=0):
         # Caller holds the lock. TTL is a maximum, not a retention guarantee.
@@ -411,12 +460,15 @@ class ThermalJobs:
                 raise ThermalAPIError("capacity_exceeded", "thermal job capacity unavailable", 429)
             # dict insertion order breaks equal monotonic-clock ties deterministically.
             oldest, _ = min(candidates, key=lambda item: item[1]["terminal_at"])
-            del self._records[oldest]
+            self._discard(oldest)
 
-    def reserve(self):
+    def reserve(self, reservation=None):
         with self._lock:
             self._expire()
-            budget = self.limits.payload_bytes+self.limits.status_bytes
+            budget = (self.limits.payload_bytes+self.limits.status_bytes
+                      if reservation is None else reservation)
+            if type(budget) is not int or budget <= 0 or budget > self.limits.terminal_bytes:
+                raise ThermalAPIError("capacity_exceeded", "invalid thermal reservation", 429)
             if self._active >= self.limits.active_jobs:
                 raise ThermalAPIError("capacity_exceeded", "thermal job capacity unavailable", 429)
             self._make_room(budget, 1)
@@ -434,7 +486,7 @@ class ThermalJobs:
                             "error": error, "has_result": has_result}, self.limits.status_bytes)
 
     def attach(self, lease, job, result_id, spec):
-        identity = {"kind": KIND, "job": job, "result_id": result_id, **spec.tags()}
+        identity = {"kind": getattr(spec, "kind", KIND), "job": job, "result_id": result_id, **spec.tags()}
         status = self._status(identity, "running", [], None, False)
         with self._lock:
             if lease.released or lease.job is not None or job in self._records:
@@ -450,16 +502,19 @@ class ThermalJobs:
         with self._lock:
             return dict(self._records[lease.job]["identity"])
 
-    def _publish(self, lease, status, result, log, error):
+    def _publish(self, lease, status, result, log, error, *, raw=None):
         with self._lock:
             rec = self._records.get(lease.job)
             if lease.released or rec is None or rec["status"] != "running":
                 return False
             encoded = self._status(rec["identity"], status, log, error, result is not None)
-            self._make_room(len(encoded)+len(result or b""), 0,
+            raw_bytes = sum(a.nbytes for a in raw.values()) if raw is not None else 0
+            if len(encoded)+len(result or b"")+raw_bytes > lease.reservation:
+                raise ThermalAPIError("capacity_exceeded", "result exceeds reserved bytes", 429)
+            self._make_room(len(encoded)+len(result or b"")+raw_bytes, 0,
                             released_reservation=lease.reservation)
             rec.update(status=status, status_bytes=encoded, result=result,
-                       terminal_at=self._clock())
+                       raw=raw, raw_bytes=raw_bytes, terminal_at=self._clock())
             return True
 
     def complete(self, lease, payload, log):
@@ -467,6 +522,16 @@ class ThermalJobs:
             raise ThermalAPIError("payload_limit_exceeded", "invalid or oversized encoded result", 413)
         return self._publish(lease, "done", payload,
                              bounded_log(log, self.limits.log_bytes), None)
+
+    def complete_transient(self, lease, payload, arrays, log, display_scale):
+        if type(payload) is not bytes:
+            raise ValueError("encoded transient manifest required")
+        with self._lock:
+            published = self._publish(lease, "done", payload, bounded_log(log, self.limits.log_bytes),
+                                      None, raw=arrays)
+            if published:
+                self._records[lease.job]["display_length_in_m"] = display_scale
+            return published
 
     def fail(self, lease, exc, code="solver_failed"):
         if isinstance(exc, ThermalAPIError):
@@ -516,3 +581,53 @@ class ThermalJobs:
             if rec["status"] != "done" or rec["result"] is None:
                 raise ThermalAPIError("result_not_ready", "thermal job is "+rec["status"], 409)
             return rec["result"]
+
+
+class AdmissionGate:
+    """Nonblocking single permit, with token identity and idempotent release."""
+
+    def __init__(self, code):
+        self._lock = threading.Lock()
+        self._token = None
+        self.code = code
+
+    def acquire(self):
+        with self._lock:
+            if self._token is not None:
+                raise ThermalAPIError(self.code, "thermal request capacity unavailable", 429)
+            token = Permit(self)
+            self._token = token
+            return token
+
+    def _release(self, token):
+        with self._lock:
+            if self._token is token:
+                self._token = None
+
+
+class Permit:
+    def __init__(self, gate):
+        self.gate = gate
+        self.released = False
+
+    def release(self):
+        if not self.released:
+            self.released = True
+            self.gate._release(self)
+
+
+class RecordPin:
+    def __init__(self, jobs, record, payload):
+        self.jobs, self.record, self.payload = jobs, record, payload
+        self.released = False
+        self._release_lock = threading.Lock()
+
+    def release(self):
+        with self._release_lock:
+            if not self.released:
+                self.released = True
+                if self.jobs is not None:
+                    if self.record is None:
+                        self.jobs._unpin_snapshot(self)
+                    else:
+                        self.jobs._unpin(self.record)
