@@ -2,6 +2,10 @@
 
 [한국어](locales/ko/pages/README.md)
 
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
 GitHub Actions is enabled with owner approval as of 2026-10-16. The retained
 Linux package and narrow Windows workflows may run on pushes, pull requests
 and manual dispatch. Check each exact run, exit status and artifact; enabling
@@ -57,7 +61,7 @@ Repeatable vector timing, memory and profiling commands are documented in
 [benchmark_vector.md](benchmark_vector.md). Performance measurements supplement
 the numerical checks; they are not CI timing gates.
 
-From the repository root, with a Python 3.12 virtual environment active:
+POSIX-shell Linux validation commands, from the repository root with a Python 3.12 virtual environment active (these Linux dependencies are not a portable platform matrix):
 
 ```bash
 python -m pip install -r ci/requirements-py312-linux.txt
@@ -66,8 +70,8 @@ python -m pip install --no-deps --no-build-isolation \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pip check
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
-python ci/fetch_rii.py /tmp/openphysics-rii
-export PHYSMAT_RII_PATH=/tmp/openphysics-rii/database
+python ci/fetch_rii.py .validation-rii
+export PHYSMAT_RII_PATH="$PWD/.validation-rii/database"
 gmsh --version
 python -m pytest -q -ra
 node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
@@ -331,7 +335,7 @@ check does not add schema/CLI/Studio support or certify thermodynamic coupling.
 
 ## Prescribed-temperature total-traction distribution contract
 
-At the pre-publication traction snapshot, the required byte inventory contained92 entries: the previous79 plus13 exact traction implementation/reference/guide/example/producer/independent assets. Publication then replaced seven Korean READMEs with fourteen docs overview pages, giving99 entries before the transient candidate's15 additions. Original independent reports and tests retain their historical counts and failures. The installed suite preserves389 prior cases and adds the original producer/reference/convergence files and independent90; report actual collected counts, failures and optional skips rather than treating planned totals as passing. The four standalone original `python -I` consumer checks run separately, as does the actual archived English example. No copied engine guard may scan an empty directory; source guard6 and installed origins/module bytes remain separate checks.
+At the pre-publication traction snapshot, the required byte inventory contained92 entries: the previous79 plus13 exact traction implementation/reference/guide/example/producer/independent assets. Publication then replaced seven Korean READMEs with fourteen docs overview pages, giving99 entries before the transient implementation's15 additions. Original independent reports and tests retain their historical counts and failures. The installed suite preserves389 prior cases and adds the original producer/reference/convergence files and independent90; report actual collected counts, failures and optional skips rather than treating planned totals as passing. The four standalone original `python -I` consumer checks run separately, as does the actual archived English example. No copied engine guard may scan an empty directory; source guard6 and installed origins/module bytes remain separate checks.
 
 The new Python API applies total physical `sigma*n` on the prescribed-temperature mechanical stage. There is no scalar-pressure keyword/local-frame/follower API; global Pa `-p*normal` callbacks on fixed reference geometry are valid. The one-way heat workflow and JSON/CLI/Studio remain unchanged. Producer reproduction commands use the repository root; extracted sdists have package-local `tests/` and `examples/` paths. Both original test files and required oracle/reference sources are shipped explicitly.
 
@@ -343,11 +347,11 @@ and `windows-py312-thermal`. Green PRs land via GitHub Rebase and merge;
 record the new main SHA and require green main checks before releasing.
 Main push runs are never cancelled by a newer push; branch/PR runs may be superseded.
 Tags do not trigger these workflows, and neither workflow publishes packages.
-## Transient heat candidate distribution checks
+## Transient heat distribution checks
 
-This feature-branch checkout contains a transient heat candidate; its full
-physical, independent and distribution acceptance is pending. It is not an
-accepted develop capability or a validated release. The [candidate contract](../../packages/galerkin/docs/transient_heat.md)
+This checkout contains the transient heat implementation and its verification gates.
+Full physical, independent and distribution acceptance requires exact current CI
+evidence; implementation alone is not a validated release. The [implementation contract](../../packages/galerkin/docs/transient_heat.md)
 and [independent report](../../packages/galerkin/docs/transient_heat_independent_validation.md)
 separate the producer's recorded 70 small source tests from the remaining gates.
 
@@ -370,8 +374,21 @@ program then runs with `python -I`. Neither `core` nor a shortened smoke
 replaces these gates. Each stage runs sequentially; failure leaves later stages
 unexecuted and must retain the original exit/logs.
 
-```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+output = Path(tempfile.mkdtemp(prefix="openphysics-transient-")) / "distributions"
+print("Validation output:", output)
+subprocess.run([sys.executable, "ci/check_distributions.py", "--output", str(output)], cwd=root, env=env, check=True)
 ```
 
 Use an empty owned output directory and the documented validation dependencies.
