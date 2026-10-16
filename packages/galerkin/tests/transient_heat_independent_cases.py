@@ -276,12 +276,19 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
         initial = moving_affine(x, 0)
         mesh = mesh_of(x, cells)
         calls = {}
+        boundary_calls = {}
+        def boundary_value(node, t):
+            key = (node, t)
+            boundary_calls[key] = boundary_calls.get(key, 0)+1
+            return float(initial[node]+3*t)
+        conditions = {int(i): (lambda t, node=int(i): boundary_value(node, t))
+                      for i in fixed}
         def source(p, t):
             calls[t] = calls.get(t, 0)+len(p)
             return np.full(len(p), 3*C_SI)
         r = engine.solve_transient_heat(mesh, conductivity=K_SI,
             volumetric_heat_capacity=C_SI, time_s=ts, initial_temperature_k=initial,
-            dirichlet=affine_bc(x, fixed), heat_source=source)
+            dirichlet=conditions, heat_source=source)
         shapes = dict(time_s=(3,), temperature_k=(3, len(x)),
             heat_flux_w_m2=(3, len(cells), 2), source_load_w_per_m=(3, len(x)),
             reaction_w_per_m=(2, len(x)), residual_w_per_m=(2, len(x)),
@@ -302,6 +309,7 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
                     value.flat[0] = 0
         self.assertEqual(set(calls), set(ts))
         self.assertEqual(len(set(calls.values())), 1)
+        self.assertEqual(boundary_calls, {(int(i), float(t)): 1 for i in fixed for t in ts})
         self.assertEqual(r.conductivity_w_mk, K_SI)
         self.assertEqual(r.volumetric_heat_capacity_j_m3k, C_SI)
         mesh.nodes[:] += 100
