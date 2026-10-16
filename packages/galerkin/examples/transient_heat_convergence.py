@@ -1,9 +1,9 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Fixed registered transient convergence demonstration; not yet executed here.
+"""Fixed registered transient convergence demonstration.
 
-Run only after execution authorization. This program asserts the gates rather
-than printing an unconditional success. Full histories can use substantial RAM.
+This program asserts the gates before reporting results. Full histories can
+use substantial RAM; see the validation guide for reproduction requirements.
 """
 import json
 import numpy as np

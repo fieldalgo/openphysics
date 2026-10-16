@@ -341,8 +341,9 @@ the convergence rate is the lie detector.
 - **Beyond electromagnetics**: the low-level assembly can represent anisotropic
   coefficients. The public steady-heat API currently accepts homogeneous
   isotropic conductivity, including prescribed outward flux and Robin boundaries.
-  Static elasticity provides its own vector nodal space. Transient problems need
-  time integration and Stokes needs a P2 space. The M3a two-field block system
+  Static elasticity provides its own vector nodal space. The standalone transient
+  heat API uses consistent mass and backward Euler; other transient models need
+  their own time integration and validation. Stokes needs a P2 space. The M3a two-field block system
   illustrates an assembly pattern; it does not certify automatic coupling.
 
 ## License
@@ -359,6 +360,18 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
+
+## Transient heat API
+
+For time-dependent heating and cooling, use the explicit
+`galerkin.transient_heat.solve_transient_heat` submodule. Its fixed SI P1 mesh,
+constant isotropic conductivity and volumetric heat capacity, time-dependent
+Dirichlet values, insulated edges and complete temperature/flux histories are
+documented in the [transient contract](docs/transient_heat.md),
+[validation guide](docs/transient_heat_validation.md) and
+[independent acceptance](docs/transient_heat_independent_validation.md).
+This separate Python API does not add transient flux/Robin, JSON/CLI/Studio,
+persistence or automatic heat-to-mechanics coupling.
 
 ## Steady heat boundary contract
 
