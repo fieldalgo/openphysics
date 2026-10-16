@@ -196,7 +196,7 @@ def _thermal_error(exc):
 @app.get("/api/capabilities")
 def studio_capabilities():
     caps = thermal.capabilities(_thermal_jobs.limits)
-    caps[transient.KIND] = transient.capabilities()
+    caps[transient.KIND] = transient.capabilities(_thermal_jobs.limits)
     return caps
 
 
