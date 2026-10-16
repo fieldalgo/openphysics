@@ -57,3 +57,22 @@ Artifact schema `transient-instrumented-resource-v1`:
 - `failure`, `exit_code`, `child_exit`, optional `forced_stop`: preserve refused/startup/timeout/failed attempts. A forced child stop invalidates acceptance; it is harness cleanup, not a server cancellation endpoint.
 
 Current RSS is available on Linux through /proc; cumulative ru_maxrss is normalized on Linux/macOS and unavailable elsewhere. Traced live/phase peak starts after imports/server startup and may omit native allocations. Six native thread variables are fixed to1. Nested hook clocks overlap; the bounded256 hook events include observation overhead, while counters continue. RAM highwater, encoded bytes and logical retained accounting are different measurements. Origin hashes require comparison to exact Git/package bytes; declared HEAD alone does not prove every imported byte. Do not call these observations numerical or maximum-capacity acceptance.
+
+## Retained Linux workload wrapper
+Run once for the exact integrated checkout, in the configured Linux validation environment:
+```sh
+python ci/tools/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
+```
+Do not dispatch an extra workflow solely for this tool when an authorized validation run is already scheduled. Retain the entire output directory in that run's existing artifact.
+
+The wrapper uses the exact `workload_plan()` choices: small n2/Nt3, medium n16/Nt8, near n85/Nt28 and the over-preflight n46/Nt96 actor (subject to the source's candidate policy). It writes standard uniform-source insulated2mm×1mm documents, initial300K, k2.5/c4/Q8, times2+0.01i, no boundary constraints. These are concrete resource inputs, not copied independent oracle expectations. D0 actual raw estimates and conservative D=N preflight estimates are both retained. The over actor exceeds the conservative preflight bound even though its D0 byte estimate is below16MiB; it is not an actual-D capacity rejection or exact cap+1 fixture.
+
+Each of the three stages launches a separate profiler process and fresh actual-server child, with its own report/stdout/stderr. Only the near stage also submits the supplied over document and requires413/no extra solve. A failed stage stops the wrapper without retry or later stages. No source preflight, numerical tolerance, boundary data or policy limit is altered.
+
+The companion asserts at completed capture that every one of the thirteen public array getter counters increases exactly1, and the first completed workload records all thirteen counts==1. Later identical-frame reads require zero getter/solve/capture increments; allowed on-demand encoding remains counted. `server_internal_measurements` explicitly describes companion instrumentation rather than inheriting the public observer's unavailable marker.
+
+Retained paths:
+- `.validation/transient-resource-observation/workload-summary.json` (`transient-resource-workloads-v1`): exact plan/input hashes, attempted/completed stage status, subprocess argv/exits/report hashes.
+- `small-observation/instrumented-report.json`, `medium-observation/instrumented-report.json`, `near_raw_candidate-observation/instrumented-report.json`: fresh-process measurements.
+- Stage stdout/stderr, child.stderr, original input/reject documents, selected response*.bin and terminal-state.json within those directories.
+Use `--prepare-only --output NEW_DIRECTORY` to write documents/shape arithmetic without importing runtime dependencies; its success is preparation only. Runtime reports and artifact provenance must be independently audited before acceptance.
