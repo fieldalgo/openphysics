@@ -74,3 +74,5 @@ include tests/test_studio_transient_thermal_acceptance.py
 include docs/thermal_transient_studio.md
 include docs/locales/ko/pages/thermal_transient_studio.md
 include simcase/studio/transient_thermal_api.py
+include docs/studio_transient_thermal_independent_validation.md
+include docs/locales/ko/pages/studio_transient_thermal_independent_validation.md

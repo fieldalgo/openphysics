@@ -150,6 +150,8 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/studio_transient_independent_fixtures.py',
               'tests/test_studio_transient_thermal_acceptance.py',
               'docs/thermal_transient_studio.md',
+              'docs/studio_transient_thermal_independent_validation.md',
+              'docs/locales/ko/pages/studio_transient_thermal_independent_validation.md',
               'docs/locales/ko/pages/thermal_transient_studio.md',
               'docs/thermal_studio.md',
               'docs/locales/ko/pages/thermal_studio.md',
