@@ -63,8 +63,8 @@ Python 3.10/3.11 remain outside this CI matrix despite the package metadata floo
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
-GitHub Actions is enabled with owner approval as of 2026-10-16. The retained
-Linux, narrow Windows and platform-install workflows run on main pushes, Ready
+The retained GitHub Actions Linux, narrow Windows and platform-install workflows
+run on main pushes, Ready
 pull requests and explicit manual dispatch. Check each exact run, exit status and artifact; enabling
 CI does not itself establish acceptance. Earlier Work-cloud results retain
 their original source, environment and scope.

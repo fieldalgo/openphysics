@@ -68,7 +68,7 @@ dispatch도 지원하지만 독립 수동 실행은 PR 검증을 대체하지 �
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. Linux 패키지·좁은 Windows·설치 플랫폼 workflow는 main push·Ready PR·명시적 수동 dispatch에서 실행합니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
+GitHub Actions의 Linux 패키지·좁은 Windows·설치 플랫폼 workflow는 main push·Ready PR·명시적 수동 dispatch에서 실행합니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
 
 루트 `validate.yml` workflow는 main push·Ready PR·수동 dispatch에서 실행됩니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11은 이 CI 검증 범위 밖이며
