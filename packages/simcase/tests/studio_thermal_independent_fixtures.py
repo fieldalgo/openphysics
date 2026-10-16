@@ -38,12 +38,18 @@ def _number_tree(value, integer=False):
 
 
 def captured_arrays(payload, version=2):
-    """Draft adopted wire envelope; adjust only bindings after exact server review."""
+    """Validate the top-level wire contract observed in the public server."""
     if payload.get("payload_format") != WIRE_FORMAT or payload.get("kind") != "thermal.steady2d":
         raise AssertionError("wire format/kind")
     fmt = "thermal.steady2d-result-v"+str(version)
     if payload.get("result_format") != fmt or payload.get("field_layout") != PAIRS[fmt]:
         raise AssertionError("result/layout pair")
+    scale = payload["display_length_in_m"]
+    _number_tree(scale)
+    if not isinstance(scale,(int,float)) or scale <= 0:
+        raise AssertionError("positive display length scale")
+    if "coordinates" in payload:
+        raise AssertionError("obsolete nested coordinate metadata")
     source = payload["arrays"]
     selected = tuple(FIELDS) if version == 2 else LEGACY
     if set(source) != set(selected):
@@ -105,7 +111,8 @@ def synthetic_wire():
             "convective_outward_w_per_m":HT-B,"system_rhs_w_per_m":rhs}
     fmt="thermal.steady2d-result-v2"
     return {"payload_format":WIRE_FORMAT,"kind":"thermal.steady2d",
-            "result_format":fmt,"field_layout":PAIRS[fmt],"arrays":{k:v.tolist() for k,v in arrays.items()},
+            "result_format":fmt,"field_layout":PAIRS[fmt],"display_length_in_m":1.,
+            "arrays":{k:v.tolist() for k,v in arrays.items()},
             "summary":{"result_format":fmt,"field_layout":PAIRS[fmt],
                        "field_shapes":{k:list(v.shape) for k,v in arrays.items()},
                        "field_units":dict(FIELDS),"field_locations":dict(LOCATIONS)}}
@@ -113,7 +120,7 @@ def synthetic_wire():
 
 def malformed_wires():
     original=synthetic_wire()
-    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra"):
+    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra","scale_bool","scale_zero","scale_nan","nested_coordinates"):
         p=copy.deepcopy(original)
         if kind == "layout": p["field_layout"]="thermal2d-p1-node-cell-v1"
         elif kind == "unit": p["summary"]["field_units"]["load_w_per_m"]="W"
@@ -123,12 +130,20 @@ def malformed_wires():
         elif kind == "index": p["arrays"]["triangles"][0][0]=999
         elif kind == "fractional": p["arrays"]["triangles"][0][0]=.5
         elif kind == "missing": p["arrays"].pop("ambient_load_w_per_m")
+        elif kind == "scale_bool": p["display_length_in_m"]=True
+        elif kind == "scale_zero": p["display_length_in_m"]=0.
+        elif kind == "scale_nan": p["display_length_in_m"]=float("nan")
+        elif kind == "nested_coordinates": p["coordinates"]={"display_length_in_m":1.}
         else: p["arrays"]["time_s"]=[0]
         yield kind,p
 
 
 def audit_payload(payload, data, case, version=2):
     arrays=captured_arrays(payload,version)
+    unit=data["units"]["length"]
+    expected_scale=UNITS[unit] if isinstance(unit,str) else unit["in_m"]
+    close(np.array(payload["display_length_in_m"]),np.array(expected_scale),expected_scale,
+          "declared display length scale",1e-9)
     if version == 2:
         audit(arrays,data,case,patch=(case=="linear"))
     return arrays
