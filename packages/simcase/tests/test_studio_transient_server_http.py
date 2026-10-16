@@ -32,12 +32,12 @@ def test_running_status_snapshot_stays_pinned_when_terminal_replaces_status():
     pin = jobs.pin("thermal-one")
     original = pin.payload
     assert b'"running"' in original
-    assert sum(map(len, jobs._snapshots.values())) == len(original)
+    assert sum(len(s["payload"]) for s in jobs._snapshots.values()) == len(original)
     jobs.complete(lease, b"{}", [])
     jobs.release(lease)
     assert b'"done"' in jobs.status("thermal-one")
     assert pin.payload == original
-    assert sum(map(len, jobs._snapshots.values())) == len(original)
+    assert sum(len(s["payload"]) for s in jobs._snapshots.values()) == len(original)
     pin.release()
     pin.release()
     assert not jobs._snapshots
@@ -75,3 +75,36 @@ def test_pinned_bytes_can_prevent_new_admission_without_early_release():
     next_lease = jobs.reserve()
     jobs.release(next_lease)
     assert jobs._active == jobs._pending == jobs._reserved_bytes == 0
+
+
+def test_running_pins_deduplicate_backing_and_current_status_is_reserved():
+    jobs = thermal.ThermalJobs()
+    lease = attached(jobs)
+    one = jobs.pin("thermal-one")
+    two = jobs.pin("thermal-one")
+    assert one.payload is two.payload
+    assert len(jobs._snapshots) == 1
+    assert next(iter(jobs._snapshots.values()))["refs"] == 2
+    assert jobs._retained_bytes() == 0
+    old_size = len(one.payload)
+    jobs.complete(lease, b"{}", [])
+    jobs.release(lease)
+    terminal_size = jobs._record_bytes(jobs._records["thermal-one"])
+    assert jobs._retained_bytes() == terminal_size+old_size
+    one.release()
+    assert one.payload is None and one.record is None
+    assert jobs._retained_bytes() == terminal_size+old_size
+    two.release()
+    assert jobs._retained_bytes() == terminal_size
+
+
+def test_released_terminal_pin_drops_its_strong_payload_and_record_references():
+    jobs = thermal.ThermalJobs()
+    lease = attached(jobs)
+    jobs.complete(lease, b"{}", [])
+    jobs.release(lease)
+    pin = jobs.pin("thermal-one", result=True)
+    jobs._discard("thermal-one")
+    pin.release()
+    assert pin.payload is pin.record is pin.jobs is None
+    assert not jobs._retired
