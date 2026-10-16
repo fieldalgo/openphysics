@@ -578,3 +578,25 @@ Mesh/Results 가시성을 검사합니다. 실제 진행 중 frame 요청은 비
 `transient-error-dirty-results.png`는 각각 늦은 read 뒤 빈 visible 결과를 남깁니다.
 기존 steady browser 검사도 필수로 유지합니다. 설정된 시나리오는 exact CI에서
 실행해야 하며 구문 검사나 Node fixture가 native-browser 수용은 아닙니다.
+
+
+## 과도 Studio 자원 workload 산출물
+
+기존 steady 자원 관측이 성공한 뒤, Linux는 같은 job-success 조건으로 정확한
+과도 wrapper를 한 번 실행합니다.
+
+```text
+python ci/tools/run_transient_resource_workloads.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/transient-resource-observation
+```
+
+기존 `.validation/` always-upload가
+`transient-resource-observation/workload-summary.json`, 각 workload stdout/stderr,
+생성 입력 문서와 각 `*-observation/instrumented-report.json` 및 원 HTTP 근거를
+보존합니다. small·medium·near-raw-candidate workload는 각각 새 process를 사용합니다.
+near workload는 over-budget actor도 전달하여 solve 전 413 거절을 요구하고,
+완료 capture에서는 공개 getter 13개를 각각 정확히 한 번 읽었는지 검사합니다.
+실패·부분 단계와 원 exit를 보존하고, 앞선 실패 뒤 없는 단계를 성공 측정으로
+취급하지 않습니다. 이는 계측 workload 관측이며 물리 수용·최대 용량·RSS 상한·
+누수 증명·전용 성능 기준선이 아닙니다. 정확 source commit·세 exit·getter 횟수·
+원응답·계상 보고를 source/설치/browser/플랫폼 gate와 구분해 검토합니다.
+이 step은 별도 CI 실행을 만들지 않으며 기존 steady 관측을 그대로 보존합니다.
