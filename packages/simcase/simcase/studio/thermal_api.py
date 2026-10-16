@@ -309,15 +309,15 @@ def capture_result(result, identity, limits):
                  and shape == list(shapes[key]), key+": wrong metadata shape")
     doc = result.doc
     declared = copy.deepcopy(doc["units"])
-    _require(summary.get("units") == declared, "document/summary unit mismatch")
+    _require(summary.get("units") == declared and summary.get("mesh_length_unit") == "m",
+             "document/summary unit mismatch")
     length_in_m = doc.scale.to_si(1., {"length": 1})
     _require(not isinstance(length_in_m, bool) and math.isfinite(length_in_m) and length_in_m > 0,
              "invalid display length scale")
     payload = {
         "payload_format": "studio-thermal-steady-v1", **identity,
         "result_format": pair[0], "field_layout": pair[1],
-        "coordinates": {"raw_unit": "m", "display_unit": declared["length"],
-                        "display_length_in_m": float(length_in_m)},
+        "display_length_in_m": float(length_in_m),
         "summary": summary, "arrays": {key: arrays[key].tolist() for key in keys},
     }
     return encode_json(payload, limits.payload_bytes)

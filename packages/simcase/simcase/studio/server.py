@@ -211,44 +211,54 @@ async def validate_thermal(body: Request):
             "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
 
 
-def _run_thermal_job(lease, doc):
+def _start_thermal_thread(target, args):
+    """Narrow thread-start binding; tests need not patch the global threading module."""
+    threading.Thread(target=target, args=args, daemon=True).start()
+
+
+def _run_thermal_job(jobs, lease, doc):
     stage = "solver_failed"
     try:
         result = run(doc, verbose=False)
         stage = "invalid_result"
-        encoded = thermal.capture_result(result, _thermal_jobs.identity(lease), _thermal_jobs.limits)
+        encoded = thermal.capture_result(result, jobs.identity(lease), jobs.limits)
         stage = "publication_failed"
-        _thermal_jobs.complete(lease, encoded, result.log)
+        jobs.complete(lease, encoded, result.log)
     except Exception as exc:
         try:
-            _thermal_jobs.fail(lease, exc, stage)
+            jobs.fail(lease, exc, stage)
+        except Exception:
+            pass  # release retains a bounded publication error, or removes only this own record
         finally:
-            _thermal_jobs.release(lease)
+            jobs.release(lease)
     else:
-        _thermal_jobs.release(lease)
+        jobs.release(lease)
 
 
 @app.post("/api/thermal/run")
 async def start_thermal_run(body: Request):
+    jobs = _thermal_jobs  # one store/config lifetime for this request and its worker
     spec = None
     lease = None
     identity = {}
     try:
-        spec = await thermal.read_request(body, _thermal_jobs.limits, for_run=True)
+        spec = await thermal.read_request(body, jobs.limits, for_run=True)
         # copy() resets scale; validation restores it before the worker owns it.
         doc = spec.doc.copy()
         doc.validate()
-        lease = _thermal_jobs.reserve()
+        lease = jobs.reserve()
         token = uuid.uuid4().hex
-        identity = _thermal_jobs.attach(lease, "thermal-"+token, "result-"+token, spec)
-        threading.Thread(target=_run_thermal_job, args=(lease, doc), daemon=True).start()
+        identity = jobs.attach(lease, "thermal-"+token, "result-"+token, spec)
+        _start_thermal_thread(_run_thermal_job, (jobs, lease, doc))
         return JSONResponse(identity, headers={"Cache-Control": "no-store"})
     except Exception as exc:
         if lease is not None:
             try:
-                _thermal_jobs.fail(lease, exc, "thread_start_failed")
+                jobs.fail(lease, exc, "thread_start_failed")
+            except Exception:
+                pass  # final release is independent of error-publication success
             finally:
-                _thermal_jobs.release(lease)
+                jobs.release(lease)
         if isinstance(exc, thermal.ThermalAPIError):
             exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
             return _thermal_error(exc)
