@@ -2,10 +2,24 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat.md) · [Validation](transient_heat_validation.md)
 
-**Submission status: implementation and static review only.** The new source,
-tests and example have not been parsed/imported or executed in Python at this
-submission. No numerical, regression, installed-wheel or platform pass is
-claimed. The commands below are reproduction instructions for later execution.
+**Initial submission (d21): source and static review only.** Python parsing,
+imports, compilation and collection had not been executed at that submission.
+That historical status is retained; no earlier numerical pass is inferred.
+
+**Bounded follow-up, 2026-10-16:** exact code snapshots
+d21e083d9723eec71ab5e32777ecd331d75cd981 and
+b2f420f4d540503ad3711bdab996e12dcbce9e9d each compiled all five new Python
+files and imported the engine/reference submodules successfully. Targeted
+collect-only found 70 identical node IDs per snapshot: 58 producer cases and
+12 reference cases. **Collected does not mean passed: no test body ran.**
+A fresh, Git-blob-verified 38-file source subset and fresh venv used Python3.12.14,
+pytest9.1.1, NumPy2.5.4 and SciPy1.18.1 with existing runtime packages; imports
+were from those exact source snapshots, not an installed-wheel proof.
+This did not recover an old checkout, venv or historical execution records.
+
+Numerical/physical gates, actual contract/reference test bodies, source/whole
+regression, sdist/wheel validation and platform tests remain unexecuted.
+The commands below are reproduction instructions, not evidence of those stages.
 
 ## Explicit submodule and minimal use
 

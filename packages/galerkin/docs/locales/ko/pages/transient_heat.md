@@ -2,9 +2,23 @@
 
 [English](../../../transient_heat.md) · [검증](transient_heat_validation.md)
 
-**제출 상태: 구현과 정적 검토만 완료했습니다.** 이 제출에서 새 source, 시험, 예제를
-Python으로 parse/import하거나 실행하지 않았습니다. 수치·회귀·설치 wheel·플랫폼 통과를
-주장하지 않습니다. 아래 명령은 향후 실행을 위한 재현 지침입니다.
+**최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
+parse/import/compile과 collection은 미실행이었습니다. 그 역사적 상태를 보존하며
+이전 수치 통과를 추론하지 않습니다.
+
+**2026-10-16 제한 후속 검증:** exact code snapshot
+d21e083d9723eec71ab5e32777ecd331d75cd981과
+b2f420f4d540503ad3711bdab996e12dcbce9e9d에서 각각 새 Python 5파일 compile과
+engine/reference 하위 모듈 import가 성공했습니다. 대상 collect-only는 snapshot마다
+동일한 node ID 70개(producer 58개, reference 12개)를 수집했습니다.
+**Collected는 passed가 아니며 시험 본문은 하나도 실행하지 않았습니다.**
+Git blob을 확인한 새 38파일 source 부분 복원본과 새 venv에서 기존 runtime 패키지인
+Python3.12.14, pytest9.1.1, NumPy2.5.4, SciPy1.18.1을 사용했습니다.
+Import 출처는 해당 exact source snapshot이며 설치 wheel 증명이 아닙니다.
+기존 checkout·venv·역사적 실행 기록을 복구한 것이 아닙니다.
+
+수치/물리 gate, 실제 계약/reference 시험 본문, source/전체 회귀, sdist/wheel 검증과
+플랫폼 시험은 계속 미실행입니다. 아래 명령은 재현 지침이지 해당 단계의 실행 근거가 아닙니다.
 
 ## 명시적 하위 모듈과 최소 사용법
 
