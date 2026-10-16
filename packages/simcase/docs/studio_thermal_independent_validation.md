@@ -148,3 +148,29 @@ No acceptance is granted to that early resource behavior and the tests do not
 hide it. All exact HTTP/physics/installed/CI results remain unexecuted here.
 Later producer changes require a separate source-delta review and exact combined
 CI. The separate writer-fixture correction does not enter this branch.
+
+## Follow-up exact binding decision
+
+Static review of f8506b7490b52105c37a55e656dc8f23baa98647 supersedes the
+early533 pending-resource observations above. Server source is unchanged
+(blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b); the adapter is now
+blob4fd5633340ca945aff9c3fb878aeb40a2f6c106e.
+
+The adapter captures public result_format/field_layout and requires equality
+with the summary pair, preserves the same top-level display factor and
+arrays/summary/identity, checks array shape/dtype/finite bounds before copies,
+and publishes only strict encoded data. The existing malformed layout, unit,
+shape, nonfinite, bool and index actors still target the consumed values.
+
+Capabilities now expose run_enabled from public result API availability under
+the validated resource configuration. Admission/publication make room by evicting
+oldest released done/error records; active leases are excluded. Thermal records
+are separate from optical records, TTL remains a maximum and evicted IDs404.
+This statically resolves the early two-terminal admission issue without resets,
+TTL waits, reduced mesh sequences or skipped tests.
+
+No further independent test or physical-gate change was needed for this source
+binding. Static scope is approved with no confirmed binding blocker found.
+Actual HTTP/source/installed execution, malformed-result rejection and resource
+behavior still require exact integrated CI. This is not a measured performance,
+browser or platform acceptance.
