@@ -82,7 +82,7 @@ jobs:
             packages/galerkin/tests/test_transient_thermal_mechanical_physics.py
       - name: Check transient thermal Studio before the full suite
         run: |
-          python -m pytest -q -ra --junitxml=.validation/studio-transient-preflight.xml \
+          python -m pytest -q -ra -o junit_logging=all -o junit_log_passing_tests=true --junitxml=.validation/studio-transient-preflight.xml \
             packages/simcase/tests/test_studio_transient_server_http.py \
             packages/simcase/tests/test_studio_transient_thermal_acceptance.py \
             packages/simcase/tests/test_studio_transient_lifecycle.py
