@@ -4,13 +4,14 @@
 
 ## 제공 상태·범위
 
-이 가이드는 제출된 과도 Studio 인터페이스를 설명합니다. 전용 HTTP검증/실행·
-manifest/frame/history route, 공유admission/retention, typed JavaScript와
-배포페이지 시간/field/HV control은 제출된 서버·화면source에 구현돼 있습니다.
-Capability정합화·통합은 대기이므로 route/page존재만으로 실행 가능하고 수용된
-end-to-end흐름을 뜻하지 않습니다. 일치하는 결합capability를 사용하고 정확후보의
-runtime/설치/browser/resource CIartifact를 확인하세요. 이번 문서갱신은 새로운
-통과·main지원·release를 주장하지 않습니다.
+이 checkout은 전용 capability·HTTP 검증/실행·manifest/frame/history route와
+배포 페이지의 시간/field/H/V control을 갖춘 과도 Studio 인터페이스를 구현합니다.
+Capability는 지원하는 format·view·route와 설정된 제한을 알립니다.
+`run_enabled`는 runtime 가용성과 유효한 제한 설정을 나타내며 실측 용량이나
+성능 보장이 아닙니다. 구현과 검증은 별개입니다. 실제 실행·설치·browser·자원 및
+플랫폼별 검증 범위는 정확한 checkout의 CI 결과와 artifact에서 확인하세요.
+설정된 제한은 계속 `candidate-unmeasured`이며 이 설명은 새로운 통과 수치나
+release를 주장하지 않습니다.
 [Headless 과도 가이드](thermal_transient2d.md)는 기존 입력·저장이력을 정의하며
 [정상 Studio](thermal_studio.md)는 별도입니다.
 
@@ -21,7 +22,7 @@ runtime/설치/browser/resource CIartifact를 확인하세요. 이번 문서갱�
 임의형상/재료확장·restart·연성·cancel/delete/save/NPZ endpoint는없습니다.
 View변경이solver를다시실행하거나문서를바꾸지않습니다.
 
-## 일치하는 결합 capability에서의 사용자 흐름
+## 사용자 흐름
 
 일치하는runtime패키지와선택적Studio extra설치뒤저장소루트에서시작합니다.
 

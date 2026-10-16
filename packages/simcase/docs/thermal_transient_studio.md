@@ -4,14 +4,15 @@
 
 ## Availability and scope
 
-This guide describes the submitted transient Studio interface. Dedicated HTTP
-validation/run and manifest/frame/history routes, shared admission/retention,
-typed JavaScript and shipped-page time/field/H/V controls are implemented in
-the submitted server and frontend sources. Capability alignment and integration
-remain pending, so route/page presence alone does not establish an executable,
-accepted end-to-end workflow. Use a matching integrated capability and inspect
-the exact candidate's runtime/installed/browser/resource CI artifacts.
-No new pass, main support or release is asserted by this documentation update.
+This checkout implements the transient Studio interface with a dedicated
+capability, HTTP validation/run and manifest/frame/history routes, and shipped-page
+time/field/H/V controls. The capability advertises supported formats, views,
+routes and configured limits. `run_enabled` reflects runtime availability and
+valid limit configuration, not measured capacity or performance. Implementation
+and validation are distinct: inspect the exact checkout's CI results and artifacts
+for observed runtime, installed, browser, resource and platform scope. Configured
+limits remain `candidate-unmeasured`; this description asserts no new pass count
+or release.
 The [headless transient guide](thermal_transient2d.md) defines existing input and
 saved-history behavior; [steady Studio](thermal_studio.md) remains separate.
 
@@ -24,7 +25,7 @@ There is no new solver, interpolation, downsampling, transient flux/Robin,
 arbitrary geometry/material expansion, restart, coupling, cancel/delete/save or
 NPZ endpoint. A view change never reruns the solver or modifies its document.
 
-## User workflow with a matching integrated capability
+## User workflow
 
 After installing matching runtime packages and the optional Studio extra, start
 from the repository root:
