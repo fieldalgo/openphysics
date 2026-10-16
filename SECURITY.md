@@ -1,7 +1,5 @@
 # Security
 
-**English** | [한국어](SECURITY.ko.md)
-
 Please report suspected vulnerabilities through GitHub's
 [private vulnerability reporting](https://github.com/fieldalgo/openphysics/security/advisories/new).
 Do not put exploit details, credentials or confidential models in a public issue.

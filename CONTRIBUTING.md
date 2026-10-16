@@ -1,7 +1,5 @@
 # Contributing
 
-**English** | [한국어](CONTRIBUTING.ko.md)
-
 OpenPhysics is under active development. Start with the [package overview](README.md)
 and [implementation and validation contracts](docs/README.md). The `develop`
 branch is the integration branch and the default branch; target pull requests
@@ -14,7 +12,7 @@ models before attaching files. Report vulnerabilities through the private
 channel in [SECURITY.md](SECURITY.md).
 
 Install and run from the repository root as described in [README.md](README.md).
-Use [ci/README.md](ci/README.md) for the pinned Linux validation environment,
+Use [validation guide](ci/docs/README.md) for the pinned Linux validation environment,
 optional tools and data, and isolated distribution checks. GitHub Actions is
 currently disabled; do not enable or dispatch workflows as part of a contribution.
 Record the exact commands, exits, failures and optional skips from your own checks.
@@ -22,7 +20,8 @@ Record the exact commands, exits, failures and optional skips from your own chec
 Physics changes need independent analytical references and mesh-convergence
 checks. Preserve existing numerical thresholds and report limitations. Keep
 production code, comments, APIs and executable examples in English; update
-complete English and Korean usage and validation documents together. A passing
+English and Korean usage and validation documents under `docs/` together.
+Repository READMEs and contribution/security entry points remain English. A passing
 subset or a documentation change does not establish new platform support.
 
 Keep changes focused. Do not commit credentials, generated build directories,

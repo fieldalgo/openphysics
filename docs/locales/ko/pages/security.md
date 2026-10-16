@@ -1,6 +1,6 @@
 # 보안
 
-[English](SECURITY.md) | **한국어**
+[English](../../../security.md) | **한국어**
 
 의심되는 취약점은 GitHub의
 [비공개 취약점 신고](https://github.com/fieldalgo/openphysics/security/advisories/new)를
@@ -12,4 +12,4 @@ OpenPhysics는 개발 중입니다. 보안 수정은 `develop`에서 진행하�
 버전의 지원 기간을 보장하지 않습니다. 브라우저 Studio는 기본적으로 loopback에
 바인딩하며 로컬 사용을 위한 도구입니다. 인증된 다중 사용자 서비스가 아니므로
 신뢰할 수 없는 네트워크에 노출하지 마세요. 수치 검증과 지원 운영체제의 한계는
-[검증 색인](docs/locales/ko/pages/index.md)에 별도로 설명합니다.
+[검증 색인](index.md)에 별도로 설명합니다.

@@ -1,8 +1,8 @@
 # meshine — a small quality triangle mesher for multi-material planar domains
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 Constrained Delaunay refinement (Ruppert's algorithm) written in Python on top
 of scipy's Delaunay. Describe a cross-section as named material regions —

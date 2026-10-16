@@ -2,9 +2,9 @@
 
 **English** | [한국어](locales/ko/pages/index.md)
 
-[Suite overview and installation](../README.md) · [한국어 overview](../README.ko.md)
+[Suite overview and installation](overview.md) · [한국어 overview](locales/ko/pages/overview.md)
 
-English source documents remain at their existing package paths. Complete Korean counterparts use each package's `docs/locales/ko/pages/<same-name>.md`; package overviews use `README.ko.md`. Code identifiers, equations, commands and recorded outputs retain their meaning in both languages. A translation does not establish a new numerical result. Pending entries below are not advertised as completed translations.
+English is the repository default. READMEs and contribution/security entry points are English. Bilingual documentation lives under `docs/` directories: English pages at `docs/<name>.md` and Korean counterparts at `docs/locales/ko/pages/<name>.md`, including package overviews. Code identifiers, equations, commands and recorded outputs retain their meaning in both languages. A translation does not establish a new numerical result.
 
 ## Current implementation contracts and evidence
 
@@ -22,25 +22,25 @@ English source documents remain at their existing package paths. Complete Korean
 | Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
 | Mechanical-stage acceptance | [Independent original 3D law](../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
 
-Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
+Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/docs/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
-This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/README.md) for Work-cloud Linux results, disabled Actions and unresolved Windows verification.
+This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, disabled Actions and unresolved Windows verification.
 
 ## Package overviews: complete Korean counterparts
 
 | Package | English | 한국어 |
 |---|---|---|
-| galerkin | [English](../packages/galerkin/README.md) | [한국어](../packages/galerkin/README.ko.md) |
-| galerkin-refsol | [English](../packages/galerkin-refsol/README.md) | [한국어](../packages/galerkin-refsol/README.ko.md) |
-| meshine | [English](../packages/meshine/README.md) | [한국어](../packages/meshine/README.ko.md) |
-| gmshio | [English](../packages/gmshio/README.md) | [한국어](../packages/gmshio/README.ko.md) |
-| physmat | [English](../packages/physmat/README.md) | [한국어](../packages/physmat/README.ko.md) |
-| simcase | [English](../packages/simcase/README.md) | [한국어](../packages/simcase/README.ko.md) |
-| openphysics | [English](../packages/openphysics/README.md) | [한국어](../packages/openphysics/README.ko.md) |
+| galerkin | [English](../packages/galerkin/docs/overview.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/overview.md) |
+| galerkin-refsol | [English](../packages/galerkin-refsol/docs/overview.md) | [한국어](../packages/galerkin-refsol/docs/locales/ko/pages/overview.md) |
+| meshine | [English](../packages/meshine/docs/overview.md) | [한국어](../packages/meshine/docs/locales/ko/pages/overview.md) |
+| gmshio | [English](../packages/gmshio/docs/overview.md) | [한국어](../packages/gmshio/docs/locales/ko/pages/overview.md) |
+| physmat | [English](../packages/physmat/docs/overview.md) | [한국어](../packages/physmat/docs/locales/ko/pages/overview.md) |
+| simcase | [English](../packages/simcase/docs/overview.md) | [한국어](../packages/simcase/docs/locales/ko/pages/overview.md) |
+| openphysics | [English](../packages/openphysics/docs/overview.md) | [한국어](../packages/openphysics/docs/locales/ko/pages/overview.md) |
 
 ## Headless thermal implementation contract
 
-| English | 한국어 | Scope / 범위 |
+| English | 한국어 | Scope |
 |---|---|---|
 | [Contract](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) | Headless only; consult the contract and independent report for measured scope and ownership limits |
 
@@ -51,9 +51,9 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [thermal_flux_robin](../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | [thermal_flux_robin_independent_validation](../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | [thermal_simcase_independent_validation](../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| [README](../ci/README.md) | [한국어](../ci/locales/ko/pages/README.md) |
-| [benchmark_cavity](../ci/benchmark_cavity.md) | [한국어](../ci/locales/ko/pages/benchmark_cavity.md) |
-| [benchmark_vector](../ci/benchmark_vector.md) | [한국어](../ci/locales/ko/pages/benchmark_vector.md) |
+| [README](../ci/docs/README.md) | [한국어](../ci/docs/locales/ko/pages/README.md) |
+| [benchmark_cavity](../ci/docs/benchmark_cavity.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_cavity.md) |
+| [benchmark_vector](../ci/docs/benchmark_vector.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
 These pages describe this checkout. Actions is disabled and two Windows failures remain unresolved; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
 
@@ -84,3 +84,10 @@ For source snapshot `0bc4419f4cfaf9e1185872d14232f1644639fc72`, Linux cloud vali
 ## Asset provenance
 
 See [bundled images, fixtures and data](assets.md) for source history and licensing boundaries.
+
+## Contribution and security guides
+
+| English | 한국어 |
+|---|---|
+| [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
+| [Security](security.md) | [한국어](locales/ko/pages/security.md) |

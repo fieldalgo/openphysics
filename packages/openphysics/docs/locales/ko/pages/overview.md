@@ -1,6 +1,6 @@
 # openphysics
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 

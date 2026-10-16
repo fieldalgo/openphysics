@@ -19,7 +19,7 @@ README. They share one git history, one test run and one install.
 ## Rules
 
 - Code, comments, docstrings, API identifiers and executable examples remain English.
-- User-facing READMEs, usage guides and validation explanations are maintained in English and complete Korean versions. Keep the existing English source paths; use README.ko.md for overviews and docs/locales/ko/pages/<same-name>.md for package documentation. Preserve equations, units, commands, numerical gates and limitations; translations do not imply new tests. Link languages through the documentation index, verify relative links and include both versions in source distributions. This follows the explicit user instruction of 2026-10-15.
+- English is the default language for the repository, READMEs, contribution and security entry points, code, comments and executable examples. Bilingual English/Korean content belongs only under `docs/` directories: English pages at `docs/<name>.md` and complete Korean counterparts at `docs/locales/ko/pages/<name>.md`. Package overview translations belong there, not in separate Korean READMEs. Preserve equations, units, commands, numerical gates and limitations; translations do not imply new tests. Keep language navigation inside documentation, verify relative links and include both documentation versions in source distributions. This follows the explicit user correction of 2026-10-16.
 - Every new physics feature is validated against refsol (analytic) with a mesh-convergence check.
 - Run the whole suite from the repository root: `python -m pytest -q`. A single package is
   `python -m pytest -q packages/<name>/tests` — still the fast inner loop.
@@ -27,7 +27,7 @@ README. They share one git history, one test run and one install.
   shadow the installed packages: the import succeeds but yields an empty namespace package whose
   `__file__` is None, and the failure surfaces far away. The repository root is safe.
 - Third-party integrations are their own package (`gmshio` is the pattern: it shells out to Gmsh,
-  so the GPL stays isolated and the core never implies it). A new backend is a new folder under
+  with its external executable and upstream license documented separately). A new backend is a new folder under
   `packages/` with its own pyproject, not a new repository.
 
 ## Setup

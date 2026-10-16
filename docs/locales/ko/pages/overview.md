@@ -1,6 +1,6 @@
 # OpenPhysics
 
-[English](README.md) | **한국어** · [문서](docs/locales/ko/pages/index.md)
+[English](../../../overview.md) | **한국어**
 
 OpenPhysics는 전자기장, 열전도와 고체역학을 위한 Python 시뮬레이션 도구 모음입니다.
 유한요소 해석기, 메시 생성, 재료 모델과 독립 해석해를 한 저장소에서 제공합니다.
@@ -14,11 +14,11 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 
 | 분야 | 구현 범위 | 안내 |
 |---|---|---|
-| 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](packages/simcase/README.ko.md), [벡터 신뢰성](packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
-| 3D 공동 | Python API 또는 단일 JSON study를 통한 진공 직육면체 PEC 공동 고유모드 | [공동 API](packages/galerkin/docs/locales/ko/pages/cavity_solver.md), [JSON 계약](packages/simcase/docs/locales/ko/pages/cavity3d.md) |
-| 열전도 | 정상·상수·등방 2D 열전도, 독립 API의 Dirichlet·처방 열유속·Robin 경계, 별도의 직사각형 헤드리스 JSON 경로 | [열전도 API](packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
-| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](packages/galerkin/docs/locales/ko/pages/elasticity2d.md), [표면하중](packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
-| 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md), [전체 표면하중](packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md), [workflow](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
+| 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](../../../../packages/simcase/docs/locales/ko/pages/overview.md), [벡터 신뢰성](../../../../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
+| 3D 공동 | Python API 또는 단일 JSON study를 통한 진공 직육면체 PEC 공동 고유모드 | [공동 API](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md), [JSON 계약](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
+| 열전도 | 정상·상수·등방 2D 열전도, 독립 API의 Dirichlet·처방 열유속·Robin 경계, 별도의 직사각형 헤드리스 JSON 경로 | [열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
+| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](../../../../packages/galerkin/docs/locales/ko/pages/elasticity2d.md), [표면하중](../../../../packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
+| 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md), [전체 표면하중](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md), [workflow](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
 
 JSON 실행기는 무손실 `em.modes2d`, `em.cavity3d`와 문서에 명시한
 `thermal.steady2d` 범위를 지원합니다. Python 전용 기능이 JSON이나 Studio에도
@@ -34,14 +34,14 @@ JSON 실행기는 무손실 `em.modes2d`, `em.cavity3d`와 문서에 명시한
 
 | 패키지 | 역할 |
 |---|---|
-| [galerkin](packages/galerkin/README.ko.md) | 유한요소 해석기와 장 후처리 |
-| [galerkin-refsol](packages/galerkin-refsol/README.ko.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
-| [meshine](packages/meshine/README.ko.md) | 재료 영역의 2D 삼각형 메시 |
-| [gmshio](packages/gmshio/README.ko.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
-| [physmat](packages/physmat/README.ko.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
-| [simcase](packages/simcase/README.ko.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
+| [galerkin](../../../../packages/galerkin/docs/locales/ko/pages/overview.md) | 유한요소 해석기와 장 후처리 |
+| [galerkin-refsol](../../../../packages/galerkin-refsol/docs/locales/ko/pages/overview.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
+| [meshine](../../../../packages/meshine/docs/locales/ko/pages/overview.md) | 재료 영역의 2D 삼각형 메시 |
+| [gmshio](../../../../packages/gmshio/docs/locales/ko/pages/overview.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
+| [physmat](../../../../packages/physmat/docs/locales/ko/pages/overview.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
+| [simcase](../../../../packages/simcase/docs/locales/ko/pages/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
 
-일곱 번째 배포인 [openphysics](packages/openphysics/README.ko.md)(`0.0.1`)는
+일곱 번째 배포인 [openphysics](../../../../packages/openphysics/docs/locales/ko/pages/overview.md)(`0.0.1`)는
 프로젝트 이름을 예약합니다. 엔진을 포함하지 않고 위 패키지들을 설치하지도 않습니다.
 저장소 루트 자체도 설치 가능한 배포가 아닙니다.
 **아래 소스 설치 방법을 사용하세요. `pip install openphysics`만으로는 시뮬레이션
@@ -66,7 +66,7 @@ python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packag
 Gmsh는 선택 도구로 별도 설치합니다. 메시 생성에는 PATH의 `gmsh` 또는
 `GMSH_EXECUTABLE`이 필요하지만, 기존 MSH 파일을 읽는 데에는 필요하지 않습니다.
 내장 광학 재료는 전체 refractiveindex.info 데이터베이스를 내려받지 않아도 동작합니다.
-재현 가능한 의존성·데이터베이스 버전은 [검증 환경 안내](ci/locales/ko/pages/README.md)를 따르세요.
+재현 가능한 의존성·데이터베이스 버전은 [검증 환경 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따르세요.
 
 ## 예제 실행
 
@@ -117,7 +117,7 @@ python -m pytest -q packages/simcase/tests
 **선택 기능 16개를 skip**했습니다. Skip은 Gmsh 부재 14개와 로컬 데이터베이스 부재
 2개입니다. 별도의 설치 wheel 실행은 **541개 시험이 skip 없이 통과**했습니다.
 일곱 sdist→wheel build와 배포물 14개의 엄격한 metadata 검사도 통과했습니다.
-정확한 snapshot과 범위는 [검증 색인](docs/locales/ko/pages/index.md)을 참고하세요.
+정확한 snapshot과 범위는 [검증 색인](index.md)을 참고하세요.
 과거 수치가 이후의 모든 문서 커밋에서 전체 시험을 다시 실행했다는 뜻은 아니며,
 일부 시험 통과가 skip한 통합 기능을 검증하지는 않습니다.
 
@@ -130,18 +130,18 @@ Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. �
 
 ## 문서와 기여
 
-[문서 색인](docs/locales/ko/pages/index.md)에서 시작하세요. 사용법·검증 안내는
-완전한 한국어판을 함께 제공합니다. [자산 출처](docs/locales/ko/pages/assets.md)에는
+[문서 색인](index.md)에서 시작하세요. 사용법·검증 안내는
+완전한 한국어판을 함께 제공합니다. [자산 출처](assets.md)에는
 과거 그림, fixture와 데이터의 출처를 기록했습니다.
 
 기본 브랜치 `develop`에는 검토한 통합 변경을 반영합니다. 기능 브랜치에는 검증하지
 않은 작업이 있을 수 있습니다. 변경과 재현 가능한 버그 보고는
-[기여 안내](CONTRIBUTING.ko.md), 비공개 취약점 신고는 [보안 안내](SECURITY.ko.md)를
+[기여 안내](contributing.md), 비공개 취약점 신고는 [보안 안내](security.md)를
 따르세요. 이 checkout을 사용하는 데 별도의 비공개 저장소는 필요하지 않습니다.
 
 ## 라이선스
 
-자체 코드와 문서는 웨이브빗과 같은 **[Apache-2.0](LICENSE)**입니다.
-[NOTICE](NOTICE)와 각 패키지 고지에 제3자 조건을 보존합니다. 포함된
+자체 코드와 문서는 웨이브빗과 같은 **[Apache-2.0](../../../../LICENSE)**입니다.
+[NOTICE](../../../../NOTICE)와 각 패키지 고지에 제3자 조건을 보존합니다. 포함된
 refractiveindex.info 광학 데이터는 CC0 1.0이고 Gmsh는 자체 라이선스로 별도 설치합니다.
 이 저장소의 라이선스가 의존성의 라이선스를 대체하지 않습니다.

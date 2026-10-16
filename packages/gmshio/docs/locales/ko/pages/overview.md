@@ -1,6 +1,6 @@
 # gmshio — Gmsh와 링크하지 않고 galerkin에 메시 제공
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
@@ -77,7 +77,7 @@ python -m pytest -q packages/gmshio/tests
 
 ## 라이선스
 
-Apache License 2.0 — [LICENSE](LICENSE), [NOTICE](NOTICE)를 참조하세요.
+Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 

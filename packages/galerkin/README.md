@@ -1,8 +1,8 @@
 # galerkin — an electromagnetic FEM engine (FieldAlgo project)
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.

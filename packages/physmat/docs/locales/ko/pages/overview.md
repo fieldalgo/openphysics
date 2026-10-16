@@ -1,6 +1,6 @@
 # physmat — 물리 솔버용 재료 물성
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
@@ -73,9 +73,9 @@ python -m pytest -q packages/physmat/tests
 
 ## 라이선스
 
-Apache License 2.0 — [LICENSE](LICENSE), [NOTICE](NOTICE)를 참조하세요.
+Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-내장 광학 데이터에는 이 라이선스 부여가 적용되지 않습니다. 해당 데이터는 refractiveindex.info 데이터베이스에서 왔고 CC0 1.0(퍼블릭 도메인)입니다. 위 [데이터 라이선스](#데이터-라이선스)와 [NOTICE](NOTICE)를 참조하세요. Apache-2.0 라이선스는 코드에 적용됩니다.
+내장 광학 데이터에는 이 라이선스 부여가 적용되지 않습니다. 해당 데이터는 refractiveindex.info 데이터베이스에서 왔고 CC0 1.0(퍼블릭 도메인)입니다. 위 [데이터 라이선스](#데이터-라이선스)와 [NOTICE](../../../../NOTICE)를 참조하세요. Apache-2.0 라이선스는 코드에 적용됩니다.
 

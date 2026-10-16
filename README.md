@@ -1,7 +1,5 @@
 # OpenPhysics
 
-**English** | [한국어](README.ko.md) · [Documentation](docs/README.md)
-
 OpenPhysics is a Python simulation toolkit for electromagnetic fields, heat
 conduction and solid mechanics. It brings finite-element solvers, meshing,
 material models and independent reference solutions into one repository.
@@ -70,7 +68,7 @@ shadow installed modules with the directories of the same name.
 Gmsh is optional and separately installed: mesh generation needs `gmsh` on PATH
 or `GMSH_EXECUTABLE`; reading existing MSH files does not. Built-in optical
 materials work without downloading the full refractiveindex.info database.
-For reproducible dependency and database versions, use the [validation setup](ci/README.md).
+For reproducible dependency and database versions, use the [validation setup](ci/docs/README.md).
 
 ## Run an example
 

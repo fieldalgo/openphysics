@@ -2,9 +2,9 @@
 
 [English](../../../README.md) | **한국어**
 
-[도구 개요·설치 안내](../../../../README.ko.md) · [영어 개요](../../../../README.md)
+[도구 개요·설치 안내](overview.md) · [영어 개요](../../../overview.md)
 
-영어 원문은 기존 패키지 경로에 유지한다. 완전한 한국어판은 각 패키지의 `docs/locales/ko/pages/<같은파일명>.md`, 패키지 개요는 `README.ko.md`에 둔다. 수식·API·단위·부호·실행 명령·검증 수치와 한계는 두 언어에서 같은 의미로 유지한다. 번역을 추가한 것은 수치 실험을 새로 실행하거나 새 합격 근거를 얻었다는 뜻이 아니다.
+기본 언어는 영어다. README와 기여·보안 진입 문서는 영어로 유지한다. 영어·한국어 지원은 `docs/` 안에서만 제공하며, 영어는 `docs/<이름>.md`, 한국어는 `docs/locales/ko/pages/<이름>.md`에 둔다. 패키지 개요도 이 구조를 따른다. 수식·API·단위·명령·검증 수치와 한계는 두 언어에서 같은 의미로 유지하며 번역은 새 검증 근거가 아니다.
 
 아래는 이 checkout에 실제 포함된 영어·한국어 구현 계약과 검증 보고다. 번역을 추가한 것과 수치 실험을 실행한 것은 구분한다.
 
@@ -24,21 +24,21 @@
 | 처방 온도장 기계단계 | [Snapshot·3D 감소·에너지](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
 | 기계단계 수용검증 | [독립 원3D 재료 법칙](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
 
-패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
+패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/docs/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
 
-이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 헤드리스 JSON은 여전히 flux/Robin 경계를 거부한다. Work cloud Linux 결과·Actions 비활성·Windows 검증 미확정 범위는 [검증 안내](../../../../ci/locales/ko/pages/README.md)를 참고한다.
+이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 헤드리스 JSON은 여전히 flux/Robin 경계를 거부한다. Work cloud Linux 결과·Actions 비활성·Windows 검증 미확정 범위는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고한다.
 
 ## 패키지 개요: 전체 한국어판
 
 | 패키지 | English | 한국어 |
 |---|---|---|
-| galerkin | [English](../../../../packages/galerkin/README.md) | [한국어](../../../../packages/galerkin/README.ko.md) |
-| galerkin-refsol | [English](../../../../packages/galerkin-refsol/README.md) | [한국어](../../../../packages/galerkin-refsol/README.ko.md) |
-| meshine | [English](../../../../packages/meshine/README.md) | [한국어](../../../../packages/meshine/README.ko.md) |
-| gmshio | [English](../../../../packages/gmshio/README.md) | [한국어](../../../../packages/gmshio/README.ko.md) |
-| physmat | [English](../../../../packages/physmat/README.md) | [한국어](../../../../packages/physmat/README.ko.md) |
-| simcase | [English](../../../../packages/simcase/README.md) | [한국어](../../../../packages/simcase/README.ko.md) |
-| openphysics | [English](../../../../packages/openphysics/README.md) | [한국어](../../../../packages/openphysics/README.ko.md) |
+| galerkin | [English](../../../../packages/galerkin/docs/overview.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/overview.md) |
+| galerkin-refsol | [English](../../../../packages/galerkin-refsol/docs/overview.md) | [한국어](../../../../packages/galerkin-refsol/docs/locales/ko/pages/overview.md) |
+| meshine | [English](../../../../packages/meshine/docs/overview.md) | [한국어](../../../../packages/meshine/docs/locales/ko/pages/overview.md) |
+| gmshio | [English](../../../../packages/gmshio/docs/overview.md) | [한국어](../../../../packages/gmshio/docs/locales/ko/pages/overview.md) |
+| physmat | [English](../../../../packages/physmat/docs/overview.md) | [한국어](../../../../packages/physmat/docs/locales/ko/pages/overview.md) |
+| simcase | [English](../../../../packages/simcase/docs/overview.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/overview.md) |
+| openphysics | [English](../../../../packages/openphysics/docs/overview.md) | [한국어](../../../../packages/openphysics/docs/locales/ko/pages/overview.md) |
 
 ## 헤드리스 열전도 구현 계약
 
@@ -53,9 +53,9 @@
 | [thermal_flux_robin](../../../../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | [thermal_flux_robin_independent_validation](../../../../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | [thermal_simcase_independent_validation](../../../../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| [README](../../../../ci/README.md) | [한국어](../../../../ci/locales/ko/pages/README.md) |
-| [benchmark_cavity](../../../../ci/benchmark_cavity.md) | [한국어](../../../../ci/locales/ko/pages/benchmark_cavity.md) |
-| [benchmark_vector](../../../../ci/benchmark_vector.md) | [한국어](../../../../ci/locales/ko/pages/benchmark_vector.md) |
+| [README](../../../../ci/docs/README.md) | [한국어](../../../../ci/docs/locales/ko/pages/README.md) |
+| [benchmark_cavity](../../../../ci/docs/benchmark_cavity.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_cavity.md) |
+| [benchmark_vector](../../../../ci/docs/benchmark_vector.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
 이 문서들은 이 checkout을 설명합니다. Actions는 비활성화돼 있고 Windows 두 실패는 미확정이며 Linux 결과가 Windows 수용을 뜻하지 않습니다. 독립 Robin API와 헤드리스 JSON 계약은 별개입니다.
 
@@ -86,3 +86,10 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 ## 자산 출처
 
 [포함된 이미지·fixture·데이터](assets.md)에서 도입 이력과 라이선스 범위를 확인할 수 있습니다.
+
+## 기여·보안 안내
+
+| English | 한국어 |
+|---|---|
+| [Contributing](../../../contributing.md) | [한국어](contributing.md) |
+| [Security](../../../security.md) | [한국어](security.md) |
