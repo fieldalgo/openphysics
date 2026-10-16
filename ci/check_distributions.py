@@ -33,7 +33,10 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
                          "simcase": ("simcase/schema.py", "simcase/transient_thermal_contract.py",
                                      "simcase/transient_thermal.py", "simcase/runner.py",
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
-                                     "simcase/thermal.py", "simcase/studio/server.py") }
+                                     "simcase/thermal.py", "simcase/studio/server.py",
+                                     "simcase/studio/thermal_api.py") }
+STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
+                          "simcase/studio/static/thermal.js")
 DOCUMENT_ASSETS = {'galerkin': (
               'galerkin/transient_heat.py',
               'docs/transient_heat.md',
@@ -126,6 +129,18 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
  'simcase': (
+              'simcase/studio/thermal_api.py',
+              'simcase/studio/static/index.html',
+              'simcase/studio/static/thermal.js',
+              'tests/studio_steady_thermal.cjs',
+              'tests/test_studio_steady_thermal_http.py',
+              'tests/test_studio_thermal_acceptance.py',
+              'tests/studio_thermal_independent_fixtures.py',
+              'tests/test_studio_thermal_lifecycle.py',
+              'docs/thermal_studio.md',
+              'docs/locales/ko/pages/thermal_studio.md',
+              'docs/studio_thermal_independent_validation.md',
+              'docs/locales/ko/pages/studio_thermal_independent_validation.md',
               'simcase/schema.py',
               'simcase/transient_thermal_contract.py',
               'simcase/transient_thermal.py',
@@ -242,6 +257,10 @@ def main():
                 expected_bytes = (ROOT / "packages" / package_name / relative).read_bytes()
                 if archive.read(relative) != expected_bytes:
                     raise RuntimeError(f"{wheel.name}: runtime module differs: {relative}")
+            if package_name == "simcase":
+                for relative in STUDIO_RESOURCE_ASSETS:
+                    if archive.read(relative) != (ROOT / "packages/simcase" / relative).read_bytes():
+                        raise RuntimeError(f"{wheel.name}: Studio resource differs: {relative}")
             if not any(p.endswith("/LICENSE") for p in names):
                 raise RuntimeError(f"{wheel.name} is missing LICENSE")
             if not wheel.name.startswith("openphysics-") and not any(p.endswith("/NOTICE") for p in names):
@@ -301,6 +320,25 @@ def main():
             + "Path(sys.argv[1]).write_text(json.dumps(report, indent=2) + '\\n', encoding='utf-8')\n"
             + "print(json.dumps(report), flush=True)\n", encoding="utf-8")
         run(python, "-I", origin_probe, output / "transient-module-origins.json", cwd=work, env=env)
+        # Verify installed static resources as well as Python module origins.
+        studio_resources = {relative: hashlib.sha256(
+            (ROOT / "packages/simcase" / relative).read_bytes()).hexdigest()
+            for relative in STUDIO_RESOURCE_ASSETS}
+        resource_probe = work / "studio_resource_origins.py"
+        resource_probe.write_text(
+            "import hashlib, json, sys, simcase\nfrom pathlib import Path\n"
+            + "expected = " + repr(studio_resources) + "\n"
+            + "root = Path(simcase.__file__).resolve().parent.parent\n"
+            + "if not sys.flags.isolated or not root.is_relative_to(Path(sys.prefix).resolve()): raise RuntimeError('installed resource root required')\n"
+            + "report = {}\n"
+            + "for relative, digest in expected.items():\n"
+            + "    path = root / relative\n"
+            + "    actual = hashlib.sha256(path.read_bytes()).hexdigest()\n"
+            + "    if actual != digest: raise RuntimeError('installed Studio resource mismatch')\n"
+            + "    report[relative] = {'origin': str(path), 'sha256': actual}\n"
+            + "Path(sys.argv[1]).write_text(json.dumps(report, indent=2)+'\\n', encoding='utf-8')\n",
+            encoding="utf-8")
+        run(python, "-I", resource_probe, output / "studio-resource-origins.json", cwd=work, env=env)
         smoke = work / "wheel_smoke.py"
         shutil.copy2(ROOT / "ci" / "wheel_smoke.py", smoke)
         run(python, "-I", smoke, cwd=work, env=env)
@@ -332,7 +370,10 @@ def main():
         simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
         with tarfile.open(simcase_sdist) as archive:
             for filename in ("test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
-                             "test_studio_transient.py", "test_transient_headless_windows.py"):
+                             "test_studio_transient.py", "test_transient_headless_windows.py",
+                             "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
+                             "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
+                             "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
                 (tests / filename).write_bytes(archive.extractfile(member).read())
@@ -415,6 +456,22 @@ def main():
         run(python, "-I", "-m", "simcase", "validate", document, cwd=work, env=env)
         run(python, "-I", "-m", "simcase", "run", document, "-q",
             "-o", work / "transient-headless-example", cwd=work, env=env)
+        # Small real-browser E2E uses these installed wheels, never source imports.
+        browser_model = work / "studio-browser-model.json"
+        browser_model.write_text(json.dumps({
+            "openphysics": "0.2", "name": "Studio browser acceptance",
+            "units": {"length": "m", "temperature": "K"},
+            "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+            "materials": {}, "physics": {"heat1": {"type": "thermal.steady2d",
+                "conductivity_w_mk": 2, "heat_source_w_m3": 0,
+                "dirichlet_temperature_k": {"left": 300, "right": 293}}},
+            "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
+            "results": {"save_fields": True, "plots": False}
+        }, allow_nan=False), encoding="utf-8")
+        run("node", ROOT / "ci/tools/studio_thermal_browser.mjs",
+            "--python", python, "--model", browser_model,
+            "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,
+            "--output", output / "studio-browser", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")
 
 

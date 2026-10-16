@@ -384,3 +384,43 @@ python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --r
 14개 checksum 및 지정 runtime wheel bytes를 확인합니다. twine strict·설치 실행·
 독립 물리 또는 정확 source commit 검증을 대체하지 않습니다. 구성된 명령이나
 과거 baseline을 새 후보의 통과로 표시하지 않습니다.
+
+## 정상열 Studio 배포·브라우저 검사
+
+checker는 simcase sdist에 정확한 Studio adapter, 페이지/thermal JavaScript,
+원 HTTP·수용·lifecycle 시험 세 파일, 독립 fixture, Node script와 사용법·독립보고
+EN/KO 두 쌍을 요구합니다. Python module과 static resource는 wheel에서 source와
+byte가 같아야 하며 설치 module hash와 `studio-resource-origins.json`은 격리 venv도
+검사합니다. 원시험은 검증한 archive에서 source conftest 없이 추출합니다. 독립
+fixture가 사용하는 P2 steady-boundary cases/oracle 원문도 같은 archive에 있어야
+합니다. 수용 전 해당 기능과 결합해야 하며 배포 전용 branch가 생산 의존성을
+제공하는 것은 아닙니다. 기존 engine all17·전체 수렴·headless·Windows gate를
+제거하지 않습니다.
+
+Linux preflight는 `studio-thermal-preflight.xml`을 기록하며 실패는 전체 수용 전의
+실패입니다. source Node에는 실제 `studio_steady_thermal.cjs`를 추가합니다.
+브라우저 수용은 별도입니다. 검증한 wheel 환경 안에서
+`ci/tools/studio_thermal_browser.mjs`가 본인 격리 uvicorn 서버를 시작하고,
+which/version으로 찾은 기존 Chrome/Chromium에 Node24 내장 WebSocket/fetch
+CDP를 사용합니다. npm/Python/browser 다운로드를 추가하지 않습니다. 작은 실제
+모델로 Apply JSON·Validate·Run·온도/flux·Results/Mesh·dirty 입력의 stale run
+거절을 조작합니다. 보이는 canvas CSS/backing 크기, console 예외, PNG, origin,
+환경과 본인 subprocess exit는 `dist/studio-browser/`에 남깁니다. 브라우저 부재는
+unavailable과 nonzero exit로 기록하며 passing mock이나 skip으로 숨기지 않습니다.
+
+검증 성공 뒤 Linux source 서버 관측을 한 번 수행합니다.
+
+```text
+python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
+```
+
+각각 새 본인 서버 process에서 n2/32/100 공개 API·실제 HTTP 구간, 실제
+capture_result/encode_json hooks, result 열 번 읽기, encoded bytes, tracemalloc과
+RSS, 추가 job admission/oldest terminal 회수, 서버 종료를 측정합니다. hook 시간은
+중첩되므로 합산하지 않습니다. TTL300s는 최대 보관이며 최소 보장이 아닙니다.
+회수/만료 job은 자동 재실행 없이404입니다. run_enabled는 설정된 공개 API 가용성이고
+candidate-unmeasured 자원 정책과 별개입니다. 고정 workload와 공유 runner 측정은
+관측이며 용량·성능 인증이 아닙니다. 가짜 물리나 limit patch를 사용하지 않습니다.
+기존 always-upload 단계가 partial 보고도 보존합니다. 설정된 명령은 exact 실행의
+완료 근거가 아니므로 실제 CI exit·count·artifact를 보고해야 합니다. 브라우저,
+수치 독립 수용, source 자원 관측, Windows는 별도 수용 범위입니다.
