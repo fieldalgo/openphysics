@@ -100,3 +100,35 @@ summary로물리기대값을만들지않는다.
 미검증: exactwire이름/producer주입위치,실행·수집,malformedresult거절,
 물리HTTP수렴,설치origin/archive소비,실제Canvas,Windows/macOS/최종통합.
 기존정상경계C11/CLI/installed수용은별도기능결과이며exactCI원로그로확인해야한다.
+
+## 초기 exact 서버 binding
+
+원문검토로 시험을 server/adapter commit
+533c5e8c3f50d05f52323588e81b4997500e00e5에 연결했다.
+worker가공개server.run을호출하므로 malformed공개결과주입점이확인됐다.
+wire는top-level display_length_in_m/arrays/summary 및
+kind/job/result_id/client_revision/request_seq identity를사용한다.
+중첩coordinates metadata는폐기됐고독립consumer가거절한다.
+
+consumer는finite양수표시scale을선언m/mm/um또는명시in_m길이와대조하고,
+정확metadata필드집합·status/result echo를검사한다.
+bool/zero/nonfinite scale·선언scale불일치음성을추가했다.
+malformed-layout actor는공개field_layout property뿐아니라
+summary.field_layout도바꾼다. earlyadapter가summary pair를읽어
+property만바꾸면의도한거절에도달하지않기때문이다.
+시험정의정정이며producer보호/물리gate는변경하지않았다.
+binding중새UNITS참조의누락import는실행전정적발견해정정했다.
+
+요구자원정책은admission/publication압박때가장오래된terminal done/error를
+회수하고active/optical을보존하며evictedID는404이다.
+300s TTL은최대보관시간이다. 원mesh8/16/32/64를순차실행하고
+store reset/mesh축소/TTL대기/skip을하지않는다.
+기존짧은polling대기는실제비동기상태관측용이지보관정책우회가아니다.
+run_enabled=true는유효설정정책/공개API가용을뜻하고실측성능인증이아니다.
+
+early533에는run_enabled가아직없고terminal2보관뒤TTL만료전admission을
+거절하므로생산후속수정이예정돼있다.
+이초기자원동작을수용하거나시험으로숨기지않는다.
+본단계exactHTTP/물리/설치/CI는모두미실행이다.
+후속생산변경은별도source delta검토·정확결합CI가필요하다.
+별도writer fixture수정은이branch에포함하지않는다.
