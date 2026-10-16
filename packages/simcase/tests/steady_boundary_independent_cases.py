@@ -239,7 +239,7 @@ class TestSteadyBoundaryIndependent(unittest.TestCase):
             temperature=300+7*e.x[:,0]+3*e.x[:,1]**2
             G,B,HT=e.boundary(temperature,{"right":2.},{"right":4.},{"right":290.})
             truth=HT-B+G
-            for variant in ("wrong_sign_G","missing_H","negative_H","missing_B","lumped_H"):
+            for variant in ("wrong_sign_G","missing_H","negative_H","missing_B","lumped_H","wrong_offset"):
                 gg,bb,hh=e.boundary(temperature,{"right":2.},{"right":4.},{"right":290.},variant)
                 with self.subTest(variant=variant),self.assertRaises(AssertionError):
                     close(hh-bb+gg,truth,max(1.,np.sum(abs(truth))),variant)
@@ -253,3 +253,45 @@ class TestSteadyBoundaryIndependent(unittest.TestCase):
             reaction=a["reaction_w_per_m"]
             # The thermostat alone is -14, total outward is zero in this source-free case.
             self.assertGreater(abs(-reaction.sum()),1.)
+
+    def test_fixed_corner_and_total_outward_negative_actors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data=model(n=2);p=data["physics"]["heat1"]
+            p["dirichlet_temperature_k"]={"bottom":300};p["convection"]={}
+            _,_,a=saved(data,Path(tmp)/"corner")
+            e=Elements(a["nodes_m"],a["triangles"],2.,0.)
+            G,_,_=e.boundary(a["temperature_k"],{"right":2.},{},{})
+            dropped=G.copy();dropped[a["dirichlet_node_ids"]]=0
+            with self.assertRaises(AssertionError):
+                close(dropped,G,2.,"dropped fixed-corner load")
+            _,s,a=saved(model(),Path(tmp)/"linear")
+            physical=(a["prescribed_outward_load_w_per_m"]+
+                      a["convective_outward_w_per_m"]-a["reaction_w_per_m"]).sum()
+            wrong=-a["reaction_w_per_m"].sum()
+            with self.assertRaises(AssertionError):
+                close(np.array(wrong),np.array(physical),14.,"thermostat-only total")
+            close(np.array(s["outward_heat_w_per_m"]),np.array(physical),14.,"summary outward")
+
+    def test_saved_labels_units_object_and_nonfinite_actors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);_,summary,arrays=saved(model(),root/"original")
+            for variant in ("format","layout","units","object","nonfinite"):
+                out=root/variant;out.mkdir()
+                a={k:np.array(v,copy=True) for k,v in arrays.items()}
+                metadata=copy.deepcopy(summary)
+                if variant=="format":
+                    a["result_format"]=np.asarray("thermal.steady2d-result-v1")
+                elif variant=="layout":
+                    a["field_layout"]=np.asarray("thermal2d-p1-node-cell-v1")
+                elif variant=="units":
+                    metadata["field_units"]["ambient_load_w_per_m"]="W"
+                    a["metadata_json"]=np.asarray(json.dumps(metadata))
+                elif variant=="object":
+                    a["temperature_k"]=np.asarray([object()],dtype=object)
+                else:
+                    a["temperature_k"][0]=np.nan
+                (out/"summary.json").write_text(json.dumps(metadata),encoding="utf-8")
+                with (out/"fields.npz").open("wb") as stream:
+                    np.savez(stream,**a)
+                with self.subTest(variant=variant),self.assertRaises((ValueError,AssertionError)):
+                    read_saved(out)
