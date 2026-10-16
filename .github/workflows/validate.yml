@@ -44,6 +44,14 @@ jobs:
           gmsh --version
       - name: Fetch pinned RII database
         run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Check transient document acceptance before the full suite
+        run: |
+          python -m pytest -q -ra --showlocals --junitxml=.validation/transient-preflight.xml \
+            packages/simcase/tests/test_transient_headless_independent_validation.py \
+            packages/simcase/tests/test_transient_thermal_runtime.py \
+            packages/simcase/tests/test_transient_thermal_contract.py \
+            packages/simcase/tests/test_transient_headless_windows.py \
+            packages/simcase/tests/test_studio_transient.py
       - name: Run all Python tests including RII and convergence studies
         id: source_tests
         env:

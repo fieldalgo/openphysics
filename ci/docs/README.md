@@ -403,6 +403,13 @@ establish Windows support.
 
 ## Headless transient distribution validation
 
+The Linux job first runs the transient document, runtime, independent acceptance,
+Studio refusal and portable save tests. Their JUnit report is
+`transient-preflight.xml`. A failure stops that job before the expensive full
+suite; it is a failed check, not a successful subset or a skipped acceptance
+requirement. On success, the complete source and installed suites below still
+run with their existing numerical gates.
+
 The helper preserves the existing engine independent `--suite all` PDE and complete
 archived convergence example. It additionally requires 20 simcase source assets
 (runtime/dispatch and ownership modules, two usage pages, the JSON example,
