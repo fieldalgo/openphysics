@@ -390,24 +390,35 @@ python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --r
 게시된 경계 helper·원시험, 사용안내와 독립보고의 EN/KO 페이지, 원 독립 수용
 네 파일을 필수 byte 자산으로 요구합니다. 독립 설치 소비자가 정확한 identity를
 요구하므로 기존 steady engine 모듈도 필수 자산과 wheel byte 검사에 추가합니다.
-현재 명세는147개로, P1기존136+경계계약2+게시된문서/독립자산8+steady원문1입니다.
+현재 명세는153개로, P1기존136+경계계약2+문서/독립자산8+steady원문1+schema/runtime/예제/platform자산6입니다.
 이는 구성 개수이며 통과 수가 아닙니다.
 
-별도 정상 열경계 preflight는 원 계약·독립 source entry point를 기존 P1 preflight와
+별도 정상 열경계 preflight는 원 계약·schema·runtime·독립·저장/platform·Studio source entry point를 기존 P1 preflight와
 전체 suite 전에 실행합니다. 실패하면 job이 실패하고 뒤 단계는 미실행입니다.
 preflight 성공이 전체 suite를 대체하지 않습니다. 필수 완료 검사와 main 실행
 보존 규칙은 그대로입니다.
 
 원 독립 oracle/cases/consumer는 검증한 simcase sdist에서 추출해 checkout 밖에서
 `python -I`, `--expected-installed-root`, `--expected-module-hashes`로 실행합니다.
-원 계약 시험도 설치 pytest로 소비합니다. hash 명세에는 steady consumer가 요구하는
+원 계약·schema·runtime·저장/platform·Studio 시험도 설치 pytest로 소비합니다. hash 명세에는 steady consumer가 요구하는
 여섯 identity가 모두 있으며, 기존 transient·dispatch를 포함한 runtime 모듈은13개입니다.
 standalone unittest·설치 pytest·preflight·전체 source 개수는 분리합니다.
 기존 transient 독립17/headless9/전체 archive 수렴과 Windows 회귀는 유지합니다.
 
 이 연결에는 경계 기능을 갖춘 결합 schema/runtime 후보가 필요합니다. 게시된 문서
 초안이나 정의된 시험이 현재 API/CLI·build·설치·플랫폼 성공을 인증하지 않습니다.
-새 schema 시험·runtime 예제/시험·Windows 파일은 정확 게시 경로를 읽은 뒤 추가하며
-미게시 경로를 요구하지 않습니다. 정확 결합 CI와 artifact를 확인해야 합니다.
+schema/runtime 시험·thermal_boundary.json·platform 시험은 정확 게시 경로를 읽고 연결했으며
+미게시 경로를 요구하지 않습니다. 검증 JSON 예제는 격리 설치 CLI validate/run으로 새 출력에 소비합니다. 정확 결합 CI와 artifact를 확인해야 합니다.
 위 보존 artifact 감사 명령은 수치 소비자를 반복하지 않고 이 명세에도 적용됩니다.
 패키지 게시는 하지 않습니다.
+
+Node source gate에는 `studio_steady_boundary.cjs`도 추가하며 원문 byte를 simcase sdist에서
+요구합니다. 이는 source UI 검증이며 별도 설치 Node 실행을 주장하지 않습니다.
+Windows 설치 선택에는 기존 모든 선택 사례와 함께 standalone
+`test_steady_boundary_platform.py` 전체를 포함합니다. 기존 Windows origin probe에
+steady 경계 identity 두 개를 추가하여 총11모듈을 확인합니다.
+별도 source 대상보호 단계는 동일 platform 파일의 기존 대상보호 세 사례를 소비합니다.
+기존 source 보호 단계도 유지하며 새 로그/JUnit은
+`windows-steady-boundary-source-target.log`,
+`windows-steady-boundary-source-target-tests.xml`로 분리합니다.
+실제 개수와 skip은 정확 CI에서 확인해야 하며 새 의존성이나 플랫폼 지원을 뜻하지 않습니다.
