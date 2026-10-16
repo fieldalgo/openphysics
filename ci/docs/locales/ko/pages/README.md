@@ -23,7 +23,8 @@ CI를 실행하지 않으며 Linux 집계 작업을 포함한 모든 검증 작�
 system site packages 없는 새 venv에 의존성을 설치하고 직접 만든 wheel만
 `--no-index --no-deps`로 설치한 뒤 checkout 밖에서 `python -I`로 실행합니다.
 기존 열전도 폐형식·단위·저장 소비자, scalar slab/reference, Gmsh parser 시험의
-수치 허용치를 유지합니다. 별도 공개 mesh smoke는 양의 요소 면적과 전체 단위
+수치 허용치를 유지합니다. 소비자 시험·예제·MSH fixture는 정확 checkout에서
+복사하고 별도 hash를 기록합니다. 각 sdist에 시험 fixture가 포함된다는 주장은 아닙니다. 별도 공개 mesh smoke는 양의 요소 면적과 전체 단위
 면적을 확인합니다. 이 검증표는 외부 Gmsh 실행, macOS/Windows 전체 회귀,
 RII 다운로드, 브라우저 runtime을 검증했다고 주장하지 않으며 전체 Linux 수용을 보완합니다.
 

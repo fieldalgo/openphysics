@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Build sdists, rebuild wheels, and audit a fresh installed consumer on this OS."""
 import argparse
+from email.parser import BytesParser
 import hashlib
 import json
 import os
@@ -12,8 +13,11 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import venv
 import zipfile
+
+from packaging.utils import canonicalize_name, parse_wheel_filename
 
 PACKAGES = {"galerkin": "galerkin", "galerkin-refsol": "refsol", "meshine": "meshine",
             "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase"}
@@ -60,9 +64,12 @@ def main():
         sdists.mkdir()
         wheels.mkdir()
         expected = {}
+        wheel_owners = {}
         manifest = {"packages": {}, "files": {}, "scope": "six installed packages; no external Gmsh execution"}
         for package, module in PACKAGES.items():
             source = ROOT / "packages" / package
+            project = tomllib.loads((source / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+            before_wheels = set(wheels.glob("*.whl"))
             run(sys.executable, "-I", "-X", "utf8", "-m", "build", "--sdist",
                 "--no-isolation", "--outdir", sdists, source, cwd=work)
             archives = [p for p in sdists.glob("*.tar.gz") if p not in expected]
@@ -74,6 +81,9 @@ def main():
                 prefixes = {p.name.split("/")[0] for p in members}
                 assert len(prefixes) == 1
                 prefix = prefixes.pop()
+                metadata = BytesParser().parsebytes(archive.extractfile(prefix + "/PKG-INFO").read())
+                assert canonicalize_name(metadata["Name"]) == canonicalize_name(project["name"])
+                assert metadata["Version"] == project["version"]
                 for member in members:
                     assert not member.issym() and not member.islnk()
                 for path in sorted((source / module).rglob("*")):
@@ -89,6 +99,19 @@ def main():
                 archive.extractall(extraction, filter="data")
             run(sys.executable, "-I", "-X", "utf8", "-m", "build", "--wheel",
                 "--no-isolation", "--outdir", wheels, extraction / prefix, cwd=work)
+            created = set(wheels.glob("*.whl")) - before_wheels
+            assert len(created) == 1, package
+            wheel_path = created.pop()
+            wheel_name, wheel_version, _, _ = parse_wheel_filename(wheel_path.name)
+            assert wheel_name == canonicalize_name(project["name"])
+            assert str(wheel_version) == project["version"]
+            with zipfile.ZipFile(wheel_path) as wheel_archive:
+                metadata_names = [n for n in wheel_archive.namelist() if n.endswith(".dist-info/METADATA")]
+                assert len(metadata_names) == 1, wheel_path.name
+                metadata = BytesParser().parsebytes(wheel_archive.read(metadata_names[0]))
+                assert canonicalize_name(metadata["Name"]) == wheel_name
+                assert metadata["Version"] == project["version"]
+            wheel_owners[wheel_path.name] = module
             manifest["packages"][module] = package
         wheel_files = sorted(wheels.glob("*.whl"))
         assert len(wheel_files) == len(PACKAGES) == 6
@@ -100,6 +123,7 @@ def main():
                 assert any(n.endswith("/NOTICE") for n in names), wheel.name
                 for relative in manifest["files"]:
                     if relative in names:
+                        assert relative.split("/")[0] == wheel_owners[wheel.name], relative
                         data = archive.read(relative)
                         assert digest(data) == manifest["files"][relative], relative
                         assert relative not in wheel_entries, relative
@@ -133,8 +157,14 @@ def main():
         (work / "examples").mkdir()
         for name in ("thermal_slab.json", "thermal_mixed.json"):
             shutil.copy2(ROOT / "packages/simcase/examples" / name, work / "examples" / name)
+        # These consumers and fixtures come from this exact checkout, not from
+        # the rebuilt package archives. Record every copied byte explicitly.
+        copied = {p.relative_to(work).as_posix(): digest(p.read_bytes())
+                  for directory in (tests, work / "examples")
+                  for p in sorted(directory.rglob("*")) if p.is_file()}
         (output / "consumer-test-hashes.json").write_text(json.dumps({
-            p.name: digest(p.read_bytes()) for p in copies}, indent=2)+"\n", encoding="utf-8")
+            "source": "checkout test/fixture copies", "files": copied,
+        }, indent=2)+"\n", encoding="utf-8")
         env["OPENPHYSICS_INSTALL_MANIFEST"] = str(output / "package-byte-manifest.json")
         env["OPENPHYSICS_INSTALL_REPORT"] = str(output / "installed-origins.json")
         run(python, "-I", "-X", "utf8", tests / "test_platform_install.py", cwd=work)

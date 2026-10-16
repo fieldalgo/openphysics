@@ -24,7 +24,9 @@ limit this matrix to Windows. It installs dependencies into a fresh venv without
 system site packages, installs only the locally built wheels with `--no-index
 --no-deps`, then runs outside the checkout with `python -I`. Existing thermal
 closed-form/units/save consumers and the scalar slab/reference and Gmsh parser
-tests retain their numerical bounds. A separate public mesh smoke checks
+tests retain their numerical bounds. Consumer tests, examples and MSH fixtures
+are copied from the exact checkout and hashed separately; they are not an
+assertion that test fixtures ship inside each sdist. A separate public mesh smoke checks
 positive element areas and unit total area. No external Gmsh process, full
 macOS/Windows regression, RII download or browser runtime is claimed by this
 matrix; these checks complement full Linux acceptance.

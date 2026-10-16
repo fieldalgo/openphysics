@@ -20,6 +20,8 @@ README. They share one git history, one test run and one install.
 
 ## Rules
 
+- Agent-authored commits include `Co-authored-by: Codex <noreply@openai.com>` (or the authoring agent's equivalent attribution).
+
 - Code, comments, docstrings, API identifiers and executable examples remain English.
 - English is the default language for the repository, READMEs, contribution and security entry points, code, comments and executable examples. Bilingual English/Korean content belongs only under `docs/` directories: English pages at `docs/<name>.md` and complete Korean counterparts at `docs/locales/ko/pages/<name>.md`. Package overview translations belong there, not in separate Korean READMEs. Preserve equations, units, commands, numerical gates and limitations; translations do not imply new tests. Keep language navigation inside documentation, verify relative links and include both documentation versions in source distributions. This follows the explicit user correction of 2026-10-16.
 - Every new physics feature is validated against refsol (analytic) with a mesh-convergence check.

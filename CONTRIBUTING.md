@@ -4,10 +4,13 @@ OpenPhysics is under active development. Start with the [package overview](READM
 and [implementation and validation contracts](docs/README.md). The `main`
 branch is the only trunk and the default branch; target pull requests there. Feature branches may contain work that has not passed acceptance.
 
-Open an issue for a reproducible bug or a proposed change. Include the commit,
-Python and platform versions, input units, a minimal example, and the expected
-and actual results. Remove credentials, personal information and confidential
-models before attaching files. Report vulnerabilities through the private
+Reports of suspected bugs, accuracy questions, research questions and proposed
+changes are welcome. Search existing issues first and use the closest issue form.
+Include available observations, the exact release/commit, Python/platform versions
+and expected behavior; mark missing evidence honestly. A complete reproducer or
+confirmed defect is helpful but is not required to open an issue. Distinguish
+main behavior from a PR-only candidate. Remove credentials, personal information
+and confidential models before attaching files. Report vulnerabilities through the private
 channel in [SECURITY.md](SECURITY.md).
 
 Install and run from the repository root as described in [README.md](README.md).
