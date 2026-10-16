@@ -202,7 +202,7 @@ function installAPI(p,{rejectValidation=false,rejectRun=false,held=false}={}) {
       'shape:vector?[2,2]:[4],arrays:{[f]:vector?[[1000*i+1,-1000*i-2],[1000*i+11,-1000*i-12]]:[100*i,100*i+1,100*i+2,100*i+3]}});'+
     'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v1",start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
       'time_s:fixtureManifest.time_s.slice(start,stop),shape:[stop-start],arrays:{[f]:Array.from({length:stop-start},(_,j)=>10+start+j)}});'+
-    (held?'return new Promise(resolve=>held.push(()=>resolve({ok:true,json:async()=>result})));':
+    (held?'return new Promise((resolve,reject)=>held.push(error=>error?reject(Error(error)):resolve({ok:true,json:async()=>result})));':
       'return {ok:true,json:async()=>result};')+'};');
 }
 async function readyPage(options){
@@ -332,4 +332,21 @@ test('shipped mesh display overflow clears stale field and mesh rather than fall
   assert.ok(p.element('meshCanvas').calls.filter(x=>x==='clear').length>meshClears);
   assert.match(p.element('meshInfo').textContent,/Mesh view error.*overflow/);
   assert.equal(p.element('fieldCanvas').onmousemove,null);
+});
+
+for(const outcome of ['success','error'])test('shipped dirty status overrides obsolete physical read '+outcome,async()=>{
+  const p=await readyPage({held:true});await p.element('runBtn').onclick();await tick();
+  assert.equal(p.run('transientController.state().readActive'),true);
+  assert.match(p.element('status').textContent,/reading saved transient data/);
+  p.element('json').value='{';p.element('json').oninput();
+  const dirtyStatus=p.element('status').textContent;
+  assert.equal(dirtyStatus,'validate current transient JSON');
+  assert.equal(p.run('transientController.state().readActive'),true);
+  p.run(outcome==='success'?'held[0]()':'held[0]("obsolete read error")');await tick();
+  assert.equal(p.run('transientController.state().readActive'),false);
+  assert.equal(p.element('status').textContent,dirtyStatus);
+  assert.equal(p.run('transientController.result()'),null);
+  assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.equal(p.element('transientControls').hidden,true);
+  assert.equal(p.element('runBtn').disabled,true);
 });
