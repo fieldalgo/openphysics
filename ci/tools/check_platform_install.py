@@ -131,10 +131,11 @@ def main():
             p.name: digest(p.read_bytes()) for p in copies}, indent=2)+"\n", encoding="utf-8")
         env["OPENPHYSICS_INSTALL_MANIFEST"] = str(output / "package-byte-manifest.json")
         env["OPENPHYSICS_INSTALL_REPORT"] = str(output / "installed-origins.json")
+        run(python, "-I", "-X", "utf8", tests / "test_platform_install.py", cwd=work)
         run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra",
             "--confcutdir", tests, "--basetemp", output / "consumer-files",
             "--junitxml=" + str(output / "installed-tests.xml"),
-            tests / "test_platform_install.py", tests / "test_thermal_simcase_wheel.py",
+            tests / "test_thermal_simcase_wheel.py",
             tests / "test_msh.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)

@@ -1,6 +1,8 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 """External -I consumer: installed bytes/origins and portable public API smoke."""
+__test__ = False  # Standalone installed consumer, explicitly executed by the driver.
+
 import hashlib
 import importlib
 import json
@@ -50,3 +52,9 @@ def test_public_mesh_generation_has_ccw_unit_area():
     area = (a[:, 0]*b[:, 1]-a[:, 1]*b[:, 0])/2
     assert np.all(area > 0)
     np.testing.assert_allclose(area.sum(), 1.0, rtol=0, atol=1e-12)
+
+
+if __name__ == "__main__":
+    test_installed_origins_all_package_bytes_and_bundled_assets()
+    test_public_mesh_generation_has_ccw_unit_area()
+    print("Installed byte/origin and public mesh smoke completed")
