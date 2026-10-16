@@ -93,3 +93,8 @@ consumer는 설치 루트 밖 origin/byte 불일치를 거절하고 identity/cou
 새 범위 source/isolatedinstalled, exact CI, Windows/macOS, 전체 회귀,
 source archive 포함 및 main 통합은 모두 미검증이다.
 배포 총괄이 archive/CI 연결과 전체 회귀 일정을 소유한다.
+
+준비된 suite는 현재11개 시험 메서드를 선언한다(수집/통과 수가 아님).
+reference offset 누락, 고정 corner 하중 제거, thermostat-only 총 외향량,
+저장 format/layout/unit/object/nonfinite actor도 포함한다.
+원문 검토만으로 이러한 대조를 실제 실행했다고 주장하지 않는다.
