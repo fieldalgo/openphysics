@@ -4,28 +4,19 @@
 
 ## 제공 상태
 
-**구현 후보이며 통합·수용 대기입니다.** 이 가이드는 전용 server route·typed capture/encoding·JSON-first UI·일치하는
-headless runtime을 함께 포함한 결합 checkout
-`b584d50df6ef024e6600c611fe24d9467034c890`(Draft PR 11)을 설명합니다.
-Frontend 기여는 `767cc8dbaeccd4a7cf85c828971d5324abdbd863`입니다.
-이전 개별 문서/UI branch가 아닌 결합 checkout을 평가하세요.
-정상 headless 경계 계약은 main
-`49ff59874af3c5140d0e8126b1feb18964953e7e`에 반영됐지만, 이것이 전용
-Studio 기능 반영·수용을 뜻하지 않습니다. 제출된 구현은 정식 main Studio
-지원 주장이 아닙니다.
-이번 문서 갱신에 대한 통합 CI·실제 browser·자원 실측 결과는 없습니다.
+이 checkout은 Studio의 JSON-first 정상 열전도를 구현합니다. 전용 검증·실행
+route, typed SI결과, 실제 결과 메시, 절점 Kelvin과 요소 열유속 표시를 제공합니다.
+기존 균질 직사각형/P1 headless solver를 사용하며 상수 등방 k·열원,
+변 Dirichlet·단열·상수 외향 flux/Robin조건을 다룹니다. 기존 광학동작과
+generic-route 열 guard는 유지합니다. 과도 UI·해석 전 메시 preview·임의 형상·
+자동 연성·새 결과저장 endpoint는 이 인터페이스 범위 밖입니다.
 
-아래 최상위 wire envelope·공개 result/layout ID검사·`run_enabled`·
-oldest-terminal회수는 이 결합 후보에 구현돼 있습니다.
-`run_enabled=true`는 유효한 설정 limits와 공개 API 지원을 뜻하며
-**성능 실측 완료를 뜻하지 않습니다**.
-`resource_policy="candidate-unmeasured"`는 별도 선언으로 유지합니다.
-
-구현 후보 범위는 JSON-first `thermal.steady2d`입니다. 균질 직사각형/P1,
-상수 등방 k·열원, 변 지정온도·단열과 별도로 통합하는 상수 외향 flux/Robin
-계약을 사용합니다. 과도 UI·mesh-only preview·새 solver·결과저장 endpoint·
-임의 형상·자동 연성은 없습니다. 기존 광학 동작을 유지합니다.
-모델 단위와 기존 Python/CLI 흐름은 [headless 정상 가이드](thermal_steady2d.md)에서 시작하세요.
+구현과 검증·release상태는 별개입니다. Source·설치 플랫폼·browser·자원 근거는
+정확한 checkout의 CI결과·artifact에서 확인하세요. 이 페이지는 새로운 통과나
+release를 주장하지 않습니다. `run_enabled=true`는 유효한 설정 limits와 공개API
+가용성을 뜻하며 성능실측완료가 아닙니다. 자원정책은 `candidate-unmeasured`를
+유지하며 설정 제한은 용량·성능 보장이 아닙니다. 모델 단위와 Python/CLI 사용법은
+[headless 정상 가이드](thermal_steady2d.md)를 참조하세요.
 
 ## 시작과 사용자 흐름
 
@@ -37,7 +28,7 @@ python -m pip install -e "packages/simcase[studio]"
 python -m simcase.studio --no-browser
 ```
 
-출력된 localhost 주소를 엽니다. 기존 시작 명령이 누락된 server/frontend 코드를 제공하거나 capability검사를
+출력된 localhost 주소를 엽니다. 시작 명령이 capability검사나 설정 자원 제한을
 우회하지는 않습니다.
 
 1. 완전한 정상열 JSON 문서를 열거나 JSON editor에 붙여 넣고 명시적으로 적용합니다.
@@ -214,6 +205,6 @@ Universal wheel이 OS 동작을 입증하지 않습니다.
 
 n8/16/32/64 마지막 두 구간 온도 L2차수>=1.8, flux차수>=0.9,
 정규화 residual/열수지1e-10·SI상사성1e-9를 유지합니다.
-Studio거절이 물리gate 면제가 아닙니다. 이 초안 작성 중 새 수치·HTTP·Node·
-설치·browser·플랫폼시험은 실행하지 않았습니다. Linux통과가 Windows/macOS
+Studio거절이 물리gate 면제가 아닙니다. 수치·HTTP·Node·설치·browser·플랫폼 수용은 각각 정확 checkout의 실제 실행이
+필요합니다. Linux통과가 Windows/macOS
 통과를 뜻하지 않으며 시험 정의가 실행·수용·main통합을 뜻하지 않습니다.

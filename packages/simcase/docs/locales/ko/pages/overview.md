@@ -260,10 +260,10 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 [`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Studio는 이 문서를 거절하고 오래된 광학 상태를 지웁니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
 
-## 예정된 전용 정상열 Studio 인터페이스
+## 정상열 Studio
 
-[정상열 Studio 초안](thermal_studio.md)은 JSON 열기/적용·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·후보 자원제한을 설명합니다. Server/frontend후보는 JSON-first 정상열입력·결과표시·terminal회수를 구현합니다. 통합 CI·실제 browser·자원실측이 남아 있으며 정식 main 지원이라는 뜻은 아닙니다. 기존 generic 열 거절·광학동작을 유지하며 과도 UI·mesh-only preview·새 결과저장 endpoint는 범위 밖입니다.
+[정상열 Studio 가이드](thermal_studio.md)는 이 checkout의 JSON 입력·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·제한된 자원정책을 설명합니다. Generic 열 거절·광학동작은 유지하며 과도 UI·해석 전 메시 preview·새 결과저장 endpoint는 범위 밖입니다. 구현과 실제검증은 별개이며 정확 checkout의 CI·artifact를 확인하세요. `candidate-unmeasured`는 실측용량 보장이 아닙니다.
 
 ## 검증·반영 상태 구분
 
-문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio 후보의 실제 browser·자원실측은 미확인입니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](thermal_studio.md)를 참조하세요.
+문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio browser·자원실측 근거는 정확 checkout별로 확인합니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](thermal_studio.md)를 참조하세요.
