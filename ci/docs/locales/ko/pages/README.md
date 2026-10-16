@@ -563,3 +563,18 @@ always-upload되는 `studio-transient-preflight.xml`과 `dist/wheel-tests.xml`�
 요소를 검사합니다. 설정만으로 수치 case의 실행·통과를 주장하지 않습니다.
 전체 source·기존 installed·독립 all-suite/full-convergence·필수 플랫폼 gate는
 그대로 유지합니다.
+
+
+설치 browser 검사는 검산한 archive의 `transient_thermal_uniform.json`도 실제
+shipped 과도 페이지에서 소비합니다. 저장된 최종/최초/비균일 중간 index, T와
+qx/qy/magnitude의 현재 frame raw 범위, 명시적 유계 H/V page의 표시 원값·단위,
+Mesh/Results 가시성을 검사합니다. 실제 진행 중 frame 요청은 비동기 성공/finally가
+게시되기 전에 dirty JSON으로 무효화합니다. 사용자가 명시적으로 두 번째 실행한
+뒤 browser 내부 offline 음성 대조로 늦은 transport error/finally도 검사하며 응답
+본문이나 물리를 합성하지 않습니다. offline 상태는 finally에서 복구합니다. 이
+음성 대조를 성공한 실제 HTTP solve/read 근거와 구분해 보고합니다.
+`browser-report.json`은 과도 frame/history/raw label·transport 실패·hidden/visible
+무효화와 기존 소유 process 정리를 보존합니다. `transient-dirty-results.png`와
+`transient-error-dirty-results.png`는 각각 늦은 read 뒤 빈 visible 결과를 남깁니다.
+기존 steady browser 검사도 필수로 유지합니다. 설정된 시나리오는 exact CI에서
+실행해야 하며 구문 검사나 Node fixture가 native-browser 수용은 아닙니다.

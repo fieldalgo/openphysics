@@ -35,7 +35,8 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/th
                                      "simcase/transient_thermal.py", "simcase/runner.py",
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
                                      "simcase/thermal.py", "simcase/studio/server.py",
-                                     "simcase/studio/thermal_api.py") }
+                                     "simcase/studio/thermal_api.py",
+                                     "simcase/studio/transient_thermal_api.py") }
 STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
                           "simcase/studio/static/thermal.js",
                           "simcase/studio/static/transient_thermal.js")
@@ -144,6 +145,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/studio_transient_lifecycle_fixtures.py',
               'tests/test_studio_transient_lifecycle.py',
               'simcase/studio/static/transient_thermal.js',
+              'simcase/studio/transient_thermal_api.py',
               'tests/studio_transient_thermal.cjs',
               'tests/studio_transient_independent_fixtures.py',
               'tests/test_studio_transient_thermal_acceptance.py',
@@ -566,7 +568,7 @@ def main():
             "results": {"save_fields": True, "plots": False}
         }, allow_nan=False), encoding="utf-8")
         run("node", ROOT / "ci/tools/studio_thermal_browser.mjs",
-            "--python", python, "--model", browser_model,
+            "--python", python, "--model", browser_model, "--transient-model", document,
             "--source-commit", subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                 check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip(),
             "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,
