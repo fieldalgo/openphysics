@@ -249,3 +249,56 @@ def test_finite_json_failure_and_cli_exit_codes(tmp_path, monkeypatch, capsys):
     assert main(['run', str(model), '-o', str(tmp_path/'invalid'), '-q']) == 2
     assert not (tmp_path/'invalid').exists()
     assert 'error:' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('path,value', [
+    ('name', 'Relabelled result'),
+    ('units.length', 'mm'),
+    ('geometry.domain.xmax', 2.),
+    ('mesh.subdivisions', [3, 2]),
+    ('physics.heat1.initial_temperature_k', 301.),
+    ('physics.heat1.dirichlet_temperature_k', {'left': {'values_k': [300., 301., 302.]}}),
+    ('physics.heat1.heat_source_w_m3', 9.),
+    ('study.time_s', [0., .2, .4]),
+    ('results.save_fields', False),
+])
+def test_result_document_changes_cannot_relabel_old_histories(tmp_path, path, value):
+    r = run(document(), verbose=False)
+    r.doc.set_path(path, copy.deepcopy(value))
+    # These are valid standalone new models; validation alone is insufficient.
+    r.doc.validate()
+    with pytest.raises(ValueError, match='document changed after run'):
+        r.summary()
+    with pytest.raises(ValueError, match='document changed after run'):
+        r.save(tmp_path/'changed')
+    assert not (tmp_path/'changed').exists()
+
+
+def test_original_input_mutation_and_mapping_order_are_not_result_mutation(tmp_path):
+    d = document()
+    r = run(d, verbose=False)
+    d.sole_physics()[1]['heat_source_w_m3'] = 9.
+    d.data['name'] = 'New caller model'
+    # JSON mapping order is irrelevant, while its captured values stay fixed.
+    r.doc.data = dict(reversed(list(r.doc.data.items())))
+    out = r.save(tmp_path/'original')
+    saved = json.loads((out/'model.json').read_text(encoding='utf-8'))
+    assert saved['physics']['heat1']['heat_source_w_m3'] == 8.
+    assert saved['name'] == TRANSIENT_THERMAL_UNIFORM['name']
+    with np.load(out/'fields.npz', allow_pickle=False) as arrays:
+        np.testing.assert_allclose(arrays['source_load_w_per_m'].sum(1), 8.,
+                                   rtol=0, atol=1e-10)
+
+
+@pytest.mark.parametrize('save_fields', [False, True])
+def test_derived_json_overflow_leaves_no_completed_output(tmp_path, save_fields):
+    d = document()
+    d.data['results']['save_fields'] = save_fields
+    r = run(d, verbose=False)
+    # Each raw entry is finite but its nodal sum overflows.
+    huge = np.full_like(r.solution.source_load_w_per_m, np.finfo(float).max)
+    object.__setattr__(r.solution, 'source_load_w_per_m', huge)
+    with np.errstate(over='ignore', invalid='ignore'):
+        with pytest.raises(ValueError):
+            r.save(tmp_path/'overflow')
+    assert not (tmp_path/'overflow').exists()
