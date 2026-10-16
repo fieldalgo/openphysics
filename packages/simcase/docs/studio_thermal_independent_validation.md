@@ -4,20 +4,15 @@
 
 ## Current scope and evidence
 
-This feature checkout implements JSON-first steady thermal validation and
-execution, typed HTTP results and independent acceptance tests. The reviewed
-candidate is `14063f8a010639ca016d9d8b5e864e9e2339d366` (PR11), based on main
-`6e9be99a10fba77d329063da973401f26d4ed0b5`. This is a candidate validation
-contract, not a claim that Studio has landed on main.
-
-Reported CI status: the Studio preflight step succeeded; final exact-candidate
-source and isolated-installed acceptance are still pending. No complete
-numerical, browser, resource or three-platform acceptance is claimed here.
-This documentation update ran no tests. A preflight subset, synthetic fixture,
-TestClient check or Node VM result cannot substitute for the remaining evidence.
+This checkout implements JSON-first steady thermal validation and execution,
+typed HTTP results and independent acceptance tests. This document describes
+the checks and their unchanged numerical criteria. Use the exact checkout's
+CI logs and artifacts to establish observed source, installed, browser,
+resource and platform results. Test definitions and preflight subsets do not
+establish complete acceptance or a release.
 
 See [the Studio guide](thermal_studio.md) for use and
-[the validation guide](../../../ci/docs/README.md) for environment/distribution
+[the validation guide](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/README.md) for environment/distribution
 requirements. Intermediate implementation reviews are historical and do not
 define the current runtime or its acceptance status.
 

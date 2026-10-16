@@ -4,20 +4,14 @@
 
 ## 현재 범위와 근거
 
-이 기능 checkout에는 JSON-first 정상열 검증·실행, typed HTTP 결과와
-독립 수용시험이 구현돼 있다. 검토 후보는 main
-`6e9be99a10fba77d329063da973401f26d4ed0b5` 기반 PR11
-`14063f8a010639ca016d9d8b5e864e9e2339d366`이다.
-본문은 후보의 검증 계약이며 Studio가 main에 반영됐다는 주장이 아니다.
-
-보고된 CI 상태는 Studio preflight 단계 성공이며, 정확 후보의 최종
-source·격리 설치 수용은 아직 미완료다. 전체 수치·브라우저·자원·3플랫폼
-수용을 주장하지 않는다. 이번 문서 수정에서는 시험을 실행하지 않았다.
-preflight 부분집합·합성 fixture·TestClient·Node VM 결과는 남은 근거를
-대체하지 않는다.
+이 checkout에는 JSON-first 정상열 검증·실행, typed HTTP 결과와 독립 수용시험이
+구현돼 있다. 본문은 검사 항목과 유지해야 할 수치 기준을 설명한다.
+실제 source·설치본·브라우저·자원·플랫폼 결과는 정확한 checkout의 CI 로그와
+원자료로 확인한다. 시험 정의와 preflight 부분집합만으로 전체 수용이나
+릴리스를 입증할 수 없다.
 
 사용법은 [Studio 가이드](thermal_studio.md), 환경·배포 요구사항은
-[검증 가이드](../../../../../../ci/docs/README.md)를 따른다.
+[검증 가이드](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/locales/ko/pages/README.md)를 따른다.
 중간 구현 검토는 과거 이력이며 현재 runtime이나 수용 상태를 정의하지 않는다.
 
 ## HTTP suite의 검사 범위
