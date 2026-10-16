@@ -98,3 +98,33 @@ source archive 포함 및 main 통합은 모두 미검증이다.
 reference offset 누락, 고정 corner 하중 제거, thermostat-only 총 외향량,
 저장 format/layout/unit/object/nonfinite actor도 포함한다.
 원문 검토만으로 이러한 대조를 실제 실행했다고 주장하지 않는다.
+
+## 정확 구현 연결 정적 검토
+
+schema/contract 4bd15626fe37c306eb6265f1db1b308c6b580460 및
+runtime56238cd76ab09e422344ef54e89d68f5a1aa579e 원문을 읽었다.
+병렬 제출이며 실행된 결합 checkout이 아니다.
+수치 엔진 thermal.py blob4633e03953d8f6369bdf0e7398d2ebd85b2b4684는 그대로다.
+
+관측한 이름은 독립 consumer와 일치한다. runtime thermal.py539–598은
+문서를 검증·복사하고 다섯 경계 keyword를 연결하며 solve 전 입력을 포착한 뒤
+반환 경계4배열을 확인한다. 600–619는 source/지정외향/convection/thermostat을
+분리하며 총 외향에 세 경계 기여를 모두 넣는다. 430–472는 v2의 빈 고정
+indices와13개 finite 수치 필드를 허용한다. 352–386은 이후 검증 전에 복사한
+canonical data를 포착하며 default 복원으로 편집이 숨겨지기 전에 거절한다.
+498–529는 승인된 v2 metadata와 원 model snapshot을 저장한다.
+이 원문 검토에서 확정 생산 blocker는 발견하지 못했다.
+
+contract는 새 키 부재/빈 mapping 존재, h0/양수 Robin anchor, 한 고정 끝점/
+완전 고정 자연 경계 변을 구분한다. 경계 identity는 여섯 side 쌍 교집합을 모두
+검사하고 Dirichlet 절점을 실제 외곽 변 끝점에서 구한다.
+
+엔진은 rhs=fQ+B-G, 안정적인 shifted Robin offset,
+C=H*increment-shifted_B, 원 고정절점 반력과 두 normalized1e-10 guard를
+직접 유지한다. 독립 oracle은 helper를 정답으로 호출하지 않고 원 절대온도
+수학식과 analytic 해를 사용한다. 원문 검토로 부동소수 정확도를 입증하지 않는다.
+
+초기 snapshot 시험의 API 오류를 수정했다. Document에는 항목 대입이 없어
+doc.data["name"] 및 result.doc.data["name"]로 변경했다.
+원 기대와 모든 gate는 그대로다. 수치 재현/source·installed 통과/CLI 실행을
+주장하지 않는다. 실제 결합 후보 CI와 원 진단 배열이 아직 필요하다.
