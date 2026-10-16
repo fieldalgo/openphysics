@@ -175,3 +175,25 @@ subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=
 companion에 상당한 메모리가 필요합니다. 실행 시간은 전용 호스트 성능 기준선이 아닙니다.
 
 현재 MANIFEST와 배포 helper는 EN/KO 페이지·예제·원 시험·독립 consumer 및 runtime 모듈의 포함과 byte 검사를 연결합니다. Helper는 실제 sdist→wheel을 만들고 설치 출처/source byte를 확인하며, 검증한 archive의 독립 `--suite all` consumer와 전체 영어 수렴 예제를 실행하도록 구현돼 있습니다. 이 gate의 구현은 실제 build/install 성공과 다릅니다. 정확한 현재 CI의 종료값·로그·artifact로 포함·설치·수치 성공을 확인해야 합니다. Windows의 좁은 저장 gate는 과도 열전도 전체 물리 수용이 아니며, 릴리스 성공도 별도입니다.
+
+## 제한된 공간 잔차 보정
+
+초기 성분 상태 offset은 전체 해석에서 고정합니다. 강성과 기울기를 평가할 때만
+각 성분의 현재 대표 절점값을 뺍니다. 온도, 이력 또는 질량 미분을 재정의하지 않습니다.
+성분 상수 E에 대해 정확한 산술에서는 K E=0이므로 원래 backward-Euler 방정식과
+old/new 경계 질량항을 모두 유지합니다. 반올림된 조립 K에서는 비트 단위 K E=0이
+아닐 수 있으며, 반올림된 행렬이 불변이라고 주장하지 않습니다.
+
+각 단계는 원래 행렬과 LU를 유지하고 물리 잔차 평가 6회와 같은 LU를 사용하는
+자유 DOF 보정 5회를 수행합니다. 지정 절점의 보정은 0입니다. 물리 잔차가 가장 작은
+반복값을 선택한 뒤 원래 자유 잔차·성분 평형 검사를 허용치 변경 없이 적용합니다.
+해석적 평균 대입, projection 또는 새 수용 기준이 아닙니다. 최종 검사 실패는
+여전히 오류입니다. 추가 분해 없이 단계당 삼각 풀이 최대 5회와 추가 행렬-벡터
+평가가 필요하며 수렴이나 성능을 보장하지 않습니다.
+
+새 제작자 시험 `test_transient_heat_conditioning.py`와
+`test_transient_heat_general_state.py`는 작은 균일장·ramp 및 비균일장, 이동 경계,
+전체 고정, 분리·재정렬 상태를 독립 dense consistent-mass 재구성과 함께 다룹니다.
+파일 추가는 실행이 아닙니다. 선택한 소스의 좁은 네 사례 진단은 성공 반환했지만
+전체 source·설치·공개 headless·플랫폼 수용은 아닙니다. 원래 실패 근거와 모든 고정
+수치 기준을 계속 보존합니다.

@@ -214,3 +214,30 @@ from a finite-mesh weak thermostat reaction and must be reported separately.
 
 See the [validation guide](transient_heat_validation.md) for the fixed
 fixed gates, independent algebra/reference boundaries and reproduction.
+
+## Bounded spatial-residual refinement
+
+The initial component state offset remains fixed for the entire solve. Only
+stiffness and gradient evaluation subtract each component's current representative
+value. This does not redefine temperature, its history or the mass derivative.
+For component constants E, K E=0 in exact arithmetic, so the original
+backward-Euler equation and both old/new boundary mass terms are preserved.
+A rounded assembled K need not satisfy K E=0 bit-for-bit; this is not a claim
+that the rounded pencil is unchanged.
+
+Each step retains its original matrix and LU, evaluates six physical residuals
+and performs five free-DOF corrections using that same LU. Prescribed-node
+corrections are zero. The best physical-residual iterate is selected before the
+original free-residual and component-balance guards, with unchanged tolerances.
+This is not an analytic mean replacement, projection or new acceptance gate.
+A failed final guard still raises. The bounded loop adds up to five triangular
+solves and additional matrix-vector evaluations per step, without an additional
+factorization; it guarantees neither convergence nor performance.
+
+New producer tests in `test_transient_heat_conditioning.py` and
+`test_transient_heat_general_state.py` cover tiny uniform/ramp controls and
+nonuniform, moving-boundary, all-fixed and disconnected/reordered states with
+independent dense consistent-mass reconstruction. Addition is not execution.
+A narrow four-case diagnostic of the selected source returned successfully;
+this is not full source, installed, public-headless or platform acceptance.
+Original failing evidence and all fixed numerical gates remain applicable.
