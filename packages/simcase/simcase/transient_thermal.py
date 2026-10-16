@@ -150,7 +150,7 @@ class TransientThermalRunResult:
             'balance_equation': 'sum(storage)=sum(source at step end)+sum(reaction)',
             'heat_content_definition': 'H=1^T M T; J/m, chosen zero at 0 K',
             'quadratic_functional_definition': 'V=0.5 T^T M T; J K/m; not stored heat',
-            'raw_fields_saved': self.doc['results']['save_fields'],
+            'save_fields': self.doc['results']['save_fields'],
             'timings_s': dict(self.timings),
         }
         json.dumps(result, allow_nan=False)
