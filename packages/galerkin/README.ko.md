@@ -182,7 +182,7 @@ Hadley의 명시 정확도 ±3e-6에는 **도달하지 못했습니다**. 원인
 
 - **MFEM**은 문제 규모가 순수 Python 직접해법의 범위를 넘을 때의 생산 코어로 검토 중입니다. 이 3D 희소 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없으며, 그 이후에는 보조 공간 전처리기를 쓰는 반복 솔버가 필요합니다.
 - **유전체 충전 및 열린 3D 문제**: 3D 텐서 계수 경로가 있으므로(`assemble_stiffness_3d`가 (T,3,3) 텐서를 받음) M2.5 PML을 옮길 수 있습니다. 부족한 것은 해석해를 갖는 3D 검증 사례입니다.
-- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 과도 문제에는 시간 적분기, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
+- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 아래 과도 열전도 하위 모듈은 후진 Euler를 사용합니다. 다른 과도 물리에는 전용 시간 적분기가, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
 
 ## 라이선스
 
@@ -216,3 +216,11 @@ Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니�
 단방향 연산은 JSON/CLI/Studio·저장 계약, Robin/flux/traction workflow, 과도 피드백이나
 열역학적 완전 연성을 추가하지 않습니다. 불변 전달이 callback이나 반환 후 가변 결과를
 인증하지 않습니다. 계약은 열 W/m·기계 N/m·물리적 에너지 J/m를 구분합니다.
+
+## 과도 열전도 Python 하위 모듈
+
+`galerkin.transient_heat.solve_transient_heat`를 명시적으로 import합니다. 고정된 적합 P1 삼각형, 일관 질량과 후진 Euler, 상수 등방 열전도율·체적열용량, 시간변 온도를 갖는 고정 Dirichlet 절점과 나머지 경계의 단열을 사용합니다. 좌표·시간·온도 단위는 m, s, K입니다. 선형 수학 API는 유한한 음의 Kelvin을 허용하며 clamp·물리 온도 인증·discrete maximum principle을 약속하지 않습니다. 별도 열→기계 전달은 계속 음의 K를 거절합니다.
+
+[사용법](docs/locales/ko/pages/transient_heat.md) ([English](docs/transient_heat.md)) · [생산 검증 계약](docs/locales/ko/pages/transient_heat_validation.md) ([English](docs/transient_heat_validation.md)) · [독립 검증 보고](docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](docs/transient_heat_independent_validation.md))
+
+구현과 수용 파일은 제출됐지만 수치·빌드·설치 검사는 미실행입니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.

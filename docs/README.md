@@ -61,3 +61,15 @@ These pages describe this checkout. Actions is disabled and two Windows failures
 |---|---|
 | [thermal_mechanical_workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
 | [thermal_mechanical_independent_validation](../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |
+
+## Transient heat: submitted Python contracts
+
+The explicit `galerkin.transient_heat.solve_transient_heat` submodule implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
+
+| English | 한국어 |
+|---|---|
+| [transient_heat](../packages/galerkin/docs/transient_heat.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat.md) |
+| [transient_heat_validation](../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
+| [transient_heat_independent_validation](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
+
+Implementation and independent acceptance files are submitted; numerical, build and installed validation remain unexecuted. These links describe this checkout, not a validated release or integration acceptance. The validation pages distinguish fixed gates from observed results.
