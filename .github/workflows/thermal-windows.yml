@@ -60,10 +60,39 @@ jobs:
           subprocess.run([str(python), '-I', '-m', 'pip', 'install', '--no-index', '--no-deps',
                           *map(str, wheels)], check=True, cwd=work)
           subprocess.run([str(python), '-I', '-m', 'pip', 'check'], check=True, cwd=work)
+          expected = {}
+          for module, package, relative in (
+              ('simcase', 'simcase', 'simcase/__init__.py'),
+              ('simcase.schema', 'simcase', 'simcase/schema.py'),
+              ('simcase.transient_thermal_contract', 'simcase', 'simcase/transient_thermal_contract.py'),
+              ('simcase.transient_thermal', 'simcase', 'simcase/transient_thermal.py'),
+              ('simcase.runner', 'simcase', 'simcase/runner.py'),
+              ('simcase.cli', 'simcase', 'simcase/cli.py'),
+              ('simcase.examples', 'simcase', 'simcase/examples.py'),
+              ('simcase.thermal', 'simcase', 'simcase/thermal.py'),
+              ('galerkin.transient_heat', 'galerkin', 'galerkin/transient_heat.py'),
+          ):
+              expected[module] = hashlib.sha256((root / 'packages' / package / relative).read_bytes()).hexdigest()
+          probe = '\n'.join([
+              'import hashlib, importlib, json, pathlib, sys',
+              'expected = ' + repr(expected),
+              'report = {}',
+              'assert sys.flags.isolated',
+              'for name, digest in expected.items():',
+              '    path = pathlib.Path(importlib.import_module(name).__file__).resolve()',
+              '    assert path.is_relative_to(pathlib.Path(sys.prefix).resolve()), name',
+              '    actual = hashlib.sha256(path.read_bytes()).hexdigest()',
+              '    assert actual == digest, name',
+              '    report[name] = {"origin": str(path), "sha256": actual}',
+              'pathlib.Path(sys.argv[1]).write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")',
+          ])
+          subprocess.run([str(python), '-I', '-c', probe,
+                          str(output / 'headless-module-origins.json')], check=True, cwd=work)
           tests = work / 'tests'
           tests.mkdir()
           shutil.copy2(root / 'ci' / 'test_thermal_simcase_wheel.py', tests)
           shutil.copy2(root / 'packages' / 'simcase' / 'tests' / 'test_thermal.py', tests / 'test_shipped_thermal_io.py')
+          shutil.copy2(root / 'packages' / 'simcase' / 'tests' / 'test_transient_headless_windows.py', tests)
           examples = work / 'examples'
           examples.mkdir()
           for filename in ('thermal_slab.json', 'thermal_mixed.json'):

@@ -52,7 +52,9 @@ jobs:
       - name: Build sdists and validate installed wheels
         # Preserve a failing source gate while collecting independent package evidence.
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: python ci/check_distributions.py
+        run: |
+          python ci/check_distributions.py
+          python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
