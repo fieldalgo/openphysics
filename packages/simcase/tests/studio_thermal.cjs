@@ -33,7 +33,8 @@ function page() {
   return { element, colors, run: code => vm.runInContext(code, ctx) };
 }
 
-const thermal = {physics:{heat1:{type:'thermal.steady2d'}},units:{length:'mm',temperature:'K'}};
+for (const physicsType of ['thermal.steady2d', 'thermal.transient2d']) {
+const thermal = {physics:{heat1:{type:physicsType}},units:{length:'mm',temperature:'K'}};
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function assertCleared(p) {
   assert.equal(p.run('resultData'), null); assert.equal(p.run('meshData'), null);
@@ -43,7 +44,7 @@ function assertCleared(p) {
 }
 function importThermal(p) { p.run(`doc = ${JSON.stringify(thermal)}; invalidateDocument(); refresh();`); }
 
-test('thermal JSON import clears old optical fields and makes no API request', async () => {
+test(`${physicsType}: JSON import clears old optical fields and makes no API request`, async () => {
   const p=page();
   p.run(`resultData={old:true}; meshData={old:true}; currentJob='old'; api.post=()=>{throw Error('no thermal request')};`);
   p.element('json').value=JSON.stringify(thermal);
@@ -52,7 +53,7 @@ test('thermal JSON import clears old optical fields and makes no API request', a
   await p.run('doRun()'); await p.run('doMesh()'); assertCleared(p);
 });
 
-test('late mesh and validation replies cannot restore stale optical state', async () => {
+test(`${physicsType}: late mesh and validation replies cannot restore stale optical state`, async () => {
   for (const action of ['doMesh()', 'doValidate()']) {
     const p=page();p.run('api.post=()=>new Promise(resolve=>globalThis.reply=resolve)');
     const pending=p.run(action);importThermal(p);
@@ -61,7 +62,7 @@ test('late mesh and validation replies cannot restore stale optical state', asyn
   }
 });
 
-for (const stage of ['submit','status','result']) test(`late run ${stage} reply is ignored after thermal import`, async () => {
+for (const stage of ['submit','status','result']) test(`${physicsType}: late run ${stage} reply is ignored after thermal import`, async () => {
   const p=page();
   p.run(`api.post=()=>${stage==='submit'?'new Promise(resolve=>globalThis.reply=resolve)':"Promise.resolve({job:'old'})"};
     api.get=url=>${stage==='status'?'new Promise(resolve=>globalThis.reply=resolve)':"url.endsWith('/result') ? new Promise(resolve=>globalThis.reply=resolve) : Promise.resolve({status:'done',log:[]})"};`);
@@ -69,7 +70,7 @@ for (const stage of ['submit','status','result']) test(`late run ${stage} reply 
   p.run("reply({job:'old',status:'done',log:[],summary:{},fields:[]})");await pending;assertCleared(p);
 });
 
-test('pending example load and file import cannot replace a newer thermal document', async () => {
+test(`${physicsType}: pending example load and file import cannot replace a newer thermal document`, async () => {
   const p=page();p.run('api.get=()=>new Promise(resolve=>globalThis.reply=resolve)');
   const pending=p.run("loadExample('old')");importThermal(p);p.run('reply({old:true})');await pending;
   assert.equal(p.run('isHeadlessThermal()'),true);assertCleared(p);
@@ -77,3 +78,36 @@ test('pending example load and file import cannot replace a newer thermal docume
   const loading=p.element('fileInput').onchange({target:{files:[file]}});importThermal(p);reply('{"old":true}');await loading;
   assert.equal(p.run('isHeadlessThermal()'),true);assertCleared(p);
 });
+
+
+test(`${physicsType}: file import refuses headless requests and clears optical selectors`, async () => {
+  const p=page();
+  p.run(`resultData={old:true}; meshData={old:true}; currentJob='old'; api.post=()=>{throw Error('no thermal request')};`);
+  const file={name:'headless.json',text:async()=>JSON.stringify(thermal)};
+  await p.element('fileInput').onchange({target:{files:[file]}});
+  assertCleared(p);
+  assert.match(p.element('props').textContent, new RegExp(physicsType.replaceAll('.', '\\.')));
+  assert.equal(p.element('componentLabel').hidden,true);
+  assert.equal(p.element('jobInfo').textContent,'');
+  assert.equal(await p.run('doValidate()'),false);
+});
+
+test(`${physicsType}: late failed request cannot overwrite headless status or reenable buttons`, async () => {
+  for (const action of ['doRun()', 'doMesh()']) {
+    const p=page();p.run('api.post=()=>new Promise((resolve,reject)=>globalThis.fail=reject)');
+    const pending=p.run(action);importThermal(p);
+    p.run("fail(Error('late optical failure'))");await pending;
+    assertCleared(p);assert.match(p.element('status').textContent,/headless thermal/);
+  }
+});
+
+test(`${physicsType}: unexpected thermal result is never installed as an optical result`, async () => {
+  const p=page();
+  p.run(`api.post=async()=>({job:'old'}); api.get=async url=>url.endsWith('/result')
+    ? {summary:{physics_type:${JSON.stringify(physicsType)}},fields:[]}
+    : {status:'done',log:[]};`);
+  await p.run('doRun()');
+  assert.equal(p.run('resultData'),null);
+  assert.match(p.element('status').textContent,/run failed/);
+});
+}
