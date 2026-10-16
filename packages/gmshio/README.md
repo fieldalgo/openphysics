@@ -1,5 +1,9 @@
 # gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh
 
+[Documentation](docs/overview.md)
+
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
+
 Writes `.geo` scripts, runs the `gmsh` command-line program as a separate
 process, and reads the resulting MSH 4.1 file into numpy arrays that a
 finite-element code can use directly: node coordinates, consistently oriented
@@ -13,7 +17,8 @@ depends on numpy alone.
 ## Install
 
 ```bash
-pip install git+https://github.com/FieldAlgo/gmshio
+# From the repository root
+python -m pip install -e packages/gmshio
 # plus a gmsh executable, one of:
 pip install gmsh            # PyPI wheel ships the program
 # or a system package / download from https://gmsh.info, or set GMSH_EXECUTABLE
@@ -50,6 +55,12 @@ mesh = read_msh("model.msh")
 mesh.cells("triangle"), mesh.physical_tags("triangle"), mesh.cells_in("pec", "line")
 ```
 
+A `.geo` script is written in whatever unit its author chose, so `gmshio` holds no
+absolute length constant. Point merging and T-junction splitting in `Geo` are a
+dimensionless fraction of the geometry's own bounding-box diagonal, and `to_fem2d`
+judges planarity against the mesh's own in-plane extent, so the same geometry
+resolves to the same topology whether it is written in micrometres or kilometres.
+
 Ready-made geometries in `gmshio.geo`:
 
 | function | what | regions / boundaries |
@@ -61,8 +72,9 @@ Ready-made geometries in `gmshio.geo`:
 ## Self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/gmshio
+python -m pytest -q packages/gmshio/tests
 ```
 
 The tests check what a solver relies on rather than the reader against

@@ -1,0 +1,211 @@
+{
+  "candidate_branch": "codex/openphysics-thermal-steady2d-recovery",
+  "candidate_commit": "aaf948ae38aa82907ca16ef7cdeed75dfa7484ba",
+  "candidate_base": "df694bbe4e327b78e36956be915c91c22e9e5673",
+  "preimplementation_plan_commit": "60b99343ef446a036b52a2e8754794268ba062ae",
+  "independent_branch": "codex/openphysics-thermal-independent-validation",
+  "original_source_blobs_verified_before_and_after": 210,
+  "environment": {
+    "os": "Linux-6.18.44-x86_64-with-glibc2.39",
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "pytest": "9.1.1",
+    "threads": 1,
+    "shared_host_no_performance_comparison": true
+  },
+  "source_independent": {
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0
+  },
+  "installed_independent": {
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0,
+    "import_location": "own installed-venv site-packages, external test directory, no product conftest",
+    "python_modules_byte_verified": 16
+  },
+  "original_thermal_refsol_rerun": {
+    "passed": 84,
+    "failed": 0,
+    "skipped": 0
+  },
+  "full_environment_run": {
+    "passed": 699,
+    "failed": 9,
+    "skipped": 9,
+    "subtests_passed": 9,
+    "warning_count": 1,
+    "scope": "candidate plus collected 43-test independent revision; final added two cases separately passed in source45 and installed45",
+    "failures": {
+      "missing_gmsh_and_legacy_optional_helpers": 7,
+      "cli_subprocess_missing_simcase_import_path": 2
+    },
+    "skips": {
+      "missing_gmsh": 7,
+      "missing_local_refractiveindex_database": 2
+    },
+    "recovery": {
+      "cli_only_rerun_with_explicit_candidate_pythonpath": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "whole_suite_not_rerun": true,
+      "seven_gmsh_failures_remain_unresolved": true
+    },
+    "performance": "runtime not a performance baseline"
+  },
+  "convergence": [
+    {
+      "case": "quartic",
+      "rows": [
+        {
+          "n": 8,
+          "temperature_L2": 0.0029394484218742403,
+          "flux_L2": 37.001201882032994,
+          "balance": 3.761440636127976e-16,
+          "functional_left": 14433.282077768257,
+          "functional_right": 14433.28207776824,
+          "original_free_residual": 9.74718173364856e-16
+        },
+        {
+          "n": 16,
+          "temperature_L2": 0.0007349924564517772,
+          "flux_L2": 18.522650118195006,
+          "balance": 9.360010974726394e-17,
+          "functional_left": 14464.925116502523,
+          "functional_right": 14464.925116502513,
+          "original_free_residual": 8.854789378557381e-16
+        },
+        {
+          "n": 32,
+          "temperature_L2": 0.0001837551403774009,
+          "flux_L2": 9.264080373542349,
+          "balance": 3.0817388057171216e-15,
+          "functional_left": 14472.796536417667,
+          "functional_right": 14472.796536417656,
+          "original_free_residual": 9.742906754600938e-16
+        },
+        {
+          "n": 64,
+          "temperature_L2": 4.5939201964164375e-05,
+          "flux_L2": 4.632384576229506,
+          "balance": 2.0335086740370206e-14,
+          "functional_left": 14474.761808905347,
+          "functional_right": 14474.761808905192,
+          "original_free_residual": 9.75117361075702e-16
+        }
+      ],
+      "orders": [
+        [
+          1.999744115203739,
+          0.998281607291534
+        ],
+        [
+          1.9999448344646482,
+          0.999570851118003
+        ],
+        [
+          1.9999869083763626,
+          0.9998927404611493
+        ]
+      ]
+    },
+    {
+      "case": "mixed_quadratic",
+      "rows": [
+        {
+          "n": 8,
+          "temperature_L2": 0.00025155764746913133,
+          "flux_L2": 2.6516504294495538,
+          "balance": 2.7832658457753117e-15,
+          "functional_left": 10243.770833333336,
+          "functional_right": 10243.770833333352,
+          "original_free_residual": 1.0068268404446314e-15
+        },
+        {
+          "n": 16,
+          "temperature_L2": 6.288941186871893e-05,
+          "flux_L2": 1.3258252147247778,
+          "balance": 1.0426202215920172e-14,
+          "functional_left": 10244.192708333383,
+          "functional_right": 10244.192708333418,
+          "original_free_residual": 1.2674619267284106e-15
+        },
+        {
+          "n": 32,
+          "temperature_L2": 1.5722352966598975e-05,
+          "flux_L2": 0.6629126073623796,
+          "balance": 1.2370070425668028e-15,
+          "functional_left": 10244.298177083178,
+          "functional_right": 10244.298177083374,
+          "original_free_residual": 1.3830940823349319e-15
+        },
+        {
+          "n": 64,
+          "temperature_L2": 3.930588218152481e-06,
+          "flux_L2": 0.3314563036811924,
+          "balance": 1.6063420024189814e-13,
+          "functional_left": 10244.324544270225,
+          "functional_right": 10244.324544269848,
+          "original_free_residual": 1.2836013300584778e-15
+        }
+      ],
+      "orders": [
+        [
+          1.999999999967056,
+          0.999999999999999
+        ],
+        [
+          2.0000000000532907,
+          1.0000000000000202
+        ],
+        [
+          2.000000008624507,
+          0.9999999999999887
+        ]
+      ]
+    }
+  ],
+  "initial_independent_failure": {
+    "passed": 42,
+    "failed": 1,
+    "cause": "independent oracle expected hot-left reaction signs despite cold-left fixture; corrected expected [-1,1], unchanged tolerance",
+    "full_raw_log": "accidentally overwritten; observed tool transcript and retained summary preserve result and limitation"
+  },
+  "negative_controls": [
+    "wrong source sign rejected against original independent K/f",
+    "wrong conductivity rejected against independent physical system",
+    "reversed flux detected",
+    "damaged returned interior temperature rejected"
+  ],
+  "wheel_sha256": "879493316cb240594631b9eb3a75fe710e56ab75e4190230425db46679119a60",
+  "record_sha256": {
+    "thermal-math-probe.log": "ed25c0b25cec0149ffd07ecbca51275ad2f04c231c269f23e2cf121ecbdfb8b5",
+    "candidate-manifest.json": "d7bbee3a96e73c8a26a4b5280ab8fa0c7e681a9901ce00d6c9f66c58c4f3e619",
+    "initial-oracle-sign-failure-summary.txt": "ca6c88fabf9ef7d293772e4d62fa6a9c86ca1f03bd6c0eef45196c6314c139b4",
+    "wheel-install.log": "792544faf61a1668b62de4def4d31f9aa023a6ced95c020a055bd4ea5f6578a1",
+    "independent-source-final.log": "6baf97c06ce2bc9ff81bd7c6099574aadddd43fa3cbc9328c5fa92c0f726877d",
+    "independent-installed-final.log": "5a9e902c816e0fab0011ac7a2c255a6c58b569e5c31038f0682edd156a38c64f",
+    "wheel-build.log": "2162b65198079391da8a3644501fee6704d0e01d9d10190c9d26828803fbd83b",
+    "sdist-build.log": "3436104b3fd7cc38fa4770eb01aeb8f0068c42f45a0eb74b81a41b5cf316d401",
+    "thermal-math-probe.json": "ed25c0b25cec0149ffd07ecbca51275ad2f04c231c269f23e2cf121ecbdfb8b5",
+    "independent-installed.log": "cd423997d1c2b88a156d00989107f5db812156142c487116bc5c2fadc98c2b70",
+    "independent-source.log": "70be13431e2e3428afa166b443a5d032b1ce4ee002a955c0dc948787e9b60115",
+    "full-source.log": "a1d722dc12da233d074acc4d677f6c68fd674f735f2e2283897d0052a0f615b2",
+    "full-source-collected-independent-test.py": "bcec1a4179d7de79e05b1955a248182452d9a8157f401be8fc93b2e94f9c7305"
+  },
+  "new_file_git_blobs": {
+    "packages/galerkin/tests/thermal_independent_oracle.py": "90258384a1c3e151140f831a9543ffd9edd59b75",
+    "packages/galerkin/tests/test_thermal_independent_validation.py": "74c821475df36ac87070e21331b01161a5fa98e2",
+    "packages/galerkin/docs/thermal_independent_validation.md": "2abcc3bb33caf7f71707aae498b8b89e711078be"
+  },
+  "limits": [
+    "whole-environment run failed; no whole-suite success claim",
+    "no new native dependencies or Gmsh repair",
+    "no whole distribution/platform CI claim",
+    "no variable conductivity/Robin/transient/coupled physics"
+  ]
+}

@@ -1,5 +1,9 @@
 # meshine — a small quality triangle mesher for multi-material planar domains
 
+[Documentation](docs/overview.md)
+
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
+
 Constrained Delaunay refinement (Ruppert's algorithm) written in Python on top
 of scipy's Delaunay. Describe a cross-section as named material regions —
 polygons and circles that tile the domain, holes allowed — and get back a
@@ -28,6 +32,15 @@ mesh.min_angle(), mesh.quality(), mesh.region_area("core")
 Shared edges and T-junctions between regions are resolved automatically.
 Circles are exact: nodes the refinement inserts on a circular boundary are
 projected onto the true circle, so a fiber core really is round.
+
+The mesher is never told what a length is, and there is no absolute length
+constant anywhere in the package. Point merging and boundary classification are
+a dimensionless fraction of the domain's own bounding-box diagonal, and the
+degeneracy test compares a triangle's area to its own edge lengths, so the same
+cross-section meshes to the same geometry whether it is written in micrometres
+or in kilometres. Triangle counts legally differ a little between scales,
+because refinement rounds differently; region areas, the angle bound and the
+boundary names do not.
 
 ```python
 from meshine import shapes
@@ -59,8 +72,9 @@ rib cross-section takes about a second.
 ## Self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/meshine
+python -m pytest -q packages/meshine/tests
 ```
 
 Checked properties: polygonal region areas reproduced to 1e-9; every triangle
@@ -71,6 +85,13 @@ minimum angle holds; edge lengths follow per-region sizes and a size function;
 fiber interface nodes lie on the true circle to 1e-12 with second-order area
 convergence; holes are left empty; and edge-midpoint quadrature of a smooth
 function converges at second order on a deliberately irregular mesh.
+
+Scale is checked separately: the same device written at five length scales
+spanning twelve decades gives the same region-area fractions, the same angle
+bound and the same boundary names, and each comparison fails as vacuous if its
+scale ratio turns out to be 1.0. An empty mesh is refused by `generate` with a
+message naming the count that was zero and which of the two causes it was,
+rather than returned for a reduction several frames later to trip over.
 
 `examples/compare_with_gmsh.py` draws the same rib waveguide meshed here and
 by Gmsh (through the `gmshio` package) side by side. Gmsh's Frontal-Delaunay

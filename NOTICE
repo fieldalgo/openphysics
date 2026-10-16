@@ -1,0 +1,20 @@
+OpenPhysics
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+The original code and documentation in this repository are licensed under
+the Apache License, Version 2.0. See LICENSE and each package's LICENSE and
+NOTICE for its applicable notices.
+
+Third-party material retains its own terms:
+
+- Optical data and dispersion coefficients identified in packages/physmat/NOTICE
+  come from the refractiveindex.info database under CC0 1.0. Individual source
+  references are retained in the material records.
+- Published benchmark numbers and their references are identified in
+  packages/galerkin-refsol/NOTICE.
+- Gmsh is an optional, separately installed external executable under its own
+  GPL license. It is not bundled with the OpenPhysics distributions. The file
+  readers and executable integration are described in packages/gmshio/NOTICE
+  and packages/galerkin/NOTICE.
+- Separately installed dependencies retain their respective licenses. The
+  Apache-2.0 license here does not relicense those dependencies or datasets.

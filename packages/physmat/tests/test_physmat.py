@@ -3,6 +3,7 @@
 
 """Checks against published values and physical constraints."""
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,9 @@ import pytest
 import physmat
 from physmat import Constant, DrudeLorentz, OutOfRange, RIIFormula, Sellmeier, Tabulated, fit_drude_lorentz
 
-RII_PATH = next((p for p in (Path("/tmp/rii/database"), Path.home() / ".cache/physmat/rii") if p.exists()), None)
+# An explicit path must fail if broken, not silently skip the database checks.
+RII_PATH = os.environ.get("PHYSMAT_RII_PATH") or next(
+    (p for p in (Path("/tmp/rii/database"), Path.home() / ".cache/physmat/rii") if p.exists()), None)
 
 
 # ---- built-in materials vs literature ---------------------------------------

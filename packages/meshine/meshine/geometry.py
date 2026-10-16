@@ -8,6 +8,11 @@ is a simple outer loop plus optional hole loops; a loop is either a polygon
 (vertex list) or a ``Circle``. Regions may share edges and touch at
 T-junctions — the domain resolves those into a single conforming set of
 segments, which is what the mesher constrains.
+
+Every geometric tolerance here is dimensionless and is scaled by the input's
+own extent. meshine is never told what a length is: the same waveguide is 4.0
+written in micrometres and 4e-6 written in metres, and an absolute tolerance
+quietly means something different in each. See ``MERGE_EPS`` and ``PARAM_EPS``.
 """
 
 from __future__ import annotations
@@ -18,6 +23,19 @@ from dataclasses import dataclass, field
 import numpy as np
 
 Point2 = tuple[float, float]
+
+#: Two points closer than ``MERGE_EPS`` times the diagonal of the input's bounding box
+#: are the same point. Dimensionless on purpose: an absolute merge distance is a
+#: statement about the unit the caller writes in. Measured, the absolute 1e-9 this
+#: replaces was *half the domain* for a 220 nm device written in kilometres, so every
+#: vertex collapsed onto one and the build died with "zero-length edge in input polygon".
+MERGE_EPS = 1e-9
+
+#: How far along a segment, as a fraction of that segment's own length, a point must sit
+#: to count as strictly inside it. A separate constant from ``MERGE_EPS`` because a
+#: position along a segment is dimensionless while a merge distance is a length: one
+#: constant cannot carry both dimensions and still be right under a change of unit.
+PARAM_EPS = 1e-9
 
 
 class Circle:
@@ -65,9 +83,12 @@ class Segment:
 
 
 class Domain:
-    def __init__(self, size: float = 0.1, tol: float = 1e-9):
+    def __init__(self, size: float = 0.1, *, merge_eps: float = MERGE_EPS,
+                 param_eps: float = PARAM_EPS):
         self.default_size = float(size)
-        self.tol = tol
+        self.merge_eps = float(merge_eps)
+        self.param_eps = float(param_eps)
+        self.point_tol = 0.0                # a length; ``build`` derives it from the input
         self.points: list[np.ndarray] = []
         self.regions: list[Region] = []
         self._pending: list[tuple[str, list, float | None]] = []
@@ -79,10 +100,32 @@ class Domain:
         self._pending.append((name, [outer, *holes], size))
         return self
 
+    @staticmethod
+    def _loop_vertices(name: str, lp) -> np.ndarray:
+        verts = lp.vertices() if isinstance(lp, Circle) else np.asarray(lp, dtype=float)
+        if verts.ndim != 2 or verts.shape[1] != 2 or len(verts) < 3:
+            raise ValueError(f"region {name!r}: a loop needs >= 3 vertices with 2 coordinates")
+        return verts
+
+    def extent(self) -> float:
+        """Diagonal of the bounding box of every input vertex.
+
+        The one length the caller supplies that every tolerance here is measured
+        against. It is a property of the input, not of the unit it is written in.
+        """
+        lo = np.array([np.inf, np.inf])
+        hi = np.array([-np.inf, -np.inf])
+        for name, loops, _size in self._pending:
+            for lp in loops:
+                v = self._loop_vertices(name, lp)
+                lo = np.minimum(lo, v.min(axis=0))
+                hi = np.maximum(hi, v.max(axis=0))
+        return float(np.hypot(*(hi - lo)))
+
     def _register(self, p) -> int:
         p = np.asarray(p, dtype=float)
         for i, q in enumerate(self.points):
-            if abs(q[0] - p[0]) <= self.tol and abs(q[1] - p[1]) <= self.tol:
+            if abs(q[0] - p[0]) <= self.point_tol and abs(q[1] - p[1]) <= self.point_tol:
                 return i
         self.points.append(p)
         return len(self.points) - 1
@@ -92,15 +135,20 @@ class Domain:
         """Resolve shared edges and T-junctions; return points, segments, regions."""
         if not self._pending:
             raise ValueError("no regions added")
+        diag = self.extent()
+        if not np.isfinite(diag) or diag <= 0.0:
+            raise ValueError(
+                "Domain.build: the input has no extent: the bounding box of every region "
+                "vertex has a zero diagonal, so every vertex is the same point. A domain "
+                "needs a finite extent before any tolerance here means anything.")
+        self.point_tol = self.merge_eps * diag
         self.points, self.regions = [], []
         raw_loops: list[list[tuple[list[int], Circle | None]]] = []
         for name, loops, size in self._pending:
             reg_loops = []
             for lp in loops:
                 curve = lp if isinstance(lp, Circle) else None
-                verts = lp.vertices() if curve else np.asarray(lp, dtype=float)
-                if verts.ndim != 2 or verts.shape[1] != 2 or len(verts) < 3:
-                    raise ValueError(f"region {name!r}: a loop needs >= 3 vertices with 2 coordinates")
+                verts = self._loop_vertices(name, lp)
                 reg_loops.append(([self._register(v) for v in verts], curve))
             raw_loops.append(reg_loops)
             self.regions.append(Region(name, [], size, []))
@@ -108,11 +156,12 @@ class Domain:
         pts = np.array(self.points)
         segs: dict[tuple[int, int], Segment] = {}
         for r, reg_loops in enumerate(raw_loops):
+            region_name = self._pending[r][0]
             for ids, curve in reg_loops:
                 chain: list[int] = []
                 for k in range(len(ids)):
                     a, b = ids[k], ids[(k + 1) % len(ids)]
-                    pieces = self._split(pts, a, b)
+                    pieces = self._split(pts, a, b, region_name)
                     for s, t in pieces:
                         key = (min(s, t), max(s, t))
                         seg = segs.get(key)
@@ -133,26 +182,42 @@ class Domain:
                 raise ValueError("a segment is shared by more than two regions; regions overlap")
         return pts, list(segs.values()), self.regions
 
-    def _split(self, pts, a: int, b: int) -> list[tuple[int, int]]:
+    def _split(self, pts, a: int, b: int, region: str = "?") -> list[tuple[int, int]]:
         pa, pb = pts[a], pts[b]
         d = pb - pa
         L2 = float(d @ d)
         if L2 == 0:
-            raise ValueError("zero-length edge in input polygon")
+            raise ValueError(
+                f"Domain.build: region {region!r} has a zero-length edge. Two consecutive "
+                f"vertices fell within the merge distance {self.point_tol:g} "
+                f"({self.merge_eps:g} of the {self.extent():g}-unit domain diagonal) and became "
+                f"one point. Either the loop repeats a vertex, or the feature is finer than "
+                f"{self.merge_eps:g} of the domain that contains it.")
         inside = []
         w = pts - pa
         cross = np.abs(d[0] * w[:, 1] - d[1] * w[:, 0]) / np.sqrt(L2)
         s = (w @ d) / L2
-        for i in np.nonzero((cross <= self.tol) & (s > self.tol) & (s < 1 - self.tol))[0]:
+        # ``cross`` is a perpendicular distance and takes the length tolerance; ``s`` is a
+        # position along the segment as a fraction of its own length and takes the
+        # dimensionless one. Using one constant for both was wrong in one of the two.
+        for i in np.nonzero((cross <= self.point_tol)
+                            & (s > self.param_eps) & (s < 1 - self.param_eps))[0]:
             if i not in (a, b):
                 inside.append((s[i], int(i)))
         chain = [a] + [i for _, i in sorted(inside)] + [b]
         return list(zip(chain[:-1], chain[1:]))
 
 
-def box_sides(xmin: float, xmax: float, ymin: float, ymax: float, tol: float = 1e-9
+def box_sides(xmin: float, xmax: float, ymin: float, ymax: float, eps: float = MERGE_EPS
               ) -> Callable[[Point2], str]:
-    """Boundary namer for a rectangular domain: left / right / bottom / top."""
+    """Boundary namer for a rectangular domain: left / right / bottom / top.
+
+    ``eps`` is a fraction of the box's own diagonal, not a distance. The same box is
+    6 x 4 written in micrometres and 6e-6 x 4e-6 written in metres; a fixed distance
+    names every edge of the second one "outer" and the solver loses its boundaries.
+    """
+    tol = eps * float(np.hypot(xmax - xmin, ymax - ymin))
+
     def namer(mid: Point2) -> str:
         x, y = mid
         if abs(x - xmin) <= tol:

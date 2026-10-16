@@ -1,0 +1,4 @@
+include docs/overview.md
+include docs/locales/ko/pages/overview.md
+include refsol/thermoelastic_traction.py
+include tests/test_thermoelastic_traction_reference.py
