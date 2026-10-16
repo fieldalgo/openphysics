@@ -62,8 +62,19 @@ try{
  await cdp.eval('(()=>{const e=document.querySelector("#json");e.value+=" ";e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
  const dirty=await cdp.eval('({disabled:document.querySelector("#runBtn").disabled,status:document.querySelector("#status").textContent})');
  report.dirty=dirty;if(!dirty.disabled)throw Error('Dirty JSON permits stale run');
- const cleared=await cdp.eval('(()=>{const c=document.querySelector("#fieldCanvas"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;return !d.some((v,i)=>i%4===3&&v!==0)})()');
- report.dirty.cleared=cleared;if(!cleared)throw Error('Dirty JSON retained stale field pixels');
+ // Invalidation can discard a hidden canvas backing store by resizing it to zero.
+ // getImageData throws for that valid empty state. Inspect without resizing or
+ // clearing the canvas ourselves, and also check that no result owner survives.
+ const inspectDirty=()=>cdp.eval('(()=>{const c=document.querySelector("#fieldCanvas"),r=c.getBoundingClientRect();const emptyBackingStore=c.width===0||c.height===0;const cleared=emptyBackingStore||!c.getContext("2d").getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v!==0);return {cleared,emptyBackingStore,width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,resultAbsent:thermalController.result()===null,validationAbsent:thermalController.gate.validated===null,legacyAbsent:meshData===null&&resultData===null&&currentJob===null,labelsCleared:["resInfo","meshInfo","meshLegend"].every(id=>document.getElementById(id).textContent===""),hoverAbsent:c.onmousemove===null,controlsHidden:document.querySelector("#thermalControls").hidden,runDisabled:document.querySelector("#runBtn").disabled}})()');
+ const requireDirty=state=>{if(!state.cleared||!state.resultAbsent||!state.validationAbsent||!state.legacyAbsent||!state.labelsCleared||!state.hoverAbsent||!state.controlsHidden||!state.runDisabled)throw Error('Dirty JSON retained stale field ownership or pixels');};
+ report.dirty.hiddenCanvas=await inspectDirty();requireDirty(report.dirty.hiddenCanvas);
+ await click('[data-tab="results"]');
+ await sleep(300);
+ report.dirty.returnedCanvas=await inspectDirty();requireDirty(report.dirty.returnedCanvas);
+ if(!(report.dirty.returnedCanvas.cssWidth>0&&report.dirty.returnedCanvas.cssHeight>0))throw Error('Dirty results tab did not become visible');
+ report.dirty.cleared=true;
+ const dirtyPng=await cdp.call('Page.captureScreenshot',{format:'png'});
+ await writeFile(join(out,'dirty-results.png'),Buffer.from(dirtyPng.data,'base64'));
  await writeFile(join(out,'final-dom.json'),JSON.stringify(await cdp.eval('({status:document.querySelector("#status").textContent,controls:{runDisabled:document.querySelector("#runBtn").disabled,thermalHidden:document.querySelector("#thermalControls").hidden},html:document.documentElement.outerHTML})'),null,2)+'\n','utf8');
  if(report.console.length)throw Error('Browser console exception/error');
  if(!report.http.some(x=>x.url.endsWith('/api/thermal/run')&&[200,202].includes(x.status))||!report.http.some(x=>/\/api\/jobs\/[^/]+\/result$/.test(x.url)&&x.status===200))throw Error('No successful real thermal run/result HTTP evidence');
