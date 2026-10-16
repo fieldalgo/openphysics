@@ -398,6 +398,13 @@ python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --r
 preflight 성공이 전체 suite를 대체하지 않습니다. 필수 완료 검사와 main 실행
 보존 규칙은 그대로입니다.
 
+정상 열경계 선행 검사는 기존 `test_thermal.py`와
+`test_thermal_simcase_independent_validation.py` 소비자도 실행합니다. 저장 시험의
+이름과 `save_fields`는 해석 전에 설정합니다. 완료된 결과의 문서를 바꾸면 해석 시
+포착한 입력과 달라져 거절되기 때문입니다. 동시 저장 시험의 단일 승자·완결된 파일
+검사는 유지하며, 비유한 metadata 시험은 무관한 문서 변경이 아니라 비유한 값 때문에
+실패하는지 확인합니다.
+
 원 독립 oracle/cases/consumer는 검증한 simcase sdist에서 추출해 checkout 밖에서
 `python -I`, `--expected-installed-root`, `--expected-module-hashes`로 실행합니다.
 원 계약·schema·runtime·저장/platform·Studio 시험도 설치 pytest로 소비합니다. hash 명세에는 steady consumer가 요구하는

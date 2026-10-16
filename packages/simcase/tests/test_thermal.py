@@ -320,7 +320,8 @@ def test_thermal_all_raw_metadata(tmp_path):
 
 @pytest.mark.parametrize('key',['nodes_m','triangles','temperature_k','heat_flux_w_m2','load_w_per_m','reaction_w_per_m','residual_w_per_m','dirichlet_node_ids','dirichlet_temperature_k'])
 def test_thermal_all_raw_nonfinite_rejected_even_without_fields(tmp_path,key):
-    r=run(Document.from_dict(model()),False);r.doc['results']['save_fields']=False
+    data=model();data['results']['save_fields']=False
+    r=run(Document.from_dict(data),False)
     owners={'nodes_m':(r.mesh,'nodes'),'triangles':(r.mesh,'triangles'),
             'dirichlet_node_ids':(r,'dirichlet_node_ids'),'dirichlet_temperature_k':(r,'dirichlet_temperature_k')}
     owner,attr=owners.get(key,(r.solution,{'temperature_k':'temperature','heat_flux_w_m2':'heat_flux','load_w_per_m':'load','reaction_w_per_m':'reaction','residual_w_per_m':'residual'}.get(key)))
@@ -355,14 +356,17 @@ def test_thermal_json_integer_policy():
 
 def test_thermal_cli_nonfinite_summary_exit1(tmp_path,capsys,monkeypatch):
     import simcase.cli as cli
-    r=run(Document.from_dict(model()),False);r.doc['results']['save_fields']=False
+    data=model();data['results']['save_fields']=False
+    r=run(Document.from_dict(data),False)
     r.diagnostics['injected_nonfinite']=float('nan')
     # Put a nonfinite value in a metadata field actually emitted by summary().
     r.timings['solve']=float('nan')
     f=tmp_path/'model.json';r.doc.save(f)
     monkeypatch.setattr(cli,'run',lambda *a,**kw:r)
     assert main(['run',str(f),'-o',str(tmp_path/'bad')])==1
-    assert not (tmp_path/'bad').exists() and 'Traceback' not in capsys.readouterr().err
+    error=capsys.readouterr().err
+    assert not (tmp_path/'bad').exists() and 'Traceback' not in error
+    assert 'JSON compliant' in error  # Exercise nonfinite metadata, not snapshot refusal.
 
 
 @pytest.mark.parametrize('name',['model.json','log.txt','fields.npz','summary.json','.incomplete'])
