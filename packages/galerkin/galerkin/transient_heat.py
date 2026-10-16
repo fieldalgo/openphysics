@@ -135,28 +135,31 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     free = np.setdiff1d(np.arange(len(p)), fixed)
     source = heat_source if callable(heat_source) else _scalar(heat_source, "heat_source")
 
-    mass = assemble_mass(private_mesh, capacity)
-    stiffness = assemble_stiffness(private_mesh, k)
-    _finite(mass.data, stiffness.data)
-    if np.any(mass.diagonal() <= 0):
-        raise ValueError("consistent mass lost positive diagonal at this numeric scale")
-    # One constant offset per component throughout the run, never a per-step
-    # redefinition. K annihilates these constants; the mass derivative is zero.
-    offsets = np.array([initial[np.flatnonzero(labels == c)[0]] for c in range(count)])[labels]
-    with np.errstate(over="ignore", invalid="ignore"):
-        initial_increment = initial-offsets
-    _finite(initial_increment)
-
-    nt, n, cells = len(times), len(p), len(t)
-    temperature = np.empty((nt, n))
-    flux = np.empty((nt, cells, 2))
-    loads = np.empty((nt, n))
-    reactions = np.empty((nt-1, n))
-    residuals = np.empty((nt-1, n))
-    storage = np.empty((nt-1, n))
-    content = np.empty(nt)
-    quadratic = np.empty(nt)
-    boundary_values = np.empty((nt, len(fixed)))
+    try:
+        mass = assemble_mass(private_mesh, capacity)
+        stiffness = assemble_stiffness(private_mesh, k)
+        _finite(mass.data, stiffness.data)
+        if np.any(mass.diagonal() <= 0):
+            raise ValueError("consistent mass lost positive diagonal at this numeric scale")
+        # One constant offset per component throughout the run, never a per-step
+        # redefinition. K annihilates these constants; the mass derivative is zero.
+        offsets = np.array([initial[np.flatnonzero(labels == c)[0]] for c in range(count)])[labels]
+        with np.errstate(over="ignore", invalid="ignore"):
+            initial_increment = initial-offsets
+        _finite(initial_increment)
+    
+        nt, n, cells = len(times), len(p), len(t)
+        temperature = np.empty((nt, n))
+        flux = np.empty((nt, cells, 2))
+        loads = np.empty((nt, n))
+        reactions = np.empty((nt-1, n))
+        residuals = np.empty((nt-1, n))
+        storage = np.empty((nt-1, n))
+        content = np.empty(nt)
+        quadratic = np.empty(nt)
+        boundary_values = np.empty((nt, len(fixed)))
+    except Exception as exc:
+        raise TransientHeatStepError(0, times[0]) from exc
 
     def sample(index):
         now = float(times[index])

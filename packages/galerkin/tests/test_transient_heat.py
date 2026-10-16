@@ -231,3 +231,17 @@ def test_negative_fixed_kelvin_and_no_top_level_export():
     np.testing.assert_allclose(r.temperature_k,-10.,atol=1e-10,rtol=0)
     import galerkin
     assert not hasattr(galerkin,'solve_transient_heat')
+
+
+def test_preparation_and_final_copy_failures_are_chained(monkeypatch):
+    import galerkin.transient_heat as module
+    marker=MemoryError('copy marker')
+    with monkeypatch.context() as context:
+        context.setattr(module,'_owned',lambda *a,**k:(_ for _ in ()).throw(marker))
+        with pytest.raises(TransientHeatStepError) as caught:solve()
+        assert caught.value.time_index==2 and caught.value.time_s==.3
+        assert caught.value.__cause__ is marker
+    with monkeypatch.context() as context:
+        context.setattr(module,'assemble_mass',lambda *a,**k:(_ for _ in ()).throw(marker))
+        with pytest.raises(TransientHeatStepError) as caught:solve()
+        assert caught.value.time_index==0 and caught.value.__cause__ is marker
