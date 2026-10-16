@@ -147,3 +147,55 @@ TRANSIENT_THERMAL_UNIFORM = {
 }
 EXAMPLES['transient_thermal_uniform'] = TRANSIENT_THERMAL_UNIFORM
 
+
+# Constant-boundary steady example; supported by the headless runner only.
+THERMAL_BOUNDARY = {
+    "openphysics": "0.2",
+    "name": "Steady additive outward flux and convection",
+    "units": {
+        "length": "m",
+        "temperature": "K"
+    },
+    "geometry": {
+        "domain": {
+            "xmin": 0,
+            "xmax": 1,
+            "ymin": 0,
+            "ymax": 1
+        }
+    },
+    "materials": {},
+    "physics": {
+        "heat1": {
+            "type": "thermal.steady2d",
+            "conductivity_w_mk": 2,
+            "heat_source_w_m3": 0,
+            "dirichlet_temperature_k": {
+                "left": 300
+            },
+            "outward_flux_w_m2": {
+                "right": 2
+            },
+            "convection": {
+                "right": {
+                    "h_w_m2k": 4,
+                    "ambient_temperature_k": 290
+                }
+            }
+        }
+    },
+    "mesh": {
+        "subdivisions": [
+            8,
+            8
+        ]
+    },
+    "study": {
+        "type": "single"
+    },
+    "results": {
+        "save_fields": True,
+        "plots": False
+    }
+}
+EXAMPLES['thermal_boundary'] = THERMAL_BOUNDARY
