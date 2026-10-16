@@ -229,6 +229,8 @@ async def read_request(request, limits, *, for_run):
         return ThermalInput(doc, **tags)
     except ThermalAPIError as exc:
         exc.tags = dict(tags)
+        if not for_run and exc.code == "invalid_document":
+            exc.status = 200
         raise
 
 

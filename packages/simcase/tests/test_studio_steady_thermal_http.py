@@ -591,3 +591,19 @@ def test_status_encoding_failure_removes_only_unpublished_own_record_and_release
         jobs.status('thermal-2')
     assert caught.value.status == 404
     assert_no_active(jobs)
+
+
+@pytest.mark.parametrize('subdivisions', [None, [], [0, 2], [True, 2], [2.0, 2]])
+def test_invalid_mesh_validation_is_logical_but_run_is_bad_request(client, monkeypatch, subdivisions):
+    forbid_allocation(monkeypatch)
+    doc = model()
+    doc['mesh']['subdivisions'] = subdivisions
+    for route, status in [('/api/thermal/validate', 200), ('/api/thermal/run', 400)]:
+        response = post(client, route, envelope(doc))
+        assert response.status_code == status
+        body = response.json()
+        assert body['ok'] is False
+        assert body['error']['code'] == 'invalid_document'
+        assert body['client_revision'] == 12
+        assert body['request_seq'] == 7
+    assert_no_active(server._thermal_jobs)
