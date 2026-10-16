@@ -309,6 +309,12 @@ def test_result_scale_is_ready_at_return_and_caller_is_preserved(unit, factor, l
     assert result.doc.data == before
     assert doc.data == before
     assert doc.scale.to_si(1., {'length': 1}) == caller_scale
+    # Direct public construction isolates __post_init__ from run's final summary validation.
+    clone = ThermalRunResult(doc, result.mesh, result.solution, result.dirichlet_node_ids,
+                             result.dirichlet_temperature_k, result.diagnostics,
+                             result.timings, result.log)
+    assert clone.doc.scale.to_si(1., {'length': 1}) == caller_scale
+    assert clone.doc.data == before
 
 
 def test_removed_default_is_detected_before_validation_can_restore_it(tmp_path):
