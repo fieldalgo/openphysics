@@ -4,12 +4,15 @@
 
 ## 제공 상태
 
-**구현 후보이며 통합·수용 대기입니다.** 서버 `f8506b7490b52105c37a55e656dc8f23baa98647`와 frontend
-`06d73d74c5092fd628ec36b1137c1c9e7363d1ed`는 여기서 설명하는
+**구현 후보이며 통합·수용 대기입니다.** 서버 `c762c4e5fdb9700978a24f639e694630477b8679`와 frontend
+`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9`는 여기서 설명하는
 전용 정상열 route·typed capture/encoding·JSON-first 표시를 구현합니다.
 일치하는 headless runtime을 포함한 정확한 결합 checkout을 사용하세요.
 이 문서 branch만으로 해당 코드 변경이 포함되는 것은 아닙니다.
-제출된 구현이 정식 main 지원을 뜻하지 않습니다.
+정상 headless 경계 계약은 main
+`49ff59874af3c5140d0e8126b1feb18964953e7e`에 반영됐지만, 이것이 전용
+Studio 기능 반영·수용을 뜻하지 않습니다. 제출된 구현은 정식 main Studio
+지원 주장이 아닙니다.
 이번 문서 갱신에 대한 통합 CI·실제 browser·자원 실측 결과는 없습니다.
 
 아래 최상위 wire envelope·공개 result/layout ID검사·`run_enabled`·
@@ -169,6 +172,33 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 실제 공유호스트 측정은 부하를 공개해야 하며 전용 성능 baseline을 주장하지 않습니다.
 전체 배열을 반복 직렬화하는 대신 제한된 encoded 결과를 유지합니다.
 새 save/upload/path/overwrite API나 자동 재시도 queue는 없습니다.
+
+## 기여·검증 수명주기
+
+문서를 포함한 모든 변경에 같은 main/PR 검증 정책을 적용합니다.
+작업은 Draft PR로 열며 Draft PR과 기능 branch push에는 검증 CI를 실행하지
+않습니다. 허용된 개발 환경에서 관련 검사를 통과한 뒤 검토한 후보를 Ready로
+전환합니다. 사용자 PC에서 수치 작업을 실행하지 않습니다.
+실행하지 못한 검사는 통과가 아닌 명시적 공백입니다. Ready PR·main 검증은
+과학 gate와 필수 검사를 유지해야 합니다.
+검토된 Ready PR은 필수 검사 후 자동 **Rebase and merge**를 사용하며
+자동 반영이 검토·병합 후 근거 확인을 대체하지 않습니다.
+제출 commit과 달라질 수 있는 실제 landed main SHA를 기록합니다.
+
+Main 검증은 workflow/ref 고정 concurrency key,
+`cancel-in-progress: false`, `queue: max`를 사용합니다.
+Non-main/PR은 `queue: single`로 오래된 실행을 대체·취소합니다.
+Main pending 한도는100이며 대기열 진입 순서는 commit 순서·무한 보존·
+용량 예약·배포 보장이 아닙니다. Green PR과 green landed main을 구분합니다.
+해당 green main commit에서만 release하며 검증은 패키지를 게시하지 않습니다.
+
+Linux 전체 과학 수용과 Linux·macOS·Windows 설치 배포 검증은 별도 요구입니다.
+Matrix 설정이 실제3OS 통과는 아닙니다. 정확 job별 환경·import origin·
+archive/wheel identity·실패·skip·artifact를 확인하세요.
+과거 좁은 Windows 검사는 Windows 전체 물리나 macOS를 인증하지 않습니다.
+Universal wheel이 OS 동작을 입증하지 않습니다.
+실행할 수 없는 플랫폼은 미검증으로 기록하고 플랫폼 실패를 설명 없는 skip으로
+바꾸지 않습니다. 실제 browser 상호작용·자원 실측도 HTTP/Node/설치 검사와 별도입니다.
 
 ## 테스트 지도와 근거 상태
 

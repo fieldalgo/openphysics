@@ -257,3 +257,7 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 ## 예정된 전용 정상열 Studio 인터페이스
 
 [정상열 Studio 초안](thermal_studio.md)은 JSON 열기/적용·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·후보 자원제한을 설명합니다. Server/frontend후보는 JSON-first 정상열입력·결과표시·terminal회수를 구현합니다. 통합 CI·실제 browser·자원실측이 남아 있으며 정식 main 지원이라는 뜻은 아닙니다. 기존 generic 열 거절·광학동작을 유지하며 과도 UI·mesh-only preview·새 결과저장 endpoint는 범위 밖입니다.
+
+## 검증·반영 상태 구분
+
+문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio 후보의 실제 browser·자원실측은 미확인입니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](thermal_studio.md)를 참조하세요.

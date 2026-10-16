@@ -4,12 +4,15 @@
 
 ## Availability
 
-**Implementation candidate; integration and acceptance pending.** Server `f8506b7490b52105c37a55e656dc8f23baa98647` and frontend
-`06d73d74c5092fd628ec36b1137c1c9e7363d1ed` implement the dedicated
+**Implementation candidate; integration and acceptance pending.** Server `c762c4e5fdb9700978a24f639e694630477b8679` and frontend
+`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9` implement the dedicated
 steady-thermal routes, typed capture/encoding and JSON-first display described
 here. Use their exact combined checkout with the matching headless runtime;
 this documentation branch alone does not contain those code changes.
-These submitted implementations are not a claim of official main support.
+The steady headless boundary contract landed in main
+`49ff59874af3c5140d0e8126b1feb18964953e7e`; that does not land or accept
+this dedicated Studio feature. These submitted implementations are not a claim
+of official main Studio support.
 No integrated CI, actual-browser or resource measurement result is available
 for this documentation update.
 
@@ -183,6 +186,35 @@ serialization and concurrent work add overhead. Actual shared-host measurements
 must disclose load; no dedicated performance baseline is claimed.
 Retain bounded encoded results rather than repeated full array serialization.
 There is no new save/upload/path/overwrite API or automatic retry queue.
+
+## Contribution and validation lifecycle
+
+All changes, including documentation, follow the same main/PR validation policy.
+Open work as a Draft PR; Draft PRs and feature-branch pushes do not run validation
+CI. After relevant checks pass in an authorized development environment, mark
+the reviewed candidate Ready. Do not run numerical workloads on a user's PC.
+Missing execution remains an explicit gap, not a pass. Ready PR and main
+validation must preserve the scientific gates and required checks.
+Reviewed Ready PRs use automatic **Rebase and merge** after required checks;
+automatic landing does not replace review or post-merge evidence. Record the
+landed main SHA, which may differ from the submitted commit.
+
+Main validation uses a stable workflow/ref concurrency key,
+`cancel-in-progress: false` and `queue: max`. Non-main/PR supersession uses
+`queue: single` with cancellation of superseded runs. The main pending limit
+is 100; queue-entry order is not commit order, unlimited retention, reserved
+capacity or a deployment guarantee. A green PR is distinct from green landed
+main. Release only from the appropriate green main commit; validation does not
+publish packages.
+
+Full Linux scientific acceptance and installed-distribution validation on
+Linux, macOS and Windows are distinct requirements. A configured matrix is not
+three observed passes; inspect each exact job, environment, import origins,
+archive/wheel identities, failures, skips and artifacts. Narrow historical
+Windows checks do not certify full Windows physics or macOS. A universal wheel
+does not establish OS behavior. Report unavailable platforms as unverified;
+do not turn platform failures into unexplained skips. Actual browser interaction
+and resource measurements remain separate from HTTP/Node/installed checks.
 
 ## Test map and evidence status
 

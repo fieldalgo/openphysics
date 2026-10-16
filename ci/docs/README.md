@@ -6,11 +6,48 @@
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
-GitHub Actions is enabled with owner approval as of 2026-10-16. The retained
-Linux package and narrow Windows workflows may run on pushes, pull requests
-and manual dispatch. Check each exact run, exit status and artifact; enabling
-CI does not itself establish acceptance. Earlier Work-cloud results retain
-their original source, environment and scope.
+GitHub Actions is enabled. The common validation policy below supersedes older
+feature-push and unrestricted pull-request trigger descriptions. Configuration,
+execution, PR acceptance and landed-main acceptance are separate evidence.
+Earlier cloud results retain their original source, environment and scope.
+
+## Contribution and validation lifecycle
+
+All changes, including documentation, follow the same main/PR validation policy.
+Open work as a Draft PR; Draft PRs and feature-branch pushes do not run validation
+CI. After relevant checks pass in an authorized development environment, mark
+the reviewed candidate Ready. Do not run numerical workloads on a user's PC.
+Missing execution remains an explicit gap, not a pass. Ready PR and main
+validation must preserve the scientific gates and required checks.
+Reviewed Ready PRs use automatic **Rebase and merge** after required checks;
+automatic landing does not replace review or post-merge evidence. Record the
+landed main SHA, which may differ from the submitted commit.
+
+Main validation uses a stable workflow/ref concurrency key,
+`cancel-in-progress: false` and `queue: max`. Non-main/PR supersession uses
+`queue: single` with cancellation of superseded runs. The main pending limit
+is 100; queue-entry order is not commit order, unlimited retention, reserved
+capacity or a deployment guarantee. A green PR is distinct from green landed
+main. Release only from the appropriate green main commit; validation does not
+publish packages.
+
+Full Linux scientific acceptance and installed-distribution validation on
+Linux, macOS and Windows are distinct requirements. A configured matrix is not
+three observed passes; inspect each exact job, environment, import origins,
+archive/wheel identities, failures, skips and artifacts. Narrow historical
+Windows checks do not certify full Windows physics or macOS. A universal wheel
+does not establish OS behavior. Report unavailable platforms as unverified;
+do not turn platform failures into unexplained skips. Actual browser interaction
+and resource measurements remain separate from HTTP/Node/installed checks.
+
+## Current rollout and historical evidence
+
+The Studio integration and three-OS installation rollout require exact combined
+workflow/code review and actual job artifacts. Their success is not established
+by this documentation update. The historical environment descriptions below
+apply to the named Linux and narrow Windows gates, not to a completed new
+three-OS matrix. No new macOS run, full Windows science, browser acceptance or
+resource-capacity result is claimed here.
 
 ## Narrow Windows headless thermal gate
 
@@ -50,9 +87,10 @@ installation checks do not replace independent convergence/ownership acceptance.
 The save implementation's platform validation and any observed failures must
 be assessed from the exact candidate's CI, rather than inferred from this workflow.
 
-The root `validate.yml` workflow runs on pushes, pull requests and manual dispatch.
+The historical root `validate.yml` environment described below predates the
+Draft/Ready and three-OS rollout; use the current workflow for trigger details.
 It tests CPython 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. Python 3.10/3.11
-and other operating systems remain outside this CI coverage; the package metadata
+and other operating systems were outside that historical Linux gate's coverage; the package metadata
 still declares Python >=3.10. `requirements-py312-linux.txt` pins the validation
 tools and their transitive dependencies, not the packages' runtime requirements.
 Review and update the pins deliberately, then rerun both source and wheel checks.
@@ -453,3 +491,77 @@ asset/link checks and validates all 14 checksums and configured runtime wheel
 bytes. It does not replace twine strict, installed execution, independent physics
 or verification of the exact source commit. Never present a configured command
 or historical baseline as a new candidate pass.
+
+## Steady boundary contract and independent distribution gates
+
+The published boundary helper and its original test, the English/Korean usage
+and independent-report pages, and all four original independent acceptance files
+are required byte assets. The existing steady engine module is additionally
+required and checked in wheel bytes because the independent installed consumer
+requires its exact identity. The pre-Studio P2 inventory is 153 assets: the retained
+P1 136, two boundary contract assets, eight documentation/acceptance assets,
+one steady engine source and six schema/runtime/example/platform assets. Counts describe configuration, not passes.
+
+A separate steady boundary preflight runs the original contract, schema, runtime,
+independent, save/platform and Studio source entry points before the unchanged P1 preflight and whole suite. Failure
+fails the job and leaves later stages unexecuted. Successful preflights do not
+replace the whole suite. Required completion checks and main run preservation
+remain unchanged.
+
+The steady preflight also runs the legacy `test_thermal.py` and
+`test_thermal_simcase_independent_validation.py` consumers. Save tests configure
+names and `save_fields` before solving: editing a completed result's document
+invalidates its captured calculation. Concurrent-writer tests retain their
+single-winner and complete-artifact checks; nonfinite-metadata tests must fail
+for nonfinite data, not an unrelated document edit.
+
+The original independent oracle/cases/consumer are extracted from the verified
+simcase sdist and run outside the checkout using `python -I`,
+`--expected-installed-root` and `--expected-module-hashes`. The original contract, schema, runtime,
+save/platform and Studio tests are also consumed by installed pytest. The hash manifest includes all six
+identities required by the steady consumer; there are 13 configured runtime
+modules including existing transient and dispatch identities. Standalone
+unittest, installed pytest, preflight and whole-source counts are separate.
+Existing transient independent 17/headless 9/full archived convergence and
+Windows regressions remain intact.
+
+These connections require a combined boundary-enabled schema/runtime candidate.
+Published draft documents and defined tests do not certify current API/CLI,
+build, installed or platform success. The schema/runtime tests, thermal_boundary.json and platform tests now refer to
+reviewed, published files; no unposted path is required here. The verified JSON
+example is validated and run through the installed isolated CLI with a fresh output. Inspect the exact combined CI and artifacts.
+The retained-artifact audit command above applies to this inventory without
+repeating numerical consumers. No package publication is performed.
+
+The Node source gate additionally runs `studio_steady_boundary.cjs`; its original
+bytes are required in the simcase sdist. This is source UI validation, not a claim
+of a separate installed Node execution. The Windows installed selection includes
+the complete standalone `test_steady_boundary_platform.py` alongside every
+existing selected case. Both steady boundary module identities are added to the
+existing Windows origin probe (11 modules total). A separate source target-
+protection step consumes the same platform file's three existing-target cases,
+retaining the previous source protection step and using separate log/JUnit names
+`windows-steady-boundary-source-target.log` and
+`windows-steady-boundary-source-target-tests.xml`. Actual counts and skips must
+come from exact CI. No new dependency or platform support is implied.
+
+## Dedicated steady Studio validation candidate
+
+Server `c762c4e5fdb9700978a24f639e694630477b8679` and UI
+`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9` are submitted implementations,
+not an integrated CI pass. The lifecycle file at
+`c3ede1feba4e26ca19a935c2a7aa03ba998389ab` defines 55 cases; that count
+is unexecuted here and is not an OS result. Independent consumer and physics
+evidence remain separate from producer HTTP, shipped-script Node and real-browser
+checks. The browser harness is validation tooling, not evidence it has run.
+
+The [Studio guide](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md)
+documents typed SI fields and bounded jobs. Follow the current combined checkout's
+asset inventory rather than treating historical 136/153 counts as the new total.
+Archive inclusion/byte/link checks, installed module origins and runtime checks
+must use the same exact candidate. Installed checks on Linux/macOS/Windows do
+not each imply the Linux full numerical suite or a browser session. No new
+three-OS, browser or resource-measurement success is reported by this page update.
+`run_enabled=true` is configured API availability; `candidate-unmeasured`
+resource policy is not measured capacity. Preserve failed/unknown runs and report
+actual exits/JUnit/counts/skips and raw artifact identities before acceptance.

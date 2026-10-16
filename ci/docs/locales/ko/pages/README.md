@@ -8,11 +8,50 @@
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. 기존 Linux 패키지·좁은 Windows workflow는 push·pull request·수동 dispatch에서 사용할 수 있습니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
+GitHub Actions는 활성화돼 있습니다. 아래 공통 검증 정책이 과거 기능 push·
+제한 없는 pull-request trigger 설명보다 우선합니다.
+설정·실행·PR수용·landed-main수용은 별도 근거입니다.
+과거 cloud 결과는 원래 소스·환경·범위를 유지합니다.
 
-루트 `validate.yml` workflow는 push·pull request·수동 dispatch에서 실행됩니다.
+## 기여·검증 수명주기
+
+문서를 포함한 모든 변경에 같은 main/PR 검증 정책을 적용합니다.
+작업은 Draft PR로 열며 Draft PR과 기능 branch push에는 검증 CI를 실행하지
+않습니다. 허용된 개발 환경에서 관련 검사를 통과한 뒤 검토한 후보를 Ready로
+전환합니다. 사용자 PC에서 수치 작업을 실행하지 않습니다.
+실행하지 못한 검사는 통과가 아닌 명시적 공백입니다. Ready PR·main 검증은
+과학 gate와 필수 검사를 유지해야 합니다.
+검토된 Ready PR은 필수 검사 후 자동 **Rebase and merge**를 사용하며
+자동 반영이 검토·병합 후 근거 확인을 대체하지 않습니다.
+제출 commit과 달라질 수 있는 실제 landed main SHA를 기록합니다.
+
+Main 검증은 workflow/ref 고정 concurrency key,
+`cancel-in-progress: false`, `queue: max`를 사용합니다.
+Non-main/PR은 `queue: single`로 오래된 실행을 대체·취소합니다.
+Main pending 한도는100이며 대기열 진입 순서는 commit 순서·무한 보존·
+용량 예약·배포 보장이 아닙니다. Green PR과 green landed main을 구분합니다.
+해당 green main commit에서만 release하며 검증은 패키지를 게시하지 않습니다.
+
+Linux 전체 과학 수용과 Linux·macOS·Windows 설치 배포 검증은 별도 요구입니다.
+Matrix 설정이 실제3OS 통과는 아닙니다. 정확 job별 환경·import origin·
+archive/wheel identity·실패·skip·artifact를 확인하세요.
+과거 좁은 Windows 검사는 Windows 전체 물리나 macOS를 인증하지 않습니다.
+Universal wheel이 OS 동작을 입증하지 않습니다.
+실행할 수 없는 플랫폼은 미검증으로 기록하고 플랫폼 실패를 설명 없는 skip으로
+바꾸지 않습니다. 실제 browser 상호작용·자원 실측도 HTTP/Node/설치 검사와 별도입니다.
+
+## 현재 적용과 과거 근거
+
+Studio 통합·3OS 설치 검증 적용에는 정확한 결합 workflow/code검토와 실제
+job artifact가 필요합니다. 이 문서 갱신이 성공을 입증하지 않습니다.
+아래 과거 환경 설명은 명시한 Linux·좁은 Windows gate의 범위이며
+새3OS matrix 완료를 뜻하지 않습니다. 새 macOS실행·Windows전체과학·
+browser수용·자원용량 실측을 주장하지 않습니다.
+
+아래 기존 루트 `validate.yml` 환경은 Draft/Ready·3OS적용 이전의 설명입니다.
+Trigger 세부사항은 현재 workflow를 확인합니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11과
-다른 운영체제는 이 CI 검증 범위 밖이며 패키지 metadata는 여전히 Python >=3.10을
+다른 운영체제는 그 과거 Linux gate의 검증 범위 밖이었으며 패키지 metadata는 여전히 Python >=3.10을
 선언합니다. `requirements-py312-linux.txt`는 패키지 runtime 요구가 아니라 검증 도구와
 전이 의존성을 고정합니다. pin을 의도적으로 검토·갱신하고 source·wheel 검사를 모두
 다시 실행합니다.
@@ -384,3 +423,66 @@ python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --r
 14개 checksum 및 지정 runtime wheel bytes를 확인합니다. twine strict·설치 실행·
 독립 물리 또는 정확 source commit 검증을 대체하지 않습니다. 구성된 명령이나
 과거 baseline을 새 후보의 통과로 표시하지 않습니다.
+
+## 정상 열경계 계약·독립 배포 gate
+
+게시된 경계 helper·원시험, 사용안내와 독립보고의 EN/KO 페이지, 원 독립 수용
+네 파일을 필수 byte 자산으로 요구합니다. 독립 설치 소비자가 정확한 identity를
+요구하므로 기존 steady engine 모듈도 필수 자산과 wheel byte 검사에 추가합니다.
+Studio이전 P2 명세는153개로, P1기존136+경계계약2+문서/독립자산8+steady원문1+schema/runtime/예제/platform자산6입니다.
+이는 구성 개수이며 통과 수가 아닙니다.
+
+별도 정상 열경계 preflight는 원 계약·schema·runtime·독립·저장/platform·Studio source entry point를 기존 P1 preflight와
+전체 suite 전에 실행합니다. 실패하면 job이 실패하고 뒤 단계는 미실행입니다.
+preflight 성공이 전체 suite를 대체하지 않습니다. 필수 완료 검사와 main 실행
+보존 규칙은 그대로입니다.
+
+정상 열경계 선행 검사는 기존 `test_thermal.py`와
+`test_thermal_simcase_independent_validation.py` 소비자도 실행합니다. 저장 시험의
+이름과 `save_fields`는 해석 전에 설정합니다. 완료된 결과의 문서를 바꾸면 해석 시
+포착한 입력과 달라져 거절되기 때문입니다. 동시 저장 시험의 단일 승자·완결된 파일
+검사는 유지하며, 비유한 metadata 시험은 무관한 문서 변경이 아니라 비유한 값 때문에
+실패하는지 확인합니다.
+
+원 독립 oracle/cases/consumer는 검증한 simcase sdist에서 추출해 checkout 밖에서
+`python -I`, `--expected-installed-root`, `--expected-module-hashes`로 실행합니다.
+원 계약·schema·runtime·저장/platform·Studio 시험도 설치 pytest로 소비합니다. hash 명세에는 steady consumer가 요구하는
+여섯 identity가 모두 있으며, 기존 transient·dispatch를 포함한 runtime 모듈은13개입니다.
+standalone unittest·설치 pytest·preflight·전체 source 개수는 분리합니다.
+기존 transient 독립17/headless9/전체 archive 수렴과 Windows 회귀는 유지합니다.
+
+이 연결에는 경계 기능을 갖춘 결합 schema/runtime 후보가 필요합니다. 게시된 문서
+초안이나 정의된 시험이 현재 API/CLI·build·설치·플랫폼 성공을 인증하지 않습니다.
+schema/runtime 시험·thermal_boundary.json·platform 시험은 정확 게시 경로를 읽고 연결했으며
+미게시 경로를 요구하지 않습니다. 검증 JSON 예제는 격리 설치 CLI validate/run으로 새 출력에 소비합니다. 정확 결합 CI와 artifact를 확인해야 합니다.
+위 보존 artifact 감사 명령은 수치 소비자를 반복하지 않고 이 명세에도 적용됩니다.
+패키지 게시는 하지 않습니다.
+
+Node source gate에는 `studio_steady_boundary.cjs`도 추가하며 원문 byte를 simcase sdist에서
+요구합니다. 이는 source UI 검증이며 별도 설치 Node 실행을 주장하지 않습니다.
+Windows 설치 선택에는 기존 모든 선택 사례와 함께 standalone
+`test_steady_boundary_platform.py` 전체를 포함합니다. 기존 Windows origin probe에
+steady 경계 identity 두 개를 추가하여 총11모듈을 확인합니다.
+별도 source 대상보호 단계는 동일 platform 파일의 기존 대상보호 세 사례를 소비합니다.
+기존 source 보호 단계도 유지하며 새 로그/JUnit은
+`windows-steady-boundary-source-target.log`,
+`windows-steady-boundary-source-target-tests.xml`로 분리합니다.
+실제 개수와 skip은 정확 CI에서 확인해야 하며 새 의존성이나 플랫폼 지원을 뜻하지 않습니다.
+
+## 전용 정상열 Studio 검증 후보
+
+서버 `c762c4e5fdb9700978a24f639e694630477b8679`·UI
+`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9`는 제출된 구현이며 통합CI통과가
+아닙니다. `c3ede1feba4e26ca19a935c2a7aa03ba998389ab`의 lifecycle파일은
+55사례를 정의하며 여기서는 미실행이고 OS결과가 아닙니다. 독립소비자·물리근거는
+생산HTTP·배포스크립트Node·실제browser검사와 별개입니다.
+Browser harness는 검증도구이며 실행근거가 아닙니다.
+
+[Studio가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md)는
+typed SI필드·제한된job을 설명합니다. 과거136/153을 새전체개수로 쓰지 말고 현재
+결합checkout의 자산명세를 따르세요. Archive포함/byte/link검사·설치moduleorigin·
+runtime검사는 같은 정확후보를 사용해야 합니다. Linux/macOS/Windows설치검사 각각이
+Linux전체수치suite나 browser세션을 뜻하지 않습니다. 이번 갱신은 새3OS·browser·
+자원실측성공을 보고하지 않습니다. `run_enabled=true`는 설정된API가용성이며
+`candidate-unmeasured` 자원정책은 실측용량이 아닙니다. 실패/미확인실행을 보존하고
+수용 전 실제exit/JUnit/개수/skip·rawartifactidentity를 보고하세요.
