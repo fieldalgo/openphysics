@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -29,6 +30,11 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
+    (output / "environment.json").write_text(json.dumps({
+        "platform": platform.platform(), "python": sys.version,
+        "commit": os.environ.get("GITHUB_SHA"),
+        "scope": "six installed packages; external Gmsh not executed",
+    }, indent=2)+"\n", encoding="utf-8")
     commands = []
     env = {**os.environ, "MPLBACKEND": "Agg", "OPENBLAS_NUM_THREADS": "1",
            "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}

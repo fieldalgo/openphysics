@@ -2,13 +2,53 @@
 
 [한국어](locales/ko/pages/README.md)
 
+## CI policy and installed platform matrix
+
+Validation runs on main pushes, Ready PRs (`opened`, `synchronize`, `reopened`,
+`ready_for_review`) and explicit manual dispatch. Feature-branch pushes do not
+run CI; every validation job excludes draft PRs, including the Linux aggregate.
+Reviewed Ready PRs can use automatic Rebase and merge after relevant checks.
+All required checks remain mandatory. Main runs share a stable workflow/ref
+group with `queue: max` and cancellation disabled; other refs use `queue: single`
+and supersede earlier runs. This is a workflow queue, not a PR merge queue.
+
+| Workflow | Platform | Coverage |
+|---|---|---|
+| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | Full source suite, seven distributions, strict archive/document checks, installed consumers and Studio Node checks |
+| `thermal-windows.yml` | Windows 2022, Python 3.12.10 | Existing installed heat and save-ownership regressions |
+| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | Six implementation sdists rebuilt as wheels; fresh isolated consumer environment; package bytes, module origins, bundled assets and public API/CLI/save smoke |
+
+The installed matrix reuses the exact portable pins in
+`ci/requirements-py312-windows-thermal.txt`; that historical filename does not
+limit this matrix to Windows. It installs dependencies into a fresh venv without
+system site packages, installs only the locally built wheels with `--no-index
+--no-deps`, then runs outside the checkout with `python -I`. Existing thermal
+closed-form/units/save consumers and the scalar slab/reference and Gmsh parser
+tests retain their numerical bounds. A separate public mesh smoke checks
+positive element areas and unit total area. No external Gmsh process, full
+macOS/Windows regression, RII download or browser runtime is claimed by this
+matrix; these checks complement full Linux acceptance.
+
+Each OS uploads `installed-packages-<os>-<run_id>` containing command exits/logs,
+environment details, twelve archive checksums, package-byte and consumer-test
+hashes, installed origins and pytest JUnit. Run locally or on another runner with:
+
+```bash
+python -m pip install -r ci/requirements-py312-windows-thermal.txt
+python -X utf8 ci/tools/check_platform_install.py
+```
+
+The output directory must be new. Configuration is not proof of a pass: verify
+the exact commit's three matrix jobs and artifacts before claiming acceptance.
+Python 3.10/3.11 remain outside this CI matrix despite the package metadata floor.
+
 ## Current checkout and evidence
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
 GitHub Actions is enabled with owner approval as of 2026-10-16. The retained
-Linux package and narrow Windows workflows may run on pushes, pull requests
-and manual dispatch. Check each exact run, exit status and artifact; enabling
+Linux, narrow Windows and platform-install workflows run on main pushes, Ready
+pull requests and explicit manual dispatch. Check each exact run, exit status and artifact; enabling
 CI does not itself establish acceptance. Earlier Work-cloud results retain
 their original source, environment and scope.
 
@@ -50,9 +90,9 @@ installation checks do not replace independent convergence/ownership acceptance.
 The save implementation's platform validation and any observed failures must
 be assessed from the exact candidate's CI, rather than inferred from this workflow.
 
-The root `validate.yml` workflow runs on pushes, pull requests and manual dispatch.
+The root `validate.yml` workflow runs on main pushes, Ready pull requests and manual dispatch.
 It tests CPython 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. Python 3.10/3.11
-and other operating systems remain outside this CI coverage; the package metadata
+remain outside this CI coverage; the separate installed matrix covers three operating systems; the package metadata
 still declares Python >=3.10. `requirements-py312-linux.txt` pins the validation
 tools and their transitive dependencies, not the packages' runtime requirements.
 Review and update the pins deliberately, then rerun both source and wheel checks.

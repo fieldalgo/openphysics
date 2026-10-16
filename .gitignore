@@ -13,3 +13,6 @@ dist/
 .venv/
 venv/
 error.log
+
+.validation-platform/
+.validation-windows-thermal/
