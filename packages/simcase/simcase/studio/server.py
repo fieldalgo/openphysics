@@ -19,19 +19,21 @@ import uuid
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import physmat
 from simcase import Document, DocumentError, build_mesh, examples, run, unit_vocabulary
+from . import thermal_api as thermal
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version="0.1.0")
 
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
+_thermal_jobs = thermal.ThermalJobs()
 
 
 class DocBody(BaseModel):
@@ -185,8 +187,97 @@ def start_run(body: DocBody):
     return {"job": job_id}
 
 
+
+def _thermal_error(exc):
+    return JSONResponse(exc.body(), status_code=exc.status, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/capabilities")
+def studio_capabilities():
+    return thermal.capabilities(_thermal_jobs.limits)
+
+
+@app.post("/api/thermal/validate")
+async def validate_thermal(body: Request):
+    spec = None
+    try:
+        spec = await thermal.read_request(body, _thermal_jobs.limits, for_run=False)
+        payload = thermal.validation_payload(spec, _thermal_jobs.limits)
+        return Response(payload, media_type="application/json", headers={"Cache-Control": "no-store"})
+    except thermal.ThermalAPIError as exc:
+        return _thermal_error(exc)
+    except Exception as exc:
+        return _thermal_error(thermal.ThermalAPIError(
+            "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
+
+
+def _start_thermal_thread(target, args):
+    """Narrow thread-start binding; tests need not patch the global threading module."""
+    threading.Thread(target=target, args=args, daemon=True).start()
+
+
+def _run_thermal_job(jobs, lease, doc):
+    stage = "solver_failed"
+    try:
+        result = run(doc, verbose=False)
+        stage = "invalid_result"
+        encoded = thermal.capture_result(result, jobs.identity(lease), jobs.limits)
+        stage = "publication_failed"
+        jobs.complete(lease, encoded, result.log)
+    except Exception as exc:
+        try:
+            jobs.fail(lease, exc, stage)
+        except Exception:
+            pass  # release retains a bounded publication error, or removes only this own record
+        finally:
+            jobs.release(lease)
+    else:
+        jobs.release(lease)
+
+
+@app.post("/api/thermal/run")
+async def start_thermal_run(body: Request):
+    jobs = _thermal_jobs  # one store/config lifetime for this request and its worker
+    spec = None
+    lease = None
+    identity = {}
+    try:
+        spec = await thermal.read_request(body, jobs.limits, for_run=True)
+        # copy() resets scale; validation restores it before the worker owns it.
+        doc = spec.doc.copy()
+        doc.validate()
+        lease = jobs.reserve()
+        token = uuid.uuid4().hex
+        identity = jobs.attach(lease, "thermal-"+token, "result-"+token, spec)
+        _start_thermal_thread(_run_thermal_job, (jobs, lease, doc))
+        return JSONResponse(identity, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        if lease is not None:
+            try:
+                jobs.fail(lease, exc, "thread_start_failed")
+            except Exception:
+                pass  # final release is independent of error-publication success
+            finally:
+                jobs.release(lease)
+        if isinstance(exc, thermal.ThermalAPIError):
+            exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
+            return _thermal_error(exc)
+        return _thermal_error(thermal.ThermalAPIError(
+            "thread_start_failed" if lease is not None else "invalid_document",
+            str(exc), 500 if lease is not None else 400,
+            tags={**(spec.tags() if spec else {}), **identity}))
+
+
 @app.get("/api/jobs/{job_id}")
-def job_status(job_id: str):
+def job_status(job_id: str, request: Request):
+    if job_id.startswith("thermal-"):
+        try:
+            if request.query_params:
+                raise thermal.ThermalAPIError("unsupported_query", "thermal status has no field/time selector")
+            return Response(_thermal_jobs.status(job_id), media_type="application/json",
+                            headers={"Cache-Control": "no-store"})
+        except thermal.ThermalAPIError as exc:
+            return _thermal_error(exc)
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:
@@ -195,7 +286,15 @@ def job_status(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/result")
-def job_result(job_id: str):
+def job_result(job_id: str, request: Request):
+    if job_id.startswith("thermal-"):
+        try:
+            if request.query_params:
+                raise thermal.ThermalAPIError("unsupported_query", "steady thermal results have no field/time selector")
+            return Response(_thermal_jobs.result(job_id), media_type="application/json",
+                            headers={"Cache-Control": "no-store"})
+        except thermal.ThermalAPIError as exc:
+            return _thermal_error(exc)
     with _jobs_lock:
         job = _jobs.get(job_id)
     if job is None:

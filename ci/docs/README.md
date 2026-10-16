@@ -570,3 +570,47 @@ retaining the previous source protection step and using separate log/JUnit names
 `windows-steady-boundary-source-target.log` and
 `windows-steady-boundary-source-target-tests.xml`. Actual counts and skips must
 come from exact CI. No new dependency or platform support is implied.
+
+## Steady thermal Studio distribution and browser checks
+
+The checker requires the exact Studio adapter, shipped page/thermal JavaScript,
+three original HTTP/acceptance/lifecycle test files, independent fixture, Node
+script and both pairs of usage/independent EN/KO pages in the simcase sdist.
+Python modules and static resources must match source bytes in wheels; installed
+module hashes and `studio-resource-origins.json` verify the isolated venv too.
+The original tests are extracted from the verified archive without source
+conftest; the independent fixture also requires the unchanged P2 steady-boundary
+cases/oracle in that archive. Combine these changes with that feature before
+acceptance: the distribution-only branch does not supply production dependencies.
+No old engine all17, full convergence, headless or Windows gate is removed.
+
+The Linux preflight writes `studio-thermal-preflight.xml`; a failure remains a
+failed check before whole acceptance. Source Node additionally runs the actual
+`studio_steady_thermal.cjs`. Browser acceptance is distinct: inside the verified
+wheel environment, `ci/tools/studio_thermal_browser.mjs` starts an owned isolated
+uvicorn server and uses Node24 built-in WebSocket/fetch CDP with an already
+installed Chrome/Chromium discovered by which/version. No npm/Python/browser
+download is added. It drives a small real model through Apply JSON, Validate,
+Run, temperature/flux, Results/Mesh and dirty-input stale-run rejection. Visible
+canvas CSS/backing sizes, console exceptions, PNGs, origins, environment and
+owned subprocess exits go to `dist/studio-browser/`. Browser absence is recorded
+as unavailable with nonzero exit, never hidden as a passing mock or skip.
+
+After successful validation, one Linux source-server observation runs:
+
+```text
+python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
+```
+
+Fresh owned server processes measure n2/32/100 public API and real HTTP phases,
+actual capture_result/encode_json hooks, ten result reads, encoded bytes,
+tracemalloc and RSS, additional job admission/oldest terminal eviction and server
+shutdown. Hook timings overlap; never sum nested times. TTL300s is a maximum,
+not minimum retention; evicted/expired jobs return404 without automatic rerun.
+run_enabled describes configured public API availability, independently of
+candidate-unmeasured resource policy. Fixed workloads and shared runner metrics
+are observations, not capacity/performance certification. No fake physics or
+limit patch is used. Partial reports are retained by the existing always-upload
+step. These configured commands are not evidence of a completed exact run;
+report actual CI exits, counts and artifacts. Browser, numerical independence,
+source resource observation and Windows remain separate acceptance scopes.
