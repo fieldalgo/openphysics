@@ -133,3 +133,5 @@ The benchmark values in `refsol.benchmarks` are numerical results published by
 Hadley (2002); see [NOTICE](NOTICE) for their provenance.
 
 `refsol.thermal_boundary` provides independent closed forms for prescribed outward flux and Robin boundaries. Coordinates are m, temperature K, conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K). It is included in both archives; this standalone reference does not extend the headless JSON schema.
+
+`refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.

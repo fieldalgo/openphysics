@@ -235,7 +235,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 79개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 92개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -273,3 +273,11 @@ skip을 보고해야 합니다. 검증한 sdist의 영어 workflow 예제도 che
 wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험이 실제 engine
 파일을 scan합니다. 설치 module origin과 wheel module byte는 별도로 확인합니다.
 이 배포 검사가 schema/CLI/Studio 지원이나 열역학적 완전 연성을 인증하지는 않습니다.
+
+## 처방 온도 전체 표면하중의 배포 계약
+
+필수 byte 목록은 기존79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개입니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
+
+새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
+
+개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 비활성 상태이며 조회·활성화·dispatch·재실행을 하지 않습니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.

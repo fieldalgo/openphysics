@@ -102,3 +102,5 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 
 `refsol.thermal_boundary`는 처방 외향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 외향 열유속은 W/m^2, 대류 h는 W/(m^2 K)입니다. 두 배포 아카이브에 포함되며 이 독립 참조 모듈이 헤드리스 JSON schema를 확장하지는 않습니다.
+
+`refsol.thermoelastic_traction`는 원래3D 구성 법칙의 `uniform_combined`, `polynomial_manufactured`, `parent_state`, `traction_from_stress`를 NumPy/표준 라이브러리만으로 제공하며 engine을 import하지 않습니다. 좌표·변위는 m, 온도는 K, 응력·전체 표면하중은 Pa, 체적력은 N/m^3, 힘·반력은 N/m, 물리적 에너지는 J/m입니다. 처방 온도장 기계 참조이며 열 해석이나 출처 인증이 아닙니다.
