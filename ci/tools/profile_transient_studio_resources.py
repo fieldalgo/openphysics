@@ -95,6 +95,17 @@ def child(args):
                                  (common.ReadAllocation,'publish','read_publish'),
                                  (common.ReadAllocation,'release','read_release')]:
             hook(owner,name,label)
+        observed_capture = transient.capture_result
+        def capture_once(*a, **kw):
+            with lock:
+                before_getters = {k:counts.get('getter:'+k,0) for k in transient.SPEC}
+            result = observed_capture(*a, **kw)
+            with lock:
+                actual = {k:counts.get('getter:'+k,0)-before_getters[k] for k in transient.SPEC}
+            if any(value!=1 for value in actual.values()):
+                raise AssertionError('completed capture must read each13 public getters once: '+json.dumps(actual))
+            return result
+        transient.capture_result = capture_once
         original_getattr = simcase.TransientThermalRunResult.__getattr__
         def getter(self, name):
             if name in transient.SPEC:
@@ -253,6 +264,14 @@ def parent(args):
                 'limitations':['not an exhaustive producer allocation inventory',
                                'native coverage and eviction/disconnect lifecycle proof remain separate']}
             after=rpc(process,'snapshot')['snapshot']
+            getter_counts={k:after['counts'].get('getter:'+k,0) for k in [
+                'nodes_m','triangles','time_s','temperature_k','heat_flux_w_m2',
+                'source_load_w_per_m','reaction_w_per_m','residual_w_per_m',
+                'storage_rate_w_per_m','heat_content_j_per_m','quadratic_functional_jk_per_m',
+                'dirichlet_node_ids','dirichlet_temperatures_k']}
+            report['completed_capture_getters']=getter_counts
+            if any(v!=1 for v in getter_counts.values()):
+                raise ValueError('each13 completed-capture getter must have count1')
             if after['counts'].get('public_run')!=1 or after['counts'].get('capture')!=1:
                 raise ValueError('expected exactly one actual public solve and capture')
             report['phases'].append({'name':'single_actual_solve_and_public_reads','elapsed_s':time.perf_counter()-phase_started,'before':before,'after':after})
