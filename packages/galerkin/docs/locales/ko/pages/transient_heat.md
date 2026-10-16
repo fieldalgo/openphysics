@@ -17,8 +17,18 @@ Python3.12.14, pytest9.1.1, NumPy2.5.4, SciPy1.18.1을 사용했습니다.
 Import 출처는 해당 exact source snapshot이며 설치 wheel 증명이 아닙니다.
 기존 checkout·venv·역사적 실행 기록을 복구한 것이 아닙니다.
 
-수치/물리 gate, 실제 계약/reference 시험 본문, source/전체 회귀, sdist/wheel 검증과
-플랫폼 시험은 계속 미실행입니다. 아래 명령은 재현 지침이지 해당 단계의 실행 근거가 아닙니다.
+**2026-10-16 실제 소형 본문 후속 검증:** exact
+b2f420f4d540503ad3711bdab996e12dcbce9e9d의 대상 두 파일을 한 번 실행해
+**70 passed(producer 58 + reference 12), exit0, 실패/error/skip0**를 확인했습니다.
+이전 70 collected와 구분합니다. 원래 stdout·stderr·JUnit 바이트, 해시, 자원 사전값과
+모듈 출처를 보존했습니다. 동일한 Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1
+source 환경에서 BLAS/OMP/MKL1을 사용했으며 시험 수나 허용치를 줄이지 않았습니다.
+솔버 수정이나 시험 재실행은 필요하지 않았습니다. d21 snapshot의 시험 본문을 별도로
+실행한 것은 아닙니다.
+
+고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀, 설치 sdist/wheel 증명,
+독립 수용과 플랫폼 시험은 계속 미실행입니다. 소형 대조가 완전한 물리 수용을 뜻하지
+않습니다. 아래 명령은 미완료 단계의 재현 지침으로 유지됩니다.
 
 ## 명시적 하위 모듈과 최소 사용법
 

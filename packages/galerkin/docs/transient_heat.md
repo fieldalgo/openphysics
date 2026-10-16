@@ -17,9 +17,19 @@ pytest9.1.1, NumPy2.5.4 and SciPy1.18.1 with existing runtime packages; imports
 were from those exact source snapshots, not an installed-wheel proof.
 This did not recover an old checkout, venv or historical execution records.
 
-Numerical/physical gates, actual contract/reference test bodies, source/whole
-regression, sdist/wheel validation and platform tests remain unexecuted.
-The commands below are reproduction instructions, not evidence of those stages.
+**Actual small-body follow-up, 2026-10-16:** exact
+b2f420f4d540503ad3711bdab996e12dcbce9e9d ran the two targeted files once:
+**70 passed (58 producer + 12 reference), exit0, no failures/errors/skips**.
+This is distinct from the earlier 70 collected. The original stdout, stderr,
+JUnit bytes, hashes, resource preflight and module origins were preserved.
+The same Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1 source environment
+used BLAS/OMP/MKL1; no test count or tolerance was reduced. No solver fix or
+test rerun was needed. The d21 snapshot did not separately run test bodies.
+
+The fixed temporal/PDE spatial/5% separation gates, complete source regression,
+installed sdist/wheel proof, independent acceptance and platform tests remain
+unexecuted. These small controls are not complete physical acceptance.
+The commands below remain reproduction instructions for the pending stages.
 
 ## Explicit submodule and minimal use
 
