@@ -57,12 +57,26 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 
 These pages describe this checkout. Actions is disabled and two Windows failures remain unresolved; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
 
+## Explicit steady heat-to-mechanics workflow
+
+The Python-only workflow freezes a same-mesh nodal-P1 Kelvin field before the mechanical stage. It is steady and one-way; it adds no JSON/CLI/Studio integration, persistence or transient solve.
+
 | English | 한국어 |
 |---|---|
 | [thermal_mechanical_workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
 | [thermal_mechanical_independent_validation](../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |
 
+## Prescribed-temperature total mechanical traction
+
+The Python mechanical API accepts optional global Cartesian total traction `sigma*n` in Pa on a fixed reference mesh with prescribed nodal-P1 Kelvin temperatures. Body and traction loads form the external load; the positive thermal-equivalent load remains separate. The contract retains the original 18 positional result fields and appends two optional load fields. It reports per-depth forces in N/m and physical elastic energy in J/m, including plane-strain out-of-plane stress and support work.
+
+A global Pa callback `-p*normal` is valid on the fixed boundary; no dedicated scalar-pressure, local-frame or follower API is added. This does not add traction to the heat-to-mechanics workflow or JSON/CLI/Studio, and does not run heat conduction or authenticate temperature or boundary-tag provenance.
+
 | English | 한국어 |
 |---|---|
 | [thermoelastic_traction](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
 | [thermoelastic_traction_independent_validation](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
+
+Implementation contracts, independent candidate evidence and combined release validation have different scopes. Linked reports retain their exact candidates and original failures; targeted recovery does not turn an earlier failed whole run into a passing one. A completed combined result requires the corresponding final command exit and complete JUnit evidence. Missing final evidence or a transport interruption establishes neither numerical success nor the interruption's cause. Linux checks do not establish Windows acceptance.
+
+For source snapshot `0bc4419f4cfaf9e1185872d14232f1644639fc72`, Linux cloud validation recorded 1536 source tests passed, 9 subtests passed and 16 skipped, with command exit0. The skips were 14 optional Gmsh cases and 2 local refractiveindex.info database cases. A separate sdist-to-wheel installed run passed 541 cases with no failures or skips. The original distribution helper completed all 16 commands with exit0, including seven sdist-to-wheel builds and strict Twine checks of 14 artifacts. This snapshot was integrated as `da811aec95f6695f6d7b9988a7d3e9055736ff97`. These results are limited to the recorded Linux environment and do not establish Windows/other-OS acceptance or resolve the cause of earlier transport interruptions. Earlier failed and unknown runs remain separate evidence.

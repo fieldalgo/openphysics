@@ -59,12 +59,26 @@
 
 이 문서들은 이 checkout을 설명합니다. Actions는 비활성화돼 있고 Windows 두 실패는 미확정이며 Linux 결과가 Windows 수용을 뜻하지 않습니다. 독립 Robin API와 헤드리스 JSON 계약은 별개입니다.
 
+## 명시적 정상 열전도→기계 workflow
+
+Python 전용 workflow는 같은 메시의 절점 P1 Kelvin 장을 동결한 뒤 기계단계를 실행합니다. 정상·단방향이며 JSON/CLI/Studio·저장·과도 해석 지원 범위를 확대하지 않습니다.
+
 | English | 한국어 |
 |---|---|
 | [thermal_mechanical_workflow](../../../../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
 | [thermal_mechanical_independent_validation](../../../../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |
 
+## 처방 온도장의 전체 기계 표면하중
+
+Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시에서 선택적 전역 Cartesian 전체 표면하중 `sigma*n`을 Pa로 받습니다. 체적·표면하중의 합이 외부 하중이며 양의 열 등가 하중은 별도로 유지합니다. 계약은 기존 위치 인자 결과 필드 18개를 유지하고 선택적 하중 필드 두 개를 덧붙입니다. 깊이당 힘은 N/m, 물리 탄성 에너지는 J/m이며 평면변형률의 면외 응력과 지지 일을 포함합니다.
+
+고정 경계의 전역 Pa callback `-p*normal`은 유효하지만 scalar pressure 전용·로컬 프레임·follower API는 추가하지 않습니다. 열→기계 workflow나 JSON/CLI/Studio에 traction을 추가하지 않으며 열전도를 실행하거나 온도·경계 태그의 출처를 인증하지 않습니다.
+
 | English | 한국어 |
 |---|---|
 | [thermoelastic_traction](../../../../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
 | [thermoelastic_traction_independent_validation](../../../../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
+
+구현 계약, 독립 후보 근거와 결합 배포 검증은 서로 다른 범위입니다. 연결된 보고는 정확한 후보와 원 실패를 보존하며 선별 회복이 이전 전체 실패를 전체 통과로 바꾸지는 않습니다. 완료된 결합 결과에는 해당 최종 명령 exit와 완결 JUnit 근거가 필요합니다. 최종 근거 누락이나 transport 단절만으로 수치 성공이나 단절 원인을 확정할 수 없습니다. Linux 검사가 Windows 수용을 입증하지 않습니다.
+
+소스 snapshot `0bc4419f4cfaf9e1185872d14232f1644639fc72`의 Linux cloud 검증은 source 시험 1536개 통과, 하위검사 9개 통과, skip 16개와 명령 exit0을 기록했습니다. Skip은 optional Gmsh 사례 14개와 로컬 refractiveindex.info database 사례 2개입니다. 별도 sdist→wheel 설치 실행은 541개 사례가 실패·skip 없이 통과했습니다. 원 배포 helper의 16개 명령은 모두 exit0으로 완료됐으며 일곱 sdist→wheel build와 artifact 14개의 strict Twine 검사를 포함합니다. 이 snapshot은 `da811aec95f6695f6d7b9988a7d3e9055736ff97`로 통합됐습니다. 결과는 기록된 Linux 환경에 한정되며 Windows·다른 OS 수용이나 이전 transport 단절의 원인을 입증하지 않습니다. 이전 실패·미확인 실행은 별도 근거로 유지합니다.
