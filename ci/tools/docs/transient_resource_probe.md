@@ -33,3 +33,27 @@ Small n2/Nt3 and medium n16/Nt8 are preparation shapes. The script searches lega
 | Provenance | Exact source/origin/byte manifests and instrumented patch hash; operator SHA alone is not verification. |
 
 No private store access or guessed metric endpoints are used. Memory/lease/counter measurements are explicitly unavailable in this tool. A future instrumented runner must preserve exact production source, numerical gates and existing steady behavior; companion lifecycle/physics tests and supported-platform CI remain separate.
+
+## Fresh-process instrumented companion
+The separate `ci/tools/profile_transient_studio_resources.py` starts the actual source Studio server in a fresh child, runs the HTTP client in the parent and writes `instrumented-report.json` plus raw selected responses and `child.stderr`. It is opt-in, not wired to duplicate steady CI runs.
+
+```sh
+python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
+python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
+```
+
+The checkout must match the full expected HEAD and have no tracked package modifications. Use the existing declared runtime dependencies. Missing imports/startup fail once with evidence; the tool does not install or retry. Every invocation uses a fresh server process and one real solve. Choose independently valid small/medium/near-preflight inputs separately; no synthetic replacement producer is installed. The optional over-budget document must elicit413 without another public solve; a429 is preserved as a failure of this expected actor, not capacity success.
+
+Runtime wrappers count the actual public run, capture, public forwarded getters, strict/view encoding, pin/reserve/read-allocation publication and releases while calling originals unchanged. Imports of producer implementation modules are not used. Hooks and a scalar-only cache snapshot inspect the actual Studio transport, not a modeled store. The first phase runs the public observer (eleven frame GETs plus one H page). A separate phase sends eleven identical frame GETs and checks zero added run/capture/getter calls with eleven allowed view encodes. Counts across both phases must not be mistaken for one eleven-read workload.
+
+For a bounded slow-reader control, an ASGI observation wrapper holds one actual frame body at send for at most30s. The parent sends another frame expecting429, then releases the first send and checks a subsequent read200 and cleared read pins/workspace. The wrapper does not edit response bytes or solver results. This is a deterministic transport hold, not natural socket throughput; eviction during a held history, disconnect/send exceptions, TTL expiry and all lifecycle actors remain separate tests.
+
+Artifact schema `transient-instrumented-resource-v1`:
+- `child_start`: PID, Python/platform/versions, baseline, pre-run module origins+SHA256.
+- `requests`: parent HTTP timings/status/bytes/hash/raw-file references; total includes the public observer and instrumented phases.
+- `phases`: before/after server memory, store and cumulative counter snapshots; repeated-read counter deltas; held-send/refusal snapshots.
+- `store`: active/pending/reserved/retained/read-workspace, live/retired/snapshot counts, record pins, raw/manifest byte lists and allocation-ID byte inventory. IDs are process-local, not reproducible identifiers.
+- `cleanup`: owned-server stop status, final snapshot and post-run origins. No global cache clear is performed; this is not a leak/TTL proof.
+- `failure`, `exit_code`, `child_exit`, optional `forced_stop`: preserve refused/startup/timeout/failed attempts. A forced child stop invalidates acceptance; it is harness cleanup, not a server cancellation endpoint.
+
+Current RSS is available on Linux through /proc; cumulative ru_maxrss is normalized on Linux/macOS and unavailable elsewhere. Traced live/phase peak starts after imports/server startup and may omit native allocations. Six native thread variables are fixed to1. Nested hook clocks overlap; the bounded256 hook events include observation overhead, while counters continue. RAM highwater, encoded bytes and logical retained accounting are different measurements. Origin hashes require comparison to exact Git/package bytes; declared HEAD alone does not prove every imported byte. Do not call these observations numerical or maximum-capacity acceptance.
