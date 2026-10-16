@@ -6,7 +6,7 @@ import numpy as np
 # These are unchanged independent acceptance assets, supplied by the separately
 # reviewed steady boundary feature when the coordinator combines the branches.
 from steady_boundary_independent_cases import FIELDS, audit, model
-from steady_boundary_independent_oracle import Elements, close, slab
+from steady_boundary_independent_oracle import Elements, UNITS, close, slab
 
 WIRE_FORMAT = "studio-thermal-steady-v1"
 PAIRS = {
