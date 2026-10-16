@@ -110,7 +110,7 @@ See [bundled images, fixtures and data](assets.md) for source history and licens
 
 ## Transient heat: implementation and acceptance evidence
 
-The explicit `galerkin.transient_heat.solve_transient_heat` function implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. The engine function itself does not add document dispatch or saving; the separate headless interface is described below. Studio, restart and automatic heat-to-mechanics coupling remain unsupported.
+The explicit `galerkin.transient_heat.solve_transient_heat` function implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. The engine function itself does not add document dispatch or saving; the separate headless interface is described below. The engine API does not enable a Studio route; dedicated transient UI scope and integration status are described in the Studio guide. Restart and automatic heat-to-mechanics coupling remain unsupported.
 
 | English | 한국어 |
 |---|---|
@@ -127,7 +127,7 @@ The historical b2 snapshot's 70 small producer/reference source passes are evide
 
 ## Headless transient heat
 
-The rectangular `thermal.transient2d` document connects fixed-P1, consistent-mass backward-Euler heat to the Python API, CLI and versioned JSON/NPZ histories. It accepts explicit seconds, uniform/affine initial Kelvin and side-constant or requested-time sampled Dirichlet values with insulation elsewhere. Initial/boundary agreement is checked without projection; finite negative K is not clamped. Studio, transient flux/Robin, restart and automatic coupling remain unsupported. Read the [complete input/API/CLI/save contract](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)). Implemented interfaces and packaging rules require exact combined source, installed and CI evidence; the older engine results are not headless acceptance.
+The rectangular `thermal.transient2d` document connects fixed-P1, consistent-mass backward-Euler heat to the Python API, CLI and versioned JSON/NPZ histories. It accepts explicit seconds, uniform/affine initial Kelvin and side-constant or requested-time sampled Dirichlet values with insulation elsewhere. Initial/boundary agreement is checked without projection; finite negative K is not clamped. Generic optical Studio routes retain their thermal guards; dedicated transient UI availability is separate. Transient flux/Robin, restart and automatic coupling remain unsupported. Read the [complete input/API/CLI/save contract](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)). Implemented interfaces and packaging rules require exact combined source, installed and CI evidence; the older engine results are not headless acceptance.
 
 ## Steady thermal Studio
 
@@ -136,3 +136,7 @@ The [steady heat Studio guide](https://github.com/fieldalgo/openphysics/blob/mai
 ## Validation and landing evidence
 
 Documentation follows Draft → relevant checks → Ready PR → required CI → automatic Rebase and merge → landed-main validation. Main uses a non-cancelling queue=max; PR supersession uses queue=single. Full Linux science and Linux/macOS/Windows installed validation are separate; distinguish configuration, execution, acceptance and main landing. Check actual Studio browser/resource evidence for the exact checkout. See the [steady Studio guide](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md) for the operational and evidence boundaries.
+
+## Transient thermal Studio integration
+
+The [transient Studio guide](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient_studio.md) covers exact requested-time indices (default final), nodal K/cell flux, H[J/m]/V[J K/m] pages, typed reads, explicit429 recovery and bounded lifetimes. It is an integration contract pending production submission/runtime acceptance at this documentation base; headless transient support or existing steady Studio acceptance does not establish transient UI support. Generic optical guards remain. No interpolation, downsampling, new solver or cancel/delete/save endpoint is added. Inspect exact CI and artifact evidence separately from candidate limits and implementation.
