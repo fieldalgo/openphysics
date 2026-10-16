@@ -116,3 +116,7 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 |---|---|
 | [thermoelastic_traction](../../../../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
 | [thermoelastic_traction_independent_validation](../../../../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
+
+## 과도 엔진과 문서 인터페이스 경계
+
+과도 Python 엔진만으로 과도 JSON/API/CLI study가 활성화되지는 않습니다. [인터페이스 경계](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md) ([English](../../../../packages/simcase/docs/thermal_transient2d.md))에서 명시한 snapshot의 지원·단위·초기/step 이력·근거 한계를 확인하세요. 이 경계 페이지가 수용된 과도 문서 schema를 발표하는 것은 아닙니다.
