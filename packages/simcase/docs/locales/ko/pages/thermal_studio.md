@@ -4,11 +4,11 @@
 
 ## 제공 상태
 
-**구현 후보이며 통합·수용 대기입니다.** 서버 `c762c4e5fdb9700978a24f639e694630477b8679`와 frontend
-`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9`는 여기서 설명하는
-전용 정상열 route·typed capture/encoding·JSON-first 표시를 구현합니다.
-일치하는 headless runtime을 포함한 정확한 결합 checkout을 사용하세요.
-이 문서 branch만으로 해당 코드 변경이 포함되는 것은 아닙니다.
+**구현 후보이며 통합·수용 대기입니다.** 이 가이드는 전용 server route·typed capture/encoding·JSON-first UI·일치하는
+headless runtime을 함께 포함한 결합 checkout
+`b584d50df6ef024e6600c611fe24d9467034c890`(Draft PR 11)을 설명합니다.
+Frontend 기여는 `767cc8dbaeccd4a7cf85c828971d5324abdbd863`입니다.
+이전 개별 문서/UI branch가 아닌 결합 checkout을 평가하세요.
 정상 headless 경계 계약은 main
 `49ff59874af3c5140d0e8126b1feb18964953e7e`에 반영됐지만, 이것이 전용
 Studio 기능 반영·수용을 뜻하지 않습니다. 제출된 구현은 정식 main Studio
@@ -16,7 +16,7 @@ Studio 기능 반영·수용을 뜻하지 않습니다. 제출된 구현은 정�
 이번 문서 갱신에 대한 통합 CI·실제 browser·자원 실측 결과는 없습니다.
 
 아래 최상위 wire envelope·공개 result/layout ID검사·`run_enabled`·
-oldest-terminal회수는 이 후보들에 구현돼 있습니다.
+oldest-terminal회수는 이 결합 후보에 구현돼 있습니다.
 `run_enabled=true`는 유효한 설정 limits와 공개 API 지원을 뜻하며
 **성능 실측 완료를 뜻하지 않습니다**.
 `resource_policy="candidate-unmeasured"`는 별도 선언으로 유지합니다.

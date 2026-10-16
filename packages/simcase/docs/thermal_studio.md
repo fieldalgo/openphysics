@@ -4,11 +4,12 @@
 
 ## Availability
 
-**Implementation candidate; integration and acceptance pending.** Server `c762c4e5fdb9700978a24f639e694630477b8679` and frontend
-`912c75ea6f61fbb778fe277c3c765c2d0d2b62a9` implement the dedicated
-steady-thermal routes, typed capture/encoding and JSON-first display described
-here. Use their exact combined checkout with the matching headless runtime;
-this documentation branch alone does not contain those code changes.
+**Implementation candidate; integration and acceptance pending.** This guide describes the combined checkout
+`b584d50df6ef024e6600c611fe24d9467034c890` (Draft PR 11), which includes
+the dedicated server routes, typed capture/encoding, JSON-first UI and matching
+headless runtime together. The frontend contribution is
+`767cc8dbaeccd4a7cf85c828971d5324abdbd863`; evaluate the combined checkout,
+not an earlier standalone documentation or UI branch.
 The steady headless boundary contract landed in main
 `49ff59874af3c5140d0e8126b1feb18964953e7e`; that does not land or accept
 this dedicated Studio feature. These submitted implementations are not a claim
@@ -17,7 +18,7 @@ No integrated CI, actual-browser or resource measurement result is available
 for this documentation update.
 
 The top-level wire envelope, public result/layout ID checks, `run_enabled`
-and oldest-terminal reclamation below are implemented in these candidates.
+and oldest-terminal reclamation below are implemented in this combined candidate.
 `run_enabled=true` means valid configured limits and supported public API,
 **not completed performance measurement**.
 `resource_policy="candidate-unmeasured"` remains a separate declaration.
