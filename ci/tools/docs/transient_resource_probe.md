@@ -1,5 +1,5 @@
 # Transient Studio resource observer
-[한국어](locales/ko/transient_resource_probe.md)
+[한국어](locales/ko/pages/transient_resource_probe.md)
 
 The stdlib-only `ci/tools/probe_transient_studio_resources.py` observes an already running, explicitly selected loopback server. It does not start/install a server, import a solver, replace numerical acceptance or certify capacity. Use a new evidence directory for every attempt.
 
@@ -8,7 +8,7 @@ python ci/tools/probe_transient_studio_resources.py --plan --output records/tran
 python ci/tools/probe_transient_studio_resources.py --base-url http://127.0.0.1:8000 --document input.json --source-commit FULL_SERVER_SHA --output records/transient-http
 ```
 
-The input is a document object, not the request envelope. HTTP mode records capabilities, validates, submits exactly one solve (never retries it), polls with bounded timeout/request count, saves the manifest and last temperature frame, repeats the identical complete frame query ten times, and reads one H history page of at most sixteen rows. Same-query status/length/hash must match. Transient frame encoding on demand is permitted; matching hashes cannot establish zero producer getter or solve calls. Status errors and non-2xx bodies remain evidence, never successful capacity samples. A timeout does not cancel the server solve.
+The input is a document object, not the request envelope. HTTP mode records capabilities, validates, submits exactly one solve (never retries it), polls with bounded timeout/request count, saves the manifest and last temperature frame, repeats the identical complete frame query ten times (eleven frame GETs total: first1+repeat10), and reads one H history page of at most sixteen rows. Same-query status/length/hash must match. Transient frame encoding on demand is permitted; matching hashes cannot establish zero producer getter or solve calls. Status errors and non-2xx bodies remain evidence, never successful capacity samples. A timeout does not cancel the server solve.
 
 Reports include operator-supplied source SHA (not source verification), Python/platform, input hash, HTTP paths/status/bytes/hash/time, selected raw responses, failure and exit. Redirects/proxies/credentials/nonliteral nonloopback addresses are excluded. Requests are <=1MiB, individual reads <=4MiB (status <=128KiB), request count<=160; no encoded frame cache is created. Reports and input copies can contain user model data; use an appropriate local records directory. Output must not already exist.
 
