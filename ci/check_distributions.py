@@ -146,6 +146,9 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/test_studio_thermal_acceptance.py',
               'tests/studio_thermal_independent_fixtures.py',
               'tests/test_studio_thermal_lifecycle.py',
+              'tests/test_studio_transient_server_http.py',
+              'tests/studio_transient_lifecycle_fixtures.py',
+              'tests/test_studio_transient_lifecycle.py',
               'docs/thermal_studio.md',
               'docs/locales/ko/pages/thermal_studio.md',
               'docs/studio_thermal_independent_validation.md',
@@ -402,6 +405,9 @@ def main():
                              "test_studio_transient.py", "test_transient_headless_windows.py",
                              "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
                              "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
+                             "test_studio_transient_server_http.py",
+                             "studio_transient_lifecycle_fixtures.py",
+                             "test_studio_transient_lifecycle.py",
                              "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
