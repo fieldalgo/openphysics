@@ -1,5 +1,6 @@
 """Independent public HTTP acceptance for saved transient thermal Studio data."""
 import copy
+import json
 import time
 
 import numpy as np
@@ -10,7 +11,7 @@ from simcase import Document, TransientThermalRunResult, run
 from simcase.studio import server
 from studio_transient_independent_fixtures import (
     DYNAMIC, FIELD_UNITS, FRAME, HISTORY, IDENTITY, KIND, STEP_FIELDS,
-    audit, envelope, frame_array, identity, manifest_arrays, metadata, model, numeric,
+    audit, envelope, expected_arrays, frame_array, identity, manifest_arrays, metadata, model, numeric,
     require_close)
 
 
@@ -127,6 +128,14 @@ def test_studio_transient_independent_all13_physical_frames_and_history(client,u
     accepted,manifest,a = finished(client,data)
     collect(client,accepted,manifest,a,data)
     audit(a,case,data,manifest["summary"])
+    expected = expected_arrays(a,case,data)
+    print(json.dumps({"gate":"studio_transient_independent_exact","case":case,"unit":unit,
+                      "time_s":a["time_s"].tolist(),
+                      "max_absolute_error":{key:float(np.max(abs(a[key]-value),initial=0.))
+                                            for key,value in expected.items()},
+                      "heat_content_j_per_m":a["heat_content_j_per_m"].tolist(),
+                      "quadratic_functional_jk_per_m":a["quadratic_functional_jk_per_m"].tolist()},
+                     allow_nan=False))
     original = public_arrays(data)
     for field in FIELD_UNITS:
         # This is secondary equality; independent P1/analytic gates above are mandatory.
