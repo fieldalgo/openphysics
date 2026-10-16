@@ -50,16 +50,28 @@ def captured_arrays(payload, version=2):
         raise AssertionError("positive display length scale")
     if "coordinates" in payload:
         raise AssertionError("obsolete nested coordinate metadata")
+    for tag in ("client_revision","request_seq"):
+        value=payload[tag]
+        if type(value) is not int or not 0 <= value <= 2**53-1:
+            raise AssertionError("safe integer wire identity")
+    for tag in ("job","result_id"):
+        if not isinstance(payload[tag],str) or not payload[tag]:
+            raise AssertionError("nonempty wire identity")
     source = payload["arrays"]
+    if not isinstance(source,dict):
+        raise AssertionError("array mapping")
     selected = tuple(FIELDS) if version == 2 else LEGACY
     if set(source) != set(selected):
         raise AssertionError("exact versioned array set")
     summary = payload["summary"]
+    if not isinstance(summary,dict):
+        raise AssertionError("summary mapping")
     if (summary.get("physics_type") != "thermal.steady2d" or
             summary["result_format"] != fmt or summary["field_layout"] != PAIRS[fmt]):
         raise AssertionError("summary version pair")
     declared=summary["units"]
-    if declared["temperature"] != "K" or summary["mesh_length_unit"] != "m":
+    if (not isinstance(declared,dict) or set(declared) != {"length","temperature"}
+            or declared["temperature"] != "K" or summary["mesh_length_unit"] != "m"):
         raise AssertionError("thermal SI metadata")
     length=declared["length"]
     if isinstance(length,str):
@@ -73,7 +85,7 @@ def captured_arrays(payload, version=2):
         raise AssertionError("declared length")
     close(np.array(scale),np.array(expected_scale),expected_scale,"display declaration",1e-9)
     for meta in ("field_shapes","field_units","field_locations"):
-        if set(summary[meta]) != set(selected):
+        if not isinstance(summary[meta],dict) or set(summary[meta]) != set(selected):
             raise AssertionError("exact metadata field set")
     arrays = {}
     for key in selected:
@@ -101,7 +113,9 @@ def captured_arrays(payload, version=2):
                  heat_flux_w_m2=(len(t),2),dirichlet_node_ids=(len(d),),
                  dirichlet_temperature_k=(len(d),))
     for key,value in arrays.items():
-        if value.shape != shape[key] or summary["field_shapes"][key] != list(shape[key]):
+        metadata_shape=summary["field_shapes"][key]
+        if (not isinstance(metadata_shape,list) or any(type(v) is not int for v in metadata_shape)
+                or value.shape != shape[key] or metadata_shape != list(shape[key])):
             raise AssertionError("array shape metadata: "+key)
         if summary["field_units"][key] != FIELDS[key] or summary["field_locations"][key] != LOCATIONS[key]:
             raise AssertionError("array units/location: "+key)
@@ -129,6 +143,7 @@ def synthetic_wire():
             "convective_outward_w_per_m":HT-B,"system_rhs_w_per_m":rhs}
     fmt="thermal.steady2d-result-v2"
     return {"payload_format":WIRE_FORMAT,"kind":"thermal.steady2d",
+            "job":"synthetic-job","result_id":"synthetic-result","client_revision":7,"request_seq":11,
             "result_format":fmt,"field_layout":PAIRS[fmt],"display_length_in_m":1.,
             "arrays":{k:v.tolist() for k,v in arrays.items()},
             "summary":{"physics_type":"thermal.steady2d","result_format":fmt,"field_layout":PAIRS[fmt],
@@ -139,7 +154,8 @@ def synthetic_wire():
 
 def malformed_wires():
     original=synthetic_wire()
-    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra","scale_bool","scale_zero","scale_nan","scale_units","nested_coordinates"):
+    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra","scale_bool","scale_zero","scale_nan","scale_units","nested_coordinates","metadata_shape_float","metadata_shape_bool",
+                 "identity_float","identity_bool","identity_empty"):
         p=copy.deepcopy(original)
         if kind == "layout": p["field_layout"]="thermal2d-p1-node-cell-v1"
         elif kind == "unit": p["summary"]["field_units"]["load_w_per_m"]="W"
@@ -153,6 +169,11 @@ def malformed_wires():
         elif kind == "scale_zero": p["display_length_in_m"]=0.
         elif kind == "scale_nan": p["display_length_in_m"]=float("nan")
         elif kind == "scale_units": p["summary"]["units"]["length"]="mm"
+        elif kind == "metadata_shape_float": p["summary"]["field_shapes"]["temperature_k"]=[5.0]
+        elif kind == "metadata_shape_bool": p["summary"]["field_shapes"]["temperature_k"]=[True]
+        elif kind == "identity_float": p["client_revision"]=7.0
+        elif kind == "identity_bool": p["request_seq"]=True
+        elif kind == "identity_empty": p["result_id"]=""
         elif kind == "nested_coordinates": p["coordinates"]={"display_length_in_m":1.}
         else: p["arrays"]["time_s"]=[0]
         yield kind,p
