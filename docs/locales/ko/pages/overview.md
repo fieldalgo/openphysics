@@ -132,6 +132,13 @@ Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. �
 지원을 입증하지 않습니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며
 검증된 플랫폼 목록이 아닙니다. GitHub Actions는 활성화돼 있습니다. 과거 클라우드 결과는 원래 snapshot의 근거이며 새 커밋은 정확한 workflow 결과를 확인해야 합니다.
 
+현재 CI 구성에는 Linux·macOS·Windows 설치 패키지 검사가 추가되어 있습니다.
+각 OS에서 여섯 구현 sdist를 wheel로 만들고 격리 소비자의 import, 패키지 바이트,
+번들 자산과 선택한 공개 API/CLI/저장 동작을 확인합니다. 필수 `tests` 집계는
+전체 Linux 수용과 세 설치 플랫폼을 모두 기다리며 기존 Windows 열전도 검사도
+필수로 유지합니다. 이는 구성된 검증 범위이며 과거 통과 결과에 새 주장을 더하지
+않습니다. 범위·명령·정확 실행 artifact는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고하세요.
+
 ## 문서와 기여
 
 [문서 색인](index.md)에서 시작하세요. 사용법·검증 안내는

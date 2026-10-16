@@ -4,6 +4,13 @@
 
 ## 현재 checkout과 근거
 
+현재 CI 구성에는 Linux·macOS·Windows 설치 패키지 검사가 추가되어 있습니다.
+각 OS에서 여섯 구현 sdist를 wheel로 만들고 격리 소비자의 import, 패키지 바이트,
+번들 자산과 선택한 공개 API/CLI/저장 동작을 확인합니다. 필수 `tests` 집계는
+전체 Linux 수용과 세 설치 플랫폼을 모두 기다리며 기존 Windows 열전도 검사도
+필수로 유지합니다. 이는 구성된 검증 범위이며 과거 통과 결과에 새 주장을 더하지
+않습니다. 범위·명령·정확 실행 artifact는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고하세요.
+
 이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
 [도구 개요·설치 안내](overview.md) · [영어 개요](../../../overview.md)

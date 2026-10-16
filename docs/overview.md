@@ -140,6 +140,14 @@ and `py3-none-any` wheels describe metadata, not a tested platform matrix.
 GitHub Actions is enabled. Recorded cloud results remain evidence for their
 original snapshots; check the exact workflow run for newer commits.
 
+The current CI configuration adds installed-package checks on Linux, macOS and
+Windows. Each builds six implementation sdists into wheels and validates isolated
+consumer imports, package bytes, bundled assets and selected public API/CLI/save
+behavior. The required `tests` aggregate waits for full Linux acceptance and all
+three installed platforms; the existing Windows thermal gate also remains required.
+This is configured coverage, not a new historical pass claim. See the
+[validation guide](../ci/docs/README.md) for scope, commands and exact-run artifacts.
+
 ## Documentation and contributions
 
 Start with the [documentation index](README.md). Usage and validation guides

@@ -3,22 +3,23 @@ name: Windows headless thermal save
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # Preserve main runs in one queue per workflow/ref; supersede older non-main runs.
   group: thermal-windows-${{ github.ref }}
   queue: ${{ github.ref == 'refs/heads/main' && 'max' || 'single' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   windows-py312-thermal:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: windows-2022
     timeout-minutes: 20
     env:
