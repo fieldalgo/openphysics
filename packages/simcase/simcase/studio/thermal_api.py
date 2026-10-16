@@ -409,10 +409,28 @@ class ThermalJobs:
         if rec.get("pins", 0):
             self._retired[id(rec)] = rec
 
+    @staticmethod
+    def _allocations(rec):
+        """Payload identities, not references; full-record pins retain all."""
+        values = {}
+        for key in ("status_bytes", "result"):
+            value = rec.get(key)
+            if value is not None:
+                values[id(value)] = len(value)
+        for value in (rec.get("raw") or {}).values():
+            values[id(value)] = value.nbytes
+        return values
+
     def _retained_bytes(self):
-        live = (rec for rec in self._records.values() if rec["lease"].released)
-        return sum(self._record_bytes(rec) for rec in live)+sum(
-            self._record_bytes(rec) for rec in self._retired.values())+sum(len(v) for v in self._snapshots.values())
+        covered, retained = {}, {}
+        for rec in self._records.values():
+            (retained if rec["lease"].released else covered).update(self._allocations(rec))
+        for rec in self._retired.values():
+            retained.update(self._allocations(rec))
+        for allocation, snapshot in self._snapshots.items():
+            if allocation not in covered:
+                retained[allocation] = len(snapshot["payload"])
+        return sum(size for allocation, size in retained.items() if allocation not in covered)
 
     def pin(self, job, *, result=False, result_id=None):
         """Pin one immutable terminal record until transport/reader finally."""
@@ -431,17 +449,20 @@ class ThermalJobs:
             if not rec["lease"].released:
                 if not result:
                     payload = rec["status_bytes"]
-                    self._make_room(len(payload), 0)
-                    pin = RecordPin(self, None, payload)
-                    self._snapshots[id(pin)] = payload
-                    return pin
+                    allocation = id(payload)
+                    snapshot = self._snapshots.setdefault(allocation, {"payload": payload, "refs": 0})
+                    snapshot["refs"] += 1
+                    return RecordPin(self, None, payload, allocation)
                 raise ThermalAPIError("result_not_ready", "terminal publication pending", 409)
             rec["pins"] = rec.get("pins", 0)+1
             return RecordPin(self, rec, rec["result"] if result else rec["status_bytes"])
 
-    def _unpin_snapshot(self, pin):
+    def _unpin_snapshot(self, allocation):
         with self._lock:
-            self._snapshots.pop(id(pin), None)
+            snapshot = self._snapshots[allocation]
+            snapshot["refs"] -= 1
+            if snapshot["refs"] == 0:
+                del self._snapshots[allocation]
 
     def _unpin(self, rec):
         with self._lock:
@@ -511,7 +532,9 @@ class ThermalJobs:
             raw_bytes = sum(a.nbytes for a in raw.values()) if raw is not None else 0
             if len(encoded)+len(result or b"")+raw_bytes > lease.reservation:
                 raise ThermalAPIError("capacity_exceeded", "result exceeds reserved bytes", 429)
-            self._make_room(len(encoded)+len(result or b"")+raw_bytes, 0,
+            old_status = rec["status_bytes"]
+            orphan = len(old_status) if id(old_status) in self._snapshots else 0
+            self._make_room(len(encoded)+len(result or b"")+raw_bytes+orphan, 0,
                             released_reservation=lease.reservation)
             rec.update(status=status, status_bytes=encoded, result=result,
                        raw=raw, raw_bytes=raw_bytes, terminal_at=self._clock())
@@ -559,6 +582,8 @@ class ThermalJobs:
                 try:
                     error = {"code": "publication_failed", "message": "thermal job did not publish a terminal state"}
                     encoded = self._status(rec["identity"], "error", [], error, False)
+                    orphan = len(rec["status_bytes"]) if id(rec["status_bytes"]) in self._snapshots else 0
+                    self._make_room(max(0, len(encoded)-len(rec["status_bytes"])+orphan), 0)
                     rec.update(status="error", status_bytes=encoded, result=None, terminal_at=self._clock())
                 except Exception:
                     # Remove only this unpublished thermal record; never a shared job.
@@ -617,8 +642,9 @@ class Permit:
 
 
 class RecordPin:
-    def __init__(self, jobs, record, payload):
+    def __init__(self, jobs, record, payload, allocation=None):
         self.jobs, self.record, self.payload = jobs, record, payload
+        self.allocation = allocation
         self.released = False
         self._release_lock = threading.Lock()
 
