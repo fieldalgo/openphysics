@@ -651,3 +651,21 @@ thresholds. Report actual testcase, subtest and suite-reported counts separately
 and inspect failure/error/skip elements. Configuration alone is not evidence of
 an executed or passing numerical case. The full source, existing installed,
 independent all-suite/full-convergence and required platform gates remain intact.
+
+
+The installed browser check also consumes the verified archived
+`transient_thermal_uniform.json` through the shipped transient page. It checks
+exact last/first/nonuniform-middle stored indices, T and qx/qy/magnitude with
+current-frame raw ranges, explicit bounded H/V pages and their displayed raw
+values/units, then Mesh/Results visibility. A real in-flight frame is invalidated
+by dirty JSON before its asynchronous success/finally can publish. An explicit
+second user run followed by a browser-local offline negative control checks an
+obsolete transport error/finally without fabricating response bodies or physics.
+The offline condition is restored in a finally block. Report this negative
+control separately from the successful real HTTP solve/read evidence.
+`browser-report.json` retains transient frames/history/raw labels, transport
+failures, hidden/visible invalidation and the existing owned-process cleanup.
+`transient-dirty-results.png` and `transient-error-dirty-results.png` retain the
+empty visible result after each obsolete read. Existing steady browser checks
+remain mandatory. Configured browser scenarios still require exact CI execution;
+a syntax check or Node fixture is not native-browser acceptance.
