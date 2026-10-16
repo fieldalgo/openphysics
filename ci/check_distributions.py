@@ -460,7 +460,8 @@ def main():
         run(python, "-I", examples / "thermoelastic_traction.py", cwd=work, env=env)
         run(python, "-I", tests / "thermoelastic_traction_independent_consumer.py", cwd=work, env=env)
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
-        run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
+        run(python, "-I", "-m", "pytest", "-q", "-ra",
+            "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)
         # Use only byte-verified sdist acceptance files outside the checkout.
         acceptance = work / "transient-acceptance"
