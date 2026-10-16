@@ -100,7 +100,7 @@ See [bundled images, fixtures and data](assets.md) for source history and licens
 
 ## Transient heat: implementation and acceptance evidence
 
-The explicit `galerkin.transient_heat.solve_transient_heat` function implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
+The explicit `galerkin.transient_heat.solve_transient_heat` function implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. The engine function itself does not add document dispatch or saving; the separate headless interface is described below. Studio, restart and automatic heat-to-mechanics coupling remain unsupported.
 
 | English | 한국어 |
 |---|---|
@@ -115,6 +115,6 @@ The historical b2 snapshot's 70 small producer/reference source passes are evide
 | [thermoelastic_traction](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
 | [thermoelastic_traction_independent_validation](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
 
-## Transient engine and document interface boundary
+## Headless transient heat
 
-The transient Python engine does not by itself enable a transient JSON/API/CLI study. See the [interface boundary](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)) for the named snapshot's support, units, initial/step histories and evidence limits. This boundary page does not announce an accepted transient document schema.
+The rectangular `thermal.transient2d` document connects fixed-P1, consistent-mass backward-Euler heat to the Python API, CLI and versioned JSON/NPZ histories. It accepts explicit seconds, uniform/affine initial Kelvin and side-constant or requested-time sampled Dirichlet values with insulation elsewhere. Initial/boundary agreement is checked without projection; finite negative K is not clamped. Studio, transient flux/Robin, restart and automatic coupling remain unsupported. Read the [complete input/API/CLI/save contract](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)). Implemented interfaces and packaging rules require exact combined source, installed and CI evidence; the older engine results are not headless acceptance.

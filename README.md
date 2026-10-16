@@ -17,15 +17,15 @@ coupled multiphysics solver.
 | Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](packages/simcase/README.md), [vector reliability](packages/galerkin/docs/eigenspace_reliability.md) |
 | 3D cavities | Vacuum rectangular PEC-box eigenmodes through a Python API or a single JSON study | [Cavity API](packages/galerkin/docs/cavity_solver.md), [JSON contract](packages/simcase/docs/cavity3d.md) |
 | Heat conduction | Steady homogeneous isotropic 2D conduction; standalone Dirichlet, prescribed-flux and Robin boundaries; a separate rectangular headless JSON path | [Heat API](packages/galerkin/docs/thermal_steady2d.md), [flux/Robin](packages/galerkin/docs/thermal_flux_robin.md), [thermal JSON](packages/simcase/docs/thermal_steady2d.md) |
-| Transient heat | Standalone 2D Python API on a fixed P1 mesh; consistent mass and backward Euler, constant isotropic properties, time-dependent Dirichlet values and insulated edges | [Transient heat](packages/galerkin/docs/transient_heat.md), [validation](packages/galerkin/docs/transient_heat_validation.md) |
+| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation | [Transient heat](packages/galerkin/docs/transient_heat.md), [validation](packages/galerkin/docs/transient_heat_validation.md) |
 | Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](packages/galerkin/docs/elasticity2d.md), [traction](packages/galerkin/docs/elasticity_traction.md) |
 | Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](packages/galerkin/docs/prescribed_temperature_thermoelasticity.md), [total traction](packages/galerkin/docs/thermoelastic_traction.md), [workflow](packages/galerkin/docs/thermal_mechanical_workflow.md) |
 
 The JSON runner supports lossless `em.modes2d`, `em.cavity3d` and the documented
-`thermal.steady2d` subset. Python-only capabilities do not automatically appear
+`thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only capabilities do not automatically appear
 in JSON or Studio. Studio supports 2D optical models; it rejects 3D models and
-has no thermal forms or plots. Transient heat is Python-only, with no transient
-JSON, persistence, flux/Robin input or automatic coupling. Nonlinear mechanics, geometry
+has no thermal forms or plots. Transient heat also has a rectangular headless document path with saved histories,
+but no thermal Studio, restart, transient flux/Robin input or automatic coupling. Nonlinear mechanics, geometry
 sweeps, lossy document-mode solves and fully coupled thermal feedback are not
 part of the integrated scope. The steady heat→mechanics workflow does not yet
 accept the separate Robin/flux/traction extensions.
@@ -157,3 +157,5 @@ the same license used by Wavebit. [NOTICE](NOTICE) and package notices preserve
 third-party terms: embedded refractiveindex.info optical data is CC0 1.0,
 Gmsh is separately installed under its own license, and dependency licenses
 are not replaced by this repository's license.
+
+For transient headless input, initial agreement, time axes and output ownership, follow the [document contract](packages/simcase/docs/thermal_transient2d.md). Current implementation and exact combined CI acceptance are distinct; earlier engine/steady-save measurements do not establish the new public API's acceptance.

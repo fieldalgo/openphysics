@@ -66,15 +66,17 @@ repository; separate historical package repositories are not needed to use them.
   steady and transient thermal, elasticity and prescribed-temperature thermoelastic models,
   plus the documented steady heat-to-mechanics workflow.
 - **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
-  documented `thermal.steady2d` subset. Python-only extensions do not
+  documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
   automatically become document features.
 - **Studio:** a local browser interface for 2D optical models. It rejects 3D
   models and does not yet provide thermal or structural forms and plots.
 
 These layers do not imply a general-purpose, fully coupled multiphysics solver.
 The standalone [transient heat API](../packages/galerkin/docs/transient_heat.md)
-uses a fixed P1 mesh, consistent mass and backward Euler. It has no transient
-JSON, persistence, flux/Robin input or automatic coupling. Exact contracts
+uses a fixed P1 mesh, consistent mass and backward Euler. The separate
+[headless document path](../packages/simcase/docs/thermal_transient2d.md) adds
+rectangular JSON/API/CLI and saved histories, not Studio, restart,
+transient flux/Robin input or automatic coupling. Exact contracts
 and measured validation limits are linked from the
 [documentation index](README.md).
 

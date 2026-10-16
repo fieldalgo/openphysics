@@ -65,15 +65,17 @@ flowchart TB
 - **Python:** 가장 넓은 API 범위를 제공합니다. 독립 전자기·정상 및 과도 열전도·탄성·
   처방 온도 열탄성 모델과 문서화된 정상 열전도→기계 workflow를 포함합니다.
 - **`simcase`의 JSON / CLI:** 무손실 `em.modes2d`, `em.cavity3d`와 문서화된
-  `thermal.steady2d` 부분집합을 지원합니다. Python 전용 확장이 자동으로
+  `thermal.steady2d`와 직사각형 `thermal.transient2d` 부분집합을 지원합니다. Python 전용 확장이 자동으로
   문서 입력 기능에 연결되지는 않습니다.
 - **Studio:** 2D 광학 모델용 로컬 브라우저 화면입니다. 3D 모델을 거부하며,
   열·구조 입력 화면과 결과 그래프는 아직 제공하지 않습니다.
 
 이 계층 구성이 범용 완전 연성 다중물리 해석기를 뜻하지는 않습니다.
 [독립 과도 열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)는
-고정 P1 메시, 일관 질량과 후진 Euler를 사용합니다. 과도 JSON, 저장, flux/Robin 입력과
-자동 연성은 제공하지 않습니다. 정확한 사용 계약과
+고정 P1 메시, 일관 질량과 후진 Euler를 사용합니다.
+별도 [headless 문서 경로](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)는
+직사각형 JSON/API/CLI·저장 이력을 추가하지만 Studio·restart·과도 flux/Robin 입력·
+자동 연성을 제공하지 않습니다. 정확한 사용 계약과
 실측 검증 한계는 [문서 색인](index.md)에 연결돼 있습니다.
 
 ## 실제 코드와의 연결
