@@ -132,3 +132,25 @@ early533에는run_enabled가아직없고terminal2보관뒤TTL만료전admission�
 본단계exactHTTP/물리/설치/CI는모두미실행이다.
 후속생산변경은별도source delta검토·정확결합CI가필요하다.
 별도writer fixture수정은이branch에포함하지않는다.
+
+## 후속 exact binding 판정
+
+f8506b7490b52105c37a55e656dc8f23baa98647 정적검토가위의early533
+자원미완료관측을대체한다. 서버는blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b
+그대로이고adapter는blob4fd5633340ca945aff9c3fb878aeb40a2f6c106e이다.
+
+adapter는공개result_format/field_layout을포착해summary pair와일치를
+요구하며동일top-level표시factor/arrays/summary/identity를유지한다.
+복사전배열shape/dtype/finite/크기를확인하고엄격encoding된결과만게시한다.
+기존layout/unit/shape/nonfinite/bool/index actor는실제소비값을겨냥한다.
+
+capabilities는검증된자원설정하에공개result API가용으로run_enabled를
+명시한다. admission/publication은가장오래된released done/error를회수하며
+active lease는제외한다. thermal기록은optical과분리되고TTL은최대보관시간,
+evicted ID는404이다. reset/TTL대기/mesh수열축소/skip없이
+초기terminal2이후admission문제가정적으로해소됐다.
+
+이sourcebinding에추가독립시험/물리gate변경은필요없었다.
+확정binding blocker미발견으로정적범위를승인한다.
+실제HTTP/source/installed/음성거절/자원동작은정확결합CI가필요하다.
+실측성능/browser/플랫폼수용은아니다.
