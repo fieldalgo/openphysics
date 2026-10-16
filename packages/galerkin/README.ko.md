@@ -224,3 +224,7 @@ Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니�
 [사용법](docs/locales/ko/pages/transient_heat.md) ([English](docs/transient_heat.md)) · [생산 검증 계약](docs/locales/ko/pages/transient_heat_validation.md) ([English](docs/transient_heat_validation.md)) · [독립 검증 보고](docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](docs/transient_heat_independent_validation.md))
 
 구현과 수용 파일은 제출됐지만 수치·빌드·설치 검사는 미실행입니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.
+
+## 처방 온도장의 전체 기계 표면하중
+
+[전체 표면하중 계약](docs/locales/ko/pages/thermoelastic_traction.md), [영어 예제](examples/thermoelastic_traction.py), [독립 보고](docs/locales/ko/pages/thermoelastic_traction_independent_validation.md)는 고정 온도장 기계단계의 선택적 전역 Cartesian Pa 하중을 설명합니다. 매핑은 전체 물리 응력 `sigma*n`이며 열 표면하중을 다시 더하거나 빼면 안 됩니다. 체적·선·열 하중과 구속 반력은 분리해 기록합니다. 기존18개 위치 인자의 결과 구성은 유효하며 새 하중 필드 기본값은 None입니다. scalar pressure 전용·로컬 프레임·follower API는 없지만 고정 기준 경계의 `lambda points_m, normals: -p * normals` 전역 Pa callback은 유효합니다. heat workflow·JSON/CLI/Studio·저장을 확장하지 않습니다.

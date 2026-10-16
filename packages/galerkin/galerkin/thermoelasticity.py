@@ -11,7 +11,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
 from .elasticity import (_mesh_data, _constraints, _quadrature, _real,
-                         constitutive_matrix)
+                         constitutive_matrix, _traction_load)
 
 _M = np.array([1., 1., 0.])
 
@@ -180,7 +180,7 @@ class ThermoelasticResult:
     total_strain is element constant. thermal_strain, elastic_strain, stress,
     sigma_zz and epsilon_zz are sampled at triangle centroids; stress generally
     varies linearly inside a triangle. Strain order is (exx,eyy,gamma_xy).
-    load_external/body, load_thermal, reaction and residual are distinct N/m
+    load_external (body + traction), load_thermal, reaction and residual are N/m
     arrays. physical_elastic_energy is the reduced physical 3D energy, J/m.
     """
     displacement: np.ndarray
@@ -201,22 +201,28 @@ class ThermoelasticResult:
     young_modulus: float
     poisson_ratio: float
     plane: str
+    load_body: np.ndarray | None = None
+    load_traction: np.ndarray | None = None
 
     @property
     def load_total(self):
-        """External body load plus thermal-equivalent load, N/m of thickness."""
+        """External body/traction load plus thermal-equivalent load, N/m of thickness."""
         return self.load_external+self.load_thermal
 
 
 def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_k,
                           thermal_expansion_per_k, young_modulus, poisson_ratio,
-                          plane, dirichlet, body_force=(0.,0.)):
+                          plane, dirichlet, body_force=(0.,0.), traction=None):
     """Solve the static mechanical stage; no automatic heat solve or transfer.
 
     Absolute T/Tref: nonnegative K; alpha: signed 1/K; E: Pa. Coordinates and
-    displacement: m. Natural traction is zero TOTAL thermoelastic traction.
-    Explicit mechanical traction/pressure and cross-mesh interpolation are
-    unsupported. Near-incompressible plane-strain P1 locking remains possible.
+    displacement: m. traction maps boundary_edges tags to global Cartesian
+    Pa vectors or (points_m, outward_normals)->(Q,2) callbacks. It is TOTAL
+    physical sigma*n; never adjust it by thermal traction. None/{} keeps zero
+    TOTAL natural traction. Prescribed components retain applied line loads in
+    reactions/support work. No dedicated scalar-pressure keyword, local-frame traction API, or follower
+    geometry update is provided. A global Pa callback returning -p*normal is valid
+    on the fixed reference boundary. Cross-mesh interpolation is unsupported. Near-incompressible plane-strain P1 locking remains possible.
     """
     p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
     _verify_snapshot(temperature_snapshot,p,t)
@@ -236,10 +242,12 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
         raise ValueError("element stiffness exceeds finite numeric range")
     rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
     k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
-    external = _external_body_load(p,t,area,dofs,body_force)
+    body = _external_body_load(p,t,area,dofs,body_force)
+    line = _traction_load(mesh,p,t,traction)
+    external = body+line
     thermal = _thermal_load(area,b,dofs,q[t].mean(axis=1),len(p))
     load = external+thermal
-    if not all(np.all(np.isfinite(v)) for v in (external,thermal,load)):
+    if not all(np.all(np.isfinite(v)) for v in (body,line,external,thermal,load)):
         raise ValueError("assembled external/thermal load exceeds finite numeric range")
     free = np.setdiff1d(np.arange(len(load)),fixed)
     u = np.zeros_like(load)
@@ -277,4 +285,5 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
         raise ValueError("computed thermoelastic strain/stress exceeds finite numeric range")
     return ThermoelasticResult(u.reshape(-1,2),strain,th,elastic,stress,zz,ez,
         external.reshape(-1,2),thermal.reshape(-1,2),reaction.reshape(-1,2),
-        residual.reshape(-1,2),energy,temperature_snapshot,tref,alpha,e,nu,plane)
+        residual.reshape(-1,2),energy,temperature_snapshot,tref,alpha,e,nu,plane,
+        body.reshape(-1,2),line.reshape(-1,2))

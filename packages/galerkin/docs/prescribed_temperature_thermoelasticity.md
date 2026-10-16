@@ -31,8 +31,11 @@ returning `(Q,2)` force densities in N/m^3. It is integrated with the same
 six-point-per-axis Duffy rule as the elasticity body load. Meshes use triangles
 with vector nodal displacement; DOF order is `[ux0, uy0, ux1, uy1, ...]`.
 Dirichlet maps exterior `(node, component)` to displacement m; components are
-0=x, 1=y. Remaining components have **zero total thermoelastic natural traction**.
-Explicit traction and pressure are unsupported in this version.
+0=x, 1=y. Without an applied traction mapping, remaining components have **zero total
+thermoelastic natural traction**. The optional global Cartesian total-traction
+mapping is described in the [traction contract](thermoelastic_traction.md).
+There is no dedicated scalar-pressure/local-frame/follower API; a global Pa
+callback `lambda points_m, normals: -p * normals` is valid on the fixed boundary.
 
 Loads and reactions are line forces per out-of-plane thickness, N/m. Multiplying
 by an actual thickness in m gives N. Physical elastic energy is J/m; multiplying
@@ -175,11 +178,13 @@ Homogeneous isotropic linear small-strain, static triangular P1 displacement,
 constant material/alpha and explicitly prescribed same-mesh nodal-P1 T only.
 Near-incompressible plane strain can lock; nu approaching .5 is not cured by
 validation. No nonlinear/large-strain/contact/dynamics/3D/thermal conduction,
-explicit traction/pressure, material-temperature dependence, cross-mesh transfer,
+dedicated scalar-pressure/local-frame/follower APIs, material-temperature dependence, cross-mesh transfer,
 simcase or Studio integration is included. Boundary tags do not certify units
 or provenance. Callable body forces are integrated numerically, so highly
 oscillatory inputs require an independently adequate mesh/quadrature.
 
-Shared MANIFEST/README/CI remain release-owner files. New Python submodules are
-wheel-importable; adding this document/example to source-distribution asset
-manifests and release consumer gates is a release-owner follow-up proposal.
+This document and its English example are included in the source-distribution
+manifest and required byte-asset checks. Installed-wheel consumer checks are
+configured to execute the verified archived example with isolated Python.
+Inclusion and check configuration are not execution results; confirm actual
+build, installation and validation outcomes for the exact candidate.

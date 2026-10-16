@@ -43,6 +43,17 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/transient_heat_independent_oracle.py',
               'tests/transient_heat_independent_cases.py',
               'tests/transient_heat_independent_consumer.py',
+              'galerkin/thermoelasticity.py',
+              'docs/thermoelastic_traction.md',
+              'docs/locales/ko/pages/thermoelastic_traction.md',
+              'examples/thermoelastic_traction.py',
+              'tests/test_thermoelastic_traction.py',
+              'tests/test_thermoelastic_traction_convergence.py',
+              'docs/thermoelastic_traction_independent_validation.md',
+              'docs/locales/ko/pages/thermoelastic_traction_independent_validation.md',
+              'tests/test_thermoelastic_traction_independent_validation.py',
+              'tests/thermoelastic_traction_independent_oracle.py',
+              'tests/thermoelastic_traction_independent_consumer.py',
               'docs/thermal_mechanical_independent_validation.md',
               'docs/locales/ko/pages/thermal_mechanical_independent_validation.md',
               'tests/test_thermal_mechanical_independent_validation.py',
@@ -99,7 +110,9 @@ DOCUMENT_ASSETS = {'galerkin': (
  'galerkin-refsol': (
               'refsol/transient_heat.py',
               'tests/test_transient_heat_reference.py',
-              'refsol/elasticity.py',
+              'refsol/thermoelastic_traction.py',
+                     'tests/test_thermoelastic_traction_reference.py',
+                     'refsol/elasticity.py',
                      'refsol/thermal.py',
                      'refsol/elasticity_traction.py',
                      'refsol/thermoelasticity.py',
@@ -293,10 +306,26 @@ def main():
         with tarfile.open(galerkin_sdist) as archive:
             for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
                              "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
-                             "thermal_mechanical_workflow.py", "transient_heat_convergence.py"):
+                             "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
+                             "transient_heat_convergence.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
+            # Preserve new original acceptance files from the verified archive.
+            for filename in ("test_thermoelastic_traction.py",
+                             "test_thermoelastic_traction_convergence.py",
+                             "test_thermoelastic_traction_independent_validation.py",
+                             "thermoelastic_traction_independent_oracle.py",
+                             "thermoelastic_traction_independent_consumer.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (tests / filename).write_bytes(archive.extractfile(member).read())
+        refsol_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin-refsol")
+        with tarfile.open(refsol_sdist) as archive:
+            filename = "test_thermoelastic_traction_reference.py"
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+            (tests / filename).write_bytes(archive.extractfile(member).read())
         simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
         with tarfile.open(simcase_sdist) as archive:
             for filename in ("thermal_slab.json", "thermal_mixed.json"):
@@ -305,6 +334,8 @@ def main():
                 (examples / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
         run(python, "-I", examples / "thermal_mechanical_workflow.py", cwd=work, env=env)
+        run(python, "-I", examples / "thermoelastic_traction.py", cwd=work, env=env)
+        run(python, "-I", tests / "thermoelastic_traction_independent_consumer.py", cwd=work, env=env)
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)

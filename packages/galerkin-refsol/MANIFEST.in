@@ -1,3 +1,5 @@
 include README.ko.md
+include refsol/thermoelastic_traction.py
+include tests/test_thermoelastic_traction_reference.py
 include refsol/transient_heat.py
 include tests/test_transient_heat_reference.py

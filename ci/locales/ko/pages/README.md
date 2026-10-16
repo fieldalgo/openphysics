@@ -235,7 +235,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 94개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 107개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -274,11 +274,19 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 파일을 scan합니다. 설치 module origin과 wheel module byte는 별도로 확인합니다.
 이 배포 검사가 schema/CLI/Studio 지원이나 열역학적 완전 연성을 인증하지는 않습니다.
 
+## 처방 온도 전체 표면하중의 배포 계약
+
+필수 byte 목록은 기존79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개입니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
+
+새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
+
+개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 비활성 상태이며 조회·활성화·dispatch·재실행을 하지 않습니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
+
 ## 과도 열전도 배포 연결 (실행 대기)
 
 helper는 기존 일곱 배포의 build·strict metadata/license·byte/link·역사 JSON gate와
-설치 소비자 suite를 유지합니다. 필수 자산은 기존 79개 전부와 과도 자산 15개를 합한
-94개입니다. 사용법·생산 검증·독립 보고 EN/KO 여섯 페이지, 영어 수렴 예제,
+설치 소비자 suite를 유지합니다. 필수 자산은 기존 92개 전부와 과도 자산 15개를 합한
+107개입니다. 사용법·생산 검증·독립 보고 EN/KO 여섯 페이지, 영어 수렴 예제,
 엔진/참조 모듈, 원 생산/참조 시험, 독립 oracle/cases/pytest-wrapper/consumer
 네 파일이 sdist와 byte 단위로 같아야 합니다. 동결 oracle·수용 gate·역사 보고는
 수정하지 않습니다.
@@ -307,7 +315,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 승인된 cloud 환경과 비어 있는 본인 출력 경로를 사용하고 현재 source 실행 뒤에
 이 무거운 순서를 배정하며 동시에 실행하지 않습니다. helper는 설치 pytest→독립
 `all`→archive 수렴 예제를 순차 실행합니다. 실제 exit/count·로그를 별도 보존하며
-실패하면 helper가 멈추므로 이후 단계는 미실행입니다. 기존 389 소비자는 과거 기준
+실패하면 helper가 멈추므로 이후 단계는 미실행입니다. 기존 541 소비자는 과거 기준
 범위이며 새 후보의 실측 count가 아닙니다. 독립 unittest 사례/subtest와 archive
 프로그램 assertion은 pytest JUnit count와 별도입니다. native prerequisite 누락,
 optional skip, strict 도구 가용성도 실제 환경에서 확인해 기록해야 합니다.
@@ -315,4 +323,4 @@ optional skip, strict 도구 가용성도 실제 환경에서 확인해 기록�
 공개 API는 고정 메시 standalone 후진 Euler이며 과도 JSON/CLI/Studio, Robin/flux
 입력, 저장 또는 자동 열–기계 연결이 아닙니다. Actions는 비활성이고 Windows는
 미검증입니다. root source 회귀·이 배포 순서·오너 통합은 각자 exact-SHA 근거가
-필요하며 진행 중인 처방온도+traction 검증 후보는 여기에 합치지 않습니다.
+필요하며 통합된 처방온도+traction gate와 standalone 소비자는 그대로 보존합니다.

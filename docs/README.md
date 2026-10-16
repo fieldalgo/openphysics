@@ -73,3 +73,8 @@ The explicit `galerkin.transient_heat.solve_transient_heat` submodule implements
 | [transient_heat_independent_validation](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
 
 Implementation and independent acceptance files are submitted; numerical, build and installed validation remain unexecuted. These links describe this checkout, not a validated release or integration acceptance. The validation pages distinguish fixed gates from observed results.
+
+| English | 한국어 |
+|---|---|
+| [thermoelastic_traction](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
+| [thermoelastic_traction_independent_validation](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |

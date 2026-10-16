@@ -75,3 +75,8 @@
 | [transient_heat_independent_validation](../../../../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
 
 구현과 독립 수용 파일은 제출됐지만 수치·빌드·설치 검증은 미실행입니다. 이 링크는 현재 checkout을 설명하며 검증된 릴리스나 통합 수용을 뜻하지 않습니다. 검증 페이지는 고정 gate와 관측 결과를 구분합니다.
+
+| English | 한국어 |
+|---|---|
+| [thermoelastic_traction](../../../../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
+| [thermoelastic_traction_independent_validation](../../../../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |

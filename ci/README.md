@@ -276,7 +276,7 @@ All seven Korean package READMEs and received Korean guide counterparts are
 required byte assets. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 94 entries.
+are likewise required. The current required-byte list contains 107 entries.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
@@ -324,11 +324,19 @@ The guard stays in source; its six tests scan actual engine files. Installed
 module origins and wheel module bytes are checked separately. This packaging
 check does not add schema/CLI/Studio support or certify thermodynamic coupling.
 
+## Prescribed-temperature total-traction distribution contract
+
+The required byte inventory now contains92 entries: the existing79 plus13 exact traction implementation/reference/guide/example/producer/independent assets. Original independent reports and tests retain their historical counts and failures. The installed suite preserves389 prior cases and adds the original producer/reference/convergence files and independent90; report actual collected counts, failures and optional skips rather than treating planned totals as passing. The four standalone original `python -I` consumer checks run separately, as does the actual archived English example. No copied engine guard may scan an empty directory; source guard6 and installed origins/module bytes remain separate checks.
+
+The new Python API applies total physical `sigma*n` on the prescribed-temperature mechanical stage. There is no scalar-pressure keyword/local-frame/follower API; global Pa `-p*normal` callbacks on fixed reference geometry are valid. The one-way heat workflow and JSON/CLI/Studio remain unchanged. Producer reproduction commands use the repository root; extracted sdists have package-local `tests/` and `examples/` paths. Both original test files and required oracle/reference sources are shipped explicitly.
+
+Individual candidate measurements90/90/isolated4/related208/wrong17 do not establish a combined whole or installed result. The independent report preserves the original whole1385pass/7CLI-environment failures/16skip/+9subtests and target7 recovery as distinct evidence. New results must identify the exact source and real archives, actual failures and optional skips. GitHub Actions is disabled; no query/enable/dispatch/rerun is permitted. Linux results cannot establish Windows acceptance, and core metadata parsing does not substitute for unavailable twine strict checks.
+
 ## Transient heat distribution connections (execution pending)
 
 The helper retains the existing seven-distribution build, strict metadata/license,
 byte/link/historical-JSON gates and installed consumer suite. The required asset
-list is now 94 entries: all previous 79 plus 15 transient assets. Six EN/KO usage,
+list is now 107 entries: all previous 92 plus 15 transient assets. Six EN/KO usage,
 producer-validation and independent-report pages, the English convergence example,
 the engine/reference modules, original producer/reference tests, and all four
 independent oracle/cases/pytest-wrapper/consumer files must match their sdists.
@@ -361,7 +369,7 @@ schedule this heavy sequence after the current source run, not concurrently.
 The helper runs installed pytest, then independent `all`, then the archived
 convergence example sequentially. Preserve their separate actual exits/counts and
 logs; a failure stops the helper and later stages remain unexecuted. Existing
-389-consumer history is a baseline scope, not a measured new candidate count.
+541-consumer history is a baseline scope, not a measured new candidate count.
 Independent unittest cases/subtests and archived-program assertions are separate
 from pytest JUnit counts. Missing native prerequisites, optional skips and strict
 tool availability must be reported from the actual environment.
@@ -370,4 +378,4 @@ The public API is standalone fixed-mesh backward Euler, not transient JSON/CLI/
 Studio, Robin/flux input, persistence or automatic thermal-mechanical coupling.
 Actions remains disabled and Windows remains unverified. Root source regression,
 this distribution sequence and owner integration require their own exact-SHA
-evidence; the in-progress validation of thermoelastic traction is not merged here.
+evidence; the integrated thermoelastic-traction gates and standalone consumer remain intact.

@@ -104,4 +104,6 @@ GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않�
 
 명시적 Python 전용 [정상 열전도→기계 workflow](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md)는 같은 메시 열전도와 처방 온도 기계단계를 불변 nodal-P1 Kelvin 복사로 연결합니다. [독립 보고](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md)는 실측 수용과 구현 범위를 구분합니다. JSON/CLI/Studio 연결·저장·Robin/flux/traction workflow·과도 피드백·열역학적 완전 연성을 추가하지 않습니다.
 
+처방 온도장 기계단계는 선택적인 [전역 Cartesian 전체 표면하중](packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md)을 받으며 [독립 보고](packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md)를 제공합니다. 전역 Pa callback `-p*normal`은 유효하지만 scalar pressure 전용·로컬 프레임·follower API는 없습니다. 정상 열전도→기계 workflow나 JSON/CLI/Studio를 확장하지 않습니다.
+
 standalone [과도 열전도 Python API](packages/galerkin/docs/locales/ko/pages/transient_heat.md)는 고정 P1 삼각형·일관 질량·후진 Euler를 사용합니다. [생산 검증 계약](packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md)과 [독립 보고](packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md)는 작성된 gate와 실측 근거를 구분합니다. 배포 검사는 전체 archive 수렴 예제와 독립 `--suite all`을 소비하도록 설정하며 설정은 실행 결과가 아닙니다. 과도 JSON/CLI/Studio, Robin/flux 입력, 저장 또는 자동 열→기계 연결은 추가하지 않습니다.

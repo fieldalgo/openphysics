@@ -47,6 +47,17 @@ include docs/thermal_mechanical_independent_validation.md
 include docs/locales/ko/pages/thermal_mechanical_independent_validation.md
 include tests/test_thermal_mechanical_independent_validation.py
 include tests/thermal_mechanical_independent_oracle.py
+include galerkin/thermoelasticity.py
+include docs/thermoelastic_traction.md
+include docs/locales/ko/pages/thermoelastic_traction.md
+include examples/thermoelastic_traction.py
+include tests/test_thermoelastic_traction.py
+include tests/test_thermoelastic_traction_convergence.py
+include docs/thermoelastic_traction_independent_validation.md
+include docs/locales/ko/pages/thermoelastic_traction_independent_validation.md
+include tests/test_thermoelastic_traction_independent_validation.py
+include tests/thermoelastic_traction_independent_oracle.py
+include tests/thermoelastic_traction_independent_consumer.py
 include galerkin/transient_heat.py
 include docs/transient_heat.md
 include docs/locales/ko/pages/transient_heat.md
