@@ -242,7 +242,8 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 docs/ 안의 패키지 개요 EN/KO 일곱 쌍과 수신한 한국어 안내는 필수 byte 자산입니다. 진입점 README는 영어로 유지합니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 114개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 134개이며 headless 과도 추가 항목은 아래에서
+설명합니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -303,7 +304,7 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 [독립 보고](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md)는
 생산 담당의 소형 source70개 기록과 남은 gate를 구분합니다.
 
-필수 byte 목록114개는 공개 baseline99개와 과도15개입니다. EN/KO여섯 페이지,
+엔진만 추가한 단계의 필수 byte 목록114개는 공개 baseline99개와 과도15개였습니다. EN/KO여섯 페이지,
 영어 수렴 예제, 새 runtime모듈 두 개, 원생산/참조시험과 독립
 oracle/cases/pytest-wrapper/consumer 네 파일을 포함합니다. 기존 metadata/license,
 archive링크·역사JSON·traction수용 검사는 유지합니다. 새 runtime두모듈은 wheelbyte도
@@ -337,8 +338,9 @@ subprocess.run([sys.executable, "ci/check_distributions.py", "--output", str(out
 비어 있는 본인 출력경로와 문서의 검증 의존성을 사용합니다. 이는 재현명령이며 후보
 build나통과 근거가 아닙니다. pytestJUnit·독립unittest사례/subtest·archive프로그램
 결과·nativeprerequisite를 별도 보고합니다. 기존 traction541사례와 전용consumer4는
-baseline근거이며 새 과도 count가 아닙니다. standalonePython후보는 과도JSON/CLI/Studio,
-Robin/flux입력·저장·자동열–기계연결을 추가하지 않습니다. 수용 전에 CI와 cloud실험의
+baseline근거이며 새 과도 count가 아닙니다. 엔진만 추가한 단계에는 과도JSON/CLI와
+저장이 없었습니다. 현재 headless API·JSON/CLI·저장 이력은 아래에서 설명합니다.
+과도 Studio·Robin/flux입력·자동열–기계연결은 아직 지원하지 않습니다. 수용 전에 CI와 cloud실험의
 정확source근거가 필요하며 Linux결과가 Windows지원을 입증하지 않습니다.
 
 ## Headless 과도 배포 검증
