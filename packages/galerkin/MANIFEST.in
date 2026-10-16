@@ -73,3 +73,4 @@ include tests/transient_heat_independent_oracle.py
 include tests/transient_heat_independent_cases.py
 include tests/transient_heat_independent_consumer.py
 include tests/test_transient_heat_tiny_domain.py
+include tests/test_transient_heat_general_state.py
