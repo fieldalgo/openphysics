@@ -73,6 +73,15 @@ PHYSICS_TYPES = {"em.modes2d", "em.cavity3d", "thermal.steady2d", "thermal.trans
 FORMULATIONS = {"scalar", "vector"}
 
 
+def _steady_boundary_requested(data) -> bool:
+    """New mappings opt into strict v2 by presence, including empty objects."""
+    physics = data.get("physics") if isinstance(data, dict) else None
+    return isinstance(physics, dict) and any(
+        isinstance(p, dict) and p.get("type") == "thermal.steady2d"
+        and ("outward_flux_w_m2" in p or "convection" in p)
+        for p in physics.values())
+
+
 class DocumentError(ValueError):
     pass
 
@@ -243,6 +252,14 @@ class Document:
         if is_transient_thermal(d):
             validate_transient_thermal(self)
             return
+        if _steady_boundary_requested(d):
+            from .steady_boundary_contract import validate_steady_boundary
+            validate_steady_boundary(self)
+            # Schema normalization is separate from the non-mutating validator.
+            self.scale = units.resolve(d["units"])
+            self.sole_physics()[1].setdefault("heat_source_w_m3", 0.0)
+            self.notes = []
+            return
         if str(d.get("openphysics")) != FORMAT:
             raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
         try:
@@ -390,6 +407,22 @@ class Document:
         from .transient_thermal_contract import is_transient_thermal, transient_thermal_summary
         if is_transient_thermal(self.data):
             return transient_thermal_summary(self)
+        if _steady_boundary_requested(self.data):
+            from .steady_boundary_contract import steady_result_versions
+            self.validate()
+            name, p = self.sole_physics()
+            result_format, field_layout = steady_result_versions(self)
+            return (
+                f'{self["name"]} (openphysics 0.2)\n'
+                f'  physics {name}: thermal.steady2d, single steady heat\n'
+                f'  domain {self.domain} {self.length_unit}; mesh {self["mesh"]["subdivisions"]}\n'
+                f'  k={p["conductivity_w_mk"]} W/(m K), Q={p["heat_source_w_m3"]} W/m^3\n'
+                f'  Dirichlet {p["dirichlet_temperature_k"]} K; '
+                f'outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
+                f'convection {p.get("convection", {})}\n'
+                '  q.n = g_out + h*(T-T_ambient); unselected natural sides insulated\n'
+                f'  result: {result_format}; layout: {field_layout}\n'
+                '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth')
         from .thermal import is_thermal, thermal_summary
         if is_thermal(self.data):
             return thermal_summary(self)
