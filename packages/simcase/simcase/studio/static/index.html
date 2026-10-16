@@ -115,11 +115,21 @@
             <option value="qx">qx (W/m², cells)</option><option value="qy">qy (W/m², cells)</option>
             <option value="magnitude">|q| (W/m², cells)</option>
           </select></label>
+          <span id="transientControls" hidden>
+            <label>saved index <select id="transientTime"></select></label>
+            <button id="transientPrev">Previous</button><button id="transientNext">Next</button>
+            <button id="transientRetry">Read frame</button>
+          </span>
           <span id="resInfo">no results yet — press Run</span>
         </div>
         <div class="results-body">
           <div class="split"><canvas id="fieldCanvas" class="plot"></canvas></div>
-          <div class="side"><canvas id="sweepCanvas" width="340" height="240"></canvas><div id="resTable"></div></div>
+          <div class="side"><canvas id="sweepCanvas" width="340" height="240"></canvas><div id="resTable"></div><div id="transientHistory" hidden>
+            <p>H [J/m] and V [J K/m] are distinct. Read saved pages explicitly (at most 16 rows).</p>
+            <label>page start index <input id="transientPageStart" type="number" min="0" step="1" value="0"></label>
+            <button id="transientReadH">Read H page</button><button id="transientReadV">Read V page</button>
+            <div id="transientH"></div><div id="transientV"></div>
+          </div></div>
         </div>
       </div>
       <div id="tab-json">
@@ -136,6 +146,7 @@
 </footer>
 
 <script src="/static/thermal.js"></script>
+<script src="/static/transient_thermal.js"></script>
 <script>
 'use strict';
 // ------------------------------------------------------------------ state
@@ -154,6 +165,8 @@ function isHeadlessThermal(data = doc) {
   return Object.values(data?.physics || {}).some(p => isHeadlessThermalType(p?.type));
 }
 function clearResultViews() {
+  $('transientControls').hidden=$('transientHistory').hidden=true;
+  $('transientH').textContent=$('transientV').textContent='';
   for (const id of ['meshInfo', 'meshLegend']) $(id).textContent = '';
   $('thermalControls').hidden=true; $('fieldCanvas').onmousemove=null;
   meshData = resultData = null; currentJob = null;
@@ -165,6 +178,7 @@ function clearResultViews() {
 function invalidateDocument() {
   documentRevision += 1; inputSequence += 1;
   if (thermalController) thermalController.invalidate();
+  if (transientController) transientController.invalidate();
   clearResultViews();
   $('runBtn').disabled = $('meshBtn').disabled = editorDirty || isHeadlessThermal();
   return documentRevision;
@@ -189,7 +203,7 @@ const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalS
     return reply;
   },
   onState: state => {
-    if (!isHeadlessThermal()) return; // Thermal capability startup must not disturb optical UI.
+    if (!isHeadlessThermal() || isTransientDoc()) return; // Thermal capability startup must not disturb optical UI.
     $('meshBtn').disabled = true;
     $('runBtn').disabled = editorDirty || !state.canRun;
     if (!state.result) {
@@ -210,6 +224,127 @@ const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalS
     showTab('results'); drawThermalViews();
   }
 });
+
+function isTransientDoc(data=doc) { return Object.values(data?.physics||{}).some(p=>p?.type==='thermal.transient2d'); }
+function transientSupported() { return !!transientController?.supports(doc); }
+function clearTransientField(message='No accepted saved-time frame') {
+  const cv=$('fieldCanvas');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.onmousemove=null;
+  $('resInfo').textContent=message;
+}
+const transientController=typeof TransientThermalStudio==='undefined'?null:TransientThermalStudio.createController({
+  request:async(method,url,body,rawDoc)=>{
+    const encoded=rawDoc===undefined?JSON.stringify(body):
+      '{"doc":'+rawDoc+',"client_revision":'+body.client_revision+',"request_seq":'+body.request_seq+'}';
+    const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:encoded});
+    const reply=await response.json();
+    if(!response.ok)throw Error(reply.error?.message||('HTTP '+response.status));
+    return reply;
+  },
+  onState:state=>{
+    if(!isTransientDoc())return;
+    $('meshBtn').disabled=true;$('runBtn').disabled=editorDirty||!state.canRun;
+    $('transientControls').hidden=$('transientHistory').hidden=!state.manifest;
+    if(!state.manifest){clearResultViews();}
+    const nt=state.manifest?.time_s.length||0;
+    $('transientPrev').disabled=!nt||state.index===0;
+    $('transientNext').disabled=!nt||state.index===nt-1;
+    $('transientRetry').disabled=!nt||state.readActive;
+    $('transientReadH').disabled=$('transientReadV').disabled=!nt||state.readActive;
+    if(state.error){status(state.error);log(state.error,'err');}
+    else status(state.busy?'transient request…':state.readActive?'reading saved transient data…':
+      state.frame?'transient frame ready':state.manifest?'select a saved frame':state.validated?'transient thermal valid':'validate current transient JSON');
+  },
+  onManifest:man=>{
+    $('transientTime').innerHTML=man.time_s.map((t,i)=>'<option value="'+i+'">index '+i+'; t = '+t+' s</option>').join('');
+    $('transientTime').value=man.default_frame_index;
+    $('transientPageStart').value=Math.floor(man.default_frame_index/16)*16;
+    $('thermalControls').hidden=false;$('thermalField').value='temperature_k';
+    $('componentLabel').hidden=true;$('ptSel').innerHTML=$('modeSel').innerHTML='';
+    renderTransientSummary(man);showTab('results');
+  },
+  onFrame:frame=>{
+    if(!isTransientDoc())return;
+    if(!frame)clearTransientField();
+    const pages=transientController.state().pages;for(const page of Object.values(pages))renderTransientHistory(page);
+    drawTransientViews();
+  },
+  onHistory:page=>renderTransientHistory(page)
+});
+function renderTransientSummary(man) {
+  const host=$('resTable');host.textContent='';
+  const text=document.createElement('p');
+  text.textContent='Accepted transient result: '+man.arrays.nodes_m.length+' nodes, '+man.arrays.triangles.length+
+    ' cells; '+man.time_s.length+' exact saved times. Frame colours use the current frame min/max; equal colours at different times need not mean equal values.';
+  host.appendChild(text);
+  const details=document.createElement('details'),label=document.createElement('summary'),pre=document.createElement('pre');
+  label.textContent='Full result metadata';pre.textContent=JSON.stringify(man.summary,null,2);details.appendChild(label);details.appendChild(pre);host.appendChild(details);
+}
+function renderTransientHistory(page) {
+  const state=transientController.state();if(!state.manifest||page.result_id!==state.manifest.result_id)return;
+  const h=page.field==='heat_content_j_per_m',host=$(h?'transientH':'transientV');host.textContent='';
+  const title=document.createElement('p');title.textContent=(h?'H heat content':'V quadratic functional (not stored heat)')+
+    ' ['+page.unit+']; saved indices ['+page.start+', '+page.stop+')';host.appendChild(title);
+  const table=document.createElement('table');
+  page.time_indices.forEach((index,i)=>{
+    const row=document.createElement('tr'),button=document.createElement('button'),value=document.createElement('td'),time=document.createElement('td');
+    button.textContent='index '+index+(state.frame&&state.index===index?' (current frame)':'');button.onclick=()=>selectTransient(index);
+    const cell=document.createElement('td');cell.appendChild(button);row.appendChild(cell);
+    time.textContent='t = '+page.time_s[i]+' s';value.textContent=String(page.arrays[page.field][i])+' '+page.unit;
+    row.appendChild(time);row.appendChild(value);table.appendChild(row);
+  });host.appendChild(table);
+}
+function drawTransientViews() {
+  const state=transientController?.state(),man=state?.manifest;
+  if(!man||!transientSupported())return;
+  const token=transientController.renderToken();
+  Promise.resolve().then(()=>{
+    const current=()=>transientController.renderCurrent(token);
+    if(!current())return;
+    const mesh=$('meshCanvas'),mr=mesh.getBoundingClientRect();
+    if(mr.width>0&&mr.height>0){
+      ThermalStudio.draw(mesh,TransientThermalStudio.meshModel(man),{meshOnly:true,current});
+      if(!current())return;
+      $('meshInfo').textContent='Actual transient result mesh — '+man.arrays.nodes_m.length+' nodes, '+man.arrays.triangles.length+' cells; axes '+man.lengthLabel;
+      $('meshLegend').textContent='';
+    }
+    const cv=$('fieldCanvas'),rect=cv.getBoundingClientRect();
+    if(rect.width<=0||rect.height<=0){cv.onmousemove=null;return;}
+    if(!state.frame){clearTransientField(state.error||'Saved index '+state.index+'; t = '+man.time_s[state.index]+' s — no accepted frame');return;}
+    try{
+      const model=TransientThermalStudio.model(man,state.frame,state.view);
+      if(!current())return;ThermalStudio.draw(cv,model,{current});
+      if(!current())return;
+      $('resInfo').textContent='Saved index '+state.index+'; t = '+state.frame.time_s+' s; '+model.field+' ['+model.unit+
+        ']; current-frame raw '+model.min+' … '+model.max+'; colours rescale per frame';
+      cv.onmousemove=e=>{
+        if(!current())return;
+        const r=cv.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
+        const transform=ThermalStudio.transform(model,r.width,r.height);
+        const value=ThermalStudio.sample(model,transform.inverse(e.clientX-r.left,e.clientY-r.top));
+        if(value!==null)$('resInfo').textContent='Saved index '+state.index+'; t = '+state.frame.time_s+' s; '+model.field+
+          ' = '+value+' '+model.unit+'; current-frame raw '+model.min+' … '+model.max;
+      };
+    }catch(error){if(current()){clearTransientField(state.view+' — view error: '+error.message);status(error.message);log(error.message,'err');}}
+  }).catch(error=>{if(transientController.renderCurrent(token)){status(error.message);log(error.message,'err');}});
+}
+function selectTransient(index) {
+  if(!transientController?.result())return;
+  try{
+    const raw=index===undefined?String($('transientTime').value):String(index);
+    if(!/^(0|[1-9]\d*)$/.test(raw))throw Error('Select an integer saved time index');
+    transientController.select(Number(raw),$('thermalField').value||'temperature_k');
+    $('transientTime').value=Number(raw);
+  }catch(error){clearTransientField(error.message);status(error.message);log(error.message,'err');}
+}
+function readTransientHistory(field) {
+  try{
+    const man=transientController?.result(),raw=String($('transientPageStart').value);
+    if(!man||!/^(0|[1-9]\d*)$/.test(raw))throw Error('Select an integer history page start');
+    const start=Number(raw),stop=Math.min(start+Math.min(16,transientController.state().cap.limits.page_rows),man.time_s.length);
+    if(!transientController.loadHistory(field,start,stop))status('A saved-data read is active; select Read again after it finishes');
+  }catch(error){status(error.message);log(error.message,'err');}
+}
+
 function thermalSupported() { return !!thermalController?.supports(doc); }
 function drawThermalViews() {
   const payload=thermalController?.result();
@@ -332,6 +467,7 @@ function drawTriangles(ctx, T, nodes, tris, colorOf, edges = true) {
   }
 }
 function drawMesh() {
+  if(transientSupported()){drawTransientViews();return;}
   if (thermalController?.result() && thermalSupported()) { drawThermalViews(); return; }
   const cv = $('meshCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!meshData || !doc) return;
@@ -350,6 +486,7 @@ function vectorMagnitudes(field, mode, component) {
     ? Math.hypot(...v, ...im[t]) : Math.hypot(v[+component], im[t][+component]));
 }
 function drawField() {
+  if(transientSupported()&&transientController.result()){drawTransientViews();return;}
   if (thermalController?.result() && thermalSupported()) { drawThermalViews(); return; }
   const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!resultData || !doc) return;
@@ -374,6 +511,7 @@ function drawField() {
     (vector ? ' (relative amplitude, common |E| scale)' : '');
 }
 function drawSweep() {
+  if(transientSupported()&&transientController.result())return;
   if (thermalController?.result() && thermalSupported()) return;
   const cv = $('sweepCanvas'); const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
   if (!resultData) return;
@@ -416,6 +554,7 @@ function renderThermalSummary(result) {
 }
 
 function fillResultTable() {
+  if(transientSupported()&&transientController.result()){renderTransientSummary(transientController.result());return;}
   if (thermalController?.result() && thermalSupported()) { renderThermalSummary(thermalController.result()); return; }
   if (!resultData) {
     $('resTable').innerHTML = ''; $('componentLabel').hidden = true;
@@ -563,6 +702,7 @@ function onAction(e) {
 function showTab(name) { document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('.view > div').forEach(d => d.classList.toggle('on', d.id === `tab-${name}`)); redrawAll(); }
 function redrawAll() {
+  if(transientSupported()){drawTransientViews();return;}
   if (thermalSupported()) { drawThermalViews(); return; }
   if (isHeadlessThermal()) {
     for (const id of ['geoCanvas', 'meshCanvas', 'fieldCanvas', 'sweepCanvas']) {
@@ -573,6 +713,15 @@ function redrawAll() {
   drawGeometry(); drawMesh(); drawField(); drawSweep();
 }
 function refresh() {
+  if(transientSupported()){
+    if(transientController.result()){
+      $('transientControls').hidden=$('transientHistory').hidden=false;$('thermalControls').hidden=false;
+      renderTransientSummary(transientController.result());drawTransientViews();return;
+    }
+    clearResultViews();$('tree').innerHTML='';$('props').textContent='Transient heat: edit JSON, validate, run, then select exact saved indices. H/V pages are read explicitly.';
+    $('meshBtn').disabled=true;$('runBtn').disabled=editorDirty||!transientController.state().canRun;
+    return;
+  }
   if (!editorDirty) $('json').value = rawDocumentText !== null && isHeadlessThermal() ? rawDocumentText : JSON.stringify(doc, null, 2);
   if (isHeadlessThermal() && thermalSupported()) {
     clearResultViews(); $('tree').innerHTML=''; $('props').textContent='Steady heat: edit JSON, validate, then run. Mesh is available only from the result. No transient UI.';
@@ -606,6 +755,12 @@ async function doValidate() {
       rawDocumentText=$('json').value;doc=candidate;
     } catch(error) {status('invalid JSON');log('JSON error: '+error.message,'err');return false;}
   }
+  if(isTransientDoc()&&transientSupported()) {
+    const revision=documentRevision;
+    const ok=await transientController.validate(doc,rawDocumentText===null?JSON.stringify(doc):rawDocumentText);
+    if(ok&&revision===documentRevision&&transientController.snapshot()){doc=transientController.snapshot();editorDirty=false;refresh();}
+    return ok;
+  }
   if(isHeadlessThermal()&&thermalSupported()) {
     const ok=await thermalController.validate(doc,rawDocumentText===null?JSON.stringify(doc):rawDocumentText);
     if(ok){doc=JSON.parse(JSON.stringify(thermalController.gate.validated));editorDirty=false;refresh();}
@@ -631,6 +786,7 @@ async function doMesh() {
 }
 async function doRun() {
   if (editorDirty) { status('Validate current JSON before run'); return; }
+  if (isTransientDoc() && transientSupported()) { await transientController.run(); return; }
   if (isHeadlessThermal() && thermalSupported()) { await thermalController.run(); return; }
   if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
   const revision = invalidateDocument();
@@ -659,8 +815,12 @@ $('runBtn').onclick = doRun;
 $('download').onclick = () => {
   let value=doc;
   if(isHeadlessThermal()){
-    if(!thermalController?.gate.validated||thermalController.gate.dirty||editorDirty){status('Validate current thermal JSON before download');return;}
-    value=thermalController.gate.validated;
+    if(isTransientDoc()){
+      value=transientController?.snapshot();if(!value||transientController.state().dirty||editorDirty){status('Validate current transient JSON before download');return;}
+    }else{
+      if(!thermalController?.gate.validated||thermalController.gate.dirty||editorDirty){status('Validate current thermal JSON before download');return;}
+      value=thermalController.gate.validated;
+    }
   }
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
   a.download=(value.name||'model').replace(/[^\w.-]+/g,'_')+'.json';a.click();
@@ -682,14 +842,21 @@ $('applyJson').onclick = async () => {
   }catch(error){if(revision===documentRevision){editorDirty=true;$('runBtn').disabled=true;log('JSON error: '+error.message,'err');status('invalid JSON');}}
 };
 $('json').oninput = () => {rawDocumentText=$('json').value;editorDirty=true;invalidateDocument();$('runBtn').disabled=$('meshBtn').disabled=true;};
-$('thermalField').onchange = drawThermalViews;
+$('thermalField').onchange = () => {if(transientSupported())selectTransient();else drawThermalViews();};
+$('transientTime').onchange=()=>selectTransient();
+$('transientPrev').onclick=()=>selectTransient(transientController.state().index-1);
+$('transientNext').onclick=()=>selectTransient(transientController.state().index+1);
+$('transientRetry').onclick=()=>selectTransient();
+$('transientReadH').onclick=()=>readTransientHistory('heat_content_j_per_m');
+$('transientReadV').onclick=()=>readTransientHistory('quadratic_functional_jk_per_m');
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $('ptSel').onchange = drawField; $('modeSel').onchange = drawField;
 $('componentSel').onchange = drawField;
 window.addEventListener('resize', redrawAll);
 
 (async function init() {
-  if (thermalController) thermalController.loadCapability().then(()=>{if(isHeadlessThermal()&&!editorDirty)refresh();});
+  if (transientController) transientController.loadCapability().then(()=>{if(isTransientDoc()&&!editorDirty)refresh();});
+  if (thermalController) thermalController.loadCapability().then(()=>{if(isHeadlessThermal()&&!isTransientDoc()&&!editorDirty)refresh();});
   try { const ex = await api.get('/api/examples'); $('exampleSel').innerHTML = ex.examples.map(n => `<option>${n}</option>`).join(''); $('exampleSel').value = 'soi_strip';
     materials = (await api.get('/api/materials')).materials; unitVocab = await api.get('/api/units'); await loadExample('soi_strip'); }
   catch (e) { log('startup failed: ' + e.message, 'err'); }
@@ -697,3 +864,4 @@ window.addEventListener('resize', redrawAll);
 </script>
 </body>
 </html>
+
