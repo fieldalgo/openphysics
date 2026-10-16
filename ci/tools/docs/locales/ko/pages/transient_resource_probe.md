@@ -40,3 +40,21 @@ HEAD정확일치/추적package무변경을검사한다. 기존declareddeps만사
 artifact `transient-instrumented-resource-v1`: child_start(PID/환경/version/baseline/originSHA256),requests(부모HTTP시간/status/bytes/hash/raw),phases(서버memory/store/counter전후·delta/hold거절),store(active/pending/reserved/retained/workspace/live/retired/snapshot/pins/raw·manifestbytes/allocationID목록),cleanup(stop상태/최종snapshot/originafter),failure/exit_code/child_exit/forced_stop. allocationID는프로세스로컬값이다. 강제종료는수용실패이며harness정리이지서버cancelendpoint가아니다.
 
 Linux /proc currentRSS, Linux/macOS정규화ru_maxrss누적highwater를분리한다. 다른플랫폼RSS는미지원값으로남긴다. tracemalloc은import/serverstartup후시작하며native일부누락. native6thread변수1,hook중첩시간/계측overhead/최대256events와계속누적counter를구분한다. encoded/retained/RSS는서로다르고32MiB는RAM보증아님. originhash를exactGit/packagebytes와별도대조해야한다. 수치/최대capacity수용주장없음.
+
+## Retained Linux workload wrapper
+정상설정된Linux환경의exact통합checkout에서한번실행한다.
+```sh
+python ci/tools/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
+```
+승인된validationrun이있으면이도구때문에별도workflow를중복dispatch하지않는다. 기존artifact에output전체를보존한다.
+
+정확workload_plan선택:small n2/Nt3,medium n16/Nt8,near n85/Nt28,over-preflight n46/Nt96. 입력은기존단열2mm×1mm·initial300K·k2.5/c4/Q8·time2+0.01i·D0계약의구체resource문서다. 독립oracle기대값복제가아니다. 실제D0raw추정과보수적D=N사전추정을함께기록한다. over는D0추정16MiB미만이어도보수적사전상계를초과하는actor이며actualD용량/cap+1시험은아니다.
+
+3stage각각profiler별도process+fresh실제serverchild를띄우고near만over문서추가제출413/solve증가0을요구한다. 실패시후속stage/재시도없음. 원preflight/수치허용치/BC/policy수정없음.
+완료capture안에서13getterdelta각1을assert하고최초workload완료후13전체count1을보존한다. 반복frame은getter/solve/capture증가0,허용요청별encode는계수한다. server_internal_measurements는companion실측scope를기록하며public-onlyunavailable문구를그대로쓰지않는다.
+
+원자료경로:
+- .validation/transient-resource-observation/workload-summary.json 형식transient-resource-workloads-v1:exactplan/inputhash/시도·완료stage/argv/exit/reporthash.
+- small-observation/instrumented-report.json,medium-observation/instrumented-report.json,near_raw_candidate-observation/instrumented-report.json.
+- stage stdout/stderr,child.stderr,입력·reject문서,선택response*.bin/terminal-state.json.
+--prepare-only --output NEW_DIRECTORY는runtimeimport없이문서/산식만생성하며성공도준비완료일뿐이다. 실제artifact/provenance독립감사전수용주장없음.
