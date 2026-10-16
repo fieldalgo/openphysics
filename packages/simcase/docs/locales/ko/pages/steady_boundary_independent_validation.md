@@ -128,3 +128,39 @@ C=H*increment-shifted_B, 원 고정절점 반력과 두 normalized1e-10 guard를
 doc.data["name"] 및 result.doc.data["name"]로 변경했다.
 원 기대와 모든 gate는 그대로다. 수치 재현/source·installed 통과/CLI 실행을
 주장하지 않는다. 실제 결합 후보 CI와 원 진단 배열이 아직 필요하다.
+
+## 추가 direct-path 실측
+
+schema4bd15626fe37c306eb6265f1db1b308c6b580460,
+runtime56238cd76ab09e422344ef54e89d68f5a1aa579e 및 기존 독립Robin oracle를
+결합한 별도 source를 Python3.12.14/NumPy2.3.5/SciPy1.17.0에서 실행한 근거다.
+실제Document.from_dict와 directrun_thermal을 사용했으나 package root
+initializer는 우회했다. 새 Elements/11시험 공식suite나 공개root-runner/
+CLI/설치 수용이 아니다.
+
+10logicalgroup은 n2선형,상수Robin-only빈D,legacy/명시빈v2,mm/um저장,
+이차mesh8/16/32/64이다. 첫실행은10solve를모두끝낸뒤 NumPybool JSON보고에서
+exit1로실패했다. 직렬화만수정한최종10group은3.050654208999731s/exit0/
+stderr없음이다. 앞probe포함21solve이며21독립시험이아니다.
+
+C가원archive/14source SHA256·Gitblob/eight저장artifact hash를감사한뒤
+새solve없이 수치NPZ를독립해독·재적분했다. 원배열선형G2/C12/R14 W/m이므로
+오른쪽외향14/왼쪽thermostat외향-14/총약0이다. 이차각rawsource는60W/m,
+최종총외향결손은약1.04e-11 W/m이다. rhs=fQ+B-G가각성분일치한다.
+
+보고마지막2차수는 T1.9988550488612653/1.999656433643703,
+flux.9994821862440284/.9998446426372463이다. 별도원배열구적은
+T1.9988550488799535/1.9996564337200657,
+flux.9994821862440356/.9998446426372037로둘다고정1.8/.9충족한다.
+Gauss8/10최대relative는보고8.650446906980553e-11,
+독립재적분1.3590626820738625e-11로모두<.01이다.
+최종차원있는영역fluxL2는.3314417618241207,정확analyticfluxnorm
+35.166282766624136으로나눈relative는.009424987111196404<.02이다.
+영역상대L2이며경계gradient실측이아니다. 추가 normalized진단
+5.6282662146672146e-14는명시된constituent합scale을사용하며공식gate를대체하지않는다.
+
+이근거는10direct-path group만지지한다. 원점은이suite의(.1,.2)m가아닌0,
+선형/단위n8대신n2,Robin-only는추가비영source/h0계열이아닌상수이다.
+snapshot은caller-name격리/result-name거절만확인했고모든값변형이아니다.
+새wrongactor/fieldsfalse/CLI/publicrunner/isolatedinstalled/플랫폼수용은
+도출하지않는다. 정확결합후보의원suite/CI가여전히필요하다. gate변경없다.
