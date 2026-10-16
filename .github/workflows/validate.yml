@@ -48,7 +48,11 @@ jobs:
         run: |
           python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
             packages/simcase/tests/test_steady_boundary_contract.py \
-            packages/simcase/tests/test_steady_boundary_independent_validation.py
+            packages/simcase/tests/test_steady_boundary_independent_validation.py \
+            packages/simcase/tests/test_steady_boundary_schema.py \
+            packages/simcase/tests/test_steady_boundary_runtime.py \
+            packages/simcase/tests/test_steady_boundary_platform.py \
+            packages/simcase/tests/test_studio_steady_boundary.py
       - name: Check transient document acceptance before the full suite
         run: |
           python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
@@ -73,7 +77,7 @@ jobs:
           python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
+        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_boundary.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
