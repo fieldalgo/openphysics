@@ -149,4 +149,146 @@ test('same revision old validation error/finally and reversed capability replies
   const caps=[];const d=X.createController({request:()=>new Promise(resolve=>caps.push(resolve))});
   const a=d.loadCapability(),b=d.loadCapability();caps[1]({});await b;caps[0](cap());await a;assert.equal(d.supports(doc()),false);
 });
-module.exports={cap,doc,manifest,frame,history};
+
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const staticRoot=path.join(__dirname,'../simcase/studio/static');
+const html=fs.readFileSync(path.join(staticRoot,'index.html'),'utf8');
+function page(){
+  const elements=new Map(),requests=[];let activeTab='geometry';
+  const names=['geometry','mesh','results','json'];
+  const tabs=names.map(tab=>({dataset:{tab},classList:{toggle(){}},onclick:null}));
+  const panels=names.map(name=>({id:'tab-'+name,classList:{toggle(cls,on){if(on)activeTab=name;}}}));
+  function element(id){
+    if(!elements.has(id)){
+      const calls=[],ctx=new Proxy({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
+        clearRect:()=>calls.push('clear'),putImageData:()=>calls.push('pixels'),
+        moveTo:()=>calls.push('path'),fillText:text=>calls.push(['text',text])},{get:(o,k)=>o[k]||(()=>{})});
+      elements.set(id,{width:320,height:240,calls,value:'',hidden:false,textContent:'',innerHTML:'',children:[],
+        appendChild(x){this.children.push(x);},getContext:()=>ctx,click(){return this.onclick?.();},
+        getBoundingClientRect(){
+          const tab=id==='meshCanvas'?'mesh':id==='geoCanvas'?'geometry':'results';
+          const on=!id.endsWith('Canvas')||activeTab===tab;return {width:on?320:0,height:on?240:0,left:0,top:0};
+        }});
+    }return elements.get(id);
+  }
+  const child=()=>({textContent:'',children:[],appendChild(x){this.children.push(x);},click(){return this.onclick?.();}});
+  const context=vm.createContext({document:{getElementById:element,createElement:child,
+    querySelectorAll:s=>s==='.view > div'?panels:s==='.tabs button'?tabs:[]},window:{devicePixelRatio:1,addEventListener(){}},
+    console,URL,URLSearchParams,Blob,Uint8ClampedArray,setTimeout:cb=>cb(),
+    fetch:(...args)=>{requests.push(args);return new Promise(()=>{});}});
+  for(const script of ['thermal.js','transient_thermal.js'])vm.runInContext(fs.readFileSync(path.join(staticRoot,script),'utf8'),context);
+  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
+  return {element,requests,context,run:code=>vm.runInContext(code,context),tab:name=>tabs.find(b=>b.dataset.tab===name).onclick()};
+}
+function installAPI(p,{rejectValidation=false,rejectRun=false,held=false}={}) {
+  // All generated source is parsed by the same VM before invoking handlers.
+  p.run('globalThis.fixtureManifest='+JSON.stringify(manifest())+';globalThis.fixtureCap='+JSON.stringify(cap())+
+    ';globalThis.apiCalls=[];globalThis.held=[];'+
+    'globalThis.fetch=async(url,options)=>{apiCalls.push(url);'+
+    'if(url==="/api/capabilities")return {ok:true,json:async()=>fixtureCap};'+
+    'if(url.endsWith("/validate")){const e=JSON.parse(options.body);return {ok:true,status:200,json:async()=>('+
+      (rejectValidation?'{ok:false,error:{message:"invalid fixture"}}':'{ok:true,doc:e.doc,client_revision:e.client_revision,request_seq:e.request_seq}')+')};}'+
+    'if(url.endsWith("/run")){const e=JSON.parse(options.body);fixtureManifest.client_revision=e.client_revision;fixtureManifest.request_seq=e.request_seq;'+
+      (rejectRun?'return {ok:false,status:400,json:async()=>({error:{message:"run rejected fixture"}})};':
+        'return {ok:true,json:async()=>({kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,client_revision:e.client_revision,request_seq:e.request_seq})};')+'}'+
+    'if(url.endsWith("/result"))return {ok:true,json:async()=>fixtureManifest};'+
+    'if(!url.includes("?"))return {ok:true,json:async()=>({...fixtureManifest,status:"done"})};'+
+    'const u=new URL(url,"http://test"),q=Object.fromEntries(u.searchParams);'+
+    'const i=Number(q.time_index),start=Number(q.start),stop=Number(q.stop),f=q.field;'+
+    'const vector=f==="heat_flux_w_m2";const result={kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,'+
+      'client_revision:fixtureManifest.client_revision,request_seq:fixtureManifest.request_seq,result_format:fixtureManifest.result_format,'+
+      'field_layout:fixtureManifest.field_layout,display_length_in_m:1,frame_seq:Number(q.frame_seq),field:f,unit:fixtureManifest.fields[f].unit,location:fixtureManifest.fields[f].location};'+
+    'if(u.pathname.endsWith("/frame"))Object.assign(result,{payload_format:"studio-thermal-transient-frame-v1",time_index:i,time_s:fixtureManifest.time_s[i],'+
+      'shape:vector?[2,2]:[4],arrays:{[f]:vector?[[1000*i+1,-1000*i-2],[1000*i+11,-1000*i-12]]:[100*i,100*i+1,100*i+2,100*i+3]}});'+
+    'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v1",start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
+      'time_s:fixtureManifest.time_s.slice(start,stop),shape:[stop-start],arrays:{[f]:Array.from({length:stop-start},(_,j)=>10+start+j)}});'+
+    (held?'return new Promise(resolve=>held.push(()=>resolve({ok:true,json:async()=>result})));':
+      'return {ok:true,json:async()=>result};')+'};');
+}
+async function readyPage(options){
+  const p=page();installAPI(p,options);await p.run('transientController.loadCapability()');
+  p.element('json').value=JSON.stringify(doc());p.element('json').oninput();await p.element('applyJson').onclick();return p;
+}
+test('shipped transient page runs default exact last frame, explicit H/V pages and actual tabs',async()=>{
+  const p=await readyPage();assert.equal(p.element('runBtn').disabled,false);
+  await p.element('runBtn').onclick();await tick();
+  assert.equal(p.element('transientTime').value,4);assert.match(p.element('resInfo').textContent,/index 4; t = 3 s/);
+  assert.match(p.element('resInfo').textContent,/raw 400 … 403/);assert.ok(p.element('fieldCanvas').calls.includes('pixels'));
+  assert.equal(p.element('meshCanvas').getBoundingClientRect().width,0);
+  assert.equal(p.run('apiCalls.some(u=>u.includes("/history?"))'),false);
+  p.element('thermalField').value='qy';p.element('thermalField').onchange();await tick();
+  assert.match(p.element('resInfo').textContent,/qy.*-4012 … -4002/);
+  p.tab('mesh');await tick();assert.equal(p.element('fieldCanvas').getBoundingClientRect().width,0);
+  assert.match(p.element('meshInfo').textContent,/Actual transient result mesh/);
+  p.tab('results');await tick();assert.match(p.element('resInfo').textContent,/qy/);
+  p.element('transientPageStart').value='1';p.element('transientReadH').onclick();await tick();
+  assert.ok(p.element('transientH').children.some(x=>/H heat content.*J\/m/.test(x.textContent)));
+  p.element('transientReadV').onclick();await tick();
+  assert.ok(p.element('transientV').children.some(x=>/not stored heat.*J K\/m/.test(x.textContent)));
+});
+test('shipped dirty transient JSON clears controller/hover/labels and pending render cannot restore',async()=>{
+  const p=await readyPage();await p.element('runBtn').onclick();await tick();
+  p.element('thermalField').value='magnitude';p.element('thermalField').onchange();
+  p.element('json').value='{';p.element('json').oninput();await tick();
+  assert.equal(p.run('transientController.result()'),null);assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.equal(p.element('runBtn').disabled,true);assert.equal(p.element('transientControls').hidden,true);
+  assert.equal(p.element('meshInfo').textContent,'');assert.equal(p.element('meshLegend').textContent,'');
+  p.tab('results');await tick();assert.equal(p.run('transientController.state().frame'),null);
+});
+test('shipped transient original duplicate raw keys never approve or run',async()=>{
+  const p=await readyPage();p.element('json').value=JSON.stringify(doc()).replace('"openphysics":"0.2"','"openphysics":"0.2","openphysics":"0.2"');
+  p.element('json').oninput();await p.element('applyJson').onclick();
+  assert.equal(p.element('runBtn').disabled,true);assert.match(p.element('status').textContent,/duplicate/);
+  await p.element('runBtn').onclick();assert.equal(p.run('apiCalls.filter(u=>u.endsWith("/run")).length'),0);
+});
+test('shipped transient validation200 false and run400 remain distinct failures',async()=>{
+  const invalid=await readyPage({rejectValidation:true});assert.equal(invalid.element('runBtn').disabled,true);
+  assert.match(invalid.element('status').textContent,/invalid fixture/);
+  const badRun=await readyPage({rejectRun:true});await badRun.element('runBtn').onclick();
+  assert.equal(badRun.run('transientController.result()'),null);assert.match(badRun.element('status').textContent,/run rejected/);
+});
+test('shipped serialized latest selection, hidden tabs, stale callbacks and dirty during held fetch',async()=>{
+  const p=await readyPage({held:true});await p.element('runBtn').onclick();await tick();
+  assert.equal(p.run('held.length'),1);
+  p.element('transientTime').value='1';p.element('transientTime').onchange();
+  p.element('transientTime').value='2';p.element('transientTime').onchange();
+  p.run('held[0]()');await tick();assert.equal(p.run('held.length'),2);
+  assert.equal(p.run('transientController.state().frame'),null);
+  p.run('held[1]()');await tick();assert.match(p.element('resInfo').textContent,/index 2; t = 2.1 s/);
+  p.tab('mesh');p.element('thermalField').value='qx';p.element('thermalField').onchange();
+  p.element('json').value='{';p.element('json').oninput();p.run('held[2]()');await tick();
+  p.tab('results');await tick();assert.equal(p.run('transientController.result()'),null);
+  assert.equal(p.element('fieldCanvas').onmousemove,null);assert.equal(p.element('runBtn').disabled,true);
+});
+
+
+
+test('manifest rejects illustrative comments and abbreviated public summaries',()=>{
+  const m=manifest();m.fixture_summary_note='not production';assert.throws(()=>X.manifest(m,m,cap()[X.TYPE].limits));
+  delete m.fixture_summary_note;m.summary={physics_type:X.TYPE,result_format:X.RESULT,field_layout:X.LAYOUT};
+  assert.throws(()=>X.manifest(m,m,cap()[X.TYPE].limits));
+});
+test('nearby saved times never select by rounded text or accept bool/string/fractional indices',async()=>{
+  const m=manifest();m.time_s=[2,2+1e-12,2.1,2.4,3];m.summary.study.time_s=m.time_s;
+  const valid=X.manifest(m,m,cap()[X.TYPE].limits),q={field:'temperature_k',time_index:1,frame_seq:1};
+  assert.equal(X.frame(frame(valid,q),valid,q).time_s,2+1e-12);
+  const b=boot();await b.c.loadCapability();await b.c.validate(doc());await b.c.run();await tick();
+  for(const i of [true,'1',.5,-1,5])assert.throws(()=>b.c.select(i));
+});
+test('shipped current magnitude overflow clears field only and newer temperature restores exact label/hover',async()=>{
+  const p=await readyPage();
+  p.run('const normalFetch=fetch;globalThis.fetch=async(...args)=>{const response=await normalFetch(...args);return {...response,json:async()=>{const value=await response.json();'
+    +'if(value.payload_format==="studio-thermal-transient-frame-v1"&&value.field==="heat_flux_w_m2")value.arrays.heat_flux_w_m2=[[Number.MAX_VALUE,Number.MAX_VALUE],[1,0]];return value;}};};');
+  await p.element('runBtn').onclick();await tick();
+  p.element('thermalField').value='magnitude';p.element('thermalField').onchange();await tick();
+  assert.match(p.element('resInfo').textContent,/view error.*overflow/);assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.ok(p.run('transientController.result()'));p.tab('mesh');await tick();assert.match(p.element('meshInfo').textContent,/Actual transient result mesh/);
+  p.element('thermalField').value='temperature_k';p.element('thermalField').onchange();p.tab('results');await tick();
+  assert.match(p.element('resInfo').textContent,/index 4.*raw 400 … 403/);
+  assert.equal(typeof p.element('fieldCanvas').onmousemove,'function');
+});
+test('refresh preserves an accepted transient view rather than clearing panels through steady fallback',async()=>{
+  const p=await readyPage();await p.element('runBtn').onclick();await tick();p.run('refresh()');await tick();
+  assert.equal(p.element('transientControls').hidden,false);assert.equal(p.element('transientHistory').hidden,false);
+  assert.match(p.element('resInfo').textContent,/index 4/);
+});
