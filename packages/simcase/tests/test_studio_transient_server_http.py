@@ -306,3 +306,56 @@ def test_public_page_limit_and_final_scalar_frame(http_client):
     page = http_client.get(base+"/history", params={"result_id": identity["result_id"],
         "field": "heat_content_j_per_m", "start": 0, "stop": 17, "frame_seq": 10})
     assert page.status_code == 422
+
+
+def test_transient_capability_contains_shared_and_history_bounds(http_client):
+    cap = http_client.get("/api/capabilities").json()["thermal.transient2d"]
+    assert cap["run_enabled"] is True and cap["time_navigation"] is True
+    for key in ("request_bytes", "max_nodes", "max_triangles",
+                "terminal_bytes", "terminal_jobs", "active_jobs", "max_times",
+                "raw_bytes", "manifest_bytes", "frame_page_bytes"):
+        assert type(cap["limits"][key]) is int and cap["limits"][key] > 0
+    assert cap["limits"]["terminal_bytes"] == 32*1024**2
+
+
+def test_signed_index_range_and_opaque_result_identity(http_client):
+    identity = accepted_job(http_client)
+    base = "/api/jobs/"+identity["job"]
+    query = {"result_id": identity["result_id"], "field": "temperature_k",
+             "time_index": -1, "frame_seq": 1}
+    negative = http_client.get(base+"/frame", params=query)
+    assert negative.status_code == 422, negative.text
+    query.update(time_index=0, result_id="different-result")
+    stale = http_client.get(base+"/frame", params=query)
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["result_id"] == identity["result_id"]
+    assert stale.json()["requested_result_id"] == "different-result"
+    query.update(result_id=identity["result_id"], frame_seq=-1)
+    assert http_client.get(base+"/frame", params=query).status_code == 400
+
+
+@pytest.mark.parametrize("fault", ["mesh", "study", "rate_axis", "shape_bool"])
+def test_malformed_public_summary_cannot_publish(http_client, monkeypatch, fault):
+    import copy
+    from simcase import Document, TransientThermalRunResult
+    original = server.run(Document.from_dict(transient_model()), verbose=False)
+    class Probe(TransientThermalRunResult):
+        def __init__(self):
+            object.__setattr__(self, "original", original)
+        def __getattr__(self, name):
+            return getattr(object.__getattribute__(self, "original"), name)
+        def summary(self):
+            meta = copy.deepcopy(original.summary())
+            if fault == "mesh": meta["mesh"]["nodes"] += 1
+            elif fault == "study": meta["study"]["time_s"][0] += .1
+            elif fault == "rate_axis": meta["rate_time_s"] = [2.]
+            else: meta["field_shapes"]["temperature_k"][0] = True
+            return meta
+    monkeypatch.setattr(server, "run", lambda *a, **k: Probe())
+    response = http_client.post("/api/thermal/transient/run", json=request_body())
+    assert response.status_code == 200
+    job = response.json()["job"]
+    state = http_client.get("/api/jobs/"+job).json()
+    assert state["status"] == "error" and state["has_result"] is False
+    assert http_client.get("/api/jobs/"+job+"/result").status_code == 409
+    assert server._thermal_jobs._active == server._thermal_jobs._reserved_bytes == 0

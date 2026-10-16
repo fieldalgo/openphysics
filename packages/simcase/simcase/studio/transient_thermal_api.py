@@ -97,7 +97,7 @@ class TransientInput:
 async def read_request(request, limits, *, for_run):
     # Same bounded strict reader, with a route-specific public preflight callback.
     spec = await common.read_request(request, limits, for_run=for_run,
-                                     preflight=preflight, runtime_check=lambda: True)
+                                     preflight=preflight, runtime_check=lambda: runtime_available(limits))
     return TransientInput(spec.doc, spec.client_revision, spec.request_seq)
 
 
@@ -107,16 +107,25 @@ def validation_payload(spec, limits):
                                "notes": list(spec.doc.notes)}, limits.metadata_bytes)
 
 
-def capabilities():
-    return {"supported": True, "run_enabled": True,
+def runtime_available(limits):
+    return (callable(getattr(TransientThermalRunResult, "summary", None))
+            and hasattr(TransientThermalRunResult, "mesh_nodes_m")
+            and hasattr(TransientThermalRunResult, "mesh_triangles")
+            and RAW_BYTES+ENCODED_BYTES+limits.status_bytes <= limits.terminal_bytes)
+
+
+def capabilities(limits):
+    bounds = common.asdict(limits)
+    bounds.update(max_times=MAX_TIMES, raw_bytes=RAW_BYTES,
+                  manifest_bytes=ENCODED_BYTES, frame_page_bytes=ENCODED_BYTES,
+                  page_rows=PAGE_ROWS, read_encoding_slots=1, ingress_slots=1)
+    return {"supported": True, "run_enabled": runtime_available(limits),
             "validate": "/api/thermal/transient/validate", "run": "/api/thermal/transient/run",
             "input": "json", "mesh_preview": False, "mesh_from_result": True,
             "time_navigation": True, "result_formats": [PAIR[0]], "field_layouts": [PAIR[1]],
             "payload_formats": [MANIFEST, FRAME, HISTORY], "fields": sorted(UI_FIELDS),
             "resource_policy": "candidate-unmeasured",
-            "limits": {"max_times": MAX_TIMES, "raw_bytes": RAW_BYTES,
-                       "manifest_bytes": ENCODED_BYTES, "frame_page_bytes": ENCODED_BYTES,
-                       "page_rows": PAGE_ROWS, "read_encoding_slots": 1, "ingress_slots": 1}}
+            "limits": bounds}
 
 
 def reservation(limits):
@@ -184,6 +193,28 @@ def capture_result(result, identity, limits, document):
     for meta in ("field_units", "field_locations", "field_time_axes", "field_shapes"):
         require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(SPEC),
                 "transient metadata field set mismatch")
+    mesh_meta, study_meta = summary.get("mesh"), summary.get("study")
+    require(isinstance(mesh_meta, dict) and type(mesh_meta.get("nodes")) is int
+            and type(mesh_meta.get("triangles")) is int
+            and mesh_meta["nodes"] == n and mesh_meta["triangles"] == m
+            and isinstance(mesh_meta.get("subdivisions"), list)
+            and all(type(v) is int for v in mesh_meta["subdivisions"])
+            and mesh_meta["subdivisions"] == document["mesh"]["subdivisions"],
+            "transient summary mesh disagrees with captured geometry")
+    declared_times = study_meta.get("time_s") if isinstance(study_meta, dict) else None
+    require(isinstance(study_meta, dict) and study_meta.get("type") == "transient"
+            and isinstance(declared_times, list)
+            and all(type(v) in (int, float) and math.isfinite(v) for v in declared_times)
+            and np.array_equal(np.asarray(declared_times), captured["time_s"]),
+            "transient summary study disagrees with captured times")
+    rate_times = summary.get("rate_time_s")
+    require(isinstance(rate_times, list)
+            and all(type(v) in (int, float) and math.isfinite(v) for v in rate_times)
+            and np.array_equal(np.asarray(rate_times), captured["time_s"][1:]),
+            "transient summary rate times disagree")
+    require(type(summary.get("dirichlet_nodes")) is int
+            and summary["dirichlet_nodes"] == fixed_count,
+            "transient summary Dirichlet count disagrees")
     descriptors = {}
     for key, (unit, location, axis) in SPEC.items():
         declared_shape = summary["field_shapes"][key]
@@ -214,11 +245,11 @@ def capture_result(result, identity, limits, document):
     return encoded, MappingProxyType(captured), scale
 
 
-def _query_integer(value):
-    require(isinstance(value, str) and re.fullmatch(r"0|[1-9][0-9]{0,15}", value) is not None,
+def _query_integer(value, *, signed=False):
+    require(isinstance(value, str) and re.fullmatch(r"-?(0|[1-9][0-9]{0,15})" if signed else r"0|[1-9][0-9]{0,15}", value) is not None,
             "query requires nonnegative integer", code="invalid_query")
     number = int(value)
-    require(number <= 2**53-1, "query integer exceeds safe range", code="invalid_query")
+    require(abs(number) <= 2**53-1, "query integer exceeds safe range", code="invalid_query")
     return number
 
 
@@ -228,12 +259,12 @@ def parse_query(query, *, history):
     require(len(items) == len(expected) and {k for k, _ in items} == expected,
             "unexpected, missing or duplicate query", code="invalid_query")
     values = dict(items)
-    require(len(values["result_id"]) <= 128 and values["result_id"].startswith("result-")
-            and re.fullmatch(r"[A-Za-z0-9-]+", values["result_id"]) is not None,
+    require(0 < len(values["result_id"]) <= 128
+            and re.fullmatch(r"[A-Za-z0-9._~-]+", values["result_id"]) is not None,
             "invalid result identity", code="invalid_query")
     require(values["field"] in DYNAMIC, "unsupported transient field", code="invalid_query")
     for key in expected-{"result_id", "field"}:
-        values[key] = _query_integer(values[key])
+        values[key] = _query_integer(values[key], signed=key != "frame_seq")
     return values
 
 
@@ -252,7 +283,7 @@ def encode_view(record, query, *, history):
             "frame_seq": query["frame_seq"], "field": key, "unit": unit, "location": location}
     if history:
         start, stop = query["start"], query["stop"]
-        require(start < stop <= nt and stop-start <= PAGE_ROWS,
+        require(0 <= start < stop <= nt and stop-start <= PAGE_ROWS,
                 "history page range invalid", 422, "invalid_range")
         require(axis != "time_s[1:]" or start >= 1,
                 "initial rate is unavailable", 422, "unavailable_initial_rate")
@@ -265,7 +296,7 @@ def encode_view(record, query, *, history):
                            interval_end_s=times[start:stop].tolist())
     else:
         index = query["time_index"]
-        require(index < nt, "time index outside requested times", 422, "invalid_range")
+        require(0 <= index < nt, "time index outside requested times", 422, "invalid_range")
         require(axis != "time_s[1:]" or index >= 1,
                 "initial rate is unavailable", 422, "unavailable_initial_rate")
         row = arrays[key][index-1 if axis == "time_s[1:]" else index]
