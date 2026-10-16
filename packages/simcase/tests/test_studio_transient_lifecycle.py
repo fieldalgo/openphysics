@@ -232,3 +232,192 @@ def test_identical_cached_object_pin_charged_until_last_sender(isolated_store):
             await cleanup(*list(zip(responses, tasks)))
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("gate_name,code", [
+    ("ingress", "ingress_capacity_exceeded"),
+    ("read_encoder", "read_capacity_exceeded"),
+])
+def test_actual_permit_old_release_cannot_free_new_owner(isolated_store, gate_name, code):
+    jobs = isolated_store.jobs
+    gate = getattr(jobs, gate_name)
+    first = gate.acquire()
+    try:
+        with pytest.raises(isolated_store.thermal.ThermalAPIError) as busy:
+            gate.acquire()
+        assert busy.value.status == 429 and busy.value.code == code
+    finally:
+        first.release()
+    second = gate.acquire()
+    try:
+        first.release()
+        # Also exercise the gate's identity check, separately from Permit's flag.
+        gate._release(first)
+        with pytest.raises(isolated_store.thermal.ThermalAPIError) as busy:
+            gate.acquire()
+        assert busy.value.status == 429 and busy.value.code == code
+    finally:
+        second.release()
+        second.release()
+    third = gate.acquire()
+    third.release()
+
+
+def test_actual_ingress_solver_and_read_permits_are_independent(isolated_store):
+    jobs = isolated_store.jobs
+    ingress = jobs.ingress.acquire()
+    solver = None
+    read = None
+    try:
+        solver = jobs.reserve()
+        read = jobs.read_encoder.acquire()
+        assert jobs._active == 1
+        for acquire in (jobs.ingress.acquire, jobs.reserve, jobs.read_encoder.acquire):
+            with pytest.raises(isolated_store.thermal.ThermalAPIError) as busy:
+                acquire()
+            assert busy.value.status == 429
+        ingress.release()
+        next_validation = jobs.ingress.acquire()
+        next_validation.release()
+        assert jobs._active == 1  # validation release must not release the solver
+    finally:
+        ingress.release()
+        if read is not None:
+            read.release()
+        if solver is not None:
+            jobs.release(solver)
+
+
+def attach_cache_record(life, job="thermal-store-probe"):
+    jobs = life.jobs
+    lease = jobs.reserve()
+    spec = life.thermal.ThermalInput(None, 7, 11)
+    jobs.attach(lease, job, "result-store-probe", spec)
+    return lease
+
+
+@pytest.mark.parametrize("reader_count", [1, 2])
+def test_running_same_status_allocation_is_not_charged_per_reader_or_twice_with_reservation(
+        isolated_store, reader_count):
+    life = isolated_store
+    jobs = life.jobs
+    lease = attach_cache_record(life)
+    pins = []
+    try:
+        before = jobs._retained_bytes() + jobs._reserved_bytes
+        assert before == lease.reservation
+        for _ in range(reader_count):
+            pins.append(jobs.pin("thermal-store-probe"))
+        old_size = len(pins[0].payload)
+        assert all(pin.payload is pins[0].payload for pin in pins)
+        # These are references to the already-reserved running status allocation,
+        # not new encoded copies and not additional per-reader byte allocations.
+        assert jobs._retained_bytes() + jobs._reserved_bytes == before
+        assert jobs.complete(lease, b"{}", [])
+        jobs.release(lease)
+        current = jobs._records["thermal-store-probe"]
+        expected = len(current["status_bytes"]) + len(current["result"]) + old_size
+        assert jobs._retained_bytes() == expected
+        if reader_count == 2:
+            pins[0].release()
+            pins[0].release()
+            assert jobs._retained_bytes() == expected
+        pins[-1].release()
+        assert jobs._retained_bytes() == len(current["status_bytes"]) + len(current["result"])
+    finally:
+        for pin in pins:
+            pin.release()
+        jobs.release(lease)
+
+
+@pytest.mark.parametrize("result_pin", [False, True])
+def test_actual_raw_and_encoded_record_pins_survive_expiry_until_last_reader(
+        isolated_store, result_pin):
+    import numpy as np
+    life = isolated_store
+    jobs = life.jobs
+    lease = attach_cache_record(life)
+    pins = []
+    try:
+        raw = {"temperature_k": np.arange(12, dtype=np.float64).reshape(3, 4)}
+        assert jobs.complete_transient(lease, b"{}", raw, [], 1.0)
+        jobs.release(lease)
+        pins = [jobs.pin("thermal-store-probe", result=result_pin,
+                         result_id="result-store-probe") for _ in range(2)]
+        record = pins[0].record
+        expected = len(record["status_bytes"]) + len(record["result"]) + raw["temperature_k"].nbytes
+        assert pins[1].record is record
+        assert jobs._retained_bytes() == expected
+        del record, raw  # leave ownership exclusively with the store and its pins
+        life.clock.value = jobs.limits.ttl_seconds
+        with pytest.raises(life.thermal.ThermalAPIError) as expired:
+            jobs.status("thermal-store-probe")
+        assert expired.value.status == 404
+        assert not jobs._records and jobs._retained_bytes() == expected
+        pins[0].release()
+        pins[0].release()
+        assert jobs._retained_bytes() == expected
+        pins[1].release()
+        assert jobs._retained_bytes() == 0
+    finally:
+        for pin in pins:
+            pin.release()
+        jobs.release(lease)
+
+
+def test_released_pin_drops_its_own_raw_and_encoded_references(isolated_store):
+    import gc
+    import weakref
+    import numpy as np
+    life = isolated_store
+    jobs = life.jobs
+    lease = attach_cache_record(life)
+    raw = {"temperature_k": np.arange(12, dtype=np.float64).reshape(3, 4)}
+    assert jobs.complete_transient(lease, b"{}", raw, [], 1.0)
+    jobs.release(lease)
+    pin = jobs.pin("thermal-store-probe", result=True)
+    array_reference = weakref.ref(raw["temperature_k"])
+    del raw
+    life.clock.value = jobs.limits.ttl_seconds
+    with pytest.raises(life.thermal.ThermalAPIError):
+        jobs.result("thermal-store-probe")
+    assert jobs._retained_bytes() > 0 and array_reference() is not None
+    pin.release()
+    pin.release()
+    # A released transport object can itself remain referenced by a completed
+    # coroutine. It must not retain uncharged payload/raw backing through record.
+    assert pin.record is None and pin.payload is None
+    gc.collect()
+    assert array_reference() is None
+    assert jobs._retained_bytes() == 0
+
+
+@pytest.mark.parametrize("stage", ["slice", "encode", "response", "disconnect"])
+def test_actual_read_permit_and_pin_finally_on_independent_failure_stage(isolated_store, stage):
+    life = isolated_store
+    jobs = life.jobs
+    lease = attach_cache_record(life)
+    jobs.complete(lease, b"{}", [])
+    jobs.release(lease)
+    permit = jobs.read_encoder.acquire()
+    pin = jobs.pin("thermal-store-probe", result=True)
+    try:
+        with pytest.raises(RuntimeError, match="injected"):
+            try:
+                assert pin.payload == b"{}"
+                raise RuntimeError("injected " + stage)
+            finally:
+                pin.release()
+                permit.release()
+        # Duplicate finally must not free a later reader's ownership.
+        later = jobs.read_encoder.acquire()
+        try:
+            pin.release()
+            permit.release()
+            with pytest.raises(life.thermal.ThermalAPIError):
+                jobs.read_encoder.acquire()
+        finally:
+            later.release()
+    finally:
+        pin.release()
+        permit.release()
