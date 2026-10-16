@@ -10,7 +10,6 @@ Replacement fixtures must actually complete; no OS behavior is mocked.
 from concurrent.futures import ThreadPoolExecutor
 import copy
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -34,7 +33,6 @@ BOUNDARY_FIELDS = {
     "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
     "convective_outward_w_per_m", "system_rhs_w_per_m",
 }
-CLI_ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 METADATA = {"result_format", "field_layout", "mesh_length_unit", "metadata_json"}
 
 
@@ -196,8 +194,8 @@ def test_boundary_api_and_cli_preserve_existing_target(tmp_path, kind):
     document = tmp_path / "model.json"
     document.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     child = subprocess.run(
-        [sys.executable, "-I", "-m", "simcase", "run", str(document), "-q", "-o", str(target)],
-        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8", env=CLI_ENV,
+        [sys.executable, "-I", "-X", "utf8", "-m", "simcase", "run", str(document), "-q", "-o", str(target)],
+        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8",
     )
     assert child.returncode == 1, (child.stdout, child.stderr)
     assert "Traceback" not in child.stderr
@@ -308,10 +306,10 @@ def test_boundary_isolated_cli_validates_and_saves_v2(tmp_path, kind):
     document = tmp_path / "model.json"
     document.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     for command in (
-        [sys.executable, "-I", "-m", "simcase", "validate", str(document)],
-        [sys.executable, "-I", "-m", "simcase", "run", str(document), "-q", "-o", str(tmp_path / "cli-result")],
+        [sys.executable, "-I", "-X", "utf8", "-m", "simcase", "validate", str(document)],
+        [sys.executable, "-I", "-X", "utf8", "-m", "simcase", "run", str(document), "-q", "-o", str(tmp_path / "cli-result")],
     ):
-        child = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, encoding="utf-8", env=CLI_ENV)
+        child = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, encoding="utf-8")
         assert child.returncode == 0, (child.stdout, child.stderr)
         assert "Traceback" not in child.stderr
     summary = read_summary(tmp_path / "cli-result")
