@@ -171,12 +171,12 @@ class TestSteadyBoundaryIndependent(unittest.TestCase):
     def test_snapshot_relabelling_and_fields_disabled(self):
         data=model()
         doc=Document.from_dict(copy.deepcopy(data));result=run(doc,False)
-        doc["name"]="caller edited"
+        doc.data["name"]="caller edited"
         with tempfile.TemporaryDirectory() as tmp:
             result.save(Path(tmp)/"snapshot")
             stored=json.loads((Path(tmp)/"snapshot"/"model.json").read_text(encoding="utf-8"))
             self.assertEqual(stored["name"],data["name"])
-            result.doc["name"]="invalid relabelling"
+            result.doc.data["name"]="invalid relabelling"
             with self.assertRaises(ValueError):
                 result.save(Path(tmp)/"edited")
             data["results"]["save_fields"]=False
