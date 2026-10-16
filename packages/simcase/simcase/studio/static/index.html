@@ -154,7 +154,7 @@ function isHeadlessThermal(data = doc) {
   return Object.values(data?.physics || {}).some(p => isHeadlessThermalType(p?.type));
 }
 function clearResultViews() {
-  for (const id of ['resInfo', 'meshInfo', 'meshLegend']) $(id).textContent = '';
+  for (const id of ['meshInfo', 'meshLegend']) $(id).textContent = '';
   $('thermalControls').hidden=true; $('fieldCanvas').onmousemove=null;
   meshData = resultData = null; currentJob = null;
   $('ptSel').innerHTML = $('modeSel').innerHTML = '';
