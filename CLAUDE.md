@@ -42,15 +42,10 @@ From the repository root after installing the packages:
 
     python -m simcase.studio      -> http://127.0.0.1:8765
 
-## Elsewhere
+## Contributions
 
-Study notes, concept demos and experiments live in the sibling repository `../openphysics-lab`
-(private, never published). Public implementation and validation material stays in this
-repository; research experiments stay in the lab.
-
-Current private roadmap, decisions and session progress live in
-`~/project/fieldalgo/hq`. Read its `AGENTS.md` and `ROADMAP.md`; the current
-inventory and follow-up work are in `work/openphysics-baseline.md`.
-Claude Project "FieldAlgo" is historical context, not the current progress record.
-Public implementation and validation facts belong with the code; private plans
-and session handoffs belong in HQ.
+Use `develop` as the integration branch. Read CONTRIBUTING.md and SECURITY.md
+before submitting changes or reporting vulnerabilities. Keep implementation and
+validation contracts with the code; do not commit private plans, credentials,
+research records or session handoffs. GitHub Actions is disabled; do not enable
+or dispatch workflows.

@@ -80,3 +80,7 @@ A global Pa callback `-p*normal` is valid on the fixed boundary; no dedicated sc
 Implementation contracts, independent candidate evidence and combined release validation have different scopes. Linked reports retain their exact candidates and original failures; targeted recovery does not turn an earlier failed whole run into a passing one. A completed combined result requires the corresponding final command exit and complete JUnit evidence. Missing final evidence or a transport interruption establishes neither numerical success nor the interruption's cause. Linux checks do not establish Windows acceptance.
 
 For source snapshot `0bc4419f4cfaf9e1185872d14232f1644639fc72`, Linux cloud validation recorded 1536 source tests passed, 9 subtests passed and 16 skipped, with command exit0. The skips were 14 optional Gmsh cases and 2 local refractiveindex.info database cases. A separate sdist-to-wheel installed run passed 541 cases with no failures or skips. The original distribution helper completed all 16 commands with exit0, including seven sdist-to-wheel builds and strict Twine checks of 14 artifacts. This snapshot was integrated as `da811aec95f6695f6d7b9988a7d3e9055736ff97`. These results are limited to the recorded Linux environment and do not establish Windows/other-OS acceptance or resolve the cause of earlier transport interruptions. Earlier failed and unknown runs remain separate evidence.
+
+## Asset provenance
+
+See [bundled images, fixtures and data](assets.md) for source history and licensing boundaries.

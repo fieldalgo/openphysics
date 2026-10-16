@@ -172,3 +172,20 @@ This checkout includes standalone outward-flux/Robin heat boundaries; see [contr
 The explicit Python-only [steady heat→mechanics workflow](packages/galerkin/docs/thermal_mechanical_workflow.md) connects same-mesh heat and prescribed-temperature mechanics through an immutable nodal-P1 Kelvin copy. Its [independent report](packages/galerkin/docs/thermal_mechanical_independent_validation.md) separates measured acceptance from implementation. It adds no JSON/CLI/Studio integration, persistence, Robin/flux/traction workflow, transient feedback or thermodynamic coupling.
 
 Prescribed-temperature mechanics also accepts optional [total global Cartesian traction](packages/galerkin/docs/thermoelastic_traction.md), with an [independent report](packages/galerkin/docs/thermoelastic_traction_independent_validation.md). A global Pa callback `-p*normal` is valid; a dedicated scalar-pressure/local-frame/follower API is not provided. This feature does not extend the steady heat-to-mechanics workflow or JSON/CLI/Studio.
+
+## Project status and contributions
+
+The default `develop` branch contains reviewed integrations. OpenPhysics is an
+actively developed source project; feature branches may contain unvalidated work.
+Publishing this repository does not publish new PyPI releases. The `openphysics`
+name-reservation package is still empty; install the individual implementations
+using the checkout instructions above. See [contributing](CONTRIBUTING.md),
+[security reporting](SECURITY.md), and the [validation index](docs/README.md).
+
+## License and third-party material
+
+The original code and documentation are licensed under [Apache-2.0](LICENSE).
+[NOTICE](NOTICE) and each package's notices identify third-party material.
+Embedded refractiveindex.info optical data retains CC0 1.0 terms. Optional Gmsh
+is separately installed under its own license and is not bundled in these
+packages. Dependency licenses are not replaced by the repository license.

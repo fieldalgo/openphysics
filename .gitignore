@@ -7,3 +7,9 @@ dist/
 .pytest_cache/
 .DS_Store
 .validation/
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+error.log

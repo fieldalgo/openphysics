@@ -18,8 +18,9 @@ distributed with this package and is NOT linked into it. ``galerkin.gmsh`` is
 an independent parser for the published MSH 2.2 and 4.1 ASCII formats, written
 from the format description in the Gmsh reference manual; no Gmsh source code
 was copied. Gmsh, when used at all, is run as a separate executable and only
-the file it writes is read. The GPL therefore does not extend to this package
-or to any program that uses it.
+the file it writes is read. This notice describes this package's integration
+boundary; it does not determine the licensing obligations of a different
+downstream integration.
 
 "Gmsh" is the name of that upstream project. This package is not affiliated
 with, endorsed by, or supported by the Gmsh project or its authors.

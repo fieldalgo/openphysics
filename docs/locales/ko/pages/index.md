@@ -82,3 +82,7 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 구현 계약, 독립 후보 근거와 결합 배포 검증은 서로 다른 범위입니다. 연결된 보고는 정확한 후보와 원 실패를 보존하며 선별 회복이 이전 전체 실패를 전체 통과로 바꾸지는 않습니다. 완료된 결합 결과에는 해당 최종 명령 exit와 완결 JUnit 근거가 필요합니다. 최종 근거 누락이나 transport 단절만으로 수치 성공이나 단절 원인을 확정할 수 없습니다. Linux 검사가 Windows 수용을 입증하지 않습니다.
 
 소스 snapshot `0bc4419f4cfaf9e1185872d14232f1644639fc72`의 Linux cloud 검증은 source 시험 1536개 통과, 하위검사 9개 통과, skip 16개와 명령 exit0을 기록했습니다. Skip은 optional Gmsh 사례 14개와 로컬 refractiveindex.info database 사례 2개입니다. 별도 sdist→wheel 설치 실행은 541개 사례가 실패·skip 없이 통과했습니다. 원 배포 helper의 16개 명령은 모두 exit0으로 완료됐으며 일곱 sdist→wheel build와 artifact 14개의 strict Twine 검사를 포함합니다. 이 snapshot은 `da811aec95f6695f6d7b9988a7d3e9055736ff97`로 통합됐습니다. 결과는 기록된 Linux 환경에 한정되며 Windows·다른 OS 수용이나 이전 transport 단절의 원인을 입증하지 않습니다. 이전 실패·미확인 실행은 별도 근거로 유지합니다.
+
+## 자산 출처
+
+[포함된 이미지·fixture·데이터](assets.md)에서 도입 이력과 라이선스 범위를 확인할 수 있습니다.

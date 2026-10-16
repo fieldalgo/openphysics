@@ -112,8 +112,7 @@ against regular archive members, including percent-decoded paths and fragments.
 Current package docs use unspaced inline targets. Reference-style links, Markdown
 parsing beyond that syntax, fragment-anchor existence, and external URL reachability
 are outside this check. Cross-package/root links use explicit repository URLs at a
-known integrated revision; they require network access and repository permission
-while this repository is private. A passing check does not certify fully offline
+known integrated revision; they require network access. A passing check does not certify fully offline
 documentation. Neither a wheel nor a single sdist is a monorepo checkout: editable
 `packages/...` setup commands require the repository root.
 

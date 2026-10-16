@@ -105,3 +105,19 @@ GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않�
 명시적 Python 전용 [정상 열전도→기계 workflow](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md)는 같은 메시 열전도와 처방 온도 기계단계를 불변 nodal-P1 Kelvin 복사로 연결합니다. [독립 보고](packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md)는 실측 수용과 구현 범위를 구분합니다. JSON/CLI/Studio 연결·저장·Robin/flux/traction workflow·과도 피드백·열역학적 완전 연성을 추가하지 않습니다.
 
 처방 온도장 기계단계는 선택적인 [전역 Cartesian 전체 표면하중](packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md)을 받으며 [독립 보고](packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md)를 제공합니다. 전역 Pa callback `-p*normal`은 유효하지만 scalar pressure 전용·로컬 프레임·follower API는 없습니다. 정상 열전도→기계 workflow나 JSON/CLI/Studio를 확장하지 않습니다.
+
+## 프로젝트 상태와 기여
+
+기본 브랜치 `develop`에는 검토한 통합 변경을 반영합니다. OpenPhysics는 개발 중인
+소스 프로젝트이며 기능 브랜치에는 검증하지 않은 작업이 있을 수 있습니다.
+이 저장소의 공개가 새로운 PyPI 버전 배포를 뜻하지는 않습니다. 이름 예약용
+`openphysics` 패키지는 여전히 비어 있으므로 위 checkout 안내에 따라 개별 구현
+패키지를 설치하세요. [기여 안내](CONTRIBUTING.ko.md),
+[보안 신고](SECURITY.ko.md), [검증 색인](docs/locales/ko/pages/index.md)을 참고하세요.
+
+## 라이선스와 제3자 자료
+
+자체 코드와 문서에는 [Apache-2.0](LICENSE)가 적용됩니다. [NOTICE](NOTICE)와
+각 패키지 고지에 제3자 자료를 명시합니다. 포함된 refractiveindex.info 광학 데이터는
+CC0 1.0 조건을 유지합니다. 선택 도구 Gmsh는 자체 라이선스로 별도 설치하며 이
+패키지들에 포함하지 않습니다. 저장소 라이선스가 의존성의 라이선스를 대체하지 않습니다.
