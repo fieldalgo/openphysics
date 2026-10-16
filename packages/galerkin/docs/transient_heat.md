@@ -213,4 +213,4 @@ H(div)-conforming: its direct boundary normal integral is generally different
 from a finite-mesh weak thermostat reaction and must be reported separately.
 
 See the [validation guide](transient_heat_validation.md) for the fixed
-fixed gates, independent algebra/reference boundaries and reproduction.
+gates, independent algebra/reference boundaries and reproduction.

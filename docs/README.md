@@ -114,3 +114,7 @@ The historical b2 snapshot's 70 small producer/reference source passes are evide
 |---|---|
 | [thermoelastic_traction](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
 | [thermoelastic_traction_independent_validation](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
+
+## Transient engine and document interface boundary
+
+The transient Python engine does not by itself enable a transient JSON/API/CLI study. See the [interface boundary](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)) for the named snapshot's support, units, initial/step histories and evidence limits. This boundary page does not announce an accepted transient document schema.
