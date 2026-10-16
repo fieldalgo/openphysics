@@ -184,7 +184,11 @@ test('actual shipped DOM: run installs result mesh and typed fields, late render
   assert.match(p.element('meshInfo').textContent,/Actual result mesh/);
   assert.match(p.element('resInfo').textContent,/temperature_k/);
   p.element('thermalField').value='qy';p.element('thermalField').onchange();
-  p.element('json').value='{';p.element('json').oninput();await tick();
+  for(const id of ['resInfo','meshInfo','meshLegend'])p.element(id).textContent='old result '+id;
+  p.element('json').value='{';p.element('json').oninput();
+  for(const id of ['resInfo','meshInfo','meshLegend'])assert.equal(p.element(id).textContent,'');
+  await tick();
+  for(const id of ['resInfo','meshInfo','meshLegend'])assert.equal(p.element(id).textContent,'');
   assert.equal(p.run('thermalController.result()'),null);
   assert.equal(p.element('fieldCanvas').onmousemove,null);
   assert.equal(p.element('thermalControls').hidden,true);
