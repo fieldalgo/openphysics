@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: thermal-windows-${{ github.ref }}
+  group: thermal-windows-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
