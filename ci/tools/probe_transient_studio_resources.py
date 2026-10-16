@@ -13,6 +13,7 @@ import json
 import platform
 import sys
 import time
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -94,6 +95,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 class Observer:
     def __init__(self, base: str, out: Path, report: dict, timeout: float):
         self.base, self.out, self.report, self.timeout = base, out, report, timeout
+        self.record_lock = threading.Lock()
         # Ignore ambient proxy settings for the explicitly local server.
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
@@ -111,7 +113,11 @@ class Observer:
         started = time.perf_counter()
         entry = {"path": path, "method": "GET" if data is None else "POST",
                  "request_bytes": len(data or b"")}
-        self.report["requests"].append(entry)
+        with self.record_lock:
+            if len(self.report["requests"]) >= 160:
+                raise ValueError("observation request-count bound reached")
+            self.report["requests"].append(entry)
+            sequence = len(self.report["requests"])
         try:
             try:
                 response = self.opener.open(req, timeout=self.timeout)
@@ -122,7 +128,7 @@ class Observer:
                 entry.update(status=response.code, response_bytes=len(body),
                              sha256=hashlib.sha256(body).hexdigest())
                 if save or response.code >= 400:
-                    name = f"response-{len(self.report['requests']):03d}.bin"
+                    name = f"response-{sequence:03d}.bin"
                     (self.out / name).write_bytes(body)
                     entry["raw_file"] = name
                 if len(body) > cap:
