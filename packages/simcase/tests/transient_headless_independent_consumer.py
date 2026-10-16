@@ -28,8 +28,8 @@ def main():
     expected=json.loads(args.expected_module_hashes.read_text(encoding="utf-8"))
     if not isinstance(expected,dict) or not expected:
         raise RuntimeError("nonempty explicit source hash mapping required")
-    # F runtime module names are bound once its exact candidate is supplied.
-    for required in ("simcase.schema","galerkin.transient_heat"):
+    # Bind additional adapter modules after the exact implementation is reviewed.
+    for required in ("simcase.schema","simcase.transient_thermal_contract","galerkin.transient_heat"):
         if required not in expected:
             raise RuntimeError("missing required module identity: "+required)
     origins={}
