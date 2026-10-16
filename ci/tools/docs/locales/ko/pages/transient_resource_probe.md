@@ -22,3 +22,21 @@ small n2/Nt3,medium n16/Nt8은준비shape. 16MiB raw후보바로아래/위의보
 동반계측필수: 실제shape/dtype/rawbytes와사전예측, ingress-before-buffer/BC/metadata, sharedraw+manifest+예약+pins합과allocationID, 결정적ASGIsend대기중eviction·새admission, encoded응답도최종참조까지계수, slice/list전readslot획득·send-finally까지보유·초과429·예외정확해제, capture후getter/solve0과steadybytecache보존, ingress1/solver1독립·crossroute/failure후다음성공요청, servercurrentRSS/누적highwater/tracedlive·peak/native범위와중첩시간, exactsource/origin/계측patchhash. socketbackpressure만으로slowreader/pin을증명하지않는다.
 
 도구는private store/추측metricsendpoint를읽지않는다. 내부memory/lease/counter는명시적미측정이다. 향후계측runner는생산원문/수치gate/steady계약을보존해야하며독립물리·수명·플랫폼CI와구분한다.
+
+## 별도 fresh-process 계측 companion
+`ci/tools/profile_transient_studio_resources.py`는 실제 source Studio 서버를 새 child에 띄우고 HTTP client는 parent에둔다. `instrumented-report.json`, 선택응답원문, `child.stderr`를저장한다. opt-in이며steadyCI중복실행에자동연결하지않는다.
+
+```sh
+python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
+python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
+```
+
+HEAD정확일치/추적package무변경을검사한다. 기존declareddeps만사용,import/start실패는원문보존하고설치/재시도없음. 호출별freshprocess/실제solve1회다. 독립유효small/medium/near문서를각각실행한다. 선택over문서는413·추가solve0을기대하며429는그actor의실패로보존하고capacity성공으로세지않는다.
+
+실제publicrun/capture/공개forwardedgetter/strict·viewencode/pin/reserve/readpublish/release를원함수그대로호출하며계수한다. producer구현module을import하지않고실제Studio전송store만계측한다. 첫phase는publicobserver(frame11GET+Hpage1),별도phase는동일frame11GET이며run/capture/getter증가0·허용viewencode11을확인한다. 전체count를단일11회workload로혼동하지않는다.
+
+실제frame ASGIsendbody를최대30초hold하고두번째frame429→hold해제→다음read200·pin/workspace해제를검사한다. solver/응답bytes는변경하지않는다. 결정적transporthold이며socket속도시험이아니다. hold중eviction/disconnect/send실패/TTL/모든수명actor는별도미검증이다.
+
+artifact `transient-instrumented-resource-v1`: child_start(PID/환경/version/baseline/originSHA256),requests(부모HTTP시간/status/bytes/hash/raw),phases(서버memory/store/counter전후·delta/hold거절),store(active/pending/reserved/retained/workspace/live/retired/snapshot/pins/raw·manifestbytes/allocationID목록),cleanup(stop상태/최종snapshot/originafter),failure/exit_code/child_exit/forced_stop. allocationID는프로세스로컬값이다. 강제종료는수용실패이며harness정리이지서버cancelendpoint가아니다.
+
+Linux /proc currentRSS, Linux/macOS정규화ru_maxrss누적highwater를분리한다. 다른플랫폼RSS는미지원값으로남긴다. tracemalloc은import/serverstartup후시작하며native일부누락. native6thread변수1,hook중첩시간/계측overhead/최대256events와계속누적counter를구분한다. encoded/retained/RSS는서로다르고32MiB는RAM보증아님. originhash를exactGit/packagebytes와별도대조해야한다. 수치/최대capacity수용주장없음.
