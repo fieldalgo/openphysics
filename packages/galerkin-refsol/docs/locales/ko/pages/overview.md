@@ -4,7 +4,7 @@
 
 ## 현재 checkout과 근거
 
-이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
@@ -113,8 +113,8 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 `refsol.transient_heat`를 명시적으로 import해 `uniform_insulated`, `moving_affine`, `sine_manufactured`, 소형 dense `p1_matrices`, `smallest_dirichlet_mode`, `backward_euler_amplitude`를 사용합니다. 이 모듈은 engine import 없이 NumPy/표준 라이브러리를 사용합니다. 좌표·시간·온도는 m/s/K, 열전도율은 W/(m K), 체적열용량은 J/(m³ K), source는 W/m³, flux는 W/m²입니다. Dense 행렬과 mode는 작은 참조 메시용이며 semidiscrete BE product는 연속체 PDE 해와 구분합니다. 이 참조는 물리 온도 유효성이나 최대 원리를 인증하지 않으며 독립 수용은 자체 정답을 도출해야 합니다.
 
-상수 등방 재료, 시간변 Dirichlet 값과 단열을 사용하는 고정 P1·일관 질량·후진 Euler 엔진 API는 다음 문서에 설명돼 있습니다.
+상수 등방 재료, 시간변 Dirichlet 값과 단열을 사용하는 고정 P1·일관 질량·후진 Euler 엔진 API는 다음 문서에 설명돼 있습니다. 별도 galerkin 패키지의 문서 링크이므로 네트워크 접근이 필요합니다.
 
-[사용법](../../../../../galerkin/docs/locales/ko/pages/transient_heat.md) ([English](../../../../../galerkin/docs/transient_heat.md)) · [생산 검증 계약](../../../../../galerkin/docs/locales/ko/pages/transient_heat_validation.md) ([English](../../../../../galerkin/docs/transient_heat_validation.md)) · [독립 검증 보고](../../../../../galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](../../../../../galerkin/docs/transient_heat_independent_validation.md))
+[사용법](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat.md)) · [생산 검증 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat_validation.md)) · [독립 검증 보고](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat_independent_validation.md))
 
 과거 b2 snapshot의 소형 source 70개 통과와 현재 checkout의 수용은 별개입니다. 현재 manifest/helper에는 문서·원 시험·독립 consumer·runtime byte 검사가 연결돼 있습니다. 실제 전체 시간/PDE·독립·배포·설치 성공은 정확한 현재 CI의 종료값과 artifact로 확인해야 합니다. 구현이나 gate 연결만으로 릴리스·통합 수용을 뜻하지 않습니다. JSON/CLI/Studio·저장·자동 열→기계 연결은 제공하지 않습니다.

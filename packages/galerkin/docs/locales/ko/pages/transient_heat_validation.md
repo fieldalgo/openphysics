@@ -4,7 +4,7 @@
 
 ## 현재 checkout과 근거
 
-이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
 ## 실행 경계
 
@@ -145,8 +145,9 @@ dt1/256s로1s까지 해석하고 .25,.5,1s에서 관측합니다. 각 관측 시
 | 실패 context 누락/부분 성공 | t0/후속 BC/source/solve/최종 복사 fault 사례 |
 
 Producer 계약 파일은 기본 계약, 원래 계 감사와 소형 reference 검사를 다룹니다.
-모든 독립 wrong variant를 이미 주입·거절했다는 주장이 아닙니다. 지정 mutation 실행과
-독립 물리 증명은 미완료입니다. 기존 gate는 변경하지 않습니다.
+모든 독립 wrong variant를 이미 주입·거절했다는 주장이 아닙니다. 독립 수용 suite에
+해당 runtime 판별과 물리 gate가 포함돼 있으며, 결과는 정확한 실행 근거에서 확인합니다.
+기존 gate는 변경하지 않습니다.
 
 ## 재현과 배포 경계
 
