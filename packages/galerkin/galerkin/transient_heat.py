@@ -12,7 +12,7 @@ import numpy as np
 from scipy.sparse.linalg import splu
 
 from .mesh import Mesh
-from .thermal import _mesh_geometry, _real, _source_load
+from .thermal import _mesh_geometry, _real as _base_real, _source_load
 from .assembly import assemble_mass, assemble_stiffness
 from .postprocess import element_gradient
 
@@ -26,6 +26,17 @@ class TransientHeatStepError(ValueError):
         super().__init__(
             f"transient heat failed at time index {self.time_index}, "
             f"time_s={self.time_s!r}")
+
+
+def _real(value, name):
+    # Preserve explicit bool rejection before heterogeneous Python sequences can
+    # coerce bools to a floating dtype. Already-normalized float arrays carry no
+    # recoverable history of how their elements were constructed.
+    if (isinstance(value, (bool, np.bool_))
+            or (isinstance(value, (list, tuple))
+                and any(isinstance(v, (bool, np.bool_)) for v in value))):
+        raise ValueError(f"{name} must not contain booleans")
+    return _base_real(value, name)
 
 
 def _scalar(value, name, positive=False):
@@ -154,7 +165,8 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                        for node in fixed], dtype=float)
         load = _source_load(
             private_mesh, p, t, area,
-            (lambda points: source(points.copy(), now)) if callable(source) else source)
+            (lambda points: _real(source(points.copy(), now), "heat_source callback"))
+            if callable(source) else source)
         _finite(bc, load)
         return bc, load
 
@@ -227,6 +239,9 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         except Exception as exc:
             raise TransientHeatStepError(index, times[index]) from exc
 
-    return TransientHeatResult(
-        times, temperature, flux, loads, reactions, residuals, storage,
-        content, quadratic, fixed, boundary_values, p, t, k, capacity)
+    try:
+        return TransientHeatResult(
+            times, temperature, flux, loads, reactions, residuals, storage,
+            content, quadratic, fixed, boundary_values, p, t, k, capacity)
+    except Exception as exc:
+        raise TransientHeatStepError(nt-1, times[-1]) from exc
