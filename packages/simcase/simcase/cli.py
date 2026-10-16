@@ -41,7 +41,8 @@ def main(argv=None) -> int:
         return 0
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
     from .thermal import is_thermal, require_fresh_output
-    if is_thermal(doc.data):
+    from .transient_thermal_contract import is_transient_thermal
+    if is_thermal(doc.data) or is_transient_thermal(doc.data):
         try:
             require_fresh_output(out)
         except OSError as exc:
@@ -68,3 +69,4 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
