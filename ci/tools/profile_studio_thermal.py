@@ -381,6 +381,8 @@ def main():
                             check=True, text=True, encoding="utf-8", capture_output=True).stdout.strip()
     if actual != args.expected_commit:
         parser.error("exact checkout commit differs from the requested observation")
+    subprocess.run(["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", "packages"],
+                   check=True)
     args.output.mkdir(parents=True, exist_ok=False)
     report = {
         "scope": "actual public API and real loopback ASGI HTTP in fresh server processes",

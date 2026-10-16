@@ -28,9 +28,10 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
+RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/thermal.py"),
                          "galerkin-refsol": ("refsol/transient_heat.py",),
-                         "simcase": ("simcase/schema.py", "simcase/transient_thermal_contract.py",
+                         "simcase": ("simcase/steady_boundary_contract.py",
+                                     "simcase/schema.py", "simcase/transient_thermal_contract.py",
                                      "simcase/transient_thermal.py", "simcase/runner.py",
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
                                      "simcase/thermal.py", "simcase/studio/server.py",
@@ -38,6 +39,7 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
 STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
                           "simcase/studio/static/thermal.js")
 DOCUMENT_ASSETS = {'galerkin': (
+              'galerkin/thermal.py',
               'galerkin/transient_heat.py',
               'docs/transient_heat.md',
               'docs/locales/ko/pages/transient_heat.md',
@@ -141,6 +143,22 @@ DOCUMENT_ASSETS = {'galerkin': (
               'docs/locales/ko/pages/thermal_studio.md',
               'docs/studio_thermal_independent_validation.md',
               'docs/locales/ko/pages/studio_thermal_independent_validation.md',
+              'tests/test_steady_boundary_schema.py',
+              'tests/test_steady_boundary_runtime.py',
+              'examples/thermal_boundary.json',
+              'tests/test_steady_boundary_platform.py',
+              'tests/test_studio_steady_boundary.py',
+              'tests/studio_steady_boundary.cjs',
+              'docs/thermal_steady_boundary2d.md',
+              'docs/locales/ko/pages/thermal_steady_boundary2d.md',
+              'docs/steady_boundary_independent_validation.md',
+              'docs/locales/ko/pages/steady_boundary_independent_validation.md',
+              'tests/steady_boundary_independent_oracle.py',
+              'tests/steady_boundary_independent_cases.py',
+              'tests/steady_boundary_independent_consumer.py',
+              'tests/test_steady_boundary_independent_validation.py',
+              'simcase/steady_boundary_contract.py',
+              'tests/test_steady_boundary_contract.py',
               'simcase/schema.py',
               'simcase/transient_thermal_contract.py',
               'simcase/transient_thermal.py',
@@ -369,7 +387,10 @@ def main():
         # Run original headless contract/runtime/Studio/save tests from the verified sdist.
         simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
         with tarfile.open(simcase_sdist) as archive:
-            for filename in ("test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
+            for filename in ("test_steady_boundary_schema.py", "test_steady_boundary_runtime.py",
+                             "test_steady_boundary_platform.py", "test_studio_steady_boundary.py",
+                             "test_steady_boundary_contract.py",
+                             "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
                              "test_studio_transient.py", "test_transient_headless_windows.py",
                              "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
                              "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
@@ -456,6 +477,56 @@ def main():
         run(python, "-I", "-m", "simcase", "validate", document, cwd=work, env=env)
         run(python, "-I", "-m", "simcase", "run", document, "-q",
             "-o", work / "transient-headless-example", cwd=work, env=env)
+        # Original steady-boundary independent cases run separately from pytest.
+        steady_acceptance = work / "steady-boundary-acceptance"
+        steady_acceptance.mkdir()
+        with tarfile.open(simcase_sdist) as archive:
+            for filename in ("steady_boundary_independent_oracle.py",
+                             "steady_boundary_independent_cases.py",
+                             "steady_boundary_independent_consumer.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (steady_acceptance / filename).write_bytes(archive.extractfile(member).read())
+        run(python, "-I", steady_acceptance / "steady_boundary_independent_consumer.py",
+            "--expected-installed-root", env_root,
+            "--expected-module-hashes", hash_manifest, cwd=work, env=env)
+        # Consume the exact shipped steady boundary JSON through the installed CLI.
+        with tarfile.open(simcase_sdist) as archive:
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == "examples/thermal_boundary.json")
+            boundary_document = examples / "thermal_boundary.json"
+            boundary_document.write_bytes(archive.extractfile(member).read())
+        run(python, "-I", "-m", "simcase", "validate", boundary_document, cwd=work, env=env)
+        run(python, "-I", "-m", "simcase", "run", boundary_document, "-q",
+            "-o", work / "steady-boundary-example", cwd=work, env=env)
+        # Run the original Node script against verified installed static bytes.
+        # Node VM cases remain distinct from the real browser/public-API check.
+        node_root = work / "studio-installed-node"
+        (node_root / "tests").mkdir(parents=True)
+        static = node_root / "simcase" / "studio" / "static"
+        static.mkdir(parents=True)
+        copy_resources = work / "copy_installed_studio_resources.py"
+        copy_resources.write_text(
+            "import hashlib, json, sys, simcase\nfrom pathlib import Path\n"
+            + "expected = " + repr(studio_resources) + "\n"
+            + "root = Path(simcase.__file__).resolve().parent.parent\n"
+            + "target = Path(sys.argv[1])\n"
+            + "if not sys.flags.isolated or not root.is_relative_to(Path(sys.prefix).resolve()): raise RuntimeError('installed resource root required')\n"
+            + "for relative, digest in expected.items():\n"
+            + "    data = (root / relative).read_bytes()\n"
+            + "    if hashlib.sha256(data).hexdigest() != digest: raise RuntimeError('installed resource changed')\n"
+            + "    (target / Path(relative).name).write_bytes(data)\n",
+            encoding="utf-8")
+        run(python, "-I", copy_resources, static, cwd=work, env=env)
+        with tarfile.open(simcase_sdist) as archive:
+            relative = "tests/studio_steady_thermal.cjs"
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == relative)
+            node_test = node_root / relative
+            node_test.write_bytes(archive.extractfile(member).read())
+        with (output / "studio-installed-node.tap").open("w", encoding="utf-8") as log:
+            subprocess.run(["node", "--test", str(node_test)], cwd=work, env=env,
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
         # Small real-browser E2E uses these installed wheels, never source imports.
         browser_model = work / "studio-browser-model.json"
         browser_model.write_text(json.dumps({
@@ -470,6 +541,8 @@ def main():
         }, allow_nan=False), encoding="utf-8")
         run("node", ROOT / "ci/tools/studio_thermal_browser.mjs",
             "--python", python, "--model", browser_model,
+            "--source-commit", subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip(),
             "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,
             "--output", output / "studio-browser", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")

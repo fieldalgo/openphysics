@@ -13,14 +13,15 @@ const expectedRoot=resolve(arg('--expected-installed-root')), hashes=JSON.parse(
 const out=resolve(arg('--output')), python=arg('--python'), model=JSON.parse(await readFile(arg('--model'),'utf8'));
 await mkdir(out,{recursive:false});
 const artifactWrites=[];
-const report={status:'incomplete',scope:'real installed Studio browser/public API',node:process.version,console:[],stages:[]};
+const sourceCommit=arg('--source-commit');
+const report={sourceCommit,status:'incomplete',scope:'real installed Studio browser/public API',node:process.version,console:[],http:[],stages:[]};
 const owned=[]; let profile,cdp;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function port(){const s=createServer();await new Promise(r=>s.listen(0,'127.0.0.1',r));const p=s.address().port;await new Promise(r=>s.close(r));return p;}
 async function wait(fn,label){const end=Date.now()+60000;while(Date.now()<end){try{const x=await fn();if(x)return x;}catch{}await sleep(200);}throw Error('Timeout: '+label);}
 function launch(command,argv,name){const p=spawn(command,argv,{stdio:['ignore','pipe','pipe'],env:{...process.env,OPENBLAS_NUM_THREADS:'1',OMP_NUM_THREADS:'1',MKL_NUM_THREADS:'1'}});owned.push(p);let log='';p.stdout.on('data',x=>{log+=x});p.stderr.on('data',x=>{log+=x});p.on('error',e=>{log+=String(e)});p.on('close',(exit,signal)=>{report[name]={pid:p.pid,exit,signal};artifactWrites.push(writeFile(join(out,name+'.log'),log,'utf8'));});return p;}
 class CDP{
- constructor(url){this.id=0;this.pending=new Map();this.ws=new WebSocket(url);this.ready=new Promise((r,j)=>{this.ws.addEventListener('open',r,{once:true});this.ws.addEventListener('error',j,{once:true});});this.ws.addEventListener('message',e=>{const x=JSON.parse(e.data);if(x.id){const p=this.pending.get(x.id);if(p){clearTimeout(p.timer);this.pending.delete(x.id);x.error?p.reject(Error(JSON.stringify(x.error))):p.resolve(x.result);}}else if(x.method==='Runtime.exceptionThrown'||(x.method==='Runtime.consoleAPICalled'&&x.params.type==='error'))report.console.push(x);});}
+ constructor(url){this.id=0;this.pending=new Map();this.ws=new WebSocket(url);this.ready=new Promise((r,j)=>{this.ws.addEventListener('open',r,{once:true});this.ws.addEventListener('error',j,{once:true});});this.ws.addEventListener('message',e=>{const x=JSON.parse(e.data);if(x.id){const p=this.pending.get(x.id);if(p){clearTimeout(p.timer);this.pending.delete(x.id);x.error?p.reject(Error(JSON.stringify(x.error))):p.resolve(x.result);}}else if(x.method==='Network.responseReceived'){const p=x.params;if(p.response.url.includes('/api/thermal/')||/\/api\/jobs\//.test(p.response.url))report.http.push({url:p.response.url,status:p.response.status,mimeType:p.response.mimeType});}else if(x.method==='Runtime.exceptionThrown'||(x.method==='Runtime.consoleAPICalled'&&x.params.type==='error'))report.console.push(x);});}
  async call(method,params={}){await this.ready;const id=++this.id;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('CDP timeout '+method))},30000);this.pending.set(id,{resolve,reject,timer});this.ws.send(JSON.stringify({id,method,params}));});}
  async eval(expression){const r=await this.call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
 }
@@ -39,7 +40,7 @@ try{
  launch(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-address=127.0.0.1','--remote-debugging-port='+debugPort,'--user-data-dir='+profile,'--window-size=1440,1000','about:blank'],'browser');
  const targets=await wait(async()=>{const r=await fetch('http://127.0.0.1:'+debugPort+'/json/list');return r.ok?await r.json():null},'CDP');
  cdp=new CDP(targets.find(x=>x.type==='page').webSocketDebuggerUrl);
- await cdp.call('Runtime.enable');await cdp.call('Page.enable');
+ await cdp.call('Runtime.enable');await cdp.call('Page.enable');await cdp.call('Network.enable');
  await cdp.call('Page.navigate',{url:base});
  await wait(()=>cdp.eval("document.readyState==='complete' && !!document.querySelector('#applyJson') && thermalController.state().cap?.run_enabled===true"),'page');
  const click=selector=>cdp.eval('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e||e.disabled)throw Error("Missing/disabled control");e.click();return true})()');
@@ -65,6 +66,7 @@ try{
  report.dirty.cleared=cleared;if(!cleared)throw Error('Dirty JSON retained stale field pixels');
  await writeFile(join(out,'final-dom.json'),JSON.stringify(await cdp.eval('({status:document.querySelector("#status").textContent,controls:{runDisabled:document.querySelector("#runBtn").disabled,thermalHidden:document.querySelector("#thermalControls").hidden},html:document.documentElement.outerHTML})'),null,2)+'\n','utf8');
  if(report.console.length)throw Error('Browser console exception/error');
+ if(!report.http.some(x=>x.url.endsWith('/api/thermal/run')&&[200,202].includes(x.status))||!report.http.some(x=>/\/api\/jobs\/[^/]+\/result$/.test(x.url)&&x.status===200))throw Error('No successful real thermal run/result HTTP evidence');
  report.model=model; report.fakeApi=false; report.injectedPhysicalResult=false;
  report.status='passed';
 }catch(e){if(cdp){try{const png=await cdp.call('Page.captureScreenshot',{format:'png'});await writeFile(join(out,'failure.png'),Buffer.from(png.data,'base64'));}catch{}}

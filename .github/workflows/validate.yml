@@ -2,20 +2,23 @@ name: Validate packages
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validation-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  group: validation-${{ github.workflow }}-${{ github.ref }}
+  queue: ${{ github.ref == 'refs/heads/main' && 'max' || 'single' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   linux-py312:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -44,6 +47,17 @@ jobs:
           gmsh --version
       - name: Fetch pinned RII database
         run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Check steady boundary contract before transient and full acceptance
+        run: |
+          python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
+            packages/simcase/tests/test_thermal.py \
+            packages/simcase/tests/test_thermal_simcase_independent_validation.py \
+            packages/simcase/tests/test_steady_boundary_contract.py \
+            packages/simcase/tests/test_steady_boundary_independent_validation.py \
+            packages/simcase/tests/test_steady_boundary_schema.py \
+            packages/simcase/tests/test_steady_boundary_runtime.py \
+            packages/simcase/tests/test_steady_boundary_platform.py \
+            packages/simcase/tests/test_studio_steady_boundary.py
       - name: Check transient document acceptance before the full suite
         run: |
           python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
@@ -74,7 +88,7 @@ jobs:
           python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_thermal.cjs
+        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_boundary.cjs packages/simcase/tests/studio_steady_thermal.cjs
       - name: Observe exact steady thermal Studio resources once
         if: ${{ success() }}
         run: python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
@@ -89,7 +103,7 @@ jobs:
   tests:
     name: tests
     needs: linux-py312
-    if: ${{ always() }}
+    if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

@@ -3,20 +3,23 @@ name: Windows headless thermal save
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: thermal-windows-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  group: thermal-windows-${{ github.ref }}
+  queue: ${{ github.ref == 'refs/heads/main' && 'max' || 'single' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   windows-py312-thermal:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: windows-2022
     timeout-minutes: 20
     env:
@@ -64,6 +67,7 @@ jobs:
           for module, package, relative in (
               ('simcase', 'simcase', 'simcase/__init__.py'),
               ('simcase.schema', 'simcase', 'simcase/schema.py'),
+              ('simcase.steady_boundary_contract', 'simcase', 'simcase/steady_boundary_contract.py'),
               ('simcase.transient_thermal_contract', 'simcase', 'simcase/transient_thermal_contract.py'),
               ('simcase.transient_thermal', 'simcase', 'simcase/transient_thermal.py'),
               ('simcase.runner', 'simcase', 'simcase/runner.py'),
@@ -71,6 +75,7 @@ jobs:
               ('simcase.examples', 'simcase', 'simcase/examples.py'),
               ('simcase.thermal', 'simcase', 'simcase/thermal.py'),
               ('galerkin.transient_heat', 'galerkin', 'galerkin/transient_heat.py'),
+              ('galerkin.thermal', 'galerkin', 'galerkin/thermal.py'),
           ):
               expected[module] = hashlib.sha256((root / 'packages' / package / relative).read_bytes()).hexdigest()
           probe = '\n'.join([
@@ -93,6 +98,7 @@ jobs:
           shutil.copy2(root / 'ci' / 'test_thermal_simcase_wheel.py', tests)
           shutil.copy2(root / 'packages' / 'simcase' / 'tests' / 'test_thermal.py', tests / 'test_shipped_thermal_io.py')
           shutil.copy2(root / 'packages' / 'simcase' / 'tests' / 'test_transient_headless_windows.py', tests)
+          shutil.copy2(root / 'packages' / 'simcase' / 'tests' / 'test_steady_boundary_platform.py', tests)
           examples = work / 'examples'
           examples.mkdir()
           for filename in ('thermal_slab.json', 'thermal_mixed.json'):
@@ -133,6 +139,22 @@ jobs:
                   str(root / 'ci' / 'test_thermal_simcase_wheel.py')],
                   cwd=root, stdout=log, stderr=subprocess.STDOUT, text=True)
           print((output / 'windows-source-target.log').read_text())
+          raise SystemExit(result.returncode)
+      - name: Source steady boundary target protection from the same consumer file
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          output = root / '.validation-windows-thermal'
+          context = json.loads((output / 'consumer-work.json').read_text(encoding='utf-8'))
+          with (output / 'windows-steady-boundary-source-target.log').open('w', encoding='utf-8') as log:
+              result = subprocess.run([context['python'], '-I', '-m', 'pytest', '-q', '-ra',
+                  '--confcutdir', str(root), '-k', 'test_boundary_api_and_cli_preserve_existing_target',
+                  '--junitxml=' + str(output / 'windows-steady-boundary-source-target-tests.xml'),
+                  str(root / 'packages' / 'simcase' / 'tests' / 'test_steady_boundary_platform.py')],
+                  cwd=root, stdout=log, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+          print((output / 'windows-steady-boundary-source-target.log').read_text(encoding='utf-8'))
           raise SystemExit(result.returncode)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
