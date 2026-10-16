@@ -178,8 +178,11 @@ def test_independent_actual_failure_cleanup(tmp_path,monkeypatch,stage):
 
 
 def test_independent_actual_two_writers(tmp_path):
-    results=[actual(source=q) for q in (0.,answer.SOURCE)]
-    for i,result in enumerate(results):result.doc.data['name']=f'independent writer {i}'
+    results=[]
+    for i,q in enumerate((0.,answer.SOURCE)):
+        data=answer.document(source=q)
+        data['name']=f'independent writer {i}'
+        results.append(run(Document.from_dict(data),verbose=False))
     target=tmp_path/'race';barrier=threading.Barrier(2)
     def writer(i):
         barrier.wait()
