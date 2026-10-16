@@ -126,7 +126,7 @@ both summary and absence of `.incomplete` under the same exclusivity assumption.
 This is not atomic multi-file publication, adversarial race protection or crash
 rollback. Independent source/installed counterexamples demonstrate the check/use
 limitation; see the [independent report](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/thermal_simcase_independent_validation.md).
-That limitation is separate from the two unresolved Windows fixture-operation
+That limitation is separate from the two historical Windows fixture-operation
 failures; it does not establish their cause.
 Ownership uses POSIX file descriptors and a narrow Windows adapter. Windows
 file identities are pinned by temporary hard links in exclusively created sibling
@@ -170,4 +170,13 @@ Failure-injection checks record OS errno/winerror/message and fixture stages.
 They require the intended post-NPZ injected error after replacement has completed;
 an OS rename/replace refusal is a fixture-precondition failure, not successful
 cleanup protection or proof that cleanup deleted a replacement.
+
+The handle-free file-pin candidate `d89ce964b71ac3c47cd1bed47118653374967fbb`
+passed the narrow Windows Server 2022 / CPython 3.12.10 installed API/CLI/save
+gate: 36 passed and 62 deselected, plus 3 source target-protection cases passed
+and 14 deselected. The unchanged five fault stages include both formerly refused
+rename/replace operations; seven additional link-pin cases are included.
+See [the exact run](https://github.com/fieldalgo/openphysics/actions/runs/38857948286).
+This is not full Windows regression, macOS acceptance, or a promise for filesystems
+without hard-link support. Earlier failures remain historical evidence.
 

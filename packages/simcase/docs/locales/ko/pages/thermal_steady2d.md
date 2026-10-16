@@ -120,7 +120,7 @@ Cleanup은 관측한 소유권을 검사하며 디렉터리를 재귀적으로 �
 있고 `.incomplete`가 없는지 모두 확인해야 합니다. 원자적 다중 파일 게시·적대적 race
 보호·crash rollback 보장이 아닙니다. 독립 source/설치본의 실제 반례가 check/use 한계를
 보여줍니다. [독립 보고서](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md)를 참고하세요.
-이 한계는 원인이 미확정인 Windows fixture-operation 두 실패와 별개이며 그 원인을
+이 한계는 과거 Windows fixture-operation 두 실패와 별개이며 그 원인을
 입증하지 않습니다.
 소유권 고정에는 POSIX 파일 descriptor와 좁은 Windows adapter를 사용합니다.
 Windows 파일 identity는 쓰기 후 유지하는 파일 handle 대신, 독점 생성한 인접 임시
@@ -161,4 +161,12 @@ CLI 오류와 Studio 지연 응답을 시험합니다.
 교체가 완료된 뒤 의도한 NPZ 이후 주입 오류에 도달해야 합니다. OS가 rename/replace를
 거부하면 fixture 사전조건 실패이며 cleanup 소유 보호의 성공이나 cleanup이 교체 파일을
 지웠다는 증거로 해석하지 않습니다.
+
+열린 파일 handle을 유지하지 않는 pin 후보 `d89ce964b71ac3c47cd1bed47118653374967fbb`는
+Windows Server 2022 / CPython 3.12.10의 좁은 설치 API·CLI·저장 gate에서
+36개 통과·62개 deselect, 별도 source 기존 대상 보호 3개 통과·14개 deselect를 기록했습니다.
+원래 다섯 fault 단계는 바꾸지 않았고 이전에 거부된 rename/replace 두 연산도 포함합니다.
+추가 link-pin 사례 일곱 개도 포함됩니다. [정확한 실행](https://github.com/fieldalgo/openphysics/actions/runs/38857948286)을
+참조하세요. Windows 전체 회귀·macOS 수용이나 hard link 미지원 파일시스템을 보장하지 않습니다.
+이전 실패는 역사적 근거로 보존합니다.
 
