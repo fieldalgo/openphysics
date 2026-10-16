@@ -212,3 +212,22 @@ The new metadata assertion gap was a consumer test-definition issue, not a
 confirmed production defect. No Python parse/pytest/HTTP/solver/installed/browser
 or platform execution was performed. Exact combined Studio source/installed
 CI, including real repeated runs and all negative controls, is still required.
+
+## Exact combined-candidate review
+
+Reviewed combined candidate b584d50df6ef024e6600c611fe24d9467034c890
+(parent main6e9be99a10fba77d329063da973401f26d4ed0b5).
+Its HTTP test, strict fixture, P2 oracle/cases and thermal adapter exactly match
+the reviewed blobs f47db1a/b7b7e0c/8957c566/963e685/6ecec32.
+No physical gate, sequential mesh, SI or conservation assertion changed.
+
+Overall acceptance is held for a confirmed peer test-definition blocker:
+tests/studio_steady_thermal.cjs307 invokes undefined load(...) while constructing
+the final HTTP-mock test string. The existing cap() fixture can replace the
+dynamic loader expression through JSON.stringify(cap()). No peer-owned source
+was changed by this independent review. This is a source-confirmed test error,
+not a newly executed Node failure or a physical/UI defect.
+
+Actual HTTP/Node/numerical/installed/browser/platform validation of this combined
+candidate remains unexecuted in this review. The corrected exact candidate and
+its original independent results must be checked before acceptance.
