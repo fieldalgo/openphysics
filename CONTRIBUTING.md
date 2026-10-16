@@ -4,15 +4,18 @@ OpenPhysics is under active development. Start with the [package overview](READM
 and [implementation and validation contracts](docs/README.md). The `main`
 branch is the only trunk and the default branch; target pull requests there. Feature branches may contain work that has not passed acceptance.
 
-Open an issue for a reproducible bug or a proposed change. Include the commit,
-Python and platform versions, input units, a minimal example, and the expected
-and actual results. Remove credentials, personal information and confidential
-models before attaching files. Report vulnerabilities through the private
+Reports of suspected bugs, accuracy questions, research questions and proposed
+changes are welcome. Search existing issues first and use the closest issue form.
+Include available observations, the exact release/commit, Python/platform versions
+and expected behavior; mark missing evidence honestly. A complete reproducer or
+confirmed defect is helpful but is not required to open an issue. Distinguish
+main behavior from a PR-only candidate. Remove credentials, personal information
+and confidential models before attaching files. Report vulnerabilities through the private
 channel in [SECURITY.md](SECURITY.md).
 
 Install and run from the repository root as described in [README.md](README.md).
 Use [validation guide](ci/docs/README.md) for the pinned Linux validation environment,
-optional tools and data, and isolated distribution checks. GitHub Actions is enabled for pushes and pull requests. Review the exact
+optional tools and data, and isolated distribution checks. GitHub Actions runs on main pushes, Ready pull requests and explicit manual dispatch. Review the exact
 workflow results and artifacts when validating a contribution.
 Record the exact commands, exits, failures and optional skips from your own checks.
 
@@ -31,12 +34,28 @@ with third-party exceptions recorded in [NOTICE](NOTICE) and package notices.
 
 ## Branches and releases
 
+Open pull requests as drafts. Branch pushes do not run validation, and draft PRs
+allocate no validation runners. After reviewing the change and running relevant
+checks in an appropriate local or remote environment, mark the PR Ready for
+review. Validation runs on Ready PR changes, main pushes and explicit manual
+dispatch. Enable automatic Rebase and merge only after review and relevant
+validation, with every required check preserved.
+
+Main validation uses a stable workflow/ref concurrency group with `queue: max`
+and cancellation disabled. Non-main runs use `queue: single` and supersede older
+runs. This Actions queue is separate from a pull-request merge queue.
+
+Keep file paths, temporary directories, subprocesses and cleanup portable.
+The validation structure is full Linux acceptance plus installed-distribution
+checks on Linux, macOS and Windows. Do not infer a platform pass from another
+OS or a universal wheel; inspect the exact run and retain failures and artifacts.
+
 `main` is the only trunk and the default branch. Create a feature branch from
 current `origin/main`, push it and open a pull request targeting `main`. Preserve
 shared or submitted history; use a new branch if replaying it is necessary.
 Every change, including documentation, requires the `tests` completion check
-(Linux source, distributions and Studio) and `windows-py312-thermal` from GitHub
-Actions. Review the exact candidate's logs and artifacts, not only its badge.
+(Linux source, distributions, Studio and all three installed-platform checks)
+and `windows-py312-thermal` from GitHub Actions. Review the exact candidate's logs and artifacts, not only its badge.
 
 Land green PRs through GitHub **Rebase and merge**. Direct pushes, merge commits,
 squash merges, force pushes and deleting main are blocked. No approving review

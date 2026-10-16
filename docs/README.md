@@ -4,6 +4,14 @@
 
 ## Current checkout and evidence
 
+The current CI configuration adds installed-package checks on Linux, macOS and
+Windows. Each builds six implementation sdists into wheels and validates isolated
+consumer imports, package bytes, bundled assets and selected public API/CLI/save
+behavior. The required `tests` aggregate waits for full Linux acceptance and all
+three installed platforms; the existing Windows thermal gate also remains required.
+This is configured coverage, not a new historical pass claim. See the
+[validation guide](../ci/docs/README.md) for scope, commands and exact-run artifacts.
+
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
 [Suite overview and installation](overview.md) · [한국어 overview](locales/ko/pages/overview.md)

@@ -17,17 +17,62 @@
 검증은 바뀌지 않으며, 릴리스에는 정확한 대상 커밋의 검증 성공이 필요합니다.
 이는 CI 실행 대기열이며 PR 병합 대기열과는 다릅니다.
 
+## CI 정책과 설치 플랫폼 검증표
+
+검증은 main push, Ready PR(`opened`, `synchronize`, `reopened`,
+`ready_for_review`), 명시적 수동 dispatch에서 실행합니다. 기능 브랜치 push는
+CI를 실행하지 않으며 Linux 집계 작업을 포함한 모든 검증 작업이 draft PR을
+제외합니다. 변경 검토와 관련 검사를 마친 Ready PR은 자동 Rebase and merge를
+사용할 수 있습니다. 필수 검사는 모두 유지합니다. main은 고정 workflow/ref
+그룹과 `queue: max`, 취소 비활성화를 사용합니다. 다른 ref는 `queue: single`로
+이전 실행을 대체합니다. 이것은 workflow 대기열이며 PR 병합 큐가 아닙니다.
+
+| Workflow | 플랫폼 | 검증 범위 |
+|---|---|---|
+| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | 전체 소스 시험, 일곱 배포판, 엄격한 archive/문서 검사, 설치 소비자와 Studio Node 검사 |
+| `thermal-windows.yml` | Windows 2022, Python 3.12.10 | 기존 설치 열전도와 저장 소유권 회귀 시험 |
+| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | 여섯 구현 sdist에서 wheel 재빌드; 새 격리 소비자 환경; 패키지 바이트·모듈 출처·번들 자산 및 공개 API/CLI/저장 smoke |
+
+설치 검증표는 `ci/requirements-py312-windows-thermal.txt`의 기존 이식 가능한
+정확 pin을 재사용합니다. 이 과거 파일명이 검증표를 Windows로 한정하지 않습니다.
+system site packages 없는 새 venv에 의존성을 설치하고 직접 만든 wheel만
+`--no-index --no-deps`로 설치한 뒤 checkout 밖에서 `python -I`로 실행합니다.
+기존 열전도 폐형식·단위·저장 소비자, scalar slab/reference, Gmsh parser 시험의
+수치 허용치를 유지합니다. 소비자 시험·예제·MSH fixture는 정확 checkout에서
+복사하고 별도 hash를 기록합니다. 각 sdist에 시험 fixture가 포함된다는 주장은 아닙니다. 별도 공개 mesh smoke는 양의 요소 면적과 전체 단위
+면적을 확인합니다. 이 검증표는 외부 Gmsh 실행, macOS/Windows 전체 회귀,
+RII 다운로드, 브라우저 runtime을 검증했다고 주장하지 않으며 전체 Linux 수용을 보완합니다.
+
+각 OS는 명령 종료값/로그, 환경 정보, archive checksum 12개, 패키지 바이트와
+소비자 시험 hash, 설치 출처와 pytest JUnit을
+`installed-packages-<os>-<run_id>` artifact로 올립니다. 로컬 또는 다른 실행기에서:
+
+```bash
+python -m pip install -r ci/requirements-py312-windows-thermal.txt
+python -X utf8 ci/tools/check_platform_install.py
+```
+
+출력 디렉터리는 새 경로여야 합니다. 설정만으로 통과를 입증하지 않습니다.
+수용을 주장하기 전에 정확 커밋의 세 OS 작업과 artifact를 확인합니다.
+패키지 metadata 최소 버전과 별개로 Python 3.10/3.11은 이 CI 검증표 범위 밖입니다.
+
+`platform-install.yml`은 `validate.yml`이 호출하는 재사용 workflow입니다.
+기존 필수 `tests` 집계가 전체 Linux 수용과 설치 플랫폼의 모든 작업을 기다리며,
+플랫폼 하나가 실패하거나 skip되면 집계도 통과하지 않습니다. 기존 보호 규칙의
+검사 이름을 유지하면서 플랫폼 검사가 병합에 필수로 작용합니다. 명시적 수동
+dispatch도 지원하지만 독립 수동 실행은 PR 검증을 대체하지 않습니다.
+
 ## 현재 checkout과 근거
 
 이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. 기존 Linux 패키지·좁은 Windows workflow는 push·pull request·수동 dispatch에서 사용할 수 있습니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
+2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. Linux 패키지·좁은 Windows·설치 플랫폼 workflow는 main push·Ready PR·명시적 수동 dispatch에서 실행합니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
 
-루트 `validate.yml` workflow는 push·pull request·수동 dispatch에서 실행됩니다.
-Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11과
-다른 운영체제는 이 CI 검증 범위 밖이며 패키지 metadata는 여전히 Python >=3.10을
+루트 `validate.yml` workflow는 main push·Ready PR·수동 dispatch에서 실행됩니다.
+Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11은 이 CI 검증 범위 밖이며
+별도 설치 검증표가 세 운영체제를 다룹니다. 패키지 metadata는 여전히 Python >=3.10을
 선언합니다. `requirements-py312-linux.txt`는 패키지 runtime 요구가 아니라 검증 도구와
 전이 의존성을 고정합니다. pin을 의도적으로 검토·갱신하고 source·wheel 검사를 모두
 다시 실행합니다.
