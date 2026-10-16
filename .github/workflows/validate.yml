@@ -103,6 +103,9 @@ jobs:
       - name: Observe exact steady thermal Studio resources once
         if: ${{ success() }}
         run: python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
+      - name: Observe exact transient thermal Studio resources once
+        if: ${{ success() }}
+        run: python ci/tools/run_transient_resource_workloads.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/transient-resource-observation
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
