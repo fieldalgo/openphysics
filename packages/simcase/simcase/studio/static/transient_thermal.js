@@ -225,17 +225,24 @@
       emit();
       try {const raw=await request('GET',queryURL(owner.man,task.kind==='frame'?'frame':'history',q));
         if(!current(owner))return;
-        if(task.kind==='frame'){accepted=frame(raw,owner.man,q);onFrame(accepted);}
+        if(task.kind==='frame'){
+          const candidate=frame(raw,owner.man,q);
+          model(owner.man,candidate,task.field); // A derived view is not accepted merely because its raw row is finite.
+          accepted=candidate;onFrame(accepted);
+        }
         else {const page=history(raw,owner.man,q);panes[task.field]=page;onHistory(page);}
       }catch(e){if(current(owner)){error=String(e.message||e);if(task.kind==='frame'){accepted=null;onFrame(null);}}}
       finally {readActive=false;readKind=null;if(current(owner))emit();if(pending){emit();void drain();}}
     }
     function renderToken(){return {...token(),renderSeq:++renderSeq,frame:accepted};}
     function renderCurrent(t){return current(t)&&t.renderSeq===renderSeq&&t.frame===accepted;}
+    function rejectView(t,message){
+      if(!renderCurrent(t)||!accepted)return false;
+      accepted=null;error=String(message);renderSeq++;onFrame(null);emit();return true;
+    }
     return {loadCapability,validate,run,select,loadHistory,invalidate,state,result:()=>man,
       snapshot:()=>validated?copy(validated):null,supports:doc=>!!cap&&T.soleType(doc)===TYPE,
-      renderToken,renderCurrent};
+      renderToken,renderCurrent,rejectView};
   }
   return {TYPE,RESULT,LAYOUT,UI,SPEC,copy,capability,template,queryURL,manifest,frame,history,model,meshModel,createController};
 });
-
