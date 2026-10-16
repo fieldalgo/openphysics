@@ -10,6 +10,7 @@ so neither editable installs nor the root conftest can supply package code.
 
 import argparse
 import hashlib
+import json
 import os
 import posixpath
 from pathlib import Path
@@ -28,7 +29,11 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
-                         "galerkin-refsol": ("refsol/transient_heat.py",)}
+                         "galerkin-refsol": ("refsol/transient_heat.py",),
+                         "simcase": ("simcase/schema.py", "simcase/transient_thermal_contract.py",
+                                     "simcase/transient_thermal.py", "simcase/runner.py",
+                                     "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
+                                     "simcase/thermal.py", "simcase/studio/server.py") }
 DOCUMENT_ASSETS = {'galerkin': (
               'galerkin/transient_heat.py',
               'docs/transient_heat.md',
@@ -118,7 +123,28 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'refsol/thermoelasticity.py',
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
- 'simcase': ('docs/cavity3d.md',
+ 'simcase': (
+              'simcase/schema.py',
+              'simcase/transient_thermal_contract.py',
+              'simcase/transient_thermal.py',
+              'simcase/runner.py',
+              'simcase/cli.py',
+              'simcase/examples.py',
+              'simcase/__init__.py',
+              'simcase/thermal.py',
+              'simcase/studio/server.py',
+              'docs/thermal_transient2d.md',
+              'docs/locales/ko/pages/thermal_transient2d.md',
+              'examples/transient_thermal_uniform.json',
+              'tests/test_transient_thermal_contract.py',
+              'tests/test_transient_thermal_runtime.py',
+              'tests/test_studio_transient.py',
+              'tests/test_transient_headless_windows.py',
+              'tests/test_transient_headless_independent_validation.py',
+              'tests/transient_headless_independent_oracle.py',
+              'tests/transient_headless_independent_cases.py',
+              'tests/transient_headless_independent_consumer.py',
+              'docs/cavity3d.md',
              'examples/cavity_box.json',
              'docs/geometry.png',
              'docs/results.png',
@@ -252,11 +278,12 @@ def main():
         run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
         # Verify the new explicit submodules before any numerical consumer runs.
         runtime_expected = {
-            "galerkin.transient_heat": hashlib.sha256(
-                (ROOT / "packages/galerkin/galerkin/transient_heat.py").read_bytes()).hexdigest(),
-            "refsol.transient_heat": hashlib.sha256(
-                (ROOT / "packages/galerkin-refsol/refsol/transient_heat.py").read_bytes()).hexdigest(),
+            relative[:-3].replace("/", ".").removesuffix(".__init__"):
+                hashlib.sha256((ROOT / "packages" / package / relative).read_bytes()).hexdigest()
+            for package, relatives in RUNTIME_MODULE_ASSETS.items() for relative in relatives
         }
+        hash_manifest = output / "installed-module-hashes.json"
+        hash_manifest.write_text(json.dumps(runtime_expected, indent=2) + "\n", encoding="utf-8")
         origin_probe = work / "transient_module_origins.py"
         origin_probe.write_text(
             "import hashlib, importlib, json, sys\nfrom pathlib import Path\n"
@@ -299,6 +326,14 @@ def main():
         for package, filename in (("galerkin", "test_transient_heat.py"),
                                   ("galerkin-refsol", "test_transient_heat_reference.py")):
             shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
+        # Run original headless contract/runtime/Studio/save tests from the verified sdist.
+        simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
+        with tarfile.open(simcase_sdist) as archive:
+            for filename in ("test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
+                             "test_studio_transient.py", "test_transient_headless_windows.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (tests / filename).write_bytes(archive.extractfile(member).read())
         # Execute the verified archived example, not a source-tree copy.
         examples = work / "examples"
         examples.mkdir()
@@ -355,6 +390,27 @@ def main():
             "--suite", "all", cwd=work, env=env)
         # Full fixed n8..n64 convergence example, not a shortened smoke or core substitute.
         run(python, "-I", examples / "transient_heat_convergence.py", cwd=work, env=env)
+        # Keep headless independent cases separate from pytest counts and engine PDE all.
+        headless_acceptance = work / "transient-headless-acceptance"
+        headless_acceptance.mkdir()
+        with tarfile.open(simcase_sdist) as archive:
+            for filename in ("transient_headless_independent_oracle.py",
+                             "transient_headless_independent_cases.py",
+                             "transient_headless_independent_consumer.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (headless_acceptance / filename).write_bytes(archive.extractfile(member).read())
+            filename = "transient_thermal_uniform.json"
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
+            document = examples / filename
+            document.write_bytes(archive.extractfile(member).read())
+        run(python, "-I", headless_acceptance / "transient_headless_independent_consumer.py",
+            "--expected-installed-root", env_root,
+            "--expected-module-hashes", hash_manifest, cwd=work, env=env)
+        run(python, "-I", "-m", "simcase", "validate", document, cwd=work, env=env)
+        run(python, "-I", "-m", "simcase", "run", document, "-q",
+            "-o", work / "transient-headless-example", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")
 
 

@@ -340,3 +340,37 @@ build나통과 근거가 아닙니다. pytestJUnit·독립unittest사례/subtest
 baseline근거이며 새 과도 count가 아닙니다. standalonePython후보는 과도JSON/CLI/Studio,
 Robin/flux입력·저장·자동열–기계연결을 추가하지 않습니다. 수용 전에 CI와 cloud실험의
 정확source근거가 필요하며 Linux결과가 Windows지원을 입증하지 않습니다.
+
+## Headless 과도 배포 검증
+
+helper는 기존 engine 독립 `--suite all` PDE와 archive의 전체 수렴 예제를 유지합니다.
+추가로 simcase 원문 자산20개(runtime/dispatch·소유권 모듈, 사용안내 두 페이지,
+JSON 예제, 생산/계약/Studio/Windows 시험, 독립 수용 파일 네 개)를 요구하여
+현재 checkout의 필수 자산은134개입니다. 이는 포함 gate이며 실측 통과 수가 아닙니다.
+
+새 runtime 두 모듈과 기존 dispatch/schema/소유권 모듈은 wheel byte를 대조하고
+checkout 밖에서 `python -I`로 import합니다. `installed-module-hashes.json`과
+`transient-module-origins.json`에 기대 hash와 실제 설치 origin을 기록합니다.
+원 계약·runtime·Studio·저장 시험은 검증된 simcase sdist에서 설치 pytest로
+추출합니다. 원 독립 headless consumer와 oracle/cases는 별도로 추출하고
+`--expected-installed-root` 및 `--expected-module-hashes`로 실행합니다.
+그 unittest 개수는 설치 pytest 및 engine 독립17개와 분리합니다.
+검증된 JSON 예제는 격리 CLI validate/run으로 소비하며 새 출력 경로를 사용합니다.
+source 시험은 저장소 루트의 전체 pytest 명령에 포함됩니다.
+
+좁은 Windows job은 기존 설치 선택에 `test_transient_headless_windows.py`의
+12개를 모두 추가하고, 기존 steady 설치 및 source 대상보호 시험을 유지합니다.
+소비자 전에 명시적인 설치 모듈 origin/hash를 기록합니다. 이 검사는 전체
+Windows 과도 PDE나 macOS 수용이 아니며 정확 run의 실패·skip·개수·artifact를 확인해야 합니다.
+
+build/consumer 성공 뒤 Linux workflow는 소비자를 반복하지 않고 보존 archive bytes를
+독립적으로 감사합니다.
+
+```text
+python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
+```
+
+보고 경로는 기존에 없어야 합니다. 이 감사는 checkout의 필수 자산/link 검사를 재사용하고
+14개 checksum 및 지정 runtime wheel bytes를 확인합니다. twine strict·설치 실행·
+독립 물리 또는 정확 source commit 검증을 대체하지 않습니다. 구성된 명령이나
+과거 baseline을 새 후보의 통과로 표시하지 않습니다.

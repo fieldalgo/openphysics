@@ -400,3 +400,44 @@ This standalone Python candidate adds no transient JSON/CLI/Studio, Robin/flux
 input, persistence or automatic thermal-mechanical coupling. CI and any cloud
 experiments require exact-source evidence before acceptance; Linux results do not
 establish Windows support.
+
+## Headless transient distribution validation
+
+The helper preserves the existing engine independent `--suite all` PDE and complete
+archived convergence example. It additionally requires 20 simcase source assets
+(runtime/dispatch and ownership modules, two usage pages, the JSON example,
+producer/contract/Studio/Windows tests and four independent acceptance files),
+for 134 required assets in this checkout. These are inclusion gates, not measured
+pass counts.
+
+The two new runtime modules and the existing dispatch/schema/ownership modules
+are checked against wheel bytes and imported with `python -I` outside the
+checkout; `installed-module-hashes.json` and `transient-module-origins.json`
+record their expected hashes and actual installed origins. Original contract,
+runtime, Studio and save tests are extracted from the verified simcase sdist
+into installed pytest. The original independent headless consumer and its
+oracle/cases are extracted separately and run with
+`--expected-installed-root` and `--expected-module-hashes`; its unittest count
+is separate from installed pytest and the engine's 17-case independent suite.
+The verified JSON example is consumed by isolated CLI validate/run with a fresh
+output directory. Source tests remain part of the complete root pytest command.
+
+The narrow Windows job adds all 12 tests in
+`test_transient_headless_windows.py` to its existing installed selection and
+retains the existing steady installed and source target-protection tests.
+It records explicit installed module origins/hashes before consumers. These
+checks do not constitute full Windows transient PDE or macOS acceptance; inspect
+the exact run's failures, skips, counts and artifacts.
+
+After a successful build/consumer run, the Linux workflow independently audits
+the retained archive bytes without repeating consumers:
+
+```text
+python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
+```
+
+The report path must not already exist. This audit reuses the checkout's required
+asset/link checks and validates all 14 checksums and configured runtime wheel
+bytes. It does not replace twine strict, installed execution, independent physics
+or verification of the exact source commit. Never present a configured command
+or historical baseline as a new candidate pass.
