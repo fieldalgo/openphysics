@@ -147,7 +147,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         with np.errstate(over="ignore", invalid="ignore"):
             initial_increment = initial-offsets
         _finite(initial_increment)
-    
+
         nt, n, cells = len(times), len(p), len(t)
         temperature = np.empty((nt, n))
         flux = np.empty((nt, cells, 2))
