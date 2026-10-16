@@ -392,32 +392,155 @@ def test_released_pin_drops_its_own_raw_and_encoded_references(isolated_store):
     assert jobs._retained_bytes() == 0
 
 
-def test_actual_read_permit_pin_caller_finally_unit_control(isolated_store):
-    """Unit control only; this does not execute a producer encode or send path."""
+
+def transient_cache_record(life, monkeypatch):
+    """Immutable array/cache fixture, not capture_result or PDE acceptance."""
+    import numpy as np
+    from types import MappingProxyType
+    # Test-specific encoder budget; production encoder and all cleanup paths run.
+    monkeypatch.setattr(server.transient, "ENCODED_BYTES", 2048)
+    lease = life.jobs.reserve()
+    spec = SimpleNamespace(kind="thermal.transient2d",
+                           tags=lambda: {"client_revision": 7, "request_seq": 11})
+    identity = life.jobs.attach(lease, "thermal-transient-route-probe", "result-route-probe", spec)
+    raw = {"time_s": np.array([2., 3.5]),
+           "temperature_k": np.arange(8, dtype=float).reshape(2, 4)}
+    for value in raw.values():
+        value.flags.writeable = False
+    assert life.jobs.complete_transient(lease, b"{}", MappingProxyType(raw), [], 1.)
+    life.jobs.release(lease)
+    return identity
+
+
+def view_exchange(identity, view):
+    from urllib.parse import urlencode
+    query = {"result_id": identity["result_id"], "field": "temperature_k", "frame_seq": 3}
+    query.update({"start": 0, "stop": 2} if view == "history" else {"time_index": 1})
+    return Exchange("/api/jobs/"+identity["job"]+"/"+view, method="GET",
+                    query=urlencode(query).encode("ascii"))
+
+
+@pytest.mark.parametrize("view", ["frame", "history"])
+@pytest.mark.parametrize("termination", ["success", "disconnect", "cancel"])
+def test_actual_view_slow_send_pins_eviction_read_competition_and_final_release(
+        isolated_store, monkeypatch, view, termination):
     life = isolated_store
-    jobs = life.jobs
-    lease = attach_cache_record(life)
-    jobs.complete(lease, b"{}", [])
-    jobs.release(lease)
-    permit = jobs.read_encoder.acquire()
-    pin = jobs.pin("thermal-store-probe", result=True)
-    try:
-        with pytest.raises(RuntimeError, match="injected"):
-            try:
-                assert pin.payload == b"{}"
-                raise RuntimeError("injected caller-finally unit control")
-            finally:
-                pin.release()
-                permit.release()
-        # Duplicate finally must not free a later reader's ownership.
-        later = jobs.read_encoder.acquire()
+    identity = transient_cache_record(life, monkeypatch)
+
+    async def scenario():
+        exchange = view_exchange(identity, view)
+        original_send = exchange.send
+        if termination == "disconnect":
+            async def disconnected_send(message):
+                await original_send(message)
+                if message["type"] == "http.response.body":
+                    raise OSError("injected ASGI send disconnect")
+            exchange.send = disconnected_send
+        task = asyncio.create_task(exchange.invoke(server.app))
         try:
-            pin.release()
+            await reach(task, exchange.send_entered)
+            assert exchange.status == 200
+            payload = exchange.json()
+            assert payload["frame_seq"] == 3
+            assert payload["arrays"]["temperature_k"] == (
+                [[0., 1., 2., 3.], [4., 5., 6., 7.]] if view == "history"
+                else [4., 5., 6., 7.])
+            record = life.jobs._records[identity["job"]]
+            raw_size = sum(a.nbytes for a in record["raw"].values())
+            owned_size = (len(record["status_bytes"])+len(record["result"])
+                          +raw_size)
+            encoded_size = len(b"".join(m.get("body", b"") for m in exchange.messages))
+            assert life.jobs._read_workspace == 0
+            assert life.jobs._retained_bytes() == owned_size+encoded_size
+            # One global read owner for BOTH production frame/history routes.
+            for contender_view in ("frame", "history"):
+                contender = view_exchange(identity, contender_view)
+                contender.unblock()
+                await contender.invoke(server.app)
+                assert contender.status == 429
+                assert contender.json()["error"]["code"] == "read_capacity_exceeded"
+                assert record["pins"] == 1
+                assert life.jobs._retained_bytes() == owned_size+encoded_size
+            life.clock.value = life.jobs.limits.ttl_seconds
+            with pytest.raises(life.thermal.ThermalAPIError) as expired:
+                life.jobs.status(identity["job"])
+            assert expired.value.status == 404
+            assert not life.jobs._records and life.jobs._retained_bytes() == owned_size+encoded_size
+            del record
+            with pytest.raises(life.thermal.ThermalAPIError) as blocked:
+                life.jobs.reserve()
+            assert blocked.value.status == 429
+            if termination == "cancel":
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            elif termination == "disconnect":
+                exchange.unblock()
+                with pytest.raises(OSError, match="ASGI send disconnect"):
+                    await task
+            else:
+                await finish(exchange, task)
+            assert not life.jobs._retired and not life.jobs._snapshots
+            assert life.jobs._read_workspace == 0 and life.jobs._retained_bytes() == 0
+            permit = life.jobs.read_encoder.acquire()
             permit.release()
-            with pytest.raises(life.thermal.ThermalAPIError):
-                jobs.read_encoder.acquire()
+            lease = life.jobs.reserve()
+            life.jobs.release(lease)
         finally:
-            later.release()
-    finally:
-        pin.release()
+            await cleanup((exchange, task))
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("view", ["frame", "history"])
+@pytest.mark.parametrize("stage", ["slice", "encode", "response"])
+def test_actual_view_production_fault_releases_pin_workspace_and_permit(
+        isolated_store, monkeypatch, view, stage):
+    import numpy as np
+    life = isolated_store
+    identity = transient_cache_record(life, monkeypatch)
+    record = life.jobs._records[identity["job"]]
+    original_retained = life.jobs._retained_bytes()
+    calls = []
+
+    if stage == "slice":
+        class FailedSlice(np.ndarray):
+            def __getitem__(self, key):
+                calls.append("slice")
+                raise RuntimeError("injected production slice")
+        # Production encode_view performs the actual frame/page indexing.
+        original = record["raw"]
+        record["raw"] = dict(original)
+        record["raw"]["temperature_k"] = original["temperature_k"].view(FailedSlice)
+    elif stage == "encode":
+        original_encode = server.transient.common.encode_json
+        def failed_encode(value, limit):
+            if value.get("payload_format") in (server.transient.FRAME, server.transient.HISTORY):
+                calls.append("encode")
+                raise RuntimeError("injected production encode")
+            return original_encode(value, limit)
+        monkeypatch.setattr(server.transient.common, "encode_json", failed_encode)
+    else:
+        def failed_response(*args, **kwargs):
+            calls.append("response")
+            raise RuntimeError("injected production response construction")
+        monkeypatch.setattr(server, "ThermalResponse", failed_response)
+
+    async def scenario():
+        exchange = view_exchange(identity, view)
+        exchange.unblock()
+        await exchange.invoke(server.app)
+        assert exchange.status == 500
+        assert exchange.json()["error"]["code"] == "view_failed"
+        assert calls == [stage], "fault must occur inside the actual producer path"
+        assert record["pins"] == 0
+        assert life.jobs._read_workspace == 0 and not life.jobs._snapshots
+        assert life.jobs._retained_bytes() == original_retained
+        permit = life.jobs.read_encoder.acquire()
         permit.release()
+        life.clock.value = life.jobs.limits.ttl_seconds
+        with pytest.raises(life.thermal.ThermalAPIError) as expired:
+            life.jobs.status(identity["job"])
+        assert expired.value.status == 404
+        assert life.jobs._retained_bytes() == 0 and not life.jobs._retired
+    asyncio.run(scenario())
