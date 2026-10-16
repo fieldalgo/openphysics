@@ -42,7 +42,8 @@ def client(monkeypatch):
     jobs = thermal.ThermalJobs()
     monkeypatch.setattr(server, '_thermal_jobs', jobs)
     monkeypatch.setattr(server, '_start_thermal_thread', lambda target, args: target(*args))
-    return TestClient(server.app)
+    with TestClient(server.app) as value:
+        yield value
 
 
 @pytest.fixture
@@ -562,3 +563,31 @@ def test_six_lifecycle_runs_reuse_bounded_cache_without_reset_or_sleep(lifecycle
         assert_no_active(server._thermal_jobs)
     assert client.get('/api/jobs/'+tokens[0]['job']+'/result').status_code == 404
     assert client.get('/api/jobs/'+tokens[-1]['job']+'/result').status_code == 200
+
+
+def test_public_pair_is_compared_to_summary_even_when_both_pairs_are_valid():
+    obj = fake_result()
+    obj.public_ids = dict(result_format=thermal.V1[0], field_layout=thermal.V1[1])
+    with pytest.raises(thermal.ThermalAPIError, match='public and summary'):
+        thermal.capture_result(obj, IDENTITY, thermal.ThermalLimits())
+    assert obj.id_reads == {'result_format': 1, 'field_layout': 1}
+    assert not obj.reads
+
+
+def test_status_encoding_failure_removes_only_unpublished_own_record_and_releases(monkeypatch):
+    jobs = thermal.ThermalJobs()
+    first = attach(jobs, 1)
+    jobs.complete(first, b'{"ok":true}', [])
+    jobs.release(first)
+    keep = jobs.result('thermal-1')
+    second = attach(jobs, 2)
+    def failed(*a, **k):
+        raise ValueError('injected status publication failure')
+    monkeypatch.setattr(jobs, '_status', failed)
+    jobs.release(second)
+    jobs.release(second)
+    assert jobs.result('thermal-1') == keep
+    with pytest.raises(thermal.ThermalAPIError) as caught:
+        jobs.status('thermal-2')
+    assert caught.value.status == 404
+    assert_no_active(jobs)

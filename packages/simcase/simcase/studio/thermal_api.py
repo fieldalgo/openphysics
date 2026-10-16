@@ -425,6 +425,9 @@ class ThermalJobs:
             return lease
 
     def _status(self, identity, status, log, error, has_result):
+        encode_json(log, self.limits.log_bytes)
+        if error is not None:
+            encode_json(error, self.limits.error_bytes)
         return encode_json({**identity, "status": status, "log": log,
                             "error": error, "has_result": has_result}, self.limits.status_bytes)
 
