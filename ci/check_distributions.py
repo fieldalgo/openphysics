@@ -45,6 +45,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'examples/transient_heat_convergence.py',
               'tests/test_transient_heat.py',
                'tests/test_transient_heat_tiny_domain.py',
+               'tests/test_transient_heat_general_state.py',
               'tests/test_transient_heat_independent_validation.py',
               'tests/transient_heat_independent_oracle.py',
               'tests/transient_heat_independent_cases.py',
@@ -349,6 +350,7 @@ def main():
                 (examples / filename).write_bytes(archive.extractfile(member).read())
             # Preserve new original acceptance files from the verified archive.
             for filename in ("test_transient_heat_tiny_domain.py",
+                             "test_transient_heat_general_state.py",
                              "test_thermoelastic_traction.py",
                              "test_thermoelastic_traction_convergence.py",
                              "test_thermoelastic_traction_independent_validation.py",
