@@ -352,6 +352,7 @@ class ThermalRunResult:
     def __post_init__(self):
         # Bind ordinary public-result mutations to the calculation that ran.
         self.doc = self.doc.copy()
+        self.doc.validate()  # copy() resets scale/notes; restore declared units immediately.
         self._document_json = self._canonical_document()
         self._nodes_snapshot = np.array(self.mesh.nodes, copy=True)
         self._triangles_snapshot = np.array(self.mesh.triangles, copy=True)
@@ -368,9 +369,12 @@ class ThermalRunResult:
         return json.dumps(self.doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
     def _validated_document(self):
-        self.doc.validate()
+        # Compare BEFORE validation: restoring a removed default must not hide an edit.
         if self._canonical_document() != self._document_json:
             raise ValueError('thermal result document changed after the solve; run again')
+        self.doc.validate()
+        if self._canonical_document() != self._document_json:
+            raise ValueError('thermal result document normalization changed after the solve')
         for current, captured in (
                 (self.mesh.nodes, self._nodes_snapshot),
                 (self.mesh.triangles, self._triangles_snapshot),
