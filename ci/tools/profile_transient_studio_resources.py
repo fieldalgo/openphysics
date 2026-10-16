@@ -249,6 +249,9 @@ def parent(args):
             phase_started=time.perf_counter()
             before=rpc(process,'reset_peak')['snapshot']
             public_probe.observe(argparse.Namespace(document=args.document,base_url=base,http_timeout=60,job_timeout=90),args.output,report)
+            report['server_internal_measurements']={'status':'instrumented companion snapshots and cumulative hooks',
+                'limitations':['not an exhaustive producer allocation inventory',
+                               'native coverage and eviction/disconnect lifecycle proof remain separate']}
             after=rpc(process,'snapshot')['snapshot']
             if after['counts'].get('public_run')!=1 or after['counts'].get('capture')!=1:
                 raise ValueError('expected exactly one actual public solve and capture')
