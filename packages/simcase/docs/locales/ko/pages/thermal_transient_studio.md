@@ -4,10 +4,13 @@
 
 ## 제공 상태·범위
 
-이 문서는 과도 Studio 통합 계약입니다. 문서 기준에는 정상 Studio와 headless
-과도 API/JSON/CLI/저장이 있지만 이 과도 UI는 아직 없습니다.
-아래 흐름을 제공·검증된 기능으로 판단하기 전에 정확한 결합 구현과 CI artifact를
-확인하세요. 새로운 runtime·browser·플랫폼·용량 결과를 주장하지 않습니다.
+이 문서는 과도 Studio 통합 계약입니다. 공유 admission/retention기반과
+typed 과도 JavaScript모듈은 제출됐지만 검토 checkout의 전용 과도 HTTProute·
+배포페이지 연결은 미완료입니다. 정상 Studio와 headless과도 API/JSON/CLI/저장은
+기존 인터페이스로 사용합니다. 일치하는 serverroute·page연결·명시capability가
+통합되기 전에는 아래 흐름을 실행 가능한 browser경로로 해석하지 마세요.
+구현·runtime시험·exactCI·main수용은 별개이며 새로운 runtime·browser·플랫폼·
+용량 결과를 주장하지 않습니다.
 [Headless 과도 가이드](thermal_transient2d.md)는 기존 입력·저장이력을 정의하며
 [정상 Studio](thermal_studio.md)는 별도입니다.
 
@@ -18,7 +21,7 @@
 임의형상/재료확장·restart·연성·cancel/delete/save/NPZ endpoint는없습니다.
 View변경이solver를다시실행하거나문서를바꾸지않습니다.
 
-## 사용자 흐름
+## 통합 후 사용자 흐름
 
 일치하는runtime패키지와선택적Studio extra설치뒤저장소루트에서시작합니다.
 
