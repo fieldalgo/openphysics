@@ -117,4 +117,8 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 [사용법](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat.md)) · [생산 검증 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat_validation.md)) · [독립 검증 보고](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat_independent_validation.md))
 
-과거 b2 snapshot의 소형 source 70개 통과와 현재 checkout의 수용은 별개입니다. 현재 manifest/helper에는 문서·원 시험·독립 consumer·runtime byte 검사가 연결돼 있습니다. 실제 전체 시간/PDE·독립·배포·설치 성공은 정확한 현재 CI의 종료값과 artifact로 확인해야 합니다. 구현이나 gate 연결만으로 릴리스·통합 수용을 뜻하지 않습니다. JSON/CLI/Studio·저장·자동 열→기계 연결은 제공하지 않습니다.
+과거 b2 snapshot의 소형 source 70개 통과와 현재 checkout의 수용은 별개입니다. 현재 manifest/helper에는 문서·원 시험·독립 consumer·runtime byte 검사가 연결돼 있습니다. 실제 전체 시간/PDE·독립·배포·설치 성공은 정확한 현재 CI의 종료값과 artifact로 확인해야 합니다. 구현이나 gate 연결만으로 릴리스·통합 수용을 뜻하지 않습니다. 엔진/참조 모듈 자체는 문서 실행기·직렬화를 제공하지 않으며 별도 headless adapter는 아래에서 설명합니다. Studio·자동 열→기계 연성은 미지원입니다.
+
+## Headless 과도 인터페이스의 참조 경계
+
+simcase의 직사각형 `thermal.transient2d`는 기존 과도 엔진의 adapter이며 새로운 물리 참조해가 아닙니다. [문서 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)은 별도 패키지의 온라인 문서이며 네트워크 접근이 필요합니다. 엔진 참조/수렴 통과는 직렬화·CLI·저장·설치 수용과 별개이고 독립 소비자는 자체 정답을 사용해야 합니다. Studio·과도 flux/Robin·자동 연성·restart는 미지원입니다.

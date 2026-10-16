@@ -202,3 +202,7 @@ maximum principle을 주장하면 안 됩니다. 복원한 셀 flux는 H(div)-co
 
 고정 gate, 독립 대수/reference 경계와 재현은
 [검증 가이드](transient_heat_validation.md)를 보세요.
+
+## 별도의 headless 문서 adapter
+
+직사각형 `thermal.transient2d` JSON/API/CLI와 저장 이력은 별도 simcase adapter가 제공합니다. [입력·결과·저장 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)은 다른 패키지의 온라인 문서로 네트워크 접근이 필요합니다. 이 engine 함수의 임의 callback/메시 범위가 문서 직렬화 범위인 것은 아닙니다. 문서는 균일/affine 초기장과 변 상수/요청 시간별 표본을 사용하며 초기 일치·무projection·finite K/no clamp를 유지합니다. Studio·restart·과도 flux/Robin·자동 연성은 추가하지 않습니다. 엔진 수용과 headless source/설치/저장/CI 수용은 구분합니다.

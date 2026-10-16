@@ -428,3 +428,7 @@ Hostile filesystem races and atomic rollback are outside acceptance. Do not let
 another writer mutate the output during this interval. Windows save verification
 remains incomplete with two unresolved historical failures; Linux results do not establish Windows
 acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required for acceptance.
+
+## Headless transient heat
+
+The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times, uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and insulation. `run(Document)` returns `TransientThermalRunResult`; the CLI example is `transient_thermal_uniform`. Results save JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version metadata. Initial values are not projected and negative K is not clamped. Follow the contract for fresh-output ownership, memory and failures; disabling fields is not streaming. Studio rejects these documents and clears stale optical state. No transient flux/Robin, restart or automatic coupling is added. Implementation is distinct from exact source/installed/CI acceptance.
