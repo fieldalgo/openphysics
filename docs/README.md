@@ -4,6 +4,8 @@
 
 [Suite overview and installation](overview.md) · [한국어 overview](locales/ko/pages/overview.md)
 
+[Architecture and package map](architecture.md) · [한국어 구조도](locales/ko/pages/architecture.md)
+
 English is the repository default. READMEs and contribution/security entry points are English. Bilingual documentation lives under `docs/` directories: English pages at `docs/<name>.md` and Korean counterparts at `docs/locales/ko/pages/<name>.md`, including package overviews. Code identifiers, equations, commands and recorded outputs retain their meaning in both languages. A translation does not establish a new numerical result.
 
 ## Current implementation contracts and evidence
