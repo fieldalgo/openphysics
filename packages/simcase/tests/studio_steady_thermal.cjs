@@ -304,7 +304,7 @@ test('shipped HTTP bridge treats validation 200 ok=false and run 400 as errors',
   const p=page();
   p.run('globalThis.invalidValidation=true;globalThis.runRequests=0;'
     +'globalThis.fetch=async(url,options)=>{'
-    +'if(url==="/api/capabilities")return {ok:true,json:async()=>'+JSON.stringify((()=>{const m={exports:{}};new Function("module","exports",load("p3JS"))(m,m.exports);const src=load("p3NodeTests");return new Function("T",src.slice(src.indexOf("function cap()"),src.indexOf("function doc()"))+";return cap();")(m.exports);})())+'};'
+    +'if(url==="/api/capabilities")return {ok:true,json:async()=>'+JSON.stringify(cap())+'};'
     +'const e=JSON.parse(options.body);'
     +'if(url==="/api/thermal/validate")return {ok:true,status:200,json:async()=>invalidValidation?'
     +'{ok:false,error:{code:"invalid_document",message:"invalid thermal fixture"},client_revision:e.client_revision,request_seq:e.request_seq}:'
