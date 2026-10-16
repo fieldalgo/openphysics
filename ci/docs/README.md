@@ -285,7 +285,7 @@ All seven English/Korean package overviews under docs/ and received Korean guide
 counterparts are required byte assets. Entry-point READMEs remain English. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 134 entries;
+are likewise required. The current required-byte list contains 136 entries;
 the headless transient additions are detailed below.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
@@ -405,7 +405,8 @@ establish Windows support.
 
 ## Headless transient distribution validation
 
-The Linux job first runs the transient document, runtime, independent acceptance,
+The Linux job first runs the tiny-domain and general-state engine regressions,
+transient document, runtime, independent acceptance,
 Studio refusal and portable save tests. Their JUnit report is
 `transient-preflight.xml`. A failure stops that job before the expensive full
 suite; it is a failed check, not a successful subset or a skipped acceptance
@@ -416,7 +417,9 @@ The helper preserves the existing engine independent `--suite all` PDE and compl
 archived convergence example. It additionally requires 20 simcase source assets
 (runtime/dispatch and ownership modules, two usage pages, the JSON example,
 producer/contract/Studio/Windows tests and four independent acceptance files),
-for 134 required assets in this checkout. These are inclusion gates, not measured
+plus the two original tiny-domain/general-state engine regression files, for
+136 required assets in this checkout. Both regression files also run from the
+verified sdist in installed pytest. These are inclusion gates, not measured
 pass counts.
 
 The two new runtime modules and the existing dispatch/schema/ownership modules

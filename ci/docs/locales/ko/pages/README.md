@@ -242,7 +242,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 docs/ 안의 패키지 개요 EN/KO 일곱 쌍과 수신한 한국어 안내는 필수 byte 자산입니다. 진입점 README는 영어로 유지합니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 134개이며 headless 과도 추가 항목은 아래에서
+필수입니다. 현재 필수 byte 목록은 136개이며 headless 과도 추가 항목은 아래에서
 설명합니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
@@ -345,7 +345,7 @@ baseline근거이며 새 과도 count가 아닙니다. 엔진만 추가한 단�
 
 ## Headless 과도 배포 검증
 
-Linux job은 과도 문서·실행·독립 수용·Studio 거부·이식 가능한 저장 시험을
+Linux job은 작은 영역·일반 상태 엔진 회귀, 과도 문서·실행·독립 수용·Studio 거부·이식 가능한 저장 시험을
 먼저 실행하며 `transient-preflight.xml`에 JUnit 결과를 남깁니다. 실패하면
 비용이 큰 전체 시험 전에 해당 job을 실패로 끝냅니다. 부분 시험 통과나 수용
 요건을 건너뛴 성공으로 처리하지 않습니다. 성공하면 아래의 전체 source·설치
@@ -353,8 +353,10 @@ Linux job은 과도 문서·실행·독립 수용·Studio 거부·이식 가능�
 
 helper는 기존 engine 독립 `--suite all` PDE와 archive의 전체 수렴 예제를 유지합니다.
 추가로 simcase 원문 자산20개(runtime/dispatch·소유권 모듈, 사용안내 두 페이지,
-JSON 예제, 생산/계약/Studio/Windows 시험, 독립 수용 파일 네 개)를 요구하여
-현재 checkout의 필수 자산은134개입니다. 이는 포함 gate이며 실측 통과 수가 아닙니다.
+JSON 예제, 생산/계약/Studio/Windows 시험, 독립 수용 파일 네 개)와 원래의
+작은 영역·일반 상태 엔진 회귀 파일 두 개를 요구하여 현재 필수 자산은136개입니다.
+두 회귀 파일은 검증된 sdist에서 가져와 설치 pytest에서도 실행합니다.
+이는 포함 gate이며 실측 통과 수가 아닙니다.
 
 새 runtime 두 모듈과 기존 dispatch/schema/소유권 모듈은 wheel byte를 대조하고
 checkout 밖에서 `python -I`로 import합니다. `installed-module-hashes.json`과

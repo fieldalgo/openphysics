@@ -48,6 +48,8 @@ jobs:
         run: |
           python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
           python -m pytest -q -ra --showlocals --junitxml=.validation/transient-preflight.xml \
+            packages/galerkin/tests/test_transient_heat_tiny_domain.py \
+            packages/galerkin/tests/test_transient_heat_general_state.py \
             packages/simcase/tests/test_transient_headless_independent_validation.py \
             packages/simcase/tests/test_transient_thermal_runtime.py \
             packages/simcase/tests/test_transient_thermal_contract.py \
