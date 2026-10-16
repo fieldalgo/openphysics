@@ -110,6 +110,11 @@
             <option value="magnitude">|E|</option><option value="0">|Ex|</option>
             <option value="1">|Ey|</option><option value="2">|Ez|</option>
           </select></label>
+          <label id="thermalControls" hidden>thermal field <select id="thermalField">
+            <option value="temperature_k">Temperature (K, nodal P1)</option>
+            <option value="qx">qx (W/m², cells)</option><option value="qy">qy (W/m², cells)</option>
+            <option value="magnitude">|q| (W/m², cells)</option>
+          </select></label>
           <span id="resInfo">no results yet — press Run</span>
         </div>
         <div class="results-body">
@@ -130,6 +135,7 @@
   <pre id="log"></pre>
 </footer>
 
+<script src="/static/thermal.js"></script>
 <script>
 'use strict';
 // ------------------------------------------------------------------ state
@@ -138,6 +144,7 @@ let selected = 'model';    // tree node id
 let materials = [];        // physmat built-ins from the server
 let meshData = null, resultData = null, currentJob = null;
 let documentRevision = 0;
+let editorDirty = false, rawDocumentText = null, inputSequence = 0;
 const $ = id => document.getElementById(id);
 
 function isHeadlessThermalType(type) {
@@ -147,6 +154,7 @@ function isHeadlessThermal(data = doc) {
   return Object.values(data?.physics || {}).some(p => isHeadlessThermalType(p?.type));
 }
 function clearResultViews() {
+  $('thermalControls').hidden=true; $('fieldCanvas').onmousemove=null;
   meshData = resultData = null; currentJob = null;
   $('ptSel').innerHTML = $('modeSel').innerHTML = '';
   $('componentLabel').hidden = true; $('jobInfo').textContent = '';
@@ -154,8 +162,10 @@ function clearResultViews() {
   const cv = $('meshCanvas'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
 }
 function invalidateDocument() {
-  documentRevision += 1; clearResultViews();
-  $('runBtn').disabled = $('meshBtn').disabled = isHeadlessThermal();
+  documentRevision += 1; inputSequence += 1;
+  if (thermalController) thermalController.invalidate();
+  clearResultViews();
+  $('runBtn').disabled = $('meshBtn').disabled = editorDirty || isHeadlessThermal();
   return documentRevision;
 }
 
@@ -165,6 +175,65 @@ const api = {
     if (!r.ok) throw new Error(await errText(r)); return r.json(); },
 };
 async function errText(r) { try { const j = await r.json(); return j.detail || JSON.stringify(j); } catch { return r.statusText; } }
+
+const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalStudio.createController({
+  request: async (method, url, body, rawDoc) => {
+    // Preserve the original document text inside the envelope, including duplicates.
+    const encoded = rawDoc === undefined ? JSON.stringify(body)
+      : '{"doc":'+rawDoc+',"client_revision":'+body.client_revision+',"request_seq":'+body.request_seq+'}';
+    const response = await fetch(url, method === 'GET' ? undefined :
+      {method,headers:{'Content-Type':'application/json'},body:encoded});
+    const reply = await response.json();
+    if (!response.ok) throw new Error(reply.error?.message || reply.detail || ('HTTP '+response.status));
+    return reply;
+  },
+  onState: state => {
+    if (!isHeadlessThermal()) return; // Thermal capability startup must not disturb optical UI.
+    $('meshBtn').disabled = true;
+    $('runBtn').disabled = editorDirty || !state.canRun;
+    if (!state.result) {
+      $('thermalControls').hidden=true;$('resTable').textContent='';
+      for(const id of ['fieldCanvas','meshCanvas','sweepCanvas']) {
+        const cv=$(id);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
+      }
+    }
+    if (state.error) { status(state.error); log(state.error,'err'); }
+    else if (state.supported) status(state.busy ? 'thermal request…' : state.result
+      ? 'steady thermal result ready' : state.validated ? 'steady thermal valid' : 'validate current thermal JSON');
+  },
+  onResult: result => {
+    $('ptSel').innerHTML = $('modeSel').innerHTML = '';
+    $('componentLabel').hidden = true; $('thermalControls').hidden = false;
+    $('resTable').textContent = JSON.stringify(result.summary,null,2);
+    showTab('results'); drawThermalViews();
+  }
+});
+function thermalSupported() { return !!thermalController?.supports(doc); }
+function drawThermalViews() {
+  const payload=thermalController?.result();
+  if (!payload || !thermalSupported()) return;
+  const field=$('thermalField').value || 'temperature_k', token=thermalController.renderToken(field);
+  Promise.resolve().then(()=>{
+    if(!thermalController.renderCurrent(token))return;
+    const model=ThermalStudio.viewModel(payload,field);
+    const current=()=>thermalController.renderCurrent(token);
+    if(!current())return;
+    ThermalStudio.draw($('fieldCanvas'),model,{current});
+    if(!current())return;
+    ThermalStudio.draw($('meshCanvas'),ThermalStudio.viewModel(payload),{meshOnly:true,current});
+    if(!current())return;
+    $('meshInfo').textContent='Actual result mesh — '+payload.arrays.nodes_m.length+' nodes, '+payload.arrays.triangles.length+' cells; axes '+payload.lengthLabel;
+    $('meshLegend').textContent='';
+    $('resInfo').textContent=model.field+' ['+model.unit+'], raw '+model.min+' … '+model.max+'; no physical normalization';
+    const sweep=$('sweepCanvas');sweep.getContext('2d').clearRect(0,0,sweep.width,sweep.height);
+    $('fieldCanvas').onmousemove = event => {
+      if(!current())return;
+      const rect=$('fieldCanvas').getBoundingClientRect(),T=ThermalStudio.transform(model,rect.width,rect.height);
+      const value=ThermalStudio.sample(model,T.inverse(event.clientX-rect.left,event.clientY-rect.top));
+      if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')';
+    };
+  }).catch(error=>{if(thermalController.renderCurrent(token)){status(error.message);log(error.message,'err');}});
+}
 
 function log(msg, cls) { const el = document.createElement('div'); if (cls) el.className = cls; el.textContent = msg; $('log').appendChild(el); $('log').scrollTop = 1e9; }
 function status(s) { $('status').textContent = s; }
@@ -240,6 +309,7 @@ function drawTriangles(ctx, T, nodes, tris, colorOf, edges = true) {
   }
 }
 function drawMesh() {
+  if (thermalController?.result() && thermalSupported()) { drawThermalViews(); return; }
   const cv = $('meshCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!meshData || !doc) return;
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
@@ -257,6 +327,7 @@ function vectorMagnitudes(field, mode, component) {
     ? Math.hypot(...v, ...im[t]) : Math.hypot(v[+component], im[t][+component]));
 }
 function drawField() {
+  if (thermalController?.result() && thermalSupported()) { drawThermalViews(); return; }
   const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!resultData || !doc) return;
   const p = +$('ptSel').value || 0, m = +$('modeSel').value || 0;
@@ -280,6 +351,7 @@ function drawField() {
     (vector ? ' (relative amplitude, common |E| scale)' : '');
 }
 function drawSweep() {
+  if (thermalController?.result() && thermalSupported()) return;
   const cv = $('sweepCanvas'); const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
   if (!resultData) return;
   const xs = resultData.values, ys = resultData.neff; const nm = ys[0].length;
@@ -299,6 +371,7 @@ function drawSweep() {
     xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(X(x), Y(ys[i][j]), 3, 0, 7); ctx.fill(); }); }
 }
 function fillResultTable() {
+  if (thermalController?.result() && thermalSupported()) { $('resTable').textContent=JSON.stringify(thermalController.result().summary,null,2); return; }
   if (!resultData) {
     $('resTable').innerHTML = ''; $('componentLabel').hidden = true;
     $('ptSel').innerHTML = ''; $('modeSel').innerHTML = ''; $('componentSel').value = 'magnitude';
@@ -445,6 +518,7 @@ function onAction(e) {
 function showTab(name) { document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('.view > div').forEach(d => d.classList.toggle('on', d.id === `tab-${name}`)); redrawAll(); }
 function redrawAll() {
+  if (thermalSupported()) { drawThermalViews(); return; }
   if (isHeadlessThermal()) {
     for (const id of ['geoCanvas', 'meshCanvas', 'fieldCanvas', 'sweepCanvas']) {
       const cv = $(id); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
@@ -454,7 +528,13 @@ function redrawAll() {
   drawGeometry(); drawMesh(); drawField(); drawSweep();
 }
 function refresh() {
-  $('json').value = JSON.stringify(doc, null, 2);
+  if (!editorDirty) $('json').value = rawDocumentText !== null && isHeadlessThermal() ? rawDocumentText : JSON.stringify(doc, null, 2);
+  if (isHeadlessThermal() && thermalSupported()) {
+    clearResultViews(); $('tree').innerHTML=''; $('props').textContent='Steady heat: edit JSON, validate, then run. Mesh is available only from the result. No transient UI.';
+    $('meshBtn').disabled=true;
+    $('runBtn').disabled=editorDirty || thermalController.gate.dirty || thermalController.gate.busy;
+    $('thermalControls').hidden=!thermalController.result(); drawThermalViews(); return;
+  }
   if (isHeadlessThermal()) {
     const physicsType = Object.values(doc.physics).find(p => isHeadlessThermalType(p?.type)).type;
     clearResultViews(); $('tree').innerHTML = ''; $('props').textContent = `${physicsType} is headless Python/CLI only; Studio does not support heat input or results.`;
@@ -466,17 +546,35 @@ function refresh() {
 }
 
 async function loadExample(name) {
-  const revision = invalidateDocument(), data = await api.get(`/api/examples/${name}`);
-  if (revision !== documentRevision) return;
-  doc = data; selected = 'model'; refresh(); log(`loaded example ${name}`);
+  const revision=invalidateDocument(),sequence=++inputSequence;
+  try {
+    const data=await api.get('/api/examples/'+name);
+    if(revision!==documentRevision||sequence!==inputSequence)return;
+    editorDirty=false;rawDocumentText=null;doc=data;selected='model';refresh();log('loaded example '+name);
+  } catch(error) { if(revision===documentRevision&&sequence===inputSequence){log('example failed: '+error.message,'err');status('example failed');} }
 }
 async function doValidate() {
+  if(editorDirty) {
+    try {
+      const candidate=JSON.parse($('json').value);
+      if(!isHeadlessThermal(candidate)){status('Apply JSON before validation or run');return false;}
+      rawDocumentText=$('json').value;doc=candidate;
+    } catch(error) {status('invalid JSON');log('JSON error: '+error.message,'err');return false;}
+  }
+  if(isHeadlessThermal()&&thermalSupported()) {
+    const ok=await thermalController.validate(doc,rawDocumentText===null?JSON.stringify(doc):rawDocumentText);
+    if(ok){doc=JSON.parse(JSON.stringify(thermalController.gate.validated));editorDirty=false;refresh();}
+    return ok;
+  }
   if (isHeadlessThermal()) { invalidateDocument(); refresh(); return false; }
-  const revision = documentRevision, r = await api.post('/api/validate', { doc });
-  if (revision !== documentRevision) return false;
-  if (r.ok) { doc = r.doc; refresh(); log('valid:\n' + r.summary); (r.notes || []).forEach(n => log('warning: ' + n, 'err')); status('valid'); }
-  else { invalidateDocument(); log('invalid: ' + r.error, 'err'); status('invalid document'); }
-  return r.ok;
+  const revision=documentRevision,sequence=++inputSequence;
+  try {
+    const r=await api.post('/api/validate',{doc});
+    if(revision!==documentRevision||sequence!==inputSequence)return false;
+    if(r.ok){doc=r.doc;editorDirty=false;rawDocumentText=null;refresh();log('valid:\n'+r.summary);(r.notes||[]).forEach(n=>log('warning: '+n,'err'));status('valid');}
+    else{invalidateDocument();log('invalid: '+r.error,'err');status('invalid document');}
+    return r.ok;
+  } catch(error) {if(revision===documentRevision&&sequence===inputSequence){log('validation failed: '+error.message,'err');status('validation failed');}return false;}
 }
 async function doMesh() {
   if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
@@ -487,6 +585,8 @@ async function doMesh() {
   finally { if (revision === documentRevision) $('meshBtn').disabled = false; }
 }
 async function doRun() {
+  if (editorDirty) { status('Validate current JSON before run'); return; }
+  if (isHeadlessThermal() && thermalSupported()) { await thermalController.run(); return; }
   if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
   const revision = invalidateDocument();
   status('running…'); $('runBtn').disabled = true;
@@ -511,20 +611,40 @@ $('loadExample').onclick = () => loadExample($('exampleSel').value);
 $('validate').onclick = doValidate;
 $('meshBtn').onclick = doMesh;
 $('runBtn').onclick = doRun;
-$('download').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' })); a.download = (doc.name || 'model').replace(/[^\w.-]+/g, '_') + '.json'; a.click(); };
+$('download').onclick = () => {
+  let value=doc;
+  if(isHeadlessThermal()){
+    if(!thermalController?.gate.validated||thermalController.gate.dirty||editorDirty){status('Validate current thermal JSON before download');return;}
+    value=thermalController.gate.validated;
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
+  a.download=(value.name||'model').replace(/[^\w.-]+/g,'_')+'.json';a.click();
+};
 $('openFile').onclick = () => $('fileInput').click();
-$('fileInput').onchange = async e => { const f = e.target.files[0]; if (!f) return; const revision = invalidateDocument();
-  try { const data = JSON.parse(await f.text()); if (revision !== documentRevision) return;
-    doc = data; selected = 'model'; refresh(); await doValidate(); log(`opened ${f.name}`); }
-  catch (err) { if (revision === documentRevision) log('could not open: ' + err.message, 'err'); } };
-$('applyJson').onclick = async () => { invalidateDocument(); try { doc = JSON.parse($('json').value); selected = 'model'; refresh(); await doValidate(); } catch (err) { log('JSON error: ' + err.message, 'err'); } };
-$('json').oninput = () => invalidateDocument();
+$('fileInput').onchange = async e => {
+  const f=e.target.files[0];if(!f)return;editorDirty=true;const revision=invalidateDocument(),sequence=++inputSequence;
+  try{
+    const text=await f.text();if(revision!==documentRevision||sequence!==inputSequence)return;
+    rawDocumentText=text;$('json').value=text;const data=JSON.parse(text);
+    doc=data;selected='model';editorDirty=false;refresh();await doValidate();
+    if(revision===documentRevision&&sequence===inputSequence)log('opened '+f.name);
+  }catch(error){if(revision===documentRevision&&sequence===inputSequence){editorDirty=true;$('runBtn').disabled=true;log('could not open: '+error.message,'err');}}
+};
+$('applyJson').onclick = async () => {
+  const text=$('json').value;editorDirty=true;const revision=invalidateDocument();
+  try{
+    const data=JSON.parse(text);rawDocumentText=text;doc=data;selected='model';editorDirty=false;refresh();await doValidate();
+  }catch(error){if(revision===documentRevision){editorDirty=true;$('runBtn').disabled=true;log('JSON error: '+error.message,'err');status('invalid JSON');}}
+};
+$('json').oninput = () => {rawDocumentText=$('json').value;editorDirty=true;invalidateDocument();$('runBtn').disabled=$('meshBtn').disabled=true;};
+$('thermalField').onchange = drawThermalViews;
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $('ptSel').onchange = drawField; $('modeSel').onchange = drawField;
 $('componentSel').onchange = drawField;
 window.addEventListener('resize', redrawAll);
 
 (async function init() {
+  if (thermalController) thermalController.loadCapability().then(()=>{if(isHeadlessThermal()&&!editorDirty)refresh();});
   try { const ex = await api.get('/api/examples'); $('exampleSel').innerHTML = ex.examples.map(n => `<option>${n}</option>`).join(''); $('exampleSel').value = 'soi_strip';
     materials = (await api.get('/api/materials')).materials; unitVocab = await api.get('/api/units'); await loadExample('soi_strip'); }
   catch (e) { log('startup failed: ' + e.message, 'err'); }
