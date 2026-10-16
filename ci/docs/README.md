@@ -285,7 +285,8 @@ All seven English/Korean package overviews under docs/ and received Korean guide
 counterparts are required byte assets. Entry-point READMEs remain English. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 114 entries.
+are likewise required. The current required-byte list contains 134 entries;
+the headless transient additions are detailed below.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
@@ -355,7 +356,7 @@ evidence; implementation alone is not a validated release. The [implementation c
 and [independent report](../../packages/galerkin/docs/transient_heat_independent_validation.md)
 separate the producer's recorded 70 small source tests from the remaining gates.
 
-The required byte list has 114 entries: the public baseline's 99 plus 15 transient
+The engine-only stage had 114 required entries: the public baseline's 99 plus 15 transient
 assets. These cover six EN/KO pages, the English convergence example, both new
 runtime modules, original producer/reference tests and all four independent
 oracle/cases/pytest-wrapper/consumer files. Existing metadata/license, archive
@@ -396,8 +397,9 @@ This is a reproducibility command, not evidence that the candidate has built or
 passed. Report pytest JUnit, independent unittest cases/subtests, archive program
 results and native prerequisites separately. Existing 541-case traction history
 and its standalone consumer4 are baseline evidence, not new transient counts.
-This standalone Python candidate adds no transient JSON/CLI/Studio, Robin/flux
-input, persistence or automatic thermal-mechanical coupling. CI and any cloud
+That engine-only stage did not add transient JSON/CLI or persistence. The current
+headless API, JSON/CLI and saved histories are covered below. Transient Studio,
+Robin/flux input and automatic thermal-mechanical coupling remain unsupported. CI and any cloud
 experiments require exact-source evidence before acceptance; Linux results do not
 establish Windows support.
 
