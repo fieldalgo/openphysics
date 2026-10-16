@@ -4,12 +4,19 @@
 
 ## 제공 상태
 
-**사용자 계약 초안: 구현·검증 대기.** 검토 기준은
-`6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`이며 기존 Studio route는
-아직 열 문서를 거절합니다. 이 가이드는 예정된 전용 정상열 route/UI를 설명하며
-현재 제공 기능이나 시험 통과를 뜻하지 않습니다. 상태를 바꾸기 전에 정확한
-server/frontend 후보와 실측 자원 제한을 확인해야 합니다.
-Headless 수용이 UI 수용을 입증하지 않습니다.
+**구현 후보이며 통합·수용 대기입니다.** 서버
+`533c5e8c3f50d05f52323588e81b4997500e00e5`는 전용 열 route와 typed
+capture/encoding을 구현합니다. Frontend 후보 `4aa8beac`는 이 wire계약에
+맞춰 동기화 중입니다. 구성요소를 따로 사용하지 말고 정확한 결합 후보를 사용하세요.
+문서 기준 main에는 generic 열 거절이 남아 있습니다.
+여기서는 수치·HTTP·browser·설치·플랫폼 통과를 주장하지 않습니다.
+
+아래 wire형식은 고정 계약입니다. Capability `run_enabled`와 terminal회수는
+필수 통합 정책이며 초기 서버 후보에는 해당 flag와 조기 terminal회수가
+아직 없습니다. 수용 전 후속 source·시험으로 확인해야 합니다.
+`run_enabled=true`는 유효한 설정 limits와 공개 API 지원을 뜻하며
+**성능 실측 완료를 뜻하지 않습니다**.
+`resource_policy="candidate-unmeasured"`는 별도 선언으로 유지합니다.
 
 예정 범위는 JSON-first `thermal.steady2d`입니다. 균질 직사각형/P1,
 상수 등방 k·열원, 변 지정온도·단열과 별도로 통합하는 상수 외향 flux/Robin
@@ -50,7 +57,7 @@ python -m simcase.studio --no-browser
 
 | 표시/데이터 | 예정 계약 |
 | --- | --- |
-| 좌표 | raw `nodes_m`는 m; 축은 캡처 문서의 양수 metres-per-length-unit scale로 나눔 |
+| 좌표 | raw `arrays.nodes_m`는 m; 축은 최상위 `display_length_in_m`(캡처 문서의 양수 metres-per-document-length-unit scale)로 나눔 |
 | 온도 | `temperature_k`, 절점 P1, K; 선형 보간·단위 colorbar |
 | Flux | `heat_flux_w_m2`, 삼각형별 상수, W/m²; 전역 qx/qy 또는 크기 |
 | 화살표 | 실제 요소 중심·전역 방향; 명시한 view gain이며 물리값 재조정 아님 |
@@ -76,9 +83,32 @@ V1 raw배열은 9개, v2는 13개이며 Robin-only v2의 Dirichlet 절점 수는
 정확한 허용 버전쌍·단위·위치·shape·유한한 비불리언 배열·유효 CCW 연결 정보를
 검사해야 합니다. 알 수 없는 layout·누락 필드·잘못된 payload를 표시하면 안 됩니다.
 
+## 고정 wire envelope
+
+```text
+payload_format = "studio-thermal-steady-v1"
+kind = "thermal.steady2d"
+job, result_id, client_revision, request_seq
+result_format, field_layout
+display_length_in_m
+summary
+arrays
+```
+
+모두 최상위 필드이며 **중첩 coordinates 객체는 없습니다**.
+`arrays`는 정확히 v1의 9개 또는 v2의 13개 headless 배열을 포함합니다.
+`summary`는 일치하는 단위·위치·shape를 포함합니다.
+좌표는 미터(`summary.mesh_length_unit="m"`)이며 `summary.units.length`는
+문서 표시 단위 선언입니다. Run identity는 kind/job/result_id와 비음수
+safe-integer counter 두 개입니다. Status는 status/log/error/has_result를
+추가합니다. 요청은 정확히 doc/client_revision/request_seq를 포함하고 UTF-8
+application/json을 사용합니다. 중복키·비유한 JSON·잘못된 envelope·미지원
+physics를 거절합니다. 열 status/result route에는 field/time selector를
+허용하지 않습니다. Arrays·summary·identity는 이 단일 계약을 사용합니다.
+
 ## Route 경계와 회복
 
-다음 전용 route는 **예정**이며 검토 기준에는 없습니다.
+서버 후보는 다음 전용 route를 구현하며 아직 수용된 main 기능은 아닙니다.
 
 | Route | 예정 동작 |
 | --- | --- |
@@ -111,8 +141,14 @@ Localhost/auth/CORS 동작이 다중 사용자 격리 서비스로 강화되는 
 모든 값은 **후보 설정이며 실측 용량이 아닙니다**.
 요청1 MiB, N<=10201절점, M<=20000요소, 인코딩결과16 MiB,
 활성 열 작업1개, terminal 열 기록 최대2개·합계32 MiB,
-terminal 보존300 s입니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
+terminal 최대 보존300 s입니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
 필수 정책이 미설정이면 열 run은 비활성 상태를 유지합니다.
+신규 admission/publication에 count/byte 공간이 필요하면 가장 오래된 terminal
+기록(done **또는** error)을 회수하며 활성 열 작업과 모든 광학 작업은 보존합니다.
+TTL300 s는 최대 보관이며 **최소 제공시간 보장이 아닙니다**.
+결과가 더 일찍 회수될 수 있으며 회수/만료된 status·result는404를 반환하고
+자동 재실행하지 않습니다. 매 세 번째 실행을 5분 차단하는 정책은 없습니다.
+UI무효화로 global job을 삭제하지 않습니다.
 성공·실패 terminal metadata/log/error 모두 제한하며 성공과 모든 실패
 (thread-start·encoding·publication 포함) 후 용량을 해제해야 합니다.
 활성/광학 작업은 축출하지 않습니다.

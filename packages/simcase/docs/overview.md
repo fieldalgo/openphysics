@@ -435,4 +435,4 @@ The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed rec
 
 ## Planned dedicated steady thermal Studio interface
 
-The [steady heat Studio draft](thermal_studio.md) describes JSON opening/applying, dedicated validation/run, result-derived mesh, nodal Kelvin and cell flux views, error recovery and candidate resource limits. It is not an implemented or validated UI at this documentation base. Existing generic heat refusal and optical behavior remain; transient UI, mesh-only preview and new result-save endpoints are outside scope.
+The [steady heat Studio draft](thermal_studio.md) describes JSON opening/applying, dedicated validation/run, result-derived mesh, nodal Kelvin and cell flux views, error recovery and candidate resource limits. Dedicated server routes are submitted, while frontend wire alignment, resource-policy follow-ups and combined validation remain pending. This is not a validated UI on main. Existing generic heat refusal and optical behavior remain; transient UI, mesh-only preview and new result-save endpoints are outside scope.

@@ -256,4 +256,4 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 ## 예정된 전용 정상열 Studio 인터페이스
 
-[정상열 Studio 초안](thermal_studio.md)은 JSON 열기/적용·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·후보 자원제한을 설명합니다. 이 문서 기준에서 구현·검증된 UI가 아닙니다. 기존 generic 열 거절·광학동작을 유지하며 과도 UI·mesh-only preview·새 결과저장 endpoint는 범위 밖입니다.
+[정상열 Studio 초안](thermal_studio.md)은 JSON 열기/적용·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·후보 자원제한을 설명합니다. 전용 서버 route는 제출됐으며 frontend wire동기화·자원정책 후속·결합 검증이 남아 있습니다. Main에서 검증된 UI라는 뜻은 아닙니다. 기존 generic 열 거절·광학동작을 유지하며 과도 UI·mesh-only preview·새 결과저장 endpoint는 범위 밖입니다.

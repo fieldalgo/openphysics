@@ -123,4 +123,4 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 
 ## 정상열 Studio 초안
 
-[정상열 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md)와 [영문판](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md)은 예정된 JSON-first·결과메시 인터페이스를 설명합니다. 구현·검증 대기이며 현재 generic Studio 열 guard는 유지합니다. 이 canonical 링크는 네트워크 접근과 해당 문서의 main 통합이 필요합니다.
+[정상열 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md)와 [영문판](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md)은 JSON-first·결과메시 구현 후보와 수용 대기를 설명합니다. 전용 서버 route는 제출됐으며 frontend 동기화·최신 자원 정책은 정확한 결합 검증이 필요합니다. Generic Studio 열 guard는 유지합니다. 이 canonical 링크는 네트워크 접근과 해당 문서의 main 통합이 필요합니다.

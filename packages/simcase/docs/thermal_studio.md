@@ -4,12 +4,19 @@
 
 ## Availability
 
-**Draft user contract: implementation and validation pending.** The reviewed
-base is `6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`; it still rejects heat
-through Studio's existing routes. This guide describes the planned dedicated
-steady-thermal route/UI, not an available feature or a passing test.
-Exact server/frontend candidates and measured resource limits must be checked
-before changing this status. Headless acceptance does not establish UI acceptance.
+**Implementation candidate; integration and acceptance pending.** Server
+`533c5e8c3f50d05f52323588e81b4997500e00e5` implements the dedicated thermal
+routes and typed capture/encoding. Frontend candidate `4aa8beac` is being aligned
+with this wire contract. Use the exact combined candidate, not these components
+independently. The documentation base main still has generic heat refusal.
+No numerical, HTTP, browser, installed or platform pass is asserted here.
+
+The wire format below is fixed. Capability `run_enabled` and terminal eviction
+describe the required integration policy; the initial server candidate does not
+yet emit that flag or implement early terminal eviction. Follow-up source and
+tests must confirm them before acceptance. `run_enabled=true` means valid
+configured limits and supported public API, **not completed performance measurement**.
+`resource_policy="candidate-unmeasured"` remains a separate declaration.
 
 The intended scope is JSON-first `thermal.steady2d`: homogeneous rectangle/P1,
 constant isotropic k and source, prescribed side temperatures, insulation and
@@ -56,7 +63,7 @@ enable an unimplemented thermal capability.
 
 | Display/data | Intended contract |
 | --- | --- |
-| Coordinates | Raw `nodes_m` in m; axes divide by the captured document's positive metres-per-length-unit scale |
+| Coordinates | Raw `arrays.nodes_m` in m; axes divide by top-level `display_length_in_m`, the captured positive metres-per-document-length-unit scale |
 | Temperature | `temperature_k`, nodal P1, K; linear interpolation and labelled colorbar |
 | Flux | `heat_flux_w_m2`, constant per triangle, W/m²; global qx/qy or magnitude |
 | Arrows | Actual cell centroids and global directions; labelled view gain, no physical rescaling |
@@ -85,9 +92,33 @@ Dirichlet nodes. Require the exact allowed version pair, units, locations,
 shapes, finite nonboolean arrays and valid CCW connectivity. Unknown layouts,
 missing fields and malformed payloads must not reach the display.
 
+## Fixed wire envelope
+
+```text
+payload_format = "studio-thermal-steady-v1"
+kind = "thermal.steady2d"
+job, result_id, client_revision, request_seq
+result_format, field_layout
+display_length_in_m
+summary
+arrays
+```
+
+These are top-level fields; there is **no nested coordinates object**.
+`arrays` contains exactly the nine v1 or thirteen v2 headless arrays.
+`summary` carries matching units, locations and shapes; coordinates are metres
+(`summary.mesh_length_unit="m"`), while `summary.units.length` supplies the
+document display declaration. Run identity is kind/job/result_id plus the two
+nonnegative safe-integer counters. Status adds status/log/error/has_result.
+Requests contain exactly doc/client_revision/request_seq and use UTF-8
+application/json. Duplicate keys, nonfinite JSON, malformed envelopes and
+unsupported physics are refused. No field/time selector is accepted on thermal
+status/result routes. Arrays, summary and identity use this single contract.
+
 ## Route boundaries and recovery
 
-These dedicated routes are **planned**, not present in the reviewed base:
+The server candidate implements these dedicated routes; they are not yet
+accepted main functionality:
 
 | Route | Planned behavior |
 | --- | --- |
@@ -122,8 +153,14 @@ not upgraded into multi-tenant isolation.
 All limits remain **candidate settings, not measured capacity**:
 request 1 MiB; N<=10201 nodes; M<=20000 cells; encoded result 16 MiB;
 one active thermal job; at most two terminal thermal records and 32 MiB total;
-terminal retention 300 s. Final capabilities must expose the actual configured
+terminal retention at most 300 s. Final capabilities must expose the actual configured
 policy. Thermal run stays disabled if required policy is not configured.
+Admission/publication reclaim the oldest terminal records (done **or** error)
+when count/byte space is needed, preserving active thermal and all optical jobs.
+TTL 300 s is a maximum retention, **not a minimum availability guarantee**.
+A result may be evicted earlier; evicted/expired status or result returns 404,
+with no automatic rerun. There is no policy that blocks every third run for
+five minutes. UI invalidation never deletes global jobs.
 Limits cover successful and failed terminal metadata, logs and errors; capacity
 must be released after success and every failure, including thread-start,
 encoding and publication failures. Active/optical jobs are not evicted.
