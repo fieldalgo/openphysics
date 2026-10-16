@@ -212,3 +212,35 @@ The new metadata assertion gap was a consumer test-definition issue, not a
 confirmed production defect. No Python parse/pytest/HTTP/solver/installed/browser
 or platform execution was performed. Exact combined Studio source/installed
 CI, including real repeated runs and all negative controls, is still required.
+
+## Current-main review and peer test blocker
+
+Main6e9be99a10fba77d329063da973401f26d4ed0b5 retains the reviewed P2 oracle
+blob8957c5663e4dfacb62331c46c215f5872732c6bc and cases
+blob963e6850099c1b5ffe458c9bd31b373327546f04. The changes since main49ff
+concern validation/platform infrastructure and public guidance, not the numerical
+oracle. The independent HTTP/strict-metadata fixture and original physical gates
+need no further code change for this base. Public guidance and installed checks
+on Linux/macOS/Windows remain part of exact integration validation.
+
+The F c762c4e5fdb9700978a24f639e694630477b8679 wire/resource source remains
+compatible with sequential original8/16/32/64 runs: a current payload is received
+and audited before a later admission can evict an older terminal result. This is
+a source-level conclusion, not a newly executed repeated-run result. No store
+reset, retention sleep, skip or threshold change was added.
+
+A separate confirmed test-definition blocker was found in B
+767cc8dbaeccd4a7cf85c828971d5324abdbd863:
+tests/studio_steady_thermal.cjs line307 evaluates an immediate function containing
+load("p3JS") and load("p3NodeTests"), but that file declares/imports no load.
+In ordinary Node the callback therefore raises ReferenceError while constructing
+its HTTP mock, before exercising validation/run behavior. The existing cap()
+fixture at lines14–18 can supply the same capability object directly through
+JSON.stringify(cap()). This is a minimal peer-owned correction recommendation,
+not a change to the production UI, numerical contract or this independent suite.
+
+No Node/HTTP/numerical execution was performed for this finding. Preserve the
+original B source and verify its corrected exact candidate in the coordinated
+Node run. Overall integration acceptance remains pending that correction plus
+the exact independent source/installed/physics/metadata results. No extra full
+CI or manual dispatch was started for this review.
