@@ -9,9 +9,11 @@
 `c*dT/dt - div(k*grad T) = Q`를 적합 P1 삼각형·일관 질량·후진 Euler로 풉니다.
 형상은 m로 변환하고 요청 시간은 명시적 초입니다. 계산은 단위 면외 깊이당 값입니다.
 
-Headless 인터페이스이며 열 Studio editor·renderer가 아닙니다. Studio는 정상·과도
-열 문서를 거절하고 오래된 광학 상태를 지우며 열 예제를 노출하지 않습니다.
-Schema가 문서를 수용한다고 Studio 렌더링이 활성화되는 것은 아닙니다.
+이 페이지는 headless 인터페이스를 설명합니다. Generic 광학 Studio route의
+열 guard는 유지하며 전용 [정상 Studio](thermal_studio.md)는 별도입니다.
+[과도 Studio 통합 가이드](thermal_transient_studio.md)에서 capability·시간view·
+구현/검증 상태를 구분합니다. Schema수용만으로 browserroute·renderer가
+활성화되지 않습니다.
 
 구현·source 시험·설치 consumer·정확 CI·main 통합은 서로 다른 근거 단계입니다.
 코드는 아래 계약을 정의하며 새 시험 결과가 아닙니다. 보고된 source 부분집합

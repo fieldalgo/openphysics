@@ -437,7 +437,7 @@ acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required
 
 ## Headless transient heat
 
-The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times, uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and insulation. `run(Document)` returns `TransientThermalRunResult`; the CLI example is `transient_thermal_uniform`. Results save JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version metadata. Initial values are not projected and negative K is not clamped. Follow the contract for fresh-output ownership, memory and failures; disabling fields is not streaming. Studio rejects these documents and clears stale optical state. No transient flux/Robin, restart or automatic coupling is added. Implementation is distinct from exact source/installed/CI acceptance.
+The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times, uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and insulation. `run(Document)` returns `TransientThermalRunResult`; the CLI example is `transient_thermal_uniform`. Results save JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version metadata. Initial values are not projected and negative K is not clamped. Follow the contract for fresh-output ownership, memory and failures; disabling fields is not streaming. Generic optical Studio routes reject thermal documents and clear stale optical state; the dedicated transient interface has its own capability and integration status. No transient flux/Robin, restart or automatic coupling is added. Implementation is distinct from exact source/installed/CI acceptance.
 
 ## Steady thermal Studio
 
@@ -446,3 +446,7 @@ The [steady heat Studio guide](thermal_studio.md) describes this checkout's JSON
 ## Validation and landing evidence
 
 Documentation follows Draft → relevant checks → Ready PR → required CI → automatic Rebase and merge → landed-main validation. Main uses a non-cancelling queue=max; PR supersession uses queue=single. Full Linux science and Linux/macOS/Windows installed validation are separate; distinguish configuration, execution, acceptance and main landing. Check actual Studio browser/resource evidence for the exact checkout. See the [steady Studio guide](thermal_studio.md) for the operational and evidence boundaries.
+
+## Transient thermal Studio integration
+
+The [transient Studio guide](thermal_transient_studio.md) covers exact requested-time indices (default final), nodal K/cell flux, H[J/m]/V[J K/m] pages, typed reads, explicit429 recovery and bounded lifetimes. It is an integration contract pending production submission/runtime acceptance at this documentation base; headless transient support or existing steady Studio acceptance does not establish transient UI support. Generic optical guards remain. No interpolation, downsampling, new solver or cancel/delete/save endpoint is added. Inspect exact CI and artifact evidence separately from candidate limits and implementation.

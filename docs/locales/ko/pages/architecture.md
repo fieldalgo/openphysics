@@ -69,15 +69,13 @@ flowchart TB
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
   생략한 기존 문서는 v1을 유지합니다.
-- **Studio:** 2D 광학 모델용 로컬 브라우저 화면입니다. 3D 모델을 거부하며,
-  열·구조 입력 화면과 결과 그래프는 아직 제공하지 않습니다.
+- **Studio:** 2D광학과전용JSON-first정상열용로컬browser화면입니다. Generic광학route의열/3Dguard는유지합니다. [과도 Studio 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)은별도시간index/history통합과구현/검증대기를설명합니다. 구조폼·3D·범용열폼editor는범위밖입니다.
 
 이 계층 구성이 범용 완전 연성 다중물리 해석기를 뜻하지는 않습니다.
 [독립 과도 열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)는
 고정 P1 메시, 일관 질량과 후진 Euler를 사용합니다.
 별도 [headless 문서 경로](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)는
-직사각형 JSON/API/CLI·저장 이력을 추가하지만 Studio·restart·과도 flux/Robin 입력·
-자동 연성을 제공하지 않습니다. 정확한 사용 계약과
+직사각형JSON/API/CLI·저장이력을추가합니다. HeadlessAPI자체가Studio를활성화하지않고전용route/capability지원은별도입니다. Restart·과도flux/Robin입력·자동연성은계약범위밖입니다. 정확한 사용 계약과
 실측 검증 한계는 [문서 색인](index.md)에 연결돼 있습니다.
 
 ## 실제 코드와의 연결
