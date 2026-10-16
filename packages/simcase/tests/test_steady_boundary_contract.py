@@ -328,3 +328,44 @@ def test_large_origin_wrong_dirichlet_node_side_is_rejected():
     mesh.boundary["left"] = mesh.boundary["right"].copy()
     with pytest.raises(DocumentError, match="complete unique SI side"):
         steady_boundary_inputs(d, mesh)
+
+
+@pytest.mark.parametrize("tamper", [False, True])
+def test_large_origin_adjacent_side_edge_ambiguity_rejects_even_normal_tags(tamper):
+    d = document()
+    p = physics(d)
+    p["dirichlet_temperature_k"] = {}
+    p["outward_flux_w_m2"] = {}
+    d.data["mesh"]["subdivisions"] = [8, 8]
+    origin = 1e13
+    d.data["geometry"]["domain"] = {
+        "xmin": origin, "xmax": origin+1.,
+        "ymin": origin, "ymax": origin+1.,
+    }
+    mesh = rectangle_mesh(1., 1., 8, 8)
+    mesh.nodes += origin
+    if tamper:
+        # The last top edge is adjacent to right and shorter than the retained
+        # coordinate budget. It must never be admitted as another right edge.
+        mesh.boundary_edges["right"] = np.vstack(
+            [mesh.boundary_edges["right"], mesh.boundary_edges["top"][-1]])
+    validate_steady_boundary(d)
+    with pytest.raises(DocumentError, match="ambiguous rectangle side edge classification"):
+        steady_boundary_inputs(d, mesh)
+
+
+def test_near_side_interior_node_cannot_become_dirichlet_by_coordinate_mask():
+    d = document()
+    d.data["mesh"]["subdivisions"] = [8, 8]
+    origin = 1e13
+    d.data["geometry"]["domain"] = {
+        "xmin": origin, "xmax": origin+1.,
+        "ymin": origin, "ymax": origin+1.,
+    }
+    mesh = rectangle_mesh(1., 1., 8, 8)
+    mesh.nodes += origin
+    # This malformed selection includes the nearby interior column. Geometry's
+    # ambiguous edge classification must reject before accepting any such nodes.
+    mesh.boundary["left"] = np.flatnonzero(mesh.nodes[:, 0] <= origin+.125)
+    with pytest.raises(DocumentError, match="ambiguous rectangle side edge classification"):
+        steady_boundary_inputs(d, mesh)

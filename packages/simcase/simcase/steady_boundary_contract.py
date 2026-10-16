@@ -7,6 +7,7 @@ Document without mutating its data, scale or notes. They do not solve or save.
 """
 import math
 from collections.abc import Mapping
+from itertools import combinations
 
 import numpy as np
 
@@ -180,9 +181,11 @@ def steady_boundary_inputs(doc, mesh):
     expected_edges = {tag: {edge for edge in exterior
                             if np.all(abs(p[list(edge), axis]-value) <= tol[axis])}
                       for tag, (axis, value) in axes.items()}
-    if (expected_edges["left"] & expected_edges["right"]
-            or expected_edges["bottom"] & expected_edges["top"]):
-        raise DocumentError("mesh: ambiguous opposite-side edge classification")
+    # Each actual exterior edge must belong to exactly one side, including
+    # adjacent sides: a short corner edge can fit both tolerance bands.
+    if any(expected_edges[a] & expected_edges[b] for a, b in combinations(SIDES, 2)):
+        raise DocumentError("mesh: insufficient coordinate precision; ambiguous "
+                            "rectangle side edge classification")
     if (set().union(*expected_edges.values()) != exterior
             or any(not edges for edges in expected_edges.values())
             or not np.isclose(area.sum(), np.prod(upper-lower), rtol=1e-12, atol=0)):
@@ -193,8 +196,10 @@ def steady_boundary_inputs(doc, mesh):
     prescribed = {}
     for tag, value in side_bc.items():
         ids = np.asarray(node_tags.get(tag, []))
-        axis, location = axes[tag]
-        expected = np.flatnonzero(abs(p[:, axis]-location) <= tol[axis])
+        # Boundary identity comes from verified exterior edges, not a broad
+        # coordinate mask that could also include nearby interior nodes.
+        expected = np.array(sorted({node for edge in expected_edges[tag] for node in edge}),
+                            dtype=int)
         if (ids.ndim != 1 or ids.dtype.kind not in "iu" or len(ids) != len(expected)
                 or len(np.unique(ids)) != len(ids) or np.any(ids < 0) or np.any(ids >= len(p))
                 or not np.array_equal(np.sort(ids), expected)):
