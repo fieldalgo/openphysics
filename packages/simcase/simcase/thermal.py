@@ -349,6 +349,59 @@ class ThermalRunResult:
     timings: dict
     log: list
 
+    def __post_init__(self):
+        # Bind ordinary public-result mutations to the calculation that ran.
+        self.doc = self.doc.copy()
+        self._document_json = self._canonical_document()
+        self._nodes_snapshot = np.array(self.mesh.nodes, copy=True)
+        self._triangles_snapshot = np.array(self.mesh.triangles, copy=True)
+        self._fixed_snapshot = np.array(self.dirichlet_node_ids, copy=True)
+        self._temperature_snapshot = np.array(self.dirichlet_temperature_k, copy=True)
+        physics = self.doc.sole_physics()[1]
+        if 'outward_flux_w_m2' in physics or 'convection' in physics:
+            from .steady_boundary_contract import steady_result_versions
+            self._result_format, self._field_layout = steady_result_versions(self.doc)
+        else:
+            self._result_format, self._field_layout = RESULT_FORMAT, FIELD_LAYOUT
+
+    def _canonical_document(self):
+        return json.dumps(self.doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+    def _validated_document(self):
+        self.doc.validate()
+        if self._canonical_document() != self._document_json:
+            raise ValueError('thermal result document changed after the solve; run again')
+        for current, captured in (
+                (self.mesh.nodes, self._nodes_snapshot),
+                (self.mesh.triangles, self._triangles_snapshot),
+                (self.dirichlet_node_ids, self._fixed_snapshot),
+                (self.dirichlet_temperature_k, self._temperature_snapshot)):
+            a = np.asarray(current)
+            if a.dtype != captured.dtype or not np.array_equal(a, captured):
+                raise ValueError('thermal result mesh or prescribed data changed after the solve')
+        return self.doc
+
+    @property
+    def result_format(self): return self._result_format
+
+    @property
+    def field_layout(self): return self._field_layout
+
+    @property
+    def boundary_enabled(self): return self._result_format.endswith('-v2')
+
+    @property
+    def prescribed_outward_load_w_per_m(self): return self.solution.prescribed_outward_load
+
+    @property
+    def ambient_load_w_per_m(self): return self.solution.ambient_load
+
+    @property
+    def convective_outward_w_per_m(self): return self.solution.convective_outward
+
+    @property
+    def system_rhs_w_per_m(self): return self.solution.system_rhs
+
     @property
     def mesh_nodes_m(self): return self.mesh.nodes
 
@@ -371,11 +424,17 @@ class ThermalRunResult:
     def residual_w_per_m(self): return self.solution.residual
 
     def _raw_arrays(self):
+        self._validated_document()
         arrays = dict(nodes_m=np.asarray(self.mesh.nodes), triangles=np.asarray(self.mesh.triangles),
                       temperature_k=np.asarray(self.temperature_k), heat_flux_w_m2=np.asarray(self.heat_flux_w_m2),
                       load_w_per_m=np.asarray(self.load_w_per_m), reaction_w_per_m=np.asarray(self.reaction_w_per_m),
                       residual_w_per_m=np.asarray(self.residual_w_per_m), dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
                       dirichlet_temperature_k=np.asarray(self.dirichlet_temperature_k))
+        if self.boundary_enabled:
+            arrays.update(prescribed_outward_load_w_per_m=np.asarray(self.prescribed_outward_load_w_per_m),
+                          ambient_load_w_per_m=np.asarray(self.ambient_load_w_per_m),
+                          convective_outward_w_per_m=np.asarray(self.convective_outward_w_per_m),
+                          system_rhs_w_per_m=np.asarray(self.system_rhs_w_per_m))
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
@@ -384,7 +443,7 @@ class ThermalRunResult:
             raise ValueError('thermal nodes_m: expected nonempty (N,2) coordinates')
         if tris.ndim != 2 or tris.shape[1] != 3 or not len(tris) or tris.dtype.kind not in 'iu':
             raise ValueError('thermal triangles: expected integer (M,3) connectivity')
-        if fixed.ndim != 1 or not len(fixed) or fixed.dtype.kind not in 'iu':
+        if fixed.ndim != 1 or (not self.boundary_enabled and not len(fixed)) or fixed.dtype.kind not in 'iu':
             raise ValueError('thermal dirichlet_node_ids: expected integer (D,) indices')
         if np.any(tris < 0) or np.any(tris >= len(nodes)) or np.any(fixed < 0) or np.any(fixed >= len(nodes)):
             raise ValueError('thermal raw connectivity/Dirichlet indices outside mesh')
@@ -393,6 +452,10 @@ class ThermalRunResult:
         shapes = {'temperature_k': (len(nodes),), 'heat_flux_w_m2': (len(tris), 2),
                   'load_w_per_m': (len(nodes),), 'reaction_w_per_m': (len(nodes),),
                   'residual_w_per_m': (len(nodes),), 'dirichlet_temperature_k': (len(fixed),)}
+        if self.boundary_enabled:
+            for key in ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
+                        'convective_outward_w_per_m', 'system_rhs_w_per_m'):
+                shapes[key] = (len(nodes),)
         for key, shape in shapes.items():
             if arrays[key].shape != shape:
                 raise ValueError(f'thermal raw array {key}: expected shape {shape}')
@@ -408,7 +471,7 @@ class ThermalRunResult:
         arrays = self._raw_arrays()
         name, p = self.doc.sole_physics()
         result = {'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
-                'result_format': RESULT_FORMAT, 'field_layout': FIELD_LAYOUT,
+                'result_format': self.result_format, 'field_layout': self.field_layout,
                 'units': copy.deepcopy(self.doc['units']), 'mesh_length_unit': 'm',
                 'field_units': {'nodes_m': 'm', 'triangles': '1', 'dirichlet_node_ids': '1',
                                 'dirichlet_temperature_k': 'K', 'temperature_k': 'K', 'heat_flux_w_m2': 'W/m^2',
@@ -428,6 +491,16 @@ class ThermalRunResult:
                 'temperature_min_k': float(self.temperature_k.min()),
                 'temperature_max_k': float(self.temperature_k.max()),
                 **self.diagnostics, 'timings_s': dict(self.timings)}
+        if self.boundary_enabled:
+            added = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
+                     'convective_outward_w_per_m', 'system_rhs_w_per_m')
+            result['field_units'].update({key: 'W/m' for key in added})
+            result['field_locations'].update({key: 'nodes' for key in added})
+            result['outward_flux_w_m2'] = copy.deepcopy(p.get('outward_flux_w_m2', {}))
+            result['convection'] = copy.deepcopy(p.get('convection', {}))
+            result['reaction_sign'] = 'inward thermostat contribution; thermostat outward = -sum(reaction)'
+            result['outward_sign'] = 'total outward = sum(prescribed_outward_load + convective_outward - reaction)'
+            result['load_definition'] = 'source only; system_rhs = load + ambient_load - prescribed_outward_load'
         json.dumps(result, allow_nan=False)
         return result
 
@@ -437,10 +510,10 @@ class ThermalRunResult:
             owned.write('.incomplete', lambda f: f.write(b'incomplete thermal result\n'))
             summary = self.summary()
             encoded = json.dumps(summary, indent=2, allow_nan=False).encode()
-            owned.write('model.json', lambda f: f.write(json.dumps(self.doc.data, indent=2, allow_nan=False).encode()))
+            owned.write('model.json', lambda f: f.write(self._document_json.encode('utf-8')))
             owned.write('log.txt', lambda f: f.write(('\n'.join(self.log)+'\n').encode()))
             if self.doc['results']['save_fields']:
-                arrays = dict(self._raw_arrays(), result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT,
+                arrays = dict(self._raw_arrays(), result_format=self.result_format, field_layout=self.field_layout,
                               mesh_length_unit='m', metadata_json=encoded.decode())
                 if any(np.asarray(v).dtype.hasobject for v in arrays.values()):
                     raise ValueError('thermal raw arrays must not contain Python objects')
@@ -475,36 +548,67 @@ def run_thermal(doc, verbose=True):
     t0 = time.perf_counter()
     mesh = rectangle_mesh(*lengths, *map(int, doc['mesh']['subdivisions']))
     mesh.nodes += origin
-    prescribed = {}
-    for tag, value in p['dirichlet_temperature_k'].items():
-        nodes = mesh.boundary.get(tag)
-        if nodes is None or not len(nodes):
-            raise DocumentError(f'physics.{name}.dirichlet_temperature_k.{tag}: empty or unknown exterior tag')
-        for node in nodes:
-            if int(node) in prescribed and prescribed[int(node)] != value:
-                raise DocumentError(f'physics.{name}: conflicting corner temperature at node {node}')
-            prescribed[int(node)] = value
+    from .steady_boundary_contract import steady_boundary_inputs
+    boundary_enabled = 'outward_flux_w_m2' in p or 'convection' in p
+    if boundary_enabled:
+        kwargs = steady_boundary_inputs(doc, mesh)
+        prescribed = kwargs['dirichlet']
+    else:
+        # Preserve legacy side-to-node conversion and numerical call path.
+        prescribed = {}
+        for tag, value in p['dirichlet_temperature_k'].items():
+            nodes = mesh.boundary.get(tag)
+            if nodes is None or not len(nodes):
+                raise DocumentError(f'physics.{name}.dirichlet_temperature_k.{tag}: empty or unknown exterior tag')
+            for node in nodes:
+                if int(node) in prescribed and prescribed[int(node)] != value:
+                    raise DocumentError(f'physics.{name}: conflicting corner temperature at node {node}')
+                prescribed[int(node)] = value
+        prescribed = dict(sorted(prescribed.items()))
+        kwargs = dict(conductivity=p['conductivity_w_mk'], dirichlet=prescribed,
+                      heat_source=p['heat_source_w_m3'])
     fixed = np.array(sorted(prescribed), dtype=int)
-    prescribed = {int(i): prescribed[int(i)] for i in fixed}
     t_mesh = time.perf_counter()-t0
     t0 = time.perf_counter()
     try:
-        solution = solve_steady_heat(mesh, conductivity=p['conductivity_w_mk'], dirichlet=prescribed,
-                                     heat_source=p['heat_source_w_m3'])
+        solution = solve_steady_heat(mesh, **kwargs)
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
-    stiffness = assemble_stiffness(mesh, p['conductivity_w_mk'])
-    increment = solution.temperature-prescribed[int(fixed[0])]
-    scale = max(float(np.max(abs(stiffness)@abs(increment)+abs(solution.load))), np.finfo(float).tiny)
-    free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
-    source_heat = float(solution.load.sum())
-    outward = -float(solution.reaction[fixed].sum())
-    balance_scale = max(float(np.sum(abs(solution.load))+np.sum(abs(solution.reaction))), np.finfo(float).tiny)
-    diagnostics = {'source_heat_w_per_m': source_heat, 'outward_heat_w_per_m': outward,
-                   'heat_balance_defect_w_per_m': outward-source_heat,
-                   'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
-                   'normalized_free_residual': float(np.max(abs(solution.residual[free]))/scale) if len(free) else 0.}
+    if boundary_enabled:
+        # These are returned physical terms, not an absolute-temperature reassembly.
+        G = solution.prescribed_outward_load
+        C = solution.convective_outward
+        source_heat = float(solution.load.sum())
+        prescribed_outward = float(G.sum())
+        convective_outward = float(C.sum())
+        thermostat_outward = -float(solution.reaction.sum())
+        outward = prescribed_outward+convective_outward+thermostat_outward
+        balance_scale = max(float(sum(np.sum(abs(a)) for a in
+                            (solution.load, solution.reaction, G, C))), np.finfo(float).tiny)
+        free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
+        diagnostics = {
+            'source_heat_w_per_m': source_heat,
+            'prescribed_outward_heat_w_per_m': prescribed_outward,
+            'convective_outward_heat_w_per_m': convective_outward,
+            'thermostat_outward_heat_w_per_m': thermostat_outward,
+            'outward_heat_w_per_m': outward,
+            'heat_balance_defect_w_per_m': outward-source_heat,
+            'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
+            # No K-only scale is presented as the Robin engine's normalized guard.
+            'free_residual_max_w_per_m': float(np.max(abs(solution.residual[free]))) if len(free) else 0.}
+    else:
+        stiffness = assemble_stiffness(mesh, p['conductivity_w_mk'])
+        increment = solution.temperature-prescribed[int(fixed[0])]
+        scale = max(float(np.max(abs(stiffness)@abs(increment)+abs(solution.load))), np.finfo(float).tiny)
+        free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
+        source_heat = float(solution.load.sum())
+        outward = -float(solution.reaction[fixed].sum())
+        balance_scale = max(float(np.sum(abs(solution.load))+np.sum(abs(solution.reaction))), np.finfo(float).tiny)
+        diagnostics = {'source_heat_w_per_m': source_heat, 'outward_heat_w_per_m': outward,
+                       'heat_balance_defect_w_per_m': outward-source_heat,
+                       'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
+                       'normalized_free_residual': float(np.max(abs(solution.residual[free]))/scale) if len(free) else 0.}
     log = [doc.summary(), f'temperature K: {solution.temperature.min():.12g} to {solution.temperature.max():.12g}',
            f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
     if verbose:
