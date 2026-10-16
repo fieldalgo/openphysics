@@ -148,7 +148,7 @@ test('actual shipped DOM: no capability preserves steady and transient refusal',
   }
 });
 test('actual shipped DOM: duplicate thermal JSON never validates old doc or runs',async()=>{
-  const p=page();p.run('thermalController.loadCapability()');p.run('globalThis.fetch=async()=>({ok:true,json:async()=>'+JSON.stringify(cap())+'})');
+  const p=page();p.run('thermalController.loadCapability()');p.run('globalThis.fetch=async()=>({ok:true,json:async()=>('+JSON.stringify(cap())+')})');
   await p.run('thermalController.loadCapability()');
   p.element('json').value=JSON.stringify(doc()).replace('"name":"Heat"','"name":"Heat","name":"other"');
   p.element('json').oninput();await p.element('applyJson').onclick();
@@ -292,10 +292,23 @@ test('shipped page current derived overflow clears only field; stale render cann
   assert.match(p.element('resInfo').textContent,/magnitude.*view error.*overflow/);
   assert.equal(p.run('thermalController.result()===wire'),true);
   assert.match(p.element('meshInfo').textContent,/Actual result mesh/);
-  const clears=p.element('fieldCanvas').calls.filter(x=>x[0]==='clear').length;
+  const failedLabel=p.element('resInfo').textContent;
+  p.run('globalThis.frameTrace=[];'
+    +'const fieldContext=document.getElementById("fieldCanvas").getContext("2d");'
+    +'const originalPut=fieldContext.putImageData;'
+    +'fieldContext.clearRect=()=>frameTrace.push("clear");'
+    +'fieldContext.putImageData=image=>{frameTrace.push("pixels");originalPut(image);};');
   p.element('thermalField').value='magnitude';p.run('drawThermalViews()');
+  // This checkpoint runs after the obsolete callback and before the current frame.
+  p.run('Promise.resolve().then(()=>{globalThis.afterStale={trace:frameTrace.slice(),'
+    +'label:document.getElementById("resInfo").textContent,'
+    +'hover:document.getElementById("fieldCanvas").onmousemove===null};})');
   p.element('thermalField').value='temperature_k';p.run('drawThermalViews()');await tick();
-  assert.equal(p.element('fieldCanvas').calls.filter(x=>x[0]==='clear').length,clears);
+  assert.equal(p.run('JSON.stringify(afterStale.trace)'),'[]');
+  assert.equal(p.run('afterStale.label'),failedLabel);
+  assert.equal(p.run('afterStale.hover'),true);
+  assert.equal(p.run('JSON.stringify(frameTrace)'),JSON.stringify(['clear','pixels']));
+  assert.equal(typeof p.element('fieldCanvas').onmousemove,'function');
   assert.match(p.element('resInfo').textContent,/temperature_k/);
   assert.doesNotMatch(p.element('resInfo').textContent,/view error/);
 });
