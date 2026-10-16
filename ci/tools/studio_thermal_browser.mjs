@@ -70,9 +70,21 @@ try{
 }catch(e){if(cdp){try{const png=await cdp.call('Page.captureScreenshot',{format:'png'});await writeFile(join(out,'failure.png'),Buffer.from(png.data,'base64'));}catch{}}
  report.error=String(e.stack||e);if(report.status!=='browser-unavailable')report.status='failed';process.exitCode=1;}
 finally{
- if(cdp)cdp.ws.close();
- for(const p of owned.reverse()){if(p.exitCode===null){p.kill('SIGTERM');await Promise.race([new Promise(r=>p.once('close',r)),sleep(5000)]);if(p.exitCode===null&&p.signalCode===null){p.kill('SIGKILL');await new Promise(r=>p.once('close',r));}}}
- if(profile)await rm(profile,{recursive:true,force:true});
- await Promise.all(artifactWrites);
+ try {
+  if(cdp)cdp.ws.close();
+  for(const p of owned.reverse()){
+   if(p.exitCode===null&&p.signalCode===null){
+    p.kill('SIGTERM');
+    await Promise.race([new Promise(r=>p.once('close',r)),sleep(5000)]);
+    if(p.exitCode===null&&p.signalCode===null){
+     p.kill('SIGKILL');
+     await Promise.race([new Promise(r=>p.once('close',r)),sleep(5000)]);
+     if(p.exitCode===null&&p.signalCode===null)throw Error('Owned subprocess did not terminate');
+    }
+   }
+  }
+  if(profile)await rm(profile,{recursive:true,force:true});
+  await Promise.all(artifactWrites);
+ }catch(e){report.cleanupError=String(e.stack||e);report.status='failed';process.exitCode=1;}
  await writeFile(join(out,'browser-report.json'),JSON.stringify(report,null,2)+'\n','utf8');
 }
