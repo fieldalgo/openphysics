@@ -299,3 +299,28 @@ test('shipped page current derived overflow clears only field; stale render cann
   assert.match(p.element('resInfo').textContent,/temperature_k/);
   assert.doesNotMatch(p.element('resInfo').textContent,/view error/);
 });
+
+test('shipped HTTP bridge treats validation 200 ok=false and run 400 as errors',async()=>{
+  const p=page();
+  p.run('globalThis.invalidValidation=true;globalThis.runRequests=0;'
+    +'globalThis.fetch=async(url,options)=>{'
+    +'if(url==="/api/capabilities")return {ok:true,json:async()=>'+JSON.stringify((()=>{const m={exports:{}};new Function("module","exports",load("p3JS"))(m,m.exports);const src=load("p3NodeTests");return new Function("T",src.slice(src.indexOf("function cap()"),src.indexOf("function doc()"))+";return cap();")(m.exports);})())+'};'
+    +'const e=JSON.parse(options.body);'
+    +'if(url==="/api/thermal/validate")return {ok:true,status:200,json:async()=>invalidValidation?'
+    +'{ok:false,error:{code:"invalid_document",message:"invalid thermal fixture"},client_revision:e.client_revision,request_seq:e.request_seq}:'
+    +'{ok:true,doc:e.doc,client_revision:e.client_revision,request_seq:e.request_seq}};'
+    +'runRequests++;return {ok:false,status:400,json:async()=>({ok:false,error:{code:"invalid_document",message:"run rejected fixture"},client_revision:e.client_revision,request_seq:e.request_seq})};};');
+  await p.run('thermalController.loadCapability()');
+  p.element('json').value=JSON.stringify(doc());await p.element('applyJson').onclick();
+  assert.equal(p.element('runBtn').disabled,true);
+  assert.equal(p.run('thermalController.gate.validated'),null);
+  assert.match(p.element('status').textContent,/invalid thermal fixture/);
+  await p.run('doRun()');assert.equal(p.run('runRequests'),0);
+  p.run('invalidValidation=false');await p.element('applyJson').onclick();
+  assert.equal(p.element('runBtn').disabled,false);
+  await p.run('doRun()');
+  assert.equal(p.run('runRequests'),1);
+  assert.equal(p.run('thermalController.result()'),null);
+  assert.equal(p.run('thermalController.gate.busy'),false);
+  assert.match(p.element('status').textContent,/run rejected fixture/);
+});
