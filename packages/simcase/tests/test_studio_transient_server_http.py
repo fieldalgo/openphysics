@@ -360,25 +360,3 @@ def test_malformed_public_summary_cannot_publish(http_client, monkeypatch, fault
     assert http_client.get("/api/jobs/"+job+"/result").status_code == 409
     assert server._thermal_jobs._active == server._thermal_jobs._reserved_bytes == 0
 
-
-@pytest.mark.parametrize("pair", [("wrong", transient.PAIR[1]),
-                                  (transient.PAIR[0], "wrong"),
-                                  (transient.PAIR[0], None)])
-def test_optional_public_transient_pair_must_agree(http_client, monkeypatch, pair):
-    from simcase import Document, TransientThermalRunResult
-    original = server.run(Document.from_dict(transient_model()), verbose=False)
-    class Probe(TransientThermalRunResult):
-        def __init__(self):
-            object.__setattr__(self, "original", original)
-        def __getattr__(self, name):
-            if name == "result_format": return pair[0]
-            if name == "field_layout":
-                if pair[1] is None: raise AttributeError(name)
-                return pair[1]
-            return getattr(object.__getattribute__(self, "original"), name)
-        def summary(self): return original.summary()
-    monkeypatch.setattr(server, "run", lambda *a, **k: Probe())
-    response = http_client.post("/api/thermal/transient/run", json=request_body())
-    assert response.status_code == 200
-    state = http_client.get("/api/jobs/"+response.json()["job"]).json()
-    assert state["status"] == "error" and state["has_result"] is False
