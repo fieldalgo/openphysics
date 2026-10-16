@@ -433,3 +433,142 @@ def test_thermal_encoding_budget_failure_has_no_result_and_releases(lifecycle, b
     assert status.json()["has_result"] is False
     assert life.client.get("/api/jobs/" + job + "/result").status_code == 409
     assert_released_once(life)
+
+
+@pytest.mark.parametrize("stage", ["uuid", "attach"])
+def test_thermal_reserved_admission_failure_releases_pending_once(lifecycle, monkeypatch, stage):
+    life = lifecycle
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("injected reserved admission " + stage)
+
+    with monkeypatch.context() as fault:
+        if stage == "uuid":
+            fault.setattr(server, "uuid", SimpleNamespace(uuid4=broken))
+        else:
+            fault.setattr(life.jobs, "attach", broken)
+        response = submit(life)
+    assert response.status_code == 500
+    assert life.gate.starts == 0 and not life.jobs._records
+    assert_released_once(life)
+    response = submit(life, 2)
+    assert response.status_code == 200
+    life.gate.finish_one()
+    assert life.client.get("/api/jobs/" + response.json()["job"] + "/result").status_code == 200
+
+
+def test_thermal_failed_success_and_error_publication_still_release(lifecycle, monkeypatch):
+    life = lifecycle
+    response = submit(life)
+    assert response.status_code == 200
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("injected publication failure")
+
+    with monkeypatch.context() as fault:
+        fault.setattr(life.jobs, "complete", broken)
+        fault.setattr(life.jobs, "fail", broken)
+        life.gate.finish_one()
+    assert_released_once(life)
+    status = life.client.get("/api/jobs/" + response.json()["job"])
+    assert status.status_code == 200 and status.json()["status"] == "error"
+    assert status.json()["has_result"] is False
+    assert life.client.get("/api/jobs/" + response.json()["job"] + "/result").status_code == 409
+    following = submit(life, 2)
+    assert following.status_code == 200
+    life.gate.finish_one()
+
+
+def test_thermal_double_release_cannot_release_a_different_active_lease(lifecycle):
+    life = lifecycle
+    jobs = life.jobs
+    spec = life.thermal.ThermalInput(None, 1, 1)
+    old = jobs.reserve()
+    jobs.attach(old, "thermal-released", "result-released", spec)
+    jobs.fail(old, RuntimeError("first"))
+    jobs.release(old)
+    active = jobs.reserve()
+    jobs.attach(active, "thermal-current", "result-current", spec)
+    accounting = (jobs._active, jobs._pending, jobs._reserved_bytes)
+    jobs.release(old)
+    assert accounting == (jobs._active, jobs._pending, jobs._reserved_bytes)
+    assert jobs._active == 1
+    with pytest.raises(life.thermal.ThermalAPIError) as blocked:
+        jobs.reserve()
+    assert blocked.value.status == 429
+    assert json.loads(jobs.status("thermal-current"))["status"] == "running"
+    jobs.fail(active, RuntimeError("finish"))
+    jobs.release(active)
+
+
+def test_thermal_eviction_uses_terminal_time_not_admission_or_last_read(lifecycle):
+    life = lifecycle
+    jobs = life.jobs
+    jobs.limits = replace(jobs.limits, active_jobs=2, terminal_jobs=2,
+                          terminal_bytes=2*(jobs.limits.payload_bytes+jobs.limits.status_bytes))
+    spec = life.thermal.ThermalInput(None, 1, 1)
+    admitted_first = jobs.reserve()
+    jobs.attach(admitted_first, "thermal-first", "result-first", spec)
+    admitted_second = jobs.reserve()
+    jobs.attach(admitted_second, "thermal-second", "result-second", spec)
+    jobs.fail(admitted_second, RuntimeError("completed earlier"))
+    jobs.release(admitted_second)
+    life.clock.advance(1)
+    jobs.complete(admitted_first, b"{}", [])
+    jobs.release(admitted_first)
+    # Reading the older terminal does not promise another TTL or make it newest.
+    assert jobs.status("thermal-second")
+    third = jobs.reserve()
+    with pytest.raises(life.thermal.ThermalAPIError) as evicted:
+        jobs.status("thermal-second")
+    assert evicted.value.status == 404
+    assert jobs.result("thermal-first") == b"{}"
+    jobs.attach(third, "thermal-third", "result-third", spec)
+    jobs.fail(third, RuntimeError("done"))
+    jobs.release(third)
+
+
+def test_thermal_error_terminal_expires_at_exact_maximum_without_read_refresh(lifecycle):
+    life = lifecycle
+    jobs = life.jobs
+    spec = life.thermal.ThermalInput(None, 1, 1)
+    lease = jobs.reserve()
+    jobs.attach(lease, "thermal-error-ttl", "result-error-ttl", spec)
+    jobs.fail(lease, RuntimeError("error"))
+    jobs.release(lease)
+    life.clock.advance(jobs.limits.ttl_seconds - 0.25)
+    assert json.loads(jobs.status("thermal-error-ttl"))["status"] == "error"
+    life.clock.advance(0.25)
+    for getter in (jobs.status, jobs.result):
+        with pytest.raises(life.thermal.ThermalAPIError) as expired:
+            getter("thermal-error-ttl")
+        assert expired.value.status == 404
+
+
+def test_thermal_release_fallback_never_exceeds_configured_error_bytes(lifecycle, monkeypatch):
+    life = lifecycle
+    life.jobs.limits = replace(life.jobs.limits, error_bytes=32)
+    response = submit(life)
+    assert response.status_code == 200
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("large failure " * 100)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(server, "run", broken)
+        life.gate.finish_one()
+    assert_released_once(life)
+    job = response.json()["job"]
+    status = life.client.get("/api/jobs/" + job)
+    # If even the fallback cannot fit, dropping this own unpublished record is
+    # fail-closed. Retaining an error larger than its budget is not acceptable.
+    if status.status_code == 404:
+        assert life.client.get("/api/jobs/" + job + "/result").status_code == 404
+    else:
+        assert status.status_code == 200
+        value = status.json()
+        assert value["status"] == "error" and value["has_result"] is False
+        encoded_error = json.dumps(value["error"], ensure_ascii=False,
+                                   separators=(",", ":")).encode("utf-8")
+        assert len(encoded_error) <= life.jobs.limits.error_bytes
+        assert life.client.get("/api/jobs/" + job + "/result").status_code == 409
