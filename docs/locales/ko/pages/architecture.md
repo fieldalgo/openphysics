@@ -69,7 +69,7 @@ flowchart TB
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
   생략한 기존 문서는 v1을 유지합니다.
-- **Studio:** 2D광학과전용JSON-first정상열용로컬browser화면입니다. Generic광학route의열/3Dguard는유지합니다. [과도 Studio 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)은별도시간index/history통합과제출된구현·capability/runtime통합대기를설명합니다. 구조폼·3D·범용열폼editor는범위밖입니다.
+- **Studio:** 2D광학과전용JSON-first정상열용로컬browser화면입니다. Generic광학route의열/3Dguard는유지합니다. [과도 Studio 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)은 전용 capability·route, 정확한 시간 index/history view와 자원 제한을 설명하며 실측 범위는 정확한 checkout의 CI 근거에서 확인합니다. 구조폼·3D·범용열폼editor는범위밖입니다.
 
 이 계층 구성이 범용 완전 연성 다중물리 해석기를 뜻하지는 않습니다.
 [독립 과도 열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)는
