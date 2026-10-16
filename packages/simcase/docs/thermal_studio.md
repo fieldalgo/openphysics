@@ -4,21 +4,22 @@
 
 ## Availability
 
-**Implementation candidate; integration and acceptance pending.** Server
-`533c5e8c3f50d05f52323588e81b4997500e00e5` implements the dedicated thermal
-routes and typed capture/encoding. Frontend candidate `4aa8beac` is being aligned
-with this wire contract. Use the exact combined candidate, not these components
-independently. The documentation base main still has generic heat refusal.
-No numerical, HTTP, browser, installed or platform pass is asserted here.
+**Implementation candidate; integration and acceptance pending.** Server `f8506b7490b52105c37a55e656dc8f23baa98647` and frontend
+`06d73d74c5092fd628ec36b1137c1c9e7363d1ed` implement the dedicated
+steady-thermal routes, typed capture/encoding and JSON-first display described
+here. Use their exact combined checkout with the matching headless runtime;
+this documentation branch alone does not contain those code changes.
+These submitted implementations are not a claim of official main support.
+No integrated CI, actual-browser or resource measurement result is available
+for this documentation update.
 
-The wire format below is fixed. Capability `run_enabled` and terminal eviction
-describe the required integration policy; the initial server candidate does not
-yet emit that flag or implement early terminal eviction. Follow-up source and
-tests must confirm them before acceptance. `run_enabled=true` means valid
-configured limits and supported public API, **not completed performance measurement**.
+The top-level wire envelope, public result/layout ID checks, `run_enabled`
+and oldest-terminal reclamation below are implemented in these candidates.
+`run_enabled=true` means valid configured limits and supported public API,
+**not completed performance measurement**.
 `resource_policy="candidate-unmeasured"` remains a separate declaration.
 
-The intended scope is JSON-first `thermal.steady2d`: homogeneous rectangle/P1,
+The implemented candidate scope is JSON-first `thermal.steady2d`: homogeneous rectangle/P1,
 constant isotropic k and source, prescribed side temperatures, insulation and
 the separately integrated constant outward-flux/Robin contract.
 There is no transient UI, mesh-only preview, new solver, result-saving endpoint,
@@ -26,7 +27,7 @@ arbitrary geometry or automatic coupling. Existing optical behavior remains.
 The [headless steady guide](thermal_steady2d.md) remains the starting point for
 model units and the existing Python/CLI workflow.
 
-## Start and planned user flow
+## Start and user flow
 
 After installing matching packages and the optional Studio dependencies from a
 repository checkout, start from the repository root:
@@ -37,7 +38,7 @@ python -m simcase.studio --no-browser
 ```
 
 Open the printed localhost address. These existing startup commands do not
-enable an unimplemented thermal capability.
+supply missing server/frontend code or bypass capability checks.
 
 1. Open a complete steady heat JSON document or paste it into the JSON editor.
    Apply it explicitly. A thermal form-based material/boundary editor is outside
@@ -59,9 +60,17 @@ enable an unimplemented thermal capability.
    Old asynchronous success, error and finalization callbacks must not replace
    current controls, messages, mesh, field or colorbar.
 
+The editor preserves original JSON text for strict validation, including duplicate-key
+detection; normalized model data is a separate snapshot. After success, the
+summary table shows the raw temperature range, result node/cell counts and
+the server's named source/outward/balance quantities. Expand **Full result
+metadata** to inspect the complete summary; it is not an independent physical
+oracle. Hidden tabs are not rasterized at zero layout size: switching to a
+visible Mesh/Results tab redraws the current accepted result without solving.
+
 ## Units and physical meaning
 
-| Display/data | Intended contract |
+| Display/data | Contract |
 | --- | --- |
 | Coordinates | Raw `arrays.nodes_m` in m; axes divide by top-level `display_length_in_m`, the captured positive metres-per-document-length-unit scale |
 | Temperature | `temperature_k`, nodal P1, K; linear interpolation and labelled colorbar |
@@ -86,7 +95,7 @@ Constant temperatures need a constant-range display, not division by zero.
 Cell flux is not averaged into a nodal field. Overflow in converted coordinates
 or derived flux magnitude is a view error, not permission to change raw data.
 
-The intended typed payload separates wire format from headless v1/v2 result and
+The typed payload separates wire format from headless v1/v2 result and
 layout IDs. V1 has nine raw arrays, v2 thirteen; Robin-only v2 can have zero
 Dirichlet nodes. Require the exact allowed version pair, units, locations,
 shapes, finite nonboolean arrays and valid CCW connectivity. Unknown layouts,
@@ -120,7 +129,7 @@ status/result routes. Arrays, summary and identity use this single contract.
 The server candidate implements these dedicated routes; they are not yet
 accepted main functionality:
 
-| Route | Planned behavior |
+| Route | Candidate behavior |
 | --- | --- |
 | `GET /api/capabilities` | Versioned steady capability and configured resource policy |
 | `POST /api/thermal/validate` | Strict JSON envelope, public document validation and preflight |
@@ -135,7 +144,7 @@ not remove generic optical guards. Transient documents and time/history selector
 remain unsupported. Missing/malformed capabilities disable thermal actions
 without disabling existing optical startup.
 
-Planned errors distinguish malformed input (400), logical validation failure
+Errors distinguish malformed input (400), logical validation failure
 (200 with `ok=false`), request/resource limits (413/429), expired/unknown result
 (404), and unavailable running/error result (409). HTTP200 alone is not validation
 success. Network/non-JSON errors require an explicit current retry; expiration
@@ -153,7 +162,8 @@ not upgraded into multi-tenant isolation.
 All limits remain **candidate settings, not measured capacity**:
 request 1 MiB; N<=10201 nodes; M<=20000 cells; encoded result 16 MiB;
 one active thermal job; at most two terminal thermal records and 32 MiB total;
-terminal retention at most 300 s. Final capabilities must expose the actual configured
+terminal retention at most 300 s. Logs are capped at 64 KiB, errors at 4 KiB,
+summary metadata at 64 KiB and status encoding at 128 KiB. Final capabilities must expose the actual configured
 policy. Thermal run stays disabled if required policy is not configured.
 Admission/publication reclaim the oldest terminal records (done **or** error)
 when count/byte space is needed, preserving active thermal and all optical jobs.

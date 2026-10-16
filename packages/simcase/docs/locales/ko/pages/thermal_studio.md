@@ -4,27 +4,27 @@
 
 ## 제공 상태
 
-**구현 후보이며 통합·수용 대기입니다.** 서버
-`533c5e8c3f50d05f52323588e81b4997500e00e5`는 전용 열 route와 typed
-capture/encoding을 구현합니다. Frontend 후보 `4aa8beac`는 이 wire계약에
-맞춰 동기화 중입니다. 구성요소를 따로 사용하지 말고 정확한 결합 후보를 사용하세요.
-문서 기준 main에는 generic 열 거절이 남아 있습니다.
-여기서는 수치·HTTP·browser·설치·플랫폼 통과를 주장하지 않습니다.
+**구현 후보이며 통합·수용 대기입니다.** 서버 `f8506b7490b52105c37a55e656dc8f23baa98647`와 frontend
+`06d73d74c5092fd628ec36b1137c1c9e7363d1ed`는 여기서 설명하는
+전용 정상열 route·typed capture/encoding·JSON-first 표시를 구현합니다.
+일치하는 headless runtime을 포함한 정확한 결합 checkout을 사용하세요.
+이 문서 branch만으로 해당 코드 변경이 포함되는 것은 아닙니다.
+제출된 구현이 정식 main 지원을 뜻하지 않습니다.
+이번 문서 갱신에 대한 통합 CI·실제 browser·자원 실측 결과는 없습니다.
 
-아래 wire형식은 고정 계약입니다. Capability `run_enabled`와 terminal회수는
-필수 통합 정책이며 초기 서버 후보에는 해당 flag와 조기 terminal회수가
-아직 없습니다. 수용 전 후속 source·시험으로 확인해야 합니다.
+아래 최상위 wire envelope·공개 result/layout ID검사·`run_enabled`·
+oldest-terminal회수는 이 후보들에 구현돼 있습니다.
 `run_enabled=true`는 유효한 설정 limits와 공개 API 지원을 뜻하며
 **성능 실측 완료를 뜻하지 않습니다**.
 `resource_policy="candidate-unmeasured"`는 별도 선언으로 유지합니다.
 
-예정 범위는 JSON-first `thermal.steady2d`입니다. 균질 직사각형/P1,
+구현 후보 범위는 JSON-first `thermal.steady2d`입니다. 균질 직사각형/P1,
 상수 등방 k·열원, 변 지정온도·단열과 별도로 통합하는 상수 외향 flux/Robin
 계약을 사용합니다. 과도 UI·mesh-only preview·새 solver·결과저장 endpoint·
 임의 형상·자동 연성은 없습니다. 기존 광학 동작을 유지합니다.
 모델 단위와 기존 Python/CLI 흐름은 [headless 정상 가이드](thermal_steady2d.md)에서 시작하세요.
 
-## 시작과 예정 사용자 흐름
+## 시작과 사용자 흐름
 
 저장소 checkout에서 일치하는 패키지와 선택적 Studio 의존성을 설치한 뒤
 저장소 루트에서 시작합니다.
@@ -34,8 +34,8 @@ python -m pip install -e "packages/simcase[studio]"
 python -m simcase.studio --no-browser
 ```
 
-출력된 localhost 주소를 엽니다. 기존 시작 명령이 미구현 열 capability를
-활성화하지는 않습니다.
+출력된 localhost 주소를 엽니다. 기존 시작 명령이 누락된 server/frontend 코드를 제공하거나 capability검사를
+우회하지는 않습니다.
 
 1. 완전한 정상열 JSON 문서를 열거나 JSON editor에 붙여 넣고 명시적으로 적용합니다.
    열 재료·경계 전용 폼은 범위 밖이며 generic 광학 예제는 광학용으로 유지합니다.
@@ -53,9 +53,16 @@ python -m simcase.studio --no-browser
    성공·오류·finalization callback이 현재 control·메시지·mesh·field·colorbar를
    덮지 않아야 합니다.
 
+Editor는 중복키 검출을 포함한 엄격 검증을 위해 원래 JSON텍스트를 보존하며
+정규화 모델 데이터는 별도 snapshot입니다. 성공 후 summary표는 raw온도범위·
+결과 절점/요소 수·서버의 명명된 source/outward/balance양을 표시합니다.
+**Full result metadata**를 펼치면 전체 summary를 볼 수 있으나 독립 물리정답은
+아닙니다. 숨겨진 tab은 layout크기0으로 rasterize하지 않습니다.
+보이는 Mesh/Results tab으로 전환하면 재해석 없이 현재 수용된 결과를 다시 그립니다.
+
 ## 단위와 물리 의미
 
-| 표시/데이터 | 예정 계약 |
+| 표시/데이터 | 계약 |
 | --- | --- |
 | 좌표 | raw `arrays.nodes_m`는 m; 축은 최상위 `display_length_in_m`(캡처 문서의 양수 metres-per-document-length-unit scale)로 나눔 |
 | 온도 | `temperature_k`, 절점 P1, K; 선형 보간·단위 colorbar |
@@ -78,7 +85,7 @@ thermostat_outward = -sum(reaction)
 대신 상수 범위로 표시합니다. 요소 flux를 절점장으로 평균하지 않습니다.
 변환 좌표·파생 flux 크기 overflow는 view 오류이며 raw값 변경 허가가 아닙니다.
 
-예정 typed payload는 wire format과 headless v1/v2 result/layout ID를 구분합니다.
+Typed payload는 wire format과 headless v1/v2 result/layout ID를 구분합니다.
 V1 raw배열은 9개, v2는 13개이며 Robin-only v2의 Dirichlet 절점 수는 0일 수 있습니다.
 정확한 허용 버전쌍·단위·위치·shape·유한한 비불리언 배열·유효 CCW 연결 정보를
 검사해야 합니다. 알 수 없는 layout·누락 필드·잘못된 payload를 표시하면 안 됩니다.
@@ -110,7 +117,7 @@ physics를 거절합니다. 열 status/result route에는 field/time selector를
 
 서버 후보는 다음 전용 route를 구현하며 아직 수용된 main 기능은 아닙니다.
 
-| Route | 예정 동작 |
+| Route | 후보 동작 |
 | --- | --- |
 | `GET /api/capabilities` | 버전 있는 정상열 capability·설정 자원 정책 |
 | `POST /api/thermal/validate` | 엄격 JSON envelope·공개 문서 검증·preflight |
@@ -124,7 +131,7 @@ physics를 거절합니다. 열 status/result route에는 field/time selector를
 합니다. 과도 문서·시간/history selector는 미지원입니다. Capability가 없거나
 잘못되면 열 동작을 비활성화하되 기존 광학 시작을 막지 않습니다.
 
-예정 오류는 잘못된 입력400, 논리 검증실패200+`ok=false`, 요청/자원 제한413/429,
+오류는 잘못된 입력400, 논리 검증실패200+`ok=false`, 요청/자원 제한413/429,
 만료/알 수 없는 결과404, 아직 제공할 수 없는 running/error결과409를 구분합니다.
 HTTP200만으로 검증 성공이 아닙니다. Network/non-JSON 오류는 현재 연산의
 명시적 재시도가 필요하며 만료가 자동 재해석을 유발하면 안 됩니다.
@@ -141,7 +148,8 @@ Localhost/auth/CORS 동작이 다중 사용자 격리 서비스로 강화되는 
 모든 값은 **후보 설정이며 실측 용량이 아닙니다**.
 요청1 MiB, N<=10201절점, M<=20000요소, 인코딩결과16 MiB,
 활성 열 작업1개, terminal 열 기록 최대2개·합계32 MiB,
-terminal 최대 보존300 s입니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
+terminal 최대 보존300 s입니다. Log상한64 KiB·error4 KiB·summary metadata64 KiB·
+status encoding128 KiB도 적용합니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
 필수 정책이 미설정이면 열 run은 비활성 상태를 유지합니다.
 신규 admission/publication에 count/byte 공간이 필요하면 가장 오래된 terminal
 기록(done **또는** error)을 회수하며 활성 열 작업과 모든 광학 작업은 보존합니다.
