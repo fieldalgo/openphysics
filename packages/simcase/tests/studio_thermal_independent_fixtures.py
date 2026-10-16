@@ -55,8 +55,26 @@ def captured_arrays(payload, version=2):
     if set(source) != set(selected):
         raise AssertionError("exact versioned array set")
     summary = payload["summary"]
-    if summary["result_format"] != fmt or summary["field_layout"] != PAIRS[fmt]:
+    if (summary.get("physics_type") != "thermal.steady2d" or
+            summary["result_format"] != fmt or summary["field_layout"] != PAIRS[fmt]):
         raise AssertionError("summary version pair")
+    declared=summary["units"]
+    if declared["temperature"] != "K" or summary["mesh_length_unit"] != "m":
+        raise AssertionError("thermal SI metadata")
+    length=declared["length"]
+    if isinstance(length,str):
+        expected_scale=UNITS[length]
+    elif isinstance(length,dict) and set(length)=={"in_m"}:
+        expected_scale=length["in_m"]
+        _number_tree(expected_scale)
+        if expected_scale <= 0:
+            raise AssertionError("positive custom length")
+    else:
+        raise AssertionError("declared length")
+    close(np.array(scale),np.array(expected_scale),expected_scale,"display declaration",1e-9)
+    for meta in ("field_shapes","field_units","field_locations"):
+        if set(summary[meta]) != set(selected):
+            raise AssertionError("exact metadata field set")
     arrays = {}
     for key in selected:
         _number_tree(source[key], key in ("triangles", "dirichlet_node_ids"))
@@ -113,14 +131,15 @@ def synthetic_wire():
     return {"payload_format":WIRE_FORMAT,"kind":"thermal.steady2d",
             "result_format":fmt,"field_layout":PAIRS[fmt],"display_length_in_m":1.,
             "arrays":{k:v.tolist() for k,v in arrays.items()},
-            "summary":{"result_format":fmt,"field_layout":PAIRS[fmt],
+            "summary":{"physics_type":"thermal.steady2d","result_format":fmt,"field_layout":PAIRS[fmt],
+                       "units":{"length":"m","temperature":"K"},"mesh_length_unit":"m",
                        "field_shapes":{k:list(v.shape) for k,v in arrays.items()},
                        "field_units":dict(FIELDS),"field_locations":dict(LOCATIONS)}}
 
 
 def malformed_wires():
     original=synthetic_wire()
-    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra","scale_bool","scale_zero","scale_nan","nested_coordinates"):
+    for kind in ("layout","unit","shape","nan","infinity","bool","index","fractional","missing","extra","scale_bool","scale_zero","scale_nan","scale_units","nested_coordinates"):
         p=copy.deepcopy(original)
         if kind == "layout": p["field_layout"]="thermal2d-p1-node-cell-v1"
         elif kind == "unit": p["summary"]["field_units"]["load_w_per_m"]="W"
@@ -133,6 +152,7 @@ def malformed_wires():
         elif kind == "scale_bool": p["display_length_in_m"]=True
         elif kind == "scale_zero": p["display_length_in_m"]=0.
         elif kind == "scale_nan": p["display_length_in_m"]=float("nan")
+        elif kind == "scale_units": p["summary"]["units"]["length"]="mm"
         elif kind == "nested_coordinates": p["coordinates"]={"display_length_in_m":1.}
         else: p["arrays"]["time_s"]=[0]
         yield kind,p
