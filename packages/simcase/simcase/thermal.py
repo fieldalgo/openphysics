@@ -524,7 +524,7 @@ class ThermalRunResult:
                 owned.write('fields.npz', lambda f: np.savez_compressed(f, **arrays))
             owned.write('summary.json', lambda f: f.write(encoded))
             owned.finish()
-        except (OSError, ValueError, RuntimeError):
+        except Exception:
             owned.cleanup()
             raise
         finally:
@@ -569,13 +569,29 @@ def run_thermal(doc, verbose=True):
                       heat_source=p['heat_source_w_m3'])
     fixed = np.array(sorted(prescribed), dtype=int)
     t_mesh = time.perf_counter()-t0
+    # Capture the calculation before entering the producer, not after it returns.
+    calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    calculation_nodes = np.array(mesh.nodes, copy=True)
+    calculation_triangles = np.array(mesh.triangles, copy=True)
+    calculation_prescribed = dict(prescribed)
     t0 = time.perf_counter()
     try:
         solution = solve_steady_heat(mesh, **kwargs)
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
+    if (json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False) != calculation_json
+            or not np.array_equal(mesh.nodes, calculation_nodes)
+            or not np.array_equal(mesh.triangles, calculation_triangles)
+            or prescribed != calculation_prescribed):
+        raise ValueError('thermal calculation inputs changed during the solve')
     if boundary_enabled:
+        for attr in ('prescribed_outward_load', 'ambient_load',
+                     'convective_outward', 'system_rhs'):
+            array = np.asarray(getattr(solution, attr, None))
+            if (array.shape != (mesh.num_nodes,) or array.dtype.kind not in 'iuf'
+                    or not np.isfinite(array).all()):
+                raise ValueError(f'thermal boundary result {attr}: expected finite real (N,) data')
         # These are returned physical terms, not an absolute-temperature reassembly.
         G = solution.prescribed_outward_load
         C = solution.convective_outward
@@ -613,6 +629,8 @@ def run_thermal(doc, verbose=True):
            f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
     if verbose:
         print('\n'.join(log))
-    return ThermalRunResult(doc, mesh, solution, fixed, np.array(list(prescribed.values())), diagnostics,
-                            {'mesh': t_mesh, 'solve': t_solve}, log)
+    result = ThermalRunResult(doc, mesh, solution, fixed, np.array(list(prescribed.values())), diagnostics,
+                              {'mesh': t_mesh, 'solve': t_solve}, log)
+    result.summary()  # Validate complete output even without saving raw fields.
+    return result
 
