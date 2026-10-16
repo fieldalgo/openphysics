@@ -47,6 +47,8 @@ jobs:
       - name: Check steady boundary contract before transient and full acceptance
         run: |
           python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
+            packages/simcase/tests/test_thermal.py \
+            packages/simcase/tests/test_thermal_simcase_independent_validation.py \
             packages/simcase/tests/test_steady_boundary_contract.py \
             packages/simcase/tests/test_steady_boundary_independent_validation.py \
             packages/simcase/tests/test_steady_boundary_schema.py \

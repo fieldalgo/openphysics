@@ -470,6 +470,13 @@ fails the job and leaves later stages unexecuted. Successful preflights do not
 replace the whole suite. Required completion checks and main run preservation
 remain unchanged.
 
+The steady preflight also runs the legacy `test_thermal.py` and
+`test_thermal_simcase_independent_validation.py` consumers. Save tests configure
+names and `save_fields` before solving: editing a completed result's document
+invalidates its captured calculation. Concurrent-writer tests retain their
+single-winner and complete-artifact checks; nonfinite-metadata tests must fail
+for nonfinite data, not an unrelated document edit.
+
 The original independent oracle/cases/consumer are extracted from the verified
 simcase sdist and run outside the checkout using `python -I`,
 `--expected-installed-root` and `--expected-module-hashes`. The original contract, schema, runtime,
