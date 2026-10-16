@@ -279,3 +279,30 @@ def test_ingress_shared_cross_route_and_cancel_release(monkeypatch):
         with pytest.raises(asyncio.CancelledError): await first
         assert jobs.ingress._token is None
     asyncio.run(exercise())
+
+
+def test_transient_combined_raw_preflight_rejects_before_public_run(http_client, monkeypatch):
+    def forbidden(*args, **kwargs): raise AssertionError("resource refusal reached solver")
+    monkeypatch.setattr(server, "run", forbidden)
+    data = transient_model()
+    data["mesh"]["subdivisions"] = [100, 100]
+    data["study"]["time_s"] = list(range(128))
+    response = http_client.post("/api/thermal/transient/run", json=request_body(data))
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "history_limit_exceeded"
+    assert not server._thermal_jobs._records
+    assert server._thermal_jobs.ingress._token is None
+
+
+def test_public_page_limit_and_final_scalar_frame(http_client):
+    identity = accepted_job(http_client)
+    base = "/api/jobs/"+identity["job"]
+    params = {"result_id": identity["result_id"], "field": "quadratic_functional_jk_per_m",
+              "time_index": 1, "frame_seq": 9}
+    frame = http_client.get(base+"/frame", params=params)
+    assert frame.status_code == 200
+    assert frame.json()["shape"] == []
+    assert isinstance(frame.json()["arrays"][params["field"]], float)
+    page = http_client.get(base+"/history", params={"result_id": identity["result_id"],
+        "field": "heat_content_j_per_m", "start": 0, "stop": 17, "frame_seq": 10})
+    assert page.status_code == 422
