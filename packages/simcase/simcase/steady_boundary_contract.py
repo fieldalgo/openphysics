@@ -150,6 +150,16 @@ def steady_boundary_inputs(doc, mesh):
     existing engine, with no new solver or assembly.
     """
     bounds, side_bc, k, q, flux, convection, _ = _validated(doc)
+    lower = np.array([bounds["xmin"], bounds["ymin"]])
+    upper = np.array([bounds["xmax"], bounds["ymax"]])
+    extent = upper-lower
+    tol = 64*np.finfo(float).eps*np.maximum(np.maximum(abs(lower), abs(upper)), extent)
+    # Finite endpoints alone do not guarantee distinguishable opposite sides.
+    # Keep the existing roundoff budget, but reject before it can span both
+    # sides. Never silently enlarge/shrink that budget to accept ambiguous data.
+    if np.any(tol >= extent/2):
+        raise DocumentError("mesh: insufficient coordinate precision to distinguish "
+                            "opposite rectangle sides; use a smaller coordinate origin")
     from galerkin.thermal import _mesh_geometry
     try:
         p, t, area, _, count, _ = _mesh_geometry(mesh)
@@ -157,9 +167,6 @@ def steady_boundary_inputs(doc, mesh):
         raise DocumentError(f"mesh: {exc}") from exc
     if count != 1:
         raise DocumentError("mesh: rectangle must be connected")
-    lower = np.array([bounds["xmin"], bounds["ymin"]])
-    upper = np.array([bounds["xmax"], bounds["ymax"]])
-    tol = 64*np.finfo(float).eps*np.maximum(np.maximum(abs(lower), abs(upper)), upper-lower)
     if np.any(p < lower-tol) or np.any(p > upper+tol):
         raise DocumentError("mesh.nodes: outside declared SI rectangle")
     axes = {"left": (0, lower[0]), "right": (0, upper[0]),
@@ -173,6 +180,9 @@ def steady_boundary_inputs(doc, mesh):
     expected_edges = {tag: {edge for edge in exterior
                             if np.all(abs(p[list(edge), axis]-value) <= tol[axis])}
                       for tag, (axis, value) in axes.items()}
+    if (expected_edges["left"] & expected_edges["right"]
+            or expected_edges["bottom"] & expected_edges["top"]):
+        raise DocumentError("mesh: ambiguous opposite-side edge classification")
     if (set().union(*expected_edges.values()) != exterior
             or any(not edges for edges in expected_edges.values())
             or not np.isclose(area.sum(), np.prod(upper-lower), rtol=1e-12, atol=0)):

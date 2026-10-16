@@ -281,3 +281,50 @@ def test_invalid_mesh_does_not_change_document():
         with pytest.raises(DocumentError, match="mesh"):
             steady_boundary_inputs(d, bad)
     assert d.data == before
+
+
+@pytest.mark.parametrize("origin", [1e9, 1e15])
+@pytest.mark.parametrize("tag", ["normal", "wrong_side", "all_exterior"])
+def test_large_origin_side_precision_and_tampered_robin_tag(origin, tag):
+    d = document()
+    p = physics(d)
+    p["dirichlet_temperature_k"] = {}
+    p["outward_flux_w_m2"] = {}
+    d.data["geometry"]["domain"] = {
+        "xmin": origin, "xmax": origin+1.,
+        "ymin": origin, "ymax": origin+1.,
+    }
+    mesh = rectangle_mesh(1., 1., 2, 2)
+    mesh.nodes += origin
+    if tag == "wrong_side":
+        mesh.boundary_edges["right"] = mesh.boundary_edges["left"].copy()
+    elif tag == "all_exterior":
+        mesh.boundary_edges["right"] = np.vstack(
+            [mesh.boundary_edges[side] for side in ("left", "right", "bottom", "top")])
+    before = copy.deepcopy(d.data)
+    validate_steady_boundary(d)  # Finite JSON bounds alone are not a mesh precision guarantee.
+    if origin == 1e15:
+        # Even correct tags must fail clearly when the unchanged 64-eps
+        # coordinate budget can cover opposite sides. No wrong tag is accepted.
+        with pytest.raises(DocumentError, match="insufficient coordinate precision"):
+            steady_boundary_inputs(d, mesh)
+    elif tag != "normal":
+        with pytest.raises(DocumentError, match="complete SI side"):
+            steady_boundary_inputs(d, mesh)
+    else:
+        kw = steady_boundary_inputs(d, mesh)
+        assert kw["dirichlet"] == {}
+        assert kw["convection"] == {"right": (4., 290.)}
+    assert d.data == before
+
+
+def test_large_origin_wrong_dirichlet_node_side_is_rejected():
+    d = document()
+    d.data["geometry"]["domain"] = {
+        "xmin": 1e9, "xmax": 1e9+1., "ymin": 1e9, "ymax": 1e9+1.,
+    }
+    mesh = rectangle_mesh(1., 1., 2, 2)
+    mesh.nodes += 1e9
+    mesh.boundary["left"] = mesh.boundary["right"].copy()
+    with pytest.raises(DocumentError, match="complete unique SI side"):
+        steady_boundary_inputs(d, mesh)
