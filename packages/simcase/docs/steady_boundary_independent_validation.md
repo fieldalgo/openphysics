@@ -139,3 +139,46 @@ does not implement item assignment; mutation now uses doc.data["name"] and
 result.doc.data["name"]. The original expectation and all gates are unchanged.
 No numerical reproduction, source/installed pass or CLI execution is claimed.
 Actual combined-candidate CI and original diagnostic arrays are still required.
+
+## Supplemental direct-path measurements
+
+A separate source composition using schema4bd15626fe37c306eb6265f1db1b308c6b580460,
+runtime56238cd76ab09e422344ef54e89d68f5a1aa579e and the unchanged historical
+independent Robin oracle was exercised in Python3.12.14/NumPy2.3.5/SciPy1.17.0.
+It used actual Document.from_dict and direct run_thermal while bypassing package
+root initializers. This is neither the official new Elements/eleven-case suite
+nor public root-runner/CLI/installed acceptance.
+
+Ten logical groups covered linear n2, constant Robin-only empty D, legacy versus
+explicit-empty v2, mm/um saves and quadratic meshes8/16/32/64. An initial run
+completed all ten solves, then failed reporting a NumPy boolean to JSON (exit1).
+Only serialization was repaired; the final ten-group run exited0 with empty
+stderr in3.050654208999731s. Including an earlier probe there were21 solve
+invocations, not21 independent tests.
+
+C audited the original archive, all14 source SHA256/Git blob identities and
+eight saved artifact hashes, then independently decoded numeric NPZ arrays and
+reintegrated them without running a new solve. Direct raw signs give linear
+G=2,C=12,R=14 W/m, hence right outward14, left thermostat outward-14 and
+total approximately0. Every quadratic raw source sum is60 W/m; the finest
+total outward differs by about1.04e-11 W/m. Componentwise rhs=fQ+B-G agrees.
+
+Reported last-two orders are T1.9988550488612653/1.999656433643703 and
+flux.9994821862440284/.9998446426372463. Separate raw-array quadrature gives
+T1.9988550488799535/1.9996564337200657 and
+flux.9994821862440356/.9998446426372037. Both satisfy fixed1.8/.9.
+Reported Gauss8/10 maximumrelative8.650446906980553e-11 and independent
+reintegration1.3590626820738625e-11 both satisfy <.01.
+Finest dimensional domain flux L2 is .3314417618241207;
+exact analytic flux norm35.166282766624136 gives relative
+.009424987111196404 (<.02). This is domain relative L2, not a boundary-gradient
+measurement. Supplemental normalized diagnostic5.6282662146672146e-14
+uses its disclosed constituent-sum scale and does not replace official gates.
+
+These data support only the ten direct-path groups. Their origin is0 rather
+than this suite's (.1,.2)m, linear/units use n2 rather than n8 and Robin-only
+is constant rather than the additional nonzero-source/h0 families.
+Snapshot checks cover caller-name isolation and result-name refusal, not all
+value mutations. No new wrong-actor, fields=false, CLI, public runner, isolated
+installed or platform acceptance follows. The exact integrated candidate
+still requires its own original suite and CI. No gate was changed.
