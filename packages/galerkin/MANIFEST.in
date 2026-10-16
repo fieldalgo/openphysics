@@ -75,3 +75,9 @@ include tests/transient_heat_independent_consumer.py
 include tests/test_transient_heat_tiny_domain.py
 include tests/test_transient_heat_general_state.py
 include galerkin/thermal.py
+include galerkin/transient_thermal_mechanical.py
+include docs/transient_thermal_mechanical.md
+include docs/locales/ko/pages/transient_thermal_mechanical.md
+include examples/transient_thermal_mechanical.py
+include tests/test_transient_thermal_mechanical.py
+include tests/test_transient_thermal_mechanical_physics.py

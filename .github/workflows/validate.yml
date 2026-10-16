@@ -75,6 +75,11 @@ jobs:
             packages/simcase/tests/test_studio_steady_thermal_http.py \
             packages/simcase/tests/test_studio_thermal_acceptance.py \
             packages/simcase/tests/test_studio_thermal_lifecycle.py
+      - name: Check transient thermomechanical contract and separated convergence
+        run: |
+          python -m pytest -q --capture=tee-sys -o junit_logging=all --junitxml=.validation/transient-thermomechanical.xml \
+            packages/galerkin/tests/test_transient_thermal_mechanical.py \
+            packages/galerkin/tests/test_transient_thermal_mechanical_physics.py
       - name: Run all Python tests including RII and convergence studies
         id: source_tests
         env:
