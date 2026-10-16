@@ -369,3 +369,32 @@ def test_near_side_interior_node_cannot_become_dirichlet_by_coordinate_mask():
     mesh.boundary["left"] = np.flatnonzero(mesh.nodes[:, 0] <= origin+.125)
     with pytest.raises(DocumentError, match="ambiguous rectangle side edge classification"):
         steady_boundary_inputs(d, mesh)
+
+
+@pytest.mark.parametrize("include_interior", [False, True])
+def test_dirichlet_identity_uses_exterior_endpoints_not_nearby_interior(include_interior):
+    # Fixture geometry validity is intentionally checked by the real helper;
+    # this direct branch coverage must not mock or bypass _mesh_geometry.
+    d = document()
+    origin = 1e12
+    d.data["geometry"]["domain"] = {
+        "xmin": origin, "xmax": origin+1.,
+        "ymin": origin, "ymax": origin+1.,
+    }
+    mesh = rectangle_mesh(1., 1., 2, 2)
+    exterior_nodes = np.unique(np.concatenate(list(mesh.boundary.values())))
+    interior = np.setdiff1d(np.arange(mesh.num_nodes), exterior_nodes)
+    assert len(interior) == 1
+    center = int(interior[0])
+    mesh.nodes[center] = [.0078125, .5]
+    mesh.nodes += origin
+    normal_left = mesh.boundary["left"].copy()
+    assert len(normal_left) == 3 and center not in normal_left
+    if include_interior:
+        mesh.boundary["left"] = np.append(normal_left, center)
+        with pytest.raises(DocumentError, match="complete unique SI side"):
+            steady_boundary_inputs(d, mesh)
+    else:
+        kw = steady_boundary_inputs(d, mesh)
+        assert list(kw["dirichlet"]) == sorted(map(int, normal_left))
+        assert center not in kw["dirichlet"]
