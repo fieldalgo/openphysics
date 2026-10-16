@@ -78,7 +78,11 @@ def test_studio_thermal_capabilities_and_original_generic_refusal(client):
     assert heat["run_enabled"] is True
     assert heat["mesh_preview"] is False and heat["mesh_from_result"] is True
     assert heat["time_navigation"] is False
-    assert cap["thermal.transient2d"]["supported"] is False
+    transient = cap["thermal.transient2d"]
+    assert transient["supported"] is True
+    assert transient["validate"] == "/api/thermal/transient/validate"
+    assert transient["run"] == "/api/thermal/transient/run"
+    assert transient["time_navigation"] is True
     data=model()
     response=client.post("/api/thermal/validate",json=envelope(data))
     assert response.status_code==200 and response.json()["ok"] is True,response.text
