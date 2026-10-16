@@ -17,6 +17,8 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
+      # Share runner capacity with Wavebit while retaining all three platform checks.
+      max-parallel: 1
       matrix:
         os: [ubuntu-24.04, macos-14, windows-2022]
     runs-on: ${{ matrix.os }}
