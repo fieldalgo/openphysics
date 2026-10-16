@@ -535,3 +535,31 @@ candidate-unmeasured 자원 정책과 별개입니다. 고정 workload와 공유
 기존 always-upload 단계가 partial 보고도 보존합니다. 설정된 명령은 exact 실행의
 완료 근거가 아니므로 실제 CI exit·count·artifact를 보고해야 합니다. 브라우저,
 수치 독립 수용, source 자원 관측, Windows는 별도 수용 범위입니다.
+
+
+## 과도 Studio 배포 및 수치 원자료
+
+과도 Studio preflight는 게시된 producer HTTP·독립수용·수명 시험을 전체 source
+앞에서 실행합니다. preflight 실패는 job 실패이며, 실행되지 않은 후속 단계를
+수용 근거로 취급하지 않습니다. 독립 fixture와 기존 headless cases/oracle은
+byte 검산한 simcase sdist에서 격리 설치 pytest 전에 추출합니다. SHA256은
+`dist/transient-studio-consumer-assets.json`에 보존합니다. shipped 과도 CJS는
+기존 source Node 스크립트들과 실행하고, byte 검산한 설치 static을 대상으로
+steady CJS와 함께 실행합니다. Node fixture는 물리·설치 Python·실제 브라우저
+수용을 대신하지 않습니다.
+
+시험이 출력한 성공 수치 진단 JSON도 실패 출력뿐 아니라 실제로 남겨야 합니다.
+과도 preflight와 기존 설치 pytest 호출 모두 다음 옵션을 사용하며, 같은 시험을
+두 번 실행하지 않습니다.
+
+```text
+-o junit_logging=all -o junit_log_passing_tests=true
+```
+
+always-upload되는 `studio-transient-preflight.xml`과 `dist/wheel-tests.xml`은
+성공 testcase의 captured stdout을 `system-out`에 보존하며 해당하는 log/stderr도
+남깁니다. 원 XML과 hash를 보존하고 JSON 수치를 반올림하거나 허용치를 바꾸지
+않고 읽습니다. 실제 testcase·subtest·suite 보고 수를 구분하고 failure/error/skip
+요소를 검사합니다. 설정만으로 수치 case의 실행·통과를 주장하지 않습니다.
+전체 source·기존 installed·독립 all-suite/full-convergence·필수 플랫폼 gate는
+그대로 유지합니다.
