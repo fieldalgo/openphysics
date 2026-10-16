@@ -2,6 +2,10 @@
 
 [English original](../../../README.md)
 
+## 현재 checkout과 근거
+
+이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
 2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. 기존 Linux 패키지·좁은 Windows workflow는 push·pull request·수동 dispatch에서 사용할 수 있습니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
@@ -17,7 +21,7 @@ Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.
 [benchmark_vector.md](benchmark_vector.md)에 있습니다. 성능 측정은 수치 검사를
 보완하며 CI 시간 gate가 아닙니다.
 
-Python 3.12 가상환경을 활성화한 뒤 저장소 루트에서 실행합니다.
+Python 3.12 가상환경을 활성화한 뒤 저장소 루트에서 실행하는 POSIX 셸용 Linux 검증 명령입니다. 이 Linux 의존성이 이식 가능한 플랫폼 검증표를 뜻하지는 않습니다.
 
 ```bash
 python -m pip install -r ci/requirements-py312-linux.txt
@@ -26,8 +30,8 @@ python -m pip install --no-deps --no-build-isolation \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pip check
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
-python ci/fetch_rii.py /tmp/openphysics-rii
-export PHYSMAT_RII_PATH=/tmp/openphysics-rii/database
+python ci/fetch_rii.py .validation-rii
+export PHYSMAT_RII_PATH="$PWD/.validation-rii/database"
 gmsh --version
 python -m pytest -q -ra
 node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs
@@ -279,7 +283,7 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 ## 처방 온도 전체 표면하중의 배포 계약
 
-공개 전 traction snapshot의 필수 byte 목록은 이전79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개였습니다. 공개 준비에서 한국어 README 일곱 개를 docs 개요 EN/KO 열네 페이지로 바꿔99개가 됐으며 과도 후보에서15개를 추가합니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
+공개 전 traction snapshot의 필수 byte 목록은 이전79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개였습니다. 공개 준비에서 한국어 README 일곱 개를 docs 개요 EN/KO 열네 페이지로 바꿔99개가 됐으며 과도 구현에서15개를 추가합니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
 
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
@@ -291,11 +295,11 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 릴리스 전에 main의 필수 검사 성공을 확인합니다. 뒤 push가 main 실행을 취소하지
 않으며 기능 브랜치·PR 실행은 대체될 수 있습니다. 태그는 이 workflow를 실행하지
 않고 두 workflow 모두 패키지를 게시하지 않습니다.
-## 과도 열전도 후보 배포 검사
+## 과도 열전도 배포 검사
 
-이 기능 branch checkout에는 과도 열전도 후보가 있지만 전체 물리·독립·배포 수용은
-대기 중입니다. develop에 수용된 지원 기능이나 검증된 릴리스가 아닙니다.
-[후보 계약](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)과
+이 checkout에는 과도 열전도 구현과 검증 gate가 있습니다. 전체 물리·독립·배포
+수용에는 정확한 현재 CI 근거가 필요하며 구현만으로 검증된 릴리스가 되지 않습니다.
+[구현 계약](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)과
 [독립 보고](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md)는
 생산 담당의 소형 source70개 기록과 남은 gate를 구분합니다.
 
@@ -313,8 +317,21 @@ artifact곁에 `transient-module-origins.json`을 기록합니다.
 프로그램을 `python -I`로 실행합니다. `core`나 짧은 smoke로 이를 대체하지 않습니다.
 모든 단계는 순차이며 실패 뒤 단계는 미실행으로 두고 원 exit/log를 보존합니다.
 
-```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```python
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+root = Path.cwd()  # Run this script from the repository root.
+env = os.environ.copy()
+for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
+    env[name] = "1"
+output = Path(tempfile.mkdtemp(prefix="openphysics-transient-")) / "distributions"
+print("Validation output:", output)
+subprocess.run([sys.executable, "ci/check_distributions.py", "--output", str(output)], cwd=root, env=env, check=True)
 ```
 
 비어 있는 본인 출력경로와 문서의 검증 의존성을 사용합니다. 이는 재현명령이며 후보

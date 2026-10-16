@@ -2,6 +2,10 @@
 
 **English** | [한국어](locales/ko/pages/index.md)
 
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
 [Suite overview and installation](overview.md) · [한국어 overview](locales/ko/pages/overview.md)
 
 [Architecture and package map](architecture.md) · [한국어 구조도](locales/ko/pages/architecture.md)
@@ -94,9 +98,9 @@ See [bundled images, fixtures and data](assets.md) for source history and licens
 | [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
 | [Security](security.md) | [한국어](locales/ko/pages/security.md) |
 
-## Transient heat candidate: acceptance pending
+## Transient heat: implementation and acceptance evidence
 
-This feature-branch candidate contains the explicit `galerkin.transient_heat.solve_transient_heat` submodule implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
+The explicit `galerkin.transient_heat.solve_transient_heat` submodule implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
 
 | English | 한국어 |
 |---|---|
@@ -104,7 +108,7 @@ This feature-branch candidate contains the explicit `galerkin.transient_heat.sol
 | [transient_heat_validation](../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
 | [transient_heat_independent_validation](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
 
-Implementation and independent acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. These links describe the candidate checkout, not supported functionality accepted on develop or a validated release. The validation pages distinguish fixed gates from observed results.
+The historical b2 snapshot's 70 small producer/reference source passes are evidence for that snapshot. This checkout wires usage, producer-validation and independent-validation pages and distribution gates. Assess current full temporal/PDE, independent acceptance, build and installed validation from the exact CI run, exits and artifacts. Fixed gates and implemented checks are distinct from observed success or release approval.
 
 | English | 한국어 |
 |---|---|

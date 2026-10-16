@@ -2,7 +2,11 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat.md) · [Validation](transient_heat_validation.md)
 
-**Initial submission (d21): source and static review only.** Python parsing,
+## Current checkout and evidence
+
+This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+
+**Historical initial submission (d21): source and static review only.** Python parsing,
 imports, compilation and collection had not been executed at that submission.
 That historical status is retained; no earlier numerical pass is inferred.
 
@@ -26,10 +30,11 @@ The same Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1 source environment
 used BLAS/OMP/MKL1; no test count or tolerance was reduced. No solver fix or
 test rerun was needed. The d21 snapshot did not separately run test bodies.
 
-The fixed temporal/PDE spatial/5% separation gates, complete source regression,
-installed sdist/wheel proof, independent acceptance and platform tests remain
-unexecuted. These small controls are not complete physical acceptance.
-The commands below remain reproduction instructions for the pending stages.
+At that historical checkpoint, the fixed temporal/PDE spatial/5% separation gates,
+complete source regression, installed sdist/wheel proof, independent acceptance and
+platform tests were unexecuted. The 70 small controls are not complete physical
+acceptance. Use the exact current CI evidence to assess the present checkout;
+the commands below define reproduction, not a new pass result.
 
 ## Explicit submodule and minimal use
 
@@ -208,4 +213,4 @@ H(div)-conforming: its direct boundary normal integral is generally different
 from a finite-mesh weak thermostat reaction and must be reported separately.
 
 See the [validation guide](transient_heat_validation.md) for the fixed
-unexecuted gates, independent algebra/reference boundaries and reproduction.
+fixed gates, independent algebra/reference boundaries and reproduction.
