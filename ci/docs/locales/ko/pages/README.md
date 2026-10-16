@@ -235,10 +235,10 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 
 ## 배포본의 독립 수용
 
-한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
+docs/ 안의 패키지 개요 EN/KO 일곱 쌍과 수신한 한국어 안내는 필수 byte 자산입니다. 진입점 README는 영어로 유지합니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 92개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 114개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -279,7 +279,7 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 ## 처방 온도 전체 표면하중의 배포 계약
 
-필수 byte 목록은 기존79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개입니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
+공개 전 traction snapshot의 필수 byte 목록은 이전79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개였습니다. 공개 준비에서 한국어 README 일곱 개를 docs 개요 EN/KO 열네 페이지로 바꿔99개가 됐으며 과도 후보에서15개를 추가합니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
 
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
@@ -291,3 +291,35 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 릴리스 전에 main의 필수 검사 성공을 확인합니다. 뒤 push가 main 실행을 취소하지
 않으며 기능 브랜치·PR 실행은 대체될 수 있습니다. 태그는 이 workflow를 실행하지
 않고 두 workflow 모두 패키지를 게시하지 않습니다.
+## 과도 열전도 후보 배포 검사
+
+이 기능 branch checkout에는 과도 열전도 후보가 있지만 전체 물리·독립·배포 수용은
+대기 중입니다. develop에 수용된 지원 기능이나 검증된 릴리스가 아닙니다.
+[후보 계약](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)과
+[독립 보고](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md)는
+생산 담당의 소형 source70개 기록과 남은 gate를 구분합니다.
+
+필수 byte 목록114개는 공개 baseline99개와 과도15개입니다. EN/KO여섯 페이지,
+영어 수렴 예제, 새 runtime모듈 두 개, 원생산/참조시험과 독립
+oracle/cases/pytest-wrapper/consumer 네 파일을 포함합니다. 기존 metadata/license,
+archive링크·역사JSON·traction수용 검사는 유지합니다. 새 runtime두모듈은 wheelbyte도
+같아야 합니다. 격리 설치 preflight가 venvorigin·sourceSHA256을 확인하고
+artifact곁에 `transient-module-origins.json`을 기록합니다.
+
+기존 설치pytest파일은 바꾸지 않고 과도 원생산/참조시험 두 파일을 추가합니다.
+독립 발견wrapper는 source재현자산으로 보존하며 설치pytest에 중복복사하지 않습니다.
+대신 검증sdist에서 원standaloneconsumer·oracle/cases를 읽어 `--suite all`로 한 번
+실행하고 동결 PDE·companion·구적gate를 포함합니다. 이어 archive의 전체 영어 수렴
+프로그램을 `python -I`로 실행합니다. `core`나 짧은 smoke로 이를 대체하지 않습니다.
+모든 단계는 순차이며 실패 뒤 단계는 미실행으로 두고 원 exit/log를 보존합니다.
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```
+
+비어 있는 본인 출력경로와 문서의 검증 의존성을 사용합니다. 이는 재현명령이며 후보
+build나통과 근거가 아닙니다. pytestJUnit·독립unittest사례/subtest·archive프로그램
+결과·nativeprerequisite를 별도 보고합니다. 기존 traction541사례와 전용consumer4는
+baseline근거이며 새 과도 count가 아닙니다. standalonePython후보는 과도JSON/CLI/Studio,
+Robin/flux입력·저장·자동열–기계연결을 추가하지 않습니다. 수용 전에 CI와 cloud실험의
+정확source근거가 필요하며 Linux결과가 Windows지원을 입증하지 않습니다.

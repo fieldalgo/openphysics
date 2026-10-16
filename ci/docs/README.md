@@ -277,11 +277,11 @@ support. GitHub Actions is enabled; evaluate every candidate against its own run
 
 ## Packaged independent acceptance
 
-All seven Korean package READMEs and received Korean guide counterparts are
-required byte assets. The standalone outward-flux/Robin contract, example,
+All seven English/Korean package overviews under docs/ and received Korean guide
+counterparts are required byte assets. Entry-point READMEs remain English. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 92 entries.
+are likewise required. The current required-byte list contains 114 entries.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
@@ -331,7 +331,7 @@ check does not add schema/CLI/Studio support or certify thermodynamic coupling.
 
 ## Prescribed-temperature total-traction distribution contract
 
-The required byte inventory now contains92 entries: the existing79 plus13 exact traction implementation/reference/guide/example/producer/independent assets. Original independent reports and tests retain their historical counts and failures. The installed suite preserves389 prior cases and adds the original producer/reference/convergence files and independent90; report actual collected counts, failures and optional skips rather than treating planned totals as passing. The four standalone original `python -I` consumer checks run separately, as does the actual archived English example. No copied engine guard may scan an empty directory; source guard6 and installed origins/module bytes remain separate checks.
+At the pre-publication traction snapshot, the required byte inventory contained92 entries: the previous79 plus13 exact traction implementation/reference/guide/example/producer/independent assets. Publication then replaced seven Korean READMEs with fourteen docs overview pages, giving99 entries before the transient candidate's15 additions. Original independent reports and tests retain their historical counts and failures. The installed suite preserves389 prior cases and adds the original producer/reference/convergence files and independent90; report actual collected counts, failures and optional skips rather than treating planned totals as passing. The four standalone original `python -I` consumer checks run separately, as does the actual archived English example. No copied engine guard may scan an empty directory; source guard6 and installed origins/module bytes remain separate checks.
 
 The new Python API applies total physical `sigma*n` on the prescribed-temperature mechanical stage. There is no scalar-pressure keyword/local-frame/follower API; global Pa `-p*normal` callbacks on fixed reference geometry are valid. The one-way heat workflow and JSON/CLI/Studio remain unchanged. Producer reproduction commands use the repository root; extracted sdists have package-local `tests/` and `examples/` paths. Both original test files and required oracle/reference sources are shipped explicitly.
 
@@ -343,3 +343,43 @@ and `windows-py312-thermal`. Green PRs land via GitHub Rebase and merge;
 record the new main SHA and require green main checks before releasing.
 Main push runs are never cancelled by a newer push; branch/PR runs may be superseded.
 Tags do not trigger these workflows, and neither workflow publishes packages.
+## Transient heat candidate distribution checks
+
+This feature-branch checkout contains a transient heat candidate; its full
+physical, independent and distribution acceptance is pending. It is not an
+accepted develop capability or a validated release. The [candidate contract](../../packages/galerkin/docs/transient_heat.md)
+and [independent report](../../packages/galerkin/docs/transient_heat_independent_validation.md)
+separate the producer's recorded 70 small source tests from the remaining gates.
+
+The required byte list has 114 entries: the public baseline's 99 plus 15 transient
+assets. These cover six EN/KO pages, the English convergence example, both new
+runtime modules, original producer/reference tests and all four independent
+oracle/cases/pytest-wrapper/consumer files. Existing metadata/license, archive
+link, historical-JSON and traction acceptance checks remain intact.
+Both new runtime modules must also match wheel bytes. An isolated installed
+preflight verifies venv origins and source SHA256 and writes
+`transient-module-origins.json` alongside the artifacts.
+
+Existing installed pytest files remain unchanged; the two original transient
+producer/reference test files are added. The independent discovery wrapper is
+a source-reproduction asset and is not additionally copied into installed pytest.
+Instead, the original standalone consumer and its oracle/cases are read from the
+verified sdist and run once with `--suite all`, including the frozen PDE,
+companion and quadrature gates. The complete archived English convergence
+program then runs with `python -I`. Neither `core` nor a shortened smoke
+replaces these gates. Each stage runs sequentially; failure leaves later stages
+unexecuted and must retain the original exit/logs.
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```
+
+Use an empty owned output directory and the documented validation dependencies.
+This is a reproducibility command, not evidence that the candidate has built or
+passed. Report pytest JUnit, independent unittest cases/subtests, archive program
+results and native prerequisites separately. Existing 541-case traction history
+and its standalone consumer4 are baseline evidence, not new transient counts.
+This standalone Python candidate adds no transient JSON/CLI/Studio, Robin/flux
+input, persistence or automatic thermal-mechanical coupling. CI and any cloud
+experiments require exact-source evidence before acceptance; Linux results do not
+establish Windows support.
