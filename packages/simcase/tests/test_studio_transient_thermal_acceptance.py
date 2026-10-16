@@ -10,7 +10,8 @@ from simcase import Document, TransientThermalRunResult, run
 from simcase.studio import server
 from studio_transient_independent_fixtures import (
     DYNAMIC, FIELD_UNITS, FRAME, HISTORY, IDENTITY, KIND, STEP_FIELDS,
-    audit, envelope, frame_array, identity, manifest_arrays, metadata, model, numeric)
+    audit, envelope, frame_array, identity, manifest_arrays, metadata, model, numeric,
+    require_close)
 
 
 @pytest.fixture
@@ -250,3 +251,60 @@ def test_studio_transient_independent_malformed_producer_no_publication(client,m
     state = terminal(client,accepted)
     assert state["status"] == "error" and state["has_result"] is False,state
     assert client.get("/api/jobs/"+accepted["job"]+"/result").status_code == 409
+
+
+def test_studio_transient_independent_real_history_page_boundaries(client):
+    data = model("uniform_absolute")
+    data["study"]["time_s"] = [2+i/16 for i in range(17)]
+    accepted,manifest,a = finished(client,data,sequence=50)
+    for field in ("heat_content_j_per_m","quadratic_functional_jk_per_m"):
+        for start,stop in ((0,16),(16,17)):
+            response = history(client,accepted,field,start,stop,500+start)
+            assert response.status_code == 200,response.text
+            p = response.json()
+            identity(p,accepted)
+            assert p["payload_format"] == HISTORY
+            assert p["field"] == field and set(p["arrays"]) == {field}
+            assert type(p["start"]) is int and p["start"] == start
+            assert type(p["stop"]) is int and p["stop"] == stop
+            assert type(p["frame_seq"]) is int and p["frame_seq"] == 500+start
+            assert p["time_indices"] == list(range(start,stop))
+            assert all(type(i) is int for i in p["time_indices"])
+            times = np.asarray(data["study"]["time_s"][start:stop])
+            assert p["time_s"] == times.tolist()
+            assert p["shape"] == [stop-start] and type(p["shape"][0]) is int
+            assert p["unit"] == FIELD_UNITS[field] and p["location"] == "domain"
+            temperature = 300+2*times
+            expected = 8e-6*temperature if field=="heat_content_j_per_m" else 4e-6*temperature**2
+            actual = numeric(p["arrays"][field],[stop-start])
+            require_close(actual,expected,float(np.max(abs(expected))),field)
+    assert history(client,accepted,"heat_content_j_per_m",0,17,700).status_code == 422
+
+
+@pytest.mark.parametrize("fault",("heat_vs_quadratic","storage_zero","source_sign",
+                                  "temperature_origin","flux_sign","support_sign","initial_rate"))
+def test_studio_transient_independent_oracle_rejects_wrong_runtime_arrays(fault):
+    # Actual public run followed by deliberate corruption: not synthetic PDE success.
+    case = "affine" if fault=="flux_sign" else "all_fixed_support" if fault=="support_sign" else "uniform_absolute"
+    data = model(case)
+    result = run(Document.from_dict(copy.deepcopy(data)),False)
+    a = {name:np.array(getattr(result,name),copy=True) for name in FIELD_UNITS}
+    summary = result.summary()
+    audit(a,case,data,summary)
+    if fault=="heat_vs_quadratic":
+        a["heat_content_j_per_m"] = a["quadratic_functional_jk_per_m"].copy()
+    elif fault=="storage_zero":
+        a["storage_rate_w_per_m"] *= 0
+    elif fault=="source_sign":
+        a["source_load_w_per_m"] *= -1
+    elif fault=="temperature_origin":
+        a["temperature_k"] -= 4
+    elif fault=="flux_sign":
+        a["heat_flux_w_m2"] *= -1
+    elif fault=="support_sign":
+        a["reaction_w_per_m"] *= -1
+    else:
+        x = a["storage_rate_w_per_m"]
+        a["storage_rate_w_per_m"] = np.concatenate((np.zeros_like(x[:1]),x))
+    with pytest.raises(AssertionError):
+        audit(a,case,data,summary)
