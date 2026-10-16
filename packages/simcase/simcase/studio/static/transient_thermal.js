@@ -70,6 +70,8 @@
   }
   function manifest(raw,expected,limits) {
     const x=copy(raw);typed(x,'studio-thermal-transient-v1');matches(x,expected);
+    if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
+      'display_length_in_m','payload_format','default_frame_index','time_s','arrays','summary','fields','frame_url','history_url']))fail('manifest fields');
     if(!keys(x.arrays,['nodes_m','triangles','dirichlet_node_ids'])||!Array.isArray(x.time_s))fail('static arrays/time catalog');
     const times=x.time_s,nt=times.length,n=x.arrays.nodes_m?.length,m=x.arrays.triangles?.length,d=x.arrays.dirichlet_node_ids?.length;
     if(!integer(n)||n<3||n>limits.max_nodes||!integer(m)||m<1||m>limits.max_triangles||!integer(d)||d>n
@@ -110,6 +112,8 @@
   }
   function frame(raw,man,q) {
     const x=copy(raw);typed(x,'studio-thermal-transient-frame-v1');matches(x,man);
+    if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
+      'display_length_in_m','payload_format','frame_seq','field','time_index','time_s','unit','location','shape','arrays']))fail('frame fields');
     const desc=man.fields[q.field];
     if(!['temperature_k','heat_flux_w_m2'].includes(q.field)||!integer(q.time_index)||q.time_index>=man.time_s.length
         ||!integer(q.frame_seq)||x.frame_seq!==q.frame_seq||x.field!==q.field||x.time_index!==q.time_index
@@ -120,6 +124,8 @@
   }
   function history(raw,man,q) {
     const x=copy(raw);typed(x,'studio-thermal-transient-history-v1');matches(x,man);
+    if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
+      'display_length_in_m','payload_format','frame_seq','field','start','stop','time_indices','time_s','unit','location','shape','arrays']))fail('history fields');
     if(!['heat_content_j_per_m','quadratic_functional_jk_per_m'].includes(q.field)
         ||!integer(q.start)||!integer(q.stop)||q.stop<=q.start||q.stop>man.time_s.length||q.stop-q.start>16
         ||!integer(q.frame_seq))fail('history query');
@@ -232,3 +238,4 @@
   }
   return {TYPE,RESULT,LAYOUT,UI,SPEC,copy,capability,template,queryURL,manifest,frame,history,model,meshModel,createController};
 });
+
