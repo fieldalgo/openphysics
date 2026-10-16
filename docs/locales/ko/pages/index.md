@@ -4,7 +4,7 @@
 
 ## 현재 checkout과 근거
 
-이 페이지는 현재 checkout의 구현과 재현 계약을 설명합니다. 아래 d21/b2/e79의 과거 관측은 명시한 snapshot에만 적용됩니다. 현재 checkout의 source·독립 수치·배포·설치 gate는 정확한 CI 실행·명령 종료값·artifact로 확인해야 하며, 여기서는 전체 CI 성공을 주장하지 않습니다. GitHub Actions는 활성화돼 있습니다. 모든 변경은 main 대상 PR과 필수 검사를 거쳐 GitHub Rebase and merge로 반영하며, 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.
+이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
 [도구 개요·설치 안내](overview.md) · [영어 개요](../../../overview.md)
 
@@ -102,7 +102,7 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 
 ## 과도 열전도: 구현과 수용 근거
 
-명시적 `galerkin.transient_heat.solve_transient_heat` 하위 모듈은 고정 P1 삼각형, 일관 질량과 후진 Euler를 사용하며 상수 등방 열전도율·열용량, 시간변 Dirichlet 값과 단열을 지원합니다. 유한 Kelvin 입력은 물리적 유효성이나 최대 원리를 인증하지 않습니다. JSON/CLI/Studio, 저장 또는 자동 열→기계 연결은 추가하지 않습니다.
+명시적 `galerkin.transient_heat.solve_transient_heat` 함수는 고정 P1 삼각형, 일관 질량과 후진 Euler를 사용하며 상수 등방 열전도율·열용량, 시간변 Dirichlet 값과 단열을 지원합니다. 유한 Kelvin 입력은 물리적 유효성이나 최대 원리를 인증하지 않습니다. JSON/CLI/Studio, 저장 또는 자동 열→기계 연결은 추가하지 않습니다.
 
 | English | 한국어 |
 |---|---|

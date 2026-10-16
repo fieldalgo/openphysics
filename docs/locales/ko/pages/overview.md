@@ -17,13 +17,15 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](../../../../packages/simcase/docs/locales/ko/pages/overview.md), [벡터 신뢰성](../../../../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
 | 3D 공동 | Python API 또는 단일 JSON study를 통한 진공 직육면체 PEC 공동 고유모드 | [공동 API](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md), [JSON 계약](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
 | 열전도 | 정상·상수·등방 2D 열전도, 독립 API의 Dirichlet·처방 열유속·Robin 경계, 별도의 직사각형 헤드리스 JSON 경로 | [열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
+| 과도 열전도 | 고정 P1 메시의 독립 2D Python API, 일관 질량과 후진 Euler, 상수 등방 물성, 시간변 Dirichlet 값과 단열 경계 | [과도 열전도](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md), [검증](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
 | 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](../../../../packages/galerkin/docs/locales/ko/pages/elasticity2d.md), [표면하중](../../../../packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
 | 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md), [전체 표면하중](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md), [workflow](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
 
 JSON 실행기는 무손실 `em.modes2d`, `em.cavity3d`와 문서에 명시한
 `thermal.steady2d` 범위를 지원합니다. Python 전용 기능이 JSON이나 Studio에도
 자동으로 제공되는 것은 아닙니다. Studio는 2D 광학 모델을 지원하고 3D 모델을
-거절하며, 열전도 폼·그래프는 없습니다. 과도 열전도, 비선형 역학, 형상 sweep,
+거절하며, 열전도 폼·그래프는 없습니다. 과도 열전도는 Python 전용이며 과도 JSON,
+저장, flux/Robin 입력이나 자동 연성을 제공하지 않습니다. 비선형 역학, 형상 sweep,
 손실 모드 문서 해석과 열역학적 완전 피드백 연성은 현재 통합 범위에 포함하지 않습니다.
 정상 열전도→기계 workflow는 별도 Robin·열유속·표면하중 확장을 아직 받지 않습니다.
 

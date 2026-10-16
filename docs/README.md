@@ -4,7 +4,7 @@
 
 ## Current checkout and evidence
 
-This page describes the implementation and reproduction contract in this checkout. Historical d21/b2/e79 observations below apply only to their named snapshots. The current checkout's source, independent numerical, distribution and installed gates require the exact CI run, command exits and artifacts; no full-CI success is asserted here. GitHub Actions is enabled. All changes use a main-targeted PR and the required checks before GitHub Rebase and merge; release additionally requires green checks on the resulting main commit.
+This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
 [Suite overview and installation](overview.md) · [한국어 overview](locales/ko/pages/overview.md)
 
@@ -100,7 +100,7 @@ See [bundled images, fixtures and data](assets.md) for source history and licens
 
 ## Transient heat: implementation and acceptance evidence
 
-The explicit `galerkin.transient_heat.solve_transient_heat` submodule implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
+The explicit `galerkin.transient_heat.solve_transient_heat` function implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
 
 | English | 한국어 |
 |---|---|
