@@ -99,3 +99,8 @@ counts, and fails if any test is skipped.
 Source/isolated-installed, exact CI, Windows/macOS, whole regression, source
 archive inclusion and main integration are all unverified for this new scope.
 The release coordinator owns archive/CI integration and full regression scheduling.
+
+The prepared suite now declares eleven test methods (not collected passes). It also
+includes omitted reference-offset, fixed-corner-load removal, thermostat-only
+total-outward, and saved format/layout/unit/object/nonfinite actors. Source review
+alone has not executed any of these controls.
