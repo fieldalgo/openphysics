@@ -292,3 +292,31 @@ def test_public_cli_solver_and_save_errors_exit_one(tmp_path, monkeypatch, stage
     out = tmp_path/'failed'
     assert main(['run', str(path), '-q', '-o', str(out)]) == 1
     assert not out.exists()
+
+
+@pytest.mark.parametrize('unit,factor', [('mm', 1000.), ('um', 1e6)])
+@pytest.mark.parametrize('legacy', [False, True])
+def test_result_scale_is_ready_at_return_and_caller_is_preserved(unit, factor, legacy):
+    data = model(legacy=legacy)
+    data['units']['length'] = unit
+    data['geometry']['domain'] = {k: v*factor for k, v in data['geometry']['domain'].items()}
+    doc = Document.from_dict(data)
+    before = json.loads(json.dumps(doc.data))
+    caller_scale = doc.scale.to_si(1., {'length': 1})
+    result = run(doc, False)
+    # Check before explicitly calling result.summary() or result.save().
+    assert result.doc.scale.to_si(1., {'length': 1}) == caller_scale == 1./factor
+    assert result.doc.data == before
+    assert doc.data == before
+    assert doc.scale.to_si(1., {'length': 1}) == caller_scale
+
+
+def test_removed_default_is_detected_before_validation_can_restore_it(tmp_path):
+    result = run(Document.from_dict(model()), False)
+    del result.doc.sole_physics()[1]['heat_source_w_m3']
+    with pytest.raises(ValueError, match='document changed'):
+        result.summary()
+    assert 'heat_source_w_m3' not in result.doc.sole_physics()[1]
+    with pytest.raises(ValueError, match='document changed'):
+        result.save(tmp_path/'removed')
+    assert not (tmp_path/'removed').exists()
