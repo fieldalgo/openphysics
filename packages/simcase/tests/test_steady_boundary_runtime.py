@@ -209,9 +209,7 @@ def test_existing_output_is_preserved(tmp_path, target):
     out = tmp_path/'existing'
     if target == 'file': out.write_bytes(b'keep')
     elif target == 'dangling':
-        try: out.symlink_to(tmp_path/'missing', target_is_directory=True)
-        except (OSError, NotImplementedError) as exc:
-            pytest.skip(f'filesystem cannot create the prerequisite symlink: {exc}')
+        out.symlink_to(tmp_path/'missing', target_is_directory=True)
     else:
         out.mkdir()
         if target == 'nonempty': (out/'foreign').write_bytes(b'keep')
@@ -276,3 +274,21 @@ def test_public_cli_exit_and_fresh_preflight(tmp_path, capsys):
     path.write_text(json.dumps(invalid), encoding='utf-8')
     assert main(['run', str(path), '-o', str(tmp_path/'invalid')]) == 2
     assert not (tmp_path/'invalid').exists()
+
+
+@pytest.mark.parametrize('stage', ['solver', 'save'])
+def test_public_cli_solver_and_save_errors_exit_one(tmp_path, monkeypatch, stage):
+    path = tmp_path/'model.json'
+    path.write_text(json.dumps(model()), encoding='utf-8')
+    if stage == 'solver':
+        import galerkin.thermal as engine
+        def broken(*args, **kwargs):
+            raise ValueError('injected solver failure')
+        monkeypatch.setattr(engine, 'solve_steady_heat', broken)
+    else:
+        def broken(*args, **kwargs):
+            raise OSError('injected save failure')
+        monkeypatch.setattr(np, 'savez_compressed', broken)
+    out = tmp_path/'failed'
+    assert main(['run', str(path), '-q', '-o', str(out)]) == 1
+    assert not out.exists()
