@@ -65,8 +65,8 @@ is required. GitHub replays the commits onto current main with new commit IDs;
 record the landed main SHA. Only conflicting PRs require manual rebasing and
 another validation run. There is no merge queue or pre-landing rerun of the
 combined state. Main push runs validate that state and must not be cancelled by
-later pushes; branch/PR runs may be superseded. If main fails, fix forward that
-day, or submit a revert PR if a fix cannot be completed within one hour.
+later pushes; branch/PR runs may be superseded. Investigate failed main validation
+and fix or revert through a PR before releasing that state.
 Merged feature branches are deleted automatically; preserve any remaining work
 on a separate branch before merging.
 
@@ -79,3 +79,16 @@ PyPI/documentation publication is not configured in this repository; release
 credentials and publication gates require separate setup. Create
 `maintenance/X.Y.x` from a released tag only when that release needs a patch,
 and carry reviewed fixes from main.
+
+## Repository structure and agent entry points
+
+The six implementation packages retain separate distribution names, metadata,
+licenses and notices. Third-party integrations belong in a separate package with
+an explicit API and documented external dependencies, following `gmshio`.
+Run Python from the repository root, not inside `packages/`: package directory
+names can shadow installed imports and produce empty namespace packages.
+
+This guide and the implementation/validation documents hold the shared contributor
+contract. `AGENTS.md` contains short navigation, essential commands and technical
+pitfalls; `CLAUDE.md` imports it. Keep personal preferences, account settings, private
+paths, session coordination and operational history outside the public repository.
