@@ -128,6 +128,12 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
  'simcase': (
+              'tests/test_steady_boundary_schema.py',
+              'tests/test_steady_boundary_runtime.py',
+              'examples/thermal_boundary.json',
+              'tests/test_steady_boundary_platform.py',
+              'tests/test_studio_steady_boundary.py',
+              'tests/studio_steady_boundary.cjs',
               'docs/thermal_steady_boundary2d.md',
               'docs/locales/ko/pages/thermal_steady_boundary2d.md',
               'docs/steady_boundary_independent_validation.md',
@@ -343,7 +349,9 @@ def main():
         # Run original headless contract/runtime/Studio/save tests from the verified sdist.
         simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
         with tarfile.open(simcase_sdist) as archive:
-            for filename in ("test_steady_boundary_contract.py",
+            for filename in ("test_steady_boundary_schema.py", "test_steady_boundary_runtime.py",
+                             "test_steady_boundary_platform.py", "test_studio_steady_boundary.py",
+                             "test_steady_boundary_contract.py",
                              "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
                              "test_studio_transient.py", "test_transient_headless_windows.py"):
                 member = next(p for p in archive.getmembers()
@@ -441,6 +449,15 @@ def main():
         run(python, "-I", steady_acceptance / "steady_boundary_independent_consumer.py",
             "--expected-installed-root", env_root,
             "--expected-module-hashes", hash_manifest, cwd=work, env=env)
+        # Consume the exact shipped steady boundary JSON through the installed CLI.
+        with tarfile.open(simcase_sdist) as archive:
+            member = next(p for p in archive.getmembers()
+                          if p.isfile() and p.name.split("/", 1)[-1] == "examples/thermal_boundary.json")
+            boundary_document = examples / "thermal_boundary.json"
+            boundary_document.write_bytes(archive.extractfile(member).read())
+        run(python, "-I", "-m", "simcase", "validate", boundary_document, cwd=work, env=env)
+        run(python, "-I", "-m", "simcase", "run", boundary_document, "-q",
+            "-o", work / "steady-boundary-example", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")
 
 

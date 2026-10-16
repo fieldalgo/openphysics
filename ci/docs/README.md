@@ -460,20 +460,20 @@ The published boundary helper and its original test, the English/Korean usage
 and independent-report pages, and all four original independent acceptance files
 are required byte assets. The existing steady engine module is additionally
 required and checked in wheel bytes because the independent installed consumer
-requires its exact identity. The current inventory is 147 assets: the retained
-P1 136, two boundary contract assets, eight published documentation/acceptance
-assets and one steady engine source. Counts describe configuration, not passes.
+requires its exact identity. The current inventory is 153 assets: the retained
+P1 136, two boundary contract assets, eight documentation/acceptance assets,
+one steady engine source and six schema/runtime/example/platform assets. Counts describe configuration, not passes.
 
-A separate steady boundary preflight runs the original contract and independent
-source entry points before the unchanged P1 preflight and whole suite. Failure
+A separate steady boundary preflight runs the original contract, schema, runtime,
+independent, save/platform and Studio source entry points before the unchanged P1 preflight and whole suite. Failure
 fails the job and leaves later stages unexecuted. Successful preflights do not
 replace the whole suite. Required completion checks and main run preservation
 remain unchanged.
 
 The original independent oracle/cases/consumer are extracted from the verified
 simcase sdist and run outside the checkout using `python -I`,
-`--expected-installed-root` and `--expected-module-hashes`. The original contract
-test is also consumed by installed pytest. The hash manifest includes all six
+`--expected-installed-root` and `--expected-module-hashes`. The original contract, schema, runtime,
+save/platform and Studio tests are also consumed by installed pytest. The hash manifest includes all six
 identities required by the steady consumer; there are 13 configured runtime
 modules including existing transient and dispatch identities. Standalone
 unittest, installed pytest, preflight and whole-source counts are separate.
@@ -482,8 +482,20 @@ Windows regressions remain intact.
 
 These connections require a combined boundary-enabled schema/runtime candidate.
 Published draft documents and defined tests do not certify current API/CLI,
-build, installed or platform success. New schema tests, runtime examples/tests
-and Windows files are added only after their exact published paths are reviewed;
-no unposted path is required here. Inspect the exact combined CI and artifacts.
+build, installed or platform success. The schema/runtime tests, thermal_boundary.json and platform tests now refer to
+reviewed, published files; no unposted path is required here. The verified JSON
+example is validated and run through the installed isolated CLI with a fresh output. Inspect the exact combined CI and artifacts.
 The retained-artifact audit command above applies to this inventory without
 repeating numerical consumers. No package publication is performed.
+
+The Node source gate additionally runs `studio_steady_boundary.cjs`; its original
+bytes are required in the simcase sdist. This is source UI validation, not a claim
+of a separate installed Node execution. The Windows installed selection includes
+the complete standalone `test_steady_boundary_platform.py` alongside every
+existing selected case. Both steady boundary module identities are added to the
+existing Windows origin probe (11 modules total). A separate source target-
+protection step consumes the same platform file's three existing-target cases,
+retaining the previous source protection step and using separate log/JUnit names
+`windows-steady-boundary-source-target.log` and
+`windows-steady-boundary-source-target-tests.xml`. Actual counts and skips must
+come from exact CI. No new dependency or platform support is implied.

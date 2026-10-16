@@ -45,3 +45,9 @@ include tests/steady_boundary_independent_oracle.py
 include tests/steady_boundary_independent_cases.py
 include tests/steady_boundary_independent_consumer.py
 include tests/test_steady_boundary_independent_validation.py
+include tests/test_steady_boundary_schema.py
+include tests/test_steady_boundary_runtime.py
+include examples/thermal_boundary.json
+include tests/test_steady_boundary_platform.py
+include tests/test_studio_steady_boundary.py
+include tests/studio_steady_boundary.cjs
