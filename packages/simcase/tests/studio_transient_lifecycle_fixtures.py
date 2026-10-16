@@ -7,8 +7,9 @@ import json
 
 
 class Exchange:
-    def __init__(self, path, *, method="POST", body=b"{", receive_mode="normal", hold_body=False):
+    def __init__(self, path, *, method="POST", body=b"{", receive_mode="normal", hold_body=False, query=b""):
         self.path, self.method, self.body = path, method, body
+        self.query = query
         self.receive_mode, self.hold_body = receive_mode, hold_body
         self.receive_entered = asyncio.Event()
         self.receive_release = asyncio.Event()
@@ -42,7 +43,7 @@ class Exchange:
             "type": "http", "asgi": {"version": "3.0", "spec_version": "2.4"},
             "http_version": "1.1", "method": self.method, "scheme": "http",
             "path": self.path, "raw_path": self.path.encode("ascii"),
-            "root_path": "", "query_string": b"",
+            "root_path": "", "query_string": self.query,
             "headers": [(b"content-type", b"application/json")],
             "client": ("127.0.0.1", 12345), "server": ("testserver", 80),
         }
