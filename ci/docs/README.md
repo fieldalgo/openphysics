@@ -621,3 +621,33 @@ limit patch is used. Partial reports are retained by the existing always-upload
 step. These configured commands are not evidence of a completed exact run;
 report actual CI exits, counts and artifacts. Browser, numerical independence,
 source resource observation and Windows remain separate acceptance scopes.
+
+
+## Transient Studio distribution and numerical evidence
+
+The transient Studio preflight runs the published producer HTTP, independent
+acceptance and lifecycle tests before the full source suite. A preflight failure
+fails the job; later stages are not acceptance evidence when they did not run.
+The independent fixtures and their original headless cases/oracle are extracted
+from the byte-verified simcase sdist before isolated installed pytest. Their
+SHA256 values are retained in `dist/transient-studio-consumer-assets.json`.
+The shipped transient CJS runs with the existing source Node scripts and with
+the steady CJS against verified installed static bytes. Node fixtures are not
+physical, installed-Python or native-browser acceptance.
+
+Successful numerical diagnostic JSON printed by a test must remain available,
+not just failed-test output. The transient preflight and the existing installed
+pytest invocation both use these options, without a second test run:
+
+```text
+-o junit_logging=all -o junit_log_passing_tests=true
+```
+
+The always-uploaded `studio-transient-preflight.xml` and
+`dist/wheel-tests.xml` contain passing-test captured stdout in testcase
+`system-out` (and captured logging/stderr where applicable). Preserve the
+original XML and its hash; decode the JSON records without rounding or changing
+thresholds. Report actual testcase, subtest and suite-reported counts separately,
+and inspect failure/error/skip elements. Configuration alone is not evidence of
+an executed or passing numerical case. The full source, existing installed,
+independent all-suite/full-convergence and required platform gates remain intact.
