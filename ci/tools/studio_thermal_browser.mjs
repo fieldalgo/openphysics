@@ -44,14 +44,20 @@ try{
  await cdp.call('Runtime.enable');await cdp.call('Page.enable');await cdp.call('Network.enable');
  await cdp.call('Page.navigate',{url:base});
  await wait(()=>cdp.eval("document.readyState==='complete' && !!document.querySelector('#applyJson') && thermalController.state().cap?.run_enabled===true"),'page');
+ // Capability readiness precedes the asynchronous initial example load. Wait
+ // for that load to finish before editing, otherwise it can replace our model.
+ await wait(()=>cdp.eval('document.querySelector("#log").textContent.includes("loaded example soi_strip")'),'initial example loaded');
+ report.initialExampleLoaded=true;
+ const validatedModel=()=>cdp.eval('thermalController.supports(doc) && doc.name==='+JSON.stringify(model.name)+' && thermalController.gate.validated?.name==='+JSON.stringify(model.name)+' && !thermalController.gate.dirty && !thermalController.gate.busy && !document.querySelector("#runBtn").disabled');
  const click=selector=>cdp.eval('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e||e.disabled)throw Error("Missing/disabled control");e.click();return true})()');
  const snapshot=async(name,canvas)=>{await sleep(300);const state=await cdp.eval('(()=>{const c=document.querySelector('+JSON.stringify(canvas)+'),r=c.getBoundingClientRect();const pixels=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let paintedPixels=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i])paintedPixels++;return {paintedPixels,status:document.querySelector("#status").textContent,canvas:{width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height},runDisabled:document.querySelector("#runBtn").disabled}})()');report.stages.push({name,...state});if(!(state.canvas.width>0&&state.canvas.height>0&&state.canvas.cssWidth>0&&state.canvas.cssHeight>0&&state.paintedPixels>0))throw Error('Zero-size visible canvas '+name);const png=await cdp.call('Page.captureScreenshot',{format:'png'});await writeFile(join(out,name+'.png'),Buffer.from(png.data,'base64'));};
  await click('[data-tab="json"]');
  await cdp.eval('(()=>{const e=document.querySelector("#json");e.value='+JSON.stringify(JSON.stringify(model,null,2))+';e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
  await click('#applyJson');
- await wait(()=>cdp.eval('!document.querySelector("#runBtn").disabled'),'applied/validated');
+ await wait(validatedModel,'applied thermal model validated');
  await click('#validate');
- await wait(()=>cdp.eval('!document.querySelector("#runBtn").disabled'),'explicit validation');
+ await wait(validatedModel,'explicit thermal validation');
+ report.validatedModel=await cdp.eval('({name:doc.name,validatedName:thermalController.gate.validated.name,supported:thermalController.supports(doc)})');
  await click('#runBtn');
  await wait(()=>cdp.eval('document.querySelector("#status").textContent==="steady thermal result ready"'),'real solver result');
  await snapshot('temperature','#fieldCanvas');
