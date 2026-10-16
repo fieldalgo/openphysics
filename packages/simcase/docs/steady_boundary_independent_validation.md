@@ -4,16 +4,18 @@
 
 ## Status and scope
 
-Acceptance code prepared from main `6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`.
-This report describes fixed expectations, not measured passes. The boundary-enabled
-schema/runtime implementation has not yet been bound to an exact combined candidate.
-The current base supports legacy Dirichlet-only steady documents. The new tests
-intentionally require the approved boundary contract; no fake implementation,
-skip or weakened tolerance substitutes for that implementation.
+The acceptance code was prepared from main
+`6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`, before the boundary extension was
+integrated. Fixed expectations, subsequent exact-source binding reviews and
+supplemental direct-path measurements are recorded separately below. These are
+bounded evidence snapshots, not a live CI status report. Consult the exact
+checkout's CI logs and artifacts for full source, installed and platform results.
 
-No Python parsing, pytest, solver, installed consumer or platform execution was
-available during preparation. Source review is not numerical acceptance. Existing
-transient and standalone Robin engine tests and tolerances remain unchanged.
+The tests require the boundary contract; no fake implementation, skip or weakened
+tolerance substitutes for it. The original preparation environment could not run
+Python parsing, pytest, solvers or installed consumers. Later direct-path
+measurements do not retroactively establish that original suite's execution.
+Existing transient and standalone Robin engine tests and tolerances are unchanged.
 
 ## Independent mathematics
 

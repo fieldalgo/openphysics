@@ -4,22 +4,18 @@
 
 ## Implementation and validation status
 
-This page describes the boundary-extension candidate for `thermal.steady2d`.
-The implementation reviewed here is combined candidate
-`8e6ef95c4782e2e5901becec318f19c429755000` (PR 6), including runtime
-`862a29789aa7f3404d4e62051553fd374015828b`.
-It implements `Document.from_dict`, JSON loading, validation, document
-summaries, `run(Document)`, `ThermalRunResult`, CLI dispatch and JSON/NPZ
-saving with the existing thermal engine. This is a submitted implementation,
-not a claim that the feature is already on main. Use the exact combined
-checkout rather than an earlier standalone component.
-The [legacy guide](thermal_steady2d.md) retains the original v1 contract.
+This checkout implements the boundary extension for `thermal.steady2d` through
+`Document.from_dict`, JSON loading, validation, document summaries,
+`run(Document)`, `ThermalRunResult`, the CLI and JSON/NPZ saving with the existing
+thermal engine. The [legacy guide](thermal_steady2d.md) retains the original v1
+contract. Use matching packages from the same checkout.
 
-P2 numerical and installed acceptance are not complete. Independent and platform
-tests are submitted separately; their existence is not a passing result.
-Examples below are reproduction procedures and analytical expectations, not
-measurements made for this document. Check the exact combined candidate's CI,
-artifacts and platform results before treating it as accepted.
+The [independent validation report](steady_boundary_independent_validation.md)
+separates fixed acceptance gates, source review and bounded direct-path
+measurements. Full source, installed and platform acceptance must be checked
+against the exact commit's CI logs and artifacts. Test definitions alone do not
+establish a pass. Examples below give reproduction procedures and analytical
+expectations; they do not expand the measured validation scope.
 
 ## Inputs and supported scope
 
