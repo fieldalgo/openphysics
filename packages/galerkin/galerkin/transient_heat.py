@@ -143,7 +143,8 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             raise ValueError("consistent mass lost positive diagonal at this numeric scale")
         # One constant offset per component throughout the run, never a per-step
         # redefinition. K annihilates these constants; the mass derivative is zero.
-        offsets = np.array([initial[np.flatnonzero(labels == c)[0]] for c in range(count)])[labels]
+        representatives = np.array([np.flatnonzero(labels == c)[0] for c in range(count)])
+        offsets = initial[representatives][labels]
         with np.errstate(over="ignore", invalid="ignore"):
             initial_increment = initial-offsets
         _finite(initial_increment)
@@ -173,6 +174,11 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         _finite(bc, load)
         return bc, load
 
+    def centered(values):
+        # Operator evaluation only: state and mass derivative retain their fixed
+        # initial baseline. K and grad annihilate each component's constant.
+        return values-values[representatives][labels]
+
     def record(index, increment, load, bc):
         absolute = increment+offsets
         # Preserve the caller's exact initial field, with no implicit projection.
@@ -180,7 +186,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             absolute = initial.copy()
         mtemp = mass@absolute
         temperature[index] = absolute
-        flux[index] = -k*element_gradient(private_mesh, increment)
+        flux[index] = -k*element_gradient(private_mesh, centered(increment))
         loads[index] = load
         boundary_values[index] = bc
         content[index] = np.sum(mtemp)
@@ -212,10 +218,48 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             if len(free):
                 reduced_rhs = rhs[free]-system[free][:, fixed]@current[fixed]
                 _finite(reduced_rhs)
-                current[free] = splu(system[free][:, free].tocsc()).solve(reduced_rhs)
+                factor = splu(system[free][:, free].tocsc())
+                current[free] = factor.solve(reduced_rhs)
+                # Refine the same full BE equation with fixed boundary
+                # correction zero. Do not stop on the wide original K|u| scale.
+                # Retain the best physical residual of six fixed evaluations;
+                # no exact-scenario substitution or mean overwrite is used.
+                best = current.copy()
+                best_score = np.inf
+                for refinement in range(6):
+                    trial_rate = (current-previous)/step
+                    trial_storage = mass@trial_rate
+                    trial_spatial = stiffness@centered(current)
+                    trial_residual = trial_storage+trial_spatial-load
+                    _finite(trial_rate, trial_storage, trial_spatial, trial_residual)
+                    physical_terms = (abs(mass)@abs(trial_rate)
+                                      +abs(stiffness)@abs(centered(current))+abs(load))
+                    _finite(physical_terms)
+                    physical_scale = max(float(np.max(physical_terms)), np.finfo(float).tiny)
+                    score = float(np.max(abs(trial_residual[free])))/physical_scale
+                    for component in range(count):
+                        selected = labels == component
+                        trial_reaction = np.zeros(n)
+                        trial_reaction[fixed] = trial_residual[fixed]
+                        balance = float(np.sum((trial_storage-load-trial_reaction)[selected]))
+                        balance_scale = max(float(np.sum(
+                            (abs(trial_storage)+abs(load)+abs(trial_reaction))[selected])),
+                            np.finfo(float).tiny)
+                        _finite(balance, balance_scale)
+                        score = max(score, abs(balance)/balance_scale)
+                    _finite(score)
+                    if score < best_score:
+                        best_score = score
+                        best = current.copy()
+                    if refinement != 5:
+                        correction = factor.solve(-trial_residual[free])
+                        _finite(correction)
+                        current[free] += correction
+                        _finite(current)
+                current = best
             rate = (current-previous)/step
             stored = mass@rate
-            spatial = stiffness@current
+            spatial = stiffness@centered(current)
             residual = stored+spatial-load
             reaction = np.zeros(n)
             reaction[fixed] = residual[fixed]

@@ -218,3 +218,30 @@ gates, independent algebra/reference boundaries and reproduction.
 ## Separate headless document adapter
 
 Rectangular `thermal.transient2d` JSON/API/CLI and saved histories are provided by a separate simcase adapter. Its [input, result and save contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient2d.md) is online documentation in another package and requires network access. This engine function's arbitrary callbacks/mesh support are not the serialized document scope. Documents use uniform/affine initial fields and side-constant/requested-time samples while retaining initial agreement, no projection and finite K/no clamp. No Studio, restart, transient flux/Robin or automatic coupling is added. Engine acceptance is distinct from headless source/installed/save/CI acceptance.
+
+## Bounded spatial-residual refinement
+
+The initial component state offset remains fixed for the entire solve. Only
+stiffness and gradient evaluation subtract each component's current representative
+value. This does not redefine temperature, its history or the mass derivative.
+For component constants E, K E=0 in exact arithmetic, so the original
+backward-Euler equation and both old/new boundary mass terms are preserved.
+A rounded assembled K need not satisfy K E=0 bit-for-bit; this is not a claim
+that the rounded pencil is unchanged.
+
+Each step with free degrees of freedom retains its original matrix and LU, evaluates six physical residuals
+and performs five free-DOF corrections using that same LU. Prescribed-node
+corrections are zero. The best physical-residual iterate is selected before the
+original free-residual and component-balance guards, with unchanged tolerances.
+This is not an analytic mean replacement, projection or new acceptance gate.
+A failed final guard still raises. The bounded loop adds up to five triangular
+solves and additional matrix-vector evaluations per step, without an additional
+factorization; it guarantees neither convergence nor performance.
+
+New producer tests in `test_transient_heat_tiny_domain.py` and
+`test_transient_heat_general_state.py` cover tiny uniform/ramp controls and
+nonuniform, moving-boundary, all-fixed and disconnected/reordered states with
+independent dense consistent-mass reconstruction. Addition is not execution.
+A narrow four-case diagnostic of the selected source returned successfully;
+this is not full source, installed, public-headless or platform acceptance.
+Original failing evidence and all fixed numerical gates remain applicable.

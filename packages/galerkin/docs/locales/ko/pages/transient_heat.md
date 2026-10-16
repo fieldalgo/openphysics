@@ -206,3 +206,24 @@ maximum principle을 주장하면 안 됩니다. 복원한 셀 flux는 H(div)-co
 ## 별도의 headless 문서 adapter
 
 직사각형 `thermal.transient2d` JSON/API/CLI와 저장 이력은 별도 simcase adapter가 제공합니다. [입력·결과·저장 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)은 다른 패키지의 온라인 문서로 네트워크 접근이 필요합니다. 이 engine 함수의 임의 callback/메시 범위가 문서 직렬화 범위인 것은 아닙니다. 문서는 균일/affine 초기장과 변 상수/요청 시간별 표본을 사용하며 초기 일치·무projection·finite K/no clamp를 유지합니다. Studio·restart·과도 flux/Robin·자동 연성은 추가하지 않습니다. 엔진 수용과 headless source/설치/저장/CI 수용은 구분합니다.
+## 제한된 공간 잔차 보정
+
+초기 성분 상태 offset은 전체 해석에서 고정합니다. 강성과 기울기를 평가할 때만
+각 성분의 현재 대표 절점값을 뺍니다. 온도, 이력 또는 질량 미분을 재정의하지 않습니다.
+성분 상수 E에 대해 정확한 산술에서는 K E=0이므로 원래 backward-Euler 방정식과
+old/new 경계 질량항을 모두 유지합니다. 반올림된 조립 K에서는 비트 단위 K E=0이
+아닐 수 있으며, 반올림된 행렬이 불변이라고 주장하지 않습니다.
+
+자유 DOF가 있는 각 단계는 원래 행렬과 LU를 유지하고 물리 잔차 평가 6회와 같은 LU를 사용하는
+자유 DOF 보정 5회를 수행합니다. 지정 절점의 보정은 0입니다. 물리 잔차가 가장 작은
+반복값을 선택한 뒤 원래 자유 잔차·성분 평형 검사를 허용치 변경 없이 적용합니다.
+해석적 평균 대입, projection 또는 새 수용 기준이 아닙니다. 최종 검사 실패는
+여전히 오류입니다. 추가 분해 없이 단계당 삼각 풀이 최대 5회와 추가 행렬-벡터
+평가가 필요하며 수렴이나 성능을 보장하지 않습니다.
+
+새 제작자 시험 `test_transient_heat_tiny_domain.py`와
+`test_transient_heat_general_state.py`는 작은 균일장·ramp 및 비균일장, 이동 경계,
+전체 고정, 분리·재정렬 상태를 독립 dense consistent-mass 재구성과 함께 다룹니다.
+파일 추가는 실행이 아닙니다. 선택한 소스의 좁은 네 사례 진단은 성공 반환했지만
+전체 source·설치·공개 headless·플랫폼 수용은 아닙니다. 원래 실패 근거와 모든 고정
+수치 기준을 계속 보존합니다.

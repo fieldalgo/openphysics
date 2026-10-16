@@ -182,3 +182,30 @@ predetermined pass. It retains all requested history, so the n64 companion
 needs substantial memory. No wall time is a dedicated-host performance baseline.
 
 The current manifests and distribution helper wire EN/KO pages, the example, original tests, independent consumers and runtime modules into inclusion and byte checks. The helper builds real sdist→wheel artifacts, verifies installed origins/source bytes, and runs the verified archive's independent `--suite all` consumer and full English convergence example. An implemented gate is distinct from a successful build/install run. Establish inclusion, installed and numerical success from the exact current CI exits, logs and artifacts. The narrow Windows save gate is not full transient-physics acceptance; release success is separate.
+
+## Bounded spatial-residual refinement
+
+The initial component state offset remains fixed for the entire solve. Only
+stiffness and gradient evaluation subtract each component's current representative
+value. This does not redefine temperature, its history or the mass derivative.
+For component constants E, K E=0 in exact arithmetic, so the original
+backward-Euler equation and both old/new boundary mass terms are preserved.
+A rounded assembled K need not satisfy K E=0 bit-for-bit; this is not a claim
+that the rounded pencil is unchanged.
+
+Each step with free degrees of freedom retains its original matrix and LU, evaluates six physical residuals
+and performs five free-DOF corrections using that same LU. Prescribed-node
+corrections are zero. The best physical-residual iterate is selected before the
+original free-residual and component-balance guards, with unchanged tolerances.
+This is not an analytic mean replacement, projection or new acceptance gate.
+A failed final guard still raises. The bounded loop adds up to five triangular
+solves and additional matrix-vector evaluations per step, without an additional
+factorization; it guarantees neither convergence nor performance.
+
+New producer tests in `test_transient_heat_tiny_domain.py` and
+`test_transient_heat_general_state.py` cover tiny uniform/ramp controls and
+nonuniform, moving-boundary, all-fixed and disconnected/reordered states with
+independent dense consistent-mass reconstruction. Addition is not execution.
+A narrow four-case diagnostic of the selected source returned successfully;
+this is not full source, installed, public-headless or platform acceptance.
+Original failing evidence and all fixed numerical gates remain applicable.
