@@ -390,6 +390,7 @@ class ThermalJobs:
         self._pending = 0
         self._retired = {}
         self._snapshots = {}
+        self._read_workspace = 0
         self.ingress = AdmissionGate("ingress_capacity_exceeded")
         self.read_encoder = AdmissionGate("read_capacity_exceeded")
 
@@ -430,7 +431,18 @@ class ThermalJobs:
         for allocation, snapshot in self._snapshots.items():
             if allocation not in covered:
                 retained[allocation] = len(snapshot["payload"])
-        return sum(size for allocation, size in retained.items() if allocation not in covered)
+        return sum(size for allocation, size in retained.items() if allocation not in covered)+self._read_workspace
+
+    def begin_read(self, budget):
+        permit = self.read_encoder.acquire()
+        try:
+            with self._lock:
+                self._make_room(budget, 0)
+                self._read_workspace += budget
+            return ReadAllocation(self, permit, budget)
+        except BaseException:
+            permit.release()
+            raise
 
     def pin(self, job, *, result=False, result_id=None):
         """Pin one immutable terminal record until transport/reader finally."""
@@ -453,7 +465,6 @@ class ThermalJobs:
                     snapshot = self._snapshots.setdefault(allocation, {"payload": payload, "refs": 0})
                     snapshot["refs"] += 1
                     return RecordPin(self, None, payload, allocation)
-                raise ThermalAPIError("result_not_ready", "terminal publication pending", 409)
             rec["pins"] = rec.get("pins", 0)+1
             return RecordPin(self, rec, rec["result"] if result else rec["status_bytes"])
 
@@ -662,3 +673,41 @@ class RecordPin:
                 else:
                     jobs._unpin(record)
             record = None
+
+
+class ReadAllocation:
+    """Reserved encoder workspace transfers to immutable output until send ends."""
+
+    def __init__(self, jobs, permit, budget):
+        self.jobs, self.permit, self.budget = jobs, permit, budget
+        self.allocation = None
+        self.payload = None
+        self.released = False
+        self._lock = threading.Lock()
+
+    def publish(self, payload):
+        if type(payload) is not bytes or len(payload) > self.budget:
+            raise ThermalAPIError("payload_limit_exceeded", "encoded view exceeds reservation", 413)
+        with self._lock, self.jobs._lock:
+            if self.released or self.allocation is not None:
+                raise RuntimeError("read allocation already completed")
+            self.jobs._read_workspace -= self.budget
+            self.allocation = id(payload)
+            self.payload = payload
+            entry = self.jobs._snapshots.setdefault(self.allocation, {"payload": payload, "refs": 0})
+            entry["refs"] += 1
+
+    def release(self):
+        with self._lock:
+            if self.released:
+                return
+            self.released = True
+            self.payload = None
+            jobs, self.jobs = self.jobs, None
+            permit, self.permit = self.permit, None
+            with jobs._lock:
+                if self.allocation is None:
+                    jobs._read_workspace -= self.budget
+                else:
+                    jobs._unpin_snapshot(self.allocation)
+            permit.release()
