@@ -9,8 +9,10 @@ and run routes, typed SI results, the actual result mesh, nodal Kelvin and cell
 heat-flux views. It uses the existing homogeneous rectangle/P1 headless solver
 with constant isotropic k and source, side Dirichlet, insulation and constant
 outward-flux/Robin conditions. Existing optical behavior and generic-route heat
-guards remain; transient UI, pre-solve mesh preview, arbitrary geometry,
-automatic coupling and new result-saving endpoints are outside this interface.
+guards remain. This steady interface excludes transient documents and time/history
+selection; see the separate [transient Studio guide](thermal_transient_studio.md).
+Pre-solve mesh preview, arbitrary geometry, automatic coupling and new
+result-saving endpoints are outside this interface.
 
 Implementation is separate from validation and release status. Inspect the
 exact checkout's CI results and artifacts for source, installed-platform,
@@ -120,10 +122,10 @@ status/result routes. Arrays, summary and identity use this single contract.
 
 ## Route boundaries and recovery
 
-The server candidate implements these dedicated routes; they are not yet
-accepted main functionality:
+This checkout implements the following dedicated steady routes. Implementation
+and exact-checkout validation are distinct, as described above:
 
-| Route | Candidate behavior |
+| Route | Steady behavior |
 | --- | --- |
 | `GET /api/capabilities` | Versioned steady capability and configured resource policy |
 | `POST /api/thermal/validate` | Strict JSON envelope, public document validation and preflight |
@@ -134,8 +136,10 @@ accepted main functionality:
 Existing `/api/validate` keeps heat `ok=false`; generic `/api/mesh` and
 `/api/run` keep heat/cavity execution refusal. Existing cavity schema-validation
 behavior is distinct from execution. Thermal support must use dedicated routes,
-not remove generic optical guards. Transient documents and time/history selectors
-remain unsupported. Missing/malformed capabilities disable thermal actions
+not remove generic optical guards. These steady endpoints reject transient
+documents and time/history selectors; the separate
+[transient Studio interface](thermal_transient_studio.md) defines their dedicated
+routes and views. Missing/malformed steady capabilities disable steady actions
 without disabling existing optical startup.
 
 Errors distinguish malformed input (400), logical validation failure
