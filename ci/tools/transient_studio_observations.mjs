@@ -71,7 +71,10 @@ export function assertCurrentFrameRange(manifest, frame, selection, observed) {
   for (const value of scalars) { minimum = Math.min(minimum, value); maximum = Math.max(maximum, value); }
   assert.equal(observed.minimum, minimum, 'current frame minimum');
   assert.equal(observed.maximum, maximum, 'current frame maximum');
-  assert.equal(observed.unit, frame.unit);
+  // The shipped renderer spells the wire's W/m^2 as W/m². No other unit
+  // conversion, scale change or typographic normalization is accepted here.
+  const observedUnit = observed.unit === 'W/m²' ? 'W/m^2' : observed.unit;
+  assert.equal(observedUnit, frame.unit);
   assert.equal(observed.rangePolicy, 'current-frame');
 }
 

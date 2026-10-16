@@ -67,3 +67,9 @@ include docs/locales/ko/pages/studio_thermal_independent_validation.md
 include tests/test_studio_transient_server_http.py
 include tests/studio_transient_lifecycle_fixtures.py
 include tests/test_studio_transient_lifecycle.py
+include simcase/studio/static/transient_thermal.js
+include tests/studio_transient_thermal.cjs
+include tests/studio_transient_independent_fixtures.py
+include tests/test_studio_transient_thermal_acceptance.py
+include docs/thermal_transient_studio.md
+include docs/locales/ko/pages/thermal_transient_studio.md
