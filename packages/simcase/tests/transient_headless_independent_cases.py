@@ -220,3 +220,25 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
             for name,value in mutations:
                 with self.subTest(field=name),self.assertRaises(AssertionError):
                     audit_arrays(dict(a,**{name:value}),"heating",8)
+
+    def test_saved_identifier_units_and_object_arrays_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            summary,a=saved_run(model(),root/"original")
+            for variant in ("format","layout","units","object"):
+                out=root/variant;out.mkdir()
+                metadata=copy.deepcopy(summary)
+                altered={k:np.array(v,copy=True) for k,v in a.items()}
+                if variant=="format":
+                    altered["result_format"]=np.asarray("wrong-result-v1")
+                elif variant=="layout":
+                    altered["field_layout"]=np.asarray("wrong-field-layout")
+                elif variant=="units":
+                    metadata["field_units"]["heat_content_j_per_m"]="J K/m"
+                else:
+                    altered["temperature_k"]=np.asarray([[object()]],dtype=object)
+                (out/"summary.json").write_text(json.dumps(metadata),encoding="utf-8")
+                with (out/"fields.npz").open("wb") as stream:
+                    np.savez(stream,**altered)
+                with self.subTest(variant=variant),self.assertRaises((AssertionError,ValueError)):
+                    read_saved(out)
