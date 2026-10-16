@@ -133,3 +133,13 @@ The benchmark values in `refsol.benchmarks` are numerical results published by
 Hadley (2002); see [NOTICE](NOTICE) for their provenance.
 
 `refsol.thermal_boundary` provides independent closed forms for prescribed outward flux and Robin boundaries. Coordinates are m, temperature K, conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K). It is included in both archives; this standalone reference does not extend the headless JSON schema.
+
+## Transient heat references
+
+Import `refsol.transient_heat` explicitly for `uniform_insulated`, `moving_affine`, `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and `backward_euler_amplitude`. The module uses NumPy/stdlib without engine imports. Coordinates/time/temperature are m/s/K, conductivity W/(m K), volumetric heat capacity J/(m³ K), source W/m³ and flux W/m². Dense matrices and modes target small reference meshes; a semidiscrete BE product is distinct from a continuum PDE solution. These references do not certify physical temperature validity or a maximum principle, and independent acceptance must derive its own truth.
+
+The fixed-P1, consistent-mass, backward-Euler engine API with constant isotropic materials, time-dependent Dirichlet values and insulation is documented here:
+
+[Usage](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat_independent_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md))
+
+These exact-revision repository links require network access and repository permission. Implementation and acceptance files are submitted; numerical, build and installed validation remain unexecuted, including distribution inclusion. This is not release or integration acceptance. No JSON/CLI/Studio or automatic heat-to-mechanics connection is provided.
