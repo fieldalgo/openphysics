@@ -34,7 +34,7 @@
   function route(s) { return typeof s === 'string' && /^\/api\/[a-zA-Z0-9_/-]+$/.test(s) && !s.includes('..'); }
   function capability(data) {
     const c = data?.[TYPE];
-    if (data?.capability_format !== 'studio-capabilities-v1' || !object(c)
+    if (data?.capability_format !== 'studio-capabilities-v1' || !object(c) || ('supported' in c && c.supported !== true)
         || c.input !== 'json' || c.mesh_preview !== false || c.mesh_from_result !== true
         || c.time_navigation !== false || !route(c.validate) || !route(c.run)
         || !Array.isArray(c.result_formats) || !Array.isArray(c.field_layouts)
@@ -210,11 +210,17 @@
     const v=((c[1]-a[1])*(p[0]-c[0])+(a[0]-c[0])*(p[1]-c[1]))/det;
     return [u,v,1-u-v];
   }
+  function interpolate(model,tri,w) {
+    const base=model.values[tri[0]];
+    const value=base+w[1]*(model.values[tri[1]]-base)+w[2]*(model.values[tri[2]]-base);
+    if(!finite(value))fail('P1 view interpolation overflow');
+    return value;
+  }
   function sample(model, point) {
     for (let i=0;i<model.triangles.length;i++) {
       const tri=model.triangles[i], w=barycentric(point,...tri.map(n=>model.nodes[n]));
       if (w.every(v=>v>=-1e-10&&v<=1+1e-10))
-        return model.nodal ? w.reduce((s,v,j)=>s+v*model.values[tri[j]],0) : model.values[i];
+        return model.nodal ? interpolate(model,tri,w) : model.values[i];
     }
     return null;
   }
@@ -242,7 +248,7 @@
         for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++) {
           const w=barycentric(T.inverse(x+.5,y+.5),...pts);
           if (w.some(v=>v < -1e-10)) continue;
-          const value=model.nodal?w.reduce((s,v,j)=>s+v*model.values[tri[j]],0):model.values[i];
+          const value=model.nodal?interpolate(model,tri,w):model.values[i];
           const rgb=color(value,model.min,model.max),k=4*(y*W+x);
           image.data.set([...rgb,255],k);
         }
@@ -265,7 +271,7 @@
       for(let i=0;i<model.triangles.length;i+=stride) {
         const pts=model.triangles[i].map(n=>model.nodes[n]);
         const x=pts.reduce((s,p)=>s+p[0]/3,0),y=pts.reduce((s,p)=>s+p[1]/3,0);
-        const [qx,qy]=model.flux[i],dx=22*qx/maxQ,dy=-22*qy/maxQ;
+        const [qx,qy]=model.flux[i],dx=22*(qx/maxQ),dy=-22*(qy/maxQ);
         const X=T.X(x),Y=T.Y(y),angle=Math.atan2(dy,dx);
         ctx.beginPath();ctx.moveTo(X,Y);ctx.lineTo(X+dx,Y+dy);
         ctx.moveTo(X+dx-5*Math.cos(angle-.5),Y+dy-5*Math.sin(angle-.5));ctx.lineTo(X+dx,Y+dy);
@@ -273,10 +279,10 @@
       }
     }
     ctx.fillStyle='#17212b';ctx.font='12px system-ui';ctx.textAlign='center';
-    ctx.fillText('x ('+model.lengthLabel+'); y upward',W/2,H-12);
+    ctx.fillText('x / y ('+model.lengthLabel+'); +y upward',W/2,H-12);
     ctx.textAlign='left';ctx.fillText(meshOnly?'Actual result mesh':model.field+' ['+model.unit+'] '+model.min+' … '+model.max,12,18);
     if (!meshOnly) {
-      for(let i=0;i<100;i++){ctx.fillStyle='rgb('+color(model.min+(model.max-model.min)*i/99,model.min,model.max).join(',')+')';ctx.fillRect(12+i*1.5,27,2,10);}
+      for(let i=0;i<100;i++){ctx.fillStyle='rgb('+color(model.min+(model.max-model.min)*(i/99),model.min,model.max).join(',')+')';ctx.fillRect(12+i*1.5,27,2,10);}
       ctx.fillStyle='#17212b';ctx.fillText(model.max===model.min?'constant field':model.min+' … '+model.max+' '+model.unit,12,51);
       if(!model.nodal)ctx.fillText('Cell flux; arrows max 22 px (view only), global +y upward',12,H-31);
     }

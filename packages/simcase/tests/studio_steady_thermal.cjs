@@ -207,3 +207,19 @@ test('older capability reply cannot reenable a newer unsupported capability',asy
   const old=c.loadCapability(),newer=c.loadCapability();pending[1]({});await newer;
   pending[0](cap());await old;assert.equal(c.supports(doc()),false);
 });
+
+test('explicit supported=false disables capability despite complete routes',()=>{
+  const value=cap();value[T.TYPE].supported=false;assert.equal(T.capability(value),null);
+});
+test('finite huge flux arrows and constant high Kelvin stay finite in display',()=>{
+  const value=payload();value.arrays.heat_flux_w_m2=[[1e308,0],[0,1e308]];
+  value.arrays.temperature_k.fill(Number.MAX_VALUE);
+  const p=T.validatePayload(value),m=T.viewModel(p);
+  assert.equal(T.sample(m,[.75,.25]),Number.MAX_VALUE);
+  const cv=canvas();T.draw(cv,T.viewModel(p,'magnitude'));
+  assert.ok(cv.calls.filter(x=>x[0]==='move'||x[0]==='line').every(x=>x.slice(1).every(Number.isFinite)));
+});
+test('nonfinite metadata is rejected, never converted to JSON null',()=>{
+  const value=payload();value.summary.normalized_heat_balance_defect=Infinity;
+  assert.throws(()=>T.validatePayload(value),/nonfinite JSON metadata/);
+});
