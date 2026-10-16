@@ -4,9 +4,9 @@
 """Shared helpers for the validation suite.
 
 Every test here grades galerkin against `refsol`, a separate package holding the
-closed-form and published reference solutions. Keeping the answer key out of the
-engine's own repository is the point: a solver that ships its own idea of the
-right answer can agree with itself forever.
+closed-form and published reference solutions. The packages share a repository,
+but the reference implementation never imports the engine it grades. The engine
+also never imports the answer key; tests/test_independence.py checks that boundary.
 """
 
 import pathlib

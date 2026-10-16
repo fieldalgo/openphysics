@@ -1,9 +1,13 @@
 # galerkin-refsol — reference solutions for validating galerkin
 
+[Documentation](docs/overview.md)
+
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
+
 Closed-form solutions and published high-accuracy benchmarks used as the
-answer key for the [galerkin](https://github.com/FieldAlgo/galerkin)
-electromagnetic FEM engine. Kept in its own repository so that the grader
-never imports the code it grades; depends only on numpy and scipy.
+answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
+FEM engine. It is a separate package in the same monorepo;
+the grader never imports the code it grades. It depends only on numpy and scipy.
 
 A numerical solver is software that can be plausibly wrong. This package is
 the part that does not depend on the discretization.
@@ -14,6 +18,10 @@ The Python package name is `refsol` (`from refsol import fiber`).
 
 | module | contents | self-checks |
 |---|---|---|
+| `refsol.thermoelasticity` | Prescribed-Kelvin uniform free/constrained, compatible and sine fields; out-of-plane stress and physical elastic energy | Original three-dimensional law, no FEM imports |
+| `refsol.thermal` | Kelvin slab and steady sine manufactured fields; heat flux W/m^2 and source W/m^3 | Direct analytic derivatives, no engine imports |
+| `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
+| `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge) and exact vector modes TE/TM/HE/EH | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field | closed forms |
@@ -21,6 +29,41 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
+
+Explicitly import `refsol.thermoelasticity` for the prescribed-temperature
+mechanical-stage reference fields. Coordinates/displacement use m, T and Tref
+absolute K, signed alpha 1/K, E/stress Pa and energy density J/m^3. The original
+3D elastic law retains the plane-strain out-of-plane stress and energy; a free
+uniform plane-strain field can have zero in-plane stress and nonzero energy.
+This module is automatically included in sdists and wheels, with byte checks.
+It does not solve heat or certify a sequential heat-to-mechanics workflow.
+
+For steady heat, explicitly import `refsol.thermal`; `slab` returns temperature,
+heat flux and heat source for metre coordinates, Kelvin and conductivity W/(m K).
+For boundary-loaded elasticity, explicitly import `refsol.elasticity_traction`.
+Its traction vectors use global Cartesian Pa; integrated mechanical load is N/m
+of out-of-plane thickness. Both modules are automatically included as Python
+code in sdists and wheels. The installed distribution checks verify their bytes
+and public imports. They do not implement a coupled thermoelastic model.
+
+For static 2D elasticity, explicitly import `refsol.elasticity`. Its coordinates
+and displacement use metres, E and stress use Pa, body force uses N/m^3, and
+strain is ordered `(epsilon_xx, epsilon_yy, gamma_xy)` with engineering shear.
+For example, uniaxial extension with free lateral traction in plane stress:
+
+```python
+from refsol.elasticity import affine
+
+field = affine([[0., 0.], [1., 1.]], [[1e-3, 0.], [0., -0.3e-3]],
+               young_modulus=70e9, poisson_ratio=0.3, plane="stress")
+print(field.displacement)  # metres
+print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
+```
+
+The reference module is included in both the sdist and wheel. It imports no FEM
+engine. The separate [engine contract](https://github.com/fieldalgo/openphysics/blob/a292ae15707b3713f0464b4d126be765b4c205ae/packages/galerkin/docs/elasticity2d.md)
+describes boundary constraints, per-thickness loads and locking limitations.
+It is a repository link requiring network access and repository permission.
 
 ```python
 from refsol import fiber, slab, scattering, benchmarks
@@ -41,14 +84,16 @@ benchmarks.rib_neff(0.3)   # 3.412492
 ## Run the self-checks
 
 ```bash
-pip install pytest
-PYTHONPATH=. python3 -m pytest -q tests
+# From the repository root
+python -m pip install pytest -e packages/galerkin-refsol
+python -m pytest -q packages/galerkin-refsol/tests
 ```
 
 ## Use from galerkin
 
 ```bash
-pip install git+https://github.com/FieldAlgo/galerkin-refsol
+# From the repository root
+python -m pip install -e packages/galerkin-refsol
 ```
 
 Suggested validation order for a vector mode solver: step-index fiber
@@ -86,3 +131,7 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 The benchmark values in `refsol.benchmarks` are numerical results published by
 Hadley (2002); see [NOTICE](NOTICE) for their provenance.
+
+`refsol.thermal_boundary` provides independent closed forms for prescribed outward flux and Robin boundaries. Coordinates are m, temperature K, conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K). It is included in both archives; this standalone reference does not extend the headless JSON schema.
+
+`refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.

@@ -1,8 +1,13 @@
-# galerkin — a 2D electromagnetic FEM engine (FieldAlgo project)
+# galerkin — an electromagnetic FEM engine (FieldAlgo project)
+
+[Documentation](docs/overview.md)
+
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.
-Currently covers 2D electromagnetics; designed to grow into a multiphysics core.
+Currently covers 2D electromagnetics, static 2D elasticity and 3D cavity eigenmodes; designed to grow
+into a multiphysics core.
 
 - **M1**: Electrostatics — ∇·(ε∇V) = −ρ (P1 elements)
 - **M2**: Frequency-domain waves — ∇²u + k²u = 0 (complex arithmetic, absorbing boundaries)
@@ -12,7 +17,57 @@ Currently covers 2D electromagnetics; designed to grow into a multiphysics core.
   Nédélec / longitudinal nodal formulation, effective indices and vector mode profiles
 - **M3b**: 3D Maxwell — tetrahedral Nédélec edge elements, rectangular cavity eigenmodes
 
+The public `solve_cavity_box` API provides SI frequencies and raw edge fields for
+a vacuum PEC box. See its [API and numerical contract](docs/cavity_solver.md),
+including near-target search limitations and the alternating-mesh repair of the
+rectangular cluster-mean convergence gate.
+
+The standalone `galerkin.elasticity` submodule solves homogeneous isotropic,
+small-strain static P1 elasticity with explicit plane stress or plane strain.
+See the [elasticity API, units and limitations](docs/elasticity2d.md) and the
+[English example](examples/elasticity2d.py). These files are included in the
+sdist. The example can run from the repository root or an unpacked galerkin
+sdist after installing the packages; it is not a simcase/Studio model.
+The separate [independent elasticity validation](docs/elasticity2d_independent_validation.md)
+documents polynomial manufactured fields, mixed boundaries and work/energy
+checks; its contract is also included byte-for-byte in the sdist.
+
+Vector modes retain complex transverse and longitudinal coefficients, including
+degenerate eigenspace directions. Read the [eigenspace reliability contract](docs/eigenspace_reliability.md)
+before converting fields to real values; this does not add subspace tracking.
+
+The standalone `galerkin.thermal` API solves homogeneous isotropic steady 2D
+conduction in Kelvin, with volumetric sources and natural insulation. Read the
+[heat contract and boundary signs](docs/thermal_steady2d.md) and run the
+[English heat example](examples/thermal_steady2d.py) after installing the packages.
+The [independent heat validation](docs/thermal_independent_validation.md) and
+[historical acceptance manifest](docs/thermal_independent_validation_manifest.json)
+are preserved as originally recorded and included byte-for-byte in the sdist.
+Static elasticity additionally accepts global Cartesian boundary tractions:
+see the [traction guide](docs/elasticity_traction.md),
+[English traction example](examples/elasticity_traction.py) and
+[independent acceptance](docs/elasticity_traction_independent_validation.md).
+These documents and examples are included in the sdist. Neither API adds
+transient analysis, thermoelastic coupling, simcase or Studio integration.
+
+The separate `galerkin.thermoelasticity` submodule is a static mechanical stage
+for an explicitly prescribed same-mesh nodal-P1 Kelvin field. See its
+[SI contract, immutable snapshot and physical 3D energy](docs/prescribed_temperature_thermoelasticity.md)
+and [English executable example](examples/prescribed_temperature_thermoelasticity.py),
+both included byte-for-byte in the sdist. Alpha is signed 1/K; displacement is
+m, stress Pa, load/reaction N/m and physical elastic energy J/m of thickness.
+It does not solve heat, automatically connect a heat result, validate a full
+sequential coupling workflow, or add simcase/Studio integration.
+The separate [independent mechanical-stage acceptance](docs/prescribed_temperature_thermoelasticity_independent_validation.md)
+and its original oracle/tests are also included unchanged in the sdist.
+
 ## Layout
+
+For a headless JSON/API/CLI wrapper around the standalone steady heat solver,
+see the [simcase thermal document contract](https://github.com/fieldalgo/openphysics/blob/4ec9da9fcba661958a12f37bc445a543cb4ffc1c/packages/simcase/docs/thermal_steady2d.md).
+The wrapper handles explicit length units, Kelvin inputs and numeric SI result
+files; this does not add a thermal Studio interface or automatic heat-to-mechanics
+workflow to this engine.
 
 ```
 galerkin/
@@ -26,6 +81,7 @@ galerkin/
   mesh3d.py       # M3b: Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # M3b: P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # M3b: Whitney edge elements on tetrahedra, all matrices closed form
+  cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   gmsh.py         # M3b: read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 tests/
@@ -56,22 +112,23 @@ examples/
 
 ## Tests
 
-The engine is graded against [galerkin-refsol](https://github.com/FieldAlgo/galerkin-refsol),
+The engine is graded against [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin-refsol/README.md),
 a separate package holding the closed-form and published reference solutions. It
-lives in its own repository on purpose: a solver that ships its own idea of the
-right answer can agree with itself forever. `tests/test_independence.py` enforces
+shares this repository but stays an independent implementation: the reference
+package does not import the solver it grades. `tests/test_independence.py` enforces
 that the engine never imports it, and that the engine's only dependencies stay
 numpy and scipy.
 
 ```bash
-pip install -e .            # the engine alone: numpy and scipy
-pip install -e '.[test]'    # plus the answer key and the meshers
-pytest                      # everything
-pytest -m "not slow"        # the fast gates, about a minute
+# From the repository root
+python -m pip install -e packages/galerkin   # engine only: numpy and scipy
+# Install the full local test stack using ../../README.md, then:
+python -m pytest -q packages/galerkin/tests
+python -m pytest -q packages/galerkin/tests -m "not slow"
 ```
 
-An editable install puts `galerkin` on the path, so the tests and examples run
-without `PYTHONPATH=.`.
+Run all commands from the repository root. An editable install puts `galerkin`
+on the path, so the tests and examples run without `PYTHONPATH=.`.
 
 The examples keep their own analytical solutions so they run without the test
 extra; two tests check those independent implementations against refsol so the
@@ -80,20 +137,22 @@ pair cannot drift apart.
 ## Run
 
 ```bash
-PYTHONPATH=. python3 examples/coax_convergence.py        # M1 validation
-PYTHONPATH=. python3 examples/waveguide_convergence.py   # M2 convergence
-PYTHONPATH=. python3 examples/cylinder_scattering.py     # M2 scattering
-PYTHONPATH=. python3 examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
-PYTHONPATH=. python3 examples/waveguide_modes.py         # M3-prep eigenmodes
-PYTHONPATH=. python3 examples/fiber_modes.py            # M3a step-index fibre
-PYTHONPATH=. python3 examples/cavity_modes.py           # M3b 3D cavity
-PYTHONPATH=.:examples python3 examples/mesh_io.py       # M3b Gmsh reader
-PYTHONPATH=.:examples python3 examples/visualize.py      # figures
-PYTHONPATH=.:examples python3 examples/visualize_fiber.py  # M3a figure
-PYTHONPATH=.:examples python3 examples/visualize_cavity.py # M3b figure
+python packages/galerkin/examples/coax_convergence.py        # M1 validation
+python packages/galerkin/examples/waveguide_convergence.py   # M2 convergence
+python packages/galerkin/examples/cylinder_scattering.py     # M2 scattering
+python packages/galerkin/examples/cylinder_scattering_pml.py # M2.5 ABC vs PML
+python packages/galerkin/examples/waveguide_modes.py         # M3-prep eigenmodes
+python packages/galerkin/examples/fiber_modes.py            # M3a step-index fibre
+python packages/galerkin/examples/cavity_modes.py           # M3b 3D cavity
+python packages/galerkin/examples/mesh_io.py       # M3b Gmsh reader
+python packages/galerkin/examples/visualize.py      # figures
+python packages/galerkin/examples/visualize_fiber.py  # M3a figure
+python packages/galerkin/examples/visualize_cavity.py # M3b figure
 ```
 
 ## Validation results (2026-09-05)
+
+These are historical measurements from the date above, not a fresh test report.
 
 Every milestone is gated on agreement with an analytical solution plus the
 theoretical convergence rate. A solver is software that can be plausibly wrong;
@@ -279,11 +338,12 @@ the convergence rate is the lie detector.
 - **Dielectric-loaded and open 3D problems**: the tensor-coefficient path exists
   in 3D (`assemble_stiffness_3d` takes (T,3,3) tensors), so the M2.5 PML carries
   over; what is missing is a 3D validation case with an analytical answer.
-- **Beyond electromagnetics**: the assembly core is physics-neutral. Anisotropic
-  steady heat conduction with convective (Robin) boundaries already runs on the
-  M1 routines unchanged; elasticity needs a vector nodal space, transient
-  problems a time integrator, and Stokes a P2 space. M3a's two-field block
-  system is the pattern every coupled multiphysics problem reuses.
+- **Beyond electromagnetics**: the low-level assembly can represent anisotropic
+  coefficients. The public steady-heat API currently accepts homogeneous
+  isotropic conductivity, including prescribed outward flux and Robin boundaries.
+  Static elasticity provides its own vector nodal space. Transient problems need
+  time integration and Stokes needs a P2 space. The M3a two-field block system
+  illustrates an assembly pattern; it does not certify automatic coupling.
 
 ## License
 
@@ -299,3 +359,31 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
+
+## Steady heat boundary contract
+
+The standalone isotropic `galerkin.thermal` API adds prescribed outward flux and
+Robin convection; see [boundary contract](docs/thermal_flux_robin.md),
+[English example](examples/thermal_flux_robin.py), and
+[independent acceptance](docs/thermal_flux_robin_independent_validation.md).
+The contract and independent report distinguish implementation from measured acceptance.
+The headless simcase JSON contract still rejects flux/Robin boundaries; the
+standalone extension does not enable them in Studio or add automatic coupling.
+
+## Explicit one-way thermal–mechanical workflow
+
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity` explicitly solves
+steady Dirichlet/insulated heat, freezes the exact nodal-P1 Kelvin field, and
+runs prescribed-temperature mechanics on the same isolated reference mesh.
+See the [EN/KO implementation contract](docs/thermal_mechanical_workflow.md),
+[English example](examples/thermal_mechanical_workflow.py) and
+[independent acceptance report](docs/thermal_mechanical_independent_validation.md).
+Inputs require explicit m/K declarations; no unit conversion is inferred.
+This Python-only, steady one-way operation adds no JSON/CLI/Studio or persistence
+contract, Robin/flux/traction workflow, transient feedback or thermodynamic
+coupling. Immutable transfer does not certify callbacks or mutable results after
+return. The contract separates heat W/m, mechanical N/m and physical energy J/m.
+
+## Prescribed-temperature total mechanical traction
+
+The [total-traction contract](docs/thermoelastic_traction.md), [English example](examples/thermoelastic_traction.py) and [independent report](docs/thermoelastic_traction_independent_validation.md) describe optional global Cartesian Pa loads on the frozen-temperature mechanical stage. The prescribed mapping is total physical `sigma*n`; do not add/subtract thermal traction. Body, line, thermal loads and constrained reactions remain separately accounted for. Legacy18 positional result construction remains valid; new load fields default to None. There is no dedicated scalar-pressure/local-frame/follower API, but `lambda points_m, normals: -p * normals` is a valid global Pa callback on the fixed reference boundary. This does not extend the heat workflow, JSON/CLI/Studio or persistence.

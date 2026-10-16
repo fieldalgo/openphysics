@@ -1,6 +1,7 @@
 # OpenPhysics
 
-A multiphysics simulation suite. One repository, six packages, each its own PyPI distribution.
+A multiphysics simulation suite. One repository, six implementation packages,
+each its own PyPI distribution, plus the empty `openphysics` name reservation.
 
 ```
 packages/galerkin/         FEM engine (layers 3-6)
@@ -8,8 +9,8 @@ packages/galerkin-refsol/  analytic reference solutions for validation (import n
 packages/meshine/          2D quality mesher
 packages/gmshio/           Gmsh runner + MSH reader (3D meshes)
 packages/physmat/          materials: optical dispersion, refractiveindex.info reader
-packages/openphysics/      model document (JSON) + headless runner, plus the optional
-                           web UI in openphysics/studio/ (FastAPI + static/index.html)
+packages/simcase/      model document (JSON) + headless runner, plus the optional
+                           web UI in simcase/studio/ (FastAPI + static/index.html)
 ```
 
 Packages stay independent where it matters: separate PyPI names, versions, LICENSE, NOTICE and
@@ -17,7 +18,8 @@ README. They share one git history, one test run and one install.
 
 ## Rules
 
-- Code, comments, docstrings, READMEs: English only. This repository is intended to go public.
+- Code, comments, docstrings, API identifiers and executable examples remain English.
+- English is the default language for the repository, READMEs, contribution and security entry points, code, comments and executable examples. Bilingual English/Korean content belongs only under `docs/` directories: English pages at `docs/<name>.md` and complete Korean counterparts at `docs/locales/ko/pages/<name>.md`. Package overview translations belong there, not in separate Korean READMEs. Preserve equations, units, commands, numerical gates and limitations; translations do not imply new tests. Keep language navigation inside documentation, verify relative links and include both documentation versions in source distributions. This follows the explicit user correction of 2026-10-16.
 - Every new physics feature is validated against refsol (analytic) with a mesh-convergence check.
 - Run the whole suite from the repository root: `python -m pytest -q`. A single package is
   `python -m pytest -q packages/<name>/tests` — still the fast inner loop.
@@ -25,23 +27,37 @@ README. They share one git history, one test run and one install.
   shadow the installed packages: the import succeeds but yields an empty namespace package whose
   `__file__` is None, and the failure surfaces far away. The repository root is safe.
 - Third-party integrations are their own package (`gmshio` is the pattern: it shells out to Gmsh,
-  so the GPL stays isolated and the core never implies it). A new backend is a new folder under
+  with its external executable and upstream license documented separately). A new backend is a new folder under
   `packages/` with its own pyproject, not a new repository.
 
 ## Setup
 
     pip install numpy scipy matplotlib shapely fastapi uvicorn pyyaml pytest httpx
     pip install --no-deps -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
-                          -e packages/gmshio -e packages/physmat -e packages/openphysics
+                          -e packages/gmshio -e packages/physmat -e packages/simcase
 
 ## Run the UI
 
-    cd packages/openphysics && python -m openphysics.studio      -> http://127.0.0.1:8765
+From the repository root after installing the packages:
 
-## Elsewhere
+    python -m simcase.studio      -> http://127.0.0.1:8765
 
-Study notes, concept demos and experiments live in the sibling repository `../openphysics-lab`
-(personal account, never published). A path inside it is never public; everything in this
-repository ships with a product one day. When unsure where a file goes, it goes in the lab.
+## Contributions
 
-Background, decisions and validation values: Claude Project "FieldAlgo".
+Use `main` as the only trunk and default branch. Branch from current `origin/main`
+and open a PR to `main`. Every change, including documentation, requires the
+`tests` completion check and `windows-py312-thermal` from GitHub Actions.
+Land green PRs using GitHub Rebase and merge, with no required approving review;
+record the resulting main SHA because GitHub creates new commit IDs. Rebase and
+rerun manually only for conflicts. Do not push directly to main, force-push shared
+work, create merge commits or squash on landing. Merged branches are automatically
+deleted, so preserve any remaining work first. Main push CI validates the combined
+state and must not be cancelled by newer pushes. Fix a failed main the same day;
+if a fix cannot be completed within one hour, submit a revert PR. No merge queue.
+Combine branches only when needed; there is no permanent integration branch.
+Release tags require green checks on the resulting main commit. Branch updates
+alone do not publish packages. Read CONTRIBUTING.md and SECURITY.md
+before submitting changes or reporting vulnerabilities. Keep implementation and
+validation contracts with the code; do not commit private plans, credentials,
+research records or session handoffs. GitHub Actions is enabled with owner approval. Use the retained validation
+workflows and record exact commits, command exits and artifacts.

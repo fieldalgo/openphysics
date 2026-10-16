@@ -1,0 +1,41 @@
+{
+  "openphysics": "0.2",
+  "name": "Steady heat with uniform source",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 30.0,
+      "ymin": 0.0,
+      "ymax": 20.0
+    }
+  },
+  "materials": {},
+  "physics": {
+    "heat1": {
+      "type": "thermal.steady2d",
+      "conductivity_w_mk": 12.5,
+      "heat_source_w_m3": 100000.0,
+      "dirichlet_temperature_k": {
+        "left": 280.0,
+        "right": 315.0
+      }
+    }
+  },
+  "mesh": {
+    "subdivisions": [
+      32,
+      16
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

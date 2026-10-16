@@ -13,11 +13,47 @@ import pytest
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (rectangle_mesh, EdgeSpace, assemble_curlcurl,
-                      assemble_edge_mass, assemble_mass)
+from galerkin import (Mesh, rectangle_mesh, EdgeSpace, assemble_curlcurl,
+                      assemble_edge_mass, assemble_mass, eval_edge_field)
 from conftest import assert_second_order
 
 A_WG, B_WG = 1.0, 0.5
+
+
+@pytest.mark.parametrize("seed", [0, 17, 42])
+def test_edge_numbering_and_physical_orientation_after_mesh_reordering(seed):
+    mesh = rectangle_mesh(A_WG, B_WG, 5, 3)
+    rng = np.random.default_rng(seed)
+    nodes = rng.permutation(mesh.num_nodes)
+    inverse = np.argsort(nodes)
+    triangles = inverse[mesh.triangles[rng.permutation(mesh.num_triangles)]]
+    # Cycle local vertices without changing their physical orientation.
+    for triangle in triangles:
+        triangle[:] = np.roll(triangle, rng.integers(3))
+    mesh = Mesh(mesh.nodes[nodes], triangles, {})
+    space = EdgeSpace(mesh)
+    expected = sorted({tuple(sorted((int(t[i]), int(t[(i + 1) % 3]))))
+                       for t in mesh.triangles for i in range(3)})
+    np.testing.assert_array_equal(space.edges, expected)
+    for triangle, edge_ids in zip(mesh.triangles, space.tri_edges):
+        for opposite, edge_id in enumerate(edge_ids):
+            endpoints = sorted(np.delete(triangle, opposite))
+            np.testing.assert_array_equal(space.edges[edge_id], endpoints)
+    # The circulation of grad(2x - 3y) must reconstruct the same constant field
+    # regardless of global node ids, triangle order and local edge directions.
+    potential = mesh.nodes @ np.array([2.0, -3.0])
+    dofs = potential[space.edges[:, 1]] - potential[space.edges[:, 0]]
+    field = eval_edge_field(space, dofs)
+    np.testing.assert_allclose(field, np.tile([2.0, -3.0], (mesh.num_triangles, 1)), atol=1e-13)
+    np.testing.assert_allclose(assemble_curlcurl(space) @ dofs, 0, atol=1e-10)
+
+
+def test_empty_edge_space_has_valid_empty_maps():
+    mesh = Mesh(np.empty((0, 2)), np.empty((0, 3), dtype=int), {})
+    space = EdgeSpace(mesh)
+    assert space.edges.shape == (0, 2)
+    assert space.tri_edges.shape == space.signs.shape == (0, 3)
+    assert space.boundary_edge_ids().size == 0
 
 
 def _nedelec(nx, ny, k=10, sigma=60.0):

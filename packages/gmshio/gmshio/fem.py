@@ -17,6 +17,20 @@ import numpy as np
 
 from .mesh import Mesh
 
+#: A mesh counts as planar when its largest |z| is under ``PLANE_EPS`` times its own
+#: in-plane extent. Dimensionless: the form it replaces, ``plane_tol * max(1.0, ...)``,
+#: collapsed to a flat 1e-9 for any mesh smaller than one unit, so a 220 nm device
+#: written in metres was judged against a tolerance four orders of magnitude wider
+#: than the device itself and nothing could ever be non-planar.
+PLANE_EPS = 1e-9
+
+
+def _extent(points: np.ndarray) -> float:
+    """Diagonal of the bounding box of ``points`` — the length tolerances are measured against."""
+    if len(points) == 0:
+        return 0.0
+    return float(np.linalg.norm(points.max(axis=0) - points.min(axis=0)))
+
 
 @dataclass
 class FemMesh2D:
@@ -56,20 +70,32 @@ class FemMesh3D:
         return float(self.volumes[self.regions == self.region_names.index(name)].sum())
 
 
-def to_fem2d(mesh: Mesh, plane_tol: float = 1e-9) -> FemMesh2D:
+def to_fem2d(mesh: Mesh, plane_eps: float = PLANE_EPS) -> FemMesh2D:
     """Linear triangles in the z=0 plane -> ``FemMesh2D``.
 
     Region ids follow the physical-surface names in tag order; triangles whose
     entity has no physical group get region id -1. Boundary edges come from
     physical curves. Nodes not used by any triangle are dropped.
+
+    ``plane_eps`` is a fraction of the mesh's own in-plane extent, not a distance.
     """
     tris = mesh.cells("triangle")
     if len(tris) == 0:
         raise ValueError("mesh has no linear triangles (was it generated with dim=2, order=1?)")
     if mesh.cells("triangle6").size or mesh.cells("quad").size:
         raise ValueError("only first-order triangles are supported by to_fem2d")
-    if np.abs(mesh.points[:, 2]).max() > plane_tol * max(1.0, np.abs(mesh.points).max()):
-        raise ValueError("mesh is not planar (z != 0)")
+    extent = _extent(mesh.points[:, :2])
+    if not np.isfinite(extent) or extent <= 0.0:
+        raise ValueError(
+            f"to_fem2d: the {len(mesh.points)} mesh points have no extent in the xy plane, so "
+            f"there is no length to measure planarity against. The mesh is a point or a "
+            f"vertical line, not a planar geometry.")
+    out_of_plane = float(np.abs(mesh.points[:, 2]).max())
+    if out_of_plane > plane_eps * extent:
+        raise ValueError(
+            f"mesh is not planar (z != 0): the largest |z| is {out_of_plane:g}, which is "
+            f"{out_of_plane / extent:g} of the {extent:g}-unit in-plane extent, above the "
+            f"{plane_eps:g} allowed.")
 
     region_names = mesh.names(2)
     tag_to_region = {mesh.physical_tag(n, 2): i for i, n in enumerate(region_names)}

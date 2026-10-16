@@ -93,7 +93,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
 
 
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
-                num_modes: int = 6, mu_r=1.0, pec_nodes=None):
+                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None):
     """Guided modes with effective index near n_target.
 
     n_target: shift-invert target for beta/k0 — the core index is the natural
@@ -101,15 +101,22 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     pec_nodes: nodes carrying n x E = 0; defaults to every boundary node. An open
               guide is truncated by putting this wall out where the evanescent
               cladding field has already died.
+    pec_edges: explicit global EdgeSpace edge ids for tangential E constraints.
+              If omitted, boundary edges with both endpoints in pec_nodes are
+              fixed, preserving the original API. Supply explicit ids for mixed
+              walls: a one-edge PMC wall can have two PEC corner nodes without
+              being a PEC edge. pec_nodes still constrains the nodal E_z values.
 
     Returns (n_eff, space, et, ez) sorted by descending effective index:
       n_eff (m,)      beta / k0
       et    (m, n_e)  edge dofs of E_t  -> use eval_edge_field(space, et[i])
       ez    (m, n_n)  nodal values with E_z = 1j * ez[i]
 
-    The factor of i is physical, not bookkeeping: in a guided mode the longitudinal
-    component sits in quadrature with the transverse one. The relative magnitude of
-    et and ez is scaled correctly, so |E_z|/|E_t| is meaningful.
+    Both coefficient arrays are complex, preserving the eigensolver's full span.
+    The factor of i follows the variable transformation above. For a real basis,
+    the longitudinal component sits in quadrature with the transverse one; a
+    complex combination of degenerate modes need not have that componentwise
+    phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
     """
     A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r)
     n_e, n_n = space.num_edges, mesh.num_nodes
@@ -118,8 +125,11 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
         pec_nodes = np.unique(np.concatenate(
             [mesh.boundary[k] for k in mesh.boundary]))
     pec_nodes = np.asarray(pec_nodes, dtype=int)
+    if pec_edges is None:
+        pec_edges = space.boundary_edge_ids(pec_nodes)
+    pec_edges = np.asarray(pec_edges, dtype=int)
     fixed = np.unique(np.concatenate(
-        [space.boundary_edge_ids(pec_nodes), n_e + pec_nodes]))
+        [pec_edges, n_e + pec_nodes]))
     free = np.setdiff1d(np.arange(n_e + n_n), fixed)
 
     A, B = A[free][:, free].tocsc(), B[free][:, free].tocsc()
@@ -137,13 +147,17 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     keep = keep[np.argsort(beta2[keep])[::-1]]
 
     n_eff = np.sqrt(beta2[keep]) / k0
-    et = np.zeros((len(keep), n_e))
-    ez = np.zeros((len(keep), n_n))
+    et = np.zeros((len(keep), n_e), dtype=complex)
+    ez = np.zeros((len(keep), n_n), dtype=complex)
     for i, j in enumerate(keep):
         v = vecs[:, j]
-        v = v * np.exp(-1j * np.angle(v[np.argmax(np.abs(v))]))  # fix ARPACK's phase
-        x = np.zeros(n_e + n_n)
-        x[free] = v.real
+        pivot = v[np.argmax(np.abs(v))]
+        v = v * (pivot.conjugate() / abs(pivot))  # fix ARPACK's phase
+        # A real pencil can return complex bases of a degenerate eigenspace.
+        # Taking real parts column by column can collapse independent directions.
+        # Preserve each eigenvector; do not mix nearby, distinct eigenpairs.
+        x = np.zeros(n_e + n_n, dtype=complex)
+        x[free] = v
         et[i] = x[:n_e] / np.sqrt(beta2[j])   # e_t = beta E_t  ->  E_t
         ez[i] = x[n_e:]
     return n_eff, space, et, ez

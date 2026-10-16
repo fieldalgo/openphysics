@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simcase"
+version = "0.1.0"
+description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Environment :: Web Environment",
+]
+dependencies = [
+  "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
+  "meshine>=0.1",
+  "physmat>=0.1",
+  "galerkin>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
+Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
+Issues = "https://github.com/FieldAlgo/openphysics/issues"
+
+[project.optional-dependencies]
+# The base install is headless on purpose: a batch or an HPC user must not pull
+# a web stack to run a document.
+studio = ["fastapi>=0.100", "uvicorn>=0.20"]
+test = ["pytest", "httpx", "galerkin-refsol>=0.1"]
+
+[project.scripts]
+simcase = "simcase.cli:main"
+simcase-studio = "simcase.studio.server:main"
+simcase-run = "simcase.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["simcase*"]
+
+[tool.setuptools.package-data]
+"simcase.studio" = ["static/*"]

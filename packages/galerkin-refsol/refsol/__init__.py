@@ -15,9 +15,10 @@ fiber       step-index optical fiber: scalar LP modes and exact vector modes
 metallic    hollow metallic waveguide cutoffs, cavity resonances, coaxial potential
 scattering  plane-wave scattering off a circular cylinder (PEC and dielectric)
 benchmarks  published reference values with citations (Hadley 2002 rib waveguides, ...)
+cavity      complete finite-frequency Cartesian spectrum of a vacuum PEC box
 """
 
-from . import slab, fiber, metallic, scattering, benchmarks
+from . import slab, fiber, metallic, scattering, benchmarks, cavity
 
 __version__ = "0.1.0"
-__all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks"]
+__all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks", "cavity"]

@@ -157,11 +157,7 @@ gmshio = pytest.importorskip("gmshio")
 
 
 def _has_gmsh():
-    try:
-        gmshio.find_gmsh()
-        return True
-    except Exception:
-        return False
+    return gmshio.find_gmsh() is not None
 
 
 needs_gmsh = pytest.mark.skipif(not _has_gmsh(),
