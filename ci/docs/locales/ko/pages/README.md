@@ -343,6 +343,12 @@ Robin/flux입력·저장·자동열–기계연결을 추가하지 않습니다.
 
 ## Headless 과도 배포 검증
 
+Linux job은 과도 문서·실행·독립 수용·Studio 거부·이식 가능한 저장 시험을
+먼저 실행하며 `transient-preflight.xml`에 JUnit 결과를 남깁니다. 실패하면
+비용이 큰 전체 시험 전에 해당 job을 실패로 끝냅니다. 부분 시험 통과나 수용
+요건을 건너뛴 성공으로 처리하지 않습니다. 성공하면 아래의 전체 source·설치
+시험과 기존 수치 gate를 모두 이어서 실행합니다.
+
 helper는 기존 engine 독립 `--suite all` PDE와 archive의 전체 수렴 예제를 유지합니다.
 추가로 simcase 원문 자산20개(runtime/dispatch·소유권 모듈, 사용안내 두 페이지,
 JSON 예제, 생산/계약/Studio/Windows 시험, 독립 수용 파일 네 개)를 요구하여
