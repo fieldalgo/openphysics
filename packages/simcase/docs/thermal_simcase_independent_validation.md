@@ -65,8 +65,8 @@ stage; a fixture rename/replace OSError must not count as cleanup acceptance.
 **Windows is unverified.** Two previously reported Windows failures have no
 established cause in this review: actual errno/winerror/stage evidence is needed.
 Linux execution and static inspection do not prove Windows support or a fix.
-GitHub Actions are prohibited by the current instruction: no enable, dispatch
-or rerun; Windows runner validation is stopped/unverified.
+GitHub Actions is enabled as of 2026-10-16. Windows acceptance still requires
+fresh runner evidence; the earlier failures remain part of this report.
 
 A separate deterministic Linux interleaving diagnostic found a remaining
 pathname TOCTOU limit: replacing model.json after cleanup's ownership check

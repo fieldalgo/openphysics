@@ -131,7 +131,8 @@ are outside the measured full-regression scope. The narrow Windows 2022 /
 Python 3.12.10 save-I/O gate remains incomplete with two unresolved failures;
 Linux results do not establish Windows acceptance. `OS Independent` classifiers
 and `py3-none-any` wheels describe metadata, not a tested platform matrix.
-GitHub Actions is currently disabled; validation is performed separately.
+GitHub Actions is enabled. Recorded cloud results remain evidence for their
+original snapshots; check the exact workflow run for newer commits.
 
 ## Documentation and contributions
 

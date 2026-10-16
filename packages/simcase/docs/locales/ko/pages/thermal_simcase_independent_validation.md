@@ -16,7 +16,7 @@ sdist7개에서 wheel7개를 생성했습니다. 기존 sdist asset gate7개와 
 
 후속 생산 **94bd34b5711521d805bdce4bee17852895041344**는929 대비 생산 fault-injection 시험과 한·영 guide만 변경합니다. 생산 `simcase/thermal.py`는 blob **7823d39f451cad1c6b53d2f8dde7899fd854321c**로 byte 동일합니다. 독립 Linux 리뷰에서 엄격해진 fault5개는 source·실제 installed **5 + 5개 통과**했습니다. 기존 독립 저장·CLI 선별 시험은 별도로 **34 + 34개 통과**, 각105개 deselected이며139개 전체 재실행이 아닙니다. 새 assertion은 의도한 주입 오류와 교체 완료 단계를 요구합니다. fixture rename/replace의 OSError를 cleanup 수용 통과로 세면 안 됩니다.
 
-**Windows는 미검증입니다.** 이전 보고된 Windows 실패2개의 원인은 이 리뷰에서 확정하지 않았으며 실제 errno/winerror/stage 근거가 필요합니다. Linux 실행과 정적 검토는 Windows 지원이나 수정 완료를 입증하지 않습니다. 최신 지시로 GitHub Actions 활성화·dispatch·재실행은 금지하며 Windows runner 검증은 중단·미검증입니다.
+**Windows는 미검증입니다.** 이전 보고된 Windows 실패2개의 원인은 이 리뷰에서 확정하지 않았으며 실제 errno/winerror/stage 근거가 필요합니다. Linux 실행과 정적 검토는 Windows 지원이나 수정 완료를 입증하지 않습니다. 2026-10-16 오너 승인으로 GitHub Actions는 활성화됐습니다. Windows 수용에는 새 runner 근거가 필요하며 이 보고의 이전 실패는 보존합니다.
 
 별도의 결정론적 Linux interleaving 진단에서 pathname TOCTOU 한계를 확인했습니다. cleanup의 소유 확인 뒤 unlink 전에 model.json을 교체하면 source·installed 모두 foreign replacement를 삭제했습니다. 두 번째 writer를 check/use 간격에 스케줄링한 것이며 Windows 실패2개의 원인 진단은 아닙니다. inode pin과 검사는 이미 교체된 파일의 시험 사례를 보호하지만 pathname 작업을 원자적으로 만들지는 않습니다. 생산 수정 완료를 주장하지 않습니다. 지원하는 fresh-output 계약은 호출자가 배타적으로 통제하는 출력 경로를 요구합니다. save와 실패 시 cleanup이 모두 끝날 때까지 다른 writer가 출력을 변경하지 않도록 해야 합니다. 검사 전에 이미 관측한 교체의 보존과 check/use race 도중 교체의 보존은 다르며 후자는 보장하지 않습니다. 제한된 동시 save 시험은 새 target 획득의 배타성을 확인할 뿐 일반적인 외부 동시 writer 보호를 입증하지 않습니다. 적대적 race·crash recovery·thermal Studio UI·heat-to-mechanical 연성은 이 수용 주장의 범위 밖입니다.
 

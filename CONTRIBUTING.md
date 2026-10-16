@@ -13,8 +13,8 @@ channel in [SECURITY.md](SECURITY.md).
 
 Install and run from the repository root as described in [README.md](README.md).
 Use [validation guide](ci/docs/README.md) for the pinned Linux validation environment,
-optional tools and data, and isolated distribution checks. GitHub Actions is
-currently disabled; do not enable or dispatch workflows as part of a contribution.
+optional tools and data, and isolated distribution checks. GitHub Actions is enabled for pushes and pull requests. Review the exact
+workflow results and artifacts when validating a contribution.
 Record the exact commands, exits, failures and optional skips from your own checks.
 
 Physics changes need independent analytical references and mesh-convergence
