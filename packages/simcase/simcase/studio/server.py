@@ -27,6 +27,7 @@ from pydantic import BaseModel
 import physmat
 from simcase import Document, DocumentError, build_mesh, examples, run, unit_vocabulary
 from . import thermal_api as thermal
+from . import transient_thermal_api as transient
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version="0.1.0")
@@ -194,21 +195,29 @@ def _thermal_error(exc):
 
 @app.get("/api/capabilities")
 def studio_capabilities():
-    return thermal.capabilities(_thermal_jobs.limits)
+    caps = thermal.capabilities(_thermal_jobs.limits)
+    caps[transient.KIND] = transient.capabilities()
+    return caps
 
 
 @app.post("/api/thermal/validate")
 async def validate_thermal(body: Request):
     spec = None
+    permit = None
+    jobs = _thermal_jobs
     try:
-        spec = await thermal.read_request(body, _thermal_jobs.limits, for_run=False)
-        payload = thermal.validation_payload(spec, _thermal_jobs.limits)
+        permit = jobs.ingress.acquire()
+        spec = await thermal.read_request(body, jobs.limits, for_run=False)
+        payload = thermal.validation_payload(spec, jobs.limits)
         return Response(payload, media_type="application/json", headers={"Cache-Control": "no-store"})
     except thermal.ThermalAPIError as exc:
         return _thermal_error(exc)
     except Exception as exc:
         return _thermal_error(thermal.ThermalAPIError(
             "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
+    finally:
+        if permit is not None:
+            permit.release()
 
 
 def _start_thermal_thread(target, args):
@@ -241,7 +250,9 @@ async def start_thermal_run(body: Request):
     spec = None
     lease = None
     identity = {}
+    permit = None
     try:
+        permit = jobs.ingress.acquire()
         spec = await thermal.read_request(body, jobs.limits, for_run=True)
         # copy() resets scale; validation restores it before the worker owns it.
         doc = spec.doc.copy()
@@ -266,16 +277,19 @@ async def start_thermal_run(body: Request):
             "thread_start_failed" if lease is not None else "invalid_document",
             str(exc), 500 if lease is not None else 400,
             tags={**(spec.tags() if spec else {}), **identity}))
+    finally:
+        if permit is not None:
+            permit.release()
 
 
 @app.get("/api/jobs/{job_id}")
-def job_status(job_id: str, request: Request):
+async def job_status(job_id: str, request: Request):
     if job_id.startswith("thermal-"):
         try:
             if request.query_params:
                 raise thermal.ThermalAPIError("unsupported_query", "thermal status has no field/time selector")
-            return Response(_thermal_jobs.status(job_id), media_type="application/json",
-                            headers={"Cache-Control": "no-store"})
+            pin = _thermal_jobs.pin(job_id)
+            return ThermalResponse(pin.payload, pin)
         except thermal.ThermalAPIError as exc:
             return _thermal_error(exc)
     with _jobs_lock:
@@ -286,13 +300,13 @@ def job_status(job_id: str, request: Request):
 
 
 @app.get("/api/jobs/{job_id}/result")
-def job_result(job_id: str, request: Request):
+async def job_result(job_id: str, request: Request):
     if job_id.startswith("thermal-"):
         try:
             if request.query_params:
                 raise thermal.ThermalAPIError("unsupported_query", "steady thermal results have no field/time selector")
-            return Response(_thermal_jobs.result(job_id), media_type="application/json",
-                            headers={"Cache-Control": "no-store"})
+            pin = _thermal_jobs.pin(job_id, result=True)
+            return ThermalResponse(pin.payload, pin)
         except thermal.ThermalAPIError as exc:
             return _thermal_error(exc)
     with _jobs_lock:
@@ -302,6 +316,144 @@ def job_result(job_id: str, request: Request):
     if job["status"] != "done":
         raise HTTPException(409, f"job is {job['status']}")
     return job["result"]
+
+
+
+
+class ThermalResponse(Response):
+    """Drop transport references before releasing their logical allocation pins."""
+
+    def __init__(self, payload, *leases):
+        self._leases = leases
+        try:
+            super().__init__(payload, media_type="application/json",
+                             headers={"Cache-Control": "no-store"})
+        except BaseException:
+            self.body = b""
+            self._leases = ()
+            for lease in reversed(leases):
+                lease.release()
+            raise
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.body = b""
+            leases, self._leases = self._leases, ()
+            for lease in reversed(leases):
+                lease.release()
+
+
+def _transient_error(exc):
+    exc.tags = {"kind": transient.KIND, **exc.tags}
+    return _thermal_error(exc)
+
+
+@app.post("/api/thermal/transient/validate")
+async def validate_transient(body: Request):
+    jobs, permit, spec = _thermal_jobs, None, None
+    try:
+        permit = jobs.ingress.acquire()
+        spec = await transient.read_request(body, jobs.limits, for_run=False)
+        encoded = transient.validation_payload(spec, jobs.limits)
+        return Response(encoded, media_type="application/json", headers={"Cache-Control": "no-store"})
+    except thermal.ThermalAPIError as exc:
+        return _transient_error(exc)
+    except Exception as exc:
+        return _transient_error(thermal.ThermalAPIError(
+            "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
+    finally:
+        if permit is not None:
+            permit.release()
+
+
+def _run_transient_job(jobs, lease, doc):
+    stage = "solver_failed"
+    try:
+        result = run(doc, verbose=False)
+        stage = "invalid_result"
+        manifest, arrays, scale = transient.capture_result(result, jobs.identity(lease), jobs.limits, doc)
+        stage = "publication_failed"
+        jobs.complete_transient(lease, manifest, arrays, result.log, scale)
+    except Exception as exc:
+        try:
+            jobs.fail(lease, exc, stage)
+        except Exception:
+            pass
+    finally:
+        jobs.release(lease)
+
+
+@app.post("/api/thermal/transient/run")
+async def start_transient(body: Request):
+    jobs, permit, spec, lease = _thermal_jobs, None, None, None
+    identity = {}
+    try:
+        permit = jobs.ingress.acquire()
+        spec = await transient.read_request(body, jobs.limits, for_run=True)
+        doc = spec.doc.copy()
+        doc.validate()
+        lease = jobs.reserve(transient.reservation(jobs.limits))
+        token = uuid.uuid4().hex
+        identity = jobs.attach(lease, "thermal-transient-"+token, "result-"+token, spec)
+        _start_thermal_thread(_run_transient_job, (jobs, lease, doc))
+        return JSONResponse(identity, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        if lease is not None:
+            try:
+                jobs.fail(lease, exc, "thread_start_failed")
+            except Exception:
+                pass
+            finally:
+                jobs.release(lease)
+        if isinstance(exc, thermal.ThermalAPIError):
+            exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
+            return _transient_error(exc)
+        return _transient_error(thermal.ThermalAPIError(
+            "thread_start_failed" if lease is not None else "invalid_document",
+            str(exc), 500 if lease is not None else 400,
+            tags={**(spec.tags() if spec else {}), **identity}))
+    finally:
+        if permit is not None:
+            permit.release()
+
+
+def _transient_view(job_id, request, *, history):
+    jobs, permit, pin = _thermal_jobs, None, None
+    query = None
+    try:
+        query = transient.parse_query(request.query_params, history=history)
+        pin = jobs.pin(job_id, result=True, result_id=query["result_id"])
+        permit = jobs.begin_read(transient.ENCODED_BYTES)
+        encoded = transient.encode_view(pin.record, query, history=history)
+        permit.publish(encoded)
+        return ThermalResponse(encoded, permit, pin)
+    except Exception as exc:
+        identity = dict(pin.record["identity"]) if pin is not None and pin.record is not None else {}
+        if pin is not None:
+            pin.release()
+        if permit is not None:
+            permit.release()
+        if not isinstance(exc, thermal.ThermalAPIError):
+            exc = thermal.ThermalAPIError("view_failed", str(exc), 500)
+        exc.tags = {**identity, **exc.tags}
+        if not identity:
+            exc.tags.setdefault("requested_job", thermal.limited_text(job_id, 128))
+        if query is not None:
+            exc.tags.update({k: v for k, v in query.items() if k != "result_id"})
+            exc.tags["requested_result_id"] = query["result_id"]
+        return _transient_error(exc)
+
+
+@app.get("/api/jobs/{job_id}/frame")
+async def transient_frame(job_id: str, request: Request):
+    return _transient_view(job_id, request, history=False)
+
+
+@app.get("/api/jobs/{job_id}/history")
+async def transient_history(job_id: str, request: Request):
+    return _transient_view(job_id, request, history=True)
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
