@@ -104,3 +104,38 @@ The prepared suite now declares eleven test methods (not collected passes). It a
 includes omitted reference-offset, fixed-corner-load removal, thermostat-only
 total-outward, and saved format/layout/unit/object/nonfinite actors. Source review
 alone has not executed any of these controls.
+
+## Exact implementation binding review
+
+Static review read schema/contract at 4bd15626fe37c306eb6265f1db1b308c6b580460
+and runtime at 56238cd76ab09e422344ef54e89d68f5a1aa579e. These are parallel
+submissions, not an executed combined checkout. The numerical engine remains
+thermal.py blob4633e03953d8f6369bdf0e7398d2ebd85b2b4684.
+
+The observed names match the independent consumer. Runtime thermal.py539–598
+validates/copies the document, maps the five boundary keywords, captures inputs
+before the solve and checks the four returned boundary arrays. Lines600–619
+separate source, prescribed outward, convection and thermostat rates; total
+outward includes all three boundary contributions. Lines430–472 allow empty
+fixed indices for v2 and retain thirteen finite numeric fields. Lines352–386
+capture copied canonical data before later validation; ordinary document edits
+fail before defaults can be restored. Lines498–529 publish the adopted v2
+metadata and original model snapshot. No confirmed production blocker was
+identified by this source review.
+
+Contract validation distinguishes absence from empty-map presence, h0 from a
+positive Robin anchor, and one fixed endpoint from a fully fixed natural edge.
+Its edge identity checks all six side-pair intersections and derives selected
+Dirichlet nodes from actual exterior edge endpoints.
+
+The engine directly implements rhs=fQ+B-G, stable shifted Robin offsets,
+C=H*increment-shifted_B, original fixed-node reactions and both original
+normalized1e-10 guards. The independent oracle still uses original absolute
+mathematical forms and analytic solutions rather than these helpers as truth.
+Source inspection does not establish floating-point accuracy.
+
+A test-interface defect in the initial snapshot test was corrected: Document
+does not implement item assignment; mutation now uses doc.data["name"] and
+result.doc.data["name"]. The original expectation and all gates are unchanged.
+No numerical reproduction, source/installed pass or CLI execution is claimed.
+Actual combined-candidate CI and original diagnostic arrays are still required.
