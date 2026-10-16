@@ -430,7 +430,6 @@ class ThermalRunResult:
     def residual_w_per_m(self): return self.solution.residual
 
     def _raw_arrays(self):
-        self._validated_document()
         arrays = dict(nodes_m=np.asarray(self.mesh.nodes), triangles=np.asarray(self.mesh.triangles),
                       temperature_k=np.asarray(self.temperature_k), heat_flux_w_m2=np.asarray(self.heat_flux_w_m2),
                       load_w_per_m=np.asarray(self.load_w_per_m), reaction_w_per_m=np.asarray(self.reaction_w_per_m),
@@ -444,6 +443,7 @@ class ThermalRunResult:
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
+        self._validated_document()
         self._validate_mesh_snapshot()
         nodes, tris, fixed = arrays['nodes_m'], arrays['triangles'], arrays['dirichlet_node_ids']
         if nodes.ndim != 2 or nodes.shape[1] != 2 or len(nodes) < 3:
