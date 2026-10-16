@@ -650,10 +650,15 @@ class RecordPin:
 
     def release(self):
         with self._release_lock:
-            if not self.released:
-                self.released = True
-                if self.jobs is not None:
-                    if self.record is None:
-                        self.jobs._unpin_snapshot(self)
-                    else:
-                        self.jobs._unpin(self.record)
+            if self.released:
+                return
+            self.released = True
+            self.payload = None
+            record, self.record = self.record, None
+            jobs, self.jobs = self.jobs, None
+            if jobs is not None:
+                if record is None:
+                    jobs._unpin_snapshot(self.allocation)
+                else:
+                    jobs._unpin(record)
+            record = None
