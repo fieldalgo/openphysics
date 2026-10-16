@@ -2,6 +2,13 @@
 
 [한국어](locales/ko/pages/thermal_steady2d.md)
 
+This page describes the legacy v1 path without the new natural-boundary keys.
+The [boundary extension guide](thermal_steady_boundary2d.md) documents the
+submitted constant outward-flux/convection candidate. New-key presence, even
+an empty mapping, selects v2. Robin-only anchoring with empty Dirichlet,
+additional raw fields and total outward heat are defined there.
+Candidate implementation is distinct from incomplete P2 numerical/installed acceptance.
+
 `thermal.steady2d` solves `-div(k grad T) = Q` in a single homogeneous
 2D rectangle of unit out-of-plane thickness. It uses the existing P1 thermal
 engine. This document describes the headless API and CLI; Studio rejects these
@@ -32,8 +39,9 @@ integers. `4` is accepted; `4.0`, `true`, zero and negative counts are rejected.
 `materials` is empty, there is exactly one physics, and `study` is
 `{"type":"single"}`. `results` accepts boolean `save_fields` and `plots`;
 `plots` must be false (the default). Optical material/dispersion/wavelength keys,
-shapes, sweeps, extra keys, region-dependent k, Neumann/Robin, transient, coupled
-and 3D requests are rejected.
+shapes, sweeps, extra keys, region-dependent k, transient, coupled
+and 3D requests are rejected on this steady path. Natural boundary keys use the
+separate boundary-extension contract, rather than the legacy v1 validator.
 
 Generate the complete examples and run them:
 
