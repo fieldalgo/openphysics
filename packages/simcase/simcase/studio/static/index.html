@@ -227,9 +227,15 @@ const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalS
 
 function isTransientDoc(data=doc) { return Object.values(data?.physics||{}).some(p=>p?.type==='thermal.transient2d'); }
 function transientSupported() { return !!transientController?.supports(doc); }
-function clearTransientField(message='No accepted saved-time frame') {
+let transientDisplayed=null,transientViewError=null;
+function refreshTransientMarkers() {
+  if(isTransientDoc()&&transientController)for(const page of Object.values(transientController.state().pages))renderTransientHistory(page);
+}
+function clearTransientField(message='No accepted saved-time frame',viewError=false) {
+  transientDisplayed=null;transientViewError=viewError?message:null;
   const cv=$('fieldCanvas');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv.onmousemove=null;
   $('resInfo').textContent=message;
+  refreshTransientMarkers();
 }
 const transientController=typeof TransientThermalStudio==='undefined'?null:TransientThermalStudio.createController({
   request:async(method,url,body,rawDoc)=>{
@@ -251,6 +257,7 @@ const transientController=typeof TransientThermalStudio==='undefined'?null:Trans
     $('transientRetry').disabled=!nt||state.readActive;
     $('transientReadH').disabled=$('transientReadV').disabled=!nt||state.readActive;
     if(state.error){status(state.error);log(state.error,'err');}
+    else if(transientViewError)status(transientViewError);
     else status(state.busy?'transient request…':state.readActive?'reading saved transient data…':
       state.frame?'transient frame ready':state.manifest?'select a saved frame':state.validated?'transient thermal valid':'validate current transient JSON');
   },
@@ -287,11 +294,19 @@ function renderTransientHistory(page) {
   const table=document.createElement('table');
   page.time_indices.forEach((index,i)=>{
     const row=document.createElement('tr'),button=document.createElement('button'),value=document.createElement('td'),time=document.createElement('td');
-    button.textContent='index '+index+(state.frame&&state.index===index?' (current frame)':'');button.onclick=()=>selectTransient(index);
+    button.textContent='index '+index+(transientDisplayed?.frame===state.frame&&transientDisplayed?.manifest===state.manifest&&transientDisplayed?.index===index?' (current frame)':'');button.onclick=()=>selectTransient(index);
     const cell=document.createElement('td');cell.appendChild(button);row.appendChild(cell);
     time.textContent='t = '+page.time_s[i]+' s';value.textContent=String(page.arrays[page.field][i])+' '+page.unit;
     row.appendChild(time);row.appendChild(value);table.appendChild(row);
   });host.appendChild(table);
+}
+function rejectTransientRender(token,error,meshFailure=false) {
+  if(!transientController.renderCurrent(token))return;
+  if(transientController.rejectView(token,error.message))return;
+  clearTransientField('view error: '+error.message,true);
+  if(meshFailure){const cv=$('meshCanvas');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
+    $('meshInfo').textContent='Mesh view error: '+error.message;$('meshLegend').textContent='';}
+  status(error.message);log(error.message,'err');
 }
 function drawTransientViews() {
   const state=transientController?.state(),man=state?.manifest;
@@ -314,6 +329,7 @@ function drawTransientViews() {
       const model=TransientThermalStudio.model(man,state.frame,state.view);
       if(!current())return;ThermalStudio.draw(cv,model,{current});
       if(!current())return;
+      transientDisplayed={manifest:man,frame:state.frame,index:state.index};transientViewError=null;refreshTransientMarkers();
       $('resInfo').textContent='Saved index '+state.index+'; t = '+state.frame.time_s+' s; '+model.field+' ['+model.unit+
         ']; current-frame raw '+model.min+' … '+model.max+'; colours rescale per frame';
       cv.onmousemove=e=>{
@@ -324,8 +340,8 @@ function drawTransientViews() {
         if(value!==null)$('resInfo').textContent='Saved index '+state.index+'; t = '+state.frame.time_s+' s; '+model.field+
           ' = '+value+' '+model.unit+'; current-frame raw '+model.min+' … '+model.max;
       };
-    }catch(error){if(current()){clearTransientField(state.view+' — view error: '+error.message);status(error.message);log(error.message,'err');}}
-  }).catch(error=>{if(transientController.renderCurrent(token)){status(error.message);log(error.message,'err');}});
+    }catch(error){rejectTransientRender(token,error);}
+  }).catch(error=>rejectTransientRender(token,error,true));
 }
 function selectTransient(index) {
   if(!transientController?.result())return;
@@ -334,7 +350,7 @@ function selectTransient(index) {
     if(!/^(0|[1-9]\d*)$/.test(raw))throw Error('Select an integer saved time index');
     transientController.select(Number(raw),$('thermalField').value||'temperature_k');
     $('transientTime').value=Number(raw);
-  }catch(error){clearTransientField(error.message);status(error.message);log(error.message,'err');}
+  }catch(error){clearTransientField(error.message,true);status(error.message);log(error.message,'err');}
 }
 function readTransientHistory(field) {
   try{
@@ -724,7 +740,7 @@ function refresh() {
   }
   if (!editorDirty) $('json').value = rawDocumentText !== null && isHeadlessThermal() ? rawDocumentText : JSON.stringify(doc, null, 2);
   if (isHeadlessThermal() && thermalSupported()) {
-    clearResultViews(); $('tree').innerHTML=''; $('props').textContent='Steady heat: edit JSON, validate, then run. Mesh is available only from the result. No transient UI.';
+    clearResultViews(); $('tree').innerHTML=''; $('props').textContent='Steady heat: edit JSON, validate, then run. Mesh is available only from the result.';
     $('meshBtn').disabled=true;
     $('runBtn').disabled=editorDirty || thermalController.gate.dirty || thermalController.gate.busy || thermalController.state().cap?.run_enabled!==true;
     $('thermalControls').hidden=!thermalController.result(); drawThermalViews(); return;
@@ -864,4 +880,3 @@ window.addEventListener('resize', redrawAll);
 </script>
 </body>
 </html>
-

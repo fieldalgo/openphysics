@@ -280,15 +280,56 @@ test('shipped current magnitude overflow clears field only and newer temperature
   p.run('const normalFetch=fetch;globalThis.fetch=async(...args)=>{const response=await normalFetch(...args);return {...response,json:async()=>{const value=await response.json();'
     +'if(value.payload_format==="studio-thermal-transient-frame-v1"&&value.field==="heat_flux_w_m2")value.arrays.heat_flux_w_m2=[[Number.MAX_VALUE,Number.MAX_VALUE],[1,0]];return value;}};};');
   await p.element('runBtn').onclick();await tick();
+  p.element('transientReadH').onclick();await tick();
+  const marker=()=>p.element('transientH').children.at(-1).children.some(row=>row.children[0].children[0].textContent.includes('(current frame)'));
+  assert.equal(marker(),true);
   p.element('thermalField').value='magnitude';p.element('thermalField').onchange();await tick();
-  assert.match(p.element('resInfo').textContent,/view error.*overflow/);assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.match(p.element('resInfo').textContent,/derived field magnitude overflow/);assert.equal(p.element('fieldCanvas').onmousemove,null);
+  assert.equal(p.run('transientController.state().frame'),null);
+  assert.doesNotMatch(p.element('status').textContent,/frame ready/);
+  assert.equal(marker(),false);
   assert.ok(p.run('transientController.result()'));p.tab('mesh');await tick();assert.match(p.element('meshInfo').textContent,/Actual transient result mesh/);
   p.element('thermalField').value='temperature_k';p.element('thermalField').onchange();p.tab('results');await tick();
   assert.match(p.element('resInfo').textContent,/index 4.*raw 400 … 403/);
   assert.equal(typeof p.element('fieldCanvas').onmousemove,'function');
+  assert.equal(marker(),true);
 });
 test('refresh preserves an accepted transient view rather than clearing panels through steady fallback',async()=>{
   const p=await readyPage();await p.element('runBtn').onclick();await tick();p.run('refresh()');await tick();
   assert.equal(p.element('transientControls').hidden,false);assert.equal(p.element('transientHistory').hidden,false);
   assert.match(p.element('resInfo').textContent,/index 4/);
+});
+
+test('controller rejects only current render frame and stale render error cannot clear newer frame',async()=>{
+  const {c}=boot();await c.loadCapability();await c.validate(doc());await c.run();await tick();
+  const old=c.renderToken();c.select(2);await tick();const current=c.renderToken(),before=c.state().frame;
+  assert.equal(c.rejectView(old,'old render error'),false);assert.equal(c.state().frame,before);
+  assert.equal(c.rejectView(current,'current canvas failure'),true);
+  assert.equal(c.state().frame,null);assert.ok(c.result());assert.match(c.state().error,/current canvas failure/);
+});
+test('shipped canvas failure rejects accepted frame and clears history current markers',async()=>{
+  const p=await readyPage();await p.element('runBtn').onclick();await tick();
+  p.element('transientReadH').onclick();await tick();
+  p.run('const drawBeforeFailure=ThermalStudio.draw;ThermalStudio.draw=(canvas,model,options)=>{'
+    +'if(canvas===document.getElementById("fieldCanvas"))throw Error("injected current canvas failure");'
+    +'return drawBeforeFailure(canvas,model,options);};drawTransientViews();');
+  await tick();assert.equal(p.run('transientController.state().frame'),null);
+  assert.ok(p.run('transientController.result()'));assert.equal(p.element('fieldCanvas').onmousemove,null);
+  const table=p.element('transientH').children.at(-1);
+  assert.equal(table.children.some(row=>row.children[0].children[0].textContent.includes('(current frame)')),false);
+  assert.match(p.element('status').textContent,/canvas failure/);
+});
+test('shipped mesh display overflow clears stale field and mesh rather than falling outside rejection',async()=>{
+  const p=await readyPage();p.run('fixtureManifest.display_length_in_m=Number.MIN_VALUE;'
+    +'const fetchBeforeScale=fetch;globalThis.fetch=async(...args)=>{const response=await fetchBeforeScale(...args);'
+    +'return {...response,json:async()=>{const value=await response.json();if(value.payload_format==="studio-thermal-transient-frame-v1")value.display_length_in_m=Number.MIN_VALUE;return value;}};};');
+  await p.element('runBtn').onclick();await tick();
+  const fieldClears=p.element('fieldCanvas').calls.filter(x=>x==='clear').length;
+  const meshClears=p.element('meshCanvas').calls.filter(x=>x==='clear').length;
+  p.tab('mesh');await tick();
+  assert.equal(p.run('transientController.state().frame'),null);assert.ok(p.run('transientController.result()'));
+  assert.ok(p.element('fieldCanvas').calls.filter(x=>x==='clear').length>fieldClears);
+  assert.ok(p.element('meshCanvas').calls.filter(x=>x==='clear').length>meshClears);
+  assert.match(p.element('meshInfo').textContent,/Mesh view error.*overflow/);
+  assert.equal(p.element('fieldCanvas').onmousemove,null);
 });
