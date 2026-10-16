@@ -154,3 +154,35 @@ evicted ID는404이다. reset/TTL대기/mesh수열축소/skip없이
 확정binding blocker미발견으로정적범위를승인한다.
 실제HTTP/source/installed/음성거절/자원동작은정확결합CI가필요하다.
 실측성능/browser/플랫폼수용은아니다.
+
+## 정상경계 main 반영 후 Studio 재개 검토
+
+main49ff59874af3c5140d0e8126b1feb18964953e7e의정상경계독립oracle와cases는
+각각blob8957c5663e4dfacb62331c46c215f5872732c6bc,
+963e6850099c1b5ffe458c9bd31b373327546f04로기존검토수학/fixture/gate와같다.
+참조import는이제미게시의존이아닌반영된base에존재한다.
+
+server/adapter c762c4e5fdb9700978a24f639e694630477b8679를검토했다.
+server는blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b유지,
+adapter는blob6ecec32a623d7f92ba6f4543d46b3fb1d3bd8170이다.
+강화된log/error status byte계산은물리payload필드나공개runhook을바꾸지않는다.
+
+순차HTTPmesh loop는각현재result를완전히수신/감사한뒤다음job을제출한다.
+따라서이전terminal eviction은기대배열을바꾸거나과거jobID재조회를요구하지않는다.
+n64는4225node/8192cell로설정10201/20000이내이고,
+이차leftD65인v2 rawscalar는83340개이다.
+정적크기사실이며encoding용량/peakmemory실측보장이아니다.
+admission/publication압박으로300s전released done/error를회수할수있고
+active/optical은별도보존한다. reset/TTLsleep/skip/mesh축소는추가하지않았다.
+
+독립consumer정적틈을찾았다. Python동등비교에서metadata차원5.0이정수5와
+같게통과할수있었다. 이제shape는list이며각항목정확int/nonbool을요구하고,
+mapping형식/unit키/safeinteger·비어있지않은responseidentity도검사한다.
+float/bool차원과float/bool/emptyidentity음성5개를추가했다.
+이전15wire음성과6malformed공개result actor는그대로이며
+물리기대값/4mesh/모든수치허용치는변경하지않았다.
+
+조건부정적승인: main49ff/Fc762 binding의확정blocker미발견.
+metadata틈은독립consumer시험정의문제이며확정생산결함이아니다.
+Pythonparse/pytest/HTTP/solver/installed/browser/플랫폼실행은없었다.
+실제반복run과전음성을포함한정확결합Studio source/installedCI가여전히필요하다.
