@@ -12,9 +12,10 @@ const T=require('../simcase/studio/static/thermal.js');
 const copy=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 function cap(){return {capability_format:'studio-capabilities-v1','thermal.steady2d':{
-  validate:'/api/thermal/validate',run:'/api/thermal/run',input:'json',mesh_preview:false,
+  supported:true,run_enabled:true,validate:'/api/thermal/validate',run:'/api/thermal/run',input:'json',mesh_preview:false,
   mesh_from_result:true,time_navigation:false,result_formats:Object.keys(T.PAIRS),
-  field_layouts:Object.values(T.PAIRS),fields:['temperature_k','heat_flux_w_m2']}};}
+  field_layouts:Object.values(T.PAIRS),fields:['temperature_k','heat_flux_w_m2'],
+  limits:{request_bytes:1048576,max_nodes:10201,max_triangles:20000,payload_bytes:16777216,active_jobs:1,terminal_jobs:2,terminal_bytes:33554432,ttl_seconds:300,log_bytes:65536,error_bytes:4096,metadata_bytes:65536,status_bytes:131072}}};}
 function doc(){return {openphysics:'0.2',name:'Heat',units:{length:'m',temperature:'K'},
   geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1}},physics:{heat1:{type:T.TYPE}},
   mesh:{subdivisions:[1,1]},study:{type:'single'}};}
@@ -27,13 +28,13 @@ function payload({v2=true,D=0,revision=0,sequence=1}={}){
   const result_format='thermal.steady2d-result-v'+(v2?2:1),field_layout=T.PAIRS[result_format];
   const spec={...T.BASE};if(v2)T.ADDED.forEach(k=>spec[k]=['W/m','nodes',0]);
   const summary={physics_type:T.TYPE,result_format,field_layout,units:{length:'m',temperature:'K'},
-    mesh_length_unit:'m',field_units:{},field_locations:{},field_shapes:{}};
+    mesh_length_unit:'m',mesh:{nodes:4,triangles:2},field_units:{},field_locations:{},field_shapes:{}};
   for(const[k,[unit,location,cols]]of Object.entries(spec)){
     summary.field_units[k]=unit;summary.field_locations[k]=location;
     summary.field_shapes[k]=cols?[arrays[k].length,cols]:[arrays[k].length];
   }
   return {payload_format:'studio-thermal-steady-v1',kind:T.TYPE,job:'job1',result_id:'res1',
-    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,display_length_in_m:1};
+    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,coordinates:{raw_unit:'m',display_unit:'m',display_length_in_m:1}};
 }
 function canvas(W=200,H=160){
   const calls=[],ctx=new Proxy({createImageData:(w,h)=>({width:w,height:h,data:new Uint8ClampedArray(w*h*4)}),
@@ -84,7 +85,7 @@ test('malformed payload refuses '+mutation,()=>{
   if(mutation==='missing')delete p.arrays.ambient_load_w_per_m;
   if(mutation==='extra')p.arrays.neff=[1];
   if(mutation==='owner')p.job='other';
-  if(mutation==='display')p.display_length_in_m=0;
+  if(mutation==='display')p.coordinates.display_length_in_m=0;
   assert.throws(()=>T.validatePayload(p,{job:'job1',result_id:'res1',client_revision:0,request_seq:1}));
 });
 test('nodal P1 interpolation differs from flat-cell flux, no nodal averaging',()=>{
@@ -97,7 +98,7 @@ test('nodal P1 interpolation differs from flat-cell flux, no nodal averaging',()
   assert.deepEqual(p.arrays.temperature_k,[0,1,2,3]);
 });
 test('raw negative constant K and explicit length conversion remain unchanged',()=>{
-  const p=payload();p.arrays.temperature_k.fill(-10);p.display_length_in_m=.001;p.summary.units.length='mm';
+  const p=payload();p.arrays.temperature_k.fill(-10);p.coordinates.display_length_in_m=.001;p.coordinates.display_unit='mm';p.summary.units.length='mm';
   const accepted=T.validatePayload(p),m=T.viewModel(accepted);
   assert.equal(m.min,-10);assert.equal(m.max,-10);assert.equal(m.nodes[1][0],1000);
   assert.deepEqual(accepted.arrays.nodes_m[1],[1,0]);assert.equal(m.lengthLabel,'mm');
@@ -254,4 +255,20 @@ test('shipped page zero-size hidden canvases: Results/Mesh switch and stale rend
   assert.equal(p.element('meshCanvas').calls.length,count);
   assert.ok(p.element('fieldCanvas').onmousemove);
   assert.doesNotMatch(p.element('status').textContent,/canvas too small/);
+});
+
+test('actual F capability shape: v1-only allowed, bad/unconfigured limits fail closed',()=>{
+  const value=cap();value[T.TYPE].result_formats=[Object.keys(T.PAIRS)[0]];
+  value[T.TYPE].field_layouts=[Object.values(T.PAIRS)[0]];
+  assert.ok(T.capability(value));
+  delete value[T.TYPE].limits;assert.equal(T.capability(value),null);
+});
+test('unmeasured or absent run-enabled keeps validated JSON from starting a job',async()=>{
+  let runs=0;const c=T.createController({request:async(method,url,body)=>{
+    if(url==='/api/capabilities'){const value=cap();delete value[T.TYPE].run_enabled;return value;}
+    if(url.endsWith('/validate'))return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};
+    runs++;throw Error('must not run');
+  }});
+  await c.loadCapability();assert.equal(await c.validate(doc()),true);
+  assert.equal(await c.run(),false);assert.equal(runs,0);
 });

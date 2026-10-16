@@ -198,6 +198,7 @@ const thermalController = typeof ThermalStudio === 'undefined' ? null : ThermalS
       }
     }
     if (state.error) { status(state.error); log(state.error,'err'); }
+    else if(state.supported && thermalController.state().cap?.run_enabled!==true) status('Thermal execution disabled until server resource policy is enabled');
     else if (state.supported) status(state.busy ? 'thermal request…' : state.result
       ? 'steady thermal result ready' : state.validated ? 'steady thermal valid' : 'validate current thermal JSON');
   },
@@ -545,7 +546,7 @@ function refresh() {
   if (isHeadlessThermal() && thermalSupported()) {
     clearResultViews(); $('tree').innerHTML=''; $('props').textContent='Steady heat: edit JSON, validate, then run. Mesh is available only from the result. No transient UI.';
     $('meshBtn').disabled=true;
-    $('runBtn').disabled=editorDirty || thermalController.gate.dirty || thermalController.gate.busy;
+    $('runBtn').disabled=editorDirty || thermalController.gate.dirty || thermalController.gate.busy || thermalController.state().cap?.run_enabled!==true;
     $('thermalControls').hidden=!thermalController.result(); drawThermalViews(); return;
   }
   if (isHeadlessThermal()) {

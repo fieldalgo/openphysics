@@ -34,13 +34,24 @@
   function route(s) { return typeof s === 'string' && /^\/api\/[a-zA-Z0-9_/-]+$/.test(s) && !s.includes('..'); }
   function capability(data) {
     const c = data?.[TYPE];
-    if (data?.capability_format !== 'studio-capabilities-v1' || !object(c) || ('supported' in c && c.supported !== true)
+    if (data?.capability_format !== 'studio-capabilities-v1' || !object(c) || c.supported!==true
         || c.input !== 'json' || c.mesh_preview !== false || c.mesh_from_result !== true
         || c.time_navigation !== false || !route(c.validate) || !route(c.run)
-        || !Array.isArray(c.result_formats) || !Array.isArray(c.field_layouts)
-        || !Object.entries(PAIRS).every(([f,l]) => c.result_formats.includes(f) && c.field_layouts.includes(l))
-        || !Array.isArray(c.fields) || !['temperature_k','heat_flux_w_m2'].every(f=>c.fields.includes(f)))
-      return null;
+        || !Array.isArray(c.result_formats) || !c.result_formats.length || !Array.isArray(c.field_layouts)
+        || c.field_layouts.length!==c.result_formats.length
+        || new Set(c.result_formats).size!==c.result_formats.length
+        || !c.result_formats.every((f,i)=>PAIRS[f]===c.field_layouts[i])
+        || !Array.isArray(c.fields) || c.fields.length!==2
+        || !['temperature_k','heat_flux_w_m2'].every(f=>c.fields.includes(f))
+        || !object(c.limits)) return null;
+    const integerLimits=['request_bytes','max_nodes','max_triangles','payload_bytes','active_jobs',
+      'terminal_jobs','terminal_bytes','log_bytes','error_bytes','metadata_bytes','status_bytes'];
+    if(integerLimits.some(k=>!Number.isSafeInteger(c.limits[k])||c.limits[k]<=0)
+        || !finite(c.limits.ttl_seconds)||c.limits.ttl_seconds<=0
+        || c.limits.max_nodes<3 || c.limits.max_triangles<1
+        ||c.limits.active_jobs>c.limits.terminal_jobs
+        ||!Number.isSafeInteger(c.limits.payload_bytes+c.limits.status_bytes)
+        ||c.limits.payload_bytes+c.limits.status_bytes>c.limits.terminal_bytes) return null;
     return clone(c);
   }
   function strictParse(text) {
@@ -86,7 +97,7 @@
   function validatePayload(input, expected) {
     finiteJSON(input);
     const allowed=['payload_format','kind','job','result_id','client_revision','request_seq',
-      'result_format','field_layout','arrays','summary','display_length_in_m'];
+      'result_format','field_layout','arrays','summary','coordinates'];
     if(!object(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('unknown wire field');
     if(['neff','group_index','wavelength','modes','parameter','time_s'].some(k=>k in (input.summary||{})))
       fail('optical/transient summary keys are unsupported');
@@ -107,6 +118,10 @@
     const N = a.nodes_m?.length, M = a.triangles?.length, D = a.dirichlet_node_ids?.length;
     if (!integer(N) || N<3 || !integer(M) || M<1 || !integer(D) || D>N
         || (input.result_format.endsWith('-v1') && D===0)) fail('invalid N/M/D');
+    for(const meta of ['field_units','field_locations','field_shapes'])
+      if(!object(s[meta])||Object.keys(s[meta]).length!==Object.keys(spec).length
+          ||Object.keys(s[meta]).some(k=>!spec[k]))fail('metadata field set '+meta);
+    if(s.mesh?.nodes!==N||s.mesh?.triangles!==M)fail('summary mesh counts');
     const arrays = {};
     for (const [key,[unit,location,cols]] of Object.entries(spec)) {
       const rows = key==='triangles'||key==='heat_flux_w_m2' ? M : key.startsWith('dirichlet_') ? D : N;
@@ -133,15 +148,19 @@
       if (!finite(det)||det<=0) fail('CCW nondegenerate geometry');
     }
     if (ids.some((v,i)=>!integer(v)||v>=N||(i&&v<=ids[i-1]))) fail('unique sorted fixed IDs');
-    if (!finite(input.display_length_in_m)||input.display_length_in_m<=0) fail('display length conversion');
+    const coordinates=input.coordinates;
+    if(!object(coordinates)||Object.keys(coordinates).length!==3||coordinates.raw_unit!=='m'
+        ||!finite(coordinates.display_length_in_m)||coordinates.display_length_in_m<=0)
+      fail('display length conversion');
     const declared=s.units?.length;
     const label=typeof declared==='string' ? declared
       : object(declared)&&Object.keys(declared).length===1&&finite(declared.in_m)&&declared.in_m>0
         ? String(declared.in_m)+' m' : null;
-    if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m') fail('explicit length/K units');
+    if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m'
+        ||JSON.stringify(coordinates.display_unit)!==JSON.stringify(declared))fail('explicit length/K units');
     // Copy the validated finite summary; no backend text is interpreted as HTML.
     const summary = clone(s);
-    return Object.freeze({...input, arrays, summary, lengthLabel:label});
+    return Object.freeze({...input, arrays, summary, display_length_in_m:coordinates.display_length_in_m,lengthLabel:label});
   }
 
   class Ownership {
@@ -292,7 +311,7 @@
   function createController({request,wait=ms=>new Promise(r=>setTimeout(r,ms)),onState=()=>{},onResult=()=>{}}) {
     const gate=new Ownership();let cap=null,result=null,error=null;
     function emit() { onState({supported:!!cap,busy:gate.busy,dirty:gate.dirty,validated:!!gate.validated,
-      canRun:!!cap&&!gate.dirty&&!!gate.validated&&!gate.busy,result,error}); }
+      canRun:!!cap&&cap.run_enabled===true&&!gate.dirty&&!!gate.validated&&!gate.busy,result,error}); }
     function invalidate() { gate.invalidate();result=null;error=null;emit(); }
     async function loadCapability() {
       const seq=gate.beginCapability();
@@ -317,7 +336,7 @@
       finally { if(gate.finish(token))emit(); }
     }
     async function run() {
-      if(!cap||gate.dirty||!gate.validated||gate.busy)return false;
+      if(!cap||cap.run_enabled!==true||gate.dirty||!gate.validated||gate.busy)return false;
       let token=gate.begin('run');result=null;error=null;emit();
       try {
         const reply=await request('POST',cap.run,{doc:clone(gate.validated),client_revision:token.revision,request_seq:token.sequence});
