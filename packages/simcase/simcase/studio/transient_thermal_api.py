@@ -143,6 +143,14 @@ def capture_result(result, identity, limits, document):
     require(isinstance(summary, dict) and summary.get("physics_type") == KIND
             and (summary.get("result_format"), summary.get("field_layout")) == PAIR,
             "unsupported transient summary/result pair")
+    # Current public transient API exposes IDs through summary, not properties.
+    # If an extended public producer provides a pair, it must agree exactly.
+    absent = object()
+    public_format = getattr(result, "result_format", absent)
+    public_layout = getattr(result, "field_layout", absent)
+    require((public_format is absent and public_layout is absent)
+            or (public_format, public_layout) == PAIR,
+            "public transient pair disagrees with frozen summary pair")
     # Producer summary validates its own bound snapshot; compare against this job too.
     require(json.dumps(result.doc.data, sort_keys=True, separators=(",", ":"), allow_nan=False)
             == original, "public result document does not match accepted snapshot")
