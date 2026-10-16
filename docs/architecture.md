@@ -63,7 +63,7 @@ repository; separate historical package repositories are not needed to use them.
 ## Entry points and current scope
 
 - **Python:** the broadest API surface, including standalone electromagnetic,
-  steady thermal, elasticity and prescribed-temperature thermoelastic models,
+  steady and transient thermal, elasticity and prescribed-temperature thermoelastic models,
   plus the documented steady heat-to-mechanics workflow.
 - **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
   documented `thermal.steady2d` subset. Python-only extensions do not
@@ -72,8 +72,10 @@ repository; separate historical package repositories are not needed to use them.
   models and does not yet provide thermal or structural forms and plots.
 
 These layers do not imply a general-purpose, fully coupled multiphysics solver.
-Transient heat is not part of the integrated scope described here. Exact
-contracts and measured validation limits are linked from the
+The standalone [transient heat API](../packages/galerkin/docs/transient_heat.md)
+uses a fixed P1 mesh, consistent mass and backward Euler. It has no transient
+JSON, persistence, flux/Robin input or automatic coupling. Exact contracts
+and measured validation limits are linked from the
 [documentation index](README.md).
 
 ## Connections in the code

@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Producer contracts. Written for later authorized execution, not a pass record."""
+"""Producer contracts; validation results are recorded separately from tests."""
 from dataclasses import fields
 import numpy as np
 import pytest

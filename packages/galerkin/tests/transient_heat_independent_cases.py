@@ -1,4 +1,4 @@
-"""Unexecuted independent public-API acceptance; stdlib unittest and NumPy."""
+"""Independent public-API acceptance using stdlib unittest and NumPy."""
 import dataclasses
 import json
 import math
