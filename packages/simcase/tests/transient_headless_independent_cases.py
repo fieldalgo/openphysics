@@ -25,6 +25,18 @@ FIELD_UNITS = {
 }
 
 
+FIELD_LOCATIONS = {
+    "nodes_m": "nodes", "triangles": "triangle_connectivity", "time_s": "requested_times",
+    "temperature_k": "nodes", "heat_flux_w_m2": "triangle_centroids",
+    "source_load_w_per_m": "nodes", "reaction_w_per_m": "nodes",
+    "residual_w_per_m": "nodes", "storage_rate_w_per_m": "nodes",
+    "heat_content_j_per_m": "domain", "quadratic_functional_jk_per_m": "domain",
+    "dirichlet_node_ids": "dirichlet_nodes", "dirichlet_temperatures_k": "dirichlet_nodes",
+}
+STEP_FIELDS = {"reaction_w_per_m", "residual_w_per_m", "storage_rate_w_per_m"}
+STATIC_FIELDS = {"nodes_m", "triangles", "dirichlet_node_ids"}
+
+
 def model(unit="m", n=8, initial=300.0, q=8.0, bc=None):
     scale = UNITS[unit]
     return {
@@ -69,13 +81,34 @@ def read_saved(directory):
             raise AssertionError("field unit: "+name)
         if list(a.shape) != summary["field_shapes"][name]:
             raise AssertionError("field shape: "+name)
-        if name not in summary["field_locations"]:
-            raise AssertionError("missing field location: "+name)
+        if summary["field_locations"][name] != FIELD_LOCATIONS[name]:
+            raise AssertionError("field location: "+name)
+        axis = "static" if name in STATIC_FIELDS else "time_s[1:]" if name in STEP_FIELDS else "time_s"
+        if summary["field_time_axes"][name] != axis:
+            raise AssertionError("field time axis: "+name)
         if a.dtype.kind not in "iuf" or not np.all(np.isfinite(a)):
             raise AssertionError("nonfinite/nonreal raw: "+name)
     if (directory/".incomplete").exists():
         raise AssertionError("save returned with incomplete marker")
     return summary, arrays
+
+
+def audit_summary(summary, arrays):
+    times = arrays["time_s"]
+    require_close(np.asarray(summary["study"]["time_s"]), times, 3, "summary requested times")
+    require_close(np.asarray(summary["rate_time_s"]), times[1:], 3, "summary rate times")
+    source = arrays["source_load_w_per_m"].sum(axis=1)
+    storage = arrays["storage_rate_w_per_m"].sum(axis=1)
+    reaction = arrays["reaction_w_per_m"].sum(axis=1)
+    scale = max(24e-6, np.max(abs(source)), np.max(abs(storage)), np.max(abs(reaction)))
+    for name, expected in (
+        ("source_heat_w_per_m", source), ("storage_heat_w_per_m", storage),
+        ("outward_heat_w_per_m", -reaction),
+        ("heat_balance_defect_w_per_m", storage-source[1:]-reaction),
+        ("heat_content_j_per_m", arrays["heat_content_j_per_m"]),
+        ("quadratic_functional_jk_per_m", arrays["quadratic_functional_jk_per_m"])):
+        physical_scale = max(scale, np.max(abs(expected))) if expected.size else scale
+        require_close(np.asarray(summary[name]), expected, physical_scale, "summary "+name)
 
 
 def audit_arrays(a, kind, q, initial=300.0):
@@ -102,6 +135,20 @@ def audit_arrays(a, kind, q, initial=300.0):
         raise AssertionError("unknown independent scenario")
     require_close(a["temperature_k"], expected, max(1, np.max(abs(expected))), "analytic temperature")
     fixed = a["dirichlet_node_ids"]
+    if fixed.dtype.kind not in "iu" or fixed.ndim != 1:
+        raise AssertionError("fixed integer IDs")
+    if kind in ("ramp", "fixed"):
+        selected = np.flatnonzero((abs(x[:, 0]) <= COORD_ATOL_M)
+                    | (abs(x[:, 0]-.002) <= COORD_ATOL_M)
+                    | (abs(x[:, 1]) <= COORD_ATOL_M)
+                    | (abs(x[:, 1]-.001) <= COORD_ATOL_M))
+    elif kind == "affine":
+        selected = np.flatnonzero((abs(x[:, 0]) <= COORD_ATOL_M)
+                    | (abs(x[:, 0]-.002) <= COORD_ATOL_M))
+    else:
+        selected = np.array([], dtype=int)
+    if not np.array_equal(fixed, selected):
+        raise AssertionError("independent exterior Dirichlet selection")
     d = e.histories(expected, ts, q, fixed)
     shape = {"temperature_k": (nt, n), "heat_flux_w_m2": (nt, m, 2),
              "source_load_w_per_m": (nt, n), "reaction_w_per_m": (nt-1, n),
@@ -136,7 +183,9 @@ def saved_run(data, out):
     # Public Document/run/save only; producer summaries never define truth.
     result = run(Document.from_dict(copy.deepcopy(data)), False)
     result.save(out)
-    return read_saved(out)
+    summary, arrays = read_saved(out)
+    audit_summary(summary, arrays)
+    return summary, arrays
 
 
 class TestTransientHeadlessIndependent(unittest.TestCase):
@@ -242,3 +291,40 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
                     np.savez(stream,**altered)
                 with self.subTest(variant=variant),self.assertRaises((AssertionError,ValueError)):
                     read_saved(out)
+
+    def test_owned_result_snapshot_and_fields_disabled(self):
+        data = model()
+        document = Document.from_dict(copy.deepcopy(data))
+        result = run(document, False)
+        saved = {name: np.array(getattr(result, name), copy=True) for name in FIELD_UNITS}
+        for name in FIELD_UNITS:
+            self.assertFalse(getattr(result, name).flags.writeable, name)
+        document["study"]["time_s"][0] = 99
+        document["physics"]["heat1"]["initial_temperature_k"] = -900
+        for name, expected in saved.items():
+            self.assertTrue(np.array_equal(getattr(result, name), expected), name)
+        with tempfile.TemporaryDirectory() as tmp:
+            result.save(Path(tmp)/"snapshot")
+            _, arrays = read_saved(Path(tmp)/"snapshot")
+            audit_arrays(arrays, "heating", 8)
+            data["results"]["save_fields"] = False
+            disabled = run(Document.from_dict(data), False)
+            disabled.save(Path(tmp)/"disabled")
+            self.assertFalse((Path(tmp)/"disabled"/"fields.npz").exists())
+            summary = json.loads((Path(tmp)/"disabled"/"summary.json").read_text(encoding="utf-8"))
+            self.assertFalse(summary["save_fields"])
+            self.assertEqual(summary["field_shapes"]["reaction_w_per_m"], [4, len(disabled.nodes_m)])
+
+    def test_accepted_initial_roundoff_is_not_projected(self):
+        eps = np.finfo(float).eps
+        initial = float(300+8*eps*300)
+        bc = {s: 300.0 for s in ("left","right","bottom","top")}
+        data = model(n=1, initial=initial, q=0, bc=bc)
+        result = run(Document.from_dict(data), False)
+        self.assertTrue(np.array_equal(result.temperature_k[0], np.full(len(result.nodes_m), initial)))
+        expected = np.full_like(result.temperature_k, 300.0)
+        expected[0] = initial
+        e = P1(result.nodes_m, result.triangles, 4, 2.5)
+        d = e.histories(expected, np.array(TIMES_S), 0, np.arange(len(result.nodes_m)))
+        scale = max(np.max(abs(d["storage"])), np.finfo(float).tiny)
+        require_close(result.storage_rate_w_per_m, d["storage"], scale, "accepted initial old mass")
