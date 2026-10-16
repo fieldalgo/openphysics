@@ -2,6 +2,13 @@
 
 [English](../../../thermal_steady2d.md)
 
+이 페이지는 새 자연경계 키가 없는 legacy v1 경로를 설명합니다.
+정상 열전도의 상수 외향 flux·대류 확장 후보는
+[경계 확장 가이드](thermal_steady_boundary2d.md)를 참조하세요.
+새 키가 존재하면 빈 매핑도 v2를 선택합니다. Dirichlet이 비어 있는 양수 Robin
+구속, 추가 raw 필드와 전체 외향 열수지는 그 가이드에 정의합니다.
+후보 구현과 아직 미완료인 P2 수치·설치 수용을 구분하세요.
+
 `thermal.steady2d`는 면외 방향 단위 두께를 갖는 단일 균질 2D 직사각형에서
 `-div(k grad T) = Q`를 풉니다. 기존 P1 열전도 엔진을 사용합니다. 이 문서는
 headless API와 CLI를 설명합니다. Studio는 이 모델을 거절하고 이전 광학 결과를
@@ -31,7 +38,8 @@ JSON 정수여야 합니다. `4`는 허용하지만 `4.0`, `true`, 0과 음수�
 `materials`는 비어 있어야 하며 physics는 정확히 하나, `study`는
 `{"type":"single"}`이어야 합니다. `results`는 불리언 `save_fields`와 `plots`를
 받으며 `plots`는 기본값인 false만 허용합니다. 광학 재료·분산·파장 키, shapes,
-sweep, 추가 키, 영역별 k, Neumann/Robin, 시간 의존, 결합 해석, 3D 요청은 거절합니다.
+sweep, 추가 키, 영역별 k, 시간 의존, 결합 해석, 3D 요청은 이 정상 경로에서 거절합니다.
+자연 경계 키는 legacy v1 검증기가 아닌 별도 경계 확장 계약을 사용합니다.
 
 완전한 예제를 생성하고 실행합니다.
 

@@ -2,17 +2,22 @@
 
 [한국어](locales/ko/pages/thermal_steady_boundary2d.md)
 
-## Contract and implementation status
+## Implementation and validation status
 
-This page describes the boundary-extension input/output contract for
-`thermal.steady2d`. The [existing steady guide](thermal_steady2d.md) describes
-the legacy headless path. At the documentation base
-`6d6eac56d1dddb8bdfe3f23d6db78d674487a42b`, that public reader/runtime
-does not yet implement this extension. The independent boundary helper at
-`1c408be05e8f103e8436502610e03c763493d200` implements input/mesh checks,
-not a public JSON/CLI solve or save. Runtime and schema integration are separate.
-The example below is a contract example, not an observed successful run.
-No new source, installed, CI or platform acceptance is asserted by this draft.
+This page describes the boundary-extension candidate for `thermal.steady2d`.
+Schema candidate `4bd15626fe37c306eb6265f1db1b308c6b580460` implements
+`Document.from_dict`, JSON loading, validation and document summaries.
+Runtime candidate `11f2d2ba893a7c103effc9025f75fea615a636f6` implements
+`run(Document)`, `ThermalRunResult`, CLI dispatch and JSON/NPZ saving with
+the existing thermal engine. These are submitted implementations, not a claim
+that this feature is already on main. Use their combined exact checkout.
+The [legacy guide](thermal_steady2d.md) retains the original v1 contract.
+
+P2 numerical and installed acceptance are not complete. Independent and platform
+tests are submitted separately; their existence is not a passing result.
+Examples below are reproduction procedures and analytical expectations, not
+measurements made for this document. Check the exact combined candidate's CI,
+artifacts and platform results before treating it as accepted.
 
 ## Inputs and supported scope
 
@@ -91,29 +96,89 @@ evaluation and physical residual/balance guards remain authoritative.
 ## Contract example
 
 This unit-square linear solution has T=300-7x K and qx=14 W/m².
-On the right, g=2 and h*(T-Ta)=12; the left thermostat contributes
+The built-in `thermal_boundary` example uses h=4 W/(m² K) and Ta=290 K.
+On the right, T=293 K, g=2 and h*(T-Ta)=12; the left thermostat contributes
 -14 W/m. These are analytical expectations, not measurements.
 
 ```json
 {
   "openphysics": "0.2",
-  "name": "Steady additive boundary contract",
+  "name": "Steady additive outward flux and convection",
   "units": {"length": "m", "temperature": "K"},
   "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
   "materials": {},
-  "physics": {"heat": {
+  "physics": {"heat1": {
     "type": "thermal.steady2d",
     "conductivity_w_mk": 2,
     "heat_source_w_m3": 0,
     "dirichlet_temperature_k": {"left": 300},
     "outward_flux_w_m2": {"right": 2},
-    "convection": {"right": {"h_w_m2k": 1, "ambient_temperature_k": 281}}
+    "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}}
   }},
   "mesh": {"subdivisions": [8, 8]},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
 ```
+
+## API, CLI and output files
+
+After installing the matching packages from the combined checkout, run this
+portable Python example from the repository root. It uses the same interpreter
+for CLI subprocesses, writes UTF-8 explicitly and chooses fresh temporary paths.
+It is a reproduction recipe; it has not been executed for this document.
+
+```python
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+from simcase import Document, ThermalRunResult, run
+
+env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    env[key] = "1"
+with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
+    root = Path(directory)
+    model = root / "thermal_boundary.json"
+    example = subprocess.run(
+        [sys.executable, "-m", "simcase", "example", "thermal_boundary"],
+        check=True, capture_output=True, text=True, encoding="utf-8", env=env,
+    )
+    model.write_text(example.stdout, encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "simcase", "validate", str(model)],
+        check=True, env=env,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "simcase", "run", str(model),
+         "-o", str(root / "cli_results")],
+        check=True, env=env,
+    )
+    document = Document.load(model)
+    result = run(document, verbose=False)
+    assert isinstance(result, ThermalRunResult)
+    summary = result.summary()
+    result.save(root / "api_results")
+    assert summary["result_format"] == "thermal.steady2d-result-v2"
+    json.dumps(summary, allow_nan=False)
+```
+
+The temporary output is removed when the context ends; choose an owned,
+nonexistent persistent target to retain results. CLI exit codes are 0 for
+success, 2 for invalid input and 1 for solver/save or existing-target failures.
+No thermal PNG is produced. Studio rejects thermal documents and clears stale
+optical state; headless support does not imply Studio support.
+
+`summary()` returns a JSON-safe dictionary. `result_format`, `field_layout`
+and `boundary_enabled` identify the captured layout. Public array properties
+use the names below, except `nodes_m` is `mesh_nodes_m` and `triangles` is
+`mesh_triangles`. `dirichlet_node_ids` and `dirichlet_temperature_k` are
+public result attributes. No optical effective index or modal normalization is
+attached to temperature.
 
 ## Version and raw-field contract
 
@@ -123,22 +188,45 @@ Absence of both retains legacy v1 identifiers and nine arrays. Do not insert
 empty defaults or infer versions from nonempty values. Null is invalid.
 Input format remains 0.2.
 
-The nine legacy arrays retain their units and meanings. V2 adds four nodal
-arrays of shape (N,) and unit W/m:
-
-| Array | Meaning |
-| --- | --- |
-| `prescribed_outward_load_w_per_m` | G |
-| `ambient_load_w_per_m` | B |
-| `convective_outward_w_per_m` | C |
-| `system_rhs_w_per_m` | fQ+B-G |
+| NPZ array | Shape | Location / meaning | Unit |
+| --- | --- | --- | --- |
+| `nodes_m` | (N,2) | nodes, SI coordinates | m |
+| `triangles` | (M,3) | integer CCW connectivity | 1 |
+| `temperature_k` | (N,) | nodes | K |
+| `heat_flux_w_m2` | (M,2) | triangle centroids, -k grad(T) | W/m² |
+| `load_w_per_m` | (N,) | nodes, source fQ only | W/m |
+| `reaction_w_per_m` | (N,) | nodes, inward thermostat reaction | W/m |
+| `residual_w_per_m` | (N,) | nodes, A*T-rhs | W/m |
+| `dirichlet_node_ids` | (D,) | sorted unique prescribed integer IDs | 1 |
+| `dirichlet_temperature_k` | (D,) | matching prescribed values | K |
+| `prescribed_outward_load_w_per_m` | (N,) | nodes, G; v2 only | W/m |
+| `ambient_load_w_per_m` | (N,) | nodes, B; v2 only | W/m |
+| `convective_outward_w_per_m` | (N,) | nodes, C; v2 only | W/m |
+| `system_rhs_w_per_m` | (N,) | nodes, fQ+B-G; v2 only | W/m |
 
 For Robin-only anchoring, both Dirichlet arrays have shape (0,); node IDs
 remain integer. Full residual uses A and rhs above. Consumers must check
 format/layout, units, shapes, finite numeric types and metadata, using
 `allow_pickle=False`. Missing v2 fields must not be replaced with invented
-zeros. Exact public result properties, summary diagnostics and save metadata
-must be checked against the runtime candidate before this draft is finalized.
+zeros. Summary metadata includes `field_units`, `field_locations`,
+`field_shapes`, `mesh_length_unit="m"`, original document units,
+boundary mappings, fixed-node count, temperature extrema and mesh/solve timings.
+NPZ additionally stores Unicode scalars `result_format`, `field_layout`,
+`mesh_length_unit` and `metadata_json`; metadata JSON matches the summary.
+It does not contain Python object arrays.
+
+V2 diagnostics are `source_heat_w_per_m`,
+`prescribed_outward_heat_w_per_m`, `convective_outward_heat_w_per_m`,
+`thermostat_outward_heat_w_per_m`, `outward_heat_w_per_m`,
+`heat_balance_defect_w_per_m`, `normalized_heat_balance_defect` and
+`free_residual_max_w_per_m`. The signed defect is total outward minus source.
+The normalized defect divides its absolute value by the sum of absolute nodal
+source, reaction, G and C contributions, with a positive floating-point floor.
+The free residual maximum is dimensional W/m (zero when no free nodes exist).
+V2 does not publish the v1 `normalized_free_residual` diagnostic: a K-only
+normalization is not the Robin engine's guard. These summary checks do not
+replace the engine's unchanged physical residual/balance guards or independent
+acceptance. Diagnostic-scale follow-ups must be reviewed at their exact SHA.
 
 ## Geometry, lifetime and validation limits
 
@@ -151,11 +239,24 @@ coordinate mask that can include nearby interior nodes. Large origins and
 very short edges may be rejected for insufficient coordinate precision;
 choose a smaller coordinate origin rather than relaxing geometry guards.
 
-The runtime must bind saved metadata to the original calculation and preserve
-the [fresh-output ownership contract](thermal_steady2d.md#output-ownership-and-failures).
-Set output options before running. Fields-disabled saves still require raw and
-finite-JSON checks; no atomic publication, hostile-writer protection or crash
-rollback is implied. Exact snapshot enforcement awaits actual runtime review.
+The runtime copies the input document and captures canonical JSON, mesh nodes,
+triangles and prescribed data. Summary/save reject ordinary post-run value
+changes in `result.doc`, including name/results options; key order alone is
+irrelevant. Set output options before running. The saved model describes that
+captured calculation. Caller input changes are isolated. This is consistency
+checking, not cryptographic authentication or authorization, and concurrent
+mutation during run/capture is unsupported. Further snapshot changes require
+review of the actual runtime follow-up.
+
+Saving preserves the [fresh-output ownership contract](thermal_steady2d.md#output-ownership-and-failures).
+A fresh target receives `.incomplete`, `model.json`, UTF-8 `log.txt`,
+optional `fields.npz` and `summary.json` last. `save_fields=false` omits NPZ,
+not raw finite/shape/connectivity/CCW and finite-JSON validation. The complete
+solution remains in memory. Nonfinite reductions/JSON are refused, not emitted
+as NaN/Infinity. Caller exclusivity is required throughout save and cleanup;
+check/use replacement races, atomic publication and crash rollback are outside
+the guarantee. Windows hard-link capability and actual Windows/macOS execution
+must be assessed separately. Original ownership failures remain evidence.
 
 Preserve n8/16/32/64 final-two temperature L2 order >=1.8 and flux order >=0.9,
 normalized residual/balance 1e-10 and SI similarity 1e-9. Existing quadrature

@@ -402,9 +402,15 @@ in the sdist alongside that contract. After installation, run
 `simcase run thermal_slab.json -o fresh_heat_results` using the example file.
 The output target must be fresh, including no dangling symlink. Numeric SI NPZ
 arrays use a dedicated result version/layout and load with `allow_pickle=False`;
-support heat reaction is inward and signed outward heat is its negative.
-This headless path does not add thermal Studio UI, plots, flux/Robin boundaries
-or automatic thermoelastic coupling. Read the contract's save ownership and
+support heat reaction is inward; its negative is the thermostat outward contribution.
+With flux/convection, total outward also includes those boundary contributions.
+The [steady boundary extension](docs/thermal_steady_boundary2d.md) candidate adds
+side-constant outward flux and convection, v2 metadata and thirteen raw arrays;
+legacy documents retain v1. The CLI example is `thermal_boundary`; empty
+Dirichlet requires positive Robin anchoring. Input Kelvin is nonnegative;
+finite negative computed temperature is not clamped. P2 numerical/installed
+acceptance is not complete. This does not add thermal Studio UI, plots,
+transient flux/Robin or automatic thermoelastic coupling. Read the contract's save ownership and
 platform limits; narrow Windows save validation is tracked separately from
 the Linux full regression gate.
 
