@@ -82,7 +82,11 @@ def test_capabilities_are_truthful_about_public_runtime(client):
     assert heat['run_enabled'] == thermal.runtime_available()
     assert (thermal.V2[0] in heat['result_formats']) == thermal.v2_available()
     assert heat['limits']['request_bytes'] == 1048576
-    assert c['thermal.transient2d']['supported'] is False
+    transient = c['thermal.transient2d']
+    assert transient['supported'] is True
+    assert transient['validate'] == '/api/thermal/transient/validate'
+    assert transient['run'] == '/api/thermal/transient/run'
+    assert transient['time_navigation'] is True
     assert c['em.cavity3d']['supported'] is False
 
 
