@@ -600,3 +600,5 @@ near workload는 over-budget actor도 전달하여 solve 전 413 거절을 요�
 누수 증명·전용 성능 기준선이 아닙니다. 정확 source commit·세 exit·getter 횟수·
 원응답·계상 보고를 source/설치/browser/플랫폼 gate와 구분해 검토합니다.
 이 step은 별도 CI 실행을 만들지 않으며 기존 steady 관측을 그대로 보존합니다.
+
+과도 dirty 수용은 늦은 성공·transport 오류 read 이후 hidden/visible 복귀 네 경로에서 status가 정확히 `validate current transient JSON`인지도 요구합니다. 픽셀이 비워져도 이전 reading/result-ready 상태가 남아 있으면 실패합니다.
