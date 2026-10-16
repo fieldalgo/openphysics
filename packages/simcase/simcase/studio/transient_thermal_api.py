@@ -186,9 +186,11 @@ def capture_result(result, identity, limits, document):
                 "transient metadata field set mismatch")
     descriptors = {}
     for key, (unit, location, axis) in SPEC.items():
-        require(summary["field_units"][key] == unit and summary["field_locations"][key] == location
+        declared_shape = summary["field_shapes"][key]
+        require(isinstance(declared_shape, list) and all(type(n) is int for n in declared_shape)
+                and summary["field_units"][key] == unit and summary["field_locations"][key] == location
                 and summary["field_time_axes"][key] == axis
-                and summary["field_shapes"][key] == list(captured[key].shape),
+                and declared_shape == list(captured[key].shape),
                 "transient metadata mismatch: "+key)
         descriptors[key] = {"shape": list(captured[key].shape), "unit": unit,
                             "location": location, "axis": axis,
