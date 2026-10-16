@@ -11,10 +11,11 @@ conforming P1 triangles, consistent mass and backward Euler. Geometry is
 converted to metres; requested times are explicit seconds. The calculation
 is per unit out-of-plane depth.
 
-This is a headless interface, not a thermal Studio editor or renderer.
-Studio rejects steady and transient thermal documents, clears stale optical
-state and does not expose thermal examples. A schema accepting a document
-does not enable Studio rendering.
+This page describes the headless interface. Generic optical Studio routes keep
+their thermal guards; dedicated [steady Studio](thermal_studio.md) is separate.
+The [transient Studio integration guide](thermal_transient_studio.md) distinguishes
+its capability, time views and implementation/validation status.
+Schema acceptance alone does not enable a browser route or renderer.
 
 Implementation, source tests, installed consumers, exact CI and main
 integration are different evidence stages. The code defines the contract
