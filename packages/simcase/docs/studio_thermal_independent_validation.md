@@ -114,3 +114,37 @@ collection, malformed-result behavior, physical HTTP convergence, installed
 origin/archive consumption, actual Canvas behavior, Windows/macOS and final
 integration. Existing steady-boundary C11/CLI/installed acceptance is a separate
 feature result and must be confirmed from its exact CI logs.
+
+## Early exact server binding
+
+Source review now binds these tests to server/adapter commit
+533c5e8c3f50d05f52323588e81b4997500e00e5. The worker calls public server.run;
+the malformed-public-result injection point is therefore confirmed.
+The wire uses top-level display_length_in_m, arrays, summary and identity
+(kind,job,result_id,client_revision,request_seq). Nested coordinates metadata
+is obsolete and rejected by the independent consumer.
+
+The consumer now checks finite positive display scale against the declared
+m/mm/um or explicit in_m length, exact metadata field sets and echoed status/
+result identities. Additional malformed cases cover boolean/zero/nonfinite
+display scales and a declaration/scale mismatch. The malformed-layout result
+actor changes summary.field_layout as well as the public field_layout property:
+the early adapter reads the summary pair, so changing only the property would
+not exercise the intended rejection. This was a test-definition correction;
+neither producer guards nor physical gates changed. A missing UNITS import
+introduced during binding was found statically and corrected before execution.
+
+The required resource policy evicts oldest terminal done/error records under
+admission/publication pressure, preserves active and optical jobs, makes evicted
+IDs404, and treats300s TTL as a maximum retention time. The original meshes
+8/16/32/64 must run sequentially without store reset, reduced meshes, TTL waits
+or skips. Existing short polling waits observe real asynchronous job progress;
+they are not retention workarounds. run_enabled=true advertises valid configured
+policy and public API availability, not measured performance.
+
+The early533 source still lacks run_enabled and refuses admission after two
+retained terminal records until TTL expiry; a producer follow-up is expected.
+No acceptance is granted to that early resource behavior and the tests do not
+hide it. All exact HTTP/physics/installed/CI results remain unexecuted here.
+Later producer changes require a separate source-delta review and exact combined
+CI. The separate writer-fixture correction does not enter this branch.
