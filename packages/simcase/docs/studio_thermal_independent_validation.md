@@ -174,3 +174,41 @@ binding. Static scope is approved with no confirmed binding blocker found.
 Actual HTTP/source/installed execution, malformed-result rejection and resource
 behavior still require exact integrated CI. This is not a measured performance,
 browser or platform acceptance.
+
+## Landed steady-boundary and resumed Studio review
+
+The steady-boundary independent oracle and cases on main
+49ff59874af3c5140d0e8126b1feb18964953e7e have blobs
+8957c5663e4dfacb62331c46c215f5872732c6bc and
+963e6850099c1b5ffe458c9bd31b373327546f04, respectively: the previously reviewed
+mathematics, fixtures and gates are unchanged. Their imports are now present
+on the landed base rather than an unpublished dependency.
+
+Reviewed server/adapter submission c762c4e5fdb9700978a24f639e694630477b8679:
+server remains blob6c750aa452ae78a21f5a470bc0c1d6fb5aaeee0b; adapter is
+blob6ecec32a623d7f92ba6f4543d46b3fb1d3bd8170. Its stricter log/error status
+byte accounting does not alter physical payload fields or the public run hook.
+
+The sequential HTTP mesh loop fully receives and audits each current result
+before submitting the next. Eviction of older terminal results therefore does
+not change the expected arrays or require fetching old job IDs. n64 uses4225
+nodes/8192 cells, within configured10201/20000 limits; v2 has83340 raw scalars
+for the quadratic left-side D=65. These are static size facts, not measured
+encoding capacity or peak-memory guarantees. Admission/publication pressure
+may evict old released done/error records before300s; active/optical records
+remain separate. No reset, TTL sleep, skip or reduced mesh was introduced.
+
+Static inspection found a gap in the independent consumer: Python equality
+would accept float metadata dimensions such as5.0 as equal to integer5.
+The consumer now explicitly requires list dimensions of exact int type, excluding
+bool, and checks mapping forms, unit keys and safe integer/nonempty response
+identity. Five new malformed controls cover float/bool dimensions and float/
+bool/empty identities. The previous fifteen malformed-wire controls and six
+malformed-public-result actors remain unchanged; the physical expected values,
+four meshes and every numerical tolerance remain unchanged.
+
+Conditional static approval: no confirmed main49ff/Fc762 binding blocker found.
+The new metadata assertion gap was a consumer test-definition issue, not a
+confirmed production defect. No Python parse/pytest/HTTP/solver/installed/browser
+or platform execution was performed. Exact combined Studio source/installed
+CI, including real repeated runs and all negative controls, is still required.
