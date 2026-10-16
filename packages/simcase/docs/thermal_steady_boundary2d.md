@@ -5,12 +5,14 @@
 ## Implementation and validation status
 
 This page describes the boundary-extension candidate for `thermal.steady2d`.
-Schema candidate `4bd15626fe37c306eb6265f1db1b308c6b580460` implements
-`Document.from_dict`, JSON loading, validation and document summaries.
-Runtime candidate `11f2d2ba893a7c103effc9025f75fea615a636f6` implements
-`run(Document)`, `ThermalRunResult`, CLI dispatch and JSON/NPZ saving with
-the existing thermal engine. These are submitted implementations, not a claim
-that this feature is already on main. Use their combined exact checkout.
+The implementation reviewed here is combined candidate
+`8e6ef95c4782e2e5901becec318f19c429755000` (PR 6), including runtime
+`862a29789aa7f3404d4e62051553fd374015828b`.
+It implements `Document.from_dict`, JSON loading, validation, document
+summaries, `run(Document)`, `ThermalRunResult`, CLI dispatch and JSON/NPZ
+saving with the existing thermal engine. This is a submitted implementation,
+not a claim that the feature is already on main. Use the exact combined
+checkout rather than an earlier standalone component.
 The [legacy guide](thermal_steady2d.md) retains the original v1 contract.
 
 P2 numerical and installed acceptance are not complete. Independent and platform
@@ -226,7 +228,8 @@ The free residual maximum is dimensional W/m (zero when no free nodes exist).
 V2 does not publish the v1 `normalized_free_residual` diagnostic: a K-only
 normalization is not the Robin engine's guard. These summary checks do not
 replace the engine's unchanged physical residual/balance guards or independent
-acceptance. Diagnostic-scale follow-ups must be reviewed at their exact SHA.
+acceptance. The reviewed implementation keeps the v2 dimensional free residual
+separate from the legacy normalization.
 
 ## Geometry, lifetime and validation limits
 
@@ -239,14 +242,22 @@ coordinate mask that can include nearby interior nodes. Large origins and
 very short edges may be rejected for insufficient coordinate precision;
 choose a smaller coordinate origin rather than relaxing geometry guards.
 
-The runtime copies the input document and captures canonical JSON, mesh nodes,
-triangles and prescribed data. Summary/save reject ordinary post-run value
-changes in `result.doc`, including name/results options; key order alone is
-irrelevant. Set output options before running. The saved model describes that
-captured calculation. Caller input changes are isolated. This is consistency
-checking, not cryptographic authentication or authorization, and concurrent
-mutation during run/capture is unsupported. Further snapshot changes require
-review of the actual runtime follow-up.
+The runtime copies and validates the input document, restoring its declared
+unit scale immediately, and captures canonical JSON, mesh nodes, triangles
+and prescribed data. Summary/save compare document values before validation,
+then check again after normalization: deleting a defaulted field cannot hide
+an edit by having validation restore it. Name/results changes are rejected;
+key order alone is irrelevant. Mesh and prescribed arrays must match captured
+values and dtypes. Set output options before running. The saved model describes
+that calculation, and changes to the caller's original document are isolated.
+
+Raw real-numeric/finite checks run before document and mesh-snapshot checks.
+Thus a nonfinite raw value is refused as such even if another input was also
+changed. Snapshot checks do not bypass raw validation when fields are disabled.
+This is consistency checking, not cryptographic authentication or authorization;
+it does not freeze every exposed result object or independently re-solve and
+certify a caller-modified finite solution. Concurrent mutation during
+run/capture/save is unsupported.
 
 Saving preserves the [fresh-output ownership contract](thermal_steady2d.md#output-ownership-and-failures).
 A fresh target receives `.incomplete`, `model.json`, UTF-8 `log.txt`,

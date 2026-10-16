@@ -5,12 +5,13 @@
 ## 구현과 검증 상태
 
 이 페이지는 `thermal.steady2d` 경계 확장 후보를 설명합니다.
-Schema 후보 `4bd15626fe37c306eb6265f1db1b308c6b580460`은
-`Document.from_dict`, JSON 읽기, 검증과 문서 summary를 구현합니다.
-Runtime 후보 `11f2d2ba893a7c103effc9025f75fea615a636f6`은
-기존 열 엔진을 이용한 `run(Document)`, `ThermalRunResult`, CLI 분기와
-JSON/NPZ 저장을 구현합니다. 이는 제출된 구현이며 main에 이미 포함됐다는 주장이
-아닙니다. 두 후보를 결합한 정확한 checkout을 사용하세요.
+여기서 검토한 구현은 runtime
+`862a29789aa7f3404d4e62051553fd374015828b`를 포함한 결합 후보
+`8e6ef95c4782e2e5901becec318f19c429755000`(PR 6)입니다.
+기존 열 엔진을 이용한 `Document.from_dict`, JSON 읽기, 검증, 문서 summary,
+`run(Document)`, `ThermalRunResult`, CLI 분기와 JSON/NPZ 저장을
+구현합니다. 이는 제출된 구현이며 main에 이미 포함됐다는 주장이 아닙니다.
+이전 개별 구성 요소 대신 정확한 결합 checkout을 사용하세요.
 [기존 가이드](thermal_steady2d.md)는 원래 v1 계약을 보존합니다.
 
 P2 수치·설치본 수용은 미완료입니다. 독립·플랫폼 시험은 별도로 제출됐으며
@@ -219,7 +220,8 @@ V2 진단은 `source_heat_w_per_m`, `prescribed_outward_heat_w_per_m`,
 자유 절점이 없으면 0입니다. V2에는 v1의 `normalized_free_residual` 진단을
 게시하지 않습니다. K만 사용하는 정규화는 Robin 엔진의 guard가 아닙니다.
 Summary 검사가 엔진의 원래 물리 residual·열수지 guard나 독립 수용을
-대체하지 않습니다. 진단 scale 후속 변경은 정확한 SHA에서 검토해야 합니다.
+대체하지 않습니다. 검토한 구현은 v2 차원량 자유 residual과 기존 정규화를
+분리해 유지합니다.
 
 ## 형상·수명·검증 한계
 
@@ -231,13 +233,20 @@ Tolerance가 extent의 절반에 도달하거나 side-edge 분류가 겹치거�
 얻습니다. 큰 원점·아주 짧은 edge는 좌표 정밀도 부족으로 거절할 수 있습니다.
 형상 guard를 완화하는 대신 더 작은 좌표 원점을 선택하세요.
 
-Runtime은 입력 문서를 복사하고 canonical JSON, 메시 절점·삼각형과
-지정 데이터를 캡처합니다. Summary/save는 name/results 옵션을 포함한
-`result.doc`의 일반적인 실행 후 값 변경을 거절하며 키 순서만 바뀐 것은
-무관합니다. 출력 옵션은 실행 전에 정하세요. 저장 model은 캡처한 계산을
-설명하며 caller 원래 입력 변경은 격리됩니다. 이는 일관성 검사이며
-암호학적 인증·권한 검증이 아닙니다. Run/capture 중 동시 변경은 지원하지
-않습니다. 추가 snapshot 변경은 실제 runtime 후속 검토가 필요합니다.
+Runtime은 입력 문서를 복사·검증해 선언된 단위 scale을 즉시 복구하고,
+canonical JSON, 메시 절점·삼각형과 지정 데이터를 캡처합니다.
+Summary/save는 검증 전에 문서 값을 비교하고 정규화 후 다시 검사합니다.
+기본 필드를 삭제한 변경을 검증 과정의 기본값 복원으로 숨길 수 없습니다.
+Name/results 변경은 거절하며 키 순서만 바뀐 것은 무관합니다.
+메시·지정 배열은 캡처한 값·dtype과 같아야 합니다. 출력 옵션은 실행 전에
+정하세요. 저장 model은 해당 계산을 설명하며 caller 원래 문서 변경은 격리됩니다.
+
+Raw 실수 수치·유한성 검사는 문서·메시 snapshot 검사보다 먼저 수행합니다.
+따라서 다른 입력도 변경됐더라도 비유한 raw 값 자체를 먼저 거절합니다.
+Fields 비활성화 시에도 snapshot 검사가 raw 검증을 우회하지 않습니다.
+이는 일관성 검사이며 암호학적 인증·권한 검증이 아닙니다.
+노출된 모든 result 객체를 동결하거나 caller가 바꾼 유한 해를 독립적으로
+다시 풀어 인증하지 않습니다. Run/capture/save 중 동시 변경은 지원하지 않습니다.
 
 저장은 [새 출력 소유권 계약](thermal_steady2d.md#출력-소유권과-실패)을
 유지합니다. 새 대상에 `.incomplete`, `model.json`, UTF-8 `log.txt`,
