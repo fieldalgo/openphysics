@@ -4,20 +4,17 @@
 
 ## 구현과 검증 상태
 
-이 페이지는 `thermal.steady2d` 경계 확장 후보를 설명합니다.
-여기서 검토한 구현은 runtime
-`862a29789aa7f3404d4e62051553fd374015828b`를 포함한 결합 후보
-`8e6ef95c4782e2e5901becec318f19c429755000`(PR 6)입니다.
-기존 열 엔진을 이용한 `Document.from_dict`, JSON 읽기, 검증, 문서 summary,
-`run(Document)`, `ThermalRunResult`, CLI 분기와 JSON/NPZ 저장을
-구현합니다. 이는 제출된 구현이며 main에 이미 포함됐다는 주장이 아닙니다.
-이전 개별 구성 요소 대신 정확한 결합 checkout을 사용하세요.
+이 checkout은 기존 열 엔진을 이용해 `thermal.steady2d` 경계 확장을
+`Document.from_dict`, JSON 읽기, 검증, 문서 summary, `run(Document)`,
+`ThermalRunResult`, CLI와 JSON/NPZ 저장에 연결합니다.
 [기존 가이드](thermal_steady2d.md)는 원래 v1 계약을 보존합니다.
+같은 checkout에서 만든 서로 일치하는 패키지를 사용하세요.
 
-P2 수치·설치본 수용은 미완료입니다. 독립·플랫폼 시험은 별도로 제출됐으며
-시험이 있다는 사실이 통과 결과는 아닙니다. 아래 예제는 재현 절차와 해석적 기대값이며
-이 문서 작성 중 측정한 결과가 아닙니다. 정확한 결합 후보의 CI·artifact·플랫폼
-결과를 확인한 뒤 수용 여부를 판단하세요.
+[독립 검증 보고서](steady_boundary_independent_validation.md)는 고정 수용 기준,
+원문 검토와 제한된 직접 경로 실측을 구분합니다. 전체 source·설치본·플랫폼 수용은
+정확한 커밋의 CI 로그와 산출물에서 확인해야 합니다. 시험 정의만으로 통과를
+뜻하지는 않습니다. 아래 예제는 재현 절차와 해석적 기대값이며 실측 검증 범위를
+넓히지 않습니다.
 
 ## 입력과 지원 범위
 
