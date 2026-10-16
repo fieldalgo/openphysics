@@ -140,8 +140,11 @@ let meshData = null, resultData = null, currentJob = null;
 let documentRevision = 0;
 const $ = id => document.getElementById(id);
 
+function isHeadlessThermalType(type) {
+  return type === 'thermal.steady2d' || type === 'thermal.transient2d';
+}
 function isHeadlessThermal(data = doc) {
-  return Object.values(data?.physics || {}).some(p => p?.type === 'thermal.steady2d');
+  return Object.values(data?.physics || {}).some(p => isHeadlessThermalType(p?.type));
 }
 function clearResultViews() {
   meshData = resultData = null; currentJob = null;
@@ -453,7 +456,8 @@ function redrawAll() {
 function refresh() {
   $('json').value = JSON.stringify(doc, null, 2);
   if (isHeadlessThermal()) {
-    clearResultViews(); $('tree').innerHTML = ''; $('props').textContent = 'thermal.steady2d is headless Python/CLI only; Studio does not support heat input or results.';
+    const physicsType = Object.values(doc.physics).find(p => isHeadlessThermalType(p?.type)).type;
+    clearResultViews(); $('tree').innerHTML = ''; $('props').textContent = `${physicsType} is headless Python/CLI only; Studio does not support heat input or results.`;
     $('runBtn').disabled = $('meshBtn').disabled = true;
     status('headless thermal document unsupported in Studio'); redrawAll(); return;
   }
@@ -496,7 +500,7 @@ async function doRun() {
       for (; shown < j.log.length; shown++) log(j.log[shown]);
       if (j.status === 'done') { const data = await api.get(`/api/jobs/${job}/result`);
         if (revision !== documentRevision || currentJob !== job) return;
-        if (data.summary?.physics_type === 'thermal.steady2d') throw new Error('Studio cannot render headless thermal results');
+        if (isHeadlessThermalType(data.summary?.physics_type)) throw new Error('Studio cannot render headless thermal results');
         resultData = data; populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
       if (j.status === 'error') { log(j.error, 'err'); status('run failed'); break; } } }
   catch (e) { if (revision === documentRevision) { log('run failed: ' + e.message, 'err'); status('run failed'); } }

@@ -94,9 +94,14 @@ def material_preview(body: MaterialPreview):
             "source": m.source}
 
 
+def _headless_thermal_type(doc: Document):
+    return next((p.get("type") for p in doc["physics"].values()
+                 if p.get("type") in ("thermal.steady2d", "thermal.transient2d")), None)
+
+
 def _require_studio_physics(doc: Document):
-    if any(p.get('type') == 'thermal.steady2d' for p in doc['physics'].values()):
-        raise HTTPException(400, 'thermal.steady2d is headless Python/CLI only; Studio does not support heat input or results')
+    if physics_type := _headless_thermal_type(doc):
+        raise HTTPException(400, f'{physics_type} is headless Python/CLI only; Studio does not support heat input or results')
     if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
 
@@ -105,8 +110,8 @@ def _require_studio_physics(doc: Document):
 def validate(body: DocBody):
     try:
         doc = Document.from_dict(body.doc)
-        if any(p.get('type') == 'thermal.steady2d' for p in doc['physics'].values()):
-            return {'ok': False, 'error': 'Studio unsupported: thermal.steady2d is headless Python/CLI only'}
+        if physics_type := _headless_thermal_type(doc):
+            return {'ok': False, 'error': f'Studio unsupported: {physics_type} is headless Python/CLI only'}
     except DocumentError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes}
