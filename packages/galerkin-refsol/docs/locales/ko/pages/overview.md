@@ -2,7 +2,7 @@
 
 [English](../../../overview.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
 [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md) FEM 엔진의 정답지로 사용하는 폐형식 해와 출판된 고정밀 벤치마크입니다. 같은 모노레포 안의 별도 패키지이며, 평가자는 평가 대상 코드를 import하지 않습니다. numpy와 scipy에만 의존합니다.
 

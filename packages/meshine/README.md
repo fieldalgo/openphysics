@@ -2,7 +2,7 @@
 
 [Documentation](docs/overview.md)
 
-[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Constrained Delaunay refinement (Ruppert's algorithm) written in Python on top
 of scipy's Delaunay. Describe a cross-section as named material regions —

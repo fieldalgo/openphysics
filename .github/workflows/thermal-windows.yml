@@ -3,7 +3,9 @@ name: Windows headless thermal save
 
 on:
   push:
+    branches: ["**"]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +13,7 @@ permissions:
 
 concurrency:
   group: thermal-windows-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   windows-py312-thermal:

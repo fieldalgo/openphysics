@@ -2,7 +2,7 @@
 
 [English](../../../overview.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
 `.geo` 스크립트를 작성하고 `gmsh` 명령행 프로그램을 별도 프로세스로 실행한 뒤, 생성된 MSH 4.1 파일을 유한요소 코드에서 바로 사용할 수 있는 numpy 배열로 읽습니다. 노드 좌표, 일관된 방향의 요소, 요소별 영역 ID, 이름별 경계 면을 제공합니다.
 

@@ -2,7 +2,7 @@
 
 [English](../../../overview.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
 해석해 검증을 먼저 수행하는 방식으로 단계별 개발한 순수 Python(numpy + scipy.sparse) 유한요소 솔버 엔진입니다. 현재 2D 전자기, 정적 2D 탄성, 3D 공진기 고유모드를 다루며 다중물리 코어로 확장하도록 설계했습니다.
 

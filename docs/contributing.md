@@ -3,9 +3,8 @@
 **English** | [한국어](locales/ko/pages/contributing.md)
 
 OpenPhysics is under active development. Start with the [package overview](../README.md)
-and [implementation and validation contracts](README.md). The `develop`
-branch is the integration branch and the default branch; target pull requests
-there. Feature branches may contain work that has not passed acceptance.
+and [implementation and validation contracts](README.md). The `main`
+branch is the only trunk and the default branch; target pull requests there. Feature branches may contain work that has not passed acceptance.
 
 Open an issue for a reproducible bug or a proposed change. Include the commit,
 Python and platform versions, input units, a minimal example, and the expected
@@ -31,3 +30,28 @@ local environment files or private research material. Preserve upstream notices
 and verify the terms and provenance of any added dependency, data or copied code.
 Contributions are submitted under the repository's [Apache-2.0 license](../LICENSE),
 with third-party exceptions recorded in [NOTICE](../NOTICE) and package notices.
+
+## Branches and releases
+
+`main` is the only trunk and the default branch. Create a feature branch from
+current `origin/main`. Before review, fetch and rebase your own unpublished work
+onto `origin/main`, push it and open a pull request targeting `main`. Preserve
+shared or submitted history; use a new branch if replaying it is necessary.
+
+Every change, including documentation, requires successful `linux-py312` and
+`windows-py312-thermal` checks from GitHub Actions on the exact proposed commit.
+Review their logs and artifacts, not only the badge. Once the PR is reviewed,
+fast-forward that tested commit with `git push origin <branch>:main`. Never
+force-push. If the base moved or a required check rejects the push, update the
+candidate, push and validate again. Do not create an untested merge commit or
+squash after validation. The PR remains the review record for the landed commit.
+Main runs are retained when later pushes arrive; branch/PR runs may be superseded.
+
+Combine work in one temporary branch only when changes depend on each other or
+conflict. There is no permanent integration branch. To release, land the version
+change through the same PR and CI process, then tag that validated main commit
+`vX.Y.Z` and publish release notes and verified artifacts. Branch updates alone
+never publish packages. Automated PyPI/documentation publication is not configured
+in this repository; release credentials and publication gates require separate
+setup. Create `maintenance/X.Y.x` from a released tag only when that release needs
+a patch, and carry reviewed fixes from main.

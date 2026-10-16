@@ -2,7 +2,7 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Writes `.geo` scripts, runs the `gmsh` command-line program as a separate
 process, and reads the resulting MSH 4.1 file into numpy arrays that a

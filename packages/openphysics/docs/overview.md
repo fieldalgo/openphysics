@@ -2,7 +2,7 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Name reservation for the OpenPhysics suite.
 

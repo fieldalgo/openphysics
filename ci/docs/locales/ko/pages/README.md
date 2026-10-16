@@ -212,9 +212,12 @@ Windows 요구는 Linux exact version의 최소 부분집합입니다. pytest/bu
 `colorama==0.4.6`은 별도 pin이며 upstream tag의 pyproject와 LICENSE.txt에서
 BSD-3-Clause를 확인했습니다. runtime 요구나 패키지 버전은 바꾸지 않았습니다.
 Windows 전체 회귀·광학/Gmsh·다른 OS/Python 지원을 인증하지 않습니다.
-마지막 native-handle 후보에서 기존 교체 시험 두 개가 미해결이며 Windows 저장·정리
-수용은 미완료입니다. GitHub runner 검증은 중단됐습니다. 보존 workflow는 재현 정의이지
-Windows 합격 주장이 아니고 Linux 결과가 이를 대신하지 않습니다. Windows log/JUnit/
+hard-link 파일 pin 후보 `636a23a`는 같은 runner에서 설치 API·CLI·저장 36개와
+source 기존 대상 보호 3개가 통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
+기존 교체 fixture를 바꾸지 않고 통과했으며 이전 실패는 역사적 근거로 보존합니다.
+Windows 전체·macOS 지원은 아닙니다. Windows 저장은 동일 볼륨 hard link를 지원하는
+파일시스템과 임시 인접 pin 디렉터리에 대한 호출자의 독점 제어가 필요하며 미지원 시
+명시적으로 실패합니다. [저장 계약](../../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md)을 참고하세요. Windows log/JUnit/
 환경·네 wheel checksum은 별도 `windows-thermal-installed-and-io-<run_id>` artifact입니다.
 Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88 consumer는
 유지되며 Node는 shipped `studio_thermal.cjs`도 실행하도록 정의했습니다.
@@ -228,7 +231,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
 교체 보호는 시험하지만 소유권 검사와 unlink 사이의 외부 교체는 안전을 보장하지 않습니다.
 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. 이 동안 다른 writer가
-출력을 바꾸면 안 됩니다. 이전 Windows 두 실패의 원인은 미확정입니다. Actions는 활성화됐으며 새 runner 근거가 필요합니다.
+출력을 바꾸면 안 됩니다. Windows 교체 fixture는 위 `636a23a` 좁은 gate에서 회복됐지만 소유권 계약이나 전체 플랫폼 지원 범위가 넓어진 것은 아닙니다. Actions는 활성화돼 있으며 후보마다 해당 실행 근거를 확인해야 합니다.
 
 ## 배포본의 독립 수용
 
@@ -281,3 +284,8 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
 개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 활성화돼 있으며 새 workflow 결과와 이 과거 실측은 구분해야 합니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
+
+두 workflow는 문서를 포함한 모든 main 대상 PR의 필수 검사입니다. 검사명은
+`linux-py312`와 `windows-py312-thermal`입니다. 뒤 push가 main 실행을 취소하지
+않으며 기능 브랜치·PR 실행은 대체될 수 있습니다. 태그는 이 workflow를 실행하지
+않고 두 workflow 모두 패키지를 게시하지 않습니다.

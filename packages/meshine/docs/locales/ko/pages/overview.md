@@ -2,7 +2,7 @@
 
 [English](../../../overview.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
+[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
 scipy Delaunay를 바탕으로 Python으로 작성한 제약 Delaunay 세분화(Ruppert 알고리즘)입니다. 영역을 빈틈없이 채우는 다각형과 원을 이름 있는 재료 영역으로 기술하면, 구멍도 허용하면서 최소각을 보장하는 적합 삼각형 메시를 반환합니다. 영역별 크기 제어, 삼각형별 영역 ID, 이름별 경계 변을 제공합니다.
 

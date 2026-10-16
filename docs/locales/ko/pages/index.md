@@ -28,7 +28,7 @@
 
 패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/docs/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
 
-이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 헤드리스 JSON은 여전히 flux/Robin 경계를 거부한다. Work cloud Linux 결과·Actions 활성·Windows 검증 미확정 범위는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고한다.
+이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 헤드리스 JSON은 여전히 flux/Robin 경계를 거부한다. Work cloud Linux 결과·Actions 활성·Windows 검증의 실측 범위는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고한다.
 
 ## 패키지 개요: 전체 한국어판
 
@@ -59,7 +59,7 @@
 | [benchmark_cavity](../../../../ci/docs/benchmark_cavity.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_cavity.md) |
 | [benchmark_vector](../../../../ci/docs/benchmark_vector.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
-이 문서들은 이 checkout을 설명합니다. Actions는 활성화돼 있으며 마지막 Windows 실행의 두 실패는 미해결 상태이고 Linux 결과가 Windows 수용을 뜻하지 않습니다. 독립 Robin API와 헤드리스 JSON 계약은 별개입니다.
+이 문서들은 이 checkout을 설명합니다. Actions는 활성화돼 있습니다. `636a23a`의 좁은 Windows gate는 설치 36개·source 3개가 통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)). Windows 전체 회귀나 macOS 수용을 뜻하지 않습니다. 독립 Robin API와 헤드리스 JSON 계약은 별개입니다.
 
 ## 명시적 정상 열전도→기계 workflow
 

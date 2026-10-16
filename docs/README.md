@@ -26,7 +26,7 @@ English is the repository default. READMEs and contribution/security entry point
 
 Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/docs/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
-This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, disabled Actions and unresolved Windows verification.
+This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Headless JSON still rejects flux/Robin boundaries. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, enabled Actions and the measured scope of Windows verification.
 
 ## Package overviews: complete Korean counterparts
 
@@ -57,7 +57,7 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [benchmark_cavity](../ci/docs/benchmark_cavity.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_cavity.md) |
 | [benchmark_vector](../ci/docs/benchmark_vector.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_vector.md) |
 
-These pages describe this checkout. Actions is enabled; the last recorded Windows run has two unresolved failures; Linux results do not establish Windows acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
+These pages describe this checkout. Actions is enabled. The narrow Windows gate at `636a23a` passed 36 installed and 3 source cases ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)); this is not full Windows regression or macOS acceptance. Standalone Robin boundaries are separate from the headless JSON contract.
 
 ## Explicit steady heat-to-mechanics workflow
 

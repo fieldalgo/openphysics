@@ -2,7 +2,7 @@
 
 [Documentation](docs/overview.md)
 
-[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Writes `.geo` scripts, runs the `gmsh` command-line program as a separate
 process, and reads the resulting MSH 4.1 file into numpy arrays that a

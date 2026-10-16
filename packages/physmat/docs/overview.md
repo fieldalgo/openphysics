@@ -2,7 +2,7 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Optical dispersion first (complex refractive index and permittivity versus
 wavelength), with a slot for the thermal and mechanical constants a

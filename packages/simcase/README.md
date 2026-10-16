@@ -2,7 +2,7 @@
 
 [Documentation](docs/overview.md)
 
-[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 A COMSOL-style program is, underneath, a file that describes the model and an
 engine that runs the file. `simcase` implements that file format and engine for the

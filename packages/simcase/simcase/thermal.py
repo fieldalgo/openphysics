@@ -129,7 +129,8 @@ def _identity(path):
 def _windows_handle(path, *, create=False):
     """Win32 sharing contract via stdlib only; callers own the returned handle.
 
-    CREATE_NEW is exclusive; FILE_SHARE_DELETE allows rename/unlink while pinned.
+    CREATE_NEW is exclusive; delete sharing requests rename/unlink compatibility.
+    Open-file restrictions still apply; saved file identities use hard-link pins.
     Directory/query handles require BACKUP_SEMANTICS. OPEN_REPARSE_POINT avoids
     following a substituted junction/symlink. No third-party implementation used.
     """

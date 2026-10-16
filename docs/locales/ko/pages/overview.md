@@ -124,8 +124,10 @@ python -m pytest -q packages/simcase/tests
 패키지 metadata는 Python 3.10 이상을 허용하지만 고정한 Linux 검증 의존성은
 Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. 다른 환경은 실측한
 전체 회귀시험 범위 밖입니다. Windows 2022 / Python 3.12.10의 좁은 저장 I/O
-검증은 두 실패의 원인이 미확정인 채 미완료 상태이며, Linux 결과로 Windows 수용을
-대신하지 않습니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며
+검증은 `636a23a`에서 설치 API·CLI·저장 36개와 source 기존 대상 보호 3개가
+통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
+과거 교체 실패 두 개를 회복한 범위이며 Windows 전체 회귀·다른 파일시스템·macOS
+지원을 입증하지 않습니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며
 검증된 플랫폼 목록이 아닙니다. GitHub Actions는 활성화돼 있습니다. 과거 클라우드 결과는 원래 snapshot의 근거이며 새 커밋은 정확한 workflow 결과를 확인해야 합니다.
 
 ## 문서와 기여
@@ -134,7 +136,7 @@ Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. �
 완전한 한국어판을 함께 제공합니다. [자산 출처](assets.md)에는
 과거 그림, fixture와 데이터의 출처를 기록했습니다.
 
-기본 브랜치 `develop`에는 검토한 통합 변경을 반영합니다. 기능 브랜치에는 검증하지
+기본 브랜치 `main`에는 검토한 통합 변경을 반영합니다. 기능 브랜치에는 검증하지
 않은 작업이 있을 수 있습니다. 변경과 재현 가능한 버그 보고는
 [기여 안내](contributing.md), 비공개 취약점 신고는 [보안 안내](security.md)를
 따르세요. 이 checkout을 사용하는 데 별도의 비공개 저장소는 필요하지 않습니다.

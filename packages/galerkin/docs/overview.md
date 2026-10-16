@@ -2,7 +2,7 @@
 
 **English** | [한국어](locales/ko/pages/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.

@@ -9,7 +9,7 @@ Include the affected commit or package version, platform, reproduction steps,
 expected impact and a minimal example without sensitive data.
 
 OpenPhysics is under active development. Security fixes are developed on
-`develop`; there is no promised support period for historical package versions.
+`main`; there is no promised support period for historical package versions.
 The browser Studio binds to loopback by default and is intended for local use.
 It is not an authenticated multi-user service; do not expose it to an untrusted
 network. Numerical validation and supported platform limits are documented

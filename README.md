@@ -128,8 +128,10 @@ the full suite, and a passing subset does not validate skipped integrations.
 Package metadata permits Python 3.10+, but the pinned Linux validation dependencies
 are for Python 3.12 and cannot be reused unchanged on 3.10/3.11. Other environments
 are outside the measured full-regression scope. The narrow Windows 2022 /
-Python 3.12.10 save-I/O gate remains incomplete with two unresolved failures;
-Linux results do not establish Windows acceptance. `OS Independent` classifiers
+Python 3.12.10 gate passed 36 installed API/CLI/save cases and 3 source
+target-protection cases at `636a23a` ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
+This recovers two historical replacement failures; it does not establish full
+Windows regression, other filesystems or macOS support. `OS Independent` classifiers
 and `py3-none-any` wheels describe metadata, not a tested platform matrix.
 GitHub Actions is enabled. Recorded cloud results remain evidence for their
 original snapshots; check the exact workflow run for newer commits.
@@ -141,7 +143,7 @@ Start with the [documentation index](docs/README.md) and the
 have complete Korean counterparts. [Asset provenance](docs/assets.md) identifies
 historical figures, fixtures and data sources.
 
-The default branch, `develop`, contains reviewed integrations. Feature branches
+The default branch, `main`, contains reviewed integrations. Feature branches
 may contain unvalidated work. See [CONTRIBUTING.md](CONTRIBUTING.md) for changes
 and reproducible bug reports, or [SECURITY.md](SECURITY.md) for private vulnerability
 reporting. No separate private repository is needed to use this checkout.

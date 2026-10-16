@@ -2,7 +2,7 @@
 
 [Documentation](docs/overview.md)
 
-[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Closed-form solutions and published high-accuracy benchmarks used as the
 answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
