@@ -69,6 +69,12 @@ jobs:
             packages/simcase/tests/test_transient_thermal_contract.py \
             packages/simcase/tests/test_transient_headless_windows.py \
             packages/simcase/tests/test_studio_transient.py
+      - name: Check steady thermal Studio before the full suite
+        run: |
+          python -m pytest -q -ra --junitxml=.validation/studio-thermal-preflight.xml \
+            packages/simcase/tests/test_studio_steady_thermal_http.py \
+            packages/simcase/tests/test_studio_thermal_acceptance.py \
+            packages/simcase/tests/test_studio_thermal_lifecycle.py
       - name: Run all Python tests including RII and convergence studies
         id: source_tests
         env:
@@ -82,7 +88,10 @@ jobs:
           python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_boundary.cjs
+        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_boundary.cjs packages/simcase/tests/studio_steady_thermal.cjs
+      - name: Observe exact steady thermal Studio resources once
+        if: ${{ success() }}
+        run: python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

@@ -438,3 +438,11 @@ acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required
 ## Headless transient heat
 
 The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times, uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and insulation. `run(Document)` returns `TransientThermalRunResult`; the CLI example is `transient_thermal_uniform`. Results save JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version metadata. Initial values are not projected and negative K is not clamped. Follow the contract for fresh-output ownership, memory and failures; disabling fields is not streaming. Studio rejects these documents and clears stale optical state. No transient flux/Robin, restart or automatic coupling is added. Implementation is distinct from exact source/installed/CI acceptance.
+
+## Planned dedicated steady thermal Studio interface
+
+The [steady heat Studio draft](thermal_studio.md) describes JSON opening/applying, dedicated validation/run, result-derived mesh, nodal Kelvin and cell flux views, error recovery and candidate resource limits. Server/frontend candidates implement JSON-first steady input, result views and terminal reclamation. Integrated CI, actual-browser and resource measurements remain pending; this is not official main support. Existing generic heat refusal and optical behavior remain; transient UI, mesh-only preview and new result-save endpoints are outside scope.
+
+## Validation and landing evidence
+
+Documentation follows Draft → relevant checks → Ready PR → required CI → automatic Rebase and merge → landed-main validation. Main uses a non-cancelling queue=max; PR supersession uses queue=single. Full Linux science and Linux/macOS/Windows installed validation are separate; distinguish configuration, execution, acceptance and main landing. Actual Studio browser/resource measurements remain unverified. See the [steady Studio guide](thermal_studio.md) for the operational and evidence boundaries.

@@ -51,3 +51,15 @@ include examples/thermal_boundary.json
 include tests/test_steady_boundary_platform.py
 include tests/test_studio_steady_boundary.py
 include tests/studio_steady_boundary.cjs
+include simcase/studio/thermal_api.py
+include simcase/studio/static/index.html
+include simcase/studio/static/thermal.js
+include tests/studio_steady_thermal.cjs
+include tests/test_studio_steady_thermal_http.py
+include tests/test_studio_thermal_acceptance.py
+include tests/studio_thermal_independent_fixtures.py
+include tests/test_studio_thermal_lifecycle.py
+include docs/thermal_studio.md
+include docs/locales/ko/pages/thermal_studio.md
+include docs/studio_thermal_independent_validation.md
+include docs/locales/ko/pages/studio_thermal_independent_validation.md

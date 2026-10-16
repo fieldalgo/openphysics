@@ -129,3 +129,11 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 ## Headless 과도 열전도
 
 직사각형 `thermal.transient2d` 문서는 고정 P1·일관 질량·후진 Euler 열전도를 Python API·CLI·버전 JSON/NPZ 이력에 연결합니다. 명시적 초, 균일/affine 초기 Kelvin, 변 상수 또는 요청 시간별 Dirichlet 표본과 나머지 단열을 받습니다. 초기/경계 일치를 projection 없이 검사하고 유한 음의 K를 clamp하지 않습니다. Studio·과도 flux/Robin·restart·자동 연성은 미지원입니다. [완전한 입력/API/CLI/save 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md) ([English](../../../../packages/simcase/docs/thermal_transient2d.md))을 읽으세요. 구현한 인터페이스·포장 규칙에는 정확한 결합 source·설치·CI 근거가 필요하며 기존 엔진 결과는 headless 수용이 아닙니다.
+
+## 정상열 Studio 초안
+
+[정상열 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md)와 [영문판](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md)은 JSON-first·결과메시 구현 후보와 수용 대기를 설명합니다. Server/frontend후보는 전용 정상열 UI·자원정책을 구현하며 통합 CI·실제 browser·자원실측은 대기입니다. Generic Studio 열 guard는 유지합니다. 이 canonical 링크는 네트워크 접근과 해당 문서의 main 통합이 필요합니다.
+
+## 검증·반영 상태 구분
+
+문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio 후보의 실제 browser·자원실측은 미확인입니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md)를 참조하세요.

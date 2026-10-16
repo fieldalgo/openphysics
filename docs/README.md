@@ -128,3 +128,11 @@ The historical b2 snapshot's 70 small producer/reference source passes are evide
 ## Headless transient heat
 
 The rectangular `thermal.transient2d` document connects fixed-P1, consistent-mass backward-Euler heat to the Python API, CLI and versioned JSON/NPZ histories. It accepts explicit seconds, uniform/affine initial Kelvin and side-constant or requested-time sampled Dirichlet values with insulation elsewhere. Initial/boundary agreement is checked without projection; finite negative K is not clamped. Studio, transient flux/Robin, restart and automatic coupling remain unsupported. Read the [complete input/API/CLI/save contract](../packages/simcase/docs/thermal_transient2d.md) ([한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)). Implemented interfaces and packaging rules require exact combined source, installed and CI evidence; the older engine results are not headless acceptance.
+
+## Steady thermal Studio draft
+
+The [steady heat Studio guide](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md) and its [Korean counterpart](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_studio.md) describe the JSON-first, result-mesh implementation candidate and pending acceptance. Server/frontend candidates implement the dedicated steady UI and resource policy; integrated CI, actual-browser and resource measurements remain pending. Generic Studio heat guards remain. These canonical links require network access and the corresponding documentation to be integrated on main.
+
+## Validation and landing evidence
+
+Documentation follows Draft → relevant checks → Ready PR → required CI → automatic Rebase and merge → landed-main validation. Main uses a non-cancelling queue=max; PR supersession uses queue=single. Full Linux science and Linux/macOS/Windows installed validation are separate; distinguish configuration, execution, acceptance and main landing. Actual Studio browser/resource measurements remain unverified. See the [steady Studio guide](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_studio.md) for the operational and evidence boundaries.
