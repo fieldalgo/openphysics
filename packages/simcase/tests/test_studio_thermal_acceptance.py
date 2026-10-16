@@ -33,6 +33,7 @@ def submit(client, data, sequence=11):
     assert response.status_code in (200,202),response.text
     accepted=response.json()
     assert accepted["client_revision"]==7 and accepted["request_seq"]==sequence
+    assert accepted["kind"]=="thermal.steady2d"
     assert isinstance(accepted["job"],str) and accepted["job"]
     assert isinstance(accepted["result_id"],str) and accepted["result_id"]
     return accepted
@@ -45,6 +46,8 @@ def terminal(client, accepted):
         response=client.get("/api/jobs/"+accepted["job"])
         assert response.status_code==200,response.text
         state=response.json()
+        for key in ("kind","job","result_id","client_revision","request_seq"):
+            assert state[key]==accepted[key]
         if state["status"] in ("done","error"):
             return state
         time.sleep(.01)
@@ -72,6 +75,7 @@ def test_studio_thermal_capabilities_and_original_generic_refusal(client):
     heat=cap["thermal.steady2d"]
     assert heat["validate"]=="/api/thermal/validate"
     assert heat["run"]=="/api/thermal/run"
+    assert heat["run_enabled"] is True
     assert heat["mesh_preview"] is False and heat["mesh_from_result"] is True
     assert heat["time_navigation"] is False
     assert cap["thermal.transient2d"]["supported"] is False
@@ -188,7 +192,9 @@ class PublicResultProbe(ThermalRunResult):
         self.doc=original.doc.copy();self.doc.validate()
         self.log=list(original.log);self.timings=dict(original.timings)
         self.metadata=copy.deepcopy(original.summary())
-        if fault=="layout":self.captured["field_layout"]="wrong-layout"
+        if fault=="layout":
+            self.captured["field_layout"]="wrong-layout"
+            self.metadata["field_layout"]="wrong-layout"
         elif fault=="unit":self.metadata["field_units"]["load_w_per_m"]="W"
         elif fault=="shape":self.captured["heat_flux_w_m2"]=np.zeros((1,2))
         elif fault=="nonfinite":self.captured["temperature_k"][0]=np.nan
