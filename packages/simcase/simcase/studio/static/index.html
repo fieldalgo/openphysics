@@ -258,7 +258,8 @@ const transientController=typeof TransientThermalStudio==='undefined'?null:Trans
     $('transientReadH').disabled=$('transientReadV').disabled=!nt||state.readActive;
     if(state.error){status(state.error);log(state.error,'err');}
     else if(transientViewError)status(transientViewError);
-    else status(state.busy?'transient request…':state.readActive?'reading saved transient data…':
+    else status(state.busy?'transient request…':state.dirty||!state.validated?'validate current transient JSON':
+      state.readActive?'reading saved transient data…':
       state.frame?'transient frame ready':state.manifest?'select a saved frame':state.validated?'transient thermal valid':'validate current transient JSON');
   },
   onManifest:man=>{
