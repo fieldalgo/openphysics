@@ -38,6 +38,7 @@ from .tracking import ModeTracker, ModeTrackingError, tracking_settings
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
     from .thermal import ThermalRunResult
+    from .transient_thermal import TransientThermalRunResult
 
 
 @dataclass
@@ -69,6 +70,9 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
+    from .transient_thermal_contract import is_transient_thermal
+    if is_transient_thermal(doc.data):
+        raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.transient2d')
     from .thermal import is_thermal
     if is_thermal(doc.data):
         raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.steady2d')
@@ -102,6 +106,8 @@ def study_points(doc: Document) -> tuple[str | None, list]:
 
 def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
+    if physics.get('type') == 'thermal.transient2d':
+        raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.transient2d')
     if physics.get('type') == 'thermal.steady2d':
         raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.steady2d')
     if physics.get("type") == "em.cavity3d":
@@ -238,7 +244,7 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | ThermalRunResult:
+def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult:
     """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
     log: list[str] = []
 
@@ -248,6 +254,10 @@ def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | Th
             print(msg)
 
     doc.validate()
+    from .transient_thermal_contract import is_transient_thermal
+    if is_transient_thermal(doc.data):
+        from .transient_thermal import run_transient_thermal
+        return run_transient_thermal(doc, verbose=verbose)
     from .thermal import is_thermal, run_thermal
     if is_thermal(doc.data):
         return run_thermal(doc, verbose=verbose)
@@ -321,3 +331,4 @@ def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | Th
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
                      np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking)
+
