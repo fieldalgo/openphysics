@@ -186,3 +186,21 @@ float/bool차원과float/bool/emptyidentity음성5개를추가했다.
 metadata틈은독립consumer시험정의문제이며확정생산결함이아니다.
 Pythonparse/pytest/HTTP/solver/installed/browser/플랫폼실행은없었다.
 실제반복run과전음성을포함한정확결합Studio source/installedCI가여전히필요하다.
+
+## 정확 결합후보 검토
+
+결합후보 b584d50df6ef024e6600c611fe24d9467034c890
+(parentmain6e9be99a10fba77d329063da973401f26d4ed0b5)을검토했다.
+HTTP시험/엄격fixture/P2oracle·cases/열adapter는검토한
+blobf47db1a/b7b7e0c/8957c566/963e685/6ecec32와정확히같다.
+물리gate/순차mesh/SI/보존assertion변경은없다.
+
+확정타담당시험정의blocker때문에전체수용을보류한다.
+tests/studio_steady_thermal.cjs307의최종HTTP mock문자열구성에서
+미정의load(...)를호출한다. 동적loader식대신기존cap()fixture를
+JSON.stringify(cap())로쓸수있다.
+독립리뷰에서타담당소스를수정하지않았다.
+소스로확인한시험오류이며새Node실패실측이나물리/UI결함이아니다.
+
+이리뷰의결합후보HTTP/Node/수치/설치/browser/플랫폼검증은미실행이다.
+정정된정확후보와원독립결과를확인한뒤수용해야한다.
