@@ -136,7 +136,8 @@ original snapshots; check the exact workflow run for newer commits.
 
 ## Documentation and contributions
 
-Start with the [documentation index](docs/README.md). Usage and validation guides
+Start with the [documentation index](docs/README.md) and the
+[architecture and package map](docs/architecture.md). Usage and validation guides
 have complete Korean counterparts. [Asset provenance](docs/assets.md) identifies
 historical figures, fixtures and data sources.
 
