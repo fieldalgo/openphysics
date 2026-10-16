@@ -140,4 +140,4 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 
 ## 과도 열전도 Studio 통합
 
-[과도 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 전용서버route·배포페이지control은제출됐으며일치하는capability통합·exactruntime수용은대기입니다. Headless과도지원·기존정상Studio수용이과도UI수용을입증하지않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.
+[과도 Studio 가이드](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 이 checkout은 전용 capability·route와 배포 페이지 control을 구현합니다. 실측 runtime·설치·browser·자원·플랫폼 범위는 정확한 checkout의 CI 결과와 artifact에서 확인하며 headless·정상열 수용이 과도 UI 수용을 입증하지는 않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.

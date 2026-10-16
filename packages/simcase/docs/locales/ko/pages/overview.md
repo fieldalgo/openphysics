@@ -258,7 +258,7 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 ## Headless 과도 열전도
 
-[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Generic광학Studio route는열문서를거절하고오래된광학상태를지우며전용과도인터페이스는별도capability·통합상태를갖습니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Generic광학Studio route는열문서를거절하고오래된광학상태를지우며전용 과도 인터페이스는 별도 capability·route·시간/history view를 사용합니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
 
 ## 정상열 Studio
 
@@ -270,4 +270,4 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 ## 과도 열전도 Studio 통합
 
-[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 전용서버route·배포페이지control은제출됐으며일치하는capability통합·exactruntime수용은대기입니다. Headless과도지원·기존정상Studio수용이과도UI수용을입증하지않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.
+[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 이 checkout은 전용 capability·route와 배포 페이지 control을 구현합니다. 실측 runtime·설치·browser·자원·플랫폼 범위는 정확한 checkout의 CI 결과와 artifact에서 확인하며 headless·정상열 수용이 과도 UI 수용을 입증하지는 않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.
