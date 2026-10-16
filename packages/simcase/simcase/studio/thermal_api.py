@@ -85,16 +85,20 @@ class ThermalLimits:
             raise ValueError("thermal byte budget cannot reserve one complete record")
 
 
+def runtime_available():
+    return all(hasattr(ThermalRunResult, key) for key in ("result_format", "field_layout"))
+
+
 def v2_available():
     return all(hasattr(ThermalRunResult, PROPERTIES[key]) for key in BOUNDARY_FIELDS)
 
 
 def capabilities(limits):
-    pairs = (V1, V2) if v2_available() else (V1,)
+    pairs = ((V1, V2) if v2_available() else (V1,)) if runtime_available() else ()
     return {
         "capability_format": "studio-capabilities-v1",
         KIND: {
-            "supported": True, "validate": "/api/thermal/validate",
+            "supported": True, "run_enabled": runtime_available(), "validate": "/api/thermal/validate",
             "run": "/api/thermal/run", "input": "json",
             "mesh_preview": False, "mesh_from_result": True,
             "result_formats": [p[0] for p in pairs],
@@ -216,6 +220,8 @@ async def read_request(request, limits, *, for_run):
         tags = {"client_revision": _counter(raw["client_revision"], "client_revision"),
                 "request_seq": _counter(raw["request_seq"], "request_seq")}
         _preflight(raw["doc"], limits)
+        if for_run and not runtime_available():
+            raise ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
         try:
             doc = Document.from_dict(raw["doc"])
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
@@ -265,16 +271,41 @@ def capture_result(result, identity, limits):
     summary = copy.deepcopy(result.summary())
     _require(isinstance(summary, dict), "thermal summary must be an object")
     encode_json(summary, limits.metadata_bytes)
-    pair = (summary.get("result_format"), summary.get("field_layout"))
-    _require(pair in (V1, V2) and summary.get("physics_type") == KIND, "unsupported thermal result/layout pair")
+    public_format = result.result_format
+    public_layout = result.field_layout
+    pair = (public_format, public_layout)
+    _require(pair in (V1, V2) and summary.get("physics_type") == KIND,
+             "unsupported public thermal result/layout pair")
+    _require(pair == (summary.get("result_format"), summary.get("field_layout")),
+             "public and summary result/layout pair disagree")
     keys = BASE_FIELDS+BOUNDARY_FIELDS if pair == V2 else BASE_FIELDS
     arrays = {}
     for key in keys:
         value = getattr(result, PROPERTIES[key])  # one property read
         _require(isinstance(value, np.ndarray), key+": expected a numeric ndarray")
         _require(value.dtype.kind in "iuf", key+": expected real nonboolean dtype")
+        # Refuse malformed oversized producers before allocating another owned copy.
+        if key == "nodes_m":
+            _require(value.ndim == 2 and value.shape[1] == 2
+                     and 3 <= len(value) <= limits.max_nodes, "invalid or oversized nodes_m")
+            node_count = len(value)
+        elif key == "triangles":
+            _require(value.dtype.kind in "iu" and value.ndim == 2 and value.shape[1] == 3
+                     and 1 <= len(value) <= limits.max_triangles, "invalid or oversized triangles")
+            cell_count = len(value)
+        elif key == "heat_flux_w_m2":
+            _require(value.shape == (cell_count, 2), "invalid heat_flux_w_m2 shape before copy")
+        elif key == "dirichlet_node_ids":
+            _require(value.dtype.kind in "iu" and value.ndim == 1 and len(value) <= node_count,
+                     "invalid Dirichlet IDs before copy")
+            fixed_count = len(value)
+        elif key == "dirichlet_temperature_k":
+            _require(value.shape == (fixed_count,), "invalid prescribed temperature shape before copy")
+        else:
+            _require(value.shape == (node_count,), key+": invalid nodal shape before copy")
+        _require(np.isfinite(value).all(), key+": nonfinite array before copy")
         arrays[key] = value.copy(order="C")
-        _require(np.isfinite(arrays[key]).all(), key+": nonfinite array")
+        _require(np.isfinite(arrays[key]).all(), key+": nonfinite captured array")
     nodes, triangles, fixed = arrays["nodes_m"], arrays["triangles"], arrays["dirichlet_node_ids"]
     _require(nodes.ndim == 2 and nodes.shape[1] == 2 and len(nodes) >= 3, "invalid nodes_m shape")
     _require(triangles.ndim == 2 and triangles.shape[1] == 3 and len(triangles) > 0
@@ -345,7 +376,7 @@ class ThermalLease:
 
 
 class ThermalJobs:
-    """Separate bounded thermal store; never evicts optical/unexpired jobs."""
+    """Bounded thermal cache; evict oldest released terminal, never active/optical."""
 
     def __init__(self, limits=None, *, clock=None):
         self.limits = limits or ThermalLimits()
@@ -367,14 +398,26 @@ class ThermalJobs:
         return sum(len(rec["status_bytes"])+len(rec["result"] or b"")
                    for rec in self._records.values() if rec["lease"].released)
 
+    def _make_room(self, byte_count, slots, *, released_reservation=0):
+        # Caller holds the lock. TTL is a maximum, not a retention guarantee.
+        while (len(self._records)+self._pending+slots > self.limits.terminal_jobs
+               or self._retained_bytes()+self._reserved_bytes-released_reservation+byte_count
+               > self.limits.terminal_bytes):
+            candidates = [(key, rec) for key, rec in self._records.items()
+                          if rec["lease"].released and rec["status"] in ("done", "error")]
+            if not candidates:
+                raise ThermalAPIError("capacity_exceeded", "thermal job capacity unavailable", 429)
+            # dict insertion order breaks equal monotonic-clock ties deterministically.
+            oldest, _ = min(candidates, key=lambda item: item[1]["terminal_at"])
+            del self._records[oldest]
+
     def reserve(self):
         with self._lock:
             self._expire()
             budget = self.limits.payload_bytes+self.limits.status_bytes
-            if (self._active >= self.limits.active_jobs
-                    or len(self._records)+self._pending >= self.limits.terminal_jobs
-                    or self._retained_bytes()+self._reserved_bytes+budget > self.limits.terminal_bytes):
+            if self._active >= self.limits.active_jobs:
                 raise ThermalAPIError("capacity_exceeded", "thermal job capacity unavailable", 429)
+            self._make_room(budget, 1)
             lease = ThermalLease(budget)
             self._active += 1
             self._pending += 1
@@ -408,6 +451,8 @@ class ThermalJobs:
             if lease.released or rec is None or rec["status"] != "running":
                 return False
             encoded = self._status(rec["identity"], status, log, error, result is not None)
+            self._make_room(len(encoded)+len(result or b""), 0,
+                            released_reservation=lease.reservation)
             rec.update(status=status, status_bytes=encoded, result=result,
                        terminal_at=self._clock())
             return True
