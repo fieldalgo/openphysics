@@ -28,7 +28,7 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
+RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/thermal.py"),
                          "galerkin-refsol": ("refsol/transient_heat.py",),
                          "simcase": ("simcase/steady_boundary_contract.py",
                                      "simcase/schema.py", "simcase/transient_thermal_contract.py",
@@ -36,6 +36,7 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
                                      "simcase/thermal.py", "simcase/studio/server.py") }
 DOCUMENT_ASSETS = {'galerkin': (
+              'galerkin/thermal.py',
               'galerkin/transient_heat.py',
               'docs/transient_heat.md',
               'docs/locales/ko/pages/transient_heat.md',
@@ -127,6 +128,14 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
  'simcase': (
+              'docs/thermal_steady_boundary2d.md',
+              'docs/locales/ko/pages/thermal_steady_boundary2d.md',
+              'docs/steady_boundary_independent_validation.md',
+              'docs/locales/ko/pages/steady_boundary_independent_validation.md',
+              'tests/steady_boundary_independent_oracle.py',
+              'tests/steady_boundary_independent_cases.py',
+              'tests/steady_boundary_independent_consumer.py',
+              'tests/test_steady_boundary_independent_validation.py',
               'simcase/steady_boundary_contract.py',
               'tests/test_steady_boundary_contract.py',
               'simcase/schema.py',
@@ -419,6 +428,19 @@ def main():
         run(python, "-I", "-m", "simcase", "validate", document, cwd=work, env=env)
         run(python, "-I", "-m", "simcase", "run", document, "-q",
             "-o", work / "transient-headless-example", cwd=work, env=env)
+        # Original steady-boundary independent cases run separately from pytest.
+        steady_acceptance = work / "steady-boundary-acceptance"
+        steady_acceptance.mkdir()
+        with tarfile.open(simcase_sdist) as archive:
+            for filename in ("steady_boundary_independent_oracle.py",
+                             "steady_boundary_independent_cases.py",
+                             "steady_boundary_independent_consumer.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (steady_acceptance / filename).write_bytes(archive.extractfile(member).read())
+        run(python, "-I", steady_acceptance / "steady_boundary_independent_consumer.py",
+            "--expected-installed-root", env_root,
+            "--expected-module-hashes", hash_manifest, cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")
 
 
