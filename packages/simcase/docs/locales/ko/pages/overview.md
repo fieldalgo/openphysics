@@ -258,7 +258,7 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 ## Headless 과도 열전도
 
-[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Studio는 이 문서를 거절하고 오래된 광학 상태를 지웁니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Generic광학Studio route는열문서를거절하고오래된광학상태를지우며전용과도인터페이스는별도capability·통합상태를갖습니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
 
 ## 정상열 Studio
 
@@ -267,3 +267,7 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 ## 검증·반영 상태 구분
 
 문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio browser·자원실측 근거는 정확 checkout별로 확인합니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](thermal_studio.md)를 참조하세요.
+
+## 과도 열전도 Studio 통합
+
+[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 문서기준에서production제출/runtime수용대기인통합계약이며headless과도지원·기존정상Studio수용이과도UI지원을입증하지않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.

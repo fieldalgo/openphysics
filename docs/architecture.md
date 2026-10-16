@@ -70,15 +70,13 @@ repository; separate historical package repositories are not needed to use them.
   automatically become document features. The [steady boundary contract](../packages/simcase/docs/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
   both new keys retain v1.
-- **Studio:** a local browser interface for 2D optical models. It rejects 3D
-  models and does not yet provide thermal or structural forms and plots.
+- **Studio:** a local browser interface for 2D optical models and dedicated JSON-first steady heat. Generic optical routes retain heat/3D guards. The [transient Studio contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient_studio.md) describes the separate time-index/history integration and its pending implementation/validation status. Structural forms, 3D and a general thermal form editor are outside this scope.
 
 These layers do not imply a general-purpose, fully coupled multiphysics solver.
 The standalone [transient heat API](../packages/galerkin/docs/transient_heat.md)
 uses a fixed P1 mesh, consistent mass and backward Euler. The separate
 [headless document path](../packages/simcase/docs/thermal_transient2d.md) adds
-rectangular JSON/API/CLI and saved histories, not Studio, restart,
-transient flux/Robin input or automatic coupling. Exact contracts
+rectangular JSON/API/CLI and saved histories. This headless API does not itself enable Studio; dedicated route/capability support is separate. Restart, transient flux/Robin input and automatic coupling remain outside the contract. Exact contracts
 and measured validation limits are linked from the
 [documentation index](README.md).
 
