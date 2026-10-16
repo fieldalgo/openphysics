@@ -10,8 +10,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from simcase import Document, DocumentError, TransientThermalRunResult, run, build_mesh, solve_point
-from simcase.cli import main
+from simcase.schema import Document, DocumentError
+from simcase.transient_thermal import TransientThermalRunResult, run_transient_thermal as run
 from simcase.examples import TRANSIENT_THERMAL_UNIFORM
 from simcase.transient_thermal import _FIELD_SPEC
 import simcase.transient_thermal as adapter
@@ -90,6 +90,12 @@ def test_document_and_input_lifetime_and_no_em_attributes():
         assert not a.flags.writeable
     for attr in ('neff', 'wavelength', 'group_index'):
         assert not hasattr(r, attr)
+
+
+def test_public_dispatch_and_stage_refusals():
+    from simcase import run as public_run, build_mesh, solve_point
+    r = public_run(document(), verbose=False)
+    assert isinstance(r, TransientThermalRunResult)
     with pytest.raises(DocumentError, match='thermal.transient2d'):
         build_mesh(r.doc)
     with pytest.raises(DocumentError, match='thermal.transient2d'):
@@ -224,6 +230,7 @@ def test_two_writers_one_fresh_target(tmp_path):
 
 
 def test_finite_json_failure_and_cli_exit_codes(tmp_path, monkeypatch, capsys):
+    from simcase.cli import main
     model = tmp_path/'model.json'
     model.write_text(json.dumps(document().data), encoding='utf-8')
     assert main(['validate', str(model)]) == 0
