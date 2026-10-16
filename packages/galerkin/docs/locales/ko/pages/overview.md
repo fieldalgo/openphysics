@@ -182,7 +182,7 @@ Hadley의 명시 정확도 ±3e-6에는 **도달하지 못했습니다**. 원인
 
 - **MFEM**은 문제 규모가 순수 Python 직접해법의 범위를 넘을 때의 생산 코어로 검토 중입니다. 이 3D 희소 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없으며, 그 이후에는 보조 공간 전처리기를 쓰는 반복 솔버가 필요합니다.
 - **유전체 충전 및 열린 3D 문제**: 3D 텐서 계수 경로가 있으므로(`assemble_stiffness_3d`가 (T,3,3) 텐서를 받음) M2.5 PML을 옮길 수 있습니다. 부족한 것은 해석해를 갖는 3D 검증 사례입니다.
-- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 과도 문제에는 시간 적분기, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
+- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 아래 후보의 과도 열전도 하위 모듈은 후진 Euler를 사용합니다. 다른 과도 물리에는 전용 시간 적분기가, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
 
 ## 라이선스
 
@@ -220,3 +220,11 @@ Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니�
 ## 처방 온도장의 전체 기계 표면하중
 
 [전체 표면하중 계약](thermoelastic_traction.md), [영어 예제](../../../../examples/thermoelastic_traction.py), [독립 보고](thermoelastic_traction_independent_validation.md)는 고정 온도장 기계단계의 선택적 전역 Cartesian Pa 하중을 설명합니다. 매핑은 전체 물리 응력 `sigma*n`이며 열 표면하중을 다시 더하거나 빼면 안 됩니다. 체적·선·열 하중과 구속 반력은 분리해 기록합니다. 기존18개 위치 인자의 결과 구성은 유효하며 새 하중 필드 기본값은 None입니다. scalar pressure 전용·로컬 프레임·follower API는 없지만 고정 기준 경계의 `lambda points_m, normals: -p * normals` 전역 Pa callback은 유효합니다. heat workflow·JSON/CLI/Studio·저장을 확장하지 않습니다.
+
+## 과도 열전도 후보 Python 하위 모듈
+
+`galerkin.transient_heat.solve_transient_heat`를 명시적으로 import합니다. 고정된 적합 P1 삼각형, 일관 질량과 후진 Euler, 상수 등방 열전도율·체적열용량, 시간변 온도를 갖는 고정 Dirichlet 절점과 나머지 경계의 단열을 사용합니다. 좌표·시간·온도 단위는 m, s, K입니다. 선형 수학 API는 유한한 음의 Kelvin을 허용하며 clamp·물리 온도 인증·discrete maximum principle을 약속하지 않습니다. 별도 열→기계 전달은 계속 음의 K를 거절합니다.
+
+[사용법](transient_heat.md) ([English](../../../transient_heat.md)) · [생산 검증 계약](transient_heat_validation.md) ([English](../../../transient_heat_validation.md)) · [독립 검증 보고](transient_heat_independent_validation.md) ([English](../../../transient_heat_independent_validation.md))
+
+구현과 수용 파일은 제출됐습니다. 생산 담당의 사용/검증 페이지에 소형 source 시험 70개 통과가 기록돼 있으며, 전체 시간/PDE·독립 수용·빌드·설치 검증은 별도 근거가 필요합니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.

@@ -93,3 +93,20 @@ See [bundled images, fixtures and data](assets.md) for source history and licens
 |---|---|
 | [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
 | [Security](security.md) | [한국어](locales/ko/pages/security.md) |
+
+## Transient heat candidate: acceptance pending
+
+This feature-branch candidate contains the explicit `galerkin.transient_heat.solve_transient_heat` submodule implements fixed P1 triangles, consistent mass and backward Euler with constant isotropic conductivity/heat capacity, time-dependent Dirichlet values and insulation. Finite Kelvin inputs do not certify physical validity or a maximum principle. No JSON/CLI/Studio, persistence or automatic heat-to-mechanics connection is added.
+
+| English | 한국어 |
+|---|---|
+| [transient_heat](../packages/galerkin/docs/transient_heat.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat.md) |
+| [transient_heat_validation](../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
+| [transient_heat_independent_validation](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
+
+Implementation and independent acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. These links describe the candidate checkout, not supported functionality accepted on develop or a validated release. The validation pages distinguish fixed gates from observed results.
+
+| English | 한국어 |
+|---|---|
+| [thermoelastic_traction](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
+| [thermoelastic_traction_independent_validation](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |

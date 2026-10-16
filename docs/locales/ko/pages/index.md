@@ -95,3 +95,20 @@ Python 기계 API는 처방된 절점 P1 Kelvin 온도와 고정 기준 메시�
 |---|---|
 | [Contributing](../../../contributing.md) | [한국어](contributing.md) |
 | [Security](../../../security.md) | [한국어](security.md) |
+
+## 과도 열전도 후보: 수용 대기
+
+이 기능 branch 후보에는 명시적 `galerkin.transient_heat.solve_transient_heat` 하위 모듈은 고정 P1 삼각형, 일관 질량과 후진 Euler를 사용하며 상수 등방 열전도율·열용량, 시간변 Dirichlet 값과 단열을 지원합니다. 유한 Kelvin 입력은 물리적 유효성이나 최대 원리를 인증하지 않습니다. JSON/CLI/Studio, 저장 또는 자동 열→기계 연결은 추가하지 않습니다.
+
+| English | 한국어 |
+|---|---|
+| [transient_heat](../../../../packages/galerkin/docs/transient_heat.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md) |
+| [transient_heat_validation](../../../../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
+| [transient_heat_independent_validation](../../../../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
+
+구현과 독립 수용 파일은 제출됐습니다. 생산 담당의 사용/검증 페이지에 소형 source 시험 70개 통과가 기록돼 있으며, 전체 시간/PDE·독립 수용·빌드·설치 검증은 별도 근거가 필요합니다. 이 링크는 후보 checkout을 설명하며 develop에 수용된 지원 기능이나 검증된 릴리스를 뜻하지 않습니다. 검증 페이지는 고정 gate와 관측 결과를 구분합니다.
+
+| English | 한국어 |
+|---|---|
+| [thermoelastic_traction](../../../../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
+| [thermoelastic_traction_independent_validation](../../../../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
