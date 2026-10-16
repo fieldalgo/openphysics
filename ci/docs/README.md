@@ -693,3 +693,5 @@ capacity, RSS bounds, leak proof or dedicated performance baselines. Review the
 exact source commit, all three exits, getter counts, raw responses and accounting
 reports separately from source/installed/browser/platform gates. No extra CI
 run is created by this step, and the existing steady observation remains intact.
+
+Dirty transient acceptance additionally requires the exact status text `validate current transient JSON` in both hidden and returned-visible states after obsolete success and transport-error reads. Cleared pixels alone must not leave a stale reading/result-ready status.
