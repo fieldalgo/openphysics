@@ -128,14 +128,26 @@ rollback. Independent source/installed counterexamples demonstrate the check/use
 limitation; see the [independent report](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/thermal_simcase_independent_validation.md).
 That limitation is separate from the two unresolved Windows fixture-operation
 failures; it does not establish their cause.
-Ownership uses POSIX descriptors or Windows native handles through stdlib ctypes.
-On Windows, directory handles use `FILE_FLAG_BACKUP_SEMANTICS`; all native file
+Ownership uses POSIX file descriptors and a narrow Windows adapter. Windows
+file identities are pinned by temporary hard links in exclusively created sibling
+directories, not by file handles retained after writing. This keeps the original
+file allocated even if its output name is replaced. The filesystem must support
+same-volume hard links; otherwise saving fails with a chained `OSError`, without
+silently weakening identity checks. These temporary siblings require a writable
+output parent and caller-exclusive control until save/cleanup completes. Only
+the observed owned link and its empty directory are removed; unexpected contents
+are preserved. A crash can leave pin directories; this is not crash rollback.
+Directory handles still use stdlib ctypes and `FILE_FLAG_BACKUP_SEMANTICS`; all native file
 opens request read/write/delete sharing; actual operation availability must be
 verified separately under the caller-exclusive contract. New files use
 `CREATE_NEW`. Platform-specific execution evidence must be checked separately.
 The Windows API contracts are documented by Microsoft:
 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
 and [directory handles](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory).
+Microsoft also documents restrictions on replacing open destination files and
+renaming directories containing open files in
+[FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information).
+Delete sharing alone must not be assumed to remove those restrictions.
 
 CLI exit codes are 0 for success, 2 for invalid input, and 1 for solver/save
 failure (including finite-JSON rejection). Expected failures produce an error
@@ -158,3 +170,4 @@ Failure-injection checks record OS errno/winerror/message and fixture stages.
 They require the intended post-NPZ injected error after replacement has completed;
 an OS rename/replace refusal is a fixture-precondition failure, not successful
 cleanup protection or proof that cleanup deleted a replacement.
+

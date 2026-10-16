@@ -10,6 +10,70 @@ from simcase.cli import main
 from simcase.thermal import _OwnedOutput
 
 
+@pytest.mark.parametrize('mode',['complete','ordinary','foreign','replaced','known_replaced'])
+def test_thermal_partial_failure_safe_cleanup_link_pins(tmp_path,monkeypatch,mode):
+    """Exercise the handle-free file pin on every OS, including the Windows gate."""
+    import simcase.thermal as thermal
+    monkeypatch.setattr(thermal,'_pin_file',lambda path,stream:thermal._pin_file_link(path))
+    out=tmp_path/'out';moved=tmp_path/'moved'
+    owned=_OwnedOutput(out)
+    try:
+        owned.write('.incomplete',lambda f:f.write(b'incomplete'))
+        owned.write('model.json',lambda f:f.write(b'original'))
+        # No original stream is held open here. Both fixture operations must work.
+        if mode=='replaced':
+            out.rename(moved);out.mkdir();(out/'foreign').write_bytes(b'keep')
+        if mode=='known_replaced':
+            replacement=tmp_path/'replacement'
+            replacement.write_bytes(b'keep')
+            replacement.replace(out/'model.json')
+        if mode=='foreign':(out/'foreign').write_bytes(b'keep')
+        if mode=='complete':owned.finish()
+        else:owned.cleanup()
+    finally:
+        owned.close()
+    assert not list(tmp_path.glob('.simcase-pin-*'))
+    if mode=='complete':
+        assert (out/'model.json').read_bytes()==b'original'
+        assert not (out/'.incomplete').exists()
+    elif mode=='ordinary':assert not out.exists()
+    elif mode=='replaced':
+        assert (out/'foreign').read_bytes()==b'keep'
+        assert (moved/'.incomplete').exists()
+    elif mode=='known_replaced':
+        assert (out/'model.json').read_bytes()==b'keep'
+        assert (out/'.incomplete').exists()
+    else:
+        assert (out/'foreign').read_bytes()==b'keep'
+        assert (out/'.incomplete').exists()
+
+
+def test_thermal_partial_failure_safe_cleanup_link_capability(tmp_path,monkeypatch):
+    import simcase.thermal as thermal
+    path=tmp_path/'out';path.mkdir();file=path/'file';file.write_bytes(b'keep')
+    def unsupported(*args,**kwargs):raise OSError('hard links unavailable')
+    monkeypatch.setattr(thermal.os,'link',unsupported)
+    with pytest.raises(OSError,match='hard-link identity pins') as caught:
+        thermal._pin_file_link(file)
+    assert str(caught.value.__cause__)=='hard links unavailable'
+    assert file.read_bytes()==b'keep'
+    assert not list(tmp_path.glob('.simcase-pin-*'))
+
+
+def test_thermal_partial_failure_safe_cleanup_link_foreign_pin(tmp_path):
+    import simcase.thermal as thermal
+    out=tmp_path/'out';out.mkdir();file=out/'file';file.write_bytes(b'original')
+    close=thermal._pin_file_link(file)
+    directory,=tmp_path.glob('.simcase-pin-*')
+    # Replacing the private pin is outside caller ownership, but never recurse.
+    replacement=tmp_path/'replacement';replacement.write_bytes(b'foreign')
+    replacement.replace(directory/'file')
+    with pytest.raises(OSError,match='pin was replaced'):close()
+    assert (directory/'file').read_bytes()==b'foreign'
+    assert file.read_bytes()==b'original'
+
+
+
 def model(source=0., n=8, unit='mm'):
     data=copy.deepcopy(examples.THERMAL_SLAB)
     data['mesh']['subdivisions']=[n,n]
@@ -338,3 +402,4 @@ def test_thermal_posix_unlink_recreate_inode_reuse_regression(tmp_path,monkeypat
     monkeypatch.setattr(_OwnedOutput,'write',failing)
     with pytest.raises(OSError):r.save(out)
     assert (out/'model.json').read_text()=='replacement' and (out/'.incomplete').exists()
+

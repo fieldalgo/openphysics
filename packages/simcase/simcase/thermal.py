@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import tempfile
 import time
 
 import numpy as np
@@ -179,6 +180,55 @@ def _exclusive_stream(path):
         raise
 
 
+def _pin_file_link(path):
+    """Keep a file identity alive without an open handle to its output path.
+
+    Windows rename/replace can reject open destination files or directories
+    containing open files even with delete sharing. A sibling hard link keeps
+    the old file allocated while leaving the saved pathname free of handles.
+    The filesystem must support same-volume hard links; failure is explicit.
+    Only our link and its empty, exclusively created directory are removed.
+    """
+    directory = Path(tempfile.mkdtemp(prefix='.simcase-pin-', dir=path.parent.parent))
+    directory_identity = _identity(directory)
+    pin = directory/'file'
+    try:
+        os.link(path, pin)
+    except OSError as exc:
+        try:
+            directory.rmdir()
+        except OSError:
+            pass  # never remove an unexpected file or mask link acquisition
+        raise OSError('thermal output filesystem must support hard-link identity pins') from exc
+    identity = _identity(pin)
+    released = False
+
+    def close():
+        nonlocal released
+        if released:
+            return
+        if directory.is_symlink() or _identity(directory) != directory_identity:
+            raise OSError('thermal identity-pin directory was replaced; refusing cleanup')
+        if os.path.lexists(pin):
+            if pin.is_symlink() or _identity(pin) != identity:
+                raise OSError('thermal identity pin was replaced; refusing cleanup')
+            pin.unlink()
+        directory.rmdir()  # preserve any unexpected file; never recurse
+        released = True
+    return close
+
+
+def _pin_file(path, stream):
+    if os.name == 'nt':
+        return _pin_file_link(path)
+    retained = [os.dup(stream.fileno())]
+
+    def close():
+        if retained:
+            os.close(retained.pop())
+    return close
+
+
 class _OwnedOutput:
     """Exclusive directory ownership; no recursive deletion or rename transaction."""
     def __init__(self, path):
@@ -227,11 +277,7 @@ class _OwnedOutput:
             raise OSError('thermal output target was replaced; refusing to write')
         with _exclusive_stream(self.path/name) as stream:
             # Keep the inode alive: unlink/recreate must never acquire our identity.
-            fd = os.dup(stream.fileno())
-            retained = [fd]
-            def close_file():
-                if retained:
-                    os.close(retained.pop())
+            close_file = _pin_file(self.path/name, stream)
             self.file_closers[name] = close_file
             self.handles.append(close_file)
             self.files[name] = (os.fstat(stream.fileno()).st_dev, os.fstat(stream.fileno()).st_ino)
@@ -262,8 +308,7 @@ class _OwnedOutput:
     def _cleanup(self):
         if not self.unchanged():
             return  # never touch a replaced target, even if it has familiar names
-        # Windows delete-pending files disappear only after their pins close.
-        # Releasing our detached old file never deletes a replacement pathname.
+        # Releasing a detached old pin never deletes a replacement pathname.
         for name, close in self.file_closers.items():
             if not self.owns(name):
                 close()
@@ -465,3 +510,4 @@ def run_thermal(doc, verbose=True):
         print('\n'.join(log))
     return ThermalRunResult(doc, mesh, solution, fixed, np.array(list(prescribed.values())), diagnostics,
                             {'mesh': t_mesh, 'solve': t_solve}, log)
+

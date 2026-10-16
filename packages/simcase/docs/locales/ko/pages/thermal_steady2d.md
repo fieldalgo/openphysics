@@ -122,14 +122,24 @@ Cleanup은 관측한 소유권을 검사하며 디렉터리를 재귀적으로 �
 보여줍니다. [독립 보고서](https://github.com/fieldalgo/openphysics/blob/e9183fc8f5444422c7a5e167c878d2d5804a6611/packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md)를 참고하세요.
 이 한계는 원인이 미확정인 Windows fixture-operation 두 실패와 별개이며 그 원인을
 입증하지 않습니다.
-소유권 고정에는 POSIX descriptor 또는 표준 라이브러리 ctypes를 통한 Windows
-native handle을 사용합니다. Windows 디렉터리 handle은
+소유권 고정에는 POSIX 파일 descriptor와 좁은 Windows adapter를 사용합니다.
+Windows 파일 identity는 쓰기 후 유지하는 파일 handle 대신, 독점 생성한 인접 임시
+디렉터리의 hard link로 고정합니다. 출력 이름이 교체돼도 원래 파일의 할당을 유지합니다.
+파일시스템이 동일 볼륨 hard link를 지원해야 하며, 지원하지 않으면 identity 검사를
+조용히 약화하지 않고 원인을 chain한 `OSError`로 저장에 실패합니다. 출력 부모에
+쓰기 권한이 필요하며 저장·정리가 끝날 때까지 이 임시 인접 경로도 호출자가 독점해야 합니다.
+관측한 자기 link와 빈 디렉터리만 제거하고 예상 밖 내용은 보존합니다. crash 시 pin
+디렉터리가 남을 수 있으며 crash rollback을 제공하지 않습니다.
+디렉터리 handle은 여전히 표준 라이브러리 ctypes와
 `FILE_FLAG_BACKUP_SEMANTICS`를 사용하며 모든 native 파일 열기는 read/write/delete를
 공유를 요청합니다. 실제 연산 가능 여부는 caller-exclusive 계약 아래 별도로
 확인해야 합니다. 새 파일에는 `CREATE_NEW`를
 사용합니다. 플랫폼별 실제 실행 근거는 별도로 확인해야 합니다. Windows API 계약은
 Microsoft의 [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)와
 [directory handles](https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory)에 설명되어 있습니다.
+Microsoft의 [FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)은
+열린 대상 파일 교체와 열린 파일을 포함한 디렉터리 이름 변경의 제한도 설명합니다.
+delete 공유만으로 이 제한이 사라진다고 가정하면 안 됩니다.
 
 CLI 종료 코드는 성공 0, 잘못된 입력 2, solver/save 실패 1입니다. 유한하지 않은
 JSON 거절도 1입니다. 예상된 실패는 traceback 없이 오류를 출력합니다.
@@ -151,3 +161,4 @@ CLI 오류와 Studio 지연 응답을 시험합니다.
 교체가 완료된 뒤 의도한 NPZ 이후 주입 오류에 도달해야 합니다. OS가 rename/replace를
 거부하면 fixture 사전조건 실패이며 cleanup 소유 보호의 성공이나 cleanup이 교체 파일을
 지웠다는 증거로 해석하지 않습니다.
+
