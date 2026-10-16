@@ -270,4 +270,4 @@ GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거�
 
 ## 과도 열전도 Studio 통합
 
-[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 문서기준에서production제출/runtime수용대기인통합계약이며headless과도지원·기존정상Studio수용이과도UI지원을입증하지않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.
+[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 전용서버route·배포페이지control은제출됐으며일치하는capability통합·exactruntime수용은대기입니다. Headless과도지원·기존정상Studio수용이과도UI수용을입증하지않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.
