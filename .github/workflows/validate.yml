@@ -44,6 +44,10 @@ jobs:
           gmsh --version
       - name: Fetch pinned RII database
         run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Check steady boundary contract before transient and full acceptance
+        run: |
+          python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
+            packages/simcase/tests/test_steady_boundary_contract.py
       - name: Check transient document acceptance before the full suite
         run: |
           python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json

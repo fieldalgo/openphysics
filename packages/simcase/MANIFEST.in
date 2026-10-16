@@ -35,3 +35,5 @@ include tests/test_transient_headless_independent_validation.py
 include tests/transient_headless_independent_oracle.py
 include tests/transient_headless_independent_cases.py
 include tests/transient_headless_independent_consumer.py
+include simcase/steady_boundary_contract.py
+include tests/test_steady_boundary_contract.py
