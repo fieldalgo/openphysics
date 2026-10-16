@@ -16,8 +16,9 @@ This package drives Gmsh (https://gmsh.info), which is licensed under the GNU
 General Public License v2 or later. Gmsh is NOT distributed with this package
 and is NOT linked into it: gmshio writes a .geo script, invokes the ``gmsh``
 command-line program as a separate process, and reads back the resulting .msh
-file. The GPL therefore does not extend to gmshio or to any program that uses
-it. Users must obtain and install Gmsh themselves under its own license.
+file. Users must obtain and install Gmsh themselves under its own license.
+This notice describes this package's integration boundary; it does not determine
+the licensing obligations of a different downstream integration.
 
 The MSH 4.1 parser is an independent implementation written from the published
 format description in the Gmsh reference manual. No Gmsh source code was

@@ -1,1 +1,2 @@
-include README.ko.md
+include docs/overview.md
+include docs/locales/ko/pages/overview.md

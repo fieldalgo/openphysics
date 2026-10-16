@@ -1,8 +1,8 @@
 # galerkin — an electromagnetic FEM engine (FieldAlgo project)
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 A finite-element solver engine written in pure Python (numpy + scipy.sparse),
 built milestone by milestone with an analytical-validation-first culture.
@@ -341,9 +341,8 @@ the convergence rate is the lie detector.
 - **Beyond electromagnetics**: the low-level assembly can represent anisotropic
   coefficients. The public steady-heat API currently accepts homogeneous
   isotropic conductivity, including prescribed outward flux and Robin boundaries.
-  Static elasticity provides its own vector nodal space. The transient heat
-  submodule below uses backward Euler; other transient physics needs its own
-  time integration, and Stokes needs a P2 space. The M3a two-field block system
+  Static elasticity provides its own vector nodal space. Transient problems need
+  time integration and Stokes needs a P2 space. The M3a two-field block system
   illustrates an assembly pattern; it does not certify automatic coupling.
 
 ## License
@@ -384,14 +383,6 @@ This Python-only, steady one-way operation adds no JSON/CLI/Studio or persistenc
 contract, Robin/flux/traction workflow, transient feedback or thermodynamic
 coupling. Immutable transfer does not certify callbacks or mutable results after
 return. The contract separates heat W/m, mechanical N/m and physical energy J/m.
-
-## Transient heat Python submodule
-
-Import `galerkin.transient_heat.solve_transient_heat` explicitly. It uses fixed conforming P1 triangles, consistent mass and backward Euler, constant isotropic conductivity/volumetric heat capacity, fixed Dirichlet nodes with time-dependent temperatures, and insulation elsewhere. Coordinates, time and temperature are m, s and K. Finite negative Kelvin is allowed by the linear mathematical API; no clamping, physical-temperature certification or discrete maximum principle is promised. The separate heat-to-mechanics transfer still rejects negative K.
-
-[Usage](docs/transient_heat.md) ([한국어](docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](docs/transient_heat_validation.md) ([한국어](docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](docs/transient_heat_independent_validation.md) ([한국어](docs/locales/ko/pages/transient_heat_independent_validation.md))
-
-Implementation and acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation still require separate evidence. Fixed verification gates are not measured pass results; this is not release or integration acceptance. No Robin/flux, JSON/CLI/Studio, persistence or automatic thermal–mechanical connection is added.
 
 ## Prescribed-temperature total mechanical traction
 

@@ -1,8 +1,8 @@
 # galerkin-refsol — reference solutions for validating galerkin
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 Closed-form solutions and published high-accuracy benchmarks used as the
 answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
@@ -133,15 +133,5 @@ The benchmark values in `refsol.benchmarks` are numerical results published by
 Hadley (2002); see [NOTICE](NOTICE) for their provenance.
 
 `refsol.thermal_boundary` provides independent closed forms for prescribed outward flux and Robin boundaries. Coordinates are m, temperature K, conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K). It is included in both archives; this standalone reference does not extend the headless JSON schema.
-
-## Transient heat references
-
-Import `refsol.transient_heat` explicitly for `uniform_insulated`, `moving_affine`, `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and `backward_euler_amplitude`. The module uses NumPy/stdlib without engine imports. Coordinates/time/temperature are m/s/K, conductivity W/(m K), volumetric heat capacity J/(m³ K), source W/m³ and flux W/m². Dense matrices and modes target small reference meshes; a semidiscrete BE product is distinct from a continuum PDE solution. These references do not certify physical temperature validity or a maximum principle, and independent acceptance must derive its own truth.
-
-The fixed-P1, consistent-mass, backward-Euler engine API with constant isotropic materials, time-dependent Dirichlet values and insulation is documented here:
-
-[Usage](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat.md)) · [Producer validation contract](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md)) · [Independent validation report](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/transient_heat_independent_validation.md) ([한국어](https://github.com/fieldalgo/openphysics/blob/3d0aa671f63203861f4d7d0835e114fc21609eca/packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md))
-
-These exact-revision repository links require network access and repository permission. Implementation and acceptance files are submitted. The producer's usage/validation pages record 70 small source tests passed; full temporal/PDE and independent acceptance, build and installed validation, including distribution inclusion, still require separate evidence. This is not release or integration acceptance. No JSON/CLI/Studio or automatic heat-to-mechanics connection is provided.
 
 `refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.

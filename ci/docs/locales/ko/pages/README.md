@@ -4,7 +4,7 @@
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-GitHub Actions는 사용자 지시로 비활성화돼 있습니다. 활성화·dispatch·재실행을 하지 않습니다. 아래 workflow 명령은 보존한 정의이며 현재 GitHub runner에서 실행했다는 뜻이 아닙니다. 현재 검증은 Work cloud 안에서만 수행합니다.
+2026-10-16 오너 승인으로 GitHub Actions를 활성화했습니다. 기존 Linux 패키지·좁은 Windows workflow는 push·pull request·수동 dispatch에서 사용할 수 있습니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
 
 루트 `validate.yml` workflow는 push·pull request·수동 dispatch에서 실행됩니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11과
@@ -73,8 +73,8 @@ Setuptools가 시험 파일은 이미 포함하며 manifest는 원래 누락되�
 fragment를 포함해 archive의 일반 파일과 대조합니다. 현재 package 문서는 공백 없는
 inline target을 사용합니다. reference-style link, 그 문법을 넘는 Markdown parsing,
 fragment anchor의 존재와 외부 URL 도달성은 이 검사 범위 밖입니다. package 간·root
-링크는 알려진 통합 revision의 명시적 repository URL을 사용하며, 저장소가 private인
-동안 network 접근과 repository 권한이 필요합니다. 검사 통과가 완전한 오프라인 문서를
+링크는 알려진 통합 revision의 명시적 repository URL을 사용하며 network 접근이
+필요합니다. 검사 통과가 완전한 오프라인 문서를
 인증하지는 않습니다. wheel이나 단일 sdist는 monorepo checkout이 아니므로 editable
 `packages/...` 설치 명령에는 저장소 루트가 필요합니다.
 
@@ -228,14 +228,14 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
 교체 보호는 시험하지만 소유권 검사와 unlink 사이의 외부 교체는 안전을 보장하지 않습니다.
 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. 이 동안 다른 writer가
-출력을 바꾸면 안 됩니다. Windows 두 실패의 원인은 미확정이며 Actions는 비활성화돼 있습니다.
+출력을 바꾸면 안 됩니다. 이전 Windows 두 실패의 원인은 미확정입니다. Actions는 활성화됐으며 새 runner 근거가 필요합니다.
 
 ## 배포본의 독립 수용
 
-한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
+docs/ 안의 패키지 개요 EN/KO 일곱 쌍과 수신한 한국어 안내는 필수 byte 자산입니다. 진입점 README는 영어로 유지합니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 107개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 114개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -248,7 +248,7 @@ Dirichlet 회귀가 연결됩니다. headless JSON은 여전히 flux/Robin을 �
 Work cloud는 현재 가용 Linux/Python 3.12.14, numpy 2.3.5, scipy 1.17.0으로 검증하며
 보존 pinned CI 환경이 아닙니다. Gmsh와 명시적 RII database가 없으므로 실제 skip을
 기록합니다. twine이 없어 strict 검사는 기존 도구가 가용해지지 않는 한 미실행입니다.
-Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 계속 비활성 상태입니다.
+Linux 결과로 Windows 수용을 추정하지 않습니다. Actions는 활성화돼 있으므로 정확한 workflow 결과를 확인합니다.
 
 ## 명시적 workflow의 source 재현 자산
 
@@ -276,51 +276,41 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 ## 처방 온도 전체 표면하중의 배포 계약
 
-필수 byte 목록은 기존79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개입니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
+공개 전 traction snapshot의 필수 byte 목록은 이전79개에 정확한 traction 구현·참조·안내·예제·producer·독립 자산13개를 더한92개였습니다. 공개 준비에서 한국어 README 일곱 개를 docs 개요 EN/KO 열네 페이지로 바꿔99개가 됐으며 과도 후보에서15개를 추가합니다. 원 독립 보고와 시험의 역사적 개수·실패는 그대로 유지합니다. 설치 suite는 기존389개 사례를 보존하고 원래 producer·참조·수렴 파일과 독립90개를 추가합니다. 계획한 합계가 아닌 실제 수집·실행 개수와 실패·선택적 skip을 보고해야 합니다. 원래 `python -I` 전용 consumer4개와 실제 archive 영어 예제는 별도로 실행합니다. 복사한 engine guard가 빈 디렉터리를 scan하면 안 되며 source guard6·설치 origin/module byte 검사는 분리합니다.
 
 새 Python API는 처방 온도장 기계단계에 전체 물리 응력 `sigma*n`을 적용합니다. scalar pressure 전용 키워드·로컬 프레임·follower API는 없지만 고정 기준 형상에서 전역 Pa `-p*normal` callback은 유효합니다. 단방향 heat workflow와 JSON/CLI/Studio는 바뀌지 않습니다. producer 재현 명령은 저장소 루트용이며 풀어 놓은 sdist에는 패키지 내부 `tests/`와 `examples/` 경로가 있습니다. 원 시험 파일과 필요한 oracle·참조 source를 명시적으로 배포합니다.
 
-개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 비활성 상태이며 조회·활성화·dispatch·재실행을 하지 않습니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
+개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 활성화돼 있으며 새 workflow 결과와 이 과거 실측은 구분해야 합니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
 
-## 과도 열전도 배포 연결 (실행 대기)
+## 과도 열전도 후보 배포 검사
 
-helper는 기존 일곱 배포의 build·strict metadata/license·byte/link·역사 JSON gate와
-설치 소비자 suite를 유지합니다. 필수 자산은 기존 92개 전부와 과도 자산 15개를 합한
-107개입니다. 사용법·생산 검증·독립 보고 EN/KO 여섯 페이지, 영어 수렴 예제,
-엔진/참조 모듈, 원 생산/참조 시험, 독립 oracle/cases/pytest-wrapper/consumer
-네 파일이 sdist와 byte 단위로 같아야 합니다. 동결 oracle·수용 gate·역사 보고는
-수정하지 않습니다.
+이 기능 branch checkout에는 과도 열전도 후보가 있지만 전체 물리·독립·배포 수용은
+대기 중입니다. develop에 수용된 지원 기능이나 검증된 릴리스가 아닙니다.
+[후보 계약](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)과
+[독립 보고](../../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md)는
+생산 담당의 소형 source70개 기록과 남은 gate를 구분합니다.
 
-새 runtime 모듈 두 개는 wheel byte도 같아야 합니다. 수치 소비자 실행 전에
-격리 Python으로 설치 venv origin과 SHA256을 확인해 artifact 출력의
-`transient-module-origins.json`에 기록합니다. 문서와 수용 파일은 sdist 자산이며
-runtime wheel 모듈이 아닙니다.
+필수 byte 목록114개는 공개 baseline99개와 과도15개입니다. EN/KO여섯 페이지,
+영어 수렴 예제, 새 runtime모듈 두 개, 원생산/참조시험과 독립
+oracle/cases/pytest-wrapper/consumer 네 파일을 포함합니다. 기존 metadata/license,
+archive링크·역사JSON·traction수용 검사는 유지합니다. 새 runtime두모듈은 wheelbyte도
+같아야 합니다. 격리 설치 preflight가 venvorigin·sourceSHA256을 확인하고
+artifact곁에 `transient-module-origins.json`을 기록합니다.
 
-기존 설치 pytest suite는 그대로 유지합니다. 원 `test_transient_heat.py`와
-`test_transient_heat_reference.py`를 checkout 밖으로 복사해 suite에 추가합니다.
-독립 pytest 발견 wrapper는 sdist 재현 자산으로 보존하되 설치 pytest에는 중복
-복사하지 않습니다. 대신 원 standalone consumer를 `--suite all`로 한 번 실행해
-동결 PDE/companion/구적 gate를 포함합니다. oracle/cases/consumer는 byte 검증된
-sdist에서 읽으며 editable 설치를 사용하지 않습니다.
-이어 검증한 archive의 전체 `transient_heat_convergence.py`를 `python -I`로
-실행합니다. 짧은 smoke나 `core` 결과로 어느 gate도 대체하지 않습니다.
-
-아래 명령은 준비된 검증 순서이며 이 연결 변경으로 새로운 source 전체·build·설치·
-수렴 결과를 주장하지 않습니다.
+기존 설치pytest파일은 바꾸지 않고 과도 원생산/참조시험 두 파일을 추가합니다.
+독립 발견wrapper는 source재현자산으로 보존하며 설치pytest에 중복복사하지 않습니다.
+대신 검증sdist에서 원standaloneconsumer·oracle/cases를 읽어 `--suite all`로 한 번
+실행하고 동결 PDE·companion·구적gate를 포함합니다. 이어 archive의 전체 영어 수렴
+프로그램을 `python -I`로 실행합니다. `core`나 짧은 smoke로 이를 대체하지 않습니다.
+모든 단계는 순차이며 실패 뒤 단계는 미실행으로 두고 원 exit/log를 보존합니다.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
 ```
 
-승인된 cloud 환경과 비어 있는 본인 출력 경로를 사용하고 현재 source 실행 뒤에
-이 무거운 순서를 배정하며 동시에 실행하지 않습니다. helper는 설치 pytest→독립
-`all`→archive 수렴 예제를 순차 실행합니다. 실제 exit/count·로그를 별도 보존하며
-실패하면 helper가 멈추므로 이후 단계는 미실행입니다. 기존 541 소비자는 과거 기준
-범위이며 새 후보의 실측 count가 아닙니다. 독립 unittest 사례/subtest와 archive
-프로그램 assertion은 pytest JUnit count와 별도입니다. native prerequisite 누락,
-optional skip, strict 도구 가용성도 실제 환경에서 확인해 기록해야 합니다.
-
-공개 API는 고정 메시 standalone 후진 Euler이며 과도 JSON/CLI/Studio, Robin/flux
-입력, 저장 또는 자동 열–기계 연결이 아닙니다. Actions는 비활성이고 Windows는
-미검증입니다. root source 회귀·이 배포 순서·오너 통합은 각자 exact-SHA 근거가
-필요하며 통합된 처방온도+traction gate와 standalone 소비자는 그대로 보존합니다.
+비어 있는 본인 출력경로와 문서의 검증 의존성을 사용합니다. 이는 재현명령이며 후보
+build나통과 근거가 아닙니다. pytestJUnit·독립unittest사례/subtest·archive프로그램
+결과·nativeprerequisite를 별도 보고합니다. 기존 traction541사례와 전용consumer4는
+baseline근거이며 새 과도 count가 아닙니다. standalonePython후보는 과도JSON/CLI/Studio,
+Robin/flux입력·저장·자동열–기계연결을 추가하지 않습니다. 수용 전에 CI와 cloud실험의
+정확source근거가 필요하며 Linux결과가 Windows지원을 입증하지 않습니다.

@@ -12,8 +12,8 @@ is distributed with this product in the file LICENSE, and is also available at
 --------------------------------------------------------------------------------
 THIRD-PARTY MATERIAL
 
-Embedded optical data (physmat/physmat/_tables.py and the dispersion-formula
-coefficients in physmat/physmat/library.py) is taken from the
+Embedded optical data (physmat/_tables.py and the dispersion-formula
+coefficients in physmat/library.py, relative to this package root) is taken from the
 refractiveindex.info database, which is dedicated to the public domain under
 CC0 1.0 Universal:
 

@@ -1,6 +1,6 @@
 # galerkin — 전자기 FEM 엔진(FieldAlgo 프로젝트)
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
@@ -13,15 +13,15 @@
 - **M3a**: 유전체 도파로 단면 모드 솔버 — 횡방향 Nédélec / 종방향 절점 혼합 정식화, 유효 굴절률과 벡터 모드 분포
 - **M3b**: 3D Maxwell — 사면체 Nédélec 변 요소, 직육면체 공진기 고유모드
 
-공개 `solve_cavity_box` API는 진공 PEC 상자의 SI 주파수와 원시 변 장을 제공합니다. 목표 근처 탐색의 한계와 직육면체 군집 평균 수렴 gate를 복구한 교대 메시를 포함하는 [API와 수치 계약](docs/cavity_solver.md)을 참조하세요.
+공개 `solve_cavity_box` API는 진공 PEC 상자의 SI 주파수와 원시 변 장을 제공합니다. 목표 근처 탐색의 한계와 직육면체 군집 평균 수렴 gate를 복구한 교대 메시를 포함하는 [API와 수치 계약](../../../cavity_solver.md)을 참조하세요.
 
-독립 `galerkin.elasticity` 하위 모듈은 평면응력 또는 평면변형률을 명시적으로 선택하는 균질 등방성 소변형 정적 P1 탄성을 풉니다. [탄성 API·단위·한계](docs/elasticity2d.md)와 [영어 예제](examples/elasticity2d.py)를 참조하세요. 두 파일은 sdist에 포함됩니다. 예제는 패키지 설치 후 저장소 루트 또는 풀어 놓은 galerkin sdist에서 실행할 수 있으며 simcase/Studio 모델이 아닙니다. 별도 [독립 탄성 검증](docs/elasticity2d_independent_validation.md)은 다항 제조해, 혼합 경계, 일/에너지 검사를 설명하며 계약 문서도 sdist에 byte 동일하게 포함됩니다.
+독립 `galerkin.elasticity` 하위 모듈은 평면응력 또는 평면변형률을 명시적으로 선택하는 균질 등방성 소변형 정적 P1 탄성을 풉니다. [탄성 API·단위·한계](../../../elasticity2d.md)와 [영어 예제](../../../../examples/elasticity2d.py)를 참조하세요. 두 파일은 sdist에 포함됩니다. 예제는 패키지 설치 후 저장소 루트 또는 풀어 놓은 galerkin sdist에서 실행할 수 있으며 simcase/Studio 모델이 아닙니다. 별도 [독립 탄성 검증](../../../elasticity2d_independent_validation.md)은 다항 제조해, 혼합 경계, 일/에너지 검사를 설명하며 계약 문서도 sdist에 byte 동일하게 포함됩니다.
 
-벡터 모드는 축퇴 고유공간 방향을 포함하는 복소 횡·종방향 계수를 보존합니다. 장을 실수로 바꾸기 전에 [고유공간 신뢰성 계약](docs/eigenspace_reliability.md)을 읽으세요. 부분공간 추적을 추가하는 기능은 아닙니다.
+벡터 모드는 축퇴 고유공간 방향을 포함하는 복소 횡·종방향 계수를 보존합니다. 장을 실수로 바꾸기 전에 [고유공간 신뢰성 계약](../../../eigenspace_reliability.md)을 읽으세요. 부분공간 추적을 추가하는 기능은 아닙니다.
 
-독립 `galerkin.thermal` API는 체적 열원과 자연 단열 경계를 갖는 균질 등방성 정상 2D 열전도를 Kelvin으로 풉니다. [열 계약과 경계 부호](docs/thermal_steady2d.md)를 읽고 설치 후 [영어 열전도 예제](examples/thermal_steady2d.py)를 실행하세요. [독립 열 검증](docs/thermal_independent_validation.md)과 [역사적 수용 manifest](docs/thermal_independent_validation_manifest.json)는 최초 기록을 그대로 보존하며 sdist에 byte 동일하게 포함합니다. 정적 탄성은 전역 Cartesian 경계 표면하중도 받습니다. [표면하중 안내](docs/elasticity_traction.md), [영어 표면하중 예제](examples/elasticity_traction.py), [독립 수용검증](docs/elasticity_traction_independent_validation.md)을 참조하세요. 이 문서와 예제는 sdist에 포함됩니다. 어느 API도 과도해석, 열탄성 연성, simcase 또는 Studio 통합을 추가하지 않습니다.
+독립 `galerkin.thermal` API는 체적 열원과 자연 단열 경계를 갖는 균질 등방성 정상 2D 열전도를 Kelvin으로 풉니다. [열 계약과 경계 부호](../../../thermal_steady2d.md)를 읽고 설치 후 [영어 열전도 예제](../../../../examples/thermal_steady2d.py)를 실행하세요. [독립 열 검증](../../../thermal_independent_validation.md)과 [역사적 수용 manifest](../../../thermal_independent_validation_manifest.json)는 최초 기록을 그대로 보존하며 sdist에 byte 동일하게 포함합니다. 정적 탄성은 전역 Cartesian 경계 표면하중도 받습니다. [표면하중 안내](../../../elasticity_traction.md), [영어 표면하중 예제](../../../../examples/elasticity_traction.py), [독립 수용검증](../../../elasticity_traction_independent_validation.md)을 참조하세요. 이 문서와 예제는 sdist에 포함됩니다. 어느 API도 과도해석, 열탄성 연성, simcase 또는 Studio 통합을 추가하지 않습니다.
 
-별도 `galerkin.thermoelasticity` 하위 모듈은 명시적으로 주어진 동일 메시 절점-P1 Kelvin 장의 정적 기계 단계입니다. [SI 계약·불변 snapshot·물리적 3D 에너지](docs/prescribed_temperature_thermoelasticity.md)와 [영어 실행 예제](examples/prescribed_temperature_thermoelasticity.py)를 참조하세요. 둘 다 sdist에 byte 동일하게 포함됩니다. Alpha는 부호 있는 1/K, 변위는 m, 응력은 Pa, 하중/반력은 N/m, 물리적 탄성에너지는 두께당 J/m입니다. 열 방정식을 풀거나 열 결과를 자동 연결하거나 완전한 순차 연성 흐름을 검증하거나 simcase/Studio 통합을 추가하지 않습니다. 별도 [독립 기계 단계 수용검증](docs/prescribed_temperature_thermoelasticity_independent_validation.md)과 원래 oracle/시험도 변경 없이 sdist에 포함됩니다.
+별도 `galerkin.thermoelasticity` 하위 모듈은 명시적으로 주어진 동일 메시 절점-P1 Kelvin 장의 정적 기계 단계입니다. [SI 계약·불변 snapshot·물리적 3D 에너지](../../../prescribed_temperature_thermoelasticity.md)와 [영어 실행 예제](../../../../examples/prescribed_temperature_thermoelasticity.py)를 참조하세요. 둘 다 sdist에 byte 동일하게 포함됩니다. Alpha는 부호 있는 1/K, 변위는 m, 응력은 Pa, 하중/반력은 N/m, 물리적 탄성에너지는 두께당 J/m입니다. 열 방정식을 풀거나 열 결과를 자동 연결하거나 완전한 순차 연성 흐름을 검증하거나 simcase/Studio 통합을 추가하지 않습니다. 별도 [독립 기계 단계 수용검증](../../../prescribed_temperature_thermoelasticity_independent_validation.md)과 원래 oracle/시험도 변경 없이 sdist에 포함됩니다.
 
 ## 구성
 
@@ -182,11 +182,11 @@ Hadley의 명시 정확도 ±3e-6에는 **도달하지 못했습니다**. 원인
 
 - **MFEM**은 문제 규모가 순수 Python 직접해법의 범위를 넘을 때의 생산 코어로 검토 중입니다. 이 3D 희소 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없으며, 그 이후에는 보조 공간 전처리기를 쓰는 반복 솔버가 필요합니다.
 - **유전체 충전 및 열린 3D 문제**: 3D 텐서 계수 경로가 있으므로(`assemble_stiffness_3d`가 (T,3,3) 텐서를 받음) M2.5 PML을 옮길 수 있습니다. 부족한 것은 해석해를 갖는 3D 검증 사례입니다.
-- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 아래 과도 열전도 하위 모듈은 후진 Euler를 사용합니다. 다른 과도 물리에는 전용 시간 적분기가, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
+- **전자기 이후**: 조립 코어는 물리에 중립적입니다. 저수준 조립은 이방성 계수를 표현할 수 있지만, 현재 공개 정상 열전도 API는 균질 등방성 재료만 받습니다. Robin 경계도 이 등방성 API 범위입니다. 정적 탄성은 전용 벡터 절점 공간을 제공합니다. 아래 후보의 과도 열전도 하위 모듈은 후진 Euler를 사용합니다. 다른 과도 물리에는 전용 시간 적분기가, Stokes에는 P2 공간이 필요합니다. M3a의 두 장 블록 시스템은 조립 패턴을 예시하며, 자동 연성의 검증을 뜻하지 않습니다.
 
 ## 라이선스
 
-Apache License 2.0 — [LICENSE](LICENSE), [NOTICE](NOTICE)를 참조하세요.
+Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
@@ -198,9 +198,9 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 ## 정상 열전도 경계 계약
 
 독립 등방성 `galerkin.thermal` API는 처방 외향 열유속과 Robin 대류를 추가합니다.
-[경계 계약](docs/locales/ko/pages/thermal_flux_robin.md),
-[영어 예제](examples/thermal_flux_robin.py),
-[독립 수용검증](docs/locales/ko/pages/thermal_flux_robin_independent_validation.md)을 참고하세요.
+[경계 계약](thermal_flux_robin.md),
+[영어 예제](../../../../examples/thermal_flux_robin.py),
+[독립 수용검증](thermal_flux_robin_independent_validation.md)을 참고하세요.
 계약과 독립 보고는 구현과 실제 수용검증 범위를 구분합니다.
 헤드리스 simcase JSON 계약은 여전히 flux/Robin 경계를 거부합니다. 독립 API 확장은
 Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니다.
@@ -209,22 +209,22 @@ Studio에서 이를 활성화하거나 자동 연성을 추가하지 않습니�
 
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`는 Dirichlet·단열 정상
 열전도를 명시적으로 풀고 정확한 nodal-P1 Kelvin 장을 고정한 뒤 같은 격리 기준
-메시에서 처방 온도 기계단계를 실행합니다. [한영 구현 계약](docs/locales/ko/pages/thermal_mechanical_workflow.md),
-[영어 예제](examples/thermal_mechanical_workflow.py),
-[독립 수용 보고](docs/locales/ko/pages/thermal_mechanical_independent_validation.md)를 참고하세요.
+메시에서 처방 온도 기계단계를 실행합니다. [한영 구현 계약](thermal_mechanical_workflow.md),
+[영어 예제](../../../../examples/thermal_mechanical_workflow.py),
+[독립 수용 보고](thermal_mechanical_independent_validation.md)를 참고하세요.
 명시적 m/K 선언이 필요하며 단위 변환을 추론하지 않습니다. 이 Python 전용 정상
 단방향 연산은 JSON/CLI/Studio·저장 계약, Robin/flux/traction workflow, 과도 피드백이나
 열역학적 완전 연성을 추가하지 않습니다. 불변 전달이 callback이나 반환 후 가변 결과를
 인증하지 않습니다. 계약은 열 W/m·기계 N/m·물리적 에너지 J/m를 구분합니다.
 
-## 과도 열전도 Python 하위 모듈
+## 처방 온도장의 전체 기계 표면하중
+
+[전체 표면하중 계약](thermoelastic_traction.md), [영어 예제](../../../../examples/thermoelastic_traction.py), [독립 보고](thermoelastic_traction_independent_validation.md)는 고정 온도장 기계단계의 선택적 전역 Cartesian Pa 하중을 설명합니다. 매핑은 전체 물리 응력 `sigma*n`이며 열 표면하중을 다시 더하거나 빼면 안 됩니다. 체적·선·열 하중과 구속 반력은 분리해 기록합니다. 기존18개 위치 인자의 결과 구성은 유효하며 새 하중 필드 기본값은 None입니다. scalar pressure 전용·로컬 프레임·follower API는 없지만 고정 기준 경계의 `lambda points_m, normals: -p * normals` 전역 Pa callback은 유효합니다. heat workflow·JSON/CLI/Studio·저장을 확장하지 않습니다.
+
+## 과도 열전도 후보 Python 하위 모듈
 
 `galerkin.transient_heat.solve_transient_heat`를 명시적으로 import합니다. 고정된 적합 P1 삼각형, 일관 질량과 후진 Euler, 상수 등방 열전도율·체적열용량, 시간변 온도를 갖는 고정 Dirichlet 절점과 나머지 경계의 단열을 사용합니다. 좌표·시간·온도 단위는 m, s, K입니다. 선형 수학 API는 유한한 음의 Kelvin을 허용하며 clamp·물리 온도 인증·discrete maximum principle을 약속하지 않습니다. 별도 열→기계 전달은 계속 음의 K를 거절합니다.
 
-[사용법](docs/locales/ko/pages/transient_heat.md) ([English](docs/transient_heat.md)) · [생산 검증 계약](docs/locales/ko/pages/transient_heat_validation.md) ([English](docs/transient_heat_validation.md)) · [독립 검증 보고](docs/locales/ko/pages/transient_heat_independent_validation.md) ([English](docs/transient_heat_independent_validation.md))
+[사용법](transient_heat.md) ([English](../../../transient_heat.md)) · [생산 검증 계약](transient_heat_validation.md) ([English](../../../transient_heat_validation.md)) · [독립 검증 보고](transient_heat_independent_validation.md) ([English](../../../transient_heat_independent_validation.md))
 
 구현과 수용 파일은 제출됐습니다. 생산 담당의 사용/검증 페이지에 소형 source 시험 70개 통과가 기록돼 있으며, 전체 시간/PDE·독립 수용·빌드·설치 검증은 별도 근거가 필요합니다. 고정 검증 gate는 측정한 통과 결과가 아니며 릴리스나 통합 수용을 뜻하지 않습니다. Robin/flux, JSON/CLI/Studio, 저장 또는 자동 열–기계 연결은 추가하지 않습니다.
-
-## 처방 온도장의 전체 기계 표면하중
-
-[전체 표면하중 계약](docs/locales/ko/pages/thermoelastic_traction.md), [영어 예제](examples/thermoelastic_traction.py), [독립 보고](docs/locales/ko/pages/thermoelastic_traction_independent_validation.md)는 고정 온도장 기계단계의 선택적 전역 Cartesian Pa 하중을 설명합니다. 매핑은 전체 물리 응력 `sigma*n`이며 열 표면하중을 다시 더하거나 빼면 안 됩니다. 체적·선·열 하중과 구속 반력은 분리해 기록합니다. 기존18개 위치 인자의 결과 구성은 유효하며 새 하중 필드 기본값은 None입니다. scalar pressure 전용·로컬 프레임·follower API는 없지만 고정 기준 경계의 `lambda points_m, normals: -p * normals` 전역 Pa callback은 유효합니다. heat workflow·JSON/CLI/Studio·저장을 확장하지 않습니다.

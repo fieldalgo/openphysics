@@ -1,6 +1,6 @@
 # simcase — 모델 문서와 헤드리스 실행기
 
-[English](README.md) | **한국어**
+[English](../../../overview.md) | **한국어**
 
 [영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/develop/docs/locales/ko/pages/index.md)
 
@@ -20,7 +20,7 @@ python -m simcase run model.json                          # -> model_results/
 
 ## 진공 PEC 공진기 문서
 
-기능 브랜치는 단일 study `em.cavity3d` 문서와 SI JSON/NPZ 출력 계약을 추가합니다. 이 브랜치에서 전체 엔진 검증은 대기 중입니다. 지원 설정, 탐색 한계, 입력 단위와 SI 출력의 구분은 [공진기 입력·결과 계약](docs/cavity3d.md)을 참조하세요. 아래 기존 2D 흐름은 계속 사용할 수 있습니다.
+기능 브랜치는 단일 study `em.cavity3d` 문서와 SI JSON/NPZ 출력 계약을 추가합니다. 이 브랜치에서 전체 엔진 검증은 대기 중입니다. 지원 설정, 탐색 한계, 입력 단위와 SI 출력의 구분은 [공진기 입력·결과 계약](../../../cavity3d.md)을 참조하세요. 아래 기존 2D 흐름은 계속 사용할 수 있습니다.
 
 ## 문서
 
@@ -169,8 +169,8 @@ python -m simcase.studio --port 9000 --no-browser
 
 기본 설치는 헤드리스를 유지합니다. `fastapi`, `uvicorn`은 `studio` extra에만 포함되므로 배치·HPC 사용자가 문서를 실행하기 위해 웹 스택을 받을 필요가 없습니다.
 
-![형상](docs/geometry.png)
-![결과](docs/results.png)
+![형상](../../../geometry.png)
+![결과](../../../results.png)
 
 - 예제를 읽고, 디스크의 `.json`을 열고, 편집 문서를 다운로드합니다.
 - 모델 트리: Units, Domain, Background, 형상(rect / circle / polygon 추가·순서변경·삭제), 사용자 재료, Physics, Mesh, Study, Results. 노드를 선택하면 편집 폼이 나타나고 모든 편집이 형상 보기와 JSON 탭에 즉시 반영되며 검증기의 크기 경고가 옆에 표시됩니다.
@@ -225,13 +225,13 @@ script / CLI  ->  runs the document      simcase.run
 
 ## 헤드리스 정상 열전도
 
-별도 [thermal.steady2d 계약](docs/thermal_steady2d.md)은 명시적 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. [슬랩](examples/thermal_slab.json)과 [혼합 열원](examples/thermal_mixed.json) 예제는 계약과 함께 sdist에 byte 동일하게 포함됩니다. 설치 후 예제 파일에 `simcase validate thermal_slab.json`, `simcase run thermal_slab.json -o fresh_heat_results`를 실행하세요. 출력 경로는 새 경로여야 하며 끊어진 symlink도 없어야 합니다. 수치 SI NPZ 배열에는 전용 결과 버전/구성이 있고 `allow_pickle=False`로 읽습니다. 지지점 열반력은 안쪽 방향이며 부호 있는 바깥쪽 열은 그 음수입니다.
+별도 [thermal.steady2d 계약](../../../thermal_steady2d.md)은 명시적 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. [슬랩](../../../../examples/thermal_slab.json)과 [혼합 열원](../../../../examples/thermal_mixed.json) 예제는 계약과 함께 sdist에 byte 동일하게 포함됩니다. 설치 후 예제 파일에 `simcase validate thermal_slab.json`, `simcase run thermal_slab.json -o fresh_heat_results`를 실행하세요. 출력 경로는 새 경로여야 하며 끊어진 symlink도 없어야 합니다. 수치 SI NPZ 배열에는 전용 결과 버전/구성이 있고 `allow_pickle=False`로 읽습니다. 지지점 열반력은 안쪽 방향이며 부호 있는 바깥쪽 열은 그 음수입니다.
 
 이 헤드리스 경로는 열전도 Studio UI, 그림, flux/Robin 경계, 자동 열탄성 연성을 추가하지 않습니다. 저장 소유권과 플랫폼 한계는 계약을 읽으세요. 좁은 Windows 저장 검증은 Linux 전체 회귀 gate와 별도로 추적합니다.
 
 ## 라이선스
 
-Apache License 2.0 — [LICENSE](LICENSE), [NOTICE](NOTICE)를 참조하세요.
+Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
@@ -240,12 +240,12 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 | Topic / 주제 | English | 한국어 |
 |---|---|---|
-| Cavity / 공동 | [English](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
-| Headless heat / 헤드리스 열전도 | [English](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |
+| Cavity / 공동 | [English](../../../cavity3d.md) | [한국어](cavity3d.md) |
+| Headless heat / 헤드리스 열전도 | [English](../../../thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
 
 저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
 교체에 대한 보호는 시험하지만, 소유권 검사와 unlink 사이의 외부 교체는 안전을
 보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.
 이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
 원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
-GitHub Actions는 비활성화돼 있으며 dispatch와 재실행을 하지 않습니다.
+GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거가 필요합니다.

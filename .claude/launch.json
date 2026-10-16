@@ -5,7 +5,7 @@
       "name": "simcase.studio",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "simcase.studio"],
-      "cwd": "packages/simcase",
+      "cwd": ".",
       "port": 8765
     }
   ]

@@ -1,8 +1,8 @@
 # gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 Writes `.geo` scripts, runs the `gmsh` command-line program as a separate
 process, and reads the resulting MSH 4.1 file into numpy arrays that a

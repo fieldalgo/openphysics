@@ -1,8 +1,8 @@
 # simcase — the model document and its headless runner
 
-[English](README.md) | [한국어](README.ko.md)
+[Documentation](docs/overview.md)
 
-[English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
+[Suite documentation](https://github.com/fieldalgo/openphysics/blob/develop/docs/README.md)
 
 A COMSOL-style program is, underneath, a file that describes the model and an
 engine that runs the file. `simcase` implements that file format and engine for the
@@ -414,17 +414,15 @@ Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-## Documentation languages / 문서 언어
+## Documentation
 
-| Topic / 주제 | English | 한국어 |
-|---|---|---|
-| Cavity / 공동 | [English](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
-| Headless heat / 헤드리스 열전도 | [English](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |
+See the [cavity guide](docs/cavity3d.md), [headless heat guide](docs/thermal_steady2d.md)
+and [package overview](docs/overview.md).
 
 Output ownership requires exclusive caller control until save and cleanup finish.
 Protection against replacements observed before cleanup is tested; a foreign
 replacement between an ownership check and unlink is not guaranteed safe.
 Hostile filesystem races and atomic rollback are outside acceptance. Do not let
 another writer mutate the output during this interval. Windows save verification
-is stopped with two unresolved failures; Linux results do not establish Windows
-acceptance. GitHub Actions is disabled; do not dispatch or rerun workflows.
+remains incomplete with two unresolved historical failures; Linux results do not establish Windows
+acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required for acceptance.
