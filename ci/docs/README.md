@@ -338,6 +338,8 @@ The new Python API applies total physical `sigma*n` on the prescribed-temperatur
 Individual candidate measurements90/90/isolated4/related208/wrong17 do not establish a combined whole or installed result. The independent report preserves the original whole1385pass/7CLI-environment failures/16skip/+9subtests and target7 recovery as distinct evidence. New results must identify the exact source and real archives, actual failures and optional skips. GitHub Actions is enabled; distinguish new workflow results from these historical measurements. Linux results cannot establish Windows acceptance, and core metadata parsing does not substitute for unavailable twine strict checks.
 
 Both workflows gate every main-targeted PR, including documentation changes.
-Their required check names are `linux-py312` and `windows-py312-thermal`.
+Their required check names are `tests` (the always-run Linux completion job)
+and `windows-py312-thermal`. Green PRs land via GitHub Rebase and merge;
+record the new main SHA and require green main checks before releasing.
 Main push runs are never cancelled by a newer push; branch/PR runs may be superseded.
 Tags do not trigger these workflows, and neither workflow publishes packages.

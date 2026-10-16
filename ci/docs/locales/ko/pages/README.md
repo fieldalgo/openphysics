@@ -286,6 +286,8 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 활성화돼 있으며 새 workflow 결과와 이 과거 실측은 구분해야 합니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
 
 두 workflow는 문서를 포함한 모든 main 대상 PR의 필수 검사입니다. 검사명은
-`linux-py312`와 `windows-py312-thermal`입니다. 뒤 push가 main 실행을 취소하지
+`tests`(항상 실행하는 Linux 완료 job)와 `windows-py312-thermal`입니다.
+초록 PR은 GitHub Rebase and merge로 반영하며 새 main SHA를 기록하고
+릴리스 전에 main의 필수 검사 성공을 확인합니다. 뒤 push가 main 실행을 취소하지
 않으며 기능 브랜치·PR 실행은 대체될 수 있습니다. 태그는 이 workflow를 실행하지
 않고 두 workflow 모두 패키지를 게시하지 않습니다.

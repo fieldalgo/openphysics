@@ -32,24 +32,29 @@ with third-party exceptions recorded in [NOTICE](NOTICE) and package notices.
 ## Branches and releases
 
 `main` is the only trunk and the default branch. Create a feature branch from
-current `origin/main`. Before review, fetch and rebase your own unpublished work
-onto `origin/main`, push it and open a pull request targeting `main`. Preserve
+current `origin/main`, push it and open a pull request targeting `main`. Preserve
 shared or submitted history; use a new branch if replaying it is necessary.
+Every change, including documentation, requires the `tests` completion check
+(Linux source, distributions and Studio) and `windows-py312-thermal` from GitHub
+Actions. Review the exact candidate's logs and artifacts, not only its badge.
 
-Every change, including documentation, requires successful `linux-py312` and
-`windows-py312-thermal` checks from GitHub Actions on the exact proposed commit.
-Review their logs and artifacts, not only the badge. Once the PR is reviewed,
-fast-forward that tested commit with `git push origin <branch>:main`. Never
-force-push. If the base moved or a required check rejects the push, update the
-candidate, push and validate again. Do not create an untested merge commit or
-squash after validation. The PR remains the review record for the landed commit.
-Main runs are retained when later pushes arrive; branch/PR runs may be superseded.
+Land green PRs through GitHub **Rebase and merge**. Direct pushes, merge commits,
+squash merges, force pushes and deleting main are blocked. No approving review
+is required. GitHub replays the commits onto current main with new commit IDs;
+record the landed main SHA. Only conflicting PRs require manual rebasing and
+another validation run. There is no merge queue or pre-landing rerun of the
+combined state. Main push runs validate that state and must not be cancelled by
+later pushes; branch/PR runs may be superseded. If main fails, fix forward that
+day, or submit a revert PR if a fix cannot be completed within one hour.
+Merged feature branches are deleted automatically; preserve any remaining work
+on a separate branch before merging.
 
 Combine work in one temporary branch only when changes depend on each other or
 conflict. There is no permanent integration branch. To release, land the version
-change through the same PR and CI process, then tag that validated main commit
-`vX.Y.Z` and publish release notes and verified artifacts. Branch updates alone
-never publish packages. Automated PyPI/documentation publication is not configured
-in this repository; release credentials and publication gates require separate
-setup. Create `maintenance/X.Y.x` from a released tag only when that release needs
-a patch, and carry reviewed fixes from main.
+change through the same PR process, then wait for successful required checks on
+the resulting main commit before tagging it `vX.Y.Z` and publishing release notes
+and verified artifacts. Branch updates alone never publish packages. Automated
+PyPI/documentation publication is not configured in this repository; release
+credentials and publication gates require separate setup. Create
+`maintenance/X.Y.x` from a released tag only when that release needs a patch,
+and carry reviewed fixes from main.

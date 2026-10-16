@@ -44,15 +44,19 @@ From the repository root after installing the packages:
 
 ## Contributions
 
-Use `main` as the only trunk and default branch. Branch from current `origin/main`,
-rebase unpublished work onto it before opening a PR to `main`, and require both
-`linux-py312` and `windows-py312-thermal` on the exact commit, including documentation
-changes. Land that tested commit with a fast-forward push only after PR review.
-If the base moves or a push is rejected, update the candidate and rerun CI.
-Do not force-push shared work. Combine branches only when their changes depend
-on one another; there is no permanent integration branch. Releases use version
-tags on validated `main` commits. Never infer a release or PyPI upload from a
-branch update. Main CI runs must not be cancelled by newer pushes. Read CONTRIBUTING.md and SECURITY.md
+Use `main` as the only trunk and default branch. Branch from current `origin/main`
+and open a PR to `main`. Every change, including documentation, requires the
+`tests` completion check and `windows-py312-thermal` from GitHub Actions.
+Land green PRs using GitHub Rebase and merge, with no required approving review;
+record the resulting main SHA because GitHub creates new commit IDs. Rebase and
+rerun manually only for conflicts. Do not push directly to main, force-push shared
+work, create merge commits or squash on landing. Merged branches are automatically
+deleted, so preserve any remaining work first. Main push CI validates the combined
+state and must not be cancelled by newer pushes. Fix a failed main the same day;
+if a fix cannot be completed within one hour, submit a revert PR. No merge queue.
+Combine branches only when needed; there is no permanent integration branch.
+Release tags require green checks on the resulting main commit. Branch updates
+alone do not publish packages. Read CONTRIBUTING.md and SECURITY.md
 before submitting changes or reporting vulnerabilities. Keep implementation and
 validation contracts with the code; do not commit private plans, credentials,
 research records or session handoffs. GitHub Actions is enabled with owner approval. Use the retained validation

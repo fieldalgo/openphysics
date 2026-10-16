@@ -63,3 +63,15 @@ jobs:
           path: .validation/
           include-hidden-files: true
           if-no-files-found: warn
+
+  tests:
+    name: tests
+    needs: linux-py312
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require complete Linux validation
+        env:
+          VALIDATION_RESULT: ${{ needs.linux-py312.result }}
+        run: test "$VALIDATION_RESULT" = success
