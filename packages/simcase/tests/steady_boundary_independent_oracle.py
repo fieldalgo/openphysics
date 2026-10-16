@@ -102,7 +102,7 @@ class Elements:
                     outward *= -1
                 np.add.at(G,edge,outward)
                 np.add.at(B,edge,offset)
-                np.add.at(HT,edge,matrix@np.asarray(temperature)[edge])
+                np.add.at(HT,edge,matrix@(np.asarray(temperature)[edge]-(290. if variant == "wrong_offset" else 0.)))
         return G,B,HT
 
     def errors(self, temperature, L, a, b, Q, origin, degree):
