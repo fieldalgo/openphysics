@@ -47,3 +47,16 @@ include docs/thermal_mechanical_independent_validation.md
 include docs/locales/ko/pages/thermal_mechanical_independent_validation.md
 include tests/test_thermal_mechanical_independent_validation.py
 include tests/thermal_mechanical_independent_oracle.py
+include galerkin/transient_heat.py
+include docs/transient_heat.md
+include docs/locales/ko/pages/transient_heat.md
+include docs/transient_heat_validation.md
+include docs/locales/ko/pages/transient_heat_validation.md
+include docs/transient_heat_independent_validation.md
+include docs/locales/ko/pages/transient_heat_independent_validation.md
+include examples/transient_heat_convergence.py
+include tests/test_transient_heat.py
+include tests/test_transient_heat_independent_validation.py
+include tests/transient_heat_independent_oracle.py
+include tests/transient_heat_independent_cases.py
+include tests/transient_heat_independent_consumer.py

@@ -276,7 +276,7 @@ All seven Korean package READMEs and received Korean guide counterparts are
 required byte assets. The standalone outward-flux/Robin contract, example,
 independent report/oracle/test and `refsol.thermal_boundary` are included verbatim.
 The headless independent EN/KO report, oracle, test and stale-state Node file
-are likewise required. The current required-byte list contains 79 entries.
+are likewise required. The current required-byte list contains 94 entries.
 The installed suite preserves the original 105 consumers and adds the original
 headless and Robin independent Python acceptance files without editing their
 thresholds; report actual counts and skips for each execution. The Node command
@@ -323,3 +323,51 @@ is also run with installed wheels under `python -I`, outside the checkout.
 The guard stays in source; its six tests scan actual engine files. Installed
 module origins and wheel module bytes are checked separately. This packaging
 check does not add schema/CLI/Studio support or certify thermodynamic coupling.
+
+## Transient heat distribution connections (execution pending)
+
+The helper retains the existing seven-distribution build, strict metadata/license,
+byte/link/historical-JSON gates and installed consumer suite. The required asset
+list is now 94 entries: all previous 79 plus 15 transient assets. Six EN/KO usage,
+producer-validation and independent-report pages, the English convergence example,
+the engine/reference modules, original producer/reference tests, and all four
+independent oracle/cases/pytest-wrapper/consumer files must match their sdists.
+No frozen oracle, acceptance gate or historical report is rewritten.
+
+Both new runtime modules must also match the wheel bytes. Before numerical
+consumers, isolated Python checks their installed venv origins and SHA256 and
+writes `transient-module-origins.json` to the artifact output. Documentation and
+acceptance files are sdist assets, not runtime wheel modules.
+
+The existing installed pytest suite remains intact. The original
+`test_transient_heat.py` and `test_transient_heat_reference.py` are copied outside
+the checkout and added to that suite. The independent pytest discovery wrapper
+is preserved as an sdist reproduction asset but is not additionally copied into
+installed pytest: the original standalone consumer runs once with `--suite all`,
+including the frozen PDE/companion/quadrature gates. Its oracle/cases/consumer are
+read from the already byte-verified sdist, never from an editable install.
+The full verified archived `transient_heat_convergence.py` then runs with
+`python -I`; no shortened smoke or `core` result substitutes for either gate.
+
+These commands define the prepared verification sequence; no new source whole,
+build, installed or convergence result is asserted by this connection change:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```
+
+Use a fresh owned output directory and the authorized cloud validation environment;
+schedule this heavy sequence after the current source run, not concurrently.
+The helper runs installed pytest, then independent `all`, then the archived
+convergence example sequentially. Preserve their separate actual exits/counts and
+logs; a failure stops the helper and later stages remain unexecuted. Existing
+389-consumer history is a baseline scope, not a measured new candidate count.
+Independent unittest cases/subtests and archived-program assertions are separate
+from pytest JUnit counts. Missing native prerequisites, optional skips and strict
+tool availability must be reported from the actual environment.
+
+The public API is standalone fixed-mesh backward Euler, not transient JSON/CLI/
+Studio, Robin/flux input, persistence or automatic thermal-mechanical coupling.
+Actions remains disabled and Windows remains unverified. Root source regression,
+this distribution sequence and owner integration require their own exact-SHA
+evidence; the in-progress validation of thermoelastic traction is not merged here.

@@ -235,7 +235,7 @@ Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88
 한국어 package README 일곱 개와 수신한 전체 한국어 안내는 필수 byte 자산입니다.
 독립 외향 열유속/Robin 계약·예제·독립 보고/oracle/시험과 `refsol.thermal_boundary`를
 원문 그대로 포함합니다. headless 독립 EN/KO 보고·oracle·시험·stale-state Node도
-필수입니다. 현재 필수 byte 목록은 79개입니다. 설치 시험은 기존 consumer 105개를
+필수입니다. 현재 필수 byte 목록은 94개입니다. 설치 시험은 기존 consumer 105개를
 유지하고 원래 headless·Robin 독립 Python 수용 파일을 허용치 수정 없이 추가합니다.
 각 실행의 실제 개수와 skip을 보고합니다. Node 명령은 기존 vector 8 + thermal guard 6 +
 독립 stale guard 8 = 22개이며 서로 다른 범위를 물리 인증 숫자 하나로 합치지 않습니다.
@@ -273,3 +273,46 @@ skip을 보고해야 합니다. 검증한 sdist의 영어 workflow 예제도 che
 wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험이 실제 engine
 파일을 scan합니다. 설치 module origin과 wheel module byte는 별도로 확인합니다.
 이 배포 검사가 schema/CLI/Studio 지원이나 열역학적 완전 연성을 인증하지는 않습니다.
+
+## 과도 열전도 배포 연결 (실행 대기)
+
+helper는 기존 일곱 배포의 build·strict metadata/license·byte/link·역사 JSON gate와
+설치 소비자 suite를 유지합니다. 필수 자산은 기존 79개 전부와 과도 자산 15개를 합한
+94개입니다. 사용법·생산 검증·독립 보고 EN/KO 여섯 페이지, 영어 수렴 예제,
+엔진/참조 모듈, 원 생산/참조 시험, 독립 oracle/cases/pytest-wrapper/consumer
+네 파일이 sdist와 byte 단위로 같아야 합니다. 동결 oracle·수용 gate·역사 보고는
+수정하지 않습니다.
+
+새 runtime 모듈 두 개는 wheel byte도 같아야 합니다. 수치 소비자 실행 전에
+격리 Python으로 설치 venv origin과 SHA256을 확인해 artifact 출력의
+`transient-module-origins.json`에 기록합니다. 문서와 수용 파일은 sdist 자산이며
+runtime wheel 모듈이 아닙니다.
+
+기존 설치 pytest suite는 그대로 유지합니다. 원 `test_transient_heat.py`와
+`test_transient_heat_reference.py`를 checkout 밖으로 복사해 suite에 추가합니다.
+독립 pytest 발견 wrapper는 sdist 재현 자산으로 보존하되 설치 pytest에는 중복
+복사하지 않습니다. 대신 원 standalone consumer를 `--suite all`로 한 번 실행해
+동결 PDE/companion/구적 gate를 포함합니다. oracle/cases/consumer는 byte 검증된
+sdist에서 읽으며 editable 설치를 사용하지 않습니다.
+이어 검증한 archive의 전체 `transient_heat_convergence.py`를 `python -I`로
+실행합니다. 짧은 smoke나 `core` 결과로 어느 gate도 대체하지 않습니다.
+
+아래 명령은 준비된 검증 순서이며 이 연결 변경으로 새로운 source 전체·build·설치·
+수렴 결과를 주장하지 않습니다.
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 BLIS_NUM_THREADS=1 python ci/check_distributions.py --output /tmp/openphysics-transient-dist-check
+```
+
+승인된 cloud 환경과 비어 있는 본인 출력 경로를 사용하고 현재 source 실행 뒤에
+이 무거운 순서를 배정하며 동시에 실행하지 않습니다. helper는 설치 pytest→독립
+`all`→archive 수렴 예제를 순차 실행합니다. 실제 exit/count·로그를 별도 보존하며
+실패하면 helper가 멈추므로 이후 단계는 미실행입니다. 기존 389 소비자는 과거 기준
+범위이며 새 후보의 실측 count가 아닙니다. 독립 unittest 사례/subtest와 archive
+프로그램 assertion은 pytest JUnit count와 별도입니다. native prerequisite 누락,
+optional skip, strict 도구 가용성도 실제 환경에서 확인해 기록해야 합니다.
+
+공개 API는 고정 메시 standalone 후진 Euler이며 과도 JSON/CLI/Studio, Robin/flux
+입력, 저장 또는 자동 열–기계 연결이 아닙니다. Actions는 비활성이고 Windows는
+미검증입니다. root source 회귀·이 배포 순서·오너 통합은 각자 exact-SHA 근거가
+필요하며 진행 중인 처방온도+traction 검증 후보는 여기에 합치지 않습니다.

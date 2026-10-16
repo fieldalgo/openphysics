@@ -27,7 +27,23 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-DOCUMENT_ASSETS = {'galerkin': ('docs/thermal_mechanical_independent_validation.md',
+RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py",),
+                         "galerkin-refsol": ("refsol/transient_heat.py",)}
+DOCUMENT_ASSETS = {'galerkin': (
+              'galerkin/transient_heat.py',
+              'docs/transient_heat.md',
+              'docs/locales/ko/pages/transient_heat.md',
+              'docs/transient_heat_validation.md',
+              'docs/locales/ko/pages/transient_heat_validation.md',
+              'docs/transient_heat_independent_validation.md',
+              'docs/locales/ko/pages/transient_heat_independent_validation.md',
+              'examples/transient_heat_convergence.py',
+              'tests/test_transient_heat.py',
+              'tests/test_transient_heat_independent_validation.py',
+              'tests/transient_heat_independent_oracle.py',
+              'tests/transient_heat_independent_cases.py',
+              'tests/transient_heat_independent_consumer.py',
+              'docs/thermal_mechanical_independent_validation.md',
               'docs/locales/ko/pages/thermal_mechanical_independent_validation.md',
               'tests/test_thermal_mechanical_independent_validation.py',
               'tests/thermal_mechanical_independent_oracle.py',
@@ -80,7 +96,10 @@ DOCUMENT_ASSETS = {'galerkin': ('docs/thermal_mechanical_independent_validation.
               'examples/thermal_flux_robin.py',
               'tests/thermal_flux_robin_independent_oracle.py',
               'tests/test_thermal_flux_robin_independent_validation.py'),
- 'galerkin-refsol': ('refsol/elasticity.py',
+ 'galerkin-refsol': (
+              'refsol/transient_heat.py',
+              'tests/test_transient_heat_reference.py',
+              'refsol/elasticity.py',
                      'refsol/thermal.py',
                      'refsol/elasticity_traction.py',
                      'refsol/thermoelasticity.py',
@@ -177,6 +196,11 @@ def main():
     for wheel in wheels:
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
+            package_name = parse_wheel_filename(wheel.name)[0]
+            for relative in RUNTIME_MODULE_ASSETS.get(package_name, ()):
+                expected_bytes = (ROOT / "packages" / package_name / relative).read_bytes()
+                if archive.read(relative) != expected_bytes:
+                    raise RuntimeError(f"{wheel.name}: runtime module differs: {relative}")
             if not any(p.endswith("/LICENSE") for p in names):
                 raise RuntimeError(f"{wheel.name} is missing LICENSE")
             if not wheel.name.startswith("openphysics-") and not any(p.endswith("/NOTICE") for p in names):
@@ -213,6 +237,28 @@ def main():
             "-c", ROOT / "ci" / "requirements-py312-linux.txt", *requirements,
             cwd=work, env=env)
         run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
+        # Verify the new explicit submodules before any numerical consumer runs.
+        runtime_expected = {
+            "galerkin.transient_heat": hashlib.sha256(
+                (ROOT / "packages/galerkin/galerkin/transient_heat.py").read_bytes()).hexdigest(),
+            "refsol.transient_heat": hashlib.sha256(
+                (ROOT / "packages/galerkin-refsol/refsol/transient_heat.py").read_bytes()).hexdigest(),
+        }
+        origin_probe = work / "transient_module_origins.py"
+        origin_probe.write_text(
+            "import hashlib, importlib, json, sys\nfrom pathlib import Path\n"
+            + "expected = " + repr(runtime_expected) + "\n"
+            + "report = {}\n"
+            + "if not sys.flags.isolated: raise RuntimeError('isolated Python required')\n"
+            + "for name, digest in expected.items():\n"
+            + "    path = Path(importlib.import_module(name).__file__).resolve()\n"
+            + "    actual = hashlib.sha256(path.read_bytes()).hexdigest()\n"
+            + "    if not path.is_relative_to(Path(sys.prefix).resolve()): raise RuntimeError('module outside installed venv')\n"
+            + "    if actual != digest: raise RuntimeError('installed runtime byte mismatch')\n"
+            + "    report[name] = {'origin': str(path), 'sha256': actual}\n"
+            + "Path(sys.argv[1]).write_text(json.dumps(report, indent=2) + '\\n')\n"
+            + "print(json.dumps(report), flush=True)\n")
+        run(python, "-I", origin_probe, output / "transient-module-origins.json", cwd=work, env=env)
         smoke = work / "wheel_smoke.py"
         shutil.copy2(ROOT / "ci" / "wheel_smoke.py", smoke)
         run(python, "-I", smoke, cwd=work, env=env)
@@ -236,6 +282,10 @@ def main():
         ):
             for filename in filenames:
                 shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
+        # Preserve producer contract/reference tests; independent all runs separately below.
+        for package, filename in (("galerkin", "test_transient_heat.py"),
+                                  ("galerkin-refsol", "test_transient_heat_reference.py")):
+            shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
         # Execute the verified archived example, not a source-tree copy.
         examples = work / "examples"
         examples.mkdir()
@@ -243,7 +293,7 @@ def main():
         with tarfile.open(galerkin_sdist) as archive:
             for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
                              "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
-                             "thermal_mechanical_workflow.py"):
+                             "thermal_mechanical_workflow.py", "transient_heat_convergence.py"):
                 member = next(p for p in archive.getmembers()
                               if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
                 (examples / filename).write_bytes(archive.extractfile(member).read())
@@ -258,6 +308,22 @@ def main():
         # No source conftest is copied; test_studio finds static files via simcase.__file__.
         run(python, "-I", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)
+        # Use only byte-verified sdist acceptance files outside the checkout.
+        acceptance = work / "transient-acceptance"
+        acceptance.mkdir()
+        with tarfile.open(galerkin_sdist) as archive:
+            for filename in ("transient_heat_independent_oracle.py",
+                             "transient_heat_independent_cases.py",
+                             "transient_heat_independent_consumer.py"):
+                member = next(p for p in archive.getmembers()
+                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
+                (acceptance / filename).write_bytes(archive.extractfile(member).read())
+        run(python, "-I", acceptance / "transient_heat_independent_consumer.py",
+            "--expected-installed-root", env_root,
+            "--expected-module-sha256", runtime_expected["galerkin.transient_heat"],
+            "--suite", "all", cwd=work, env=env)
+        # Full fixed n8..n64 convergence example, not a shortened smoke or core substitute.
+        run(python, "-I", examples / "transient_heat_convergence.py", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")
 
 
