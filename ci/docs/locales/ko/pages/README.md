@@ -513,6 +513,12 @@ CDP를 사용합니다. npm/Python/browser 다운로드를 추가하지 않습�
 환경과 본인 subprocess exit는 `dist/studio-browser/`에 남깁니다. 브라우저 부재는
 unavailable과 nonzero exit로 기록하며 passing mock이나 skip으로 숨기지 않습니다.
 
+dirty 입력 검사는 폐기된 크기 0 canvas backing store를 빈 상태로 인정하며
+빈 영역에 getImageData를 호출하지 않습니다. 숨겨진 동안과 보이는 Results 탭으로
+돌아온 뒤 모두 결과·hover 소유권 부재, 열 제어 숨김, Run 비활성화를 검사합니다.
+검사 도구가 canvas를 직접 비우거나 크기를 바꾸지 않으며 dirty-results.png에
+복귀 상태를 남깁니다. 정상 결과 표시 단계는 계속 양수 크기와 실제 픽셀을 요구합니다.
+
 검증 성공 뒤 Linux source 서버 관측을 한 번 수행합니다.
 
 ```text

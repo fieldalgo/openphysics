@@ -596,6 +596,13 @@ canvas CSS/backing sizes, console exceptions, PNGs, origins, environment and
 owned subprocess exits go to `dist/studio-browser/`. Browser absence is recorded
 as unavailable with nonzero exit, never hidden as a passing mock or skip.
 
+Dirty-input checks accept a discarded zero-size canvas backing store without
+calling getImageData on an empty region. They also require the result and hover
+owner to be absent, thermal controls hidden and Run disabled, both while hidden
+and after returning to the visible Results tab. The test never clears or resizes
+the canvas itself; dirty-results.png records that return. Positive dimensions
+and painted pixels remain required for all successful result-render stages.
+
 After successful validation, one Linux source-server observation runs:
 
 ```text
