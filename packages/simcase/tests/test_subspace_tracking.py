@@ -387,3 +387,33 @@ def test_coarse_samples_cannot_see_an_excursion_between_them(mesh, basis):
     with pytest.raises(ModeTrackingError, match="weakest principal value squared"):
         for t in (0.0, 0.25, 0.5, 0.75, 1.0):
             fine.step(neff, sample(t), f"t={t}")
+
+
+def test_avoided_crossing_identity_depends_on_sampling(mesh, basis):
+    """H(t) = [[t, d], [d, -t]]: coarse samples follow field character, fine ones the eigenvector.
+
+    Identity is field continuity at the samples, so the reported branch is the
+    diabatic one for a coarse step and the adiabatic one for a fine step. Both
+    are refined-step questions; the tracker does not choose a physical meaning.
+    """
+    metric = ElectricMetric(mesh)
+    orthonormal = columns(basis, whiten(metric.product(basis, basis))[0])
+    delta = 0.1
+
+    def sample(t):
+        values, vectors = np.linalg.eigh(np.array([[t, delta], [delta, -t]]))
+        order = np.argsort(-values)
+        mix = np.zeros((8, 3))
+        mix[:2, :2] = vectors[:, order]
+        mix[2, 2] = 1.0                                          # guard candidate
+        neff = np.concatenate([2.0 + 0.01 * values[order], [1.9]])
+        return neff, columns(orthonormal, mix)
+
+    coarse = SubspaceTracker(mesh, 1, _settings(1))
+    coarse.step(*sample(-1.0), "t=-1")
+    _, _, _, _, evidence = coarse.step(*sample(1.0), "t=+1")
+    assert evidence["candidate_ranks"] == [2]                   # followed the field character (diabatic)
+    fine = SubspaceTracker(mesh, 1, _settings(1))
+    for t in np.linspace(-1.0, 1.0, 81):
+        _, _, _, _, evidence = fine.step(*sample(t), f"t={t:.3f}")
+        assert evidence["candidate_ranks"] == [1]               # followed the upper eigenvector (adiabatic)
