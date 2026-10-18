@@ -161,7 +161,11 @@ any other layout version, and a failed run clears the previous display.
   principal angle 0.097, 0.049 and 0.033 at scales 1 to 3. A dispersive
   Sellmeier core/cladding case agrees with the exact dispersive n_g to 6.0e-6
   and 2.6e-6 at scales 2 and 3, and its material-dispersion contribution
-  matches the exact one to 2.5e-7. Other guides remain open.
+  matches the exact one to 2.5e-7. On a higher-V fiber (n1 = 1.47, V = 4.79), an accidental rank-3 cluster
+  (HE21 pair and TM01, 2.2e-5 apart) tracked with HE11 and TE01 gives mean-index
+  errors below 3.5e-5 at mesh scale 3, decreasing at scale 4. At scale 2 the
+  same settings were refused, because the coarser mesh joins TE01 to that
+  cluster. Other guides and geometries remain open.
 - Splitting, merging, rank changes, cutoff continuation, individual
   polarization labels and individual slopes inside a cluster are out of scope.
 - The candidate search is bounded. A guard shows only that something was
