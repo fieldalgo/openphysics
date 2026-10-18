@@ -449,7 +449,8 @@ function drawAxes(ctx, T, dom, W, H, unit = lengthUnit()) {
 function shapePath(ctx, s, T) {
   ctx.beginPath();
   if (s.type === 'rect') ctx.rect(T.X(s.x), T.Y(s.y + s.h), s.w * T.s, s.h * T.s);
-  else if (s.type === 'circle') ctx.arc(T.X(s.cx), T.Y(s.cy), s.r * T.s, 0, 2 * Math.PI);
+  // A hidden canvas has no size, so its scale can be negative; arc() rejects a negative radius.
+  else if (s.type === 'circle') ctx.arc(T.X(s.cx), T.Y(s.cy), Math.max(0, s.r * T.s), 0, 2 * Math.PI);
   else if (s.type === 'polygon') { s.points.forEach((p, i) => i ? ctx.lineTo(T.X(p[0]), T.Y(p[1])) : ctx.moveTo(T.X(p[0]), T.Y(p[1]))); ctx.closePath(); }
 }
 function drawGeometry() {
