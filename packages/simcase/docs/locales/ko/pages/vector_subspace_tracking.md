@@ -98,6 +98,15 @@ Hermitian 양의 준정부호입니다. 시작 지점의 방향은 임의입니�
 `mode_tracking_json`을 담습니다. `save_fields=false`이면 이 파일을 쓰지 않습니다. `save`와 CLI는
 이미 있는 출력 경로를 거절하므로 새 metadata가 이전 실행의 장과 섞이지 않습니다.
 
+`simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
+boundary, neff, field)`는 풀이와 같은 파장 축척·PEC 구속으로 각 열을 원래 벡터 pencil의
+고유쌍으로 평가합니다. 원시 열은 반올림 수준의 고유쌍입니다(예제에서 약 1e-14). n_eff가 다른
+구성원을 섞은 frame 열은 고유쌍이 아니며, 잔차는 구성원 고유값의 상대 폭 정도입니다. 예를 들어
+예제의 HE11 쌍 안에서는 2e-6, HE11 구성원과 TE01을 섞으면 3e-3입니다.
+
+근거 항목 `sin_max_angle`은 `sqrt(1 - sigma^2)`가 아니라 투영 잔차 `Q - P (P^H W Q)`로
+계산하므로 작은 각에서도 정확도를 유지합니다.
+
 ## Studio
 
 Studio는 분지 대신 군집 선택("cluster 1 (rank 2)")을 보여 줍니다. 장 화면은 정규화 부분공간

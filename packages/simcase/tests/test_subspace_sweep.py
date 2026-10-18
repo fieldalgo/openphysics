@@ -194,3 +194,28 @@ def test_studio_returns_a_versioned_cluster_payload(result):
     assert density.shape == (5, 1, len(result.mesh_triangles))
     np.testing.assert_allclose(density[2, 0], result.subspace_density(2, 1))
     assert np.allclose(density.max(axis=2), 1.0)
+
+
+def test_raw_eigenpairs_satisfy_the_original_pencil_and_rotated_mixtures_do_not(result):
+    """Raw columns stay eigenpairs; mixing unequal eigenvalues is not an eigenmode."""
+    from simcase.physics_em_modes2d import vector_pencil_residuals
+    from simcase.runner import build_mesh, solve_point
+    from simcase.subspace_tracking import columns
+
+    doc = Document.from_dict(examples.VECTOR_FIBER_SUBSPACE_SWEEP)
+    model = build_mesh(doc)
+    physics = doc.sole_physics()[1]
+    for i, wl in enumerate(result.values):
+        eps = model.eps_per_triangle(wl)
+        raw = vector_pencil_residuals(model.mesh, eps, wl, physics["boundary"], result.neff[i], result.vector_fields[i])
+        assert raw.max() < 1e-10
+    solved = solve_point(model, dict(physics, num_modes=6))
+    eps = model.eps_per_triangle(physics["wavelength"])
+    base = vector_pencil_residuals(model.mesh, eps, physics["wavelength"], physics["boundary"],
+                                   solved["neff"], solved["vector_field"])
+    mix = np.eye(len(solved["neff"]), dtype=complex)
+    mix[1:3, 1:3] = [[np.cos(0.7), -np.sin(0.7)], [np.sin(0.7), np.cos(0.7)]]       # HE11 member with TE01
+    mixed = vector_pencil_residuals(model.mesh, eps, physics["wavelength"], physics["boundary"],
+                                    solved["neff"], columns(solved["vector_field"], mix))
+    assert base.max() < 1e-10
+    assert mixed[1:3].min() > 1e6 * base.max()

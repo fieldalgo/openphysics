@@ -95,3 +95,39 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding):
     field = VectorField(space.edges.copy(), et.T * wavelength / norm,
                         1j * ez.T / norm, electric / norm[None, :, None])
     return {"neff": neff, "guided": np.ones(len(keep), dtype=bool), "vector_field": field}
+
+
+def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
+                            neff: np.ndarray, field: VectorField) -> np.ndarray:
+    """Relative residual of each column as an eigenpair of the original vector pencil.
+
+    Uses the same wavelength-scaled mesh, k0 = 2 pi and PEC constraints as the
+    vector solve. For a raw column with effective index n, the pencil vector is
+    proportional to x = [2 pi n * transverse / wavelength; -1j * longitudinal]
+    (galerkin's e_t = beta E_t and e_z = -i E_z), and the residual is
+
+        ||A x + beta^2 B x|| / (||A x|| + beta^2 ||B x||)  on free DOFs.
+
+    A diagnostic: a rotated mixture of eigenvectors with different eigenvalues
+    is not an eigenvector of either value and has a large residual.
+    """
+    from galerkin import assemble_mode_system
+
+    scaled = Mesh(mesh.nodes / wavelength, mesh.triangles.copy(), mesh.boundary, mesh.boundary_edges)
+    A, B, space = assemble_mode_system(scaled, np.real(eps_tri), 2 * np.pi)
+    pec_sides = [side for side, kind in boundary.items() if kind == "pec"]
+    pec = np.unique(np.concatenate([mesh.boundary[s] for s in pec_sides])) if pec_sides else np.zeros(0, int)
+    edge_ids = {tuple(edge): i for i, edge in enumerate(space.edges)}
+    pec_edges = np.unique([edge_ids[tuple(sorted(edge))]
+                           for side in pec_sides for edge in mesh.boundary_edges[side]]).astype(int)
+    fixed = np.concatenate([pec_edges, space.num_edges + pec])
+    free = np.setdiff1d(np.arange(space.num_edges + mesh.num_nodes), fixed)
+    A, B = A[free][:, free], B[free][:, free]
+    residuals = []
+    for j, n in enumerate(np.asarray(neff, dtype=float)):
+        beta = 2 * np.pi * n
+        x = np.concatenate([beta * field.transverse[:, j] / wavelength, -1j * field.longitudinal[:, j]])[free]
+        ax, bx = A @ x, B @ x
+        residuals.append(float(np.linalg.norm(ax + beta ** 2 * bx)
+                               / (np.linalg.norm(ax) + beta ** 2 * np.linalg.norm(bx))))
+    return np.array(residuals)

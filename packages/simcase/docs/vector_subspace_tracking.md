@@ -116,6 +116,18 @@ layout cannot misread raw member columns as branches.
 the file. `save` and the CLI refuse an existing output path so new metadata is
 never mixed with fields from an earlier run.
 
+`simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
+boundary, neff, field)` evaluates each column as an eigenpair of the original
+vector pencil, with the same wavelength scaling and PEC constraints as the
+solve. Raw columns are eigenpairs to roundoff (about 1e-14 on the example).
+A frame column that mixes members with different n_eff is not: its residual is
+about the members' relative eigenvalue spread, for example 2e-6 inside the
+example's HE11 pair and 3e-3 when an HE11 member is mixed with TE01.
+
+The evidence field `sin_max_angle` is computed from the projection residual
+`Q - P (P^H W Q)` rather than `sqrt(1 - sigma^2)`, so small angles keep their
+accuracy.
+
 ## Studio
 
 Studio shows a cluster selector ("cluster 1 (rank 2)") instead of branches. The
