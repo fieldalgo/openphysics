@@ -68,6 +68,14 @@ and fix or revert through a PR before releasing that state.
 Merged feature branches are deleted automatically; preserve any remaining work
 on a separate branch before merging.
 
+When a commit lands work first written in another commit (replayed onto a new base,
+rewritten, squashed before submission, or ported by another contributor), name each
+original in the commit or PR body with one `Ports: <sha>` line. A PR's own commits
+landed by Rebase and merge need no such line; the PR records them. Give the SHA only,
+without private branch names or paths. A commit that is not an ancestor of main may
+still have landed under a new ID: check `Ports:` lines, the PR record or the behavior
+on main before reporting it missing.
+
 Combine work in one temporary branch only when changes depend on each other or
 conflict. There is no permanent integration branch. To release, land the version
 change through the same PR process, then wait for successful required checks on
