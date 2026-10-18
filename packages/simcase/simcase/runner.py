@@ -33,10 +33,12 @@ from .materials import material_table
 from .fields import VectorField
 from .schema import Document, DocumentError
 from .tracking import ModeTracker, ModeTrackingError, tracking_settings
+from .subspace_tracking import SUBSPACE_METHOD, SubspaceTracker
 
 
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
+    from .subspace_result import SubspaceSweepResult
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
 
@@ -244,7 +246,7 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult:
+def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult:
     """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
     log: list[str] = []
 
@@ -293,6 +295,8 @@ def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | Th
     if vector_fields is not None and parameter is not None:
         requested = int(doc.sole_physics()[1]["num_modes"])
         settings = tracking_settings(requested, doc["study"].get("tracking"))
+        if settings.get("method") == SUBSPACE_METHOD:
+            return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh)
         tracker = ModeTracker(model.mesh, requested, settings)
         tracking = dict(method="electric-l2-assignment-v1", settings=settings, points=[])
         say("vector sweep: tracking resolved modes by electric L2 overlap; check wavelength-step convergence")
@@ -332,3 +336,42 @@ def run(doc: Document, verbose: bool = True) -> RunResult | CavityRunResult | Th
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
                      np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking)
 
+
+
+def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> "SubspaceSweepResult":
+    """Opt-in electric-l2-subspace-v1 sweep: all points succeed or nothing is returned."""
+    from .subspace_result import SubspaceSweepResult
+
+    requested = int(doc.sole_physics()[1]["num_modes"])
+    tracker = SubspaceTracker(model.mesh, requested, settings)
+    tracking = dict(method=SUBSPACE_METHOD, settings=settings, points=[])
+    say("vector sweep: tracking isolated clusters by electric L2 principal angles "
+        "(electric-l2-subspace-v1); check wavelength-step, mesh and search_modes convergence")
+    neffs, fields, transforms, offsets = [], [], [], None
+    t0 = time.time()
+    for v in values:
+        d = doc.copy()
+        d.set_path(parameter, v)
+        physics = dict(d.sole_physics()[1], num_modes=settings["search_modes"])
+        location = f"wavelength {v:g} {doc.length_unit}"
+        try:
+            res = solve_point(model, physics)
+        except (ValueError, RuntimeError) as exc:
+            raise ModeTrackingError(f"vector subspace sweep at {location}: {exc}") from exc
+        neff, field, transform, point_offsets, evidence = tracker.step(res["neff"], res["vector_field"], location)
+        if offsets is None:
+            offsets = point_offsets
+        tracking["points"].append(evidence)
+        neffs.append(neff)
+        fields.append(field)
+        transforms.append(transform)
+        bands = "; ".join(f"cluster {c + 1}: " + ", ".join(f"{n:.6f}" for n in neff[offsets[c]:offsets[c + 1]])
+                          for c in range(len(offsets) - 1))
+        say(f"  {parameter} = {v} {doc.length_unit}: {bands}")
+    t_solve = time.time() - t0
+    say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
+    tm = model.tri
+    return SubspaceSweepResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
+                               parameter, list(values), np.array(neffs), [], {"mesh": t_mesh, "solve": t_solve},
+                               log, fields, tracking, cluster_offsets=np.asarray(offsets),
+                               frame_transforms=transforms)

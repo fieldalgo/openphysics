@@ -22,13 +22,23 @@ class ModeTrackingError(ValueError):
 
 
 def tracking_settings(num_modes: int, supplied=None) -> dict:
-    """Resolve and validate JSON settings, without altering the document."""
+    """Resolve and validate JSON settings, without altering the document.
+
+    ``method`` selects the tracker. The default ``electric-l2-assignment-v1``
+    settings are returned without a ``method`` key, exactly as before the
+    opt-in ``electric-l2-subspace-v1`` method existed.
+    """
     defaults = dict(search_modes=max(2 * num_modes, num_modes + 4), min_overlap=0.8,
                     min_margin=0.1, degeneracy_tolerance=1e-5)
     if supplied is None:
         supplied = {}
     if not isinstance(supplied, dict):
         raise ValueError("study.tracking must be an object")
+    from .subspace_tracking import SUBSPACE_METHOD, subspace_settings, tracking_method
+    method = tracking_method(supplied)
+    if method == SUBSPACE_METHOD:
+        return subspace_settings(num_modes, supplied)
+    supplied = {k: v for k, v in supplied.items() if k != "method"}
     if set(supplied) - set(defaults):
         raise ValueError(f"unknown study.tracking settings: {sorted(set(supplied) - set(defaults))}")
     settings = defaults | supplied
