@@ -31,11 +31,12 @@ from .geometry import build_domain
 from .fields import VectorField
 from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
 from .schema import FORMAT, Document, DocumentError
+from .subspace_result import SubspaceSweepResult
 from .tracking import ModeTrackingError
 from .units import unit_vocabulary
 
 __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "VectorField", "ModeTrackingError", "unit_vocabulary"]
+           "run", "RunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "unit_vocabulary"]
 
