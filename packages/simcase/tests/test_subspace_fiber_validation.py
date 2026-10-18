@@ -144,3 +144,13 @@ def test_rank_three_accidental_cluster_mean_group_index():
         errors.append(np.abs(r["g"][2] - reference))
     assert errors[0].max() < 2e-4
     assert errors[1].max() < errors[0].max()
+
+
+@pytest.mark.slow
+def test_nanometre_coordinates_give_the_same_cluster_statistics(base):
+    """Scaling coordinates and wavelengths by 1000 (um -> nm) leaves g_bar unchanged."""
+    nm = cluster_sweep([1000 * w for w in centred(0.01)], 2,
+                       dict(method="electric-l2-subspace-v1", cluster_span_max=1e-6, external_gap_min=1e-3),
+                       core_radius=1000 * A)
+    assert nm["ranks"] == base["ranks"] and nm["guards"] == base["guards"]
+    np.testing.assert_allclose(nm["g"][:, 0], base["g"], atol=1e-9, rtol=0)

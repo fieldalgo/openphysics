@@ -359,3 +359,31 @@ def test_unwhitenable_candidate_of_a_tracked_rank_fails_instead_of_being_dropped
     with pytest.raises(ModeTrackingError, match="candidate cluster at ranks 1-2: .*rank deficient"):
         tracker.step(neff, degenerate, "collapsed")
     assert tracker.previous is state
+
+
+def test_coarse_samples_cannot_see_an_excursion_between_them(mesh, basis):
+    """Documented non-guarantee: equal endpoint spans pass even if the span leaves in between.
+
+    The tracked direction rotates fully into an orthogonal one and back between two
+    samples. Sampling only the endpoints reports a perfect match; refining the
+    sampling exposes the excursion and the tracker refuses.
+    """
+    metric = ElectricMetric(mesh)
+    orthonormal = columns(basis, whiten(metric.product(basis, basis))[0])
+    neff = np.array([2.0, 1.9])
+
+    def sample(t):
+        angle = 0.5 * np.pi * np.sin(np.pi * t)      # 0 at t = 0 and 1, pi/2 at t = 0.5
+        mix = np.zeros((8, 2))
+        mix[0, 0], mix[5, 0] = np.cos(angle), np.sin(angle)
+        mix[1, 1] = 1.0
+        return columns(orthonormal, mix)
+
+    coarse = SubspaceTracker(mesh, 1, _settings(1))
+    coarse.step(neff, sample(0.0), "t=0")
+    _, _, _, _, evidence = coarse.step(neff, sample(1.0), "t=1")
+    assert evidence["clusters"][0]["min_principal_squared"] == pytest.approx(1.0)
+    fine = SubspaceTracker(mesh, 1, _settings(1))
+    with pytest.raises(ModeTrackingError, match="weakest principal value squared"):
+        for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+            fine.step(neff, sample(t), f"t={t}")
