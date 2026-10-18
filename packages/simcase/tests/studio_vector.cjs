@@ -230,3 +230,10 @@ test('a failed cluster run clears the previous cluster display', async () => {
   assert.equal(p.element('status').textContent, 'run failed');
   assert(p.element('log').children.some(line => line.textContent.includes(message)));
 });
+
+test('circles on a hidden zero-size canvas do not throw', () => {
+  const p = page();
+  // Browsers reject a negative arc radius; a zero-size canvas gives a negative scale.
+  p.run(`const strict = { beginPath() {}, arc(x, y, r) { if (r < 0) throw new RangeError('negative radius ' + r); } };
+    shapePath(strict, { type: 'circle', cx: 0, cy: 0, r: 4 }, transformFor({ xmin: -20, xmax: 20, ymin: -20, ymax: 20 }, 0, 0));`);
+});
