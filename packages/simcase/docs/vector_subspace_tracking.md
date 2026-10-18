@@ -7,7 +7,7 @@ The default vector sweep tracker (`electric-l2-assignment-v1`, see the
 modes and rejects near-degenerate partners such as the two HE11 polarizations of
 a circular fiber. `electric-l2-subspace-v1` is an explicit opt-in that tracks the
 **span** of an isolated cluster of nearby modes instead. It is available through
-Python and the CLI. Studio rejects it until a cluster view exists.
+Python, the CLI and Studio.
 
 ```bash
 python -m simcase example vector_fiber_subspace_sweep > fiber_pair.json
@@ -115,6 +115,18 @@ layout cannot misread raw member columns as branches.
 `cluster_mean_group_index` and `mode_tracking_json`. `save_fields=false` omits
 the file. `save` and the CLI refuse an existing output path so new metadata is
 never mixed with fields from an earlier run.
+
+## Studio
+
+Studio shows a cluster selector ("cluster 1 (rank 2)") instead of branches. The
+field view draws the normalized subspace field density and reports the n_eff
+band, mean, mean-index derivative and the smallest squared principal value at
+the selected wavelength. The sweep chart plots cluster mean n_eff. The table
+lists the mean n_eff, band width and mean-index n_g per cluster; no member group
+index is shown. The HTTP result carries a separate `subspace` object with
+`field_representation="vector-subspace-edge-nodal-v1"`; `neff` and
+`group_index` are null, so the branch views cannot display it. The page refuses
+any other layout version, and a failed run clears the previous display.
 
 ## Limits
 

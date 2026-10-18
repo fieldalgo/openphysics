@@ -130,7 +130,7 @@ CAVITY_BOX = {
 EXAMPLES["cavity_box"] = CAVITY_BOX
 
 # Opt-in subspace tracking of the isolated HE11 polarization pair. The next
-# guided family (TE01/TM01/HE21) is the observed lower guard. Python/CLI only.
+# guided family (TE01/TM01/HE21) is the observed lower guard.
 VECTOR_FIBER_SUBSPACE_SWEEP = copy.deepcopy(VECTOR_FIBER)
 VECTOR_FIBER_SUBSPACE_SWEEP["name"] = "step-index fiber, HE11 pair subspace wavelength sweep"
 VECTOR_FIBER_SUBSPACE_SWEEP["physics"]["em1"]["num_modes"] = 2

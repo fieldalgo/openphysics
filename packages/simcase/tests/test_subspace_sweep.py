@@ -167,16 +167,30 @@ def test_cli_writes_results_and_refuses_existing_or_failed_output(tmp_path, caps
     assert not (tmp_path / "bad").exists()
 
 
-def test_studio_rejects_the_opt_in_method():
+def test_studio_returns_a_versioned_cluster_payload(result):
     pytest.importorskip("fastapi")
+    import time
     from fastapi.testclient import TestClient
     from simcase.studio.server import app
 
     client = TestClient(app)
-    doc = copy.deepcopy(examples.VECTOR_FIBER_SUBSPACE_SWEEP)
-    assert "vector_fiber_subspace_sweep" not in client.get("/api/examples").json()["examples"]
-    assert client.get("/api/examples/vector_fiber_subspace_sweep").status_code == 400
-    check = client.post("/api/validate", json={"doc": doc}).json()
-    assert check["ok"] is False and "electric-l2-subspace-v1" in check["error"]
-    response = client.post("/api/run", json={"doc": doc})
-    assert response.status_code == 400 and "Studio does not display cluster results" in response.json()["detail"]
+    assert "vector_fiber_subspace_sweep" in client.get("/api/examples").json()["examples"]
+    doc = client.get("/api/examples/vector_fiber_subspace_sweep").json()
+    assert client.post("/api/validate", json={"doc": doc}).json()["ok"] is True
+    job = client.post("/api/run", json={"doc": doc}).json()["job"]
+    for _ in range(600):
+        status = client.get(f"/api/jobs/{job}").json()["status"]
+        if status in ("done", "error"):
+            break
+        time.sleep(0.1)
+    assert status == "done"
+    payload = client.get(f"/api/jobs/{job}/result").json()
+    assert payload["neff"] is None and payload["group_index"] is None and "vector_fields" not in payload
+    sub = payload["subspace"]
+    assert sub["field_representation"] == payload["summary"]["field_representation"] == "vector-subspace-edge-nodal-v1"
+    assert sub["clusters"] == [{"id": 1, "rank": 2, "columns": [0, 2]}]
+    np.testing.assert_allclose(sub["cluster_mean_group_index"], result.cluster_mean_group_index())
+    density = np.array(sub["density"])
+    assert density.shape == (5, 1, len(result.mesh_triangles))
+    np.testing.assert_allclose(density[2, 0], result.subspace_density(2, 1))
+    assert np.allclose(density.max(axis=2), 1.0)
