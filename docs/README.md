@@ -27,6 +27,7 @@ English is the repository default. READMEs and contribution/security entry point
 | Transient heat to quasistatic mechanics | [Stored-index API and independent gates](../packages/galerkin/docs/transient_thermal_mechanical.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
 | 3D PEC cavity engine | [API, units and convergence](../packages/galerkin/docs/cavity_solver.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/cavity_solver.md) |
 | Cavity document and CLI | [Input and saved fields](../packages/simcase/docs/cavity3d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
+| Vector subspace tracking | [Opt-in cluster sweeps](../packages/simcase/docs/vector_subspace_tracking.md) | [한국어](../packages/simcase/docs/locales/ko/pages/vector_subspace_tracking.md) |
 | Complex vector eigenspaces | [Preservation and limits](../packages/galerkin/docs/eigenspace_reliability.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
 | Static elasticity | [Plane models and constraints](../packages/galerkin/docs/elasticity2d.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity2d.md) |
 | Elasticity acceptance | [Independent continuum checks](../packages/galerkin/docs/elasticity2d_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity2d_independent_validation.md) |

@@ -58,7 +58,9 @@ def index():
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
-                               if all(p.get("type") == "em.modes2d" for p in data["physics"].values()))}
+                               if all(p.get("type") == "em.modes2d" for p in data["physics"].values())
+                               and data.get("study", {}).get("tracking", {}).get("method")
+                               != "electric-l2-subspace-v1")}
 
 
 @app.get("/api/examples/{name}")
@@ -102,11 +104,19 @@ def _headless_thermal_type(doc: Document):
                  if p.get("type") in ("thermal.steady2d", "thermal.transient2d")), None)
 
 
+def _subspace_tracking_requested(doc: Document) -> bool:
+    tracking = doc["study"].get("tracking")
+    return isinstance(tracking, dict) and tracking.get("method") == "electric-l2-subspace-v1"
+
+
 def _require_studio_physics(doc: Document):
     if physics_type := _headless_thermal_type(doc):
         raise HTTPException(400, f'{physics_type} is headless Python/CLI only; Studio does not support heat input or results')
     if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
+    if _subspace_tracking_requested(doc):
+        raise HTTPException(400, "study.tracking.method electric-l2-subspace-v1 is available through Python and "
+                                 "the CLI; Studio does not display cluster results yet")
 
 
 @app.post("/api/validate")
@@ -115,6 +125,9 @@ def validate(body: DocBody):
         doc = Document.from_dict(body.doc)
         if physics_type := _headless_thermal_type(doc):
             return {'ok': False, 'error': f'Studio unsupported: {physics_type} is headless Python/CLI only'}
+        if _subspace_tracking_requested(doc):
+            return {"ok": False, "error": "Studio unsupported: study.tracking.method electric-l2-subspace-v1 is "
+                                          "Python/CLI only"}
     except DocumentError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes}

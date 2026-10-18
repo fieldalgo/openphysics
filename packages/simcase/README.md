@@ -211,10 +211,10 @@ overlap is weak, assignment is ambiguous, or a selected candidate has a
 near-degenerate partner (including an unselected candidate). A selected mode at
 the last rank of a saturated candidate search also fails: increase `search_modes`
 to check for an unseen partner. The search is bounded, not an exhaustive spectral
-proof. Degenerate-subspace transport and continuation through cutoff are not
-implemented. For example, the fiber's two HE11 partners are intentionally
-rejected by the default tracker even when only one is requested; inspect them
-with independent single studies.
+proof. Continuation through cutoff is not implemented. The fiber's two HE11
+partners are intentionally rejected by the default tracker even when only one
+is requested; inspect them with independent single studies, or track their
+span with the opt-in [subspace method](docs/vector_subspace_tracking.md).
 
 Tracking failures identify the wavelength, reason and a next action. Numerical
 solver failures retain the wavelength and underlying reason. The CLI exits

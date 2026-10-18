@@ -1,0 +1,80 @@
+{
+  "openphysics": "0.2",
+  "name": "step-index fiber, HE11 pair subspace wavelength sweep",
+  "units": {
+    "length": "um"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": -20.0,
+      "xmax": 20.0,
+      "ymin": -20.0,
+      "ymax": 20.0
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "core",
+        "type": "circle",
+        "cx": 0.0,
+        "cy": 0.0,
+        "r": 4.0,
+        "material": "core",
+        "mesh_size": 0.5
+      }
+    ]
+  },
+  "materials": {
+    "core": {
+      "n": 1.45
+    },
+    "clad": {
+      "n": 1.44
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "wavelength": 1.55,
+      "num_modes": 2,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      },
+      "n_cladding": 1.44
+    }
+  },
+  "mesh": {
+    "size": 3.0,
+    "grading": {
+      "center": [
+        0.0,
+        0.0
+      ],
+      "near": 0.5,
+      "far": 3.0,
+      "distance": 12.0
+    }
+  },
+  "study": {
+    "type": "sweep",
+    "parameter": "physics.em1.wavelength",
+    "values": [
+      1.5,
+      1.525,
+      1.55,
+      1.575,
+      1.6
+    ],
+    "tracking": {
+      "method": "electric-l2-subspace-v1",
+      "cluster_span_max": 0.0001,
+      "external_gap_min": 0.001
+    }
+  }
+}
