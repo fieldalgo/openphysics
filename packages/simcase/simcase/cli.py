@@ -44,7 +44,9 @@ def main(argv=None) -> int:
     from .thermal import is_thermal, require_fresh_output
     from .transient_thermal_contract import is_transient_thermal
     tracking = doc["study"].get("tracking") if "study" in doc.data else None
-    if isinstance(tracking, dict) and tracking.get("method") == "electric-l2-subspace-v1" and os.path.lexists(out):
+    subspace = (isinstance(tracking, dict) and tracking.get("method") == "electric-l2-subspace-v1"
+                and doc["study"].get("type") == "sweep")
+    if subspace and os.path.lexists(out):
         print(f"error: subspace sweep output already exists: {out}; choose a fresh output directory", file=sys.stderr)
         return 1
     if is_thermal(doc.data) or is_transient_thermal(doc.data):

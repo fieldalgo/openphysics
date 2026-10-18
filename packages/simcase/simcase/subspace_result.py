@@ -13,6 +13,8 @@ from __future__ import annotations
 import copy
 import json
 import os
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -125,12 +127,28 @@ class SubspaceSweepResult(RunResult):
         """Write into a fresh directory; an existing path is refused.
 
         A fresh directory guarantees that new metadata is never combined with
-        stale fields from an earlier run.
+        stale fields from an earlier run. Files are written to a hidden staging
+        directory beside the target and renamed into place only when all of
+        them succeeded, so a failed save leaves no partial result that would
+        block a retry. The existence check and the rename are not one atomic
+        step; concurrent writers to the same path are not supported.
         """
         outdir = Path(outdir)
         if os.path.lexists(outdir):
             raise FileExistsError(f"subspace sweep output already exists: {outdir}; choose a fresh output directory")
-        outdir.mkdir(parents=True, exist_ok=False)
+        outdir.parent.mkdir(parents=True, exist_ok=True)
+        stage = Path(tempfile.mkdtemp(prefix=f".{outdir.name}.partial-", dir=outdir.parent))
+        try:
+            self._write(stage)
+            if os.path.lexists(outdir):
+                raise FileExistsError(f"subspace sweep output appeared during save: {outdir}")
+            os.rename(stage, outdir)
+        except BaseException:
+            shutil.rmtree(stage, ignore_errors=True)
+            raise
+        return outdir
+
+    def _write(self, outdir: Path) -> None:
         (outdir / "summary.json").write_text(json.dumps(self.summary(), indent=2, allow_nan=False),
                                              encoding="utf-8")
         (outdir / "log.txt").write_text("\n".join(self.log) + "\n", encoding="utf-8")
@@ -153,7 +171,6 @@ class SubspaceSweepResult(RunResult):
             np.savez_compressed(outdir / "fields.npz", **arrays)
         if self.doc["results"].get("plots", True):
             self.plot(outdir / "results.png")
-        return outdir
 
     def plot(self, path: str | Path) -> None:
         import matplotlib

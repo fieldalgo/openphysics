@@ -219,3 +219,23 @@ def test_raw_eigenpairs_satisfy_the_original_pencil_and_rotated_mixtures_do_not(
                                     solved["neff"], columns(solved["vector_field"], mix))
     assert base.max() < 1e-10
     assert mixed[1:3].min() > 1e6 * base.max()
+
+
+def test_failed_save_leaves_no_partial_output(result, tmp_path, monkeypatch):
+    def broken_plot(path):
+        raise RuntimeError("plot failed")
+    monkeypatch.setattr(result, "plot", broken_plot)
+    with pytest.raises(RuntimeError, match="plot failed"):
+        result.save(tmp_path / "out")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_cli_fresh_output_rule_applies_only_to_subspace_sweeps(tmp_path, capsys):
+    d = copy.deepcopy(examples.VECTOR_FIBER_SUBSPACE_SWEEP)
+    d["study"] = {"type": "single", "tracking": d["study"]["tracking"]}
+    d["results"] = {"save_fields": False, "plots": False}
+    model = tmp_path / "single.json"
+    Document.from_dict(d).save(model)
+    output = tmp_path / "out"
+    output.mkdir()
+    assert main(["run", str(model), "-q", "-o", str(output)]) == 0

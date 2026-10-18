@@ -125,8 +125,10 @@ about the members' relative eigenvalue spread, for example 2e-6 inside the
 example's HE11 pair and 3e-3 when an HE11 member is mixed with TE01.
 
 The evidence field `sin_max_angle` is computed from the projection residual
-`Q - P (P^H W Q)` rather than `sqrt(1 - sigma^2)`, so small angles keep their
-accuracy.
+`Q - P (P^H W Q)` rather than `sqrt(1 - sigma^2)`, avoiding cancellation at
+small angles. Its accuracy is still limited by the frames' orthonormality
+defect delta, to about sqrt(delta): near 1e-8 for typical clusters and about
+1e-4 near the Gram condition limit.
 
 ## Studio
 

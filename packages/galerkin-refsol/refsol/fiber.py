@@ -283,8 +283,7 @@ def vector_group_index(a: float, n1: float, n2: float, wavelength: float, label:
     Raises ValueError near cutoff, near a Bessel pole of the residual, or when
     the implicit derivative is ill conditioned.
     """
-    l_needed = int(label[2]) if label[:2] in ("HE", "EH") else 1
-    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, l_needed))
+    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
                  if md.label == label), None)
     if mode is None:
         raise ValueError(f"{label} is not guided at wavelength {wavelength}")
@@ -388,5 +387,10 @@ def vector_mode_field(a: float, n1: float, n2: float, wavelength: float, label: 
 
 
 def mode_l(label: str) -> int:
-    """Azimuthal order of a vector mode label (TE/TM -> 0)."""
+    """Azimuthal order of a vector mode label such as HE11, EH21, TE01 (TE/TM -> 0).
+
+    Labels carry single-digit l and m, as produced by vector_modes.
+    """
+    if len(label) != 4 or label[:2] not in ("HE", "EH", "TE", "TM") or not label[2:].isdigit():
+        raise ValueError(f"malformed vector mode label {label!r}")
     return 0 if label[:2] in ("TE", "TM") else int(label[2])
