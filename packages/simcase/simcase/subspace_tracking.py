@@ -137,7 +137,7 @@ def partition(neff: np.ndarray, span_max: float) -> list[tuple[int, int]]:
     return bounds
 
 
-def _component_evidence(neff, component, components, saturated, settings):
+def _component_evidence(neff, component, saturated, settings):
     """Span, isolation and lower-guard evidence of one component, plus failures."""
     start, stop = component
     span = float(neff[start] - neff[stop - 1])
@@ -152,7 +152,8 @@ def _component_evidence(neff, component, components, saturated, settings):
             problems.append(f"{side} gap {gap:.6g} is not above external_gap_min "
                             f"{settings['external_gap_min']:g} (ambiguous isolation)")
     if lower is None:
-        why = "the candidate budget is exhausted" if saturated else "no lower guided candidate was found"
+        why = ("the candidate budget is exhausted" if saturated else
+               "no lower guided candidate was found within the search (the mesh may also cap the candidate count)")
         problems.append(f"no observed lower guard candidate ({why}; search boundary unresolved)")
     evidence = dict(candidate_ranks=list(range(start + 1, stop + 1)), rank=stop - start, span=span,
                     upper_gap=upper, lower_gap=lower, lower_guard_rank=stop + 1 if lower is not None else None)
@@ -324,14 +325,14 @@ class SubspaceTracker:
         saturated = count >= settings["search_modes"]
         components = partition(neff, settings["cluster_span_max"])
         if self.previous is None:
-            chosen = self._seed(neff, components, saturated, location)
+            chosen = self._seed(neff, components, location)
             scores = margins = principal = None
         else:
             chosen, scores, margins, principal = self._match(neff, field, components, saturated, location)
 
         raw_parts, transforms, frames, cluster_evidence = [], [], [], []
         for n, (start, stop) in enumerate(chosen):
-            evidence, problems = _component_evidence(neff, (start, stop), components, saturated, settings)
+            evidence, problems = _component_evidence(neff, (start, stop), saturated, settings)
             if problems:
                 self._fail(location, f"cluster {n + 1} (candidate ranks {start + 1}-{stop}): " + "; ".join(problems),
                            "adjust cluster_span_max/external_gap_min, increase search_modes or narrow the interval")
@@ -371,7 +372,7 @@ class SubspaceTracker:
                         candidate_ranks=(selected + 1).tolist(), clusters=cluster_evidence)
         return neff[selected], raw_field, block, offsets, evidence
 
-    def _seed(self, neff, components, saturated, location):
+    def _seed(self, neff, components, location):
         target = self.num_modes
         if len(neff) < target:
             self._fail(location, f"requested {target} vectors, found only {len(neff)} guided candidates "
@@ -396,8 +397,11 @@ class SubspaceTracker:
             raw = columns(field, np.eye(field.transverse.shape[1])[:, start:stop])
             try:
                 inverse_root, whitening = whiten(self.metric.product(raw, raw))
-            except ValueError:
-                continue                 # an unusable candidate cannot be a match
+            except ValueError as exc:
+                # A candidate of a tracked rank that cannot be whitened might be the true
+                # continuation; dropping it would hide that from the assignment and margins.
+                self._fail(location, f"candidate cluster at ranks {start + 1}-{stop}: {exc}",
+                           "check the mesh and solved fields")
             candidates.append(((start, stop), columns(raw, inverse_root), whitening["orthonormal_defect"]))
         observed = [b - a for a, b in components]
         if not candidates:

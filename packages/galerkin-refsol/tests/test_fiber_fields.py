@@ -82,3 +82,9 @@ def test_single_polarization_and_unguided_requests_are_refused():
         fiber.vector_mode_field(A, N1, N2, WL, "TE01", [1.0], [0.0], 1)
     with pytest.raises(ValueError, match="not guided"):
         fiber.vector_mode_field(A, N1, N2, WL, "EH11", [1.0], [0.0])
+
+
+@pytest.mark.parametrize("label", ["HE", "HE1", "XY11", "HE1a"])
+def test_malformed_labels_are_refused(label):
+    with pytest.raises(ValueError, match="malformed"):
+        fiber.mode_l(label)

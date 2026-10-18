@@ -348,3 +348,14 @@ def test_projection_residual_angle_is_accurate_where_one_minus_cosine_cancels(me
         assert projection_sin_max_angle(metric, previous, current, cross) == pytest.approx(np.sin(angle), rel=1e-6)
     naive = np.sqrt(max(0.0, 1 - principal_values(cross)[0][-1]))
     assert abs(naive - np.sin(1e-9)) > 1e-9          # the cancelling formula is wrong at this angle
+
+
+def test_unwhitenable_candidate_of_a_tracked_rank_fails_instead_of_being_dropped(mesh, basis):
+    neff = np.array([2.0, 2.0 - 2e-5, 1.9, 1.8])
+    tracker = SubspaceTracker(mesh, 2, _settings(2))
+    tracker.step(neff, columns(basis, np.eye(8)[:, :4]), "seed")
+    state = tracker.previous
+    degenerate = columns(basis, np.eye(8)[:, [0, 0, 2, 3]])         # the pair collapses to one direction
+    with pytest.raises(ModeTrackingError, match="candidate cluster at ranks 1-2: .*rank deficient"):
+        tracker.step(neff, degenerate, "collapsed")
+    assert tracker.previous is state
