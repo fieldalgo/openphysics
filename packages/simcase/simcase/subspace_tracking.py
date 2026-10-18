@@ -39,13 +39,23 @@ SUBSPACE_METHOD = "electric-l2-subspace-v1"
 METHODS = (ASSIGNMENT_METHOD, SUBSPACE_METHOD)
 
 # Numerical guards for the small Gram matrices. They detect rank loss and
-# metric failure; they are not physical accuracy claims. A Gram condition number
-# above GRAM_CONDITION_MAX would amplify roundoff in the whitened frame by about
-# that factor, so such a cluster is refused instead of reduced or pseudo-inverted.
+# metric failure; they are not physical accuracy claims.
+#
+# Whitening H = G^(-1/2) by a Hermitian eigendecomposition is backward stable,
+# so the orthonormality defect of Q = U H grows like (machine epsilon) x cond(G)
+# times a small dimension factor. GRAM_CONDITION_MAX = 1e8 keeps that defect
+# near 1e-8 and refuses worse clusters instead of reducing or pseudo-inverting
+# them; ORTHONORMAL_DEFECT_MAX is the matching measured check (a cluster near
+# the condition limit may be refused by either). The Gram matrix itself is a
+# sum of sparse products with relative roundoff far below HERMITIAN_DEFECT_MAX.
+# Principal values may exceed one only through the measured defects of the two
+# frames: with spectral defects e_P, e_Q <= rank x max-entry defect,
+# sigma_max^2 <= (1 + e_P)(1 + e_Q). principal_values() accepts that bound plus
+# SINGULAR_ROUNDOFF and refuses anything larger.
 GRAM_CONDITION_MAX = 1e8
 HERMITIAN_DEFECT_MAX = 1e-10      # relative Frobenius defect of G - G^H
 ORTHONORMAL_DEFECT_MAX = 1e-8     # max |Q^H W Q - I| after whitening
-SINGULAR_EXCURSION_MAX = 1e-8     # tolerated roundoff of sigma^2 above one
+SINGULAR_ROUNDOFF = 1e-12         # SVD/product roundoff allowance on sigma^2
 
 _FORBIDDEN = -1e6                 # assignment cost of a rank-mismatched pair
 
@@ -202,20 +212,43 @@ def whiten(gram: np.ndarray) -> tuple[np.ndarray, dict]:
                               orthonormal_defect=orthonormal_defect)
 
 
-def principal_values(cross: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def excursion_bound(rank: int, defect_previous: float, defect_current: float) -> float:
+    """Largest roundoff excursion of sigma^2 above one implied by measured frame defects."""
+    return (1 + rank * defect_previous) * (1 + rank * defect_current) - 1 + SINGULAR_ROUNDOFF
+
+
+def principal_values(cross: np.ndarray, excursion_max: float = SINGULAR_ROUNDOFF
+                     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """SVD of the whitened cross Gram P^H W Q = L diag(sigma) V^H.
 
     Returns (sigma^2 descending, L, V^H). sigma are the cosines of principal
     angles. Roundoff excursions above one are clipped only within
-    SINGULAR_EXCURSION_MAX; larger ones indicate a metric or whitening failure.
+    ``excursion_max`` (see excursion_bound); larger ones indicate a metric or
+    whitening failure.
     """
     if not np.isfinite(cross).all():
         raise ValueError("non-finite cross Gram matrix")
     left, sigma, right_h = np.linalg.svd(cross)
     squared = sigma ** 2
-    if squared.size and squared.max() > 1 + SINGULAR_EXCURSION_MAX:
+    if squared.size and squared.max() > 1 + excursion_max:
         raise ValueError(f"principal value {squared.max():.12g} exceeds one: frames are not orthonormal")
     return np.clip(squared, 0.0, 1.0), left, right_h
+
+
+def projection_sin_max_angle(metric: ElectricMetric, previous: VectorField, current: VectorField,
+                             cross: np.ndarray) -> float:
+    """sin of the largest principal angle from the projection residual.
+
+    With orthonormal frames P and Q and C = P^H W Q, the residual R = Q - P C
+    satisfies R^H W R = I - C^H C, whose largest eigenvalue is sin^2(theta_max).
+    Forming R directly avoids the cancellation in sqrt(1 - sigma^2) at small
+    angles.
+    """
+    residual = VectorField(current.edges, current.transverse - previous.transverse @ cross,
+                           current.longitudinal - previous.longitudinal @ cross,
+                           current.electric - np.einsum("tmc,mk->tkc", previous.electric, cross))
+    gram = metric.product(residual, residual)
+    return float(math.sqrt(max(0.0, np.linalg.eigvalsh((gram + gram.conj().T) / 2)[-1])))
 
 
 def assign_clusters(scores: np.ndarray, allowed: np.ndarray):
@@ -262,6 +295,7 @@ class SubspaceTracker:
         self.settings = settings
         self.metric = ElectricMetric(mesh)
         self.previous: list[VectorField] | None = None      # one W-orthonormal frame per cluster
+        self.previous_defects: list[float] | None = None     # their measured orthonormality defects
         self.ranks: list[int] | None = None
 
     def _fail(self, location, reason, action):
@@ -303,12 +337,15 @@ class SubspaceTracker:
                            "adjust cluster_span_max/external_gap_min, increase search_modes or narrow the interval")
             raw, inverse_root, whitened, diagnostics = self._whitened(field, start, stop, location,
                                                                       f"cluster {n + 1}")
+            sin_max = None
             if self.previous is None:
                 rotation = np.eye(stop - start)       # seed orientation is arbitrary
             else:
                 cross = self.metric.product(self.previous[n], whitened)
-                _, left, right_h = principal_values(cross)
+                bound = excursion_bound(stop - start, self.previous_defects[n], diagnostics["orthonormal_defect"])
+                _, left, right_h = principal_values(cross, bound)
                 rotation = right_h.conj().T @ left.conj().T
+                sin_max = projection_sin_max_angle(self.metric, self.previous[n], whitened, cross)
             transform = inverse_root @ rotation
             raw_parts.append(raw)
             transforms.append(transform)
@@ -317,7 +354,7 @@ class SubspaceTracker:
             if principal is not None:
                 evidence.update(principal_squared=principal[n].tolist(), min_principal_squared=float(principal[n][-1]),
                                 score=scores[n], margin=margins[n],
-                                sin_max_angle=float(math.sqrt(max(0.0, 1.0 - principal[n][-1]))))
+                                sin_max_angle=sin_max)
             cluster_evidence.append(evidence)
 
         selected = np.concatenate([np.arange(a, b) for a, b in chosen])
@@ -328,6 +365,7 @@ class SubspaceTracker:
         raw_field = columns(field, np.eye(count)[:, selected])
         # commit only after every check passed
         self.previous = frames
+        self.previous_defects = [c["orthonormal_defect"] for c in cluster_evidence]
         self.ranks = [b - a for a, b in chosen]
         evidence = dict(candidate_count=count, saturated=bool(saturated),
                         candidate_ranks=(selected + 1).tolist(), clusters=cluster_evidence)
@@ -357,10 +395,10 @@ class SubspaceTracker:
                 continue
             raw = columns(field, np.eye(field.transverse.shape[1])[:, start:stop])
             try:
-                inverse_root, _ = whiten(self.metric.product(raw, raw))
+                inverse_root, whitening = whiten(self.metric.product(raw, raw))
             except ValueError:
                 continue                 # an unusable candidate cannot be a match
-            candidates.append(((start, stop), columns(raw, inverse_root)))
+            candidates.append(((start, stop), columns(raw, inverse_root), whitening["orthonormal_defect"]))
         observed = [b - a for a, b in components]
         if not candidates:
             self._fail(location, f"no candidate cluster has a tracked rank {self.ranks} (observed component ranks "
@@ -369,11 +407,12 @@ class SubspaceTracker:
         allowed = np.zeros_like(scores, dtype=bool)
         spectra = {}
         for i, frame in enumerate(self.previous):
-            for j, ((start, stop), whitened) in enumerate(candidates):
+            for j, ((start, stop), whitened, defect) in enumerate(candidates):
                 if stop - start != self.ranks[i]:
                     continue
+                bound = excursion_bound(stop - start, self.previous_defects[i], defect)
                 try:
-                    squared, _, _ = principal_values(self.metric.product(frame, whitened))
+                    squared, _, _ = principal_values(self.metric.product(frame, whitened), bound)
                 except ValueError as exc:
                     self._fail(location, f"cluster {i + 1}: {exc}", "check the mesh and solved fields")
                 scores[i, j] = squared.mean()

@@ -14,7 +14,8 @@ import pytest
 from galerkin import EdgeSpace, eval_edge_field, rectangle_mesh
 from simcase.fields import VectorField
 from simcase.subspace_tracking import (ElectricMetric, SUBSPACE_METHOD, SubspaceTracker, assign_clusters,
-                                       columns, partition, principal_values, subspace_settings, whiten)
+                                       columns, partition, principal_values, projection_sin_max_angle,
+                                       subspace_settings, whiten)
 from simcase.tracking import ModeTracker, ModeTrackingError, tracking_settings
 
 SETTINGS = dict(method=SUBSPACE_METHOD, cluster_span_max=1e-4, external_gap_min=1e-3)
@@ -156,7 +157,14 @@ def test_worst_direction_rejects_a_lost_direction_despite_high_mean():
 def test_principal_values_refuse_large_excursions_above_one():
     with pytest.raises(ValueError, match="exceeds one"):
         principal_values(np.array([[1.01]]))
-    np.testing.assert_array_equal(principal_values(np.array([[1 + 1e-12]]))[0], [1.0])
+    np.testing.assert_array_equal(principal_values(np.array([[1 + 1e-13]]))[0], [1.0])
+    # Measured frame defects widen the allowance exactly as the norm bound implies.
+    from simcase.subspace_tracking import excursion_bound
+    bound = excursion_bound(2, 1e-9, 2e-9)
+    assert bound == pytest.approx((1 + 2e-9) * (1 + 4e-9) - 1 + 1e-12)
+    principal_values(np.array([[np.sqrt(1 + 0.9 * bound)]]), bound)
+    with pytest.raises(ValueError, match="exceeds one"):
+        principal_values(np.array([[np.sqrt(1 + 1.1 * bound)]]), bound)
 
 
 # -- assignment ----------------------------------------------------------------
@@ -324,3 +332,19 @@ def test_equal_rank_swap_is_followed_and_ambiguity_is_refused(mesh, basis):
     blend[:2, :2] = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
     with pytest.raises(ModeTrackingError, match="ambiguous assignment margin"):
         tracker.step(neff, columns(orthonormal, blend), "blend")
+
+
+def test_projection_residual_angle_is_accurate_where_one_minus_cosine_cancels(mesh, basis):
+    """A known tiny rotation out of the span: sqrt(1 - sigma^2) loses it, the residual does not."""
+    metric = ElectricMetric(mesh)
+    orthonormal = columns(basis, whiten(metric.product(basis, basis))[0])
+    previous = columns(orthonormal, np.eye(8)[:, :2])
+    for angle in (1e-3, 1e-6, 1e-9):
+        mix = np.zeros((8, 2))
+        mix[0, 0] = mix[1, 1] = 1.0
+        mix[0, 0], mix[5, 0] = np.cos(angle), np.sin(angle)
+        current = columns(orthonormal, mix)
+        cross = metric.product(previous, current)
+        assert projection_sin_max_angle(metric, previous, current, cross) == pytest.approx(np.sin(angle), rel=1e-6)
+    naive = np.sqrt(max(0.0, 1 - principal_values(cross)[0][-1]))
+    assert abs(naive - np.sin(1e-9)) > 1e-9          # the cancelling formula is wrong at this angle
