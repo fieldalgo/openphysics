@@ -497,6 +497,28 @@ function drawMesh() {
 }
 
 // ------------------------------------------------------------------ results view
+const SUBSPACE_REPRESENTATION = 'vector-subspace-edge-nodal-v1';
+// Cluster results are shown only for the exact versioned layout; member columns are not branches.
+function subspaceOf(data) {
+  const sub = data?.subspace;
+  if (!sub) return null;
+  if (sub.field_representation !== SUBSPACE_REPRESENTATION || data.summary?.field_representation !== SUBSPACE_REPRESENTATION)
+    throw new Error(`unsupported cluster result layout ${sub.field_representation}`);
+  return sub;
+}
+function drawSubspaceField(sub, p, c) {
+  const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv);
+  const dom = doc.geometry.domain; const T = transformFor(dom, W, H), density = sub.density[p][c];
+  drawTriangles(ctx, T, resultData.nodes, resultData.triangles, t => cmap(density[t]), false);
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
+  drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
+  const cluster = sub.clusters[c], o = cluster.columns, band = sub.raw_neff[p].slice(o[0], o[1]);
+  const point = resultData.summary.mode_tracking.points[p].clusters[c];
+  const match = point.min_principal_squared === undefined ? ', seed point (arbitrary frame)' : `, smallest principal value² ${point.min_principal_squared.toFixed(4)}`;
+  $('resInfo').textContent = `${sub.density_label}, cluster ${cluster.id} (rank ${cluster.rank}) at ${studyLabel(resultData)} = ${resultData.values[p]}: ` +
+    `n_eff ${Math.min(...band).toFixed(6)} to ${Math.max(...band).toFixed(6)}, mean ${sub.cluster_mean_neff[p][c].toFixed(6)}, ` +
+    `mean-index derivative n_g ${sub.cluster_mean_group_index[p][c].toFixed(4)}${match} (not energy density or a polarized mode)`;
+}
 function vectorMagnitudes(field, mode, component) {
   const re = field.real[mode], im = field.imag[mode];
   return re.map((v, t) => component === 'magnitude'
@@ -508,6 +530,8 @@ function drawField() {
   const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv); ctx.clearRect(0, 0, W, H);
   if (!resultData || !doc) return;
   const p = +$('ptSel').value || 0, m = +$('modeSel').value || 0;
+  const sub = subspaceOf(resultData);
+  if (sub) { drawSubspaceField(sub, p, m); return; }
   const vector = resultData.vector_fields?.[p], component = $('componentSel').value || 'magnitude';
   const f = vector ? vectorMagnitudes(vector, m, component) : resultData.fields[p][m];
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
@@ -532,7 +556,8 @@ function drawSweep() {
   if (thermalController?.result() && thermalSupported()) return;
   const cv = $('sweepCanvas'); const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
   if (!resultData) return;
-  const xs = resultData.values, ys = resultData.neff; const nm = ys[0].length;
+  const sub = subspaceOf(resultData);
+  const xs = resultData.values, ys = sub ? sub.cluster_mean_neff : resultData.neff; const nm = ys[0].length;
   if (xs.length < 2) { ctx.fillStyle = '#6b7280'; ctx.font = '12px system-ui'; ctx.fillText('single study point — see table', 20, 30); return; }
   const m = { l: 50, r: 16, t: 20, b: 34 };
   let ymin = Infinity, ymax = -Infinity; ys.forEach(r => r.forEach(v => { ymin = Math.min(ymin, v); ymax = Math.max(ymax, v); }));
@@ -542,7 +567,7 @@ function drawSweep() {
   ctx.fillStyle = '#6b7280'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
   ctx.fillText(studyLabel(resultData), W / 2, H - 8); ctx.fillText(xs[0], X(xs[0]), H - m.b + 14); ctx.fillText(xs[xs.length - 1], X(xs[xs.length - 1]), H - m.b + 14);
   ctx.textAlign = 'right'; ctx.fillText(ymin.toFixed(4), m.l - 4, Y(ymin) + 4); ctx.fillText(ymax.toFixed(4), m.l - 4, Y(ymax) + 4);
-  ctx.textAlign = 'left'; ctx.fillText('n_eff', m.l + 4, m.t - 6);
+  ctx.textAlign = 'left'; ctx.fillText(sub ? 'cluster mean n_eff' : 'n_eff', m.l + 4, m.t - 6);
   const palette = ['#2f6fed', '#e8590c', '#0b7a5a', '#8e44ad'];
   for (let j = 0; j < nm; j++) { ctx.strokeStyle = palette[j % 4]; ctx.fillStyle = palette[j % 4]; ctx.lineWidth = 1.5; ctx.beginPath();
     xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i][j])) : ctx.moveTo(X(x), Y(ys[i][j]))); ctx.stroke();
@@ -578,12 +603,24 @@ function fillResultTable() {
     $('ptSel').innerHTML = ''; $('modeSel').innerHTML = ''; $('componentSel').value = 'magnitude';
     $('resInfo').textContent = 'no results available'; return;
   }
+  const sub = subspaceOf(resultData);
+  if (sub) { fillSubspaceTable(sub); return; }
   const nm = resultData.neff[0].length, ng = resultData.group_index;
   const tracked = !!resultData.summary.mode_tracking, ngCount = ng ? (tracked ? nm : 1) : 0;
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
   resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
   if (tracked) h += '<div class="hint" style="margin:0 10px">Branch numbers follow the modes seeded at the first wavelength. Refine the wavelength spacing to check group-index accuracy.</div>';
+  const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
+  $('resTable').innerHTML = h;
+}
+function fillSubspaceTable(sub) {
+  const head = sub.clusters.map(c => `<th>mean n_eff cluster ${c.id} (rank ${c.rank})</th><th>band width ${c.id}</th><th>mean-index n_g ${c.id}</th>`).join('');
+  let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Cluster results"><table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + head + '</tr>';
+  resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + sub.clusters.map((c, j) => { const band = sub.raw_neff[i].slice(c.columns[0], c.columns[1]);
+    return `<td>${sub.cluster_mean_neff[i][j].toFixed(6)}</td><td>${(Math.max(...band) - Math.min(...band)).toExponential(2)}</td><td>${sub.cluster_mean_group_index[i][j].toFixed(4)}</td>`; }).join('') + '</tr>'; });
+  h += '</table></div>';
+  h += '<div class="hint" style="margin:0 10px">Clusters are tracked as subspaces (electric-l2-subspace-v1). Members inside a cluster are not tracked individually, so no member group index is shown; n_g is the derivative of the cluster mean index. Refine the wavelength spacing, mesh and candidate budget to check it.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
   $('resTable').innerHTML = h;
 }
@@ -595,7 +632,9 @@ function populateResultSelectors() {
   $('componentSel').value = 'magnitude';
   $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${studyLabel(resultData)} = ${v}</option>`).join('');
   $('ptSel').value = Math.floor(resultData.values.length / 2);
-  $('modeSel').innerHTML = resultData.neff[0].map((_, j) => `<option value="${j}">${resultData.summary.mode_tracking ? 'branch ' : ''}${j + 1}</option>`).join('');
+  const sub = subspaceOf(resultData);
+  $('modeSel').innerHTML = sub ? sub.clusters.map((c, j) => `<option value="${j}">cluster ${c.id} (rank ${c.rank})</option>`).join('')
+    : resultData.neff[0].map((_, j) => `<option value="${j}">${resultData.summary.mode_tracking ? 'branch ' : ''}${j + 1}</option>`).join('');
 }
 
 // ------------------------------------------------------------------ tree
@@ -819,6 +858,7 @@ async function doRun() {
       if (j.status === 'done') { const data = await api.get(`/api/jobs/${job}/result`);
         if (revision !== documentRevision || currentJob !== job) return;
         if (isHeadlessThermalType(data.summary?.physics_type)) throw new Error('Studio cannot render headless thermal results');
+        subspaceOf(data);
         resultData = data; populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
       if (j.status === 'error') { log(j.error, 'err'); status('run failed'); break; } } }
   catch (e) { if (revision === documentRevision) { log('run failed: ' + e.message, 'err'); status('run failed'); } }

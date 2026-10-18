@@ -5,8 +5,7 @@
 기본 벡터 sweep 추적기(`electric-l2-assignment-v1`, [개요](overview.md) 참고)는 개별
 모드를 따라가며 원형 광섬유의 두 HE11 편광처럼 근축퇴 상대가 있으면 거절합니다.
 `electric-l2-subspace-v1`은 명시적으로 선택하는 방법으로, 가까운 모드들이 이루는 고립
-군집의 **span**을 추적합니다. Python과 CLI에서 쓸 수 있으며, 군집 화면이 생기기 전까지
-Studio는 이 방법을 거절합니다.
+군집의 **span**을 추적합니다. Python, CLI, Studio에서 쓸 수 있습니다.
 
 ```bash
 python -m simcase example vector_fiber_subspace_sweep > fiber_pair.json
@@ -98,6 +97,16 @@ Hermitian 양의 준정부호입니다. 시작 지점의 방향은 임의입니�
 (지점 x 벡터 x 벡터, 복소), `cluster_mean_neff`, `cluster_mean_group_index`,
 `mode_tracking_json`을 담습니다. `save_fields=false`이면 이 파일을 쓰지 않습니다. `save`와 CLI는
 이미 있는 출력 경로를 거절하므로 새 metadata가 이전 실행의 장과 섞이지 않습니다.
+
+## Studio
+
+Studio는 분지 대신 군집 선택("cluster 1 (rank 2)")을 보여 줍니다. 장 화면은 정규화 부분공간
+장 밀도를 그리고, 선택한 파장에서 n_eff 범위·평균·평균 굴절률 미분·가장 작은 주값 제곱을
+표시합니다. sweep 그래프는 군집 평균 n_eff를 그립니다. 표는 군집별 평균 n_eff, 범위 폭, 평균
+굴절률 n_g를 보여 주며 구성원 군굴절률은 표시하지 않습니다. HTTP 결과는
+`field_representation="vector-subspace-edge-nodal-v1"`인 별도 `subspace` 객체를 담고 `neff`와
+`group_index`는 null이므로 분지 화면이 이를 표시할 수 없습니다. 페이지는 다른 구성 버전을
+거절하며, 실행이 실패하면 이전 표시를 지웁니다.
 
 ## 한계
 

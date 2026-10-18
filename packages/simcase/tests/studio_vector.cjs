@@ -158,3 +158,75 @@ for (const failure of ['validation', 'tracking']) {
     assert.equal(p.run('resultData'), null);
   });
 }
+
+function subspaceSweep() {
+  const data = structuredClone(result);
+  delete data.vector_fields;
+  data.parameter = 'physics.em1.wavelength';
+  data.values = [1500, 1550, 1600];
+  data.neff = null; data.group_index = null; data.fields = [];
+  data.summary.field_representation = 'vector-subspace-edge-nodal-v1';
+  data.summary.mode_tracking = { method: 'electric-l2-subspace-v1', points: [
+    { clusters: [{ rank: 2 }] },
+    { clusters: [{ rank: 2, min_principal_squared: 0.9991 }] },
+    { clusters: [{ rank: 2, min_principal_squared: 0.9987 }] }] };
+  data.subspace = { field_representation: 'vector-subspace-edge-nodal-v1',
+    clusters: [{ id: 1, rank: 2, columns: [0, 2] }],
+    raw_neff: [[2.1, 2.09], [2.05, 2.04], [2.0, 1.99]],
+    cluster_mean_neff: [[2.095], [2.045], [1.995]],
+    cluster_mean_group_index: [[4.1], [4.2], [4.3]],
+    density: [[[1, 0.25]], [[0.5, 1]], [[1, 0.75]]],
+    density_label: 'normalized subspace field density' };
+  return data;
+}
+
+test('cluster sweeps show the invariant density and cluster statistics, not member branches', () => {
+  const p = page();
+  p.run(`resultData = ${JSON.stringify(subspaceSweep())}; populateResultSelectors();`);
+  assert.equal(p.element('componentLabel').hidden, true);
+  assert(p.element('modeSel').innerHTML.includes('cluster 1 (rank 2)'));
+  assert(!p.element('modeSel').innerHTML.includes('branch'));
+  p.element('ptSel').value = '1'; p.element('modeSel').value = '0';
+  p.run('drawField()');
+  assert.deepEqual(p.colors, [0.5, 1]);
+  const info = p.element('resInfo').textContent;
+  assert(info.includes('normalized subspace field density, cluster 1 (rank 2)'));
+  assert(info.includes('n_eff 2.040000 to 2.050000, mean 2.045000'));
+  assert(info.includes('mean-index derivative n_g 4.2000'));
+  assert(info.includes('smallest principal value² 0.9991'));
+  assert(info.includes('not energy density'));
+  p.element('ptSel').value = '0'; p.run('drawField()');
+  assert(p.element('resInfo').textContent.includes('seed point (arbitrary frame)'));
+});
+
+test('cluster table reports mean index, band width and mean-index group index only', () => {
+  const p = page();
+  p.run(`resultData = ${JSON.stringify(subspaceSweep())}; fillResultTable();`);
+  const table = p.element('resTable').innerHTML;
+  assert(table.includes('<th>mean n_eff cluster 1 (rank 2)</th><th>band width 1</th><th>mean-index n_g 1</th>'));
+  assert(table.includes('<td>1550</td><td>2.045000</td><td>1.00e-2</td><td>4.2000</td>'));
+  assert(!table.includes('branch'));
+  assert(table.includes('no member group index'));
+});
+
+test('an unknown cluster layout version is refused instead of displayed', () => {
+  const p = page(), data = subspaceSweep();
+  data.subspace.field_representation = 'vector-subspace-edge-nodal-v2';
+  assert.throws(() => p.run(`resultData = ${JSON.stringify(data)}; populateResultSelectors();`), /unsupported cluster result layout/);
+});
+
+test('a failed cluster run clears the previous cluster display', async () => {
+  const p = page();
+  p.run(`resultData = ${JSON.stringify(subspaceSweep())}; populateResultSelectors(); fillResultTable(); drawField();`);
+  const message = 'vector subspace sweep at wavelength 1600 nm: cluster 1 has weakest principal value squared 0.1';
+  p.run(`api.post = async () => ({job:'test-job'});
+    api.get = async url => { if (url.endsWith('/result')) throw new Error('failed jobs must not fetch a result');
+      return {status:'error', log:[], error:${JSON.stringify(message)}}; };`);
+  const running = p.run('doRun()');
+  assert.equal(p.run('resultData'), null);
+  assert.equal(p.element('resTable').innerHTML, '');
+  assert.equal(p.element('modeSel').innerHTML, '');
+  await running;
+  assert.equal(p.element('status').textContent, 'run failed');
+  assert(p.element('log').children.some(line => line.textContent.includes(message)));
+});
