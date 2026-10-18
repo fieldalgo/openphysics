@@ -125,9 +125,12 @@ never mixed with fields from an earlier run.
   2.1e-5, 6.4e-6 and 2.9e-6 at mesh scales 1, 2 and 3. The pre-registered
   gate is below 2e-4 at scale 2, decreasing at scale 3. Tracking TE01 and
   TM01 as separate singletons on the same fixture failed: the mesh resolves
-  their 9.6e-6 splitting only to about 1e-6. Domain, wavelength-step and
-  candidate-budget studies and an analytic field-space comparison are still
-  open.
+  their 9.6e-6 splitting only to about 1e-6. On the same HE11 case, enlarging
+  the domain to 8a or 10a changed the result by 1e-11. Halving or doubling the
+  wavelength step changed it exactly as the analytic stencil truncation
+  predicts (about 1e-7). A larger candidate budget and random rotations of the
+  solver's degenerate bases changed nothing beyond roundoff. An analytic
+  field-space comparison and other guides remain open.
 - Splitting, merging, rank changes, cutoff continuation, individual
   polarization labels and individual slopes inside a cluster are out of scope.
 - The candidate search is bounded. A guard shows only that something was
