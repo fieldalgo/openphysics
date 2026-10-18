@@ -18,6 +18,12 @@ only to about 1e-6); it is recorded in the issue and not encoded here.
 at scale 2, decreasing over scales 1-3 with observed order > 0.8 on the finest
 pair; the exact HE21 span is a negative control (sin theta_min > 0.9).
 
+#17 Sellmeier case: dispersive core and cladding (core 1 + 1.1 l^2/(l^2-0.01),
+cladding 0.993 x core) re-evaluated per wavelength on the fixed mesh: g_bar
+within 2e-4 of the exact dispersive n_g at scale 2 and smaller at scale 3; the
+FEM material-dispersion contribution (dispersive minus frozen indices) within
+2e-4 of the oracle's.
+
 #18 (scale 2): domain radius 8a changes g_bar by < 1e-6; a nonuniform grid is
 within 5e-6 of the uniform one and its reversal agrees to 1e-12; a larger
 candidate budget keeps ranks/guards and g_bar within 1e-9; random unitary
@@ -29,7 +35,7 @@ import numpy as np
 import pytest
 
 from refsol import fiber
-from subspace_fiber_fixture import A, N1, N2, centred, field_space_sin_angles, he11_sweep
+from subspace_fiber_fixture import A, N1, N2, centred, field_space_sin_angles, he11_sweep, sellmeier
 
 
 @pytest.fixture(scope="module")
@@ -91,3 +97,25 @@ def test_fem_he11_span_converges_to_the_exact_span_at_first_order():
 @pytest.mark.slow
 def test_field_space_negative_control():
     assert field_space_sin_angles(2, label="HE21").min() > 0.9
+
+
+@pytest.fixture(scope="module")
+def sellmeier_case():
+    n1, n2, dn1, dn2 = sellmeier(1.55)
+    exact = fiber.vector_group_index(A, n1, n2, 1.55, "HE11", dn1, dn2)[1]
+    frozen = fiber.vector_group_index(A, n1, n2, 1.55, "HE11")[1]
+    dispersive = he11_sweep(centred(0.01), materials=lambda wl: sellmeier(wl)[:2])["g"][2]
+    fem_frozen = he11_sweep(centred(0.01), materials=lambda wl: (n1, n2))["g"][2]
+    return dict(exact=exact, frozen=frozen, dispersive=dispersive, fem_frozen=fem_frozen)
+
+
+def test_dispersive_he11_cluster_group_index_meets_the_preregistered_budget(sellmeier_case):
+    c = sellmeier_case
+    assert abs(c["dispersive"] - c["exact"]) < 2e-4
+    assert abs((c["dispersive"] - c["fem_frozen"]) - (c["exact"] - c["frozen"])) < 2e-4
+
+
+@pytest.mark.slow
+def test_dispersive_he11_error_decreases_with_refinement(sellmeier_case):
+    fine = he11_sweep(centred(0.01), scale=3, materials=lambda wl: sellmeier(wl)[:2])["g"][2]
+    assert abs(fine - sellmeier_case["exact"]) < abs(sellmeier_case["dispersive"] - sellmeier_case["exact"])
