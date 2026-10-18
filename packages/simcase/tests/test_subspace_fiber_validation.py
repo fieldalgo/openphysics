@@ -13,6 +13,11 @@ smaller at scale 3. A first attempt that also tracked TE01 and TM01 as
 singletons failed at every scale (the mesh resolves their 9.6e-6 splitting
 only to about 1e-6); it is recorded in the issue and not encoded here.
 
+#17 item 2: the FEM HE11 eigenvector span approaches the exact HE11 span
+(two polarizations, electric L2 by degree-5 quadrature): sin(theta_max) < 0.05
+at scale 2, decreasing over scales 1-3 with observed order > 0.8 on the finest
+pair; the exact HE21 span is a negative control (sin theta_min > 0.9).
+
 #18 (scale 2): domain radius 8a changes g_bar by < 1e-6; a nonuniform grid is
 within 5e-6 of the uniform one and its reversal agrees to 1e-12; a larger
 candidate budget keeps ranks/guards and g_bar within 1e-9; random unitary
@@ -24,7 +29,7 @@ import numpy as np
 import pytest
 
 from refsol import fiber
-from subspace_fiber_fixture import A, N1, N2, centred, he11_sweep
+from subspace_fiber_fixture import A, N1, N2, centred, field_space_sin_angles, he11_sweep
 
 
 @pytest.fixture(scope="module")
@@ -70,3 +75,19 @@ def test_candidate_budget_and_solver_orientation_do_not_change_the_result(base):
     np.testing.assert_allclose(rotated["g"], base["g"], atol=1e-10, rtol=0)
     for a, b in zip(rotated["sigma2"][1:], base["sigma2"][1:]):
         np.testing.assert_allclose(a, b, atol=1e-10, rtol=0)
+
+
+def test_fem_he11_span_matches_the_exact_field_span():
+    assert field_space_sin_angles(2).max() < 0.05
+
+
+@pytest.mark.slow
+def test_fem_he11_span_converges_to_the_exact_span_at_first_order():
+    errors = [field_space_sin_angles(scale).max() for scale in (1, 2, 3)]
+    assert errors[0] > errors[1] > errors[2]
+    assert np.log(errors[1] / errors[2]) / np.log(1.5) > 0.8
+
+
+@pytest.mark.slow
+def test_field_space_negative_control():
+    assert field_space_sin_angles(2, label="HE21").min() > 0.9

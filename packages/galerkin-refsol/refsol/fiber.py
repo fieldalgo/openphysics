@@ -299,3 +299,94 @@ def vector_group_index(a: float, n1: float, n2: float, wavelength: float, label:
     if not np.isfinite(d["n"]) or abs(d["n"]) * mode.neff < 1e-8 * scale:
         raise ValueError(f"{label}: implicit derivative is ill conditioned (dF/dn = {d['n']:.3g})")
     return mode.neff, float(mode.neff + wavelength * total / d["n"])
+
+
+# --------------------------------------------------------------------------
+# Exact vector mode fields
+# --------------------------------------------------------------------------
+
+def _bessel_parts(l, U, W):
+    from scipy.special import kv
+    J, Jp = jv(l, U), 0.5 * (jv(l - 1, U) - jv(l + 1, U))
+    K, Kp = kv(l, W), -0.5 * (kv(l - 1, W) + kv(l + 1, W))
+    return J, Jp, K, Kp
+
+
+def _continuity_matrix(mode: Mode, a: float, n1: float, n2: float, wavelength: float) -> np.ndarray:
+    """Rows: tangential E_phi and H_phi jumps at r = a, columns: core (A, B) amplitudes.
+
+    Fields use E = (E_t + z E_z) exp(-i beta z), Maxwell in units c = mu0 = eps0 = 1
+    (omega = k0, mu = 1, eps = n^2), and the transverse relations
+        E_phi = (-i/kc^2) ((beta/r) dEz/dphi - k0 dHz/dr),
+        H_phi = (-i/kc^2) ((beta/r) dHz/dphi + k0 n^2 dEz/dr),
+    with kc^2 = k0^2 n^2 - beta^2 in each region. Core: Ez = A J_l(U r/a) cos(l phi + p),
+    Hz = B J_l(U r/a) sin(l phi + p); cladding: J_l(U) K_l(W r/a) / K_l(W) in place of
+    J_l(U r/a), so Ez and Hz are continuous by construction.
+    """
+    k0 = 2 * np.pi / wavelength
+    beta = k0 * mode.neff
+    l, U, W = mode.l, mode.u, mode.w
+    J, Jp, K, Kp = _bessel_parts(l, U, W)
+    u, w = U / a, W / a
+    # common factors at r = a; the angular factor sin(l phi + p) / cos(l phi + p) cancels
+    e_core = (-1j / u ** 2) * np.array([-beta * l * J / a, -k0 * u * Jp])
+    e_clad = (-1j / -w ** 2) * np.array([-beta * l * J / a, -k0 * w * Kp * J / K])
+    h_core = (-1j / u ** 2) * np.array([k0 * n1 ** 2 * u * Jp, beta * l * J / a])
+    h_clad = (-1j / -w ** 2) * np.array([k0 * n2 ** 2 * w * Kp * J / K, beta * l * J / a])
+    return np.array([e_core - e_clad, h_core - h_clad])
+
+
+def vector_mode_field(a: float, n1: float, n2: float, wavelength: float, label: str,
+                      x: np.ndarray, y: np.ndarray, polarization: int = 0) -> np.ndarray:
+    """Exact electric field (Ex, Ey, Ez) of a guided vector mode at points (x, y).
+
+    ``polarization`` 0 or 1 selects the angular phase p = 0 or pi/2 of the
+    degenerate +-l pair. TE/TM modes have one polarization (TE uses p = pi/2
+    so that Hz = B J_0 is nonzero, TM uses p = 0). The overall amplitude and
+    phase are arbitrary; the core amplitudes come from the null vector of the
+    tangential continuity conditions, whose singularity at the root is checked.
+    Returns complex array (len(x), 3); E_t is in quadrature with E_z for the
+    exp(-i beta z) convention used by galerkin.
+    """
+    from scipy.special import kv
+    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
+                 if md.label == label), None)
+    if mode is None:
+        raise ValueError(f"{label} is not guided at wavelength {wavelength}")
+    l, U, W = mode.l, mode.u, mode.w
+    if l == 0 and polarization:
+        raise ValueError(f"{label} has a single polarization")
+    k0 = 2 * np.pi / wavelength
+    beta = k0 * mode.neff
+    matrix = _continuity_matrix(mode, a, n1, n2, wavelength)
+    _, singular, vh = np.linalg.svd(matrix)
+    if singular[-1] > 1e-8 * singular[0]:
+        raise ValueError(f"{label}: continuity conditions are not singular at the root "
+                         f"({singular[-1] / singular[0]:.3g}); field convention mismatch")
+    A, B = vh[-1].conj()
+    J, _, K, _ = _bessel_parts(l, U, W)
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    r, phi = np.hypot(x, y), np.arctan2(y, x)
+    r = np.maximum(r, 1e-12 * a)
+    # For l = 0 the angular factors are constants: TM keeps Ez (p = 0), TE keeps Hz (p = pi/2).
+    p = 0.5 * np.pi * (polarization if l else int(label.startswith("TE")))
+    cos_, sin_ = np.cos(l * phi + p), np.sin(l * phi + p)
+    core = r < a
+    radial = np.where(core, U * r / a, W * r / a)
+    f = np.where(core, jv(l, radial), J * kv(l, radial) / K)
+    df = np.where(core, (U / a) * 0.5 * (jv(l - 1, radial) - jv(l + 1, radial)),
+                  (W / a) * J * -0.5 * (kv(l - 1, radial) + kv(l + 1, radial)) / K)
+    kc2 = np.where(core, (U / a) ** 2, -(W / a) ** 2)
+    Ez = A * f * cos_
+    dEz_dr, dEz_dphi = A * df * cos_, -l * A * f * sin_
+    dHz_dr, dHz_dphi = B * df * sin_, l * B * f * cos_
+    Er = (-1j / kc2) * (beta * dEz_dr + (k0 / r) * dHz_dphi)
+    Ephi = (-1j / kc2) * ((beta / r) * dEz_dphi - k0 * dHz_dr)
+    Ex = Er * np.cos(phi) - Ephi * np.sin(phi)
+    Ey = Er * np.sin(phi) + Ephi * np.cos(phi)
+    return np.stack([Ex, Ey, Ez], axis=-1)
+
+
+def mode_l(label: str) -> int:
+    """Azimuthal order of a vector mode label (TE/TM -> 0)."""
+    return 0 if label[:2] in ("TE", "TM") else int(label[2])
