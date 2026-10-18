@@ -130,6 +130,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/thermal_flux_robin_independent_oracle.py',
               'tests/test_thermal_flux_robin_independent_validation.py'),
  'galerkin-refsol': (
+              'tests/test_fiber_group_index.py',
               'refsol/transient_heat.py',
               'tests/test_transient_heat_reference.py',
               'refsol/thermoelastic_traction.py',
