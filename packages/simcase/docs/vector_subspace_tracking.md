@@ -118,10 +118,16 @@ never mixed with fields from an earlier run.
 
 ## Limits
 
-- Physical accuracy of the cluster mean group index has **not** yet been
-  validated against an independent vector-fiber field and dispersion-derivative
-  reference, or by mesh/domain/wavelength-step studies. The current tests check
-  the algebra, invariances, failure rules and data products.
+- Physical validation is narrow so far. On the symmetric polar fiber fixture
+  (a = 4 um, n1 = 1.45, n2 = 1.44, radius 6a, 1.53 to 1.57 um), the HE11 pair's
+  cluster mean-index derivative at 1.55 um differs from the exact vector group
+  index (implicit differentiation, `refsol.fiber.vector_group_index`) by
+  2.1e-5, 6.4e-6 and 2.9e-6 at mesh scales 1, 2 and 3. The pre-registered
+  gate is below 2e-4 at scale 2, decreasing at scale 3. Tracking TE01 and
+  TM01 as separate singletons on the same fixture failed: the mesh resolves
+  their 9.6e-6 splitting only to about 1e-6. Domain, wavelength-step and
+  candidate-budget studies and an analytic field-space comparison are still
+  open.
 - Splitting, merging, rank changes, cutoff continuation, individual
   polarization labels and individual slopes inside a cluster are out of scope.
 - The candidate search is bounded. A guard shows only that something was

@@ -390,7 +390,9 @@ class SubspaceTracker:
             if squared[-1] < self.settings["min_overlap"]:
                 self._fail(location, f"cluster {i + 1} has weakest principal value squared {squared[-1]:.6g} "
                            f"< min_overlap {self.settings['min_overlap']:g} (mean {squared.mean():.6g}; "
-                           "a direction was lost)", "reduce the wavelength step or expand search_modes")
+                           f"a direction was lost, or the partition changed: tracked ranks {self.ranks}, "
+                           f"observed component ranks {observed})",
+                           "reduce the wavelength step, expand search_modes or check cluster_span_max")
             if margins[i] is not None and margins[i] < self.settings["min_margin"]:
                 self._fail(location, f"cluster {i + 1} has ambiguous assignment margin {margins[i]:.6g} "
                            f"< min_margin {self.settings['min_margin']:g}", "reduce the wavelength step")
