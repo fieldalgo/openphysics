@@ -172,7 +172,10 @@ any other layout version, and a failed run clears the previous display.
   observed below the cluster, not that the spectrum is complete. Repeat with
   two larger `search_modes` before relying on a cluster identification.
 - Sampled overlaps cannot certify behavior between samples; refine the
-  wavelength step.
+  wavelength step. Identity is field continuity at the samples. Near an
+  avoided crossing between clusters, a coarse step follows the field
+  character (diabatic) and a fine step follows the instantaneous eigenvector
+  (adiabatic). The tracker does not choose between these meanings for you.
 - The example's circular core sits in a square PEC box with an unstructured
   mesh, so its HE11 pair is split by about 4e-6 in n_eff. That is a numerical
   splitting, not a physical one.
