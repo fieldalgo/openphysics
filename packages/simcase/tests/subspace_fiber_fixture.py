@@ -26,7 +26,15 @@ def centred(step):
 
 
 def he11_sweep(wavelengths, scale=2, radius=6.0, search_modes=None, rotate_seed=None, materials=None):
-    """Return dict(g, mean, sigma2, guards, ranks) for the HE11 rank-2 cluster.
+    """HE11 rank-2 cluster sweep; see cluster_sweep. ``g`` is the HE11 cluster's g_bar."""
+    out = cluster_sweep(wavelengths, 2, SETTINGS, scale, radius, search_modes, rotate_seed, materials)
+    out["g"], out["mean"] = out["g"][:, 0], out["mean"][:, 0]
+    return out
+
+
+def cluster_sweep(wavelengths, num_modes, settings, scale=2, radius=6.0, search_modes=None, rotate_seed=None,
+                  materials=None, core_radius=A):
+    """Return dict(g, mean, sigma2, guards, ranks) per point and cluster.
 
     ``radius`` is in units of a; the outer shell keeps 4 radial layers per a
     per scale. ``rotate_seed`` applies an independent random unitary to each
@@ -36,11 +44,12 @@ def he11_sweep(wavelengths, scale=2, radius=6.0, search_modes=None, rotate_seed=
     """
     if materials is None:
         materials = lambda wl: (N1, N2)        # noqa: E731
-    mesh = disk_mesh((A, 2 * A, radius * A), (4 * scale, 4 * scale, int(round(4 * scale * (radius - 2)))),
+    a = core_radius
+    mesh = disk_mesh((a, 2 * a, radius * a), (4 * scale, 4 * scale, int(round(4 * scale * (radius - 2)))),
                      32 * scale)
     extra = {} if search_modes is None else {"search_modes": search_modes}
-    settings = tracking_settings(2, dict(SETTINGS, **extra))
-    tracker = SubspaceTracker(mesh, 2, settings)
+    settings = tracking_settings(num_modes, dict(settings, **extra))
+    tracker = SubspaceTracker(mesh, num_modes, settings)
     rng = np.random.default_rng(rotate_seed)
     means, sigma2, guards, ranks = [], [], [], None
     for wl in wavelengths:
@@ -63,12 +72,12 @@ def he11_sweep(wavelengths, scale=2, radius=6.0, search_modes=None, rotate_seed=
             field = columns(field, unitary)
         neff, _, _, offsets, evidence = tracker.step(n_eff[keep], field, f"{wl} um")
         ranks = np.diff(offsets).tolist()
-        means.append(neff.mean())
-        guards.append(evidence["clusters"][0]["lower_guard_rank"])
+        means.append([neff[offsets[c]:offsets[c + 1]].mean() for c in range(len(ranks))])
+        guards.append(evidence["clusters"][-1]["lower_guard_rank"])
         sigma2.append(evidence["clusters"][0].get("principal_squared"))
     wl = np.asarray(wavelengths)
     means = np.asarray(means)
-    g = means - wl * np.gradient(means, wl, edge_order=2)
+    g = means - wl[:, None] * np.gradient(means, wl, axis=0, edge_order=2)
     return dict(g=g, mean=means, sigma2=sigma2, guards=guards, ranks=ranks)
 
 

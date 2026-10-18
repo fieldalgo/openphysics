@@ -24,6 +24,15 @@ within 2e-4 of the exact dispersive n_g at scale 2 and smaller at scale 3; the
 FEM material-dispersion contribution (dispersive minus frozen indices) within
 2e-4 of the oracle's.
 
+#18 second family: fiber a = 4 um, n1 = 1.47, n2 = 1.44 (V = 4.79). HE21 x2 and
+TM01 (2.2e-5 apart) form an isolated rank-3 cluster of physically distinct
+modes; settings span 4e-5, gap 6e-5 were chosen from the analytic gaps. The
+pre-registered run failed at scale 2 (FEM TE01-HE21 gap below 4e-5 chains TE01
+into the cluster; safe refusal) and is recorded in the issue. A separately
+pre-registered run at scales 3 and 4 is encoded: partition [2, 1, 3] with the
+EH11 guard, every cluster's g_bar within 2e-4 of its exact reference at scale 3
+(rank 3: (2 n_g(HE21) + n_g(TM01)) / 3), largest error smaller at scale 4.
+
 #18 (scale 2): domain radius 8a changes g_bar by < 1e-6; a nonuniform grid is
 within 5e-6 of the uniform one and its reversal agrees to 1e-12; a larger
 candidate budget keeps ranks/guards and g_bar within 1e-9; random unitary
@@ -35,7 +44,8 @@ import numpy as np
 import pytest
 
 from refsol import fiber
-from subspace_fiber_fixture import A, N1, N2, centred, field_space_sin_angles, he11_sweep, sellmeier
+from subspace_fiber_fixture import (A, N1, N2, centred, cluster_sweep, field_space_sin_angles, he11_sweep,
+                                    sellmeier)
 
 
 @pytest.fixture(scope="module")
@@ -119,3 +129,18 @@ def test_dispersive_he11_cluster_group_index_meets_the_preregistered_budget(sell
 def test_dispersive_he11_error_decreases_with_refinement(sellmeier_case):
     fine = he11_sweep(centred(0.01), scale=3, materials=lambda wl: sellmeier(wl)[:2])["g"][2]
     assert abs(fine - sellmeier_case["exact"]) < abs(sellmeier_case["dispersive"] - sellmeier_case["exact"])
+
+
+@pytest.mark.slow
+def test_rank_three_accidental_cluster_mean_group_index():
+    a, n1, n2 = 4.0, 1.47, 1.44
+    ng = {label: fiber.vector_group_index(a, n1, n2, 1.55, label)[1] for label in ("HE11", "TE01", "HE21", "TM01")}
+    reference = np.array([ng["HE11"], ng["TE01"], (2 * ng["HE21"] + ng["TM01"]) / 3])
+    settings = dict(method="electric-l2-subspace-v1", cluster_span_max=4e-5, external_gap_min=6e-5)
+    errors = []
+    for scale in (3, 4):
+        r = cluster_sweep(centred(0.01), 6, settings, scale=scale, materials=lambda wl: (n1, n2), core_radius=a)
+        assert r["ranks"] == [2, 1, 3] and r["guards"] == [7] * 5
+        errors.append(np.abs(r["g"][2] - reference))
+    assert errors[0].max() < 2e-4
+    assert errors[1].max() < errors[0].max()
