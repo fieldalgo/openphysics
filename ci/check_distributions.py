@@ -148,6 +148,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/test_subspace_tracking.py',
               'tests/test_subspace_sweep.py',
               'tests/test_subspace_fiber_validation.py',
+              'tests/subspace_fiber_fixture.py',
               'docs/vector_subspace_tracking.md',
               'docs/locales/ko/pages/vector_subspace_tracking.md',
               'simcase/studio/thermal_api.py',
