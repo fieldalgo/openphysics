@@ -217,3 +217,85 @@ def fundamental_neff(a: float, n1: float, n2: float, wavelength: float) -> float
         if md.label == "HE11":
             return md.neff
     raise RuntimeError("HE11 not found — check parameters")
+
+
+# --------------------------------------------------------------------------
+# Group index of exact vector modes (implicit differentiation)
+# --------------------------------------------------------------------------
+
+def _vector_residual_and_partials(family: str, l: int, n: float, wavelength: float, a: float,
+                                  n1: float, n2: float) -> tuple[float, dict]:
+    """Exact vector dispersion residual F and its analytic partial derivatives.
+
+    F is the equation vector_modes solves, written in X = J'_l/(u J_l) and
+    Y = K'_l/(w K_l). Their derivatives follow from the Bessel equations
+        J'' = -J'/u - (1 - l^2/u^2) J,     K'' = -K'/w + (1 + l^2/w^2) K,
+    giving
+        dX/du = -2X/u - (1 - l^2/u^2)/u - u X^2,
+        dY/dw = -2Y/w + (1 + l^2/w^2)/w - w Y^2.
+    With k = 2 pi a / wavelength, u = k sqrt(n1^2-n^2), w = k sqrt(n^2-n2^2) and
+    q = (n2/n1)^2, the chain rule gives partials with respect to n, wavelength,
+    n1 and n2. No finite differences are used.
+    """
+    k = 2.0 * np.pi * a / wavelength
+    u = k * np.sqrt(n1 ** 2 - n ** 2)
+    w = k * np.sqrt(n ** 2 - n2 ** 2)
+    q = (n2 / n1) ** 2
+    X = 0.5 * (jv(l - 1, u) - jv(l + 1, u)) / (u * jv(l, u))
+    Y = (-kve(l - 1, w) / kve(l, w) - l / w) / w
+    X_u = -2 * X / u - (1 - l ** 2 / u ** 2) / u - u * X ** 2
+    Y_w = -2 * Y / w + (1 + l ** 2 / w ** 2) / w - w * Y ** 2
+    if family == "TE":
+        F, F_X, F_Y, F_q, F_u, F_w = X + Y, 1.0, 1.0, 0.0, 0.0, 0.0
+    elif family == "TM":
+        F, F_X, F_Y, F_q, F_u, F_w = X + q * Y, 1.0, q, Y, 0.0, 0.0
+    else:
+        A = 1 / u ** 2 + 1 / w ** 2
+        B = 1 / u ** 2 + q / w ** 2
+        F = (X + Y) * (X + q * Y) - l ** 2 * A * B
+        F_X = (X + q * Y) + (X + Y)
+        F_Y = (X + q * Y) + q * (X + Y)
+        F_q = (X + Y) * Y - l ** 2 * A / w ** 2
+        F_u = -l ** 2 * (-2 / u ** 3) * (B + A)
+        F_w = -l ** 2 * ((-2 / w ** 3) * B + A * (-2 * q / w ** 3))
+    dF_du = F_X * X_u + F_u
+    dF_dw = F_Y * Y_w + F_w
+    partials = {
+        "n": dF_du * (-k ** 2 * n / u) + dF_dw * (k ** 2 * n / w),
+        "wavelength": dF_du * (-u / wavelength) + dF_dw * (-w / wavelength),
+        "n1": dF_du * (k ** 2 * n1 / u) + F_q * (-2 * q / n1),
+        "n2": dF_dw * (-k ** 2 * n2 / w) + F_q * (2 * q / n2),
+    }
+    return float(F), {name: float(value) for name, value in partials.items()}
+
+
+def vector_group_index(a: float, n1: float, n2: float, wavelength: float, label: str,
+                       dn1_dwavelength: float = 0.0, dn2_dwavelength: float = 0.0) -> tuple[float, float]:
+    """(n_eff, n_g) of the exact vector mode ``label`` by implicit differentiation.
+
+    For F(n, lambda, n1, n2) = 0,
+        dn/dlambda = -(F_lambda + F_n1 n1' + F_n2 n2') / F_n,   n_g = n - lambda dn/dlambda,
+    with analytic partials from the Bessel equations (_vector_residual_and_partials).
+    No FEM output and no finite differences are used. ``n1``, ``n2`` and their
+    wavelength derivatives are material values at ``wavelength``, in the length
+    unit of ``a``.
+
+    Raises ValueError near cutoff, near a Bessel pole of the residual, or when
+    the implicit derivative is ill conditioned.
+    """
+    l_needed = int(label[2]) if label[:2] in ("HE", "EH") else 1
+    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, l_needed))
+                 if md.label == label), None)
+    if mode is None:
+        raise ValueError(f"{label} is not guided at wavelength {wavelength}")
+    V = v_number(a, n1, n2, wavelength)
+    if mode.w < 1e-3 * V:
+        raise ValueError(f"{label} is too close to cutoff for a reliable derivative (w = {mode.w:.3g})")
+    if abs(jv(mode.l, mode.u)) < 1e-6:
+        raise ValueError(f"{label} root is too close to a pole of the residual")
+    _, d = _vector_residual_and_partials(label[:2], mode.l, mode.neff, wavelength, a, n1, n2)
+    total = d["wavelength"] + d["n1"] * dn1_dwavelength + d["n2"] * dn2_dwavelength
+    scale = abs(d["wavelength"]) * wavelength + abs(d["n1"]) * n1 + abs(d["n2"]) * n2
+    if not np.isfinite(d["n"]) or abs(d["n"]) * mode.neff < 1e-8 * scale:
+        raise ValueError(f"{label}: implicit derivative is ill conditioned (dF/dn = {d['n']:.3g})")
+    return mode.neff, float(mode.neff + wavelength * total / d["n"])
