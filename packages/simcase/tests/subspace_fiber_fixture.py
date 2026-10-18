@@ -14,29 +14,41 @@ A, N1, N2 = 4.0, 1.45, 1.44
 SETTINGS = dict(method="electric-l2-subspace-v1", cluster_span_max=1e-6, external_gap_min=1e-3)
 
 
+def sellmeier(wavelength):
+    """Core 1 + 1.1 l^2/(l^2 - 0.01), cladding 0.993 x core: (n1, n2, dn1, dn2)."""
+    n1 = np.sqrt(1 + 1.1 * wavelength ** 2 / (wavelength ** 2 - 0.01))
+    dn1 = -1.1 * 0.01 * wavelength / (n1 * (wavelength ** 2 - 0.01) ** 2)
+    return n1, 0.993 * n1, dn1, 0.993 * dn1
+
+
 def centred(step):
     return [1.55 + k * step for k in (-2, -1, 0, 1, 2)]
 
 
-def he11_sweep(wavelengths, scale=2, radius=6.0, search_modes=None, rotate_seed=None):
+def he11_sweep(wavelengths, scale=2, radius=6.0, search_modes=None, rotate_seed=None, materials=None):
     """Return dict(g, mean, sigma2, guards, ranks) for the HE11 rank-2 cluster.
 
     ``radius`` is in units of a; the outer shell keeps 4 radial layers per a
     per scale. ``rotate_seed`` applies an independent random unitary to each
     returned degenerate pair basis (HE11 and HE21) before every step.
+    ``materials(wavelength) -> (n1, n2)`` makes the indices wavelength dependent
+    on the fixed mesh (default: constant N1, N2).
     """
+    if materials is None:
+        materials = lambda wl: (N1, N2)        # noqa: E731
     mesh = disk_mesh((A, 2 * A, radius * A), (4 * scale, 4 * scale, int(round(4 * scale * (radius - 2)))),
                      32 * scale)
-    eps = mesh.by_region([N1 ** 2, N2 ** 2, N2 ** 2])
     extra = {} if search_modes is None else {"search_modes": search_modes}
     settings = tracking_settings(2, dict(SETTINGS, **extra))
     tracker = SubspaceTracker(mesh, 2, settings)
     rng = np.random.default_rng(rotate_seed)
     means, sigma2, guards, ranks = [], [], [], None
     for wl in wavelengths:
-        n_eff, space, et, ez = solve_modes(mesh, eps, 2 * np.pi / wl, n_target=N1,
+        n1, n2 = materials(wl)
+        eps = mesh.by_region([n1 ** 2, n2 ** 2, n2 ** 2])
+        n_eff, space, et, ez = solve_modes(mesh, eps, 2 * np.pi / wl, n_target=n1,
                                            num_modes=max(10, settings["search_modes"] + 4))
-        keep = np.flatnonzero((n_eff > N2) & (n_eff < N1))[:settings["search_modes"]]
+        keep = np.flatnonzero((n_eff > n2) & (n_eff < n1))[:settings["search_modes"]]
         electric = np.zeros((mesh.num_triangles, len(keep), 3), dtype=complex)
         for j, i in enumerate(keep):
             electric[:, j, :2] = eval_edge_field(space, et[i])
