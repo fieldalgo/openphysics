@@ -37,7 +37,8 @@ RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/th
                                      "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
                                      "simcase/thermal.py", "simcase/studio/server.py",
                                      "simcase/studio/thermal_api.py",
-                                     "simcase/studio/transient_thermal_api.py") }
+                                     "simcase/studio/transient_thermal_api.py",
+                                     "simcase/subspace_tracking.py", "simcase/subspace_result.py") }
 STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
                           "simcase/studio/static/thermal.js",
                           "simcase/studio/static/transient_thermal.js")
@@ -140,6 +141,13 @@ DOCUMENT_ASSETS = {'galerkin': (
                      'docs/overview.md', 'docs/locales/ko/pages/overview.md',
                      'refsol/thermal_boundary.py'),
  'simcase': (
+              'simcase/subspace_tracking.py',
+              'simcase/subspace_result.py',
+              'examples/vector_fiber_subspace_sweep.json',
+              'tests/test_subspace_tracking.py',
+              'tests/test_subspace_sweep.py',
+              'docs/vector_subspace_tracking.md',
+              'docs/locales/ko/pages/vector_subspace_tracking.md',
               'simcase/studio/thermal_api.py',
               'simcase/studio/static/index.html',
               'simcase/studio/static/thermal.js',

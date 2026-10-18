@@ -129,6 +129,16 @@ CAVITY_BOX = {
 
 EXAMPLES["cavity_box"] = CAVITY_BOX
 
+# Opt-in subspace tracking of the isolated HE11 polarization pair. The next
+# guided family (TE01/TM01/HE21) is the observed lower guard. Python/CLI only.
+VECTOR_FIBER_SUBSPACE_SWEEP = copy.deepcopy(VECTOR_FIBER)
+VECTOR_FIBER_SUBSPACE_SWEEP["name"] = "step-index fiber, HE11 pair subspace wavelength sweep"
+VECTOR_FIBER_SUBSPACE_SWEEP["physics"]["em1"]["num_modes"] = 2
+VECTOR_FIBER_SUBSPACE_SWEEP["study"] = {
+    "type": "sweep", "parameter": "physics.em1.wavelength", "values": [1.5, 1.525, 1.55, 1.575, 1.6],
+    "tracking": {"method": "electric-l2-subspace-v1", "cluster_span_max": 1e-4, "external_gap_min": 1e-3}}
+EXAMPLES["vector_fiber_subspace_sweep"] = VECTOR_FIBER_SUBSPACE_SWEEP
+
 # These examples are deliberately excluded from the optional Studio.
 EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED)
 

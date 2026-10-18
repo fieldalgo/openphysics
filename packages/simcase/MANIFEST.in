@@ -76,3 +76,8 @@ include docs/locales/ko/pages/thermal_transient_studio.md
 include simcase/studio/transient_thermal_api.py
 include docs/studio_transient_thermal_independent_validation.md
 include docs/locales/ko/pages/studio_transient_thermal_independent_validation.md
+include examples/vector_fiber_subspace_sweep.json
+include tests/test_subspace_tracking.py
+include tests/test_subspace_sweep.py
+include docs/vector_subspace_tracking.md
+include docs/locales/ko/pages/vector_subspace_tracking.md

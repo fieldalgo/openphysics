@@ -211,10 +211,10 @@ overlap is weak, assignment is ambiguous, or a selected candidate has a
 near-degenerate partner (including an unselected candidate). A selected mode at
 the last rank of a saturated candidate search also fails: increase `search_modes`
 to check for an unseen partner. The search is bounded, not an exhaustive spectral
-proof. Degenerate-subspace transport and continuation through cutoff are not
-implemented. For example, the fiber's two HE11 partners are intentionally
-rejected by the default tracker even when only one is requested; inspect them
-with independent single studies.
+proof. Continuation through cutoff is not implemented. The fiber's two HE11
+partners are intentionally rejected by the default tracker even when only one
+is requested; inspect them with independent single studies, or track their
+span with the opt-in [subspace method](vector_subspace_tracking.md).
 
 Tracking failures identify the wavelength, reason and a next action. Numerical
 solver failures retain the wavelength and underlying reason. The CLI exits
@@ -425,6 +425,7 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 | Topic / 주제 | English | 한국어 |
 |---|---|---|
 | Cavity / 공동 | [English](cavity3d.md) | [한국어](locales/ko/pages/cavity3d.md) |
+| Vector subspace tracking / 벡터 부분공간 추적 | [English](vector_subspace_tracking.md) | [한국어](locales/ko/pages/vector_subspace_tracking.md) |
 | Headless heat / 헤드리스 열전도 | [English](thermal_steady2d.md) | [한국어](locales/ko/pages/thermal_steady2d.md) |
 
 Output ownership requires exclusive caller control until save and cleanup finish.

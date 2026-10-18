@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -42,6 +43,10 @@ def main(argv=None) -> int:
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
     from .thermal import is_thermal, require_fresh_output
     from .transient_thermal_contract import is_transient_thermal
+    tracking = doc["study"].get("tracking") if "study" in doc.data else None
+    if isinstance(tracking, dict) and tracking.get("method") == "electric-l2-subspace-v1" and os.path.lexists(out):
+        print(f"error: subspace sweep output already exists: {out}; choose a fresh output directory", file=sys.stderr)
+        return 1
     if is_thermal(doc.data) or is_transient_thermal(doc.data):
         try:
             require_fresh_output(out)
