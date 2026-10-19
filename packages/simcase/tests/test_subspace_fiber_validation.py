@@ -37,7 +37,8 @@ EH11 guard, every cluster's g_bar within 2e-4 of its exact reference at scale 3
 within 5e-6 of the uniform one and its reversal agrees to 1e-12; a larger
 candidate budget keeps ranks/guards and g_bar within 1e-9; random unitary
 rotations of the solver's degenerate bases change g_bar and sigma^2 by
-< 1e-10.
+< 1e-10; coordinates and wavelengths written in nm or m give g_bar within
+1e-9 of the um run.
 """
 
 import numpy as np
@@ -147,10 +148,15 @@ def test_rank_three_accidental_cluster_mean_group_index():
 
 
 @pytest.mark.slow
-def test_nanometre_coordinates_give_the_same_cluster_statistics(base):
-    """Scaling coordinates and wavelengths by 1000 (um -> nm) leaves g_bar unchanged."""
-    nm = cluster_sweep([1000 * w for w in centred(0.01)], 2,
-                       dict(method="electric-l2-subspace-v1", cluster_span_max=1e-6, external_gap_min=1e-3),
-                       core_radius=1000 * A)
-    assert nm["ranks"] == base["ranks"] and nm["guards"] == base["guards"]
-    np.testing.assert_allclose(nm["g"][:, 0], base["g"], atol=1e-9, rtol=0)
+@pytest.mark.parametrize("unit, ratio", [("nm", 1e3), ("m", 1e-6)])
+def test_scaled_coordinates_give_the_same_cluster_statistics(base, unit, ratio):
+    """Writing coordinates and wavelengths in nm or m instead of um leaves g_bar unchanged.
+
+    The metre case was pre-registered with the nanometre threshold (ranks and
+    guards identical, g_bar within 1e-9); it was observed at about 1e-13.
+    """
+    scaled = cluster_sweep([ratio * w for w in centred(0.01)], 2,
+                           dict(method="electric-l2-subspace-v1", cluster_span_max=1e-6, external_gap_min=1e-3),
+                           core_radius=ratio * A)
+    assert scaled["ranks"] == base["ranks"] and scaled["guards"] == base["guards"]
+    np.testing.assert_allclose(scaled["g"][:, 0], base["g"], atol=1e-9, rtol=0)
