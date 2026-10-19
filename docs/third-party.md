@@ -165,9 +165,12 @@ also listed. Static linkage was read from the Linux, macOS arm64 and Windows
 binaries without running them. Wheels for other platforms, Python versions or
 package versions can differ.
 
-Not surveyed: Linux aarch64, musllinux, Windows arm64, CPython 3.10, 3.11 and
-3.13 (the packages accept Python 3.10 and later), and versions inside the
-declared ranges other than the pins.
+Not surveyed: Linux aarch64, musllinux, Windows arm64, 32-bit Windows (win32),
+CPython versions other than 3.12, and versions inside the declared ranges other
+than the pins. The packages accept Python 3.10 and later with no upper bound;
+the pinned numpy, scipy and shapely also publish cp313 to cp315 wheels, and
+numpy 2.5.4 and scipy 1.18.1 need Python 3.12 or later, so 3.10 and 3.11
+install older releases.
 
 | Wheel | Component | License (SPDX) | Platforms and linkage |
 |---|---|---|---|
