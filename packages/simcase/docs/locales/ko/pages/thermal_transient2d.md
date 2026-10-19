@@ -2,6 +2,12 @@
 
 [English](../../../thermal_transient2d.md)
 
+**한눈에 보기**
+
+- **하는 일:** `thermal.transient2d`는 과도 열전도 엔진을 `simcase` 문서 API·CLI·버전 JSON/NPZ 이력에 연결합니다. 고정된 균질 직사각형 하나, P1 삼각형, 일관 질량과 후진 Euler, 초 단위 명시 시간, 균일 또는 affine 초기 Kelvin, 변 상수 또는 표본 Dirichlet 값과 나머지 단열이며, 깊이당 계산입니다.
+- **한계:** 과도 열유속·Robin·복사, 가변 또는 영역별 k/c, 적응 시간 간격, Crank–Nicolson, 자동 연성, restart가 없습니다. 초기값을 projection하지 않고 유한한 음의 Kelvin을 clamp하지 않습니다.
+- **검증:** 엔진 수치 기준은 galerkin 과도 열전도 검증 계약(아래 링크, 변경 없음)에 있고, 이 페이지는 문서·adapter·설치·저장 검사를 따로 나열합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 ## 범위와 근거
 
 `thermal.transient2d`는 기존 과도 열전도 엔진을 `simcase` 문서 API·CLI와

@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/thermal_studio.md)
 
+**At a glance**
+
+- **What it does:** a dedicated, JSON-first Studio view for rectangular `thermal.steady2d` documents (homogeneous rectangle, P1, constant isotropic k and source, side Dirichlet, insulation, constant outward flux and Robin). It validates and runs through its own routes and shows the result mesh, nodal Kelvin and cell heat flux.
+- **Limits:** no transient documents (see the separate transient Studio guide), pre-solve mesh preview, arbitrary geometry, coupling or result-saving endpoints. Configured resource limits are `candidate-unmeasured`, not capacity guarantees. Studio is a local tool, not a multi-user service.
+- **Validation:** see the [independent steady Studio validation](studio_thermal_independent_validation.md). For a specific commit, see its CI run.
+
 ## Availability
 
 This checkout implements JSON-first steady heat in Studio: dedicated validation

@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/studio_thermal_independent_validation.md)
 
+**At a glance**
+
+- **What it checks:** the steady heat Studio HTTP routes (`/api/capabilities`, `/api/thermal/validate`, `/api/thermal/run`, job status and result) with the real public solver. Returned arrays are audited by independent element assets, not production assembly or refsol helpers.
+- **Fixed gates:** a quadratic-source case on 8/16/32/64 needs temperature L2 order ≥ 1.8 and cell-flux L2 order ≥ 0.9; Gauss 8/10 error differences < 1%; finest relative domain flux L2 ≤ 2%; algebra and conservation 1e-10; SI invariance 1e-9.
+- **Scope:** transient UI, mesh-only preview, a new solver, coupling, material extensions and saving endpoints are outside it. For a specific commit, see its CI run.
+
 ## Current scope and evidence
 
 This checkout implements JSON-first steady thermal validation and execution,

@@ -2,6 +2,12 @@
 
 [English](../../../thermal_transient_studio.md)
 
+**한눈에 보기**
+
+- **하는 일:** 직사각형 `thermal.transient2d` 문서를 위한 Studio 화면으로, 전용 capability·검증·실행·manifest/frame/history route를 씁니다. 정확한 요청 시간(기본값은 마지막)을 골라 절점 Kelvin과 요소 열유속을 보고, 열량 H[J/m]와 이차 범함수 V[J K/m] 이력을 페이지 단위로 봅니다.
+- **한계:** 새 솔버, 보간, downsample, 과도 열유속·Robin, restart, 연성, 취소·삭제·저장·NPZ endpoint가 없으며, 화면을 바꿔도 솔버를 다시 돌리지 않습니다. 설정한 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다.
+- **검증:** [과도 Studio 독립 수용 검증](studio_transient_thermal_independent_validation.md)을 참고하세요. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 ## 제공 상태·범위
 
 이 checkout은 전용 capability·HTTP 검증/실행·manifest/frame/history route와
