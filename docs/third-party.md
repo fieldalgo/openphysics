@@ -152,18 +152,26 @@ which are Apache-2.0 packages of this repository.
 | `cryptography` | secretstorage | Apache-2.0 OR BSD-3-Clause |
 | `secretstorage`, `pycparser` | keyring, cffi | BSD-3-Clause |
 
-pip vendors a copy of certifi's CA bundle (MPL-2.0), used unmodified.
+pip vendors a copy of certifi's CA bundle (MPL-2.0), used unmodified. pip and
+setuptools also ship Windows launcher executables, and cryptography, cffi and
+nh3 statically link native code (OpenSSL, libffi, Rust crates including two
+under MPL-2.0); see [bundled components](#bundled-components).
 
 ## Bundled components
 
 What the third-party wheels pinned in CI ship inside themselves (policy level 3).
 Survey basis: CPython 3.12 wheels of the versions pinned in
 `ci/requirements-py312-linux.txt`, on the platforms CI tests (manylinux x86_64,
-macOS 14 arm64, Windows amd64). The numpy and scipy wheels for macOS before 14
-and the macOS x86_64 wheels of numpy, scipy, shapely, matplotlib and pillow were
-also listed. Static linkage was read from the Linux, macOS arm64 and Windows
-binaries without running them. Wheels for other platforms, Python versions or
-package versions can differ.
+macOS 14 arm64, Windows amd64), covering runtime, optional, test and tool
+wheels. Tool wheels that only the Linux job installs (cryptography, cffi, nh3)
+were read on manylinux x86_64 only. The numpy and scipy wheels for macOS
+before 14 and the macOS x86_64 wheels of numpy, scipy, shapely, matplotlib and
+pillow were also listed. Static linkage was read from the Linux, macOS arm64
+and Windows binaries without running them. Header-only libraries and compiler
+support code built into extension modules (pybind11 in contourpy and
+matplotlib; Cython and mypyc output in fonttools and charset-normalizer) are
+not listed. Wheels for other platforms, Python versions or package versions can
+differ.
 
 Not surveyed: Linux aarch64, musllinux, Windows arm64, 32-bit Windows (win32),
 CPython versions other than 3.12, and versions inside the declared ranges other
@@ -194,12 +202,19 @@ install older releases.
 | `pydantic-core` | Rust crates (pyo3, regex, serde_json, icu_normalizer and others) | MIT, Apache-2.0, Unlicense OR MIT, Unicode-3.0 | Statically linked; the wheel carries only pydantic-core's own license |
 | `pyyaml` | libyaml | MIT | Statically linked into `_yaml` |
 | `pip` | certifi CA bundle | MPL-2.0 | Vendored data file, used unmodified |
+| | Windows launcher executables (`pip/_vendor/distlib/t*.exe`, `w*.exe`) | BSD-2-Clause (distlib's `PC/launcher.c`) | Installed on every OS, run only on Windows; they import no C runtime DLL. The wheel carries distlib's PSF-2.0 license text but not the launcher's BSD notice |
+| `setuptools` | Windows launcher executables (`setuptools/cli*.exe`, `gui*.exe`) | MIT (setuptools' `launcher.c`) | Installed on every OS, run only on Windows; they load the Microsoft C runtime (`VCRUNTIME140.dll`, Universal CRT) from the system |
+| `cryptography` | OpenSSL 4.0.3 | Apache-2.0 | Linux job only: statically linked into the `_rust` extension module (the wheel's SBOM records a `no-shared` build) |
+| | Rust crates (pyo3, asn1, the openssl bindings and others) | Mostly MIT OR Apache-2.0; also BSD-3-Clause, Unicode-3.0 (unicode-ident) and Apache-2.0 OR GPL-2.0-only (self_cell, used under Apache-2.0) | Statically linked; listed in the wheel's CycloneDX SBOM |
+| `cffi` | libffi | MIT | Linux job only: statically linked into `_cffi_backend`; the wheel carries only cffi's own MIT-0 license |
+| `nh3` | Rust crates (ammonia, html5ever, ICU4X and others) | Mostly MIT OR Apache-2.0 or MIT; Unicode-3.0 (ICU4X); MPL-2.0 (cssparser, dtoa-short) | Linux job only (twine dependency): statically linked into the extension module and listed in the wheel's CycloneDX SBOM. MPL-2.0 is file-level weak copyleft; the crates are used as the wheel's publisher compiled them |
 | `gmsh` | libgmsh, with OpenCASCADE, FLTK and other libraries inside | GPL-2.0-or-later with the Gmsh exception | Shared library installed under the environment's `lib/` directory, loaded only by Gmsh's own Python module inside the separate `gmsh` process (see [external programs](#external-programs)) |
 
 The gaps in upstream notices noted above (libquadmath without the LGPL text, no
 notice for numpy's `msvcp140.dll` or for winpthreads, the static GCC runtime and
-libquadmath in scipy's Windows extension module, no GEOS copyright line) do not
-create obligations for OpenPhysics while it redistributes none of these wheels.
+libquadmath in scipy's Windows extension module, no GEOS copyright line, no
+libffi notice in cffi, no BSD notice for pip's launchers) do not create
+obligations for OpenPhysics while it redistributes none of these wheels.
 They matter for anyone who redistributes them.
 
 Re-check this section on all three CI platforms when a pin changes, when CI adds

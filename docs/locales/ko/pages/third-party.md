@@ -136,16 +136,22 @@ crate를 정적으로 링크하며, 휠에는 자기 MIT 라이선스만 들어 
 | `cryptography` | secretstorage | Apache-2.0 OR BSD-3-Clause |
 | `secretstorage`, `pycparser` | keyring, cffi | BSD-3-Clause |
 
-pip는 certifi의 CA 묶음(MPL-2.0) 사본을 자기 안에 넣어 두고 수정 없이 씁니다.
+pip는 certifi의 CA 묶음(MPL-2.0) 사본을 자기 안에 넣어 두고 수정 없이 씁니다. pip와
+setuptools는 Windows 런처 실행 파일도 담고, cryptography·cffi·nh3는 네이티브 코드(OpenSSL,
+libffi, MPL-2.0 두 개를 포함한 Rust crate)를 정적으로 링크합니다. [묶인 구성 요소](#묶인-구성-요소)
+참고.
 
 ## 묶인 구성 요소
 
 CI에 고정한 제3자 휠이 자기 안에 넣어 배포하는 것입니다(정책 3층). 조사 기준:
 `ci/requirements-py312-linux.txt`에 고정한 버전의 CPython 3.12 휠, CI가 시험하는 플랫폼(manylinux
-x86_64, macOS 14 arm64, Windows amd64). macOS 14 미만용 numpy·scipy 휠과 numpy·scipy·shapely·
-matplotlib·pillow의 macOS x86_64 휠도 목록을 확인했습니다. 정적 링크 여부는 Linux, macOS arm64,
-Windows 바이너리를 실행하지 않고 읽어 확인했습니다. 다른 플랫폼, Python 버전, 패키지 버전의 휠은
-다를 수 있습니다.
+x86_64, macOS 14 arm64, Windows amd64)이고 runtime·optional·시험·도구 휠을 모두 봤습니다. Linux
+작업에서만 설치하는 도구 휠(cryptography, cffi, nh3)은 manylinux x86_64에서만 확인했습니다.
+macOS 14 미만용 numpy·scipy 휠과 numpy·scipy·shapely·matplotlib·pillow의 macOS x86_64 휠도 목록을
+확인했습니다. 정적 링크 여부는 Linux, macOS arm64, Windows 바이너리를 실행하지 않고 읽어
+확인했습니다. 확장 모듈에 함께 컴파일된 헤더 전용 라이브러리와 컴파일러 지원 코드(contourpy·
+matplotlib의 pybind11, fonttools·charset-normalizer의 Cython·mypyc 출력)는 목록에 넣지 않았습니다.
+다른 플랫폼, Python 버전, 패키지 버전의 휠은 다를 수 있습니다.
 
 조사하지 않은 것: Linux aarch64, musllinux, Windows arm64, 32비트 Windows(win32), CPython 3.12 외
 버전, 선언한 범위 안의 고정 버전 외 버전. 패키지는 상한 없이 Python 3.10 이상을 받습니다. 고정한
@@ -174,12 +180,18 @@ numpy·scipy·shapely는 cp313부터 cp315까지의 휠도 올리고, numpy 2.5.
 | `pydantic-core` | Rust crate(pyo3, regex, serde_json, icu_normalizer 등) | MIT, Apache-2.0, Unlicense OR MIT, Unicode-3.0 | 정적 링크. 휠에는 pydantic-core 자신의 라이선스만 있음 |
 | `pyyaml` | libyaml | MIT | `_yaml`에 정적으로 링크 |
 | `pip` | certifi CA 묶음 | MPL-2.0 | 함께 넣어 둔 데이터 파일, 수정 없이 사용 |
+| | Windows 런처 실행 파일(`pip/_vendor/distlib/t*.exe`, `w*.exe`) | BSD-2-Clause(distlib `PC/launcher.c`) | 모든 OS에 설치되고 Windows에서만 실행됨. C 런타임 DLL을 import하지 않음. 휠에는 distlib의 PSF-2.0 라이선스 문서만 있고 런처의 BSD 고지는 없음 |
+| `setuptools` | Windows 런처 실행 파일(`setuptools/cli*.exe`, `gui*.exe`) | MIT(setuptools `launcher.c`) | 모든 OS에 설치되고 Windows에서만 실행됨. Microsoft C 런타임(`VCRUNTIME140.dll`, Universal CRT)은 시스템 것을 로드함 |
+| `cryptography` | OpenSSL 4.0.3 | Apache-2.0 | Linux 작업에서만 설치: `_rust` 확장 모듈에 정적으로 링크(휠 SBOM에 `no-shared` 빌드로 기록) |
+| | Rust crate(pyo3, asn1, openssl 바인딩 등) | 대부분 MIT OR Apache-2.0. BSD-3-Clause, Unicode-3.0(unicode-ident), Apache-2.0 OR GPL-2.0-only(self_cell, Apache-2.0로 사용)도 있음 | 정적 링크. 휠의 CycloneDX SBOM에 목록이 있음 |
+| `cffi` | libffi | MIT | Linux 작업에서만 설치: `_cffi_backend`에 정적으로 링크. 휠에는 cffi 자신의 MIT-0 라이선스만 있음 |
+| `nh3` | Rust crate(ammonia, html5ever, ICU4X 등) | 대부분 MIT OR Apache-2.0 또는 MIT. Unicode-3.0(ICU4X), MPL-2.0(cssparser, dtoa-short) | Linux 작업에서만 설치(twine 의존성): 확장 모듈에 정적으로 링크하고 휠의 CycloneDX SBOM에 목록이 있음. MPL-2.0은 파일 단위 약한 copyleft이고, 휠을 올린 쪽이 컴파일한 그대로 씀 |
 | `gmsh` | libgmsh(OpenCASCADE, FLTK 등 포함) | GPL-2.0-or-later, Gmsh 예외 포함 | 환경의 `lib/` 디렉터리에 설치되는 공유 라이브러리. 별도 `gmsh` 프로세스 안에서 Gmsh 자신의 Python 모듈만 로드함([외부 프로그램](#외부-프로그램) 참고) |
 
 위에 적은 상류 고지의 빈틈(LGPL 전문 없는 libquadmath, numpy `msvcp140.dll`과 winpthreads의
-고지 없음, scipy Windows 확장 모듈 안의 정적 GCC 런타임·libquadmath, GEOS 저작권 줄 없음)은
-OpenPhysics가 이 휠들을 재배포하지 않는 동안에는 OpenPhysics의 의무를 만들지 않습니다. 이 휠들을
-재배포하는 쪽에는 중요합니다.
+고지 없음, scipy Windows 확장 모듈 안의 정적 GCC 런타임·libquadmath, GEOS 저작권 줄 없음, cffi의
+libffi 고지 없음, pip 런처의 BSD 고지 없음)은 OpenPhysics가 이 휠들을 재배포하지 않는 동안에는
+OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 쪽에는 중요합니다.
 
 고정 버전이 바뀔 때, CI에 플랫폼·휠 태그·Python 버전이 추가될 때, 의존성이 추가될 때, 패키지에
 컴파일된 코드가 생길 때, OpenPhysics 코드가 묶인 라이브러리를 직접 로드하려 할 때는 이 절을 CI
