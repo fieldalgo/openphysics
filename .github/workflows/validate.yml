@@ -45,6 +45,10 @@ jobs:
             -e packages/gmshio -e packages/physmat -e packages/simcase
           python -m pip check
           gmsh --version
+      - name: Record CPU model and BLAS kernel
+        run: |
+          mkdir -p .validation
+          python ci/tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
       - name: Fetch pinned RII database
         run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
       - name: Check steady boundary contract before transient and full acceptance
@@ -114,13 +118,55 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
+  blas-kernels:
+    # Hosted runners change CPU model between runs, and OpenBLAS picks its kernel
+    # from the CPU, so last-bit results can differ for the same commit. Force two
+    # kernels that round differently (Haswell: AVX2, also used on AMD Zen;
+    # Sandybridge: AVX) so numerically sensitive tests cannot depend on whichever
+    # runner the job happened to get.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        core: [Haswell, Sandybridge]
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_CORETYPE: ${{ matrix.core }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.14"
+      - name: Install pinned validation environment
+        run: |
+          python -m pip install -r ci/requirements-py312-linux.txt
+          python -m pip install --no-deps --no-build-isolation \
+            -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
+            -e packages/gmshio -e packages/physmat -e packages/simcase
+      - name: Confirm the forced OpenBLAS kernel and record the CPU
+        run: python ci/tools/report_numeric_runtime.py --expect-core "${{ matrix.core }}"
+      - name: Numerically sensitive tracking, eigenspace and fiber reference tests
+        run: |
+          python -m pytest -q -ra -m "not slow" \
+            packages/simcase/tests/test_tracking.py \
+            packages/simcase/tests/test_subspace_tracking.py \
+            packages/simcase/tests/test_subspace_sweep.py \
+            packages/simcase/tests/test_vector_sweep.py \
+            packages/galerkin/tests/test_eigenspace_reliability.py \
+            packages/galerkin-refsol/tests/test_fiber_group_index.py \
+            packages/galerkin-refsol/tests/test_fiber_fields.py
+
   installed-platforms:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     uses: ./.github/workflows/platform-install.yml
 
   tests:
     name: tests
-    needs: [linux-py312, installed-platforms]
+    needs: [linux-py312, blas-kernels, installed-platforms]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -128,7 +174,9 @@ jobs:
       - name: Require complete Linux and installed-platform validation
         env:
           VALIDATION_RESULT: ${{ needs.linux-py312.result }}
+          KERNEL_RESULT: ${{ needs.blas-kernels.result }}
           PLATFORM_RESULT: ${{ needs.installed-platforms.result }}
         run: |
           test "$VALIDATION_RESULT" = success
+          test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success

@@ -51,8 +51,8 @@ universal wheel에서 플랫폼 지원을 추론하지 마세요. 정확한 실�
 `main`이 유일한 개발 줄기이자 기본 브랜치입니다. 최신 `origin/main`에서 기능
 브랜치를 만들어 push하고 `main` 대상 PR을 엽니다. 공유·제출한 이력은 보존하고
 다시 적용해야 한다면 새 브랜치를 사용합니다. 문서를 포함한 모든 변경은 GitHub
-Actions의 `tests` 완료 검사(Linux source·배포·Studio와 세 설치 플랫폼)와 `windows-py312-thermal`이
-성공해야 합니다. 배지뿐 아니라 정확한 후보의 로그와 artifact도 검토합니다.
+Actions의 `tests` 완료 검사가 성공해야 합니다. 이 검사는 Linux source·배포·Studio,
+강제한 BLAS 커널 두 가지에서의 민감한 수치 시험, 저장/I-O 견고성을 포함한 세 설치 플랫폼을 다룹니다. 배지뿐 아니라 정확한 후보의 로그와 artifact도 검토합니다.
 
 초록 PR은 GitHub **Rebase and merge**로 반영합니다. 직접 push·merge 커밋·squash·
 force-push·main 삭제는 차단하며 승인 리뷰 수는 0입니다. GitHub가 최신 main 위에
