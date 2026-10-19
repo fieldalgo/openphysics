@@ -63,6 +63,8 @@
     "matplotlib": {"spdx": "LicenseRef-Matplotlib", "url": "https://matplotlib.org/stable/project/license.html",
                    "review": "PSF-based permissive license agreement; no SPDX identifier exists for it."},
     "mdurl": {"spdx": "MIT", "url": "https://github.com/executablebooks/mdurl"},
+    "meshio": {"spdx": "MIT", "url": "https://github.com/nschloe/meshio",
+               "review": "simcase[export] optional extra for VTU export; pure Python, requires numpy and rich."},
     "more-itertools": {"spdx": "MIT", "url": "https://github.com/more-itertools/more-itertools"},
     "nh3": {"spdx": "MIT", "url": "https://github.com/messense/nh3"},
     "numpy": {"spdx": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0", "url": "https://github.com/numpy/numpy/blob/main/LICENSE.txt",

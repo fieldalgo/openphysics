@@ -16,6 +16,8 @@ include tests/thermal_simcase_independent_oracle.py
 include tests/test_thermal_simcase_independent_validation.py
 include tests/thermal_simcase_independent_stale.cjs
 include simcase/schema.py
+include simcase/export.py
+include tests/test_export.py
 include simcase/transient_thermal_contract.py
 include simcase/transient_thermal.py
 include simcase/runner.py

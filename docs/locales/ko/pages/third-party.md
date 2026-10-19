@@ -59,6 +59,8 @@ import·링크·번들하지 않고 소스를 복사하지 않습니다. AGPL은
 | `typing-extensions` | fastapi, pydantic | PSF-2.0 |
 | `opentelemetry-api` | fastapi | Apache-2.0 |
 | `pyyaml` | `physmat[rii]` | MIT |
+| `meshio` | `simcase[export]`(`>=5.3,<6`) | MIT |
+| `rich`, `markdown-it-py`, `mdurl` (and `pygments`, BSD-2-Clause) | meshio | MIT |
 
 ### 시험
 

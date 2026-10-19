@@ -13,7 +13,8 @@ is distributed with this product in the file LICENSE, and is also available at
 THIRD-PARTY SOFTWARE
 
 simcase requires numpy, scipy, shapely and matplotlib, and its optional
-``studio`` extra requires fastapi and uvicorn. They are installed separately
+``studio`` extra requires fastapi and uvicorn, and its optional ``export``
+extra requires meshio. They are installed separately
 by the package installer under their own permissive licenses and are not
 included in this distribution. Wheels of shapely load the GEOS library
 (LGPL-2.1) as an unmodified shared library; simcase only calls shapely's
