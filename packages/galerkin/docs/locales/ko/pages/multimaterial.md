@@ -309,7 +309,9 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   삼각형별 값으로 두 도구에서 풉니다: 정상 열전도, 두 평면의 탄성과 열탄성, backward Euler
   과도 열전도. 온도·변위·열유속·응력이 1.6e-12 이내로 일치하며 기준은 1e-9입니다
   ([레퍼런스 비교](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/reference-comparisons.md)).
-- 별도 연구(2026-10-19)에서 이 문서의 기준 문제를 네 메시 수준 모두에서 반복했습니다. 같은
+- 별도 연구(2026-10-19)에서 정상 열전도, 탄성, 열탄성, 강철/단열재 벽 과도 기준 문제를 네 메시
+  수준 모두에서 반복했습니다. 벽 B와 영점 개수 고유값 탐색을 넣기 전 코드였으므로, 벽 B와 그
+  잘못된 물성 검사는 아직 도구 비교가 없습니다. 같은
   메시 P1 필드는 1.4e-12(온도·변위), 6.2e-11(열유속·응력) 이내로 일치했습니다. 같은
   refsol 정답에 대한 scikit-fem P2 결과가 정답을 확인했습니다: 직선 변 고리 메시에서는 다각형
   형상 때문에 P2가 약 2차에 머물고, 곡선 형상의 isoparametric P2는 약 3차에 이릅니다. 열원이

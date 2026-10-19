@@ -5,7 +5,7 @@
 
 Every case uses the same nodes, triangles, per-triangle material values,
 loads and constraints in both tools, so the discrete solutions must agree;
-differences are gated at 1e-9 relative (observed 1e-12 or smaller). This is
+differences are gated at 1e-9 relative (observed 1.6e-12 or smaller). This is
 code-to-code evidence only: the analytical per-region gates in
 test_*_multimaterial.py and docs/multimaterial.md are unchanged, and agreement
 between the tools is not convergence evidence.
@@ -94,7 +94,7 @@ def test_heat_p1_three_region_wall_same_mesh(skfem):
     flux = -(kt[:, None] * basis.interpolate(theirs).grad[:, :, 0].T)
     emit(make_record(
         case="heat-p1-three-region-wall", analytical_acceptance=ACCEPTANCE.format("thermal"),
-        stopwatch=clock, physics="2D steady heat conduction, per-region k and uniform Q",
+        stopwatch=clock, physics="2D steady heat conduction, per-region k and Q",
         api="galerkin.thermal.solve_steady_heat", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementTriP1, per-triangle k and Q",
         matched=["same nodes and triangles (layered_rectangle_mesh 20/30/10 mm x 20 mm, [4, 6, 2] x 4)",
@@ -242,7 +242,7 @@ def test_transient_heat_p1_three_region_wall_same_mesh(skfem):
         theirs = np.array(history)
     emit(make_record(
         case="transient-heat-p1-three-region-wall", analytical_acceptance=ACCEPTANCE.format("transient_heat"),
-        stopwatch=clock, physics="2D transient heat, backward Euler, per-region k, c and uniform Q",
+        stopwatch=clock, physics="2D transient heat, backward Euler, per-region k, c and Q",
         api="galerkin.transient_heat.solve_transient_heat",
         discretization="P1 Lagrange triangles, consistent mass, backward Euler",
         tool="scikit-fem",
