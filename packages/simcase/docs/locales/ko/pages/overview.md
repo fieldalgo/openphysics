@@ -187,6 +187,16 @@ result = solve_point(model, doc.sole_physics()[1])
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 
+과도 열전도 결과는
+`simcase.export.export_time_series("out/fields.npz", "out/paraview")`로 저장된 모든 시각을
+씁니다. `fields_00000.vtu`, `fields_00001.vtu`, …와 ParaView 컬렉션 `fields.pvd`가 생기며,
+컬렉션은 저장된 각 `time_s`(초)를 timestep으로 기록합니다. ParaView에서 `fields.pvd`를 열면
+시간 컨트롤로 시각을 넘기거나 애니메이션을 재생할 수 있습니다. 각 VTU에는 그 시각에 저장된
+배열만 들어가므로 `reaction_w_per_m`, `residual_w_per_m`, `storage_rate_w_per_m`은 두 번째
+시각부터 나타납니다. 출력 폴더는 새것이거나 비어 있어야 하며 아무것도 덮어쓰지 않습니다.
+컬렉션은 VTU 파일을 상대 경로로 가리키므로 폴더째 옮겨도 됩니다. `name="heat"`로 파일 이름
+앞부분을 바꿀 수 있습니다. `.pvd`는 일반 XML이라 meshio 외 의존성은 필요 없습니다.
+
 ## 브라우저 UI
 
 `simcase.studio`는 이 스택의 선택적 프로그램 부분입니다. 왼쪽 모델 트리, 가운데 형상/메시/결과 보기, 오른쪽 속성 패널, 아래 로그로 구성됩니다. 스크립트와 같은 문서를 편집하고 로컬 서버에 같은 엔진으로 메시 생성과 실행을 요청합니다.

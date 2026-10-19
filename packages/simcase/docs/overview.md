@@ -348,6 +348,18 @@ the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
 because meshio's XDMF writer needs h5py.
 
+For a transient heat result,
+`simcase.export.export_time_series("out/fields.npz", "out/paraview")` writes
+every stored time: `fields_00000.vtu`, `fields_00001.vtu`, … and the ParaView
+collection `fields.pvd`, which records each stored `time_s` (seconds) as its
+timestep. Open `fields.pvd` in ParaView to step through time with the time
+controls or play an animation. Each VTU holds the arrays stored at its time, so
+`reaction_w_per_m`, `residual_w_per_m` and `storage_rate_w_per_m` appear from
+the second time on. The output directory must be new or empty and nothing is
+overwritten; the collection refers to its VTU files by relative paths, so the
+directory can be moved as a whole. `name="heat"` changes the file stem. No
+dependency beyond meshio is needed: the `.pvd` is plain XML.
+
 ## The browser UI
 
 `simcase.studio` is the program part of the stack, and it is optional: a model
