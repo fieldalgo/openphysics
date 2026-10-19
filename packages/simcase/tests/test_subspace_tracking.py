@@ -128,10 +128,92 @@ def test_whitening_refuses_rank_loss_and_bad_metrics(mesh, basis):
 
 
 def test_whitening_refuses_ill_conditioning_without_a_pseudoinverse():
-    with pytest.raises(ValueError, match="ill conditioned"):
-        whiten(np.diag([1.0, 1e-9]))
-    inverse_root, diagnostics = whiten(np.diag([1.0, 1e-7]))
-    assert diagnostics["gram_condition"] == pytest.approx(1e7)
+    for small in (1e-9, 1e-7):                      # 1e7 was accepted before the limit became 1e6
+        with pytest.raises(ValueError, match="ill conditioned"):
+            whiten(np.diag([1.0, small]))
+    inverse_root, diagnostics = whiten(np.diag([1.0, 1e-5]))
+    assert diagnostics["gram_condition"] == pytest.approx(1e5)
+
+
+def _unitary(rank, rng):
+    return np.linalg.qr(rng.normal(size=(rank, rank)) + 1j * rng.normal(size=(rank, rank)))[0]
+
+
+def _conditioned(metric, fields, rank, condition, rng):
+    """`rank` fields of the span of `fields` whose Gram matrix has the given condition number."""
+    head = columns(fields, np.eye(fields.transverse.shape[1])[:, :rank])
+    orthonormal = columns(head, whiten(_gram(metric, head))[0])
+    scales = np.logspace(0, -0.5 * np.log10(condition), rank) if rank > 1 else np.ones(1)
+    return columns(orthonormal, _unitary(rank, rng) @ np.diag(scales) @ _unitary(rank, rng))
+
+
+def test_guard_constants_are_consistent_with_the_roundoff_budget():
+    """At the condition limit, roundoff alone stays below the defect guard, so that guard signals failures."""
+    from simcase.subspace_tracking import (GRAM_CONDITION_MAX, ORTHONORMAL_DEFECT_MAX, SINGULAR_ROUNDOFF,
+                                           UNIT_ROUNDOFF, frame_defect_budget)
+    assert frame_defect_budget(8, GRAM_CONDITION_MAX, 10 ** 6) < ORTHONORMAL_DEFECT_MAX
+    assert frame_defect_budget(8, 1e8, 10 ** 6) > 10 * ORTHONORMAL_DEFECT_MAX      # why 1e8 was inconsistent
+    assert 2 * UNIT_ROUNDOFF * (8 + np.sqrt(10 ** 7)) < SINGULAR_ROUNDOFF
+
+
+@pytest.mark.parametrize("cells", [(4, 3), (40, 20)])
+def test_formed_frame_defect_stays_within_the_roundoff_budget(cells):
+    """Measured on generic fields over rank, conditioning and mesh size.
+
+    The largest observed ratios were about 2.3 of the 8 in frame_defect_budget and
+    0.45 of the 2 in the excursion allowance, under both CI OpenBLAS kernels.
+    """
+    from simcase.subspace_tracking import UNIT_ROUNDOFF, frame_defect, frame_defect_budget
+    mesh = rectangle_mesh(2.0, 1.0, *cells)
+    metric = ElectricMetric(mesh)
+    rng = np.random.default_rng(7)
+    edges = EdgeSpace(mesh).num_edges
+    fields = _field(mesh, rng.normal(size=(edges, 8)) + 1j * rng.normal(size=(edges, 8)),
+                    rng.normal(size=(mesh.num_nodes, 8)) + 1j * rng.normal(size=(mesh.num_nodes, 8)))
+    size = edges + mesh.num_nodes
+    for rank in (1, 2, 4, 8):
+        for condition in (1.0, 1e2, 1e4, 1e6 * 0.9):
+            raw = _conditioned(metric, fields, rank, condition, rng)
+            formed = []
+            for coordinates in (raw, columns(raw, _unitary(rank, rng))):     # one span, two coordinate sets
+                inverse_root, diagnostics = whiten(_gram(metric, coordinates))
+                frame = columns(coordinates, inverse_root @ _unitary(rank, rng))
+                defect = frame_defect(metric, frame)
+                assert defect <= frame_defect_budget(rank, diagnostics["gram_condition"], size)
+                formed.append((frame, defect))
+            (first, d_first), (second, d_second) = formed
+            excursion = np.linalg.svd(metric.product(first, second), compute_uv=False).max() ** 2 - 1
+            implied = (1 + rank * d_first) * (1 + rank * d_second) - 1
+            assert excursion - implied <= 2 * UNIT_ROUNDOFF * (rank + np.sqrt(size))
+
+
+def test_same_span_in_ill_conditioned_coordinates_is_not_refused(mesh, basis):
+    """Identical spans near the condition limit must match.
+
+    Defects measured against the Gram matrix the whitening came from miss its
+    roundoff amplified by the condition number; principal values of identical
+    spans then exceeded the derived bound and were refused as non-orthonormal.
+    """
+    from simcase.subspace_tracking import frame_defect
+    rng = np.random.default_rng(11)
+    neff = np.array([2.0, 2.0 - 2e-5, 2.0 - 4e-5, 1.9])
+    for trial in range(40):
+        rank = 2 + trial % 2
+        values = np.concatenate([neff[:rank], neff[3:]])
+        condition = (1e5, 3e5, 9e5)[trial % 3]
+        tracker = SubspaceTracker(mesh, rank, _settings(rank))
+        cluster = _conditioned(ElectricMetric(mesh), basis, rank, condition, rng)
+        guard = columns(basis, np.eye(8)[:, [7]])
+        for location in ("seed", "same span"):
+            mixed = columns(cluster, _unitary(rank, rng))
+            stacked = VectorField(mixed.edges, np.column_stack([mixed.transverse, guard.transverse]),
+                                  np.column_stack([mixed.longitudinal, guard.longitudinal]),
+                                  np.concatenate([mixed.electric, guard.electric], axis=1))
+            _, _, _, _, evidence = tracker.step(values, stacked, location)
+        (record,) = evidence["clusters"]
+        assert record["min_principal_squared"] == pytest.approx(1.0, abs=1e-6)
+        assert record["orthonormal_defect"] == pytest.approx(frame_defect(tracker.metric, tracker.previous[0]),
+                                                             rel=1e-6, abs=1e-15)
 
 
 # -- principal values ----------------------------------------------------------

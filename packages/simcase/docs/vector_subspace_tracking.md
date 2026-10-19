@@ -60,7 +60,8 @@ A selected cluster is accepted only if:
 Each cluster's raw fields `U` are whitened in the electric L2 metric of the
 fixed document mesh, `W = diag(M_edge, M_node)`: with `G = U^H W U`, the frame
 `Q = U G^(-1/2)` satisfies `Q^H W Q = I`. A rank-deficient or ill-conditioned
-Gram matrix (condition number above 1e8) fails; there is no pseudoinverse.
+Gram matrix (condition number above 1e6) fails; there is no pseudoinverse
+(see [Numerical guards](#numerical-guards)).
 
 Against the previous frame `P`, the cross Gram `P^H W Q = L diag(sigma) V^H`
 gives cosines of the principal angles. Equal-rank clusters are matched by a
@@ -103,7 +104,8 @@ Cluster quantities:
 `summary.json` uses `field_representation="vector-subspace-edge-nodal-v1"` and
 contains `clusters`, `raw_neff`, `cluster_mean_neff`, `cluster_mean_group_index`
 and `mode_tracking`. Per point and cluster, tracking evidence records candidate
-ranks, span, upper/lower gaps, guard rank, Gram condition, orthonormality defect,
+ranks, span, upper/lower gaps, guard rank, Gram condition, orthonormality defect
+of the committed frame,
 all squared principal values, the score, margin and the sine of the largest
 angle. There is no `neff` or `group_index` key, so a consumer of the default
 layout cannot misread raw member columns as branches.
@@ -126,9 +128,49 @@ example's HE11 pair and 3e-3 when an HE11 member is mixed with TE01.
 
 The evidence field `sin_max_angle` is computed from the projection residual
 `Q - P (P^H W Q)` rather than `sqrt(1 - sigma^2)`, avoiding cancellation at
-small angles. Its accuracy is still limited by the frames' orthonormality
-defect delta, to about sqrt(delta): near 1e-8 for typical clusters and about
-1e-4 near the Gram condition limit.
+small angles. The frames' orthonormality defects `d_P`, `d_Q` still limit it:
+the absolute error of `sin^2` is at most about `r (d_P + d_Q)`, so small angles
+are resolved to about `sqrt(r (d_P + d_Q))`: about 1e-7 on the example (defects
+below 1e-15) and, at the Gram condition limit, about 1e-4 for rank 2 and 3e-4
+for rank 8.
+
+## Numerical guards
+
+Four guards protect the small cluster matrices. They separate roundoff from rank
+loss or a wrong metric; they are not accuracy claims about the physics. With
+unit roundoff `u` (1.1e-16), cluster rank `r`, Gram condition number `kappa` and
+`N` mesh degrees of freedom, the roundoff budget is:
+
+| Guard | Value | Roundoff budget | A failure looks like |
+|---|---|---|---|
+| Hermitian defect of `G`, relative Frobenius | 1e-10 | about `sqrt(N) u` (2e-14 at N = 2e5); worst case `2 N u`, below the guard up to N = 4e5 | order one (wrong metric) |
+| Gram condition `kappa` | 1e6 | none; a limit chosen so the next row stays consistent | near-duplicate fields |
+| Orthonormality defect `max abs(Q^H W Q - I)` of each formed frame | 1e-8 | `8 r u (kappa + sqrt(N))`; at most 7e-9 for kappa = 1e6, r = 8, N = 1e6 | well above the budget |
+| `sigma^2` above one | `(1 + r d_P)(1 + r d_Q) - 1 + 1e-12` | defects `d` of the two frames, plus about `u (r + sqrt(N))` of SVD and product roundoff, covered by 1e-12 for N up to about 1e7 | frames not orthonormal |
+
+Where the budget terms come from. `G` is a sum of sparse products, so its
+entries carry relative roundoff of order `sqrt(N) u`. The Hermitian
+eigendecomposition used for `G^(-1/2)` is backward stable, and `G^(-1/2)`
+amplifies both its backward error and the Gram roundoff by up to `kappa`. The
+frame is then formed and its defect measured with fresh products, which adds
+the `sqrt(N)` term. The spectral defect of a frame is at most `r` times its
+largest entry defect, which bounds `sigma_max^2` by `(1 + r d_P)(1 + r d_Q)`.
+
+Measured on generic random fields (ranks 1 to 12, `kappa` up to 1e6, N from
+153 to 2e5, both CI OpenBLAS kernels), the defect reached 2.3 of the 8 in the
+budget and the remaining `sigma^2` excursion reached 0.45 of `u (r + sqrt(N))`.
+The tests check the budget with these margins. The factor of the `sqrt(N)` term
+also grows with the conditioning of the mass matrices (strongly graded meshes);
+only quasi-uniform meshes were measured.
+
+Changes from the first version, both stricter: the condition limit was 1e8,
+where the defect budget is about 1e-6, so the defect guard, not the stated
+limit, decided; and the defects were measured from `H^H G H` against the Gram
+matrix the whitening came from. That misses the Gram roundoff amplified by
+`kappa`, and identical spans in coordinates with `kappa` between about 1e6 and
+3e7 were refused as "principal value exceeds one". Defects are now measured on
+the frames that are actually stored and compared, and the evidence field
+`orthonormal_defect` is that of the committed frame.
 
 ## Studio
 

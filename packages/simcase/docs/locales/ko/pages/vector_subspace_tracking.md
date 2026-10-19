@@ -52,7 +52,8 @@ python -m simcase run fiber_pair.json -o fiber_pair_results
 
 각 군집의 원시 장 `U`를 고정 문서 메시의 전기장 L2 metric `W = diag(M_edge, M_node)`로
 백색화합니다. `G = U^H W U`이면 frame `Q = U G^(-1/2)`는 `Q^H W Q = I`를 만족합니다. Gram
-행렬이 rank 부족이거나 조건수가 1e8을 넘으면 실패하며 pseudoinverse는 쓰지 않습니다.
+행렬이 rank 부족이거나 조건수가 1e6을 넘으면 실패하며 pseudoinverse는 쓰지 않습니다
+([수치 안전장치](#수치-안전장치) 참고).
 
 이전 frame `P`와의 교차 Gram `P^H W Q = L diag(sigma) V^H`가 주각의 코사인을 줍니다. 같은
 rank 군집끼리 군집별 `sigma^2` 평균의 합이 최대인 전역 일대일 할당으로 짝짓습니다. 짝은 가장
@@ -88,7 +89,7 @@ Hermitian 양의 준정부호입니다. 시작 지점의 방향은 임의입니�
 
 `summary.json`은 `field_representation="vector-subspace-edge-nodal-v1"`을 쓰며 `clusters`,
 `raw_neff`, `cluster_mean_neff`, `cluster_mean_group_index`, `mode_tracking`을 담습니다. 지점·군집별
-추적 근거에는 후보 순위, 폭, 위/아래 간격, guard 순위, Gram 조건수, 정규직교 결함, 모든 주값 제곱,
+추적 근거에는 후보 순위, 폭, 위/아래 간격, guard 순위, Gram 조건수, 확정된 frame의 정규직교 결함, 모든 주값 제곱,
 점수, margin, 최대 각의 sine이 있습니다. `neff`와 `group_index` 키는 없으므로 기본 구성을 읽는
 소비자가 원시 구성원 열을 분지로 오해할 수 없습니다.
 
@@ -105,8 +106,38 @@ boundary, neff, field)`는 풀이와 같은 파장 축척·PEC 구속으로 각 
 예제의 HE11 쌍 안에서는 2e-6, HE11 구성원과 TE01을 섞으면 3e-3입니다.
 
 근거 항목 `sin_max_angle`은 `sqrt(1 - sigma^2)`가 아니라 투영 잔차 `Q - P (P^H W Q)`로
-계산하므로 작은 각의 상쇄 오차를 피합니다. 정확도는 여전히 frame 정규직교 결함 delta에 따라 약
-sqrt(delta)로 제한됩니다. 보통 군집에서는 1e-8 근처, Gram 조건수 한계 근처에서는 약 1e-4입니다.
+계산하므로 작은 각의 상쇄 오차를 피합니다. 그래도 frame 정규직교 결함 `d_P`, `d_Q`가 한계를
+정합니다. `sin^2`의 절대 오차는 약 `r (d_P + d_Q)` 이하라 작은 각은 약 `sqrt(r (d_P + d_Q))`까지
+구분됩니다. 예제(결함 1e-15 미만)에서 약 1e-7, Gram 조건수 한계에서는 rank 2에서 약 1e-4, rank 8에서 3e-4입니다.
+
+## 수치 안전장치
+
+작은 군집 행렬을 네 가지 안전장치가 지킵니다. 반올림과 rank 손실·잘못된 metric을 가르는 장치이며
+물리 정확도 주장이 아닙니다. 단위 반올림 `u`(1.1e-16), 군집 rank `r`, Gram 조건수 `kappa`, 메시
+자유도 수 `N`에 대해 반올림 예산은 다음과 같습니다.
+
+| 안전장치 | 값 | 반올림 예산 | 실패는 이렇게 보임 |
+|---|---|---|---|
+| `G`의 Hermitian 결함(상대 Frobenius) | 1e-10 | 약 `sqrt(N) u`(N = 2e5에서 2e-14), 최악 `2 N u`는 N = 4e5까지 기준 아래 | 1 정도(잘못된 metric) |
+| Gram 조건수 `kappa` | 1e6 | 없음. 다음 행과 모순되지 않도록 고른 한계 | 거의 같은 장 |
+| 만든 frame마다 정규직교 결함 `max abs(Q^H W Q - I)` | 1e-8 | `8 r u (kappa + sqrt(N))`, kappa = 1e6, r = 8, N = 1e6에서 최대 7e-9 | 예산보다 훨씬 큼 |
+| `sigma^2`의 1 초과분 | `(1 + r d_P)(1 + r d_Q) - 1 + 1e-12` | 두 frame의 결함 `d`, 그리고 SVD·곱 반올림 약 `u (r + sqrt(N))`. N 약 1e7까지 1e-12가 덮음 | frame이 정규직교가 아님 |
+
+예산 항의 출처. `G`는 희소 곱의 합이라 원소에 `sqrt(N) u` 정도의 상대 반올림이 있습니다.
+`G^(-1/2)`에 쓰는 Hermitian 고유분해는 후방 안정이며, `G^(-1/2)`는 그 후방 오차와 Gram 반올림을
+최대 `kappa`배 키웁니다. 그 뒤 frame을 만들고 새 곱으로 결함을 재므로 `sqrt(N)` 항이 더해집니다.
+frame의 스펙트럼 결함은 가장 큰 원소 결함의 `r`배 이하이므로 `sigma_max^2 <= (1 + r d_P)(1 + r d_Q)`입니다.
+
+일반적인 난수 장(rank 1–12, `kappa` 최대 1e6, N 153–2e5, CI의 두 OpenBLAS 커널)에서 잰 결함은
+예산 계수 8 중 2.3까지, 남은 `sigma^2` 초과분은 `u (r + sqrt(N))`의 0.45배까지였습니다. 시험은 이
+여유로 예산을 확인합니다. `sqrt(N)` 항의 계수는 질량 행렬 조건수(강하게 등급화된 메시)에 따라서도
+커집니다. 잰 것은 거의 균일한 메시뿐입니다.
+
+첫 버전에서 바뀐 점(둘 다 더 엄격함): 조건수 한계가 1e8이었는데 거기서 결함 예산은 약 1e-6이라,
+적힌 한계가 아니라 결함 안전장치가 거절을 결정했습니다. 또 결함을 백색화에 쓴 Gram 행렬 기준
+`H^H G H`로 쟀습니다. 이 값은 `kappa`배 커진 Gram 반올림을 놓치므로, 같은 부분공간을 `kappa`가 약
+1e6–3e7인 좌표로 넣으면 "principal value exceeds one"으로 거절됐습니다. 이제 결함은 실제로 저장되고
+비교되는 frame에서 재며, 근거 항목 `orthonormal_defect`는 확정된 frame의 값입니다.
 
 ## Studio
 
