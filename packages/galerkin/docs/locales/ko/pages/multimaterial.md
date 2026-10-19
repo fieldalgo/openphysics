@@ -325,4 +325,5 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 - 접촉 저항·경계면 열원 없음.
 - 혼합 정식화 없음: 균질 해석기처럼 거의 비압축성인 영역은 평면 변형률에서 locking.
 - 온도 의존 물성 없음, 기준 온도는 값 하나.
-- simcase 문서는 아직 균질 재료 하나만 받습니다.
+- simcase 정상·과도 열전도 문서는 이름 있는 재료 영역을 받습니다
+  ([thermal_regions2d](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_regions2d.md)). 탄성·열탄성은 simcase 문서가 없습니다.

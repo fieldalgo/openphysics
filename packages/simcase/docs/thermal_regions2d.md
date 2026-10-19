@@ -33,9 +33,9 @@ heater in insulation, cooled at the bottom and by convection at the top:
     ]
   },
   "materials": {
-    "steel": {"conductivity_w_mk": 45},
-    "copper": {"conductivity_w_mk": 400},
-    "insulation": {"conductivity_w_mk": 0.04}
+    "steel": {"conductivity_w_mk": 45, "source": "document value"},
+    "copper": {"conductivity_w_mk": 400, "source": "document value"},
+    "insulation": {"conductivity_w_mk": 0.04, "source": "document value"}
   },
   "physics": {"heat1": {
     "type": "thermal.steady2d",

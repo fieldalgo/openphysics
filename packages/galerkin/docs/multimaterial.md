@@ -373,4 +373,6 @@ is code-to-code evidence, not convergence evidence.
 - No mixed formulation: nearly incompressible regions lock in plane strain,
   as in the homogeneous solver.
 - No temperature-dependent properties; reference temperature is one value.
-- simcase documents still accept one homogeneous material.
+- simcase steady and transient heat documents accept named material regions
+  ([thermal_regions2d](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_regions2d.md)); elasticity and thermoelasticity have no simcase
+  document.

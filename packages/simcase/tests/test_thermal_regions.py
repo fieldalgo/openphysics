@@ -263,7 +263,20 @@ def test_rectangle_documents_keep_their_original_contract():
     with pytest.raises(DocumentError, match='requires an empty object'):
         Document.from_dict(legacy)
     r = run(Document.from_dict(examples.EXAMPLES['thermal_slab']), verbose=False)
-    assert r.result_format == 'thermal.steady2d-result-v1' and not hasattr(r.mesh, 'regions') or r.mesh.regions is None
+    assert r.result_format == 'thermal.steady2d-result-v1'
+    assert r.field_layout == 'thermal2d-p1-node-cell-v1'
+    assert r.mesh.regions is None and 'triangle_regions' not in r.summary()['field_shapes']
+
+
+@pytest.mark.parametrize('page', ['docs/thermal_regions2d.md', 'docs/locales/ko/pages/thermal_regions2d.md'])
+def test_the_documented_example_is_the_shipped_example(page):
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1]/page
+    if not path.exists():
+        pytest.skip('contract pages are not part of this installation')
+    text = path.read_text(encoding='utf-8')
+    block = text.split('```json\n', 1)[1].split('```', 1)[0]
+    assert json.loads(block) == examples.EXAMPLES['thermal_regions']
 
 
 def test_studio_refuses_region_documents_without_running(monkeypatch):
