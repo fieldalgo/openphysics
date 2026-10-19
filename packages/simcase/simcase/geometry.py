@@ -5,9 +5,9 @@
 
 Shapes are booleans on top of each other ("later wins"), clipped to the
 domain box; the background fills the remainder. shapely does the polygon
-arithmetic, the result goes to meshine as polygons with holes. A circle that
-no other boundary touches is passed as a true meshine.Circle so its nodes stay
-on the exact circle (see _isolated_circle).
+arithmetic, the result goes to meshine as polygons with holes. A circle that no
+later shape overlaps and no other boundary touches is passed as a true
+meshine.Circle so its nodes stay on the exact circle (see _isolated_circle).
 """
 
 from __future__ import annotations

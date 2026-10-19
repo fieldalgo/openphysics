@@ -68,9 +68,9 @@ simcase run packages/simcase/examples/thermal_regions.json -o heated_plate
   each with a unique nonempty `name` (not `background`), a `material` and an
   optional `mesh_size`. No other keys are accepted. Shapes are clipped to the
   domain. A shape that lies outside the domain or is smaller than 1e-12 of the
-  domain area is refused (electromagnetic documents only warn and drop it). A
-  shape that later shapes cover completely gets no triangles; the run log names
-  it.
+  domain area is refused (electromagnetic documents drop it without a message in
+  the run log). A shape that later shapes cover completely gets no triangles; the
+  run log names it.
 - `materials`: `{material name: {...}}` with `conductivity_w_mk` > 0 (required
   for every material used), optional `volumetric_heat_capacity_j_m3k` > 0 (not
   used by steady heat) and an optional `source` note. Thermal properties are
@@ -99,20 +99,26 @@ circle is smaller than pi r^2 by O(h^2). The meshed problem is passed to
 `galerkin.thermal.solve_steady_heat` with conductivity and source mapped by
 region name ([multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/multimaterial.md)).
 
-A circle that no other boundary touches keeps its nodes on the exact circle. A
-circle that touches or crosses a domain side or another shape is meshed as a
-128-sided polygon like the other shapes, so neighbouring regions share one
-boundary.
+A circle that no later shape overlaps (including one lying wholly inside it) and
+no other boundary touches keeps its nodes on the exact circle. Any other circle
+is meshed as a 128-sided polygon like the other shapes, so neighbouring regions
+share one boundary.
 
-**Known meshing limit.** meshine has no protection for small input angles. A
-circle that touches another boundary tangentially or crosses it at a shallow
-angle, or a sharp polygon corner, can keep refinement running for minutes or
-without end; the run does not fail on its own. Measured on the shipped example
-with the heater moved onto the bottom side or the plate's top edge: tangent
-contact and crossings at 18, 25 and 35 degrees did not finish within 40 to 90 s,
-while 30 degrees, 41 degrees or steeper, and a 0.001 mm clearance meshed in under
-4 s. Keep shapes clear of other boundaries or let them cross steeply.
-Electromagnetic documents share this limit.
+**Known meshing limit.** meshine has no protection for small input angles or
+near-coincident vertices. A circle that touches or crosses another boundary, or
+a sharp polygon corner, can keep refinement running without end; the run does
+not fail on its own. Whether a crossing finishes depends on where the circle's
+polygon vertices fall, not only on the angle. Measured on the shipped example
+(heater r = 2 mm), each case given 40 to 150 s:
+
+| Heater placed across | Did not finish | Meshed in under 4 s |
+| --- | --- | --- |
+| The bottom side | tangent; 18, 20, 25, 35 and 45 degrees | 30, 41, 50 and 60 degrees |
+| The plate's top edge (from above) | tangent; 18, 30 and 45 degrees | 35, 41, 50 and 60 degrees |
+
+A 0.001 mm clearance from the bottom side meshed in under 4 s. The reliable
+choice is to keep shapes clear of other boundaries. Electromagnetic documents
+share this limit.
 
 meshine does not produce the same node positions for one geometry written in
 different length units. Results in mm, m and um therefore agree to
@@ -152,7 +158,7 @@ comparison:
 | 19 invalid documents, a covered source region, a shape outside the domain and a shape below the sliver limit | Refused with `DocumentError` |
 | A shape covered by a later shape | No triangles; named in the run log |
 | Heater moved across the plate's top edge | Meshes (in a subprocess with a 300 s limit) as a polygon; heat balance <= 1e-10 |
-| Exact-circle rule | Only a circle clear of every other boundary is meshed as an exact circle |
+| Exact-circle rule | Only a circle clear of every other boundary, with no later shape inside it, is meshed as an exact circle |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
 | Studio | Region documents are refused before any mesher or worker call |
 
