@@ -252,6 +252,17 @@ class Document:
         if is_transient_thermal(d):
             validate_transient_thermal(self)
             return
+        from .thermal_regions import is_region_thermal, validate_region_thermal
+        if is_region_thermal(d):
+            if str(d.get("openphysics")) != FORMAT:
+                raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
+            try:
+                self.scale = units.resolve(d.get("units"))
+            except UnitError as exc:
+                raise DocumentError(str(exc)) from None
+            _reject_tagged_values(d)
+            validate_region_thermal(self)
+            return
         if _steady_boundary_requested(d):
             from .steady_boundary_contract import validate_steady_boundary
             validate_steady_boundary(self)
@@ -407,6 +418,9 @@ class Document:
         from .transient_thermal_contract import is_transient_thermal, transient_thermal_summary
         if is_transient_thermal(self.data):
             return transient_thermal_summary(self)
+        from .thermal_regions import is_region_thermal, region_summary
+        if is_region_thermal(self.data):
+            return region_summary(self)
         if _steady_boundary_requested(self.data):
             from .steady_boundary_contract import steady_result_versions
             self.validate()

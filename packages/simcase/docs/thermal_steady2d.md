@@ -3,6 +3,8 @@
 [한국어](locales/ko/pages/thermal_steady2d.md)
 
 This page describes the legacy v1 path without the new natural-boundary keys.
+Documents whose geometry has `background` or `shapes` follow the
+[region document contract](thermal_regions2d.md) instead.
 The [boundary extension guide](thermal_steady_boundary2d.md) documents the
 submitted constant outward-flux/convection candidate. New-key presence, even
 an empty mapping, selects v2. Robin-only anchoring with empty Dirichlet,
