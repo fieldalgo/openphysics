@@ -193,6 +193,28 @@ def test_source_on_a_fully_covered_region_is_refused_at_meshing():
         run(Document.from_dict(data), verbose=False)
 
 
+@pytest.mark.parametrize('shape', [
+    {'name': 'spreader', 'type': 'rect', 'x': 5., 'y': 11000., 'w': 30., 'h': 1., 'material': 'steel'},
+    {'name': 'speck', 'type': 'circle', 'cx': 15., 'cy': 2., 'r': 1e-6, 'material': 'steel'}])
+def test_a_named_shape_that_contributes_no_material_is_refused(shape):
+    """Outside the domain or below the sliver limit: refused, never dropped silently."""
+    data = wall(2.)
+    data['geometry']['shapes'].append(shape)
+    with pytest.raises(DocumentError, match=f"{shape['name']}.*refuses a shape"):
+        Document.from_dict(data)
+
+
+def test_a_fully_covered_shape_is_named_in_the_log():
+    data = wall(2.)
+    data['geometry']['shapes'] += [
+        {'name': 'hidden', 'type': 'rect', 'x': 2., 'y': 1., 'w': 2., 'h': 2., 'material': 'insulation'},
+        {'name': 'cover', 'type': 'rect', 'x': 1., 'y': .5, 'w': 4., 'h': 3., 'material': 'steel'}]
+    data['physics']['heat1']['heat_source_w_m3'] = {'steel_plate': 2e5, 'cover': 2e5}
+    r = run(Document.from_dict(data), verbose=False)
+    assert 'hidden' not in r.mesh.region_names
+    assert "shapes fully covered by later shapes (no triangles): ['hidden']" in r.log
+
+
 def test_rectangle_documents_keep_their_original_contract():
     legacy = copy.deepcopy(examples.EXAMPLES['thermal_slab'])
     legacy['materials'] = {'steel': {'conductivity_w_mk': 45.}}
