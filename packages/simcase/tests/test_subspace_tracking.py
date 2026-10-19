@@ -198,6 +198,13 @@ def _graded_mesh(cells, ratio):
     return Mesh(stretch(square.nodes), square.triangles, square.boundary, square.boundary_edges)
 
 
+def _smallest_eigenvectors(matrix, count):
+    """Eigenvectors of the `count` smallest eigenvalues of a sparse SPD matrix."""
+    from scipy.sparse.linalg import eigsh
+    _, vectors = eigsh(matrix.tocsc(), count, sigma=0.0, which="LM", v0=np.ones(matrix.shape[0]))
+    return vectors
+
+
 def test_cancellation_matches_hand_values(mesh):
     metric = ElectricMetric(mesh)
     edges, nodes = EdgeSpace(mesh).num_edges, mesh.num_nodes
@@ -226,8 +233,11 @@ def test_roundoff_budget_holds_on_flat_elements_through_the_cancellation_term():
     space = EdgeSpace(mesh)
     size = space.num_edges + mesh.num_nodes
     rng = np.random.default_rng(5)
-    edge_vectors = np.linalg.eigh(metric.edge_mass.toarray())[1][:, :8]
-    node_vectors = np.linalg.eigh(metric.node_mass.toarray())[1][:, :8]
+    # Sparse shift-invert, not a dense eigh of the whole mass matrix: the dense
+    # 1240 x 1240 eigh segfaulted inside OpenBLAS with the forced Haswell kernel
+    # on an AMD EPYC (Zen 5) CI runner. A fixed start vector keeps it deterministic.
+    edge_vectors = _smallest_eigenvectors(metric.edge_mass, 8)
+    node_vectors = _smallest_eigenvectors(metric.node_mass, 8)
     oscillating = _field(mesh, edge_vectors, 1e-3 * node_vectors)
     tangents = mesh.nodes[space.edges[:, 1]] - mesh.nodes[space.edges[:, 0]]
     midpoints = mesh.nodes[space.edges].mean(axis=1)
