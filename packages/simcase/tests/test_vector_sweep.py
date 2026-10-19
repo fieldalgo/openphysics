@@ -142,14 +142,15 @@ def test_fiber_rejects_unselected_degenerate_partner_even_for_one_requested_mode
 @pytest.mark.parametrize("failure", [RuntimeError("factor is exactly singular"),
     ArpackNoConvergence("no convergence", np.empty(0), None)])
 def test_numerical_solve_failure_keeps_wavelength_context_without_partial_output(failure, monkeypatch, tmp_path, capsys):
-    original = runner.solve_point
+    # A tracked sweep solves in micrometres and converts fields once, after tracking.
+    original = runner._solve_in_micrometres
 
     def failing_point(model, physics):
         if physics["wavelength"] == 1.55:
             raise failure
         return original(model, physics)
 
-    monkeypatch.setattr(runner, "solve_point", failing_point)
+    monkeypatch.setattr(runner, "_solve_in_micrometres", failing_point)
     model = tmp_path / "numerical-failure.json"
     Document.from_dict(sweep_data()).save(model)
     output = tmp_path / "out"
