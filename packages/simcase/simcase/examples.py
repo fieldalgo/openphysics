@@ -4,7 +4,7 @@
 """Example documents (also used by the tests)."""
 
 import copy
-from .thermal_examples import THERMAL_SLAB, THERMAL_MIXED
+from .thermal_examples import THERMAL_SLAB, THERMAL_MIXED, THERMAL_REGIONS
 
 SOI_STRIP = {
     "openphysics": "0.2",
@@ -161,7 +161,7 @@ VECTOR_FIBER_SUBSPACE_SWEEP["study"] = {
 EXAMPLES["vector_fiber_subspace_sweep"] = VECTOR_FIBER_SUBSPACE_SWEEP
 
 # These examples are deliberately excluded from the optional Studio.
-EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED)
+EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED, thermal_regions=THERMAL_REGIONS)
 
 TRANSIENT_THERMAL_UNIFORM = {
     'openphysics': '0.2', 'name': 'Insulated constant-source transient heat',

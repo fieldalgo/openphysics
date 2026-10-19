@@ -51,6 +51,7 @@
 | 처방 열유속·Robin 경계 | [외향 열유속·대류](../../../../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | 열유속·Robin 수용검증 | [독립 경계 검사](../../../../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | 정상 열전도 문서 | [헤드리스 JSON/API/CLI](../../../../packages/simcase/docs/thermal_steady2d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
+| 정상 열전도 영역 문서 | [재료 표와 도형](../../../../packages/simcase/docs/thermal_regions2d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_regions2d.md) |
 | 열전도 문서 수용검증 | [독립 문서 검사](../../../../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
 | 정상 경계조건 문서 | [변별 상수 열유속·대류, v1/v2 필드](../../../../packages/simcase/docs/thermal_steady_boundary2d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md) |
 | 정상 경계조건 수용검증 | [해석해·요소·수렴 기준](../../../../packages/simcase/docs/steady_boundary_independent_validation.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/steady_boundary_independent_validation.md) |

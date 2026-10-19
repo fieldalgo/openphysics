@@ -1,0 +1,81 @@
+{
+  "openphysics": "0.2",
+  "name": "Heated steel plate in insulation",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 40.0,
+      "ymin": 0.0,
+      "ymax": 20.0
+    },
+    "background": {
+      "material": "insulation"
+    },
+    "shapes": [
+      {
+        "name": "plate",
+        "type": "rect",
+        "x": 5.0,
+        "y": 5.0,
+        "w": 30.0,
+        "h": 6.0,
+        "material": "steel"
+      },
+      {
+        "name": "heater",
+        "type": "circle",
+        "cx": 20.0,
+        "cy": 8.0,
+        "r": 2.0,
+        "material": "copper",
+        "mesh_size": 0.5
+      }
+    ]
+  },
+  "materials": {
+    "steel": {
+      "conductivity_w_mk": 45.0,
+      "source": "document value"
+    },
+    "copper": {
+      "conductivity_w_mk": 400.0,
+      "source": "document value"
+    },
+    "insulation": {
+      "conductivity_w_mk": 0.04,
+      "source": "document value"
+    }
+  },
+  "physics": {
+    "heat1": {
+      "type": "thermal.steady2d",
+      "heat_source_w_m3": {
+        "heater": 5000000.0
+      },
+      "dirichlet_temperature_k": {
+        "bottom": 300.0
+      },
+      "convection": {
+        "top": {
+          "h_w_m2k": 10.0,
+          "ambient_temperature_k": 295.0
+        }
+      }
+    }
+  },
+  "mesh": {
+    "size": 2.0,
+    "min_angle": 28.0
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}
