@@ -175,3 +175,66 @@ class LayeredWall:
             T = T+a*np.exp(-l*t)*X
             q = q+a*np.exp(-l*t)*F
         return LayeredTransientFields(T, np.column_stack([q, np.zeros(len(x))]), i)
+
+    def _steady(self, x, i, temperature, sources):
+        """Steady state with both ends at `temperature` and per-layer sources."""
+        S = np.concatenate([[0.], np.cumsum(sources*self.width)])[:-1]
+        drop = (S*self.width+sources*self.width**2/2)/self.k
+        q0 = -np.sum(drop)/np.sum(self.width/self.k)
+        full = np.concatenate([[0.], np.cumsum(q0*self.width/self.k+drop)])[:-1]
+        d = x-self.edges[i]
+        T = temperature-full[i]-((q0+S[i])*d+sources[i]*d**2/2)/self.k[i]
+        return T, q0+S[i]+sources[i]*d
+
+    def _quadrature(self, panels=64, order=20):
+        g, w = np.polynomial.legendre.leggauss(order)
+        xs, ws, layer = [], [], []
+        for i, (lo, hi) in enumerate(zip(self.edges[:-1], self.edges[1:])):
+            cuts = np.linspace(lo, hi, panels+1)
+            for a, b in zip(cuts[:-1], cuts[1:]):
+                xs.append(a+(b-a)*(g+1)/2)
+                ws.append(w*(b-a)/2)
+                layer.append(np.full(order, i))
+        return np.concatenate(xs), np.concatenate(ws), np.concatenate(layer)
+
+    def source_amplitudes(self, *, temperature, sources, count):
+        """A_m for T(x,0) = temperature: c-weighted projections of T0 - T_s."""
+        T0 = _scalar(temperature, "temperature")
+        Q = _vector(sources, "sources", len(self.k))
+        key = (T0, tuple(Q), int(count))
+        cache = getattr(self, "_amplitude_cache", {})
+        if key in cache:
+            return cache[key]
+        self.eigenvalues(count)
+        x, w, layer = self._quadrature()
+        Ts, _ = self._steady(x, layer, T0, Q)
+        weight = w*self.c[layer]
+        amp = np.empty(count)
+        for m in range(count):
+            X, _ = self.mode(m, x, layer)
+            amp[m] = np.sum(weight*(T0-Ts)*X)/np.sum(weight*X*X)
+        cache[key] = amp
+        self._amplitude_cache = cache
+        return amp
+
+    def source_driven(self, points, time_s, *, temperature, sources, count, layer=None):
+        """Wall at uniform `temperature` with fixed ends; sources switched on at t = 0.
+
+        T = T_s + sum_{m<count} A_m X_m exp(-lambda_m t). The truncated tail is
+        not bounded here; compare two counts to measure it.
+        """
+        p = np.asarray(points)
+        if p.ndim != 2 or p.shape[1] != 2 or p.dtype.kind not in "iuf" or not np.all(np.isfinite(p)):
+            raise ValueError("points must be finite real (Q,2) metre coordinates")
+        t = _scalar(time_s, "time_s")
+        if t < 0:
+            raise ValueError("time_s must be >= 0")
+        amp = self.source_amplitudes(temperature=temperature, sources=sources, count=count)
+        x = p[:, 0].astype(float)
+        i = self.locate(x, layer)
+        T, q = self._steady(x, i, float(temperature), np.asarray(sources, dtype=float))
+        for m, (a, l) in enumerate(zip(amp, self.eigenvalues(count))):
+            X, F = self.mode(m, x, i)
+            T = T+a*np.exp(-l*t)*X
+            q = q+a*np.exp(-l*t)*F
+        return LayeredTransientFields(T, np.column_stack([q, np.zeros(len(x))]), i)
