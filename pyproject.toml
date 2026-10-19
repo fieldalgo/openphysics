@@ -9,5 +9,6 @@
 
 [tool.pytest.ini_options]
 testpaths = ["packages/galerkin/tests", "packages/galerkin-refsol/tests", "packages/meshine/tests",
-             "packages/gmshio/tests", "packages/physmat/tests", "packages/simcase/tests"]
+             "packages/gmshio/tests", "packages/physmat/tests", "packages/simcase/tests",
+             "ci/tests"]
 markers = ["slow: convergence studies that take more than a few seconds"]

@@ -8,3 +8,16 @@ use this product except in compliance with the License. A copy of the License
 is distributed with this product in the file LICENSE, and is also available at
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+THIRD-PARTY SOFTWARE
+
+simcase requires numpy, scipy, shapely and matplotlib, and its optional
+``studio`` extra requires fastapi and uvicorn. They are installed separately
+by the package installer under their own permissive licenses and are not
+included in this distribution. Wheels of shapely load the GEOS library
+(LGPL-2.1) as an unmodified shared library; simcase only calls shapely's
+public Python API.
+
+The optional test dependency ``galerkin-refsol`` is a separate FieldAlgo
+package under Apache-2.0.

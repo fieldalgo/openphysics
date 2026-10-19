@@ -47,6 +47,10 @@ jobs:
             -e packages/gmshio -e packages/physmat -e packages/simcase
           python -m pip check
           gmsh --version
+      - name: Check installed licenses against the reviewed inventory
+        run: |
+          mkdir -p .validation
+          python ci/check_licenses.py --report .validation/licenses-validation-env.json
       - name: Record CPU model and BLAS kernel
         run: |
           mkdir -p .validation

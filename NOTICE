@@ -18,3 +18,9 @@ Third-party material retains its own terms:
   and packages/galerkin/NOTICE.
 - Separately installed dependencies retain their respective licenses. The
   Apache-2.0 license here does not relicense those dependencies or datasets.
+  No third-party source code is copied into this repository.
+
+docs/third-party.md lists every third-party dependency, external program,
+dataset and published reference with its version range, SPDX license
+identifier, how it is used and its source. ci/third_party_licenses.json is the
+machine-readable inventory checked in CI by ci/check_licenses.py.

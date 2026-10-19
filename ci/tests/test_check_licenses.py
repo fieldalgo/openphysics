@@ -1,0 +1,184 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
+"""Rules of ci/check_licenses.py, exercised on synthetic installed environments."""
+
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+_spec = importlib.util.spec_from_file_location("check_licenses", ROOT / "ci" / "check_licenses.py")
+check_licenses = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(check_licenses)
+
+INVENTORY = json.loads((ROOT / "ci" / "third_party_licenses.json").read_text(encoding="utf-8"))
+
+
+def install(site, name, *, version="1.0", expression=None, license=None, classifiers=(),
+            requires=(), extras=()):
+    info = site / f"{name.replace('-', '_')}-{version}.dist-info"
+    info.mkdir(parents=True)
+    lines = ["Metadata-Version: 2.4", f"Name: {name}", f"Version: {version}"]
+    if expression:
+        lines.append(f"License-Expression: {expression}")
+    if license:
+        lines.append(f"License: {license}")
+    lines += [f"Classifier: {c}" for c in classifiers]
+    lines += [f"Provides-Extra: {e}" for e in extras]
+    lines += [f"Requires-Dist: {r}" for r in requires]
+    (info / "METADATA").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def inventory(**entries):
+    result = json.loads(json.dumps(INVENTORY))
+    result["distributions"] = entries
+    return result
+
+
+def run(site, entries, **first_party):
+    for name, kwargs in first_party.items():
+        install(site, name.replace("_", "-"), license="Apache-2.0", **kwargs)
+    return check_licenses.check([str(site)], inventory(**entries), check_docs=False)
+
+
+def test_permissive_runtime_dependency_passes(tmp_path):
+    install(tmp_path, "numlib", expression="BSD-3-Clause")
+    errors, report = run(tmp_path, {"numlib": {"spdx": "BSD-3-Clause"}},
+                         galerkin={"requires": ["numlib>=1"]})
+    assert errors == []
+    assert report["numlib"]["use"] == "runtime"
+
+
+def test_unreviewed_distribution_fails(tmp_path):
+    install(tmp_path, "surprise", expression="MIT")
+    errors, _ = run(tmp_path, {})
+    assert any("surprise" in e and "no reviewed entry" in e for e in errors)
+
+
+@pytest.mark.parametrize("spdx", ["GPL-3.0-or-later", "LGPL-2.1-or-later", "MPL-2.0"])
+def test_copyleft_runtime_dependency_fails(tmp_path, spdx):
+    install(tmp_path, "copylib", expression=spdx)
+    errors, _ = run(tmp_path, {"copylib": {"spdx": spdx, "test_only": True}},
+                    galerkin={"requires": ["copylib"]})
+    assert any("not allowed for runtime use" in e for e in errors)
+
+
+def test_copyleft_through_optional_extra_fails(tmp_path):
+    install(tmp_path, "webstack", expression="MIT", requires=["weakdep"])
+    install(tmp_path, "weakdep", expression="LGPL-3.0-or-later")
+    errors, report = run(tmp_path, {"webstack": {"spdx": "MIT"},
+                                    "weakdep": {"spdx": "LGPL-3.0-or-later", "test_only": True}},
+                         simcase={"requires": ['webstack; extra == "studio"'], "extras": ["studio"]})
+    assert report["weakdep"]["use"] == "optional"
+    assert any("weakdep" in e and "optional use" in e for e in errors)
+
+
+def test_weak_copyleft_allowed_only_when_marked_test_only(tmp_path):
+    install(tmp_path, "certs", expression="MPL-2.0")
+    first_party = {"simcase": {"requires": ['certs; extra == "test"'], "extras": ["test"]}}
+    errors, report = run(tmp_path, {"certs": {"spdx": "MPL-2.0", "test_only": True}}, **first_party)
+    assert errors == [] and report["certs"]["use"] == "test"
+    other = tmp_path / "unmarked"
+    install(other, "certs", expression="MPL-2.0")
+    errors, _ = run(other, {"certs": {"spdx": "MPL-2.0"}}, **first_party)
+    assert any("not allowed for test use" in e for e in errors)
+
+
+def test_named_test_extras_are_test_only(tmp_path):
+    install(tmp_path, "reftool", expression="MPL-2.0")
+    errors, report = run(tmp_path, {"reftool": {"spdx": "MPL-2.0", "test_only": True}},
+                         galerkin={"requires": ['reftool; extra == "crosscheck"'], "extras": ["crosscheck"]})
+    assert errors == [] and report["reftool"]["use"] == "test"
+
+
+def test_strictest_path_wins(tmp_path):
+    install(tmp_path, "shared", expression="MIT")
+    errors, report = run(tmp_path, {"shared": {"spdx": "MIT"}},
+                         galerkin={"requires": ["shared"]},
+                         simcase={"requires": ['shared; extra == "test"'], "extras": ["test"]})
+    assert errors == [] and report["shared"]["use"] == "runtime"
+
+
+def test_gpl_requires_external_process_entry(tmp_path):
+    install(tmp_path, "mesher", license="GPLv2+",
+            classifiers=["License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)"])
+    errors, _ = run(tmp_path, {"mesher": {"spdx": "GPL-2.0-or-later"}})
+    assert any("not allowed for tool use" in e for e in errors)
+    external = {"spdx": "GPL-2.0-or-later",
+                "external_process": {"executable": "mesher", "forbidden_imports": ["mesher_never_imported"]}}
+    errors, report = run(tmp_path, {"mesher": external})
+    assert errors == [] and report["mesher"]["use"] == "external-process"
+
+
+def test_external_process_cannot_be_base_runtime(tmp_path):
+    install(tmp_path, "mesher", license="GPLv2+")
+    external = {"spdx": "GPL-2.0-or-later",
+                "external_process": {"executable": "mesher", "forbidden_imports": ["mesher_never_imported"]}}
+    errors, _ = run(tmp_path, {"mesher": external}, gmshio={"requires": ["mesher"]})
+    assert any("cannot be a base runtime requirement" in e for e in errors)
+
+
+def test_first_party_import_of_external_tool_is_detected():
+    # numpy is imported by first-party code, so treating it as external must fail.
+    assert check_licenses.first_party_imports({"numpy"})
+    assert check_licenses.first_party_imports({"gmsh"}) == []
+
+
+@pytest.mark.parametrize("spdx", ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only"])
+def test_agpl_is_never_allowed(tmp_path, spdx):
+    install(tmp_path, "netlib", expression=spdx)
+    errors, _ = run(tmp_path, {"netlib": {"spdx": spdx, "test_only": True}})
+    assert any("never allowed" in e for e in errors)
+
+
+def test_metadata_change_must_be_reviewed(tmp_path):
+    install(tmp_path, "drift", expression="MIT AND LGPL-2.1-only")
+    errors, _ = run(tmp_path, {"drift": {"spdx": "MIT"}})
+    assert any("metadata declares" in e for e in errors)
+    assert any("mentions a copyleft license" in e for e in errors)
+
+
+def test_undeclared_copyleft_classifier_needs_review(tmp_path):
+    install(tmp_path, "mixed", classifiers=["License :: OSI Approved :: GNU General Public License (GPL)"])
+    errors, _ = run(tmp_path, {"mixed": {"spdx": "BSD-2-Clause"}})
+    assert any("mentions a copyleft license" in e for e in errors)
+    reviewed = tmp_path / "reviewed"
+    install(reviewed, "mixed", classifiers=["License :: OSI Approved :: GNU General Public License (GPL)"])
+    errors, _ = run(reviewed, {"mixed": {"spdx": "BSD-2-Clause", "metadata_review": "files outside the wheel"}})
+    assert errors == []
+
+
+def test_first_party_must_declare_apache(tmp_path):
+    install(tmp_path, "meshine", license="MIT")
+    errors, _ = check_licenses.check([str(tmp_path)], inventory(), check_docs=False)
+    assert any("first-party metadata must declare Apache-2.0" in e for e in errors)
+
+
+@pytest.mark.parametrize("expression, allowed, expected", [
+    ("Apache-2.0 OR BSD-3-Clause", {"BSD-3-Clause"}, True),
+    ("MIT AND (Zlib OR GPL-3.0-only)", {"MIT", "Zlib"}, True),
+    ("MIT AND (Zlib OR GPL-3.0-only)", {"MIT"}, False),
+    ("GPL-3.0-or-later WITH GCC-exception-3.1", {"MIT"}, False),
+])
+def test_spdx_expression_evaluation(expression, allowed, expected):
+    assert check_licenses.satisfies(check_licenses.parse_expression(expression), allowed) is expected
+
+
+def test_inventory_entries_are_valid_and_documented():
+    policy = INVENTORY["policy"]
+    known = set(policy["permissive"]) | set(policy["weak_copyleft"]) | {"GPL-2.0-or-later"}
+    for name, entry in INVENTORY["distributions"].items():
+        ids = check_licenses.identifiers(check_licenses.parse_expression(entry["spdx"]))
+        assert ids <= known, (name, ids)
+        assert entry["url"].startswith("https://"), name
+        if ids & set(policy["weak_copyleft"]):
+            assert entry.get("test_only") and entry.get("review"), name
+        if "GPL-2.0-or-later" in ids:
+            assert "external_process" in entry, name
+    for doc in check_licenses.DOCS:
+        text = doc.read_text(encoding="utf-8")
+        for name in INVENTORY["distributions"]:
+            assert f"`{name}`" in text, (doc.name, name)

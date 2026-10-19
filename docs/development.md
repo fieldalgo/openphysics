@@ -50,6 +50,7 @@ export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # full source suite
 node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
 python ci/check_distributions.py           # build, inspect and install all packages
+python ci/check_licenses.py                # installed licenses vs. the reviewed inventory
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -96,18 +97,24 @@ varies.
 **Distribution checks** (`ci/check_distributions.py`). Builds all seven packages
 (including the empty `openphysics` name reservation), each wheel from its sdist,
 with pinned build tools. It checks metadata with `twine check --strict`,
-LICENSE/NOTICE files, Studio assets, and that every file in the checker's
+that every sdist and wheel carries its package's LICENSE and NOTICE unchanged, Studio assets, and that every file in the checker's
 required list is present and byte-identical in its sdist. Relative Markdown links
 inside archives must resolve; external URLs are not fetched. Wheels are then
 installed into a fresh environment outside the checkout and exercised through
 their public API, CLI and saved files, the shipped examples and the independent
 acceptance consumers, with `python -I` so the checkout cannot leak in. The
+installed environment must pass `ci/check_licenses.py`. The
 Studio browser check runs a small real model in Chrome. Finally
 `ci/tools/audit_distribution_artifacts.py` re-checks the retained archives'
 checksums and wheel bytes.
 
+**Licenses** (`ci/check_licenses.py`). Before the tests, the pinned validation
+environment, and later each fresh installed environment, is compared with the
+reviewed inventory in `ci/third_party_licenses.json`. Policy and the full list
+are in [third-party software](third-party.md).
+
 **Installed platforms** (`ci/tools/check_platform_install.py`). On each OS:
-package bytes, installed module origins, bundled assets, public API/CLI/save
+installed licenses, package bytes, installed module origins, bundled assets, public API/CLI/save
 smoke tests, the heat save/I-O robustness tests (partial-failure cleanup,
 simultaneous writers, existing targets) and two source target-protection
 fixtures. This is installed acceptance, not a full macOS or Windows regression.
