@@ -1,6 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Build sdists, rebuild wheels, and audit a fresh installed consumer on this OS."""
+"""Build sdists, rebuild wheels, and audit a fresh installed consumer on this OS.
+
+Also runs the installed heat API/CLI and save/I-O robustness consumers (partial
+failures, simultaneous writers, existing targets, replacement and ownership)
+on every platform. Until 2026-10-19 these ran only in a separate Windows
+workflow (thermal-windows.yml) with the same selection.
+"""
 import argparse
 from email.parser import BytesParser
 import hashlib
@@ -39,6 +45,9 @@ def main():
         "commit": os.environ.get("GITHUB_SHA"),
         "scope": "six installed packages; external Gmsh not executed",
     }, indent=2)+"\n", encoding="utf-8")
+    # CPU model and BLAS kernel of this runner, for last-bit numerical differences.
+    subprocess.run([sys.executable, "-I", str(ROOT / "ci" / "tools" / "report_numeric_runtime.py"),
+                    "--json", str(output / "numeric-runtime.json")], check=True)
     commands = []
     env = {**os.environ, "MPLBACKEND": "Agg", "OPENBLAS_NUM_THREADS": "1",
            "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
@@ -151,7 +160,13 @@ def main():
             ROOT / "ci" / "test_platform_install.py": tests / "test_platform_install.py",
             ROOT / "ci" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
             ROOT / "packages/simcase/tests/test_simcase.py": tests / "original_scalar.py",
-            ROOT / "packages/gmshio/tests/test_msh.py": tests / "test_msh.py"}
+            ROOT / "packages/gmshio/tests/test_msh.py": tests / "test_msh.py",
+            # Save/I-O robustness consumers (see the module docstring).
+            ROOT / "packages/simcase/tests/test_thermal.py": tests / "test_shipped_thermal_io.py",
+            ROOT / "packages/simcase/tests/test_transient_headless_windows.py":
+                tests / "test_transient_headless_windows.py",
+            ROOT / "packages/simcase/tests/test_steady_boundary_platform.py":
+                tests / "test_steady_boundary_platform.py"}
         for source, destination in copies.items():
             shutil.copy2(source, destination)
         shutil.copytree(ROOT / "packages/gmshio/tests/data", tests / "data")
@@ -177,6 +192,25 @@ def main():
             tests / "test_msh.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
+        # Installed save/I-O robustness: every transient and steady-boundary platform
+        # consumer, plus the save-ownership subset of the shipped thermal tests.
+        io_selection = ("not test_shipped_thermal_io or partial_failure_safe_cleanup or "
+                        "simultaneous_writers_preserve_winner or existing_target_unchanged or "
+                        "fields_disabled_cli_and_expected_errors or cli_nonfinite_summary_exit1")
+        run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra", "--confcutdir", tests,
+            "-k", io_selection, "--junitxml=" + str(output / "installed-io-tests.xml"),
+            tests / "test_shipped_thermal_io.py", tests / "test_transient_headless_windows.py",
+            tests / "test_steady_boundary_platform.py", cwd=work)
+        # Target protection from the same consumer files with the checkout's root
+        # conftest selecting this exact source for API imports; the CLI subprocesses
+        # stay isolated and use the installed wheels built from the same checkout.
+        for name, selection, test_file in (
+                ("source-target", "api_and_cli_preserve_existing_target",
+                 ROOT / "ci" / "test_thermal_simcase_wheel.py"),
+                ("steady-boundary-source-target", "test_boundary_api_and_cli_preserve_existing_target",
+                 ROOT / "packages" / "simcase" / "tests" / "test_steady_boundary_platform.py")):
+            run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra", "--confcutdir", ROOT,
+                "-k", selection, "--junitxml=" + str(output / f"{name}-tests.xml"), test_file, cwd=ROOT)
 
 
 if __name__ == "__main__":

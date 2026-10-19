@@ -29,9 +29,8 @@ and supersede earlier runs. This is a workflow queue, not a PR merge queue.
 
 | Workflow | Platform | Coverage |
 |---|---|---|
-| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | Full source suite, seven distributions, strict archive/document checks, installed consumers and Studio Node checks |
-| `thermal-windows.yml` | Windows 2022, Python 3.12.10 | Existing installed heat and save-ownership regressions |
-| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | Six implementation sdists rebuilt as wheels; fresh isolated consumer environment; package bytes, module origins, bundled assets and public API/CLI/save smoke |
+| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | Full source suite, seven distributions, strict archive/document checks, installed consumers, Studio Node checks, and sensitive numerical tests under two forced BLAS kernels (`blas-kernels`) |
+| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | Six implementation sdists rebuilt as wheels; fresh isolated consumer environment; package bytes, module origins, bundled assets, public API/CLI/save smoke and heat save/I-O robustness |
 
 The installed matrix reuses the exact portable pins in
 `ci/requirements-py312-windows-thermal.txt`; that historical filename does not
@@ -63,48 +62,79 @@ Python 3.10/3.11 remain outside this CI matrix despite the package metadata floo
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
-The retained GitHub Actions Linux, narrow Windows and platform-install workflows
+The GitHub Actions Linux validation and platform-install workflows
 run on main pushes, Ready
 pull requests and explicit manual dispatch. Check each exact run, exit status and artifact; enabling
 CI does not itself establish acceptance. Earlier Work-cloud results retain
 their original source, environment and scope.
 
 `platform-install.yml` is a reusable workflow called by `validate.yml`, so the
-existing required `tests` aggregate waits for both full Linux acceptance and
-every installed-platform matrix job. A failed or skipped platform prevents that
+required `tests` aggregate waits for full Linux acceptance, both forced BLAS
+kernels and every installed-platform matrix job. A failed or skipped platform prevents that
 aggregate from passing. This preserves the existing protection names and avoids
 an independent, non-blocking platform workflow. It also supports explicit manual
 dispatch; a standalone manual run does not replace PR validation.
 
-## Narrow Windows headless thermal gate
+## Installed save/I-O robustness on every platform
 
-`thermal-windows.yml` runs Python 3.12.10 on GitHub-hosted windows-2022. It
-builds four local wheels (galerkin, meshine, physmat, simcase), installs them
-without an index or dependency resolution into a consumer venv, and runs the
-dedicated heat document consumers plus selected shipped save/I/O tests outside
-the checkout with `python -I`. The selected tests exercise actual API/CLI saves,
-numeric raw output, existing files/directories/dangling links, partial failures,
-file/directory replacement and concurrent ownership. Failures are not skipped.
-The consumer venv reuses the pinned job dependencies through system-site-packages;
-this is not a clean-room dependency installation.
+Since 2026-10-19 the installed matrix (`platform-install.yml`, through
+`ci/tools/check_platform_install.py`) also runs the heat save/I-O robustness
+consumers on Ubuntu, macOS and Windows: every case in
+`test_transient_headless_windows.py` and `test_steady_boundary_platform.py`, and
+the save-ownership subset of the shipped `test_thermal.py` (partial-failure
+cleanup, simultaneous writers, unchanged existing targets, disabled fields and
+expected CLI errors, non-finite summaries). They run outside the checkout with
+`python -I` against the wheels built from the same checkout. Two source
+target-protection fixtures then run with the checkout's root conftest selecting
+this exact source for API imports while their CLI subprocesses stay isolated.
+The selections are the same ones the former Windows-only workflow used.
 
-The Windows requirements reuse a minimal subset of the Linux exact versions.
-The Windows pytest/build transitive `colorama==0.4.6` is pinned separately; its
-upstream tag identifies BSD-3-Clause in pyproject metadata and LICENSE.txt.
-No runtime requirement or package version is changed. This gate does not certify
-Windows full regression, optical/Gmsh behavior or broader OS/Python support.
-The hard-link file-pin candidate `636a23a` passed 36 installed API/CLI/save cases
-and 3 source target-protection cases on this runner
-([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
-The unchanged replacement fixtures now pass; previous failures remain historical
-evidence. This is narrow acceptance, not full Windows or macOS support.
-Saving on Windows requires a filesystem supporting same-volume hard links and
-exclusive caller control of temporary sibling pin directories. Unsupported
-filesystems fail explicitly. See the [save contract](../../packages/simcase/docs/thermal_steady2d.md).
-Windows logs/JUnit/environment and four wheel checksums use the separate
-`windows-thermal-installed-and-io-<run_id>` artifact. Linux full source, all seven
-sdist-to-wheel/strict/metadata/byte/link gates and the existing 88 consumers remain
+Until then these consumers ran only in a separate Windows workflow
+(`thermal-windows.yml`, required check `windows-py312-thermal`), which built four
+wheels into a consumer venv that reused the job's pinned dependencies through
+system-site-packages. That workflow is retired: the installed matrix already
+built the same wheels on Windows in a clean venv and ran
+`test_thermal_simcase_wheel.py` again, and macOS ran none of the save-robustness
+cases. Its last run on `bcc8030` passed 74 installed cases (62 deselected) and
+3 + 3 source target-protection cases. Earlier results, including the hard-link
+file-pin candidate `636a23a` (36 installed API/CLI/save cases and 3 source
+target-protection cases,
+[run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)), remain
+historical evidence. This is installed acceptance, not full Windows or macOS
+regression. Saving on Windows requires a filesystem supporting same-volume hard
+links and exclusive caller control of temporary sibling pin directories.
+Unsupported filesystems fail explicitly. See the
+[save contract](../../packages/simcase/docs/thermal_steady2d.md). The JUnit
+files `installed-io-tests.xml`, `source-target-tests.xml` and
+`steady-boundary-source-target-tests.xml` are in each
+`installed-packages-<os>-<run_id>` artifact. Linux full source, all seven
+sdist-to-wheel/strict/metadata/byte/link gates and the existing consumers remain
 required. The Linux Node step also runs the shipped `studio_thermal.cjs` guards.
+
+## CPU model, BLAS kernel and last-bit differences
+
+Hosted runners are fresh virtual machines whose CPU model can change between
+runs of the same commit. numpy's bundled OpenBLAS (`DYNAMIC_ARCH`) selects its
+kernel from that CPU, so last-bit floating-point results can differ even with
+identical pins, seeds and `OPENBLAS_NUM_THREADS=1`. On 2026-10-19 a test that
+compared exactly at such a boundary passed on a PR run and failed on the main
+run of the same code; forcing kernels locally reproduced both outcomes.
+
+- `ci/tools/report_numeric_runtime.py` records the CPU model, the OpenBLAS kernel
+  in use and `numpy.show_runtime()`. The Linux job writes
+  `.validation/numeric-runtime.json` and every installed platform writes
+  `numeric-runtime.json` into its artifact.
+- The `blas-kernels` job in `validate.yml` runs the numerically sensitive
+  tracking, eigenspace and fiber-reference tests (not `slow`) twice with
+  `OPENBLAS_CORETYPE` forced to `Haswell` (AVX2, also the kernel used on AMD
+  Zen) and `Sandybridge` (AVX). These round differently for the cases above. The
+  job first confirms the forced kernel is active, so a fallback cannot pass
+  silently. It runs in parallel with the Linux job and the `tests` aggregate
+  requires it.
+
+Write tests so they do not depend on last-bit rounding: compare with explicit
+tolerances that are well clear of roundoff, never exactly at a boundary that
+roundoff can reach.
 
 The headless heat consumer adds independent SI slab and signed mixed-source
 closed forms, unique corner constraints, numeric version/units/shape checks and
@@ -406,12 +436,14 @@ The new Python API applies total physical `sigma*n` on the prescribed-temperatur
 
 Individual candidate measurements90/90/isolated4/related208/wrong17 do not establish a combined whole or installed result. The independent report preserves the original whole1385pass/7CLI-environment failures/16skip/+9subtests and target7 recovery as distinct evidence. New results must identify the exact source and real archives, actual failures and optional skips. GitHub Actions is enabled; distinguish new workflow results from these historical measurements. Linux results cannot establish Windows acceptance, and core metadata parsing does not substitute for unavailable twine strict checks.
 
-Both workflows gate every main-targeted PR, including documentation changes.
-Their required check names are `tests` (the always-run Linux completion job)
-and `windows-py312-thermal`. Green PRs land via GitHub Rebase and merge;
+This workflow gates every main-targeted PR, including documentation changes.
+Its single required check is `tests`, the always-run completion job that
+requires Linux acceptance, both forced BLAS kernels and all three installed
+platforms (including Windows and macOS save/I-O robustness). Until 2026-10-19
+`windows-py312-thermal` from the retired Windows workflow was also required. Green PRs land via GitHub Rebase and merge;
 record the new main SHA and require green main checks before releasing.
 Main push runs are never cancelled by a newer push; branch/PR runs may be superseded.
-Tags do not trigger these workflows, and neither workflow publishes packages.
+Tags do not trigger these workflows, and none of them publishes packages.
 ## Transient heat distribution checks
 
 This checkout contains the transient heat implementation and its verification gates.
@@ -498,12 +530,12 @@ is separate from installed pytest and the engine's 17-case independent suite.
 The verified JSON example is consumed by isolated CLI validate/run with a fresh
 output directory. Source tests remain part of the complete root pytest command.
 
-The narrow Windows job adds all 12 tests in
-`test_transient_headless_windows.py` to its existing installed selection and
-retains the existing steady installed and source target-protection tests.
-It records explicit installed module origins/hashes before consumers. These
-checks do not constitute full Windows transient PDE or macOS acceptance; inspect
-the exact run's failures, skips, counts and artifacts.
+The installed matrix runs all 12 tests in `test_transient_headless_windows.py`
+with the steady installed and source target-protection tests on Ubuntu, macOS
+and Windows (formerly in the narrow Windows job only). It records installed
+module origins and byte hashes before consumers. These checks do not constitute
+full Windows or macOS transient PDE acceptance; inspect the exact run's
+failures, skips, counts and artifacts.
 
 After a successful build/consumer run, the Linux workflow independently audits
 the retained archive bytes without repeating consumers:

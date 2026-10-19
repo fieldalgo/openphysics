@@ -29,9 +29,8 @@ CI를 실행하지 않으며 Linux 집계 작업을 포함한 모든 검증 작�
 
 | Workflow | 플랫폼 | 검증 범위 |
 |---|---|---|
-| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | 전체 소스 시험, 일곱 배포판, 엄격한 archive/문서 검사, 설치 소비자와 Studio Node 검사 |
-| `thermal-windows.yml` | Windows 2022, Python 3.12.10 | 기존 설치 열전도와 저장 소유권 회귀 시험 |
-| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | 여섯 구현 sdist에서 wheel 재빌드; 새 격리 소비자 환경; 패키지 바이트·모듈 출처·번들 자산 및 공개 API/CLI/저장 smoke |
+| `validate.yml` | Ubuntu 24.04, Python 3.12.14 | 전체 소스 시험, 일곱 배포판, 엄격한 archive/문서 검사, 설치 소비자, Studio Node 검사, 강제한 BLAS 커널 두 가지에서의 민감한 수치 시험(`blas-kernels`) |
+| `platform-install.yml` | Ubuntu 24.04, macOS 14, Windows 2022; Python 3.12.10 | 여섯 구현 sdist에서 wheel 재빌드; 새 격리 소비자 환경; 패키지 바이트·모듈 출처·번들 자산, 공개 API/CLI/저장 smoke, 열전도 저장/I-O 견고성 |
 
 설치 검증표는 `ci/requirements-py312-windows-thermal.txt`의 기존 이식 가능한
 정확 pin을 재사용합니다. 이 과거 파일명이 검증표를 Windows로 한정하지 않습니다.
@@ -57,7 +56,7 @@ python -X utf8 ci/tools/check_platform_install.py
 패키지 metadata 최소 버전과 별개로 Python 3.10/3.11은 이 CI 검증표 범위 밖입니다.
 
 `platform-install.yml`은 `validate.yml`이 호출하는 재사용 workflow입니다.
-기존 필수 `tests` 집계가 전체 Linux 수용과 설치 플랫폼의 모든 작업을 기다리며,
+필수 `tests` 집계가 전체 Linux 수용, 강제한 BLAS 커널 두 가지, 설치 플랫폼의 모든 작업을 기다리며,
 플랫폼 하나가 실패하거나 skip되면 집계도 통과하지 않습니다. 기존 보호 규칙의
 검사 이름을 유지하면서 플랫폼 검사가 병합에 필수로 작용합니다. 명시적 수동
 dispatch도 지원하지만 독립 수동 실행은 PR 검증을 대체하지 않습니다.
@@ -68,7 +67,7 @@ dispatch도 지원하지만 독립 수동 실행은 PR 검증을 대체하지 �
 
 기존 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`이며 아래 내용은 현재 검토 후보의 영문 변경과 동기화했습니다.
 
-GitHub Actions의 Linux 패키지·좁은 Windows·설치 플랫폼 workflow는 main push·Ready PR·명시적 수동 dispatch에서 실행합니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
+GitHub Actions의 Linux 검증·설치 플랫폼 workflow는 main push·Ready PR·명시적 수동 dispatch에서 실행합니다. 정확한 실행·종료값·artifact를 확인해야 하며 활성화 자체가 수용을 뜻하지는 않습니다. 과거 Work cloud 결과는 원래 소스·환경·범위의 근거로 유지합니다.
 
 루트 `validate.yml` workflow는 main push·Ready PR·수동 dispatch에서 실행됩니다.
 Ubuntu 24.04의 CPython 3.12.14와 Node.js 24.19.0을 시험합니다. Python 3.10/3.11은 이 CI 검증 범위 밖이며
@@ -262,29 +261,53 @@ edge 하중, edge 반전에서 외향 콜백 법선, 처방 DOF에도 남는 적
 검사합니다. 과거 전체 환경 run의 699 passed / 9 failed / 9 skipped를 통과로
 다시 분류하지 않습니다. 독립 보고된 설치 45개와 원래 쌍 84개는 각각의 범위입니다.
 
-## 좁은 Windows 헤드리스 열전도 gate
+## 모든 플랫폼의 설치 저장/I-O 견고성
 
-`thermal-windows.yml`은 GitHub-hosted windows-2022의 Python 3.12.10을 정의합니다.
-네 로컬 wheel(galerkin, meshine, physmat, simcase)을 빌드하고 index·의존성 해석 없이
-consumer venv에 설치합니다. checkout 밖 `python -I`로 전용 열 문서 consumer와
-선택된 저장 I/O 시험을 실행하도록 정의했습니다. API/CLI 저장, 수치 raw 출력,
-기존 파일·디렉터리·끊어진 링크, 부분 실패, 파일·디렉터리 교체와 동시 소유권을 다룹니다.
-실패는 skip하지 않습니다. consumer venv는 system-site-packages로 고정 job 의존성을
-재사용하므로 clean-room 의존성 설치가 아닙니다.
+2026-10-19부터 설치 검증표(`platform-install.yml`, `ci/tools/check_platform_install.py`)가
+Ubuntu·macOS·Windows에서 열전도 저장/I-O 견고성 consumer도 실행합니다. 대상은
+`test_transient_headless_windows.py`와 `test_steady_boundary_platform.py`의 모든 시험, 그리고
+shipped `test_thermal.py`의 저장 소유권 부분(부분 실패 정리, 동시 writer, 기존 대상 보존,
+장 저장 끔과 예상 CLI 오류, 비유한 summary)입니다. 같은 checkout에서 빌드한 wheel로
+checkout 밖에서 `python -I`로 실행합니다. 이어서 source 대상보호 fixture 두 개를 실행하는데,
+API import는 checkout의 루트 conftest가 이 정확한 source를 고르고 CLI 하위 프로세스는 격리된
+상태를 유지합니다. 선택 조건은 이전 Windows 전용 workflow와 같습니다.
 
-Windows 요구는 Linux exact version의 최소 부분집합입니다. pytest/build 전이 의존성
-`colorama==0.4.6`은 별도 pin이며 upstream tag의 pyproject와 LICENSE.txt에서
-BSD-3-Clause를 확인했습니다. runtime 요구나 패키지 버전은 바꾸지 않았습니다.
-Windows 전체 회귀·광학/Gmsh·다른 OS/Python 지원을 인증하지 않습니다.
-hard-link 파일 pin 후보 `636a23a`는 같은 runner에서 설치 API·CLI·저장 36개와
-source 기존 대상 보호 3개가 통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
-기존 교체 fixture를 바꾸지 않고 통과했으며 이전 실패는 역사적 근거로 보존합니다.
-Windows 전체·macOS 지원은 아닙니다. Windows 저장은 동일 볼륨 hard link를 지원하는
-파일시스템과 임시 인접 pin 디렉터리에 대한 호출자의 독점 제어가 필요하며 미지원 시
-명시적으로 실패합니다. [저장 계약](../../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md)을 참고하세요. Windows log/JUnit/
-환경·네 wheel checksum은 별도 `windows-thermal-installed-and-io-<run_id>` artifact입니다.
-Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 88 consumer는
-유지되며 Node는 shipped `studio_thermal.cjs`도 실행하도록 정의했습니다.
+그 전까지 이 consumer는 별도 Windows workflow(`thermal-windows.yml`, 필수 검사
+`windows-py312-thermal`)에서만 돌았습니다. 이 workflow는 네 wheel을 빌드해 system-site-packages로
+job의 고정 의존성을 재사용하는 consumer venv에 설치했습니다. 이제 폐지했습니다. 설치 검증표가
+이미 Windows에서 같은 wheel을 깨끗한 venv에 빌드하고 `test_thermal_simcase_wheel.py`를
+한 번 더 돌리고 있었고, macOS에서는 저장 견고성 시험이 하나도 돌지 않았기 때문입니다.
+`bcc8030`에서의 마지막 실행은 설치 74개(62개 제외)와 source 대상보호 3 + 3개가 통과했습니다.
+hard-link 파일 pin 후보 `636a23a`(설치 API·CLI·저장 36개와 source 대상보호 3개,
+[실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)) 등 이전 결과는 역사적
+근거로 보존합니다. 이것은 설치 수용이며 Windows·macOS 전체 회귀가 아닙니다. Windows 저장은
+동일 볼륨 hard link를 지원하는 파일시스템과 임시 인접 pin 디렉터리에 대한 호출자의 독점
+제어가 필요하며 미지원 시 명시적으로 실패합니다.
+[저장 계약](../../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md)을 참고하세요.
+JUnit 파일 `installed-io-tests.xml`, `source-target-tests.xml`,
+`steady-boundary-source-target-tests.xml`은 각 `installed-packages-<os>-<run_id>` artifact에
+있습니다. Linux 전체 source, 일곱 sdist→wheel/strict/metadata/byte/link와 기존 consumer는
+유지되며 Node는 shipped `studio_thermal.cjs`도 실행합니다.
+
+## CPU 기종, BLAS 커널, 마지막 비트 차이
+
+hosted runner는 실행마다 새 가상머신이며 CPU 기종이 바뀔 수 있습니다. numpy에 번들된
+OpenBLAS(`DYNAMIC_ARCH`)는 그 CPU에 맞춰 커널을 고르므로, 고정 버전·시드·
+`OPENBLAS_NUM_THREADS=1`이 같아도 마지막 비트의 부동소수점 결과가 달라질 수 있습니다.
+2026-10-19에 그런 경계에서 정확히 비교하던 시험이 같은 코드의 PR 실행에서는 통과하고
+main 실행에서는 실패했으며, 로컬에서 커널을 강제해 두 결과를 모두 재현했습니다.
+
+- `ci/tools/report_numeric_runtime.py`가 CPU 기종, 사용 중인 OpenBLAS 커널,
+  `numpy.show_runtime()`을 기록합니다. Linux job은 `.validation/numeric-runtime.json`을,
+  각 설치 플랫폼은 artifact에 `numeric-runtime.json`을 남깁니다.
+- `validate.yml`의 `blas-kernels` job은 수치에 민감한 추적·고유공간·광섬유 기준 시험(`slow`
+  제외)을 `OPENBLAS_CORETYPE`을 `Haswell`(AVX2, AMD Zen에서도 쓰는 커널)과
+  `Sandybridge`(AVX)로 강제해 두 번 실행합니다. 이 두 커널은 위 사례에서 반올림이 서로
+  다릅니다. job은 먼저 강제한 커널이 실제로 적용됐는지 확인하므로, 다른 커널로 대체돼
+  조용히 통과할 수 없습니다. Linux job과 병렬로 돌며 `tests` 완료 검사가 이 결과를 요구합니다.
+
+시험은 마지막 비트 반올림에 의존하지 않게 작성합니다. 반올림보다 충분히 큰 명시적 허용치로
+비교하고, 반올림이 닿을 수 있는 경계에서 정확히 비교하지 않습니다.
 
 새 headless consumer는 독립 SI slab·부호 있는 혼합 열원 폐형식, 모서리 구속,
 수치 version/units/shape와 검증 archive JSON 예제를 검사합니다. 유한요소 smoke의
@@ -350,12 +373,14 @@ wheel의 `python -I`로 실행합니다. guard는 source에 두어 6개 시험�
 
 개별 후보의90/90/전용4/관련208/wrong17 실측이 결합 whole·설치 결과를 입증하지는 않습니다. 독립 보고는 원 whole1385통과/CLI환경7실패/16skip/+하위9와 target7회복을 별개 근거로 보존합니다. 새 결과에는 정확 source·실제 archive·실패·선택적 skip을 명시해야 합니다. GitHub Actions는 활성화돼 있으며 새 workflow 결과와 이 과거 실측은 구분해야 합니다. Linux 결과로 Windows 수용을 입증할 수 없고 core metadata 파싱이 미가용 twine strict 검사를 대체하지 않습니다.
 
-두 workflow는 문서를 포함한 모든 main 대상 PR의 필수 검사입니다. 검사명은
-`tests`(항상 실행하는 Linux 완료 job)와 `windows-py312-thermal`입니다.
+이 workflow는 문서를 포함한 모든 main 대상 PR의 필수 검사입니다. 필수 검사는
+`tests` 하나이며, 항상 실행하는 이 완료 job이 Linux 수용, 강제한 BLAS 커널 두 가지, 세 설치
+플랫폼(Windows·macOS 저장/I-O 견고성 포함)을 모두 요구합니다. 2026-10-19까지는 폐지된
+Windows workflow의 `windows-py312-thermal`도 필수였습니다.
 초록 PR은 GitHub Rebase and merge로 반영하며 새 main SHA를 기록하고
 릴리스 전에 main의 필수 검사 성공을 확인합니다. 뒤 push가 main 실행을 취소하지
 않으며 기능 브랜치·PR 실행은 대체될 수 있습니다. 태그는 이 workflow를 실행하지
-않고 두 workflow 모두 패키지를 게시하지 않습니다.
+않고 어느 workflow도 패키지를 게시하지 않습니다.
 ## 과도 열전도 배포 검사
 
 이 checkout에는 과도 열전도 구현과 검증 gate가 있습니다. 전체 물리·독립·배포
@@ -428,10 +453,10 @@ checkout 밖에서 `python -I`로 import합니다. `installed-module-hashes.json
 검증된 JSON 예제는 격리 CLI validate/run으로 소비하며 새 출력 경로를 사용합니다.
 source 시험은 저장소 루트의 전체 pytest 명령에 포함됩니다.
 
-좁은 Windows job은 기존 설치 선택에 `test_transient_headless_windows.py`의
-12개를 모두 추가하고, 기존 steady 설치 및 source 대상보호 시험을 유지합니다.
-소비자 전에 명시적인 설치 모듈 origin/hash를 기록합니다. 이 검사는 전체
-Windows 과도 PDE나 macOS 수용이 아니며 정확 run의 실패·skip·개수·artifact를 확인해야 합니다.
+설치 검증표는 `test_transient_headless_windows.py`의 12개 전부와 steady 설치·source
+대상보호 시험을 Ubuntu·macOS·Windows에서 실행합니다(이전에는 좁은 Windows job에서만).
+소비자 전에 설치 모듈 origin과 byte hash를 기록합니다. 이 검사는 전체 Windows·macOS
+과도 PDE 수용이 아니며 정확 run의 실패·skip·개수·artifact를 확인해야 합니다.
 
 build/consumer 성공 뒤 Linux workflow는 소비자를 반복하지 않고 보존 archive bytes를
 독립적으로 감사합니다.

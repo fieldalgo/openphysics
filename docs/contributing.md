@@ -56,8 +56,9 @@ OS or a universal wheel; inspect the exact run and retain failures and artifacts
 current `origin/main`, push it and open a pull request targeting `main`. Preserve
 shared or submitted history; use a new branch if replaying it is necessary.
 Every change, including documentation, requires the `tests` completion check
-(Linux source, distributions, Studio and all three installed-platform checks)
-and `windows-py312-thermal` from GitHub Actions. Review the exact candidate's logs and artifacts, not only its badge.
+from GitHub Actions. It covers Linux source, distributions and Studio, the
+numerically sensitive tests under two forced BLAS kernels, and all three
+installed-platform checks including save/I-O robustness. Review the exact candidate's logs and artifacts, not only its badge.
 
 Land green PRs through GitHub **Rebase and merge**. Direct pushes, merge commits,
 squash merges, force pushes and deleting main are blocked. No approving review
