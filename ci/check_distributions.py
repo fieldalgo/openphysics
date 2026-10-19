@@ -232,6 +232,7 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/transient_headless_independent_consumer.py',
               'docs/cavity3d.md',
              'examples/cavity_box.json',
+             'examples/cavity_lossy_slab.json',
              'docs/geometry.png',
              'docs/results.png',
              'docs/thermal_steady2d.md',

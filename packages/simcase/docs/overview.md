@@ -40,7 +40,7 @@ prints a supplied example.
 | Physics type | What it solves | Examples | Contract |
 |---|---|---|---|
 | `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
-| `em.cavity3d` | Vacuum rectangular PEC-box eigenmodes, SI JSON/NPZ output | `cavity_box` | [Cavity document](cavity3d.md) |
+| `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](cavity3d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
 

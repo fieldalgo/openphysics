@@ -1,4 +1,4 @@
-# Vacuum PEC box document and results
+# Rectangular cavity document and results
 
 The product contract supports one `em.cavity3d` study: a vacuum rectangular
 box with perfect electric conductor (PEC) conditions on all six faces. The
@@ -23,7 +23,9 @@ including when it is `"m"`. The six `geometry.domain` coordinates are `xmin`,
 `xmax`, `ymin`, `ymax`, `zmin`, `zmax`, in that declared length unit. Each maximum
 must exceed its minimum; a nonzero origin is allowed. `geometry.background` is
 `{"material": "vacuum"}`, `geometry.shapes` is empty, and `materials` is empty.
-Dielectrics, loss, arbitrary geometry and other boundaries are unsupported.
+Box-shaped materials, a filled background and finite-conductivity walls are
+described in [Materials and conducting walls](#materials-and-conducting-walls);
+arbitrary geometry and other boundary types are unsupported.
 
 There must be exactly one named physics entry:
 
@@ -153,6 +155,102 @@ the same subdivisions and target in Hz. The physical SI output should then be
 unchanged. Changing the physical box size without changing the target changes
 the search problem as well as the spectrum; scale the target inversely when
 comparing geometrically similar mode sets.
+
+## Materials and conducting walls
+
+The same `em.cavity3d` study accepts constant, isotropic, possibly lossy materials in
+axis-aligned boxes and finite-conductivity walls. Such a document runs
+`galerkin.solve_material_cavity_box` and writes the complex layout below. A document
+with a vacuum background, no shapes, no materials and `"boundary": "pec"` keeps
+the original solver and the vacuum layout above. The example is
+`examples/cavity_lossy_slab.json` (`python -m simcase example cavity_lossy_slab`):
+
+```json
+{
+  "geometry": {
+    "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.6},
+    "background": {"material": "vacuum"},
+    "shapes": [{"type": "box", "name": "slab", "material": "lossy_dielectric",
+                "xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.3}]
+  },
+  "materials": {"lossy_dielectric": {"relative_permittivity": [4.0, -0.04]}},
+  "physics": {"em1": {"type": "em.cavity3d",
+                      "boundary": {"conductivity_s_per_m": 58000000.0},
+                      "search": "near_target", "target_frequency_hz": 150000000.0,
+                      "num_modes": 3}},
+  "mesh": {"subdivisions": [8, 8, 8]}
+}
+```
+
+**Time convention** `exp(+j*omega*t)`. A complex constant is a real number or a
+`[real, imag]` pair with `real > 0` and `imag <= 0` (passive); a dielectric with loss
+tangent `t` is `[eps', -eps' * t]`.
+
+- `materials.<name>`: `relative_permittivity` (required) and `relative_permeability`
+  (default 1). The name `vacuum` is reserved; other keys, including the 2D `n`, `k`
+  and `sellmeier`, are rejected.
+- `geometry.background.material`: `"vacuum"` or a defined material filling the box.
+- `geometry.shapes`: boxes `{"type": "box", "name", "material", "xmin", ..., "zmax"}`
+  in the declared length unit and document frame. Names are unique. Each box lies
+  inside the domain, and every face lies on a mesh grid plane: a multiple of
+  `extent / subdivisions` from the domain minimum, relative tolerance `1e-9` of one
+  cell. Otherwise validation fails and names the spacing. Later boxes override
+  earlier ones; each tetrahedron takes the material at its centroid.
+- `physics.<name>.boundary`: `"pec"`, or `{"conductivity_s_per_m": sigma}` for all six
+  walls, or `{"conductivity_s_per_m": {"zmax": sigma, ...}}` with keys `xmin, xmax,
+  ymin, ymax, zmin, zmax`, where unnamed walls stay PEC. Conductivity is always S/m,
+  independent of `units`. Walls use the Leontovich surface impedance
+  `Zs = sqrt(j omega mu0 / sigma)`; each mode is converged by fixed-point iteration.
+
+The numerical method, gates and validation are in the engine's
+[material cavity contract](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/material_cavity.md).
+
+### Complex results
+
+`result.frequencies_hz` is complex for these studies. `summary.json` stores
+JSON-safe real arrays:
+
+- `resonant_frequencies_hz` (Re f) and `frequencies_hz_imag` (Im f, positive when lossy);
+- `quality_factors`, `Q = Re f / (2 Im f)`, or `null` for a lossless mode;
+- `eigenvalues_m2_real` and `eigenvalues_m2_imag`;
+- `relative_residuals`;
+- `fixed_point_iterations`;
+- `lossless`, `time_convention`, the document `boundary`, `background` and `materials`;
+- `wall_conductivity_s_per_m` by document wall name (`null` for PEC).
+
+`fields.npz` uses `field_layout="cavity3d-edge-complex-v1"`. It keeps the vacuum
+layout's mesh, topology and orientation keys and metadata strings, and adds or changes:
+
+| NPZ key | Shape | Meaning / unit |
+|---|---|---|
+| `frequencies_hz` | `(K,)` complex | Complex frequencies, Hz |
+| `eigenvalues_m2` | `(K,)` complex | `k0^2`, m^-2 |
+| `quality_factors` | `(K,)` | Dimensionless; `inf` when lossless |
+| `edge_coefficients` | `(E, K)` complex | m^-1/2 |
+| `electric_field` | `(K, T, 3)` complex | m^-3/2 at centroids |
+| `tet_relative_permittivity`, `tet_relative_permeability` | `(T,)` complex | Material per tetrahedron |
+| `wall_names`, `wall_conductivity_s_per_m` | `(6,)` | `xmin..zmax`; S/m, `nan` for PEC |
+| `fixed_point_iterations` | `(K,)` | Count |
+
+Here `pec_edge_ids` lists only the edges of PEC walls; edges of conducting walls
+are unknowns. The normalization is `vacuum_mass_hermitian_unit_si`: `q^H M0 q = 1`
+with the vacuum edge mass `M0`, and the largest-magnitude coefficient of each mode
+is real and positive. The amplitude is arbitrary and is **not V/m**. Arrays load with
+`numpy.load(path, allow_pickle=False)`.
+
+Tests in `packages/simcase/tests/test_cavity3d_materials.py` check:
+
+- validation of every new field;
+- that a document run equals the direct engine call;
+- that millimetres with a translated origin give the same SI result;
+- the mapping of a single wall onto the engine wall and onto PEC edges;
+- that a filled background equals the vacuum spectrum divided by `eps_r`;
+- that complex NPZ and JSON output load without pickle;
+- `null` Q for lossless studies;
+- that the vacuum PEC document keeps the original solver;
+- CLI runs, a missing engine API and Studio rejection.
+
+Studio does not list or run these studies. Plotting stays unavailable.
 
 ## Integration validation and numerical limitation
 
