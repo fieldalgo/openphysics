@@ -2,8 +2,9 @@
 
 **English** | [한국어](locales/ko/pages/multimaterial.md)
 
-Steady heat conduction and static elasticity can assign a different material
-to each named region of a 2D mesh. This page holds the shared input rule, each
+Steady heat conduction, static elasticity, the prescribed-temperature
+mechanical stage and the steady and transient heat-to-mechanics workflows can
+assign a different material to each named region of a 2D mesh. This page holds the shared input rule, each
 contract and its independent validation. Further physics will be added here as it is
 validated; until then their pages state that only one homogeneous material is
 accepted.
@@ -192,6 +193,67 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin-refsol/tests/test_elasticity_multilayer_reference.py
 ```
 
+## Thermoelasticity and heat-to-mechanics coupling
+
+`galerkin.thermoelasticity.solve_thermoelasticity` accepts
+`thermal_expansion_per_k` (1/K), `young_modulus` and `poisson_ratio` each as a
+scalar or region mapping. With any mapping, triangle e uses its own
+`D_e` and thermal stress coefficient (E/(1-nu) in plane stress, E/(1-2nu) in
+plane strain), and the thermal strain at the element nodes is
+`alpha_e (T - T_ref)`. Thermal load, centroid fields, `sigma_zz`/`epsilon_zz` and
+the reduced physical energy use the same per-triangle values. The result echoes
+each material as a float or a `{region name: float}` copy. The all-scalar call
+keeps the original code path.
+
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity` accepts mappings for
+`conductivity`, `young_modulus`, `poisson_ratio`, `thermal_expansion_per_k` and
+a constant `heat_source`; they are validated at the `input` stage and passed to
+the heat and mechanical stages. The manifest records materials as sorted
+dictionaries and a per-region source as `{'kind': 'per_region', 'value': ...}`;
+scalar manifests are unchanged. `galerkin.transient_thermal_mechanical` accepts
+the same mechanical mappings (per-region transient heat is a separate step).
+
+**Reference.** `refsol.elasticity_multilayer.composite_cylinder` with
+`thermal_expansions` and `temperature_change` rows (a_i, b_i), dT = a_i +
+b_i ln(r/r_0): in each shell u_r = kappa_i I(r)/r + A_i r + B_i/r with
+I = integral of s dT ds and kappa_i = beta_i/(lambda_i+2 mu_i)
+(beta = (3 lambda + 2 mu) alpha in plane strain, E alpha/(1-nu) in plane stress).
+Its tests reproduce the Timoshenko-Goodier thick-cylinder thermal stresses
+(evaluated by independent Gauss quadrature of the temperature integrals),
+stress-free uniform heating of one material, and equilibrium/continuity by
+finite differences. Steady conduction without a source gives exactly
+dT = a_i + b_i ln(r/r_0) in each shell, so the coupled problem has an exact
+solution built from the two references.
+
+The bimetal strip (Timoshenko 1925) is a beam-theory approximation that
+ignores free-end stress concentrations; it is not used as an acceptance
+reference.
+
+| Case | Mesh | Gate |
+| --- | --- | --- |
+| Uniform alpha mapping (with scalar or mapped E, nu) vs scalar | 2-region rectangle, nonuniform T, traction | All fields within 1e-12 relative, energy too |
+| Expansion mismatch: alpha 12/70/23 x1e-6 1/K, E 200/3/70 GPa, nu .3/.38/.33, uniform +120 K, free surfaces, both planes | layered annulus, n=1,2,4,8 | Displacement L2 order >= 1.8, stress L2 order >= 0.9, plane-strain sigma_zz order >= 0.9 (last two intervals); symmetry reactions <= 1e-9 |
+| Coupled steady heat -> mechanics: k 45/0.25/200 W/(m K), 420 K inside, 300 K outside, same mechanics, both planes | layered annulus, n=1,2,4,8 | Temperature L2 order >= 1.8; displacement >= 1.8; stress >= 0.9; plane-strain sigma_zz >= 0.9 |
+| Transient steps with mappings | 2-region rectangle | Each step equals a direct per-region mechanical solve exactly |
+| Invalid regions | — | Missing/unknown names, nonfinite alpha, E <= 0, nu = 0.5, invalid plane raise `ValueError`; the workflow raises `WorkflowStageError` at stage `input` |
+
+Observed when first run (n=1 → 8):
+
+| Quantity | Plane stress orders | Plane strain orders |
+| --- | --- | --- |
+| Mismatch displacement L2 | 1.94, 1.98, 2.00 | 1.89, 1.97, 1.99 |
+| Mismatch stress L2 | 0.98, 0.99, 1.00 | 0.96, 0.99, 1.00 |
+| Mismatch sigma_zz L2 | — (zero) | 0.92, 0.98, 0.99 |
+| Coupled temperature L2 | 2.00, 2.00, 2.00 | 2.00, 2.00, 2.00 |
+| Coupled displacement L2 | 1.93, 1.98, 2.00 | 1.89, 1.97, 1.99 |
+| Coupled stress L2 | 0.98, 0.99, 1.00 | 0.95, 0.99, 1.00 |
+| Coupled sigma_zz L2 | — (zero) | 0.93, 0.98, 1.00 |
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_thermoelastic_multimaterial.py
+```
+
 ## Limits
 
 - Piecewise constant per region only: no conductivity varying inside a region,
@@ -199,5 +261,5 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 - No contact resistance or interface sources.
 - No mixed formulation: nearly incompressible regions lock in plane strain,
   as in the homogeneous solver.
-- Thermoelasticity, the heat-to-mechanics workflows, transient heat and simcase
-  documents still accept one homogeneous material.
+- No temperature-dependent properties; reference temperature is one value.
+- Transient heat and simcase documents still accept one homogeneous material.
