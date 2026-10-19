@@ -49,6 +49,7 @@ export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # 전체 소스 시험
 node --test packages/simcase/tests/*.cjs   # Studio JavaScript 검사
 python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
+python ci/check_licenses.py                # 설치된 라이선스를 검토 목록과 대조
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -91,16 +92,20 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 
 **배포 검사** (`ci/check_distributions.py`). 패키지 일곱 개(빈 `openphysics` 이름
 예약 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
-`twine check --strict`로 메타데이터를 확인하고, LICENSE/NOTICE, Studio 자산, 검사기의
+`twine check --strict`로 메타데이터를 확인하고, 모든 sdist·wheel에 패키지의 LICENSE와 NOTICE가 그대로 들어 있는지, Studio 자산, 검사기의
 필수 목록에 있는 모든 파일이 sdist에 있고 바이트가 같은지 확인합니다. 압축본 안의
 상대 Markdown 링크는 실제 파일을 가리켜야 하며, 외부 URL은 열어 보지 않습니다.
 이어서 wheel을 checkout 밖 새 환경에 설치하고 공개 API·CLI·저장 파일, 포함된 예제,
 독립 수용 소비자 시험으로 확인합니다. `python -I`로 실행해 checkout이 섞이지 않게
-합니다. Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
+합니다. 설치된 환경은 `ci/check_licenses.py`를 통과해야 합니다. Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
 `ci/tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 wheel 바이트를
 다시 확인합니다.
 
-**설치 플랫폼** (`ci/tools/check_platform_install.py`). OS마다 패키지 바이트, 설치된
+**라이선스** (`ci/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
+환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 정책과 전체 목록은
+[제3자 소프트웨어](third-party.md)에 있습니다.
+
+**설치 플랫폼** (`ci/tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
 모듈 위치, 포함 자산, 공개 API·CLI·저장 간단 시험, 열 저장/I-O 견고성 시험(부분 실패
 정리, 동시 저장, 기존 대상 보호), source 대상 보호 fixture 두 개를 확인합니다. 설치
 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.

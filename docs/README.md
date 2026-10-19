@@ -25,6 +25,7 @@ languages; a translation does not establish a new numerical result.
 | Contributing | [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
 | Security | [Security](security.md) | [한국어](locales/ko/pages/security.md) |
 | Bundled images, fixtures and data | [Asset provenance](assets.md) | [한국어](locales/ko/pages/assets.md) |
+| Third-party software, data and licenses | [Third-party list](third-party.md) | [한국어](locales/ko/pages/third-party.md) |
 
 ## Current implementation contracts and evidence
 

@@ -157,6 +157,9 @@ def main():
             *wheel_files, cwd=work)
         run(python, "-I", "-m", "pip", "check", cwd=work)
         run(python, "-I", "-m", "pip", "freeze", "--all", cwd=work)
+        # Installed environment on this OS against the reviewed license inventory.
+        run(sys.executable, "-I", "-X", "utf8", ROOT / "ci" / "check_licenses.py", "--python", python,
+            "--report", output / "licenses-installed.json", cwd=work)
         tests = work / "tests"
         tests.mkdir()
         copies = {

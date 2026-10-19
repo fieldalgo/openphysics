@@ -262,16 +262,14 @@ def check_sdist_assets(sdist):
         # Strip the distribution-root component; no filesystem extraction occurs.
         files = {p.name.split("/", 1)[1]: p for p in archive.getmembers()
                  if p.isfile() and "/" in p.name}
-        required = {"LICENSE", "README.md", "pyproject.toml", "PKG-INFO"}
-        if name != "openphysics":
-            required.add("NOTICE")
+        required = {"LICENSE", "NOTICE", "README.md", "pyproject.toml", "PKG-INFO"}
         if name == "simcase":
             required.add("simcase/studio/static/index.html")
         document_assets = DOCUMENT_ASSETS.get(name, ())
         required.update(document_assets)
         if missing := required - files.keys():
             raise RuntimeError(f"{sdist.name} is missing {sorted(missing)}")
-        for relative in document_assets:
+        for relative in ("LICENSE", "NOTICE", *document_assets):
             source = ROOT / "packages" / name / relative
             if archive.extractfile(files[relative]).read() != source.read_bytes():
                 raise RuntimeError(f"{sdist.name}: {relative} differs from the checked-out source")
@@ -328,10 +326,13 @@ def main():
                 for relative in STUDIO_RESOURCE_ASSETS:
                     if archive.read(relative) != (ROOT / "packages/simcase" / relative).read_bytes():
                         raise RuntimeError(f"{wheel.name}: Studio resource differs: {relative}")
-            if not any(p.endswith("/LICENSE") for p in names):
-                raise RuntimeError(f"{wheel.name} is missing LICENSE")
-            if not wheel.name.startswith("openphysics-") and not any(p.endswith("/NOTICE") for p in names):
-                raise RuntimeError(f"{wheel.name} is missing NOTICE")
+            # Every wheel must carry the package's own LICENSE and NOTICE unchanged.
+            for notice in ("LICENSE", "NOTICE"):
+                found = [p for p in names if p.endswith(f".dist-info/licenses/{notice}")]
+                if len(found) != 1:
+                    raise RuntimeError(f"{wheel.name} is missing dist-info/licenses/{notice}")
+                if archive.read(found[0]) != (ROOT / "packages" / package_name / notice).read_bytes():
+                    raise RuntimeError(f"{wheel.name}: {notice} differs from the checked-out source")
             if wheel.name.startswith("simcase-") and "simcase/studio/static/index.html" not in names:
                 raise RuntimeError("simcase wheel is missing the Studio page")
     artifacts = wheels + sdists
@@ -364,6 +365,10 @@ def main():
             "-c", ROOT / "ci" / "requirements-py312-linux.txt", *requirements,
             cwd=work, env=env)
         run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
+        # The installed wheels and their resolved dependencies must match the reviewed
+        # license inventory (docs/third-party.md).
+        run(sys.executable, ROOT / "ci" / "check_licenses.py", "--python", python,
+            "--report", output / "licenses-installed.json", cwd=ROOT)
         # Verify the new explicit submodules before any numerical consumer runs.
         runtime_expected = {
             relative[:-3].replace("/", ".").removesuffix(".__init__"):
