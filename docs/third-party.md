@@ -259,8 +259,10 @@ The check reads installed metadata and each distribution's RECORD file list with
   `.dll`) other than its own Python extension modules that matches no
   `bundled_files` glob of its inventory entry, or matches one that is not
   recorded for the current OS;
-- a `bundled_files` record with a copyleft SPDX expression has no review, or a
-  distribution has no RECORD file list to check;
+- a `bundled_files` record has no review although its SPDX expression is
+  copyleft or not plainly permissive (proprietary or non-standard terms such as
+  LicenseRef- ids, FTL or Qhull), or a distribution has no RECORD file list to
+  check;
 - a `bundled_files` record of a distribution that is not an external process
   leaves only GPL terms without a runtime exception listed in the policy (such
   a library would load into the OpenPhysics process);
