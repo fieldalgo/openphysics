@@ -64,21 +64,22 @@ repository; separate historical package repositories are not needed to use them.
 
 - **Python:** the broadest API surface, including standalone electromagnetic,
   steady and transient thermal, elasticity and prescribed-temperature thermoelastic models,
-  plus the documented steady heat-to-mechanics workflow.
+  plus the documented steady heat-to-mechanics workflow and transient heat-to-mechanics call.
 - **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
   documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
   automatically become document features. The [steady boundary contract](../packages/simcase/docs/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
   both new keys retain v1.
-- **Studio:** a local browser interface for 2D optical models and dedicated JSON-first steady heat. Generic optical routes retain heat/3D guards. The [transient Studio contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient_studio.md) describes the dedicated capability/routes, exact time-index/history views and resource limits; measured scope requires the exact checkout's CI evidence. Structural forms, 3D and a general thermal form editor are outside this scope.
+- **Studio:** a local browser interface for 2D optical models and dedicated
+  steady and transient heat views for rectangular documents. Generic optical
+  routes keep their heat/3D guards. Structural forms, 3D models and a general
+  thermal form editor are outside its scope. See the
+  [steady](../packages/simcase/docs/thermal_studio.md) and
+  [transient](../packages/simcase/docs/thermal_transient_studio.md) Studio guides.
 
 These layers do not imply a general-purpose, fully coupled multiphysics solver.
-The standalone [transient heat API](../packages/galerkin/docs/transient_heat.md)
-uses a fixed P1 mesh, consistent mass and backward Euler. The separate
-[headless document path](../packages/simcase/docs/thermal_transient2d.md) adds
-rectangular JSON/API/CLI and saved histories. This headless API does not itself enable Studio; dedicated route/capability support is separate. Restart, transient flux/Robin input and automatic coupling remain outside the contract. Exact contracts
-and measured validation limits are linked from the
-[documentation index](README.md).
+The [overview](overview.md#current-limits) lists current limits; exact contracts
+and validation limits are linked from the [documentation index](README.md).
 
 ## Connections in the code
 
