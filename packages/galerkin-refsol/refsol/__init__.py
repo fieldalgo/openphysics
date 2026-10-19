@@ -16,9 +16,11 @@ metallic    hollow metallic waveguide cutoffs, cavity resonances, coaxial potent
 scattering  plane-wave scattering off a circular cylinder (PEC and dielectric)
 benchmarks  published reference values with citations (Hadley 2002 rib waveguides, ...)
 cavity      complete finite-frequency Cartesian spectrum of a vacuum PEC box
+material_cavity  complex resonances and Q of uniformly or slab-loaded lossy PEC boxes
 """
 
-from . import slab, fiber, metallic, scattering, benchmarks, cavity
+from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity
 
 __version__ = "0.1.0"
-__all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks", "cavity"]
+__all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks", "cavity",
+           "material_cavity"]

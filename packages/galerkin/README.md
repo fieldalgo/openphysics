@@ -21,6 +21,7 @@ references and fixed thresholds.
 | 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](docs/milestone_validation.md) | `examples/coax_convergence.py`, `examples/cylinder_scattering_pml.py` |
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](docs/eigenspace_reliability.md), [milestone validation](docs/milestone_validation.md) | `examples/fiber_modes.py`, `examples/waveguide_modes.py` |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](docs/cavity_solver.md) | `examples/cavity_modes.py` |
+| 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](docs/material_cavity.md) | — |
 | Steady 2D heat conduction, homogeneous isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_steady2d.md), [validation](docs/thermal_independent_validation.md) | [thermal_steady2d.py](examples/thermal_steady2d.py) |
 | Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_flux_robin.md), [validation](docs/thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](examples/thermal_flux_robin.py) |
 | Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](docs/transient_heat.md), [validation](docs/transient_heat_validation.md), [independent validation](docs/transient_heat_independent_validation.md) | [transient_heat_convergence.py](examples/transient_heat_convergence.py) |
@@ -72,6 +73,7 @@ galerkin/
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
+  material_cavity.py # PEC box with lossy box-shaped materials: complex resonances and Q
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction

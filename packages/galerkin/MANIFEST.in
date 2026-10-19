@@ -1,4 +1,6 @@
 include docs/cavity_solver.md
+include docs/material_cavity.md
+include docs/locales/ko/pages/material_cavity.md
 include docs/eigenspace_reliability.md
 include docs/elasticity2d.md
 include docs/elasticity2d_independent_validation.md
