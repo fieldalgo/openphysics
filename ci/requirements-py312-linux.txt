@@ -30,6 +30,7 @@ kiwisolver==1.5.1
 markdown-it-py==4.2.0
 matplotlib==3.11.2
 mdurl==0.1.2
+meshio==5.3.5
 more-itertools==11.2.1
 nh3==0.3.7
 numpy==2.5.4

@@ -178,6 +178,15 @@ result = solve_point(model, doc.sole_physics()[1])
 
 저장하는 실행마다 dangling symlink도 없는 새 출력 디렉터리가 필요합니다. 저장과 정리가 끝날 때까지 독점적으로 관리하세요. 정리 전에 관측된 교체에 대한 보호는 시험하지만, 소유권 확인과 unlink 사이의 외부 교체는 안전을 보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. CI는 Linux·macOS·Windows에서 열전도 저장·I/O 견고성 검사를 실행합니다. 저장·플랫폼 한계는 각 계약을 참고하세요.
 
+### ParaView로 보기
+
+선택 extra `pip install "simcase[export]"`(meshio, MIT)를 설치하면
+`simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 정상 열전도,
+과도 열전도(저장된 시각 하나, `time_index`, 기본값은 마지막), 공진기 장을 VTU 사본으로
+씁니다. 2D 메시는 z = 0으로 둡니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
+그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
+writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
+
 ## 브라우저 UI
 
 `simcase.studio`는 이 스택의 선택적 프로그램 부분입니다. 왼쪽 모델 트리, 가운데 형상/메시/결과 보기, 오른쪽 속성 패널, 아래 로그로 구성됩니다. 스크립트와 같은 문서를 편집하고 로컬 서버에 같은 엔진으로 메시 생성과 실행을 요청합니다.

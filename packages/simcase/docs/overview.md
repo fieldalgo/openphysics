@@ -330,6 +330,16 @@ filesystem races and atomic rollback are outside acceptance. CI runs the heat
 save and I/O robustness checks on Linux, macOS and Windows; see each contract
 for its save and platform limits.
 
+### Viewing in ParaView
+
+With the optional extra `pip install "simcase[export]"` (meshio, MIT),
+`simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
+copy of saved steady heat, transient heat (one stored time, `time_index`,
+default the last) and cavity fields. 2D meshes get z = 0. `fields.npz` stays
+the reference result; times, frequencies and units remain in it and in
+`summary.json`. An existing VTU is never overwritten. XDMF is not offered
+because meshio's XDMF writer needs h5py.
+
 ## The browser UI
 
 `simcase.studio` is the program part of the stack, and it is optional: a model
