@@ -4,8 +4,10 @@ Use the explicit submodule imports `galerkin.elasticity` and `refsol.elasticity`
 This first implementation is a homogeneous, isotropic, linear, static
 displacement formulation on a conforming `galerkin.mesh.Mesh` of P1 triangles.
 There are two displacement DOFs per node; scalar and electromagnetic edge
-spaces are not used. No material interfaces or region-dependent E/nu are
-supported in this API.
+spaces are not used. E and nu may also be piecewise constant on named mesh
+regions, `{region name: value}`; that extension, its references and gates are
+in [multimaterial](multimaterial.md). Everything below describes one
+homogeneous material unless stated otherwise.
 
 ## Equations and conventions
 
@@ -59,8 +61,8 @@ thickness parameter is accepted. This avoids hiding a length factor in loads.
 | Quantity | Shape / convention | SI unit |
 |---|---|---|
 | Mesh coordinates | `(N,2)` | m |
-| E, stress | scalar E; stress `(T,3)` | Pa = N/m^2 |
-| nu, strain | scalar nu; strain `(T,3)`, engineering shear | dimensionless |
+| E, stress | scalar E or `{region name: E}`; stress `(T,3)` | Pa = N/m^2 |
+| nu, strain | scalar nu or `{region name: nu}`; strain `(T,3)`, engineering shear | dimensionless |
 | Prescribed/result displacement | scalar per `(node,component)`; result `(N,2)` | m |
 | body_force | constant `(2,)`, or callback `(Q,2)->(Q,2)` | N/m^3 |
 | stiffness matrix, internal | `(2N,2N)` | N/m^2 |
