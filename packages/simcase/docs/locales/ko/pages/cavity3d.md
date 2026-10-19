@@ -1,4 +1,4 @@
-# 진공 PEC 직육면체 문서와 결과
+# 직육면체 공진기 문서와 결과
 
 [English](../../../cavity3d.md)
 
@@ -24,7 +24,7 @@ python -m simcase run cavity.json -o cavity_results
 `ymax`, `zmin`, `zmax`는 선언한 길이 단위를 사용합니다. 각 최댓값은 최솟값보다
 커야 하며 원점이 0이 아니어도 됩니다. `geometry.background`는
 `{"material": "vacuum"}`, `geometry.shapes`와 `materials`는 비어 있어야 합니다.
-유전체, 손실, 임의 형상, 다른 경계 조건은 지원하지 않습니다.
+직육면체 재료, 채워진 배경, 유한 전도도 벽은 [재료와 도체 벽](#재료와-도체-벽)에서 설명합니다. 임의 형상과 다른 경계 종류는 지원하지 않습니다.
 
 이름이 있는 physics 항목이 정확히 하나여야 합니다.
 
@@ -146,6 +146,98 @@ Cavity 출력에는 `neff`나 삼각형·절점 스칼라 배열이 없습니다
 사용할 수 있습니다. 그러면 물리적인 SI 출력이 같아야 합니다. 목표를 유지한 채
 물리적 크기를 바꾸면 스펙트럼뿐 아니라 검색 문제도 바뀝니다. 기하학적으로 닮은 모드
 집합을 비교할 때에는 크기에 반비례하도록 목표를 조정합니다.
+
+## 재료와 도체 벽
+
+같은 `em.cavity3d` study는 축 정렬 직육면체 안의 일정하고 등방적인(손실이 있을 수 있는)
+재료와 유한 전도도 벽을 받습니다. 이런 문서는 `galerkin.solve_material_cavity_box`를
+실행하고 아래 복소 배치로 저장합니다. 배경이 진공이고 shape·material이 없으며
+`"boundary": "pec"`인 문서는 원래 솔버와 위의 진공 배치를 그대로 씁니다. 예제는
+`examples/cavity_lossy_slab.json`(`python -m simcase example cavity_lossy_slab`)입니다.
+
+```json
+{
+  "geometry": {
+    "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.6},
+    "background": {"material": "vacuum"},
+    "shapes": [{"type": "box", "name": "slab", "material": "lossy_dielectric",
+                "xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.3}]
+  },
+  "materials": {"lossy_dielectric": {"relative_permittivity": [4.0, -0.04]}},
+  "physics": {"em1": {"type": "em.cavity3d",
+                      "boundary": {"conductivity_s_per_m": 58000000.0},
+                      "search": "near_target", "target_frequency_hz": 150000000.0,
+                      "num_modes": 3}},
+  "mesh": {"subdivisions": [8, 8, 8]}
+}
+```
+
+**시간 규약**은 `exp(+j*omega*t)`입니다. 복소 상수는 실수 하나 또는 `[실수부, 허수부]` 쌍이며
+`실수부 > 0`, `허수부 <= 0`(수동)이어야 합니다. 손실 탄젠트 `t`인 유전체는 `[eps', -eps' * t]`입니다.
+
+- `materials.<이름>`: `relative_permittivity`(필수)와 `relative_permeability`(기본 1).
+  이름 `vacuum`은 예약되어 있고, 2D의 `n`, `k`, `sellmeier`를 포함한 다른 키는 거부합니다.
+- `geometry.background.material`: `"vacuum"` 또는 상자 전체를 채우는 정의된 재료.
+- `geometry.shapes`: 선언한 길이 단위와 문서 좌표계의 상자
+  `{"type": "box", "name", "material", "xmin", ..., "zmax"}`. 이름은 서로 달라야 합니다. 각
+  상자는 domain 안에 있어야 하고, 모든 면은 mesh 격자 평면, 즉 domain 최솟값에서
+  `extent / subdivisions`의 배수에 있어야 합니다(한 cell의 상대 허용치 `1e-9`). 아니면 검증이
+  실패하며 간격을 알려 줍니다. 뒤의 상자가 앞의 상자보다 우선하고, 각 사면체는 무게중심의
+  재료를 가집니다.
+- `physics.<이름>.boundary`: `"pec"`, 여섯 벽 모두에 대한 `{"conductivity_s_per_m": sigma}`,
+  또는 키 `xmin, xmax, ymin, ymax, zmin, zmax`를 쓰는
+  `{"conductivity_s_per_m": {"zmax": sigma, ...}}`. 지정하지 않은 벽은 PEC입니다. 전도도는
+  `units`와 무관하게 항상 S/m입니다. 벽은 Leontovich 표면 임피던스
+  `Zs = sqrt(j omega mu0 / sigma)`를 쓰며 각 모드를 고정점 반복으로 수렴시킵니다.
+
+수치 방법, 기준, 검증은 엔진의
+[재료 공진기 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/material_cavity.md)에 있습니다.
+
+### 복소 결과
+
+이런 study의 `result.frequencies_hz`는 복소수입니다. `summary.json`에는 JSON에 안전한 실수
+배열을 저장합니다.
+
+- `resonant_frequencies_hz`(Re f)와 `frequencies_hz_imag`(Im f, 손실이 있으면 양수);
+- `quality_factors`, 즉 `Q = Re f / (2 Im f)`. 무손실 모드는 `null`;
+- `eigenvalues_m2_real`와 `eigenvalues_m2_imag`;
+- `relative_residuals`;
+- `fixed_point_iterations`;
+- `lossless`, `time_convention`, 문서의 `boundary`, `background`, `materials`;
+- 문서 벽 이름별 `wall_conductivity_s_per_m`(PEC는 `null`).
+
+`fields.npz`는 `field_layout="cavity3d-edge-complex-v1"`을 씁니다. 진공 배치의 mesh·위상·방향
+키와 메타데이터 문자열을 유지하고, 다음 키를 더하거나 바꿉니다.
+
+| NPZ 키 | 형태 | 의미 / 단위 |
+|---|---|---|
+| `frequencies_hz` | `(K,)` 복소수 | 복소 주파수, Hz |
+| `eigenvalues_m2` | `(K,)` 복소수 | `k0^2`, m^-2 |
+| `quality_factors` | `(K,)` | 무차원; 무손실이면 `inf` |
+| `edge_coefficients` | `(E, K)` 복소수 | m^-1/2 |
+| `electric_field` | `(K, T, 3)` 복소수 | 무게중심, m^-3/2 |
+| `tet_relative_permittivity`, `tet_relative_permeability` | `(T,)` 복소수 | 사면체별 재료 |
+| `wall_names`, `wall_conductivity_s_per_m` | `(6,)` | `xmin..zmax`; S/m, PEC는 `nan` |
+| `fixed_point_iterations` | `(K,)` | 횟수 |
+
+여기서 `pec_edge_ids`는 PEC 벽의 에지만 나열하며, 도체 벽의 에지는 미지수입니다. 정규화는
+`vacuum_mass_hermitian_unit_si`입니다. 진공 에지 질량 `M0`로 `q^H M0 q = 1`이고, 각 모드에서
+크기가 가장 큰 계수는 양의 실수입니다. 진폭은 임의이며 **V/m가 아닙니다**. 배열은
+`numpy.load(path, allow_pickle=False)`로 읽습니다.
+
+`packages/simcase/tests/test_cavity3d_materials.py`의 시험이 확인하는 것:
+
+- 새 필드 각각의 검증;
+- 문서 실행이 엔진 직접 호출과 같음;
+- 원점을 옮긴 mm 문서가 같은 SI 결과를 냄;
+- 단일 벽이 엔진 벽과 PEC 에지에 대응됨;
+- 채운 배경이 진공 스펙트럼을 `eps_r`로 나눈 값과 같음;
+- 복소 NPZ·JSON 출력이 pickle 없이 읽힘;
+- 무손실 study의 Q가 `null`임;
+- 진공 PEC 문서가 원래 솔버를 씀;
+- CLI 실행, 엔진 API 누락, Studio 거부.
+
+Studio는 이 study를 나열하거나 실행하지 않습니다. 그림 출력은 여전히 지원하지 않습니다.
 
 ## 통합 검증과 수치적 한계
 

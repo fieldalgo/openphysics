@@ -25,7 +25,7 @@ python -m simcase run model.json                          # -> model_results/
 | 물리 유형 | 해석 내용 | 예제 | 계약 |
 |---|---|---|---|
 | `em.modes2d` | 무손실 2D 도파 모드, 스칼라 또는 전체 벡터. 단일 지점과 모드 추적 파장 sweep | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | 이 페이지, [부분공간 추적](vector_subspace_tracking.md) |
-| `em.cavity3d` | 진공 직육면체 PEC 상자 고유모드, SI JSON/NPZ 출력 | `cavity_box` | [공진기 문서](cavity3d.md) |
+| `em.cavity3d` | 직육면체 고유모드: 진공 PEC, 또는 손실 직육면체 재료와 도체 벽의 복소 주파수와 Q; SI JSON/NPZ 출력 | `cavity_box`, `cavity_lossy_slab` | [공진기 문서](cavity3d.md) |
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
 

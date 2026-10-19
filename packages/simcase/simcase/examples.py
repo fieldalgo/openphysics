@@ -129,6 +129,27 @@ CAVITY_BOX = {
 
 EXAMPLES["cavity_box"] = CAVITY_BOX
 
+CAVITY_LOSSY_SLAB = {
+    "openphysics": "0.2",
+    "name": "Copper box with a lossy dielectric slab, Q near 150 MHz",
+    "units": {"length": "m"},
+    "geometry": {
+        "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.6},
+        "background": {"material": "vacuum"},
+        "shapes": [{"type": "box", "name": "slab", "material": "lossy_dielectric",
+                    "xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.3}],
+    },
+    "materials": {"lossy_dielectric": {"relative_permittivity": [4.0, -0.04]}},
+    "physics": {"em1": {"type": "em.cavity3d", "boundary": {"conductivity_s_per_m": 58000000.0},
+                         "search": "near_target", "target_frequency_hz": 150000000.0,
+                         "num_modes": 3}},
+    "mesh": {"subdivisions": [8, 8, 8]},
+    "study": {"type": "single"},
+    "results": {"save_fields": True, "plots": False},
+}
+
+EXAMPLES["cavity_lossy_slab"] = CAVITY_LOSSY_SLAB
+
 # Opt-in subspace tracking of the isolated HE11 polarization pair. The next
 # guided family (TE01/TM01/HE21) is the observed lower guard.
 VECTOR_FIBER_SUBSPACE_SWEEP = copy.deepcopy(VECTOR_FIBER)
