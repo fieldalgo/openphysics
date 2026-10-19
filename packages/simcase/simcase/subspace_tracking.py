@@ -38,24 +38,44 @@ ASSIGNMENT_METHOD = "electric-l2-assignment-v1"
 SUBSPACE_METHOD = "electric-l2-subspace-v1"
 METHODS = (ASSIGNMENT_METHOD, SUBSPACE_METHOD)
 
-# Numerical guards for the small Gram matrices. They detect rank loss and
-# metric failure; they are not physical accuracy claims.
+# Numerical guards for the small Gram matrices. They separate roundoff from rank
+# loss or metric failure; they are not physical accuracy claims. The budget is
+# derived in docs/vector_subspace_tracking.md ("Numerical guards"); in short,
+# with unit roundoff u, cluster rank r, Gram condition kappa and N degrees of
+# freedom:
 #
-# Whitening H = G^(-1/2) by a Hermitian eigendecomposition is backward stable,
-# so the orthonormality defect of Q = U H grows like (machine epsilon) x cond(G)
-# times a small dimension factor. GRAM_CONDITION_MAX = 1e8 keeps that defect
-# near 1e-8 and refuses worse clusters instead of reducing or pseudo-inverting
-# them; ORTHONORMAL_DEFECT_MAX is the matching measured check (a cluster near
-# the condition limit may be refused by either). The Gram matrix itself is a
-# sum of sparse products with relative roundoff far below HERMITIAN_DEFECT_MAX.
-# Principal values may exceed one only through the measured defects of the two
-# frames: with spectral defects e_P, e_Q <= rank x max-entry defect,
-# sigma_max^2 <= (1 + e_P)(1 + e_Q). principal_values() accepts that bound plus
-# SINGULAR_ROUNDOFF and refuses anything larger.
-GRAM_CONDITION_MAX = 1e8
+# * G = U^H W U is a sum of sparse products. Its Hermitian defect is roundoff of
+#   order sqrt(N) u (worst case about 2 N u), far below HERMITIAN_DEFECT_MAX; a
+#   wrong metric gives a defect of order one.
+# * The orthonormality defect of a formed frame Q = U H, measured as
+#   max |Q^H W Q - I| with a fresh product, is within
+#   frame_defect_budget(r, kappa, N) = 8 r u (kappa + sqrt(N)). The kappa term
+#   comes from the backward-stable eigendecomposition and from the Gram roundoff
+#   amplified by H = G^(-1/2); the sqrt(N) term is the product roundoff.
+# * GRAM_CONDITION_MAX = 1e6 keeps that budget below ORTHONORMAL_DEFECT_MAX
+#   (7e-9 at r = 8, N = 1e6), so a defect refusal signals a failure, not
+#   roundoff. The earlier limit 1e8 allowed budgets near 1e-6, so the defect
+#   guard, not the stated limit, refused such clusters.
+# * Principal values may exceed one only through the measured defects of the
+#   two formed frames: sigma_max^2 <= (1 + r d_P)(1 + r d_Q). The remaining SVD
+#   and cross-product roundoff, of order u (r + sqrt(N)), is covered by
+#   SINGULAR_ROUNDOFF for N up to about 1e7.
+#
+# Defects are measured on the frames that are actually formed and compared.
+# Measuring H^H G H against the Gram matrix G it was computed from misses the
+# Gram roundoff amplified by kappa and refused identical spans near kappa 1e6.
+GRAM_CONDITION_MAX = 1e6
 HERMITIAN_DEFECT_MAX = 1e-10      # relative Frobenius defect of G - G^H
-ORTHONORMAL_DEFECT_MAX = 1e-8     # max |Q^H W Q - I| after whitening
+ORTHONORMAL_DEFECT_MAX = 1e-8     # max |Q^H W Q - I| of a formed frame
 SINGULAR_ROUNDOFF = 1e-12         # SVD/product roundoff allowance on sigma^2
+UNIT_ROUNDOFF = float(np.finfo(float).eps) / 2
+FRAME_DEFECT_FACTOR = 8.0
+
+
+def frame_defect_budget(rank: int, condition: float, size: int) -> float:
+    """Roundoff budget of max |Q^H W Q - I| for a whitened frame Q formed from N = size DOFs."""
+    return FRAME_DEFECT_FACTOR * rank * UNIT_ROUNDOFF * (condition + math.sqrt(size))
+
 
 _FORBIDDEN = -1e6                 # assignment cost of a rank-mismatched pair
 
@@ -213,8 +233,17 @@ def whiten(gram: np.ndarray) -> tuple[np.ndarray, dict]:
                               orthonormal_defect=orthonormal_defect)
 
 
+def frame_defect(metric: ElectricMetric, frame: VectorField) -> float:
+    """Orthonormality defect max |F^H W F - I| of a formed frame, from a fresh product."""
+    gram = metric.product(frame, frame)
+    return float(np.abs(gram - np.eye(gram.shape[0])).max())
+
+
 def excursion_bound(rank: int, defect_previous: float, defect_current: float) -> float:
-    """Largest roundoff excursion of sigma^2 above one implied by measured frame defects."""
+    """Largest roundoff excursion of sigma^2 above one implied by measured frame defects.
+
+    The defects must be measured on the formed frames (frame_defect).
+    """
     return (1 + rank * defect_previous) * (1 + rank * defect_current) - 1 + SINGULAR_ROUNDOFF
 
 
@@ -296,11 +325,22 @@ class SubspaceTracker:
         self.settings = settings
         self.metric = ElectricMetric(mesh)
         self.previous: list[VectorField] | None = None      # one W-orthonormal frame per cluster
-        self.previous_defects: list[float] | None = None     # their measured orthonormality defects
+        self.previous_defects: list[float] | None = None     # their defects, measured on the formed frames
         self.ranks: list[int] | None = None
 
     def _fail(self, location, reason, action):
         raise ModeTrackingError(f"vector subspace sweep at {location}: {reason}; {action}")
+
+    def _formed(self, raw, transform, condition, location, label):
+        """Form raw @ transform and measure its orthonormality defect with a fresh product."""
+        frame = columns(raw, transform)
+        defect = frame_defect(self.metric, frame)
+        if defect > ORTHONORMAL_DEFECT_MAX:
+            size = frame.transverse.shape[0] + frame.longitudinal.shape[0]
+            budget = frame_defect_budget(transform.shape[1], condition, size)
+            self._fail(location, f"{label}: formed frame is not orthonormal (defect {defect:.3g} > "
+                       f"{ORTHONORMAL_DEFECT_MAX:g}; roundoff budget {budget:.3g})", "check the mesh and solved fields")
+        return frame, defect
 
     def _whitened(self, field, start, stop, location, label):
         raw = columns(field, np.eye(field.transverse.shape[1])[:, start:stop])
@@ -308,7 +348,8 @@ class SubspaceTracker:
             inverse_root, diagnostics = whiten(self.metric.product(raw, raw))
         except ValueError as exc:
             self._fail(location, f"{label}: {exc}", "check the mesh and solved fields")
-        return raw, inverse_root, columns(raw, inverse_root), diagnostics
+        whitened, defect = self._formed(raw, inverse_root, diagnostics["gram_condition"], location, label)
+        return raw, inverse_root, whitened, dict(diagnostics, orthonormal_defect=defect)
 
     def step(self, neff, field: VectorField, location: str):
         """Return (raw n_eff, raw fields, frame transform, cluster offsets, evidence).
@@ -348,10 +389,11 @@ class SubspaceTracker:
                 rotation = right_h.conj().T @ left.conj().T
                 sin_max = projection_sin_max_angle(self.metric, self.previous[n], whitened, cross)
             transform = inverse_root @ rotation
+            frame, defect = self._formed(raw, transform, diagnostics["gram_condition"], location, f"cluster {n + 1}")
             raw_parts.append(raw)
             transforms.append(transform)
-            frames.append(columns(raw, transform))
-            evidence.update(diagnostics)
+            frames.append(frame)
+            evidence.update(diagnostics, orthonormal_defect=defect)       # defect of the committed frame
             if principal is not None:
                 evidence.update(principal_squared=principal[n].tolist(), min_principal_squared=float(principal[n][-1]),
                                 score=scores[n], margin=margins[n],
@@ -402,7 +444,9 @@ class SubspaceTracker:
                 # continuation; dropping it would hide that from the assignment and margins.
                 self._fail(location, f"candidate cluster at ranks {start + 1}-{stop}: {exc}",
                            "check the mesh and solved fields")
-            candidates.append(((start, stop), columns(raw, inverse_root), whitening["orthonormal_defect"]))
+            whitened, defect = self._formed(raw, inverse_root, whitening["gram_condition"], location,
+                                            f"candidate cluster at ranks {start + 1}-{stop}")
+            candidates.append(((start, stop), whitened, defect))
         observed = [b - a for a, b in components]
         if not candidates:
             self._fail(location, f"no candidate cluster has a tracked rank {self.ranks} (observed component ranks "
