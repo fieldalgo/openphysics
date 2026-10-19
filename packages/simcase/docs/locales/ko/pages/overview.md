@@ -2,9 +2,9 @@
 
 [English](../../../overview.md) | **한국어**
 
-[영어·한국어 문서와 번역 상태](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
+[전체 문서 색인](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/index.md)
 
-COMSOL 형태의 프로그램은 본질적으로 모델을 설명하는 파일과 이를 실행하는 엔진입니다. `simcase`는 FieldAlgo 스택을 위한 해당 파일 형식과 엔진을 구현합니다. JSON 문서는 형상·재료·물리·메시 설정·study를 담고, 한 명령이 meshine(메시), physmat(재료), galerkin(FEM)을 거쳐 결과를 기록합니다. 문서를 편집하는 브라우저 UI는 같은 설치의 [선택적 하위 패키지](#브라우저-ui)이며 엔진은 이에 의존하지 않습니다.
+`simcase`는 JSON 모델 문서와 이를 실행하는 엔진을 정의합니다. 문서는 형상·재료·물리·메시 설정·study를 담고, 한 명령이 meshine(메시), physmat(재료), galerkin(FEM)을 거쳐 결과를 기록합니다. 문서를 편집하는 브라우저 UI는 같은 설치의 [선택적 하위 패키지](#브라우저-ui)이며 엔진은 이에 의존하지 않습니다.
 
 ```bash
 # From the repository root; installs the local runtime packages together.
@@ -14,13 +14,22 @@ python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"`를 유지하며 import나 배포판 이름이 아닙니다. 별도의 `openphysics` 배포판은 이름 예약용입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/README.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"`를 유지하며 import나 배포판 이름이 아닙니다. 별도의 `openphysics` 배포판은 이름 예약용입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(선언 단위, study 지점별 n_eff, 군굴절률, 메시 통계, 시간), `fields.npz`(메시와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 문서 사본이 생성됩니다.
 
-## 진공 PEC 공진기 문서
+## 지원하는 문서
 
-기능 브랜치는 단일 study `em.cavity3d` 문서와 SI JSON/NPZ 출력 계약을 추가합니다. 이 브랜치에서 전체 엔진 검증은 대기 중입니다. 지원 설정, 탐색 한계, 입력 단위와 SI 출력의 구분은 [공진기 입력·결과 계약](../../../cavity3d.md)을 참조하세요. 아래 기존 2D 흐름은 계속 사용할 수 있습니다.
+실행기는 문서마다 물리 항목 하나를 받습니다. `python -m simcase example <이름>`은 제공 예제를 출력합니다.
+
+| 물리 유형 | 해석 내용 | 예제 | 계약 |
+|---|---|---|---|
+| `em.modes2d` | 무손실 2D 도파 모드, 스칼라 또는 전체 벡터. 단일 지점과 모드 추적 파장 sweep | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | 이 페이지, [부분공간 추적](vector_subspace_tracking.md) |
+| `em.cavity3d` | 진공 직육면체 PEC 상자 고유모드, SI JSON/NPZ 출력 | `cavity_box` | [공진기 문서](cavity3d.md) |
+| `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
+| `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
+
+Studio는 2D 광학 모델을 편집·실행하고 두 열전도 유형의 전용 화면을 제공하며, 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 손실 재료, 기계해석 문서는 지원하지 않습니다.
 
 ## 문서
 
@@ -52,7 +61,7 @@ CLI 요약, 저장 그림, Studio 형상/메시/결과 라벨은 선언 길이 �
 
 형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료 이름은 `materials`에서 먼저 찾고 다음으로 physmat 내장 재료(`"Si"`, `"SiO2"`, `"Au"`, ...)에서 찾으므로 sweep의 각 파장에 분산이 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다.
 
-현재 물리: 무손실 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 두 경로 모두 손실 재료를 거절합니다. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
+광학 모드 물리는 무손실 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 두 경로 모두 손실 재료를 거절합니다. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
 
 ### 벡터 장과 단일 지점 study
 
@@ -157,6 +166,18 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
+## 열전도·공진기 문서
+
+[공진기 문서 계약](cavity3d.md)은 `em.cavity3d` 입력, 단위 변환, 탐색 한계, SI JSON/NPZ 결과 구성을 설명합니다.
+
+[thermal.steady2d 계약](thermal_steady2d.md)은 명시 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 지지 열 반력은 안쪽 방향이며 그 음수가 온도 고정부의 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 외향 열유속·대류, v2 metadata와 raw 배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 v1을 유지합니다. Dirichlet이 비어 있으면 양의 Robin 고정이 필요합니다. 입력 Kelvin은 음이 아니어야 하며, 계산된 유한 음의 온도는 clamp하지 않습니다.
+
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1, 일관 질량/후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/표본 Dirichlet 값과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환합니다. 결과는 Nt개 frame, Nt-1개 rate, SI 단위와 버전 metadata를 갖는 JSON/비객체 NPZ 이력으로 저장합니다. 초기값을 projection하지 않고 음의 K를 clamp하지 않습니다. 과도 열유속/Robin, restart, 자동 연성은 지원하지 않습니다.
+
+### 저장 출력
+
+저장하는 실행마다 dangling symlink도 없는 새 출력 디렉터리가 필요합니다. 저장과 정리가 끝날 때까지 독점적으로 관리하세요. 정리 전에 관측된 교체에 대한 보호는 시험하지만, 소유권 확인과 unlink 사이의 외부 교체는 안전을 보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다. CI는 Linux·macOS·Windows에서 열전도 저장·I/O 견고성 검사를 실행합니다. 저장·플랫폼 한계는 각 계약을 참고하세요.
+
 ## 브라우저 UI
 
 `simcase.studio`는 이 스택의 선택적 프로그램 부분입니다. 왼쪽 모델 트리, 가운데 형상/메시/결과 보기, 오른쪽 속성 패널, 아래 로그로 구성됩니다. 스크립트와 같은 문서를 편집하고 로컬 서버에 같은 엔진으로 메시 생성과 실행을 요청합니다.
@@ -176,12 +197,13 @@ python -m simcase.studio --port 9000 --no-browser
 - 모델 트리: Units, Domain, Background, 형상(rect / circle / polygon 추가·순서변경·삭제), 사용자 재료, Physics, Mesh, Study, Results. 노드를 선택하면 편집 폼이 나타나고 모든 편집이 형상 보기와 JSON 탭에 즉시 반영되며 검증기의 크기 경고가 옆에 표시됩니다.
 - 재료: 출처·유효 범위를 갖는 physmat 내장 재료와 문서 상수 재료. 사용자 Sellmeier 모델은 JSON 탭에 입력합니다. 트리/속성 항목이 모델을 식별하고 계수 편집을 JSON으로 안내하며 상수 `n`, `k`를 추가하지 않습니다.
 - 메시 생성: 서버를 통해 meshine으로 생성하고 영역별로 그리며 노드·삼각형 수, 최소각, 평균 품질을 표시합니다.
-- 실행: 백그라운드 작업 후 study 지점·모드를 선택하는 모드 장, n_eff 대 매개변수 차트, 파장 sweep 군굴절률 표를 제공합니다. 벡터 결과는 성분 선택과 상대 진폭을 추가하고 추적 sweep은 분지를 식별해 overlap과 군굴절률을 표시합니다.
+- 실행(광학 모델): 백그라운드 작업 후 study 지점·모드를 선택하는 모드 장, n_eff 대 매개변수 차트, 파장 sweep 군굴절률 표를 제공합니다. 벡터 결과는 성분 선택과 상대 진폭을 추가하고 추적 sweep은 분지를 식별해 overlap과 군굴절률을 표시합니다.
 - JSON 탭: 문서를 직접 편집하고 적용합니다.
+- 열전도: 직사각형 `thermal.steady2d`·`thermal.transient2d` 문서용 전용 화면. 정상 열전도는 결과 메시, 절점 Kelvin, 요소 열유속을 보여 주고, 과도 열전도는 요청 시간 선택과 페이지 단위 열량(H)·이차 범함수(V) 이력을 더합니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
 
 페이지는 빌드 단계와 외부 라이브러리가 없는 단일 HTML 파일(canvas 그리기만 사용)입니다. UI가 커지면 프레임워크를 도입할 수 있습니다. 데스크톱 대신 웹을 사용하므로 어떤 프런트엔드든 같은 문서 형식의 UI를 공유하고 노트북·서버에서 같은 방식으로 실행하며 HTTP로 다른 서비스에 접근할 수 있습니다.
 
-아직 없는 기능: 마우스 스케치·Boolean CAD, 3D 뷰어, 메시를 재생성하는 형상 sweep, 사용자 계정, 서버 저장 프로젝트.
+지원하지 않는 기능: 마우스 스케치·Boolean CAD, 3D 뷰어, 기계해석 폼, 메시를 재생성하는 형상 sweep, 사용자 계정, 서버 저장 프로젝트. Studio는 로컬 도구이며 인증된 다중 사용자 서비스가 아닙니다. 신뢰할 수 없는 네트워크에 노출하지 마세요.
 
 ### HTTP API
 
@@ -199,6 +221,8 @@ python -m simcase.studio --port 9000 --no-browser
 | GET | `/api/jobs/{id}` | 상태와 로그 줄 |
 | GET | `/api/jobs/{id}/result` | n_eff·군굴절률·장·메시·시간 |
 
+정상·과도 열전도 화면은 별도 capability·검증·실행·결과 route를 씁니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
+
 `simcase.studio`는 `simcase.__all__`의 이름, 즉 simcase 공개 API만 사용할 수 있으며 그 아래 모듈은 사용할 수 없습니다. 시험이 이를 강제합니다. UI를 엔진 일부가 아닌 소비자로 유지하므로 별도 배포판으로 분리할 때 재작성 대신 이동할 수 있습니다. UI에 엔진이 내보내지 않는 기능이 필요하면 엔진이 의도적으로 공개합니다.
 
 ## 자체 검증
@@ -206,11 +230,12 @@ python -m simcase.studio --port 9000 --no-browser
 ```bash
 # From the repository root after the development install in ../../README.md
 python -m pytest -q packages/simcase/tests
+node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
 ```
 
-문서는 JSON 왕복 변환을 유지하고, 잘못된 문서는 구체적인 메시지로 거절합니다. Boolean 형상은 영역을 정확히 채웁니다(면적 검사). 손대지 않은 원은 실제 원 위에 노드를 유지합니다. 세 문서를 전체 실행해 참조해와 대조합니다. 220 nm Si 슬랩은 refsol TE0을 1.5e-3까지 재현하고(P1 이산화), 계단형 광섬유는 LP01/LP11 스칼라 모드를 2e-4까지 재현하며, Hadley 리브는 출판 준-TE 값에 5e-4 이내로 접근합니다(남은 차이는 스칼라 근사). sweep에서는 n_eff가 감소하고 n_g > n_eff입니다.
+문서는 JSON 왕복 변환을 유지하고, 잘못된 문서는 구체적인 메시지로 거절합니다. Boolean 형상은 영역을 정확히 채웁니다(면적 검사). 손대지 않은 원은 실제 원 위에 노드를 유지합니다. 세 문서를 전체 실행해 참조해와 대조합니다. 220 nm Si 슬랩은 refsol TE0을 1.5e-3까지 재현하고(P1 이산화), 계단형 광섬유는 LP01/LP11 스칼라 모드를 2e-4까지 재현하며, Hadley 리브는 출판 준-TE 값에 5e-4 이내로 접근합니다(남은 차이는 스칼라 근사). sweep에서는 n_eff가 감소하고 n_g > n_eff입니다. 열전도 문서는 아래에 연결한 별도 독립 검증 보고를 갖습니다.
 
-Studio endpoint는 FastAPI test client로 검사하며, n_eff가 슬랩 참조해와 일치하는 전체 실행 작업도 포함합니다. `studio` extra가 없으면 해당 시험은 skip됩니다. 과거 수동 브라우저 검사는 load -> edit -> mesh -> run -> results를 다뤘습니다. 자동 시험은 HTTP API와 패키지 HTML을 다루며 브라우저 상호작용은 다루지 않습니다. pytest를 실행해도 그 수동 검사를 반복한 것은 아닙니다.
+Studio endpoint는 FastAPI test client로 검사하며, n_eff가 슬랩 참조해와 일치하는 전체 실행 작업도 포함합니다. `studio` extra가 없으면 해당 시험은 skip됩니다. CI는 설치된 패키지로 실제 브라우저에서 작은 모델도 실행합니다.
 
 ## 전체 구성에서의 위치
 
@@ -223,52 +248,25 @@ script / CLI  ->  runs the document      simcase.run
                      '-- refsol    references (tests)
 ```
 
-## 헤드리스 정상 열전도
+## 문서 목록
 
-별도 [thermal.steady2d 계약](../../../thermal_steady2d.md)은 명시적 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. [슬랩](../../../../examples/thermal_slab.json)과 [혼합 열원](../../../../examples/thermal_mixed.json) 예제는 계약과 함께 sdist에 byte 동일하게 포함됩니다. 설치 후 예제 파일에 `simcase validate thermal_slab.json`, `simcase run thermal_slab.json -o fresh_heat_results`를 실행하세요. 출력 경로는 새 경로여야 하며 끊어진 symlink도 없어야 합니다. 수치 SI NPZ 배열에는 전용 결과 버전/구성이 있고 `allow_pickle=False`로 읽습니다. 지지점 열반력은 안쪽 방향이며 그 음수가 thermostat 외향 기여입니다.
-Flux·대류가 있으면 전체 외향 열량에는 해당 경계 기여도 포함합니다.
-
-[정상 경계 확장](thermal_steady_boundary2d.md) 후보는 변 상수 외향 flux·대류,
-v2 metadata와 raw 배열 13개를 추가하며 기존 문서는 v1을 유지합니다.
-CLI 예제는 `thermal_boundary`이며 Dirichlet이 비어 있으면 양수 Robin 구속이
-필요합니다. 입력 Kelvin은 비음수이고 유한한 음수 계산 온도는 clamp하지 않습니다.
-P2 수치·설치 수용은 미완료입니다. 열전도 Studio UI·그림·과도 flux/Robin·
-자동 열탄성 연성은 추가하지 않습니다. 저장 소유권과 플랫폼 한계는 계약을 읽으세요. 좁은 Windows 저장 검증은 Linux 전체 회귀 gate와 별도로 추적합니다.
+| 주제 | English | 한국어 |
+|---|---|---|
+| 패키지 개요 | [Overview](../../../overview.md) | [한국어](overview.md) |
+| 벡터 부분공간 추적 | [Guide](../../../vector_subspace_tracking.md) | [한국어](vector_subspace_tracking.md) |
+| 공진기 문서 | [Contract](../../../cavity3d.md) | [한국어](cavity3d.md) |
+| 정상 열전도 문서 | [Contract](../../../thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
+| 정상 열전도 검증 | [Report](../../../thermal_simcase_independent_validation.md) | [한국어](thermal_simcase_independent_validation.md) |
+| 정상 경계조건 | [Contract](../../../thermal_steady_boundary2d.md) | [한국어](thermal_steady_boundary2d.md) |
+| 정상 경계조건 검증 | [Report](../../../steady_boundary_independent_validation.md) | [한국어](steady_boundary_independent_validation.md) |
+| 과도 열전도 문서 | [Contract](../../../thermal_transient2d.md) | [한국어](thermal_transient2d.md) |
+| 정상 열전도 Studio | [Guide](../../../thermal_studio.md) | [한국어](thermal_studio.md) |
+| 정상 Studio 검증 | [Report](../../../studio_thermal_independent_validation.md) | [한국어](studio_thermal_independent_validation.md) |
+| 과도 열전도 Studio | [Guide](../../../thermal_transient_studio.md) | [한국어](thermal_transient_studio.md) |
+| 과도 Studio 검증 | [Report](../../../studio_transient_thermal_independent_validation.md) | [한국어](studio_transient_thermal_independent_validation.md) |
 
 ## 라이선스
 
 Apache License 2.0 — [LICENSE](../../../../LICENSE), [NOTICE](../../../../NOTICE)를 참조하세요.
 
 Copyright 2026 Yongha Kim (FieldAlgo)
-
-
-## Documentation languages / 문서 언어
-
-| Topic / 주제 | English | 한국어 |
-|---|---|---|
-| Cavity / 공동 | [English](../../../cavity3d.md) | [한국어](cavity3d.md) |
-| Vector subspace tracking / 벡터 부분공간 추적 | [English](../../../vector_subspace_tracking.md) | [한국어](vector_subspace_tracking.md) |
-| Headless heat / 헤드리스 열전도 | [English](../../../thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
-
-저장과 정리가 끝날 때까지 호출자가 출력 경로를 독점해야 합니다. 정리 전에 관측한
-교체에 대한 보호는 시험하지만, 소유권 검사와 unlink 사이의 외부 교체는 안전을
-보장하지 않습니다. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.
-이 구간에는 다른 writer가 출력을 변경하면 안 됩니다. Windows 저장 검증은 두 실패의
-원인이 미확정인 상태로 중단됐으며 Linux 결과로 Windows 수용을 대신하지 않습니다.
-GitHub Actions는 활성화돼 있으며 Windows 수용에는 새 runner 근거가 필요합니다.
-
-## Headless 과도 열전도
-
-[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1·일관 질량·후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/시간 표본 Dirichlet과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환하고 CLI 예제는 `transient_thermal_uniform`입니다. 결과는 Nt frame과 Nt-1 rate, SI 단위·버전 metadata를 가진 JSON/비객체 NPZ 이력으로 저장됩니다. 초기값을 projection하거나 음의 K를 clamp하지 않습니다. 새 출력 소유권·메모리·실패 한계는 계약을 따르며 필드 비활성화가 streaming은 아닙니다. Generic광학Studio route는열문서를거절하고오래된광학상태를지우며전용 과도 인터페이스는 별도 capability·route·시간/history view를 사용합니다. 과도 flux/Robin·restart·자동 연성은 없습니다. 구현과 정확한 source/설치/CI 수용은 구분합니다.
-
-## 정상열 Studio
-
-[정상열 Studio 가이드](thermal_studio.md)는 이 checkout의 JSON 입력·전용 검증/실행·결과메시·절점 Kelvin/요소 flux 표시·오류회복·제한된 자원정책을 설명합니다. Generic 열 거절·광학동작은 유지하며 과도 UI·해석 전 메시 preview·새 결과저장 endpoint는 범위 밖입니다. 구현과 실제검증은 별개이며 정확 checkout의 CI·artifact를 확인하세요. `candidate-unmeasured`는 실측용량 보장이 아닙니다.
-
-## 검증·반영 상태 구분
-
-문서를 포함해 Draft→관련검사→Ready PR→필수CI→자동 Rebase and merge→landed main검증을 따릅니다. Main은 취소 없는 queue=max, PR은 queue=single 대체 정책입니다. Linux 전체 과학과 Linux/macOS/Windows 설치 검증은 별도이며 구성·실행·수용·main반영을 구분합니다. Studio browser·자원실측 근거는 정확 checkout별로 확인합니다. 자세한 운영·근거 경계는 [정상열 Studio 가이드](thermal_studio.md)를 참조하세요.
-
-## 과도 열전도 Studio 통합
-
-[과도 Studio 가이드](thermal_transient_studio.md)는 정확요청시간index(기본마지막)·절점K/요소flux·H[J/m]/V[J K/m] page·typed조회·명시429회복·제한수명을설명합니다. 이 checkout은 전용 capability·route와 배포 페이지 control을 구현합니다. 실측 runtime·설치·browser·자원·플랫폼 범위는 정확한 checkout의 CI 결과와 artifact에서 확인하며 headless·정상열 수용이 과도 UI 수용을 입증하지는 않습니다. Generic광학guard유지. 보간/downsample/새solver/cancel-delete-saveendpoint는추가하지않습니다. 후보한도·구현과정확CI/artifact근거를별도로확인하세요.

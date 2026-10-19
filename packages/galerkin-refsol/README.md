@@ -5,7 +5,7 @@
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
 Closed-form solutions and published high-accuracy benchmarks used as the
-answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/packages/galerkin/README.md)
+answer key for the [galerkin](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/README.md)
 FEM engine. It is a separate package in the same monorepo;
 the grader never imports the code it grades. It depends only on numpy and scipy.
 
@@ -20,11 +20,15 @@ The Python package name is `refsol` (`from refsol import fiber`).
 |---|---|---|
 | `refsol.thermoelasticity` | Prescribed-Kelvin uniform free/constrained, compatible and sine fields; out-of-plane stress and physical elastic energy | Original three-dimensional law, no FEM imports |
 | `refsol.thermal` | Kelvin slab and steady sine manufactured fields; heat flux W/m^2 and source W/m^3 | Direct analytic derivatives, no engine imports |
+| `refsol.thermal_boundary` | Steady slabs and a sine field with prescribed outward flux and Robin convection | Closed forms, no engine imports |
+| `refsol.transient_heat` | Uniform insulated heating, moving affine field, manufactured sine solution; small dense P1 matrices and backward-Euler modal references | Analytic forms and dense eigenproblems, no engine imports |
+| `refsol.thermoelastic_traction` | Combined thermal-strain and traction fields, polynomial manufactured solutions and `traction_from_stress` from the original 3D law | NumPy/stdlib only, no engine imports |
 | `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, optional material dispersion) and exact vector mode fields (`vector_mode_field`) | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots, residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r) |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field | closed forms |
+| `refsol.cavity` | every vacuum PEC box mode up to a frequency ceiling, with polarization and geometric degeneracy, SI | independent Cartesian enumeration, no solver or mesh |
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
@@ -61,9 +65,9 @@ print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 ```
 
 The reference module is included in both the sdist and wheel. It imports no FEM
-engine. The separate [engine contract](https://github.com/fieldalgo/openphysics/blob/a292ae15707b3713f0464b4d126be765b4c205ae/packages/galerkin/docs/elasticity2d.md)
+engine. The separate [engine contract](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/elasticity2d.md)
 describes boundary constraints, per-thickness loads and locking limitations.
-It is a repository link requiring network access and repository permission.
+It is an online link to the galerkin package documentation.
 
 ```python
 from refsol import fiber, slab, scattering, benchmarks
@@ -80,6 +84,30 @@ u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
 # published reference: quasi-TE n_eff of the Hadley rib waveguide, slab 0.3 um
 benchmarks.rib_neff(0.3)   # 3.412492
 ```
+
+`refsol.thermal_boundary` provides independent closed forms for prescribed
+outward flux and Robin boundaries. Coordinates are m, temperature K,
+conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K).
+
+`refsol.transient_heat` provides `uniform_insulated`, `moving_affine`,
+`sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and
+`backward_euler_amplitude`. Coordinates/time/temperature are m/s/K,
+conductivity W/(m K), volumetric heat capacity J/(m³ K), source W/m³ and flux
+W/m². The dense matrices and modes target small reference meshes; a
+semidiscrete backward-Euler product is distinct from a continuum PDE solution.
+These references do not certify physical temperature validity or a maximum
+principle. The transient engine is documented in the galerkin
+[transient heat contract](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat.md).
+
+`refsol.thermoelastic_traction` provides `uniform_combined`,
+`polynomial_manufactured`, `parent_state` and `traction_from_stress` from the
+original 3D constitutive law. Coordinates/displacement are m, temperature K,
+stress/total traction Pa, body force N/m^3, force/reaction N/m and physical
+energy J/m. It supplies prescribed-temperature mechanical references, not a heat
+solve or source authentication.
+
+All reference modules ship in the sdist and wheel. None of them implements a
+coupled model, and independent acceptance tests derive their own expected values.
 
 ## Run the self-checks
 
@@ -131,18 +159,3 @@ Copyright 2026 Yongha Kim (FieldAlgo)
 
 The benchmark values in `refsol.benchmarks` are numerical results published by
 Hadley (2002); see [NOTICE](NOTICE) for their provenance.
-
-`refsol.thermal_boundary` provides independent closed forms for prescribed outward flux and Robin boundaries. Coordinates are m, temperature K, conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K). It is included in both archives; this standalone reference does not extend the headless JSON schema.
-
-`refsol.transient_heat` provides uniform insulated heating, a moving affine
-temperature field, a manufactured sine PDE solution and independent small
-dense P1 mass/stiffness and backward-Euler modal references. Coordinates are
-metres, time seconds and temperature Kelvin. The discrete eigenmode reference
-is distinct from continuum PDE convergence; see the
-[reference overview](docs/overview.md).
-
-`refsol.thermoelastic_traction` provides `uniform_combined`, `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the original 3D constitutive law, using only NumPy/stdlib and no engine imports. Coordinates/displacement are m, temperature K, stress/total traction Pa, body force N/m^3, force/reaction N/m and physical energy J/m. It supplies prescribed-temperature mechanical references, not a heat solve or source authentication.
-
-## Reference boundary for transient headless documents
-
-The rectangular simcase `thermal.transient2d` path adapts the existing transient engine; it is not a new physical reference. Its [document contract](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/thermal_transient2d.md) is online documentation in a separate package and requires network access. Engine reference/convergence passes are separate from serialization, CLI, save and installed acceptance; independent consumers must derive their own truth. Studio, transient flux/Robin, automatic coupling and restart remain unsupported.

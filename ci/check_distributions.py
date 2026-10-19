@@ -112,6 +112,8 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/thermoelasticity_independent_oracle.py',
               'tests/test_thermoelasticity_independent_validation.py',
               'docs/overview.md', 'docs/locales/ko/pages/overview.md',
+              'docs/milestone_validation.md',
+              'docs/locales/ko/pages/milestone_validation.md',
               'docs/locales/ko/pages/cavity_solver.md',
               'docs/locales/ko/pages/eigenspace_reliability.md',
               'docs/locales/ko/pages/elasticity2d.md',
