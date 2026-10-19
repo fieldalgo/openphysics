@@ -2,9 +2,9 @@
 
 **English** | [한국어](locales/ko/pages/multimaterial.md)
 
-Heat conduction can assign a different material to each named region of a 2D
-mesh. This page holds the shared input rule, the steady-heat contract and its
-independent validation. Further physics will be added here as it is
+Steady heat conduction and static elasticity can assign a different material
+to each named region of a 2D mesh. This page holds the shared input rule, each
+contract and its independent validation. Further physics will be added here as it is
 validated; until then their pages state that only one homogeneous material is
 accepted.
 
@@ -45,8 +45,10 @@ result = solve_steady_heat(
   per-triangle array input.
 - Units are those of the scalar argument. A mapping never converts units.
 - A scalar input follows the original code path, so homogeneous results are
-  unchanged bit for bit; a mapping with the same value in every region gives
-  the same arrays as the scalar.
+  unchanged bit for bit. A mapping with the same value in every region gives
+  the same arrays as the scalar (heat: identical; elasticity: to 1e-12
+  relative, because the per-triangle constitutive contraction sums in a
+  different order).
 
 Material properties are constant within each triangle. Interfaces must lie on
 element edges (meshes that follow region boundaries, as all generators above
@@ -130,10 +132,72 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin-refsol/tests/test_thermal_multilayer_reference.py
 ```
 
+## Static elasticity
+
+`galerkin.elasticity.solve_elasticity` accepts `young_modulus` (Pa) and
+`poisson_ratio` each as a scalar or a region mapping; one may be a scalar and
+the other a mapping. Each region must satisfy E > 0 and -1 < nu < 0.5, and
+`plane` ('stress' or 'strain') applies to every region. The element matrix is
+`K_e = A_e B_e^T D_e B_e` with the region's own `D_e`, and the reported stress
+is `D_e` times the element strain. Body force, traction, Dirichlet data,
+reactions and residual checks are unchanged
+([elasticity2d](elasticity2d.md), [elasticity_traction](elasticity_traction.md)).
+Perfect bonding is assumed: displacement is continuous, and the traction
+`sigma.n` across an interface is continuous only in the limit (O(h) jump of the
+element-constant P1 stress). Interface stress singularities at free edges of
+dissimilar materials are physical and are not resolved by this element.
+
+`refsol.elasticity_multilayer` (NumPy only) gives three exact states:
+
+- `laminate_axial`: layers stacked across the load, uniform axial strain,
+  free faces. Displacement is continuous and piecewise linear, sigma_xx = E' eps
+  per layer (E' = E in plane stress, E/(1-nu^2) in plane strain).
+- `series_bar`: layers in series under uniform sigma_xx. This is exact only
+  when every layer has the same lateral strain (plane stress nu/E equal; plane
+  strain nu(1+nu)/E equal); other data are rejected because the true solution
+  then has interface singularities.
+- `composite_cylinder`: concentric shells under inner and outer pressure,
+  u_r = A_i r + B_i/r per shell, with displacement and radial stress
+  continuous; the 2n coefficients come from a small dense linear system.
+
+Their tests check the isotropic law by central differences of the displacement,
+Cartesian equilibrium by central differences of the stress, continuity of
+displacement and radial traction at interfaces, traction-free and pressure
+boundaries, the Voigt resultant, and the single-shell textbook Lamé formulas.
+
+| Case | Mesh | Gate |
+| --- | --- | --- |
+| Uniform mapping (both, or E only) vs scalar | 2-region rectangle | Displacement, strain, stress, reaction within 1e-12 relative |
+| Laminate, E 70/3/200 GPa, nu .33/.4/.29, both planes | layered rectangle | Nodal displacement <= 1e-10 of eps·H; stress <= 1e-9; top reaction = Voigt resultant to 1e-10 |
+| Series bar with matched lateral strain, both planes | layered rectangle | Displacement <= 1e-9 relative; stress = (s,0,0) to 1e-8 |
+| Composite cylinder E 200/3/70 GPa, nu .3/.38/.33, p_i 40 MPa, p_o 5 MPa, both planes | layered annulus, n=1,2,4,8 | Displacement L2 order >= 1.8, stress L2 order >= 0.9, mean radial-traction jump order >= 0.9 (last two intervals); symmetry-point reactions <= 1e-8 of the inner load |
+| Invalid regions | — | Missing/unknown names, E <= 0, nu outside (-1, 0.5), nonfinite/complex values, bare arrays, invalid plane, mapping without region data raise `ValueError` |
+
+Observed when first run (n=1 → 8):
+
+| Quantity | Plane stress | Plane strain |
+| --- | --- | --- |
+| Displacement L2 (m^2) | 4.17e-8 → 7.06e-10, orders 1.91, 1.98, 1.99 | 5.33e-8 → 9.35e-10, orders 1.87, 1.97, 1.99 |
+| Stress L2 (Pa m) | 5.54e5 → 7.28e4, orders 0.95, 0.99, 1.00 | 6.62e5 → 8.90e4, orders 0.92, 0.98, 0.99 |
+| Radial-traction jump (relative) | 1.47 → 0.187, orders 0.97, 1.00, 1.00 | 1.67 → 0.215, orders 0.95, 1.00, 1.00 |
+| Symmetry reactions (relative) | <= 1.9e-14 | <= 7.2e-15 |
+
+The soft epoxy shell (E 3 GPa) between steel and aluminium makes the
+element-constant traction jump large on coarse meshes; it halves with each
+refinement.
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_elasticity_multimaterial.py \
+  packages/galerkin-refsol/tests/test_elasticity_multilayer_reference.py
+```
+
 ## Limits
 
 - Piecewise constant per region only: no conductivity varying inside a region,
   no anisotropic tensors, no temperature-dependent properties.
 - No contact resistance or interface sources.
-- Elasticity, thermoelasticity, the heat-to-mechanics workflows, transient heat
-  and simcase documents still accept one homogeneous material.
+- No mixed formulation: nearly incompressible regions lock in plane strain,
+  as in the homogeneous solver.
+- Thermoelasticity, the heat-to-mechanics workflows, transient heat and simcase
+  documents still accept one homogeneous material.

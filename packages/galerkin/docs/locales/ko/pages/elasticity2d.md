@@ -5,7 +5,9 @@
 `galerkin.elasticity`와 `refsol.elasticity`를 명시적으로 import합니다. 이 첫 구현은
 적합 `galerkin.mesh.Mesh` P1 삼각형에서 균질·등방성·선형·정적 변위 정식화를 씁니다.
 절점당 변위 자유도는 두 개이며 스칼라·전자기 edge 공간은 사용하지 않습니다.
-이 API는 재료 계면이나 영역별 E/nu를 지원하지 않습니다.
+E와 nu는 이름 있는 메시 영역마다 구간 상수 `{영역 이름: 값}`으로 줄 수도 있으며,
+그 확장과 정답·기준은 [multimaterial](multimaterial.md)에 있습니다. 따로 적지 않으면
+아래 내용은 균질 재료 하나를 설명합니다.
 
 ## 방정식과 관례
 
@@ -57,8 +59,8 @@ shape-function gradient와 교차 배치한 국소 DOF를 사용합니다.
 | 물리량 | shape/관례 | SI 단위 |
 |---|---|---|
 | Mesh 좌표 | `(N,2)` | m |
-| E, stress | 스칼라 E; stress `(T,3)` | Pa = N/m^2 |
-| nu, strain | 스칼라 nu; strain `(T,3)`, 공학 전단 | 무차원 |
+| E, stress | 스칼라 E 또는 `{영역 이름: E}`; stress `(T,3)` | Pa = N/m^2 |
+| nu, strain | 스칼라 nu 또는 `{영역 이름: nu}`; strain `(T,3)`, 공학 전단 | 무차원 |
 | 처방·결과 변위 | `(node,component)`마다 스칼라; 결과 `(N,2)` | m |
 | body_force | 상수 `(2,)` 또는 콜백 `(Q,2)->(Q,2)` | N/m^3 |
 | 내부 강성행렬 | `(2N,2N)` | N/m^2 |
