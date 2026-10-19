@@ -194,8 +194,13 @@ def _region_energy(total_strain, a_element_nodes, area, d, e, nu, plane):
 
 
 def _material_record(value):
-    """Scalar float, or a plain {region name: float} copy for result records."""
-    return {str(k): float(v) for k, v in value.items()} if is_per_region(value) else value
+    """Python float, or a plain {region name: float} copy for result records.
+
+    Called after region_property validated the value, so float() cannot fail.
+    A scalar is converted too: an int, numpy scalar or 0-d array would
+    otherwise be echoed as given (a 0-d array aliased to the caller's object).
+    """
+    return {str(k): float(v) for k, v in value.items()} if is_per_region(value) else float(value)
 
 
 def _solve_regions(mesh, temperature_snapshot, *, reference_temperature_k,
