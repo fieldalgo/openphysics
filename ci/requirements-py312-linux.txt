@@ -3,6 +3,7 @@
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
+appdirs==1.4.4
 build==1.6.1
 certifi==2026.7.22
 cffi==2.1.1
@@ -32,6 +33,7 @@ matplotlib==3.11.2
 mdurl==0.1.2
 meshio==5.3.5
 more-itertools==11.2.1
+mpmath==1.3.0
 nh3==0.3.7
 numpy==2.5.4
 opentelemetry-api==1.45.1
@@ -59,6 +61,8 @@ setuptools==84.0.0
 shapely==2.2.0
 six==1.17.0
 starlette==1.8.0
+symfem==2025.12.0
+sympy==1.14.0
 twine==6.2.0
 typing-extensions==4.16.0
 typing-inspection==0.4.4

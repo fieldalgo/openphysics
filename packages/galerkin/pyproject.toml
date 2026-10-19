@@ -44,7 +44,8 @@ figures = ["matplotlib>=3.7"]
 # Reference tools for code-to-code comparisons (tests/test_crosscheck_*.py), test only.
 # Permissive licenses only, by choice; weak-copyleft or GPL reference tools run
 # separately and are never installed here. See docs/third-party.md in the repository.
-crosscheck = ["scikit-fem>=12,<13"]
+# symfem (with sympy) supplies exact element definitions; the engine never imports it.
+crosscheck = ["scikit-fem>=12,<13", "symfem==2025.12.0"]
 
 [tool.setuptools.packages.find]
 include = ["galerkin*"]
