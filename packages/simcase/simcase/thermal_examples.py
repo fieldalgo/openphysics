@@ -36,3 +36,23 @@ THERMAL_REGIONS = {
     'mesh': {'size': 2., 'min_angle': 28.}, 'study': {'type': 'single'},
     'results': {'save_fields': True, 'plots': False},
 }
+
+# Transient region document: steel plate and insulation heated from t = 0.
+TRANSIENT_THERMAL_REGIONS = {
+    'openphysics': '0.2', 'name': 'Heating a steel and insulation wall',
+    'units': {'length': 'mm', 'temperature': 'K', 'time': 's'},
+    'geometry': {'domain': {'xmin': 0., 'xmax': 30., 'ymin': 0., 'ymax': 5.},
+                 'background': {'material': 'insulation'},
+                 'shapes': [{'name': 'steel_plate', 'type': 'rect', 'x': 0., 'y': 0., 'w': 10., 'h': 5.,
+                             'material': 'steel'}]},
+    'materials': {'steel': {'conductivity_w_mk': 45., 'volumetric_heat_capacity_j_m3k': 3.6e6,
+                            'source': 'document value'},
+                  'insulation': {'conductivity_w_mk': .5, 'volumetric_heat_capacity_j_m3k': 1.2e6,
+                                 'source': 'document value'}},
+    'physics': {'heat1': {'type': 'thermal.transient2d', 'initial_temperature_k': 300.,
+                          'heat_source_w_m3': {'steel_plate': 2e5, 'background': 5e4},
+                          'dirichlet_temperature_k': {'left': 300., 'right': 300.}}},
+    'mesh': {'size': 2., 'min_angle': 28.},
+    'study': {'type': 'transient', 'time_s': [0., 5., 10., 20., 40., 60., 90., 120., 180.]},
+    'results': {'save_fields': True, 'plots': False},
+}

@@ -1,9 +1,9 @@
-# Steady heat documents with material regions
+# Heat documents with material regions
 
 [한국어](locales/ko/pages/thermal_regions2d.md)
 
-A `thermal.steady2d` document whose `geometry` has `background` or `shapes`
-describes several materials. It uses the same geometry as electromagnetic
+A `thermal.steady2d` or `thermal.transient2d` document whose `geometry` has
+`background` or `shapes` describes several materials. It uses the same geometry as electromagnetic
 documents: named shapes, each naming a material, drawn in order over a
 background (later shapes cut earlier ones). Thermal properties come from the
 `materials` table. The mesh follows every region boundary. This is a headless
@@ -146,10 +146,58 @@ Observed when first run (mesh size 2 → 0.25 mm):
 The engine-level per-region validation, including composite cylinders and
 interface heat rates, is in [multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/multimaterial.md).
 
+## Transient documents
+
+A `thermal.transient2d` document with `background`/`shapes` uses the same
+geometry, `materials` table and `mesh` (`size`, `min_angle`) as the steady
+region documents, with the transient time contract of
+[thermal_transient2d](thermal_transient2d.md): `units.time: "s"`,
+`study: {"type": "transient", "time_s": [...]}` with explicit increasing
+seconds, `initial_temperature_k` (uniform number or `affine` object) and
+`dirichlet_temperature_k` per side (constant or `{"values_k": [...]}` sampled at
+the requested times, agreeing with the initial field at t0). Every used
+material needs `conductivity_w_mk` and `volumetric_heat_capacity_j_m3k`;
+`heat_source_w_m3` is a number or a `{region name: number}` map. Physics-level
+`conductivity_w_mk` or `volumetric_heat_capacity_j_m3k` is refused. The shipped
+example is `transient_thermal_regions` (`examples/transient_thermal_regions.json`).
+
+Results use `thermal.transient2d-regions-result-v1` and
+`thermal2d-transient-p1-node-cell-regions-v1`: the rectangle transient fields
+plus static `triangle_regions`. The summary adds `region_names`, `regions`,
+`materials` and the mesh size. `heat_content_j_per_m` is `1^T M T` with each
+region's capacity. Full histories are kept in memory (O(steps x (nodes +
+triangles))); the convergence study below peaked at about 825 MiB.
+
+Validation (`packages/simcase/tests/test_transient_thermal_regions.py`):
+
+| Check | Gate |
+| --- | --- |
+| Q_i = r c_i in every region, insulated sides | T = T0 + r t at every node and time to 1e-10 of 300 K; flux below 1e-9 W/m^2 |
+| Long-time limit (steps of 500 s to 1e4 s) against the steady region document | Identical mesh; final temperature within 1e-9 of the temperature rise |
+| Direct `solve_transient_heat` call on the same mesh | Temperature, flux, reaction and heat content identical |
+| Layered wall heated from a uniform 300 K (Q 2e5 / 5e4 W/m^3, ends 300 K) against `refsol.transient_heat_multilayer.LayeredWall.source_driven`, mesh size 4, 2, 1, 0.5 mm, dt = 1/64 s, observed at 20 s | T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; at 0.5 mm halving dt changes each error by <= 5% |
+| One material everywhere against the rectangle transient document | Source heat equal to 1e-12; maximum temperature within 2e-3 K |
+| Saved fields, CLI, 10 invalid documents, Studio refusal | Formats, regions, materials; exit codes; `DocumentError`; no worker or mesher call |
+
+Two earlier configurations of the convergence gate failed because backward
+Euler's first-order time error was not separated from the space error:
+
+| Configuration | Observed | Result |
+| --- | --- | --- |
+| dt = 1/4 s to 180 s | 20, 60, 180 s | T orders on the last interval 0.62, 0.52, 0.88; dt/2 changed T errors by 43%, 44%, 37% (flux orders 0.99-1.00 passed) |
+| dt = 1/64 s to 20 s | 5, 10, 20 s | Last-interval T orders 1.72, 1.86, 1.92; dt/2 changed T errors by 13%, 7.1%, 4.4% |
+
+The retained gate observes 20 s, the only time that met the separation gate in
+the second run; that time was chosen after the run. Observed (mesh size 4 →
+0.5 mm): T L2 1.81e-4, 4.75e-5, 1.18e-5, 3.11e-6 K m (orders 1.93, 2.01, 1.92),
+flux L2 0.942, 0.477, 0.241, 0.121 W/m (orders 0.98, 0.99, 1.00), dt/2 change
+4.4% (T) and 3e-8 (flux). Earlier transient times at these resolutions are
+covered only by the exact-reproduction and engine-equality checks above and by
+the engine validation in [multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/multimaterial.md).
+
 ## Limits
 
-- Steady heat only; transient region documents are not yet accepted.
-- Studio refuses region documents (its heat views read `mesh.subdivisions`);
+- Studio refuses steady and transient region documents (its heat views read `mesh.subdivisions`);
   use the CLI or Python API.
 - Piecewise-constant isotropic properties; perfect contact at interfaces.
 - Plane geometry of unit depth; no thermal properties from built-in materials.

@@ -1,9 +1,9 @@
-# 재료 영역이 있는 정상 열전도 문서
+# 재료 영역이 있는 열전도 문서
 
 [English original](../../../thermal_regions2d.md)
 
-`geometry`에 `background`나 `shapes`가 있는 `thermal.steady2d` 문서는 여러 재료를
-기술합니다. 전자기 문서와 같은 기하를 씁니다: 이름 있는 도형마다 재료 이름을 달고,
+`geometry`에 `background`나 `shapes`가 있는 `thermal.steady2d`·`thermal.transient2d`
+문서는 여러 재료를 기술합니다. 전자기 문서와 같은 기하를 씁니다: 이름 있는 도형마다 재료 이름을 달고,
 배경 위에 순서대로 그립니다(나중 도형이 앞 도형을 자릅니다). 열 물성은 `materials` 표에서
 옵니다. 메시는 모든 영역 경계를 따릅니다. headless API/CLI 경로이며 Studio는 이 문서를
 거부합니다(아래 한계 참고).
@@ -128,10 +128,53 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
 복합 원통과 경계면 열유량을 포함한 엔진 수준 영역별 검증은
 [multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/multimaterial.md)에 있습니다.
 
+## 과도 문서
+
+`background`/`shapes`가 있는 `thermal.transient2d` 문서는 정상 영역 문서와 같은 기하,
+`materials` 표, `mesh`(`size`, `min_angle`)를 쓰고, 시간 규칙은
+[thermal_transient2d](thermal_transient2d.md)와 같습니다: `units.time: "s"`, 증가하는 명시적
+초의 `study: {"type": "transient", "time_s": [...]}`, `initial_temperature_k`(균일 숫자 또는
+`affine` 객체), 변별 `dirichlet_temperature_k`(상수 또는 요청 시각마다의 `{"values_k": [...]}`,
+t0에서 초기장과 일치). 사용하는 모든 재료에 `conductivity_w_mk`와
+`volumetric_heat_capacity_j_m3k`가 필요하고, `heat_source_w_m3`는 숫자 또는
+`{영역 이름: 숫자}`입니다. physics 수준의 `conductivity_w_mk`나
+`volumetric_heat_capacity_j_m3k`는 거부합니다. 배포 예제는 `transient_thermal_regions`
+(`examples/transient_thermal_regions.json`)입니다.
+
+결과는 `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1`로
+사각형 과도 필드에 정적 `triangle_regions`를 더합니다. 요약에는 `region_names`, `regions`,
+`materials`, 메시 크기가 더해집니다. `heat_content_j_per_m`는 영역별 열용량을 쓴 `1^T M T`입니다.
+전체 이력을 메모리에 둡니다(O(단계 수 x (절점 + 삼각형))). 아래 수렴 연구의 최대 메모리는 약
+825 MiB였습니다.
+
+검증(`packages/simcase/tests/test_transient_thermal_regions.py`):
+
+| 검사 | 기준 |
+| --- | --- |
+| 모든 영역에서 Q_i = r c_i, 단열 변 | 모든 절점·시각에서 T = T0 + r t(300 K의 1e-10), 열유속 1e-9 W/m^2 미만 |
+| 긴 시간 극한(500 s 간격, 1e4 s까지) 대 정상 영역 문서 | 같은 메시, 마지막 온도가 온도 상승의 1e-9 이내 |
+| 같은 메시의 `solve_transient_heat` 직접 호출 | 온도·열유속·반력·열량 동일 |
+| 균일 300 K에서 가열하는 층상 벽(Q 2e5 / 5e4 W/m^3, 양끝 300 K) 대 `refsol.transient_heat_multilayer.LayeredWall.source_driven`, 메시 크기 4, 2, 1, 0.5 mm, dt = 1/64 s, 20 s 관측 | 마지막 두 구간에서 T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9; 0.5 mm에서 dt를 절반으로 하면 각 오차 변화 <= 5% |
+| 한 재료만 쓴 문서 대 사각형 과도 문서 | 열원 1e-12 일치, 최고 온도 2e-3 K 이내 |
+| 저장 필드, CLI, 잘못된 문서 10개, Studio 거부 | 형식·영역·재료, 종료 코드, `DocumentError`, 작업자·메시 호출 없음 |
+
+수렴 기준의 앞선 두 구성은 후진 Euler의 1차 시간 오차가 공간 오차와 분리되지 않아 실패했습니다.
+
+| 구성 | 관측 | 결과 |
+| --- | --- | --- |
+| dt = 1/4 s, 180 s까지 | 20, 60, 180 s | 마지막 구간 T 차수 0.62, 0.52, 0.88; dt/2에서 T 오차 43%, 44%, 37% 변화(열유속 차수 0.99-1.00은 통과) |
+| dt = 1/64 s, 20 s까지 | 5, 10, 20 s | 마지막 구간 T 차수 1.72, 1.86, 1.92; dt/2에서 T 오차 13%, 7.1%, 4.4% 변화 |
+
+남긴 기준은 두 번째 실행에서 분리 기준을 만족한 유일한 시각인 20 s를 관측하며, 이 시각은 실행을
+본 뒤 골랐습니다. 관측값(메시 크기 4 → 0.5 mm): T L2 1.81e-4, 4.75e-5, 1.18e-5, 3.11e-6 K m
+(차수 1.93, 2.01, 1.92), 열유속 L2 0.942, 0.477, 0.241, 0.121 W/m(차수 0.98, 0.99, 1.00),
+dt/2 변화 4.4%(T)와 3e-8(열유속). 이 해상도에서 더 이른 과도 시각은 위의 정확 재현·엔진 일치
+검사와 [multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/multimaterial.md)의
+엔진 검증으로만 다룹니다.
+
 ## 한계
 
-- 정상 열전도만. 과도 영역 문서는 아직 받지 않습니다.
-- Studio는 영역 문서를 거부합니다(열 화면이 `mesh.subdivisions`를 읽음). CLI나 Python API를
+- Studio는 정상·과도 영역 문서를 거부합니다(열 화면이 `mesh.subdivisions`를 읽음). CLI나 Python API를
   쓰십시오.
 - 구간 상수 등방 물성, 경계면 완전 접촉.
 - 단위 깊이 평면 기하. 내장 재료의 열 물성 없음.

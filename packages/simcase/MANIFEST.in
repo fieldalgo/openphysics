@@ -91,3 +91,6 @@ include docs/thermal_regions2d.md
 include docs/locales/ko/pages/thermal_regions2d.md
 include examples/thermal_regions.json
 include tests/test_thermal_regions.py
+include simcase/transient_regions.py
+include examples/transient_thermal_regions.json
+include tests/test_transient_thermal_regions.py

@@ -15,7 +15,8 @@
 `c*dT/dt - div(k*grad T) = Q` in one fixed homogeneous 2D rectangle using
 conforming P1 triangles, consistent mass and backward Euler. Geometry is
 converted to metres; requested times are explicit seconds. The calculation
-is per unit out-of-plane depth.
+is per unit out-of-plane depth. Documents whose geometry has `background` or
+`shapes` follow the [region document contract](thermal_regions2d.md) instead.
 
 This page describes the headless interface. Generic optical Studio routes keep
 their thermal guards; dedicated [steady Studio](thermal_studio.md) is separate.
