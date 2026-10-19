@@ -30,7 +30,8 @@
       "runtime and optional (non-test extras of first-party packages): permissive only; the policy would allow weak copyleft in optional extras, but this repository stays stricter",
       "test (extras named in test_extras) and tool: permissive, or weak copyleft when the entry sets test_only",
       "GPL: only entries with external_process (a separate process, as a reference tool or an optional backend); never a base runtime requirement, and first-party code must not import them",
-      "never (AGPL and other network copyleft): rejected in every environment, also as an external process"
+      "never (AGPL and other network copyleft): rejected in every environment, also as an external process",
+      "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; copyleft records need a review; first-party distributions contain no native files"
     ]
   },
   "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase"],

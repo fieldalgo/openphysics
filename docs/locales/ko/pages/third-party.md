@@ -8,7 +8,7 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
 않습니다.
 
 기계가 읽는 목록은 [`ci/third_party_licenses.json`](../../../../ci/third_party_licenses.json)입니다.
-`ci/check_licenses.py`가 검증 환경마다 설치된 메타데이터와 이 목록을 대조합니다
+`ci/check_licenses.py`가 검증 환경마다 설치된 메타데이터와 파일 목록을 이 목록과 대조합니다
 ([자동 검사](#자동-검사) 참고).
 
 ## 쓰는 방식
@@ -214,8 +214,8 @@ AGPL 도구는 여기서 쓰지 않습니다.
 python ci/check_licenses.py --report .validation/licenses.json
 ```
 
-설치된 메타데이터를 `importlib.metadata`로 읽으므로 라이선스 검사 도구를 따로 설치하지
-않습니다. 다음 경우에 실패합니다.
+설치된 메타데이터와 배포판마다 RECORD 파일 목록을 `importlib.metadata`로 읽으므로 라이선스
+검사 도구를 따로 설치하지 않습니다. 다음 경우에 실패합니다.
 
 - 설치된 배포판에 검토된 목록 항목이 없을 때
 - 설치된 메타데이터가 다른 SPDX 식을 선언하거나, 항목에 없는 copyleft 라이선스를
@@ -227,12 +227,19 @@ python ci/check_licenses.py --report .validation/licenses.json
   import할 때
 - AGPL이나 다른 네트워크 copyleft 라이선스(SSPL, EUPL, OSL, CPAL, RPL)가 어디에든 있을 때(external
   process라도)
-- 자체 패키지가 Apache-2.0을 선언하지 않을 때
+- 자체 패키지가 Apache-2.0을 선언하지 않거나, 자체 배포판에 네이티브 파일(`.so`, `.dylib`,
+  `.dll`, `.pyd`)이 하나라도 있을 때
+- 제3자 배포판이 자기 Python 확장 모듈이 아닌 공유 라이브러리(`.so`, `.dylib`, `.dll`)를
+  설치했는데, 그 목록 항목의 `bundled_files` glob 어디에도 맞지 않거나 맞는 기록이 현재 OS용이
+  아닐 때
+- copyleft SPDX 식을 가진 `bundled_files` 기록에 검토 문구가 없거나, 배포판에 검사할 RECORD
+  파일 목록이 없을 때
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
 
 CI는 고정된 Linux 환경, 설치한 휠만 담은 새 환경, 그리고 Linux·macOS·Windows 설치 플랫폼
-검사에서 이 검사를 돌립니다. 제3자 휠 안에 묶인 구성 요소(shapely의 GEOS 등)는 메타데이터에
-드러나지 않으므로 직접 검토해 [묶인 구성 요소](#묶인-구성-요소)에 기록합니다.
+검사에서 이 검사를 돌리므로, 묶인 공유 라이브러리를 세 OS에서 각각 대조합니다. 제3자 휠 안에
+정적으로 링크된 코드(Windows OpenBLAS DLL 안의 GCC 런타임, matplotlib의 FreeType 등)는 이렇게
+보이지 않으므로 직접 검토해 [묶인 구성 요소](#묶인-구성-요소)에 기록합니다.
 
 의존성을 추가할 때: upstream 저장소의 LICENSE 파일로 라이선스를 확인하고, SPDX 식과 출처
 URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인 것을 확인해 적고, 이 문서와 영어

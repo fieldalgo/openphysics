@@ -9,8 +9,8 @@ does not relicense any of them.
 
 The machine-readable inventory is
 [`ci/third_party_licenses.json`](../ci/third_party_licenses.json).
-`ci/check_licenses.py` compares it with the installed metadata of each
-validation environment (see [Automated check](#automated-check)).
+`ci/check_licenses.py` compares it with the installed metadata and file lists
+of each validation environment (see [Automated check](#automated-check)).
 
 ## How a component is used
 
@@ -235,8 +235,8 @@ reported. AGPL tools are not used here.
 python ci/check_licenses.py --report .validation/licenses.json
 ```
 
-The check reads installed metadata with `importlib.metadata`, so no license
-scanning tool is installed. It fails when:
+The check reads installed metadata and each distribution's RECORD file list with
+`importlib.metadata`, so no license scanning tool is installed. It fails when:
 
 - an installed distribution has no reviewed entry in the inventory;
 - installed metadata declares a different SPDX expression, or mentions a
@@ -248,14 +248,22 @@ scanning tool is installed. It fails when:
   requirement, or is imported by first-party code;
 - AGPL or another network-copyleft license (SSPL, EUPL, OSL, CPAL, RPL) appears
   anywhere, even as an external process;
-- a first-party package does not declare Apache-2.0;
+- a first-party package does not declare Apache-2.0, or a first-party
+  distribution contains any native file (`.so`, `.dylib`, `.dll`, `.pyd`);
+- a third-party distribution installs a shared library (`.so`, `.dylib`,
+  `.dll`) other than its own Python extension modules that matches no
+  `bundled_files` glob of its inventory entry, or matches one that is not
+  recorded for the current OS;
+- a `bundled_files` record with a copyleft SPDX expression has no review, or a
+  distribution has no RECORD file list to check;
 - this page or its Korean translation does not list every inventory entry.
 
 CI runs it on the pinned Linux environment, on the fresh environment holding the
 installed wheels, and in the installed-platform check on Linux, macOS and
-Windows. Components bundled inside third-party wheels (such as GEOS in shapely)
-are not visible in metadata; they are reviewed by hand and recorded in
-[bundled components](#bundled-components).
+Windows, so the bundled shared libraries are compared on each of those OSes.
+Statically linked code inside third-party wheels (such as the GCC runtime in
+the Windows OpenBLAS DLLs, or FreeType in matplotlib) is not visible this way;
+it is reviewed by hand and recorded in [bundled components](#bundled-components).
 
 To add a dependency: confirm the license in the upstream repository's LICENSE
 file, add an entry with the SPDX expression and source URL to the inventory,

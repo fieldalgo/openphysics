@@ -18,9 +18,16 @@ INVENTORY = json.loads((ROOT / "ci" / "third_party_licenses.json").read_text(enc
 
 
 def install(site, name, *, version="1.0", expression=None, license=None, classifiers=(),
-            requires=(), extras=()):
+            requires=(), extras=(), files=(), record=True):
     info = site / f"{name.replace('-', '_')}-{version}.dist-info"
     info.mkdir(parents=True)
+    if record:
+        # importlib.metadata lists only RECORD entries that exist, so create them (empty).
+        for path in files:
+            (site / path).parent.mkdir(parents=True, exist_ok=True)
+            (site / path).touch()
+        listed = [*files, f"{info.name}/METADATA", f"{info.name}/RECORD"]
+        (info / "RECORD").write_text("".join(f"{path},,\n" for path in listed), encoding="utf-8")
     lines = ["Metadata-Version: 2.4", f"Name: {name}", f"Version: {version}"]
     if expression:
         lines.append(f"License-Expression: {expression}")
@@ -38,10 +45,19 @@ def inventory(**entries):
     return result
 
 
-def run(site, entries, **first_party):
+def run(site, entries, platform="linux", **first_party):
     for name, kwargs in first_party.items():
         install(site, name.replace("_", "-"), license="Apache-2.0", **kwargs)
-    return check_licenses.check([str(site)], inventory(**entries), check_docs=False)
+    return check_licenses.check([str(site)], inventory(**entries), check_docs=False, platform=platform)
+
+
+BLAS = "numlib.libs/libblas-1a2b3c4d.so.3.1"
+EXTENSIONS = ("numlib/_core.cpython-312-x86_64-linux-gnu.so", "numlib/_fast.cpython-312-darwin.so",
+              "numlib/_rust.abi3.so", "numlib/_win.cp312-win_amd64.pyd")
+
+
+def bundled(glob="numlib.libs/libblas-*.so.*", spdx="BSD-3-Clause", platforms=("linux",), **extra):
+    return {"glob": glob, "spdx": spdx, "linkage": "dynamic", "platforms": list(platforms), **extra}
 
 
 def test_permissive_runtime_dependency_passes(tmp_path):
@@ -167,10 +183,77 @@ def test_spdx_expression_evaluation(expression, allowed, expected):
     assert check_licenses.satisfies(check_licenses.parse_expression(expression), allowed) is expected
 
 
+def test_recorded_bundled_library_passes_and_is_reported(tmp_path):
+    install(tmp_path, "numlib", expression="MIT", files=["numlib/__init__.py", BLAS, *EXTENSIONS])
+    errors, report = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled()]}})
+    assert errors == []
+    assert report["numlib"]["bundled_files"] == [
+        {"file": BLAS, "glob": "numlib.libs/libblas-*.so.*", "spdx": "BSD-3-Clause"}]
+
+
+@pytest.mark.parametrize("library", [BLAS, "numlib/.dylibs/libgcc_s.1.1.dylib", "numlib.libs/msvcp140-0f1e.dll",
+                                     "../../libtool.so.1"])
+def test_unrecorded_bundled_library_fails(tmp_path, library):
+    # A data file outside site-packages (as gmsh installs libgmsh) appears in RECORD as ../../name.
+    site = tmp_path / "prefix" / "lib" / "python3.12" / "site-packages"
+    install(site, "numlib", expression="MIT", files=["numlib/__init__.py", library])
+    errors, _ = run(site, {"numlib": {"spdx": "MIT", "bundled_files": [bundled(glob="numlib.libs/other-*.so")]}})
+    assert any(f"unrecorded bundled native library {library}" in e for e in errors)
+
+
+def test_extension_modules_are_not_bundled_libraries(tmp_path):
+    install(tmp_path, "numlib", expression="MIT", files=["numlib/__init__.py", *EXTENSIONS])
+    errors, report = run(tmp_path, {"numlib": {"spdx": "MIT"}})
+    assert errors == [] and "bundled_files" not in report["numlib"]
+
+
+def test_copyleft_bundled_library_needs_review(tmp_path):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    unreviewed = {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx="LGPL-2.1-or-later")]}}
+    errors, _ = run(tmp_path, unreviewed)
+    assert any("copyleft 'LGPL-2.1-or-later' needs a review" in e for e in errors)
+    reviewed = {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx="LGPL-2.1-or-later", review="dynamic")]}}
+    errors, _ = run(tmp_path, reviewed)
+    assert errors == []
+
+
+def test_bundled_library_must_be_recorded_for_this_platform(tmp_path):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled()]}}, platform="windows")
+    assert any("recorded for ['linux'], but is installed on windows" in e for e in errors)
+
+
+def test_bundled_files_records_are_validated(tmp_path):
+    entries = {"numlib": {"spdx": "MIT", "bundled_files": [
+        {"glob": "a/*.so"},
+        bundled(glob="b/*.so", linkage="static"),
+        bundled(glob="c/*.so", platforms=("solaris",)),
+        bundled(glob="d/*.so", spdx="AGPL-3.0-only", review="no"),
+        bundled(glob="e/*.so"), bundled(glob="e/*.so")]}}
+    errors, _ = run(tmp_path, entries)
+    for expected in ("missing ['linkage', 'platforms', 'spdx']", "separate library files are dynamic",
+                     "platforms must be a non-empty subset", "never allowed, also when bundled", "duplicate glob"):
+        assert any(expected in e for e in errors), expected
+
+
+def test_missing_record_cannot_be_checked(tmp_path):
+    install(tmp_path, "numlib", expression="MIT", record=False)
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT"}})
+    assert any("no RECORD file list" in e for e in errors)
+
+
+@pytest.mark.parametrize("native", ["galerkin/_assemble.cpython-312-x86_64-linux-gnu.so", "galerkin/_kernel.pyd",
+                                    "galerkin.libs/libhelper-1234.so.1"])
+def test_first_party_distribution_must_not_contain_native_files(tmp_path, native):
+    errors, _ = run(tmp_path, {}, galerkin={"files": ["galerkin/__init__.py", native]})
+    assert any("first-party distribution contains native files" in e and native in e for e in errors)
+
+
 def test_inventory_entries_are_valid_and_documented():
     policy = INVENTORY["policy"]
     known = set(policy["permissive"]) | set(policy["weak_copyleft"]) | {"GPL-2.0-or-later"}
     for name, entry in INVENTORY["distributions"].items():
+        assert check_licenses.bundled_entry_errors(name, entry.get("bundled_files", []), set(policy["never"])) == []
         ids = check_licenses.identifiers(check_licenses.parse_expression(entry["spdx"]))
         assert ids <= known, (name, ids)
         assert entry["url"].startswith("https://"), name

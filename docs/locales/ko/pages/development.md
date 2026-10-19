@@ -104,7 +104,8 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 다시 확인합니다.
 
 **라이선스** (`ci/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
-환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 정책과 전체 목록은
+환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
+설치한 공유 라이브러리를 OS마다 파일 하나하나 확인합니다. 정책과 전체 목록은
 [제3자 소프트웨어](third-party.md)에 있습니다.
 
 **설치 플랫폼** (`ci/tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
