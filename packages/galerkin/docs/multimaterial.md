@@ -2,9 +2,9 @@
 
 **English** | [한국어](locales/ko/pages/multimaterial.md)
 
-Steady heat conduction, static elasticity, the prescribed-temperature
-mechanical stage and the steady and transient heat-to-mechanics workflows can
-assign a different material to each named region of a 2D mesh. This page holds the shared input rule, each
+Steady and transient heat conduction, static elasticity, the
+prescribed-temperature mechanical stage and the steady and transient
+heat-to-mechanics workflows can assign a different material to each named region of a 2D mesh. This page holds the shared input rule, each
 contract and its independent validation. Further physics will be added here as it is
 validated; until then their pages state that only one homogeneous material is
 accepted.
@@ -254,6 +254,54 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin/tests/test_thermoelastic_multimaterial.py
 ```
 
+## Transient heat conduction
+
+`galerkin.transient_heat.solve_transient_heat` accepts `conductivity` (W/(m K)),
+`volumetric_heat_capacity` (J/(m^3 K)) and a constant `heat_source` (W/m^3) as
+scalars or region mappings; callbacks for Q are unchanged. The consistent mass
+`M_e = c_e A_e/12 [[2,1,1],[1,2,1],[1,1,2]]` and the stiffness use each
+triangle's values; backward Euler, offsets, refinement and every residual and
+balance check are unchanged ([transient_heat](transient_heat.md)). The result
+records `conductivity_w_mk` and `volumetric_heat_capacity_j_m3k` as a float or
+a `{region name: float}` copy.
+
+**Reference.** `refsol.transient_heat_multilayer.LayeredWall`: a layered wall
+with fixed end temperatures, T = T_s(x) + sum A_m X_m(x) exp(-lambda_m t).
+X_m solve -(k X')' = lambda c X with continuous X and k X'; eigenvalues are
+roots of the end value of a layer transfer matrix, bracketed on a fine
+sqrt(lambda) grid and bisected. Choosing the initial field as
+T_s + sum A_m X_m makes the finite series exact. Its tests check the single-layer
+sine eigenvalues, the two-layer characteristic equation, that no root is skipped
+(sign changes on a 400 000-point scan), c-weighted orthogonality, interface
+continuity, the PDE and Fourier's law by finite differences, boundary values and
+the steady limit.
+
+| Case | Mesh / time | Gate |
+| --- | --- | --- |
+| Uniform mappings (k, c, Q) vs scalars | 2-region rectangle | Every history array identical |
+| BE step with independent dense per-region M and K | 2-layer rectangle, unequal steps | Free residual <= 1e-9, reactions and heat content match |
+| Steel/insulation wall 10 + 20 mm, k 45/0.5, c 3.6e6/1.2e6, ends 400/300 K, three modes A = 60/-25/10 K | layered rectangle [n, 2n] x n, n=1,2,4,8; dt = 1/32 s to 120 s; observed at 10, 40, 120 s | At every observed time, T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; at n=8 halving dt changes every error by <= 5% |
+| Invalid regions | — | Missing/unknown names, k or c <= 0, nonfinite Q, bare arrays, mapping without region data raise `ValueError` |
+
+The first run of the wall gate used [2n, 4n] divisions and dt = 1/8 s. Spatial
+orders passed (T 1.84-2.61, flux 0.98-1.05) but the dt/2 companion changed the
+finest temperature errors by 12%, 22% and 35%: time error was not separated
+from space error, so that configuration failed. The retained configuration
+(coarser mesh, dt four times smaller, chosen because the BE error scales with
+dt) observed:
+
+| Time | T L2 orders (n=1→8) | Flux L2 orders | dt/2 change (T, flux) |
+| --- | --- | --- | --- |
+| 10 s | 2.10, 1.84, 1.97 | 1.19, 0.99, 1.00 | 0.69%, 0.015% |
+| 40 s | 2.15, 1.88, 1.99 | 1.08, 1.03, 1.01 | 1.06%, 0.020% |
+| 120 s | 2.12, 1.95, 2.02 | 1.46, 1.05, 1.01 | 1.36%, 0.017% |
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_transient_heat_multimaterial.py \
+  packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
+```
+
 ## Limits
 
 - Piecewise constant per region only: no conductivity varying inside a region,
@@ -262,4 +310,4 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 - No mixed formulation: nearly incompressible regions lock in plane strain,
   as in the homogeneous solver.
 - No temperature-dependent properties; reference temperature is one value.
-- Transient heat and simcase documents still accept one homogeneous material.
+- simcase documents still accept one homogeneous material.

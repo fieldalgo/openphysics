@@ -65,8 +65,9 @@ solve_transient_heat(
 ```
 
 Import this submodule explicitly; no automatic top-level export is added.
-The model is c*dT/dt-div(k*grad T)=Q, constant homogeneous isotropic k>0,
-c>0, fixed conforming CCW scalar P1 triangles, consistent mass and backward
+The model is c*dT/dt-div(k*grad T)=Q, constant isotropic k>0, c>0 (one
+material, or piecewise constant on named regions as described in
+[multimaterial](multimaterial.md); the gates on this page use one material), fixed conforming CCW scalar P1 triangles, consistent mass and backward
 Euler. Unselected natural boundaries are insulated. A fully insulated or
 disconnected component needs no Dirichlet anchor: M/dt+K is positive definite
 on valid used-node geometry. Do not copy a steady mandatory-anchor rule.
@@ -177,8 +178,9 @@ nodes, M triangles, Nt requested times and D unique sorted prescribed nodes.
 | dirichlet_temperatures_k | (Nt,D) | sampled prescribed K |
 | nodes_m / triangles | (N,2) / (M,3) | copied SI geometry/connectivity/order |
 
-The two scalar metadata fields conductivity_w_mk and
-volumetric_heat_capacity_j_m3k record the supplied constants. No unit,
+The two metadata fields conductivity_w_mk and
+volumetric_heat_capacity_j_m3k record the supplied constants (a float, or a
+`{region name: float}` copy for per-region input). No unit,
 provenance, hash or source-origin authentication is claimed. Read-only arrays
 and a frozen container are not cryptographic protection against hostile code.
 

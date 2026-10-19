@@ -10,3 +10,5 @@ include refsol/thermal_multilayer.py
 include tests/test_thermal_multilayer_reference.py
 include refsol/elasticity_multilayer.py
 include tests/test_elasticity_multilayer_reference.py
+include refsol/transient_heat_multilayer.py
+include tests/test_transient_heat_multilayer_reference.py

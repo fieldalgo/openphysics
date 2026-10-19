@@ -2,8 +2,8 @@
 
 [English original](../../../multimaterial.md)
 
-정상 열전도, 정적 탄성, 처방 온도 기계단계, 정상·과도 열→역학 워크플로는 2D 메시의
-이름 있는 영역마다 다른 재료를 줄 수 있습니다.
+정상·과도 열전도, 정적 탄성, 처방 온도 기계단계, 정상·과도 열→역학 워크플로는 2D
+메시의 이름 있는 영역마다 다른 재료를 줄 수 있습니다.
 이 문서는 공통 입력 규칙, 각 계약과 그 독립 검증을 담습니다. 다른 물리는 검증되는
 대로 이 문서에 추가하며, 그 전까지 각 문서는 균질 재료 하나만 받는다고 적습니다.
 
@@ -225,10 +225,51 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin/tests/test_thermoelastic_multimaterial.py
 ```
 
+## 과도 열전도
+
+`galerkin.transient_heat.solve_transient_heat`는 `conductivity`(W/(m K)),
+`volumetric_heat_capacity`(J/(m^3 K)), 상수 `heat_source`(W/m^3)를 스칼라 또는 영역
+매핑으로 받습니다. Q 콜백은 그대로입니다. 일관 질량 `M_e = c_e A_e/12 [[2,1,1],[1,2,1],[1,1,2]]`와
+강성은 삼각형마다 자기 값을 쓰며, backward Euler, offset, 보정, 모든 잔차·수지 검사는
+그대로입니다([transient_heat](transient_heat.md)). 결과는 `conductivity_w_mk`와
+`volumetric_heat_capacity_j_m3k`를 float 또는 `{영역 이름: float}` 사본으로 기록합니다.
+
+**정답.** `refsol.transient_heat_multilayer.LayeredWall`: 양끝 온도가 고정된 층상 벽,
+T = T_s(x) + sum A_m X_m(x) exp(-lambda_m t). X_m은 X와 k X'가 연속인
+-(k X')' = lambda c X의 해이고, 고유값은 층 전달 행렬 끝값의 근으로 촘촘한 sqrt(lambda)
+격자에서 구간을 잡아 이분법으로 구합니다. 초기장을 T_s + sum A_m X_m으로 주면 유한 급수가
+정확해입니다. 정답 시험은 단일층 사인 고유값, 2층 특성방정식, 근 누락 없음(40만 점
+스캔의 부호 변화), c 가중 직교성, 경계면 연속, 유한차분으로 PDE와 푸리에 법칙, 경계값,
+정상 극한을 확인합니다.
+
+| 경우 | 메시 / 시간 | 기준 |
+| --- | --- | --- |
+| 균일 매핑(k, c, Q) 대 스칼라 | 2영역 사각형 | 모든 이력 배열 동일 |
+| 독립 밀집 영역별 M·K로 본 BE 단계 | 2층 사각형, 다른 시간 간격 | 자유 잔차 <= 1e-9, 반력·열량 일치 |
+| 강철/단열재 벽 10 + 20 mm, k 45/0.5, c 3.6e6/1.2e6, 양끝 400/300 K, 모드 셋 A = 60/-25/10 K | 층상 사각형 [n, 2n] x n, n=1,2,4,8; dt = 1/32 s, 120 s까지; 10, 40, 120 s 관측 | 모든 관측 시각에서 마지막 두 구간 T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9; n=8에서 dt를 절반으로 하면 모든 오차 변화 <= 5% |
+| 잘못된 영역 | — | 빠진/모르는 이름, k나 c <= 0, 비유한 Q, 맨 배열, 영역 정보 없는 매핑은 `ValueError` |
+
+벽 기준의 첫 실행은 [2n, 4n] 분할과 dt = 1/8 s였습니다. 공간 차수는 통과했지만(T
+1.84-2.61, 열유속 0.98-1.05) dt/2 비교에서 가장 고운 메시의 온도 오차가 12%, 22%,
+35% 바뀌어 시간 오차가 공간 오차와 분리되지 않았으므로 그 구성은 실패입니다. BE 오차가
+dt에 비례하므로 메시를 성기게, dt를 1/4로 줄인 현재 구성의 관측값:
+
+| 시각 | T L2 차수(n=1→8) | 열유속 L2 차수 | dt/2 변화(T, 열유속) |
+| --- | --- | --- | --- |
+| 10 s | 2.10, 1.84, 1.97 | 1.19, 0.99, 1.00 | 0.69%, 0.015% |
+| 40 s | 2.15, 1.88, 1.99 | 1.08, 1.03, 1.01 | 1.06%, 0.020% |
+| 120 s | 2.12, 1.95, 2.02 | 1.46, 1.05, 1.01 | 1.36%, 0.017% |
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_transient_heat_multimaterial.py \
+  packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
+```
+
 ## 한계
 
 - 영역별 구간 상수만: 영역 안에서 변하는 열전도율, 이방성 텐서, 온도 의존 물성 없음.
 - 접촉 저항·경계면 열원 없음.
 - 혼합 정식화 없음: 균질 해석기처럼 거의 비압축성인 영역은 평면 변형률에서 locking.
 - 온도 의존 물성 없음, 기준 온도는 값 하나.
-- 과도 열전도와 simcase 문서는 아직 균질 재료 하나만 받습니다.
+- simcase 문서는 아직 균질 재료 하나만 받습니다.
