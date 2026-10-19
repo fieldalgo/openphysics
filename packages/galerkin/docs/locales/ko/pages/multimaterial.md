@@ -1,0 +1,125 @@
+# 이름 있는 영역별 구간 상수 재료
+
+[English original](../../../multimaterial.md)
+
+열전도는 2D 메시의 이름 있는 영역마다 다른 재료를 줄 수 있습니다. 이 문서는
+공통 입력 규칙, 정상 열전도 계약과 그 독립 검증을 담습니다. 다른 물리는 검증되는
+대로 이 문서에 추가하며, 그 전까지 각 문서는 균질 재료 하나만 받는다고 적습니다.
+
+## 입력 규칙
+
+각 재료 물성 인자는 다음 중 정확히 하나를 받습니다.
+
+| 형태 | 의미 |
+| --- | --- |
+| 유한 실수 스칼라 | 균질 재료 하나(원래 계약, 변경 없음) |
+| `{영역 이름: 스칼라}` | 영역마다 값 하나. 키는 `mesh.region_names`와 정확히 같아야 함 |
+
+```python
+from galerkin.mesh import layered_rectangle_mesh
+from galerkin.thermal import solve_steady_heat
+
+mesh = layered_rectangle_mesh([0.02, 0.05], 0.02, [4, 6], 4, ["steel", "foam"])
+dirichlet = {int(i): 400.0 for i in mesh.boundary["left"]}
+dirichlet.update({int(i): 300.0 for i in mesh.boundary["right"]})
+result = solve_steady_heat(
+    mesh,
+    conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
+    heat_source={"steel": 2e5, "foam": 0.0},      # W/m^3
+    dirichlet=dirichlet,
+)
+```
+
+- 영역 이름은 `Mesh.region_names`에서 옵니다: `disk_mesh`,
+  `layered_rectangle_mesh`, `layered_annulus_mesh`, 또는 gmshio로 읽은 gmsh 물리
+  그룹. `mesh.regions`는 삼각형마다 영역 번호 하나를 가집니다.
+- 빠진 이름, 모르는 이름, 문자열이 아닌 키, 물성 자체 검사(예: k <= 0)를 통과하지
+  못한 값은 해당 영역 이름을 담은 `ValueError`를 냅니다. 영역 정보가 없는 메시에
+  매핑을 주면 거부합니다.
+- 물리 API는 맨 삼각형별 배열을 받지 **않습니다**. 길이 M 수열은 벡터·텐서 입력과
+  구분되지 않고, 원래 계약도 그런 수열을 거부합니다. 저수준 조립 함수
+  (`assemble_stiffness`, 전자기 모드 해석기의 `eps_r`)는 지금처럼 삼각형별 배열을
+  받습니다.
+- 단위는 스칼라 인자의 단위와 같습니다. 매핑은 단위를 바꾸지 않습니다.
+- 스칼라 입력은 원래 코드 경로를 따르므로 균질 결과는 비트 단위로 같습니다. 모든
+  영역에 같은 값을 준 매핑은 스칼라와 같은 배열을 냅니다.
+
+재료 물성은 삼각형 안에서 상수입니다. 경계면은 요소 변 위에 있어야 합니다(위
+생성기들처럼 영역 경계를 따르는 메시). 삼각형을 가로지르는 영역은 표현할 수 없습니다.
+
+## 정상 열전도
+
+`galerkin.thermal.solve_steady_heat`는 영역별 `conductivity` k > 0(W/(m K))와
+영역별 상수 `heat_source` Q(W/m^3)를 받습니다. 스칼라와 기존 좌표 콜백 Q는 그대로
+입니다. 약형식은 k와 Q가 삼각형마다 상수인 것 말고는 같습니다.
+
+```text
+K_ij = sum_e k_e integral_e grad(N_i).grad(N_j) dA,   f_i = sum_e Q_e integral_e N_i dA
+heat_flux_e = -k_e grad(T_h) on triangle e
+```
+
+온도는 연속입니다(P1). 정확해의 수직 열유속은 경계면에서 연속이고 기울기는 열전도율
+비만큼 뜁니다. 요소 상수 P1 열유속은 이를 극한에서만 만족하며 점프는 O(h)입니다.
+완전 열접촉을 가정합니다: 접촉 저항도 경계면 열원도 없습니다. 경계 조건, 반력,
+수지 검사는 [thermal_steady2d](thermal_steady2d.md)와
+[thermal_flux_robin](thermal_flux_robin.md)과 같습니다.
+
+## 독립 정답
+
+`refsol.thermal_multilayer`는 닫힌 형태 두 개를 계산하며 NumPy만 import합니다.
+
+- `layered_slab`: 직렬 벽 0 < x_1 < ... < x_n = L, 층마다 k_i와 균일 Q_i,
+  T(0)=T_L, T(L)=T_R. 열유속 q(x) = q_0 + Q의 적분, T' = -q/k이며 q_0는 T(L)에서
+  정해집니다. 열원이 없으면 직렬 열저항 q_0 = (T_L-T_R)/sum(L_i/k_i)입니다.
+- `composite_cylinder`: 동심 껍질 r_0 < ... < r_n, k_i와 Q_i, T(r_0)=T_i,
+  T(r_n)=T_o. r q_r = C + Q r dr의 적분이고 각 껍질에서
+  T = A_i - (C + offset_i) ln(r)/k_i - Q_i r^2/(4 k_i)입니다.
+
+정답 시험은 유한차분만으로 각 층의 푸리에 법칙과 에너지 수지, 모든 경계면의 온도·
+열유속 연속, 경계값, 열원 없는 직렬/로그 열저항 공식, 열유속의 반경 방향, 단일층
+교과서 공식을 확인합니다. 선택 인자 `layer=`는 층의 닫힌 형태를 해석적 연장으로
+계산하므로, 곡선 경계면 바로 바깥에 놓인 다각형 메시 삼각형의 점을 그 삼각형 자신의
+재료로 비교합니다.
+
+## 수용 기준(비교 전에 고정)
+
+`packages/galerkin/tests/test_thermal_multimaterial.py`:
+
+| 경우 | 메시 | 기준 |
+| --- | --- | --- |
+| 균일 매핑 대 스칼라 | 2영역 사각형 | 모든 결과 배열 동일 |
+| 3층 벽, 열원 없음(k 15/0.8/45) | 층상 사각형 | 절점 T 오차 <= 420 K의 1e-10, 모든 층 열유속 같음, 좌우 반력 = 정확한 q·높이(1e-10) |
+| 3층 벽, 열원 Q 2e5/-3e4/6e5 | 층상 사각형, n=1,2,4,8 | 마지막 두 구간에서 T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9, 양쪽에서 잰 변분 경계면 열유량이 정확값의 1e-9 이내 |
+| 3껍질 원통, k 50/0.25/16, Q 1e6/0/-2e5 | 층상 원환, n=1,2,4,8 | T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9, 경계면 열유량 차수 >= 1.8, 평균 수직 열유속 점프 차수 >= 0.9(마지막 두 구간) |
+| 잘못된 영역 | — | 빠짐/모름/양수 아님/비유한/복소/불리언/수열 값, 정수 키, 맨 배열, 영역 정보 없음, 범위 밖 영역 번호는 `ValueError` |
+
+오차는 삼각형마다 독립 8x8 Duffy 적분으로 계산합니다. 변분 경계면 열유량은 한쪽
+영역 자신의 강성·하중 잔차를 경계면 절점에서 더한 값입니다.
+
+기준을 처음 실행했을 때 관측값(Linux, Python 3.12):
+
+| 양 | n=1 → 2 → 4 → 8 | 차수 |
+| --- | --- | --- |
+| 벽 T L2 (K m) | 8.77e-3, 2.24e-3, 5.63e-4, 1.41e-4 | 1.97, 1.99, 2.00 |
+| 벽 열유속 L2 (W/m) | 26.1, 13.4, 6.76, 3.39 | 0.96, 0.99, 1.00 |
+| 벽 경계면 열유량(상대) | 2.5e-13, 2.6e-13, 2.0e-13, 1.5e-13 | 반올림 오차 |
+| 원통 T L2 (K m) | 5.40e-2, 1.35e-2, 3.39e-3, 8.47e-4 | 2.00, 2.00, 2.00 |
+| 원통 열유속 L2 (W/m) | 19.0, 9.41, 4.70, 2.35 | 1.01, 1.00, 1.00 |
+| 원통 경계면 열유량(상대) | 8.5e-3, 2.1e-3, 5.3e-4, 1.3e-4 | 2.00, 2.00, 2.00 |
+| 원통 수직 열유속 점프(상대) | 0.186, 0.092, 0.046, 0.023 | 1.01, 1.00, 1.00 |
+
+벽 문제는 y에 무관하므로 P1 절점값과 변분 경계면 열유량이 정확합니다. 원통의 경계면
+열유량은 내접 다각형 때문에 2차로 수렴합니다. 실행:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_thermal_multimaterial.py \
+  packages/galerkin-refsol/tests/test_thermal_multilayer_reference.py
+```
+
+## 한계
+
+- 영역별 구간 상수만: 영역 안에서 변하는 열전도율, 이방성 텐서, 온도 의존 물성 없음.
+- 접촉 저항·경계면 열원 없음.
+- 탄성, 열탄성, 열→역학 워크플로, 과도 열전도, simcase 문서는 아직 균질 재료 하나만
+  받습니다.

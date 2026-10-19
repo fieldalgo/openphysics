@@ -218,3 +218,89 @@ def disk_mesh(r_layers, n_r, n_theta: int, region_names=None) -> Mesh:
     names = (list(region_names) if region_names is not None
              else [f"layer{i}" for i in range(len(r_layers))])
     return Mesh(nodes, triangles, boundary, boundary_edges, regions, names)
+
+
+def _layer_coordinates(start, ends, n, label):
+    ends = np.atleast_1d(np.asarray(ends, dtype=float))
+    n = np.broadcast_to(np.atleast_1d(np.asarray(n, dtype=int)), ends.shape)
+    if ends.ndim != 1 or not len(ends) or not np.all(np.isfinite(ends)):
+        raise ValueError(f"{label} must be a nonempty finite 1D sequence")
+    if np.any(np.diff(np.concatenate([[start], ends])) <= 0):
+        raise ValueError(f"{label} must be strictly increasing beyond {start}")
+    if np.any(n < 1):
+        raise ValueError("every layer needs at least one division")
+    coords, band, prev = [start], [], start
+    for layer, (end, m) in enumerate(zip(ends, n)):
+        coords.extend(np.linspace(prev, end, m + 1)[1:])
+        band.extend([layer] * m)
+        prev = end
+    coords = np.asarray(coords)
+    coords[np.cumsum(np.r_[0, n])] = np.r_[start, ends]   # interfaces land exactly
+    return coords, np.asarray(band), len(ends)
+
+
+def _names(region_names, count):
+    names = (list(region_names) if region_names is not None
+             else [f"layer{i}" for i in range(count)])
+    if len(names) != count:
+        raise ValueError("region_names needs one name per layer")
+    return names
+
+
+def layered_rectangle_mesh(x_interfaces, height: float, nx, ny: int,
+                           region_names=None) -> Mesh:
+    """Structured triangulation of [0, x_interfaces[-1]] x [0, height] in x-layers.
+
+    x_interfaces: increasing right-hand x of each layer (m); layer i spans
+    x_interfaces[i-1]..x_interfaces[i] with x_interfaces[-1] = total width.
+    nx: divisions per layer (one int or one per layer). Every material
+    interface is a mesh line, so a piecewise-constant coefficient is exact on
+    the mesh. Boundary tags as rectangle_mesh ('left', 'right', 'bottom',
+    'top'). Regions are the layers, named 'layer0', ... unless region_names.
+    """
+    x, band, count = _layer_coordinates(0.0, x_interfaces, nx, "x_interfaces")
+    if ny < 1 or not np.isfinite(height) or height <= 0:
+        raise ValueError("height must be positive and ny >= 1")
+    base = rectangle_mesh(1.0, height, len(x) - 1, ny)
+    nodes = base.nodes.copy()
+    column = np.rint(nodes[:, 0] * (len(x) - 1)).astype(int)
+    nodes[:, 0] = x[column]
+    tri_column = np.min(column[base.triangles], axis=1)
+    return Mesh(nodes, base.triangles, base.boundary, base.boundary_edges,
+                band[tri_column], _names(region_names, count))
+
+
+def layered_annulus_mesh(r_inner: float, r_interfaces, n_r, n_theta: int,
+                         region_names=None) -> Mesh:
+    """Structured annulus r_inner..r_interfaces[-1] built from concentric layers.
+
+    Layer i spans r_interfaces[i-1]..r_interfaces[i] (r_interfaces[-1] is the
+    outer radius). Every layer interface is a ring of mesh nodes, so the
+    piecewise-constant material carries no geometric error beyond the inscribed
+    polygon (O(h^2)). Boundary tags 'inner' and 'outer' (nodes and edges).
+    Regions are the layers, named 'layer0', ... unless region_names is given.
+    """
+    if not np.isfinite(r_inner) or r_inner <= 0:
+        raise ValueError("r_inner must be positive")
+    if n_theta < 3:
+        raise ValueError("n_theta must be at least 3")
+    radii, band, count = _layer_coordinates(float(r_inner), r_interfaces, n_r,
+                                            "r_interfaces")
+    n_rings = len(radii)
+    theta = np.linspace(0.0, 2.0 * np.pi, n_theta, endpoint=False)
+    R, TH = np.meshgrid(radii, theta, indexing="ij")
+    nodes = np.column_stack([(R * np.cos(TH)).ravel(), (R * np.sin(TH)).ravel()])
+    it = np.arange(n_theta)
+    itp = (it + 1) % n_theta
+    k = np.arange(n_rings - 1)[:, None]
+    n00, n01 = k * n_theta + it, k * n_theta + itp
+    n10, n11 = n00 + n_theta, n01 + n_theta
+    tris = np.stack([np.stack([n00, n01, n11], -1), np.stack([n00, n11, n10], -1)],
+                    axis=2).reshape(-1, 3)
+    regions = np.repeat(band, 2 * n_theta)
+    inner, outer = it, (n_rings - 1) * n_theta + it
+    boundary = {"inner": inner, "outer": outer}
+    boundary_edges = {"inner": np.stack([inner, itp], axis=1),
+                      "outer": np.stack([outer, (n_rings - 1) * n_theta + itp], axis=1)}
+    return Mesh(nodes, tris, boundary, boundary_edges, regions,
+                _names(region_names, count))

@@ -83,3 +83,7 @@ include docs/locales/ko/pages/transient_thermal_mechanical.md
 include examples/transient_thermal_mechanical.py
 include tests/test_transient_thermal_mechanical.py
 include tests/test_transient_thermal_mechanical_physics.py
+include galerkin/materials.py
+include docs/multimaterial.md
+include docs/locales/ko/pages/multimaterial.md
+include tests/test_thermal_multimaterial.py
