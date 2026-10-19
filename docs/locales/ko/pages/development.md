@@ -170,3 +170,18 @@ PyPI 프로젝트의 trusted publisher를 리뷰를 거친 배포 워크플로�
 python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
+
+README는 PyPI 설명으로도 쓰이지만, 링크가 패키지 디렉터리 기준 상대 경로라 PyPI에서는
+깨집니다. 그래서 각 패키지의 `setup.py`는 링크를 한 리비전에 고정한 GitHub 주소로 바꾼
+README 사본을 메타데이터에 저장합니다(링크는 `blob/<ref>/…`, 이미지는 raw 파일).
+`README.md` 자체는 바뀌지 않습니다. 리비전은 `OPENPHYSICS_DOCS_REF`가 있으면 그 값,
+없으면 checkout의 커밋입니다. 릴리스 때는 push할 태그로 빌드해야 설명이 릴리스된 파일을
+가리킵니다.
+
+```bash
+OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/simcase packages/simcase
+```
+
+풀어 놓은 sdist에서 만드는 wheel은 sdist의 설명을 그대로 씁니다.
+`ci/test_readme_links.py`는 일곱 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
+않았는지 검사합니다.

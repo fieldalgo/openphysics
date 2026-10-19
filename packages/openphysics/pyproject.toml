@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "openphysics"
 version = "0.0.1"
 description = "OpenPhysics - a multiphysics simulation suite (name reservation)"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "FieldAlgo", email = "yonghakim@fieldalgo.com" }]

@@ -53,7 +53,7 @@ jobs:
           python ci/check_licenses.py --report .validation/licenses-validation-env.json
       - name: Check Markdown links
         run: |
-          python -m pytest -q -ra ci/test_markdown_links.py
+          python -m pytest -q -ra ci/test_markdown_links.py ci/test_readme_links.py
           python ci/check_markdown_links.py
       - name: Record CPU model and BLAS kernel
         run: |

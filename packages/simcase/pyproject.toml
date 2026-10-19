@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "simcase"
 version = "0.1.0"
 description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Yongha Kim" }]
