@@ -71,6 +71,7 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `colorama` | pytest, click (Windows only) | BSD-3-Clause | |
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
 | `certifi` | httpx, requests | MPL-2.0 | Unmodified CA bundle; test and tool only |
+| `scikit-fem` | `galerkin[crosscheck]` (`>=12,<13`) | BSD-3-Clause | Reference tool for [solver comparisons](reference-comparisons.md); pure Python, needs only numpy and scipy |
 
 First-party test extras also require `galerkin-refsol`, `meshine` and `gmshio`,
 which are Apache-2.0 packages of this repository.
@@ -108,8 +109,9 @@ which are Apache-2.0 packages of this repository.
 
 Solver comparisons that run other finite-element tools are recorded separately
 from the analytical acceptance references. Agreement between two tools is not
-used as convergence evidence. Permissive tools may be installed through a
-test-only extra and listed above. GPL tools are run, if at all, as separately
+used as convergence evidence. Permissive tools are installed through the
+test-only `crosscheck` extra and listed above; the record format and current
+cases are in [reference comparisons](reference-comparisons.md). GPL tools are run, if at all, as separately
 installed unmodified executables outside this repository; their source is not
 read or copied, and only numerical results are reported.
 

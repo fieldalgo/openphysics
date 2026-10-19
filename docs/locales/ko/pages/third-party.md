@@ -69,6 +69,7 @@ import·링크·번들하지 않고 소스를 복사하지 않습니다. AGPL은
 | `colorama` | pytest, click(Windows만) | BSD-3-Clause | |
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
 | `certifi` | httpx, requests | MPL-2.0 | 수정하지 않은 CA 묶음. 시험·도구 전용 |
+| `scikit-fem` | `galerkin[crosscheck]`(`>=12,<13`) | BSD-3-Clause | [솔버 비교](reference-comparisons.md)용 레퍼런스 도구. 순수 Python이며 numpy와 scipy만 필요 |
 
 자체 패키지의 test extra는 `galerkin-refsol`, `meshine`, `gmshio`도 요구합니다. 모두 이
 저장소의 Apache-2.0 패키지입니다.
@@ -105,8 +106,8 @@ import·링크·번들하지 않고 소스를 복사하지 않습니다. AGPL은
 ## 비교용 레퍼런스 도구
 
 다른 유한요소 도구를 돌린 비교 결과는 해석해 수용 기준과 따로 기록합니다. 두 도구가
-일치한다는 사실을 수렴 근거로 쓰지 않습니다. 허용형 도구는 시험 전용 extra로 설치해 위
-목록에 적습니다. GPL 도구는 쓰더라도 이 저장소 밖에서 따로 설치한 수정 없는 실행 파일로만
+일치한다는 사실을 수렴 근거로 쓰지 않습니다. 허용형 도구는 시험 전용 `crosscheck` extra로
+설치해 위 목록에 적습니다. 기록 형식과 현재 사례는 [레퍼런스 비교](reference-comparisons.md)에 있습니다. GPL 도구는 쓰더라도 이 저장소 밖에서 따로 설치한 수정 없는 실행 파일로만
 돌리며, 소스는 읽거나 복사하지 않고 수치 결과만 보고합니다.
 
 ## 자동 검사
