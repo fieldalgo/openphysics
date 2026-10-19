@@ -6,7 +6,7 @@ OpenPhysics is a Python simulation toolkit for electromagnetic fields, heat
 conduction and solid mechanics. It brings finite-element solvers, meshing,
 material models and independent reference solutions into one repository.
 Use the Python APIs directly, run supported models from JSON, or explore 2D
-optical models in the local browser Studio.
+optical models and rectangular heat documents in the local browser Studio.
 
 The project is under active development. Each feature has an explicit contract
 and a measured validation scope; the name does not imply a general-purpose
@@ -18,16 +18,19 @@ coupled multiphysics solver.
 |---|---|---|
 | Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](../packages/simcase/README.md), [vector reliability](../packages/galerkin/docs/eigenspace_reliability.md) |
 | 3D cavities | Vacuum rectangular PEC-box eigenmodes through a Python API or a single JSON study | [Cavity API](../packages/galerkin/docs/cavity_solver.md), [JSON contract](../packages/simcase/docs/cavity3d.md) |
-| Heat conduction | Steady homogeneous isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data | [Heat API](../packages/galerkin/docs/thermal_steady2d.md), [flux/Robin](../packages/galerkin/docs/thermal_flux_robin.md), [thermal JSON](../packages/simcase/docs/thermal_steady2d.md), [boundary JSON](../packages/simcase/docs/thermal_steady_boundary2d.md) |
-| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation | [Transient heat](../packages/galerkin/docs/transient_heat.md), [validation](../packages/galerkin/docs/transient_heat_validation.md) |
+| Heat conduction | Steady homogeneous isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](../packages/galerkin/docs/thermal_steady2d.md), [flux/Robin](../packages/galerkin/docs/thermal_flux_robin.md), [thermal JSON](../packages/simcase/docs/thermal_steady2d.md), [boundary JSON](../packages/simcase/docs/thermal_steady_boundary2d.md), [Studio](../packages/simcase/docs/thermal_studio.md) |
+| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](../packages/galerkin/docs/transient_heat.md), [validation](../packages/galerkin/docs/transient_heat_validation.md), [Studio](../packages/simcase/docs/thermal_transient_studio.md) |
 | Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](../packages/galerkin/docs/elasticity2d.md), [traction](../packages/galerkin/docs/elasticity_traction.md) |
 | Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md), [total traction](../packages/galerkin/docs/thermoelastic_traction.md), [workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) |
+| Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](../packages/galerkin/docs/transient_thermal_mechanical.md) |
 
 The JSON runner supports lossless `em.modes2d`, `em.cavity3d` and the documented
 `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only capabilities do not automatically appear
-in JSON or Studio. Studio supports 2D optical models; it rejects 3D models and
-has no thermal forms or plots. Transient heat also has a rectangular headless document path with saved histories,
-but no thermal Studio, restart, transient flux/Robin input or automatic coupling. Nonlinear mechanics, geometry
+in JSON or Studio. Studio supports 2D optical models and dedicated steady and
+transient heat views for the rectangular `thermal.steady2d` and `thermal.transient2d`
+subsets; it rejects 3D models and has no mechanics forms. Transient heat has no restart,
+transient flux/Robin input or automatic coupling; transient heat→mechanics is a
+separate explicit Python call with no feedback to heat, not a JSON or Studio path. Nonlinear mechanics, geometry
 sweeps, lossy document-mode solves and fully coupled thermal feedback are not
 part of the integrated scope. The steady heat→mechanics workflow does not yet
 accept the separate Robin/flux/traction extensions.
@@ -83,7 +86,7 @@ python -m simcase validate packages/simcase/examples/slab_te_check.json
 python -m simcase run packages/simcase/examples/slab_te_check.json -o slab_results
 ```
 
-Explore 2D optical models in Studio:
+Explore 2D optical models and rectangular heat documents in Studio:
 
 ```bash
 python -m simcase.studio --no-browser

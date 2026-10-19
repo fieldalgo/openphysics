@@ -5,7 +5,7 @@
 OpenPhysics는 전자기장, 열전도와 고체역학을 위한 Python 시뮬레이션 도구 모음입니다.
 유한요소 해석기, 메시 생성, 재료 모델과 독립 해석해를 한 저장소에서 제공합니다.
 Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행하거나,
-로컬 브라우저 Studio에서 2D 광학 모델을 살펴볼 수 있습니다.
+로컬 브라우저 Studio에서 2D 광학 모델과 직사각형 열전도 문서를 살펴볼 수 있습니다.
 
 현재 개발 중인 프로젝트입니다. 기능마다 입력·출력 계약과 실제 검증 범위를 명시하며,
 이름이 범용 다중물리 완전 연성 해석기의 지원을 뜻하지는 않습니다.
@@ -16,16 +16,18 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 |---|---|---|
 | 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](../../../../packages/simcase/docs/locales/ko/pages/overview.md), [벡터 신뢰성](../../../../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
 | 3D 공동 | Python API 또는 단일 JSON study를 통한 진공 직육면체 PEC 공동 고유모드 | [공동 API](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md), [JSON 계약](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
-| 열전도 | 정상·상수·등방 2D 열전도, Dirichlet·처방 열유속·Robin 경계, 변별 상수 경계 데이터를 받는 직사각형 헤드리스 JSON 경로 | [열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md), [경계조건 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md) |
-| 과도 열전도 | 2D Python 엔진과 직사각형 headless JSON/API/CLI/save, 고정 P1·일관 질량·후진 Euler, 상수 등방 물성·명시 시간·표본 Dirichlet/단열 | [과도 열전도](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md), [검증](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
+| 열전도 | 정상·상수·등방 2D 열전도, Dirichlet·처방 열유속·Robin 경계, 변별 상수 경계 데이터를 받는 직사각형 헤드리스 JSON 경로와 전용 Studio 화면 | [열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md), [경계조건 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md), [Studio](../../../../packages/simcase/docs/locales/ko/pages/thermal_studio.md) |
+| 과도 열전도 | 2D Python 엔진과 직사각형 headless JSON/API/CLI/save, 고정 P1·일관 질량·후진 Euler, 상수 등방 물성·명시 시간·표본 Dirichlet/단열, 전용 Studio 시간·장·이력 화면 | [과도 열전도](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md), [검증](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md), [Studio](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md) |
 | 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](../../../../packages/galerkin/docs/locales/ko/pages/elasticity2d.md), [표면하중](../../../../packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
 | 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md), [전체 표면하중](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md), [workflow](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
+| 과도 열응력 | 같은 고정 메시에서 저장된 과도 열전도 시간 중 고른 시간마다 준정적 선형 미소변형 기계해석, 명시적인 두 번째 Python 호출 | [과도 열전도→기계](../../../../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
 
 JSON 실행기는 무손실 `em.modes2d`, `em.cavity3d`와 문서에 명시한
 `thermal.steady2d`와 직사각형 `thermal.transient2d` 범위를 지원합니다. Python 전용 기능이 JSON이나 Studio에도
-자동으로 제공되는 것은 아닙니다. Studio는 2D 광학 모델을 지원하고 3D 모델을
-거절하며, 열전도 폼·그래프는 없습니다. 과도 열전도는 저장 이력을 갖는 직사각형 headless 문서 경로도 제공하지만,
-열 Studio·restart·과도 flux/Robin 입력·자동 연성은 제공하지 않습니다. 비선형 역학, 형상 sweep,
+자동으로 제공되는 것은 아닙니다. Studio는 2D 광학 모델과 직사각형 `thermal.steady2d`·
+`thermal.transient2d` 범위의 전용 정상·과도 열전도 화면을 지원하고, 3D 모델은 거절하며
+기계해석 폼은 없습니다. 과도 열전도는 restart·과도 flux/Robin 입력·자동 연성을 제공하지 않으며,
+과도 열전도→기계는 열로 되먹임이 없는 별도의 명시적 Python 호출이고 JSON·Studio 경로가 아닙니다. 비선형 역학, 형상 sweep,
 손실 모드 문서 해석과 열역학적 완전 피드백 연성은 현재 통합 범위에 포함하지 않습니다.
 정상 열전도→기계 workflow는 별도 Robin·열유속·표면하중 확장을 아직 받지 않습니다.
 
@@ -79,7 +81,7 @@ python -m simcase validate packages/simcase/examples/slab_te_check.json
 python -m simcase run packages/simcase/examples/slab_te_check.json -o slab_results
 ```
 
-Studio에서 2D 광학 모델을 살펴볼 수 있습니다.
+Studio에서 2D 광학 모델과 직사각형 열전도 문서를 살펴볼 수 있습니다.
 
 ```bash
 python -m simcase.studio --no-browser
