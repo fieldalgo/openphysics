@@ -131,7 +131,33 @@ def region_geometry(doc):
     names = set()
     for i, s in enumerate(shapes):
         _shape(s, i, names)
+    refuse_dropped_shapes(doc)
     return names
+
+
+def refuse_dropped_shapes(doc):
+    """Refuse a named shape that lies outside the domain or below the sliver limit.
+
+    geometry.resolve_regions drops such a shape and leaves a note; electromagnetic
+    documents report it as a warning. A heat region document would then run without
+    that material and say nothing, so the note becomes an error here. A shape that
+    later shapes cover completely is not refused ("later wins"); the run log names it.
+    """
+    from .geometry import resolve_regions
+    saved, doc.notes = doc.notes, []
+    try:
+        resolve_regions(doc)
+        dropped = list(doc.notes)
+    finally:
+        doc.notes = saved
+    if dropped:
+        raise DocumentError(' '.join(dropped)+' A heat region document refuses a shape that '
+                            'contributes no material.')
+
+
+def covered_shapes(doc, mesh):
+    """Shapes with no triangles in the mesh: fully covered by later shapes."""
+    return [s['name'] for s in doc['geometry']['shapes'] if s['name'] not in mesh.region_names]
 
 
 def region_materials_table(doc, required, label):
@@ -404,6 +430,8 @@ def run_region_thermal(doc, verbose=True):
                    'mesh_min_angle_deg': float(tri.min_angle())}
     log = [region_summary(doc),
            f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
+           *([f'shapes fully covered by later shapes (no triangles): {covered_shapes(doc, mesh)}']
+             if covered_shapes(doc, mesh) else []),
            f'temperature K: {solution.temperature.min():.12g} to {solution.temperature.max():.12g}',
            f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
     if verbose:

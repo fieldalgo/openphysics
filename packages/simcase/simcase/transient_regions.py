@@ -15,7 +15,7 @@ import time
 import numpy as np
 
 from .schema import DocumentError
-from .thermal_regions import (build_region_mesh, has_region_geometry, region_geometry,
+from .thermal_regions import (build_region_mesh, covered_shapes, has_region_geometry, region_geometry,
                               region_materials_table, region_mesh_settings, region_source)
 from .transient_thermal import TransientThermalRunResult, _FIELD_SPEC
 from .transient_thermal_contract import (PHYSICS, SIDES, _agree, _array, _initial_value, _number,
@@ -278,8 +278,10 @@ def run_transient_region_thermal(doc, verbose=True):
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     solve_seconds = time.perf_counter()-started
+    covered = covered_shapes(doc, mesh)
     log = (doc.summary(), f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, '
            f'regions {mesh.region_names}',
+           *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
            f'transient heat: {len(solution.time_s)} requested times; full histories retained',
            'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m')
     result = TransientRegionRunResult(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log,

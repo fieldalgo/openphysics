@@ -67,8 +67,10 @@ simcase run packages/simcase/examples/thermal_regions.json -o heated_plate
   `r`) or `polygon` (`points`, at least three `[x, y]`, not self-intersecting),
   each with a unique nonempty `name` (not `background`), a `material` and an
   optional `mesh_size`. No other keys are accepted. Shapes are clipped to the
-  domain; a region left smaller than 1e-12 of the domain area is dropped, as in
-  electromagnetic documents.
+  domain. A shape that lies outside the domain or is smaller than 1e-12 of the
+  domain area is refused (electromagnetic documents only warn and drop it). A
+  shape that later shapes cover completely gets no triangles; the run log names
+  it.
 - `materials`: `{material name: {...}}` with `conductivity_w_mk` > 0 (required
   for every material used), optional `volumetric_heat_capacity_j_m3k` > 0 (not
   used by steady heat) and an optional `source` note. Thermal properties are
@@ -132,7 +134,8 @@ comparison:
 | Shipped example against a direct `solve_steady_heat` call on the same mesh | Temperature and reaction identical; source heat = Q x meshed heater area to 1e-12; heater area within 1% of pi r^2; outward = source to 1e-10 |
 | Saved fields and summary | Formats, `triangle_regions`, boundary fields, region table, materials, total area, model copy |
 | CLI | validate and run exit 0; an existing output exits 1 |
-| 19 invalid documents and a covered source region | Refused with `DocumentError` |
+| 19 invalid documents, a covered source region, a shape outside the domain and a shape below the sliver limit | Refused with `DocumentError` |
+| A shape covered by a later shape | No triangles; named in the run log |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
 | Studio | Region documents are refused before any mesher or worker call |
 
@@ -177,7 +180,7 @@ Validation (`packages/simcase/tests/test_transient_thermal_regions.py`):
 | Direct `solve_transient_heat` call on the same mesh | Temperature, flux, reaction and heat content identical |
 | Layered wall heated from a uniform 300 K (Q 2e5 / 5e4 W/m^3, ends 300 K) against `refsol.transient_heat_multilayer.LayeredWall.source_driven`, mesh size 4, 2, 1, 0.5 mm, dt = 1/64 s, observed at 20 s | T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; at 0.5 mm halving dt changes each error by <= 5% |
 | One material everywhere against the rectangle transient document | Source heat equal to 1e-12; maximum temperature within 2e-3 K |
-| Saved fields, CLI, 10 invalid documents, Studio refusal | Formats, regions, materials; exit codes; `DocumentError`; no worker or mesher call |
+| Saved fields, CLI, 11 invalid documents (one a shape outside the domain), Studio refusal | Formats, regions, materials; exit codes; `DocumentError`; no worker or mesher call |
 
 Two earlier configurations of the convergence gate failed because backward
 Euler's first-order time error was not separated from the space error:

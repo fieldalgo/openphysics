@@ -62,7 +62,8 @@ simcase run packages/simcase/examples/thermal_regions.json -o heated_plate
 - `geometry.shapes`: `rect`(`x`, `y`, `w`, `h`), `circle`(`cx`, `cy`, `r`), `polygon`
   (`points`, `[x, y]` 세 개 이상, 자기 교차 없음)의 목록. 각각 고유한 비어 있지 않은
   `name`(`background` 제외), `material`, 선택 `mesh_size`를 가지며 다른 키는 받지 않습니다.
-  도형은 영역 안으로 잘리고, 영역 면적의 1e-12보다 작게 남은 영역은 전자기 문서처럼 버립니다.
+  도형은 영역 안으로 잘립니다. 영역 밖에 있거나 영역 면적의 1e-12보다 작은 도형은 거부합니다(전자기
+  문서는 경고만 하고 버림). 나중 도형에 완전히 덮인 도형은 삼각형이 없으며 실행 기록에 이름이 나옵니다.
 - `materials`: `{재료 이름: {...}}`. 사용하는 모든 재료에 `conductivity_w_mk` > 0(필수),
   선택 `volumetric_heat_capacity_j_m3k` > 0(정상 열전도는 쓰지 않음), 선택 `source` 메모.
   열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야 합니다.
@@ -114,7 +115,8 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
 | 배포 예제 대 같은 메시의 `solve_steady_heat` 직접 호출 | 온도·반력 동일; 열원 = Q x 메시 히터 면적(1e-12); 히터 면적이 pi r^2의 1% 이내; 바깥 열 = 열원(1e-10) |
 | 저장 필드와 요약 | 형식, `triangle_regions`, 경계 필드, 영역 표, 재료, 전체 면적, 모델 사본 |
 | CLI | validate·run 종료 코드 0, 기존 출력이면 1 |
-| 잘못된 문서 19개와 덮인 열원 영역 | `DocumentError`로 거부 |
+| 잘못된 문서 19개, 덮인 열원 영역, 영역 밖 도형, sliver 한계보다 작은 도형 | `DocumentError`로 거부 |
+| 나중 도형에 덮인 도형 | 삼각형 없음, 실행 기록에 이름 |
 | 사각형 문서 | 비어 있지 않은 `materials`는 여전히 거부, 원래 결과 형식 |
 | Studio | 영역 문서는 메시·작업자 호출 전에 거부 |
 
@@ -156,7 +158,7 @@ t0에서 초기장과 일치). 사용하는 모든 재료에 `conductivity_w_mk`
 | 같은 메시의 `solve_transient_heat` 직접 호출 | 온도·열유속·반력·열량 동일 |
 | 균일 300 K에서 가열하는 층상 벽(Q 2e5 / 5e4 W/m^3, 양끝 300 K) 대 `refsol.transient_heat_multilayer.LayeredWall.source_driven`, 메시 크기 4, 2, 1, 0.5 mm, dt = 1/64 s, 20 s 관측 | 마지막 두 구간에서 T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9; 0.5 mm에서 dt를 절반으로 하면 각 오차 변화 <= 5% |
 | 한 재료만 쓴 문서 대 사각형 과도 문서 | 열원 1e-12 일치, 최고 온도 2e-3 K 이내 |
-| 저장 필드, CLI, 잘못된 문서 10개, Studio 거부 | 형식·영역·재료, 종료 코드, `DocumentError`, 작업자·메시 호출 없음 |
+| 저장 필드, CLI, 잘못된 문서 11개(하나는 영역 밖 도형), Studio 거부 | 형식·영역·재료, 종료 코드, `DocumentError`, 작업자·메시 호출 없음 |
 
 수렴 기준의 앞선 두 구성은 후진 Euler의 1차 시간 오차가 공간 오차와 분리되지 않아 실패했습니다.
 

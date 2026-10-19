@@ -202,6 +202,8 @@ INVALID = {
     'time unit': lambda d: d['units'].update(time='ms'),
     'decreasing times': lambda d: d['study'].update(time_s=[0., 2., 1.]),
     'plots': lambda d: d['results'].update(plots=True),
+    'shape outside the domain': lambda d: d['geometry']['shapes'].append(
+        {'name': 'stray', 'type': 'rect', 'x': 0., 'y': 900., 'w': 1., 'h': 1., 'material': 'steel'}),
 }
 
 
