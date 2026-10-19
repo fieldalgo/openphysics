@@ -167,7 +167,7 @@ Python 3.10 이상을 받음), 선언한 범위 안의 고정 버전 외 버전.
 | | HarfBuzz, libraqm, SheenBidi | MIT-Modern-Variant, MIT, Apache-2.0 | 모든 플랫폼: `ft2font`에 정적으로 링크 |
 | | Qhull | Qhull | 모든 플랫폼: `_qhull`에 정적으로 링크 |
 | | 글꼴과 글꼴 메트릭 | OFL-1.1(STIX, Last Resort), BaKoMa Fonts Licence, Bitstream Vera 조건(DejaVu), Adobe 조건(AFM 파일) | 데이터 파일 |
-| `pillow` | libjpeg-turbo, libpng, libtiff, libwebp(sharpyuv·mux·demux 포함), OpenJPEG, Little CMS, libavif(aom·dav1d·libyuv 포함), Brotli, liblzma, zstd(Linux) 또는 zlib-ng(macOS), FreeType, HarfBuzz, libxcb, libXau | 휠 고지에 따르면 허용형. FreeType은 FTL OR GPL-2.0-or-later이고 FTL로 사용 | Linux(`pillow.libs/`)와 macOS(`PIL/.dylibs/`)는 공유 라이브러리 18개, Windows는 정적 링크. xz 항목의 LGPL·GPL 문구는 들어 있지 않은 명령줄 도구에 해당함. FriBiDi(LGPL)는 들어 있지 않고, 시스템에 있을 때만 Pillow가 실행 중에 로드함 |
+| `pillow` | libjpeg-turbo, libpng, libtiff, libwebp(sharpyuv·mux·demux 포함), OpenJPEG, Little CMS, libavif(aom·dav1d·libyuv 포함), Brotli, liblzma, zstd(Linux) 또는 zlib-ng(macOS), FreeType, HarfBuzz, libxcb, libXau | 휠 고지에 따르면 허용형. FreeType은 FTL OR GPL-2.0-or-later이고 FTL로 사용 | Linux(`pillow.libs/`)와 macOS(`PIL/.dylibs/`)는 공유 라이브러리 18개, Windows는 정적 링크. xz 항목의 LGPL·GPL 문구는 들어 있지 않은 명령줄 도구에 해당함. 묶인 liblzma(xz 5.8.3)는 상류 기준 0BSD이고, 고지에는 예전 public domain 문구가 남아 있음. FriBiDi(LGPL)는 들어 있지 않고, 시스템에 있을 때만 Pillow가 실행 중에 로드함 |
 | `pydantic-core` | Rust crate(pyo3, regex, serde_json, icu_normalizer 등) | MIT, Apache-2.0, Unlicense OR MIT, Unicode-3.0 | 정적 링크. 휠에는 pydantic-core 자신의 라이선스만 있음 |
 | `pyyaml` | libyaml | MIT | `_yaml`에 정적으로 링크 |
 | `pip` | certifi CA 묶음 | MPL-2.0 | 함께 넣어 둔 데이터 파일, 수정 없이 사용 |
