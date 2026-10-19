@@ -26,13 +26,18 @@ BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
                    'convective_outward_w_per_m', 'system_rhs_w_per_m')
 
 
-def is_region_thermal(data):
-    """A steady heat document that declares region geometry."""
+def has_region_geometry(data, physics_type):
+    """A document of physics_type that declares region geometry."""
     if not isinstance(data, dict) or not isinstance(data.get('physics'), dict):
         return False
-    steady = any(isinstance(p, dict) and p.get('type') == PHYSICS for p in data['physics'].values())
+    typed = any(isinstance(p, dict) and p.get('type') == physics_type for p in data['physics'].values())
     geometry = data.get('geometry')
-    return steady and isinstance(geometry, dict) and ('shapes' in geometry or 'background' in geometry)
+    return typed and isinstance(geometry, dict) and ('shapes' in geometry or 'background' in geometry)
+
+
+def is_region_thermal(data):
+    """A steady heat document that declares region geometry."""
+    return has_region_geometry(data, PHYSICS)
 
 
 def _shape(s, i, names):
@@ -100,22 +105,9 @@ def _sides(p, name):
         raise DocumentError(f'{path}: natural condition overlaps a fully Dirichlet side')
 
 
-def validate_region_thermal(doc):
+def region_geometry(doc):
+    """Validate geometry.domain/background/shapes; return the shape names."""
     d = doc.data
-    _object(d, {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'},
-            'document')
-    if not isinstance(d['name'], str):
-        raise DocumentError('name: expected a string')
-    name, p = doc.sole_physics()
-    if not isinstance(name, str) or not name.isidentifier():
-        raise DocumentError('physics name must be an identifier')
-    path = f'physics.{name}'
-    if 'conductivity_w_mk' in p:
-        raise DocumentError(f'{path}.conductivity_w_mk: a region document takes conductivity from materials')
-    _object(p, {'type', 'heat_source_w_m3', 'dirichlet_temperature_k', 'outward_flux_w_m2', 'convection'}, path)
-    _object(d.get('units'), {'length', 'temperature'}, 'units')
-    if 'length' not in doc.scale.declared or d['units'].get('temperature') != 'K':
-        raise DocumentError('thermal.steady2d requires explicit units.length and units.temperature="K"')
     g = d['geometry']
     _object(g, {'domain', 'background', 'shapes'}, 'geometry')
     dom = g.get('domain')
@@ -139,6 +131,12 @@ def validate_region_thermal(doc):
     names = set()
     for i, s in enumerate(shapes):
         _shape(s, i, names)
+    return names
+
+
+def region_materials_table(doc, required, label):
+    """Validate the materials table; every used material needs the `required` keys."""
+    d = doc.data
     materials = d['materials']
     if not isinstance(materials, dict):
         raise DocumentError('materials: expected an object mapping names to thermal properties')
@@ -151,13 +149,19 @@ def validate_region_thermal(doc):
             _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
         if 'source' in spec and not isinstance(spec['source'], str):
             raise DocumentError(where+'.source: expected a string')
-    for where, mname in [('geometry.background.material', background['material'])] + [
-            (f'geometry.shapes[{i}].material', s['material']) for i, s in enumerate(shapes)]:
+    g = d['geometry']
+    for where, mname in [('geometry.background.material', g['background']['material'])] + [
+            (f'geometry.shapes[{i}].material', s['material']) for i, s in enumerate(g['shapes'])]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
                                 '(thermal properties are never taken from built-in optical materials)')
-        if 'conductivity_w_mk' not in materials[mname]:
-            raise DocumentError(f'materials.{mname}.conductivity_w_mk: required by steady heat')
+        for key in required:
+            if key not in materials[mname]:
+                raise DocumentError(f'materials.{mname}.{key}: required by {label}')
+
+
+def region_source(p, names, path):
+    """Validate heat_source_w_m3: a number or {region name: number}; default zero."""
     source = p.setdefault('heat_source_w_m3', 0.0)
     if isinstance(source, dict):
         allowed = names | {'background'}
@@ -167,8 +171,10 @@ def validate_region_thermal(doc):
             _number(value, f'{path}.heat_source_w_m3.{region}')
     else:
         _number(source, f'{path}.heat_source_w_m3')
-    _sides(p, name)
-    mesh = d['mesh']
+
+
+def region_mesh_settings(doc):
+    mesh = doc.data['mesh']
     _object(mesh, {'size', 'min_angle'}, 'mesh')
     if 'size' not in mesh:
         raise DocumentError('mesh.size: required by a region document (document length units)')
@@ -177,6 +183,29 @@ def validate_region_thermal(doc):
     _number(angle, 'mesh.min_angle', positive=True)
     if angle > 33.0:
         raise DocumentError('mesh.min_angle: at most 33 degrees (refinement need not terminate above)')
+
+
+def validate_region_thermal(doc):
+    d = doc.data
+    _object(d, {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'},
+            'document')
+    if not isinstance(d['name'], str):
+        raise DocumentError('name: expected a string')
+    name, p = doc.sole_physics()
+    if not isinstance(name, str) or not name.isidentifier():
+        raise DocumentError('physics name must be an identifier')
+    path = f'physics.{name}'
+    if 'conductivity_w_mk' in p:
+        raise DocumentError(f'{path}.conductivity_w_mk: a region document takes conductivity from materials')
+    _object(p, {'type', 'heat_source_w_m3', 'dirichlet_temperature_k', 'outward_flux_w_m2', 'convection'}, path)
+    _object(d.get('units'), {'length', 'temperature'}, 'units')
+    if 'length' not in doc.scale.declared or d['units'].get('temperature') != 'K':
+        raise DocumentError('thermal.steady2d requires explicit units.length and units.temperature="K"')
+    names = region_geometry(doc)
+    region_materials_table(doc, ('conductivity_w_mk',), 'steady heat')
+    region_source(p, names, path)
+    _sides(p, name)
+    region_mesh_settings(doc)
     if d['study'] != {'type': 'single'}:
         raise DocumentError('thermal.steady2d supports only study {"type":"single"}')
     _object(d['results'], {'save_fields', 'plots'}, 'results')

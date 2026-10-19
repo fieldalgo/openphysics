@@ -29,6 +29,7 @@ python -m simcase run model.json                          # -> model_results/
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | 영역이 있는 `thermal.steady2d` | 이름 있는 재료 영역의 정상 열전도: 배경 위 도형, 재료 표, 영역 경계를 따르는 메시 | `thermal_regions` | [영역 문서](thermal_regions2d.md) |
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
+| 영역이 있는 `thermal.transient2d` | 이름 있는 재료 영역의 과도 열전도, 재료별 열전도율·열용량 | `transient_thermal_regions` | [영역 문서](thermal_regions2d.md) |
 
 Studio는 2D 광학 모델을 편집·실행하고 두 열전도 유형의 전용 화면을 제공하며, 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 손실 재료, 기계해석 문서는 지원하지 않습니다.
 
@@ -259,7 +260,7 @@ script / CLI  ->  runs the document      simcase.run
 | 정상 열전도 문서 | [Contract](../../../thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
 | 정상 열전도 검증 | [Report](../../../thermal_simcase_independent_validation.md) | [한국어](thermal_simcase_independent_validation.md) |
 | 정상 경계조건 | [Contract](../../../thermal_steady_boundary2d.md) | [한국어](thermal_steady_boundary2d.md) |
-| 정상 열전도 영역 문서 | [Contract](../../../thermal_regions2d.md) | [한국어](thermal_regions2d.md) |
+| 열전도 영역 문서 | [Contract](../../../thermal_regions2d.md) | [한국어](thermal_regions2d.md) |
 | 정상 경계조건 검증 | [Report](../../../steady_boundary_independent_validation.md) | [한국어](steady_boundary_independent_validation.md) |
 | 과도 열전도 문서 | [Contract](../../../thermal_transient2d.md) | [한국어](thermal_transient2d.md) |
 | 정상 열전도 Studio | [Guide](../../../thermal_studio.md) | [한국어](thermal_studio.md) |

@@ -271,6 +271,9 @@ def transient_solver_inputs(doc, mesh):
 
 
 def transient_thermal_summary(doc):
+    from .transient_regions import is_transient_region_thermal, transient_region_summary
+    if is_transient_region_thermal(doc.data):
+        return transient_region_summary(doc)
     name, p = doc.sole_physics()
     times = doc["study"]["time_s"]
     return (f'{doc["name"]} (openphysics 0.2)\n'

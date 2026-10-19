@@ -53,6 +53,9 @@ class TransientThermalRunResult:
     timings: dict
     log: tuple
     _document_json: str = field(init=False, repr=False, compare=False)
+    # Saved identifiers; the region-document result overrides them.
+    result_format = RESULT_FORMAT
+    field_layout = FIELD_LAYOUT
 
     def __post_init__(self):
         # Keep the existing input-lifetime guarantee for direct construction too.
@@ -147,7 +150,7 @@ class TransientThermalRunResult:
         reaction = arrays['reaction_w_per_m'].sum(axis=1)
         result = {
             'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
-            'result_format': RESULT_FORMAT, 'field_layout': FIELD_LAYOUT,
+            'result_format': self.result_format, 'field_layout': self.field_layout,
             'units': copy.deepcopy(self.doc['units']), 'mesh_length_unit': 'm',
             'field_units': {key: spec[0] for key, spec in _FIELD_SPEC.items()},
             'field_locations': {key: spec[1] for key, spec in _FIELD_SPEC.items()},
@@ -200,7 +203,7 @@ class TransientThermalRunResult:
             owned.write('model.json', lambda f: f.write(model))
             owned.write('log.txt', lambda f: f.write(log))
             if summary['save_fields']:
-                arrays.update(result_format=np.asarray(RESULT_FORMAT), field_layout=np.asarray(FIELD_LAYOUT),
+                arrays.update(result_format=np.asarray(self.result_format), field_layout=np.asarray(self.field_layout),
                               mesh_length_unit=np.asarray('m'), metadata_json=np.asarray(encoded.decode('utf-8')))
                 if any(a.dtype.hasobject for a in arrays.values()):
                     raise ValueError('transient raw arrays must not contain Python objects')
@@ -217,6 +220,9 @@ class TransientThermalRunResult:
 
 def run_transient_thermal(doc, verbose=True):
     """Validate a document snapshot and call the existing transient engine once."""
+    from .transient_regions import is_transient_region_thermal, run_transient_region_thermal
+    if is_transient_region_thermal(doc.data):
+        return run_transient_region_thermal(doc, verbose=verbose)
     from galerkin import rectangle_mesh
     from galerkin.transient_heat import solve_transient_heat
     doc.validate()

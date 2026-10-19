@@ -250,6 +250,12 @@ class Document:
         d = self.data
         from .transient_thermal_contract import is_transient_thermal, validate_transient_thermal
         if is_transient_thermal(d):
+            from .transient_regions import (is_transient_region_thermal,
+                                            validate_transient_region_thermal)
+            if is_transient_region_thermal(d):
+                _reject_tagged_values(d)
+                validate_transient_region_thermal(self)
+                return
             validate_transient_thermal(self)
             return
         from .thermal_regions import is_region_thermal, validate_region_thermal

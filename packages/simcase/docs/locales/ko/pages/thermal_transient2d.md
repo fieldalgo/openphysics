@@ -7,7 +7,8 @@
 `thermal.transient2d`는 기존 과도 열전도 엔진을 `simcase` 문서 API·CLI와
 버전이 있는 JSON/NPZ 출력에 연결합니다. 고정된 균질 2D 직사각형에서
 `c*dT/dt - div(k*grad T) = Q`를 적합 P1 삼각형·일관 질량·후진 Euler로 풉니다.
-형상은 m로 변환하고 요청 시간은 명시적 초입니다. 계산은 단위 면외 깊이당 값입니다.
+형상은 m로 변환하고 요청 시간은 명시적 초입니다. 계산은 단위 면외 깊이당 값입니다. `geometry`에
+`background`나 `shapes`가 있는 문서는 대신 [영역 문서 계약](thermal_regions2d.md)을 따릅니다.
 
 이 페이지는 headless 인터페이스를 설명합니다. Generic 광학 Studio route의
 열 guard는 유지하며 전용 [정상 Studio](thermal_studio.md)는 별도입니다.
