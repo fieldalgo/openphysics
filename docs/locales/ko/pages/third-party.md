@@ -57,9 +57,11 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    `ci/tools/report_numeric_runtime.py` 하나입니다. 이 도구는 작업 로그에 커널 이름을 남기려고
    numpy에 묶인 OpenBLAS를 ctypes로 로드합니다(Linux에서는 묶인 GCC 런타임과 libquadmath도 함께
    로드됨). 패키지 코드가 아니고, 텍스트 보고서만 CI 결과와 함께 남깁니다. 묶인 copyleft
-   라이브러리의 API를
-   노출하는 것이 주된 목적인 휠(얇은 바인딩)은 OpenPhysics가 그 라이브러리에 직접 의존하는
-   것으로 보고 검토합니다.
+   라이브러리의 API를 노출하는 것이 주된 목적인 휠(얇은 바인딩)은 OpenPhysics가 그 라이브러리에
+   직접 의존하는 것으로 보고 검토합니다. OpenPhysics와 같은 프로세스에 로드되는 묶인 라이브러리는
+   순수 GPL일 수 없습니다. 그 안의 GPL 코드는 런타임 예외(GCC 예외)나 다른 라이선스
+   선택지(FreeType의 FTL)가 있어야 합니다. GPL 라이브러리를 묶을 수 있는 것은 Gmsh처럼 별도
+   프로세스로 돌리는 도구뿐입니다.
 
 서버에서 소프트웨어를 실행하는 것은 배포가 아니지만, 브라우저로 보내는 JavaScript, CSS, 글꼴,
 WebAssembly는 배포입니다. OpenPhysics는 제3자 바이너리를 배포하지 않습니다. 제3자 바이너리를
@@ -235,6 +237,8 @@ python ci/check_licenses.py --report .validation/licenses.json
   아닐 때
 - copyleft SPDX 식을 가진 `bundled_files` 기록에 검토 문구가 없거나, 배포판에 검사할 RECORD
   파일 목록이 없을 때
+- external process가 아닌 배포판의 `bundled_files` 기록에, 정책에 적힌 런타임 예외가 없는 GPL
+  조건만 남을 때(그런 라이브러리는 OpenPhysics 프로세스에 로드됨)
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
 
 CI는 고정된 Linux 환경, 설치한 휠만 담은 새 환경, 그리고 Linux·macOS·Windows 설치 플랫폼

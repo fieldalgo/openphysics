@@ -254,6 +254,37 @@ def test_never_allowed_bundled_record_fails(tmp_path, spdx):
     assert any("never allowed, also when bundled" in e for e in errors)
 
 
+@pytest.mark.parametrize("spdx", ["GPL-3.0-only", "GPL-2.0-or-later", "MIT AND GPL-3.0-or-later", "GPL-2.0+",
+                                  "GPL-3.0-only WITH Autoconf-exception-3.0", "LicenseRef-GPL-custom"])
+def test_plain_gpl_bundled_in_process_fails(tmp_path, spdx):
+    # numlib is a runtime dependency, so its bundled library loads into the OpenPhysics process.
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    entries = {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx, review="looks fine")]}}
+    errors, _ = run(tmp_path, entries, galerkin={"requires": ["numlib"]})
+    assert any("only an external_process entry may bundle it" in e for e in errors)
+
+
+@pytest.mark.parametrize("spdx", ["FTL OR GPL-2.0-or-later", "GPL-3.0-or-later WITH GCC-exception-3.1",
+                                  "LGPL-2.1-or-later", "BSD-3-Clause AND GPL-3.0-or-later WITH GCC-exception-3.1"])
+def test_gpl_with_exception_or_other_option_bundled_in_process_passes(tmp_path, spdx):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    entries = {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx, review="reviewed")]}}
+    errors, _ = run(tmp_path, entries, galerkin={"requires": ["numlib"]})
+    assert errors == []
+
+
+def test_external_process_entry_may_bundle_gpl_library(tmp_path):
+    library = "../../lib/libmesher.so.4.15"
+    site = tmp_path / "prefix" / "lib" / "python3.12" / "site-packages"
+    install(site, "mesher", license="GPLv2+", files=["mesher/__init__.py", library])
+    external = {"spdx": "GPL-2.0-or-later",
+                "external_process": {"executable": "mesher", "forbidden_imports": ["mesher_never_imported"]},
+                "bundled_files": [bundled(glob="*/libmesher.so.*", spdx="GPL-2.0-or-later", review="own library")]}
+    errors, report = run(site, {"mesher": external}, gmshio={"requires": ['mesher; extra == "mesh"'],
+                                                             "extras": ["mesh"]})
+    assert errors == [] and report["mesher"]["bundled_files"][0]["file"] == library
+
+
 def test_bundled_library_must_be_recorded_for_this_platform(tmp_path):
     install(tmp_path, "numlib", expression="MIT", files=[BLAS])
     errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled()]}}, platform="windows")
@@ -289,9 +320,8 @@ def test_first_party_distribution_must_not_contain_native_files(tmp_path, native
 def test_inventory_entries_are_valid_and_documented():
     policy = INVENTORY["policy"]
     known = set(policy["permissive"]) | set(policy["weak_copyleft"]) | {"GPL-2.0-or-later"}
-    never = check_licenses.never_pattern(policy["never_families"])
     for name, entry in INVENTORY["distributions"].items():
-        assert check_licenses.bundled_entry_errors(name, entry.get("bundled_files", []), never) == []
+        assert check_licenses.bundled_entry_errors(name, entry, policy) == []
         ids = check_licenses.identifiers(check_licenses.parse_expression(entry["spdx"]))
         assert ids <= known, (name, ids)
         assert entry["url"].startswith("https://"), name

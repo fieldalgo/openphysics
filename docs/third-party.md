@@ -67,9 +67,12 @@ levels.
    it loads numpy's bundled OpenBLAS with ctypes only to read its kernel name
    for the job log (on Linux this also loads the bundled GCC runtime and
    libquadmath). It is not package code; only its text report is kept with the
-   CI results. A wheel
-   whose main purpose is to expose a bundled copyleft library's API (a thin
-   binding) is reviewed as if OpenPhysics depended on that library directly.
+   CI results. A wheel whose main purpose is to expose a bundled copyleft
+   library's API (a thin binding) is reviewed as if OpenPhysics depended on
+   that library directly. A bundled library that loads into the same process
+   as OpenPhysics is never plain GPL: GPL code there needs a runtime exception
+   (the GCC exception) or another license option (FreeType's FTL). Only a
+   separate-process tool such as Gmsh may bundle GPL libraries.
 
 Running software on a server is not distribution, but JavaScript, CSS, fonts and
 WebAssembly sent to a browser are. OpenPhysics distributes no third-party
@@ -258,6 +261,9 @@ The check reads installed metadata and each distribution's RECORD file list with
   recorded for the current OS;
 - a `bundled_files` record with a copyleft SPDX expression has no review, or a
   distribution has no RECORD file list to check;
+- a `bundled_files` record of a distribution that is not an external process
+  leaves only GPL terms without a runtime exception listed in the policy (such
+  a library would load into the OpenPhysics process);
 - this page or its Korean translation does not list every inventory entry.
 
 CI runs it on the pinned Linux environment, on the fresh environment holding the

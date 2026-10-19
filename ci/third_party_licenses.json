@@ -22,13 +22,15 @@
     ],
     "test_extras": ["test", "crosscheck"],
     "never_families": ["AGPL", "Affero", "SSPL", "EUPL", "OSL", "CPAL", "RPL"],
+    "runtime_exceptions": ["GCC-exception-2.0", "GCC-exception-3.1"],
     "rules": [
       "Licenses are judged at three levels: what this repository creates, copies, builds, links or distributes; each distribution by the license it declares; components bundled inside third-party wheels, which are recorded and reviewed, not banned",
       "runtime and optional (non-test extras of first-party packages): permissive only; the policy would allow weak copyleft in optional extras, but this repository stays stricter",
       "test (extras named in test_extras) and tool: permissive, or weak copyleft when the entry sets test_only",
       "GPL: only entries with external_process (a separate process, as a reference tool or an optional backend); never a base runtime requirement, and first-party code must not import them",
       "never_families (AGPL and other network copyleft): any identifier of the family (every version, deprecated ids, '+' forms and LicenseRef- names) in an entry, a bundled_files record or installed metadata is rejected in every environment, also as an external process",
-      "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; copyleft records need a review; first-party distributions contain no native files"
+      "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; copyleft records need a review; first-party distributions contain no native files",
+      "bundled_files of entries without external_process load into the OpenPhysics process: a GPL term passes only with a listed runtime exception (runtime_exceptions) or inside an OR with another option"
     ]
   },
   "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase"],
