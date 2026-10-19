@@ -273,6 +273,33 @@ def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
     assert [name for name, *_, c in resolve_regions(Document.from_dict(d)) if c] == []   # later shape inside
 
 
+# Concave bracket: part of it overlaps the domain, part only touches the right side from
+# outside, so clipping leaves a polygon plus a line piece (a GeometryCollection).
+BRACKET = [[38, 2], [44, 2], [44, 10], [40, 10], [40, 6], [42, 6], [42, 4], [38, 4]]
+
+
+def test_a_shape_that_clips_to_a_polygon_and_a_line_piece_meshes():
+    """Regression: the line piece has no boundary ring and crashed the circle check and
+    build_domain; only the polygon parts are meshed."""
+    from simcase.geometry import resolve_regions
+    d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+    d['geometry']['shapes'].insert(0, {'name': 'bracket', 'type': 'polygon', 'points': BRACKET,
+                                       'material': 'steel'})
+    doc = Document.from_dict(d)
+    regions = {name: geom for name, _m, geom, *_ in resolve_regions(doc.copy())}
+    assert regions['bracket'].geom_type == 'Polygon' and abs(regions['bracket'].area-4.) < 1e-12
+    r = run(doc, verbose=False)
+    assert r.mesh.region_names == ['bracket', 'plate', 'heater', 'background']
+    assert r.summary()['normalized_heat_balance_defect'] < 1e-10
+    fiber = copy.deepcopy(examples.EXAMPLES['fiber'])
+    dom = fiber['geometry']['domain']
+    fiber['geometry']['shapes'].append({'name': 'bracket', 'type': 'polygon', 'material':
+                                        fiber['geometry']['shapes'][0]['material'],
+                                        'points': [[x-40+dom['xmax'], y] for x, y in BRACKET]})
+    em = resolve_regions(Document.from_dict(fiber))
+    assert [name for name, *_, c in em if c] == ['core']
+
+
 def test_rectangle_documents_keep_their_original_contract():
     legacy = copy.deepcopy(examples.EXAMPLES['thermal_slab'])
     legacy['materials'] = {'steel': {'conductivity_w_mk': 45.}}
