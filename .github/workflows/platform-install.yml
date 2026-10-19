@@ -7,10 +7,10 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: platform-install-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-  queue: ${{ github.ref == 'refs/heads/main' && 'max' || 'single' }}
+# No concurrency block here. This workflow is called from validate.yml, whose
+# own group already runs one main validation at a time. A second, nested group
+# with `queue: max` coincided with every main run from 2026-10-19 05:13Z being
+# cancelled a few minutes after it started while several runs were queued.
 
 jobs:
   platform-install:
