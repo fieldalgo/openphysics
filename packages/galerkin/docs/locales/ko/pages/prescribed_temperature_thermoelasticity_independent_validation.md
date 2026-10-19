@@ -2,6 +2,12 @@
 
 [영문 원문](../../../prescribed_temperature_thermoelasticity_independent_validation.md)
 
+**한눈에 보기**
+
+- **확인하는 것:** 원래 3차원 연속체 oracle로 `galerkin.thermoelasticity.solve_thermoelasticity`를 독립 수용 검증합니다. 명시적으로 처방한 절점 P1 Kelvin 장을 평면응력·평면변형률에서 다룹니다.
+- **고정 기준:** n=8/16/32에서 두 수렴률 모두 변위 L2 ≥ 1.8, 변위 기울기 H1·3D 전체 응력 L2(zz 포함)·에너지 노름 차수 ≥ 0.9가 필요합니다. 정확 장과 에너지·일 항등식은 1e-10, 잔차는 1e-9로 일치해야 합니다.
+- **범위:** 기계 단계만 다룹니다. 열전도 솔버, 온도 전달, 출처, 과도 일, 전체 연성 workflow는 검증하지 않습니다. 아래 후보 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 이 수용은 독립 연속체 oracle과 사전 등록 gate를 사용합니다. 명시적으로 처방한
 nodal-P1 Kelvin 장에 대한 기계 응답을 다룹니다. 열 솔버·온도 전달·출처·과도 일 또는
 완전 순차연성 workflow를 검증하지 않습니다.

@@ -2,6 +2,12 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat_independent_validation.md)
 
+**At a glance**
+
+- **What it checks:** independent acceptance of `solve_transient_heat` with its own oracle (no producer or refsol code) and preregistered families: uniform insulation, moving affine field, accepted initial mismatch, discrete source endpoint, temporal eigenmode, PDE sine, temporal companion and independent quadrature.
+- **Fixed gates:** temporal orders 0.9–1.1 with the full history matching the backward-Euler product to ≤ 1e-10; PDE sine temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9; companion change ≤ 5%; quadrature 8 vs 10 within 1%.
+- **Scope:** algebra, temporal, spatial and quadrature errors are reported separately, and a failed gate stays a failure; neither time steps nor thresholds are retuned. The historical registration notes below are kept as recorded; for a specific commit, see its CI run.
+
 ## Current checkout and evidence
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.

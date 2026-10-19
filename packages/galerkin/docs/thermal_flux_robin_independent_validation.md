@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/thermal_flux_robin_independent_validation.md)
 
+**At a glance**
+
+- **What it checks:** independent acceptance of prescribed outward flux and Robin convection in `galerkin.thermal`, on a closed-form strip and a separate manufactured solution. The oracle does not import the production assembly or the boundary reference.
+- **Fixed gates:** on n=8/16/32/64, both final intervals need interior temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9; operator, load, residual, reaction and heat-balance comparisons agree to 1e-10; quadrature 8 vs 10 agree within 1% of the measured error.
+- **Scope:** the standalone steady Python API only, not documents, transient heat or coupled workflows. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+
 This report covers initial candidate `23f528dbcffb42ec4120b762fde840f70d9aeffe`.
 Its `galerkin/thermal.py` blob is
 `20b2f5f0f94583e50775743e1ed9dfaf1c68d97c`; boundary reference blob is

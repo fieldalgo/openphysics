@@ -2,6 +2,12 @@
 
 [English](../../../transient_heat.md) · [검증](transient_heat_validation.md)
 
+**한눈에 보기**
+
+- **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점이며 나머지 경계는 단열입니다.
+- **한계:** 처방 열유속·Robin 경계, restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
+- **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. 아래 과거 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 ## 현재 checkout과 근거
 
 이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
