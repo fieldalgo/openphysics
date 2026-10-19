@@ -32,6 +32,9 @@ TOOLS = {
     "scikit-fem": {"module": "skfem", "license": "BSD-3-Clause",
                    "source": "https://github.com/kinnala/scikit-fem",
                    "use": "imported in-process from the galerkin[crosscheck] test extra"},
+    "symfem": {"module": "symfem", "license": "MIT",
+               "source": "https://github.com/mscroggs/symfem",
+               "use": "imported in-process from the galerkin[crosscheck] test extra"},
 }
 REQUIRED = ("schema", "case", "physics", "openphysics", "reference", "matched", "not_matched",
             "observables", "analytical_acceptance", "wall_time_s", "not_measured", "environment", "role")
