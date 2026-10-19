@@ -33,10 +33,45 @@ def test_two_layer_eigenvalues_solve_the_characteristic_equation():
         w1, w2 = np.sqrt(l*c1/k1), np.sqrt(l*c2/k2)
         f = k1*w1*np.cos(w1*a)*np.sin(w2*b)+k2*w2*np.sin(w1*a)*np.cos(w2*b)
         assert abs(f) < 1e-9*(k1*w1+k2*w2)
-    # No root is skipped: the Sturm count from a much finer scan agrees.
-    s = np.linspace(1e-9, np.sqrt(lam[-1])*1.0001, 400000)
-    values = np.array([wall._end_value(v) for v in s])
-    assert np.count_nonzero(np.sign(values[1:]) != np.sign(values[:-1])) == 12
+    # Mode m has exactly m interior zeros (Sturm oscillation), counted here by
+    # sampling the eigenfunction, independently of the solver's phase count.
+    for m in range(12):
+        x = np.concatenate([np.linspace(a, b, 20001)[1:-1] for a, b in zip(wall.edges[:-1], wall.edges[1:])])
+        layer = np.repeat([0, 1], 19999)
+        X, _ = wall.mode(m, x, layer)
+        assert np.count_nonzero(np.sign(X[1:]) != np.sign(X[:-1])) == m
+
+
+def _fine_fe_eigenvalues(interfaces, k, c, per_layer, count):
+    """Independent 1D P1 generalized eigenvalues -(k u')' = lambda c u, u(0)=u(L)=0."""
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import eigsh
+    edges = np.concatenate([[0.], interfaces])
+    x = np.concatenate([[0.]]+[np.linspace(a, b, per_layer+1)[1:] for a, b in zip(edges[:-1], edges[1:])])
+    ke, ce = np.repeat(k, per_layer), np.repeat(c, per_layer)
+    h = np.diff(x)
+    n = len(x)
+    rows = np.r_[np.arange(n-1), np.arange(1, n), np.arange(n-1), np.arange(1, n)]
+    cols = np.r_[np.arange(n-1), np.arange(1, n), np.arange(1, n), np.arange(n-1)]
+    kv = np.r_[ke/h, ke/h, -ke/h, -ke/h]
+    mv = np.r_[ce*h/3, ce*h/3, ce*h/6, ce*h/6]
+    K = sp.csc_matrix((kv, (rows, cols)), shape=(n, n))[1:-1, 1:-1]
+    M = sp.csc_matrix((mv, (rows, cols)), shape=(n, n))[1:-1, 1:-1]
+    return np.sort(eigsh(K, k=count, M=M, sigma=0, which='LM', return_eigenvectors=False))
+
+
+@pytest.mark.parametrize('wall', [WALL, dict(interfaces=[.02, .03, .05], conductivities=[.03, 400., .03],
+                                             capacities=[3e4, 3.4e6, 3e4])])
+def test_eigenvalues_match_an_independent_fine_finite_element_solve(wall):
+    """Includes a foam|copper|foam sandwich whose modes come in near-degenerate pairs."""
+    lam = LayeredWall(**wall).eigenvalues(30)
+    fe = _fine_fe_eigenvalues(np.array(wall['interfaces']), np.array(wall['conductivities']),
+                              np.array(wall['capacities']), 3000, 30)
+    np.testing.assert_allclose(lam, fe, rtol=1e-4)
+    w = LayeredWall(**wall)
+    for m, value in enumerate(w.eigenvalues(30)):
+        s = np.sqrt(value)
+        assert w.zero_count(s*(1-1e-9)) == m and w.zero_count(s*(1+1e-9)) >= m+1
 
 
 def test_modes_are_c_weighted_orthogonal_and_satisfy_the_interface_conditions():

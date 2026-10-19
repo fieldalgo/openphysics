@@ -267,21 +267,30 @@ a `{region name: float}` copy.
 
 **Reference.** `refsol.transient_heat_multilayer.LayeredWall`: a layered wall
 with fixed end temperatures, T = T_s(x) + sum A_m X_m(x) exp(-lambda_m t).
-X_m solve -(k X')' = lambda c X with continuous X and k X'; eigenvalues are
-roots of the end value of a layer transfer matrix, bracketed on a fine
-sqrt(lambda) grid and bisected. Choosing the initial field as
-T_s + sum A_m X_m makes the finite series exact. Its tests check the single-layer
-sine eigenvalues, the two-layer characteristic equation, that no root is skipped
-(sign changes on a 400 000-point scan), c-weighted orthogonality, interface
-continuity, the PDE and Fourier's law by finite differences, boundary values and
-the steady limit.
+X_m solve -(k X')' = lambda c X with continuous X and k X'; the m-th
+eigenvalue is found by bisection on the number of interior zeros of the
+transfer-matrix solution, counted exactly from its Prüfer phase layer by layer
+(Sturm oscillation), so no root is skipped however close two roots are.
+Choosing the initial field as T_s + sum A_m X_m makes the finite series exact.
+Its tests check the single-layer sine eigenvalues, the two-layer characteristic
+equation, that mode m has exactly m interior zeros, agreement with an
+independent fine 1D finite-element eigensolve (relative 1e-4; the test wall and
+a foam/copper/foam sandwich, k 0.03/400/0.03, whose roots cluster), c-weighted
+orthogonality, interface continuity, the PDE and Fourier's law by finite
+differences, boundary values and the steady limit.
+
+The first version bracketed roots on a fixed sqrt(lambda) grid; review found it
+could skip two roots closer than the grid step (high-contrast sandwich walls).
+The test wall was not affected, and its recorded results below are unchanged.
 
 | Case | Mesh / time | Gate |
 | --- | --- | --- |
 | Uniform mappings (k, c, Q) vs scalars | 2-region rectangle | Every history array identical |
 | BE step with independent dense per-region M and K | 2-layer rectangle, unequal steps | Free residual <= 1e-9, reactions and heat content match |
 | Steel/insulation wall 10 + 20 mm, k 45/0.5, c 3.6e6/1.2e6, ends 400/300 K, three modes A = 60/-25/10 K | layered rectangle [n, 2n] x n, n=1,2,4,8; dt = 1/32 s to 120 s; observed at 10, 40, 120 s | At every observed time, T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; at n=8 halving dt changes every error by <= 5% |
-| Invalid regions | — | Missing/unknown names, k or c <= 0, nonfinite Q, bare arrays, mapping without region data raise `ValueError` |
+| Wall B: 15 + 15 mm, k 2/1, c 4e6/1e6, same ends and modes | layered rectangle [n, n] x n, n=1,2,4,8; same times and gates | Same gates as the steel/insulation wall |
+| Wrong region property: each of k and c of each wall B layer doubled | wall B, n=4 and n=8 | See below |
+| Invalid regions | — | Missing/unknown names, k or c <= 0, nonfinite Q, bare arrays, mapping without region data raise `ValueError`; a non-real region value gets the labelled region message |
 
 The first run of the wall gate used [2n, 4n] divisions and dt = 1/8 s. Spatial
 orders passed (T 1.84-2.61, flux 0.98-1.05) but the dt/2 companion changed the
@@ -295,6 +304,36 @@ dt) observed:
 | 10 s | 2.10, 1.84, 1.97 | 1.19, 0.99, 1.00 | 0.69%, 0.015% |
 | 40 s | 2.15, 1.88, 1.99 | 1.08, 1.03, 1.01 | 1.06%, 0.020% |
 | 120 s | 2.12, 1.95, 2.02 | 1.46, 1.05, 1.01 | 1.36%, 0.017% |
+
+The steel layer of this wall has a conductance (k/d = 4500 W/(m^2 K)) 180 times
+that of the insulation, so it stays close to the Dirichlet temperature. Review
+found the gate insensitive to the steel properties; measured at n=4, doubling
+steel k or c changes the temperature errors by at most 2.4%, while doubling
+insulation k or c raises them 2.1x to 28x. Wall B (conductances 133 and
+67 W/(m^2 K), heat capacities per area 6e4 and 1.5e4 J/(m^2 K)) closes that gap.
+Its gates were fixed before the first run and passed:
+
+| Time | T L2 orders (n=1→8) | Flux L2 orders | dt/2 change (T, flux) |
+| --- | --- | --- | --- |
+| 10 s | 2.16, 1.82, 1.96 | 1.16, 0.95, 0.99 | 0.29%, 0.004% |
+| 40 s | 2.36, 1.85, 1.97 | 1.16, 0.99, 1.01 | 0.48%, 0.011% |
+| 120 s | 2.31, 1.96, 2.00 | 1.20, 1.01, 1.00 | 0.56%, 0.004% |
+
+Wrong-property check on wall B. Criterion 1, fixed before the first run: at n=4
+the T error rises at least 5x at some observed time. It failed for the light
+layer's c (2.75x): that layer holds a fifth of the wall's heat capacity, so
+doubling it moves T by less than 5x the n=4 discretisation error. Criterion 2,
+fixed after that failure and before its run: the wrong property breaks the
+convergence gate on the last interval (T order below 1.8 at some observed time)
+and raises the n=8 T error at least 5x. The test asserts criterion 2 for all four
+cases and criterion 1 for the three that passed it.
+
+| Doubled property | n=4 error ratio (max) | n=8 error ratio (max) | Lowest last-interval T order |
+| --- | --- | --- | --- |
+| k, dense layer | 6.15 | 23.0 | 0.10 |
+| k, light layer | 22.7 | 88.0 | 0.04 |
+| c, dense layer | 16.5 | 69.2 | -0.77 |
+| c, light layer | 2.75 (criterion 1 failed) | 12.2 | -0.15 |
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \

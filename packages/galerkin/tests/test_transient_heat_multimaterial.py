@@ -5,6 +5,8 @@
 Reference: refsol.transient_heat_multilayer.LayeredWall, an eigenfunction
 series for a layered wall with fixed end temperatures (NumPy only).
 """
+import functools
+
 import numpy as np
 import pytest
 
@@ -141,8 +143,99 @@ def test_invalid_region_transient_inputs(bad):
         solve_transient_heat(mesh, **kw)
 
 
+@pytest.mark.parametrize('bad,message', [
+    (dict(conductivity={'a': 'x', 'b': 1.}), "conductivity in region 'a'"),
+    (dict(conductivity={'a': True, 'b': 1.}), "conductivity in region 'a'"),
+    (dict(volumetric_heat_capacity={'a': 1., 'b': 1+1j}), "volumetric_heat_capacity in region 'b'"),
+    (dict(volumetric_heat_capacity={'a': 1., 'b': [1.]}), "volumetric_heat_capacity in region 'b'")])
+def test_bad_region_values_get_the_labelled_message(bad, message):
+    """Region values are validated before the result records them."""
+    mesh = _two()
+    kw = dict(conductivity=1., volumetric_heat_capacity=1., time_s=[0., 1.],
+              initial_temperature_k=np.full(len(mesh.nodes), 300.),
+              dirichlet={int(i): 300. for i in mesh.boundary['left']})
+    kw.update(bad)
+    with pytest.raises(ValueError, match=message):
+        solve_transient_heat(mesh, **kw)
+
+
 def test_region_mapping_on_a_mesh_without_regions_is_rejected():
     mesh = rectangle_mesh(1., 1., 1, 1)
     with pytest.raises(ValueError):
         solve_transient_heat(mesh, conductivity={'a': 1.}, volumetric_heat_capacity=1., time_s=[0., 1.],
                              initial_temperature_k=np.full(4, 300.), dirichlet={0: 300.})
+
+
+# Wall B: both layers store heat and resist it (conductances 133 and 67 W/(m^2 K)).
+# Wall A above keeps its steel layer at the Dirichlet temperature, so its gate is
+# insensitive to the steel properties; wall B and the mutation check below close that
+# gap. The wall B gates were fixed before the first run; the mutation check records
+# its first criterion's failure in its docstring.
+WALL_B = dict(interfaces=[.015, .03], conductivities=[2., 1.], capacities=[4e6, 1e6])
+NAMES_B = ['dense', 'light']
+
+
+def _solve_b(n, dt, k=None, c=None):
+    mesh = layered_rectangle_mesh(WALL_B['interfaces'], .005, [n, n], n, NAMES_B)
+    wall = LayeredWall(**WALL_B)
+    times = np.arange(0., OBSERVE[-1]+dt/2, dt)
+    initial = wall.fields(mesh.nodes, 0., **STATE).temperature
+    left, right = mesh.boundary['left'], mesh.boundary['right']
+    initial[left], initial[right] = 400., 300.
+    bc = {int(i): 400. for i in left}
+    bc.update({int(i): 300. for i in right})
+    r = solve_transient_heat(mesh, conductivity=dict(zip(NAMES_B, k or WALL_B['conductivities'])),
+                             volumetric_heat_capacity=dict(zip(NAMES_B, c or WALL_B['capacities'])),
+                             time_s=times, initial_temperature_k=initial, dirichlet=bc)
+    return mesh, r, wall
+
+
+@functools.lru_cache(maxsize=None)
+def _b_errors(n, prop=None, layer=None):
+    """(times, [T, q]) errors of wall B at n, dt=1/32, with one region's k or c doubled
+    (prop=None: true materials). Cached so both wall B tests share the true runs."""
+    kwargs = {}
+    if prop:
+        values = list(WALL_B['conductivities' if prop == 'k' else 'capacities'])
+        values[layer] *= 2
+        kwargs = {prop: values}
+    mesh, r, wall = _solve_b(n, 1/32, **kwargs)
+    errors = _errors(mesh, r, wall)
+    errors.flags.writeable = False
+    return errors
+
+
+@pytest.mark.slow
+def test_wall_where_both_layers_matter_converges():
+    dt = 1/32
+    errors = np.array([_b_errors(n) for n in (1, 2, 4, 8)])
+    orders = np.log2(errors[:-1]/errors[1:])
+    mesh, fine, wall = _solve_b(8, dt/2)
+    change = abs(_errors(mesh, fine, wall)-errors[-1])/errors[-1]
+    print('wall B errors', errors.tolist(), 'orders', orders.tolist(), 'dt/2 change', change.tolist())
+    assert np.all(orders[-2:, :, 0] >= 1.8)
+    assert np.all(orders[-2:, :, 1] >= .9)
+    assert np.all(change <= .05)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize('prop,layer', [('k', 0), ('k', 1), ('c', 0), ('c', 1)])
+def test_wall_b_gate_detects_a_wrong_region_property(prop, layer):
+    """A doubled region k or c must be caught.
+
+    Criterion 1 (fixed before the first run): at n=4 the T error rises at least 5x at
+    some observation time. It failed for c of the light layer (2.75x): that layer holds
+    a fifth of the wall's heat capacity, so doubling it moves T by less than 5x the
+    n=4 discretisation error. Criterion 2 (fixed after that failure, before its run):
+    the wrong property breaks the convergence gate on the last interval (T order below
+    1.8 at some observation time) and the n=8 error rises at least 5x.
+    """
+    good4, good8 = _b_errors(4)[:, 0], _b_errors(8)[:, 0]
+    bad4, bad8 = _b_errors(4, prop, layer)[:, 0], _b_errors(8, prop, layer)[:, 0]
+    order = np.log2(bad4/bad8)
+    print('mutation', prop, layer, 'n=4 ratio', (bad4/good4).tolist(), 'n=8 ratio', (bad8/good8).tolist(),
+          'order', order.tolist())
+    if (prop, layer) != ('c', 1):
+        assert np.max(bad4/good4) >= 5
+    assert np.min(order) < 1.8
+    assert np.max(bad8/good8) >= 5
