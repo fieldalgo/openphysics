@@ -12,5 +12,5 @@ OpenPhysics is under active development. Security fixes are developed on
 `main`; there is no promised support period for historical package versions.
 The browser Studio binds to loopback by default and is intended for local use.
 It is not an authenticated multi-user service; do not expose it to an untrusted
-network. Numerical validation and supported platform limits are documented
-separately in the [validation index](README.md).
+network. Numerical validation is documented in the [documentation index](README.md)
+and the tested platforms in the [development guide](development.md).
