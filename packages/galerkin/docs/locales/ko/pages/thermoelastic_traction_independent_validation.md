@@ -188,7 +188,7 @@ python -I packages/galerkin/tests/thermoelastic_traction_independent_consumer.py
 -I로 실행되며 각 시험에서 site-packages origin을 단언합니다. 보조 smoke이며90개 고정
 gate를 대체하지 않습니다.
 
-Python3.12.14/NumPy2.3.5/SciPy1.17.0, 기존 의존성의 격리 venv/Linux shared Work cloud,
+Python3.12.14/NumPy2.3.5/SciPy1.17.0, 기존 의존성의 격리 venv/공유 Linux 클라우드 환경,
 thread6변수1입니다. Source inventory와 source/sdist/wheel/installed **runtime Python17개**의
 정확 파일명 집합·byte가 일치하고 추가 module을 허용하지 않습니다. Thermoelasticity Git blob
 **e91cfa089bc09dfc0c646841190f536ae5412333**, SHA256

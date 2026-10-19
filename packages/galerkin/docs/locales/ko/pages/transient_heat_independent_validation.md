@@ -18,7 +18,7 @@
 `d21e083d9723eec71ab5e32777ecd331d75cd981`을 대상으로 한다.
 `galerkin/transient_heat.py`의 Git blob은
 `426015f84e2c43db964f3063c734d47aca41a9fa`이다.
-독립 수용 브랜치 `codex/openphysics-transient-heat-independent-validation`은
+독립 수용 브랜치는
 이 정확한 후보에서 생성했다. 초기 코드 체크포인트는
 `55afd565b9f6feea38896dc567eef574adf21371`이다.
 그 과거 제출은 생산 코드·생산 담당 시험·refsol·기존 시험·공용 release 설정을 변경하지 않았습니다.

@@ -1,9 +1,7 @@
 {
-  "candidate_branch": "codex/openphysics-thermal-steady2d-recovery",
   "candidate_commit": "aaf948ae38aa82907ca16ef7cdeed75dfa7484ba",
   "candidate_base": "df694bbe4e327b78e36956be915c91c22e9e5673",
   "preimplementation_plan_commit": "60b99343ef446a036b52a2e8754794268ba062ae",
-  "independent_branch": "codex/openphysics-thermal-independent-validation",
   "original_source_blobs_verified_before_and_after": 210,
   "environment": {
     "os": "Linux-6.18.44-x86_64-with-glibc2.39",

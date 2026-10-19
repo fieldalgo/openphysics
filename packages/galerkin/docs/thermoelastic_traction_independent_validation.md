@@ -211,8 +211,8 @@ was disabled. No dependency was added. The separate standalone unittest/NumPy
 consumer really runs under-I and asserts site-packages origin at each test.
 It is supplementary smoke evidence, not a replacement for the90 fixed gates.
 
-Python3.12.14/NumPy2.3.5/SciPy1.17.0, isolated existing-dependency venvs, Linux
-shared Work cloud and six thread variables1. Source inventory and source/sdist/
+Python3.12.14/NumPy2.3.5/SciPy1.17.0, isolated existing-dependency venvs, a shared
+Linux cloud environment and six thread variables1. Source inventory and source/sdist/
 wheel/installed **17 runtime Python modules** have exactly matching names and
 bytes; no extra module is allowed. Thermoelasticity Git blob
 **e91cfa089bc09dfc0c646841190f536ae5412333**, SHA256
