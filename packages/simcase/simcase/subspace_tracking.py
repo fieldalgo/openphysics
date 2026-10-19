@@ -41,21 +41,25 @@ METHODS = (ASSIGNMENT_METHOD, SUBSPACE_METHOD)
 # Numerical guards for the small Gram matrices. They separate roundoff from rank
 # loss or metric failure; they are not physical accuracy claims. The budget is
 # derived in docs/vector_subspace_tracking.md ("Numerical guards"); in short,
-# with unit roundoff u, cluster rank r, Gram condition kappa and N degrees of
-# freedom:
+# with unit roundoff u, cluster rank r, Gram condition kappa, N degrees of
+# freedom and product cancellation rho (ElectricMetric.cancellation: the largest
+# sum |x||W||x| / x^H W x over the cluster fields; about 1 to 3 on shape-regular
+# meshes, larger on very flat elements):
 #
 # * G = U^H W U is a sum of sparse products. Its Hermitian defect is roundoff of
-#   order sqrt(N) u (worst case about 2 N u), far below HERMITIAN_DEFECT_MAX; a
-#   wrong metric gives a defect of order one.
+#   order sqrt(N) u, growing with rho (measured below 1e-11 for rho up to 4e5),
+#   far below HERMITIAN_DEFECT_MAX; a wrong metric gives a defect of order one.
 # * The orthonormality defect of a formed frame Q = U H, measured as
 #   max |Q^H W Q - I| with a fresh product, is within
-#   frame_defect_budget(r, kappa, N) = 8 r u (kappa + sqrt(N)). The kappa term
-#   comes from the backward-stable eigendecomposition and from the Gram roundoff
-#   amplified by H = G^(-1/2); the sqrt(N) term is the product roundoff.
+#   frame_defect_budget(r, kappa, N, rho) = 8 r u (kappa + sqrt(N) + rho). The
+#   kappa term comes from the backward-stable eigendecomposition and from the
+#   Gram roundoff amplified by H = G^(-1/2); the sqrt(N) and rho terms are the
+#   product roundoff.
 # * GRAM_CONDITION_MAX = 1e6 keeps that budget below ORTHONORMAL_DEFECT_MAX
-#   (7e-9 at r = 8, N = 1e6), so a defect refusal signals a failure, not
-#   roundoff. The earlier limit 1e8 allowed budgets near 1e-6, so the defect
-#   guard, not the stated limit, refused such clusters.
+#   (8.5e-9 at r = 8, N = 1e6, rho = 2e5), so a defect refusal signals a
+#   failure, not roundoff, unless rho is far above that. The earlier limit 1e8
+#   allowed budgets near 1e-6, so the defect guard, not the stated limit,
+#   refused such clusters.
 # * Principal values may exceed one only through the measured defects of the
 #   two formed frames: sigma_max^2 <= (1 + r d_P)(1 + r d_Q). The remaining SVD
 #   and cross-product roundoff, of order u (r + sqrt(N)), is covered by
@@ -72,9 +76,12 @@ UNIT_ROUNDOFF = float(np.finfo(float).eps) / 2
 FRAME_DEFECT_FACTOR = 8.0
 
 
-def frame_defect_budget(rank: int, condition: float, size: int) -> float:
-    """Roundoff budget of max |Q^H W Q - I| for a whitened frame Q formed from N = size DOFs."""
-    return FRAME_DEFECT_FACTOR * rank * UNIT_ROUNDOFF * (condition + math.sqrt(size))
+def frame_defect_budget(rank: int, condition: float, size: int, cancellation: float = 1.0) -> float:
+    """Roundoff budget of max |Q^H W Q - I| for a whitened frame Q formed from N = size DOFs.
+
+    ``cancellation`` is ElectricMetric.cancellation of the fields the frame was formed from.
+    """
+    return FRAME_DEFECT_FACTOR * rank * UNIT_ROUNDOFF * (condition + math.sqrt(size) + cancellation)
 
 
 _FORBIDDEN = -1e6                 # assignment cost of a rank-mismatched pair
@@ -188,6 +195,23 @@ class ElectricMetric:
     def __init__(self, mesh):
         self.edge_mass = assemble_edge_mass(EdgeSpace(mesh))
         self.node_mass = assemble_mass(mesh)
+        self._absolute = None
+
+    def cancellation(self, field: VectorField) -> float:
+        """Largest sum |x||W||x| / x^H W x over the columns: how much the product's terms cancel.
+
+        Rounding of the product grows with it. Smooth fields on shape-regular meshes
+        give about 1 to 3; oscillating fields on very flat elements give much more.
+        """
+        if self._absolute is None:
+            self._absolute = (abs(self.edge_mass), abs(self.node_mass))
+        edge, node = self._absolute
+        transverse, longitudinal = np.abs(field.transverse), np.abs(field.longitudinal)
+        terms = (np.einsum("ij,ij->j", transverse, edge @ transverse)
+                 + np.einsum("ij,ij->j", longitudinal, node @ longitudinal))
+        norms = np.real(np.einsum("ij,ij->j", field.transverse.conj(), self.edge_mass @ field.transverse)
+                        + np.einsum("ij,ij->j", field.longitudinal.conj(), self.node_mass @ field.longitudinal))
+        return float((terms / norms).max())
 
     def product(self, left: VectorField, right: VectorField) -> np.ndarray:
         return (left.transverse.conj().T @ (self.edge_mass @ right.transverse)
@@ -337,7 +361,7 @@ class SubspaceTracker:
         defect = frame_defect(self.metric, frame)
         if defect > ORTHONORMAL_DEFECT_MAX:
             size = frame.transverse.shape[0] + frame.longitudinal.shape[0]
-            budget = frame_defect_budget(transform.shape[1], condition, size)
+            budget = frame_defect_budget(transform.shape[1], condition, size, self.metric.cancellation(raw))
             self._fail(location, f"{label}: formed frame is not orthonormal (defect {defect:.3g} > "
                        f"{ORTHONORMAL_DEFECT_MAX:g}; roundoff budget {budget:.3g})", "check the mesh and solved fields")
         return frame, defect
