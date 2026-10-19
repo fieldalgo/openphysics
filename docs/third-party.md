@@ -246,8 +246,10 @@ The check reads installed metadata and each distribution's RECORD file list with
 - a weak-copyleft test or tool dependency is not marked `test_only`;
 - a GPL distribution is not an external process, is a base runtime
   requirement, or is imported by first-party code;
-- AGPL or another network-copyleft license (SSPL, EUPL, OSL, CPAL, RPL) appears
-  anywhere, even as an external process;
+- an identifier of the AGPL family or another network-copyleft family (SSPL,
+  EUPL, OSL, CPAL, RPL), in any version, deprecated or `+` form or LicenseRef-
+  name, appears in an inventory entry or `bundled_files` record, or installed
+  metadata names one, even for an external process;
 - a first-party package does not declare Apache-2.0, or a first-party
   distribution contains any native file (`.so`, `.dylib`, `.dll`, `.pyd`);
 - a third-party distribution installs a shared library (`.so`, `.dylib`,

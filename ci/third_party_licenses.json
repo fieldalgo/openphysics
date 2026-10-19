@@ -21,16 +21,13 @@
       "LGPL-3.0-or-later", "MPL-1.1", "MPL-2.0", "CECILL-C"
     ],
     "test_extras": ["test", "crosscheck"],
-    "never": [
-      "AGPL-1.0-only", "AGPL-1.0-or-later", "AGPL-3.0-only", "AGPL-3.0-or-later", "SSPL-1.0",
-      "EUPL-1.1", "EUPL-1.2", "OSL-3.0", "CPAL-1.0", "RPL-1.1", "RPL-1.5"
-    ],
+    "never_families": ["AGPL", "Affero", "SSPL", "EUPL", "OSL", "CPAL", "RPL"],
     "rules": [
       "Licenses are judged at three levels: what this repository creates, copies, builds, links or distributes; each distribution by the license it declares; components bundled inside third-party wheels, which are recorded and reviewed, not banned",
       "runtime and optional (non-test extras of first-party packages): permissive only; the policy would allow weak copyleft in optional extras, but this repository stays stricter",
       "test (extras named in test_extras) and tool: permissive, or weak copyleft when the entry sets test_only",
       "GPL: only entries with external_process (a separate process, as a reference tool or an optional backend); never a base runtime requirement, and first-party code must not import them",
-      "never (AGPL and other network copyleft): rejected in every environment, also as an external process",
+      "never_families (AGPL and other network copyleft): any identifier of the family (every version, deprecated ids, '+' forms and LicenseRef- names) in an entry, a bundled_files record or installed metadata is rejected in every environment, also as an external process",
       "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; copyleft records need a review; first-party distributions contain no native files"
     ]
   },

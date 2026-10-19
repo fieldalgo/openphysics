@@ -143,11 +143,41 @@ def test_first_party_import_of_external_tool_is_detected():
     assert check_licenses.first_party_imports({"gmsh"}) == []
 
 
-@pytest.mark.parametrize("spdx", ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only", "EUPL-1.2"])
+NEVER = ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only", "EUPL-1.2", "AGPL-3.0", "AGPL-1.0", "AGPL-3.0+",
+         "SSPL-1.0", "OSL-2.1", "RPL-1.5", "CPAL-1.0", "LicenseRef-AGPL-3.0-custom"]
+
+
+@pytest.mark.parametrize("spdx", NEVER)
 def test_agpl_is_never_allowed(tmp_path, spdx):
     install(tmp_path, "netlib", expression=spdx)
     errors, _ = run(tmp_path, {"netlib": {"spdx": spdx, "test_only": True}})
     assert any("never allowed" in e for e in errors)
+
+
+@pytest.mark.parametrize("spdx", ["AGPL-3.0-only", "AGPL-3.0", "SSPL-1.0"])
+def test_network_copyleft_is_rejected_as_external_process(tmp_path, spdx):
+    install(tmp_path, "nettool", expression=spdx)
+    external = {"spdx": spdx, "external_process": {"executable": "nettool", "forbidden_imports": ["nettool_x"]}}
+    errors, _ = run(tmp_path, {"nettool": external})
+    assert any("never allowed" in e for e in errors)
+
+
+@pytest.mark.parametrize("classifier", ["GNU Affero General Public License v3",
+                                        "GNU Affero General Public License v3 or later (AGPLv3+)",
+                                        "European Union Public Licence 1.2 (EUPL 1.2)"])
+def test_network_copyleft_in_installed_metadata_is_rejected(tmp_path, classifier):
+    # The inventory records GPL, but the installed metadata names a network-copyleft license.
+    install(tmp_path, "nettool", classifiers=[f"License :: OSI Approved :: {classifier}"])
+    external = {"spdx": "GPL-2.0-or-later",
+                "external_process": {"executable": "nettool", "forbidden_imports": ["nettool_x"]}}
+    errors, _ = run(tmp_path, {"nettool": external})
+    assert any("metadata names a never-allowed license" in e for e in errors)
+
+
+@pytest.mark.parametrize("spdx", ["MIT", "GPL-2.0-or-later", "LGPL-2.1-only", "OLDAP-2.8", "MPL-2.0"])
+def test_never_families_do_not_match_other_licenses(spdx):
+    never = check_licenses.never_pattern(INVENTORY["policy"]["never_families"])
+    assert check_licenses.never_ids({spdx}, never) == []
 
 
 def test_metadata_change_must_be_reviewed(tmp_path):
@@ -217,6 +247,13 @@ def test_copyleft_bundled_library_needs_review(tmp_path):
     assert errors == []
 
 
+@pytest.mark.parametrize("spdx", ["AGPL-3.0+", "AGPL-3.0-only", "MIT AND LicenseRef-SSPL"])
+def test_never_allowed_bundled_record_fails(tmp_path, spdx):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx, review="no")]}})
+    assert any("never allowed, also when bundled" in e for e in errors)
+
+
 def test_bundled_library_must_be_recorded_for_this_platform(tmp_path):
     install(tmp_path, "numlib", expression="MIT", files=[BLAS])
     errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled()]}}, platform="windows")
@@ -252,8 +289,9 @@ def test_first_party_distribution_must_not_contain_native_files(tmp_path, native
 def test_inventory_entries_are_valid_and_documented():
     policy = INVENTORY["policy"]
     known = set(policy["permissive"]) | set(policy["weak_copyleft"]) | {"GPL-2.0-or-later"}
+    never = check_licenses.never_pattern(policy["never_families"])
     for name, entry in INVENTORY["distributions"].items():
-        assert check_licenses.bundled_entry_errors(name, entry.get("bundled_files", []), set(policy["never"])) == []
+        assert check_licenses.bundled_entry_errors(name, entry.get("bundled_files", []), never) == []
         ids = check_licenses.identifiers(check_licenses.parse_expression(entry["spdx"]))
         assert ids <= known, (name, ids)
         assert entry["url"].startswith("https://"), name
