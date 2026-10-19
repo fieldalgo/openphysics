@@ -2,15 +2,11 @@
 
 **English** | [한국어](locales/ko/pages/index.md)
 
-## Current checkout and evidence
+## Development and validation
 
-The current CI configuration adds installed-package checks on Linux, macOS and
-Windows. Each builds six implementation sdists into wheels and validates isolated
-consumer imports, package bytes, bundled assets and selected public API/CLI/save
-behavior. The required `tests` aggregate waits for full Linux acceptance and all
-three installed platforms; the existing Windows thermal gate also remains required.
-This is configured coverage, not a new historical pass claim. See the
-[validation guide](../ci/docs/README.md) for scope, commands and exact-run artifacts.
+The [development guide](development.md) covers the environment, the checks CI
+runs (one required check, `tests`) and how to read their results. The
+[contributing guide](contributing.md) covers branches, review and releases.
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
 
@@ -38,9 +34,9 @@ English is the repository default. READMEs and contribution/security entry point
 | Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
 | Mechanical-stage acceptance | [Independent original 3D law](../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
 
-Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. [CI documentation](../ci/docs/README.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
+Package READMEs describe their own dependencies, public entry points and scope. The suite contains six implementations and one name-reservation distribution; installing the `openphysics` reservation does not install the suite. The [development guide](development.md) distinguishes declared metadata from tested environments and source acceptance from installed consumers.
 
-This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Steady rectangular JSON accepts side-constant outward flux and convection through the [boundary document contract](../packages/simcase/docs/thermal_steady_boundary2d.md); transient flux/Robin remains unsupported. See the [validation guide](../ci/docs/README.md) for Work-cloud Linux results, enabled Actions and the measured scope of Windows verification.
+This checkout includes headless thermal documents and standalone prescribed-flux/Robin boundaries. The contracts and validation reports below describe their respective implementation and measured scope. Steady rectangular JSON accepts side-constant outward flux and convection through the [boundary document contract](../packages/simcase/docs/thermal_steady_boundary2d.md); transient flux/Robin remains unsupported. The [development guide](development.md) describes what CI checks on Linux, macOS and Windows.
 
 ## Package overviews: complete Korean counterparts
 
@@ -69,11 +65,11 @@ This checkout includes headless thermal documents and standalone prescribed-flux
 | [thermal_flux_robin](../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | [thermal_flux_robin_independent_validation](../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | [thermal_simcase_independent_validation](../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| [README](../ci/docs/README.md) | [한국어](../ci/docs/locales/ko/pages/README.md) |
-| [benchmark_cavity](../ci/docs/benchmark_cavity.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_cavity.md) |
-| [benchmark_vector](../ci/docs/benchmark_vector.md) | [한국어](../ci/docs/locales/ko/pages/benchmark_vector.md) |
+| [development](development.md) | [한국어](locales/ko/pages/development.md) |
+| [benchmark_cavity](benchmark_cavity.md) | [한국어](locales/ko/pages/benchmark_cavity.md) |
+| [benchmark_vector](benchmark_vector.md) | [한국어](locales/ko/pages/benchmark_vector.md) |
 
-These pages describe this checkout. Actions is enabled. The narrow Windows gate at `636a23a` passed 36 installed and 3 source cases ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)); this is not full Windows regression or macOS acceptance. The older Windows result does not validate the newer steady boundary JSON extension; inspect its exact CI artifacts separately.
+These pages describe this checkout. Installed save/I-O robustness runs on Linux, macOS and Windows; this is installed acceptance, not a full Windows or macOS regression. Check the exact commit's CI for its results.
 
 ## Explicit steady heat-to-mechanics workflow
 

@@ -194,7 +194,7 @@ implementation, actual test execution, exact integrated CI, main landing and rel
   Canvas evidence; Linux or universal wheels do not establish other OS passes.
 
 For exact validation commands and artifacts use the
-[validation guide](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/README.md).
+[development guide](https://github.com/fieldalgo/openphysics/blob/main/docs/development.md).
 Cross-package/root links require network access. Missing runs remain unverified;
 do not convert unavailable tools, declared fixtures or prior steady passes into
 transient acceptance.

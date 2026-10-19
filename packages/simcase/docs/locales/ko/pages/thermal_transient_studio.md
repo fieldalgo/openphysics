@@ -182,7 +182,7 @@ Headless가이드를참조하며Studio저장API는추가하지않습니다.
   universalwheel이다른OS통과를입증하지않음.
 
 정확검증명령·artifact는
-[검증 가이드](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/README.md)를
+[개발 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/development.md)를
 참조하세요. 패키지간/root링크는network접근이필요합니다.
 없는실행은미검증이며가용하지않은도구/선언fixture/과거steady통과를과도수용으로
 바꾸지않습니다.

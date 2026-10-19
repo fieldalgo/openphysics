@@ -4,7 +4,7 @@
 
 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`의 영문 문서입니다.
 
-저장소 루트에서 [README.md](README.md)의 editable 설치와 고정 환경을 사용합니다.
+저장소 루트에서 [개발 안내](development.md)의 editable 설치와 고정 환경을 사용합니다.
 추가 의존성은 필요하지 않습니다.
 
 ```bash
@@ -58,7 +58,7 @@ overlap을 비교합니다. `--snapshots`를 사용하면 각 사례 첫 반복�
 보존해야 합니다. 더 일반적인 solver 변경에는 위상 불변 field 비교가 필요하며,
 퇴화 고유장은 부분공간 안에서 회전할 수 있습니다.
 
-[README.md](README.md)의 전체 시험과 배포 검사를 실행합니다. 기존 검사는 해석적
+[개발 안내](development.md)의 전체 시험과 배포 검사를 실행합니다. 기존 검사는 해석적
 TE/TM·fiber 정답, Hadley, mesh/영역/파장 수렴, 물리 field 복원·Maxwell 잔차,
 단위·분산·혼합 경계와 보수적인 tracking 실패를 다룹니다. 수치 계약을 별도로 검토·검증하지
 않는 한 성능 작업 동안 solver 허용치, candidate 수와 tracking 임계값은 고정합니다.

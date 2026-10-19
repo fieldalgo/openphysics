@@ -12,7 +12,7 @@ resource and platform results. Test definitions and preflight subsets do not
 establish complete acceptance or a release.
 
 See [the Studio guide](thermal_studio.md) for use and
-[the validation guide](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/README.md) for environment/distribution
+[the development guide](https://github.com/fieldalgo/openphysics/blob/main/docs/development.md) for environment/distribution
 requirements. Intermediate implementation reviews are historical and do not
 define the current runtime or its acceptance status.
 

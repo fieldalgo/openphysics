@@ -1,6 +1,6 @@
 # Measuring 3D PEC cavity time and memory
 
-Use the pinned Python environment in [README.md](README.md) and run from the
+Use the pinned Python environment in the [development guide](development.md) and run from the
 repository root. This source benchmark loads `packages/galerkin` from its own
 checkout explicitly and checks that import location. No new dependency, solver
 optimization, API change or CI timing gate is involved.
@@ -114,7 +114,7 @@ ARPACK/linear solves, assembly, topology and field reconstruction overlap in the
 call tree. cProfile cannot attribute peak RSS to individual phases. Establish
 such attribution in a separate follow-up before choosing a memory optimization.
 
-Run the full root test suite described in [README.md](README.md) separately from
+Run the full root test suite described in the [development guide](development.md) separately from
 timing, so tests do not compete for benchmark CPU or memory. This tool supplements
 the existing fixed numerical acceptance gates and does not replace them.
 

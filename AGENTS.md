@@ -2,7 +2,7 @@
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and release policy,
 the [package overview](README.md) for setup and architecture, and the
-[validation guide](ci/docs/README.md) for dependencies, commands and platform scope.
+[development guide](docs/development.md) for dependencies, commands and CI scope.
 The [documentation index](docs/README.md) links implementation contracts.
 
 - The six implementation packages live under `packages/` and retain independent
@@ -18,5 +18,5 @@ From the repository root in a configured environment:
 python -m pytest -q
 ```
 
-Use the validation guide for required data, optional tools and isolated wheel checks.
+Use the development guide for required data, optional tools and isolated wheel checks.
 Follow CONTRIBUTING for PRs; a subset pass does not replace required CI.

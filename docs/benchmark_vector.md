@@ -1,7 +1,7 @@
 # Measuring vector mode performance
 
 From the repository root, use the editable installation and pinned environment
-described in [README.md](README.md). No additional dependency is needed:
+described in the [development guide](development.md). No additional dependency is needed:
 
 ```bash
 python ci/benchmark_vector.py --repeats 3 --output /tmp/vector-baseline.json
@@ -59,7 +59,7 @@ implementation that preserves assembly and solver inputs should preserve these
 arrays. More general solver changes require phase-invariant field comparison;
 degenerate eigenfields can rotate within a subspace.
 
-Run the full suite and distribution checks in [README.md](README.md). Existing
+Run the full suite and distribution checks in the [development guide](development.md). Existing
 checks cover analytic TE/TM and fiber references, Hadley, mesh/domain/wavelength
 convergence, physical field reconstruction and Maxwell residuals, units,
 dispersion, mixed boundaries, and conservative tracking failures. Keep solver

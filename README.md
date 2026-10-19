@@ -70,7 +70,7 @@ shadow installed modules with the directories of the same name.
 Gmsh is optional and separately installed: mesh generation needs `gmsh` on PATH
 or `GMSH_EXECUTABLE`; reading existing MSH files does not. Built-in optical
 materials work without downloading the full refractiveindex.info database.
-For reproducible dependency and database versions, use the [validation setup](ci/docs/README.md).
+For reproducible dependency and database versions, use the [development guide](docs/development.md).
 
 ## Run an example
 
@@ -127,24 +127,14 @@ See the [validation index](docs/README.md) for the exact snapshot and scope.
 Historical numbers are not a claim that every later documentation commit reran
 the full suite, and a passing subset does not validate skipped integrations.
 
-Package metadata permits Python 3.10+, but the pinned Linux validation dependencies
-are for Python 3.12 and cannot be reused unchanged on 3.10/3.11. Other environments
-are outside the measured full-regression scope. The narrow Windows 2022 /
-Python 3.12.10 gate passed 36 installed API/CLI/save cases and 3 source
-target-protection cases at `636a23a` ([run](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
-This recovers two historical replacement failures; it does not establish full
-Windows regression, other filesystems or macOS support. `OS Independent` classifiers
-and `py3-none-any` wheels describe metadata, not a tested platform matrix.
-GitHub Actions is enabled. Recorded cloud results remain evidence for their
-original snapshots; check the exact workflow run for newer commits.
-
-The current CI configuration adds installed-package checks on Linux, macOS and
-Windows. Each builds six implementation sdists into wheels and validates isolated
-consumer imports, package bytes, bundled assets and selected public API/CLI/save
-behavior. The required `tests` aggregate waits for full Linux acceptance and all
-three installed platforms; the existing Windows thermal gate also remains required.
-This is configured coverage, not a new historical pass claim. See the
-[validation guide](ci/docs/README.md) for scope, commands and exact-run artifacts.
+Package metadata permits Python 3.10+, but CI tests only Python 3.12. Full source
+acceptance runs on Linux. On Linux, macOS and Windows, CI also builds six
+implementation sdists into wheels and tests them in a fresh environment: package
+bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness.
+This is installed acceptance, not a full Windows or macOS regression. `OS Independent`
+classifiers and `py3-none-any` wheels describe metadata, not a tested platform matrix.
+Recorded results apply to their own snapshots; check the exact workflow run for newer
+commits. The [development guide](docs/development.md) lists the checks and commands.
 
 ## Documentation and contributions
 
