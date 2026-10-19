@@ -18,9 +18,8 @@ This page describes the implementation in this checkout. Named historical snapsh
 `d21e083d9723eec71ab5e32777ecd331d75cd981`, whose
 `galerkin/transient_heat.py` Git blob is
 `426015f84e2c43db964f3063c734d47aca41a9fa`.
-The independent acceptance branch is
-`codex/openphysics-transient-heat-independent-validation`, created at that
-exact candidate. Its initial code checkpoint is
+The independent acceptance branch was
+created at that exact candidate. Its initial code checkpoint is
 `55afd565b9f6feea38896dc567eef574adf21371`.
 That historical submission changed no production code, producer tests, refsol, existing tests or shared release configuration.
 

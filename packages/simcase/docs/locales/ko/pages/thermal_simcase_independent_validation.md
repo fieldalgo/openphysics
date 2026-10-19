@@ -10,9 +10,9 @@
 
 이 현재 안내는 아래 6080/4ec 역사 절의 현재형 상태 설명보다 우선합니다. 과거 절·수식·기준·실패는 해당 정확 후보의 근거로 보존하며 현재 결과로 소급하지 않습니다.
 
-독립 제출은 명시 생산 **929ac8eb90d5598724ad066e7f8b8fc579ea8cd8**를 정상 merge한 `codex/openphysics-thermal-simcase-independent-validation`의 **9b43ae368e89e7e840541d21201e56a311a465b3**입니다. 이 추가 안내는 문서만 변경합니다. 해당 생산 후보 대비 독립 제출은 전용 파일8개를 추가하고 생산232개 blob을 모두 보존했습니다. 아래는 생산 담당의 시험 요약이 아니라 독립 검증 담당의 실행 근거입니다.
+독립 제출은 명시 생산 **929ac8eb90d5598724ad066e7f8b8fc579ea8cd8**를 정상 merge한 커밋 **9b43ae368e89e7e840541d21201e56a311a465b3**입니다. 이 추가 안내는 문서만 변경합니다. 해당 생산 후보 대비 독립 제출은 전용 파일8개를 추가하고 생산232개 blob을 모두 보존했습니다. 아래는 생산 담당의 시험 요약이 아니라 독립 검증 담당의 실행 근거입니다.
 
-재구성한 Work cloud Linux에서 최종 전용 source **139개**, 실제 sdist→wheel installed **139개**가 통과했습니다. installed는 `python -I`, checkout 밖 복사 시험과 외부 confcutdir를 사용했습니다. 각각 실패·skip0, 기존 Starlette deprecation warning1개였습니다. 실행 파일과 simcase, simcase.thermal, galerkin, galerkin.thermal, meshine, physmat의6개 module origin이 설치 venv 안에 있는지 확인했습니다. 설치 serializer와 배포 HTML bytes를 정확 Git blob과 대조했습니다. 독립 지연 응답 Node는 **source8 + installed8** 통과, 실패·skip0입니다. 실제 배포 스크립트를 VM/DOM harness에서 실행한 것이며 실제 브라우저 수용 검증은 아닙니다.
+재구성한 Linux 클라우드 환경에서 최종 전용 source **139개**, 실제 sdist→wheel installed **139개**가 통과했습니다. installed는 `python -I`, checkout 밖 복사 시험과 외부 confcutdir를 사용했습니다. 각각 실패·skip0, 기존 Starlette deprecation warning1개였습니다. 실행 파일과 simcase, simcase.thermal, galerkin, galerkin.thermal, meshine, physmat의6개 module origin이 설치 venv 안에 있는지 확인했습니다. 설치 serializer와 배포 HTML bytes를 정확 Git blob과 대조했습니다. 독립 지연 응답 Node는 **source8 + installed8** 통과, 실패·skip0입니다. 실제 배포 스크립트를 VM/DOM harness에서 실행한 것이며 실제 브라우저 수용 검증은 아닙니다.
 
 정확929 Linux 재실행에서 초기의 의도적 결과 손상 저장 반례5개와 후속 constructor·필수 artifact 검사가 해결됨을 확인했습니다. 원시 배열9개·두 field flag·원 K/f/반력/열수지·고정 수렴·SI 기준·CLI 종료·기존/교체/foreign 출력 보호·제한된 two-writer 검사를 유지했습니다. 추가 실제 installed CLI의 save_fields=false 실행은 exit0, NPZ 없이 model/summary/log만 생성하고 해석적60 W/m 열수지와 일치했습니다. 허용치 완화나 skip/xfail로 과거 실패를 통과로 바꾸지 않았습니다.
 

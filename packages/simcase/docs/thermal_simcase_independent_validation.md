@@ -12,15 +12,14 @@ This current note supersedes present-tense status statements in the historical
 6080/4ec sections below. Those sections, equations, thresholds and failures are
 preserved as evidence for their exact candidates, not as the current result.
 
-The independent submission is branch
-`codex/openphysics-thermal-simcase-independent-validation` at
+The independent submission is commit
 **9b43ae368e89e7e840541d21201e56a311a465b3**, based on explicit producer
 **929ac8eb90d5598724ad066e7f8b8fc579ea8cd8** through a normal merge.
 This addendum changes documentation only. Against that producer, the submitted
 independent work added eight dedicated files and preserved all 232 producer
 blobs. This is the independent validator's evidence, not a producer test summary.
 
-In the reconstructed Work cloud Linux environment, the final dedicated source
+In the reconstructed Linux cloud environment, the final dedicated source
 suite passed **139 tests**, and the actual sdist-to-wheel installed suite passed
 **139 tests** using `python -I`, copied tests outside the checkout and an external
 confcutdir. Each had zero failures/skips and one existing Starlette deprecation
