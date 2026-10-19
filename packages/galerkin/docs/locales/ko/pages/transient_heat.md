@@ -69,7 +69,8 @@ solve_transient_heat(
 ```
 
 하위 모듈을 명시적으로 import합니다. 자동 최상위 export는 추가하지 않습니다.
-모델은 c*dT/dt-div(k*grad T)=Q이며 상수·균질·등방성 k>0, c>0, 고정 적합 CCW
+모델은 c*dT/dt-div(k*grad T)=Q이며 상수·등방성 k>0, c>0(재료 하나, 또는
+[multimaterial](multimaterial.md)의 이름 있는 영역별 구간 상수. 이 문서의 기준은 재료 하나를 씁니다), 고정 적합 CCW
 scalar P1 삼각형, consistent mass와 backward Euler를 사용합니다. 선택하지 않은
 자연 경계는 단열입니다. 완전 단열 또는 분리된 성분에도 Dirichlet anchor가 필요하지
 않습니다. 유효한 사용 절점 형상에서 M/dt+K는 양의 정부호입니다. 정상 해석의 필수
@@ -174,8 +175,8 @@ N은 절점, M은 삼각형, Nt는 요청 시간, D는 정렬된 고유 지정 �
 | dirichlet_temperatures_k | (Nt,D) | 표본화한 지정 K |
 | nodes_m / triangles | (N,2) / (M,3) | 복사한 SI 형상/연결/순서 |
 
-두 scalar metadata 필드 conductivity_w_mk와 volumetric_heat_capacity_j_m3k는
-제공한 상수를 기록합니다. 단위·provenance·hash·source 출처 인증을 주장하지 않습니다.
+두 metadata 필드 conductivity_w_mk와 volumetric_heat_capacity_j_m3k는
+제공한 상수를 기록합니다(float, 또는 영역별 입력이면 `{영역 이름: float}` 사본). 단위·provenance·hash·source 출처 인증을 주장하지 않습니다.
 Read-only 배열과 frozen container는 적대적 코드에 대한 암호학적 보호가 아닙니다.
 
 History만 O(Nt*(N+M)) 메모리를 사용하며 sparse system/factor와 임시 복사본이

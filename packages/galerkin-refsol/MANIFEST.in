@@ -12,3 +12,5 @@ include refsol/elasticity_multilayer.py
 include tests/test_elasticity_multilayer_reference.py
 include tests/test_material_cavity_reference.py
 include tests/test_wall_loss_reference.py
+include refsol/transient_heat_multilayer.py
+include tests/test_transient_heat_multilayer_reference.py
