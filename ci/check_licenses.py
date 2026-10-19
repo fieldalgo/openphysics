@@ -27,9 +27,13 @@ Bundled native files: every shared library (.so, .dylib, .dll) that a
 third-party distribution installs, other than its own Python extension modules,
 must match a ``bundled_files`` glob of its entry (fnmatch on the POSIX path
 relative to site-packages, as listed in RECORD) recorded for the current OS.
-Entries with a copyleft SPDX expression need a ``review``. Statically linked
-code is not visible this way and is reviewed by hand. First-party distributions
-must contain no native files at all.
+Entries with a copyleft SPDX expression need a ``review``. Such a library is
+loaded into the Python process that runs OpenPhysics, so unless the owning
+entry is an ``external_process`` tool, a GPL term must offer another option
+(``FTL OR GPL-2.0-or-later``) or carry a runtime exception listed under
+``runtime_exceptions`` (``WITH GCC-exception-3.1``). Statically linked code is
+not visible this way and is reviewed by hand. First-party distributions must
+contain no native files at all.
 
 Use ``--python`` to inspect another interpreter's environment, e.g. a fresh
 venv holding the installed wheels.
@@ -56,6 +60,8 @@ DOCS = (ROOT / "docs" / "third-party.md", ROOT / "docs" / "locales" / "ko" / "pa
 RANK = {"runtime": 0, "optional": 1, "test": 2, "tool": 3}
 COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EUPL|EPL|CDDL|SSPL|OSL|CPAL|RPL|CECILL|GENERAL PUBLIC|MOZILLA PUBLIC|AFFERO)",
                       re.IGNORECASE)
+# GPL and AGPL identifiers (not LGPL): plain, deprecated, '+' and LicenseRef- forms.
+STRONG_COPYLEFT = re.compile(r"(?:^|[^A-Za-z])A?GPL", re.IGNORECASE)
 TOKEN = re.compile(r"\(|\)|[A-Za-z0-9.+:-]+")
 # Shared libraries, and the Python extension modules that are not counted as bundled libraries.
 SHARED_LIBRARY = re.compile(r"\.(so(\.[0-9]+)*|dylib|dll)$", re.IGNORECASE)
@@ -221,11 +227,22 @@ def never_ids(ids, never):
     return sorted(i for i in ids if never.search(i))
 
 
-def bundled_entry_errors(name, items, never):
-    """Structure of one distribution's bundled_files records."""
+def in_process_allowed(node, exceptions):
+    """False when the expression leaves no option but a GPL term without a listed runtime exception."""
+    if isinstance(node, str):
+        identifier, _, exception = node.partition(" WITH ")
+        return not STRONG_COPYLEFT.search(identifier) or exception in exceptions
+    test = any if node[0] == "OR" else all
+    return test(in_process_allowed(item, exceptions) for item in node[1])
+
+
+def bundled_entry_errors(name, entry, policy):
+    """Structure and license rules of one distribution's bundled_files records."""
+    never = never_pattern(policy["never_families"])
+    exceptions = set(policy["runtime_exceptions"])
     errors = []
     globs = set()
-    for item in items:
+    for item in entry.get("bundled_files", []):
         where = f"{name} bundled_files {item.get('glob')!r}"
         if missing := sorted(BUNDLED_FIELDS - item.keys()):
             errors.append(f"{where}: missing {missing}")
@@ -234,12 +251,15 @@ def bundled_entry_errors(name, items, never):
             errors.append(f"{where}: duplicate glob")
         globs.add(item["glob"])
         try:
-            ids = identifiers(parse_expression(item["spdx"]))
+            tree = parse_expression(item["spdx"])
         except (ValueError, IndexError) as error:
             errors.append(f"{where}: {error}")
             continue
-        if bad := never_ids(ids, never):
+        if bad := never_ids(identifiers(tree), never):
             errors.append(f"{where}: {bad} is never allowed, also when bundled")
+        elif "external_process" not in entry and not in_process_allowed(tree, exceptions):
+            errors.append(f"{where}: {item['spdx']!r} is GPL without a listed runtime exception or another "
+                          "option, and the library loads in-process; only an external_process entry may bundle it")
         if item["linkage"] != "dynamic":
             errors.append(f"{where}: separate library files are dynamic; record static code in 'bundled'")
         if not item["platforms"] or set(item["platforms"]) - set(PLATFORMS):
@@ -294,7 +314,7 @@ def check(paths, inventory, check_docs=True, platform=None):
     platform = platform or current_platform()
     errors, report = [], {}
     for name, entry in sorted(entries.items()):
-        errors += bundled_entry_errors(name, entry.get("bundled_files", []), never)
+        errors += bundled_entry_errors(name, entry, policy)
     for name, dist in sorted(dists.items()):
         expression, short, classifiers = declared_license(dist)
         record = {"version": dist.version, "license_expression": expression, "license": short or None,
