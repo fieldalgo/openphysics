@@ -215,6 +215,48 @@ def test_a_fully_covered_shape_is_named_in_the_log():
     assert "shapes fully covered by later shapes (no triangles): ['hidden']" in r.log
 
 
+STRADDLE = """
+import copy, json, sys
+from simcase import Document, examples, run
+from simcase.geometry import resolve_regions
+d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+d['geometry']['shapes'][1]['cy'] = 11.0          # heater crosses the plate's top edge
+doc = Document.from_dict(d)
+exact = [name for name, *_, circle in resolve_regions(doc.copy()) if circle]
+r = run(doc, verbose=False)
+print(json.dumps({'exact': exact, 'regions': r.mesh.region_names,
+                  'balance': r.summary()['normalized_heat_balance_defect']}))
+"""
+
+
+def test_a_circle_across_another_shape_s_edge_meshes():
+    """Regression: the exact circle did not coincide with the neighbours' arcs and
+    refinement never finished. Run in a subprocess so a regression cannot hang the suite."""
+    import os
+    import subprocess
+    import sys
+    out = subprocess.run([sys.executable, '-c', STRADDLE], capture_output=True, text=True, timeout=300,
+                         env=dict(os.environ), check=True)
+    result = json.loads(out.stdout.strip().splitlines()[-1])
+    assert result['exact'] == []
+    assert result['regions'] == ['plate', 'heater', 'background']
+    assert result['balance'] < 1e-10
+
+
+def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
+    from simcase.geometry import resolve_regions
+
+    def exact(**heater):
+        d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+        d['geometry']['shapes'][1].update(heater)
+        return [name for name, *_, circle in resolve_regions(Document.from_dict(d)) if circle]
+    assert exact() == ['heater']                      # inside the plate, clear of every edge
+    assert exact(cy=2.) == []                         # tangent to the bottom side
+    assert exact(cy=13.) == []                        # tangent to the plate's top edge from outside
+    assert exact(cy=11.) == []                        # crosses the plate's top edge
+    assert exact(cy=13.5) == ['heater']               # clear of the plate, in the background
+
+
 def test_rectangle_documents_keep_their_original_contract():
     legacy = copy.deepcopy(examples.EXAMPLES['thermal_slab'])
     legacy['materials'] = {'steel': {'conductivity_w_mk': 45.}}
