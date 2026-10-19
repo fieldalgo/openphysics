@@ -2,6 +2,12 @@
 
 [English](../../../studio_thermal_independent_validation.md)
 
+**한눈에 보기**
+
+- **확인하는 것:** 실제 공개 솔버로 정상 열전도 Studio HTTP route(`/api/capabilities`, `/api/thermal/validate`, `/api/thermal/run`, 작업 상태·결과)를 검사합니다. 반환 배열은 생산 조립이나 refsol helper가 아닌 독립 요소 자산으로 감사합니다.
+- **고정 기준:** 2차 열원 사례를 8/16/32/64에서 돌려 온도 L2 차수 ≥ 1.8, 요소 열유속 L2 차수 ≥ 0.9, Gauss 8/10 오차 차이 < 1%, 최세 메시 상대 영역 열유속 L2 ≤ 2%, 대수·보존 1e-10, SI 불변성 1e-9가 필요합니다.
+- **범위:** 과도 UI, 메시 전용 미리보기, 새 솔버, 연성, 재료 확장, 저장 endpoint는 범위 밖입니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 ## 현재 범위와 근거
 
 이 checkout에는 JSON-first 정상열 검증·실행, typed HTTP 결과와 독립 수용시험이

@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/thermal_transient2d.md)
 
+**At a glance**
+
+- **What it does:** `thermal.transient2d` connects the transient heat engine to the `simcase` document API, CLI and versioned JSON/NPZ histories: one fixed homogeneous rectangle, P1 triangles, consistent mass and backward Euler, explicit times in seconds, uniform or affine initial Kelvin, side-constant or sampled Dirichlet values and insulation elsewhere, per unit depth.
+- **Limits:** no transient flux, Robin or radiation, variable or region-dependent k/c, adaptive time steps, Crank–Nicolson, automatic coupling or restart. Initial values are not projected and finite negative Kelvin is not clamped.
+- **Validation:** the engine's numerical gates are in the galerkin transient heat validation contract (linked below, unchanged); this page lists the document, adapter, installed and save checks separately. For a specific commit, see its CI run.
+
 ## Scope and evidence
 
 `thermal.transient2d` connects the existing transient heat engine to the

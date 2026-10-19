@@ -2,6 +2,12 @@
 
 [English](../../../thermal_studio.md)
 
+**한눈에 보기**
+
+- **하는 일:** 직사각형 `thermal.steady2d` 문서(균질 직사각형, P1, 상수 등방 k와 열원, 변 Dirichlet, 단열, 상수 외향 열유속·Robin)를 위한 JSON 우선 전용 Studio 화면입니다. 전용 route로 검증·실행하고 결과 메시, 절점 Kelvin, 요소 열유속을 보여 줍니다.
+- **한계:** 과도 문서(별도 과도 Studio 안내 참고), 해석 전 메시 미리보기, 임의 형상, 연성, 결과 저장 endpoint가 없습니다. 설정한 자원 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다. Studio는 로컬 도구이며 다중 사용자 서비스가 아닙니다.
+- **검증:** [정상 Studio 독립 검증](studio_thermal_independent_validation.md)을 참고하세요. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 ## 제공 상태
 
 이 checkout은 Studio의 JSON-first 정상 열전도를 구현합니다. 전용 검증·실행

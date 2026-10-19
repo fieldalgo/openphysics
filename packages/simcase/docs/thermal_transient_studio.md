@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/thermal_transient_studio.md)
 
+**At a glance**
+
+- **What it does:** a Studio view for rectangular `thermal.transient2d` documents with its own capability, validation, run and manifest/frame/history routes. Pick an exact requested time (the final one by default), view nodal Kelvin and cell flux, and page heat-content H [J/m] and quadratic-functional V [J K/m] histories.
+- **Limits:** no new solver, interpolation, downsampling, transient flux/Robin, restart, coupling, or cancel/delete/save/NPZ endpoints; changing the view never reruns the solver. Configured limits are `candidate-unmeasured`, not capacity guarantees.
+- **Validation:** see the [independent transient Studio acceptance](studio_transient_thermal_independent_validation.md). For a specific commit, see its CI run.
+
 ## Availability and scope
 
 This checkout implements the transient Studio interface with a dedicated

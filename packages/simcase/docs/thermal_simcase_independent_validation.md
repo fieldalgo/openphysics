@@ -1,5 +1,11 @@
 # Independent headless thermal document validation
 
+**At a glance**
+
+- **What it checks:** independent acceptance of the headless `thermal.steady2d` document path (document, run, saved arrays) on a translated rectangle with a closed-form quadratic-source solution. The oracle reconstructs stiffness, load, flux and residuals from the saved raw arrays; metadata never generates the expected answer.
+- **Fixed gates:** on n=8/16/32/64, the last two intervals need temperature L2 order ≥ 1.8 and vector-flux order ≥ 0.9; independent 6×6 and 8×8 interior integration are compared; array, stiffness, load, reaction and heat criteria are ≤ 1e-10, and m/mm/µm equivalence ≤ 1e-9.
+- **Scope:** the current-status note directly below supersedes present-tense statements in the historical sections, which stay as evidence for their exact candidates. For a specific commit, see its CI run.
+
 ## Current final Linux status — 2026-10-16
 
 This current note supersedes present-tense status statements in the historical
