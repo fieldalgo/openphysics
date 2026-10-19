@@ -132,6 +132,10 @@ run of the same code; forcing kernels locally reproduced both outcomes.
   silently. It runs in parallel with the Linux job and the `tests` aggregate
   requires it.
 
+The `linux-py312` job usually takes 16 to 22 minutes. Hosted runner speed also
+varies: on 2026-10-19 a run took over 30 minutes and hit the former 30-minute
+limit. The limit only stops hung jobs, so it is now 45 minutes.
+
 Write tests so they do not depend on last-bit rounding: compare with explicit
 tolerances that are well clear of roundoff, never exactly at a boundary that
 roundoff can reach.

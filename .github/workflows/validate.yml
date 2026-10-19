@@ -20,7 +20,9 @@ jobs:
   linux-py312:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Usually 16-22 min; a slow hosted runner took 30+ min on 2026-10-19 and was
+    # cancelled. The limit only stops hung jobs, so keep about twice the norm.
+    timeout-minutes: 45
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
