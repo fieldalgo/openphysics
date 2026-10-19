@@ -302,6 +302,63 @@ Other wall tests:
 - A dense n=2 case uses mixed walls.
 - Invalid conductivities are rejected.
 
+## Reference-tool comparison (NGSolve)
+
+This comparison is separate from the analytic pass/fail gates above. It neither
+replaces them nor serves as convergence evidence.
+
+**Tool and setup.**
+
+- NGSolve 6.2.2608 with netgen-mesher 6.2.2608 (both `LGPL-2.1-only`). Installed from
+  PyPI wheels into a separate Python 3.12 environment and run as a separate process.
+  It is not an OpenPhysics dependency, and no NGSolve code was copied.
+- The reproduction script and raw JSON are kept in the private lab repository.
+
+**Matched:**
+
+- geometry: box `(1, 0.8, 0.6) m` with slab `z <= 0.3 m`, and box `(1, 0.45, 0.8) m`;
+- materials: `eps = 4 - 0.04j`; and `eps = 2.5 - 0.1j` with `mu = 1.2 - 0.02j`;
+- PEC walls, or copper Leontovich walls (`sigma = 5.8e7 S/m`, same weak-form term and `mu0`);
+- time convention, Q definition, and the lowest modes by real part;
+- per-mode fixed point in `k0`.
+
+**Not matched:**
+
+- mesh: unstructured Netgen tetrahedra versus the structured alternating Kuhn mesh;
+- element order: NGSolve order 4 (`maxh = 0.15 m`, 27.5k–47.3k complex unknowns),
+  with an order-3 run (`maxh = 0.2 m`) as the tool's own self-check, versus lowest-order
+  galerkin at n = 16;
+- eigensolver: NGSolve Arnoldi with a shift at the target.
+
+With 14 Arnoldi vectors, one order-4 run returned an unconverged sixth value
+(908.5 MHz, negative Q) for the `eps = 4 - 0.04j` case. Rerun with 26 vectors, all six
+modes converged. Only the converged rerun is used; the failed value is kept in the raw record.
+
+Largest relative differences over the six (slab) or four (copper) modes:
+
+| Case | NGSolve p4 vs analytic: f / Q | NGSolve p3 vs p4: f / Q | galerkin n=16 vs NGSolve p4: f / Q | galerkin n=16 vs analytic: Q |
+| --- | --- | --- | --- | --- |
+| Slab `eps 2.5-0.1j`, `mu 1.2-0.02j` | 7.8e-6 / 1.2e-4 | 1.4e-4 / 3.6e-4 | 1.8e-3 / 1.5e-3 | 1.4e-3 |
+| Slab `eps 4-0.04j` | 1.6e-7 / 1.3e-7 | 3.3e-4 / 1.3e-3 | 1.8e-3 / 1.2e-3 | 1.2e-3 |
+| Copper walls | 6.2e-7 / 1.3e-5 | 1.9e-3 / 1.4e-2 | 3.5e-3 / 7.1e-3 | 7.1e-3 |
+
+The high-order NGSolve results agree with the independent analytic references to
+`1.6e-7`–`7.8e-6` in frequency. For copper walls, the Q difference of `1.3e-5` is within
+the first-order perturbation reference's `O(1/Q)` term. Q there is `Re f / (2 Im f)`,
+which differs from `omega0 W / P` by one half. galerkin's differences from NGSolve match
+its differences from the analytic references: they are its own mesh error, already gated above.
+
+| Run | Time / memory (one core) |
+| --- | --- |
+| NGSolve order 4 | 29 s, 25 s (42 s with 26 vectors), 63 s per case; peak RSS 1.8 GB |
+| galerkin n=16 | 9.6 s, 9.2 s, 34 s |
+
+These timings come from different discretizations and are not a performance comparison.
+
+**Support decision:** unchanged. The feature is supported on the basis of the analytic
+gates. The comparison found no disagreement beyond galerkin's documented mesh error
+and the reference's first-order term.
+
 ## Limitations
 
 - Finite-conductivity walls are local Leontovich impedances on whole box walls, with
