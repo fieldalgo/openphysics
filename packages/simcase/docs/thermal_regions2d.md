@@ -70,7 +70,8 @@ simcase run packages/simcase/examples/thermal_regions.json -o heated_plate
   domain. A shape that lies outside the domain or is smaller than 1e-12 of the
   domain area is refused (electromagnetic documents drop it without a message in
   the run log). A shape that later shapes cover completely gets no triangles; the
-  run log names it.
+  run log names it. Zero-area pieces left by clipping (where a shape only touches
+  the domain or another shape from outside) are not meshed.
 - `materials`: `{material name: {...}}` with `conductivity_w_mk` > 0 (required
   for every material used), optional `volumetric_heat_capacity_j_m3k` > 0 (not
   used by steady heat) and an optional `source` note. Thermal properties are
@@ -159,6 +160,7 @@ comparison:
 | A shape covered by a later shape | No triangles; named in the run log |
 | Heater moved across the plate's top edge | Meshes (in a subprocess with a 300 s limit) as a polygon; heat balance <= 1e-10 |
 | Exact-circle rule | Only a circle clear of every other boundary, with no later shape inside it, is meshed as an exact circle |
+| A concave shape that clips to a polygon plus a line piece | Only the polygon part is meshed; heat balance <= 1e-10; an electromagnetic document keeps its exact circle |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
 | Studio | Region documents are refused before any mesher or worker call |
 

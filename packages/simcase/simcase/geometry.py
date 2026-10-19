@@ -13,6 +13,7 @@ meshine.Circle so its nodes stay on the exact circle (see _isolated_circle).
 from __future__ import annotations
 
 import numpy as np
+import shapely
 from shapely.geometry import MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
 
@@ -45,6 +46,25 @@ def shape_polygon(s: dict) -> Polygon:
     raise ValueError(t)
 
 
+def _polygonal(geom):
+    """The polygon parts of a boolean result, as a Polygon or MultiPolygon.
+
+    Clipping or subtracting can leave zero-area line or point pieces next to the
+    polygons (a shape touching the domain or another shape from outside), giving a
+    GeometryCollection. Those pieces cannot be meshed and have no boundary ring.
+    """
+    def polygons(g):
+        if g.geom_type == "Polygon":
+            return [] if g.is_empty else [g]
+        if hasattr(g, "geoms"):
+            return [p for part in g.geoms for p in polygons(part)]
+        return []
+    parts = polygons(geom)
+    if not parts:
+        return Polygon()
+    return parts[0] if len(parts) == 1 else MultiPolygon(parts)
+
+
 #: Relative clearance between an exact circle and any other boundary.
 CIRCLE_CLEARANCE = 1e-6
 
@@ -67,11 +87,11 @@ def _isolated_circle(s: dict, index: int, polys: list, clip) -> bool:
     for j, other in enumerate(polys):
         if j == index or other.is_empty:
             continue
-        boundary = other.boundary
-        for line in getattr(boundary, "geoms", [boundary]):
-            far = max(centre.distance(Point(c)) for c in line.coords)
-            if line.distance(centre) <= hi and far >= lo:
-                return False
+        for part in shapely.get_parts(other):
+            for line in (part.exterior, *part.interiors):
+                far = max(centre.distance(Point(c)) for c in line.coords)
+                if line.distance(centre) <= hi and far >= lo:
+                    return False
     return True
 
 
@@ -80,12 +100,12 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
     dom = doc.domain
     clip = box(dom["xmin"], dom["ymin"], dom["xmax"], dom["ymax"])
     shapes = doc.shapes
-    polys = [shape_polygon(s).intersection(clip) for s in shapes]
+    polys = [_polygonal(shape_polygon(s).intersection(clip)) for s in shapes]
     min_area = _min_area(doc)
     out = []
     for i, s in enumerate(shapes):
         later = [polys[j] for j in range(i + 1, len(shapes))]
-        geom = polys[i].difference(unary_union(later)) if later else polys[i]
+        geom = _polygonal(polys[i].difference(unary_union(later))) if later else polys[i]
         if geom.area < min_area:
             if polys[i].area < min_area:
                 # It was already a sliver before any boolean: nothing occluded it, so this is
@@ -101,7 +121,7 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
                 and _isolated_circle(s, i, polys, clip):
             exact = {"center": (s["cx"], s["cy"]), "r": s["r"]}
         out.append((s["name"], s["material"], geom, s.get("mesh_size"), exact))
-    background = clip.difference(unary_union(polys)) if polys else clip
+    background = _polygonal(clip.difference(unary_union(polys))) if polys else clip
     if background.area > min_area:
         out.append(("background", doc["geometry"]["background"]["material"], background,
                     doc["geometry"]["background"].get("mesh_size"), None))
