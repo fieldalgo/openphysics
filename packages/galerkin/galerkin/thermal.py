@@ -1,9 +1,11 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Steady homogeneous isotropic heat conduction on conforming P1 triangles.
+"""Steady isotropic heat conduction on conforming P1 triangles.
 
-Import this submodule explicitly. See docs/thermal_steady2d.md for SI units,
-boundary signs and validation limits. No other physics module is required.
+Conductivity and constant heat source are one scalar or piecewise constant on
+named mesh regions (galerkin.materials). Import this submodule explicitly. See
+docs/thermal_steady2d.md and docs/multimaterial.md for SI units, boundary signs
+and validation limits. No other physics module is required.
 """
 from dataclasses import dataclass
 from typing import Mapping
@@ -14,6 +16,7 @@ from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 
 from .mesh import Mesh
+from .materials import is_per_region, region_property
 from .assembly import assemble_stiffness, assemble_load
 from .postprocess import element_gradient
 from .solver import solve_dirichlet
@@ -116,6 +119,8 @@ def _mesh_geometry(mesh):
 
 
 def _source_load(mesh, p, t, area, source):
+    if is_per_region(source):
+        return assemble_load(mesh, region_property(mesh, source, "heat_source"))
     if not callable(source):
         value = _real(source, "heat_source")
         if value.shape != ():
@@ -266,7 +271,8 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
                       outward_flux=None, convection=None):
     """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
 
-    conductivity is finite scalar k>0 in W/(m K). heat_source is scalar Q
+    conductivity is finite scalar k>0 in W/(m K), or {region name: k} with
+    every mesh.region_names entry. heat_source is scalar Q, {region name: Q},
     or a callback receiving (Q,2) metre coordinates and returning (Q,) W/m^3.
     dirichlet maps exterior integer node indices to scalar temperatures in K;
     every disconnected component requires Dirichlet or positive Robin support.
@@ -275,10 +281,14 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     (points_m, outward_normals)->(Q,) use W/m^2, W/(m^2 K), K respectively.
     Untagged natural edges are insulated. See docs/thermal_flux_robin.md.
     """
-    k = _real(conductivity, "conductivity")
-    if k.shape != () or k <= 0:
-        raise ValueError("conductivity must be a finite scalar > 0")
+    if not is_per_region(conductivity):
+        k = _real(conductivity, "conductivity")
+        if k.shape != () or k <= 0:
+            raise ValueError("conductivity must be a finite scalar > 0")
+        k = float(k)
     p, t, area, boundary, count, labels = _mesh_geometry(mesh)
+    if is_per_region(conductivity):
+        k = region_property(mesh, conductivity, "conductivity", positive=True)
     if not isinstance(dirichlet, Mapping):
         raise ValueError("dirichlet must map exterior node indices to temperatures in K")
     prescribed = {}
@@ -302,7 +312,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     missing = np.flatnonzero(~constrained)
     if len(missing):
         raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
-    stiffness = assemble_stiffness(mesh, float(k))
+    stiffness = assemble_stiffness(mesh, k)
     load = _source_load(mesh, p, t, area, heat_source)
     system = stiffness+H
     rhs = load+B-G
@@ -320,7 +330,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     # Evaluate derivatives and convection before restoring absolute temperature.
     convective = H@increment-shifted_B
     residual = stiffness@increment+convective-load+G
-    flux = -float(k)*element_gradient(mesh, increment)
+    flux = -(k[:, None] if np.ndim(k) else k)*element_gradient(mesh, increment)
     if not all(np.all(np.isfinite(a)) for a in (temperature, residual, flux, convective)):
         raise ValueError("nonfinite heat solution, residual or heat flux")
     fixed = np.array(sorted(prescribed), dtype=int)

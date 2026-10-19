@@ -6,3 +6,5 @@ include refsol/transient_heat.py
 include tests/test_transient_heat_reference.py
 include tests/test_fiber_group_index.py
 include tests/test_fiber_fields.py
+include refsol/thermal_multilayer.py
+include tests/test_thermal_multilayer_reference.py

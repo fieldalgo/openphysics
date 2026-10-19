@@ -29,9 +29,9 @@ result = solve_steady_heat(
 | Input | Contract / units |
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, reference coordinates `(N,2)` in m, integer triangles `(M,3)` |
-| conductivity | Required finite real scalar k>0, W/(m K); no tensors or spatially varying k |
+| conductivity | Required finite real scalar k>0, W/(m K), or `{region name: k}` piecewise constant on `mesh.region_names` ([multimaterial](multimaterial.md)); no tensors or k varying inside a region |
 | dirichlet | Mapping exterior integer node ID -> finite scalar temperature in K |
-| heat_source | Finite real scalar Q, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; default zero |
+| heat_source | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; default zero |
 
 With the default insulated boundary, each connected component requires at least
 one prescribed temperature; the optional Robin extension can also anchor it. No node is silently pinned,
@@ -188,7 +188,8 @@ separately for an exact candidate revision.
 
 ## Limits
 
-No transient heat capacity, radiation input, variable or
+No transient heat capacity, radiation input, conductivity varying inside a
+region (piecewise-constant regions are in [multimaterial](multimaterial.md)),
 anisotropic conductivity, 3D, thermoelastic coupling, simcase or Studio support
 is included. Only existing NumPy/SciPy and original mathematical formulas are
 used. No third-party solver source or new runtime dependency is introduced.

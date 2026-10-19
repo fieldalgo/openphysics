@@ -30,9 +30,9 @@ result = solve_steady_heat(
 | 입력 | 계약/단위 |
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, 기준 좌표 `(N,2)` m, 정수 삼각형 `(M,3)` |
-| conductivity | 필수 유한 실수 스칼라 k>0, W/(m K). tensor·공간 가변 k 없음 |
+| conductivity | 필수 유한 실수 스칼라 k>0, W/(m K), 또는 `mesh.region_names` 위 구간 상수 `{영역 이름: k}`([multimaterial](multimaterial.md)). tensor·영역 안에서 변하는 k 없음 |
 | dirichlet | 외부 정수 절점 ID→유한 스칼라 온도 K 매핑 |
-| heat_source | 유한 실수 스칼라 Q 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백. 기본값 0 |
+| heat_source | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백. 기본값 0 |
 
 기본 단열 경계에서는 연결 성분마다 적어도 하나의 처방 온도가 필요하며, 선택적 Robin
 확장도 성분을 고정할 수 있습니다. 절점을 몰래 pin하지 않고 spring이나 최소제곱
@@ -169,7 +169,8 @@ A=1 K이며 네 측면에 T0를 처방합니다. 정확한 Q는 `-k Laplacian(T)
 
 ## 한계
 
-비정상 열용량, 복사 입력, 가변·이방성 열전도율, 3D, 열탄성 연성, simcase·Studio
+비정상 열용량, 복사 입력, 영역 안에서 변하는 열전도율(영역별 구간 상수는
+[multimaterial](multimaterial.md)), 이방성 열전도율, 3D, 열탄성 연성, simcase·Studio
 지원을 포함하지 않습니다. 기존 NumPy/SciPy와 직접 유도한 수식만 사용합니다. 외부
 solver 소스나 새 runtime 의존성을 추가하지 않습니다. 문서·예제의 배포 포함은 별도
 패키징 책임이며 이 기능은 공유 MANIFEST나 CI 자산 명세를 바꾸지 않습니다.
