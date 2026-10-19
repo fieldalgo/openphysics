@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .mesh import Mesh
+from .materials import is_per_region, region_property
 from .thermal_mechanical import _isolated_mesh, _mesh_state, _check_mesh, _supports
 from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
                               freeze_temperature, solve_thermoelasticity)
@@ -109,7 +110,8 @@ def solve_transient_thermoelasticity(
     Require identical ordered geometry/connectivity; no mesh/time interpolation.
     Supports are fixed exterior (node,component)->displacement m; body_force is
     a constant two-vector N/m^3. Natural total traction is zero. E is Pa, alpha
-    1/K, Tref nonnegative K; plane is 'stress' or 'strain'. All selected Kelvin
+    1/K, Tref nonnegative K; plane is 'stress' or 'strain'. E, nu and alpha may
+    each be {region name: value} over mesh.region_names. All selected Kelvin
     snapshots are validated and frozen before any mechanics call. No partial
     aggregate is returned after failure; exceptions chain the original cause.
     """
@@ -139,11 +141,17 @@ def solve_transient_thermoelasticity(
         if temperatures.shape != (len(times), len(owned.nodes)):
             raise ValueError("heat.temperature_k must have shape (stored times, nodes)")
         selected = _indices(time_indices, len(times))
-        e = _scalar(young_modulus, "young_modulus")
-        nu = _scalar(poisson_ratio, "poisson_ratio")
-        alpha = _scalar(thermal_expansion_per_k, "thermal_expansion_per_k")
+        def material(value, name, **bounds):
+            if is_per_region(value):
+                region_property(owned, value, name, **bounds)
+                return {str(k): float(value[k]) for k in sorted(value)}
+            return _scalar(value, name)
+        e = material(young_modulus, "young_modulus", positive=True)
+        nu = material(poisson_ratio, "poisson_ratio", lower=-1., upper=.5)
+        alpha = material(thermal_expansion_per_k, "thermal_expansion_per_k")
         tref = _scalar(reference_temperature_k, "reference_temperature_k")
-        if e <= 0 or not -1 < nu < .5 or tref < 0 or plane not in ("stress", "strain"):
+        if ((not isinstance(e, dict) and e <= 0) or (not isinstance(nu, dict) and not -1 < nu < .5)
+                or tref < 0 or plane not in ("stress", "strain")):
             raise ValueError("require E>0, -1<nu<.5, Tref>=0K and plane stress/strain")
         supports = _supports(mechanical_dirichlet, vector=True)
         # Reject bool values explicitly before the shared support normalizer casts.

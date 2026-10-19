@@ -7,7 +7,8 @@
 `galerkin.transient_heat.solve_transient_heat`를 호출하고 결과와 같은 mesh를
 이 함수에 전달한다. [실행 예제](../../../../examples/transient_thermal_mechanical.py)는
 두 공개 호출을 보여준다. 새 열 solver, 관성, 감쇠, 동적 평형, 역학에서 열로의
-feedback, 변형 geometry 또는 시간 보간은 없다.
+feedback, 변형 geometry 또는 시간 보간은 없다. E, nu, alpha는 각각 `{영역 이름: 값}`일
+수 있고([multimaterial](multimaterial.md)) 그러면 모든 단계가 영역별 기계단계를 호출한다.
 
 ## 입력 및 선택
 

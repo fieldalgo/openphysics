@@ -174,8 +174,10 @@ coupling acceptance results are claimed.
 
 ## Limits and release integration
 
-Homogeneous isotropic linear small-strain, static triangular P1 displacement,
-constant material/alpha and explicitly prescribed same-mesh nodal-P1 T only.
+Isotropic linear small-strain, static triangular P1 displacement, one constant
+material/alpha or piecewise-constant alpha/E/nu on named regions
+([multimaterial](multimaterial.md)), and explicitly prescribed same-mesh
+nodal-P1 T only. The criteria above describe the homogeneous material.
 Near-incompressible plane strain can lock; nu approaching .5 is not cured by
 validation. No nonlinear/large-strain/contact/dynamics/3D/thermal conduction,
 dedicated scalar-pressure/local-frame/follower APIs, material-temperature dependence, cross-mesh transfer,
