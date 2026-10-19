@@ -100,6 +100,9 @@ jobs:
         id: source_tests
         env:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
+          # Reference-tool comparisons must run, not skip, and keep their records.
+          OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
+          OPENPHYSICS_CROSSCHECK_DIR: .validation/crosscheck
         run: python -m pytest -q -ra --junitxml=.validation/source-tests.xml
       - name: Build sdists and validate installed wheels
         # Preserve a failing source gate while collecting independent package evidence.

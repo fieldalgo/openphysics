@@ -1,0 +1,87 @@
+# Reference-tool comparisons
+
+**English** | [한국어](locales/ko/pages/reference-comparisons.md)
+
+Selected problems are solved twice: with galerkin and with an independent
+finite-element tool. The comparison is recorded separately from each feature's
+analytical acceptance references, which stay unchanged.
+
+- **Same discretization** (same mesh, element, coefficients and boundary data):
+  both tools must produce the same discrete solution. The relative difference is
+  gated at `1e-9`, far above roundoff and far below any discretization error.
+  This checks assembly, boundary handling and solvers, code against code.
+- **Different discretization** (another element order or quadrature): the
+  differences are reported, never gated.
+
+Agreement between tools is not convergence evidence. Convergence and accuracy
+claims still come from analytical references and mesh-refinement studies.
+
+## Tools
+
+| Tool | Version | License | How it is used |
+|---|---|---|---|
+| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]` |
+
+Only permissively licensed tools are installed as test extras (see
+[third-party software](third-party.md)). GPL-licensed tools are not imported or
+installed by this repository; if compared at all, they run as separately
+installed, unmodified programs outside it, and only their numerical results are
+reported.
+
+## Running
+
+```bash
+python -m pip install -e "packages/galerkin[crosscheck]"
+OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
+  python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py
+```
+
+Without the tool the tests skip locally. CI sets
+`OPENPHYSICS_REQUIRE_CROSSCHECK=1`, so a missing tool fails instead, and keeps
+each record in `.validation/crosscheck/` inside the Linux job's artifact.
+
+## Record format
+
+Each comparison emits one JSON record (schema `openphysics.crosscheck/1`),
+printed into the JUnit output and optionally written to a file. The helper is
+`packages/galerkin/tests/crosscheck.py`.
+
+| Field | Content |
+|---|---|
+| `case`, `physics` | Case identifier and the problem solved |
+| `openphysics` | Distribution, installed version, API and discretization |
+| `reference` | Tool, exact installed version, SPDX license, source URL, how it is used, its discretization |
+| `matched` | Conditions made identical (mesh, element, coefficients, boundary data, forms) |
+| `not_matched` | Known differences (element order, quadrature, eigensolver) |
+| `observables` | Per quantity: name, unit, metric, value, gate (`null` = reported only), pass/fail |
+| `environment` | Python, platform, numpy and scipy versions |
+| `role` | Always `code-to-code comparison; not convergence evidence` |
+
+## Current cases
+
+Values from a local Linux run (Python 3.12, numpy 2.5.4, scipy 1.18.1,
+scikit-fem 12.0.2). The CI records of each commit are authoritative.
+
+| Case | galerkin | scikit-fem | Observable | Difference | Gate |
+|---|---|---|---|---|---|
+| `heat-p1-slab` | `thermal.solve_steady_heat`, P1 | `ElementTriP1` | nodal temperature; element heat flux | 2.1e-15; 4.0e-14 | 1e-9 |
+| `elasticity-p1-plane-strain-cantilever` | `elasticity.solve_elasticity`, P1 | `ElementVector(ElementTriP1)` | nodal displacement | 4.5e-13 | 1e-9 |
+| `elasticity-p1-plane-stress-cantilever` | same, plane stress | same | nodal displacement | 8.2e-14 | 1e-9 |
+| `waveguide-vector-rect-core` | `waveguide.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | effective index, 4 guided modes | 1.5e-15 | 1e-9 |
+| `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec tetrahedra | `ElementTetN0` | lowest 8 eigenvalues k^2 | 1.4e-14 | 1e-9 |
+| `heat-p2-reference-slab` | P1 | `ElementTriP2` | vertex temperature: P1 vs P2; P1 vs exact; P2 vs exact | 3.7e-5; 3.6e-5; 1.5e-6 | reported |
+| `elasticity-p2-reference-cantilever` | P1, plane stress | `ElementVector(ElementTriP2)` | tip deflection, P1 vs P2 | 1.7e-1 | reported |
+
+The P2 rows show the expected effect of element order on coarse meshes (P1
+triangles are stiff in bending); they are not accuracy claims for either tool.
+
+## Adding a case
+
+1. Solve the same problem with the public galerkin API and the reference tool.
+2. Match everything you can and list it in `matched`; list every remaining
+   difference in `not_matched`.
+3. Gate only same-discretization observables, with `SAME = 1e-9`; report the
+   others with `gate=None`.
+4. Add the tool to `galerkin[crosscheck]`, the CI pins, the license inventory and
+   [third-party software](third-party.md) if it is new.
+5. Update this table in English and Korean.

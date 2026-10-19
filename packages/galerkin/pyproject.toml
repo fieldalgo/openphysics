@@ -41,6 +41,9 @@ test = [
     "gmshio>=0.1",
 ]
 figures = ["matplotlib>=3.7"]
+# Reference tools for code-to-code comparisons (tests/test_crosscheck_*.py), test only.
+# Permissive licenses only; see docs/third-party.md in the repository.
+crosscheck = ["scikit-fem>=12,<13"]
 
 [tool.setuptools.packages.find]
 include = ["galerkin*"]
