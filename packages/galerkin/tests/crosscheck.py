@@ -14,12 +14,14 @@ OPENPHYSICS_REQUIRE_CROSSCHECK=1 (as CI does) to fail instead of skipping when a
 reference tool is not installed.
 """
 
+from contextlib import contextmanager
 import importlib.metadata as metadata
 import json
 import os
 from pathlib import Path
 import platform
 import sys
+import time
 
 import numpy as np
 import pytest
@@ -32,7 +34,20 @@ TOOLS = {
                    "use": "imported in-process from the galerkin[crosscheck] test extra"},
 }
 REQUIRED = ("schema", "case", "physics", "openphysics", "reference", "matched", "not_matched",
-            "observables", "environment", "role")
+            "observables", "analytical_acceptance", "wall_time_s", "not_measured", "environment", "role")
+
+
+class Stopwatch:
+    """Wall time of each tool's solve, in seconds (assembly and solve, not imports)."""
+
+    def __init__(self):
+        self.seconds = {}
+
+    @contextmanager
+    def __call__(self, label):
+        start = time.perf_counter()
+        yield
+        self.seconds[label] = self.seconds.get(label, 0.0) + time.perf_counter() - start
 
 
 def require_tool(name):
@@ -59,7 +74,7 @@ def observable(name, unit, metric, value, gate=None):
 
 
 def make_record(*, case, physics, api, discretization, tool, tool_discretization,
-                matched, not_matched, observables):
+                matched, not_matched, observables, analytical_acceptance, stopwatch):
     info = TOOLS[tool]
     record = {
         "schema": SCHEMA,
@@ -73,6 +88,10 @@ def make_record(*, case, physics, api, discretization, tool, tool_discretization
         "matched": list(matched),
         "not_matched": list(not_matched),
         "observables": list(observables),
+        # Analytical pass/fail stays in the feature's own acceptance tests.
+        "analytical_acceptance": analytical_acceptance,
+        "wall_time_s": {k: round(v, 4) for k, v in stopwatch.seconds.items()},
+        "not_measured": ["peak memory (one shared process; not separable per tool)"],
         "environment": {"python": platform.python_version(), "platform": sys.platform,
                         "numpy": np.__version__, "scipy": metadata.version("scipy")},
         "role": "code-to-code comparison; not convergence evidence",
@@ -89,6 +108,8 @@ def validate_record(record):
     for key in ("tool", "version", "license", "source", "discretization"):
         if not record["reference"].get(key):
             raise ValueError(f"reference.{key} is required")
+    if set(record["wall_time_s"]) != {"openphysics", "reference"}:
+        raise ValueError("wall_time_s needs 'openphysics' and 'reference' entries")
     if not record["observables"]:
         raise ValueError("a comparison needs at least one observable")
     for item in record["observables"]:
