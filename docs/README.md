@@ -37,7 +37,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 |---|---|---|
 | Transient heat to quasistatic mechanics | [Stored-index API and independent gates](../packages/galerkin/docs/transient_thermal_mechanical.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
 | 3D PEC cavity engine | [API, units and convergence](../packages/galerkin/docs/cavity_solver.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/cavity_solver.md) |
-| Lossy material cavity | [Complex resonances, Q and slab references](../packages/galerkin/docs/material_cavity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/material_cavity.md) |
+| Lossy material cavity | [Complex resonances, Q, wall loss and references](../packages/galerkin/docs/material_cavity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/material_cavity.md) |
 | Cavity document and CLI | [Input and saved fields](../packages/simcase/docs/cavity3d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
 | Vector subspace tracking | [Opt-in cluster sweeps](../packages/simcase/docs/vector_subspace_tracking.md) | [한국어](../packages/simcase/docs/locales/ko/pages/vector_subspace_tracking.md) |
 | Complex vector eigenspaces | [Preservation and limits](../packages/galerkin/docs/eigenspace_reliability.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |

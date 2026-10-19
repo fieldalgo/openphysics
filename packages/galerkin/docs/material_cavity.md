@@ -1,4 +1,4 @@
-# Material-loaded rectangular PEC cavity solver
+# Material-loaded rectangular cavity solver
 
 **English** | [한국어](locales/ko/pages/material_cavity.md)
 
@@ -21,10 +21,11 @@ print(result.resonant_frequencies_hz, result.quality_factors)
 
 This API extends the [vacuum PEC box solver](cavity_solver.md) with piecewise-constant,
 possibly lossy, relative permittivity and permeability in axis-aligned box regions.
-It returns complex resonant frequencies and quality factors. The walls remain
-perfect electric conductors; finite-conductivity walls, open boundaries,
-anisotropic or dispersive materials and arbitrary geometry are not included.
-`solve_cavity_box` and its contract are unchanged.
+It returns complex resonant frequencies and quality factors. Walls are perfect
+electric conductors unless a finite wall conductivity is given; then they use the
+Leontovich surface-impedance condition (see [Finite-conductivity walls](#finite-conductivity-walls)).
+Open boundaries, anisotropic or dispersive materials and arbitrary geometry are
+not included. `solve_cavity_box` and its contract are unchanged.
 
 ## Conventions
 
@@ -53,7 +54,7 @@ square root, so `Re f > 0`.
 ## Arguments
 
 `solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=6,
-target_frequency_hz)` returns a `MaterialCavityResult`. `lengths_m`, `subdivisions`,
+target_frequency_hz, wall_conductivity_s_per_m=None)` returns a `MaterialCavityResult`. `lengths_m`, `subdivisions`,
 `num_modes` and `target_frequency_hz` have the vacuum solver's meaning and validation,
 and the mesh is the same alternating Kuhn mesh.
 
@@ -82,8 +83,10 @@ Let K be the requested mode count, E the edge count and T the tetrahedron count.
 | `relative_residuals` | `(K,)` free-edge equations | dimensionless |
 | `pec_edge_ids`, `mesh`, `space` | as in the vacuum solver | |
 | `tet_relative_permittivity`, `tet_relative_permeability` | `(T,)` complex per tetrahedron | dimensionless |
-| `lossless` | every material constant is real | bool |
+| `lossless` | every material constant is real and every wall is PEC | bool |
 | `time_convention` | `"exp(+j*omega*t)"` | metadata |
+| `wall_conductivity_s_per_m` | dict over `WALLS`; `None` means PEC | S/m |
+| `fixed_point_iterations` | `(K,)`; zero without finite-conductivity walls | count |
 
 `search`, `cluster_completeness` and `mode_count_policy` carry the vacuum solver's
 values and meaning. When `lossless` is true, the solve is still complex; returned
@@ -131,10 +134,12 @@ From the repository root:
 
 ```bash
 python -m pytest -c pyproject.toml -q packages/galerkin/tests/test_material_cavity.py \
-  packages/galerkin-refsol/tests/test_material_cavity_reference.py
+  packages/galerkin/tests/test_cavity_wall_loss.py \
+  packages/galerkin-refsol/tests/test_material_cavity_reference.py \
+  packages/galerkin-refsol/tests/test_wall_loss_reference.py
 ```
 
-The references are in `refsol.material_cavity` and use no mesh or FEM code.
+The references are in `refsol.material_cavity` and `refsol.wall_loss` and use no mesh or FEM code.
 
 **Uniform filling.** A homogeneous cavity has the vacuum fields and
 `k0^2 = k_vac^2 / (eps_r mu_r)` exactly, and the discrete problem rescales the same way.
@@ -202,10 +207,105 @@ a permuted box agrees with the z-stacked reference (eigenvalues within 1.5% and 
 0.3% at n = 8); region override and centroid assignment; and rejection of off-grid
 bounds, gain, non-positive real parts, malformed bounds and wrong types.
 
+## Finite-conductivity walls
+
+`wall_conductivity_s_per_m` is `None` (all six walls PEC), one positive conductivity
+for every wall, or a dict over `galerkin.material_cavity.WALLS`
+(`"x0", "x1", "y0", "y1", "z0", "z1"`, the walls at the low and high end of each
+axis). Missing or `None` entries are PEC. Values are finite positive S/m; zero,
+negative, infinite, boolean and unknown wall names raise `ValueError`.
+
+A finite wall uses the Leontovich condition `E_t = Zs H x n` (n outward from the
+cavity), with the good-conductor impedance
+
+    Zs = sqrt(j omega mu0 / sigma) = (1 + j) Rs,   Rs = sqrt(omega mu0 / (2 sigma)).
+
+Integrating `curl(mu_r^-1 curl E)` by parts leaves `-j omega mu0 int (n x H) . v dS`,
+and `n x H = -E_t / Zs`, so the weak form gains the wall term
+
+    j k0 (eta0 / Zs) int_wall E_t . v_t dS = sqrt(j k0 eta0 sigma) B_wall,
+
+with `eta0 = mu0 c0`, `mu0 = 1.25663706212e-6 H/m` and `B_wall` the exact tangential
+Whitney edge mass of that wall's triangles. Edges in a PEC wall stay constrained;
+edges in a finite wall become unknowns. The interior-node gradients remain the
+exact kernel, so the projector and its kernel count are unchanged. The wall
+coefficient varies as `k0^(1/2)`, so
+
+    T(k0^2) q = [S + sum_w sqrt(j k0 eta0 sigma_w) B_w - k0^2 M] q = 0
+
+is a nonlinear eigenproblem. It is solved as follows:
+
+1. Solve the linear problem with the wall coefficient evaluated at the target and
+   select modes as usual.
+2. For each selected mode, use residual inverse iteration (Neumaier 1985) with one
+   LU of `T` at that mode's starting value. Each step solves the scalar equation
+   `x^T T(k0^2) x = 0` by Newton and corrects `x <- x - P T0^-1 P^T T(k0^2) x`.
+   Stop when the relative nonlinear residual is `<= 1e-10` and the eigenvalue
+   change is `<= 1e-12`, with at most 50 steps.
+3. Modes degenerate within `1e-8` relative (for example the cube's 011/101/110
+   triplet) share one wall coefficient, evaluated at their mean, and are refined
+   by repeated shifted eigensolves under the same stop rule.
+
+Nonconvergence raises `RuntimeError`. The reported residual is the larger of the
+linear residual and the nonlinear residual with `Zs` at each mode's own final
+`k0`; it must satisfy the same `<= 1e-8` gate. M-biorthogonality is not checked
+with finite walls, because each mode solves its own operator. All other gates
+apply. The impedance condition is valid only while the skin depth is small
+compared with the wall curvature and cell size, so that `|Zs| << eta0`. No
+surface roughness, wall coatings or frequency-dependent conductivity are modelled.
+
+### Wall-loss reference and validation
+
+`refsol.wall_loss` computes the standard first-order (perturbational) conductor Q,
+
+    Q_c = omega W / P_c,   W = (mu/2) int |H|^2 dV,   P_c = (Rs/2) sum_w int_w |H_t|^2 dS,
+
+from the PEC standing waves `Ex = Ax cos(kx x) sin(ky y) sin(kz z)` (and cyclic
+permutations). All integrals are closed-form products of `sin^2` and `cos^2`. When
+all three indices are positive, the two polarizations are degenerate. Wall loss
+is then a quadratic form on the amplitude plane, and its eigenvectors give two Q
+values. The Leontovich reactance lowers the real frequency by as much as the loss
+raises the imaginary part: `omega = omega0 (1 + (j - 1)/(2 Q_c))`. The neglected
+terms are of relative order `1/Q_c`.
+
+Reference self-checks: TE101 equals Pozar's closed form (*Microwave Engineering*,
+4th ed., eq. 6.46) at `1e-12`. Every mode of `(1, 0.8, 0.6) m` up to 400 MHz,
+including the split 111 doublet, matches Gauss quadrature of a finite-difference
+curl at `1e-6`. Per-wall losses add up to the total. `Q` scales as `sqrt(sigma)`.
+Uniform filling gives `Q -> Q mu_r (eps_r mu_r)^(-1/4)`. Cube degeneracies are
+preserved.
+
+The FEM tests use box `(1, 0.45, 0.8) m` (no accidental degeneracy among the four
+lowest modes) and copper, `sigma = 5.8e7 S/m`:
+
+| Mode | f (MHz) | Reference Q_c | Q error n=4 | n=8 | n=16 | Order 8→16 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 101 | 239.951 | 51776.8 | -4.74% | -1.25% | -0.314% | 1.988 |
+| 201 | 353.530 | 65216.0 | -13.9% | -2.77% | -0.714% | 1.958 |
+| 110 | 365.276 | 54744.4 | +6.12% | +0.715% | +0.184% | 1.958 |
+| 011 | 382.185 | 59436.8 | +8.28% | +2.37% | +0.616% | 1.945 |
+
+The fixed slow gate requires Q errors that decrease at every step, final orders
+**> 1.8**, n=16 Q errors `< 8e-3` and complex-frequency errors `< 4e-3`
+(observed at most `3.5e-3`). Every mode needed four nonlinear iterations.
+
+Other wall tests:
+
+- TE101 at n=8 is within 1.5% of Pozar.
+- An independent SI rebuild of `T(k0)` with `j k0 eta0 / Zs` gives nonlinear residuals `< 1e-7`.
+- The wall mass integrates every uniform field's tangential part exactly (`1e-12`).
+- Single-wall Q at n=8 agrees with the reference within 6.7%.
+- First-order additivity: the six single-wall `1/Q` sum to the all-wall `1/Q` within `3.1e-4`.
+- `sigma = 1e18` reproduces the PEC solver within `7.7e-11`.
+- A lossy dielectric fill plus copper walls gives `1/Q = 1/Q_walls + 1/Q_d` within `5e-6`. The filled-cavity wall Q matches the reference within 2.8% at n=8.
+- The cube triplet stays exactly degenerate (spread `9e-16`), has three independent modes and has Q within 3.8% of the reference at n=4.
+- A dense n=2 case uses mixed walls.
+- Invalid conductivities are rejected.
+
 ## Limitations
 
-- PEC walls only. Finite wall conductivity (surface impedance) is planned separately;
-  it makes the eigenproblem nonlinear in frequency.
+- Finite-conductivity walls are local Leontovich impedances on whole box walls, with
+  first-order references; no roughness, coatings, or partial-wall patches.
 - Constant, isotropic, frequency-independent `eps_r`, `mu_r`. Dispersive materials
   would also make the problem nonlinear.
 - Regions are boxes aligned with grid planes. No staircase or curved interfaces.

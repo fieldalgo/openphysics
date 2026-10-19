@@ -26,6 +26,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장 | 폐형식 |
 | `refsol.cavity` | 주파수 상한까지의 모든 진공 PEC 상자 모드, 편광·기하 축퇴 포함, SI | 독립 Cartesian 열거, 솔버·메시 없음 |
 | `refsol.material_cavity` | 균일 충전 또는 손실 유전·자성 판을 넣은 PEC 상자의 복소 공진과 Q(TE/TM-to-z 초월방정식 근), `exp(+j*omega*t)` | 진공 극한 = 직교 좌표 스펙트럼, 같은 두 층 = 균일 축척, 소손실 Q = 에너지 충전율 |
+| `refsol.wall_loss` | 직육면체 공동 모드의 벽별 1차 도체 손실 Q, 축퇴 편광 분리, 균일 충전 | Pozar TE101, 유한차분 curl의 수치 적분, 벽별 가법성, sqrt(sigma) 축척 |
 | `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭 | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한 |
 | `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세 | — |
 

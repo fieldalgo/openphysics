@@ -18,7 +18,7 @@
 | 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [단계별 검증 결과](milestone_validation.md) | `examples/coax_convergence.py`, `examples/cylinder_scattering_pml.py` |
 | 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/fiber_modes.py`, `examples/waveguide_modes.py` |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/cavity_modes.py` |
-| 손실 유전·자성 직육면체 영역을 넣은 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
+| 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
 | 균질 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../examples/thermal_steady2d.py) |
 | 정상 열전도의 처방 외향 열유속과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../examples/thermal_flux_robin.py) |
 | 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet과 단열 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../examples/transient_heat_convergence.py) |
@@ -65,7 +65,7 @@ galerkin/
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
-  material_cavity.py # PEC box with lossy box-shaped materials: complex resonances and Q
+  material_cavity.py # Box cavity with lossy materials and impedance walls: complex resonances and Q
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction

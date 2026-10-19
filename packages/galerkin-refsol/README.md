@@ -30,6 +30,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field | closed forms |
 | `refsol.cavity` | every vacuum PEC box mode up to a frequency ceiling, with polarization and geometric degeneracy, SI | independent Cartesian enumeration, no solver or mesh |
 | `refsol.material_cavity` | complex resonances and Q of a PEC box uniformly filled or loaded by a lossy dielectric/magnetic slab (TE/TM-to-z transcendental roots), `exp(+j*omega*t)` | vacuum limit equals the Cartesian spectrum, identical layers equal uniform rescaling, small-loss Q equals the energy filling factor |
+| `refsol.wall_loss` | first-order conductor-loss Q of rectangular cavity modes per wall, split degenerate polarizations, uniform filling | Pozar TE101, numerical quadrature of a finite-difference curl, per-wall additivity, sqrt(sigma) scaling |
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 

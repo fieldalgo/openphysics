@@ -17,10 +17,11 @@ scattering  plane-wave scattering off a circular cylinder (PEC and dielectric)
 benchmarks  published reference values with citations (Hadley 2002 rib waveguides, ...)
 cavity      complete finite-frequency Cartesian spectrum of a vacuum PEC box
 material_cavity  complex resonances and Q of uniformly or slab-loaded lossy PEC boxes
+wall_loss   first-order conductor-loss Q of rectangular cavity modes, per wall
 """
 
-from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity
+from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity, wall_loss
 
 __version__ = "0.1.0"
 __all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks", "cavity",
-           "material_cavity"]
+           "material_cavity", "wall_loss"]

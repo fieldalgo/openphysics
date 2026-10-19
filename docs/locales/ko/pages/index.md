@@ -34,7 +34,7 @@
 |---|---|---|
 | 과도 열전도 → 준정적 역학 | [저장 index API 및 독립 기준](../../../../packages/galerkin/docs/transient_thermal_mechanical.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
 | 3D PEC 공동 엔진 | [API·단위·수렴](../../../../packages/galerkin/docs/cavity_solver.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md) |
-| 손실 재료 공동 | [복소 공진·Q·판 정답](../../../../packages/galerkin/docs/material_cavity.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/material_cavity.md) |
+| 손실 재료 공동 | [복소 공진·Q·벽 손실·정답](../../../../packages/galerkin/docs/material_cavity.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/material_cavity.md) |
 | 공동 모델 문서·CLI | [입력·저장 장 계약](../../../../packages/simcase/docs/cavity3d.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
 | 벡터 부분공간 추적 | [선택형 군집 sweep](../../../../packages/simcase/docs/vector_subspace_tracking.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/vector_subspace_tracking.md) |
 | 복소 벡터 고유공간 | [보존 방식·한계](../../../../packages/galerkin/docs/eigenspace_reliability.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
