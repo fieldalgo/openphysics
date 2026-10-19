@@ -16,9 +16,12 @@ the strictest way the environment reaches the distribution:
 Runtime and optional dependencies must be permissive. Weak copyleft (LGPL, MPL,
 CeCILL-C) is accepted only for test/tool entries marked ``test_only``. GPL is accepted
 only for ``external_process`` entries, and first-party code must not import
-them. AGPL, SSPL and the other network-copyleft licenses under ``never`` are
-always rejected, also as external processes. Installed metadata that names a
-different expression, or a copyleft family the entry does not record, also fails.
+them. AGPL, SSPL and the other network-copyleft families under ``never_families``
+are always rejected, also as external processes: any identifier of the family
+(deprecated ids such as ``AGPL-3.0``, ``+`` forms and LicenseRef- names
+included) in the inventory or in installed metadata fails. Installed metadata
+that names a different expression, or a copyleft family the entry does not
+record, also fails.
 
 Bundled native files: every shared library (.so, .dylib, .dll) that a
 third-party distribution installs, other than its own Python extension modules,
@@ -204,6 +207,20 @@ def current_platform():
     return sys.platform
 
 
+def never_pattern(families):
+    """Match any identifier or metadata text of a never-allowed license family.
+
+    A family name preceded by the start or a non-letter matches, so deprecated ids
+    (AGPL-3.0), '+' forms, LicenseRef- names and classifier text are all caught.
+    """
+    names = "|".join(re.escape(family) for family in families)
+    return re.compile(rf"(?:^|[^A-Za-z])(?:{names})", re.IGNORECASE)
+
+
+def never_ids(ids, never):
+    return sorted(i for i in ids if never.search(i))
+
+
 def bundled_entry_errors(name, items, never):
     """Structure of one distribution's bundled_files records."""
     errors = []
@@ -221,8 +238,8 @@ def bundled_entry_errors(name, items, never):
         except (ValueError, IndexError) as error:
             errors.append(f"{where}: {error}")
             continue
-        if ids & never:
-            errors.append(f"{where}: {item['spdx']} is never allowed, also when bundled")
+        if bad := never_ids(ids, never):
+            errors.append(f"{where}: {bad} is never allowed, also when bundled")
         if item["linkage"] != "dynamic":
             errors.append(f"{where}: separate library files are dynamic; record static code in 'bundled'")
         if not item["platforms"] or set(item["platforms"]) - set(PLATFORMS):
@@ -265,7 +282,7 @@ def check(paths, inventory, check_docs=True, platform=None):
     policy = inventory["policy"]
     permissive = set(policy["permissive"])
     weak = set(policy["weak_copyleft"])
-    never = set(policy["never"])
+    never = never_pattern(policy["never_families"])
     first_party = {canonicalize_name(n) for n in inventory["first_party"]}
     entries = {canonicalize_name(k): v for k, v in inventory["distributions"].items()}
     dists = {}
@@ -317,8 +334,10 @@ def check(paths, inventory, check_docs=True, platform=None):
         if COPYLEFT.search(declared_text) and not recorded_copyleft and "metadata_review" not in entry:
             errors.append(f"{name} {dist.version}: metadata mentions a copyleft license ({declared_text!r}) "
                           "but the inventory records none; review it")
-        if ids & never:
-            errors.append(f"{name}: {entry['spdx']} is never allowed")
+        if never.search(declared_text):
+            errors.append(f"{name} {dist.version}: metadata names a never-allowed license ({declared_text!r})")
+        if bad := never_ids(ids, never):
+            errors.append(f"{name}: {bad} in {entry['spdx']!r} is never allowed")
             continue
         if "external_process" in entry:
             record["use"] = "external-process"
