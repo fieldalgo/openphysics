@@ -146,6 +146,8 @@ DOCUMENT_ASSETS = {'galerkin': (
               'tests/test_fiber_group_index.py',
               'refsol/material_cavity.py',
               'tests/test_material_cavity_reference.py',
+              'refsol/wall_loss.py',
+              'tests/test_wall_loss_reference.py',
               'tests/test_fiber_fields.py',
               'refsol/transient_heat.py',
               'tests/test_transient_heat_reference.py',
