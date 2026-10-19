@@ -3,9 +3,9 @@
 
 """Check installed distribution licenses against the reviewed inventory.
 
-Reads metadata with importlib.metadata only, so no license tool is needed.
-Every installed distribution must have a reviewed entry in
-ci/third_party_licenses.json. The entry's SPDX expression must be allowed for
+Reads metadata and RECORD file lists with importlib.metadata only, so no
+license tool is needed. Every installed distribution must have a reviewed entry
+in ci/third_party_licenses.json. The entry's SPDX expression must be allowed for
 the strictest way the environment reaches the distribution:
 
 - runtime: a base requirement of a first-party package (transitively)
@@ -20,6 +20,14 @@ them. AGPL, SSPL and the other network-copyleft licenses under ``never`` are
 always rejected, also as external processes. Installed metadata that names a
 different expression, or a copyleft family the entry does not record, also fails.
 
+Bundled native files: every shared library (.so, .dylib, .dll) that a
+third-party distribution installs, other than its own Python extension modules,
+must match a ``bundled_files`` glob of its entry (fnmatch on the POSIX path
+relative to site-packages, as listed in RECORD) recorded for the current OS.
+Entries with a copyleft SPDX expression need a ``review``. Statically linked
+code is not visible this way and is reviewed by hand. First-party distributions
+must contain no native files at all.
+
 Use ``--python`` to inspect another interpreter's environment, e.g. a fresh
 venv holding the installed wheels.
 """
@@ -27,6 +35,7 @@ venv holding the installed wheels.
 import argparse
 import ast
 from collections import deque
+import fnmatch
 import importlib.metadata as metadata
 import json
 from pathlib import Path
@@ -45,6 +54,12 @@ RANK = {"runtime": 0, "optional": 1, "test": 2, "tool": 3}
 COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EUPL|EPL|CDDL|SSPL|OSL|CPAL|RPL|CECILL|GENERAL PUBLIC|MOZILLA PUBLIC|AFFERO)",
                       re.IGNORECASE)
 TOKEN = re.compile(r"\(|\)|[A-Za-z0-9.+:-]+")
+# Shared libraries, and the Python extension modules that are not counted as bundled libraries.
+SHARED_LIBRARY = re.compile(r"\.(so(\.[0-9]+)*|dylib|dll)$", re.IGNORECASE)
+EXTENSION_MODULE = re.compile(r"(\.cpython-[^/]*\.so|\.abi3\.so|\.pyd)$", re.IGNORECASE)
+COMPILED = re.compile(r"\.(so(\.[0-9]+)*|dylib|dll|pyd)$", re.IGNORECASE)
+PLATFORMS = ("linux", "macos", "windows")
+BUNDLED_FIELDS = {"glob", "spdx", "linkage", "platforms"}
 
 
 def parse_expression(text):
@@ -179,7 +194,74 @@ def first_party_imports(modules):
     return offenders
 
 
-def check(paths, inventory, check_docs=True):
+def current_platform():
+    if sys.platform.startswith("linux"):
+        return "linux"
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform in ("win32", "cygwin"):
+        return "windows"
+    return sys.platform
+
+
+def bundled_entry_errors(name, items, never):
+    """Structure of one distribution's bundled_files records."""
+    errors = []
+    globs = set()
+    for item in items:
+        where = f"{name} bundled_files {item.get('glob')!r}"
+        if missing := sorted(BUNDLED_FIELDS - item.keys()):
+            errors.append(f"{where}: missing {missing}")
+            continue
+        if item["glob"] in globs:
+            errors.append(f"{where}: duplicate glob")
+        globs.add(item["glob"])
+        try:
+            ids = identifiers(parse_expression(item["spdx"]))
+        except (ValueError, IndexError) as error:
+            errors.append(f"{where}: {error}")
+            continue
+        if ids & never:
+            errors.append(f"{where}: {item['spdx']} is never allowed, also when bundled")
+        if item["linkage"] != "dynamic":
+            errors.append(f"{where}: separate library files are dynamic; record static code in 'bundled'")
+        if not item["platforms"] or set(item["platforms"]) - set(PLATFORMS):
+            errors.append(f"{where}: platforms must be a non-empty subset of {list(PLATFORMS)}")
+        if COPYLEFT.search(item["spdx"]) and not str(item.get("review", "")).strip():
+            errors.append(f"{where}: copyleft {item['spdx']!r} needs a review")
+    return errors
+
+
+def native_files(dist, pattern):
+    """POSIX paths (relative to the distribution's base, as in RECORD) whose names match pattern."""
+    return sorted(f.as_posix() for f in dist.files or () if pattern.search(f.name))
+
+
+def bundled_libraries(dist):
+    """Shared libraries a distribution installed, other than its own Python extension modules."""
+    return [path for path in native_files(dist, SHARED_LIBRARY) if not EXTENSION_MODULE.search(path)]
+
+
+def check_bundled(name, dist, items, platform):
+    """Match every bundled shared library against the entry's reviewed bundled_files globs."""
+    errors, matched = [], []
+    if dist.files is None:
+        return [f"{name} {dist.version}: no RECORD file list, so bundled native files cannot be checked"], matched
+    for path in bundled_libraries(dist):
+        hits = [item for item in items if fnmatch.fnmatchcase(path, item.get("glob", ""))]
+        if not hits:
+            errors.append(f"{name} {dist.version}: unrecorded bundled native library {path}; add a reviewed "
+                          "bundled_files entry to the inventory")
+            continue
+        item = hits[0]
+        if platform not in item.get("platforms", ()):
+            errors.append(f"{name} {dist.version}: {path} matches {item['glob']!r}, recorded for "
+                          f"{item.get('platforms')}, but is installed on {platform}; review and update it")
+        matched.append({"file": path, "glob": item["glob"], "spdx": item.get("spdx")})
+    return errors, matched
+
+
+def check(paths, inventory, check_docs=True, platform=None):
     policy = inventory["policy"]
     permissive = set(policy["permissive"])
     weak = set(policy["weak_copyleft"])
@@ -192,7 +274,10 @@ def check(paths, inventory, check_docs=True):
         dists.setdefault(name, dist)  # first on the path wins, as for imports
     test_extras = {canonicalize_name(e) for e in policy.get("test_extras", ["test"])}
     use = reachability(list(dists.values()), first_party, test_extras)
+    platform = platform or current_platform()
     errors, report = [], {}
+    for name, entry in sorted(entries.items()):
+        errors += bundled_entry_errors(name, entry.get("bundled_files", []), never)
     for name, dist in sorted(dists.items()):
         expression, short, classifiers = declared_license(dist)
         record = {"version": dist.version, "license_expression": expression, "license": short or None,
@@ -201,6 +286,9 @@ def check(paths, inventory, check_docs=True):
             declared = expression or short
             if declared != "Apache-2.0":
                 errors.append(f"{name}: first-party metadata must declare Apache-2.0, found {declared!r}")
+            if compiled := native_files(dist, COMPILED):
+                errors.append(f"{name}: first-party distribution contains native files {compiled}; "
+                              "compiled code needs a license review first")
             report[name] = {**record, "use": "first-party", "spdx": "Apache-2.0"}
             continue
         entry = entries.get(name)
@@ -210,6 +298,10 @@ def check(paths, inventory, check_docs=True):
         if entry is None:
             errors.append(f"{name} {dist.version}: no reviewed entry in {INVENTORY.relative_to(ROOT).as_posix()}")
             continue
+        bundled_errors, bundled = check_bundled(name, dist, entry.get("bundled_files", []), platform)
+        errors += bundled_errors
+        if bundled:
+            record["bundled_files"] = bundled
         record["spdx"] = entry["spdx"]
         try:
             tree = parse_expression(entry["spdx"])
@@ -263,8 +355,10 @@ def main():
     counts = {}
     for record in report.values():
         counts[record["use"]] = counts.get(record["use"], 0) + 1
+    bundled = sum(len(record.get("bundled_files", ())) for record in report.values())
     print(f"Checked {len(report)} installed distributions: "
-          + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
+          + ", ".join(f"{k} {v}" for k, v in sorted(counts.items()))
+          + f"; {bundled} bundled shared libraries matched reviewed records")
     for error in errors:
         print("LICENSE CHECK FAILED:", error, file=sys.stderr)
     return 1 if errors else 0

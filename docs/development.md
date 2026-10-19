@@ -113,8 +113,9 @@ checksums and wheel bytes.
 
 **Licenses** (`ci/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the
-reviewed inventory in `ci/third_party_licenses.json`. Policy and the full list
-are in [third-party software](third-party.md).
+reviewed inventory in `ci/third_party_licenses.json`: declared licenses, and
+every shared library a third-party wheel installs, file by file, on each OS.
+Policy and the full list are in [third-party software](third-party.md).
 
 **Installed platforms** (`ci/tools/check_platform_install.py`). On each OS:
 installed licenses, package bytes, installed module origins, bundled assets, public API/CLI/save
