@@ -19,6 +19,9 @@ Third-party material retains its own terms:
 - Separately installed dependencies retain their respective licenses. The
   Apache-2.0 license here does not relicense those dependencies or datasets.
   No third-party source code is copied into this repository.
+- Wheels of some dependencies bundle native libraries under their own terms,
+  listed in docs/third-party.md; the OpenPhysics distributions contain no
+  third-party native code.
 
 docs/third-party.md lists every third-party dependency, external program,
 dataset and published reference with its version range, SPDX license

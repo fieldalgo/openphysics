@@ -14,11 +14,14 @@ THIRD-PARTY SOFTWARE
 
 simcase requires numpy, scipy, shapely and matplotlib, and its optional
 ``studio`` extra requires fastapi and uvicorn, and its optional ``export``
-extra requires meshio. They are installed separately
-by the package installer under their own permissive licenses and are not
-included in this distribution. Wheels of shapely load the GEOS library
-(LGPL-2.1) as an unmodified shared library; simcase only calls shapely's
-public Python API.
+extra requires meshio. They are installed separately by the package installer
+under their own licenses and are not included in this distribution. Some of
+their wheels bundle libraries under other terms: LGPL libraries (GEOS in
+shapely, libquadmath in numpy and scipy), GCC runtime libraries under the GCC
+Runtime Library Exception (numpy, scipy) and FreeType under the FreeType
+License (matplotlib, Pillow). simcase only calls these packages' public Python
+APIs; it does not load, modify or redistribute the bundled libraries itself.
+docs/third-party.md in the OpenPhysics repository lists them per platform.
 
 The optional test dependency ``galerkin-refsol`` is a separate FieldAlgo
 package under Apache-2.0.

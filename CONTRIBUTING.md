@@ -40,9 +40,10 @@ optional skips; a passing subset does not replace the required CI check.
 - **Scope.** Keep changes focused. Do not commit credentials, generated build
   directories, local environment files or private research material.
 - **Licensing.** Preserve upstream notices and verify the terms and provenance of
-  any added dependency, data or copied code. Contributions are submitted under the
-  repository's [Apache-2.0 license](LICENSE), with third-party exceptions recorded
-  in [NOTICE](NOTICE) and package notices.
+  any added dependency, data or copied code against the policy in
+  [third-party software](docs/third-party.md), including what its wheels bundle.
+  Contributions are submitted under the repository's [Apache-2.0 license](LICENSE),
+  with third-party exceptions recorded in [NOTICE](NOTICE) and package notices.
 
 ## Pull requests and landing
 
@@ -96,7 +97,10 @@ tag only when that release needs a patch, and carry reviewed fixes from `main`.
 
 The six implementation packages keep separate distribution names, metadata,
 licenses and notices. Third-party integrations belong in a separate package with
-an explicit API and documented external dependencies, following `gmshio`.
+an explicit API and documented external dependencies, following `gmshio`. A GPL
+program can back such an integration only as a separate process, installed through
+an optional extra (as `gmshio[gmsh]` installs Gmsh): it is never imported, linked or
+bundled.
 
 This guide and the implementation and validation documents hold the shared
 contributor rules. `AGENTS.md` holds short navigation, essential commands and
