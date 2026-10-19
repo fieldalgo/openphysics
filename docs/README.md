@@ -54,7 +54,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 | Prescribed flux and Robin boundaries | [Outward flux and convection](../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | Flux/Robin acceptance | [Independent boundary checks](../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | Steady heat document | [Headless JSON/API/CLI](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
-| Steady heat region document | [Materials table and shapes](../packages/simcase/docs/thermal_regions2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_regions2d.md) |
+| Heat region documents | [Steady and transient, materials table and shapes](../packages/simcase/docs/thermal_regions2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_regions2d.md) |
 | Thermal document acceptance | [Independent document checks](../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
 | Steady boundary document | [Side-constant flux/convection, v1/v2 fields](../packages/simcase/docs/thermal_steady_boundary2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md) |
 | Steady boundary acceptance | [Analytic, element and convergence gates](../packages/simcase/docs/steady_boundary_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/steady_boundary_independent_validation.md) |

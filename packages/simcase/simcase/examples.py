@@ -4,7 +4,7 @@
 """Example documents (also used by the tests)."""
 
 import copy
-from .thermal_examples import THERMAL_SLAB, THERMAL_MIXED, THERMAL_REGIONS
+from .thermal_examples import THERMAL_SLAB, THERMAL_MIXED, THERMAL_REGIONS, TRANSIENT_THERMAL_REGIONS
 
 SOI_STRIP = {
     "openphysics": "0.2",
@@ -177,6 +177,7 @@ TRANSIENT_THERMAL_UNIFORM = {
     'results': {'save_fields': True, 'plots': False},
 }
 EXAMPLES['transient_thermal_uniform'] = TRANSIENT_THERMAL_UNIFORM
+EXAMPLES['transient_thermal_regions'] = TRANSIENT_THERMAL_REGIONS
 
 
 # Constant-boundary steady example; supported by the headless runner only.
