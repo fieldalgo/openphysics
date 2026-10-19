@@ -33,7 +33,8 @@ reported.
 ```bash
 python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
-  python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py
+  python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
+    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py
 ```
 
 Without the tool the tests skip locally. CI sets
@@ -72,6 +73,8 @@ scikit-fem 12.0.2). The CI records of each commit are authoritative.
 | `elasticity-p1-plane-stress-cantilever` | same, plane stress | same | nodal displacement | 8.2e-14 | 1e-9 |
 | `waveguide-vector-rect-core` | `waveguide.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | effective index, 4 guided modes | 1.5e-15 | 1e-9 |
 | `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec tetrahedra | `ElementTetN0` | lowest 8 eigenvalues k^2 | 1.4e-14 | 1e-9 |
+| `cavity-lossy-slab` | `material_cavity.solve_material_cavity_box`, complex eps/mu per tetrahedron | `ElementTetN0`, per-material assembly | six complex k^2; Q | 4.1e-15; 9.2e-14 | 1e-9 |
+| `cavity-impedance-walls` | same, Leontovich walls z1 and x0 | `ElementTetN0` + `FacetBasis` tangential mass, `T(k)` frozen at galerkin's `k0` | three complex k^2 at the fixed point | 6.8e-13 | 1e-9 |
 | `heat-p2-reference-slab` | P1 | `ElementTriP2` | vertex temperature: P1 vs P2; P1 vs exact; P2 vs exact | 3.7e-5; 3.6e-5; 1.5e-6 | reported |
 | `elasticity-p2-reference-cantilever` | P1, plane stress | `ElementVector(ElementTriP2)` | tip deflection, P1 vs P2 | 1.7e-1 | reported |
 
