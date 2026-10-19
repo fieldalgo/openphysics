@@ -174,3 +174,7 @@ Original code and documentation are licensed under **[Apache-2.0](../LICENSE)**.
 refractiveindex.info optical data is CC0 1.0, Gmsh is separately installed under
 its own license, and dependency licenses are not replaced by this repository's
 license.
+
+Every dependency, external program, dataset and published reference, with its
+license and how it is used, is listed in
+[third-party software](third-party.md).
