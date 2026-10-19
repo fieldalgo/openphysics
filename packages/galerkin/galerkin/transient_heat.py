@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Consistent-mass backward-Euler heat histories on a fixed SI P1 mesh.
 
-Explicit submodule only. See docs/transient_heat.md. Finite Kelvin values are
+Explicit submodule only. See docs/transient_heat.md; conductivity, heat
+capacity and a constant source may be piecewise constant on named mesh regions
+(docs/multimaterial.md). Finite Kelvin values are
 mathematical inputs, not a physical material-domain or positivity certificate.
 """
 from dataclasses import dataclass, fields
@@ -12,6 +14,7 @@ import numpy as np
 from scipy.sparse.linalg import splu
 
 from .mesh import Mesh
+from .materials import is_per_region, region_index, region_property
 from .thermal import _mesh_geometry, _real as _base_real, _source_load
 from .assembly import assemble_mass, assemble_stiffness
 from .postprocess import element_gradient
@@ -64,6 +67,8 @@ class TransientHeatResult:
     Node temperatures: K; element flux: W/m^2. All nodal rates: W/m depth.
     H is J/m, whereas quadratic V is J K/m and is NOT stored heat.
     Rates/reactions have no entry at t0. nodes_m/triangles capture the mesh.
+    conductivity_w_mk and volumetric_heat_capacity_j_m3k are floats, or
+    {region name: float} copies for per-region materials.
     Read-only arrays are not a cryptographic tamper/provenance guarantee.
     """
     time_s: np.ndarray
@@ -79,8 +84,8 @@ class TransientHeatResult:
     dirichlet_temperatures_k: np.ndarray
     nodes_m: np.ndarray
     triangles: np.ndarray
-    conductivity_w_mk: float
-    volumetric_heat_capacity_j_m3k: float
+    conductivity_w_mk: float | dict
+    volumetric_heat_capacity_j_m3k: float | dict
 
     def __post_init__(self):
         integer = {"dirichlet_node_ids", "triangles"}
@@ -102,11 +107,14 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     dirichlet: fixed exterior integer node -> scalar K or callback(time_s).
     Q: scalar W/m^3 or callback(points_m,time_s)->exactly(Q,) W/m^3.
     Other edges are insulated; no anchor is required on a transient component.
+    k, c and a constant Q may each be {region name: value} over mesh.region_names.
     Pure callbacks/no concurrent input mutation. Time-local failures are chained
     with index/time, no partial result; external callback side effects persist.
     """
-    k = _scalar(conductivity, "conductivity", True)
-    capacity = _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True)
+    regional = [is_per_region(v) for v in (conductivity, volumetric_heat_capacity, heat_source)]
+    k = conductivity if regional[0] else _scalar(conductivity, "conductivity", True)
+    capacity = (volumetric_heat_capacity if regional[1]
+                else _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True))
     times = _real(time_s, "time_s").copy()
     if times.ndim != 1 or len(times) < 2 or np.any(times < 0):
         raise ValueError("time_s must be nonnegative 1D seconds with at least two entries")
@@ -118,7 +126,23 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     p, t, area, exterior, count, labels = _mesh_geometry(mesh)
     p, t = p.copy(), t.copy()
     # Geometry is validated before Mesh can cast indices or repair orientation.
-    private_mesh = Mesh(p.copy(), t.copy(), boundary={})
+    record_k, record_c = k, capacity
+    if any(regional):
+        regions, names = region_index(mesh)
+        private_mesh = Mesh(p.copy(), t.copy(), boundary={}, regions=regions.copy(),
+                            region_names=list(names))
+        if regional[0]:
+            record_k = {str(n): float(conductivity[n]) for n in names if n in conductivity}
+            k = region_property(private_mesh, conductivity, "conductivity", positive=True)
+        if regional[1]:
+            record_c = {str(n): float(volumetric_heat_capacity[n])
+                        for n in names if n in volumetric_heat_capacity}
+            capacity = region_property(private_mesh, volumetric_heat_capacity,
+                                       "volumetric_heat_capacity", positive=True)
+        if regional[2]:
+            region_property(private_mesh, heat_source, "heat_source")
+    else:
+        private_mesh = Mesh(p.copy(), t.copy(), boundary={})
     initial = _real(initial_temperature_k, "initial_temperature_k").copy()
     if initial.shape != (len(p),):
         raise ValueError("initial_temperature_k must have exactly shape (N,)")
@@ -133,7 +157,8 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         conditions[int(node)] = value if callable(value) else _scalar(value, "Dirichlet temperature")
     fixed = np.array(sorted(conditions), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)
-    source = heat_source if callable(heat_source) else _scalar(heat_source, "heat_source")
+    source = (heat_source if callable(heat_source) or regional[2]
+              else _scalar(heat_source, "heat_source"))
 
     try:
         mass = assemble_mass(private_mesh, capacity)
@@ -186,7 +211,8 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             absolute = initial.copy()
         mtemp = mass@absolute
         temperature[index] = absolute
-        flux[index] = -k*element_gradient(private_mesh, centered(increment))
+        flux[index] = -(k[:, None] if np.ndim(k) else k)*element_gradient(
+            private_mesh, centered(increment))
         loads[index] = load
         boundary_values[index] = bc
         content[index] = np.sum(mtemp)
@@ -289,6 +315,6 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     try:
         return TransientHeatResult(
             times, temperature, flux, loads, reactions, residuals, storage,
-            content, quadratic, fixed, boundary_values, p, t, k, capacity)
+            content, quadratic, fixed, boundary_values, p, t, record_k, record_c)
     except Exception as exc:
         raise TransientHeatStepError(nt-1, times[-1]) from exc
