@@ -64,13 +64,17 @@ class LayeredWall:
         self.width = np.diff(self.edges)
         self._eigen = np.array([])
 
-    def _end_value(self, s):
-        """X(L) for sqrt(lambda) = s > 0, starting from X=0, F=-1 at x=0."""
-        X, F = 0., -1.
-        for k, c, d in zip(self.k, self.c, self.width):
-            w = s*np.sqrt(c/k)
-            X, F = X*np.cos(w*d)-F*np.sin(w*d)/(k*w), F*np.cos(w*d)+k*w*X*np.sin(w*d)
-        return X
+    @staticmethod
+    def _advance(X, F, k, w, d):
+        """Transfer (X, F) across a layer, then rescale to unit phase radius.
+
+        Returns the rescaled state and the log of the factor removed. Only the
+        ratio X : F/(k w) carries the phase, and across many high-contrast layers
+        the raw state can grow past the floating-point range.
+        """
+        X, F = X*np.cos(w*d)-F*np.sin(w*d)/(k*w), F*np.cos(w*d)+k*w*X*np.sin(w*d)
+        r = np.hypot(X, F/(k*w))
+        return X/r, F/r, np.log(r)
 
     def zero_count(self, s):
         """Zeros of X(x; s^2) on (0, L], counted exactly layer by layer.
@@ -85,7 +89,7 @@ class LayeredWall:
             w = s*np.sqrt(c/k)
             phi = np.arctan2(F/(k*w), X)
             total += int(np.floor((w*d+phi-np.pi/2)/np.pi)-np.floor((phi-np.pi/2)/np.pi))
-            X, F = X*np.cos(w*d)-F*np.sin(w*d)/(k*w), F*np.cos(w*d)+k*w*X*np.sin(w*d)
+            X, F, _ = self._advance(X, F, k, w, d)
         return total
 
     def eigenvalues(self, count):
@@ -116,14 +120,21 @@ class LayeredWall:
         return self._eigen[:count].copy()
 
     def _state(self, s, x, layer):
-        """(X, F) at x for sqrt(lambda) = s, unscaled."""
-        starts = [(0., -1.)]
+        """(X, F) at x for sqrt(lambda) = s, up to one positive factor that depends on s only.
+
+        Each layer's start is kept as a unit-radius state and a log scale, so a
+        mode whose amplitude varies by more than the floating-point range across
+        the wall still has the right shape (parts below that range underflow to 0).
+        """
+        starts, logs = [(0., -1.)], [0.]
         for k, c, d in zip(self.k, self.c, self.width):
             w = s*np.sqrt(c/k)
-            X0, F0 = starts[-1]
-            starts.append((X0*np.cos(w*d)-F0*np.sin(w*d)/(k*w), F0*np.cos(w*d)+k*w*X0*np.sin(w*d)))
-        X0 = np.array([starts[i][0] for i in layer])
-        F0 = np.array([starts[i][1] for i in layer])
+            X1, F1, g = self._advance(*starts[-1], k, w, d)
+            starts.append((X1, F1))
+            logs.append(logs[-1]+g)
+        weight = np.exp(np.array(logs)-max(logs))
+        X0 = np.array([starts[i][0] for i in layer])*weight[layer]
+        F0 = np.array([starts[i][1] for i in layer])*weight[layer]
         k, w = self.k[layer], s*np.sqrt(self.c[layer]/self.k[layer])
         d = x-self.edges[layer]
         return X0*np.cos(w*d)-F0*np.sin(w*d)/(k*w), F0*np.cos(w*d)+k*w*X0*np.sin(w*d)
@@ -186,11 +197,12 @@ class LayeredWall:
         T = temperature-full[i]-((q0+S[i])*d+sources[i]*d**2/2)/self.k[i]
         return T, q0+S[i]+sources[i]*d
 
-    def _quadrature(self, panels=64, order=20):
+    def _quadrature(self, panels, order=20):
+        """Gauss-Legendre points, weights and layers; panels is one count per layer."""
         g, w = np.polynomial.legendre.leggauss(order)
         xs, ws, layer = [], [], []
         for i, (lo, hi) in enumerate(zip(self.edges[:-1], self.edges[1:])):
-            cuts = np.linspace(lo, hi, panels+1)
+            cuts = np.linspace(lo, hi, panels[i]+1)
             for a, b in zip(cuts[:-1], cuts[1:]):
                 xs.append(a+(b-a)*(g+1)/2)
                 ws.append(w*(b-a)/2)
@@ -205,8 +217,11 @@ class LayeredWall:
         cache = getattr(self, "_amplitude_cache", {})
         if key in cache:
             return cache[key]
-        self.eigenvalues(count)
-        x, w, layer = self._quadrature()
+        top = np.sqrt(self.eigenvalues(count)[-1])
+        # At least one 20-point panel per half-wave of the highest mode in every
+        # layer; a fixed rule aliases once a layer holds more half-waves than nodes.
+        halfwaves = top*np.sqrt(self.c/self.k)*self.width/np.pi
+        x, w, layer = self._quadrature([max(64, int(np.ceil(h))) for h in halfwaves])
         Ts, _ = self._steady(x, layer, T0, Q)
         weight = w*self.c[layer]
         amp = np.empty(count)

@@ -164,14 +164,46 @@ def test_source_driven_series_starts_uniform_and_converges_with_more_modes():
 
 
 def test_source_driven_start_converges_on_a_sandwich_with_close_roots():
-    """Regression: grid bracketing skipped close root pairs here, and the start error
-    stalled near 0.014 K whatever the mode count (observed 4.2x and 4.1x per doubling
-    after the zero-count eigenvalue fix)."""
+    """Regression: grid bracketing skipped close root pairs here (eigenvalues wrong from
+    index 9), and the start error stalled near 0.008 K (0.0073, 0.0078, 0.0077 K at 20, 40,
+    80 modes); with the zero-count search it falls 4.2x and 4.1x per doubling."""
     wall = LayeredWall([.02, .03, .05], [.03, 400., .03], [3e4, 3.4e6, 3e4])
     x = np.linspace(0., .05, 2001)
     errors = [abs(wall.source_driven(_p(x), 0., temperature=300., sources=[0., 1e5, 0.],
                                      count=n).temperature-300.).max() for n in (20, 40, 80)]
     assert errors[0]/errors[1] >= 3 and errors[1]/errors[2] >= 3
+
+
+@pytest.mark.slow
+def test_source_driven_projection_resolves_more_than_a_thousand_modes():
+    """Regression: a fixed 64-panel rule aliased once a layer held more half-waves than
+    quadrature nodes (start error 1.19 K at 1300 modes on this layer). The single layer
+    has a closed-form sine series to compare with."""
+    L, k, c, Q, T0, N = .2, 2., 5e5, 1e5, 300., 1300
+    wall = LayeredWall([L], [k], [c])
+    x = np.linspace(0., L, 3001)
+    T = wall.source_driven(_p(x), 0., temperature=T0, sources=[Q], count=N).temperature
+    n = np.arange(1, N+1)
+    b = -(Q/(2*k))*4*L**2/(n*np.pi)**3*(1-(-1.)**n)
+    exact = T0+Q*x*(L-x)/(2*k)+(b[:, None]*np.sin(np.outer(n, np.pi*x/L))).sum(axis=0)
+    assert np.max(abs(T-exact)) < 1e-9          # observed 1.7e-11 K
+
+
+@pytest.mark.slow
+def test_many_high_contrast_layers_do_not_overflow():
+    """Regression: the unscaled transfer state overflowed to NaN at band-gap frequencies
+    of 200 alternating layers and eigenvalues() raised."""
+    nl = 200
+    wall = LayeredWall(np.cumsum(np.full(nl, 1e-3)), np.tile([.015, 2000.], nl//2),
+                       np.tile([2e3, 1.8e6], nl//2))
+    lam = wall.eigenvalues(nl+10)
+    assert np.all(np.diff(lam) > 0)
+    for m, value in enumerate(lam):
+        s = np.sqrt(value)
+        assert wall.zero_count(s*(1-1e-9)) == m and wall.zero_count(s*(1+1e-9)) >= m+1
+    x = np.linspace(0., nl*1e-3, 4001)
+    X, F = wall.mode(nl+5, x, wall.locate(x))
+    assert np.all(np.isfinite(X)) and np.all(np.isfinite(F)) and abs(np.max(abs(X))-1) < 1e-4
 
 
 def test_source_driven_series_satisfies_the_pde_with_sources():
