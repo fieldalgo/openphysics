@@ -2,14 +2,10 @@
 
 [English](../../../README.md) | **한국어**
 
-## 현재 checkout과 근거
+## 개발과 검증
 
-현재 CI 구성에는 Linux·macOS·Windows 설치 패키지 검사가 추가되어 있습니다.
-각 OS에서 여섯 구현 sdist를 wheel로 만들고 격리 소비자의 import, 패키지 바이트,
-번들 자산과 선택한 공개 API/CLI/저장 동작을 확인합니다. 필수 `tests` 집계는
-전체 Linux 수용과 세 설치 플랫폼을 모두 기다리며 기존 Windows 열전도 검사도
-필수로 유지합니다. 이는 구성된 검증 범위이며 과거 통과 결과에 새 주장을 더하지
-않습니다. 범위·명령·정확 실행 artifact는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고하세요.
+[개발 안내](development.md)는 개발 환경, CI가 돌리는 검사(필수 검사는 `tests` 하나),
+결과를 읽는 법을 설명합니다. 브랜치·리뷰·릴리스는 [기여 안내](contributing.md)에 있습니다.
 
 이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
 
@@ -39,9 +35,9 @@
 | 처방 온도장 기계단계 | [Snapshot·3D 감소·에너지](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
 | 기계단계 수용검증 | [독립 원3D 재료 법칙](../../../../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
 
-패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [CI 안내](../../../../ci/docs/README.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
+패키지 README는 각각의 의존성·공개 진입점·범위를 설명한다. 전체 구성은 구현 여섯 개와 이름 예약 배포 하나다. `openphysics` 이름 예약 패키지를 설치해도 전체 도구가 설치되지는 않는다. [개발 안내](development.md)는 선언한 메타데이터와 실제 시험 환경, 물리 수용과 설치 소비자 시험을 구분한다.
 
-이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 정상 직사각형 JSON은 [경계조건 문서 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)에 따라 변별 상수 외향 열유속·대류를 받으며, 과도 flux/Robin은 미지원이다. Work cloud Linux 결과·Actions 활성·Windows 검증의 실측 범위는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고한다.
+이 checkout에는 헤드리스 열전도 문서와 독립 API의 처방 열유속·Robin 경계가 있다. 아래 계약과 보고는 각각의 구현과 실측 범위를 설명한다. 정상 직사각형 JSON은 [경계조건 문서 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)에 따라 변별 상수 외향 열유속·대류를 받으며, 과도 flux/Robin은 미지원이다. CI가 Linux·macOS·Windows에서 무엇을 검사하는지는 [개발 안내](development.md)에 있다.
 
 ## 패키지 개요: 전체 한국어판
 
@@ -70,11 +66,11 @@
 | [thermal_flux_robin](../../../../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
 | [thermal_flux_robin_independent_validation](../../../../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
 | [thermal_simcase_independent_validation](../../../../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../../../../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| [README](../../../../ci/docs/README.md) | [한국어](../../../../ci/docs/locales/ko/pages/README.md) |
-| [benchmark_cavity](../../../../ci/docs/benchmark_cavity.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_cavity.md) |
-| [benchmark_vector](../../../../ci/docs/benchmark_vector.md) | [한국어](../../../../ci/docs/locales/ko/pages/benchmark_vector.md) |
+| [development](../../../development.md) | [한국어](development.md) |
+| [benchmark_cavity](../../../benchmark_cavity.md) | [한국어](benchmark_cavity.md) |
+| [benchmark_vector](../../../benchmark_vector.md) | [한국어](benchmark_vector.md) |
 
-이 문서들은 이 checkout을 설명합니다. Actions는 활성화돼 있습니다. `636a23a`의 좁은 Windows gate는 설치 36개·source 3개가 통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)). Windows 전체 회귀나 macOS 수용을 뜻하지 않습니다. 이전 Windows 결과가 새로운 정상 경계조건 JSON 확장을 검증하는 것은 아니므로 정확한 CI 산출물을 별도로 확인하세요.
+이 문서들은 이 checkout을 설명합니다. 설치 저장/I-O 견고성 시험은 Linux·macOS·Windows에서 돌며, 설치 수용 검사이지 Windows나 macOS 전체 회귀 시험은 아닙니다. 결과는 해당 커밋의 CI에서 확인하세요.
 
 ## 명시적 정상 열전도→기계 workflow
 

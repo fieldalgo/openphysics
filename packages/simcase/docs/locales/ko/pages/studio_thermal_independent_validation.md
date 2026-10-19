@@ -11,7 +11,7 @@
 릴리스를 입증할 수 없다.
 
 사용법은 [Studio 가이드](thermal_studio.md), 환경·배포 요구사항은
-[검증 가이드](https://github.com/fieldalgo/openphysics/blob/main/ci/docs/locales/ko/pages/README.md)를 따른다.
+[개발 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/development.md)를 따른다.
 중간 구현 검토는 과거 이력이며 현재 runtime이나 수용 상태를 정의하지 않는다.
 
 ## HTTP suite의 검사 범위

@@ -4,7 +4,7 @@
 
 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`의 영문 문서입니다.
 
-[README.md](README.md)의 고정 Python 환경을 사용하고 저장소 루트에서 실행합니다.
+[개발 안내](development.md)의 고정 Python 환경을 사용하고 저장소 루트에서 실행합니다.
 이 소스 benchmark는 자신의 checkout에서 `packages/galerkin`을 명시적으로 로드하고
 import 위치를 검사합니다. 새 의존성, solver 최적화, API 변경이나 CI 시간 gate는 없습니다.
 
@@ -105,7 +105,7 @@ solve, assembly, topology와 field 복원은 call tree에서 겹칩니다. cProf
 RSS를 개별 단계에 귀속시킬 수 없습니다. 메모리 최적화를 선택하기 전에 별도 후속
 작업으로 그러한 귀속을 확립해야 합니다.
 
-[README.md](README.md)의 루트 전체 시험은 시간 측정과 따로 실행해 benchmark의
+[개발 안내](development.md)의 루트 전체 시험은 시간 측정과 따로 실행해 benchmark의
 CPU·메모리를 놓고 경쟁하지 않게 합니다. 이 도구는 기존 고정 수치 수용 gate를
 보완하며 대체하지 않습니다.
 

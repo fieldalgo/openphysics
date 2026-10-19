@@ -68,7 +68,7 @@ python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packag
 Gmsh는 선택 도구로 별도 설치합니다. 메시 생성에는 PATH의 `gmsh` 또는
 `GMSH_EXECUTABLE`이 필요하지만, 기존 MSH 파일을 읽는 데에는 필요하지 않습니다.
 내장 광학 재료는 전체 refractiveindex.info 데이터베이스를 내려받지 않아도 동작합니다.
-재현 가능한 의존성·데이터베이스 버전은 [검증 환경 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따르세요.
+재현 가능한 의존성·데이터베이스 버전은 [개발 안내](development.md)를 따르세요.
 
 ## 예제 실행
 
@@ -123,21 +123,13 @@ python -m pytest -q packages/simcase/tests
 과거 수치가 이후의 모든 문서 커밋에서 전체 시험을 다시 실행했다는 뜻은 아니며,
 일부 시험 통과가 skip한 통합 기능을 검증하지는 않습니다.
 
-패키지 metadata는 Python 3.10 이상을 허용하지만 고정한 Linux 검증 의존성은
-Python 3.12용이므로 3.10·3.11에서 그대로 사용할 수 없습니다. 다른 환경은 실측한
-전체 회귀시험 범위 밖입니다. Windows 2022 / Python 3.12.10의 좁은 저장 I/O
-검증은 `636a23a`에서 설치 API·CLI·저장 36개와 source 기존 대상 보호 3개가
-통과했습니다([실행](https://github.com/fieldalgo/openphysics/actions/runs/38858254797)).
-과거 교체 실패 두 개를 회복한 범위이며 Windows 전체 회귀·다른 파일시스템·macOS
-지원을 입증하지 않습니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며
-검증된 플랫폼 목록이 아닙니다. GitHub Actions는 활성화돼 있습니다. 과거 클라우드 결과는 원래 snapshot의 근거이며 새 커밋은 정확한 workflow 결과를 확인해야 합니다.
-
-현재 CI 구성에는 Linux·macOS·Windows 설치 패키지 검사가 추가되어 있습니다.
-각 OS에서 여섯 구현 sdist를 wheel로 만들고 격리 소비자의 import, 패키지 바이트,
-번들 자산과 선택한 공개 API/CLI/저장 동작을 확인합니다. 필수 `tests` 집계는
-전체 Linux 수용과 세 설치 플랫폼을 모두 기다리며 기존 Windows 열전도 검사도
-필수로 유지합니다. 이는 구성된 검증 범위이며 과거 통과 결과에 새 주장을 더하지
-않습니다. 범위·명령·정확 실행 artifact는 [검증 안내](../../../../ci/docs/locales/ko/pages/README.md)를 참고하세요.
+패키지 metadata는 Python 3.10 이상을 허용하지만 CI는 Python 3.12만 시험합니다. 전체
+소스 수용 시험은 Linux에서 돕니다. CI는 Linux·macOS·Windows에서 여섯 구현 sdist를
+wheel로 만들어 새 환경에서도 시험합니다. 패키지 바이트, 포함 자산, 공개 API·CLI·저장
+동작, 열 저장/I-O 견고성을 확인합니다. 설치 수용 검사이며 Windows나 macOS 전체 회귀
+시험은 아닙니다. `OS Independent` 분류와 `py3-none-any` wheel은 metadata이며 검증된
+플랫폼 목록이 아닙니다. 기록된 결과는 그 snapshot에만 해당하며, 새 커밋은 정확한
+workflow 결과를 확인해야 합니다. 검사와 명령은 [개발 안내](development.md)에 있습니다.
 
 ## 문서와 기여
 

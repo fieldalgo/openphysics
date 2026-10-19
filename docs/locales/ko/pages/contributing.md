@@ -16,7 +16,7 @@ main 동작과 PR 후보 동작을 구분하고 첨부 전에 인증정보·개�
 
 [개요·설치 안내](overview.md)에 따라 저장소 루트에서 설치·실행하세요.
 고정한 Linux 검증 환경, 선택 도구·데이터와 격리 배포 검사는
-[ci 한국어 안내](../../../../ci/docs/locales/ko/pages/README.md)를 따릅니다. GitHub Actions는 main push·Ready PR·명시적 수동 dispatch에서 실행됩니다.
+[개발 안내](development.md)를 따릅니다. GitHub Actions는 main push·Ready PR·명시적 수동 dispatch에서 실행됩니다.
 기여 검증 시 정확한 workflow 결과와 artifact를 확인하세요.
 직접 수행한 검사의 정확한 명령, 종료값, 실패와 선택 기능 skip을 기록하세요.
 
