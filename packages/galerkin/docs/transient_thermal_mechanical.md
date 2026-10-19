@@ -8,7 +8,9 @@ reference mesh. First call `galerkin.transient_heat.solve_transient_heat`, then
 pass its result and the same mesh to this function. The runnable
 [example](../examples/transient_thermal_mechanical.py) uses two explicit calls.
 There is no new heat solver, inertia, damping, dynamic equilibrium, mechanical
-feedback to heat, deformed geometry, or temporal interpolation.
+feedback to heat, deformed geometry, or temporal interpolation. E, nu and alpha
+may each be `{region name: value}` ([multimaterial](multimaterial.md)); every
+step then calls the per-region mechanical stage.
 
 ## Inputs and selection
 

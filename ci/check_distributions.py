@@ -133,7 +133,8 @@ DOCUMENT_ASSETS = {'galerkin': (
               'docs/multimaterial.md',
               'docs/locales/ko/pages/multimaterial.md',
               'tests/test_thermal_multimaterial.py',
-              'tests/test_elasticity_multimaterial.py'),
+              'tests/test_elasticity_multimaterial.py',
+              'tests/test_thermoelastic_multimaterial.py'),
  'galerkin-refsol': (
               'refsol/thermal_multilayer.py',
               'tests/test_thermal_multilayer_reference.py',

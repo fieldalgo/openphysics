@@ -31,7 +31,7 @@ English is the repository default. READMEs and contribution/security entry point
 | Traction acceptance | [Independent forces, work and convergence](../packages/galerkin/docs/elasticity_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity_traction_independent_validation.md) |
 | Steady conduction | [Kelvin, heat flux and boundary signs](../packages/galerkin/docs/thermal_steady2d.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md) |
 | Conduction acceptance | [Independent source/wheel evidence](../packages/galerkin/docs/thermal_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_independent_validation.md) |
-| Region materials | [Per-region conductivity, source, E and nu; layered references](../packages/galerkin/docs/multimaterial.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/multimaterial.md) |
+| Region materials | [Per-region heat, elastic and thermoelastic materials; layered references](../packages/galerkin/docs/multimaterial.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/multimaterial.md) |
 | Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
 | Mechanical-stage acceptance | [Independent original 3D law](../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
 

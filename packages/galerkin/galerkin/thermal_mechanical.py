@@ -13,6 +13,7 @@ import json
 import numpy as np
 
 from .mesh import Mesh
+from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
 
@@ -134,9 +135,19 @@ def _check_mesh(mesh, state):
             raise ValueError('isolated reference boundary data changed during workflow')
 
 
+def _material(mesh, value, name, **bounds):
+    """Validated scalar float, or a {region name: float} dict (sorted keys)."""
+    if is_per_region(value):
+        region_property(mesh, value, name, **bounds)
+        return {str(k): float(value[k]) for k in sorted(value)}
+    return _scalar(value, name)
+
+
 def _input_record(value):
     if callable(value):
         return {'kind': 'callable', 'origin': 'caller_provided', 'fingerprinted': False}
+    if isinstance(value, dict):
+        return {'kind': 'per_region', 'value': dict(value)}
     return {'kind': 'constant', 'value': np.asarray(value).tolist()}
 
 
@@ -167,6 +178,8 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
 
     units must equal {'length':'m','temperature':'K'}; no conversion/inference.
     Constant k W/(m K), E Pa, nu, signed alpha 1/K, nonnegative Tref K.
+    k, E, nu, alpha and a constant heat_source may each be {region name: value}
+    over mesh.region_names (piecewise constant; docs/multimaterial.md).
     Heat uses Dirichlet + insulation. Mechanics uses component Dirichlet and
     zero total natural traction; body force N/m^3. See the complete EN/KO guide.
     """
@@ -175,16 +188,19 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
             raise ValueError("units must be exactly {'length':'m','temperature':'K'}; convert inputs explicitly")
         owned = _isolated_mesh(mesh)
         state = _mesh_state(owned)
-        k = _scalar(conductivity, 'conductivity')
-        e = _scalar(young_modulus, 'young_modulus')
-        nu = _scalar(poisson_ratio, 'poisson_ratio')
-        alpha = _scalar(thermal_expansion_per_k, 'thermal_expansion_per_k')
+        k = _material(owned, conductivity, 'conductivity', positive=True)
+        e = _material(owned, young_modulus, 'young_modulus', positive=True)
+        nu = _material(owned, poisson_ratio, 'poisson_ratio', lower=-1., upper=.5)
+        alpha = _material(owned, thermal_expansion_per_k, 'thermal_expansion_per_k')
         tref = _scalar(reference_temperature_k, 'reference_temperature_k')
-        if k <= 0 or e <= 0 or not -1 < nu < .5 or tref < 0 or plane not in ('stress', 'strain'):
+        scalars = [v for v in (k, e) if not isinstance(v, dict)]
+        if (any(v <= 0 for v in scalars) or (not isinstance(nu, dict) and not -1 < nu < .5)
+                or tref < 0 or plane not in ('stress', 'strain')):
             raise ValueError('require k>0, E>0, -1<nu<.5, Tref>=0K and plane stress/strain')
         heat_bc = _supports(thermal_dirichlet)
         mechanical_bc = _supports(mechanical_dirichlet, vector=True)
-        source = heat_source if callable(heat_source) else _scalar(heat_source, 'heat_source')
+        source = (heat_source if callable(heat_source)
+                  else _material(owned, heat_source, 'heat_source'))
         body = body_force if callable(body_force) else _real(body_force, 'body_force')
         if not callable(body) and body.shape != (2,):
             raise ValueError('constant body_force must have shape (2,)')

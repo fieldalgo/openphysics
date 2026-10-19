@@ -86,3 +86,4 @@ include docs/multimaterial.md
 include docs/locales/ko/pages/multimaterial.md
 include tests/test_thermal_multimaterial.py
 include tests/test_elasticity_multimaterial.py
+include tests/test_thermoelastic_multimaterial.py

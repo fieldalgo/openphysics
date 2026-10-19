@@ -3,6 +3,8 @@
 """Static mechanical stage for an explicitly prescribed nodal-P1 Kelvin field.
 
 This module does not call a heat solver or authenticate temperature provenance.
+alpha, E and nu are scalars or piecewise constant on named mesh regions
+(galerkin.materials, ../docs/multimaterial.md).
 See ../docs/prescribed_temperature_thermoelasticity.md for units and reductions.
 """
 from dataclasses import dataclass, field
@@ -11,7 +13,8 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
 from .elasticity import (_mesh_data, _constraints, _quadrature, _real,
-                         constitutive_matrix, _traction_load)
+                         constitutive_matrix, _traction_load, element_constitutive)
+from .materials import is_per_region, region_property
 
 _M = np.array([1., 1., 0.])
 
@@ -173,6 +176,101 @@ def _physical_energy(total_strain, a_element_nodes, area, d, e, nu, plane):
     return value
 
 
+def _region_energy(total_strain, a_element_nodes, area, d, e, nu, plane):
+    """_physical_energy with per-triangle d (T,3,3), e (T,) and nu (T,)."""
+    bary = np.array([[2/3,1/6,1/6], [1/6,2/3,1/6], [1/6,1/6,2/3]])
+    aq = a_element_nodes @ bary.T
+    effective = aq if plane == "stress" else (1+nu)[:,None]*aq
+    delta = total_strain[:,None,:]-effective[...,None]*_M
+    density = .5*np.einsum("tqi,tij,tqj->tq", delta, d, delta)
+    if plane == "strain":
+        density += .5*e[:,None]*aq**2
+    if not np.all(np.isfinite(density)) or np.any(density < 0):
+        raise ValueError("nonfinite or negative physical elastic energy; check numeric scaling")
+    value = float(np.sum(area[:,None]*density)/3)
+    if not np.isfinite(value):
+        raise ValueError("integrated physical elastic energy exceeds floating-point range")
+    return value
+
+
+def _material_record(value):
+    """Scalar float, or a plain {region name: float} copy for result records."""
+    return {str(k): float(v) for k, v in value.items()} if is_per_region(value) else value
+
+
+def _solve_regions(mesh, temperature_snapshot, *, reference_temperature_k,
+                   thermal_expansion_per_k, young_modulus, poisson_ratio,
+                   plane, dirichlet, body_force, traction):
+    p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
+    _verify_snapshot(temperature_snapshot,p,t)
+    tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
+    if plane not in ("stress", "strain"):
+        raise ValueError("plane must be 'stress' or 'strain'")
+    n = len(t)
+    alpha = np.broadcast_to(region_property(mesh,thermal_expansion_per_k,"thermal_expansion_per_k"),(n,))
+    e = np.broadcast_to(region_property(mesh,young_modulus,"young_modulus",positive=True),(n,))
+    nu = np.broadcast_to(region_property(mesh,poisson_ratio,"poisson_ratio",lower=-1.,upper=.5),(n,))
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        d = np.broadcast_to(element_constitutive(mesh,young_modulus,poisson_ratio,plane=plane),(n,3,3))
+        coefficient = _thermal_coefficient(e,nu,plane)
+        a = alpha[:,None]*(temperature_snapshot.temperature_k[t]-tref)    # (T,3) nodal per element
+        q = coefficient[:,None]*a
+    if not np.all(np.isfinite(coefficient)) or not np.all(np.isfinite(a)) or not np.all(np.isfinite(q)):
+        raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
+    fixed,values = _constraints(dirichlet,p,boundary,count,labels)
+    ke = np.einsum("tji,tjk,tkl,t->til",b,d,b,area)
+    if not np.all(np.isfinite(ke)):
+        raise ValueError("element stiffness exceeds finite numeric range")
+    rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
+    k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
+    body = _external_body_load(p,t,area,dofs,body_force)
+    line = _traction_load(mesh,p,t,traction)
+    external = body+line
+    qc = q.mean(axis=1)
+    thermal = _thermal_load(area,b,dofs,qc,len(p))
+    load = external+thermal
+    if not all(np.all(np.isfinite(v)) for v in (body,line,external,thermal,load)):
+        raise ValueError("assembled external/thermal load exceeds finite numeric range")
+    free = np.setdiff1d(np.arange(len(load)),fixed)
+    u = np.zeros_like(load)
+    u[fixed] = values
+    if len(free):
+        rhs = load[free]-k[free][:,fixed]@values
+        try:
+            u[free] = splu(k[free][:,free].tocsc()).solve(rhs)
+        except RuntimeError as exc:
+            raise ValueError("singular or ill-conditioned constrained thermoelastic system") from exc
+    residual = k@u-external-thermal
+    if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
+        raise ValueError("nonfinite thermoelastic solution")
+    scale = max(np.linalg.norm(abs(k)@abs(u)+abs(external)+abs(thermal),np.inf),np.finfo(float).tiny)
+    if len(free) and np.linalg.norm(residual[free],np.inf) > 1e-9*scale:
+        raise ValueError("constrained thermoelastic solve failed its residual tolerance")
+    reaction = np.zeros_like(load)
+    reaction[fixed] = residual[fixed]
+    strain = np.einsum("tij,tj->ti",b,u[dofs])
+    ac = a.mean(axis=1)
+    th = ac[:,None]*_M
+    elastic = strain-th
+    stress = np.einsum("tij,tj->ti",d,strain)-qc[:,None]*_M
+    if plane == "strain":
+        lam = e*nu/((1+nu)*(1-2*nu))
+        zz = lam*(strain[:,0]+strain[:,1])-qc
+        ez = np.zeros(n)
+    else:
+        zz = np.zeros(n)
+        ez = ((1+nu)*ac-nu*(strain[:,0]+strain[:,1]))/(1-nu)
+    with np.errstate(over="ignore",invalid="ignore"):
+        energy = _region_energy(strain,a,area,d,e,nu,plane)
+    if not all(np.all(np.isfinite(v)) for v in (strain,th,elastic,stress,zz,ez)):
+        raise ValueError("computed thermoelastic strain/stress exceeds finite numeric range")
+    return ThermoelasticResult(u.reshape(-1,2),strain,th,elastic,stress,zz,ez,
+        external.reshape(-1,2),thermal.reshape(-1,2),reaction.reshape(-1,2),
+        residual.reshape(-1,2),energy,temperature_snapshot,tref,
+        _material_record(thermal_expansion_per_k),_material_record(young_modulus),
+        _material_record(poisson_ratio),plane,body.reshape(-1,2),line.reshape(-1,2))
+
+
 @dataclass
 class ThermoelasticResult:
     """Mechanical fields for a prescribed temperature snapshot, per thickness.
@@ -182,6 +280,8 @@ class ThermoelasticResult:
     varies linearly inside a triangle. Strain order is (exx,eyy,gamma_xy).
     load_external (body + traction), load_thermal, reaction and residual are N/m
     arrays. physical_elastic_energy is the reduced physical 3D energy, J/m.
+    thermal_expansion_per_k, young_modulus and poisson_ratio echo the input:
+    a float, or a {region name: float} copy for per-region materials.
     """
     displacement: np.ndarray
     total_strain: np.ndarray
@@ -197,9 +297,9 @@ class ThermoelasticResult:
     physical_elastic_energy: float
     temperature_snapshot: TemperatureSnapshot
     reference_temperature_k: float
-    thermal_expansion_per_k: float
-    young_modulus: float
-    poisson_ratio: float
+    thermal_expansion_per_k: float | dict
+    young_modulus: float | dict
+    poisson_ratio: float | dict
     plane: str
     load_body: np.ndarray | None = None
     load_traction: np.ndarray | None = None
@@ -223,7 +323,14 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     reactions/support work. No dedicated scalar-pressure keyword, local-frame traction API, or follower
     geometry update is provided. A global Pa callback returning -p*normal is valid
     on the fixed reference boundary. Cross-mesh interpolation is unsupported. Near-incompressible plane-strain P1 locking remains possible.
+    alpha, E and nu may each be {region name: value} over mesh.region_names.
     """
+    if any(is_per_region(v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)):
+        return _solve_regions(mesh, temperature_snapshot,
+            reference_temperature_k=reference_temperature_k,
+            thermal_expansion_per_k=thermal_expansion_per_k, young_modulus=young_modulus,
+            poisson_ratio=poisson_ratio, plane=plane, dirichlet=dirichlet,
+            body_force=body_force, traction=traction)
     p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
     _verify_snapshot(temperature_snapshot,p,t)
     tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
