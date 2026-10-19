@@ -127,7 +127,7 @@ def test_first_party_import_of_external_tool_is_detected():
     assert check_licenses.first_party_imports({"gmsh"}) == []
 
 
-@pytest.mark.parametrize("spdx", ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only"])
+@pytest.mark.parametrize("spdx", ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only", "EUPL-1.2"])
 def test_agpl_is_never_allowed(tmp_path, spdx):
     install(tmp_path, "netlib", expression=spdx)
     errors, _ = run(tmp_path, {"netlib": {"spdx": spdx, "test_only": True}})

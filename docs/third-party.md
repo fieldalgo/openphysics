@@ -246,7 +246,8 @@ scanning tool is installed. It fails when:
 - a weak-copyleft test or tool dependency is not marked `test_only`;
 - a GPL distribution is not an external process, is a base runtime
   requirement, or is imported by first-party code;
-- AGPL or SSPL appears anywhere;
+- AGPL or another network-copyleft license (SSPL, EUPL, OSL, CPAL, RPL) appears
+  anywhere, even as an external process;
 - a first-party package does not declare Apache-2.0;
 - this page or its Korean translation does not list every inventory entry.
 
