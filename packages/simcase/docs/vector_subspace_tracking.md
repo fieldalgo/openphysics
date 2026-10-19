@@ -138,14 +138,15 @@ for rank 8.
 
 Four guards protect the small cluster matrices. They separate roundoff from rank
 loss or a wrong metric; they are not accuracy claims about the physics. With
-unit roundoff `u` (1.1e-16), cluster rank `r`, Gram condition number `kappa` and
-`N` mesh degrees of freedom, the roundoff budget is:
+unit roundoff `u` (1.1e-16), cluster rank `r`, Gram condition number `kappa`,
+`N` mesh degrees of freedom and product cancellation `rho`, the roundoff budget
+is:
 
 | Guard | Value | Roundoff budget | A failure looks like |
 |---|---|---|---|
-| Hermitian defect of `G`, relative Frobenius | 1e-10 | about `sqrt(N) u` (2e-14 at N = 2e5); worst case `2 N u`, below the guard up to N = 4e5 | order one (wrong metric) |
+| Hermitian defect of `G`, relative Frobenius | 1e-10 | about `sqrt(N) u` (2e-14 at N = 2e5), growing with `rho` (below 2e-12 at `rho` = 4e5); worst case `2 N u`, below the guard up to N = 4e5 | order one (wrong metric) |
 | Gram condition `kappa` | 1e6 | none; a limit chosen so the next row stays consistent | near-duplicate fields |
-| Orthonormality defect `max abs(Q^H W Q - I)` of each formed frame | 1e-8 | `8 r u (kappa + sqrt(N))`; at most 7e-9 for kappa = 1e6, r = 8, N = 1e6 | well above the budget |
+| Orthonormality defect `max abs(Q^H W Q - I)` of each formed frame | 1e-8 | `8 r u (kappa + sqrt(N) + rho)`; at most 8.5e-9 for kappa = 1e6, r = 8, N = 1e6, `rho` = 2e5 | well above the budget |
 | `sigma^2` above one | `(1 + r d_P)(1 + r d_Q) - 1 + 1e-12` | defects `d` of the two frames, plus about `u (r + sqrt(N))` of SVD and product roundoff, covered by 1e-12 for N up to about 1e7 | frames not orthonormal |
 
 Where the budget terms come from. `G` is a sum of sparse products, so its
@@ -153,15 +154,29 @@ entries carry relative roundoff of order `sqrt(N) u`. The Hermitian
 eigendecomposition used for `G^(-1/2)` is backward stable, and `G^(-1/2)`
 amplifies both its backward error and the Gram roundoff by up to `kappa`. The
 frame is then formed and its defect measured with fresh products, which adds
-the `sqrt(N)` term. The spectral defect of a frame is at most `r` times its
+the `sqrt(N)` and `rho` terms. The spectral defect of a frame is at most `r` times its
 largest entry defect, which bounds `sigma_max^2` by `(1 + r d_P)(1 + r d_Q)`.
 
-Measured on generic random fields (ranks 1 to 12, `kappa` up to 1e6, N from
-153 to 2e5, both CI OpenBLAS kernels), the defect reached 2.3 of the 8 in the
-budget and the remaining `sigma^2` excursion reached 0.45 of `u (r + sqrt(N))`.
-The tests check the budget with these margins. The factor of the `sqrt(N)` term
-also grows with the conditioning of the mass matrices (strongly graded meshes);
-only quasi-uniform meshes were measured.
+The product cancellation `rho` is the largest `sum |x| |W| |x| / (x^H W x)` over
+the cluster fields (`ElectricMetric.cancellation`). Rounding of each term is
+relative to `|x_i| |W_ij| |x_j|`, so the product's rounding grows with `rho`.
+It is about 1 to 3 for smooth or random fields on shape-regular meshes. It is
+large only when the field oscillates across very flat elements: on a mesh graded
+geometrically to element aspect ratios 1e4, smooth fields gave `rho` up to 4e3,
+and the mass matrices' smallest eigenvectors gave 4e4 to 4e5. Grading alone does
+not matter. Mass matrices with condition numbers up to 4e8 changed nothing for
+random fields.
+
+Measured with both CI OpenBLAS kernels, the defect reached 2.3 of the 8 in the
+budget, for generic random fields on uniform meshes (ranks 1 to 12, `kappa` up
+to 1e6, N from 153 to 2e5). On the graded meshes (aspect ratios up to 1e4, N up
+to 3e4, random, size-scaled, smooth and smallest-eigenvector fields) it reached
+1.4 of 8. Without the `rho` term the smallest-eigenvector fields exceeded the
+budget by 10 to 30 times. Absolute defects stayed below 3e-10 in every case.
+The remaining `sigma^2` excursion reached 0.45 of `u (r + sqrt(N))`, and it was
+zero on every graded mesh. The tests check these budgets with margin, including
+a graded mesh. Above `rho` of about 2e5 at rank 8, roundoff alone can reach the
+defect guard. The tracker then refuses, and its message names the budget.
 
 Changes from the first version, both stricter: the condition limit was 1e8,
 where the defect budget is about 1e-6, so the defect guard, not the stated

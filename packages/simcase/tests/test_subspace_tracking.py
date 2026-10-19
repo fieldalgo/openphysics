@@ -11,7 +11,7 @@ tracker's own output.
 import numpy as np
 import pytest
 
-from galerkin import EdgeSpace, eval_edge_field, rectangle_mesh
+from galerkin import EdgeSpace, Mesh, eval_edge_field, rectangle_mesh
 from simcase.fields import VectorField
 from simcase.subspace_tracking import (ElectricMetric, SUBSPACE_METHOD, SubspaceTracker, assign_clusters,
                                        columns, partition, principal_values, projection_sin_max_angle,
@@ -152,6 +152,7 @@ def test_guard_constants_are_consistent_with_the_roundoff_budget():
     from simcase.subspace_tracking import (GRAM_CONDITION_MAX, ORTHONORMAL_DEFECT_MAX, SINGULAR_ROUNDOFF,
                                            UNIT_ROUNDOFF, frame_defect_budget)
     assert frame_defect_budget(8, GRAM_CONDITION_MAX, 10 ** 6) < ORTHONORMAL_DEFECT_MAX
+    assert frame_defect_budget(8, GRAM_CONDITION_MAX, 10 ** 6, cancellation=2e5) < ORTHONORMAL_DEFECT_MAX
     assert frame_defect_budget(8, 1e8, 10 ** 6) > 10 * ORTHONORMAL_DEFECT_MAX      # why 1e8 was inconsistent
     assert 2 * UNIT_ROUNDOFF * (8 + np.sqrt(10 ** 7)) < SINGULAR_ROUNDOFF
 
@@ -185,6 +186,81 @@ def test_formed_frame_defect_stays_within_the_roundoff_budget(cells):
             excursion = np.linalg.svd(metric.product(first, second), compute_uv=False).max() ** 2 - 1
             implied = (1 + rank * d_first) * (1 + rank * d_second) - 1
             assert excursion - implied <= 2 * UNIT_ROUNDOFF * (rank + np.sqrt(size))
+
+
+def _graded_mesh(cells, ratio):
+    """Unit square whose element sizes grade geometrically by `ratio` towards one corner.
+
+    Elements along the two edges through that corner have aspect ratios up to `ratio`.
+    """
+    square = rectangle_mesh(1.0, 1.0, cells, cells)
+    stretch = lambda t: np.expm1(np.log(ratio) * t) / np.expm1(np.log(ratio))
+    return Mesh(stretch(square.nodes), square.triangles, square.boundary, square.boundary_edges)
+
+
+def test_cancellation_matches_hand_values(mesh):
+    metric = ElectricMetric(mesh)
+    edges, nodes = EdgeSpace(mesh).num_edges, mesh.num_nodes
+    constant = _field(mesh, np.zeros((edges, 1)), np.ones((nodes, 1)))
+    assert metric.cancellation(constant) == pytest.approx(1.0, rel=1e-12)    # positive node mass, no cancellation
+    alternating = _field(mesh, np.zeros((edges, 1)), (-1.0) ** np.arange(nodes)[:, None])
+    absolute = abs(metric.node_mass).sum()                                    # sum |W| for |x| = 1
+    signed = float(np.real(alternating.longitudinal[:, 0] @ metric.node_mass @ alternating.longitudinal[:, 0]))
+    assert metric.cancellation(alternating) == pytest.approx(absolute / signed, rel=1e-12)
+    assert metric.cancellation(alternating) > 1.5
+
+
+def test_roundoff_budget_holds_on_flat_elements_through_the_cancellation_term():
+    """Graded mesh with element aspect ratios up to 1e4.
+
+    The smallest-eigenvalue eigenvectors of the mass matrices oscillate, so their
+    product terms cancel strongly (cancellation about 4e4 here). Their frame defects
+    exceed the budget without the cancellation term (by 10x to 17x observed across
+    OpenBLAS kernels) and stay within it with the term.
+    Smooth fields stay within the budget too. Observed absolute defects stay below 1e-9.
+    """
+    from simcase.subspace_tracking import (HERMITIAN_DEFECT_MAX, UNIT_ROUNDOFF, frame_defect,
+                                           frame_defect_budget)
+    mesh = _graded_mesh(20, 1e4)
+    metric = ElectricMetric(mesh)
+    space = EdgeSpace(mesh)
+    size = space.num_edges + mesh.num_nodes
+    rng = np.random.default_rng(5)
+    edge_vectors = np.linalg.eigh(metric.edge_mass.toarray())[1][:, :8]
+    node_vectors = np.linalg.eigh(metric.node_mass.toarray())[1][:, :8]
+    oscillating = _field(mesh, edge_vectors, 1e-3 * node_vectors)
+    tangents = mesh.nodes[space.edges[:, 1]] - mesh.nodes[space.edges[:, 0]]
+    midpoints = mesh.nodes[space.edges].mean(axis=1)
+    waves = rng.normal(size=(3, 8, 2)) * 3
+    smooth = _field(mesh, np.exp(1j * midpoints @ waves[0].T) * tangents[:, :1]
+                    + np.exp(1j * midpoints @ waves[1].T) * tangents[:, 1:],
+                    np.exp(1j * mesh.nodes @ waves[2].T))
+    exceeded = 0.0
+    for fields, kind in ((oscillating, "oscillating"), (smooth, "smooth")):
+        gram = _gram(metric, fields)
+        assert np.linalg.norm(gram - gram.conj().T) / np.linalg.norm(gram) < HERMITIAN_DEFECT_MAX / 10
+        for rank in (2, 4, 8):
+            for condition in (1.0, 1e3, 1e6 * 0.9):
+                raw = _conditioned(metric, fields, rank, condition, rng)
+                cancellation = metric.cancellation(raw)
+                formed = []
+                for coordinates in (raw, columns(raw, _unitary(rank, rng))):
+                    inverse_root, diagnostics = whiten(_gram(metric, coordinates))
+                    frame = columns(coordinates, inverse_root @ _unitary(rank, rng))
+                    defect = frame_defect(metric, frame)
+                    kappa = diagnostics["gram_condition"]
+                    budget = frame_defect_budget(rank, kappa, size, cancellation)
+                    assert defect <= budget, (kind, rank, condition)
+                    assert defect < 1e-9
+                    if kind == "oscillating":
+                        exceeded = max(exceeded, defect / frame_defect_budget(rank, kappa, size))
+                    formed.append((frame, defect))
+                (first, d_first), (second, d_second) = formed
+                excursion = np.linalg.svd(metric.product(first, second), compute_uv=False).max() ** 2 - 1
+                implied = (1 + rank * d_first) * (1 + rank * d_second) - 1
+                assert excursion - implied <= 2 * UNIT_ROUNDOFF * (rank + np.sqrt(size))
+    assert metric.cancellation(oscillating) > 1e4 and metric.cancellation(smooth) < 1e4
+    assert exceeded > 3
 
 
 def test_same_span_in_ill_conditioned_coordinates_is_not_refused(mesh, basis):
@@ -501,3 +577,14 @@ def test_avoided_crossing_identity_depends_on_sampling(mesh, basis):
     for t in np.linspace(-1.0, 1.0, 81):
         _, _, _, _, evidence = fine.step(*sample(t), f"t={t:.3f}")
         assert evidence["candidate_ranks"] == [1]               # followed the upper eigenvector (adiabatic)
+
+
+def test_defect_refusal_names_the_roundoff_budget(mesh, basis, monkeypatch):
+    """A formed frame above the defect guard is refused, and the message gives the budget with cancellation."""
+    import simcase.subspace_tracking as module
+    monkeypatch.setattr(module, "frame_defect", lambda metric, frame: 1e-6)
+    tracker = SubspaceTracker(mesh, 1, _settings(1))
+    with pytest.raises(ModeTrackingError, match=r"formed frame is not orthonormal \(defect 1e-06 > 1e-08; "
+                                                r"roundoff budget [0-9.e-]+\)"):
+        tracker.step(np.array([2.0, 1.9]), columns(basis, np.eye(8)[:, :2]), "seed")
+    assert tracker.previous is None
