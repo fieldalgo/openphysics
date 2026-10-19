@@ -2,7 +2,8 @@
 
 [English original](../../../multimaterial.md)
 
-정상 열전도와 정적 탄성은 2D 메시의 이름 있는 영역마다 다른 재료를 줄 수 있습니다.
+정상 열전도, 정적 탄성, 처방 온도 기계단계, 정상·과도 열→역학 워크플로는 2D 메시의
+이름 있는 영역마다 다른 재료를 줄 수 있습니다.
 이 문서는 공통 입력 규칙, 각 계약과 그 독립 검증을 담습니다. 다른 물리는 검증되는
 대로 이 문서에 추가하며, 그 전까지 각 문서는 균질 재료 하나만 받는다고 적습니다.
 
@@ -170,9 +171,64 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin-refsol/tests/test_elasticity_multilayer_reference.py
 ```
 
+## 열탄성과 열→역학 연성
+
+`galerkin.thermoelasticity.solve_thermoelasticity`는 `thermal_expansion_per_k`(1/K),
+`young_modulus`, `poisson_ratio`를 각각 스칼라 또는 영역 매핑으로 받습니다. 매핑이
+하나라도 있으면 삼각형 e는 자신의 `D_e`와 열응력 계수(평면 응력 E/(1-nu), 평면 변형률
+E/(1-2nu))를 쓰고, 요소 절점의 열 변형률은 `alpha_e (T - T_ref)`입니다. 열 하중, 중심
+값, `sigma_zz`/`epsilon_zz`, 축약 물리 에너지도 같은 삼각형별 값을 씁니다. 결과는 각
+재료를 float 또는 `{영역 이름: float}` 사본으로 돌려줍니다. 모두 스칼라인 호출은 원래
+코드 경로를 그대로 씁니다.
+
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`는 `conductivity`,
+`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`, 상수 `heat_source`에
+매핑을 받습니다. `input` 단계에서 검증하고 열·기계 단계로 넘깁니다. manifest는 재료를
+정렬된 사전으로, 영역별 열원을 `{'kind': 'per_region', 'value': ...}`로 기록하며 스칼라
+manifest는 그대로입니다. `galerkin.transient_thermal_mechanical`도 같은 기계 매핑을
+받습니다(영역별 과도 열전도는 별도 단계).
+
+**정답.** `thermal_expansions`와 `temperature_change` 행 (a_i, b_i), dT = a_i +
+b_i ln(r/r_0)를 준 `refsol.elasticity_multilayer.composite_cylinder`: 각 껍질에서
+u_r = kappa_i I(r)/r + A_i r + B_i/r, I = s dT ds의 적분,
+kappa_i = beta_i/(lambda_i+2 mu_i)(평면 변형률 beta = (3 lambda + 2 mu) alpha,
+평면 응력 E alpha/(1-nu)). 정답 시험은 Timoshenko-Goodier 두꺼운 원통 열응력(온도
+적분을 독립 Gauss 적분으로 계산), 단일 재료 균일 가열의 무응력, 유한차분 평형·연속을
+재현합니다. 열원 없는 정상 열전도는 각 껍질에서 정확히 dT = a_i + b_i ln(r/r_0)이므로
+연성 문제는 두 정답으로 만든 정확해를 가집니다.
+
+바이메탈 띠(Timoshenko 1925)는 자유단 응력 집중을 무시하는 보 이론 근사이므로 수용
+기준 정답으로 쓰지 않습니다.
+
+| 경우 | 메시 | 기준 |
+| --- | --- | --- |
+| 균일 alpha 매핑(E, nu는 스칼라 또는 매핑) 대 스칼라 | 2영역 사각형, 비균일 T, 견인력 | 모든 장과 에너지 상대 1e-12 이내 |
+| 열팽창 불일치: alpha 12/70/23 x1e-6 1/K, E 200/3/70 GPa, nu .3/.38/.33, 균일 +120 K, 자유면, 두 평면 | 층상 원환, n=1,2,4,8 | 마지막 두 구간에서 변위 L2 차수 >= 1.8, 응력 L2 차수 >= 0.9, 평면 변형률 sigma_zz 차수 >= 0.9; 대칭점 반력 <= 1e-9 |
+| 정상 열→역학 연성: k 45/0.25/200 W/(m K), 안 420 K, 밖 300 K, 같은 역학, 두 평면 | 층상 원환, n=1,2,4,8 | 온도 L2 차수 >= 1.8, 변위 >= 1.8, 응력 >= 0.9, 평면 변형률 sigma_zz >= 0.9 |
+| 매핑을 쓴 과도 단계 | 2영역 사각형 | 각 단계가 영역별 기계단계 직접 호출과 정확히 같음 |
+| 잘못된 영역 | — | 빠진/모르는 이름, 비유한 alpha, E <= 0, nu = 0.5, 잘못된 plane은 `ValueError`; 워크플로는 `input` 단계 `WorkflowStageError` |
+
+처음 실행했을 때 관측값(n=1 → 8):
+
+| 양 | 평면 응력 차수 | 평면 변형률 차수 |
+| --- | --- | --- |
+| 불일치 변위 L2 | 1.94, 1.98, 2.00 | 1.89, 1.97, 1.99 |
+| 불일치 응력 L2 | 0.98, 0.99, 1.00 | 0.96, 0.99, 1.00 |
+| 불일치 sigma_zz L2 | —(0) | 0.92, 0.98, 0.99 |
+| 연성 온도 L2 | 2.00, 2.00, 2.00 | 2.00, 2.00, 2.00 |
+| 연성 변위 L2 | 1.93, 1.98, 2.00 | 1.89, 1.97, 1.99 |
+| 연성 응력 L2 | 0.98, 0.99, 1.00 | 0.95, 0.99, 1.00 |
+| 연성 sigma_zz L2 | —(0) | 0.93, 0.98, 1.00 |
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
+  packages/galerkin/tests/test_thermoelastic_multimaterial.py
+```
+
 ## 한계
 
 - 영역별 구간 상수만: 영역 안에서 변하는 열전도율, 이방성 텐서, 온도 의존 물성 없음.
 - 접촉 저항·경계면 열원 없음.
 - 혼합 정식화 없음: 균질 해석기처럼 거의 비압축성인 영역은 평면 변형률에서 locking.
-- 열탄성, 열→역학 워크플로, 과도 열전도, simcase 문서는 아직 균질 재료 하나만 받습니다.
+- 온도 의존 물성 없음, 기준 온도는 값 하나.
+- 과도 열전도와 simcase 문서는 아직 균질 재료 하나만 받습니다.

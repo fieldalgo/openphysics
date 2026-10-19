@@ -8,7 +8,11 @@ on one isolated reference mesh. It is steady, one-way and small-strain; it is
 not a thermodynamically coupled or transient solver. Import the submodule
 explicitly. No top-level export, model schema, CLI, Studio, persistence, Robin,
 flux, mechanical traction, remeshing, temperature-dependent material or 3D
-feature is added.
+feature is added. k, E, nu, alpha and a constant heat source may each be one
+scalar or a `{region name: value}` mapping; the per-region contract, manifest
+record (`{'kind': 'per_region', ...}` for the source, sorted dictionaries for
+materials) and its coupled composite-cylinder validation are in
+[multimaterial](multimaterial.md).
 
 ## API and SI boundary
 

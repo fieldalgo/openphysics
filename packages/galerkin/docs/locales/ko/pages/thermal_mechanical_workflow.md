@@ -6,7 +6,10 @@
 격리된 기준 메시 하나에서 기존 처방 온도 기계단계를 호출합니다. 정상·one-way·소변형
 모델이며 열역학적으로 결합된 solver나 과도 solver가 아닙니다. Submodule을 명시적으로
 import합니다. Top-level export, 모델 schema, CLI, Studio, 저장, Robin, flux,
-기계 traction, 재메시, 온도 의존 재료나 3D 기능은 추가하지 않습니다.
+기계 traction, 재메시, 온도 의존 재료나 3D 기능은 추가하지 않습니다. k, E, nu, alpha와
+상수 열원은 각각 스칼라 하나 또는 `{영역 이름: 값}` 매핑일 수 있습니다. 영역별 계약,
+manifest 기록(열원은 `{'kind': 'per_region', ...}`, 재료는 정렬된 사전)과 연성 복합 원통
+검증은 [multimaterial](multimaterial.md)에 있습니다.
 
 ## API와 SI 경계
 
