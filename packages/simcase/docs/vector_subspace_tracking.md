@@ -212,7 +212,11 @@ any other layout version, and a failed run clears the previous display.
   the domain to 8a or 10a changed the result by 1e-11. Halving or doubling the
   wavelength step changed it exactly as the analytic stencil truncation
   predicts (about 1e-7). A larger candidate budget and random rotations of the
-  solver's degenerate bases changed nothing beyond roundoff. The FEM HE11
+  solver's degenerate bases changed nothing beyond roundoff. Writing the
+  same fixture's coordinates and wavelengths in nm or m instead of um changed
+  the result by about 1e-13. The example document written in nm or m agrees
+  with the um document to 5e-8; its mesh differs slightly, because the
+  mesher's refinement rounds differently at another scale. The FEM HE11
   eigenvector span approaches the exact two-polarization field span
   (`refsol.fiber.vector_mode_field`) at first order: sin of the largest
   principal angle 0.097, 0.049 and 0.033 at scales 1 to 3. A dispersive
