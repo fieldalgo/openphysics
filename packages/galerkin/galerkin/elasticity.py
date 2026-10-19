@@ -1,7 +1,9 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Small-strain, homogeneous isotropic P1 triangle elasticity in SI units.
+"""Small-strain isotropic P1 triangle elasticity in SI units.
 
+E and nu are one homogeneous material or piecewise constant on named mesh
+regions (galerkin.materials, ../docs/multimaterial.md).
 Import this submodule explicitly; see ../docs/elasticity2d.md for the contract.
 No scalar or edge finite-element space is used here.
 """
@@ -17,6 +19,7 @@ from scipy.sparse.linalg import splu
 from scipy.spatial import cKDTree
 
 from .mesh import Mesh
+from .materials import is_per_region, region_property
 
 
 def _real(value, name):
@@ -45,6 +48,42 @@ def constitutive_matrix(young_modulus, poisson_ratio, *, plane):
     if not np.all(np.isfinite(d)):
         raise ValueError("constitutive parameters exceed floating-point range")
     return d
+
+
+def element_constitutive(mesh, young_modulus, poisson_ratio, *, plane):
+    """Pa constitutive matrix: (3,3) for scalars, (T,3,3) for region mappings.
+
+    Scalars return exactly constitutive_matrix(...). A mapping for either
+    argument gives one matrix per triangle; each region must satisfy E > 0 and
+    -1 < nu < 0.5.
+    """
+    if not (is_per_region(young_modulus) or is_per_region(poisson_ratio)):
+        return constitutive_matrix(young_modulus, poisson_ratio, plane=plane)
+    if plane not in ("stress", "strain"):
+        raise ValueError("plane must be 'stress' or 'strain'")
+    e = region_property(mesh, young_modulus, "young_modulus", positive=True)
+    nu = region_property(mesh, poisson_ratio, "poisson_ratio", lower=-1., upper=.5)
+    e = np.broadcast_to(e, (len(mesh.triangles),))
+    nu = np.broadcast_to(nu, e.shape)
+    mu = e / (2 * (1 + nu))
+    lam = (e * nu / ((1 + nu) * (1 - 2 * nu)) if plane == "strain"
+           else e * nu / (1 - nu * nu))
+    d = np.zeros((len(e), 3, 3))
+    d[:, 0, 0] = d[:, 1, 1] = lam + 2*mu
+    d[:, 0, 1] = d[:, 1, 0] = lam
+    d[:, 2, 2] = mu
+    if not np.all(np.isfinite(d)):
+        raise ValueError("constitutive parameters exceed floating-point range")
+    return d
+
+
+def stiffness_and_stress(b, d, area):
+    """Element stiffness (T,6,6) and a strain->stress map for (3,3) or (T,3,3) d."""
+    if d.ndim == 2:
+        return (np.einsum("tji,jk,tkl,t->til", b, d, b, area),
+                lambda strain: strain @ d.T)
+    return (np.einsum("tji,tjk,tkl,t->til", b, d, b, area),
+            lambda strain: np.einsum("tij,tj->ti", d, strain))
 
 
 def _mesh_data(mesh):
@@ -282,7 +321,8 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
 
     body_force: constant (2,) or callable accepting (Q,2) coordinates in m
     and returning exactly (Q,2), in N/m^3. Dirichlet: mapping from
-    (node, component=0|1) to scalar displacement in m. E and nu are homogeneous.
+    (node, component=0|1) to scalar displacement in m. E (Pa) and nu are
+    scalars or {region name: value} mappings over mesh.region_names.
     traction: {boundary_edges tag: global (2,) vector in Pa, or
     callable(points, outward_normals)->(Q,2)}. None/{} keeps zero traction.
     All line loads, including those on prescribed displacement components,
@@ -292,10 +332,16 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
     """
-    d = constitutive_matrix(young_modulus, poisson_ratio, plane=plane)
+    per_region = is_per_region(young_modulus) or is_per_region(poisson_ratio)
+    if not per_region:
+        d = constitutive_matrix(young_modulus, poisson_ratio, plane=plane)
+    elif plane not in ("stress", "strain"):
+        raise ValueError("plane must be 'stress' or 'strain'")
     p, t, area, b, dofs, boundary, count, labels = _mesh_data(mesh)
+    if per_region:
+        d = element_constitutive(mesh, young_modulus, poisson_ratio, plane=plane)
     fixed, values = _constraints(dirichlet, p, boundary, count, labels)
-    ke = np.einsum("tji,jk,tkl,t->til", b, d, b, area)
+    ke, stress_of = stiffness_and_stress(b, d, area)
     if not np.all(np.isfinite(ke)):
         raise ValueError("element stiffness exceeds floating-point range")
     rows = np.repeat(dofs, 6, axis=1).ravel()
@@ -340,7 +386,7 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     reaction = np.zeros_like(load)
     reaction[fixed] = residual[fixed]
     strain = np.einsum("tij,tj->ti", b, u[dofs])
-    stress = strain @ d.T
+    stress = stress_of(strain)
     if not np.all(np.isfinite(strain)) or not np.all(np.isfinite(stress)):
         raise ValueError("computed strain/stress exceeds floating-point range")
     return ElasticityResult(u.reshape(-1, 2), strain, stress, load.reshape(-1, 2),
