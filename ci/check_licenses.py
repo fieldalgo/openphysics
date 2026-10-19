@@ -27,9 +27,11 @@ Bundled native files: every shared library (.so, .dylib, .dll) that a
 third-party distribution installs, other than its own Python extension modules,
 must match a ``bundled_files`` glob of its entry (fnmatch on the POSIX path
 relative to site-packages, as listed in RECORD) recorded for the current OS.
-Entries with a copyleft SPDX expression need a ``review``. Such a library is
-loaded into the Python process that runs OpenPhysics, so unless the owning
-entry is an ``external_process`` tool, a GPL term must offer another option
+Records whose SPDX expression is copyleft, or is not satisfied by ``permissive``
+plus the reviewed ``bundled_permissive`` ids (proprietary and non-standard
+terms such as LicenseRef- ids, FTL or Qhull), need a ``review``. These libraries
+load into the Python process that runs OpenPhysics, so unless the owning entry
+is an ``external_process`` tool, a GPL term must offer another option
 (``FTL OR GPL-2.0-or-later``) or carry a runtime exception listed under
 ``runtime_exceptions`` (``WITH GCC-exception-3.1``). Statically linked code is
 not visible this way and is reviewed by hand. First-party distributions must
@@ -240,6 +242,7 @@ def bundled_entry_errors(name, entry, policy):
     """Structure and license rules of one distribution's bundled_files records."""
     never = never_pattern(policy["never_families"])
     exceptions = set(policy["runtime_exceptions"])
+    plain = set(policy["permissive"]) | set(policy["bundled_permissive"])
     errors = []
     globs = set()
     for item in entry.get("bundled_files", []):
@@ -264,8 +267,11 @@ def bundled_entry_errors(name, entry, policy):
             errors.append(f"{where}: separate library files are dynamic; record static code in 'bundled'")
         if not item["platforms"] or set(item["platforms"]) - set(PLATFORMS):
             errors.append(f"{where}: platforms must be a non-empty subset of {list(PLATFORMS)}")
-        if COPYLEFT.search(item["spdx"]) and not str(item.get("review", "")).strip():
-            errors.append(f"{where}: copyleft {item['spdx']!r} needs a review")
+        if not str(item.get("review", "")).strip():
+            if COPYLEFT.search(item["spdx"]):
+                errors.append(f"{where}: copyleft {item['spdx']!r} needs a review")
+            elif not satisfies(tree, plain):
+                errors.append(f"{where}: {item['spdx']!r} is not on the permissive lists and needs a review")
     return errors
 
 

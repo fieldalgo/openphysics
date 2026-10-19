@@ -285,6 +285,24 @@ def test_external_process_entry_may_bundle_gpl_library(tmp_path):
     assert errors == [] and report["mesher"]["bundled_files"][0]["file"] == library
 
 
+@pytest.mark.parametrize("spdx", ["LicenseRef-Proprietary", "LicenseRef-MSVC-Redistributable", "Qhull", "FTL",
+                                  "MIT AND LicenseRef-Vendor"])
+def test_non_permissive_bundled_library_needs_review(tmp_path, spdx):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx)]}})
+    assert any(f"{spdx!r} is not on the permissive lists and needs a review" in e for e in errors)
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx, review="terms read")]}})
+    assert errors == []
+
+
+@pytest.mark.parametrize("spdx", ["BSD-3-Clause AND BSD-3-Clause-Open-MPI", "IJG AND Zlib", "X11", "0BSD",
+                                  "MIT OR LicenseRef-Vendor"])
+def test_permissive_bundled_library_needs_no_review(tmp_path, spdx):
+    install(tmp_path, "numlib", expression="MIT", files=[BLAS])
+    errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled(spdx=spdx)]}})
+    assert errors == []
+
+
 def test_bundled_library_must_be_recorded_for_this_platform(tmp_path):
     install(tmp_path, "numlib", expression="MIT", files=[BLAS])
     errors, _ = run(tmp_path, {"numlib": {"spdx": "MIT", "bundled_files": [bundled()]}}, platform="windows")

@@ -235,8 +235,8 @@ python ci/check_licenses.py --report .validation/licenses.json
 - 제3자 배포판이 자기 Python 확장 모듈이 아닌 공유 라이브러리(`.so`, `.dylib`, `.dll`)를
   설치했는데, 그 목록 항목의 `bundled_files` glob 어디에도 맞지 않거나 맞는 기록이 현재 OS용이
   아닐 때
-- copyleft SPDX 식을 가진 `bundled_files` 기록에 검토 문구가 없거나, 배포판에 검사할 RECORD
-  파일 목록이 없을 때
+- SPDX 식이 copyleft이거나 단순한 허용형이 아닌(LicenseRef- 식별자, FTL, Qhull 같은 독점·비표준
+  조건) `bundled_files` 기록에 검토 문구가 없거나, 배포판에 검사할 RECORD 파일 목록이 없을 때
 - external process가 아닌 배포판의 `bundled_files` 기록에, 정책에 적힌 런타임 예외가 없는 GPL
   조건만 남을 때(그런 라이브러리는 OpenPhysics 프로세스에 로드됨)
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
