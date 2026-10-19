@@ -225,7 +225,8 @@ python ci/check_licenses.py --report .validation/licenses.json
 - 약한 copyleft 시험·도구 의존성에 `test_only` 표시가 없을 때
 - GPL 배포판이 external process 항목이 아니거나, 기본 runtime 의존성이거나, 자체 코드가
   import할 때
-- AGPL이나 SSPL이 어디에든 있을 때
+- AGPL이나 다른 네트워크 copyleft 라이선스(SSPL, EUPL, OSL, CPAL, RPL)가 어디에든 있을 때(external
+  process라도)
 - 자체 패키지가 Apache-2.0을 선언하지 않을 때
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
 

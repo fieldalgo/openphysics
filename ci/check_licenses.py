@@ -13,10 +13,11 @@ the strictest way the environment reaches the distribution:
 - test: a test-only extra of a first-party package (policy ``test_extras``)
 - tool: installed but not required by first-party packages (CI tools)
 
-Runtime and optional dependencies must be permissive. Weak copyleft (LGPL, MPL)
-is accepted only for test/tool entries marked ``test_only``. GPL is accepted
+Runtime and optional dependencies must be permissive. Weak copyleft (LGPL, MPL,
+CeCILL-C) is accepted only for test/tool entries marked ``test_only``. GPL is accepted
 only for ``external_process`` entries, and first-party code must not import
-them. AGPL and SSPL are always rejected. Installed metadata that names a
+them. AGPL, SSPL and the other network-copyleft licenses under ``never`` are
+always rejected, also as external processes. Installed metadata that names a
 different expression, or a copyleft family the entry does not record, also fails.
 
 Use ``--python`` to inspect another interpreter's environment, e.g. a fresh
@@ -41,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "ci" / "third_party_licenses.json"
 DOCS = (ROOT / "docs" / "third-party.md", ROOT / "docs" / "locales" / "ko" / "pages" / "third-party.md")
 RANK = {"runtime": 0, "optional": 1, "test": 2, "tool": 3}
-COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EUPL|EPL|CDDL|SSPL|OSL|CECILL|GENERAL PUBLIC|MOZILLA PUBLIC|AFFERO)",
+COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EUPL|EPL|CDDL|SSPL|OSL|CPAL|RPL|CECILL|GENERAL PUBLIC|MOZILLA PUBLIC|AFFERO)",
                       re.IGNORECASE)
 TOKEN = re.compile(r"\(|\)|[A-Za-z0-9.+:-]+")
 
