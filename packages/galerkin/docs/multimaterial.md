@@ -341,6 +341,27 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
 ```
 
+## Reference-tool comparison
+
+The analytical gates above decide acceptance. Separately, the same problems
+were solved with scikit-fem 12.0.2 (BSD-3-Clause); agreement between the tools
+is code-to-code evidence, not convergence evidence.
+
+- In CI, `tests/test_crosscheck_skfem_multimaterial.py` solves a three-region
+  wall on the same mesh with the same per-triangle values in both tools: steady
+  heat, elasticity and thermoelasticity in both planes, and backward-Euler
+  transient heat. Temperatures, displacements, fluxes and stresses agree to
+  1.6e-12 or better, gated at 1e-9 ([reference comparisons](https://github.com/fieldalgo/openphysics/blob/main/docs/reference-comparisons.md)).
+- A separate study (2026-10-19) repeated the gate problems of this page at all
+  four refinement levels. Same-mesh P1 fields agreed to 1.4e-12 (temperature,
+  displacement) and 6.2e-11 (flux, stress). scikit-fem P2 against the same refsol
+  references confirmed them: on the straight-sided annulus meshes P2 is limited
+  to order about 2 by the polygonal geometry, and isoparametric P2 on the curved
+  geometry reaches about 3. On a source-driven layered wall with dt = 1/4 s,
+  scikit-fem P2 also lost its spatial order on the finest meshes and Richardson
+  extrapolation in time restored it, so backward-Euler time error, not the
+  spatial discretisation, dominated that configuration.
+
 ## Limits
 
 - Piecewise constant per region only: no conductivity varying inside a region,

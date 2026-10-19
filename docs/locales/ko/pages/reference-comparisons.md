@@ -29,7 +29,8 @@ GPL 도구는 이 저장소에서 import하거나 설치하지 않습니다. 비
 python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
   python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
-    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py
+    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py \
+    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py
 ```
 
 도구가 없으면 로컬에서는 시험을 건너뜁니다. CI는 `OPENPHYSICS_REQUIRE_CROSSCHECK=1`을
@@ -69,6 +70,12 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 | `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec 사면체 | `ElementTetN0` | 가장 낮은 고유값 k^2 8개 | 1.4e-14 | 1e-9 |
 | `cavity-lossy-slab` | `material_cavity.solve_material_cavity_box`, 사면체별 복소 eps/mu | `ElementTetN0`, 재료별 조립 | 복소 k^2 6개; Q | 4.1e-15; 9.2e-14 | 1e-9 |
 | `cavity-impedance-walls` | 같음, z1·x0 Leontovich 벽 | `ElementTetN0` + `FacetBasis` 접선 질량, galerkin의 `k0`에서 고정한 `T(k)` | 고정점의 복소 k^2 3개 | 6.8e-13 | 1e-9 |
+| `heat-p1-three-region-wall` | `thermal.solve_steady_heat`, P1, 영역별 k·Q | `ElementTriP1`, 삼각형별 k·Q | 절점 온도, 요소 열유속 | 2.0e-15, 3.1e-13 | 1e-9 |
+| `elasticity-p1-plane-strain-three-region-bar` | `elasticity.solve_elasticity`, P1, 영역별 E·nu | `ElementVector(ElementTriP1)`, 삼각형별 Lamé 상수 | 절점 변위, 요소 응력 | 3.7e-13, 3.2e-13 | 1e-9 |
+| `elasticity-p1-plane-stress-three-region-bar` | 같음, 평면응력 | 같음 | 절점 변위, 요소 응력 | 1.6e-12, 1.0e-12 | 1e-9 |
+| `thermoelasticity-p1-plane-strain-three-region-bar` | `thermoelasticity.solve_thermoelasticity`, P1, 영역별 alpha·E·nu | 같음, 열하중 `beta (T_h - Tref) div v` | 절점 변위, 요소 응력 | 4.0e-13, 2.0e-13 | 1e-9 |
+| `thermoelasticity-p1-plane-stress-three-region-bar` | 같음, 평면응력 | 같음 | 절점 변위, 요소 응력 | 4.4e-13, 2.7e-13 | 1e-9 |
+| `transient-heat-p1-three-region-wall` | `transient_heat.solve_transient_heat`, P1, 영역별 k·c·Q | `ElementTriP1` 강성·일관 질량, 시험 안의 backward Euler | 저장된 모든 시각의 절점 온도 | 1.2e-15 | 1e-9 |
 | `heat-p2-reference-slab` | P1 | `ElementTriP2` | 꼭짓점 온도: P1 대 P2, P1 대 해석해, P2 대 해석해 | 3.7e-5, 3.6e-5, 1.5e-6 | 보고만 |
 | `elasticity-p2-reference-cantilever` | P1, 평면응력 | `ElementVector(ElementTriP2)` | 끝단 처짐, P1 대 P2 | 1.7e-1 | 보고만 |
 

@@ -300,6 +300,23 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
 ```
 
+## 레퍼런스 도구 비교
+
+수용 여부는 위의 해석 기준이 정합니다. 그와 별도로 같은 문제를 scikit-fem 12.0.2
+(BSD-3-Clause)로도 풀었습니다. 두 도구의 일치는 코드 대 코드 근거이지 수렴 근거가 아닙니다.
+
+- CI에서 `tests/test_crosscheck_skfem_multimaterial.py`가 세 영역 벽을 같은 메시와 같은
+  삼각형별 값으로 두 도구에서 풉니다: 정상 열전도, 두 평면의 탄성과 열탄성, backward Euler
+  과도 열전도. 온도·변위·열유속·응력이 1.6e-12 이내로 일치하며 기준은 1e-9입니다
+  ([레퍼런스 비교](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/reference-comparisons.md)).
+- 별도 연구(2026-10-19)에서 이 문서의 기준 문제를 네 메시 수준 모두에서 반복했습니다. 같은
+  메시 P1 필드는 1.4e-12(온도·변위), 6.2e-11(열유속·응력) 이내로 일치했습니다. 같은
+  refsol 정답에 대한 scikit-fem P2 결과가 정답을 확인했습니다: 직선 변 고리 메시에서는 다각형
+  형상 때문에 P2가 약 2차에 머물고, 곡선 형상의 isoparametric P2는 약 3차에 이릅니다. 열원이
+  있는 층상 벽(dt = 1/4 s)에서는 scikit-fem P2도 가장 고운 메시에서 공간 차수를 잃었고 시간
+  Richardson 외삽으로 되찾았으므로, 그 구성은 공간 이산화가 아니라 backward Euler 시간 오차가
+  지배했습니다.
+
 ## 한계
 
 - 영역별 구간 상수만: 영역 안에서 변하는 열전도율, 이방성 텐서, 온도 의존 물성 없음.
