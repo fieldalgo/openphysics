@@ -38,8 +38,9 @@ Every selected temperature must be nonnegative absolute Kelvin. A selected
 negative value is rejected, never clipped. Unselected finite negative values are
 allowed, consistent with the mathematical heat API. `reference_temperature_k`
 is one finite nonnegative Kelvin scalar, fixed over the run. `thermal_expansion_per_k`
-is a finite signed scalar in 1/K; zero and negative expansion are supported.
-`young_modulus` is finite positive Pa and `-1 < poisson_ratio < 0.5`.
+is a finite signed value in 1/K; zero and negative expansion are supported.
+`young_modulus` is finite positive Pa and `-1 < poisson_ratio < 0.5`. Each of the
+three is a scalar or a `{region name: value}` mapping.
 `plane` is explicitly `'stress'` or `'strain'`.
 
 `mechanical_dirichlet` maps exterior `(node, component)` indices to fixed scalar

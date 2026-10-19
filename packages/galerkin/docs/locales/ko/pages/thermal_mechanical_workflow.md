@@ -43,12 +43,12 @@ solve_steady_thermoelasticity(
 | --- | --- |
 | mesh | galerkin Mesh, nodes (N,2) m, 정수 triangles (M,3); 기준 형상 |
 | units | 정확히 `{'length':'m','temperature':'K'}`; 추가 키·자동 변환 없음 |
-| conductivity | 유한한 상수 k>0, W/(m K) |
+| conductivity | 유한한 상수 k>0, W/(m K), 또는 `mesh.region_names` 전체에 대한 `{영역 이름: k}` |
 | thermal_dirichlet | 외벽 정수 절점 → 유한한 절대 K; 나머지 단열 |
-| heat_source | 유한한 부호 있는 scalar 또는 (Q,2) 미터 좌표 → (Q,) W/m³ callback |
-| young_modulus / poisson_ratio | 유한한 E>0 Pa / -1<nu<0.5 |
+| heat_source | 유한한 부호 있는 scalar, `{영역 이름: Q}`, 또는 (Q,2) 미터 좌표 → (Q,) W/m³ callback |
+| young_modulus / poisson_ratio | 유한한 E>0 Pa / -1<nu<0.5; 각각 scalar 또는 `{영역 이름: 값}` |
 | plane | 명시적인 `stress` 또는 `strain` |
-| thermal_expansion_per_k | 유한한 부호 있는 **선팽창** alpha, 1/K; 0·음수 허용 |
+| thermal_expansion_per_k | 유한한 부호 있는 **선팽창** alpha, 1/K; 0·음수 허용; scalar 또는 `{영역 이름: alpha}` |
 | reference_temperature_k | 필수 유한 비음수 절대 K; 자동 기준값 없음 |
 | mechanical_dirichlet | 외벽 (node,component) → 변위 m; component0=x,1=y |
 | body_force | 유한한 (2,) 또는 (Q,2) 미터 좌표 → (Q,2) N/m³ callback |
@@ -116,8 +116,9 @@ assert result.mechanics.temperature_snapshot is result.temperature_snapshot
 ```
 
 JSON은 정렬된 키·compact separator·유한한 수치를 사용합니다. Schema는
-`galerkin-steady-thermoelasticity-v1`입니다. 선언한 SI 단위, scalar 재료·기준온도·plane,
-정렬된 구속, 상수 열원·body force 또는 callable label, 메시 개수·boundary·region
+`galerkin-steady-thermoelasticity-v1`입니다. 선언한 SI 단위, 재료(float, 또는 키를 정렬한
+`{영역 이름: float}` 사전), 기준온도·plane, 정렬된 구속, 열원·body force(`{'kind': 'constant',
+'value': ...}`, 영역 열원은 `{'kind': 'per_region', 'value': {...}}`, 또는 callable label), 메시 개수·boundary·region
 metadata, 메시·온도·snapshot hash, 정확 복사 전달 정책, 완료 단계 상태, 물리량 단위를
 기록합니다. 이동하는 Git revision을 전체 runtime 버전이라고 주장하지 않습니다.
 정확한 source manifest는 외부 검증 근거에 속합니다.

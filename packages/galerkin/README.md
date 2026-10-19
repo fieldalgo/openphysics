@@ -22,7 +22,7 @@ references and fixed thresholds.
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](docs/eigenspace_reliability.md), [milestone validation](docs/milestone_validation.md) | `examples/fiber_modes.py`, `examples/waveguide_modes.py` |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](docs/cavity_solver.md) | `examples/cavity_modes.py` |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](docs/material_cavity.md) | — |
-| Steady 2D heat conduction, homogeneous isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_steady2d.md), [validation](docs/thermal_independent_validation.md) | [thermal_steady2d.py](examples/thermal_steady2d.py) |
+| Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_steady2d.md), [validation](docs/thermal_independent_validation.md) | [thermal_steady2d.py](examples/thermal_steady2d.py) |
 | Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_flux_robin.md), [validation](docs/thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](examples/thermal_flux_robin.py) |
 | Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](docs/transient_heat.md), [validation](docs/transient_heat_validation.md), [independent validation](docs/transient_heat_independent_validation.md) | [transient_heat_convergence.py](examples/transient_heat_convergence.py) |
 | Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](docs/elasticity2d.md), [validation](docs/elasticity2d_independent_validation.md) | [elasticity2d.py](examples/elasticity2d.py) |
@@ -31,6 +31,7 @@ references and fixed thresholds.
 | Total traction on the prescribed-temperature mechanical stage | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](docs/thermoelastic_traction.md), [validation](docs/thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](examples/thermoelastic_traction.py) |
 | Steady heat, then mechanics on the same mesh (one-way) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [Contract](docs/thermal_mechanical_workflow.md), [validation](docs/thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](examples/thermal_mechanical_workflow.py) |
 | Quasistatic mechanics at selected stored transient-heat times (one-way) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [Contract](docs/transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](examples/transient_thermal_mechanical.py) |
+| Piecewise-constant materials on named mesh regions for steady and transient heat, elasticity, thermoelasticity and both heat-to-mechanics workflows | `{region name: value}` in place of a scalar k, c, Q, E, nu or alpha | [Contract and validation](docs/multimaterial.md) | — |
 
 Units follow each contract: SI metres, seconds and Kelvin for heat and
 mechanics; heat flow per depth W/m, mechanical force per depth N/m and physical
@@ -50,9 +51,11 @@ automatically appear there.
   the separate flux/Robin or traction extensions.
 - Transient heat has no flux/Robin input, restart or automatic coupling.
   Finite negative Kelvin is not clamped by the linear API.
-- Heat and elasticity are homogeneous and isotropic; mechanics is linear and
-  small-strain. The traction APIs take global Cartesian loads; there is no
-  dedicated scalar-pressure, local-frame or follower-load API.
+- Heat and elastic materials are isotropic and constant within each named mesh
+  region ([multimaterial](docs/multimaterial.md)); there is no temperature-dependent
+  or anisotropic material. Mechanics is linear and small-strain. The traction
+  APIs take global Cartesian loads; there is no dedicated scalar-pressure,
+  local-frame or follower-load API.
 - The cavity solver handles a vacuum rectangular PEC box. Read its contract for
   near-target search limitations.
 - The 3D sparse direct factorization is comfortable to about 25k edge degrees

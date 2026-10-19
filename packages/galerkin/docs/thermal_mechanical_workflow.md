@@ -46,12 +46,12 @@ solve_steady_thermoelasticity(
 | --- | --- |
 | mesh | galerkin Mesh, nodes (N,2) m, integer triangles (M,3); reference geometry |
 | units | exactly `{'length':'m','temperature':'K'}`; no extra keys or inferred conversion |
-| conductivity | finite constant k>0, W/(m K) |
+| conductivity | finite constant k>0, W/(m K), or `{region name: k}` over `mesh.region_names` |
 | thermal_dirichlet | exterior integer node → finite absolute K; remainder insulated |
-| heat_source | finite signed scalar or callback (Q,2) metre points → (Q,) W/m³ |
-| young_modulus / poisson_ratio | finite E>0 Pa / -1<nu<0.5 |
+| heat_source | finite signed scalar, `{region name: Q}`, or callback (Q,2) metre points → (Q,) W/m³ |
+| young_modulus / poisson_ratio | finite E>0 Pa / -1<nu<0.5; each a scalar or `{region name: value}` |
 | plane | explicitly `stress` or `strain` |
-| thermal_expansion_per_k | finite signed **linear** alpha, 1/K; zero/negative allowed |
+| thermal_expansion_per_k | finite signed **linear** alpha, 1/K; zero/negative allowed; scalar or `{region name: alpha}` |
 | reference_temperature_k | required finite nonnegative absolute K, no implicit reference |
 | mechanical_dirichlet | exterior (node,component) → displacement m; component0=x,1=y |
 | body_force | finite (2,) or callback (Q,2) metre points → (Q,2) N/m³ |
@@ -127,9 +127,11 @@ assert result.mechanics.temperature_snapshot is result.temperature_snapshot
 ```
 
 JSON uses sorted keys, compact separators and finite numbers. Schema is
-`galerkin-steady-thermoelasticity-v1`. It records declared SI units, scalar
-materials/reference/plane, sorted supports, constant sources/body force or
-callable labels, mesh counts/boundary/region metadata, mesh/temperature/snapshot
+`galerkin-steady-thermoelasticity-v1`. It records declared SI units,
+materials (a float, or a `{region name: float}` dictionary with sorted keys),
+reference/plane, sorted supports, sources/body force (`{'kind': 'constant',
+'value': ...}`, `{'kind': 'per_region', 'value': {...}}` for a region source, or
+callable labels), mesh counts/boundary/region metadata, mesh/temperature/snapshot
 hashes, exact-copy transfer policy, completed stage statuses and quantity units.
 No moving Git revision is asserted as the whole runtime version; exact source
 manifests belong in external validation evidence.
