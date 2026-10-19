@@ -131,14 +131,14 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         regions, names = region_index(mesh)
         private_mesh = Mesh(p.copy(), t.copy(), boundary={}, regions=regions.copy(),
                             region_names=list(names))
+        # Validate before recording, so a bad value gets the labelled message.
         if regional[0]:
-            record_k = {str(n): float(conductivity[n]) for n in names if n in conductivity}
             k = region_property(private_mesh, conductivity, "conductivity", positive=True)
+            record_k = {str(n): float(conductivity[n]) for n in names}
         if regional[1]:
-            record_c = {str(n): float(volumetric_heat_capacity[n])
-                        for n in names if n in volumetric_heat_capacity}
             capacity = region_property(private_mesh, volumetric_heat_capacity,
                                        "volumetric_heat_capacity", positive=True)
+            record_c = {str(n): float(volumetric_heat_capacity[n]) for n in names}
         if regional[2]:
             region_property(private_mesh, heat_source, "heat_source")
     else:

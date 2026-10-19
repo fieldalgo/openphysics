@@ -14,9 +14,13 @@ w_i = sqrt(lambda c_i / k_i) and d = x - x_{i-1}, the transfer relations
 
     X = X0 cos(w d) - F0 sin(w d)/(k w),  F = F0 cos(w d) + k w X0 sin(w d)
 
-carry (X, F = -k X') across the layer. Eigenvalues are the roots of
-X(L; lambda) = 0, bracketed on a fine sqrt(lambda) grid and bisected. Each
-mode is scaled to max |X| = 1 on a dense grid. The initial field is
+carry (X, F = -k X') across the layer. In layer i the solution is
+R cos(w d + phi), so its zeros can be counted exactly (Pruefer phase). The
+zero count N(lambda) on (0, L] is nondecreasing in lambda (Sturm comparison)
+and eigenvalue m (0-based) is the infimum of lambda with N >= m + 1; each one
+is found by bisection on N, so no root can be skipped, however close two
+eigenvalues are. Each mode is scaled to max |X| = 1 on a grid with at least
+20 points per half-wave in every layer. The initial field is
 T_s + sum A_m X_m, so the series is exact with the given finite amplitudes.
 """
 from dataclasses import dataclass
@@ -68,6 +72,22 @@ class LayeredWall:
             X, F = X*np.cos(w*d)-F*np.sin(w*d)/(k*w), F*np.cos(w*d)+k*w*X*np.sin(w*d)
         return X
 
+    def zero_count(self, s):
+        """Zeros of X(x; s^2) on (0, L], counted exactly layer by layer.
+
+        In a layer X(d) = R cos(w d + phi) with R cos(phi) = X0 and
+        R sin(phi) = F0/(k w); its zeros are w d + phi = pi/2 + n pi.
+        """
+        if not s > 0:
+            return 0
+        X, F, total = 0., -1., 0
+        for k, c, d in zip(self.k, self.c, self.width):
+            w = s*np.sqrt(c/k)
+            phi = np.arctan2(F/(k*w), X)
+            total += int(np.floor((w*d+phi-np.pi/2)/np.pi)-np.floor((phi-np.pi/2)/np.pi))
+            X, F = X*np.cos(w*d)-F*np.sin(w*d)/(k*w), F*np.cos(w*d)+k*w*X*np.sin(w*d)
+        return total
+
     def eigenvalues(self, count):
         """The first `count` eigenvalues lambda_m (1/s), increasing."""
         if not isinstance(count, (int, np.integer)) or count < 1:
@@ -75,26 +95,23 @@ class LayeredWall:
         if len(self._eigen) >= count:
             return self._eigen[:count].copy()
         phase = np.sum(self.width*np.sqrt(self.c/self.k))     # s * phase = total optical length
-        step = np.pi/phase/400
-        roots, s, f = [], step*1e-3, self._end_value(step*1e-3)
+        roots = list(np.sqrt(self._eigen))
+        lo = roots[-1] if roots else 0.
         while len(roots) < count:
-            s2 = s+step
-            f2 = self._end_value(s2)
-            if f == 0.:
-                roots.append(s)
-            elif f*f2 < 0:
-                lo, hi, flo = s, s2, f
-                for _ in range(200):
-                    mid = .5*(lo+hi)
-                    fm = self._end_value(mid)
-                    if fm == 0. or hi-lo <= 4*np.finfo(float).eps*hi:
-                        break
-                    if flo*fm < 0:
-                        hi = mid
-                    else:
-                        lo, flo = mid, fm
-                roots.append(.5*(lo+hi))
-            s, f = s2, f2
+            target = len(roots)+1
+            hi = lo+np.pi/phase
+            while self.zero_count(hi) < target:
+                hi = lo+2*(hi-lo)
+            for _ in range(400):
+                mid = .5*(lo+hi)
+                if mid <= lo or mid >= hi:
+                    break
+                if self.zero_count(mid) >= target:
+                    hi = mid
+                else:
+                    lo = mid
+            roots.append(hi)
+            lo = hi
         self._eigen = np.asarray(roots)**2
         return self._eigen[:count].copy()
 
@@ -114,8 +131,11 @@ class LayeredWall:
     def mode(self, m, x, layer):
         """Mode m (0-based) X_m and its flux -k X_m' at x, scaled to max |X| = 1."""
         s = np.sqrt(self.eigenvalues(m+1)[m])
-        dense = np.concatenate([np.linspace(a, b, 400) for a, b in zip(self.edges[:-1], self.edges[1:])])
-        dl = np.repeat(np.arange(len(self.k)), 400)
+        counts = [max(400, int(20*np.ceil(s*np.sqrt(c/k)*d/np.pi))+1)
+                  for k, c, d in zip(self.k, self.c, self.width)]
+        dense = np.concatenate([np.linspace(a, b, n) for a, b, n in
+                                zip(self.edges[:-1], self.edges[1:], counts)])
+        dl = np.repeat(np.arange(len(self.k)), counts)
         X_dense, _ = self._state(s, dense, dl)
         scale = X_dense[np.argmax(abs(X_dense))]
         X, F = self._state(s, x, layer)
