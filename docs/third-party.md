@@ -30,10 +30,13 @@ This is a project policy, not legal advice. License terms are judged at three
 levels.
 
 1. **What this repository creates, copies, builds, links or distributes**: the
-   source tree, the sdists and wheels of its packages, and CI artifacts. All of
-   it is original Apache-2.0 work. No third-party source code is copied into the
-   repository, no package contains compiled code, and the distributions declare
-   their dependencies without including them.
+   source tree, the sdists and wheels of its packages, and CI artifacts. They
+   are original Apache-2.0 work apart from the third-party data recorded under
+   [data and published numbers](#data-and-published-numbers) (CC0-1.0
+   refractive-index tables embedded in physmat, published benchmark numbers in
+   galerkin-refsol), which keeps its own terms. No third-party source code is
+   copied into the repository, no package contains compiled code, and the
+   distributions declare their dependencies without including them.
 2. **Each dependency, by the license its own distribution declares**: base
    requirements, extras, test and tool dependencies, including transitive ones.
    - Permissive licenses are the default.
