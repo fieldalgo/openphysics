@@ -105,3 +105,48 @@ def test_reference_has_no_engine_solver_or_assembly_imports():
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             names = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or '']
             assert all(n.split('.')[0] in ('numpy', 'dataclasses') for n in names)
+
+
+SOURCE = dict(temperature=300., sources=[2e5, 5e4])
+
+
+def _p(x):
+    x = np.atleast_1d(np.asarray(x, dtype=float))
+    return np.column_stack([x, np.zeros(len(x))])
+
+
+def test_source_driven_series_starts_uniform_and_converges_with_more_modes():
+    wall = LayeredWall(**WALL)
+    x = np.linspace(0., .03, 301)
+    e40 = abs(wall.source_driven(_p(x), 0., **SOURCE, count=40).temperature-300.).max()
+    e80 = abs(wall.source_driven(_p(x), 0., **SOURCE, count=80).temperature-300.).max()
+    assert e80 < e40/2 and e80 < 2e-3
+    late40 = wall.source_driven(_p(x), 20., **SOURCE, count=40).temperature
+    late80 = wall.source_driven(_p(x), 20., **SOURCE, count=80).temperature
+    np.testing.assert_allclose(late40, late80, rtol=0, atol=1e-12)
+    ends = wall.source_driven(_p([0., .03]), 45., **SOURCE, count=40).temperature
+    np.testing.assert_allclose(ends, 300., atol=1e-10)
+
+
+def test_source_driven_series_satisfies_the_pde_with_sources():
+    wall = LayeredWall(**WALL)
+    k, c, Q = np.array(WALL['conductivities']), np.array(WALL['capacities']), np.array(SOURCE['sources'])
+    for x, i in ((.004, 0), (.012, 1), (.024, 1)):
+        h, dt, t = 1e-6, 1e-2, 30.
+        f = lambda xx, tt: wall.source_driven(_p(xx), tt, **SOURCE, count=60)
+        dTdt = (f(x, t+dt).temperature-f(x, t-dt).temperature)/(2*dt)
+        dqdx = (f(x+h, t).heat_flux[0, 0]-f(x-h, t).heat_flux[0, 0])/(2*h)
+        np.testing.assert_allclose(c[i]*dTdt, Q[i]-dqdx, rtol=1e-5, atol=1e-6*Q.max())
+        dTdx = (f(x+h, t).temperature-f(x-h, t).temperature)/(2*h)
+        np.testing.assert_allclose(-k[i]*dTdx, f(x, t).heat_flux[0, 0], rtol=1e-6)
+
+
+def test_source_driven_long_time_limit_is_the_independent_steady_wall():
+    from refsol.thermal_multilayer import layered_slab
+    wall = LayeredWall(**WALL)
+    x = np.linspace(0., .03, 31)
+    late = wall.source_driven(_p(x), 1e6, **SOURCE, count=40)
+    steady = layered_slab(_p(x), interfaces=WALL['interfaces'], conductivities=WALL['conductivities'],
+                          left_temperature=300., right_temperature=300., sources=SOURCE['sources'])
+    np.testing.assert_allclose(late.temperature, steady.temperature, rtol=1e-13)
+    np.testing.assert_allclose(late.heat_flux, steady.heat_flux, rtol=1e-10, atol=1e-10*abs(steady.heat_flux).max())
