@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "galerkin-refsol"
 version = "0.1.0"
 description = "Reference solutions and published benchmarks for validating the galerkin EM FEM engine"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Yongha Kim" }]

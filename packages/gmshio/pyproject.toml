@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gmshio"
 version = "0.1.0"
 description = "Run Gmsh as an external process and read MSH 4.1 meshes into numpy arrays for FEM codes"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Yongha Kim" }]

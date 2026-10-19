@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "galerkin"
 version = "0.1.0"
 description = "A finite-element engine for electromagnetics, built milestone by milestone against analytical solutions"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Yongha Kim" }]

@@ -184,3 +184,19 @@ package:
 python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
+
+The README is also the PyPI description, but its links are relative to the
+package directory and would break there. Each package's `setup.py` therefore
+stores a copy of the README with the links rewritten to GitHub URLs pinned to
+one revision (links to `blob/<ref>/…`, images to raw files); `README.md` itself
+is unchanged. The revision is `OPENPHYSICS_DOCS_REF` if set, otherwise the
+checkout's commit. For a release, build with the tag that will be pushed, so the
+description points at the released files:
+
+```bash
+OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/simcase packages/simcase
+```
+
+A wheel built from an unpacked sdist reuses the sdist's description.
+`ci/test_readme_links.py` checks that the seven `setup.py` files are identical
+and that no relative link is left in any package description.
