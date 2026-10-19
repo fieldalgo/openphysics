@@ -217,6 +217,7 @@ def test_a_fully_covered_shape_is_named_in_the_log():
 
 STRADDLE = """
 import copy, json, sys
+import simcase
 from simcase import Document, examples, run
 from simcase.geometry import resolve_regions
 d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
@@ -224,7 +225,7 @@ d['geometry']['shapes'][1]['cy'] = 11.0          # heater crosses the plate's to
 doc = Document.from_dict(d)
 exact = [name for name, *_, circle in resolve_regions(doc.copy()) if circle]
 r = run(doc, verbose=False)
-print(json.dumps({'exact': exact, 'regions': r.mesh.region_names,
+print(json.dumps({'exact': exact, 'regions': r.mesh.region_names, 'simcase': simcase.__file__,
                   'balance': r.summary()['normalized_heat_balance_defect']}))
 """
 
@@ -233,11 +234,22 @@ def test_a_circle_across_another_shape_s_edge_meshes():
     """Regression: the exact circle did not coincide with the neighbours' arcs and
     refinement never finished. Run in a subprocess so a regression cannot hang the suite."""
     import os
+    import pathlib
     import subprocess
     import sys
+    import galerkin
+    import meshine
+    import physmat
+    import simcase
+    # The child must import the code under test, which the parent may have from sys.path
+    # (conftest) rather than from an installation.
+    roots = [str(pathlib.Path(m.__file__).resolve().parents[1]) for m in (simcase, galerkin, meshine, physmat)]
+    env = dict(os.environ)
+    env['PYTHONPATH'] = os.pathsep.join(roots+([env['PYTHONPATH']] if env.get('PYTHONPATH') else []))
     out = subprocess.run([sys.executable, '-c', STRADDLE], capture_output=True, text=True, timeout=300,
-                         env=dict(os.environ), check=True)
+                         env=env, check=True)
     result = json.loads(out.stdout.strip().splitlines()[-1])
+    assert pathlib.Path(result['simcase']).resolve() == pathlib.Path(simcase.__file__).resolve()
     assert result['exact'] == []
     assert result['regions'] == ['plate', 'heater', 'background']
     assert result['balance'] < 1e-10
@@ -255,6 +267,10 @@ def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
     assert exact(cy=13.) == []                        # tangent to the plate's top edge from outside
     assert exact(cy=11.) == []                        # crosses the plate's top edge
     assert exact(cy=13.5) == ['heater']               # clear of the plate, in the background
+    d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+    d['geometry']['shapes'].append({'name': 'pin', 'type': 'rect', 'x': 19.5, 'y': 7.5, 'w': 1., 'h': 1.,
+                                    'material': 'steel'})
+    assert [name for name, *_, c in resolve_regions(Document.from_dict(d)) if c] == []   # later shape inside
 
 
 def test_rectangle_documents_keep_their_original_contract():

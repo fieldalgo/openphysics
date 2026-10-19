@@ -138,9 +138,10 @@ def region_geometry(doc):
 def refuse_dropped_shapes(doc):
     """Refuse a named shape that lies outside the domain or below the sliver limit.
 
-    geometry.resolve_regions drops such a shape and leaves a note; electromagnetic
-    documents report it as a warning. A heat region document would then run without
-    that material and say nothing, so the note becomes an error here. A shape that
+    geometry.resolve_regions drops such a shape and leaves a note in doc.notes, which
+    no run log prints (electromagnetic documents drop it the same way). A heat region
+    document would then run without that material and say nothing, so the note
+    becomes an error here. A shape that
     later shapes cover completely is not refused ("later wins"); the run log names it.
     """
     from .geometry import resolve_regions
