@@ -6,8 +6,8 @@
 Shapes are booleans on top of each other ("later wins"), clipped to the
 domain box; the background fills the remainder. shapely does the polygon
 arithmetic, the result goes to meshine as polygons with holes. A circle that
-nothing overlaps is passed as a true meshine.Circle so its nodes stay on the
-exact circle.
+no other boundary touches is passed as a true meshine.Circle so its nodes stay
+on the exact circle (see _isolated_circle).
 """
 
 from __future__ import annotations
@@ -45,6 +45,36 @@ def shape_polygon(s: dict) -> Polygon:
     raise ValueError(t)
 
 
+#: Relative clearance between an exact circle and any other boundary.
+CIRCLE_CLEARANCE = 1e-6
+
+
+def _isolated_circle(s: dict, index: int, polys: list, clip) -> bool:
+    """True when no other boundary meets or comes close to the circle line.
+
+    The exact meshine.Circle is an n-gon with vertices on the circle, while every
+    other region describes the same arc with shapely's 128-gon. The two only
+    coincide when the arc is a whole hole of a surrounding region, which
+    build_domain maps back to the same Circle. If a domain side or another shape's
+    edge touches or crosses the circle, the two polylines cross, and refinement
+    keeps splitting crossing segments without end. Such a circle is meshed as a
+    polygon like every other shape.
+    """
+    centre, r = Point(s["cx"], s["cy"]), s["r"]
+    lo, hi = r * (1 - CIRCLE_CLEARANCE), r * (1 + CIRCLE_CLEARANCE)
+    if not clip.contains(centre) or clip.exterior.distance(centre) <= hi:
+        return False
+    for j, other in enumerate(polys):
+        if j == index or other.is_empty:
+            continue
+        boundary = other.boundary
+        for line in getattr(boundary, "geoms", [boundary]):
+            far = max(centre.distance(Point(c)) for c in line.coords)
+            if line.distance(centre) <= hi and far >= lo:
+                return False
+    return True
+
+
 def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None, dict | None]]:
     """[(region_name, material, shapely geometry, mesh_size, exact_circle_spec)] after boolean resolution."""
     dom = doc.domain
@@ -68,7 +98,7 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
             continue
         exact = None
         if s["type"] == "circle" and abs(geom.area - polys[i].area) < AREA_EPS * polys[i].area \
-                and clip.contains(shape_polygon(s)):
+                and _isolated_circle(s, i, polys, clip):
             exact = {"center": (s["cx"], s["cy"]), "r": s["r"]}
         out.append((s["name"], s["material"], geom, s.get("mesh_size"), exact))
     background = clip.difference(unary_union(polys)) if polys else clip

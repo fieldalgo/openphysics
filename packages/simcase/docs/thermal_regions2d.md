@@ -99,6 +99,21 @@ circle is smaller than pi r^2 by O(h^2). The meshed problem is passed to
 `galerkin.thermal.solve_steady_heat` with conductivity and source mapped by
 region name ([multimaterial](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/multimaterial.md)).
 
+A circle that no other boundary touches keeps its nodes on the exact circle. A
+circle that touches or crosses a domain side or another shape is meshed as a
+128-sided polygon like the other shapes, so neighbouring regions share one
+boundary.
+
+**Known meshing limit.** meshine has no protection for small input angles. A
+circle that touches another boundary tangentially or crosses it at a shallow
+angle, or a sharp polygon corner, can keep refinement running for minutes or
+without end; the run does not fail on its own. Measured on the shipped example
+with the heater moved onto the bottom side or the plate's top edge: tangent
+contact and crossings at 18, 25 and 35 degrees did not finish within 40 to 90 s,
+while 30 degrees, 41 degrees or steeper, and a 0.001 mm clearance meshed in under
+4 s. Keep shapes clear of other boundaries or let them cross steeply.
+Electromagnetic documents share this limit.
+
 meshine does not produce the same node positions for one geometry written in
 different length units. Results in mm, m and um therefore agree to
 discretization error, not node for node; the adapter's own conversion is an
@@ -136,6 +151,8 @@ comparison:
 | CLI | validate and run exit 0; an existing output exits 1 |
 | 19 invalid documents, a covered source region, a shape outside the domain and a shape below the sliver limit | Refused with `DocumentError` |
 | A shape covered by a later shape | No triangles; named in the run log |
+| Heater moved across the plate's top edge | Meshes (in a subprocess with a 300 s limit) as a polygon; heat balance <= 1e-10 |
+| Exact-circle rule | Only a circle clear of every other boundary is meshed as an exact circle |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
 | Studio | Region documents are refused before any mesher or worker call |
 
@@ -203,4 +220,6 @@ the engine validation in [multimaterial](https://github.com/fieldalgo/openphysic
 - Studio refuses steady and transient region documents (its heat views read `mesh.subdivisions`);
   use the CLI or Python API.
 - Piecewise-constant isotropic properties; perfect contact at interfaces.
+- A circle touching or shallowly crossing another boundary, or a sharp polygon
+  corner, can make meshing run without end (see Mesh and solve).
 - Plane geometry of unit depth; no thermal properties from built-in materials.
