@@ -19,7 +19,7 @@
 | 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/fiber_modes.py`, `examples/waveguide_modes.py` |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/cavity_modes.py` |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
-| 균질 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../examples/thermal_steady2d.py) |
+| 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../examples/thermal_steady2d.py) |
 | 정상 열전도의 처방 외향 열유속과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../examples/thermal_flux_robin.py) |
 | 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet과 단열 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../examples/transient_heat_convergence.py) |
 | 정적 2D 선형탄성, 평면응력 또는 평면변형률 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity2d.md), [검증](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../../examples/elasticity2d.py) |
@@ -28,6 +28,7 @@
 | 처방 온도장 기계단계의 전체 표면하중 | `galerkin.thermoelasticity.solve_thermoelasticity` | [계약](thermoelastic_traction.md), [검증](thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](../../../../examples/thermoelastic_traction.py) |
 | 정상 열전도 후 같은 메시의 기계해석(단방향) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [계약](thermal_mechanical_workflow.md), [검증](thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../../../examples/thermal_mechanical_workflow.py) |
 | 저장된 과도 열전도 시간 중 고른 시간의 준정적 기계해석(단방향) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [계약](transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../../../examples/transient_thermal_mechanical.py) |
+| 정상·과도 열전도, 탄성, 열탄성, 두 열→역학 workflow의 이름 있는 메시 영역별 구간 상수 재료 | 스칼라 k, c, Q, E, nu, alpha 대신 `{영역 이름: 값}` | [계약과 검증](multimaterial.md) | — |
 
 단위는 각 계약을 따릅니다. 열전도와 기계해석은 SI 미터·초·Kelvin을 쓰며, 깊이당 열량은 W/m,
 깊이당 기계 하중은 N/m, 깊이당 물리 탄성에너지는 J/m입니다. 벡터 모드는 축퇴 고유공간 방향을
@@ -44,7 +45,8 @@
   Dirichlet·단열 열전도만 받으며 별도 열유속/Robin이나 표면하중 확장을 받지 않습니다.
 - 과도 열전도에는 열유속/Robin 입력, restart, 자동 연성이 없습니다. 선형 API는 유한한 음의
   Kelvin을 clamp하지 않습니다.
-- 열전도와 탄성은 균질 등방성이며, 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
+- 열·탄성 재료는 등방성이며 이름 있는 메시 영역마다 상수입니다([multimaterial](multimaterial.md)).
+  온도 의존·이방성 재료는 없습니다. 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
   Cartesian 하중을 받으며 scalar pressure 전용·로컬 프레임·follower 하중 API는 없습니다.
 - 공진기 솔버는 진공 직육면체 PEC 상자를 다룹니다. 목표 근처 탐색 한계는 계약을 읽으세요.
 - 3D 희소 직접 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없습니다. 더 큰 문제에는

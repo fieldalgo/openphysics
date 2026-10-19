@@ -83,12 +83,12 @@ on valid used-node geometry. Do not copy a steady mandatory-anchor rule.
 | Input | Contract |
 |---|---|
 | mesh | galerkin Mesh, finite coordinates in m; used-node, conforming, nonoverlapping manifold CCW triangles |
-| conductivity | finite positive scalar k, W/(m K) |
-| volumetric_heat_capacity | finite positive scalar c, J/(m³ K) |
+| conductivity | finite positive scalar k, W/(m K), or `{region name: k}` |
+| volumetric_heat_capacity | finite positive scalar c, J/(m³ K), or `{region name: c}` |
 | time_s | finite real 1D seconds, at least two, nonnegative, strictly increasing with finite positive differences |
 | initial_temperature_k | finite real exactly (N,) K at time_s[0] |
 | dirichlet | fixed exterior integer node -> scalar K or callback(time_s)->scalar K |
-| heat_source | finite scalar W/m³ or callback(points_m,time_s)->exactly (Q,) W/m³ |
+| heat_source | finite scalar W/m³, `{region name: Q}`, or callback(points_m,time_s)->exactly (Q,) W/m³ |
 
 A source callback receives (Q,2) metre coordinates and one scalar second value.
 There is no scalar broadcasting for callback outputs. Reject bool, complex,
@@ -104,7 +104,7 @@ evolution need not preserve nonnegative nodes; no clamping, mass lumping or
 discrete maximum principle is promised. The separate heat-to-mechanics snapshot
 policy still rejects negative K; this module does not alter that transfer API.
 
-No Robin/outward-flux/radiation input, variable material, changing mesh,
+No Robin/outward-flux/radiation input, temperature-dependent or continuously varying material, changing mesh,
 adaptive time step, Crank–Nicolson, mechanics, schema/CLI/Studio, persistence or
 restart API is included. Unexpected keywords are not silently ignored.
 

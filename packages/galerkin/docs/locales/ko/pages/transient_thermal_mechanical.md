@@ -32,9 +32,9 @@ bool/float/중복/역순/범위 밖 값은 거절한다. 최근접 시간 검색
 선택 온도는 절대 Kelvin>=0이어야 한다. 선택 음수는 clipping 없이 거절한다.
 선택하지 않은 유한 음수는 열 API의 수학적 계약과 같이 허용한다.
 `reference_temperature_k`는 전체 이력에 고정된 유한 비음수 K scalar,
-`thermal_expansion_per_k`는 유한 부호 있는 1/K scalar이다. 영/음의 팽창을
-지원한다. `young_modulus`는 유한 양수 Pa, `-1<poisson_ratio<0.5`,
-`plane`은 명시적으로 `'stress'` 또는 `'strain'`이다.
+`thermal_expansion_per_k`는 유한 부호 있는 1/K 값이다. 영/음의 팽창을
+지원한다. `young_modulus`는 유한 양수 Pa, `-1<poisson_ratio<0.5`이며, 세 값은 각각
+scalar 또는 `{영역 이름: 값}` 매핑이다. `plane`은 명시적으로 `'stress'` 또는 `'strain'`이다.
 
 `mechanical_dirichlet`는 외곽 `(node,component)`에서 고정 scalar 변위 m로의
 mapping이다. 성분0은 x, 1은 y다. 각 분리 연결 성분의 세 rigid mode를

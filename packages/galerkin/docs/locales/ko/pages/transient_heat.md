@@ -81,12 +81,12 @@ anchor 규칙을 가져오면 안 됩니다.
 | 입력 | 계약 |
 |---|---|
 | mesh | galerkin Mesh, 유한한 m 좌표; 사용 절점·적합·비중첩 manifold CCW 삼각형 |
-| conductivity | 유한한 양의 scalar k, W/(m K) |
-| volumetric_heat_capacity | 유한한 양의 scalar c, J/(m³ K) |
+| conductivity | 유한한 양의 scalar k, W/(m K), 또는 `{영역 이름: k}` |
+| volumetric_heat_capacity | 유한한 양의 scalar c, J/(m³ K), 또는 `{영역 이름: c}` |
 | time_s | 유한 실수 1D 초, 최소 두 개, 음이 아니며 유한 양의 차이로 엄격히 증가 |
 | initial_temperature_k | time_s[0]의 유한 실수 정확히 (N,) K |
 | dirichlet | 고정 외곽 정수 절점 -> scalar K 또는 callback(time_s)->scalar K |
-| heat_source | 유한 scalar W/m³ 또는 callback(points_m,time_s)->정확히 (Q,) W/m³ |
+| heat_source | 유한 scalar W/m³, `{영역 이름: Q}`, 또는 callback(points_m,time_s)->정확히 (Q,) W/m³ |
 
 Source callback은 (Q,2) m 좌표와 한 scalar 초 값을 받습니다. Callback 출력의
 scalar broadcasting은 없습니다. bool·complex·비유한 값, 잘못된 shape와
@@ -100,7 +100,7 @@ Consistent mass 진화가 음이 아닌 절점 값을 보존하지 않을 수 �
 lumping 또는 discrete maximum principle을 약속하지 않습니다. 별도 열→기계
 snapshot 정책은 계속 음의 K를 거절하며 이 모듈은 전달 API를 바꾸지 않습니다.
 
-Robin/outward-flux/복사 입력, 가변 재료, 변경 메시, adaptive time step,
+Robin/outward-flux/복사 입력, 온도 의존 또는 연속적으로 변하는 재료, 변경 메시, adaptive time step,
 Crank–Nicolson, mechanics, schema/CLI/Studio, 저장 또는 restart API는 없습니다.
 예상하지 않은 keyword를 조용히 무시하지 않습니다.
 
