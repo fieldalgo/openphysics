@@ -181,3 +181,20 @@ def test_time_series_removes_partial_output_on_failure(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="simulated"):
         export_time_series(fields, kept)
     assert kept.is_dir() and not any(kept.iterdir())
+
+
+def test_time_series_keeps_a_collection_it_did_not_create(tmp_path, monkeypatch):
+    fields = _saved(tmp_path, "transient_thermal_uniform.json")
+    out = tmp_path / "race"
+    real_write = meshio.vtu.write
+
+    def write_then_race(path, mesh, **kwargs):
+        real_write(path, mesh, **kwargs)
+        # Another writer creates the collection before this call reaches it.
+        (out / "fields.pvd").write_text("other", encoding="utf-8")
+
+    monkeypatch.setattr(meshio.vtu, "write", write_then_race)
+    with pytest.raises(FileExistsError):
+        export_time_series(fields, out)
+    assert [p.name for p in out.iterdir()] == ["fields.pvd"]
+    assert (out / "fields.pvd").read_text(encoding="utf-8") == "other"

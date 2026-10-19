@@ -180,8 +180,9 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
                           file=file_name)
         pvd = output_dir / f"{name}.pvd"
         ET.indent(collection)
-        written.append(pvd)
         with open(pvd, "xb") as stream:
+            # Only a file this call created is removed on failure.
+            written.append(pvd)
             ET.ElementTree(collection).write(stream, encoding="utf-8", xml_declaration=True)
     except BaseException:
         for path in written:
