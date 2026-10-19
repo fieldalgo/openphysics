@@ -96,29 +96,81 @@ def test_reversed_wavelengths_give_the_same_cluster_statistics(result):
                                atol=1e-10)
 
 
-def test_metre_document_is_consistent(result):
-    """Same physics in m.
+@pytest.mark.parametrize("ratio, unit", [(1e3, "nm"), (1e-6, "m")])
+def test_scaled_document_is_consistent(result, ratio, unit):
+    """End to end in another unit: the mesh may differ, the answer may not beyond mesh noise.
 
-    Pre-registered with the nanometre test's criteria. The values agree (about
-    4e-8 against 5e-6), but the triangle count differed (1806 against 1792
-    observed), so that pre-registered criterion failed. The mesher's documented
-    contract is that connectivity may legally differ between units, because
-    refinement rounds differently; only the count band is invariant (meshine
-    test_meshine_scale.py). That band is checked here instead.
+    The mesher rounds differently at another scale, so connectivity may legally
+    differ (meshine test_meshine_scale.py); only the triangle-count band is an
+    invariant. An equal count, asserted here earlier for nm, was a coincidence:
+    m gives 1806 against 1792 triangles (a pre-registered equal-count criterion
+    failed for m). The value tolerance 5e-6 covers that mesh noise (observed
+    4e-7 nm, 3e-8 m). Unit handling itself is checked on one mesh below.
     """
-    metre = run(Document.from_dict(_scaled(examples.VECTOR_FIBER_SUBSPACE_SWEEP, 1e-6, "m")), False)
-    assert metre.cluster_ranks == result.cluster_ranks
-    assert len(metre.mesh_triangles) == pytest.approx(len(result.mesh_triangles), rel=0.1)
-    np.testing.assert_allclose(metre.cluster_mean_index(), result.cluster_mean_index(), atol=5e-6)
-    np.testing.assert_allclose(metre.cluster_mean_group_index(), result.cluster_mean_group_index(), atol=5e-6)
+    other = run(Document.from_dict(_scaled(examples.VECTOR_FIBER_SUBSPACE_SWEEP, ratio, unit)), False)
+    assert other.cluster_ranks == result.cluster_ranks
+    assert len(other.mesh_triangles) == pytest.approx(len(result.mesh_triangles), rel=0.1)
+    np.testing.assert_allclose(other.cluster_mean_index(), result.cluster_mean_index(), atol=5e-6)
+    np.testing.assert_allclose(other.cluster_mean_group_index(), result.cluster_mean_group_index(), atol=5e-6)
 
 
-def test_nanometre_document_is_consistent(result):
-    """Same physics in nm; the mesher's roundoff gives a slightly different mesh."""
-    nm = run(Document.from_dict(_scaled(examples.VECTOR_FIBER_SUBSPACE_SWEEP, 1e3, "nm")), False)
-    assert len(nm.mesh_triangles) == len(result.mesh_triangles)
-    np.testing.assert_allclose(nm.cluster_mean_index(), result.cluster_mean_index(), atol=5e-6)
-    np.testing.assert_allclose(nm.cluster_mean_group_index(), result.cluster_mean_group_index(), atol=5e-6)
+def _dispersive(data):
+    """The example fiber with physmat built-in dispersive materials (SiO2 core, CaF2 cladding)."""
+    d = copy.deepcopy(data)
+    d["materials"] = {}
+    d["geometry"]["background"]["material"] = "CaF2"
+    d["geometry"]["shapes"][0]["material"] = "SiO2"
+    d["physics"]["em1"]["n_cladding"] = 1.427       # above CaF2 and below SiO2 over 1.5-1.6 um
+    return d
+
+
+def _on_the_same_mesh(base, ratio, unit, monkeypatch):
+    """Run the scaled document on the um document's mesh, scaled exactly; return (scaled, um) results."""
+    import simcase.runner as runner
+    from meshine import TriMesh
+    from simcase.materials import material_table
+
+    um_model = runner.build_mesh(Document.from_dict(copy.deepcopy(base)))
+    doc = Document.from_dict(_scaled(base, ratio, unit))
+    t = um_model.tri
+    tri = TriMesh(t.nodes * ratio, t.triangles.copy(), t.regions.copy(), list(t.region_names),
+                  {k: v.copy() for k, v in t.boundary_edges.items()},
+                  {k: v.copy() for k, v in t.boundary_nodes.items()},
+                  {k: v.copy() for k, v in t.interfaces.items()})
+    mesh = Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
+                boundary_edges=dict(tri.boundary_edges))
+    model = runner.MeshedModel(doc, tri, mesh, dict(um_model.region_materials),
+                               material_table(doc, um_model.region_materials))
+    used = []
+    monkeypatch.setattr(runner, "build_mesh", lambda d: used.append(d) or model)
+    scaled = run(doc, False)
+    assert used, "the scaled mesh was not used"
+    monkeypatch.undo()
+    return scaled, run(Document.from_dict(copy.deepcopy(base)), False)
+
+
+@pytest.mark.parametrize("materials", ["constant", "dispersive"])
+@pytest.mark.parametrize("ratio, unit", [(1e3, "nm"), (1e-6, "m")])
+def test_scaled_document_on_the_same_mesh_matches_to_roundoff(ratio, unit, materials, monkeypatch):
+    """Unit handling isolated from meshing.
+
+    The um mesh, scaled exactly into the other unit, removes the mesher's
+    rounding differences, so any remaining difference is unit handling. Observed:
+    mean index <= 2.2e-16 and mean-index derivative <= 3.6e-14 under the default,
+    Haswell and Sandybridge kernels. The dispersive case also exercises the
+    material wavelength conversion, which the constant-index example cannot.
+    The mesher-in-loop test above cannot resolve a relative wavelength error
+    below about 3e-4; this one resolves about 2e-10.
+    """
+    assert ratio != 1.0
+    base = examples.VECTOR_FIBER_SUBSPACE_SWEEP
+    base = _dispersive(base) if materials == "dispersive" else base
+    scaled, um = _on_the_same_mesh(base, ratio, unit, monkeypatch)
+    np.testing.assert_array_equal(scaled.mesh_triangles, um.mesh_triangles)
+    np.testing.assert_allclose(scaled.mesh_nodes, um.mesh_nodes * ratio, rtol=1e-15, atol=0)
+    assert scaled.cluster_ranks == um.cluster_ranks
+    np.testing.assert_allclose(scaled.cluster_mean_index(), um.cluster_mean_index(), atol=1e-12, rtol=0)
+    np.testing.assert_allclose(scaled.cluster_mean_group_index(), um.cluster_mean_group_index(), atol=1e-10, rtol=0)
 
 
 @pytest.mark.parametrize("num_modes, message", [
