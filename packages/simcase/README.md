@@ -4,13 +4,12 @@
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
-A COMSOL-style program is, underneath, a file that describes the model and an
-engine that runs the file. `simcase` implements that file format and engine for the
-FieldAlgo stack: a JSON document holds geometry, materials, physics, mesh
-settings and the study; one command runs it through meshine (mesh), physmat
-(materials) and galerkin (FEM) and writes results. The browser UI that edits
-the document is [an optional subpackage](#the-browser-ui) of the same install;
-the engine never depends on it.
+`simcase` defines a JSON model document and the engine that runs it. A document
+holds geometry, materials, physics, mesh settings and the study; one command runs
+it through meshine (mesh), physmat (materials) and galerkin (FEM) and writes
+results. The browser UI that edits the document is
+[an optional subpackage](#the-browser-ui) of the same install; the engine never
+depends on it.
 
 ```bash
 # From the repository root; installs the local runtime packages together.
@@ -23,7 +22,7 @@ python -m simcase run model.json                          # -> model_results/
 The package and CLI are named `simcase`. The JSON version field remains
 `"openphysics": "0.2"`; it is not an import or distribution name. The separate
 `openphysics` distribution is only a name reservation. See the
-[repository setup](https://github.com/fieldalgo/openphysics/blob/2efbc413df5d3d36bcc4c9879b34ed88213b9217/README.md)
+[repository setup](https://github.com/fieldalgo/openphysics/blob/main/README.md)
 for the full development install. The editable paths above require a monorepo
 checkout; an individual sdist does not contain sibling packages or the repository
 root. When installing downloaded artifacts, pass their paths to pip together with
@@ -33,13 +32,21 @@ local artifacts for the sibling dependencies.
 mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
 (mesh, mode, sweep), `log.txt`, and a copy of the document.
 
-## Vacuum PEC cavity documents
+## Supported documents
 
-The feature branch adds a single-study `em.cavity3d` document and SI JSON/NPZ
-output contract. End-to-end engine validation is pending on this branch; see the
-[cavity input and result contract](docs/cavity3d.md) for supported settings,
-search limitations and the distinction between input units and SI output.
-The existing 2D workflow below remains available.
+The runner accepts one physics entry per document. `python -m simcase example <name>`
+prints a supplied example.
+
+| Physics type | What it solves | Examples | Contract |
+|---|---|---|---|
+| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](docs/vector_subspace_tracking.md) |
+| `em.cavity3d` | Vacuum rectangular PEC-box eigenmodes, SI JSON/NPZ output | `cavity_box` | [Cavity document](docs/cavity3d.md) |
+| `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](docs/thermal_steady2d.md), [boundaries](docs/thermal_steady_boundary2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](docs/thermal_transient2d.md) |
+
+Studio edits and runs 2D optical models and has dedicated views for the two heat
+types; it rejects cavity documents. Coupled or multiple-physics runs, geometry,
+mesh and material sweeps, lossy materials and mechanics documents are not supported.
 
 ## The document
 
@@ -88,7 +95,7 @@ existing dotted path under `physics.`. Geometry, mesh and material sweeps are
 rejected because the mesh is built once. Sweeping a wavelength also yields the
 group index.
 
-Physics today: lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
+For optical modes the physics is lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
 an approximation for 2D high-contrast cores) or full `vector` for single points
 and tracked wavelength sweeps. Lossy materials are rejected in both paths. Scalar boundaries are
 `pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
@@ -290,6 +297,39 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
+## Heat and cavity documents
+
+The [cavity document contract](docs/cavity3d.md) covers the `em.cavity3d` input,
+unit conversion, search limitations and the SI JSON/NPZ result layout.
+
+The [thermal.steady2d contract](docs/thermal_steady2d.md) describes homogeneous
+rectangular steady heat documents with explicit geometry length units and
+absolute Kelvin. Numeric SI NPZ arrays use a dedicated result version/layout and
+load with `allow_pickle=False`; support heat reaction is inward, and its negative
+is the thermostat outward contribution. The
+[steady boundary contract](docs/thermal_steady_boundary2d.md) adds side-constant
+outward flux and convection, v2 metadata and raw arrays; documents that use
+neither key keep v1. Empty Dirichlet requires positive Robin anchoring. Input
+Kelvin is nonnegative; finite negative computed temperature is not clamped.
+
+The [`thermal.transient2d` contract](docs/thermal_transient2d.md) defines a fixed
+rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times,
+uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
+insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
+JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
+metadata. Initial values are not projected and negative K is not clamped.
+Transient flux/Robin, restart and automatic coupling are not supported.
+
+### Saved output
+
+Each saved run needs a fresh output directory, including no dangling symlink.
+Keep exclusive control of it until save and cleanup finish: protection against
+replacements observed before cleanup is tested, but a foreign replacement
+between an ownership check and unlink is not guaranteed safe. Hostile
+filesystem races and atomic rollback are outside acceptance. CI runs the heat
+save and I/O robustness checks on Linux, macOS and Windows; see each contract
+for its save and platform limits.
+
 ## The browser UI
 
 `simcase.studio` is the program part of the stack, and it is optional: a model
@@ -321,19 +361,26 @@ document.
   edits to JSON, without adding a constant `n` or `k`.
 - Generate mesh: meshine through the server, drawn by region, with node and
   triangle counts, minimum angle and mean quality.
-- Run: a background job, then the mode field (selectable study point and mode),
+- Run (optical models): a background job, then the mode field (selectable study point and mode),
   an n_eff-vs-parameter chart and a group-index table for wavelength sweeps.
   Vector results add a component selector and relative amplitudes; tracked
   sweeps identify branches and display their overlap and group indices.
 - JSON tab: edit the document by hand and apply.
+- Heat: dedicated views for rectangular `thermal.steady2d` and
+  `thermal.transient2d` documents. Steady heat shows the result mesh, nodal
+  Kelvin and cell heat flux; transient heat adds requested-time selection and
+  paged heat-content (H) and quadratic-functional (V) histories. See the [steady](docs/thermal_studio.md) and
+  [transient](docs/thermal_transient_studio.md) Studio guides.
 
 The page is a single HTML file with no build step and no external libraries
 (canvas drawing only); a framework can come in when the UI grows. Web rather
 than desktop so that any front end shares one UI over the same document format,
 runs the same on a laptop or a server, and can reach other services over HTTP.
 
-Not yet: mouse sketching and boolean CAD, a 3D viewer, geometry sweeps that
-regenerate the mesh, user accounts, projects saved on the server.
+Not supported: mouse sketching and boolean CAD, a 3D viewer, mechanics forms,
+geometry sweeps that regenerate the mesh, user accounts and projects saved on
+the server. Studio is a local tool, not an authenticated multi-user service;
+keep it off untrusted networks.
 
 ### The HTTP API
 
@@ -351,6 +398,10 @@ Used by the page, usable by anything else.
 | GET | `/api/jobs/{id}` | status and log lines |
 | GET | `/api/jobs/{id}/result` | n_eff, group index, fields, mesh, timings |
 
+The steady and transient heat views use their own capability, validation, run and
+result routes; see the [steady](docs/thermal_studio.md) and
+[transient](docs/thermal_transient_studio.md) Studio guides.
+
 `simcase.studio` may use only simcase's public API — the names in
 `simcase.__all__`, never a module underneath it. A test enforces that. It keeps
 the UI a consumer of the engine rather than a part of it, so it can be lifted
@@ -362,6 +413,7 @@ needs something the engine does not export, the engine exports it on purpose.
 ```bash
 # From the repository root after the development install in ../../README.md
 python -m pytest -q packages/simcase/tests
+node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
 ```
 
 Documents round-trip through JSON; malformed documents are rejected with
@@ -371,14 +423,13 @@ run end to end against references: a 220 nm Si slab reproduces refsol's TE0
 to 1.5e-3 (P1 discretisation), a step-index fiber reproduces the LP01/LP11
 scalar modes to 2e-4, and the Hadley rib comes within 5e-4 of the published
 quasi-TE value (the remaining gap is the scalar approximation). Sweeps give
-falling n_eff and n_g > n_eff.
+falling n_eff and n_g > n_eff. The heat documents have their own independent
+validation reports, linked below.
 
 The studio's endpoints are tested with FastAPI's test client, including a full
 run job whose n_eff matches the slab reference; those tests skip when the
-`studio` extra is not installed. An earlier manual browser check covered
-load -> edit -> mesh -> run -> results.
-The automated tests cover the HTTP API and packaged HTML, not browser interaction;
-that manual check is not repeated by running pytest.
+`studio` extra is not installed. CI also runs a small model in a real browser
+against the installed packages.
 
 ## Where this sits
 
@@ -391,48 +442,25 @@ script / CLI  ->  runs the document      simcase.run
                      '-- refsol    references (tests)
 ```
 
-## Headless steady heat
+## Documentation
 
-The separate [thermal.steady2d contract](docs/thermal_steady2d.md) describes
-homogeneous rectangular steady heat documents with explicit geometry length
-units and absolute Kelvin. The [slab](examples/thermal_slab.json) and
-[mixed-source](examples/thermal_mixed.json) examples are included byte-for-byte
-in the sdist alongside that contract. After installation, run
-`simcase validate thermal_slab.json` and
-`simcase run thermal_slab.json -o fresh_heat_results` using the example file.
-The output target must be fresh, including no dangling symlink. Numeric SI NPZ
-arrays use a dedicated result version/layout and load with `allow_pickle=False`;
-support heat reaction is inward; its negative is the thermostat outward contribution.
-With flux/convection, total outward also includes those boundary contributions.
-The [steady boundary extension](docs/thermal_steady_boundary2d.md) candidate adds
-side-constant outward flux and convection, v2 metadata and thirteen raw arrays;
-legacy documents retain v1. The CLI example is `thermal_boundary`; empty
-Dirichlet requires positive Robin anchoring. Input Kelvin is nonnegative;
-finite negative computed temperature is not clamped. P2 numerical/installed
-acceptance is not complete. This does not add thermal Studio UI, plots,
-transient flux/Robin or automatic thermoelastic coupling. Read the contract's save ownership and
-platform limits; narrow Windows save validation is tracked separately from
-the Linux full regression gate.
+| Topic | English | 한국어 |
+|---|---|---|
+| Package overview | [Overview](docs/overview.md) | [한국어](docs/locales/ko/pages/overview.md) |
+| Vector subspace tracking | [Guide](docs/vector_subspace_tracking.md) | [한국어](docs/locales/ko/pages/vector_subspace_tracking.md) |
+| Cavity documents | [Contract](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
+| Steady heat documents | [Contract](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |
+| Steady heat validation | [Report](docs/thermal_simcase_independent_validation.md) | [한국어](docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
+| Steady boundaries | [Contract](docs/thermal_steady_boundary2d.md) | [한국어](docs/locales/ko/pages/thermal_steady_boundary2d.md) |
+| Steady boundary validation | [Report](docs/steady_boundary_independent_validation.md) | [한국어](docs/locales/ko/pages/steady_boundary_independent_validation.md) |
+| Transient heat documents | [Contract](docs/thermal_transient2d.md) | [한국어](docs/locales/ko/pages/thermal_transient2d.md) |
+| Steady heat Studio | [Guide](docs/thermal_studio.md) | [한국어](docs/locales/ko/pages/thermal_studio.md) |
+| Steady Studio validation | [Report](docs/studio_thermal_independent_validation.md) | [한국어](docs/locales/ko/pages/studio_thermal_independent_validation.md) |
+| Transient heat Studio | [Guide](docs/thermal_transient_studio.md) | [한국어](docs/locales/ko/pages/thermal_transient_studio.md) |
+| Transient Studio validation | [Report](docs/studio_transient_thermal_independent_validation.md) | [한국어](docs/locales/ko/pages/studio_transient_thermal_independent_validation.md) |
 
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Copyright 2026 Yongha Kim (FieldAlgo)
-
-## Documentation
-
-See the [cavity guide](docs/cavity3d.md), [headless heat guide](docs/thermal_steady2d.md)
-and [package overview](docs/overview.md).
-
-Output ownership requires exclusive caller control until save and cleanup finish.
-Protection against replacements observed before cleanup is tested; a foreign
-replacement between an ownership check and unlink is not guaranteed safe.
-Hostile filesystem races and atomic rollback are outside acceptance. Do not let
-another writer mutate the output during this interval. Windows save verification
-remains incomplete with two unresolved historical failures; Linux results do not establish Windows
-acceptance. GitHub Actions is enabled; fresh Windows runner evidence is required for acceptance.
-
-## Headless transient heat
-
-The [`thermal.transient2d` contract](docs/thermal_transient2d.md) defines a fixed rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times, uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and insulation. `run(Document)` returns `TransientThermalRunResult`; the CLI example is `transient_thermal_uniform`. Results save JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version metadata. Initial values are not projected and negative K is not clamped. Follow the contract for fresh-output ownership, memory and failures; disabling fields is not streaming. Studio rejects these documents and clears stale optical state. No transient flux/Robin, restart or automatic coupling is added. Implementation is distinct from exact source/installed/CI acceptance.

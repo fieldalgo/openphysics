@@ -18,7 +18,8 @@ installable on its own:
 | `physmat` | materials and optical dispersion |
 | `simcase` | model document, headless runner and the optional browser studio |
 
-Install whichever you need. A future release of this distribution will become an umbrella that
-pulls in the whole suite; until then it holds the name and points here.
+Install whichever you need. Installing this distribution does not install any of them; to use
+the whole suite, install from a repository checkout as described in the
+[repository README](https://github.com/fieldalgo/openphysics/blob/main/README.md).
 
-Source: https://github.com/FieldAlgo/openphysics
+Source: https://github.com/fieldalgo/openphysics

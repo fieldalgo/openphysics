@@ -17,7 +17,7 @@ OpenPhysics 제품군의 이름 예약 배포판입니다.
 | `physmat` | 재료 및 광학 분산 |
 | `simcase` | 모델 문서, 헤드리스 실행기, 선택적 브라우저 스튜디오 |
 
-필요한 패키지만 설치하세요. 이 배포판은 향후 릴리스에서 전체 제품군을 함께 설치하는 우산 패키지가 될 예정입니다. 그 전까지는 이름을 예약하고 이 저장소를 안내합니다.
+필요한 패키지만 설치하세요. 이 배포판을 설치해도 위 패키지는 설치되지 않습니다. 전체 도구 모음은 [저장소 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)에 따라 저장소 checkout에서 설치하세요.
 
-소스: https://github.com/FieldAlgo/openphysics
+소스: https://github.com/fieldalgo/openphysics
 
