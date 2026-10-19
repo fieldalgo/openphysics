@@ -42,6 +42,7 @@ prints a supplied example.
 | `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
 | `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](cavity3d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
+| `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for the two heat
@@ -483,6 +484,7 @@ script / CLI  ->  runs the document      simcase.run
 | Steady heat validation | [Report](thermal_simcase_independent_validation.md) | [한국어](locales/ko/pages/thermal_simcase_independent_validation.md) |
 | Steady boundaries | [Contract](thermal_steady_boundary2d.md) | [한국어](locales/ko/pages/thermal_steady_boundary2d.md) |
 | Steady boundary validation | [Report](steady_boundary_independent_validation.md) | [한국어](locales/ko/pages/steady_boundary_independent_validation.md) |
+| Steady heat region documents | [Contract](thermal_regions2d.md) | [한국어](locales/ko/pages/thermal_regions2d.md) |
 | Transient heat documents | [Contract](thermal_transient2d.md) | [한국어](locales/ko/pages/thermal_transient2d.md) |
 | Steady heat Studio | [Guide](thermal_studio.md) | [한국어](locales/ko/pages/thermal_studio.md) |
 | Steady Studio validation | [Report](studio_thermal_independent_validation.md) | [한국어](locales/ko/pages/studio_thermal_independent_validation.md) |

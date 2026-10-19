@@ -3,6 +3,8 @@
 [English](../../../thermal_steady2d.md)
 
 이 페이지는 새 자연경계 키가 없는 legacy v1 경로를 설명합니다.
+`geometry`에 `background`나 `shapes`가 있는 문서는 대신
+[영역 문서 계약](thermal_regions2d.md)을 따릅니다.
 정상 열전도의 상수 외향 flux·대류 확장 후보는
 [경계 확장 가이드](thermal_steady_boundary2d.md)를 참조하세요.
 새 키가 존재하면 빈 매핑도 v2를 선택합니다. Dirichlet이 비어 있는 양수 Robin

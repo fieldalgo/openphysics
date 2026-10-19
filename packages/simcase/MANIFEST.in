@@ -86,3 +86,8 @@ include docs/vector_subspace_tracking.md
 include docs/locales/ko/pages/vector_subspace_tracking.md
 include tests/test_subspace_fiber_validation.py
 include tests/subspace_fiber_fixture.py
+include simcase/thermal_regions.py
+include docs/thermal_regions2d.md
+include docs/locales/ko/pages/thermal_regions2d.md
+include examples/thermal_regions.json
+include tests/test_thermal_regions.py

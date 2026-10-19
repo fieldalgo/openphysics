@@ -107,6 +107,9 @@ def validate_thermal(doc):
 
 
 def thermal_summary(doc):
+    from .thermal_regions import is_region_thermal, region_summary
+    if is_region_thermal(doc.data):
+        return region_summary(doc)
     name, p = doc.sole_physics()
     return (f'{doc["name"]} (openphysics 0.2)\n'
             f'  physics {name}: {PHYSICS}, single steady heat\n'
@@ -540,6 +543,9 @@ class ThermalRunResult:
 
 
 def run_thermal(doc, verbose=True):
+    from .thermal_regions import is_region_thermal, run_region_thermal
+    if is_region_thermal(doc.data):
+        return run_region_thermal(doc, verbose=verbose)
     from galerkin import rectangle_mesh, assemble_stiffness
     try:
         from galerkin.thermal import solve_steady_heat
