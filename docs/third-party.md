@@ -17,17 +17,69 @@ validation environment (see [Automated check](#automated-check)).
 | Use | Meaning |
 |---|---|
 | runtime | Base requirement of a package; imported at run time. Installed separately by pip, never bundled. |
-| optional | Non-test extra (`simcase[studio]`, `physmat[rii]`, plotting extras). Same terms as runtime. |
+| optional | Non-test extra (`simcase[studio]`, `simcase[export]`, `physmat[rii]`, plotting extras). Python libraries in it meet the runtime terms here. A GPL program that an extra installs (`gmshio[gmsh]`) is an external process instead. |
 | test | Test-only extras (`test`, and `crosscheck` for reference-tool comparisons) or test-only tools; not needed by users. |
 | tool | CI build, packaging or upload tool; never imported by package code. |
-| external process | Separately installed program run as a subprocess; only its output files are read. |
+| external process | Separately installed program run as a separate process; only its output files are read. Its Python module, if it has one, is never imported by package code. |
+| bundled | Native library, statically linked code, font or runtime file that a third-party wheel's publisher ships inside that wheel. |
 | data | Numbers or records reproduced in or fetched by the repository. |
 
-Policy: runtime and optional components must be permissive. LGPL or MPL is
-accepted only for unmodified, separately installed test or tool components.
-GPL programs are used only as external processes, never imported, linked or
-bundled, and their source is not copied. AGPL is not used. No third-party source
-code is copied into the repository.
+## License policy
+
+This is a project policy, not legal advice. License terms are judged at three
+levels.
+
+1. **What this repository creates, copies, builds, links or distributes**: the
+   source tree, the sdists and wheels of its packages, and CI artifacts. All of
+   it is original Apache-2.0 work. No third-party source code is copied into the
+   repository, no package contains compiled code, and the distributions declare
+   their dependencies without including them.
+2. **Each dependency, by the license its own distribution declares**: base
+   requirements, extras, test and tool dependencies, including transitive ones.
+   - Permissive licenses are the default.
+   - Weak copyleft (LGPL, MPL, CeCILL-C) is acceptable at most in optional
+     extras, test extras and tools, installed separately and unmodified. It is
+     never a base requirement, and OpenPhysics never modifies, copies or
+     statically links it or loads it directly from its own code (ctypes, cffi
+     or compiled extensions). This repository is currently stricter: runtime
+     and optional dependencies are all permissive and the
+     [automated check](#automated-check) keeps them so, and the `crosscheck`
+     test extra installs only permissive reference tools.
+   - GPL programs run only as separate processes: as external reference tools,
+     or as the backend of an optional extra (`gmshio[gmsh]`). They are never
+     imported, linked or bundled, and their source is neither read nor copied.
+   - AGPL and other network-copyleft licenses (SSPL, EUPL, OSL and similar) are
+     not used by the packages, their CI or any hosted service. They are run, if
+     at all, only as separately executed reference tools in private research
+     repositories.
+   - A license with a runtime exception, such as
+     `GPL-3.0-or-later WITH GCC-exception-3.1`, is judged by the exception's
+     terms, which are recorded. For a dual license, the option relied on is
+     recorded (FreeType: the FreeType License, FTL).
+3. **Components bundled inside separately installed third-party wheels**: native
+   libraries, statically linked code, fonts and redistributable runtimes that a
+   wheel's publisher ships inside it. They are part of that publisher's
+   distribution and covered by its notices. They are recorded and reviewed in
+   [bundled components](#bundled-components), not banned. OpenPhysics does not
+   modify, rebuild, relink, copy or redistribute them, and its package code
+   reaches them only through the owning package's public Python API. The one
+   recorded exception is a CI diagnostic, `ci/tools/report_numeric_runtime.py`:
+   it loads numpy's bundled OpenBLAS with ctypes only to read its kernel name
+   for the job log (on Linux this also loads the bundled GCC runtime and
+   libquadmath). It is not package code; only its text report is kept with the
+   CI results. A wheel
+   whose main purpose is to expose a bundled copyleft library's API (a thin
+   binding) is reviewed as if OpenPhysics depended on that library directly.
+
+Running software on a server is not distribution, but JavaScript, CSS, fonts and
+WebAssembly sent to a browser are. OpenPhysics distributes no third-party
+binaries. Before anything that contains third-party binaries is distributed
+(container or virtual-machine images, installers, frozen applications,
+wheelhouses or wheel mirrors, browser-based Python sites, customer deliveries),
+it needs a redistribution checklist and legal review: complete license texts and
+notices, corresponding source or a written offer for LGPL and GPL components,
+LGPL libraries kept replaceable, and terms that permit modification and reverse
+engineering for debugging.
 
 ## Python distributions
 
@@ -39,13 +91,13 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 
 | Distribution | Required by (range) | SPDX | Notes |
 |---|---|---|---|
-| `numpy` | all except openphysics (`>=1.24`) | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | Wheels bundle OpenBLAS (BSD-3-Clause) and, on Linux/Windows, the GCC Fortran runtime (GPL-3.0-or-later WITH GCC-exception-3.1, which permits this use) |
-| `scipy` | galerkin, galerkin-refsol, meshine, physmat, simcase (`>=1.10`) | BSD-3-Clause | Same bundled libraries as numpy |
-| `shapely` | simcase (`>=2.0`) | BSD-3-Clause | Wheels bundle the GEOS shared library (LGPL-2.1-only), loaded dynamically and unmodified; OpenPhysics does not redistribute it |
-| `matplotlib` | simcase (any); plotting extras (`>=3.7`) | LicenseRef-Matplotlib | PSF-based permissive license agreement |
+| `numpy` | all except openphysics (`>=1.24`) | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | Wheels bundle OpenBLAS and GCC runtime libraries, including libquadmath (LGPL-2.1-or-later, not covered by the GCC exception): separate shared libraries on Linux and on macOS before 14, none on macOS 14 and later (Apple Accelerate is used), and on Windows an OpenBLAS DLL with the GCC runtime statically linked, plus `msvcp140.dll`. See [bundled components](#bundled-components) |
+| `scipy` | galerkin, galerkin-refsol, meshine, physmat, simcase (`>=1.10`) | BSD-3-Clause | Wheels bundle GCC runtime libraries, including libquadmath (LGPL-2.1-or-later), as shared libraries on Linux and every macOS version, with OpenBLAS except on macOS 14 and later. On Windows the GCC runtime is static in the OpenBLAS DLL and in one extension module. Qhull is statically linked. See [bundled components](#bundled-components) |
+| `shapely` | simcase (`>=2.0`) | BSD-3-Clause | Wheels bundle GEOS (LGPL-2.1) as separate shared libraries on Linux, macOS and Windows, loaded dynamically by shapely's own extension modules; Windows wheels also bundle `msvcp140.dll`. OpenPhysics calls only shapely's Python API and redistributes neither. See [bundled components](#bundled-components) |
+| `matplotlib` | simcase (any); plotting extras (`>=3.7`) | LicenseRef-Matplotlib | PSF-based permissive license agreement. Extension modules statically include FreeType (FTL OR GPL-2.0-or-later, used under the FTL), HarfBuzz, libraqm, SheenBidi and Qhull; data files include fonts under OFL-1.1, BaKoMa and Bitstream Vera terms |
 | `contourpy`, `cycler`, `kiwisolver` | matplotlib | BSD-3-Clause | |
 | `fonttools`, `pyparsing`, `six` | matplotlib | MIT | |
-| `pillow` | matplotlib | MIT-CMU | Bundles image codecs under permissive terms |
+| `pillow` | matplotlib | MIT-CMU | Bundles image, font and compression libraries under permissive terms (FreeType: FTL OR GPL-2.0-or-later, used under the FTL): shared libraries on Linux and macOS, statically linked on Windows |
 | `packaging` | matplotlib | Apache-2.0 OR BSD-2-Clause | |
 | `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | |
 
@@ -64,6 +116,10 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `meshio` | `simcase[export]` (`>=5.3,<6`) | MIT |
 | `rich`, `markdown-it-py`, `mdurl` (and `pygments`, BSD-2-Clause) | meshio | MIT |
 
+`pydantic-core` statically links Rust crates under MIT, Apache-2.0,
+Unlicense OR MIT and Unicode-3.0 (icu_normalizer); its wheel carries only its
+own MIT license. `pyyaml` statically includes libyaml (MIT).
+
 ### Test
 
 | Distribution | Reached through | SPDX | Notes |
@@ -72,7 +128,7 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `pygments` | pytest | BSD-2-Clause | |
 | `colorama` | pytest, click (Windows only) | BSD-3-Clause | |
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
-| `certifi` | httpx, requests | MPL-2.0 | Unmodified CA bundle; test and tool only |
+| `certifi` | httpx, requests | MPL-2.0 | CA bundle used unmodified (certifi's bundle is itself derived from Mozilla's); test and tool only |
 | `scikit-fem` | `galerkin[crosscheck]` (`>=12,<13`) | BSD-3-Clause | Reference tool for [solver comparisons](reference-comparisons.md); pure Python, needs only numpy and scipy |
 
 First-party test extras also require `galerkin-refsol`, `meshine` and `gmshio`,
@@ -90,11 +146,64 @@ which are Apache-2.0 packages of this repository.
 | `cryptography` | secretstorage | Apache-2.0 OR BSD-3-Clause |
 | `secretstorage`, `pycparser` | keyring, cffi | BSD-3-Clause |
 
+pip vendors a copy of certifi's CA bundle (MPL-2.0), used unmodified.
+
+## Bundled components
+
+What the third-party wheels pinned in CI ship inside themselves (policy level 3).
+Survey basis: CPython 3.12 wheels of the versions pinned in
+`ci/requirements-py312-linux.txt`, on the platforms CI tests (manylinux x86_64,
+macOS 14 arm64, Windows amd64). The numpy and scipy wheels for macOS before 14
+and the macOS x86_64 wheels of numpy, scipy, shapely, matplotlib and pillow were
+also listed. Static linkage was read from the Linux, macOS arm64 and Windows
+binaries without running them. Wheels for other platforms, Python versions or
+package versions can differ.
+
+Not surveyed: Linux aarch64, musllinux, Windows arm64, CPython 3.10, 3.11 and
+3.13 (the packages accept Python 3.10 and later), and versions inside the
+declared ranges other than the pins.
+
+| Wheel | Component | License (SPDX) | Platforms and linkage |
+|---|---|---|---|
+| `numpy` | OpenBLAS with LAPACK | BSD-3-Clause, BSD-3-Clause-Open-MPI | Shared library on Linux (`numpy.libs/`) and macOS before 14 (`numpy/.dylibs/`); DLL on Windows (`numpy.libs/`). Not bundled on macOS 14 and later, where numpy uses Apple Accelerate |
+| | GCC runtime: libgfortran, and libgcc_s on macOS | GPL-3.0-or-later WITH GCC-exception-3.1 | Shared libraries on Linux and macOS before 14. On Windows statically linked into the OpenBLAS DLL, as the wheel's notice states |
+| | libquadmath | LGPL-2.1-or-later; the GCC exception does not cover it | Shared library on Linux and macOS before 14. The wheel's notice names the license with a URL but does not include the LGPL text. On Windows it was not found in the stripped DLL, which is inconclusive |
+| | winpthreads | MIT AND BSD-3-Clause | Windows: statically linked into the OpenBLAS DLL; not named in the wheel's notice |
+| | Microsoft C++ runtime `msvcp140.dll` | Microsoft redistributable terms | Windows: separate DLL; the wheel carries no notice for it |
+| `scipy` | OpenBLAS with LAPACK | BSD-3-Clause, BSD-3-Clause-Open-MPI | Shared library on Linux (`scipy.libs/`) and macOS before 14 (`scipy/.dylibs/`); DLL on Windows. Not bundled on macOS 14 and later (Apple Accelerate) |
+| | GCC runtime: libgfortran, and libgcc_s on macOS | GPL-3.0-or-later WITH GCC-exception-3.1 | Shared libraries on Linux (two libgfortran builds) and every macOS version. On Windows statically linked into the OpenBLAS DLL and into the `scipy/odr/__odrpack` extension module; the notice mentions only the DLL |
+| | libquadmath | LGPL-2.1-or-later | Shared library on Linux (two copies) and every macOS version. On Windows `scipy/odr/__odrpack` very likely contains it statically (byte-level match, not confirmed by symbols); the notice does not mention it |
+| | winpthreads | MIT AND BSD-3-Clause | Windows: statically linked into the OpenBLAS DLL and several extension modules |
+| | Qhull | Qhull | All platforms: statically linked into `scipy/spatial` |
+| `shapely` | GEOS | LGPL-2.1 (the notice states no "or later" option) | Separate shared libraries `geos` and `geos_c` on Linux (`shapely.libs/`), macOS (`shapely/.dylibs/`) and Windows (`shapely.libs/`), loaded by shapely's extension modules. Built by shapely from the upstream release without patches; wheel repair tools rename the files and rewrite their library paths. `LICENSE_GEOS` includes the full LGPL-2.1 text but no GEOS copyright line |
+| | `msvcp140.dll` | Microsoft redistributable terms | Windows: separate DLL, notice in `LICENSE_win32` |
+| `matplotlib` | FreeType | FTL OR GPL-2.0-or-later; used under the FTL | All platforms: statically linked into `ft2font` |
+| | HarfBuzz, libraqm, SheenBidi | MIT-Modern-Variant, MIT, Apache-2.0 | All platforms: statically linked into `ft2font` |
+| | Qhull | Qhull | All platforms: statically linked into `_qhull` |
+| | Fonts and font metrics | OFL-1.1 (STIX, Last Resort), BaKoMa Fonts Licence, Bitstream Vera terms (DejaVu), Adobe terms (AFM files) | Data files |
+| `pillow` | libjpeg-turbo, libpng, libtiff, libwebp (with sharpyuv, mux and demux), OpenJPEG, Little CMS, libavif (with aom, dav1d and libyuv), Brotli, liblzma, zstd (Linux) or zlib-ng (macOS), FreeType, HarfBuzz, libxcb, libXau | Permissive, as stated in the wheel's notice; FreeType is FTL OR GPL-2.0-or-later, used under the FTL | 18 shared libraries on Linux (`pillow.libs/`) and macOS (`PIL/.dylibs/`); statically linked on Windows. The xz section's LGPL and GPL text covers command-line tools that are not included. FriBiDi (LGPL) is not bundled; Pillow loads it at run time only if the system provides it |
+| `pydantic-core` | Rust crates (pyo3, regex, serde_json, icu_normalizer and others) | MIT, Apache-2.0, Unlicense OR MIT, Unicode-3.0 | Statically linked; the wheel carries only pydantic-core's own license |
+| `pyyaml` | libyaml | MIT | Statically linked into `_yaml` |
+| `pip` | certifi CA bundle | MPL-2.0 | Vendored data file, used unmodified |
+| `gmsh` | libgmsh, with OpenCASCADE, FLTK and other libraries inside | GPL-2.0-or-later with the Gmsh exception | Shared library installed under the environment's `lib/` directory, loaded only by Gmsh's own Python module inside the separate `gmsh` process (see [external programs](#external-programs)) |
+
+The gaps in upstream notices noted above (libquadmath without the LGPL text, no
+notice for numpy's `msvcp140.dll` or for winpthreads, the static GCC runtime and
+libquadmath in scipy's Windows extension module, no GEOS copyright line) do not
+create obligations for OpenPhysics while it redistributes none of these wheels.
+They matter for anyone who redistributes them.
+
+Re-check this section on all three CI platforms when a pin changes, when CI adds
+a platform, wheel tag or Python version, when a dependency is added, when a
+package gains compiled code, or before OpenPhysics code would load a bundled
+library directly.
+
 ## External programs
 
 | Program | License | How it is used |
 |---|---|---|
-| Gmsh ([`gmsh`](https://gmsh.info) executable, pip distribution `gmsh` in `gmshio[gmsh]` and CI) | GPL-2.0-or-later | `gmshio` writes a `.geo` script, runs `gmsh` as a separate process and reads the `.msh` file with an original parser written from the published format description. Never imported or bundled; see [gmshio NOTICE](../packages/gmshio/NOTICE) |
+| Gmsh (pip distribution `gmsh` in `gmshio[gmsh]` and CI, or a [`gmsh`](https://gmsh.info) executable installed by the user) | GPL-2.0-or-later, with an exception that permits combining Gmsh with Netgen, METIS, OpenCASCADE and ParaView (Gmsh `LICENSE.txt`) | `gmshio` writes a `.geo` script, runs `gmsh` as a separate process and reads the `.msh` file with an original parser written from the published format description. The pip distribution's `gmsh` command is a launcher script that loads Gmsh's own Python module and `libgmsh` in that separate process. Package code never imports `gmsh` (checked) and nothing is bundled; see [gmshio NOTICE](../packages/gmshio/NOTICE) |
+| NGSolve with Netgen (pip distributions `ngsolve` and `netgen-mesher`) | LGPL-2.1-only (their package metadata) | Reference tool for the [material cavity comparison](../packages/galerkin/docs/material_cavity.md#reference-tool-comparisons). Installed from PyPI wheels into a separate environment and run as a separate process; not a dependency and not installed by this repository's CI. Only numerical results are reported and no code is copied. Its wheels also install `netgen-occt` (LGPL by its classifier) and, outside macOS, `ngsolve-openblas` (BSD-3-Clause) |
 | Node.js | MIT | Runs the Studio JavaScript checks in CI |
 | Chrome or Chromium | Chrome terms / BSD-3-Clause | Already-installed browser for the Studio browser check in CI |
 | GitHub Actions `actions/checkout`, `actions/setup-python`, `actions/setup-node`, `actions/upload-artifact` | MIT | CI only, pinned by commit |
@@ -111,11 +220,14 @@ which are Apache-2.0 packages of this repository.
 
 Solver comparisons that run other finite-element tools are recorded separately
 from the analytical acceptance references. Agreement between two tools is not
-used as convergence evidence. Permissive tools are installed through the
-test-only `crosscheck` extra and listed above; the record format and current
-cases are in [reference comparisons](reference-comparisons.md). GPL tools are run, if at all, as separately
-installed unmodified executables outside this repository; their source is not
-read or copied, and only numerical results are reported.
+used as convergence evidence. Only permissive tools are installed through the
+test-only `crosscheck` extra, by choice, and listed above; the record format and
+current cases are in [reference comparisons](reference-comparisons.md).
+Weak-copyleft tools (NGSolve, listed under [external programs](#external-programs))
+and GPL tools are not imported or installed by this repository: they run, if at
+all, as separately installed, unmodified programs in their own environment and
+process, their source is not read or copied, and only numerical results are
+reported. AGPL tools are not used here.
 
 ## Automated check
 
@@ -129,7 +241,8 @@ scanning tool is installed. It fails when:
 - an installed distribution has no reviewed entry in the inventory;
 - installed metadata declares a different SPDX expression, or mentions a
   copyleft license the entry does not record (unless the entry explains why);
-- a runtime or optional dependency of a first-party package is not permissive;
+- a runtime or optional dependency of a first-party package is not permissive
+  (external processes are checked by the GPL rule below instead);
 - a weak-copyleft test or tool dependency is not marked `test_only`;
 - a GPL distribution is not an external process, is a base runtime
   requirement, or is imported by first-party code;
@@ -139,11 +252,11 @@ scanning tool is installed. It fails when:
 
 CI runs it on the pinned Linux environment, on the fresh environment holding the
 installed wheels, and in the installed-platform check on Linux, macOS and
-Windows. Bundled native libraries inside third-party wheels (such as GEOS in
-shapely) are not visible in metadata and are reviewed by hand in the notes
-above.
+Windows. Components bundled inside third-party wheels (such as GEOS in shapely)
+are not visible in metadata; they are reviewed by hand and recorded in
+[bundled components](#bundled-components).
 
 To add a dependency: confirm the license in the upstream repository's LICENSE
 file, add an entry with the SPDX expression and source URL to the inventory,
-add a row here and in the Korean page, and record its package NOTICE if it is
-bundled or copied.
+list what its wheels bundle on each CI platform, add a row here and in the
+Korean page, and record its package NOTICE if it is bundled or copied.
