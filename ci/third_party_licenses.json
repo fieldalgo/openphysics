@@ -8,7 +8,9 @@
     "libraries, statically linked code, fonts); 'bundled_files' records each separate",
     "shared library by glob (POSIX path relative to site-packages, as in RECORD),",
     "SPDX expression, linkage and the CI platforms where it was found. Surveyed for",
-    "the pinned CPython 3.12 wheels on manylinux x86_64, macOS arm64 and Windows amd64."
+    "the pinned CPython 3.12 wheels on manylinux x86_64, macOS arm64 and Windows amd64;",
+    "tool wheels that only the Linux job installs (cryptography, cffi, nh3) on",
+    "manylinux x86_64 only."
   ],
   "policy": {
     "permissive": [
@@ -45,12 +47,14 @@
     "certifi": {"spdx": "MPL-2.0", "test_only": true,
                 "url": "https://github.com/certifi/python-certifi",
                 "review": "CA bundle used unmodified (certifi's bundle is itself derived from Mozilla's), pulled in by httpx (simcase test extra) and requests (twine). Not a runtime dependency and never redistributed."},
-    "cffi": {"spdx": "MIT-0", "url": "https://github.com/python-cffi/cffi"},
+    "cffi": {"spdx": "MIT-0", "url": "https://github.com/python-cffi/cffi",
+             "bundled": "Linux job only: _cffi_backend statically contains libffi (MIT; its ffi_* symbols are exported, no separate library). The wheel carries only cffi's own MIT-0 license, no libffi notice."},
     "charset-normalizer": {"spdx": "MIT", "url": "https://github.com/jawah/charset_normalizer"},
     "click": {"spdx": "BSD-3-Clause", "url": "https://github.com/pallets/click"},
     "colorama": {"spdx": "BSD-3-Clause", "url": "https://github.com/tartley/colorama"},
     "contourpy": {"spdx": "BSD-3-Clause", "url": "https://github.com/contourpy/contourpy"},
-    "cryptography": {"spdx": "Apache-2.0 OR BSD-3-Clause", "url": "https://github.com/pyca/cryptography"},
+    "cryptography": {"spdx": "Apache-2.0 OR BSD-3-Clause", "url": "https://github.com/pyca/cryptography",
+                     "bundled": "Linux job only: the _rust extension module statically links OpenSSL 4.0.3 (Apache-2.0; the wheel's SBOM records a no-shared build) and Rust crates, mostly MIT OR Apache-2.0, also BSD-3-Clause, Unicode-3.0 (unicode-ident) and self_cell (Apache-2.0 OR GPL-2.0-only, used under Apache-2.0). The wheel's CycloneDX SBOMs list them; its license files cover cryptography itself."},
     "cycler": {"spdx": "BSD-3-Clause", "url": "https://github.com/matplotlib/cycler"},
     "docutils": {"spdx": "LicenseRef-Public-Domain AND BSD-2-Clause AND 0BSD",
                  "url": "https://docutils.sourceforge.io/COPYING.html",
@@ -85,7 +89,8 @@
     "meshio": {"spdx": "MIT", "url": "https://github.com/nschloe/meshio",
                "review": "simcase[export] optional extra for VTU export; pure Python, requires numpy and rich."},
     "more-itertools": {"spdx": "MIT", "url": "https://github.com/more-itertools/more-itertools"},
-    "nh3": {"spdx": "MIT", "url": "https://github.com/messense/nh3"},
+    "nh3": {"spdx": "MIT", "url": "https://github.com/messense/nh3",
+            "bundled": "Linux job only (twine dependency): the extension module statically links Rust crates, mostly MIT OR Apache-2.0 or MIT, ICU4X crates under Unicode-3.0, and cssparser and dtoa-short under MPL-2.0 (file-level weak copyleft, compiled by the wheel's publisher and used as shipped). The wheel carries nh3's MIT license and a CycloneDX SBOM listing the crates. A CI tool, never imported by package code and not redistributed."},
     "numpy": {"spdx": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0", "url": "https://github.com/numpy/numpy/blob/main/LICENSE.txt",
               "bundled": "Linux and macOS before 14: OpenBLAS with LAPACK (BSD-3-Clause, BSD-3-Clause-Open-MPI), libgfortran (and libgcc_s on macOS; GPL-3.0-or-later WITH GCC-exception-3.1) and libquadmath (LGPL-2.1-or-later, not covered by the GCC exception) as separate shared libraries. macOS 14 and later: nothing bundled (Apple Accelerate). Windows: OpenBLAS DLL with the GCC runtime and winpthreads (MIT AND BSD-3-Clause) statically linked, plus msvcp140.dll (Microsoft redistributable terms, no notice in the wheel).",
               "bundled_files": [
@@ -142,7 +147,7 @@
                  {"glob": "PIL/.dylibs/libz.*.zlib-ng.dylib", "spdx": "Zlib", "linkage": "dynamic", "platforms": ["macos"]}
                ]},
     "pip": {"spdx": "MIT", "url": "https://github.com/pypa/pip",
-            "bundled": "Vendors certifi's CA bundle (MPL-2.0), used unmodified, and other permissive pure-Python packages."},
+            "bundled": "Vendors certifi's CA bundle (MPL-2.0), used unmodified, and other permissive pure-Python packages. Also ships distlib's Windows launcher executables (pip/_vendor/distlib/t*.exe, w*.exe; 32-bit, 64-bit, ARM64), built from distlib's PC/launcher.c (BSD-2-Clause); they import no C runtime DLL. Installed on every OS, run only on Windows. The wheel carries distlib's PSF-2.0 license text, not the launcher's BSD notice."},
     "pluggy": {"spdx": "MIT", "url": "https://github.com/pytest-dev/pluggy"},
     "pycparser": {"spdx": "BSD-3-Clause", "url": "https://github.com/eliben/pycparser"},
     "pydantic": {"spdx": "MIT", "url": "https://github.com/pydantic/pydantic"},
@@ -175,7 +180,8 @@
                 {"glob": "scipy.libs/libscipy_openblas-*.dll", "spdx": "BSD-3-Clause AND BSD-3-Clause-Open-MPI AND GPL-3.0-or-later WITH GCC-exception-3.1 AND MIT", "linkage": "dynamic", "platforms": ["windows"], "review": "OpenBLAS DLL with the GCC runtime (libgfortran, libgcc; GCC Runtime Library Exception 3.1) and winpthreads (MIT AND BSD-3-Clause) statically linked inside, per the wheel's notice and binary strings. Loaded by the wheel's extension modules. Not redistributed."}
               ]},
     "secretstorage": {"spdx": "BSD-3-Clause", "url": "https://github.com/mitya57/secretstorage"},
-    "setuptools": {"spdx": "MIT", "url": "https://github.com/pypa/setuptools"},
+    "setuptools": {"spdx": "MIT", "url": "https://github.com/pypa/setuptools",
+                   "bundled": "Windows launcher executables (setuptools/cli*.exe, gui*.exe; 32-bit, 64-bit, ARM64) built from setuptools' own launcher.c (MIT); they load the Microsoft C runtime (VCRUNTIME140.dll, Universal CRT) from the system. Installed on every OS, run only on Windows."},
     "shapely": {"spdx": "BSD-3-Clause", "url": "https://github.com/shapely/shapely",
                 "bundled": "Linux, macOS and Windows: GEOS (LGPL-2.1, no 'or later' stated) as separate shared libraries geos and geos_c, built from the upstream release without patches and renamed by wheel repair tools; LICENSE_GEOS carries the full LGPL-2.1 text but no GEOS copyright line. Windows also bundles msvcp140.dll (Microsoft redistributable terms, LICENSE_win32). OpenPhysics does not redistribute shapely or GEOS.",
                 "bundled_files": [
