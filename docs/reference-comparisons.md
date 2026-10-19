@@ -54,6 +54,9 @@ printed into the JUnit output and optionally written to a file. The helper is
 | `matched` | Conditions made identical (mesh, element, coefficients, boundary data, forms) |
 | `not_matched` | Known differences (element order, quadrature, eigensolver) |
 | `observables` | Per quantity: name, unit, metric, value, gate (`null` = reported only), pass/fail |
+| `analytical_acceptance` | Where the feature's analytical pass/fail lives; never replaced by the comparison |
+| `wall_time_s` | Wall time of each tool's assembly and solve |
+| `not_measured` | What the record does not cover (currently peak memory, which one shared process cannot separate per tool) |
 | `environment` | Python, platform, numpy and scipy versions |
 | `role` | Always `code-to-code comparison; not convergence evidence` |
 

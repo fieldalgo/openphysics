@@ -13,7 +13,7 @@ convergence evidence; the analytical gates of each feature stay as they are.
 import numpy as np
 import pytest
 
-from crosscheck import emit, make_record, observable, relative_difference, require_tool
+from crosscheck import Stopwatch, emit, make_record, observable, relative_difference, require_tool
 from galerkin.cavity import solve_cavity_box
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import Mesh, rectangle_mesh
@@ -63,12 +63,16 @@ def _skfem_heat(skfem, mesh, element, k, source, dirichlet):
 def test_heat_p1_same_mesh(skfem):
     mesh, dirichlet = _slab()
     k, q = 3.0, 50.0
-    ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, heat_source=q)
-    basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP1(), k, lambda x: q + 0 * x[0],
-                                dirichlet)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, heat_source=q)
+    with clock("reference"):
+        basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP1(), k, lambda x: q + 0 * x[0],
+                                    dirichlet)
     flux = -k * basis.interpolate(theirs).grad.mean(axis=-1).T  # constant per P1 triangle
     emit(make_record(
-        case="heat-p1-slab", physics="2D steady heat conduction, uniform source",
+        case="heat-p1-slab",
+        analytical_acceptance="galerkin tests/test_thermal_independent_validation.py (docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, uniform source",
         api="galerkin.thermal.solve_steady_heat", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementTriP1",
         matched=["same nodes and triangles (rectangle_mesh 2 m x 1 m, 12 x 6)",
@@ -93,13 +97,17 @@ def test_heat_p2_reference_is_reported(skfem):
     def exact(x):
         return 400.0 - 100.0 * x / length + q0 * length**2 / (k * np.pi**2) * np.sin(np.pi * x / length)
 
-    ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet,
-                             heat_source=lambda p: source(p.T))
-    basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP2(), k, source, dirichlet)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet,
+                                 heat_source=lambda p: source(p.T))
+    with clock("reference"):
+        basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP2(), k, source, dirichlet)
     vertices = basis.nodal_dofs[0]
     scale = np.max(np.abs(exact(mesh.nodes[:, 0])))
     emit(make_record(
-        case="heat-p2-reference-slab", physics="2D steady heat conduction, sinusoidal source",
+        case="heat-p2-reference-slab",
+        analytical_acceptance="galerkin tests/test_thermal_independent_validation.py (docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, sinusoidal source",
         api="galerkin.thermal.solve_steady_heat", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementTriP2",
         matched=["same nodes and triangles (12 x 6)", "k, source and Dirichlet data"],
@@ -135,12 +143,16 @@ def test_elasticity_p1_same_mesh(skfem, plane):
     mesh = rectangle_mesh(2.0, 0.5, 16, 4)
     young, poisson, body = 2.0e11, 0.3, (0.0, -7.8e4)
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
-    ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane=plane,
-                            dirichlet=dirichlet, body_force=body)
-    basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP1(), young, poisson, plane, body)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane=plane,
+                                dirichlet=dirichlet, body_force=body)
+    with clock("reference"):
+        basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP1(), young, poisson, plane, body)
     displacement = theirs[basis.nodal_dofs].T
     emit(make_record(
         case=f"elasticity-p1-plane-{plane}-cantilever",
+        analytical_acceptance="galerkin tests/test_elasticity2d_independent_validation.py (docs/elasticity2d_independent_validation.md)", stopwatch=clock,
         physics=f"2D linear elasticity, plane {plane}, clamped left edge, gravity load",
         api="galerkin.elasticity.solve_elasticity", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementVector(ElementTriP1), linear_elasticity",
@@ -156,14 +168,18 @@ def test_elasticity_p2_reference_is_reported(skfem):
     mesh = rectangle_mesh(2.0, 0.5, 16, 4)
     young, poisson, body = 2.0e11, 0.3, (0.0, -7.8e4)
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
-    ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane="stress",
-                            dirichlet=dirichlet, body_force=body)
-    basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP2(), young, poisson, "stress", body)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane="stress",
+                                dirichlet=dirichlet, body_force=body)
+    with clock("reference"):
+        basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP2(), young, poisson, "stress", body)
     tip = int(np.argmin(np.hypot(mesh.nodes[:, 0] - 2.0, mesh.nodes[:, 1] - 0.25)))
     ours_tip = ours.displacement[tip, 1]
     theirs_tip = theirs[basis.nodal_dofs[1, tip]]
     emit(make_record(
         case="elasticity-p2-reference-cantilever",
+        analytical_acceptance="galerkin tests/test_elasticity2d_independent_validation.py (docs/elasticity2d_independent_validation.md)", stopwatch=clock,
         physics="2D linear elasticity, plane stress, clamped left edge, gravity load",
         api="galerkin.elasticity.solve_elasticity", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementVector(ElementTriP2), linear_elasticity",
@@ -184,7 +200,9 @@ def test_vector_waveguide_modes_same_mesh(skfem):
     core = (np.abs(centroids[:, 0]) < 0.8) & (np.abs(centroids[:, 1]) < 0.5)
     eps = np.where(core, 3.48**2, 1.44**2)
     k0 = 2 * np.pi / 1.55
-    n_eff, _, _, _ = solve_modes(mesh, eps, k0, 3.48, num_modes=4)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        n_eff, _, _, _ = solve_modes(mesh, eps, k0, 3.48, num_modes=4)
 
     basis = skfem.Basis(_reference_mesh(skfem, mesh), skfem.ElementTriN1() * skfem.ElementTriP1())
     eps_q = np.repeat(eps[:, None], basis.default_parameters()["x"].shape[-1], axis=1)
@@ -198,15 +216,17 @@ def test_vector_waveguide_modes_same_mesh(skfem):
         return (dot(et, vt) + dot(et, grad(vz)) + dot(grad(ez), vt) + dot(grad(ez), grad(vz))
                 - k0**2 * w.eps * ez * vz)
 
-    free = basis.complement_dofs(basis.get_dofs().all())
-    a = left.assemble(basis, eps=eps_q)[free][:, free].toarray()
-    b = right.assemble(basis, eps=eps_q)[free][:, free].toarray()
-    lam = la.eigvals(a, b)
+    with clock("reference"):
+        free = basis.complement_dofs(basis.get_dofs().all())
+        a = left.assemble(basis, eps=eps_q)[free][:, free].toarray()
+        b = right.assemble(basis, eps=eps_q)[free][:, free].toarray()
+        lam = la.eigvals(a, b)
     lam = np.real(lam[np.isfinite(lam)])
     reference = np.sqrt(np.clip(-lam, 0, None)) / k0
     reference = np.sort(reference[(reference > 1.44) & (reference < 3.48)])[::-1][:4]
     emit(make_record(
         case="waveguide-vector-rect-core",
+        analytical_acceptance="galerkin tests/test_hadley.py and tests/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
         physics="2D full-vector dielectric waveguide modes (Si core 1.6 x 1.0 in SiO2, 1.55 um)",
         api="galerkin.waveguide.solve_modes",
         discretization="lowest-order Nedelec (E_t) x P1 (E_z), beta^2 formulation",
@@ -223,7 +243,9 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
     import scipy.linalg as la
     from skfem.helpers import curl, dot
     lengths, cells = (1.0, 0.7, 0.5), (4, 3, 2)
-    ours = solve_cavity_box(lengths, cells, num_modes=8, target_frequency_hz=1e8)
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve_cavity_box(lengths, cells, num_modes=8, target_frequency_hz=1e8)
     mesh = skfem.MeshTet(ours.mesh.nodes.T.copy(), ours.mesh.tets.T.copy())
     basis = skfem.Basis(mesh, skfem.ElementTetN0())
 
@@ -235,12 +257,14 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
     def mass(u, v, w):
         return dot(u, v)
 
-    free = basis.complement_dofs(basis.get_dofs().all())
-    values = la.eigh(curlcurl.assemble(basis)[free][:, free].toarray(),
-                     mass.assemble(basis)[free][:, free].toarray(), eigvals_only=True)
+    with clock("reference"):
+        free = basis.complement_dofs(basis.get_dofs().all())
+        values = la.eigh(curlcurl.assemble(basis)[free][:, free].toarray(),
+                         mass.assemble(basis)[free][:, free].toarray(), eigvals_only=True)
     reference = np.sort(values[values > 1e-6 * np.pi**2])[:8]
     emit(make_record(
-        case="cavity-pec-box", physics="3D vacuum PEC box resonances (1 x 0.7 x 0.5 m)",
+        case="cavity-pec-box",
+        analytical_acceptance="galerkin tests/test_cavity3d_validation.py (docs/cavity_solver.md)", stopwatch=clock, physics="3D vacuum PEC box resonances (1 x 0.7 x 0.5 m)",
         api="galerkin.cavity.solve_cavity_box", discretization="lowest-order Nedelec tetrahedra",
         tool="scikit-fem", tool_discretization="ElementTetN0",
         matched=["same nodes and tetrahedra (the returned SI mesh, 4 x 3 x 2 cells)",

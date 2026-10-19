@@ -48,6 +48,9 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 | `matched` | 똑같이 맞춘 조건(메시·요소·계수·경계 자료·형식) |
 | `not_matched` | 알려진 차이(요소 차수·구적·고유값 풀이기) |
 | `observables` | 관측량마다 이름, 단위, 지표, 값, 기준(`null`은 보고만), 통과 여부 |
+| `analytical_acceptance` | 기능의 해석해 pass/fail이 있는 곳. 비교가 이를 대신하지 않음 |
+| `wall_time_s` | 도구별 조립·풀이 시간 |
+| `not_measured` | 기록이 다루지 않는 것(현재는 최대 메모리. 한 프로세스를 같이 쓰므로 도구별로 나눌 수 없음) |
 | `environment` | Python, 플랫폼, numpy·scipy 버전 |
 | `role` | 항상 `code-to-code comparison; not convergence evidence` |
 
