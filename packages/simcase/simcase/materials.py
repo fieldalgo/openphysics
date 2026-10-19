@@ -21,12 +21,13 @@ def resolve_material(doc: Document, name: str) -> physmat.Material:
     if custom is not None:
         if "sellmeier" in custom:
             s = custom["sellmeier"]
-            um = units.to_micrometres(1.0, doc.scale)          # one document length, in um
             rng = tuple(s.get("range", (0.0, float("inf"))))
+            # Each coefficient is converted exactly, so the same glass written in nm,
+            # um or m reaches physmat as the same doubles.
             model = physmat.Sellmeier([float(b) for b in s["B"]],
-                                      [float(c) * um ** 2 for c in s["C"]],
+                                      [units.length_to_micrometres(c, doc.scale, power=2) for c in s["C"]],
                                       s.get("A", 1.0),
-                                      (rng[0] * um, rng[1] * um), name)
+                                      tuple(units.length_to_micrometres(r, doc.scale) for r in rng), name)
             return physmat.Material(name, model, custom.get("source", "document"))
         return physmat.Material(name, physmat.Constant(float(custom["n"]), float(custom.get("k", 0.0)), name),
                                 custom.get("source", "document"))

@@ -62,7 +62,7 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
                 # the document's own scale. Dropping it silently leaves a named material out of
                 # a run that then converges on the wrong geometry.
                 doc.notes.append(
-                    f"geometry.shapes: {s['name']!r} covers {polys[i].area:g} square units, under "
+                    f"geometry.shapes: {s['name']!r} covers {polys[i].area:g} square {doc.length_unit}, under "
                     f"{AREA_EPS:g} of the domain, so it was dropped and contributes no material. "
                     f"Check its size against the units this document declares.")
             continue
@@ -78,7 +78,7 @@ def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None,
     if not out:
         raise DocumentError(
             f"geometry resolved to no regions: all {len(shapes)} shape(s) and the background are "
-            f"smaller than {min_area:g} square units, which is {AREA_EPS:g} of the domain. Either the "
+            f"smaller than {min_area:g} square {doc.length_unit}, which is {AREA_EPS:g} of the domain. Either the "
             f"shapes lie outside geometry.domain, or they are far smaller than the domain they sit in.")
     return out
 

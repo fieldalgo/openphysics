@@ -22,9 +22,12 @@ has to say so, and cannot get metres by forgetting.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from fractions import Fraction
 from typing import Mapping
+
+import numpy as np
 
 BASE_DIMENSIONS = ("length", "mass", "time", "temperature", "current", "amount", "luminous")
 
@@ -289,9 +292,59 @@ def _parse_exponent(tokens: list[str], text: str) -> Fraction:
 UM_IN_SI = 1e-6
 
 
-def to_micrometres(value_doc: float, scale: Scale) -> float:
-    """A document length, in micrometres, for physmat."""
-    return scale.to_si(value_doc, {"length": 1}) / UM_IN_SI
+def micrometres_per_length(scale: Scale) -> Fraction:
+    """One document length unit in micrometres, as an exact ratio.
+
+    The unit's SI size is read as the decimal it was written as (``1e-09`` is
+    exactly 1/10**9, not the nearest binary double), so nm -> um is exactly
+    1/1000 and m -> um is exactly 10**6.
+    """
+    return Fraction(repr(scale.size("length"))) / Fraction(repr(UM_IN_SI))
+
+
+def length_to_micrometres(value_doc, scale: Scale, power: int = 1):
+    """A document length (``power`` 1) or area (2), in micrometres, correctly rounded.
+
+    The document number is read as the shortest decimal that round-trips to it,
+    which is what a JSON document says, and the product is rounded once. So a
+    value that is exactly representable in micrometres converts exactly: 1550 nm
+    and 1.55e-6 m both give the same double as 1.55 um. A micrometre document is
+    returned unchanged. An array converts elementwise. This is the single
+    conversion; the mesher, the solver and physmat all receive lengths through it.
+    """
+    ratio = micrometres_per_length(scale) ** power
+    if np.ndim(value_doc):
+        values = np.asarray(value_doc, dtype=float)
+        return np.array([_exact_product(float(v), ratio) for v in values.ravel()]).reshape(values.shape)
+    return _exact_product(float(value_doc), ratio)
+
+
+def _exact_product(value: float, ratio: Fraction) -> float:
+    if ratio == 1 or not math.isfinite(value):
+        return value * float(ratio)
+    return float(Fraction(repr(value)) * ratio)
+
+
+def lengths_from_micrometres(values_um: np.ndarray, scale: Scale, power: int = 1) -> np.ndarray:
+    """Micrometre lengths (or ``power`` 2 areas) back in the document unit.
+
+    Elementwise and deterministic: one multiply or divide by an exact integer
+    where the ratio allows it. A micrometre document gets the same array back.
+    """
+    ratio = micrometres_per_length(scale) ** power
+    values = np.asarray(values_um)
+    if ratio == 1:
+        return values
+    if ratio.numerator == 1:
+        return values * float(ratio.denominator)
+    if ratio.denominator == 1:
+        return values / float(ratio.numerator)
+    return values * float(ratio.denominator) / float(ratio.numerator)
+
+
+def to_micrometres(value_doc, scale: Scale):
+    """A document length, in micrometres, for physmat and the 2D mesher."""
+    return length_to_micrometres(value_doc, scale)
 
 
 # ---------------------------------------------------------------------------

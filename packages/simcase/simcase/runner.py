@@ -14,6 +14,7 @@ them.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import time
 from dataclasses import dataclass, field
@@ -56,6 +57,11 @@ class MeshedModel:
     mesh: Mesh                              # the same mesh as the solver wants it
     region_materials: dict[str, str]        # region name -> material name
     materials: dict[str, physmat.Material]  # region name -> resolved material
+    #: The same mesh in micrometres, as meshine produced it. ``tri`` and ``mesh`` are
+    #: in the document's length unit; the solver runs on this one with the wavelength
+    #: in micrometres, so a document's answer does not depend on its declared unit.
+    #: None for a model assembled by hand: the solver then uses ``mesh`` directly.
+    solver_mesh: Mesh | None = None
 
     def eps_per_triangle(self, wavelength: float) -> np.ndarray:
         """Relative permittivity of each triangle at one wavelength.
@@ -80,22 +86,74 @@ def build_mesh(doc: Document) -> MeshedModel:
         raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.steady2d')
     if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise DocumentError("build_mesh is a 2D stage; use run(document) for em.cavity3d")
-    domain, namer, region_materials = build_domain(doc)
-    mcfg = doc["mesh"]
+    # Geometry and meshing run in micrometres whatever the document declares: the
+    # same device written in nm, um or m then gives meshine the same doubles, and
+    # so the same mesh. Coordinates go back to the document unit afterwards.
+    canonical = micrometre_document(doc)
+    domain, namer, region_materials = build_domain(canonical)
+    doc.notes.extend(note for note in canonical.notes if note.startswith("geometry."))
+    mcfg = canonical["mesh"]
     size_fn = None
     if mcfg.get("grading"):
         g = mcfg["grading"]
         size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
-    tri = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
-    if tri.num_triangles == 0 or tri.num_nodes == 0:
+    tri_um = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
+    if tri_um.num_triangles == 0 or tri_um.num_nodes == 0:
         raise DocumentError(
-            f"meshing produced {tri.num_nodes} nodes and {tri.num_triangles} triangles. An empty mesh is "
+            f"meshing produced {tri_um.num_nodes} nodes and {tri_um.num_triangles} triangles. An empty mesh is "
             f"never a usable intermediate result, so it is refused here rather than in whatever reduction "
             f"reaches it first. The usual cause is a mesh.size or a feature far from the scale of the "
             f"units this document declares.")
-    mesh = Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
+    tri = dataclasses.replace(tri_um, nodes=units.lengths_from_micrometres(tri_um.nodes, doc.scale))
+    return MeshedModel(doc, tri, _solver_mesh(tri), region_materials, material_table(doc, region_materials),
+                       solver_mesh=_solver_mesh(tri_um))
+
+
+def _solver_mesh(tri: TriMesh) -> Mesh:
+    return Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
                 boundary_edges=dict(tri.boundary_edges))
-    return MeshedModel(doc, tri, mesh, region_materials, material_table(doc, region_materials))
+
+
+def micrometre_document(doc: Document) -> Document:
+    """The same em.modes2d document with every length in micrometres.
+
+    Each number is converted once and exactly where it is representable
+    (``units.length_to_micrometres``). A micrometre document comes back equal.
+    This lists every length the em.modes2d format carries; a length added to the
+    format must be added here, or it reaches the mesher in the document unit.
+    """
+    d = copy.deepcopy(doc.data)
+    um = lambda v, power=1: units.length_to_micrometres(v, doc.scale, power)   # noqa: E731
+    g = d["geometry"]
+    g["domain"] = {k: um(v) for k, v in g["domain"].items()}
+    if "mesh_size" in g["background"]:
+        g["background"]["mesh_size"] = um(g["background"]["mesh_size"])
+    for s in g["shapes"]:
+        for k in ("x", "y", "w", "h", "cx", "cy", "r", "mesh_size"):
+            if s.get(k) is not None:
+                s[k] = um(s[k])
+        if "points" in s:
+            s["points"] = [[um(c) for c in p] for p in s["points"]]
+    m = d["mesh"]
+    m["size"] = um(m["size"])
+    if m.get("grading"):
+        gr = m["grading"]
+        gr["center"] = [um(c) for c in gr["center"]]
+        for k in ("near", "far", "distance"):
+            gr[k] = um(gr[k])
+    for p in d["physics"].values():
+        p["wavelength"] = um(p["wavelength"])
+    st = d["study"]
+    if st.get("type") == "sweep" and str(st.get("parameter", "")).endswith(".wavelength"):
+        st["values"] = [um(v) for v in st["values"]]
+    for spec in d["materials"].values():
+        sm = spec.get("sellmeier") if isinstance(spec, dict) else None
+        if sm:
+            sm["C"] = [um(c, 2) for c in sm["C"]]
+            if "range" in sm:
+                sm["range"] = [um(r) for r in sm["range"]]
+    d["units"] = dict(d["units"], length="um")
+    return Document.from_dict(d)
 
 
 def study_points(doc: Document) -> tuple[str | None, list]:
@@ -114,9 +172,32 @@ def solve_point(model: MeshedModel, physics: dict) -> dict:
         raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.steady2d')
     if physics.get("type") == "em.cavity3d":
         raise DocumentError("solve_point is a 2D stage; use run(document) for em.cavity3d")
+    res = _solve_in_micrometres(model, physics)
+    if "vector_field" in res:
+        res["vector_field"] = _field_in_document_units(res["vector_field"], model)
+    return res
+
+
+def _solve_in_micrometres(model: MeshedModel, physics: dict) -> dict:
+    """``solve_point`` on the micrometre mesh. A vector field's line integrals are in um."""
     wl = physics["wavelength"]
-    return physics_em_modes2d.solve(model.mesh, model.eps_per_triangle(wl), wl, physics["boundary"],
+    eps = model.eps_per_triangle(wl)
+    mesh, wl_solve = model.mesh, wl
+    if model.solver_mesh is not None:
+        mesh, wl_solve = model.solver_mesh, units.to_micrometres(wl, model.doc.scale)
+    return physics_em_modes2d.solve(mesh, eps, wl_solve, physics["boundary"],
                                     int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"))
+
+
+def _field_in_document_units(field: VectorField, model: MeshedModel) -> VectorField:
+    """Transverse line integrals carry one length; nothing else in the field does."""
+    if model.solver_mesh is None:
+        return field
+    return dataclasses.replace(field, transverse=units.lengths_from_micrometres(field.transverse, model.doc.scale))
+
+
+def _tracking_mesh(model: MeshedModel) -> Mesh:
+    return model.mesh if model.solver_mesh is None else model.solver_mesh
 
 
 @dataclass
@@ -297,7 +378,7 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
         settings = tracking_settings(requested, doc["study"].get("tracking"))
         if settings.get("method") == SUBSPACE_METHOD:
             return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh)
-        tracker = ModeTracker(model.mesh, requested, settings)
+        tracker = ModeTracker(_tracking_mesh(model), requested, settings)
         tracking = dict(method="electric-l2-assignment-v1", settings=settings, points=[])
         say("vector sweep: tracking resolved modes by electric L2 overlap; check wavelength-step convergence")
     t0 = time.time()
@@ -310,10 +391,11 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
             physics = dict(physics, num_modes=tracker.settings["search_modes"])
             location = f"wavelength {v:g} {doc.length_unit}"
             try:
-                res = solve_point(model, physics)
+                res = _solve_in_micrometres(model, physics)
             except (ValueError, RuntimeError) as exc:
                 raise ModeTrackingError(f"vector sweep at {location}: {exc}") from exc
             res["neff"], res["vector_field"], evidence = tracker.step(res["neff"], res["vector_field"], location)
+            res["vector_field"] = _field_in_document_units(res["vector_field"], model)
             tracking["points"].append(evidence)
         else:
             res = solve_point(model, physics)
@@ -343,7 +425,7 @@ def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> 
     from .subspace_result import SubspaceSweepResult
 
     requested = int(doc.sole_physics()[1]["num_modes"])
-    tracker = SubspaceTracker(model.mesh, requested, settings)
+    tracker = SubspaceTracker(_tracking_mesh(model), requested, settings)
     tracking = dict(method=SUBSPACE_METHOD, settings=settings, points=[])
     say("vector sweep: tracking isolated clusters by electric L2 principal angles "
         "(electric-l2-subspace-v1); check wavelength-step, mesh and search_modes convergence")
@@ -355,10 +437,11 @@ def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> 
         physics = dict(d.sole_physics()[1], num_modes=settings["search_modes"])
         location = f"wavelength {v:g} {doc.length_unit}"
         try:
-            res = solve_point(model, physics)
+            res = _solve_in_micrometres(model, physics)
         except (ValueError, RuntimeError) as exc:
             raise ModeTrackingError(f"vector subspace sweep at {location}: {exc}") from exc
         neff, field, transform, point_offsets, evidence = tracker.step(res["neff"], res["vector_field"], location)
+        field = _field_in_document_units(field, model)
         if offsets is None:
             offsets = point_offsets
         tracking["points"].append(evidence)

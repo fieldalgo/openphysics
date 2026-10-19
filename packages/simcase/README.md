@@ -82,6 +82,14 @@ length unit, including numeric declarations such as `{"length": {"in_m": 1e-10}}
 This changes labels, not the stored numbers: changing a declaration alone
 reinterprets the model, so rescale its dimensional inputs when changing units.
 Built-in material previews use physmat's native micrometres and label them as such.
+For `em.modes2d`, geometry and meshing run in micrometres whatever the document
+declares: every length is converted once, with a single correctly rounded step,
+and mesh coordinates come back in the document unit for results, CLI output and
+Studio. The same device written in `nm`, `um` or `m` therefore gives the same mesh
+and bit-identical results whenever its numbers convert exactly (such as 1550 nm,
+1.55 um and 1.55e-6 m). A number that does not convert exactly can still differ
+in its last bit, and one ulp of input can change a mesh; the answer then agrees
+within the discretization, not bit for bit.
 The schema can represent multiple entries, but the current runner requires
 exactly one and rejects coupled or multiple-physics runs.
 

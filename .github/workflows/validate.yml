@@ -169,6 +169,7 @@ jobs:
             packages/simcase/tests/test_subspace_tracking.py \
             packages/simcase/tests/test_subspace_sweep.py \
             packages/simcase/tests/test_vector_sweep.py \
+            packages/simcase/tests/test_length_canonical.py \
             packages/galerkin/tests/test_eigenspace_reliability.py \
             packages/galerkin-refsol/tests/test_fiber_group_index.py \
             packages/galerkin-refsol/tests/test_fiber_fields.py

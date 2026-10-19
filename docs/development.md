@@ -80,7 +80,7 @@ not run it. It has three parts, run in parallel:
 | Job | Platform | What it checks |
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all seven distributions; Studio Node checks; one Studio resource observation |
-| `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace and fiber-reference tests under two forced OpenBLAS kernels |
+| `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Six packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
 The single required check is **`tests`**. It passes only when all three parts
@@ -169,6 +169,9 @@ differ for the same commit, pins and seeds, even with one thread.
 
 Write tests that do not depend on last-bit rounding: compare with explicit
 tolerances well clear of roundoff, never exactly at a boundary roundoff can reach.
+An exact comparison is sound only when it follows from identical inputs to the
+same code on one machine, as in `test_length_canonical.py` (the same mesher input
+in nm, um and m); say why in the test.
 
 ## Publishing
 
