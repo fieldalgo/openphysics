@@ -9,8 +9,8 @@ Use the Python APIs directly, run supported models from JSON, or explore 2D
 optical models and rectangular heat documents in the local browser Studio.
 
 The project is under active development. Each feature has an explicit contract
-and a measured validation scope; the name does not imply a general-purpose
-coupled multiphysics solver.
+and validation scope; the name does not imply a general-purpose coupled
+multiphysics solver.
 
 ## What you can solve
 
@@ -19,21 +19,33 @@ coupled multiphysics solver.
 | Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](../packages/simcase/README.md), [vector reliability](../packages/galerkin/docs/eigenspace_reliability.md) |
 | 3D cavities | Vacuum rectangular PEC-box eigenmodes through a Python API or a single JSON study | [Cavity API](../packages/galerkin/docs/cavity_solver.md), [JSON contract](../packages/simcase/docs/cavity3d.md) |
 | Heat conduction | Steady homogeneous isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](../packages/galerkin/docs/thermal_steady2d.md), [flux/Robin](../packages/galerkin/docs/thermal_flux_robin.md), [thermal JSON](../packages/simcase/docs/thermal_steady2d.md), [boundary JSON](../packages/simcase/docs/thermal_steady_boundary2d.md), [Studio](../packages/simcase/docs/thermal_studio.md) |
-| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](../packages/galerkin/docs/transient_heat.md), [validation](../packages/galerkin/docs/transient_heat_validation.md), [Studio](../packages/simcase/docs/thermal_transient_studio.md) |
+| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](../packages/galerkin/docs/transient_heat.md), [document](../packages/simcase/docs/thermal_transient2d.md), [validation](../packages/galerkin/docs/transient_heat_validation.md), [Studio](../packages/simcase/docs/thermal_transient_studio.md) |
 | Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](../packages/galerkin/docs/elasticity2d.md), [traction](../packages/galerkin/docs/elasticity_traction.md) |
 | Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md), [total traction](../packages/galerkin/docs/thermoelastic_traction.md), [workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) |
 | Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](../packages/galerkin/docs/transient_thermal_mechanical.md) |
 
-The JSON runner supports lossless `em.modes2d`, `em.cavity3d` and the documented
-`thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only capabilities do not automatically appear
-in JSON or Studio. Studio supports 2D optical models and dedicated steady and
-transient heat views for the rectangular `thermal.steady2d` and `thermal.transient2d`
-subsets; it rejects 3D models and has no mechanics forms. Transient heat has no restart,
-transient flux/Robin input or automatic coupling; transient heat→mechanics is a
-separate explicit Python call with no feedback to heat, not a JSON or Studio path. Nonlinear mechanics, geometry
-sweeps, lossy document-mode solves and fully coupled thermal feedback are not
-part of the integrated scope. The steady heat→mechanics workflow does not yet
-accept the separate Robin/flux/traction extensions.
+### Where each feature is available
+
+| Feature | Python API | JSON / CLI | Studio |
+|---|---|---|---|
+| 2D waveguide modes and sweeps | Yes | `em.modes2d` (lossless) | Yes |
+| 3D PEC cavity | Yes | `em.cavity3d` | No |
+| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
+| Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
+| Elasticity, thermal expansion, heat→mechanics | Yes | No | No |
+
+Python-only capabilities do not automatically appear in JSON or Studio.
+
+### Current limits
+
+- Heat→mechanics coupling is one-way: an explicit second Python call with no
+  feedback to heat. Fully coupled thermal feedback is not supported.
+- Transient heat has no restart, transient flux/Robin input or automatic coupling.
+- The steady heat→mechanics workflow does not yet accept the separate
+  Robin/flux/traction extensions.
+- Nonlinear mechanics, geometry sweeps and lossy document-mode solves are not
+  supported.
+- Studio rejects 3D models and has no mechanics forms.
 
 ## Packages
 
@@ -50,16 +62,14 @@ package has its own distribution, version, dependencies and license notices.
 | [simcase](../packages/simcase/README.md) | JSON documents, headless runner and optional local Studio |
 
 The seventh distribution, [openphysics](../packages/openphysics/README.md)
-(`0.0.1`), reserves the project name. It contains no engine and does not install
-these packages. The repository root is not an installable distribution.
+(`0.0.1`), only reserves the project name: it contains no engine and does not
+install these packages. The repository root is not an installable distribution.
 **Use the checkout installation below; `pip install openphysics` does not install
-the simulation toolkit.** Publishing this repository is separate from publishing
-new package versions to PyPI.
+the simulation toolkit.**
 
 ## Install from source
 
-The measured full-regression environment is CPython 3.12.14 on Ubuntu 24.04.
-For a Linux checkout:
+CI runs the full regression on CPython 3.12 and Ubuntu 24.04. For a Linux checkout:
 
 ```bash
 git clone https://github.com/fieldalgo/openphysics.git
@@ -75,7 +85,7 @@ shadow installed modules with the directories of the same name.
 Gmsh is optional and separately installed: mesh generation needs `gmsh` on PATH
 or `GMSH_EXECUTABLE`; reading existing MSH files does not. Built-in optical
 materials work without downloading the full refractiveindex.info database.
-For reproducible dependency and database versions, use the [development guide](development.md).
+For pinned dependency and database versions, use the [development guide](development.md).
 
 ## Run an example
 
@@ -106,58 +116,61 @@ python packages/galerkin/examples/elasticity_traction.py
 python packages/galerkin/examples/thermoelastic_traction.py
 ```
 
+More documents are in [`packages/simcase/examples`](../packages/simcase/examples) and
+more scripts in [`packages/galerkin/examples`](../packages/galerkin/examples).
+
 Use a fresh output directory for each saved run and retain exclusive control
 until saving and cleanup finish. Hostile filesystem races and atomic rollback
 are outside acceptance. Read each contract for units: thermal APIs use Kelvin,
 heat flow per depth is W/m, mechanical force per depth is N/m and physical
 elastic energy per depth is J/m.
 
-## Validation and current limits
+## Validation and platform support
 
 Physics features are checked against independent analytical references,
-conservation identities, negative controls and mesh-convergence studies. Run
-checks from the repository root:
+conservation identities, negative controls and mesh-convergence studies. Each
+feature's criteria and limits are in its contract and validation documents,
+linked from the [documentation index](README.md). Run the full source suite
+from the repository root:
 
 ```bash
 python -m pytest -q
-python -m pytest -q -m "not slow"
-python -m pytest -q packages/simcase/tests
 ```
 
-The recorded Linux snapshot `0bc4419` passed **1,536 source tests plus 9 subtests**,
-with **16 optional skips**: 14 Gmsh-absence cases and 2 local-database cases.
-A separate installed-wheel run passed **541 tests without skips**. Seven
-sdist→wheel builds and strict metadata checks of 14 artifacts also passed.
-See the [validation index](README.md) for the exact snapshot and scope.
-Historical numbers are not a claim that every later documentation commit reran
-the full suite, and a passing subset does not validate skipped integrations.
+| Scope | Platforms | What it covers |
+|---|---|---|
+| Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all seven distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
+| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Six implementation sdists built into wheels and tested in a fresh environment: package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
 
-Package metadata permits Python 3.10+, but CI tests only Python 3.12. Full source
-acceptance runs on Linux. On Linux, macOS and Windows, CI also builds six
-implementation sdists into wheels and tests them in a fresh environment: package
-bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness.
-This is installed acceptance, not a full Windows or macOS regression. `OS Independent`
-classifiers and `py3-none-any` wheels describe metadata, not a tested platform matrix.
-Recorded results apply to their own snapshots; check the exact workflow run for newer
-commits. The [development guide](development.md) lists the checks and commands.
+Installed acceptance is not a full macOS or Windows regression. Package metadata
+permits Python 3.10+, but CI tests only Python 3.12; `OS Independent` classifiers
+and `py3-none-any` wheels describe metadata, not a tested platform matrix. A
+commit's results are in its required `tests` check on GitHub Actions. The
+[development guide](development.md) lists the checks and commands.
 
-## Documentation and contributions
+## Documentation
 
-Start with the [documentation index](README.md). Usage and validation guides
-have complete Korean counterparts. [Asset provenance](assets.md) identifies
-historical figures, fixtures and data sources.
+| Page | Content |
+|---|---|
+| [Documentation index](README.md) | Every feature contract and validation report, English and Korean |
+| [Architecture](architecture.md) | Package map and entry points |
+| [Development guide](development.md) | Environment, checks, CI and results |
+| [Asset provenance](assets.md) | Sources of bundled figures, fixtures and data |
 
-The default branch, `main`, contains reviewed integrations. Feature branches
-may contain unvalidated work. See [CONTRIBUTING.md](../CONTRIBUTING.md) for changes
-and reproducible bug reports, or [SECURITY.md](../SECURITY.md) for private vulnerability
-reporting. No separate private repository is needed to use this checkout.
+Usage and validation guides under `docs/` have complete Korean counterparts;
+start from the [Korean index](locales/ko/pages/index.md).
+
+## Contributing and security
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for changes, bug reports and questions, and
+[SECURITY.md](../SECURITY.md) for private vulnerability reporting. The default
+branch, `main`, contains reviewed changes; feature branches may contain
+unvalidated work.
 
 ## License
 
-Original code and documentation are licensed under **[Apache-2.0](../LICENSE)**,
-the same license used by Wavebit. [NOTICE](../NOTICE) and package notices preserve
-third-party terms: embedded refractiveindex.info optical data is CC0 1.0,
-Gmsh is separately installed under its own license, and dependency licenses
-are not replaced by this repository's license.
-
-For transient headless input, initial agreement, time axes and output ownership, follow the [document contract](../packages/simcase/docs/thermal_transient2d.md). Current implementation and exact combined CI acceptance are distinct; earlier engine/steady-save measurements do not establish the new public API's acceptance.
+Original code and documentation are licensed under **[Apache-2.0](../LICENSE)**.
+[NOTICE](../NOTICE) and package notices preserve third-party terms: embedded
+refractiveindex.info optical data is CC0 1.0, Gmsh is separately installed under
+its own license, and dependency licenses are not replaced by this repository's
+license.

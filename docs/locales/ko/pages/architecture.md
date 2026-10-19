@@ -63,20 +63,21 @@ flowchart TB
 ## 진입점과 현재 지원 범위
 
 - **Python:** 가장 넓은 API 범위를 제공합니다. 독립 전자기·정상 및 과도 열전도·탄성·
-  처방 온도 열탄성 모델과 문서화된 정상 열전도→기계 workflow를 포함합니다.
+  처방 온도 열탄성 모델, 문서화된 정상 열전도→기계 workflow와 과도 열전도→기계 호출을 포함합니다.
 - **`simcase`의 JSON / CLI:** 무손실 `em.modes2d`, `em.cavity3d`와 문서화된
   `thermal.steady2d`와 직사각형 `thermal.transient2d` 부분집합을 지원합니다. Python 전용 확장이 자동으로
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
   생략한 기존 문서는 v1을 유지합니다.
-- **Studio:** 2D광학과전용JSON-first정상열용로컬browser화면입니다. Generic광학route의열/3Dguard는유지합니다. [과도 Studio 계약](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)은 전용 capability·route, 정확한 시간 index/history view와 자원 제한을 설명하며 실측 범위는 정확한 checkout의 CI 근거에서 확인합니다. 구조폼·3D·범용열폼editor는범위밖입니다.
+- **Studio:** 2D 광학 모델과 직사각형 문서용 전용 정상·과도 열전도 화면을 제공하는
+  로컬 브라우저 도구입니다. Generic 광학 route는 열/3D guard를 유지합니다. 구조 폼,
+  3D 모델과 범용 열전도 폼 editor는 범위 밖입니다.
+  [정상](../../../../packages/simcase/docs/locales/ko/pages/thermal_studio.md)·[과도](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md)
+  Studio 가이드를 참고하세요.
 
 이 계층 구성이 범용 완전 연성 다중물리 해석기를 뜻하지는 않습니다.
-[독립 과도 열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md)는
-고정 P1 메시, 일관 질량과 후진 Euler를 사용합니다.
-별도 [headless 문서 경로](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md)는
-직사각형JSON/API/CLI·저장이력을추가합니다. HeadlessAPI자체가Studio를활성화하지않고전용route/capability지원은별도입니다. Restart·과도flux/Robin입력·자동연성은계약범위밖입니다. 정확한 사용 계약과
-실측 검증 한계는 [문서 색인](index.md)에 연결돼 있습니다.
+현재 한계는 [도구 개요](overview.md#현재-한계)에 있고, 정확한 사용 계약과 검증 한계는
+[문서 색인](index.md)에 연결돼 있습니다.
 
 ## 실제 코드와의 연결
 
