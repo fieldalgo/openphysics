@@ -35,7 +35,8 @@ are reported. AGPL tools are not used.
 python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
   python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
-    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py
+    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py \
+    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py
 ```
 
 Without the tool the tests skip locally. CI sets
@@ -76,6 +77,12 @@ scikit-fem 12.0.2). The CI records of each commit are authoritative.
 | `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec tetrahedra | `ElementTetN0` | lowest 8 eigenvalues k^2 | 1.4e-14 | 1e-9 |
 | `cavity-lossy-slab` | `material_cavity.solve_material_cavity_box`, complex eps/mu per tetrahedron | `ElementTetN0`, per-material assembly | six complex k^2; Q | 4.1e-15; 9.2e-14 | 1e-9 |
 | `cavity-impedance-walls` | same, Leontovich walls z1 and x0 | `ElementTetN0` + `FacetBasis` tangential mass, `T(k)` frozen at galerkin's `k0` | three complex k^2 at the fixed point | 6.8e-13 | 1e-9 |
+| `heat-p1-three-region-wall` | `thermal.solve_steady_heat`, P1, region k and Q | `ElementTriP1`, per-triangle k and Q | nodal temperature; element heat flux | 2.0e-15; 3.1e-13 | 1e-9 |
+| `elasticity-p1-plane-strain-three-region-bar` | `elasticity.solve_elasticity`, P1, region E and nu | `ElementVector(ElementTriP1)`, per-triangle Lame parameters | nodal displacement; element stress | 3.7e-13; 3.2e-13 | 1e-9 |
+| `elasticity-p1-plane-stress-three-region-bar` | same, plane stress | same | nodal displacement; element stress | 1.6e-12; 1.0e-12 | 1e-9 |
+| `thermoelasticity-p1-plane-strain-three-region-bar` | `thermoelasticity.solve_thermoelasticity`, P1, region alpha, E, nu | same, thermal load `beta (T_h - Tref) div v` | nodal displacement; element stress | 4.0e-13; 2.0e-13 | 1e-9 |
+| `thermoelasticity-p1-plane-stress-three-region-bar` | same, plane stress | same | nodal displacement; element stress | 4.4e-13; 2.7e-13 | 1e-9 |
+| `transient-heat-p1-three-region-wall` | `transient_heat.solve_transient_heat`, P1, region k, c and Q | `ElementTriP1` stiffness and consistent mass, backward Euler in the test | nodal temperature at every stored time | 1.2e-15 | 1e-9 |
 | `heat-p2-reference-slab` | P1 | `ElementTriP2` | vertex temperature: P1 vs P2; P1 vs exact; P2 vs exact | 3.7e-5; 3.6e-5; 1.5e-6 | reported |
 | `elasticity-p2-reference-cantilever` | P1, plane stress | `ElementVector(ElementTriP2)` | tip deflection, P1 vs P2 | 1.7e-1 | reported |
 
