@@ -22,11 +22,12 @@ claims still come from analytical references and mesh-refinement studies.
 |---|---|---|---|
 | [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]` |
 
-Only permissively licensed tools are installed as test extras (see
-[third-party software](third-party.md)). GPL-licensed tools are not imported or
-installed by this repository; if compared at all, they run as separately
-installed, unmodified programs outside it, and only their numerical results are
-reported.
+By choice, only permissively licensed tools are installed as test extras and
+run in CI (see [third-party software](third-party.md)). Tools under weak
+copyleft (LGPL, such as NGSolve) or GPL are not imported or installed by this
+repository; if compared at all, they run as separately installed, unmodified
+programs in their own environment and process, and only their numerical results
+are reported. AGPL tools are not used.
 
 ## Running
 

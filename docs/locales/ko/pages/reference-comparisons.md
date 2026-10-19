@@ -19,9 +19,10 @@
 |---|---|---|---|
 | [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`, CI는 12.0.2 고정 | BSD-3-Clause | 시험 전용 extra `galerkin[crosscheck]`에서 시험 코드가 import |
 
-시험 extra로는 허용형 라이선스 도구만 설치합니다([제3자 소프트웨어](third-party.md) 참고).
-GPL 도구는 이 저장소에서 import하거나 설치하지 않습니다. 비교한다면 저장소 밖에서 따로 설치한
-수정 없는 프로그램으로 돌리고, 수치 결과만 보고합니다.
+시험 extra로 설치하고 CI에서 돌리는 도구는 정한 대로 허용형 라이선스 도구뿐입니다
+([제3자 소프트웨어](third-party.md) 참고). 약한 copyleft(NGSolve 같은 LGPL)나 GPL 도구는 이
+저장소에서 import하거나 설치하지 않습니다. 비교한다면 따로 설치한 수정 없는 프로그램을 자기 환경과
+프로세스에서 돌리고, 수치 결과만 보고합니다. AGPL 도구는 쓰지 않습니다.
 
 ## 실행
 
