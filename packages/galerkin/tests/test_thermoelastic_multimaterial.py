@@ -93,6 +93,26 @@ def test_uniform_mappings_match_the_scalar_mechanical_stage():
     assert scalar.young_modulus == 70e9
 
 
+def test_scalar_materials_beside_a_mapping_are_recorded_as_python_floats():
+    """A scalar given next to a mapping is recorded as float, never the caller's object."""
+    mesh = layered_rectangle_mesh([.3, 1.], .5, [2, 2], 2, ['a', 'b'])
+    snap = freeze_temperature(mesh, np.full(len(mesh.nodes), 320.))
+    bc = {(int(i), c): 0. for i in mesh.boundary['left'] for c in (0, 1)}
+    E0 = np.array(70e9)
+    r = solve_thermoelasticity(mesh, snap, reference_temperature_k=TREF, plane='strain', dirichlet=bc,
+                               thermal_expansion_per_k={'a': 1e-5, 'b': 2e-5}, young_modulus=E0,
+                               poisson_ratio=np.float32(.25))
+    assert type(r.young_modulus) is float and r.young_modulus == 70e9
+    assert type(r.poisson_ratio) is float and r.poisson_ratio == float(np.float32(.25))
+    assert r.thermal_expansion_per_k == {'a': 1e-5, 'b': 2e-5}
+    E0[...] = 1.
+    assert r.young_modulus == 70e9
+    r = solve_thermoelasticity(mesh, snap, reference_temperature_k=TREF, plane='strain', dirichlet=bc,
+                               thermal_expansion_per_k=1e-5, young_modulus={'a': 70e9, 'b': 70e9},
+                               poisson_ratio=0)
+    assert type(r.thermal_expansion_per_k) is float and type(r.poisson_ratio) is float
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
 def test_expansion_mismatch_composite_cylinder_converges(plane):
