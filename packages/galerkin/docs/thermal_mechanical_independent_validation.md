@@ -2,6 +2,12 @@
 
 [한국어](locales/ko/pages/thermal_mechanical_independent_validation.md)
 
+**At a glance**
+
+- **What it checks:** independent acceptance of `galerkin.thermal_mechanical.solve_steady_thermoelasticity`: Dirichlet/insulated steady heat, exact same-mesh nodal-P1 temperature transfer, then prescribed-temperature mechanics, in plane stress and plane strain.
+- **Fixed gates:** on n=8/16/32/64, every interval needs temperature and displacement L2 order ≥ 1.8 and flux, strain, full 3D stress and energy-norm orders ≥ 0.9; exact uniform/linear fields and heat balances agree to 1e-10, mechanical residual, force and moment to 1e-9.
+- **Scope:** one-way endpoint mechanics. Robin, outward flux, traction, transient heat, feedback, CLI/Studio and persistence are outside it. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+
 This report covers the public Python workflow on explicit production candidate
 **b4131d0dab425c2ba54380492e33109f78a92a0b**, a normal successor of initial
 **48920cc066708784864c95eb5bae597b0e2a2abd**. Independent test code is fixed at

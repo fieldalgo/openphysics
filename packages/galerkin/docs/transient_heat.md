@@ -2,6 +2,12 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat.md) · [Validation](transient_heat_validation.md)
 
+**At a glance**
+
+- **What it does:** `galerkin.transient_heat.solve_transient_heat` advances 2D heat conduction, c·dT/dt − div(k·grad T) = Q, on a fixed conforming P1 triangle mesh with consistent mass and backward Euler. Inputs are constant isotropic k [W/(m K)] and c [J/(m³ K)], a source Q [W/m³], explicit times [s], an initial field [K] and fixed Dirichlet nodes with time-dependent temperatures; other boundaries are insulated.
+- **Limits:** no prescribed flux or Robin boundary, restart or automatic heat-to-mechanics coupling. Finite negative Kelvin is not clamped, and no discrete maximum principle is promised.
+- **Validation:** the [validation contract](transient_heat_validation.md) and [independent acceptance](transient_heat_independent_validation.md) fix backward-Euler order 0.9–1.1 against the exact discrete eigenmode product, and temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on a manufactured sine solution. The historical notes below are kept as recorded; for a specific commit, see its CI run.
+
 ## Current checkout and evidence
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.

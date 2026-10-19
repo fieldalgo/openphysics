@@ -1,5 +1,11 @@
 # Independent prescribed-temperature mechanical-stage acceptance
 
+**At a glance**
+
+- **What it checks:** independent acceptance of `galerkin.thermoelasticity.solve_thermoelasticity` against an original three-dimensional continuum oracle, for an explicitly prescribed nodal-P1 Kelvin field in plane stress and plane strain.
+- **Fixed gates:** on n=8/16/32, both rates need displacement L2 ≥ 1.8 and displacement-gradient H1, full 3D stress L2 (including zz) and energy-norm orders ≥ 0.9; exact fields and energy/work identities agree to 1e-10, residuals to 1e-9.
+- **Scope:** the mechanical stage only. It does not validate a heat solver, temperature transfer, provenance, transient work or a full coupling workflow. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+
 This acceptance uses an independent continuum oracle and preregistered gates.
 It covers the mechanical response to an explicitly prescribed nodal-P1 Kelvin
 field. It does not validate a heat solver, temperature transfer, provenance,

@@ -2,6 +2,12 @@
 
 [영문 원문](../../../thermal_flux_robin_independent_validation.md)
 
+**한눈에 보기**
+
+- **확인하는 것:** 닫힌 형태의 strip 해와 별도 제조해로 `galerkin.thermal`의 처방 외향 열유속과 Robin 대류를 독립 수용 검증합니다. Oracle은 생산 조립이나 경계 참조 모듈을 import하지 않습니다.
+- **고정 기준:** n=8/16/32/64에서 마지막 두 구간 모두 내부 온도 L2 차수 ≥ 1.8, 열유속 L2 차수 ≥ 0.9가 필요합니다. 연산자·하중·잔차·반력·열수지 비교는 1e-10, 8차·10차 구적은 측정 오차의 1% 이내로 일치해야 합니다.
+- **범위:** 독립 정상 Python API만 다루며 문서, 과도 열전도, 연성 workflow는 포함하지 않습니다. 아래 후보 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+
 이 보고서는 초기 후보 `23f528dbcffb42ec4120b762fde840f70d9aeffe`를 다룹니다.
 `galerkin/thermal.py` blob은 `20b2f5f0f94583e50775743e1ed9dfaf1c68d97c`,
 경계 reference blob은 `6dccfad22c1300a0df698dea502e1643d1a0c153`입니다.

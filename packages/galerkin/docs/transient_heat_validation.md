@@ -2,6 +2,12 @@
 
 [전체 한국어판](locales/ko/pages/transient_heat_validation.md) · [Usage](transient_heat.md)
 
+**At a glance**
+
+- **What it checks:** the producer-side gates for `solve_transient_heat`: exact controls, a temporal gate on the smallest Dirichlet eigenmode, and spatial gates on a manufactured sine solution.
+- **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%.
+- **Scope:** the eigenmode gate measures time error only, not PDE refinement. The historical execution notes below are kept as recorded; for a specific commit, see its CI run.
+
 ## Current checkout and evidence
 
 This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
