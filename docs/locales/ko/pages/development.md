@@ -50,6 +50,7 @@ python -m pytest -q -ra                    # 전체 소스 시험
 node --test packages/simcase/tests/*.cjs   # Studio JavaScript 검사
 python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
 python ci/check_licenses.py                # 설치된 라이선스를 검토 목록과 대조
+python ci/check_markdown_links.py          # 모든 Markdown 파일의 상대 링크와 #앵커
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -77,15 +78,16 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 일곱 개; Studio Node 검사; Studio 자원 관측 1회 |
+| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 일곱 개; Studio Node 검사; Studio 자원 관측 1회 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·광섬유 기준 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 여섯 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
 필수 검사는 **`tests`** 하나입니다. 세 부분이 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
-**Linux job.** 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
-먼저 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
+**Linux job.** 먼저 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
+링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
+이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
 돌립니다. 소스 시험이 실패해도 배포 검사와 Node 검사는 근거를 남기려고 계속 돌지만,
 job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈춘 실행을 끊기 위한
 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
