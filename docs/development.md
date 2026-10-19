@@ -51,6 +51,7 @@ python -m pytest -q -ra                    # full source suite
 node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
 python ci/check_distributions.py           # build, inspect and install all packages
 python ci/check_licenses.py                # installed licenses vs. the reviewed inventory
+python ci/check_markdown_links.py          # relative links and #anchors in all Markdown files
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -78,7 +79,7 @@ not run it. It has three parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Fast preflight groups, then the full source suite with the pinned RII database; all seven distributions; Studio Node checks; one Studio resource observation |
+| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all seven distributions; Studio Node checks; one Studio resource observation |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace and fiber-reference tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Six packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
@@ -86,8 +87,10 @@ The single required check is **`tests`**. It passes only when all three parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
-**Linux job.** Preflight groups (steady boundary, transient documents, steady
-and transient Studio, transient thermomechanics) run first so a broken
+**Linux job.** A Markdown link check runs first: every relative link and
+`#anchor` in the repository's tracked Markdown files must resolve (external URLs
+are not fetched). Preflight groups (steady boundary, transient documents, steady
+and transient Studio, transient thermomechanics) run next so a broken
 contract fails within minutes. The full suite then runs everything again. The
 distribution and Node steps still run after a failed source suite so their
 evidence is kept, but the job stays failed. The job usually takes 16 to 22
