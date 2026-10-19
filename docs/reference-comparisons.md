@@ -21,6 +21,7 @@ claims still come from analytical references and mesh-refinement studies.
 | Tool | Version | License | How it is used |
 |---|---|---|---|
 | [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]` |
+| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0` (sympy 1.14.0 in CI) | MIT (sympy: BSD-3-Clause AND MIT) | Same; [element definitions](#element-definitions) only |
 
 By choice, only permissively licensed tools are installed as test extras and
 run in CI (see [third-party software](third-party.md)). Tools under weak
@@ -36,7 +37,8 @@ python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
   python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
     packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py \
-    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py
+    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py \
+    packages/galerkin/tests/test_crosscheck_symfem_elements.py
 ```
 
 Without the tool the tests skip locally. CI sets
@@ -88,6 +90,44 @@ scikit-fem 12.0.2). The CI records of each commit are authoritative.
 
 The P2 rows show the expected effect of element order on coarse meshes (P1
 triangles are stiff in bending); they are not accuracy claims for either tool.
+
+## Element definitions
+
+[symfem](https://github.com/mscroggs/symfem) builds finite elements from their
+definitions and integrates in exact rational arithmetic (sympy); DefElement uses
+it to verify other libraries. `test_crosscheck_symfem_elements.py` compares
+galerkin's element definitions and element matrices with it on two small meshes
+with rational coordinates and scrambled node ids: six triangles (obtuse, thin
+and clockwise ones included) and four tetrahedra around one interior edge.
+The engine never imports symfem (`test_independence.py`).
+
+Conventions are fixed first, exactly and independently of both codes. Each
+cell's vertices are passed to symfem in ascending global node id, and the
+circulation of every symfem Nedelec function along every edge of the cell,
+directed from the lower to the higher node id, is integrated here with sympy.
+It equals the identity matrix, so symfem's degrees of freedom are galerkin's
+(unit-tangent circulation, low node id to high node id) with no sign or scale
+conversion. The P1 functions equal the Kronecker delta at the vertices. Both
+checks are exact (gate 0). The test also asserts that galerkin's global edges
+run from the lower to the higher node id and that both local orientations occur.
+
+The global matrices are then compared entry by entry (relative gate `1e-12`;
+float64 against exact rationals gives about `1e-16`). A sign flip in the
+orientation rule, a wrong mass scale or a `1e-7` change in one P1 mass entry
+each fail it.
+
+| Case | Observable (galerkin API) | Difference | Gate |
+|---|---|---|---|
+| `elements-p1-nedelec-triangles` | edge circulations minus identity; P1 vertex values minus delta | 0; 0 | exact |
+| | P1 gradients (`postprocess.element_gradient`); stiffness; mass | 1.1e-16; 9.8e-17; 1.0e-16 | 1e-12 |
+| | Nedelec values at centroids (`edge.eval_edge_field`); curl-curl; mass; edge x P1 gradient coupling | 1.7e-16; 3.6e-16; 1.1e-16; 1.6e-16 | 1e-12 |
+| `elements-p1-nedelec-tetrahedra` | edge circulations minus identity; P1 vertex values minus delta | 0; 0 | exact |
+| | P1 gradients (`assembly3d.tet_gradients`); stiffness; mass | 2.0e-16; 1.6e-16; 7.8e-17 | 1e-12 |
+| | Nedelec values at centroids (`edge3d.eval_edge_field_3d`); curl-curl; mass; edge x P1 gradient coupling | 2.3e-16; 1.0e-16; 1.2e-16; 1.5e-16 | 1e-12 |
+
+Values from a local Linux run with symfem 2025.12.0 and sympy 1.14.0. Not
+compared: the P1 load vector (galerkin uses a one-point centroid rule) and the
+P1 boundary mass. The symbolic integration takes about 20 s on one core.
 
 ## Adding a case
 
