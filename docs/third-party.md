@@ -136,6 +136,10 @@ own MIT license. `pyyaml` statically includes libyaml (MIT).
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
 | `certifi` | httpx, requests | MPL-2.0 | CA bundle used unmodified (certifi's bundle is itself derived from Mozilla's); test and tool only |
 | `scikit-fem` | `galerkin[crosscheck]` (`>=12,<13`) | BSD-3-Clause | Reference tool for [solver comparisons](reference-comparisons.md); pure Python, needs only numpy and scipy |
+| `symfem` | `galerkin[crosscheck]` (`==2025.12.0`) | MIT | Exact element definitions for [element comparisons](reference-comparisons.md#element-definitions); pure Python. Its wheel metadata has no license field; the MIT text ships as its license file |
+| `sympy` | symfem | BSD-3-Clause AND MIT | Pure Python. Metadata says BSD; the license file adds code from Diofant, multipledispatch and PyDy (BSD-3-Clause) and latex2sympy (MIT) |
+| `mpmath` | sympy | BSD-3-Clause | Pure Python |
+| `appdirs` | symfem | MIT | Pure Python |
 
 First-party test extras also require `galerkin-refsol`, `meshine` and `gmshio`,
 which are Apache-2.0 packages of this repository.

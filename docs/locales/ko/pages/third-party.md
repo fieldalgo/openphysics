@@ -120,6 +120,10 @@ crate를 정적으로 링크하며, 휠에는 자기 MIT 라이선스만 들어 
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
 | `certifi` | httpx, requests | MPL-2.0 | CA 묶음을 수정 없이 사용(certifi의 묶음 자체가 Mozilla 묶음에서 파생된 것). 시험·도구 전용 |
 | `scikit-fem` | `galerkin[crosscheck]`(`>=12,<13`) | BSD-3-Clause | [솔버 비교](reference-comparisons.md)용 레퍼런스 도구. 순수 Python이며 numpy와 scipy만 필요 |
+| `symfem` | `galerkin[crosscheck]`(`==2025.12.0`) | MIT | [요소 비교](reference-comparisons.md#요소-정의)용 정확한 요소 정의. 순수 Python. 휠 메타데이터에 라이선스 필드가 없고 MIT 본문이 라이선스 파일로 들어 있음 |
+| `sympy` | symfem | BSD-3-Clause AND MIT | 순수 Python. 메타데이터는 BSD라고만 적고, 라이선스 파일에 Diofant·multipledispatch·PyDy(BSD-3-Clause)와 latex2sympy(MIT)에서 온 코드가 추가로 적혀 있음 |
+| `mpmath` | sympy | BSD-3-Clause | 순수 Python |
+| `appdirs` | symfem | MIT | 순수 Python |
 
 자체 패키지의 test extra는 `galerkin-refsol`, `meshine`, `gmshio`도 요구합니다. 모두 이
 저장소의 Apache-2.0 패키지입니다.
