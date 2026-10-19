@@ -61,6 +61,10 @@ def main():
                 result = subprocess.run(list(map(str, argv)), cwd=cwd, env=env,
                                         stdout=log, stderr=subprocess.STDOUT)
             record["exit"] = result.returncode
+            # Echo pytest's summary line so counts are visible in the job log itself.
+            lines = (output / f"command-{index:02d}.log").read_text(encoding="utf-8", errors="replace").splitlines()
+            if "pytest" in record["argv"] and lines:
+                print(f"[{index:02d}] exit {result.returncode}: {lines[-1].strip()}", flush=True)
             if result.returncode:
                 raise RuntimeError(f"command {index} failed with exit {result.returncode}")
         finally:
