@@ -352,8 +352,11 @@ is code-to-code evidence, not convergence evidence.
   heat, elasticity and thermoelasticity in both planes, and backward-Euler
   transient heat. Temperatures, displacements, fluxes and stresses agree to
   1.6e-12 or better, gated at 1e-9 ([reference comparisons](https://github.com/fieldalgo/openphysics/blob/main/docs/reference-comparisons.md)).
-- A separate study (2026-10-19) repeated the gate problems of this page at all
-  four refinement levels. Same-mesh P1 fields agreed to 1.4e-12 (temperature,
+- A separate study (2026-10-19) repeated the steady, elasticity,
+  thermoelasticity and steel/insulation-wall transient gate problems at all four
+  refinement levels, on code from before wall B and the zero-count eigenvalue
+  search were added; wall B and its wrong-property check have no reference-tool
+  comparison yet. Same-mesh P1 fields agreed to 1.4e-12 (temperature,
   displacement) and 6.2e-11 (flux, stress). scikit-fem P2 against the same refsol
   references confirmed them: on the straight-sided annulus meshes P2 is limited
   to order about 2 by the polygonal geometry, and isoparametric P2 on the curved

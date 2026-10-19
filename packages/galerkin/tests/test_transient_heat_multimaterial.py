@@ -5,6 +5,7 @@
 Reference: refsol.transient_heat_multilayer.LayeredWall, an eigenfunction
 series for a layered wall with fixed end temperatures (NumPy only).
 """
+import dataclasses
 import functools
 
 import numpy as np
@@ -68,9 +69,10 @@ def test_uniform_region_mapping_matches_the_scalar_history():
     mapped = solve_transient_heat(mesh, conductivity={'a': 2.5, 'b': 2.5},
                                   volumetric_heat_capacity={'a': 4., 'b': 4.},
                                   heat_source={'a': 7., 'b': 7.}, **kw)
-    for name in ('temperature_k', 'heat_flux_w_m2', 'reaction_w_per_m', 'storage_rate_w_per_m',
-                 'heat_content_j_per_m'):
-        np.testing.assert_array_equal(getattr(mapped, name), getattr(scalar, name))
+    arrays = [f.name for f in dataclasses.fields(scalar) if isinstance(getattr(scalar, f.name), np.ndarray)]
+    assert len(arrays) >= 9
+    for name in arrays:
+        np.testing.assert_array_equal(getattr(mapped, name), getattr(scalar, name), err_msg=name)
     assert mapped.conductivity_w_mk == {'a': 2.5, 'b': 2.5} and scalar.conductivity_w_mk == 2.5
 
 
