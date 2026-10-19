@@ -302,7 +302,14 @@ Other wall tests:
 - A dense n=2 case uses mixed walls.
 - Invalid conductivities are rejected.
 
-## Reference-tool comparison (NGSolve)
+## Reference-tool comparisons
+
+Same-discretization comparison with scikit-fem 12.0.2 (`BSD-3-Clause`, test extra
+`galerkin[crosscheck]`): `tests/test_crosscheck_skfem_lossy_cavity.py` rebuilds the lossy slab and
+the impedance-wall operators on galerkin's mesh and gates the eigenvalue differences at `1e-9`
+(observed `4.1e-15` and `6.8e-13`). See the [reference comparisons](https://github.com/fieldalgo/openphysics/blob/main/docs/reference-comparisons.md).
+
+### Higher-order comparison (NGSolve)
 
 This comparison is separate from the analytic pass/fail gates above. It neither
 replaces them nor serves as convergence evidence.

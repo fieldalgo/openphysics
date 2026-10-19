@@ -276,7 +276,14 @@ FEM 시험은 상자 `(1, 0.45, 0.8) m`(최저 4개 모드에 우연 축퇴 없�
 - 조밀 n=2 경우에 혼합 벽을 씁니다.
 - 잘못된 전도도를 거부합니다.
 
-## 레퍼런스 도구 비교 (NGSolve)
+## 레퍼런스 도구 비교
+
+scikit-fem 12.0.2(`BSD-3-Clause`, 시험 extra `galerkin[crosscheck]`)와 같은 이산화 비교:
+`tests/test_crosscheck_skfem_lossy_cavity.py`가 galerkin 메시에서 손실 판과 임피던스 벽 연산자를 다시
+조립하고 고유값 차이를 `1e-9`로 검사합니다(관측 `4.1e-15`, `6.8e-13`).
+[레퍼런스 비교](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/reference-comparisons.md)를 참조하세요.
+
+### 고차 비교 (NGSolve)
 
 이 비교는 위의 해석해 pass/fail 기준과 별개이며, 그것을 대신하거나 수렴 증거로 쓰지 않습니다.
 
