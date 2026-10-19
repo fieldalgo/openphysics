@@ -347,7 +347,9 @@ def test_projection_residual_angle_is_accurate_where_one_minus_cosine_cancels(me
         cross = metric.product(previous, current)
         assert projection_sin_max_angle(metric, previous, current, cross) == pytest.approx(np.sin(angle), rel=1e-6)
     naive = np.sqrt(max(0.0, 1 - principal_values(cross)[0][-1]))
-    assert abs(naive - np.sin(1e-9)) > 1e-9          # the cancelling formula is wrong at this angle
+    # The cancelling formula is wrong at this angle: depending on BLAS roundoff it
+    # returns 0 (sigma^2 rounds to one) or about sqrt(eps) ~ 1e-8, never ~1e-9.
+    assert abs(naive - np.sin(1e-9)) > 0.5 * np.sin(1e-9)
 
 
 def test_unwhitenable_candidate_of_a_tracked_rank_fails_instead_of_being_dropped(mesh, basis):
