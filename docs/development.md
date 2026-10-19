@@ -87,7 +87,7 @@ The single required check is **`tests`**. It passes only when all three parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
-**Linux job.** A Markdown link check runs first: every relative link and
+**Linux job.** After the license check, a Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
 are not fetched). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
