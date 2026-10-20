@@ -120,7 +120,11 @@ are required. Degenerate triangles, nonmanifold edges or vertices, point-only
 hinges, overlapping triangle interiors and hanging nodes are rejected. Checks
 use local relative geometry tolerances: determinant >1e-14 times squared edge
 scale, and intersection/hanging-node tolerance 1e-12 of local length. Features
-below floating-point geometric resolution remain outside the contract.
+below floating-point geometric resolution remain outside the contract. The
+overlap test considers two triangles only when their centroids lie within twice
+the larger of their centroid radii (largest centroid-to-vertex distance), which
+every overlapping pair satisfies, so its cost follows the local mesh grading,
+not the largest triangle.
 
 `Mesh` normally fixes orientation on construction, but arrays can be mutated:
 the solver validates the actual data and rejects clockwise triangles present
@@ -139,6 +143,7 @@ Run from the repository root with the existing package environment installed:
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python examples/galerkin/thermal_steady2d.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   tests/galerkin/test_thermal_steady2d.py \
+  tests/galerkin/test_mesh_overlap_candidates.py \
   tests/refsol/test_thermal_reference.py
 ```
 

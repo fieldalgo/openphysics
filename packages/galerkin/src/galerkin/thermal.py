@@ -8,6 +8,7 @@ docs/packages/galerkin/thermal_steady2d.md and
 docs/packages/galerkin/multimaterial.md for SI units, boundary signs and
 validation limits. No other physics module is required.
 """
+import itertools
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -31,6 +32,42 @@ def _real(value, name):
     if not np.all(np.isfinite(a)):
         raise ValueError(f"{name} exceeds floating-point range")
     return a
+
+
+def _overlap_candidates(centers, radii, block=4096):
+    """Yield (i, ids), ids > i ascending: every pair whose interiors may overlap.
+
+    radii are each triangle's largest centroid-to-vertex distance. Interiors can
+    overlap only if |c_i - c_k| < r_i + r_k <= 2*max(r_i, r_k), so querying each
+    centroid with twice its own radius finds every such pair from its larger
+    triangle, and the work follows the local triangle size, not the largest
+    triangle. The 1e-12 margin keeps a pair at exactly that bound, where the
+    tree and numpy may round the distance differently. Centroids are queried in
+    blocks and each found pair is kept only as one int64 key, so memory follows
+    the number of pairs, not the tree's Python lists for the whole mesh.
+    """
+    count = len(centers)
+    tree, keys = cKDTree(centers), [np.zeros(0, dtype=np.int64)]
+    for start in range(0, count, block):
+        stop = min(start+block, count)
+        found = tree.query_ball_point(centers[start:stop], 2*radii[start:stop]*(1+1e-12))
+        sizes = np.fromiter(map(len, found), dtype=np.int64, count=stop-start)
+        rows = np.repeat(np.arange(start, stop, dtype=np.int64), sizes)
+        cols = np.fromiter(itertools.chain.from_iterable(found), dtype=np.int64, count=len(rows))
+        del found
+        keep = rows != cols
+        rows, cols = rows[keep], cols[keep]
+        keys.append(np.minimum(rows, cols)*count+np.maximum(rows, cols))
+    # A pair found from both sides appears twice. Sorting and dropping repeats
+    # is much faster than np.unique on these keys.
+    key = np.concatenate(keys)
+    del keys
+    key.sort()
+    lo, hi = np.divmod(key[np.diff(key, prepend=-1) != 0], count)
+    del key
+    bounds = np.searchsorted(lo, np.arange(count+1))
+    for i in np.flatnonzero(bounds[1:] > bounds[:-1]):
+        yield int(i), hi[bounds[i]:bounds[i+1]]
 
 
 def _mesh_geometry(mesh):
@@ -84,11 +121,7 @@ def _mesh_geometry(mesh):
             raise ValueError("nonmanifold vertex or triangles joined only at a point")
     centers = q.mean(axis=1)
     radii = np.linalg.norm(q-centers[:, None], axis=2).max(axis=1)
-    tree = cKDTree(centers)
-    for i, candidates in enumerate(tree.query_ball_point(centers, radii+radii.max())):
-        ids = np.array([k for k in candidates if k > i], dtype=int)
-        if not len(ids):
-            continue
+    for i, ids in _overlap_candidates(centers, radii):
         ids = ids[np.linalg.norm(centers[ids]-centers[i], axis=1) < radii[ids]+radii[i]]
         if not len(ids):
             continue

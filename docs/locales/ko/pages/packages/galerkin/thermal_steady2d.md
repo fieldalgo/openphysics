@@ -109,7 +109,10 @@ H(div) 적합 국소 보존 복원이 아닙니다. 자연 단열은 약형으�
 edge·vertex, 점으로만 이어진 hinge, 내부 중첩과 hanging node를 거부합니다.
 국소 상대 기하 허용치를 씁니다. determinant는 edge 길이 척도 제곱의 1e-14보다 커야
 하며, 교차·hanging-node 허용치는 국소 길이의 1e-12입니다. 부동소수점 기하 해상도보다
-작은 형상은 계약 밖입니다.
+작은 형상은 계약 밖입니다. 내부 중첩 검사는 두 삼각형의 무게중심 거리가 두 무게중심
+반경(무게중심-꼭짓점 최대 거리) 중 큰 값의 두 배 이내일 때만 그 쌍을 살피고, 중첩하는
+쌍은 모두 이 조건을 만족하므로 비용은 가장 큰 삼각형이 아니라 국소 mesh 크기 변화를
+따릅니다.
 
 `Mesh`는 보통 생성 시 방향을 고치지만 배열은 변경할 수 있습니다. solver는 호출 시
 실제 데이터를 검증하며 시계 방향 삼각형을 거부합니다. `Mesh`는 생성 시 연결 인덱스를
@@ -126,6 +129,7 @@ complex·비유한 입력, 잘못된 재료, 누락된 성분 구속은 `ValueEr
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python examples/galerkin/thermal_steady2d.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
   tests/galerkin/test_thermal_steady2d.py \
+  tests/galerkin/test_mesh_overlap_candidates.py \
   tests/refsol/test_thermal_reference.py
 ```
 
