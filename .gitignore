@@ -16,3 +16,9 @@ error.log
 
 .validation-platform/
 .validation-windows-thermal/
+
+# Output of the examples, which run from the repository root, and of simcase runs
+# (saved next to the model or at -o).
+/*.npz
+/*.png
+*_results/

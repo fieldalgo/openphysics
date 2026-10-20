@@ -1,6 +1,6 @@
 # galerkin — the OpenPhysics finite-element engine
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/galerkin/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
@@ -18,20 +18,20 @@ references and fixed thresholds.
 
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
-| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](docs/milestone_validation.md) | `examples/coax_convergence.py`, `examples/cylinder_scattering_pml.py` |
-| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](docs/eigenspace_reliability.md), [milestone validation](docs/milestone_validation.md) | `examples/fiber_modes.py`, `examples/waveguide_modes.py` |
-| 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](docs/cavity_solver.md) | `examples/cavity_modes.py` |
-| 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](docs/material_cavity.md) | — |
-| Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_steady2d.md), [validation](docs/thermal_independent_validation.md) | [thermal_steady2d.py](examples/thermal_steady2d.py) |
-| Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](docs/thermal_flux_robin.md), [validation](docs/thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](examples/thermal_flux_robin.py) |
-| Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](docs/transient_heat.md), [validation](docs/transient_heat_validation.md), [independent validation](docs/transient_heat_independent_validation.md) | [transient_heat_convergence.py](examples/transient_heat_convergence.py) |
-| Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](docs/elasticity2d.md), [validation](docs/elasticity2d_independent_validation.md) | [elasticity2d.py](examples/elasticity2d.py) |
-| Global Cartesian boundary traction for elasticity | `galerkin.elasticity.solve_elasticity` | [Contract](docs/elasticity_traction.md), [validation](docs/elasticity_traction_independent_validation.md) | [elasticity_traction.py](examples/elasticity_traction.py) |
-| Mechanics under a prescribed same-mesh nodal Kelvin field | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](docs/prescribed_temperature_thermoelasticity.md), [validation](docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](examples/prescribed_temperature_thermoelasticity.py) |
-| Total traction on the prescribed-temperature mechanical stage | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](docs/thermoelastic_traction.md), [validation](docs/thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](examples/thermoelastic_traction.py) |
-| Steady heat, then mechanics on the same mesh (one-way) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [Contract](docs/thermal_mechanical_workflow.md), [validation](docs/thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](examples/thermal_mechanical_workflow.py) |
-| Quasistatic mechanics at selected stored transient-heat times (one-way) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [Contract](docs/transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](examples/transient_thermal_mechanical.py) |
-| Piecewise-constant materials on named mesh regions for steady and transient heat, elasticity, thermoelasticity and both heat-to-mechanics workflows | `{region name: value}` in place of a scalar k, c, Q, E, nu or alpha | [Contract and validation](docs/multimaterial.md) | — |
+| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](../../docs/packages/galerkin/eigenspace_reliability.md), [milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](../../docs/packages/galerkin/cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
+| 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](../../docs/packages/galerkin/material_cavity.md) | — |
+| Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](../../docs/packages/galerkin/thermal_steady2d.md), [validation](../../docs/packages/galerkin/thermal_independent_validation.md) | [thermal_steady2d.py](../../examples/galerkin/thermal_steady2d.py) |
+| Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](../../docs/packages/galerkin/thermal_flux_robin.md), [validation](../../docs/packages/galerkin/thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../examples/galerkin/thermal_flux_robin.py) |
+| Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](../../docs/packages/galerkin/transient_heat.md), [validation](../../docs/packages/galerkin/transient_heat_validation.md), [independent validation](../../docs/packages/galerkin/transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../examples/galerkin/transient_heat_convergence.py) |
+| Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](../../docs/packages/galerkin/elasticity2d.md), [validation](../../docs/packages/galerkin/elasticity2d_independent_validation.md) | [elasticity2d.py](../../examples/galerkin/elasticity2d.py) |
+| Global Cartesian boundary traction for elasticity | `galerkin.elasticity.solve_elasticity` | [Contract](../../docs/packages/galerkin/elasticity_traction.md), [validation](../../docs/packages/galerkin/elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../examples/galerkin/elasticity_traction.py) |
+| Mechanics under a prescribed same-mesh nodal Kelvin field | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](../../docs/packages/galerkin/prescribed_temperature_thermoelasticity.md), [validation](../../docs/packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
+| Total traction on the prescribed-temperature mechanical stage | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](../../docs/packages/galerkin/thermoelastic_traction.md), [validation](../../docs/packages/galerkin/thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](../../examples/galerkin/thermoelastic_traction.py) |
+| Steady heat, then mechanics on the same mesh (one-way) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [Contract](../../docs/packages/galerkin/thermal_mechanical_workflow.md), [validation](../../docs/packages/galerkin/thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../examples/galerkin/thermal_mechanical_workflow.py) |
+| Quasistatic mechanics at selected stored transient-heat times (one-way) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [Contract](../../docs/packages/galerkin/transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../examples/galerkin/transient_thermal_mechanical.py) |
+| Piecewise-constant materials on named mesh regions for steady and transient heat, elasticity, thermoelasticity and both heat-to-mechanics workflows | `{region name: value}` in place of a scalar k, c, Q, E, nu or alpha | [Contract and validation](../../docs/packages/galerkin/multimaterial.md) | — |
 
 Units follow each contract: SI metres, seconds and Kelvin for heat and
 mechanics; heat flow per depth W/m, mechanical force per depth N/m and physical
@@ -52,7 +52,7 @@ automatically appear there.
 - Transient heat has no flux/Robin input, restart or automatic coupling.
   Finite negative Kelvin is not clamped by the linear API.
 - Heat and elastic materials are isotropic and constant within each named mesh
-  region ([multimaterial](docs/multimaterial.md)); there is no temperature-dependent
+  region ([multimaterial](../../docs/packages/galerkin/multimaterial.md)); there is no temperature-dependent
   or anisotropic material. Mechanics is linear and small-strain. The traction
   APIs take global Cartesian loads; there is no dedicated scalar-pressure,
   local-frame or follower-load API.
@@ -85,11 +85,11 @@ src/galerkin/
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
-examples/         # runnable examples and figure scripts
 ```
 
-The analytical, convergence and independent-validation tests are in
-`tests/galerkin/` at the repository root, outside the package.
+The analytical, convergence and independent-validation tests, the examples
+and the documentation are outside the package, at the repository root:
+`tests/galerkin/`, `examples/galerkin/` and `docs/packages/galerkin/`.
 
 `galerkin.from_mesher` adapts any object exposing `nodes`, `triangles` or
 `tetrahedra`, `regions`, `region_names` and boundary edges or faces, and
@@ -109,7 +109,7 @@ numpy and scipy.
 ```bash
 # From the repository root
 python -m pip install -e packages/galerkin   # engine only: numpy and scipy
-# Install the full local test stack using ../../README.md, then:
+# Install the full local test stack using the repository README.md, then:
 python -m pytest -q tests/galerkin
 python -m pytest -q tests/galerkin -m "not slow"
 ```
@@ -120,24 +120,24 @@ on the path, so the tests and examples run without setting `PYTHONPATH`.
 The examples keep their own analytical solutions so they run without the test
 extra; two tests check those independent implementations against refsol so the
 pair cannot drift apart. The measurements recorded while the electromagnetic and
-cavity solvers were built are in the [milestone validation](docs/milestone_validation.md)
+cavity solvers were built are in the [milestone validation](../../docs/packages/galerkin/milestone_validation.md)
 page.
 
 ## Run
 
 ```bash
-python packages/galerkin/examples/coax_convergence.py        # electrostatics convergence
-python packages/galerkin/examples/waveguide_convergence.py   # Helmholtz convergence
-python packages/galerkin/examples/cylinder_scattering.py     # cylinder scattering
-python packages/galerkin/examples/cylinder_scattering_pml.py # ABC vs PML
-python packages/galerkin/examples/waveguide_modes.py         # waveguide cutoff eigenmodes
-python packages/galerkin/examples/fiber_modes.py             # step-index fibre vector modes
-python packages/galerkin/examples/cavity_modes.py            # 3D PEC cavity
-python packages/galerkin/examples/mesh_io.py                 # Gmsh reader
-python packages/galerkin/examples/thermal_steady2d.py        # steady heat
-python packages/galerkin/examples/elasticity_traction.py     # elasticity with traction
-python packages/galerkin/examples/thermoelastic_traction.py  # prescribed-temperature mechanics
-python packages/galerkin/examples/visualize.py               # figures
+python examples/galerkin/coax_convergence.py        # electrostatics convergence
+python examples/galerkin/waveguide_convergence.py   # Helmholtz convergence
+python examples/galerkin/cylinder_scattering.py     # cylinder scattering
+python examples/galerkin/cylinder_scattering_pml.py # ABC vs PML
+python examples/galerkin/waveguide_modes.py         # waveguide cutoff eigenmodes
+python examples/galerkin/fiber_modes.py             # step-index fibre vector modes
+python examples/galerkin/cavity_modes.py            # 3D PEC cavity
+python examples/galerkin/mesh_io.py                 # Gmsh reader
+python examples/galerkin/thermal_steady2d.py        # steady heat
+python examples/galerkin/elasticity_traction.py     # elasticity with traction
+python examples/galerkin/thermoelastic_traction.py  # prescribed-temperature mechanics
+python examples/galerkin/visualize.py               # figures
 ```
 
 ## License

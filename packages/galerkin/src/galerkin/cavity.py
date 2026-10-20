@@ -132,7 +132,7 @@ def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
     absolute edge coefficient is positive. Degenerate bases remain nonunique.
     Invalid inputs raise ValueError. Insufficient physical modes, nonconvergence,
     factorization failures, or failed residual/orthogonality checks raise
-    RuntimeError without a partial result. See docs/cavity_solver.md for the
+    RuntimeError without a partial result. See docs/packages/galerkin/cavity_solver.md for the
     fixed search and validation policy.
     """
     lengths = np.asarray(_triple(lengths_m, "lengths_m", _positive_real))

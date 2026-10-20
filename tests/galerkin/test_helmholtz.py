@@ -100,7 +100,7 @@ def test_pml_keeps_second_order_where_the_abc_plateaus(refsol):
     remove, so its convergence stalls; a PML's reflection is ~1e-6, so only mesh
     error is left and second order continues. Asserting "the PML beats the ABC by
     N times" instead would only be testing where the ladder happens to stop — the
-    gap keeps widening, reaching 38x by n_r = 192 in examples/.
+    gap keeps widening, reaching 38x by n_r = 192 in examples/galerkin/.
 
     Measured here: ABC 4.62e-2, 1.72e-2, 1.19e-2 (orders 1.42 then 0.54);
                    PML 3.84e-2, 9.86e-3, 2.57e-3 (order 1.94).

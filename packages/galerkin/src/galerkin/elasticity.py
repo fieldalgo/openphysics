@@ -3,8 +3,8 @@
 """Small-strain isotropic P1 triangle elasticity in SI units.
 
 E and nu are one homogeneous material or piecewise constant on named mesh
-regions (galerkin.materials, ../docs/multimaterial.md).
-Import this submodule explicitly; see ../docs/elasticity2d.md for the contract.
+regions (galerkin.materials, docs/packages/galerkin/multimaterial.md).
+Import this submodule explicitly; see docs/packages/galerkin/elasticity2d.md for the contract.
 No scalar or edge finite-element space is used here.
 """
 from __future__ import annotations
@@ -328,7 +328,7 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     All line loads, including those on prescribed displacement components,
     enter load; their support reactions are computed from the original K*u-load.
     Duplicate selected edges and interior edges are rejected. See
-    ../docs/elasticity_traction.md for overlap, quadrature and units.
+    docs/packages/galerkin/elasticity_traction.md for overlap, quadrature and units.
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
     """

@@ -1,6 +1,6 @@
 # galerkin-refsol — reference solutions for validating galerkin
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/galerkin-refsol/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
@@ -67,9 +67,8 @@ print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 ```
 
 The reference module is included in both the sdist and wheel. It imports no FEM
-engine. The separate [engine contract](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/elasticity2d.md)
+engine. The separate [engine contract](../../docs/packages/galerkin/elasticity2d.md)
 describes boundary constraints, per-thickness loads and locking limitations.
-It is an online link to the galerkin package documentation.
 
 ```python
 from refsol import fiber, slab, scattering, benchmarks
@@ -99,7 +98,7 @@ W/m². The dense matrices and modes target small reference meshes; a
 semidiscrete backward-Euler product is distinct from a continuum PDE solution.
 These references do not certify physical temperature validity or a maximum
 principle. The transient engine is documented in the galerkin
-[transient heat contract](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/transient_heat.md).
+[transient heat contract](../../docs/packages/galerkin/transient_heat.md).
 
 `refsol.thermoelastic_traction` provides `uniform_combined`,
 `polynomial_manufactured`, `parent_state` and `traction_from_stress` from the

@@ -180,7 +180,7 @@ def main():
         shutil.copytree(ROOT / "tests/gmshio/data", tests / "data")
         (work / "examples").mkdir()
         for name in ("thermal_slab.json", "thermal_mixed.json"):
-            shutil.copy2(ROOT / "packages/simcase/examples" / name, work / "examples" / name)
+            shutil.copy2(ROOT / "examples/simcase" / name, work / "examples" / name)
         # These consumers and fixtures come from this exact checkout, not from
         # the rebuilt package archives. Record every copied byte explicitly.
         copied = {p.relative_to(work).as_posix(): digest(p.read_bytes())

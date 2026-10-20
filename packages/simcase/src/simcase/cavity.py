@@ -231,7 +231,7 @@ def cavity_summary(doc: Document) -> str:
 class CavityRunResult:
     """Cavity result; all numerical arrays use SI, independent of input units.
 
-    See ``docs/cavity3d.md`` for raw coefficient units and search limitations.
+    See ``docs/packages/simcase/cavity3d.md`` for raw coefficient units and search limitations.
     ``cavity`` is the reusable galerkin result, with the document translation
     applied to its mesh coordinates.
     """

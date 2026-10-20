@@ -141,6 +141,9 @@ def test_first_party_import_of_external_tool_is_detected():
     # numpy is imported by first-party code, so treating it as external must fail.
     assert check_licenses.first_party_imports({"numpy"})
     assert check_licenses.first_party_imports({"gmsh"}) == []
+    # Examples and maintainer tools outside packages/ are first-party code too.
+    assert "examples/gmshio/hadley_rib_mesh.py" in check_licenses.first_party_imports({"gmshio"})
+    assert "tools/build_physmat_tables.py" in check_licenses.first_party_imports({"yaml"})
 
 
 NEVER = ["AGPL-3.0-or-later", "MIT OR AGPL-3.0-only", "EUPL-1.2", "AGPL-3.0", "AGPL-1.0", "AGPL-3.0+",

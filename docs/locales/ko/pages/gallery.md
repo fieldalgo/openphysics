@@ -10,7 +10,7 @@
 export extra(`meshio`)를 갖춘 상태에서 레포 루트에서 모든 그림을 다시 만듭니다.
 
 ```bash
-python packages/simcase/examples/gallery.py gallery-out
+python examples/simcase/gallery.py gallery-out
 ```
 
 출력 폴더는 새것이거나 비어 있어야 합니다. 스크립트는 아래에 인용한 숫자를
@@ -28,12 +28,12 @@ Pillow 12.3에서 만들었습니다.
 값으로, 근사 예제 입력입니다. 32 × 32 메시를 60초까지 저장 시각 81개로 풀며,
 먼 모서리는 323.3 K(+23.3 K)에 이르며 아직 천천히 오르는 중입니다.
 
-- 입력: [`gallery_heated_plate.json`](../../../../packages/simcase/examples/gallery_heated_plate.json)
+- 입력: [`gallery_heated_plate.json`](../../../../examples/simcase/gallery_heated_plate.json)
   (`thermal.transient2d`). [마지막 장면 정지 그림](../../../gallery/heated_plate.png)도 둡니다.
 - `meshio`가 설치돼 있으면 같은 결과를 ParaView 시간 시리즈
   `heated_plate_paraview/fields.pvd`로도 씁니다
-  ([ParaView로 보기](../../../../packages/simcase/docs/locales/ko/pages/overview.md#paraview로-보기) 참고).
-- 검증: [과도 열전도 검증](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md).
+  ([ParaView로 보기](packages/simcase/overview.md#paraview로-보기) 참고).
+- 검증: [과도 열전도 검증](packages/galerkin/transient_heat_validation.md).
   이 사례 자체는 메시·시간 간격 수렴을 확인하지 않았습니다.
 
 ## 동축 정전기와 메시 수렴
@@ -46,8 +46,8 @@ V = ln(3/r)/ln 3입니다. 스크립트는 P1 요소로 메시 네 개에서 풀
 수렴 차수는 1.99로, 기대한 2차와 맞습니다.
 
 - 입력: Python API(`annulus_mesh`, `assemble_stiffness`, `solve_dirichlet`,
-  `l2_error`), [`coax_convergence.py`](../../../../packages/galerkin/examples/coax_convergence.py)와 같은 방식.
-- 검증: [솔버 검증](../../../../packages/galerkin/docs/locales/ko/pages/milestone_validation.md)의 M1.
+  `l2_error`), [`coax_convergence.py`](../../../../examples/galerkin/coax_convergence.py)와 같은 방식.
+- 검증: [솔버 검증](packages/galerkin/milestone_validation.md)의 M1.
 
 ## 3D 직육면체 공진기 모드
 
@@ -65,10 +65,10 @@ V = ln(3/r)/ln 3입니다. 스크립트는 P1 요소로 메시 네 개에서 풀
 | (1, 0, 1) | 403.26 | 403.61 | −0.086% |
 | (0, 1, 1) | 450.13 | 450.38 | −0.056% |
 
-- 입력: [`gallery_box_cavity.json`](../../../../packages/simcase/examples/gallery_box_cavity.json)
+- 입력: [`gallery_box_cavity.json`](../../../../examples/simcase/gallery_box_cavity.json)
   (`em.cavity3d`, `near_target` 탐색;
-  [탐색 의미](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) 참고).
-- 검증: [공진기 API, 단위, 수렴](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md).
+  [탐색 의미](packages/simcase/cavity3d.md) 참고).
+- 검증: [공진기 API, 단위, 수렴](packages/galerkin/cavity_solver.md).
 
 ## 한계
 

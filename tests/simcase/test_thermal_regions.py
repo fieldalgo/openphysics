@@ -391,12 +391,11 @@ def test_rectangle_documents_keep_their_original_contract():
     assert r.mesh.regions is None and 'triangle_regions' not in r.summary()['field_shapes']
 
 
-@pytest.mark.parametrize('page', ['docs/thermal_regions2d.md', 'docs/locales/ko/pages/thermal_regions2d.md'])
+@pytest.mark.parametrize('page', ['docs/packages/simcase/thermal_regions2d.md',
+                                  'docs/locales/ko/pages/packages/simcase/thermal_regions2d.md'])
 def test_the_documented_example_is_the_shipped_example(page):
     from pathlib import Path
-    path = Path(__file__).resolve().parents[2]/"packages"/"simcase"/page
-    if not path.exists():
-        pytest.skip('contract pages are not part of this installation')
+    path = Path(__file__).resolve().parents[2]/page
     text = path.read_text(encoding='utf-8')
     block = text.split('```json\n', 1)[1].split('```', 1)[0]
     assert json.loads(block) == examples.EXAMPLES['thermal_regions']

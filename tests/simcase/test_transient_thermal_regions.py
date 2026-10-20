@@ -71,7 +71,8 @@ def test_layered_wall_heating_converges_in_space_with_separated_time_error():
     # error was not separated from space error: dt = 1/4 s observed at 20/60/180 s
     # (dt/2 changed T errors by 37-44%) and dt = 1/64 s observed at 5/10/20 s
     # (13%, 7%, 4.4%). Only 20 s met the separation gate in the second run; that
-    # time was selected after the run. The record is in docs/thermal_regions2d.md.
+    # time was selected after the run. The record is in
+    # docs/packages/simcase/thermal_regions2d.md.
     dt = 1/64
     errors = []
     for size in (4., 2., 1., .5):

@@ -3,7 +3,7 @@
 
 """The end-to-end pipeline itself: mesher -> engine -> reference.
 
-examples/rib_waveguide_scalar.py and examples/rib_waveguide_vector.py are wiring
+examples/galerkin/rib_waveguide_scalar.py and rib_waveguide_vector.py are wiring
 checks — meshine builds the mesh, galerkin assembles and solves, refsol grades.
 These tests gate the wiring, not the physics: the physics gates for this geometry
 live in test_hadley.py.
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "galerkin" / "examples"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "examples" / "galerkin"))
 
 pytest.importorskip("meshine")
 

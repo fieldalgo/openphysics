@@ -129,7 +129,7 @@ def test_unit_cube_resonances_converge_at_second_order(refsol):
 
 
 def test_the_example_agrees_with_the_answer_key(refsol):
-    """examples/cavity_modes.py enumerates the spectrum itself, so that the
+    """examples/galerkin/cavity_modes.py enumerates the spectrum itself, so that the
     example runs without the test extra. Two independent enumerations of the same
     thing are only useful if something checks they still agree."""
     import cavity_modes

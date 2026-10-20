@@ -11,7 +11,7 @@ Regenerate every picture from the repository root, after the
 ParaView output, the export extra (`meshio`):
 
 ```bash
-python packages/simcase/examples/gallery.py gallery-out
+python examples/simcase/gallery.py gallery-out
 ```
 
 The output directory must be new or empty. The script also writes
@@ -30,13 +30,13 @@ starts at 300 K. The conductivity 237 W/(m K) and volumetric heat capacity
 example inputs. The 32 × 32 mesh is solved at 81 stored times up to 60 s; the
 far corner reaches 323.3 K (+23.3 K) and is still rising slowly.
 
-- Input: [`gallery_heated_plate.json`](../packages/simcase/examples/gallery_heated_plate.json)
+- Input: [`gallery_heated_plate.json`](../examples/simcase/gallery_heated_plate.json)
   (`thermal.transient2d`). A [still of the last frame](gallery/heated_plate.png)
   is also kept.
 - With `meshio` installed the script also writes
   `heated_plate_paraview/fields.pvd`, the same result as a ParaView time series
-  (see [Viewing in ParaView](../packages/simcase/docs/overview.md#viewing-in-paraview)).
-- Validation: [transient heat validation](../packages/galerkin/docs/transient_heat_validation.md).
+  (see [Viewing in ParaView](packages/simcase/overview.md#viewing-in-paraview)).
+- Validation: [transient heat validation](packages/galerkin/transient_heat_validation.md).
   This particular case was not checked for mesh or time-step convergence.
 
 ## Coaxial electrostatics and mesh convergence
@@ -50,8 +50,8 @@ size. The error falls from 2.4 × 10⁻² to 4.1 × 10⁻⁴ and the last rate i
 matching the expected second order.
 
 - Inputs: Python API (`annulus_mesh`, `assemble_stiffness`, `solve_dirichlet`,
-  `l2_error`), as in [`coax_convergence.py`](../packages/galerkin/examples/coax_convergence.py).
-- Validation: milestone M1 in [solver validation](../packages/galerkin/docs/milestone_validation.md).
+  `l2_error`), as in [`coax_convergence.py`](../examples/galerkin/coax_convergence.py).
+- Validation: milestone M1 in [solver validation](packages/galerkin/milestone_validation.md).
 
 ## Modes of a 3D box cavity
 
@@ -70,10 +70,10 @@ frequencies are compared with the analytical box modes from `galerkin-refsol`:
 | (1, 0, 1) | 403.26 | 403.61 | −0.086% |
 | (0, 1, 1) | 450.13 | 450.38 | −0.056% |
 
-- Input: [`gallery_box_cavity.json`](../packages/simcase/examples/gallery_box_cavity.json)
+- Input: [`gallery_box_cavity.json`](../examples/simcase/gallery_box_cavity.json)
   (`em.cavity3d`, `near_target` search; see its
-  [search semantics](../packages/simcase/docs/cavity3d.md#search-and-failure-semantics)).
-- Validation: [cavity API, units and convergence](../packages/galerkin/docs/cavity_solver.md).
+  [search semantics](packages/simcase/cavity3d.md#search-and-failure-semantics)).
+- Validation: [cavity API, units and convergence](packages/galerkin/cavity_solver.md).
 
 ## Limits
 

@@ -43,19 +43,19 @@ available for the other packages; the diagram highlights the solver entry point.
 
 | Package | Responsibility |
 |---|---|
-| [simcase](../packages/simcase/docs/overview.md) | JSON model schema, study dispatch, results and saved output; optional browser Studio. |
-| [galerkin](../packages/galerkin/docs/overview.md) | Finite-element assembly, solvers and field postprocessing for implemented electromagnetic, thermal and mechanical models. |
-| [meshine](../packages/meshine/docs/overview.md) | 2D triangular meshes for material regions. |
-| [physmat](../packages/physmat/docs/overview.md) | Material models and properties, optical dispersion, refractiveindex.info access and fitting. |
-| [gmshio](../packages/gmshio/docs/overview.md) | Optional Gmsh executable integration and mesh-file reading. Existing mesh files can be read without running Gmsh. |
-| [galerkin-refsol](../packages/galerkin-refsol/docs/overview.md) | Independent analytical solutions and published benchmarks, imported as `refsol`. Tests compare solver results with these references; the reference package does not import the solver it grades. |
+| [simcase](packages/simcase/overview.md) | JSON model schema, study dispatch, results and saved output; optional browser Studio. |
+| [galerkin](packages/galerkin/overview.md) | Finite-element assembly, solvers and field postprocessing for implemented electromagnetic, thermal and mechanical models. |
+| [meshine](packages/meshine/overview.md) | 2D triangular meshes for material regions. |
+| [physmat](packages/physmat/overview.md) | Material models and properties, optical dispersion, refractiveindex.info access and fitting. |
+| [gmshio](packages/gmshio/overview.md) | Optional Gmsh executable integration and mesh-file reading. Existing mesh files can be read without running Gmsh. |
+| [galerkin-refsol](packages/galerkin-refsol/overview.md) | Independent analytical solutions and published benchmarks, imported as `refsol`. Tests compare solver results with these references; the reference package does not import the solver it grades. |
 
 `galerkin.from_mesher` adapts supported mesh objects or array dictionaries into
 the engine's mesh types. It does not make either mesher a mandatory solver
 runtime dependency. Gmsh is installed separately and retains its own license;
 see [NOTICE](../NOTICE).
 
-The seventh distribution, [`openphysics`](../packages/openphysics/docs/overview.md),
+The seventh distribution, [`openphysics`](packages/openphysics/overview.md),
 is an empty name reservation. **`pip install openphysics` does not install the
 toolkit.** The six implementation packages already live in this public
 repository; separate historical package repositories are not needed to use them.
@@ -67,15 +67,15 @@ repository; separate historical package repositories are not needed to use them.
   plus the documented steady heat-to-mechanics workflow and transient heat-to-mechanics call.
 - **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
   documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
-  automatically become document features. The [steady boundary contract](../packages/simcase/docs/thermal_steady_boundary2d.md)
+  automatically become document features. The [steady boundary contract](packages/simcase/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
   both new keys retain v1.
 - **Studio:** a local browser interface for 2D optical models and dedicated
   steady and transient heat views for rectangular documents. Generic optical
   routes keep their heat/3D guards. Structural forms, 3D models and a general
   thermal form editor are outside its scope. See the
-  [steady](../packages/simcase/docs/thermal_studio.md) and
-  [transient](../packages/simcase/docs/thermal_transient_studio.md) Studio guides.
+  [steady](packages/simcase/thermal_studio.md) and
+  [transient](packages/simcase/thermal_transient_studio.md) Studio guides.
 
 These layers do not imply a general-purpose, fully coupled multiphysics solver.
 The [overview](overview.md#current-limits) lists current limits; exact contracts

@@ -44,20 +44,24 @@ python -m pip check
 
 ## 저장소 구성
 
-각 패키지의 코드·예제·문서는 `packages/<name>/`에 있습니다. 코드는 src 구성을 따르며,
-import 패키지는 `packages/<name>/src/<import 이름>/`에 있습니다. 시험은 패키지 밖
-`tests/<import 이름>/`에 두므로, 시험이 쓰는 것은 배포물에 들어갈 수 없습니다.
+`packages/<name>/`에는 배포판 `<name>`이 싣는 것만 있습니다. `pyproject.toml`,
+`setup.py`, `README.md`, `LICENSE`, `NOTICE`, 그리고 src 구성을 따르는 import 패키지
+`packages/<name>/src/<import 이름>/`입니다. 시험·예제·패키지 문서·도구는 저장소 루트에
+두므로, 이들이 쓰는 것은 배포물에 들어갈 수 없습니다.
 
-| 패키지 | 코드 | 시험 |
-|---|---|---|
-| `packages/galerkin` | `src/galerkin/` | `tests/galerkin/` |
-| `packages/galerkin-refsol` | `src/refsol/` | `tests/refsol/` |
-| `packages/meshine` | `src/meshine/` | `tests/meshine/` |
-| `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` |
-| `packages/physmat` | `src/physmat/` | `tests/physmat/` |
-| `packages/simcase` | `src/simcase/`. Studio 정적 파일은 `src/simcase/studio/static/` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 |
+| 패키지 | 코드 | 시험 | 예제 |
+|---|---|---|---|
+| `packages/galerkin` | `src/galerkin/` | `tests/galerkin/` | `examples/galerkin/` |
+| `packages/galerkin-refsol` | `src/refsol/` | `tests/refsol/` | `examples/galerkin-refsol/` |
+| `packages/meshine` | `src/meshine/` | `tests/meshine/` | `examples/meshine/` |
+| `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` | `examples/gmshio/` |
+| `packages/physmat` | `src/physmat/` | `tests/physmat/` | `examples/physmat/` |
+| `packages/simcase` | `src/simcase/`. Studio 정적 파일은 `src/simcase/studio/static/` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 | `examples/simcase/`(JSON 문서와 `docs/gallery/`를 그리는 `gallery.py`) |
 
-빈 `openphysics` 이름 예약에는 코드도 시험도 없습니다. 루트에서 `python -m pytest`를 실행하면
+패키지마다의 문서(계약과 검증 보고서)는 `docs/packages/<name>/`에, 한국어 문서는
+`docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 CI가 돌리지 않는 관리용
+스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는 physmat의 내장 표를 다시
+만듭니다. 빈 `openphysics` 이름 예약에는 코드·시험·예제가 없습니다. 루트에서 `python -m pytest`를 실행하면
 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 `ci/tests/`를 모읍니다. `slow`
 표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
 맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.
@@ -127,16 +131,16 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 예약 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
 `twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
 sdist에는 `src/` 아래의 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
-`setup.py`, `MANIFEST.in`, 빌드가 만드는 `PKG-INFO`, `setup.cfg`, egg-info)만 있고,
+`setup.py`, 빌드가 만드는 `PKG-INFO`, `setup.cfg`, egg-info)만 있고,
 wheel에는 최상위에 둔 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
-`.dist-info/licenses/`에 들어갑니다. 문서·예제·도구는 `packages/<name>/`에만 두고
-배포하지 않습니다(모든 `MANIFEST.in`이 이들을 뺍니다). 시험은 루트 `tests/` 폴더에
-있습니다. 들어가야 할 내용은 손으로 적은 목록이 아니라 `packages/<name>/`에서 Git이
-추적하는 파일로 정합니다. `src/` 아래의 추적 파일 전부(sdist에서는 `src/<import 이름>/…`,
+`.dist-info/licenses/`에 들어갑니다. 시험·문서·예제·도구는 `packages/` 밖에 있으므로
+어느 패키지도 `MANIFEST.in`이 필요 없습니다. 들어가야 할 내용은 손으로 적은 목록이
+아니라 `packages/<name>/`에서 Git이 추적하는 파일로 정합니다. `src/` 아래의 추적 파일 전부(sdist에서는 `src/<import 이름>/…`,
 wheel에서는 `<import 이름>/…`)와, sdist에서는 위에 적은 최상위 파일 중 Git이 추적하는 것이
 모두 있어야 하고 checkout과 바이트가 같아야 합니다(`LICENSE`, `NOTICE` 포함). 그 밖의
-파일이 압축본에 있거나, 검사기가 모르는 `packages/<name>/`의 최상위 파일이나 폴더(예:
-`tests/` 폴더) 또는 `src/` 안에 import 패키지가 아닌 것을 Git이 추적하고 있으면 실패합니다.
+파일이 압축본에 있거나, `packages/<name>/`에 그 밖의 파일이나 폴더(위 파일과 `src/` 말고는
+`.gitignore`만 허용. 예: `tests/`나 `docs/` 폴더) 또는 `src/` 안에 import 패키지가 아닌 것을
+Git이 추적하고 있으면 실패합니다.
 
 이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
 Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 이 검사는
@@ -153,8 +157,8 @@ Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다.
 **설치 시험** (`ci/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
 sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 일곱 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
-`tests/`, `packages/*/examples/`, `packages/*/docs/` 아래의 추적 파일과 루트
-`pyproject.toml`만 복사하고 패키지 코드는 복사하지 않습니다. 복사한 파일의 해시는
+`tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
+`packages/` 아래는 복사하지 않습니다. 복사한 파일의 해시는
 `suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
 실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가

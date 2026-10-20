@@ -107,7 +107,7 @@ def test_backward_euler_step_uses_each_region_s_mass_and_stiffness():
 @pytest.mark.slow
 def test_two_layer_wall_converges_in_space_with_separated_time_error():
     # A first run with [2n, 4n] divisions and dt = 1/8 s failed the dt/2
-    # separation gate (12-35% change); see docs/multimaterial.md.
+    # separation gate (12-35% change); see docs/packages/galerkin/multimaterial.md.
     wall = LayeredWall(**WALL)
     dt = 1/32
     errors = []

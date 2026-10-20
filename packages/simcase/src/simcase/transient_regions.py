@@ -5,7 +5,7 @@
 A thermal.transient2d document whose geometry has ``background``/``shapes``
 takes conductivity and volumetric heat capacity from ``materials``. Initial
 data (uniform or affine), sampled side Dirichlet data and the requested-time
-contract are those of the rectangle documents. See docs/thermal_regions2d.md.
+contract are those of the rectangle documents. See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
 from dataclasses import dataclass, field
