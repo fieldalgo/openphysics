@@ -270,18 +270,8 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
         seg_objs = list(segs.values())
         mids = 0.5 * (P[seg_arr[:, 0]] + P[seg_arr[:, 1]])
         half = 0.5 * np.linalg.norm(P[seg_arr[:, 0]] - P[seg_arr[:, 1]], axis=1)
-        seg_tree = cKDTree(mids)
-        hmax = half.max()
-        encroaches = np.zeros(len(cand), dtype=bool)
-        near_lists = seg_tree.query_ball_point(cand, hmax)
-        ci_idx = np.repeat(np.arange(len(cand)), [len(l) for l in near_lists])
-        si_idx = np.fromiter((si for l in near_lists for si in l), dtype=int, count=len(ci_idx))
-        seg_to_split: set[int] = set()
-        if len(ci_idx):
-            dist = np.linalg.norm(cand[ci_idx] - mids[si_idx], axis=1)
-            hit = dist < half[si_idx] * (1 - 1e-9)
-            encroaches[ci_idx[hit]] = True
-            seg_to_split = set(np.unique(si_idx[hit]).tolist())
+        encroaches, seg_ids = _encroached(cand, mids, half)
+        seg_to_split: set[int] = set(seg_ids.tolist())
         if seg_to_split:
             split([seg_objs[si] for si in seg_to_split])
         cand, cand_R = cand[~encroaches], cand_R[~encroaches]
@@ -608,6 +598,26 @@ def _terminated(P: np.ndarray, T: np.ndarray, cc: np.ndarray, pieces: np.ndarray
                                   ((p[:, 0] - p[:, 1]) ** 2).sum(1)))
     encroached = np.linalg.norm(cc[:, None, :] - mid[None, :, :], axis=2) < 0.5 * length * (1 - 1e-9)
     return (encroached & ((length * sines)[None, :] < shortest[:, None])).any(axis=1)
+
+
+def _encroached(cand: np.ndarray, mids: np.ndarray, half: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """((C,) mask of the candidate points strictly inside the diametral circle of a segment,
+    sorted unique ids of the segments they encroach), for segments of midpoints ``mids`` and
+    half-lengths ``half``. Strict: a point closer than ``half * (1 - 1e-9)`` to the midpoint.
+
+    The tree holds the candidates and each segment asks for those within its own radius, so
+    only pairs near a segment are examined. Asking for every segment midpoint within the
+    largest radius of all segments, as before, examines nearly every pair once one long
+    segment lies beside a finely meshed region."""
+    near = cKDTree(cand).query_ball_point(mids, half)
+    si = np.repeat(np.arange(len(mids)), [len(lst) for lst in near])
+    ci = np.fromiter((c for lst in near for c in lst), dtype=np.int64, count=len(si))
+    encroaches = np.zeros(len(cand), dtype=bool)
+    if not len(si):
+        return encroaches, np.empty(0, dtype=np.int64)
+    hit = np.linalg.norm(cand[ci] - mids[si], axis=1) < half[si] * (1 - 1e-9)
+    encroaches[ci[hit]] = True
+    return encroaches, np.unique(si[hit])
 
 
 def _separate(cand: np.ndarray, R: np.ndarray, factor: float = 0.7) -> np.ndarray:
