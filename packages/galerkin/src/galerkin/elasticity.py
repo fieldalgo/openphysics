@@ -20,6 +20,7 @@ from scipy.spatial import cKDTree
 
 from .mesh import Mesh
 from .materials import is_per_region, region_property
+from .thermal import _overlap_candidates
 
 
 def _real(value, name):
@@ -139,11 +140,7 @@ def _mesh_data(mesh):
     # nodes with triangles on the same side. Touching boundaries remain allowed.
     centers = q.mean(axis=1)
     radii = np.linalg.norm(q - centers[:, None], axis=2).max(axis=1)
-    tree = cKDTree(centers)
-    for i, candidates in enumerate(tree.query_ball_point(centers, radii + radii.max())):
-        ids = np.array([k for k in candidates if k > i], dtype=int)
-        if not len(ids):
-            continue
+    for i, ids in _overlap_candidates(centers, radii):
         ids = ids[np.linalg.norm(centers[ids]-centers[i], axis=1) < radii[ids]+radii[i]]
         if not len(ids):
             continue

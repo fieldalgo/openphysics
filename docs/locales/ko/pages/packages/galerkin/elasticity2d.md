@@ -112,7 +112,9 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python examples/galerkin/elasticity2d.py
-python -m pytest -q -s tests/galerkin/test_elasticity2d.py tests/refsol/test_elasticity_reference.py
+python -m pytest -q -s tests/galerkin/test_elasticity2d.py \
+  tests/galerkin/test_mesh_overlap_candidates.py \
+  tests/refsol/test_elasticity_reference.py
 python -m pytest -q
 ```
 
@@ -169,7 +171,10 @@ solver는 유한 실수 좌표·힘, shape, 정수 연결·index, 미사용·동
 정수로 바꾸므로 소수 인덱스를 조용히 자르는 용도로 사용하지 마십시오. solver는 호출 시
 Mesh에 있는 실제 배열을 검증합니다. 위상 검사는 국소 기하 허용치 1e-12를 쓰며
 삼각형 determinant가 edge 길이 척도 제곱의 1e-14 이하이면 거부합니다. 부동소수점
-기하 해상도보다 작은 형상은 계약 밖입니다.
+기하 해상도보다 작은 형상은 계약 밖입니다. 내부 중첩 검사는 두 삼각형의 무게중심
+거리가 두 무게중심 반경(무게중심-꼭짓점 최대 거리) 중 큰 값의 두 배 이내일 때만 그
+쌍을 살피고, 중첩하는 쌍은 모두 이 조건을 만족하므로 비용은 가장 큰 삼각형이 아니라
+국소 mesh 크기 변화를 따릅니다.
 
 분리 성분마다 x/y 병진과 면내 회전을 독립 제거해야 합니다. 처방 DOF에 제한한 이 세
 강체 mode의 rank는 3이어야 합니다(무차원 rank 허용치 1e-10). 아니면 성분 번호와 함께
