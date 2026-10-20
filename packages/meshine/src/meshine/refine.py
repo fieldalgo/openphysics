@@ -450,13 +450,14 @@ def _sharp_corners(P: np.ndarray, segs: list[Segment], regions: list[Region]) ->
     """{input vertex: its sharp corners}: every gap below ``SHARP_CORNER`` between two
     consecutive segments around the vertex, whether it opens into a region or not (a
     corner that opens into a hole or out of the domain still has two sides that encroach
-    each other). ``inside`` probes the bisector at 1e-3 of the shorter side."""
+    each other). ``inside`` probes the bisector at 1e-3 of the shorter side; the probes of
+    all corners go through one point-in-polygon pass per region."""
     around: dict[int, list[int]] = {}
     for s in segs:
         around.setdefault(s.a, []).append(s.b)
         around.setdefault(s.b, []).append(s.a)
-    polys = None
-    corners: dict[int, list[_Corner]] = {}
+    found: list[tuple[int, float, float, int, int]] = []
+    probes: list[np.ndarray] = []
     for v, nbrs in around.items():
         if len(nbrs) < 2:
             continue
@@ -469,11 +470,19 @@ def _sharp_corners(P: np.ndarray, segs: list[Segment], regions: list[Region]) ->
             u, w = nbrs[k], nbrs[(k + 1) % len(nbrs)]
             mid = phi[k] + 0.5 * width[k]
             r = 1e-3 * min(np.linalg.norm(P[u] - P[v]), np.linalg.norm(P[w] - P[v]))
-            probe = (P[v] + r * np.array([np.cos(mid), np.sin(mid)]))[None, :]
-            if polys is None:
-                polys = [[P[np.array(lp)] for lp in reg.loops] for reg in regions]
-            inside = any(points_in_loops(probe, loops)[0] for loops in polys)
-            corners.setdefault(v, []).append(_Corner(float(phi[k]), float(width[k]), u, w, bool(inside)))
+            found.append((v, float(phi[k]), float(width[k]), u, w))
+            probes.append(P[v] + r * np.array([np.cos(mid), np.sin(mid)]))
+    corners: dict[int, list[_Corner]] = {}
+    if not found:
+        return corners
+    # points_in_loops tests each point on its own, so one pass over all probes per region
+    # gives every probe the answer it gets alone
+    at = np.array(probes)
+    inside = np.zeros(len(at), dtype=bool)
+    for reg in regions:
+        inside |= points_in_loops(at, [P[np.array(lp)] for lp in reg.loops])
+    for (v, start, gap, u, w), into_region in zip(found, inside):
+        corners.setdefault(v, []).append(_Corner(start, gap, u, w, bool(into_region)))
     return corners
 
 

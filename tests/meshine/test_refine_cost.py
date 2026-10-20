@@ -8,11 +8,13 @@
   then kept only the pairs strictly inside the diametral circle of their own segment.
   Next to a long segment almost every pair it built was thrown away. ``_encroached`` now
   asks a tree of the candidates, once per segment, with that segment's own radius.
+* Corner probes. ``_sharp_corners`` ran one point-in-polygon pass over every region for
+  the probe of each sharp corner; the probes now go through one pass per region.
 
-The old implementation is kept here as a private reference. ``generate`` must give the
-same mesh, or raise the same error, with it patched back in; nothing is stored, both are
-computed here. The pass criteria were fixed before the change, from measurements on its
-prototype: the measured values are quoted next to them.
+The old implementations are kept here as private references. ``generate`` must give the
+same mesh, or raise the same error, with them patched back in; nothing is stored, both
+are computed here. The pass criteria were fixed before the change, from measurements on
+its prototype: the measured values are quoted next to them.
 """
 
 import importlib.util
@@ -26,6 +28,7 @@ from scipy.spatial import cKDTree
 
 from meshine import Circle, Domain, box_sides, generate, rectangle, shapes
 from meshine import refine
+from meshine.geometry import points_in_loops
 
 HERE = Path(__file__).resolve().parent
 
@@ -49,7 +52,36 @@ def _old_encroached(cand, mids, half):
     return encroaches, np.unique(si_idx[hit])
 
 
-OLD = {"_encroached": _old_encroached}
+def _old_sharp_corners(P, segs, regions):
+    """``_sharp_corners`` before this change: one point-in-polygon pass over every region
+    for each corner's probe."""
+    around = {}
+    for s in segs:
+        around.setdefault(s.a, []).append(s.b)
+        around.setdefault(s.b, []).append(s.a)
+    polys = None
+    corners = {}
+    for v, nbrs in around.items():
+        if len(nbrs) < 2:
+            continue
+        d = P[nbrs] - P[v]
+        phi = np.arctan2(d[:, 1], d[:, 0])
+        order = np.argsort(phi)
+        phi, nbrs = phi[order], [nbrs[i] for i in order]
+        width = np.diff(np.append(phi, phi[0] + 2 * np.pi))
+        for k in np.nonzero((width > 0) & (width < refine.SHARP_CORNER))[0]:
+            u, w = nbrs[k], nbrs[(k + 1) % len(nbrs)]
+            mid = phi[k] + 0.5 * width[k]
+            r = 1e-3 * min(np.linalg.norm(P[u] - P[v]), np.linalg.norm(P[w] - P[v]))
+            probe = (P[v] + r * np.array([np.cos(mid), np.sin(mid)]))[None, :]
+            if polys is None:
+                polys = [[P[np.array(lp)] for lp in reg.loops] for reg in regions]
+            inside = any(points_in_loops(probe, loops)[0] for loops in polys)
+            corners.setdefault(v, []).append(refine._Corner(float(phi[k]), float(width[k]), u, w, bool(inside)))
+    return corners
+
+
+OLD = {"_encroached": _old_encroached, "_sharp_corners": _old_sharp_corners}
 
 
 # ---- a spy on the tree queries ---------------------------------------------------------
@@ -407,4 +439,15 @@ def test_the_old_implementations_give_the_same_mesh(monkeypatch, name):
         assert not isinstance(new, Exception), repr(new)
     elif name in EXPECTED:
         assert isinstance(new, RuntimeError) and EXPECTED[name] in str(new), repr(new)
+
+
+@pytest.mark.parametrize("name", list(CORPUS))
+def test_the_corner_probes_in_one_batch_find_the_same_corners(name):
+    """Not a pre-registered criterion: the batched probes against the old ones on each input
+    of the corpus as built, before any refinement. The vertices are compared in order too:
+    ``generate`` walks the corners in that order."""
+    domain, kwargs = CORPUS[name]()
+    P, segs, regions = domain.build(kwargs.get("boundary_names", "outer"))
+    new, old = refine._sharp_corners(P, segs, regions), _old_sharp_corners(P, segs, regions)
+    assert list(new.items()) == list(old.items())
 
