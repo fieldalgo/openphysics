@@ -13,14 +13,14 @@ CI pins Python 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. From the repository
 root, in a Python 3.12 virtual environment:
 
 ```bash
-python -m pip install -r ci/requirements-py312-linux.txt
+python -m pip install -r tools/requirements-py312-linux.txt
 python -m pip install --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pip check
 ```
 
-`ci/requirements-py312-linux.txt` pins the validation tools and their transitive
+`tools/requirements-py312-linux.txt` pins the validation tools and their transitive
 dependencies, not the packages' runtime requirements. Update pins deliberately
 in a reviewed change and rerun the source and distribution checks. Package
 metadata declares Python >=3.10; Python 3.10 and 3.11 are not tested in CI.
@@ -32,9 +32,9 @@ Optional tools and data:
 
 - **Gmsh**: mesh generation needs `gmsh` on PATH (Linux also needs the system
   libraries the workflow installs). It is a separate process and is not bundled.
-- **refractiveindex.info database**: `ci/rii-revision.txt` pins a full commit of
+- **refractiveindex.info database**: `tools/rii-revision.txt` pins a full commit of
   [polyanskiy/refractiveindex.info-database](https://github.com/polyanskiy/refractiveindex.info-database).
-  `python ci/fetch_rii.py <dir>` fetches exactly that commit and rejects a dirty
+  `python tools/fetch_rii.py <dir>` fetches exactly that commit and rejects a dirty
   or different cache. Set `PHYSMAT_RII_PATH=<dir>/database`; an explicitly set
   but invalid path fails the two database tests instead of skipping them. The
   data is CC0 1.0, stays outside the source tree and is not shipped. Citation:
@@ -62,11 +62,13 @@ enter a distribution:
 
 Each package's pages (contracts and validation reports) are in
 `docs/packages/<name>/`, with the Korean pages in
-`docs/locales/ko/pages/packages/<name>/`. `tools/` holds maintainer scripts that
-CI does not run, such as `tools/build_physmat_tables.py`, which regenerates
-physmat's embedded tables. The empty `openphysics` name reservation has no code,
-tests or examples. From the root,
-`python -m pytest` collects `tests/` and `ci/tests/` (`testpaths` in the root
+`docs/locales/ko/pages/packages/<name>/`. `tools/` holds the repository checks,
+the pinned validation environments, the reviewed license inventory and
+maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
+physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
+them required CI runs. The empty `openphysics` name reservation has no code, tests or examples.
+From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
+of the tools (`testpaths` in the root
 `pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
 puts each package's `src/` folder first on the import path, so the tests use
 this checkout's code.
@@ -88,8 +90,8 @@ python -m pytest -q -ra                    # full source suite
 node --test tests/simcase/*.cjs            # Studio JavaScript checks
 python ci/check_distributions.py           # build, inspect and install all packages
 python ci/run_installed_tests.py           # every Python test in tests/ against installed wheels
-python ci/check_licenses.py                # installed licenses vs. the reviewed inventory
-python ci/check_markdown_links.py          # relative links and #anchors in all Markdown files
+python tools/check_licenses.py             # installed licenses vs. the reviewed inventory
+python tools/check_markdown_links.py       # relative links and #anchors in all Markdown files
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -104,7 +106,7 @@ another directory.
 The installed-package check runs on any OS from a clean Python 3.12 environment:
 
 ```bash
-python -m pip install -r ci/requirements-py312-windows-thermal.txt
+python -m pip install -r tools/requirements-py312-windows-thermal.txt
 python -X utf8 ci/tools/check_platform_install.py
 ```
 
@@ -165,7 +167,7 @@ independent acceptance consumers, which exercise the public API, CLI and saved
 files. They are copied from the checkout's tracked files to a temporary
 directory outside it (their hashes are recorded in `consumer-file-hashes.json`)
 and run with `python -I` against the installed wheels, so the checkout cannot
-leak in. The installed environment must pass `ci/check_licenses.py`. The Studio
+leak in. The installed environment must pass `tools/check_licenses.py`. The Studio
 Node checks run against the installed Studio files, and the Studio browser check
 runs a small real model in Chrome. Finally
 `ci/tools/audit_distribution_artifacts.py` re-checks the retained archives'
@@ -182,7 +184,7 @@ Python test in `tests/` then runs with `python -I -m pytest`; no test is
 selected by name. Besides any failing test, the run fails if a first-party
 module does not load from the installed environment, if any test is skipped or
 xfailed, or if a test file (`test_*.py`, `*_test.py`) produced no results. The installed environment must
-also pass `ci/check_licenses.py`. The job uses the pinned requirements, Gmsh,
+also pass `tools/check_licenses.py`. The job uses the pinned requirements, Gmsh,
 the pinned RII database and required reference cross-checks
 (`OPENPHYSICS_REQUIRE_CROSSCHECK=1`). A local Linux run took about 25
 minutes; the 50-minute limit only stops hung runs. Running it locally needs Gmsh
@@ -190,9 +192,9 @@ and `PHYSMAT_RII_PATH`, because tests that need them skip otherwise and a skip
 fails the run. It is verified on Linux only. The source suite still runs in
 `linux-py312`.
 
-**Licenses** (`ci/check_licenses.py`). Before the tests, the pinned validation
+**Licenses** (`tools/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the
-reviewed inventory in `ci/third_party_licenses.json`: declared licenses, and
+reviewed inventory in `tools/third_party_licenses.json`: declared licenses, and
 every shared library a third-party wheel installs, file by file, on each OS.
 Policy and the full list are in [third-party software](third-party.md).
 
@@ -239,7 +241,7 @@ Hosted runners are fresh virtual machines whose CPU model changes between runs.
 numpy's bundled OpenBLAS picks its kernel from the CPU, so last-bit results can
 differ for the same commit, pins and seeds, even with one thread.
 
-- `ci/tools/report_numeric_runtime.py` records the CPU model, the OpenBLAS kernel
+- `tools/report_numeric_runtime.py` records the CPU model, the OpenBLAS kernel
   and `numpy.show_runtime()` in each job (`numeric-runtime.json`). macOS arm64
   uses Accelerate, so no OpenBLAS kernel is reported there.
 - `blas-kernels` forces `OPENBLAS_CORETYPE=Haswell` (AVX2, also the kernel used
@@ -284,5 +286,5 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 ```
 
 A wheel built from an unpacked sdist reuses the sdist's description.
-`ci/test_readme_links.py` checks that the seven `setup.py` files are identical
+`tools/tests/test_readme_links.py` checks that the seven `setup.py` files are identical
 and that no relative link is left in any package description.

@@ -124,7 +124,7 @@ def main():
                   checkout_dirty=bool(git("status", "--porcelain")),
                   python=sys.version, platform=platform.platform(),
                   versions={name: version(name) for name in ("numpy", "scipy", "shapely")},
-                  pins_sha256=hashlib.sha256((ROOT / "ci/requirements-py312-linux.txt").read_bytes()).hexdigest(),
+                  pins_sha256=hashlib.sha256((ROOT / "tools/requirements-py312-linux.txt").read_bytes()).hexdigest(),
                   thread_environment={k: env[k] for k in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS",
                                                         "MKL_NUM_THREADS", "BLIS_NUM_THREADS",
                                                         "VECLIB_MAXIMUM_THREADS")},

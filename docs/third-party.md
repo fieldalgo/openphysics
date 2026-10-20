@@ -8,8 +8,8 @@ repository uses, how it is used, and under which terms. The Apache-2.0 license
 does not relicense any of them.
 
 The machine-readable inventory is
-[`ci/third_party_licenses.json`](../ci/third_party_licenses.json).
-`ci/check_licenses.py` compares it with the installed metadata and file lists
+[`tools/third_party_licenses.json`](../tools/third_party_licenses.json).
+`tools/check_licenses.py` compares it with the installed metadata and file lists
 of each validation environment (see [Automated check](#automated-check)).
 
 ## How a component is used
@@ -68,7 +68,7 @@ levels.
    [bundled components](#bundled-components), not banned. OpenPhysics does not
    modify, rebuild, relink, copy or redistribute them, and its package code
    reaches them only through the owning package's public Python API. The one
-   recorded exception is a CI diagnostic, `ci/tools/report_numeric_runtime.py`:
+   recorded exception is a CI diagnostic, `tools/report_numeric_runtime.py`:
    it loads numpy's bundled OpenBLAS with ctypes only to read its kernel name
    for the job log (on Linux this also loads the bundled GCC runtime and
    libquadmath). It is not package code; only its text report is kept with the
@@ -92,8 +92,8 @@ engineering for debugging.
 ## Python distributions
 
 Version ranges are the package requirements; the exact CI versions are pinned in
-`ci/requirements-py312-linux.txt` (Linux) and
-`ci/requirements-py312-windows-thermal.txt` (installed-platform checks).
+`tools/requirements-py312-linux.txt` (Linux) and
+`tools/requirements-py312-windows-thermal.txt` (installed-platform checks).
 
 ### Runtime
 
@@ -167,7 +167,7 @@ under MPL-2.0); see [bundled components](#bundled-components).
 
 What the third-party wheels pinned in CI ship inside themselves (policy level 3).
 Survey basis: CPython 3.12 wheels of the versions pinned in
-`ci/requirements-py312-linux.txt`, on the platforms CI tests (manylinux x86_64,
+`tools/requirements-py312-linux.txt`, on the platforms CI tests (manylinux x86_64,
 macOS 14 arm64, Windows amd64), covering runtime, optional, test and tool
 wheels. Tool wheels that only the Linux job installs (cryptography, cffi, nh3)
 were read on manylinux x86_64 only. The numpy and scipy wheels for macOS
@@ -242,7 +242,7 @@ library directly.
 
 | Source | Terms | How it is used |
 |---|---|---|
-| [refractiveindex.info database](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | A subset of tables and dispersion coefficients is embedded in physmat (`physmat/_tables.py`, `physmat/library.py`). CI fetches the commit pinned in `ci/rii-revision.txt`; that copy is not shipped. Citation and per-record sources: [physmat NOTICE](../packages/physmat/NOTICE) |
+| [refractiveindex.info database](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | A subset of tables and dispersion coefficients is embedded in physmat (`physmat/_tables.py`, `physmat/library.py`). CI fetches the commit pinned in `tools/rii-revision.txt`; that copy is not shipped. Citation and per-record sources: [physmat NOTICE](../packages/physmat/NOTICE) |
 | G. R. Hadley, J. Lightwave Technol. 20(7), 1210 (2002) | Published facts | Benchmark values in `galerkin-refsol`, cross-checked against tables published with femwell (GPL-3.0); only the numbers are reproduced, no code or text. See [galerkin-refsol NOTICE](../packages/galerkin-refsol/NOTICE) |
 | Handbook-type thermal and mechanical constants | Approximate example inputs | Not certified measurements; see [asset provenance](assets.md) |
 
@@ -262,7 +262,7 @@ reported. AGPL tools are not used here.
 ## Automated check
 
 ```bash
-python ci/check_licenses.py --report .validation/licenses.json
+python tools/check_licenses.py --report .validation/licenses.json
 ```
 
 The check reads installed metadata and each distribution's RECORD file list with

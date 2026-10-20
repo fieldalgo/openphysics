@@ -1,5 +1,6 @@
 # Validation tools
 
-Scripts and pinned requirements used by CI. See the
+Scripts used by CI; pins, license data and the shared checks are in
+[tools/](../tools/README.md). See the
 [development guide](../docs/development.md) for what each check covers and how
 to run it locally.

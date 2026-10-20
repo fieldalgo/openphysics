@@ -222,12 +222,12 @@ def main():
             suffix = f"[{extras[name]}]" if name in extras else ""
             requirements.append(f"{name}{suffix} @ {wheel.as_uri()}")
         run(python, "-I", "-m", "pip", "install", "--only-binary=:all:", "--find-links", output,
-            "-c", ROOT / "ci" / "requirements-py312-linux.txt", *requirements,
+            "-c", ROOT / "tools" / "requirements-py312-linux.txt", *requirements,
             cwd=work, env=env)
         run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
         # The installed wheels and their resolved dependencies must match the reviewed
         # license inventory (docs/third-party.md).
-        run(sys.executable, ROOT / "ci" / "check_licenses.py", "--python", python,
+        run(sys.executable, ROOT / "tools" / "check_licenses.py", "--python", python,
             "--report", output / "licenses-installed.json", cwd=ROOT)
         # Every shipped module must import from the venv with the checked-out bytes
         # before any numerical consumer runs. __main__ modules would run a CLI.

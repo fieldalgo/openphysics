@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: "3.12.10"
       - name: Install existing portable validation pins
-        run: python -m pip install -r ci/requirements-py312-windows-thermal.txt
+        run: python -m pip install -r tools/requirements-py312-windows-thermal.txt
       - name: Build sdists and wheels and validate fresh installed consumer
         run: python -X utf8 ci/tools/check_platform_install.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

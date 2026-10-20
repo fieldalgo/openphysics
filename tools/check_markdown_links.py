@@ -7,7 +7,7 @@ or directory, and a #fragment pointing into a Markdown file must match one of it
 headings (GitHub slug rules) or an explicit HTML id/name. Links inside code
 blocks and inline code are ignored. External URLs are not fetched.
 
-Usage: python ci/check_markdown_links.py [--root DIR]
+Usage: python tools/check_markdown_links.py [--root DIR]
 Exits 1 and lists each broken link when any is found.
 """
 
@@ -97,7 +97,7 @@ def check(root: Path) -> tuple[int, list[str]]:
                 path_part, _, fragment = target.partition("#")
                 path_part = unquote(path_part.split("?", 1)[0])
                 resolved = (md.parent / path_part).resolve() if path_part else md
-                where = f"{md.relative_to(root)}:{number}: {target}"
+                where = f"{md.relative_to(root).as_posix()}:{number}: {target}"
                 if not resolved.exists():
                     broken.append(f"{where} (missing file)")
                 elif fragment and resolved.suffix.lower() == ".md" and resolved.is_file():

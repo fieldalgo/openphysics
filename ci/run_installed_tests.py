@@ -127,10 +127,10 @@ def main():
             suffix = f"[{','.join(extras)}]" if extras else ""
             requirements.append(f"{name}{suffix} @ {wheel.as_uri()}")
         distributions.run(python, "-I", "-m", "pip", "install", "--only-binary=:all:",
-                          "--find-links", dist, "-c", ROOT / "ci" / "requirements-py312-linux.txt",
+                          "--find-links", dist, "-c", ROOT / "tools" / "requirements-py312-linux.txt",
                           *requirements, cwd=work, env=env)
         distributions.run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
-        distributions.run(sys.executable, ROOT / "ci" / "check_licenses.py", "--python", python,
+        distributions.run(sys.executable, ROOT / "tools" / "check_licenses.py", "--python", python,
                           "--report", output / "licenses-installed.json", cwd=ROOT)
 
         # Tests, examples and docs come from this checkout's tracked files; no package code.

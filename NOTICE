@@ -25,5 +25,5 @@ Third-party material retains its own terms:
 
 docs/third-party.md lists every third-party dependency, external program,
 dataset and published reference with its version range, SPDX license
-identifier, how it is used and its source. ci/third_party_licenses.json is the
-machine-readable inventory checked in CI by ci/check_licenses.py.
+identifier, how it is used and its source. tools/third_party_licenses.json is the
+machine-readable inventory checked in CI by tools/check_licenses.py.

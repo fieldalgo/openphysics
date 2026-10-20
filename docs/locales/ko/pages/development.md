@@ -12,14 +12,14 @@ CI는 Ubuntu 24.04에서 Python 3.12.14와 Node.js 24.19.0을 고정해 사용�
 루트에서 Python 3.12 가상환경을 켠 상태로:
 
 ```bash
-python -m pip install -r ci/requirements-py312-linux.txt
+python -m pip install -r tools/requirements-py312-linux.txt
 python -m pip install --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pip check
 ```
 
-`ci/requirements-py312-linux.txt`는 검증 도구와 그 하위 의존성을 고정한 것이며,
+`tools/requirements-py312-linux.txt`는 검증 도구와 그 하위 의존성을 고정한 것이며,
 패키지의 실행 의존성이 아닙니다. 고정 버전은 리뷰를 거친 변경에서 의도적으로 바꾸고,
 소스 검사와 배포 검사를 다시 실행합니다. 패키지 메타데이터는 Python >=3.10을
 선언하지만 Python 3.10·3.11은 CI에서 시험하지 않습니다.
@@ -31,9 +31,9 @@ python -m pip check
 
 - **Gmsh**: 메시 생성에는 PATH의 `gmsh`가 필요합니다(Linux는 워크플로가 설치하는
   시스템 라이브러리도 필요). 별도 프로세스이며 배포물에 포함하지 않습니다.
-- **refractiveindex.info 데이터베이스**: `ci/rii-revision.txt`가
+- **refractiveindex.info 데이터베이스**: `tools/rii-revision.txt`가
   [polyanskiy/refractiveindex.info-database](https://github.com/polyanskiy/refractiveindex.info-database)의
-  전체 커밋 ID를 고정합니다. `python ci/fetch_rii.py <dir>`는 정확히 그 커밋을 받고,
+  전체 커밋 ID를 고정합니다. `python tools/fetch_rii.py <dir>`는 정확히 그 커밋을 받고,
   수정됐거나 다른 커밋인 캐시는 거부합니다. `PHYSMAT_RII_PATH=<dir>/database`를
   설정합니다. 명시적으로 설정한 경로가 잘못되면 두 데이터베이스 시험은 건너뛰지 않고
   실패합니다. 데이터는 CC0 1.0이며 소스 트리 밖에 두고 배포하지 않습니다. 인용:
@@ -59,10 +59,11 @@ python -m pip check
 | `packages/simcase` | `src/simcase/`. Studio 정적 파일은 `src/simcase/studio/static/` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 | `examples/simcase/`(JSON 문서와 `docs/gallery/`를 그리는 `gallery.py`) |
 
 패키지마다의 문서(계약과 검증 보고서)는 `docs/packages/<name>/`에, 한국어 문서는
-`docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 CI가 돌리지 않는 관리용
-스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는 physmat의 내장 표를 다시
-만듭니다. 빈 `openphysics` 이름 예약에는 코드·시험·예제가 없습니다. 루트에서 `python -m pytest`를 실행하면
-루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 `ci/tests/`를 모읍니다. `slow`
+`docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 저장소 검사, 고정한 검증
+환경, 검토한 라이선스 목록, 관리용 스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는
+physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
+있습니다. 빈 `openphysics` 이름 예약에는 코드·시험·예제가 없습니다. 루트에서 `python -m pytest`를
+실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
 표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
 맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.
 
@@ -83,8 +84,8 @@ python -m pytest -q -ra                    # 전체 소스 시험
 node --test tests/simcase/*.cjs            # Studio JavaScript 검사
 python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
 python ci/run_installed_tests.py           # 설치된 wheel로 tests/의 Python 시험 전체 실행
-python ci/check_licenses.py                # 설치된 라이선스를 검토 목록과 대조
-python ci/check_markdown_links.py          # 모든 Markdown 파일의 상대 링크와 #앵커
+python tools/check_licenses.py             # 설치된 라이선스를 검토 목록과 대조
+python tools/check_markdown_links.py       # 모든 Markdown 파일의 상대 링크와 #앵커
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -98,7 +99,7 @@ CI 스크립트의 출력 디렉터리는 새것이거나 비어 있어야 하�
 설치 패키지 검사는 깨끗한 Python 3.12 환경이면 어느 OS에서나 실행됩니다.
 
 ```bash
-python -m pip install -r ci/requirements-py312-windows-thermal.txt
+python -m pip install -r tools/requirements-py312-windows-thermal.txt
 python -X utf8 ci/tools/check_platform_install.py
 ```
 
@@ -149,7 +150,7 @@ Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드�
 simcase 예제, 독립 수용 소비자를 돌립니다. 이들은 checkout이 추적하는 파일을 checkout 밖
 임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록) 설치된 wheel을 대상으로
 `python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된 환경은
-`ci/check_licenses.py`를 통과해야 합니다. Studio Node 검사는 설치된 Studio 파일로 돌고,
+`tools/check_licenses.py`를 통과해야 합니다. Studio Node 검사는 설치된 Studio 파일로 돌고,
 Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
 `ci/tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 sdist·wheel의 정확한
 내용을 다시 확인합니다.
@@ -162,15 +163,15 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 `suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
 실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가
-없는 시험 파일(`test_*.py`, `*_test.py`)이 있으면 실패합니다. 설치된 환경은 `ci/check_licenses.py`도
+없는 시험 파일(`test_*.py`, `*_test.py`)이 있으면 실패합니다. 설치된 환경은 `tools/check_licenses.py`도
 통과해야 합니다. 이 job은 고정 requirements, Gmsh, 고정 RII 데이터베이스, 필수 레퍼런스
 교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬 Linux 실행에서 25분쯤
 걸렸고, 50분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬에서 돌리려면 Gmsh와
 `PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
 실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 계속 `linux-py312`에서 돕니다.
 
-**라이선스** (`ci/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
-환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
+**라이선스** (`tools/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
+환경마다 `tools/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
 설치한 공유 라이브러리를 OS마다 파일 하나하나 확인합니다. 정책과 전체 목록은
 [제3자 소프트웨어](third-party.md)에 있습니다.
 
@@ -213,7 +214,7 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 포함된 OpenBLAS는 CPU를 보고 커널을 고르므로, 같은 커밋·고정 버전·시드에 스레드를
 하나로 해도 마지막 비트가 달라질 수 있습니다.
 
-- `ci/tools/report_numeric_runtime.py`가 job마다 CPU 기종, OpenBLAS 커널,
+- `tools/report_numeric_runtime.py`가 job마다 CPU 기종, OpenBLAS 커널,
   `numpy.show_runtime()`을 기록합니다(`numeric-runtime.json`). macOS arm64는
   Accelerate를 쓰므로 OpenBLAS 커널이 표시되지 않습니다.
 - `blas-kernels`는 `OPENBLAS_CORETYPE=Haswell`(AVX2, AMD Zen에서도 쓰는 커널)과
@@ -256,5 +257,5 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 ```
 
 풀어 놓은 sdist에서 만드는 wheel은 sdist의 설명을 그대로 씁니다.
-`ci/test_readme_links.py`는 일곱 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
+`tools/tests/test_readme_links.py`는 일곱 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
 않았는지 검사합니다.
