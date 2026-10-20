@@ -133,10 +133,10 @@ Failures raise `RuntimeError` with no partial result; invalid arguments raise `V
 From the repository root:
 
 ```bash
-python -m pytest -c pyproject.toml -q packages/galerkin/tests/test_material_cavity.py \
-  packages/galerkin/tests/test_cavity_wall_loss.py \
-  packages/galerkin-refsol/tests/test_material_cavity_reference.py \
-  packages/galerkin-refsol/tests/test_wall_loss_reference.py
+python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
+  tests/galerkin/test_cavity_wall_loss.py \
+  tests/refsol/test_material_cavity_reference.py \
+  tests/refsol/test_wall_loss_reference.py
 ```
 
 The references are in `refsol.material_cavity` and `refsol.wall_loss` and use no mesh or FEM code.
@@ -305,7 +305,7 @@ Other wall tests:
 ## Reference-tool comparisons
 
 Same-discretization comparison with scikit-fem 12.0.2 (`BSD-3-Clause`, test extra
-`galerkin[crosscheck]`): `tests/test_crosscheck_skfem_lossy_cavity.py` rebuilds the lossy slab and
+`galerkin[crosscheck]`): `tests/galerkin/test_crosscheck_skfem_lossy_cavity.py` rebuilds the lossy slab and
 the impedance-wall operators on galerkin's mesh and gates the eigenvalue differences at `1e-9`
 (observed `4.1e-15` and `6.8e-13`). See the [reference comparisons](https://github.com/fieldalgo/openphysics/blob/main/docs/reference-comparisons.md).
 

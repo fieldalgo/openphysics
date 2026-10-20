@@ -108,7 +108,7 @@ def test_real_cavity_cli_writes_declared_outputs(tmp_path, save_fields):
     out = tmp_path / "results"
     completed = subprocess.run(
         [sys.executable, "-m", "simcase", "run", str(path), "-q", "-o", str(out)],
-        text=True, capture_output=True, env=os.environ.copy(), check=False,
+        text=True, capture_output=True, env=os.environ.copy(), check=False, cwd=tmp_path,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "results.png" not in completed.stdout

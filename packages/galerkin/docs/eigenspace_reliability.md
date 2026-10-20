@@ -64,8 +64,8 @@ Run from the repository root (existing dependencies only):
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -ra \
-  packages/galerkin/tests/test_eigenspace_reliability.py \
-  packages/simcase/tests/test_vector_eigenspace_reliability.py
+  tests/galerkin/test_eigenspace_reliability.py \
+  tests/simcase/test_vector_eigenspace_reliability.py
 ```
 
 The tests cover repeated 1.50/1.55/1.60 um solves, returned rank and electric-L2

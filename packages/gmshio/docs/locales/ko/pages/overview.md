@@ -64,7 +64,7 @@ mesh.cells("triangle"), mesh.physical_tags("triangle"), mesh.cells_in("pec", "li
 ```bash
 # From the repository root
 python -m pip install pytest -e packages/gmshio
-python -m pytest -q packages/gmshio/tests
+python -m pytest -q tests/gmshio
 ```
 
 판독기 출력을 자기 자신과 비교하는 대신 솔버가 의존하는 특성을 검사합니다. 다각형 영역의 면적과 상자 부피가 정확히 재현되고, 모든 요소 방향이 양수이며, 태그 경계가 정확히 한 요소에서만 쓰이는 변(면)의 집합과 일치하는지 확인합니다. 광섬유 경계 노드는 실제 원에 1e-9 이내로 놓이고, 원의 다각형 면적 오차는 2차로 감소합니다. 실행 파일이 필요한 시험은 실행 파일이 없으면 skip됩니다.

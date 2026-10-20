@@ -148,7 +148,7 @@ GitHub Actions의 필수 검사 `tests`에서 확인하세요. 검사와 명령�
 |---|---|
 | [문서 색인](index.md) | 모든 기능 계약과 검증 보고, 영어·한국어 |
 | [구조도](architecture.md) | 패키지 관계와 진입점 |
-| [개발 안내](development.md) | 개발 환경, 검사, CI와 결과 |
+| [개발 안내](development.md) | 개발 환경, 저장소 구성, 검사, CI와 결과 |
 | [자산 출처](assets.md) | 포함된 그림, fixture와 데이터의 출처 |
 
 ## 기여와 보안

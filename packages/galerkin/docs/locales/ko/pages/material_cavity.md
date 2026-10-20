@@ -127,10 +127,10 @@ S와 M은 서로 다른 재료마다 실수 지시함수 가중 조립에 복소
 저장소 루트에서:
 
 ```bash
-python -m pytest -c pyproject.toml -q packages/galerkin/tests/test_material_cavity.py \
-  packages/galerkin/tests/test_cavity_wall_loss.py \
-  packages/galerkin-refsol/tests/test_material_cavity_reference.py \
-  packages/galerkin-refsol/tests/test_wall_loss_reference.py
+python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
+  tests/galerkin/test_cavity_wall_loss.py \
+  tests/refsol/test_material_cavity_reference.py \
+  tests/refsol/test_wall_loss_reference.py
 ```
 
 정답은 `refsol.material_cavity`와 `refsol.wall_loss`에 있으며 mesh나 FEM 코드를 쓰지 않습니다.
@@ -279,7 +279,7 @@ FEM 시험은 상자 `(1, 0.45, 0.8) m`(최저 4개 모드에 우연 축퇴 없�
 ## 레퍼런스 도구 비교
 
 scikit-fem 12.0.2(`BSD-3-Clause`, 시험 extra `galerkin[crosscheck]`)와 같은 이산화 비교:
-`tests/test_crosscheck_skfem_lossy_cavity.py`가 galerkin 메시에서 손실 판과 임피던스 벽 연산자를 다시
+`tests/galerkin/test_crosscheck_skfem_lossy_cavity.py`가 galerkin 메시에서 손실 판과 임피던스 벽 연산자를 다시
 조립하고 고유값 차이를 `1e-9`로 검사합니다(관측 `4.1e-15`, `6.8e-13`).
 [레퍼런스 비교](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/reference-comparisons.md)를 참조하세요.
 

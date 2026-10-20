@@ -202,8 +202,8 @@ PYTHONPATH=packages/galerkin \
 python packages/galerkin/examples/thermal_mechanical_workflow.py
 
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-python -m pytest -q packages/galerkin/tests/test_thermal_mechanical_workflow.py \
-  packages/galerkin/tests/test_thermal_mechanical_workflow_physics.py
+python -m pytest -q tests/galerkin/test_thermal_mechanical_workflow.py \
+  tests/galerkin/test_thermal_mechanical_workflow_physics.py
 ```
 
 예제는1m 정사각형에서 선형 열전도 T=Tref+10+20x, Q=0, k=10을 사용합니다.

@@ -60,8 +60,8 @@ centroid 표본을 저장합니다. JSON 표시는 실수/허수 목록을 분�
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -ra \
-  packages/galerkin/tests/test_eigenspace_reliability.py \
-  packages/simcase/tests/test_vector_eigenspace_reliability.py
+  tests/galerkin/test_eigenspace_reliability.py \
+  tests/simcase/test_vector_eigenspace_reliability.py
 ```
 
 시험은 1.50/1.55/1.60 um 반복 해석, 반환 rank와 electric-L2 Gram, 원래 각

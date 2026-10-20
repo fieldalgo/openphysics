@@ -250,8 +250,8 @@ python -m simcase.studio --port 9000 --no-browser
 
 ```bash
 # From the repository root after the development install in ../../README.md
-python -m pytest -q packages/simcase/tests
-node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
+python -m pytest -q tests/simcase
+node --test tests/simcase/*.cjs   # Studio JavaScript checks
 ```
 
 문서는 JSON 왕복 변환을 유지하고, 잘못된 문서는 구체적인 메시지로 거절합니다. Boolean 형상은 영역을 정확히 채웁니다(면적 검사). 손대지 않은 원은 실제 원 위에 노드를 유지합니다. 세 문서를 전체 실행해 참조해와 대조합니다. 220 nm Si 슬랩은 refsol TE0을 1.5e-3까지 재현하고(P1 이산화), 계단형 광섬유는 LP01/LP11 스칼라 모드를 2e-4까지 재현하며, Hadley 리브는 출판 준-TE 값에 5e-4 이내로 접근합니다(남은 차이는 스칼라 근사). sweep에서는 n_eff가 감소하고 n_g > n_eff입니다. 열전도 문서는 아래에 연결한 별도 독립 검증 보고를 갖습니다.

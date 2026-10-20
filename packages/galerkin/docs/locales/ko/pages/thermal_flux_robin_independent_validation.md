@@ -177,7 +177,7 @@ pytest 전에 잘못된 log redirection으로 실패했으며 실행 오류로 �
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python -m pytest -c pyproject.toml -q -s \
-  packages/galerkin/tests/test_thermal_flux_robin_independent_validation.py
+  tests/galerkin/test_thermal_flux_robin_independent_validation.py
 ```
 
 설치 소비 검사는 checkout 밖 oracle/시험 복사본을

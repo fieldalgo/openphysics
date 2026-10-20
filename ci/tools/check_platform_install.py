@@ -166,17 +166,17 @@ def main():
             ROOT / "ci" / "test_transient_thermomechanical_wheel.py": tests / "test_transient_thermomechanical_wheel.py",
             ROOT / "ci" / "test_platform_install.py": tests / "test_platform_install.py",
             ROOT / "ci" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
-            ROOT / "packages/simcase/tests/test_simcase.py": tests / "original_scalar.py",
-            ROOT / "packages/gmshio/tests/test_msh.py": tests / "test_msh.py",
+            ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
+            ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
             # Save/I-O robustness consumers (see the module docstring).
-            ROOT / "packages/simcase/tests/test_thermal.py": tests / "test_shipped_thermal_io.py",
-            ROOT / "packages/simcase/tests/test_transient_headless_windows.py":
+            ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
+            ROOT / "tests/simcase/test_transient_headless_windows.py":
                 tests / "test_transient_headless_windows.py",
-            ROOT / "packages/simcase/tests/test_steady_boundary_platform.py":
+            ROOT / "tests/simcase/test_steady_boundary_platform.py":
                 tests / "test_steady_boundary_platform.py"}
         for source, destination in copies.items():
             shutil.copy2(source, destination)
-        shutil.copytree(ROOT / "packages/gmshio/tests/data", tests / "data")
+        shutil.copytree(ROOT / "tests/gmshio/data", tests / "data")
         (work / "examples").mkdir()
         for name in ("thermal_slab.json", "thermal_mixed.json"):
             shutil.copy2(ROOT / "packages/simcase/examples" / name, work / "examples" / name)
@@ -215,7 +215,7 @@ def main():
                 ("source-target", "api_and_cli_preserve_existing_target",
                  ROOT / "ci" / "test_thermal_simcase_wheel.py"),
                 ("steady-boundary-source-target", "test_boundary_api_and_cli_preserve_existing_target",
-                 ROOT / "packages" / "simcase" / "tests" / "test_steady_boundary_platform.py")):
+                 ROOT / "tests" / "simcase" / "test_steady_boundary_platform.py")):
             run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra", "--confcutdir", ROOT,
                 "-k", selection, "--junitxml=" + str(output / f"{name}-tests.xml"), test_file, cwd=ROOT)
 

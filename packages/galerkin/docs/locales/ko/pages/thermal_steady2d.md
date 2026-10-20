@@ -125,8 +125,8 @@ complex·비유한 입력, 잘못된 재료, 누락된 성분 구속은 `ValueEr
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/thermal_steady2d.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermal_steady2d.py \
-  packages/galerkin-refsol/tests/test_thermal_reference.py
+  tests/galerkin/test_thermal_steady2d.py \
+  tests/refsol/test_thermal_reference.py
 ```
 
 예제는 2 m×0.7 m slab, k=12 W/(m K), 왼쪽 350 K·오른쪽 300 K,

@@ -149,7 +149,7 @@ Run from the repository root:
 
 ```
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q \
-  packages/galerkin/tests/test_thermoelasticity_independent_validation.py
+  tests/galerkin/test_thermoelasticity_independent_validation.py
 ```
 
 Installed consumption copies the independent oracle and tests outside the

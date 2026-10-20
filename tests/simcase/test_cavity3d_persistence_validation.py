@@ -14,8 +14,8 @@ import galerkin
 
 # Load the independent checks by file path, without relying on pytest's
 # cross-package module import order.
-_path = (Path(__file__).resolve().parents[2] /
-         "galerkin/tests/test_cavity3d_validation.py")
+_path = (Path(__file__).resolve().parents[1] /
+         "galerkin/test_cavity3d_validation.py")
 _spec = importlib.util.spec_from_file_location("_independent_cavity_checks", _path)
 _checks = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_checks)

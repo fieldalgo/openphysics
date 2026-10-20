@@ -30,7 +30,7 @@ Issues = "https://github.com/FieldAlgo/openphysics/issues"
 
 [project.optional-dependencies]
 # The answer key lives in its own package so the engine never imports what grades
-# it. tests/test_independence.py enforces that separation.
+# it. tests/galerkin/test_independence.py enforces that separation.
 test = [
     "pytest",
     "galerkin-refsol>=0.1",
@@ -41,7 +41,7 @@ test = [
     "gmshio>=0.1",
 ]
 figures = ["matplotlib>=3.7"]
-# Reference tools for code-to-code comparisons (tests/test_crosscheck_*.py), test only.
+# Reference tools for code-to-code comparisons (tests/galerkin/test_crosscheck_*.py), test only.
 # Permissive licenses only, by choice; weak-copyleft or GPL reference tools run
 # separately and are never installed here. See docs/third-party.md in the repository.
 # symfem (with sympy) supplies exact element definitions; the engine never imports it.
@@ -49,7 +49,3 @@ crosscheck = ["scikit-fem>=12,<13", "symfem==2025.12.0"]
 
 [tool.setuptools.packages.find]
 include = ["galerkin*"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = ["slow: convergence studies that take more than a few seconds"]

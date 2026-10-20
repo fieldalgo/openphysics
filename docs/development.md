@@ -25,8 +25,8 @@ dependencies, not the packages' runtime requirements. Update pins deliberately
 in a reviewed change and rerun the source and distribution checks. Package
 metadata declares Python >=3.10; Python 3.10 and 3.11 are not tested in CI.
 
-Always run from the repository root: running Python inside `packages/` can
-shadow installed modules with directories of the same name.
+Always run from the repository root: running Python inside `packages/` or
+`tests/` can shadow installed modules with directories of the same name.
 
 Optional tools and data:
 
@@ -43,12 +43,41 @@ Optional tools and data:
 - **Chrome or Chromium**: the installed Studio browser check uses an already
   installed browser. If none is found, the check fails; it is never skipped.
 
+## Repository layout
+
+Each package keeps its code, examples and docs in `packages/<name>/`. Its tests
+are outside the package, in `tests/<import name>/`, so nothing a test uses can
+enter a distribution:
+
+| Package | Tests |
+|---|---|
+| `packages/galerkin` | `tests/galerkin/` |
+| `packages/galerkin-refsol` | `tests/refsol/` |
+| `packages/meshine` | `tests/meshine/` |
+| `packages/gmshio` | `tests/gmshio/`, with its `.geo`/`.msh` fixtures in `tests/gmshio/data/` |
+| `packages/physmat` | `tests/physmat/` |
+| `packages/simcase` | `tests/simcase/`, including the Studio JavaScript checks (`*.cjs`) |
+
+The empty `openphysics` name reservation has no tests. From the root,
+`python -m pytest` collects `tests/` and `ci/tests/` (`testpaths` in the root
+`pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
+puts this checkout's packages first on the import path.
+
+To run one package's tests, from the repository root:
+
+```bash
+python -m pytest -q tests/galerkin                 # one package
+python -m pytest -q tests/galerkin -m "not slow"   # without convergence studies
+python -m pytest -q tests/gmshio/test_msh.py       # one file
+node --test tests/simcase/*.cjs                    # Studio JavaScript checks
+```
+
 ## Running the checks
 
 ```bash
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # full source suite
-node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
+node --test tests/simcase/*.cjs            # Studio JavaScript checks
 python ci/check_distributions.py           # build, inspect and install all packages
 python ci/check_licenses.py                # installed licenses vs. the reviewed inventory
 python ci/check_markdown_links.py          # relative links and #anchors in all Markdown files
@@ -104,14 +133,15 @@ Distributions ship package code only. Each sdist holds exactly its import
 package, `README.md`, `LICENSE`, `NOTICE` and build files (`pyproject.toml`,
 `setup.py`, `MANIFEST.in`, and the generated `PKG-INFO`, `setup.cfg` and
 egg-info); each wheel holds exactly its import package and dist-info, with
-`LICENSE` and `NOTICE` under `.dist-info/licenses/`. Tests, docs, examples and
-tools stay in the repository and are never shipped (every `MANIFEST.in` prunes
-them). The expected contents come from the Git-tracked files of
-`packages/<name>/`, not from a hand-written list: every tracked file of the
-import package, and in the sdist each tracked top-level file above, must be
-present and byte-identical to the checkout, `LICENSE` and `NOTICE` included. Any other file
-in an archive fails the check, as does a tracked top-level file the checker
-does not know.
+`LICENSE` and `NOTICE` under `.dist-info/licenses/`. Docs, examples and tools
+stay in `packages/<name>/` and are never shipped (every `MANIFEST.in` prunes
+them); tests are in the root `tests/` folder. The expected contents come from
+the Git-tracked files of `packages/<name>/`, not from a hand-written list: every
+tracked file of the import package, and in the sdist each tracked top-level file
+above, must be present and byte-identical to the checkout, `LICENSE` and
+`NOTICE` included. Any other file in an archive fails the check, as does a
+tracked top-level file or folder of `packages/<name>/` the checker does not
+know, such as a `tests/` folder.
 
 Wheels are then installed into a fresh environment outside the checkout. Every
 shipped module (except `__main__`) and Studio static file must load from that
@@ -185,8 +215,8 @@ differ for the same commit, pins and seeds, even with one thread.
 Write tests that do not depend on last-bit rounding: compare with explicit
 tolerances well clear of roundoff, never exactly at a boundary roundoff can reach.
 An exact comparison is sound only when it follows from identical inputs to the
-same code on one machine, as in `test_length_canonical.py` (the same mesher input
-in nm, um and m); say why in the test.
+same code on one machine, as in `tests/simcase/test_length_canonical.py` (the
+same mesher input in nm, um and m); say why in the test.
 
 ## Publishing
 

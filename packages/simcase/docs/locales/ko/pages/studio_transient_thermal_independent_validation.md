@@ -12,7 +12,7 @@ test-only branch는 서버를 구현하지 않는다. 수집·HTTP 수치 실행
 구성된 시험 환경의 저장소 루트에서 실행한다.
 
 ```sh
-python -m pytest -q -s packages/simcase/tests/test_studio_transient_thermal_acceptance.py
+python -m pytest -q -s tests/simcase/test_studio_transient_thermal_acceptance.py
 ```
 
 성공 case의 studio_transient_independent_exact JSON은 정확 요청 시간,

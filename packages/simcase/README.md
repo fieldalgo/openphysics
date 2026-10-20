@@ -422,8 +422,8 @@ needs something the engine does not export, the engine exports it on purpose.
 
 ```bash
 # From the repository root after the development install in ../../README.md
-python -m pytest -q packages/simcase/tests
-node --test packages/simcase/tests/*.cjs   # Studio JavaScript checks
+python -m pytest -q tests/simcase
+node --test tests/simcase/*.cjs   # Studio JavaScript checks
 ```
 
 Documents round-trip through JSON; malformed documents are rejected with

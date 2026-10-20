@@ -5,7 +5,7 @@
 These measurements were recorded on 2026-09-05, while the electrostatic,
 Helmholtz, waveguide-mode and 3D cavity solvers (milestones M1 to M3b) were
 built. They are historical results, not a fresh test report. The current gates
-are the tests in `tests/` and the checks in the examples named below; for a
+are the tests in `tests/galerkin/` and the checks in the examples named below; for a
 specific commit, see its CI run. This page was moved unchanged from the package
 README.
 

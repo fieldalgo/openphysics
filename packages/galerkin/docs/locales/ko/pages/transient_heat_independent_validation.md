@@ -34,7 +34,7 @@ oracle blob `69238292eb72c58c3d3385cc0a60a1db8c7fcd2b`는
 
 ## 소유 범위와 파일
 
-실행 파일은 모두 `packages/galerkin/tests/`에 있다.
+실행 파일은 모두 `tests/galerkin/`에 있다.
 
 | 파일 | 역할 |
 |---|---|
@@ -209,7 +209,7 @@ for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
              "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
     env[name] = "1"
 subprocess.run([sys.executable, "-m", "pytest", "-c", "pyproject.toml", "-q", "-s",
-                "packages/galerkin/tests/test_transient_heat_independent_validation.py"],
+                "tests/galerkin/test_transient_heat_independent_validation.py"],
                cwd=root, env=env, check=True)
 ```
 

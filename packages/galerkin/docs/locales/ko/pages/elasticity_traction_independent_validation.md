@@ -148,12 +148,12 @@ self edge, node-only tag, callback shape/전치 오류, nonfinite/복소수, 부
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python -m pytest -c pyproject.toml -q -s -ra \
-  packages/galerkin/tests/test_traction_independent_validation.py \
-  packages/galerkin/tests/test_elasticity_traction.py \
-  packages/galerkin-refsol/tests/test_elasticity_traction_reference.py \
-  packages/galerkin/tests/test_elasticity2d.py \
-  packages/galerkin-refsol/tests/test_elasticity_reference.py \
-  packages/galerkin/tests/test_independence.py
+  tests/galerkin/test_traction_independent_validation.py \
+  tests/galerkin/test_elasticity_traction.py \
+  tests/refsol/test_elasticity_traction_reference.py \
+  tests/galerkin/test_elasticity2d.py \
+  tests/refsol/test_elasticity_reference.py \
+  tests/galerkin/test_independence.py
 ```
 
 외부 솔버 소스·신규 의존성은 사용하지 않습니다. 설치 wheel 검사, 구현 음성 대조,

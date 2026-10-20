@@ -51,7 +51,7 @@ mesh = generate(d, lambda mid: "pec" if abs(complex(*mid)) < 2 else "abc")
 ```bash
 # From the repository root
 python -m pip install pytest -e packages/meshine
-python -m pytest -q packages/meshine/tests
+python -m pytest -q tests/meshine
 ```
 
 검사하는 특성은 다음과 같습니다. 다각형 영역 면적을 1e-9까지 재현하고 모든 삼각형 방향이 양수이며, 태그 경계가 정확히 하나의 삼각형에서만 쓰이는 변의 집합과 일치해야 합니다(빈틈이나 겹침 없이 닫힘). 재료 경계 변은 해당 두 재료의 삼각형이 하나씩 공유해야 합니다. 요청한 최소각이 유지되고, 변 길이는 영역별 크기 및 크기 함수를 따라야 합니다. 광섬유 경계 노드는 실제 원 위에 1e-12 이내로 놓이고 면적은 2차 수렴해야 합니다. 구멍은 비어 있어야 하며, 의도적으로 불규칙한 메시에서 매끄러운 함수의 변 중점 구적은 2차 수렴해야 합니다.

@@ -117,13 +117,13 @@ counters. The public-export AST check rejects private numerical imports and
 From the repository root in the configured validation environment:
 
 ```sh
-python -m pytest -q packages/simcase/tests/test_studio_thermal_acceptance.py
+python -m pytest -q tests/simcase/test_studio_thermal_acceptance.py
 ```
 
 For the separate shipped-script/page-handler Node checks:
 
 ```sh
-node --test packages/simcase/tests/studio_steady_thermal.cjs
+node --test tests/simcase/studio_steady_thermal.cjs
 ```
 
 HTTP tests poll real asynchronous jobs with a bounded timeout. Each current

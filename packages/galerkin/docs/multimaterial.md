@@ -97,7 +97,7 @@ interface are compared with their own triangle's material.
 
 ## Acceptance (fixed before the comparison)
 
-`packages/galerkin/tests/test_thermal_multimaterial.py`:
+`tests/galerkin/test_thermal_multimaterial.py`:
 
 | Case | Mesh | Gate |
 | --- | --- | --- |
@@ -129,8 +129,8 @@ second order through the inscribed polygon. Run them with:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermal_multimaterial.py \
-  packages/galerkin-refsol/tests/test_thermal_multilayer_reference.py
+  tests/galerkin/test_thermal_multimaterial.py \
+  tests/refsol/test_thermal_multilayer_reference.py
 ```
 
 ## Static elasticity
@@ -189,8 +189,8 @@ refinement.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_elasticity_multimaterial.py \
-  packages/galerkin-refsol/tests/test_elasticity_multilayer_reference.py
+  tests/galerkin/test_elasticity_multimaterial.py \
+  tests/refsol/test_elasticity_multilayer_reference.py
 ```
 
 ## Thermoelasticity and heat-to-mechanics coupling
@@ -251,7 +251,7 @@ Observed when first run (n=1 → 8):
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermoelastic_multimaterial.py
+  tests/galerkin/test_thermoelastic_multimaterial.py
 ```
 
 ## Transient heat conduction
@@ -337,8 +337,8 @@ cases and criterion 1 for the three that passed it.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_transient_heat_multimaterial.py \
-  packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
+  tests/galerkin/test_transient_heat_multimaterial.py \
+  tests/refsol/test_transient_heat_multilayer_reference.py
 ```
 
 ## Reference-tool comparison
@@ -347,7 +347,7 @@ The analytical gates above decide acceptance. Separately, the same problems
 were solved with scikit-fem 12.0.2 (BSD-3-Clause); agreement between the tools
 is code-to-code evidence, not convergence evidence.
 
-- In CI, `tests/test_crosscheck_skfem_multimaterial.py` solves a three-region
+- In CI, `tests/galerkin/test_crosscheck_skfem_multimaterial.py` solves a three-region
   wall on the same mesh with the same per-triangle values in both tools: steady
   heat, elasticity and thermoelasticity in both planes, and backward-Euler
   transient heat. Temperatures, displacements, fluxes and stresses agree to

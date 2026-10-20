@@ -323,7 +323,7 @@ def test_rectangle_documents_keep_their_original_contract():
 @pytest.mark.parametrize('page', ['docs/thermal_regions2d.md', 'docs/locales/ko/pages/thermal_regions2d.md'])
 def test_the_documented_example_is_the_shipped_example(page):
     from pathlib import Path
-    path = Path(__file__).resolve().parents[1]/page
+    path = Path(__file__).resolve().parents[2]/"packages"/"simcase"/page
     if not path.exists():
         pytest.skip('contract pages are not part of this installation')
     text = path.read_text(encoding='utf-8')

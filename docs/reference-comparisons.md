@@ -35,10 +35,10 @@ are reported. AGPL tools are not used.
 ```bash
 python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
-  python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
-    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py \
-    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py \
-    packages/galerkin/tests/test_crosscheck_symfem_elements.py
+  python -m pytest -q tests/galerkin/test_crosscheck_skfem.py \
+    tests/galerkin/test_crosscheck_skfem_lossy_cavity.py \
+    tests/galerkin/test_crosscheck_skfem_multimaterial.py \
+    tests/galerkin/test_crosscheck_symfem_elements.py
 ```
 
 Without the tool the tests skip locally. CI sets
@@ -49,7 +49,7 @@ each record in `.validation/crosscheck/` inside the Linux job's artifact.
 
 Each comparison emits one JSON record (schema `openphysics.crosscheck/1`),
 printed into the JUnit output and optionally written to a file. The helper is
-`packages/galerkin/tests/crosscheck.py`.
+`tests/galerkin/crosscheck.py`.
 
 | Field | Content |
 |---|---|

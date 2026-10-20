@@ -128,7 +128,7 @@ shortcut, 열계수 3배, 열 RHS 부호, 열하중 누락, zz 응력 누락, ce
 
 ```
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q \
-  packages/galerkin/tests/test_thermoelasticity_independent_validation.py
+  tests/galerkin/test_thermoelasticity_independent_validation.py
 ```
 
 설치 소비 검사는 독립 oracle·시험을 checkout 밖에 복사하고 의존성/index 없이 local

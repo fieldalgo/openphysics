@@ -76,9 +76,10 @@ galerkin/
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
-tests/            # analytical, convergence and independent-validation tests
 examples/         # runnable examples and figure scripts
 ```
+
+해석해·수렴·독립 검증 시험은 패키지 밖, 저장소 루트의 `tests/galerkin/`에 있습니다.
 
 `galerkin.from_mesher`는 `nodes`, `triangles` 또는 `tetrahedra`, `regions`, `region_names`와
 경계 변·면을 제공하는 객체를 변환하고, `Mesh.by_region({"core": ..., "clad": ...})`은 영역
@@ -90,15 +91,15 @@ examples/         # runnable examples and figure scripts
 엔진은 닫힌 형태 해와 출판된 기준해를 담은 별도 패키지
 [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin-refsol/docs/locales/ko/pages/overview.md)로
 채점합니다. 같은 저장소에 있지만 독립 구현이며, 기준해 패키지는 채점 대상 솔버를 import하지
-않습니다. `tests/test_independence.py`는 엔진이 기준해를 import하지 않고 의존성이 numpy와
+않습니다. `tests/galerkin/test_independence.py`는 엔진이 기준해를 import하지 않고 의존성이 numpy와
 scipy뿐임을 강제합니다.
 
 ```bash
 # From the repository root
 python -m pip install -e packages/galerkin   # engine only: numpy and scipy
 # Install the full local test stack using ../../README.md, then:
-python -m pytest -q packages/galerkin/tests
-python -m pytest -q packages/galerkin/tests -m "not slow"
+python -m pytest -q tests/galerkin
+python -m pytest -q tests/galerkin -m "not slow"
 ```
 
 모든 명령은 저장소 루트에서 실행합니다. 편집 가능 설치가 `galerkin`을 경로에 넣으므로

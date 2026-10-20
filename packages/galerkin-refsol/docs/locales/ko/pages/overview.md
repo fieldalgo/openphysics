@@ -78,7 +78,7 @@ benchmarks.rib_neff(0.3)   # 3.412492
 ```bash
 # From the repository root
 python -m pip install pytest -e packages/galerkin-refsol
-python -m pytest -q packages/galerkin-refsol/tests
+python -m pytest -q tests/refsol
 ```
 
 ## galerkin에서 사용

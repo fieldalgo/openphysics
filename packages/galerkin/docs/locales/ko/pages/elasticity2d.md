@@ -112,7 +112,7 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/elasticity2d.py
-python -m pytest -q -s packages/galerkin/tests/test_elasticity2d.py packages/galerkin-refsol/tests/test_elasticity_reference.py
+python -m pytest -q -s tests/galerkin/test_elasticity2d.py tests/refsol/test_elasticity_reference.py
 python -m pytest -q
 ```
 

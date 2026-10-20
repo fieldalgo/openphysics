@@ -23,11 +23,12 @@ import re
 import numpy as np
 import pytest
 
+import gmshio
 from gmshio import geo, to_fem2d
 from gmshio.fem import PLANE_EPS
 from gmshio.mesh import CellBlock, Mesh
 
-PACKAGE = pathlib.Path(__file__).resolve().parent.parent / "gmshio"
+PACKAGE = pathlib.Path(gmshio.__file__).resolve().parent
 
 #: One geometry, five ways of writing it; the number is document units per micrometre.
 SCALES = [("um", 1.0), ("nm", 1e3), ("mm", 1e-3), ("m", 1e-6), ("km", 1e-9)]
@@ -156,6 +157,7 @@ def test_no_module_hides_a_length_inside_max_of_one():
     Only a bare ``max`` is scanned: ``np.maximum(x, 1)`` is legitimate where x is a count.
     """
     offenders = []
+    assert len(list(PACKAGE.glob("*.py"))) > 1, f"no package modules found in {PACKAGE}"
     for path in sorted(PACKAGE.glob("*.py")):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)

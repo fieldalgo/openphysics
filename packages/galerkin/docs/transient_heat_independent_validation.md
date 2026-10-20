@@ -34,7 +34,7 @@ acceptance. Existing thermoelastic traction/whole-run histories are separate.
 
 ## Ownership and files
 
-All executable files are in `packages/galerkin/tests/`:
+All executable files are in `tests/galerkin/`:
 
 | File | Role |
 |---|---|
@@ -217,7 +217,7 @@ for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
              "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
     env[name] = "1"
 subprocess.run([sys.executable, "-m", "pytest", "-c", "pyproject.toml", "-q", "-s",
-                "packages/galerkin/tests/test_transient_heat_independent_validation.py"],
+                "tests/galerkin/test_transient_heat_independent_validation.py"],
                cwd=root, env=env, check=True)
 ```
 

@@ -30,10 +30,10 @@
 ```bash
 python -m pip install -e "packages/galerkin[crosscheck]"
 OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
-  python -m pytest -q packages/galerkin/tests/test_crosscheck_skfem.py \
-    packages/galerkin/tests/test_crosscheck_skfem_lossy_cavity.py \
-    packages/galerkin/tests/test_crosscheck_skfem_multimaterial.py \
-    packages/galerkin/tests/test_crosscheck_symfem_elements.py
+  python -m pytest -q tests/galerkin/test_crosscheck_skfem.py \
+    tests/galerkin/test_crosscheck_skfem_lossy_cavity.py \
+    tests/galerkin/test_crosscheck_skfem_multimaterial.py \
+    tests/galerkin/test_crosscheck_symfem_elements.py
 ```
 
 도구가 없으면 로컬에서는 시험을 건너뜁니다. CI는 `OPENPHYSICS_REQUIRE_CROSSCHECK=1`을
@@ -43,7 +43,7 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 ## 기록 형식
 
 비교마다 JSON 기록 하나(스키마 `openphysics.crosscheck/1`)를 JUnit 출력에 찍고, 원하면
-파일로도 씁니다. 도우미는 `packages/galerkin/tests/crosscheck.py`입니다.
+파일로도 씁니다. 도우미는 `tests/galerkin/crosscheck.py`입니다.
 
 | 필드 | 내용 |
 |---|---|

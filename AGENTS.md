@@ -6,7 +6,8 @@ the [package overview](README.md) for setup and architecture, and the
 The [documentation index](docs/README.md) links implementation contracts.
 
 - The six implementation packages live under `packages/` and retain independent
-  distribution metadata and licenses. Keep integrations behind their package API.
+  distribution metadata and licenses; their tests are in `tests/<import name>/`.
+  Keep integrations behind their package API.
 - Run from the repository root: package directory names can shadow installed imports.
 - Validate new physics against independent analytical references and mesh convergence.
   Preserve numerical thresholds and document limitations.

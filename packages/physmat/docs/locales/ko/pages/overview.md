@@ -66,7 +66,7 @@ M. N. Polyanskiy, "Refractiveindex.info database of optical constants",
 ```bash
 # From the repository root
 python -m pip install pytest -e "packages/physmat[rii]"
-python -m pytest -q packages/physmat/tests
+python -m pytest -q tests/physmat
 ```
 
 출판된 값(용융 실리카 n_d = 1.4585, Si n(1.55) = 3.4777, 사파이어/MgF2/CaF2 n_d, 금 ε(800 nm) ≈ −24 + 1.5i), 물리 제약(Im ε ≥ 0, ω_p에서 Drude 영점 교차, ε → ε∞), 손으로 계산한 식 2–9와 대조합니다. 합성 Drude–Lorentz 적합을 1e-3까지 복원하고, 400–1000 nm의 금 적합은 5 % 이내여야 합니다. 로컬 데이터베이스 사본이 있으면 3500개가 넘는 모든 레코드를 읽고 내장 값과 일치하는지도 검사합니다.

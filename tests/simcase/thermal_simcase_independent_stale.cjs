@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const {test}=require('node:test');
-const html=fs.readFileSync(process.env.SIMCASE_INDEPENDENT_HTML || path.join(__dirname,'../simcase/studio/static/index.html'),'utf8');
+const html=fs.readFileSync(process.env.SIMCASE_INDEPENDENT_HTML || path.join(__dirname,'../../packages/simcase/simcase/studio/static/index.html'),'utf8');
 const thermal={openphysics:'0.2',name:'Imported thermal',units:{length:'mm',temperature:'K'},geometry:{domain:{xmin:0,xmax:30,ymin:0,ymax:20}},materials:{},physics:{heat:{type:'thermal.steady2d',conductivity_w_mk:12.5,heat_source_w_m3:100000,dirichlet_temperature_k:{left:280,right:315}}},mesh:{subdivisions:[4,4]},study:{type:'single'},results:{save_fields:true,plots:false}};
 const em={openphysics:'0.2',name:'Old EM',units:{length:'um'},geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'vacuum'},shapes:[]},materials:{},physics:{em1:{type:'em.modes2d',wavelength:1.55,num_modes:1,formulation:'scalar',boundary:{}}},mesh:{size:.2},study:{type:'single'},results:{plots:false}};
 function page(){

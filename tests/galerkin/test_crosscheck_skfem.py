@@ -72,7 +72,7 @@ def test_heat_p1_same_mesh(skfem):
     flux = -k * basis.interpolate(theirs).grad.mean(axis=-1).T  # constant per P1 triangle
     emit(make_record(
         case="heat-p1-slab",
-        analytical_acceptance="galerkin tests/test_thermal_independent_validation.py (docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, uniform source",
+        analytical_acceptance="tests/galerkin/test_thermal_independent_validation.py (packages/galerkin/docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, uniform source",
         api="galerkin.thermal.solve_steady_heat", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementTriP1",
         matched=["same nodes and triangles (rectangle_mesh 2 m x 1 m, 12 x 6)",
@@ -107,7 +107,7 @@ def test_heat_p2_reference_is_reported(skfem):
     scale = np.max(np.abs(exact(mesh.nodes[:, 0])))
     emit(make_record(
         case="heat-p2-reference-slab",
-        analytical_acceptance="galerkin tests/test_thermal_independent_validation.py (docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, sinusoidal source",
+        analytical_acceptance="tests/galerkin/test_thermal_independent_validation.py (packages/galerkin/docs/thermal_independent_validation.md)", stopwatch=clock, physics="2D steady heat conduction, sinusoidal source",
         api="galerkin.thermal.solve_steady_heat", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementTriP2",
         matched=["same nodes and triangles (12 x 6)", "k, source and Dirichlet data"],
@@ -152,7 +152,7 @@ def test_elasticity_p1_same_mesh(skfem, plane):
     displacement = theirs[basis.nodal_dofs].T
     emit(make_record(
         case=f"elasticity-p1-plane-{plane}-cantilever",
-        analytical_acceptance="galerkin tests/test_elasticity2d_independent_validation.py (docs/elasticity2d_independent_validation.md)", stopwatch=clock,
+        analytical_acceptance="tests/galerkin/test_elasticity2d_independent_validation.py (packages/galerkin/docs/elasticity2d_independent_validation.md)", stopwatch=clock,
         physics=f"2D linear elasticity, plane {plane}, clamped left edge, gravity load",
         api="galerkin.elasticity.solve_elasticity", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementVector(ElementTriP1), linear_elasticity",
@@ -179,7 +179,7 @@ def test_elasticity_p2_reference_is_reported(skfem):
     theirs_tip = theirs[basis.nodal_dofs[1, tip]]
     emit(make_record(
         case="elasticity-p2-reference-cantilever",
-        analytical_acceptance="galerkin tests/test_elasticity2d_independent_validation.py (docs/elasticity2d_independent_validation.md)", stopwatch=clock,
+        analytical_acceptance="tests/galerkin/test_elasticity2d_independent_validation.py (packages/galerkin/docs/elasticity2d_independent_validation.md)", stopwatch=clock,
         physics="2D linear elasticity, plane stress, clamped left edge, gravity load",
         api="galerkin.elasticity.solve_elasticity", discretization="P1 Lagrange triangles",
         tool="scikit-fem", tool_discretization="ElementVector(ElementTriP2), linear_elasticity",
@@ -226,7 +226,7 @@ def test_vector_waveguide_modes_same_mesh(skfem):
     reference = np.sort(reference[(reference > 1.44) & (reference < 3.48)])[::-1][:4]
     emit(make_record(
         case="waveguide-vector-rect-core",
-        analytical_acceptance="galerkin tests/test_hadley.py and tests/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
+        analytical_acceptance="tests/galerkin/test_hadley.py and tests/galerkin/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
         physics="2D full-vector dielectric waveguide modes (Si core 1.6 x 1.0 in SiO2, 1.55 um)",
         api="galerkin.waveguide.solve_modes",
         discretization="lowest-order Nedelec (E_t) x P1 (E_z), beta^2 formulation",
@@ -264,7 +264,7 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
     reference = np.sort(values[values > 1e-6 * np.pi**2])[:8]
     emit(make_record(
         case="cavity-pec-box",
-        analytical_acceptance="galerkin tests/test_cavity3d_validation.py (docs/cavity_solver.md)", stopwatch=clock, physics="3D vacuum PEC box resonances (1 x 0.7 x 0.5 m)",
+        analytical_acceptance="tests/galerkin/test_cavity3d_validation.py (packages/galerkin/docs/cavity_solver.md)", stopwatch=clock, physics="3D vacuum PEC box resonances (1 x 0.7 x 0.5 m)",
         api="galerkin.cavity.solve_cavity_box", discretization="lowest-order Nedelec tetrahedra",
         tool="scikit-fem", tool_discretization="ElementTetN0",
         matched=["same nodes and tetrahedra (the returned SI mesh, 4 x 3 x 2 cells)",

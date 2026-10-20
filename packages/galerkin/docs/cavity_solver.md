@@ -156,12 +156,10 @@ No silent count reduction, zero padding or tolerance relaxation is performed.
 From the repository root, with the local test dependencies installed:
 
 ```bash
-python -m pytest -c pyproject.toml -q packages/galerkin/tests/test_cavity_solver.py
+python -m pytest -q tests/galerkin/test_cavity_solver.py
 python -m pytest -q
 ```
 
-The explicit root configuration on the focused command prevents a nested package
-configuration from selecting an editable install in a different checkout.
 Tests compare refsol TE/TM enumeration with independent transverse-amplitude
 counting, complete dense discrete spectra, the 343-dimensional gradient kernel
 in a low-target sparse search, full PEC zeros, SI reassembly and reconstruction,

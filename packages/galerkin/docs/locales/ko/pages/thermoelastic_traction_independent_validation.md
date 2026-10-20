@@ -164,7 +164,7 @@ python -m pip install --no-index --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pytest -c pyproject.toml -q -s \
-  packages/galerkin/tests/test_thermoelastic_traction_independent_validation.py
+  tests/galerkin/test_thermoelastic_traction_independent_validation.py
 python -m pytest -c pyproject.toml -q -ra
 ```
 ```bash
@@ -179,7 +179,7 @@ python -m pip install --no-index --no-deps --force-reinstall \
 # Remove source PYTHONPATH, and avoid source conftests forcing checkout imports.
 python -m pytest -c pyproject.toml --confcutdir="$ACCEPTANCE_TEST_DIR" -q -s \
   "$ACCEPTANCE_TEST_DIR/test_thermoelastic_traction_independent_validation.py"
-python -I packages/galerkin/tests/thermoelastic_traction_independent_consumer.py
+python -I tests/galerkin/thermoelastic_traction_independent_consumer.py
 ```
 
 설치 pytest90은 실제 site-packages와 checkout 밖 복사 oracle/test·confcutdir를 사용합니다.

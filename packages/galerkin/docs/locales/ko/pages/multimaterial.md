@@ -85,7 +85,7 @@ heat_flux_e = -k_e grad(T_h) on triangle e
 
 ## 수용 기준(비교 전에 고정)
 
-`packages/galerkin/tests/test_thermal_multimaterial.py`:
+`tests/galerkin/test_thermal_multimaterial.py`:
 
 | 경우 | 메시 | 기준 |
 | --- | --- | --- |
@@ -115,8 +115,8 @@ heat_flux_e = -k_e grad(T_h) on triangle e
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermal_multimaterial.py \
-  packages/galerkin-refsol/tests/test_thermal_multilayer_reference.py
+  tests/galerkin/test_thermal_multimaterial.py \
+  tests/refsol/test_thermal_multilayer_reference.py
 ```
 
 ## 정적 탄성
@@ -167,8 +167,8 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_elasticity_multimaterial.py \
-  packages/galerkin-refsol/tests/test_elasticity_multilayer_reference.py
+  tests/galerkin/test_elasticity_multimaterial.py \
+  tests/refsol/test_elasticity_multilayer_reference.py
 ```
 
 ## 열탄성과 열→역학 연성
@@ -222,7 +222,7 @@ kappa_i = beta_i/(lambda_i+2 mu_i)(평면 변형률 beta = (3 lambda + 2 mu) alp
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermoelastic_multimaterial.py
+  tests/galerkin/test_thermoelastic_multimaterial.py
 ```
 
 ## 과도 열전도
@@ -296,8 +296,8 @@ dt에 비례하므로 메시를 성기게, dt를 1/4로 줄인 현재 구성의 
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_transient_heat_multimaterial.py \
-  packages/galerkin-refsol/tests/test_transient_heat_multilayer_reference.py
+  tests/galerkin/test_transient_heat_multimaterial.py \
+  tests/refsol/test_transient_heat_multilayer_reference.py
 ```
 
 ## 레퍼런스 도구 비교
@@ -305,7 +305,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 수용 여부는 위의 해석 기준이 정합니다. 그와 별도로 같은 문제를 scikit-fem 12.0.2
 (BSD-3-Clause)로도 풀었습니다. 두 도구의 일치는 코드 대 코드 근거이지 수렴 근거가 아닙니다.
 
-- CI에서 `tests/test_crosscheck_skfem_multimaterial.py`가 세 영역 벽을 같은 메시와 같은
+- CI에서 `tests/galerkin/test_crosscheck_skfem_multimaterial.py`가 세 영역 벽을 같은 메시와 같은
   삼각형별 값으로 두 도구에서 풉니다: 정상 열전도, 두 평면의 탄성과 열탄성, backward Euler
   과도 열전도. 온도·변위·열유속·응력이 1.6e-12 이내로 일치하며 기준은 1e-9입니다
   ([레퍼런스 비교](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/reference-comparisons.md)).

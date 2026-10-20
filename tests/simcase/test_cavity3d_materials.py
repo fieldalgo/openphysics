@@ -37,7 +37,7 @@ def test_example_validates_and_summarizes_materials_and_walls():
     text = doc.summary()
     assert "sigma=5.8e+07 S/m (surface impedance)" in text
     assert "box slab: lossy_dielectric" in text
-    example = Path(__file__).resolve().parents[1] / "examples" / "cavity_lossy_slab.json"
+    example = Path(__file__).resolve().parents[2] / "packages" / "simcase" / "examples" / "cavity_lossy_slab.json"
     with open(example, encoding="utf-8") as handle:
         assert json.load(handle) == examples.CAVITY_LOSSY_SLAB
 

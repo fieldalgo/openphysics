@@ -80,7 +80,7 @@ runtime 거절을 주장하지 않는다. 정확 후보에서 추가 metadata/su
 정확 구현 결합 후 저장소 루트에서:
 
 ```sh
-python -m pytest -q packages/simcase/tests/test_steady_boundary_independent_validation.py
+python -m pytest -q tests/simcase/test_steady_boundary_independent_validation.py
 python -I /external/steady_boundary_independent_consumer.py --expected-installed-root /wheel/venv --expected-module-hashes /external/source-hashes.json
 ```
 

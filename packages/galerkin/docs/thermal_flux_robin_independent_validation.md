@@ -199,7 +199,7 @@ From the repository root with existing dependencies:
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python -m pytest -c pyproject.toml -q -s \
-  packages/galerkin/tests/test_thermal_flux_robin_independent_validation.py
+  tests/galerkin/test_thermal_flux_robin_independent_validation.py
 ```
 
 Installed consumption runs copies of the independent oracle/tests outside the

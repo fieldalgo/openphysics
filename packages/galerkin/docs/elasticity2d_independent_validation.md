@@ -152,10 +152,10 @@ From the repository root, with the existing packages installed:
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python -m pytest -c pyproject.toml -q -s -ra \
-  packages/galerkin/tests/test_elasticity2d_independent_validation.py \
-  packages/galerkin/tests/test_elasticity2d.py \
-  packages/galerkin-refsol/tests/test_elasticity_reference.py \
-  packages/galerkin/tests/test_independence.py
+  tests/galerkin/test_elasticity2d_independent_validation.py \
+  tests/galerkin/test_elasticity2d.py \
+  tests/refsol/test_elasticity_reference.py \
+  tests/galerkin/test_independence.py
 ```
 
 No new dependency or external solver implementation is used. The direct
