@@ -2,26 +2,30 @@
 # SPDX-License-Identifier: Apache-2.0
 """The 2D mesh overlap check finds its candidates within each triangle's own reach.
 
-The thermal mesh check rejects overlapping triangle interiors. With r the
-largest centroid-to-vertex distance of a triangle, two interiors can overlap
-only if |c_i - c_k| < r_i + r_k. The check used to query every centroid with
-r_i + max(r), so one large triangle made every query cover most of the mesh. It
-now queries each centroid with 2*r_i and keeps a pair found from either side.
+The thermal and elasticity mesh checks reject overlapping triangle interiors.
+With r the largest centroid-to-vertex distance of a triangle, two interiors can
+overlap only if |c_i - c_k| < r_i + r_k. The checks used to query every centroid
+with r_i + max(r), so one large triangle made every query cover most of the
+mesh. They now query each centroid with 2*r_i and keep a pair found from either
+side.
 
 Pre-registered criteria:
   G1  after the strict filter the candidate pairs equal a chunked O(M^2) brute
       force, and include every pair the old query kept;
   G2  a crafted overlap with radius ratio 1e3 still raises, and touching
-      triangles still pass the overlap test;
-  G3  on a graded annulus (M = 6400) the centroid query returns at most 50*M
-      indices. The old query returns about 24 million there; it is not run.
+      triangles still pass the overlap test, in both checks;
+  G3  on a graded annulus (M = 6400) the centroid query of each check returns
+      at most 50*M indices. The old query returns about 24 million there; it
+      is not run.
 The old query stays below as a private reference, so nothing is stored.
 """
 import numpy as np
 import pytest
 from scipy.spatial import Delaunay, cKDTree
 
+import galerkin.elasticity as elasticity
 import galerkin.thermal as thermal
+from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.thermal import solve_steady_heat
 
@@ -170,7 +174,13 @@ def _thermal(mesh):
     return solve_steady_heat(mesh, conductivity=1., dirichlet={0: 300.})
 
 
-CHECKS = {"thermal": _thermal}
+def _elasticity(mesh):
+    fixed = {(node, component): 0. for node in (0, 1) for component in (0, 1)}
+    return solve_elasticity(mesh, young_modulus=1e9, poisson_ratio=.3, plane="stress",
+                            dirichlet=fixed, body_force=(0., -1e3))
+
+
+CHECKS = {"thermal": _thermal, "elasticity": _elasticity}
 
 
 @pytest.mark.parametrize("small_first", [True, False])
@@ -223,7 +233,8 @@ def _counting_tree(returned):
     return CountingTree
 
 
-GEOMETRY = {"thermal": (thermal._mesh_geometry, [thermal])}
+GEOMETRY = {"thermal": (thermal._mesh_geometry, [thermal]),
+            "elasticity": (elasticity._mesh_data, [thermal, elasticity])}
 
 
 @pytest.mark.parametrize("check", GEOMETRY)

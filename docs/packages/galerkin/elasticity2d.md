@@ -124,7 +124,9 @@ and run from the repository root:
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python examples/galerkin/elasticity2d.py
-python -m pytest -q -s tests/galerkin/test_elasticity2d.py tests/refsol/test_elasticity_reference.py
+python -m pytest -q -s tests/galerkin/test_elasticity2d.py \
+  tests/galerkin/test_mesh_overlap_candidates.py \
+  tests/refsol/test_elasticity_reference.py
 python -m pytest -q
 ```
 
@@ -188,7 +190,11 @@ callers must not use that constructor to silently truncate fractional indices.
 The solver validates the actual arrays present on the Mesh at call time.
 Numerical topology checks use local geometric tolerances (1e-12) and reject
 triangles whose determinant is <=1e-14 times squared edge scale. Features
-below floating-point geometric resolution are outside the contract.
+below floating-point geometric resolution are outside the contract. The
+overlap test considers two triangles only when their centroids lie within twice
+the larger of their centroid radii (largest centroid-to-vertex distance), which
+every overlapping pair satisfies, so its cost follows the local mesh grading,
+not the largest triangle.
 
 Each disconnected component needs independent removal of x/y translation and
 in-plane rotation. The prescribed-DOF restriction of these three rigid modes
