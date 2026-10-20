@@ -17,7 +17,7 @@ import sys
 def audit(source_root, artifacts):
     source_root = source_root.resolve()
     artifacts = artifacts.resolve()
-    checker_path = source_root / "ci" / "check_distributions.py"
+    checker_path = source_root / "tools" / "check_distributions.py"
     spec = importlib.util.spec_from_file_location("_distribution_asset_checker", checker_path)
     if spec is None or spec.loader is None:
         raise RuntimeError("distribution checker cannot be loaded")
@@ -69,7 +69,7 @@ def audit(source_root, artifacts):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--report", type=Path,
                         help="new JSON report path; existing files are never overwritten")

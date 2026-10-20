@@ -112,8 +112,8 @@ jobs:
         # Preserve a failing source gate while collecting independent package evidence.
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: |
-          python ci/check_distributions.py
-          python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
+          python tools/check_distributions.py
+          python tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: node --test tests/simcase/studio_vector.cjs tests/simcase/studio_thermal.cjs tests/simcase/thermal_simcase_independent_stale.cjs tests/simcase/studio_steady_boundary.cjs tests/simcase/studio_steady_thermal.cjs tests/simcase/studio_transient_thermal.cjs
@@ -165,7 +165,7 @@ jobs:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
           OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
           OPENPHYSICS_CROSSCHECK_DIR: .validation/installed-crosscheck
-        run: python ci/run_installed_tests.py --output .validation/installed
+        run: python tools/run_installed_tests.py --output .validation/installed
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

@@ -82,8 +82,8 @@ node --test tests/simcase/*.cjs                    # Studio JavaScript 검사
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # 전체 소스 시험
 node --test tests/simcase/*.cjs            # Studio JavaScript 검사
-python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
-python ci/run_installed_tests.py           # 설치된 wheel로 tests/의 Python 시험 전체 실행
+python tools/check_distributions.py        # 모든 패키지 빌드·검사·설치
+python tools/run_installed_tests.py        # 설치된 wheel로 tests/의 Python 시험 전체 실행
 python tools/check_licenses.py             # 설치된 라이선스를 검토 목록과 대조
 python tools/check_markdown_links.py       # 모든 Markdown 파일의 상대 링크와 #앵커
 ```
@@ -100,7 +100,7 @@ CI 스크립트의 출력 디렉터리는 새것이거나 비어 있어야 하�
 
 ```bash
 python -m pip install -r tools/requirements-py312-windows-thermal.txt
-python -X utf8 ci/tools/check_platform_install.py
+python -X utf8 tools/check_platform_install.py
 ```
 
 requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이 아닙니다.
@@ -128,7 +128,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈춘 실행을 끊기 위한
 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
 
-**배포 검사** (`ci/check_distributions.py`). 패키지 일곱 개(빈 `openphysics` 이름
+**배포 검사** (`tools/check_distributions.py`). 패키지 일곱 개(빈 `openphysics` 이름
 예약 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
 `twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
 sdist에는 `src/` 아래의 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
@@ -146,16 +146,16 @@ Git이 추적하고 있으면 실패합니다.
 이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
 Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 이 검사는
 `tests/`의 pytest 시험을 돌리지 않으며, 그 시험은 `installed-tests`가 돌립니다. 이 검사는
-공개 API·CLI·저장 파일을 확인하는 wheel 전용 소비자(`ci/test_*_wheel.py`), 고른 galerkin과
-simcase 예제, 독립 수용 소비자를 돌립니다. 이들은 checkout이 추적하는 파일을 checkout 밖
+공개 API·CLI·저장 파일을 확인하는 wheel 전용 소비자(`tools/wheel_consumers/test_*_wheel.py`),
+고른 galerkin과 simcase 예제, 독립 수용 소비자를 돌립니다. 이들은 checkout이 추적하는 파일을 checkout 밖
 임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록) 설치된 wheel을 대상으로
 `python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된 환경은
 `tools/check_licenses.py`를 통과해야 합니다. Studio Node 검사는 설치된 Studio 파일로 돌고,
 Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
-`ci/tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 sdist·wheel의 정확한
+`tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 sdist·wheel의 정확한
 내용을 다시 확인합니다.
 
-**설치 시험** (`ci/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
+**설치 시험** (`tools/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
 sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 일곱 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
 `tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
@@ -175,7 +175,7 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 설치한 공유 라이브러리를 OS마다 파일 하나하나 확인합니다. 정책과 전체 목록은
 [제3자 소프트웨어](third-party.md)에 있습니다.
 
-**설치 플랫폼** (`ci/tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
+**설치 플랫폼** (`tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
 모듈 위치, 포함 자산, 공개 API·CLI·저장 간단 시험, 열 저장/I-O 견고성 시험(부분 실패
 정리, 동시 저장, 기존 대상 보호), source 대상 보호 fixture 두 개를 확인합니다. 설치
 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.

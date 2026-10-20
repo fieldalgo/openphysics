@@ -180,7 +180,7 @@ subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=
 만들며 정해 놓은 통과를 출력하지 않습니다. 요청 history를 모두 보존하므로 n64
 companion에 상당한 메모리가 필요합니다. 실행 시간은 전용 호스트 성능 기준선이 아닙니다.
 
-배포 helper는 실제 sdist→wheel을 만들고, 패키지 코드가 checkout과 byte가 같고 문서·시험·예제가 들어 있지 않은지 확인합니다. 페이지·예제·시험은 배포하지 않습니다. Helper는 설치 출처/source byte를 확인하고, checkout에서 추적되는 독립 consumer 파일·예제를 checkout 밖으로 복사한 뒤, 설치된 wheel을 대상으로 독립 `--suite all` consumer와 전체 영어 수렴 예제를 `python -I`로 실행하도록 구현돼 있습니다. 원 시험은 `ci/run_installed_tests.py`에서 `tests/` 폴더 전체와 함께 설치된 wheel로 실행합니다. 이 gate의 구현은 실제 build/install 성공과 다릅니다. 정확한 현재 CI의 종료값·로그·artifact로 패키징·설치·수치 성공을 확인해야 합니다. Windows의 좁은 저장 gate는 과도 열전도 전체 물리 수용이 아니며, 릴리스 성공도 별도입니다.
+배포 helper는 실제 sdist→wheel을 만들고, 패키지 코드가 checkout과 byte가 같고 문서·시험·예제가 들어 있지 않은지 확인합니다. 페이지·예제·시험은 배포하지 않습니다. Helper는 설치 출처/source byte를 확인하고, checkout에서 추적되는 독립 consumer 파일·예제를 checkout 밖으로 복사한 뒤, 설치된 wheel을 대상으로 독립 `--suite all` consumer와 전체 영어 수렴 예제를 `python -I`로 실행하도록 구현돼 있습니다. 원 시험은 `tools/run_installed_tests.py`에서 `tests/` 폴더 전체와 함께 설치된 wheel로 실행합니다. 이 gate의 구현은 실제 build/install 성공과 다릅니다. 정확한 현재 CI의 종료값·로그·artifact로 패키징·설치·수치 성공을 확인해야 합니다. Windows의 좁은 저장 gate는 과도 열전도 전체 물리 수용이 아니며, 릴리스 성공도 별도입니다.
 
 ## 제한된 공간 잔차 보정
 

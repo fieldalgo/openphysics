@@ -88,8 +88,8 @@ node --test tests/simcase/*.cjs                    # Studio JavaScript checks
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # full source suite
 node --test tests/simcase/*.cjs            # Studio JavaScript checks
-python ci/check_distributions.py           # build, inspect and install all packages
-python ci/run_installed_tests.py           # every Python test in tests/ against installed wheels
+python tools/check_distributions.py        # build, inspect and install all packages
+python tools/run_installed_tests.py        # every Python test in tests/ against installed wheels
 python tools/check_licenses.py             # installed licenses vs. the reviewed inventory
 python tools/check_markdown_links.py       # relative links and #anchors in all Markdown files
 ```
@@ -107,7 +107,7 @@ The installed-package check runs on any OS from a clean Python 3.12 environment:
 
 ```bash
 python -m pip install -r tools/requirements-py312-windows-thermal.txt
-python -X utf8 ci/tools/check_platform_install.py
+python -X utf8 tools/check_platform_install.py
 ```
 
 The requirements file's historical name does not limit it to Windows.
@@ -139,7 +139,7 @@ evidence is kept, but the job stays failed. The job usually takes 16 to 22
 minutes; its 45-minute limit only stops hung runs, since hosted runner speed
 varies.
 
-**Distribution checks** (`ci/check_distributions.py`). Builds all seven packages
+**Distribution checks** (`tools/check_distributions.py`). Builds all seven packages
 (including the empty `openphysics` name reservation), each wheel from its sdist,
 with pinned build tools, and checks metadata with `twine check --strict`.
 Distributions ship package code only. Each sdist holds exactly its import
@@ -162,18 +162,18 @@ Wheels are then installed into a fresh environment outside the checkout. Every
 shipped module (except `__main__`) and Studio static file must load from that
 environment with the checked-out bytes. This check does not run the pytest
 suites in `tests/`; `installed-tests` runs them. It runs the wheel-specific
-consumers (`ci/test_*_wheel.py`), selected galerkin and simcase examples and the
-independent acceptance consumers, which exercise the public API, CLI and saved
-files. They are copied from the checkout's tracked files to a temporary
+consumers (`tools/wheel_consumers/test_*_wheel.py`), selected galerkin and
+simcase examples and the independent acceptance consumers, which exercise the
+public API, CLI and saved files. They are copied from the checkout's tracked files to a temporary
 directory outside it (their hashes are recorded in `consumer-file-hashes.json`)
 and run with `python -I` against the installed wheels, so the checkout cannot
-leak in. The installed environment must pass `tools/check_licenses.py`. The Studio
-Node checks run against the installed Studio files, and the Studio browser check
+leak in. The installed environment must pass `tools/check_licenses.py`. The
+Studio Node checks run against the installed Studio files, and the Studio browser check
 runs a small real model in Chrome. Finally
-`ci/tools/audit_distribution_artifacts.py` re-checks the retained archives'
+`tools/audit_distribution_artifacts.py` re-checks the retained archives'
 checksums and their exact sdist and wheel contents.
 
-**Installed tests** (`ci/run_installed_tests.py`). Builds every package, each
+**Installed tests** (`tools/run_installed_tests.py`). Builds every package, each
 wheel from its sdist, and checks the archives with the same rules as the
 distribution check. All seven wheels are installed, each with every extra its
 metadata declares, into a fresh environment in a temporary directory outside the
@@ -198,7 +198,7 @@ reviewed inventory in `tools/third_party_licenses.json`: declared licenses, and
 every shared library a third-party wheel installs, file by file, on each OS.
 Policy and the full list are in [third-party software](third-party.md).
 
-**Installed platforms** (`ci/tools/check_platform_install.py`). On each OS:
+**Installed platforms** (`tools/check_platform_install.py`). On each OS:
 installed licenses, package bytes, installed module origins, bundled assets, public API/CLI/save
 smoke tests, the heat save/I-O robustness tests (partial-failure cleanup,
 simultaneous writers, existing targets) and two source target-protection
