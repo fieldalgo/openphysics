@@ -6,7 +6,7 @@ checkout explicitly and checks that import location. No new dependency, solver
 optimization, API change or CI timing gate is involved.
 
 ```bash
-python ci/benchmark_cavity.py --output /tmp/cavity-baseline.json
+python benchmarks/benchmark_cavity.py --output /tmp/cavity-baseline.json
 ```
 
 The default is three repetitions of each of eight conditions: cube `(1,1,1)` m
@@ -30,9 +30,9 @@ outside the source checkout.
 For a short check or a deliberately failed solve:
 
 ```bash
-python ci/benchmark_cavity.py --case cube --subdivisions 4 --repeats 1 \
+python benchmarks/benchmark_cavity.py --case cube --subdivisions 4 --repeats 1 \
   --output /tmp/cavity-smoke.json
-python ci/benchmark_cavity.py --case cube --subdivisions 1 --repeats 1 \
+python benchmarks/benchmark_cavity.py --case cube --subdivisions 1 --repeats 1 \
   --output /tmp/cavity-insufficient-dofs.json
 ```
 
@@ -103,7 +103,7 @@ separate based on their external commands, even after updating the tool.
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 BLIS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 OMP_THREAD_LIMIT=1 \
-python -m cProfile -o /tmp/cavity-rectangle16.prof ci/benchmark_cavity.py \
+python -m cProfile -o /tmp/cavity-rectangle16.prof benchmarks/benchmark_cavity.py \
   --worker rectangle --subdivisions 16 > /tmp/cavity-rectangle16-profile.json
 python -m pstats /tmp/cavity-rectangle16.prof
 ```

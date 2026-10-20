@@ -8,8 +8,8 @@
 추가 의존성은 필요하지 않습니다.
 
 ```bash
-python ci/benchmark_vector.py --repeats 3 --output /tmp/vector-baseline.json
-python ci/benchmark_vector.py --case te --case tm --repeats 5 \
+python benchmarks/benchmark_vector.py --repeats 3 --output /tmp/vector-baseline.json
+python benchmarks/benchmark_vector.py --case te --case tm --repeats 5 \
   --output /tmp/vector-slab.json --snapshots /tmp/vector-slab-fields
 ```
 
@@ -42,7 +42,7 @@ profile을 얻으려면 단일 사례 worker를 직접 호출합니다. parent�
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  python -m cProfile -o /tmp/vector-te.prof ci/benchmark_vector.py --worker te
+  python -m cProfile -o /tmp/vector-te.prof benchmarks/benchmark_vector.py --worker te
 python -m pstats /tmp/vector-te.prof
 ```
 
