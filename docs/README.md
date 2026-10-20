@@ -27,6 +27,7 @@ languages; a translation does not establish a new numerical result.
 | Bundled images, fixtures and data | [Asset provenance](assets.md) | [한국어](locales/ko/pages/assets.md) |
 | Third-party software, data and licenses | [Third-party list](third-party.md) | [한국어](locales/ko/pages/third-party.md) |
 | Reference-tool comparisons | [Comparisons](reference-comparisons.md) | [한국어](locales/ko/pages/reference-comparisons.md) |
+| Example gallery (pictures and the script that draws them) | [Gallery](gallery.md) | [한국어](locales/ko/pages/gallery.md) |
 
 ## Current implementation contracts and evidence
 
