@@ -9,7 +9,9 @@ import sys
 
 import pytest
 
-ENGINE = pathlib.Path(__file__).resolve().parent.parent / "galerkin"
+import galerkin
+
+ENGINE = pathlib.Path(galerkin.__file__).resolve().parent
 
 
 def _imported_modules(path):
@@ -21,6 +23,10 @@ def _imported_modules(path):
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             out.add(node.module.split(".")[0])
     return out
+
+
+def test_engine_source_is_scanned():
+    assert len(list(ENGINE.glob("*.py"))) > 1, f"no engine modules found in {ENGINE}"
 
 
 def test_engine_never_imports_refsol():

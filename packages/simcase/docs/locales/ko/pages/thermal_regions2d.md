@@ -125,7 +125,7 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
 
 ## 검증
 
-`packages/simcase/tests/test_thermal_regions.py`, 비교 전에 고정한 기준:
+`tests/simcase/test_thermal_regions.py`, 비교 전에 고정한 기준:
 
 | 검사 | 기준 |
 | --- | --- |
@@ -171,7 +171,7 @@ t0에서 초기장과 일치). 사용하는 모든 재료에 `conductivity_w_mk`
 전체 이력을 메모리에 둡니다(O(단계 수 x (절점 + 삼각형))). 아래 수렴 연구의 최대 메모리는 약
 825 MiB였습니다.
 
-검증(`packages/simcase/tests/test_transient_thermal_regions.py`):
+검증(`tests/simcase/test_transient_thermal_regions.py`):
 
 | 검사 | 기준 |
 | --- | --- |

@@ -22,7 +22,7 @@ from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
 from galerkin.transient_heat import solve_transient_heat
 
 SAME = 1e-9  # identical discretizations: relative difference gate
-ACCEPTANCE = "galerkin tests/test_{}_multimaterial.py (docs/multimaterial.md)"
+ACCEPTANCE = "tests/galerkin/test_{}_multimaterial.py (packages/galerkin/docs/multimaterial.md)"
 NAMES = ["copper", "insulation", "steel"]
 
 

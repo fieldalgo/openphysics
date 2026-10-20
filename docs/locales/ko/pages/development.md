@@ -24,7 +24,7 @@ python -m pip check
 소스 검사와 배포 검사를 다시 실행합니다. 패키지 메타데이터는 Python >=3.10을
 선언하지만 Python 3.10·3.11은 CI에서 시험하지 않습니다.
 
-항상 저장소 루트에서 실행합니다. `packages/` 안에서 Python을 실행하면 같은 이름의
+항상 저장소 루트에서 실행합니다. `packages/`나 `tests/` 안에서 Python을 실행하면 같은 이름의
 디렉터리가 설치된 모듈을 가릴 수 있습니다.
 
 선택 도구와 데이터:
@@ -42,12 +42,40 @@ python -m pip check
 - **Chrome 또는 Chromium**: 설치 Studio 브라우저 검사는 이미 설치된 브라우저를
   사용합니다. 찾지 못하면 검사가 실패하며, 건너뛰지 않습니다.
 
+## 저장소 구성
+
+각 패키지의 코드·예제·문서는 `packages/<name>/`에 있습니다. 시험은 패키지 밖
+`tests/<import 이름>/`에 두므로, 시험이 쓰는 것은 배포물에 들어갈 수 없습니다.
+
+| 패키지 | 시험 |
+|---|---|
+| `packages/galerkin` | `tests/galerkin/` |
+| `packages/galerkin-refsol` | `tests/refsol/` |
+| `packages/meshine` | `tests/meshine/` |
+| `packages/gmshio` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` |
+| `packages/physmat` | `tests/physmat/` |
+| `packages/simcase` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 |
+
+빈 `openphysics` 이름 예약에는 시험이 없습니다. 루트에서 `python -m pytest`를 실행하면
+루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 `ci/tests/`를 모읍니다. `slow`
+표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 이 checkout의 패키지를 import 경로
+맨 앞에 둡니다.
+
+패키지 하나의 시험만 돌리려면 저장소 루트에서:
+
+```bash
+python -m pytest -q tests/galerkin                 # 패키지 하나
+python -m pytest -q tests/galerkin -m "not slow"   # 수렴 연구 제외
+python -m pytest -q tests/gmshio/test_msh.py       # 파일 하나
+node --test tests/simcase/*.cjs                    # Studio JavaScript 검사
+```
+
 ## 검사 실행
 
 ```bash
 export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # 전체 소스 시험
-node --test packages/simcase/tests/*.cjs   # Studio JavaScript 검사
+node --test tests/simcase/*.cjs            # Studio JavaScript 검사
 python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
 python ci/check_licenses.py                # 설치된 라이선스를 검토 목록과 대조
 python ci/check_markdown_links.py          # 모든 Markdown 파일의 상대 링크와 #앵커
@@ -98,12 +126,13 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 sdist에는 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
 `setup.py`, `MANIFEST.in`, 빌드가 만드는 `PKG-INFO`, `setup.cfg`, egg-info)만 있고,
 wheel에는 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
-`.dist-info/licenses/`에 들어갑니다. 시험·문서·예제·도구는 저장소에만 두고 배포하지
-않습니다(모든 `MANIFEST.in`이 이들을 뺍니다). 들어가야 할 내용은 손으로 적은 목록이
-아니라 `packages/<name>/`에서 Git이 추적하는 파일로 정합니다. import 패키지의 추적 파일
-전부와, sdist에서는 위에 적은 최상위 파일 중 Git이 추적하는 것이 모두 있어야 하고 checkout과 바이트가
-같아야 합니다(`LICENSE`, `NOTICE` 포함). 그 밖의 파일이 압축본에 있거나, 검사기가 모르는
-최상위 파일을 Git이 추적하고 있으면 실패합니다.
+`.dist-info/licenses/`에 들어갑니다. 문서·예제·도구는 `packages/<name>/`에만 두고
+배포하지 않습니다(모든 `MANIFEST.in`이 이들을 뺍니다). 시험은 루트 `tests/` 폴더에
+있습니다. 들어가야 할 내용은 손으로 적은 목록이 아니라 `packages/<name>/`에서 Git이
+추적하는 파일로 정합니다. import 패키지의 추적 파일 전부와, sdist에서는 위에 적은 최상위
+파일 중 Git이 추적하는 것이 모두 있어야 하고 checkout과 바이트가 같아야 합니다(`LICENSE`,
+`NOTICE` 포함). 그 밖의 파일이 압축본에 있거나, 검사기가 모르는 `packages/<name>/`의
+최상위 파일이나 폴더(예: `tests/` 폴더)를 Git이 추적하고 있으면 실패합니다.
 
 이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
 Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 공개
@@ -169,7 +198,8 @@ API·CLI·저장 파일을 확인하는 설치 시험, 예제, 독립 수용 소
 시험은 마지막 비트 반올림에 기대지 않게 씁니다. 반올림 오차보다 충분히 큰 명시적
 허용치로 비교하고, 반올림이 닿을 수 있는 경계에서 정확히 비교하지 않습니다.
 정확한 비교는 한 기계에서 같은 코드에 같은 입력이 들어간다는 데서 나올 때만 타당합니다.
-`test_length_canonical.py`(nm, um, m 문서가 메시 생성기에 같은 입력을 줌)가 그 예이며, 근거를 시험에 적습니다.
+`tests/simcase/test_length_canonical.py`(nm, um, m 문서가 메시 생성기에 같은 입력을 줌)가
+그 예이며, 근거를 시험에 적습니다.
 
 ## 배포(PyPI)
 

@@ -256,7 +256,7 @@ def test_p1_and_nedelec_triangles_match_symfem(symfem):
         not_matched=["galerkin evaluates in float64, symfem in exact rationals",
                      "P1 load vector (galerkin uses a one-point centroid rule) and boundary mass not compared"],
         observables=observables,
-        analytical_acceptance="galerkin tests/test_electrostatics.py, tests/test_edge_elements.py",
+        analytical_acceptance="tests/galerkin/test_electrostatics.py, tests/galerkin/test_edge_elements.py",
         stopwatch=clock))
 
 
@@ -329,5 +329,5 @@ def test_p1_and_nedelec_tetrahedra_match_symfem(symfem):
                  "(checked exactly; identity, no sign or scale conversion)"],
         not_matched=["galerkin evaluates in float64, symfem in exact rationals"],
         observables=observables,
-        analytical_acceptance="galerkin tests/test_cavity_modes.py, tests/test_cavity3d_validation.py",
+        analytical_acceptance="tests/galerkin/test_cavity_modes.py, tests/galerkin/test_cavity3d_validation.py",
         stopwatch=clock))

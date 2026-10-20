@@ -83,8 +83,8 @@ factorization 재사용이나 속도 보장을 주장하지 않는다.
 개발 의존성을 설치한 후 저장소 root에서 실행한다.
 
 ```sh
-python -m pytest -q packages/galerkin/tests/test_transient_thermal_mechanical.py
-python -m pytest -q -s packages/galerkin/tests/test_transient_thermal_mechanical_physics.py
+python -m pytest -q tests/galerkin/test_transient_thermal_mechanical.py
+python -m pytest -q -s tests/galerkin/test_transient_thermal_mechanical_physics.py
 python packages/galerkin/examples/transient_thermal_mechanical.py
 python -m pytest -q
 ```

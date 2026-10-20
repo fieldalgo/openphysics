@@ -144,7 +144,7 @@ a에서 b로 향하는 변에 대해 q(s)=(1-s)*p_a+s*p_b, 0<=s<=1이면 다음�
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/elasticity_traction.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s packages/galerkin/tests/test_elasticity_traction.py packages/galerkin-refsol/tests/test_elasticity_traction_reference.py
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s tests/galerkin/test_elasticity_traction.py tests/refsol/test_elasticity_traction_reference.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q
 ```
 

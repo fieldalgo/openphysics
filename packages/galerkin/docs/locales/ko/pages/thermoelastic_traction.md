@@ -37,8 +37,8 @@ Callback 예외는 전파되며 잘못된 값은 `ValueError`입니다. 실패 �
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python packages/galerkin/examples/thermoelastic_traction.py
-python -m pytest -q packages/galerkin/tests/test_thermoelastic_traction.py packages/galerkin-refsol/tests/test_thermoelastic_traction_reference.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -s packages/galerkin/tests/test_thermoelastic_traction_convergence.py
+python -m pytest -q tests/galerkin/test_thermoelastic_traction.py tests/refsol/test_thermoelastic_traction_reference.py
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -s tests/galerkin/test_thermoelastic_traction_convergence.py
 ```
 
 예제는 균일 313.15 K, Tref293.15 K, 1m 정사각형, E70GPa, nu.3,

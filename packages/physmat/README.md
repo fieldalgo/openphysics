@@ -79,7 +79,7 @@ local copy of the database.
 ```bash
 # From the repository root
 python -m pip install pytest -e "packages/physmat[rii]"
-python -m pytest -q packages/physmat/tests
+python -m pytest -q tests/physmat
 ```
 
 Checked against published values (fused-silica n_d = 1.4585, Si n(1.55) =

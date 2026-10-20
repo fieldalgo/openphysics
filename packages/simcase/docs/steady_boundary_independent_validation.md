@@ -87,7 +87,7 @@ reviewed against the published implementation without changing the oracle gates.
 From repository root, after the exact implementation is combined:
 
 ```sh
-python -m pytest -q packages/simcase/tests/test_steady_boundary_independent_validation.py
+python -m pytest -q tests/simcase/test_steady_boundary_independent_validation.py
 python -I /external/steady_boundary_independent_consumer.py --expected-installed-root /wheel/venv --expected-module-hashes /external/source-hashes.json
 ```
 

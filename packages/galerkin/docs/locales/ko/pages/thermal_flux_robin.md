@@ -130,9 +130,9 @@ mode가 아닙니다. 보고된 절대 RHS·ambient 필드에는 내부 이동�
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/thermal_flux_robin.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -s \
- packages/galerkin/tests/test_thermal_boundary.py \
- packages/galerkin/tests/test_thermal_boundary_convergence.py \
- packages/galerkin-refsol/tests/test_thermal_boundary_reference.py
+ tests/galerkin/test_thermal_boundary.py \
+ tests/galerkin/test_thermal_boundary_convergence.py \
+ tests/refsol/test_thermal_boundary_reference.py
 ```
 
 예제는 상수 Q slab을 독립 다항식 `T=a+b*x-Q*x²/(2*k)`와 직접 비교합니다.

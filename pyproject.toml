@@ -8,7 +8,7 @@
 # declared here.
 
 [tool.pytest.ini_options]
-testpaths = ["packages/galerkin/tests", "packages/galerkin-refsol/tests", "packages/meshine/tests",
-             "packages/gmshio/tests", "packages/physmat/tests", "packages/simcase/tests",
-             "ci/tests"]
+# Tests live outside the packages, one folder per import package (tests/<name>/),
+# so nothing a test uses can enter a distribution.
+testpaths = ["tests", "ci/tests"]
 markers = ["slow: convergence studies that take more than a few seconds"]

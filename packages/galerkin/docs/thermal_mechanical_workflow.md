@@ -221,8 +221,8 @@ PYTHONPATH=packages/galerkin \
 python packages/galerkin/examples/thermal_mechanical_workflow.py
 
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-python -m pytest -q packages/galerkin/tests/test_thermal_mechanical_workflow.py \
-  packages/galerkin/tests/test_thermal_mechanical_workflow_physics.py
+python -m pytest -q tests/galerkin/test_thermal_mechanical_workflow.py \
+  tests/galerkin/test_thermal_mechanical_workflow_physics.py
 ```
 
 The example uses linear conduction T=Tref+10+20x, Q=0, k=10 on a1m square.

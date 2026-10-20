@@ -228,7 +228,7 @@ Run from the repository root, using your installed local packages:
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/elasticity_traction.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s packages/galerkin/tests/test_elasticity_traction.py packages/galerkin-refsol/tests/test_elasticity_traction_reference.py
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s tests/galerkin/test_elasticity_traction.py tests/refsol/test_elasticity_traction_reference.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q
 ```
 

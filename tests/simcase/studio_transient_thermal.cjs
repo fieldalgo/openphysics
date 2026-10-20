@@ -3,7 +3,7 @@
 // Synthetic indexing fixtures; not PDE or browser acceptance.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const X=require('../simcase/studio/static/transient_thermal.js');
+const X=require('../../packages/simcase/simcase/studio/static/transient_thermal.js');
 const copy=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function cap(){return {capability_format:'studio-capabilities-v1',[X.TYPE]:{supported:true,run_enabled:true,
@@ -151,7 +151,7 @@ test('same revision old validation error/finally and reversed capability replies
 });
 
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const staticRoot=path.join(__dirname,'../simcase/studio/static');
+const staticRoot=path.join(__dirname,'../../packages/simcase/simcase/studio/static');
 const html=fs.readFileSync(path.join(staticRoot,'index.html'),'utf8');
 function page(){
   const elements=new Map(),requests=[];let activeTab='geometry';

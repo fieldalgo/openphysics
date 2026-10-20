@@ -135,12 +135,11 @@ kernel 판정 scale은 정규화 좌표에서 해석 box 기본 k²의 `1e-8`배
 로컬 시험 의존성을 설치한 저장소 루트에서 실행합니다.
 
 ```bash
-python -m pytest -c pyproject.toml -q packages/galerkin/tests/test_cavity_solver.py
+python -m pytest -q tests/galerkin/test_cavity_solver.py
 python -m pytest -q
 ```
 
-집중 명령의 명시적 루트 설정은 하위 패키지 설정이 다른 checkout의 editable install을
-고르지 못하게 합니다. 시험은 refsol TE/TM 열거를 독립 transverse-amplitude 개수,
+시험은 refsol TE/TM 열거를 독립 transverse-amplitude 개수,
 완전 dense 이산 spectrum, 낮은 목표 sparse 검색의 343차원 gradient kernel,
 전체 PEC 0, SI 재조립/복원, 물리 상사·축퇴 부분공간, 수치 오류주입과 비교합니다.
 

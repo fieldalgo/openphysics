@@ -23,10 +23,11 @@ from functools import lru_cache
 import numpy as np
 import pytest
 
+import meshine
 from meshine import Domain, box_sides, generate, geometry, rectangle
 from meshine import refine
 
-PACKAGE = pathlib.Path(__file__).resolve().parent.parent / "meshine"
+PACKAGE = pathlib.Path(meshine.__file__).resolve().parent
 
 #: One device, five ways of writing it; the number is document units per micrometre.
 #: Micrometres is the reference, and is also the scale at which absolute tolerances
@@ -161,6 +162,7 @@ def test_no_module_hides_a_length_inside_max_of_one():
     count, as it is for a vertex degree.
     """
     offenders = []
+    assert len(list(PACKAGE.glob("*.py"))) > 1, f"no package modules found in {PACKAGE}"
     for path in sorted(PACKAGE.glob("*.py")):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)

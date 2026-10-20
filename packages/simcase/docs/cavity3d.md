@@ -238,7 +238,7 @@ with the vacuum edge mass `M0`, and the largest-magnitude coefficient of each mo
 is real and positive. The amplitude is arbitrary and is **not V/m**. Arrays load with
 `numpy.load(path, allow_pickle=False)`.
 
-Tests in `packages/simcase/tests/test_cavity3d_materials.py` check:
+Tests in `tests/simcase/test_cavity3d_materials.py` check:
 
 - validation of every new field;
 - that a document run equals the direct engine call;
@@ -257,7 +257,7 @@ Studio does not list or run these studies. Plotting stays unavailable.
 With the cavity-enabled galerkin implementation, run from the repository root:
 
 ```bash
-python -m pytest -q packages/simcase/tests/test_cavity3d_integration.py
+python -m pytest -q tests/simcase/test_cavity3d_integration.py
 ```
 
 The seven integration cases passed for simcase revision `ba1c8a7` combined with

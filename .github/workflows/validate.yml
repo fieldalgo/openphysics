@@ -64,42 +64,42 @@ jobs:
       - name: Check steady boundary contract before transient and full acceptance
         run: |
           python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
-            packages/simcase/tests/test_thermal.py \
-            packages/simcase/tests/test_thermal_simcase_independent_validation.py \
-            packages/simcase/tests/test_steady_boundary_contract.py \
-            packages/simcase/tests/test_steady_boundary_independent_validation.py \
-            packages/simcase/tests/test_steady_boundary_schema.py \
-            packages/simcase/tests/test_steady_boundary_runtime.py \
-            packages/simcase/tests/test_steady_boundary_platform.py \
-            packages/simcase/tests/test_studio_steady_boundary.py
+            tests/simcase/test_thermal.py \
+            tests/simcase/test_thermal_simcase_independent_validation.py \
+            tests/simcase/test_steady_boundary_contract.py \
+            tests/simcase/test_steady_boundary_independent_validation.py \
+            tests/simcase/test_steady_boundary_schema.py \
+            tests/simcase/test_steady_boundary_runtime.py \
+            tests/simcase/test_steady_boundary_platform.py \
+            tests/simcase/test_studio_steady_boundary.py
       - name: Check transient document acceptance before the full suite
         run: |
           python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
           python -m pytest -q -ra --showlocals --junitxml=.validation/transient-preflight.xml \
-            packages/galerkin/tests/test_transient_heat_tiny_domain.py \
-            packages/galerkin/tests/test_transient_heat_general_state.py \
-            packages/simcase/tests/test_transient_headless_independent_validation.py \
-            packages/simcase/tests/test_transient_thermal_runtime.py \
-            packages/simcase/tests/test_transient_thermal_contract.py \
-            packages/simcase/tests/test_transient_headless_windows.py \
-            packages/simcase/tests/test_studio_transient.py
+            tests/galerkin/test_transient_heat_tiny_domain.py \
+            tests/galerkin/test_transient_heat_general_state.py \
+            tests/simcase/test_transient_headless_independent_validation.py \
+            tests/simcase/test_transient_thermal_runtime.py \
+            tests/simcase/test_transient_thermal_contract.py \
+            tests/simcase/test_transient_headless_windows.py \
+            tests/simcase/test_studio_transient.py
       - name: Check steady thermal Studio before the full suite
         run: |
           python -m pytest -q -ra --junitxml=.validation/studio-thermal-preflight.xml \
-            packages/simcase/tests/test_studio_steady_thermal_http.py \
-            packages/simcase/tests/test_studio_thermal_acceptance.py \
-            packages/simcase/tests/test_studio_thermal_lifecycle.py
+            tests/simcase/test_studio_steady_thermal_http.py \
+            tests/simcase/test_studio_thermal_acceptance.py \
+            tests/simcase/test_studio_thermal_lifecycle.py
       - name: Check transient thermomechanical contract and separated convergence
         run: |
           python -m pytest -q --capture=tee-sys -o junit_logging=all --junitxml=.validation/transient-thermomechanical.xml \
-            packages/galerkin/tests/test_transient_thermal_mechanical.py \
-            packages/galerkin/tests/test_transient_thermal_mechanical_physics.py
+            tests/galerkin/test_transient_thermal_mechanical.py \
+            tests/galerkin/test_transient_thermal_mechanical_physics.py
       - name: Check transient thermal Studio before the full suite
         run: |
           python -m pytest -q -ra -o junit_logging=all -o junit_log_passing_tests=true --junitxml=.validation/studio-transient-preflight.xml \
-            packages/simcase/tests/test_studio_transient_server_http.py \
-            packages/simcase/tests/test_studio_transient_thermal_acceptance.py \
-            packages/simcase/tests/test_studio_transient_lifecycle.py
+            tests/simcase/test_studio_transient_server_http.py \
+            tests/simcase/test_studio_transient_thermal_acceptance.py \
+            tests/simcase/test_studio_transient_lifecycle.py
       - name: Run all Python tests including RII and convergence studies
         id: source_tests
         env:
@@ -116,7 +116,7 @@ jobs:
           python ci/tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check Studio vector rendering
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: node --test packages/simcase/tests/studio_vector.cjs packages/simcase/tests/studio_thermal.cjs packages/simcase/tests/thermal_simcase_independent_stale.cjs packages/simcase/tests/studio_steady_boundary.cjs packages/simcase/tests/studio_steady_thermal.cjs packages/simcase/tests/studio_transient_thermal.cjs
+        run: node --test tests/simcase/studio_vector.cjs tests/simcase/studio_thermal.cjs tests/simcase/thermal_simcase_independent_stale.cjs tests/simcase/studio_steady_boundary.cjs tests/simcase/studio_steady_thermal.cjs tests/simcase/studio_transient_thermal.cjs
       - name: Observe exact steady thermal Studio resources once
         if: ${{ success() }}
         run: python ci/tools/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
@@ -165,14 +165,14 @@ jobs:
       - name: Numerically sensitive tracking, eigenspace and fiber reference tests
         run: |
           python -m pytest -q -ra -m "not slow" \
-            packages/simcase/tests/test_tracking.py \
-            packages/simcase/tests/test_subspace_tracking.py \
-            packages/simcase/tests/test_subspace_sweep.py \
-            packages/simcase/tests/test_vector_sweep.py \
-            packages/simcase/tests/test_length_canonical.py \
-            packages/galerkin/tests/test_eigenspace_reliability.py \
-            packages/galerkin-refsol/tests/test_fiber_group_index.py \
-            packages/galerkin-refsol/tests/test_fiber_fields.py
+            tests/simcase/test_tracking.py \
+            tests/simcase/test_subspace_tracking.py \
+            tests/simcase/test_subspace_sweep.py \
+            tests/simcase/test_vector_sweep.py \
+            tests/simcase/test_length_canonical.py \
+            tests/galerkin/test_eigenspace_reliability.py \
+            tests/refsol/test_fiber_group_index.py \
+            tests/refsol/test_fiber_fields.py
 
   installed-platforms:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}

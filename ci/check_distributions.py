@@ -32,9 +32,11 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
 # A distribution ships its import package and the files below, and nothing else.
-# These top-level folders of packages/<name>/ are never shipped; tests, docs and
-# examples run from the checkout. Nothing here is a list of individual files.
-UNSHIPPED_DIRS = ("tests", "docs", "examples", "tools")
+# These top-level folders of packages/<name>/ are never shipped; docs and examples
+# are used from the checkout. Tests live in the repository's tests/<name>/, so a
+# tests/ folder inside a package is rejected as unclassified. Nothing here is a
+# list of individual files.
+UNSHIPPED_DIRS = ("docs", "examples", "tools")
 SDIST_FILES = ("LICENSE", "NOTICE", "README.md", "pyproject.toml", "setup.py", "MANIFEST.in")
 GENERATED_SDIST_FILES = ("PKG-INFO", "setup.cfg")
 UNSHIPPED_FILES = (".gitignore",)
@@ -83,6 +85,8 @@ def shipped_code(name):
                                    "ship it as package code or keep it in an unshipped folder")
         elif top in UNSHIPPED_DIRS:
             continue
+        elif top == "tests":
+            raise RuntimeError(f"packages/{name}/tests/: tests belong in the repository's tests/ folder")
         elif f"{top}/__init__.py" in files:
             code.add(relative)
         else:
@@ -283,7 +287,7 @@ def main():
         tests = work / "tests"
         examples = work / "examples"
         for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
-            copy(packages / package / "tests" / filename, tests / filename)
+            copy(ROOT / "tests" / package / filename, tests / filename)
         for filename in ("test_transient_thermomechanical_wheel.py", "test_cavity_wheel.py",
                          "test_multiphysics_wheel.py", "test_thermal_traction_wheel.py",
                          "test_thermoelasticity_wheel.py", "test_thermal_simcase_wheel.py"):
@@ -319,11 +323,11 @@ def main():
                           "test_thermoelastic_traction_independent_validation.py",
                           "thermoelastic_traction_independent_oracle.py",
                           "thermoelastic_traction_independent_consumer.py")),
-            ("galerkin-refsol", ("test_transient_heat_reference.py",
-                                 "test_thermoelastic_traction_reference.py")),
+            ("refsol", ("test_transient_heat_reference.py",
+                        "test_thermoelastic_traction_reference.py")),
         ):
             for filename in filenames:
-                copy(packages / package / "tests" / filename, tests / filename)
+                copy(ROOT / "tests" / package / filename, tests / filename)
         for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
                          "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
                          "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
@@ -337,19 +341,21 @@ def main():
         for filename in ("transient_heat_independent_oracle.py",
                          "transient_heat_independent_cases.py",
                          "transient_heat_independent_consumer.py"):
-            copy(packages / "galerkin" / "tests" / filename, acceptance / filename)
+            copy(ROOT / "tests" / "galerkin" / filename, acceptance / filename)
         headless_acceptance = work / "transient-headless-acceptance"
         for filename in ("transient_headless_independent_oracle.py",
                          "transient_headless_independent_cases.py",
                          "transient_headless_independent_consumer.py"):
-            copy(packages / "simcase" / "tests" / filename, headless_acceptance / filename)
+            copy(ROOT / "tests" / "simcase" / filename, headless_acceptance / filename)
         steady_acceptance = work / "steady-boundary-acceptance"
         for filename in ("steady_boundary_independent_oracle.py",
                          "steady_boundary_independent_cases.py",
                          "steady_boundary_independent_consumer.py"):
-            copy(packages / "simcase" / "tests" / filename, steady_acceptance / filename)
+            copy(ROOT / "tests" / "simcase" / filename, steady_acceptance / filename)
+        # The Node tests read the Studio files at ../../packages/simcase/simcase/studio/static;
+        # mirror that layout with the installed bytes.
         node_root = work / "studio-installed-node"
-        node_tests = [str(copy(packages / "simcase" / "tests" / filename, node_root / "tests" / filename))
+        node_tests = [str(copy(ROOT / "tests" / "simcase" / filename, node_root / "tests" / "simcase" / filename))
                       for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs")]
         # The copies are working-tree bytes; say whether they match the commit.
         sources = sorted({entry["source"] for entry in copied.values()})
@@ -397,7 +403,7 @@ def main():
             "-o", work / "steady-boundary-example", cwd=work, env=env)
         # Run the original Node script against verified installed static bytes.
         # Node VM cases remain distinct from the real browser/public-API check.
-        static = node_root / "simcase" / "studio" / "static"
+        static = node_root / "packages" / "simcase" / "simcase" / "studio" / "static"
         static.mkdir(parents=True)
         copy_resources = work / "copy_installed_studio_resources.py"
         copy_resources.write_text(

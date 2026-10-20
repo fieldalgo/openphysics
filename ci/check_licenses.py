@@ -187,9 +187,9 @@ def reachability(dists, first_party, test_extras=frozenset({"test"})):
 
 
 def first_party_imports(modules):
-    """Return first-party source files that import any of the given top-level modules."""
+    """Return first-party source and test files that import any of the given top-level modules."""
     offenders = []
-    for path in sorted((ROOT / "packages").rglob("*.py")):
+    for path in sorted([*(ROOT / "packages").rglob("*.py"), *(ROOT / "tests").rglob("*.py")]):
         if any(part in {"build", ".eggs"} or part.endswith(".egg-info") for part in path.parts):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

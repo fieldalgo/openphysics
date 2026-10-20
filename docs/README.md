@@ -4,9 +4,9 @@
 
 New users should start with the [overview](overview.md): what OpenPhysics
 solves, installation, a first example and current limits. Contributors should
-read the [development guide](development.md) (environment, checks, CI and the
-required `tests` check) and the [contributing guide](contributing.md) (branches,
-review and releases).
+read the [development guide](development.md) (environment, repository layout,
+checks, CI and the required `tests` check) and the
+[contributing guide](contributing.md) (branches, review and releases).
 
 English is the repository default. READMEs and contribution/security entry
 points are English. Bilingual documentation lives under `docs/` directories:

@@ -176,8 +176,8 @@ env = os.environ.copy()
 for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
              "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS"):
     env[name] = "1"
-subprocess.run([sys.executable, "-m", "pytest", "-q", "packages/galerkin/tests/test_transient_heat.py",
-                "packages/galerkin-refsol/tests/test_transient_heat_reference.py"], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "-m", "pytest", "-q", "tests/galerkin/test_transient_heat.py",
+                "tests/refsol/test_transient_heat_reference.py"], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "packages/galerkin/examples/transient_heat_convergence.py"], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=True)
 ```

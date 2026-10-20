@@ -95,8 +95,8 @@ mechanics call assembles and factors independently; no reuse/speed claim is made
 From the repository root with the normal development dependencies installed:
 
 ```sh
-python -m pytest -q packages/galerkin/tests/test_transient_thermal_mechanical.py
-python -m pytest -q -s packages/galerkin/tests/test_transient_thermal_mechanical_physics.py
+python -m pytest -q tests/galerkin/test_transient_thermal_mechanical.py
+python -m pytest -q -s tests/galerkin/test_transient_thermal_mechanical_physics.py
 python packages/galerkin/examples/transient_thermal_mechanical.py
 python -m pytest -q
 ```

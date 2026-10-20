@@ -209,7 +209,7 @@ python -m pip install --no-index --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
   -e packages/gmshio -e packages/physmat -e packages/simcase
 python -m pytest -c pyproject.toml -q -s \
-  packages/galerkin/tests/test_thermal_mechanical_independent_validation.py
+  tests/galerkin/test_thermal_mechanical_independent_validation.py
 python -m pytest -c pyproject.toml -q -ra
 ```
 ```bash

@@ -225,7 +225,7 @@ Cavity 출력에는 `neff`나 삼각형·절점 스칼라 배열이 없습니다
 크기가 가장 큰 계수는 양의 실수입니다. 진폭은 임의이며 **V/m가 아닙니다**. 배열은
 `numpy.load(path, allow_pickle=False)`로 읽습니다.
 
-`packages/simcase/tests/test_cavity3d_materials.py`의 시험이 확인하는 것:
+`tests/simcase/test_cavity3d_materials.py`의 시험이 확인하는 것:
 
 - 새 필드 각각의 검증;
 - 문서 실행이 엔진 직접 호출과 같음;
@@ -244,7 +244,7 @@ Studio는 이 study를 나열하거나 실행하지 않습니다. 그림 출력�
 Cavity를 지원하는 galerkin 구현이 있는 저장소 루트에서 실행합니다.
 
 ```bash
-python -m pytest -q packages/simcase/tests/test_cavity3d_integration.py
+python -m pytest -q tests/simcase/test_cavity3d_integration.py
 ```
 
 통합 사례 7개는 simcase revision `ba1c8a7`과 galerkin revision `a660233` 조합에서

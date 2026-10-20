@@ -136,9 +136,9 @@ From the repository root, with existing dependencies and packages installed:
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/thermal_flux_robin.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -s \
- packages/galerkin/tests/test_thermal_boundary.py \
- packages/galerkin/tests/test_thermal_boundary_convergence.py \
- packages/galerkin-refsol/tests/test_thermal_boundary_reference.py
+ tests/galerkin/test_thermal_boundary.py \
+ tests/galerkin/test_thermal_boundary_convergence.py \
+ tests/refsol/test_thermal_boundary_reference.py
 ```
 
 The example compares a constant-Q slab directly to an independent polynomial:

@@ -69,7 +69,7 @@ theta=T-T0는 수학적 상수 nullspace 등가성을 검사할 때 절대 Kelvi
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   python -m pytest -c pyproject.toml -q -s \
-  packages/galerkin/tests/test_thermal_independent_validation.py
+  tests/galerkin/test_thermal_independent_validation.py
 ```
 
 설치 소비 검증에서는 별도 staging 복사본에서 sdist를 만들고 wheel로 빌드한 뒤 기존 NumPy/SciPy를 사용하는 전용 venv에 의존성 설치 없이 설치합니다. 두 독립 test/oracle 파일만 외부 시험 디렉터리로 복사합니다. 그곳에서 `--confcutdir=.`로 pytest를 실행하고 import가 source checkout이나 루트 conftest가 아니라 해당 venv의 site-packages로 해석되는지 확인합니다. 검증한 wheel의 Python 모듈 16개 모두 후보 source와 byte 비교했습니다. 이는 핵심 installed 소비자 검증이며 모든 배포물·플랫폼을 검증한 것은 아닙니다. 이 독립 작업은 공용 MANIFEST나 릴리스 설정을 바꾸지 않았습니다. (문서는 배포물에 포함되지 않습니다.)

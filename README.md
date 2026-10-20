@@ -152,7 +152,7 @@ commit's results are in its required `tests` check on GitHub Actions. The
 |---|---|
 | [Documentation index](docs/README.md) | Every feature contract and validation report, English and Korean |
 | [Architecture](docs/architecture.md) | Package map and entry points |
-| [Development guide](docs/development.md) | Environment, checks, CI and results |
+| [Development guide](docs/development.md) | Environment, repository layout, checks, CI and results |
 | [Asset provenance](docs/assets.md) | Sources of bundled figures, fixtures and data |
 
 Usage and validation guides under `docs/` have complete Korean counterparts;

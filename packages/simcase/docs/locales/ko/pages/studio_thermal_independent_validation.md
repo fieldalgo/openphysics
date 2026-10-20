@@ -111,13 +111,13 @@ nonfinite JSON, unknown key, 잘못된 counter 등 malformed envelope를 거절�
 설정된 검증 환경에서 저장소 루트 기준:
 
 ```sh
-python -m pytest -q packages/simcase/tests/test_studio_thermal_acceptance.py
+python -m pytest -q tests/simcase/test_studio_thermal_acceptance.py
 ```
 
 별도 shipped-script/page-handler Node 검사는 다음과 같다.
 
 ```sh
-node --test packages/simcase/tests/studio_steady_thermal.cjs
+node --test tests/simcase/studio_steady_thermal.cjs
 ```
 
 HTTP 시험은 실제 비동기 job을 시간제한 polling한다.

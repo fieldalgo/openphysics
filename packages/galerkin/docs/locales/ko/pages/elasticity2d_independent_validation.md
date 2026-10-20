@@ -134,10 +134,10 @@ strain은 47.53282,47.78104,47.84421 대 약 47.86541 J/m입니다.
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python -m pytest -c pyproject.toml -q -s -ra \
-  packages/galerkin/tests/test_elasticity2d_independent_validation.py \
-  packages/galerkin/tests/test_elasticity2d.py \
-  packages/galerkin-refsol/tests/test_elasticity_reference.py \
-  packages/galerkin/tests/test_independence.py
+  tests/galerkin/test_elasticity2d_independent_validation.py \
+  tests/galerkin/test_elasticity2d.py \
+  tests/refsol/test_elasticity_reference.py \
+  tests/galerkin/test_independence.py
 ```
 
 신규 의존성이나 외부 솔버 구현을 사용하지 않습니다. 다항식/연속체 항등식은 여기서

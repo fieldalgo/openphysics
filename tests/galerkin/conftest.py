@@ -6,7 +6,7 @@
 Every test here grades galerkin against `refsol`, a separate package holding the
 closed-form and published reference solutions. The packages share a repository,
 but the reference implementation never imports the engine it grades. The engine
-also never imports the answer key; tests/test_independence.py checks that boundary.
+also never imports the answer key; tests/galerkin/test_independence.py checks that boundary.
 """
 
 import pathlib
@@ -17,7 +17,7 @@ import pytest
 
 # The examples carry their own analytical solutions, written independently of
 # refsol. Tests below check the two against each other so they cannot drift.
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "examples"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "packages" / "galerkin" / "examples"))
 
 
 def rate(errors, refinement=2.0):

@@ -13,7 +13,7 @@ A synthetic wire or malformed producer actor is not a successful physical solve.
 From the repository root in the configured test environment:
 
 ```sh
-python -m pytest -q -s packages/simcase/tests/test_studio_transient_thermal_acceptance.py
+python -m pytest -q -s tests/simcase/test_studio_transient_thermal_acceptance.py
 ```
 
 The successful-case JSON labelled studio_transient_independent_exact records exact

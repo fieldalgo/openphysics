@@ -138,8 +138,8 @@ Run from the repository root with the existing package environment installed:
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python packages/galerkin/examples/thermal_steady2d.py
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
-  packages/galerkin/tests/test_thermal_steady2d.py \
-  packages/galerkin-refsol/tests/test_thermal_reference.py
+  tests/galerkin/test_thermal_steady2d.py \
+  tests/refsol/test_thermal_reference.py
 ```
 
 The example uses a 2 m by 0.7 m slab, k=12 W/(m K), left 350 K and right

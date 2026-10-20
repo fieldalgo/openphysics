@@ -146,7 +146,7 @@ rates are W/m of depth.
 
 ## Validation
 
-`packages/simcase/tests/test_thermal_regions.py`, gates fixed before the
+`tests/simcase/test_thermal_regions.py`, gates fixed before the
 comparison:
 
 | Check | Gate |
@@ -196,7 +196,7 @@ plus static `triangle_regions`. The summary adds `region_names`, `regions`,
 region's capacity. Full histories are kept in memory (O(steps x (nodes +
 triangles))); the convergence study below peaked at about 825 MiB.
 
-Validation (`packages/simcase/tests/test_transient_thermal_regions.py`):
+Validation (`tests/simcase/test_transient_thermal_regions.py`):
 
 | Check | Gate |
 | --- | --- |

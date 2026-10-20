@@ -148,9 +148,9 @@ From the repository root, with existing dependencies:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-  python -m pytest packages/simcase/tests/test_thermal_simcase_independent_validation.py \
+  python -m pytest tests/simcase/test_thermal_simcase_independent_validation.py \
   --basetemp=/absolute/own/records/unused-pytest-directory -q -s
-node --test packages/simcase/tests/thermal_simcase_independent_stale.cjs
+node --test tests/simcase/thermal_simcase_independent_stale.cjs
 ```
 
 The Python oracle/test files are copied outside the checkout for installed

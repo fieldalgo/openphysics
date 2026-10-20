@@ -60,9 +60,9 @@ sdist7개에서 wheel7개를 생성했습니다. 기존 sdist asset gate7개와 
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-  python -m pytest packages/simcase/tests/test_thermal_simcase_independent_validation.py \
+  python -m pytest tests/simcase/test_thermal_simcase_independent_validation.py \
   --basetemp=/absolute/own/records/unused-pytest-directory -q -s
-node --test packages/simcase/tests/thermal_simcase_independent_stale.cjs
+node --test tests/simcase/thermal_simcase_independent_stale.cjs
 ```
 
 Python oracle·test 파일은 설치 검증을 위해 checkout 밖으로 복사합니다. 실제 wheel venv의 `python -I -m pytest`로 복사된 시험을 실행하며 confcutdir도 source 밖에 두고 담당자의 새 basetemp를 사용합니다. simcase,simcase.thermal,galerkin,galerkin.thermal,meshine,physmat의 module.__file__이 설치 venv 안에 있는지 검증하고 sys.executable을 기록합니다. CLI 시험은 실제 `sys.executable -I -m simcase` subprocess를 실행합니다. 기존 optional 시험 의존성을 명시적으로 재사용할 수 있지만 source-tree PYTHONPATH fallback이나 새 의존성은 필요하지 않습니다. 먼저 sdist->wheel로 빌드합니다.

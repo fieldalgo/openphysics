@@ -10,14 +10,14 @@ identified material keeps the terms in [NOTICE](../NOTICE) and package
 notices. Historical pictures are illustrations, not results from a new
 validation run.
 
-| Asset under `packages/` | Provenance and reproduction input |
+| Asset | Provenance and reproduction input |
 |---|---|
-| `gmshio/examples/hadley_rib_mesh.png` | `gmshio/examples/hadley_rib_mesh.py`, a plot of the example mesh |
-| `meshine/examples/compare_with_gmsh.png` | `meshine/examples/compare_with_gmsh.py`, example mesh comparison |
-| `physmat/examples/materials.png` | `physmat/examples/plot_materials.py`, plotted material functions; optical data retains the terms in `physmat/NOTICE` |
-| `simcase/docs/geometry.png`, `mesh.png`, `results.png` | Screenshots of the project's own earlier Studio and SOI-strip example, introduced with the UI in commit `f44d7f8373f09ba9a7dbcd04066a0087485a3fd2` and retained through the package rename |
-| `simcase/examples/soi_strip_results.png` | SOI-strip example plot introduced with the document runner and input in commit `07d4a89`; the plot path is now `simcase/simcase/runner.py` |
-| `gmshio/tests/data/unit_square.geo`, `unit_square.msh` | Unit-square geometry and its mesh fixture, introduced together with the reader and assertions in commit `b2fe26a`; the `.geo` supplies the points, edges and physical tags |
+| `packages/gmshio/examples/hadley_rib_mesh.png` | `packages/gmshio/examples/hadley_rib_mesh.py`, a plot of the example mesh |
+| `packages/meshine/examples/compare_with_gmsh.png` | `packages/meshine/examples/compare_with_gmsh.py`, example mesh comparison |
+| `packages/physmat/examples/materials.png` | `packages/physmat/examples/plot_materials.py`, plotted material functions; optical data retains the terms in `packages/physmat/NOTICE` |
+| `packages/simcase/docs/geometry.png`, `mesh.png`, `results.png` | Screenshots of the project's own earlier Studio and SOI-strip example, introduced with the UI in commit `f44d7f8373f09ba9a7dbcd04066a0087485a3fd2` and retained through the package rename |
+| `packages/simcase/examples/soi_strip_results.png` | SOI-strip example plot introduced with the document runner and input in commit `07d4a89`; the plot path is now `packages/simcase/simcase/runner.py` |
+| `tests/gmshio/data/unit_square.geo`, `unit_square.msh` | Unit-square geometry and its mesh fixture, introduced together with the reader and assertions in commit `b2fe26a`; the `.geo` supplies the points, edges and physical tags |
 
 The four simcase pictures were visually checked against the repository's own
 UI/example content during publication review. They retain historical naming

@@ -74,7 +74,7 @@ Ready-made geometries in `gmshio.geo`:
 ```bash
 # From the repository root
 python -m pip install pytest -e packages/gmshio
-python -m pytest -q packages/gmshio/tests
+python -m pytest -q tests/gmshio
 ```
 
 The tests check what a solver relies on rather than the reader against

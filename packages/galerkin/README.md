@@ -85,9 +85,11 @@ galerkin/
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
-tests/            # analytical, convergence and independent-validation tests
 examples/         # runnable examples and figure scripts
 ```
+
+The analytical, convergence and independent-validation tests are in
+`tests/galerkin/` at the repository root, outside the package.
 
 `galerkin.from_mesher` adapts any object exposing `nodes`, `triangles` or
 `tetrahedra`, `regions`, `region_names` and boundary edges or faces, and
@@ -100,7 +102,7 @@ is a dependency of the engine.
 The engine is graded against [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin-refsol/README.md),
 a separate package holding the closed-form and published reference solutions. It
 shares this repository but stays an independent implementation: the reference
-package does not import the solver it grades. `tests/test_independence.py` enforces
+package does not import the solver it grades. `tests/galerkin/test_independence.py` enforces
 that the engine never imports it, and that the engine's only dependencies stay
 numpy and scipy.
 
@@ -108,8 +110,8 @@ numpy and scipy.
 # From the repository root
 python -m pip install -e packages/galerkin   # engine only: numpy and scipy
 # Install the full local test stack using ../../README.md, then:
-python -m pytest -q packages/galerkin/tests
-python -m pytest -q packages/galerkin/tests -m "not slow"
+python -m pytest -q tests/galerkin
+python -m pytest -q tests/galerkin -m "not slow"
 ```
 
 Run all commands from the repository root. An editable install puts `galerkin`
