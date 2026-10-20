@@ -39,8 +39,12 @@ optional skips; a passing subset does not replace the required CI check.
   portable. A passing subset or a documentation change does not establish new
   platform support, and a pass on one OS or a universal wheel says nothing about
   another OS.
-- **Scope.** Keep changes focused. Do not commit credentials, generated build
-  directories, local environment files or private research material.
+- **Scope.** One topic per PR. Changes on the same topic go in one PR, each as its
+  own self-contained commit; unrelated changes go in separate PRs. The test is
+  whether a later reader -- a person or an agent -- can follow what changed and
+  why from the PR and its commits, not how many CI runs it takes. Do not commit
+  credentials, generated build directories, local environment files or private
+  research material.
 - **Licensing.** Preserve upstream notices and verify the terms and provenance of
   any added dependency, data or copied code against the policy in
   [third-party software](third-party.md), including what its wheels bundle.
