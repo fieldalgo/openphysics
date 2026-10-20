@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "simcase"
 version = "0.1.0"
-description = "Model document (JSON) and headless runner for the FieldAlgo simulation stack"
+description = "JSON model document and headless runner for OpenPhysics simulations"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -30,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
-Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/simcase"
-Issues = "https://github.com/FieldAlgo/openphysics/issues"
+Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/simcase"
+Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/simcase"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
 # The base install is headless on purpose: a batch or an HPC user must not pull

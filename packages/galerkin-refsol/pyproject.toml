@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "galerkin-refsol"
 version = "0.1.0"
-description = "Reference solutions and published benchmarks for validating the galerkin EM FEM engine"
+description = "Reference solutions and published benchmarks for validating the galerkin finite-element engine"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -24,9 +24,9 @@ classifiers = [
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/galerkin-refsol"
-Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/galerkin-refsol"
-Issues = "https://github.com/FieldAlgo/openphysics/issues"
+Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin-refsol"
+Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin-refsol"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
 test = ["pytest"]

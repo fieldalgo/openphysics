@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "galerkin"
 version = "0.1.0"
-description = "A finite-element engine for electromagnetics, built milestone by milestone against analytical solutions"
+description = "Pure-Python finite-element engine for electromagnetics, heat conduction and elasticity, validated against analytical solutions"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -24,9 +24,9 @@ classifiers = [
 dependencies = ["numpy>=1.24", "scipy>=1.10"]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics/tree/main/packages/galerkin"
-Repository = "https://github.com/FieldAlgo/openphysics/tree/main/packages/galerkin"
-Issues = "https://github.com/FieldAlgo/openphysics/issues"
+Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin"
+Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
 # The answer key lives in its own package so the engine never imports what grades

@@ -18,9 +18,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/FieldAlgo/openphysics"
-Repository = "https://github.com/FieldAlgo/openphysics"
-Issues = "https://github.com/FieldAlgo/openphysics/issues"
+Homepage = "https://github.com/fieldalgo/openphysics"
+Repository = "https://github.com/fieldalgo/openphysics"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [tool.setuptools]
 packages = []
