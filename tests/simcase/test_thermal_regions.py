@@ -264,6 +264,77 @@ def test_a_circle_across_another_shape_s_edge_meshes():
     assert result['balance'] < 1e-10
 
 
+SMALL_ANGLE = """
+import copy, json, sys, time
+import meshine, simcase
+from simcase import Document, examples
+from simcase.thermal_regions import build_region_mesh
+d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+next(s for s in d['geometry']['shapes'] if s['name'] == 'heater')['cy'] = float(sys.argv[1])
+start = time.perf_counter()
+tri = build_region_mesh(Document.from_dict(d))[2]
+seconds = time.perf_counter()-start
+print(json.dumps({'seconds': seconds, 'tags': sorted(tri.boundary_edges), 'min_angle': tri.min_angle(),
+                  'areas': {n: tri.region_area(n) for n in tri.region_names},
+                  'simcase': simcase.__file__, 'meshine': meshine.__file__}))
+"""
+
+
+@pytest.mark.parametrize('cy,area_tol', [(2., 1e-9), (1.9, 1e-9), (1.638304, 1e-9), (1.414214, 1e-8),
+                                         (13., 1e-9), (12.9, 1e-9), (12.414214, 1e-8)])
+def test_a_heater_that_touches_or_crosses_an_edge_at_a_small_angle_meshes(cy, area_tol):
+    """The heater (r = 2) tangent to the bottom side (cy = 2) or to the plate's top edge
+    (cy = 13), or crossing the side at 18, 35 and 45 degrees and the edge at 18 and 45
+    degrees. Refinement never finished on any of them; the pass criteria were fixed
+    before the fix, from a prototype (measured: at most 0.8 s; the 45-degree crossings
+    lose a clipped edge of 1.4e-8 of the diagonal, an area change of 3.1e-9). The angle
+    reference is the smallest angle between two edges of the input meshine is given, or
+    the 28-degree bound where that angle is larger. Run in a subprocess so a regression
+    cannot hang the suite."""
+    import os
+    import pathlib
+    import subprocess
+    import sys
+    import galerkin
+    import meshine
+    import physmat
+    import simcase
+    from simcase.geometry import build_domain, resolve_regions
+    roots = [str(pathlib.Path(m.__file__).resolve().parents[1]) for m in (simcase, galerkin, meshine, physmat)]
+    env = dict(os.environ)
+    env['PYTHONPATH'] = os.pathsep.join(roots+([env['PYTHONPATH']] if env.get('PYTHONPATH') else []))
+    try:
+        out = subprocess.run([sys.executable, '-c', SMALL_ANGLE, repr(cy)], capture_output=True, text=True,
+                             timeout=120, env=env)
+    except subprocess.TimeoutExpired:
+        pytest.fail(f'heater at cy={cy}: meshing did not finish in 120 s')
+    assert out.returncode == 0, out.stderr
+    result = json.loads(out.stdout.strip().splitlines()[-1])
+    assert pathlib.Path(result['meshine']).resolve() == pathlib.Path(meshine.__file__).resolve()
+    assert result['seconds'] < 10.
+    assert result['tags'] == ['bottom', 'left', 'right', 'top']
+
+    d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
+    next(s for s in d['geometry']['shapes'] if s['name'] == 'heater')['cy'] = cy
+    exact = {}
+    for name, _material, geom, *_ in resolve_regions(Document.from_dict(d)):
+        exact[name] = exact.get(name, 0.)+geom.area
+    assert set(result['areas']) == set(exact)
+    for name, area in exact.items():
+        assert abs(result['areas'][name]-area) <= area_tol, name
+    domain, namer, _ = build_domain(Document.from_dict(d))
+    points, segments, _ = domain.build(namer)
+    around = {}
+    for s in segments:
+        around.setdefault(s.a, []).append(s.b)
+        around.setdefault(s.b, []).append(s.a)
+    corner = 360.
+    for v, others in around.items():
+        phi = np.sort(np.degrees(np.arctan2(*(points[others]-points[v])[:, ::-1].T)))
+        corner = min(corner, np.diff(np.append(phi, phi[0]+360.)).min())
+    assert result['min_angle'] >= min(corner, 28.)-1e-6
+
+
 def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
     from simcase.geometry import resolve_regions
 
