@@ -4,8 +4,9 @@
 
 Conductivity and constant heat source are one scalar or piecewise constant on
 named mesh regions (galerkin.materials). Import this submodule explicitly. See
-docs/thermal_steady2d.md and docs/multimaterial.md for SI units, boundary signs
-and validation limits. No other physics module is required.
+docs/packages/galerkin/thermal_steady2d.md and
+docs/packages/galerkin/multimaterial.md for SI units, boundary signs and
+validation limits. No other physics module is required.
 """
 from dataclasses import dataclass
 from typing import Mapping
@@ -279,7 +280,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     outward_flux maps edge tags to g; convection maps tags to (h, ambient).
     q.n = g+h*(T-ambient), h>=0. Boundary scalars or callbacks
     (points_m, outward_normals)->(Q,) use W/m^2, W/(m^2 K), K respectively.
-    Untagged natural edges are insulated. See docs/thermal_flux_robin.md.
+    Untagged natural edges are insulated. See docs/packages/galerkin/thermal_flux_robin.md.
     """
     if not is_per_region(conductivity):
         k = _real(conductivity, "conductivity")

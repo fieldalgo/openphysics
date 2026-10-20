@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Consistent-mass backward-Euler heat histories on a fixed SI P1 mesh.
 
-Explicit submodule only. See docs/transient_heat.md; conductivity, heat
+Explicit submodule only. See docs/packages/galerkin/transient_heat.md; conductivity, heat
 capacity and a constant source may be piecewise constant on named mesh regions
-(docs/multimaterial.md). Finite Kelvin values are
+(docs/packages/galerkin/multimaterial.md). Finite Kelvin values are
 mathematical inputs, not a physical material-domain or positivity certificate.
 """
 from dataclasses import dataclass, fields

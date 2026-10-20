@@ -1,6 +1,6 @@
 # gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/gmshio/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 

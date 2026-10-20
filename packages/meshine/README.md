@@ -1,6 +1,6 @@
 # meshine — a small quality triangle mesher for multi-material planar domains
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/meshine/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
@@ -194,7 +194,7 @@ neighbour makes incompatible, the triangles beside a straight 14° corner, two
 wedges of very different sizes at one apex, and the error that two touching
 8-gon `Circle`s end with.
 
-`examples/compare_with_gmsh.py` draws the same rib waveguide meshed here and
+`examples/meshine/compare_with_gmsh.py` draws the same rib waveguide meshed here and
 by Gmsh (through the `gmshio` package) side by side. Gmsh's Frontal-Delaunay
 still produces higher mean quality (0.98 vs 0.93 radius ratio) and smoother
 grading; meshine's guarantee is the angle bound.

@@ -7,8 +7,8 @@ Every case uses the same nodes, triangles, per-triangle material values,
 loads and constraints in both tools, so the discrete solutions must agree;
 differences are gated at 1e-9 relative (observed 1.6e-12 or smaller). This is
 code-to-code evidence only: the analytical per-region gates in
-test_*_multimaterial.py and docs/multimaterial.md are unchanged, and agreement
-between the tools is not convergence evidence.
+test_*_multimaterial.py and docs/packages/galerkin/multimaterial.md are
+unchanged, and agreement between the tools is not convergence evidence.
 """
 
 import numpy as np
@@ -22,7 +22,7 @@ from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
 from galerkin.transient_heat import solve_transient_heat
 
 SAME = 1e-9  # identical discretizations: relative difference gate
-ACCEPTANCE = "tests/galerkin/test_{}_multimaterial.py (packages/galerkin/docs/multimaterial.md)"
+ACCEPTANCE = "tests/galerkin/test_{}_multimaterial.py (docs/packages/galerkin/multimaterial.md)"
 NAMES = ["copper", "insulation", "steel"]
 
 

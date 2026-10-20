@@ -350,7 +350,7 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
     ``|k0^2 - (2*pi*f_target/c0)^2|``, then return them in ascending real
     frequency. Invalid inputs raise ValueError; nonconvergence, insufficient
     modes or failed quality checks raise RuntimeError without a partial result.
-    See docs/material_cavity.md for the conventions and validation.
+    See docs/packages/galerkin/material_cavity.md for the conventions and validation.
     """
     lengths = np.asarray(_triple(lengths_m, "lengths_m", _positive_real))
     cells = _triple(subdivisions, "subdivisions", _positive_integer)

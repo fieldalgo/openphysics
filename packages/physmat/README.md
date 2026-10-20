@@ -1,6 +1,6 @@
 # physmat — material properties for physics solvers
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/physmat/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
@@ -71,7 +71,7 @@ The refractiveindex.info database is dedicated to the public domain
 (CC0 1.0); its maintainer asks for citation:
 M. N. Polyanskiy, "Refractiveindex.info database of optical constants",
 *Sci. Data* **11**, 94 (2024). Every built-in record also names the original
-measurement. `tools/build_tables.py` regenerates the embedded tables from a
+measurement. `tools/build_physmat_tables.py` regenerates the embedded tables from a
 local copy of the database.
 
 ## Self-checks

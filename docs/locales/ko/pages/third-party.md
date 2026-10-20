@@ -207,7 +207,7 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 | 프로그램 | 라이선스 | 쓰는 방식 |
 |---|---|---|
 | Gmsh(`gmshio[gmsh]`와 CI의 pip 배포판 `gmsh`, 또는 사용자가 설치한 [`gmsh`](https://gmsh.info) 실행 파일) | GPL-2.0-or-later. Gmsh를 Netgen, METIS, OpenCASCADE, ParaView와 결합하도록 허용하는 예외 포함(Gmsh `LICENSE.txt`) | `gmshio`가 `.geo` 스크립트를 쓰고 `gmsh`를 별도 프로세스로 실행한 뒤, 공개된 형식 설명으로 새로 작성한 파서로 `.msh` 파일을 읽음. pip 배포판의 `gmsh` 명령은 그 별도 프로세스 안에서 Gmsh 자신의 Python 모듈과 `libgmsh`를 로드하는 실행 스크립트임. 패키지 코드는 `gmsh`를 import하지 않고(검사함) 아무것도 번들하지 않음. [gmshio NOTICE](../../../../packages/gmshio/NOTICE) 참고 |
-| NGSolve와 Netgen(pip 배포판 `ngsolve`, `netgen-mesher`) | LGPL-2.1-only(패키지 메타데이터 기준) | [재료 공동 비교](../../../../packages/galerkin/docs/locales/ko/pages/material_cavity.md#레퍼런스-도구-비교)의 레퍼런스 도구. PyPI 휠로 별도 환경에 설치하고 별도 프로세스로 실행함. 의존성이 아니고 이 저장소의 CI가 설치하지 않음. 수치 결과만 보고하고 코드는 복사하지 않음. 그 휠은 `netgen-occt`(분류자 기준 LGPL)와 macOS 외에서 `ngsolve-openblas`(BSD-3-Clause)도 설치함 |
+| NGSolve와 Netgen(pip 배포판 `ngsolve`, `netgen-mesher`) | LGPL-2.1-only(패키지 메타데이터 기준) | [재료 공동 비교](packages/galerkin/material_cavity.md#레퍼런스-도구-비교)의 레퍼런스 도구. PyPI 휠로 별도 환경에 설치하고 별도 프로세스로 실행함. 의존성이 아니고 이 저장소의 CI가 설치하지 않음. 수치 결과만 보고하고 코드는 복사하지 않음. 그 휠은 `netgen-occt`(분류자 기준 LGPL)와 macOS 외에서 `ngsolve-openblas`(BSD-3-Clause)도 설치함 |
 | Node.js | MIT | CI에서 Studio JavaScript 검사 실행 |
 | Chrome 또는 Chromium | Chrome 약관 / BSD-3-Clause | CI Studio 브라우저 검사에 이미 설치된 브라우저 사용 |
 | GitHub Actions `actions/checkout`, `actions/setup-python`, `actions/setup-node`, `actions/upload-artifact` | MIT | CI 전용. 커밋으로 고정 |

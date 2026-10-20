@@ -13,7 +13,7 @@ from simcase import Document, run
 from simcase.export import export_fields, export_time_series
 
 meshio = pytest.importorskip("meshio", reason="install the export extra: pip install 'simcase[export]'")
-EXAMPLES = Path(__file__).resolve().parents[2] / "packages" / "simcase" / "examples"
+EXAMPLES = Path(__file__).resolve().parents[2] / "examples" / "simcase"
 
 
 def _saved(tmp_path, name):

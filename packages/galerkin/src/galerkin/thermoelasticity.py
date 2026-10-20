@@ -4,8 +4,8 @@
 
 This module does not call a heat solver or authenticate temperature provenance.
 alpha, E and nu are scalars or piecewise constant on named mesh regions
-(galerkin.materials, ../docs/multimaterial.md).
-See ../docs/prescribed_temperature_thermoelasticity.md for units and reductions.
+(galerkin.materials, docs/packages/galerkin/multimaterial.md).
+See docs/packages/galerkin/prescribed_temperature_thermoelasticity.md for units and reductions.
 """
 from dataclasses import dataclass, field
 import numpy as np

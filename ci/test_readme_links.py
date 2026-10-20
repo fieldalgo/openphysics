@@ -38,6 +38,7 @@ def test_rewrites_links_images_and_anchors():
         "[guide](docs/guide.md) [part](docs/guide.md#units \"Units\")",
         "![figure](docs/figure.png) [top](#install) [up](../../README.md)",
         "[web](https://example.com/x.md) [mail](mailto:a@example.com)",
+        "[page](../../docs/packages/demo/guide.md) [run](../../examples/demo/run.py)",
         "```", "[code](docs/not-a-link.md)", "```",
     ])
     out = hook.absolute_links(text, REF, "packages/demo/")
@@ -48,6 +49,8 @@ def test_rewrites_links_images_and_anchors():
     assert f"![figure]({raw}packages/demo/docs/figure.png)" in out
     assert f"[top]({blob}packages/demo/README.md#install)" in out
     assert f"[up]({blob}README.md)" in out
+    assert f"[page]({blob}docs/packages/demo/guide.md)" in out
+    assert f"[run]({blob}examples/demo/run.py)" in out
     assert "[web](https://example.com/x.md)" in out and "[mail](mailto:a@example.com)" in out
     assert "[code](docs/not-a-link.md)" in out
 

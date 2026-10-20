@@ -6,7 +6,7 @@ A thermal.steady2d document whose geometry has ``background``/``shapes`` takes
 its conductivity from a ``materials`` table: every shape and the background
 name a material, and every used material gives ``conductivity_w_mk``. The
 mesh follows the region boundaries (meshine, ``mesh.size``). The rectangle
-documents of thermal.py are not changed. See docs/thermal_regions2d.md.
+documents of thermal.py are not changed. See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
 import json

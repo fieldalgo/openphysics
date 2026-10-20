@@ -5,8 +5,8 @@
 
 Each sdist holds exactly its package code, README, LICENSE, NOTICE and build files,
 and each wheel exactly its package code, all byte-identical to the checkout. Tests,
-docs and examples are never shipped: the installed checks copy the tracked test and
-example files of this checkout. The package test suites run against installed
+docs and examples live outside packages/ and are never shipped: the installed checks
+copy the tracked test and example files of this checkout. The package test suites run against installed
 wheels in ci/run_installed_tests.py; this script runs the wheel-specific
 consumers, examples and independent acceptance scripts. Run with the pinned
 validation requirements installed. No upload is performed. The temporary
@@ -33,13 +33,10 @@ from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-# A distribution ships its import package and the files below, and nothing else.
-# These top-level folders of packages/<name>/ are never shipped; docs and examples
-# are used from the checkout. Tests live in the repository's tests/<name>/, so a
-# tests/ folder inside a package is rejected as unclassified. Nothing here is a
-# list of individual files.
-UNSHIPPED_DIRS = ("docs", "examples", "tools")
-SDIST_FILES = ("LICENSE", "NOTICE", "README.md", "pyproject.toml", "setup.py", "MANIFEST.in")
+# packages/<name>/ holds what its distribution ships and nothing else: the import
+# package under src/ and the files below. Tests, docs, examples and tools live at
+# the repository root. Nothing here is a list of individual files.
+SDIST_FILES = ("LICENSE", "NOTICE", "README.md", "pyproject.toml", "setup.py")
 GENERATED_SDIST_FILES = ("PKG-INFO", "setup.cfg")
 UNSHIPPED_FILES = (".gitignore",)
 EGG_INFO = re.compile(r"(src/)?[^/]+\.egg-info/[^/]+")
@@ -73,9 +70,9 @@ def tracked(name):
 def shipped_code(name):
     """Tracked files of the import package(s) under packages/<name>/src/, as sdist paths.
 
-    Every tracked top-level entry must be a known file, an unshipped folder or src/,
-    and src/ may hold only import packages (folders with __init__.py), so a new kind
-    of file has to be classified here instead of shipping or vanishing silently.
+    Every tracked top-level entry must be a known file or src/, and src/ may hold only
+    import packages (folders with __init__.py), so a new kind of file has to be
+    classified here instead of shipping or vanishing silently.
     """
     files = tracked(name)
     code = set()
@@ -84,19 +81,15 @@ def shipped_code(name):
         if not rest:
             if top not in SDIST_FILES + UNSHIPPED_FILES:
                 raise RuntimeError(f"packages/{name}/{top}: unclassified top-level file; "
-                                   "ship it as package code or keep it in an unshipped folder")
-        elif top in UNSHIPPED_DIRS:
-            continue
-        elif top == "tests":
-            raise RuntimeError(f"packages/{name}/tests/: tests belong in the repository's tests/ folder")
+                                   "ship it as package code or move it out of packages/")
         elif top == "src":
             package, _, inner = rest.partition("/")
             if not inner or f"src/{package}/__init__.py" not in files:
                 raise RuntimeError(f"packages/{name}/src/{package}: src/ holds only import packages")
             code.add(relative)
         else:
-            raise RuntimeError(f"packages/{name}/{top}/: unclassified top-level folder; "
-                               "only src/ and " + ", ".join(UNSHIPPED_DIRS) + " are allowed")
+            raise RuntimeError(f"packages/{name}/{top}/: only src/ is allowed; tests, docs, examples "
+                               "and tools belong at the repository root")
     for required in ("LICENSE", "NOTICE", "README.md", "pyproject.toml"):
         if required not in files:
             raise RuntimeError(f"packages/{name}/{required} is not tracked")
@@ -293,7 +286,6 @@ def main():
 
         smoke = copy(ROOT / "ci" / "wheel_smoke.py", work / "wheel_smoke.py")
         run(python, "-I", smoke, cwd=work, env=env)
-        packages = ROOT / "packages"
         tests = work / "tests"
         examples = work / "examples"
         # Wheel-specific consumers. The package test suites (tests/) run against
@@ -301,13 +293,13 @@ def main():
         for source in sorted((ROOT / "ci").glob("test_*_wheel.py")):
             copy(source, tests / source.name)
         # Every tracked example of galerkin and simcase, flattened into examples/.
-        for package in ("galerkin", "simcase"):
-            for relative in sorted(tracked(package)):
-                if relative.startswith("examples/") and relative.count("/") == 1:
-                    destination = examples / relative.split("/", 1)[1]
-                    if destination.exists():
-                        raise RuntimeError(f"two examples are named {destination.name}")
-                    copy(packages / package / relative, destination)
+        for relative in sorted(repository):
+            folder, _, filename = relative.rpartition("/")
+            if folder in ("examples/galerkin", "examples/simcase"):
+                destination = examples / filename
+                if destination.exists():
+                    raise RuntimeError(f"two examples are named {filename}")
+                copy(ROOT / relative, destination)
         traction_acceptance = work / "traction-acceptance"
         for filename in ("thermoelastic_traction_independent_oracle.py",
                          "thermoelastic_traction_independent_consumer.py"):

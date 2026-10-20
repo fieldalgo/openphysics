@@ -14,7 +14,7 @@ from PIL import Image
 
 from simcase import Document
 
-EXAMPLES = Path(__file__).resolve().parents[2] / "packages" / "simcase" / "examples"
+EXAMPLES = Path(__file__).resolve().parents[2] / "examples" / "simcase"
 
 
 def _gallery():

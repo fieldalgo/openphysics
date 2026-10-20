@@ -40,7 +40,7 @@ METHODS = (ASSIGNMENT_METHOD, SUBSPACE_METHOD)
 
 # Numerical guards for the small Gram matrices. They separate roundoff from rank
 # loss or metric failure; they are not physical accuracy claims. The budget is
-# derived in docs/vector_subspace_tracking.md ("Numerical guards"); in short,
+# derived in docs/packages/simcase/vector_subspace_tracking.md ("Numerical guards"); in short,
 # with unit roundoff u, cluster rank r, Gram condition kappa, N degrees of
 # freedom and product cancellation rho (ElectricMetric.cancellation: the largest
 # sum |x||W||x| / x^H W x over the cluster fields; about 1 to 3 on shape-regular

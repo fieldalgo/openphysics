@@ -5,11 +5,11 @@
 
 Builds every package (each wheel from its sdist) and installs the wheels, with
 all of their extras, into a fresh venv in a temporary directory outside the
-checkout. The tracked files under tests/, packages/*/examples/ and
-packages/*/docs/ and the root pyproject.toml are copied next to it; no package
-code is copied. pytest then runs every test with `python -I`, so only the
-installed packages can be imported. No test is selected by name: a test that
-cannot run against the installed packages fails here.
+checkout. The tracked files under tests/, examples/ and docs/ and the root
+pyproject.toml are copied next to it; nothing under packages/ is copied.
+pytest then runs every test with `python -I`, so only the installed packages
+can be imported. No test is selected by name: a test that cannot run against
+the installed packages fails here.
 
 The run fails if a first-party module does not import from the venv, if any
 test is skipped or expected to fail (xfail), or if a test file produced no
@@ -36,8 +36,7 @@ from packaging.utils import parse_wheel_filename
 import check_distributions as distributions
 
 ROOT = distributions.ROOT
-COPIED_ROOTS = ("tests/",)
-COPIED_PACKAGE_FOLDERS = ("examples/", "docs/")
+COPIED_ROOTS = ("tests/", "examples/", "docs/")
 
 
 def wheel_extras(wheel):
@@ -50,15 +49,8 @@ def wheel_extras(wheel):
 
 def copied_sources():
     """Tracked files the installed run needs: tests, examples, docs and the pytest config."""
-    sources = ["pyproject.toml"]
-    for path in sorted(distributions.tracked_repository()):
-        if path.startswith(COPIED_ROOTS):
-            sources.append(path)
-        elif path.startswith("packages/"):
-            parts = path.split("/", 2)
-            if len(parts) == 3 and parts[2].startswith(COPIED_PACKAGE_FOLDERS):
-                sources.append(path)
-    return sources
+    return ["pyproject.toml", *sorted(p for p in distributions.tracked_repository()
+                                      if p.startswith(COPIED_ROOTS))]
 
 
 def collected_files(tests):
@@ -150,7 +142,7 @@ def main():
             shutil.copy2(ROOT / relative, destination)
             copied[relative] = hashlib.sha256(destination.read_bytes()).hexdigest()
         for name in import_names:
-            if any((suite / "packages").glob(f"*/{name}")) or any((suite / "packages").glob(f"*/src/{name}")):
+            if any(suite.rglob(f"{name}/__init__.py")):
                 raise RuntimeError(f"package code {name} must not be copied next to the tests")
         unchanged = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *copied],
                                    check=False).returncode == 0

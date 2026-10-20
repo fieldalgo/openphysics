@@ -14,13 +14,13 @@ multiphysics solver.
 
 | Area | Implemented scope | Guide |
 |---|---|---|
-| Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](packages/simcase/README.md), [vector reliability](packages/galerkin/docs/eigenspace_reliability.md) |
-| 3D cavities | Rectangular-box eigenmodes, vacuum PEC or with lossy box materials and conducting walls (complex frequencies and Q), through a Python API or a single JSON study | [Cavity API](packages/galerkin/docs/cavity_solver.md), [material cavity](packages/galerkin/docs/material_cavity.md), [JSON contract](packages/simcase/docs/cavity3d.md) |
-| Heat conduction | Steady homogeneous isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](packages/galerkin/docs/thermal_steady2d.md), [flux/Robin](packages/galerkin/docs/thermal_flux_robin.md), [thermal JSON](packages/simcase/docs/thermal_steady2d.md), [boundary JSON](packages/simcase/docs/thermal_steady_boundary2d.md), [Studio](packages/simcase/docs/thermal_studio.md) |
-| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](packages/galerkin/docs/transient_heat.md), [document](packages/simcase/docs/thermal_transient2d.md), [validation](packages/galerkin/docs/transient_heat_validation.md), [Studio](packages/simcase/docs/thermal_transient_studio.md) |
-| Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](packages/galerkin/docs/elasticity2d.md), [traction](packages/galerkin/docs/elasticity_traction.md) |
-| Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](packages/galerkin/docs/prescribed_temperature_thermoelasticity.md), [total traction](packages/galerkin/docs/thermoelastic_traction.md), [workflow](packages/galerkin/docs/thermal_mechanical_workflow.md) |
-| Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](packages/galerkin/docs/transient_thermal_mechanical.md) |
+| Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](packages/simcase/README.md), [vector reliability](docs/packages/galerkin/eigenspace_reliability.md) |
+| 3D cavities | Rectangular-box eigenmodes, vacuum PEC or with lossy box materials and conducting walls (complex frequencies and Q), through a Python API or a single JSON study | [Cavity API](docs/packages/galerkin/cavity_solver.md), [material cavity](docs/packages/galerkin/material_cavity.md), [JSON contract](docs/packages/simcase/cavity3d.md) |
+| Heat conduction | Steady homogeneous isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](docs/packages/galerkin/thermal_steady2d.md), [flux/Robin](docs/packages/galerkin/thermal_flux_robin.md), [thermal JSON](docs/packages/simcase/thermal_steady2d.md), [boundary JSON](docs/packages/simcase/thermal_steady_boundary2d.md), [Studio](docs/packages/simcase/thermal_studio.md) |
+| Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](docs/packages/galerkin/transient_heat.md), [document](docs/packages/simcase/thermal_transient2d.md), [validation](docs/packages/galerkin/transient_heat_validation.md), [Studio](docs/packages/simcase/thermal_transient_studio.md) |
+| Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](docs/packages/galerkin/elasticity2d.md), [traction](docs/packages/galerkin/elasticity_traction.md) |
+| Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](docs/packages/galerkin/prescribed_temperature_thermoelasticity.md), [total traction](docs/packages/galerkin/thermoelastic_traction.md), [workflow](docs/packages/galerkin/thermal_mechanical_workflow.md) |
+| Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](docs/packages/galerkin/transient_thermal_mechanical.md) |
 
 ### Where each feature is available
 
@@ -90,8 +90,8 @@ For pinned dependency and database versions, use the [development guide](docs/de
 Validate and run the supplied slab-waveguide document:
 
 ```bash
-python -m simcase validate packages/simcase/examples/slab_te_check.json
-python -m simcase run packages/simcase/examples/slab_te_check.json -o slab_results
+python -m simcase validate examples/simcase/slab_te_check.json
+python -m simcase run examples/simcase/slab_te_check.json -o slab_results
 ```
 
 Explore 2D optical models and rectangular heat documents in Studio:
@@ -108,14 +108,14 @@ multi-user service. Keep it off untrusted networks. CLI entry points are
 Try a headless heat document or standalone Python examples:
 
 ```bash
-python -m simcase run packages/simcase/examples/thermal_slab.json -o thermal_results
-python packages/galerkin/examples/thermal_steady2d.py
-python packages/galerkin/examples/elasticity_traction.py
-python packages/galerkin/examples/thermoelastic_traction.py
+python -m simcase run examples/simcase/thermal_slab.json -o thermal_results
+python examples/galerkin/thermal_steady2d.py
+python examples/galerkin/elasticity_traction.py
+python examples/galerkin/thermoelastic_traction.py
 ```
 
-More documents are in [`packages/simcase/examples`](packages/simcase/examples) and
-more scripts in [`packages/galerkin/examples`](packages/galerkin/examples).
+More documents are in [`examples/simcase`](examples/simcase) and
+more scripts in [`examples/galerkin`](examples/galerkin).
 
 Use a fresh output directory for each saved run and retain exclusive control
 until saving and cleanup finish. Hostile filesystem races and atomic rollback

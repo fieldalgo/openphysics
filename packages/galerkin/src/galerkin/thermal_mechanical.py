@@ -179,7 +179,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
     units must equal {'length':'m','temperature':'K'}; no conversion/inference.
     Constant k W/(m K), E Pa, nu, signed alpha 1/K, nonnegative Tref K.
     k, E, nu, alpha and a constant heat_source may each be {region name: value}
-    over mesh.region_names (piecewise constant; docs/multimaterial.md).
+    over mesh.region_names (piecewise constant; docs/packages/galerkin/multimaterial.md).
     Heat uses Dirichlet + insulation. Mechanics uses component Dirichlet and
     zero total natural traction; body force N/m^3. See the complete EN/KO guide.
     """

@@ -95,7 +95,7 @@ def test_scalar_solver_cannot_split_lp11(refsol):
 
 
 def test_the_example_analytic_solver_agrees_with_the_answer_key(refsol):
-    """examples/fiber_modes.py solves the vector dispersion relation itself, for a
+    """examples/galerkin/fiber_modes.py solves the vector dispersion relation itself, for a
     different fibre (high contrast, V = 3.5). Checking that independent
     implementation against refsol tests both."""
     import fiber_modes

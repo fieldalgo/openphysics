@@ -14,13 +14,13 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 
 | 분야 | 구현 범위 | 안내 |
 |---|---|---|
-| 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](../../../../packages/simcase/docs/locales/ko/pages/overview.md), [벡터 신뢰성](../../../../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
-| 3D 공동 | Python API 또는 단일 JSON study를 통한 직육면체 공동 고유모드: 진공 PEC, 또는 손실 직육면체 재료와 도체 벽(복소 주파수와 Q) | [공동 API](../../../../packages/galerkin/docs/locales/ko/pages/cavity_solver.md), [재료 공동](../../../../packages/galerkin/docs/locales/ko/pages/material_cavity.md), [JSON 계약](../../../../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
-| 열전도 | 정상·상수·등방 2D 열전도, Dirichlet·처방 열유속·Robin 경계, 변별 상수 경계 데이터를 받는 직사각형 헤드리스 JSON 경로와 전용 Studio 화면 | [열전도 API](../../../../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md), [열유속·Robin](../../../../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md), [열전도 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md), [경계조건 JSON](../../../../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md), [Studio](../../../../packages/simcase/docs/locales/ko/pages/thermal_studio.md) |
-| 과도 열전도 | 2D Python 엔진과 직사각형 headless JSON/API/CLI/save, 고정 P1·일관 질량·후진 Euler, 상수 등방 물성·명시 시간·표본 Dirichlet/단열, 전용 Studio 시간·장·이력 화면 | [과도 열전도](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat.md), [문서](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md), [검증](../../../../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md), [Studio](../../../../packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md) |
-| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](../../../../packages/galerkin/docs/locales/ko/pages/elasticity2d.md), [표면하중](../../../../packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
-| 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](../../../../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md), [전체 표면하중](../../../../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md), [workflow](../../../../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
-| 과도 열응력 | 같은 고정 메시에서 저장된 과도 열전도 시간 중 고른 시간마다 준정적 선형 미소변형 기계해석, 명시적인 두 번째 Python 호출 | [과도 열전도→기계](../../../../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
+| 전자기 | 2D 스칼라·전체 벡터 도파 모드, 복소 장과 모드 추적을 유지하는 분리 가능한 모드의 파장 sweep | [모델 실행기](packages/simcase/overview.md), [벡터 신뢰성](packages/galerkin/eigenspace_reliability.md) |
+| 3D 공동 | Python API 또는 단일 JSON study를 통한 직육면체 공동 고유모드: 진공 PEC, 또는 손실 직육면체 재료와 도체 벽(복소 주파수와 Q) | [공동 API](packages/galerkin/cavity_solver.md), [재료 공동](packages/galerkin/material_cavity.md), [JSON 계약](packages/simcase/cavity3d.md) |
+| 열전도 | 정상·상수·등방 2D 열전도, Dirichlet·처방 열유속·Robin 경계, 변별 상수 경계 데이터를 받는 직사각형 헤드리스 JSON 경로와 전용 Studio 화면 | [열전도 API](packages/galerkin/thermal_steady2d.md), [열유속·Robin](packages/galerkin/thermal_flux_robin.md), [열전도 JSON](packages/simcase/thermal_steady2d.md), [경계조건 JSON](packages/simcase/thermal_steady_boundary2d.md), [Studio](packages/simcase/thermal_studio.md) |
+| 과도 열전도 | 2D Python 엔진과 직사각형 headless JSON/API/CLI/save, 고정 P1·일관 질량·후진 Euler, 상수 등방 물성·명시 시간·표본 Dirichlet/단열, 전용 Studio 시간·장·이력 화면 | [과도 열전도](packages/galerkin/transient_heat.md), [문서](packages/simcase/thermal_transient2d.md), [검증](packages/galerkin/transient_heat_validation.md), [Studio](packages/simcase/thermal_transient_studio.md) |
+| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](packages/galerkin/elasticity2d.md), [표면하중](packages/galerkin/elasticity_traction.md) |
+| 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](packages/galerkin/prescribed_temperature_thermoelasticity.md), [전체 표면하중](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md) |
+| 과도 열응력 | 같은 고정 메시에서 저장된 과도 열전도 시간 중 고른 시간마다 준정적 선형 미소변형 기계해석, 명시적인 두 번째 Python 호출 | [과도 열전도→기계](packages/galerkin/transient_thermal_mechanical.md) |
 
 ### 기능별 사용 경로
 
@@ -50,14 +50,14 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
 
 | 패키지 | 역할 |
 |---|---|
-| [galerkin](../../../../packages/galerkin/docs/locales/ko/pages/overview.md) | 유한요소 해석기와 장 후처리 |
-| [galerkin-refsol](../../../../packages/galerkin-refsol/docs/locales/ko/pages/overview.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
-| [meshine](../../../../packages/meshine/docs/locales/ko/pages/overview.md) | 재료 영역의 2D 삼각형 메시 |
-| [gmshio](../../../../packages/gmshio/docs/locales/ko/pages/overview.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
-| [physmat](../../../../packages/physmat/docs/locales/ko/pages/overview.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
-| [simcase](../../../../packages/simcase/docs/locales/ko/pages/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
+| [galerkin](packages/galerkin/overview.md) | 유한요소 해석기와 장 후처리 |
+| [galerkin-refsol](packages/galerkin-refsol/overview.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
+| [meshine](packages/meshine/overview.md) | 재료 영역의 2D 삼각형 메시 |
+| [gmshio](packages/gmshio/overview.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
+| [physmat](packages/physmat/overview.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
+| [simcase](packages/simcase/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
 
-일곱 번째 배포인 [openphysics](../../../../packages/openphysics/docs/locales/ko/pages/overview.md)(`0.0.1`)는
+일곱 번째 배포인 [openphysics](packages/openphysics/overview.md)(`0.0.1`)는
 프로젝트 이름만 예약합니다. 엔진을 포함하지 않고 위 패키지들을 설치하지도 않습니다.
 저장소 루트 자체도 설치 가능한 배포가 아닙니다.
 **아래 소스 설치 방법을 사용하세요. `pip install openphysics`만으로는 시뮬레이션
@@ -89,8 +89,8 @@ Gmsh는 선택 도구로 별도 설치합니다. 메시 생성에는 PATH의 `gm
 제공하는 슬래브 도파로 문서를 검사하고 실행합니다.
 
 ```bash
-python -m simcase validate packages/simcase/examples/slab_te_check.json
-python -m simcase run packages/simcase/examples/slab_te_check.json -o slab_results
+python -m simcase validate examples/simcase/slab_te_check.json
+python -m simcase run examples/simcase/slab_te_check.json -o slab_results
 ```
 
 Studio에서 2D 광학 모델과 직사각형 열전도 문서를 살펴볼 수 있습니다.
@@ -107,14 +107,14 @@ python -m simcase.studio --no-browser
 헤드리스 열전도 문서나 독립 Python 예제를 실행할 수도 있습니다.
 
 ```bash
-python -m simcase run packages/simcase/examples/thermal_slab.json -o thermal_results
-python packages/galerkin/examples/thermal_steady2d.py
-python packages/galerkin/examples/elasticity_traction.py
-python packages/galerkin/examples/thermoelastic_traction.py
+python -m simcase run examples/simcase/thermal_slab.json -o thermal_results
+python examples/galerkin/thermal_steady2d.py
+python examples/galerkin/elasticity_traction.py
+python examples/galerkin/thermoelastic_traction.py
 ```
 
-다른 문서는 [`packages/simcase/examples`](../../../../packages/simcase/examples),
-다른 스크립트는 [`packages/galerkin/examples`](../../../../packages/galerkin/examples)에 있습니다.
+다른 문서는 [`examples/simcase`](../../../../examples/simcase),
+다른 스크립트는 [`examples/galerkin`](../../../../examples/galerkin)에 있습니다.
 
 저장하는 실행마다 새 출력 디렉터리를 사용하고 저장·정리가 끝날 때까지 독점적으로
 관리하세요. 적대적 파일시스템 경쟁과 원자적 rollback은 수용 범위 밖입니다.

@@ -9,7 +9,7 @@ from ``Mesh.region_names`` (``disk_mesh``, ``layered_*_mesh``, gmsh physical
 groups through gmshio). Bare per-triangle arrays are not accepted by the
 physics APIs: a sequence of length M is ambiguous with a vector or tensor
 input, so per-triangle data is always built from names. Values keep their SI
-units; no unit conversion happens here. See docs/multimaterial.md.
+units; no unit conversion happens here. See docs/packages/galerkin/multimaterial.md.
 """
 from collections.abc import Mapping
 

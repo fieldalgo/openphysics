@@ -1,6 +1,6 @@
 # simcase — the model document and its headless runner
 
-[Documentation](docs/overview.md)
+[Documentation](../../docs/packages/simcase/overview.md)
 
 [Suite documentation](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
@@ -39,12 +39,12 @@ prints a supplied example.
 
 | Physics type | What it solves | Examples | Contract |
 |---|---|---|---|
-| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](docs/vector_subspace_tracking.md) |
-| `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](docs/cavity3d.md) |
-| `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](docs/thermal_steady2d.md), [boundaries](docs/thermal_steady_boundary2d.md) |
-| `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](docs/thermal_regions2d.md) |
-| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](docs/thermal_transient2d.md) |
-| `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](docs/thermal_regions2d.md) |
+| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](../../docs/packages/simcase/vector_subspace_tracking.md) |
+| `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](../../docs/packages/simcase/cavity3d.md) |
+| `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](../../docs/packages/simcase/thermal_steady2d.md), [boundaries](../../docs/packages/simcase/thermal_steady_boundary2d.md) |
+| `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
+| `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for the two heat
 types; it rejects cavity documents. Coupled or multiple-physics runs, geometry,
@@ -231,7 +231,7 @@ to check for an unseen partner. The search is bounded, not an exhaustive spectra
 proof. Continuation through cutoff is not implemented. The fiber's two HE11
 partners are intentionally rejected by the default tracker even when only one
 is requested; inspect them with independent single studies, or track their
-span with the opt-in [subspace method](docs/vector_subspace_tracking.md).
+span with the opt-in [subspace method](../../docs/packages/simcase/vector_subspace_tracking.md).
 
 Tracking failures identify the wavelength, reason and a next action. Numerical
 solver failures retain the wavelength and underlying reason. The CLI exits
@@ -309,20 +309,20 @@ result = solve_point(model, doc.sole_physics()[1])
 
 ## Heat and cavity documents
 
-The [cavity document contract](docs/cavity3d.md) covers the `em.cavity3d` input,
+The [cavity document contract](../../docs/packages/simcase/cavity3d.md) covers the `em.cavity3d` input,
 unit conversion, search limitations and the SI JSON/NPZ result layout.
 
-The [thermal.steady2d contract](docs/thermal_steady2d.md) describes homogeneous
+The [thermal.steady2d contract](../../docs/packages/simcase/thermal_steady2d.md) describes homogeneous
 rectangular steady heat documents with explicit geometry length units and
 absolute Kelvin. Numeric SI NPZ arrays use a dedicated result version/layout and
 load with `allow_pickle=False`; support heat reaction is inward, and its negative
 is the thermostat outward contribution. The
-[steady boundary contract](docs/thermal_steady_boundary2d.md) adds side-constant
+[steady boundary contract](../../docs/packages/simcase/thermal_steady_boundary2d.md) adds side-constant
 outward flux and convection, v2 metadata and raw arrays; documents that use
 neither key keep v1. Empty Dirichlet requires positive Robin anchoring. Input
 Kelvin is nonnegative; finite negative computed temperature is not clamped.
 
-The [`thermal.transient2d` contract](docs/thermal_transient2d.md) defines a fixed
+The [`thermal.transient2d` contract](../../docs/packages/simcase/thermal_transient2d.md) defines a fixed
 rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times,
 uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
@@ -357,8 +357,8 @@ The base install stays headless — `fastapi` and `uvicorn` arrive only with the
 `studio` extra, so a batch or an HPC user never pulls a web stack to run a
 document.
 
-![geometry](docs/geometry.png)
-![results](docs/results.png)
+![geometry](../../docs/packages/simcase/geometry.png)
+![results](../../docs/packages/simcase/results.png)
 
 - Load an example, open a `.json` from disk, download the edited document.
 - Model tree: Units, Domain, Background, shapes (rect / circle / polygon, add,
@@ -379,8 +379,8 @@ document.
 - Heat: dedicated views for rectangular `thermal.steady2d` and
   `thermal.transient2d` documents. Steady heat shows the result mesh, nodal
   Kelvin and cell heat flux; transient heat adds requested-time selection and
-  paged heat-content (H) and quadratic-functional (V) histories. See the [steady](docs/thermal_studio.md) and
-  [transient](docs/thermal_transient_studio.md) Studio guides.
+  paged heat-content (H) and quadratic-functional (V) histories. See the [steady](../../docs/packages/simcase/thermal_studio.md) and
+  [transient](../../docs/packages/simcase/thermal_transient_studio.md) Studio guides.
 
 The page is a single HTML file with no build step and no external libraries
 (canvas drawing only); a framework can come in when the UI grows. Web rather
@@ -409,8 +409,8 @@ Used by the page, usable by anything else.
 | GET | `/api/jobs/{id}/result` | n_eff, group index, fields, mesh, timings |
 
 The steady and transient heat views use their own capability, validation, run and
-result routes; see the [steady](docs/thermal_studio.md) and
-[transient](docs/thermal_transient_studio.md) Studio guides.
+result routes; see the [steady](../../docs/packages/simcase/thermal_studio.md) and
+[transient](../../docs/packages/simcase/thermal_transient_studio.md) Studio guides.
 
 `simcase.studio` may use only simcase's public API — the names in
 `simcase.__all__`, never a module underneath it. A test enforces that. It keeps
@@ -421,7 +421,7 @@ needs something the engine does not export, the engine exports it on purpose.
 ## Self-checks
 
 ```bash
-# From the repository root after the development install in ../../README.md
+# From the repository root after the development install in the repository README.md
 python -m pytest -q tests/simcase
 node --test tests/simcase/*.cjs   # Studio JavaScript checks
 ```
@@ -456,19 +456,19 @@ script / CLI  ->  runs the document      simcase.run
 
 | Topic | English | 한국어 |
 |---|---|---|
-| Package overview | [Overview](docs/overview.md) | [한국어](docs/locales/ko/pages/overview.md) |
-| Vector subspace tracking | [Guide](docs/vector_subspace_tracking.md) | [한국어](docs/locales/ko/pages/vector_subspace_tracking.md) |
-| Cavity documents | [Contract](docs/cavity3d.md) | [한국어](docs/locales/ko/pages/cavity3d.md) |
-| Steady heat documents | [Contract](docs/thermal_steady2d.md) | [한국어](docs/locales/ko/pages/thermal_steady2d.md) |
-| Steady heat validation | [Report](docs/thermal_simcase_independent_validation.md) | [한국어](docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| Steady boundaries | [Contract](docs/thermal_steady_boundary2d.md) | [한국어](docs/locales/ko/pages/thermal_steady_boundary2d.md) |
-| Steady boundary validation | [Report](docs/steady_boundary_independent_validation.md) | [한국어](docs/locales/ko/pages/steady_boundary_independent_validation.md) |
-| Heat region documents | [Contract](docs/thermal_regions2d.md) | [한국어](docs/locales/ko/pages/thermal_regions2d.md) |
-| Transient heat documents | [Contract](docs/thermal_transient2d.md) | [한국어](docs/locales/ko/pages/thermal_transient2d.md) |
-| Steady heat Studio | [Guide](docs/thermal_studio.md) | [한국어](docs/locales/ko/pages/thermal_studio.md) |
-| Steady Studio validation | [Report](docs/studio_thermal_independent_validation.md) | [한국어](docs/locales/ko/pages/studio_thermal_independent_validation.md) |
-| Transient heat Studio | [Guide](docs/thermal_transient_studio.md) | [한국어](docs/locales/ko/pages/thermal_transient_studio.md) |
-| Transient Studio validation | [Report](docs/studio_transient_thermal_independent_validation.md) | [한국어](docs/locales/ko/pages/studio_transient_thermal_independent_validation.md) |
+| Package overview | [Overview](../../docs/packages/simcase/overview.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/overview.md) |
+| Vector subspace tracking | [Guide](../../docs/packages/simcase/vector_subspace_tracking.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
+| Cavity documents | [Contract](../../docs/packages/simcase/cavity3d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/cavity3d.md) |
+| Steady heat documents | [Contract](../../docs/packages/simcase/thermal_steady2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_steady2d.md) |
+| Steady heat validation | [Report](../../docs/packages/simcase/thermal_simcase_independent_validation.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_simcase_independent_validation.md) |
+| Steady boundaries | [Contract](../../docs/packages/simcase/thermal_steady_boundary2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_steady_boundary2d.md) |
+| Steady boundary validation | [Report](../../docs/packages/simcase/steady_boundary_independent_validation.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/steady_boundary_independent_validation.md) |
+| Heat region documents | [Contract](../../docs/packages/simcase/thermal_regions2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_regions2d.md) |
+| Transient heat documents | [Contract](../../docs/packages/simcase/thermal_transient2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_transient2d.md) |
+| Steady heat Studio | [Guide](../../docs/packages/simcase/thermal_studio.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_studio.md) |
+| Steady Studio validation | [Report](../../docs/packages/simcase/studio_thermal_independent_validation.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/studio_thermal_independent_validation.md) |
+| Transient heat Studio | [Guide](../../docs/packages/simcase/thermal_transient_studio.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_transient_studio.md) |
+| Transient Studio validation | [Report](../../docs/packages/simcase/studio_transient_thermal_independent_validation.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/studio_transient_thermal_independent_validation.md) |
 
 ## License
 

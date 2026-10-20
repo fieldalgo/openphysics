@@ -17,7 +17,7 @@ import pytest
 
 # The examples carry their own analytical solutions, written independently of
 # refsol. Tests below check the two against each other so they cannot drift.
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "packages" / "galerkin" / "examples"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "examples" / "galerkin"))
 
 
 def rate(errors, refinement=2.0):
@@ -41,4 +41,4 @@ def assert_second_order(errors, refinement=2.0, floor=1.8, name="quantity"):
 @pytest.fixture(scope="session")
 def refsol():
     return pytest.importorskip(
-        "refsol", reason="install the test extra: pip install -e '.[test]'")
+        "refsol", reason="install the answer key: pip install -e packages/galerkin-refsol")

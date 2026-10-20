@@ -9,9 +9,11 @@ checks, CI and the required `tests` check) and the
 [contributing guide](contributing.md) (branches, review and releases).
 
 English is the repository default. READMEs and contribution/security entry
-points are English. Bilingual documentation lives under `docs/` directories:
-English pages at `docs/<name>.md` and Korean counterparts at
-`docs/locales/ko/pages/<name>.md`, including package overviews. Code
+points are English. Bilingual documentation lives under `docs/` (CI tool notes
+under `ci/tools/docs/`): English pages at `docs/<name>.md` and Korean
+counterparts at `docs/locales/ko/pages/<name>.md`.
+Each package's pages, including its overview, are in `docs/packages/<package>/`
+and `docs/locales/ko/pages/packages/<package>/`. Code
 identifiers, equations, commands and recorded outputs keep their meaning in both
 languages; a translation does not establish a new numerical result.
 
@@ -37,40 +39,40 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 
 | Topic | English source | Korean status |
 |---|---|---|
-| Transient heat to quasistatic mechanics | [Stored-index API and independent gates](../packages/galerkin/docs/transient_thermal_mechanical.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_thermal_mechanical.md) |
-| 3D PEC cavity engine | [API, units and convergence](../packages/galerkin/docs/cavity_solver.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/cavity_solver.md) |
-| Lossy material cavity | [Complex resonances, Q, wall loss and references](../packages/galerkin/docs/material_cavity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/material_cavity.md) |
-| Cavity document and CLI | [Input and saved fields](../packages/simcase/docs/cavity3d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/cavity3d.md) |
-| Vector subspace tracking | [Opt-in cluster sweeps](../packages/simcase/docs/vector_subspace_tracking.md) | [한국어](../packages/simcase/docs/locales/ko/pages/vector_subspace_tracking.md) |
-| Complex vector eigenspaces | [Preservation and limits](../packages/galerkin/docs/eigenspace_reliability.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/eigenspace_reliability.md) |
-| Static elasticity | [Plane models and constraints](../packages/galerkin/docs/elasticity2d.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity2d.md) |
-| Elasticity acceptance | [Independent continuum checks](../packages/galerkin/docs/elasticity2d_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity2d_independent_validation.md) |
-| Boundary traction | [Loads and normals](../packages/galerkin/docs/elasticity_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity_traction.md) |
-| Traction acceptance | [Independent forces, work and convergence](../packages/galerkin/docs/elasticity_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/elasticity_traction_independent_validation.md) |
-| Steady conduction | [Kelvin, heat flux and boundary signs](../packages/galerkin/docs/thermal_steady2d.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_steady2d.md) |
-| Conduction acceptance | [Independent source/wheel evidence](../packages/galerkin/docs/thermal_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_independent_validation.md) |
-| Region materials | [Per-region heat, elastic and thermoelastic materials; layered references](../packages/galerkin/docs/multimaterial.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/multimaterial.md) |
-| Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](../packages/galerkin/docs/prescribed_temperature_thermoelasticity.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md) |
-| Mechanical-stage acceptance | [Independent original 3D law](../packages/galerkin/docs/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md) |
-| Prescribed flux and Robin boundaries | [Outward flux and convection](../packages/galerkin/docs/thermal_flux_robin.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin.md) |
-| Flux/Robin acceptance | [Independent boundary checks](../packages/galerkin/docs/thermal_flux_robin_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_flux_robin_independent_validation.md) |
-| Steady heat document | [Headless JSON/API/CLI](../packages/simcase/docs/thermal_steady2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady2d.md) |
-| Heat region documents | [Steady and transient, materials table and shapes](../packages/simcase/docs/thermal_regions2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_regions2d.md) |
-| Thermal document acceptance | [Independent document checks](../packages/simcase/docs/thermal_simcase_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_simcase_independent_validation.md) |
-| Steady boundary document | [Side-constant flux/convection, v1/v2 fields](../packages/simcase/docs/thermal_steady_boundary2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_steady_boundary2d.md) |
-| Steady boundary acceptance | [Analytic, element and convergence gates](../packages/simcase/docs/steady_boundary_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/steady_boundary_independent_validation.md) |
-| Steady heat Studio | [Dedicated view, errors and resource policy](../packages/simcase/docs/thermal_studio.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_studio.md) |
-| Steady Studio acceptance | [Independent Studio checks](../packages/simcase/docs/studio_thermal_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/studio_thermal_independent_validation.md) |
-| Transient heat engine | [Backward Euler, Dirichlet and insulation](../packages/galerkin/docs/transient_heat.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat.md) |
-| Transient heat validation | [Temporal and spatial gates](../packages/galerkin/docs/transient_heat_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md) |
-| Transient heat acceptance | [Independent references](../packages/galerkin/docs/transient_heat_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/transient_heat_independent_validation.md) |
-| Transient heat document | [Input, time axes and saved histories](../packages/simcase/docs/thermal_transient2d.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient2d.md) |
-| Transient heat Studio | [Time index, field and history views](../packages/simcase/docs/thermal_transient_studio.md) | [한국어](../packages/simcase/docs/locales/ko/pages/thermal_transient_studio.md) |
-| Transient Studio acceptance | [Independent Studio checks](../packages/simcase/docs/studio_transient_thermal_independent_validation.md) | [한국어](../packages/simcase/docs/locales/ko/pages/studio_transient_thermal_independent_validation.md) |
-| Steady heat-to-mechanics workflow | [Same-mesh one-way workflow](../packages/galerkin/docs/thermal_mechanical_workflow.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_workflow.md) |
-| Workflow acceptance | [Independent workflow checks](../packages/galerkin/docs/thermal_mechanical_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermal_mechanical_independent_validation.md) |
-| Prescribed-temperature traction | [Total traction with thermal strain](../packages/galerkin/docs/thermoelastic_traction.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction.md) |
-| Thermoelastic traction acceptance | [Independent loads and energy](../packages/galerkin/docs/thermoelastic_traction_independent_validation.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/thermoelastic_traction_independent_validation.md) |
+| Transient heat to quasistatic mechanics | [Stored-index API and independent gates](packages/galerkin/transient_thermal_mechanical.md) | [한국어](locales/ko/pages/packages/galerkin/transient_thermal_mechanical.md) |
+| 3D PEC cavity engine | [API, units and convergence](packages/galerkin/cavity_solver.md) | [한국어](locales/ko/pages/packages/galerkin/cavity_solver.md) |
+| Lossy material cavity | [Complex resonances, Q, wall loss and references](packages/galerkin/material_cavity.md) | [한국어](locales/ko/pages/packages/galerkin/material_cavity.md) |
+| Cavity document and CLI | [Input and saved fields](packages/simcase/cavity3d.md) | [한국어](locales/ko/pages/packages/simcase/cavity3d.md) |
+| Vector subspace tracking | [Opt-in cluster sweeps](packages/simcase/vector_subspace_tracking.md) | [한국어](locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
+| Complex vector eigenspaces | [Preservation and limits](packages/galerkin/eigenspace_reliability.md) | [한국어](locales/ko/pages/packages/galerkin/eigenspace_reliability.md) |
+| Static elasticity | [Plane models and constraints](packages/galerkin/elasticity2d.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity2d.md) |
+| Elasticity acceptance | [Independent continuum checks](packages/galerkin/elasticity2d_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity2d_independent_validation.md) |
+| Boundary traction | [Loads and normals](packages/galerkin/elasticity_traction.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity_traction.md) |
+| Traction acceptance | [Independent forces, work and convergence](packages/galerkin/elasticity_traction_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity_traction_independent_validation.md) |
+| Steady conduction | [Kelvin, heat flux and boundary signs](packages/galerkin/thermal_steady2d.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_steady2d.md) |
+| Conduction acceptance | [Independent source/wheel evidence](packages/galerkin/thermal_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_independent_validation.md) |
+| Region materials | [Per-region heat, elastic and thermoelastic materials; layered references](packages/galerkin/multimaterial.md) | [한국어](locales/ko/pages/packages/galerkin/multimaterial.md) |
+| Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](packages/galerkin/prescribed_temperature_thermoelasticity.md) | [한국어](locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity.md) |
+| Mechanical-stage acceptance | [Independent original 3D law](packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) |
+| Prescribed flux and Robin boundaries | [Outward flux and convection](packages/galerkin/thermal_flux_robin.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_flux_robin.md) |
+| Flux/Robin acceptance | [Independent boundary checks](packages/galerkin/thermal_flux_robin_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_flux_robin_independent_validation.md) |
+| Steady heat document | [Headless JSON/API/CLI](packages/simcase/thermal_steady2d.md) | [한국어](locales/ko/pages/packages/simcase/thermal_steady2d.md) |
+| Heat region documents | [Steady and transient, materials table and shapes](packages/simcase/thermal_regions2d.md) | [한국어](locales/ko/pages/packages/simcase/thermal_regions2d.md) |
+| Thermal document acceptance | [Independent document checks](packages/simcase/thermal_simcase_independent_validation.md) | [한국어](locales/ko/pages/packages/simcase/thermal_simcase_independent_validation.md) |
+| Steady boundary document | [Side-constant flux/convection, v1/v2 fields](packages/simcase/thermal_steady_boundary2d.md) | [한국어](locales/ko/pages/packages/simcase/thermal_steady_boundary2d.md) |
+| Steady boundary acceptance | [Analytic, element and convergence gates](packages/simcase/steady_boundary_independent_validation.md) | [한국어](locales/ko/pages/packages/simcase/steady_boundary_independent_validation.md) |
+| Steady heat Studio | [Dedicated view, errors and resource policy](packages/simcase/thermal_studio.md) | [한국어](locales/ko/pages/packages/simcase/thermal_studio.md) |
+| Steady Studio acceptance | [Independent Studio checks](packages/simcase/studio_thermal_independent_validation.md) | [한국어](locales/ko/pages/packages/simcase/studio_thermal_independent_validation.md) |
+| Transient heat engine | [Backward Euler, Dirichlet and insulation](packages/galerkin/transient_heat.md) | [한국어](locales/ko/pages/packages/galerkin/transient_heat.md) |
+| Transient heat validation | [Temporal and spatial gates](packages/galerkin/transient_heat_validation.md) | [한국어](locales/ko/pages/packages/galerkin/transient_heat_validation.md) |
+| Transient heat acceptance | [Independent references](packages/galerkin/transient_heat_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/transient_heat_independent_validation.md) |
+| Transient heat document | [Input, time axes and saved histories](packages/simcase/thermal_transient2d.md) | [한국어](locales/ko/pages/packages/simcase/thermal_transient2d.md) |
+| Transient heat Studio | [Time index, field and history views](packages/simcase/thermal_transient_studio.md) | [한국어](locales/ko/pages/packages/simcase/thermal_transient_studio.md) |
+| Transient Studio acceptance | [Independent Studio checks](packages/simcase/studio_transient_thermal_independent_validation.md) | [한국어](locales/ko/pages/packages/simcase/studio_transient_thermal_independent_validation.md) |
+| Steady heat-to-mechanics workflow | [Same-mesh one-way workflow](packages/galerkin/thermal_mechanical_workflow.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_mechanical_workflow.md) |
+| Workflow acceptance | [Independent workflow checks](packages/galerkin/thermal_mechanical_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_mechanical_independent_validation.md) |
+| Prescribed-temperature traction | [Total traction with thermal strain](packages/galerkin/thermoelastic_traction.md) | [한국어](locales/ko/pages/packages/galerkin/thermoelastic_traction.md) |
+| Thermoelastic traction acceptance | [Independent loads and energy](packages/galerkin/thermoelastic_traction_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermoelastic_traction_independent_validation.md) |
 
 ## Benchmarks
 
@@ -87,10 +89,10 @@ installing the `openphysics` reservation does not install the suite.
 
 | Package | English | 한국어 |
 |---|---|---|
-| galerkin | [English](../packages/galerkin/docs/overview.md) | [한국어](../packages/galerkin/docs/locales/ko/pages/overview.md) |
-| galerkin-refsol | [English](../packages/galerkin-refsol/docs/overview.md) | [한국어](../packages/galerkin-refsol/docs/locales/ko/pages/overview.md) |
-| meshine | [English](../packages/meshine/docs/overview.md) | [한국어](../packages/meshine/docs/locales/ko/pages/overview.md) |
-| gmshio | [English](../packages/gmshio/docs/overview.md) | [한국어](../packages/gmshio/docs/locales/ko/pages/overview.md) |
-| physmat | [English](../packages/physmat/docs/overview.md) | [한국어](../packages/physmat/docs/locales/ko/pages/overview.md) |
-| simcase | [English](../packages/simcase/docs/overview.md) | [한국어](../packages/simcase/docs/locales/ko/pages/overview.md) |
-| openphysics | [English](../packages/openphysics/docs/overview.md) | [한국어](../packages/openphysics/docs/locales/ko/pages/overview.md) |
+| galerkin | [English](packages/galerkin/overview.md) | [한국어](locales/ko/pages/packages/galerkin/overview.md) |
+| galerkin-refsol | [English](packages/galerkin-refsol/overview.md) | [한국어](locales/ko/pages/packages/galerkin-refsol/overview.md) |
+| meshine | [English](packages/meshine/overview.md) | [한국어](locales/ko/pages/packages/meshine/overview.md) |
+| gmshio | [English](packages/gmshio/overview.md) | [한국어](locales/ko/pages/packages/gmshio/overview.md) |
+| physmat | [English](packages/physmat/overview.md) | [한국어](locales/ko/pages/packages/physmat/overview.md) |
+| simcase | [English](packages/simcase/overview.md) | [한국어](locales/ko/pages/packages/simcase/overview.md) |
+| openphysics | [English](packages/openphysics/overview.md) | [한국어](locales/ko/pages/packages/openphysics/overview.md) |

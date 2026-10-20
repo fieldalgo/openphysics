@@ -3,7 +3,7 @@
 """Stored-index, one-way transient heat to small-strain quasistatic mechanics.
 
 Heat is computed separately. No interpolation, inertia, damping or feedback.
-See docs/transient_thermal_mechanical.md for the validation and memory contract.
+See docs/packages/galerkin/transient_thermal_mechanical.md for the validation and memory contract.
 """
 from collections.abc import Mapping
 from dataclasses import dataclass
