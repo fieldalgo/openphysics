@@ -105,21 +105,49 @@ no other boundary touches keeps its nodes on the exact circle. Any other circle
 is meshed as a 128-sided polygon like the other shapes, so neighbouring regions
 share one boundary.
 
-**Known meshing limit.** meshine has no protection for small input angles or
-near-coincident vertices. A circle that touches or crosses another boundary, or
-a sharp polygon corner, can keep refinement running without end; the run does
-not fail on its own. Whether a crossing finishes depends on where the circle's
-polygon vertices fall, not only on the angle. Measured on the shipped example
-(heater r = 2 mm), each case given 40 to 150 s:
+**Meshing near small angles.** A circle that touches or crosses another
+boundary, or a sharp polygon corner, makes an input angle below 60 degrees,
+where plain Ruppert refinement does not finish. meshine treats such corners,
+refuses an input it still cannot resolve with an error, and drops the
+sub-resolution edges that clipping can leave
+([meshine overview](https://github.com/fieldalgo/openphysics/blob/main/packages/meshine/docs/overview.md#small-input-angles)).
+Every placement of the shipped example's heater (r = 2 mm) that used to run
+without end now meshes. Measured on Linux, best of five runs:
 
-| Heater placed across | Did not finish | Meshed in under 4 s |
-| --- | --- | --- |
-| The bottom side | tangent; 18, 20, 25, 35 and 45 degrees | 30, 41, 50 and 60 degrees |
-| The plate's top edge (from above) | tangent; 18, 30 and 45 degrees | 35, 41, 50 and 60 degrees |
+| Heater placed across | Crossing | Time | Triangles | Smallest angle |
+| --- | --- | --- | --- | --- |
+| The bottom side | tangent | 0.51 s | 3030 | 1.41° |
+| | 18° | 0.22 s | 2093 | 18.28° |
+| | 20° | 0.19 s | 2062 | 21.09° |
+| | 25° | 0.20 s | 2018 | 23.91° |
+| | 35° | 0.25 s | 1979 | 28.11° |
+| | 45° | 0.13 s | 1716 | 28.45° |
+| The plate's top edge (from above) | tangent | 0.78 s | 3942 | 1.41° |
+| | 18° | 0.51 s | 2554 | 18.28° |
+| | 30° | 0.26 s | 2602 | 28.39° |
+| | 45° | 0.18 s | 2116 | 28.52° |
 
-A 0.001 mm clearance from the bottom side meshed in under 4 s. The reliable
-choice is to keep shapes clear of other boundaries. Electromagnetic documents
-share this limit.
+The heater is meshed as a 128-sided polygon, so its corner with the edge is
+1.41° when it is tangent and differs from the nominal crossing angle by up to
+1.4° otherwise (18.28° at 18°, 21.09° at 20°). Where that corner is below the
+28° bound, the triangle in it keeps the corner's angle. Every triangle below
+28° lies within 0.03 mm of the touch or crossing point, and every triangle
+reaching farther than 0.1 mm from it is at least 28.0°. Region areas equal the
+clipped geometry to 1e-12 mm², except at 45°: there clipping leaves an edge of
+6.3e-7 mm (1.4e-8 of the domain diagonal), which meshine drops, and the region
+areas change by 3.1e-9 mm². The 30, 41, 50 and 60 degree crossings and a
+0.001 mm clearance from the bottom side, which meshed before, give the same
+meshes node for node. Crossings of either edge at every odd angle from 1 to 89
+degrees mesh in at most 1.1 s.
+
+What remains: termination is measured on these cases, not proved, and only on
+Linux. An input meshine still cannot handle ends with an error instead of
+running on: the point cap, the round limit, or a boundary point the
+triangulation cannot resolve, which the error names (for example a vertex about
+1e-9 to 1e-7 of the domain diagonal off an edge it does not belong to; move it
+onto the edge or clear of it). Shapes clear of other boundaries still give the
+best triangles. Electromagnetic documents use the same mesher and behave the
+same way.
 
 meshine does not produce the same node positions for one geometry written in
 different length units. Results in mm, m and um therefore agree to
@@ -159,6 +187,7 @@ comparison:
 | 19 invalid documents, a covered source region, a shape outside the domain and a shape below the sliver limit | Refused with `DocumentError` |
 | A shape covered by a later shape | No triangles; named in the run log |
 | Heater moved across the plate's top edge | Meshes (in a subprocess with a 300 s limit) as a polygon; heat balance <= 1e-10 |
+| Heater tangent to the bottom side or the plate's top edge, or crossing the side at 18, 35 and 45 degrees and the edge at 18 and 45 degrees (7 placements that did not finish before) | Meshes in a subprocess with a 120 s limit, in under 10 s; tags exactly the four sides; region areas equal `resolve_regions` to 1e-9 mm^2 (1e-8 at 45 degrees); smallest angle >= the smaller of the input corner and 28 degrees, less 1e-6 |
 | Exact-circle rule | Only a circle clear of every other boundary, with no later shape inside it, is meshed as an exact circle |
 | A concave shape that clips to a polygon plus a line piece | Only the polygon part is meshed; heat balance <= 1e-10; an electromagnetic document keeps its exact circle |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
@@ -228,8 +257,10 @@ the engine validation in [multimaterial](https://github.com/fieldalgo/openphysic
 - Studio refuses steady and transient region documents (its heat views read `mesh.subdivisions`);
   use the CLI or Python API.
 - Piecewise-constant isotropic properties; perfect contact at interfaces.
-- A circle touching or shallowly crossing another boundary, or a sharp polygon
-  corner, can make meshing run without end (see Mesh and solve).
+- Next to a circle that touches or shallowly crosses another boundary, or a
+  sharp polygon corner, triangles in either region can be as sharp as the input
+  corner or a little sharper (measured 13.0° beside a 14° polygon corner); an
+  input meshine cannot resolve ends with an error (see Mesh and solve).
 - Plane geometry of unit depth; no thermal properties from built-in materials.
 - The VTU export (`simcase.export`, extra `simcase[export]`) does not accept the
   region layouts yet; it refuses them as an unsupported field layout.
