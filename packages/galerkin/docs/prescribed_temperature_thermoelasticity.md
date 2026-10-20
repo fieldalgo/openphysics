@@ -185,8 +185,9 @@ simcase or Studio integration is included. Boundary tags do not certify units
 or provenance. Callable body forces are integrated numerically, so highly
 oscillatory inputs require an independently adequate mesh/quadrature.
 
-This document and its English example are included in the source-distribution
-manifest and required byte-asset checks. Installed-wheel consumer checks are
-configured to execute the verified archived example with isolated Python.
-Inclusion and check configuration are not execution results; confirm actual
-build, installation and validation outcomes for the exact candidate.
+This document and its English example are not shipped; sdists carry no
+documents, tests or examples. Installed-wheel consumer checks are configured to copy the
+checkout's tracked example outside the checkout and execute it with isolated
+Python against the installed wheels. Check configuration is not an execution
+result; confirm actual build, installation and validation outcomes for the
+exact candidate.

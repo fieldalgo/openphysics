@@ -262,5 +262,5 @@ component gates and include copy/stale/invalid/component supports, cooling,
 negative/zero alpha, common reference shift, side reactions, nonzero support work
 and actual direct-math wrong-PE/centroid-energy negative controls. These producer
 checks are separate from independent acceptance and release/installed evidence.
-No Windows, Actions, distribution inclusion or performance success is implied
-by the guide or by an example. Shared release manifests remain a separate review.
+No Windows, Actions or performance success is implied by the guide or by an
+example. The guide and examples are not shipped in the distributions.

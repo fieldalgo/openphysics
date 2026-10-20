@@ -41,8 +41,8 @@ exterior boundary, not an interior node or a trusted boundary tag alone.
 Unselected natural edges have insulation. Boundary node tags can construct the
 Dirichlet mapping. Optional prescribed outward flux and Robin edge-tag inputs,
 including additional result fields and modified balance equations, are documented
-in the source-tree guide `docs/thermal_flux_robin.md`. Distribution inclusion of
-that guide/example is a separate release step. The equations below describe
+in the source-tree guide `docs/thermal_flux_robin.md`. That guide and its
+example are not shipped in the distributions. The equations below describe
 the default case without those inputs.
 
 All temperatures are specified in K; no Celsius conversion or reference
@@ -193,5 +193,5 @@ region (piecewise-constant regions are in [multimaterial](multimaterial.md)),
 anisotropic conductivity, 3D, thermoelastic coupling, simcase or Studio support
 is included. Only existing NumPy/SciPy and original mathematical formulas are
 used. No third-party solver source or new runtime dependency is introduced.
-Document/example distribution inclusion is a separate packaging responsibility;
-this feature does not alter the shared MANIFEST or CI asset specification.
+Documents and examples stay in the repository and are not shipped in the
+distributions.

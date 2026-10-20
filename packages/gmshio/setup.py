@@ -3,10 +3,10 @@
 """Build hook: the package description is README.md with absolute repository links.
 
 README.md uses links relative to this package directory so that they work on
-GitHub and inside the sdist. On PyPI there is no repository next to the page,
-so the description stored in the package metadata rewrites them to GitHub URLs
-pinned to one source revision: links to blob pages, images to raw files and
-bare #anchors to this README. README.md itself is not changed.
+GitHub. The sdist ships no docs, and on PyPI there is no repository next to
+the page, so the description stored in the package metadata rewrites them to
+GitHub URLs pinned to one source revision: links to blob pages, images to raw
+files and bare #anchors to this README. README.md itself is not changed.
 
 Revision: OPENPHYSICS_DOCS_REF if set (a release tag such as v0.2.0), otherwise
 the checkout's commit, otherwise main. A wheel built from an unpacked sdist

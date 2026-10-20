@@ -1,2 +1,8 @@
-include docs/overview.md
-include docs/locales/ko/pages/overview.md
+# The sdist holds the package code, README.md, LICENSE, NOTICE and build files
+# only; ci/check_distributions.py checks this. Tests, docs, examples and tools
+# stay in the repository and are never shipped. setuptools would otherwise add
+# tests/test*.py on its own. This file is identical in every package.
+prune tests
+prune docs
+prune examples
+prune tools

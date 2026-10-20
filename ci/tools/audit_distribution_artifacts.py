@@ -12,7 +12,6 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
-import zipfile
 
 
 def audit(source_root, artifacts):
@@ -48,24 +47,21 @@ def audit(source_root, artifacts):
         recorded[name] = digest
     if recorded != actual:
         raise RuntimeError("artifact checksums are missing or differ")
+    sdist_files = {}
     for sdist in sdists:
-        checker.check_sdist_assets(sdist)
-    runtime = {}
+        sdist_files[sdist.name] = checker.check_sdist(sdist)
+    shipped = {}
     for wheel in wheels:
         package = checker.parse_wheel_filename(wheel.name)[0]
-        with zipfile.ZipFile(wheel) as archive:
-            for relative in checker.RUNTIME_MODULE_ASSETS.get(package, ()):
-                source = (source_root / "packages" / package / relative).read_bytes()
-                if archive.read(relative) != source:
-                    raise RuntimeError(f"runtime wheel bytes differ: {package}/{relative}")
-                runtime[f"{package}/{relative}"] = hashlib.sha256(source).hexdigest()
+        for relative, digest in checker.check_wheel(wheel).items():
+            shipped[f"{package}/{relative}"] = digest
     return {
-        "scope": "retained checksums, required sdist bytes/links and runtime wheel bytes",
+        "scope": "retained checksums; exact sdist and wheel contents against the checkout",
         "source_root": str(source_root),
         "checker_sha256": hashlib.sha256(checker_path.read_bytes()).hexdigest(),
         "artifact_sha256": actual,
-        "required_assets": sum(map(len, checker.DOCUMENT_ASSETS.values())),
-        "runtime_sha256": runtime,
+        "sdist_files": sum(map(len, sdist_files.values())),
+        "shipped_sha256": shipped,
         "not_performed": ["build", "twine strict", "installed consumer", "numerical test",
                           "platform execution", "source Git provenance authentication"],
     }

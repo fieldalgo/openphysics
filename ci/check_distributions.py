@@ -1,18 +1,22 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Build all distributions and exercise their wheels in an isolated temporary venv.
+"""Build all distributions, check their contents and exercise the wheels in a fresh venv.
 
-Run with the pinned validation requirements installed. No upload is performed.
-The temporary directory, test copies and working directory are outside the checkout
-so neither editable installs nor the root conftest can supply package code.
+Each sdist holds exactly its package code, README, LICENSE, NOTICE and build files,
+and each wheel exactly its package code, all byte-identical to the checkout. Tests,
+docs and examples are never shipped: the installed checks copy the tracked test and
+example files of this checkout. Run with the pinned validation requirements
+installed. No upload is performed. The temporary directory, test copies and
+working directory are outside the checkout so neither editable installs nor the
+root conftest can supply package code.
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import os
-import posixpath
 from pathlib import Path
 import re
 import shutil
@@ -22,246 +26,20 @@ import tempfile
 import tarfile
 import venv
 import zipfile
-from urllib.parse import unquote, urlsplit
 
 from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-RUNTIME_MODULE_ASSETS = {"galerkin": ("galerkin/transient_heat.py", "galerkin/thermal.py",
-                         "galerkin/transient_thermal_mechanical.py"),
-                         "galerkin-refsol": ("refsol/transient_heat.py",),
-                         "simcase": ("simcase/steady_boundary_contract.py",
-                                     "simcase/schema.py", "simcase/transient_thermal_contract.py",
-                                     "simcase/transient_thermal.py", "simcase/runner.py",
-                                     "simcase/cli.py", "simcase/examples.py", "simcase/__init__.py",
-                                     "simcase/thermal.py", "simcase/studio/server.py",
-                                     "simcase/studio/thermal_api.py",
-                                     "simcase/studio/transient_thermal_api.py",
-                                     "simcase/subspace_tracking.py", "simcase/subspace_result.py") }
-STUDIO_RESOURCE_ASSETS = ("simcase/studio/static/index.html",
-                          "simcase/studio/static/thermal.js",
-                          "simcase/studio/static/transient_thermal.js")
-DOCUMENT_ASSETS = {'galerkin': (
-              'galerkin/transient_thermal_mechanical.py',
-              'docs/transient_thermal_mechanical.md',
-              'docs/locales/ko/pages/transient_thermal_mechanical.md',
-              'examples/transient_thermal_mechanical.py',
-              'tests/test_transient_thermal_mechanical.py',
-              'tests/test_transient_thermal_mechanical_physics.py',
-              'galerkin/thermal.py',
-              'galerkin/transient_heat.py',
-              'docs/transient_heat.md',
-              'docs/locales/ko/pages/transient_heat.md',
-              'docs/transient_heat_validation.md',
-              'docs/locales/ko/pages/transient_heat_validation.md',
-              'docs/transient_heat_independent_validation.md',
-              'docs/locales/ko/pages/transient_heat_independent_validation.md',
-              'examples/transient_heat_convergence.py',
-              'tests/test_transient_heat.py',
-               'tests/test_transient_heat_tiny_domain.py',
-               'tests/test_transient_heat_general_state.py',
-              'tests/test_transient_heat_independent_validation.py',
-              'tests/transient_heat_independent_oracle.py',
-              'tests/transient_heat_independent_cases.py',
-              'tests/transient_heat_independent_consumer.py',
-              'galerkin/thermoelasticity.py',
-              'docs/thermoelastic_traction.md',
-              'docs/locales/ko/pages/thermoelastic_traction.md',
-              'examples/thermoelastic_traction.py',
-              'tests/test_thermoelastic_traction.py',
-              'tests/test_thermoelastic_traction_convergence.py',
-              'docs/thermoelastic_traction_independent_validation.md',
-              'docs/locales/ko/pages/thermoelastic_traction_independent_validation.md',
-              'tests/test_thermoelastic_traction_independent_validation.py',
-              'tests/thermoelastic_traction_independent_oracle.py',
-              'tests/thermoelastic_traction_independent_consumer.py',
-              'docs/thermal_mechanical_independent_validation.md',
-              'docs/locales/ko/pages/thermal_mechanical_independent_validation.md',
-              'tests/test_thermal_mechanical_independent_validation.py',
-              'tests/thermal_mechanical_independent_oracle.py',
-              'galerkin/thermal_mechanical.py',
-              'docs/thermal_mechanical_workflow.md',
-              'docs/locales/ko/pages/thermal_mechanical_workflow.md',
-              'examples/thermal_mechanical_workflow.py',
-              'tests/test_thermal_mechanical_workflow.py',
-              'tests/test_thermal_mechanical_workflow_physics.py',
-              'tests/thermal_mechanical_workflow_oracle.py',
-              'docs/cavity_solver.md',
-              'docs/material_cavity.md',
-              'docs/locales/ko/pages/material_cavity.md',
-              'docs/eigenspace_reliability.md',
-              'docs/elasticity2d.md',
-              'docs/elasticity2d_independent_validation.md',
-              'examples/elasticity2d.py',
-              'tests/eigenspace_reliability_oracle.py',
-              'tests/elasticity2d_independent_oracle.py',
-              'tests/test_elasticity2d_independent_validation.py',
-              'docs/thermal_steady2d.md',
-              'examples/thermal_steady2d.py',
-              'docs/elasticity_traction.md',
-              'examples/elasticity_traction.py',
-              'docs/elasticity_traction_independent_validation.md',
-              'tests/traction_independent_oracle.py',
-              'tests/test_traction_independent_validation.py',
-              'docs/thermal_independent_validation.md',
-              'docs/thermal_independent_validation_manifest.json',
-              'tests/thermal_independent_oracle.py',
-              'tests/test_thermal_independent_validation.py',
-              'docs/prescribed_temperature_thermoelasticity.md',
-              'examples/prescribed_temperature_thermoelasticity.py',
-              'docs/prescribed_temperature_thermoelasticity_independent_validation.md',
-              'tests/thermoelasticity_independent_oracle.py',
-              'tests/test_thermoelasticity_independent_validation.py',
-              'docs/overview.md', 'docs/locales/ko/pages/overview.md',
-              'docs/milestone_validation.md',
-              'docs/locales/ko/pages/milestone_validation.md',
-              'docs/locales/ko/pages/cavity_solver.md',
-              'docs/locales/ko/pages/eigenspace_reliability.md',
-              'docs/locales/ko/pages/elasticity2d.md',
-              'docs/locales/ko/pages/elasticity2d_independent_validation.md',
-              'docs/locales/ko/pages/elasticity_traction.md',
-              'docs/locales/ko/pages/elasticity_traction_independent_validation.md',
-              'docs/locales/ko/pages/prescribed_temperature_thermoelasticity.md',
-              'docs/locales/ko/pages/prescribed_temperature_thermoelasticity_independent_validation.md',
-              'docs/locales/ko/pages/thermal_flux_robin.md',
-              'docs/locales/ko/pages/thermal_flux_robin_independent_validation.md',
-              'docs/locales/ko/pages/thermal_independent_validation.md',
-              'docs/locales/ko/pages/thermal_steady2d.md',
-              'docs/thermal_flux_robin.md',
-              'docs/thermal_flux_robin_independent_validation.md',
-              'examples/thermal_flux_robin.py',
-              'tests/thermal_flux_robin_independent_oracle.py',
-              'tests/test_thermal_flux_robin_independent_validation.py',
-              'galerkin/materials.py',
-              'docs/multimaterial.md',
-              'docs/locales/ko/pages/multimaterial.md',
-              'tests/test_thermal_multimaterial.py',
-              'tests/test_elasticity_multimaterial.py',
-              'tests/test_thermoelastic_multimaterial.py',
-              'tests/test_transient_heat_multimaterial.py'),
- 'galerkin-refsol': (
-              'refsol/thermal_multilayer.py',
-              'tests/test_thermal_multilayer_reference.py',
-              'refsol/elasticity_multilayer.py',
-              'tests/test_elasticity_multilayer_reference.py',
-              'refsol/transient_heat_multilayer.py',
-              'tests/test_transient_heat_multilayer_reference.py',
-              'tests/test_fiber_group_index.py',
-              'refsol/material_cavity.py',
-              'tests/test_material_cavity_reference.py',
-              'refsol/wall_loss.py',
-              'tests/test_wall_loss_reference.py',
-              'tests/test_fiber_fields.py',
-              'refsol/transient_heat.py',
-              'tests/test_transient_heat_reference.py',
-              'refsol/thermoelastic_traction.py',
-                     'tests/test_thermoelastic_traction_reference.py',
-                     'refsol/elasticity.py',
-                     'refsol/thermal.py',
-                     'refsol/elasticity_traction.py',
-                     'refsol/thermoelasticity.py',
-                     'docs/overview.md', 'docs/locales/ko/pages/overview.md',
-                     'refsol/thermal_boundary.py'),
- 'simcase': (
-              'simcase/subspace_tracking.py',
-              'simcase/subspace_result.py',
-              'examples/vector_fiber_subspace_sweep.json',
-              'tests/test_subspace_tracking.py',
-              'tests/test_subspace_sweep.py',
-              'tests/test_subspace_fiber_validation.py',
-              'tests/subspace_fiber_fixture.py',
-              'docs/vector_subspace_tracking.md',
-              'docs/locales/ko/pages/vector_subspace_tracking.md',
-              'simcase/studio/thermal_api.py',
-              'simcase/studio/static/index.html',
-              'simcase/studio/static/thermal.js',
-              'tests/studio_steady_thermal.cjs',
-              'tests/test_studio_steady_thermal_http.py',
-              'tests/test_studio_thermal_acceptance.py',
-              'tests/studio_thermal_independent_fixtures.py',
-              'tests/test_studio_thermal_lifecycle.py',
-              'tests/test_studio_transient_server_http.py',
-              'tests/studio_transient_lifecycle_fixtures.py',
-              'tests/test_studio_transient_lifecycle.py',
-              'simcase/studio/static/transient_thermal.js',
-              'simcase/studio/transient_thermal_api.py',
-              'tests/studio_transient_thermal.cjs',
-              'tests/studio_transient_independent_fixtures.py',
-              'tests/test_studio_transient_thermal_acceptance.py',
-              'docs/thermal_transient_studio.md',
-              'docs/studio_transient_thermal_independent_validation.md',
-              'docs/locales/ko/pages/studio_transient_thermal_independent_validation.md',
-              'docs/locales/ko/pages/thermal_transient_studio.md',
-              'docs/thermal_studio.md',
-              'docs/locales/ko/pages/thermal_studio.md',
-              'docs/studio_thermal_independent_validation.md',
-              'docs/locales/ko/pages/studio_thermal_independent_validation.md',
-              'tests/test_steady_boundary_schema.py',
-              'tests/test_steady_boundary_runtime.py',
-              'examples/thermal_boundary.json',
-              'tests/test_steady_boundary_platform.py',
-              'tests/test_studio_steady_boundary.py',
-              'tests/studio_steady_boundary.cjs',
-              'docs/thermal_steady_boundary2d.md',
-              'docs/locales/ko/pages/thermal_steady_boundary2d.md',
-              'docs/steady_boundary_independent_validation.md',
-              'docs/locales/ko/pages/steady_boundary_independent_validation.md',
-              'tests/steady_boundary_independent_oracle.py',
-              'tests/steady_boundary_independent_cases.py',
-              'tests/steady_boundary_independent_consumer.py',
-              'tests/test_steady_boundary_independent_validation.py',
-              'simcase/steady_boundary_contract.py',
-              'tests/test_steady_boundary_contract.py',
-              'simcase/schema.py',
-              'simcase/transient_thermal_contract.py',
-              'simcase/transient_thermal.py',
-              'simcase/runner.py',
-              'simcase/cli.py',
-              'simcase/examples.py',
-              'simcase/__init__.py',
-              'simcase/thermal.py',
-              'simcase/studio/server.py',
-              'docs/thermal_transient2d.md',
-              'docs/locales/ko/pages/thermal_transient2d.md',
-              'examples/transient_thermal_uniform.json',
-              'tests/test_transient_thermal_contract.py',
-              'tests/test_transient_thermal_runtime.py',
-              'tests/test_studio_transient.py',
-              'tests/test_transient_headless_windows.py',
-              'tests/test_transient_headless_independent_validation.py',
-              'tests/transient_headless_independent_oracle.py',
-              'tests/transient_headless_independent_cases.py',
-              'tests/transient_headless_independent_consumer.py',
-              'docs/cavity3d.md',
-             'examples/cavity_box.json',
-             'examples/cavity_lossy_slab.json',
-             'docs/geometry.png',
-             'docs/results.png',
-             'docs/thermal_steady2d.md',
-             'examples/thermal_slab.json',
-             'examples/thermal_mixed.json',
-             'simcase/thermal_regions.py',
-             'docs/thermal_regions2d.md',
-             'docs/locales/ko/pages/thermal_regions2d.md',
-             'examples/thermal_regions.json',
-             'tests/test_thermal_regions.py',
-             'simcase/transient_regions.py',
-             'examples/transient_thermal_regions.json',
-             'tests/test_transient_thermal_regions.py',
-             'tests/studio_thermal.cjs',
-             'docs/overview.md', 'docs/locales/ko/pages/overview.md',
-             'docs/locales/ko/pages/cavity3d.md',
-             'docs/locales/ko/pages/thermal_steady2d.md',
-             'docs/locales/ko/pages/thermal_simcase_independent_validation.md',
-             'docs/thermal_simcase_independent_validation.md',
-             'tests/thermal_simcase_independent_oracle.py',
-             'tests/test_thermal_simcase_independent_validation.py',
-             'tests/thermal_simcase_independent_stale.cjs'),
- 'meshine': ('docs/overview.md', 'docs/locales/ko/pages/overview.md',),
- 'gmshio': ('docs/overview.md', 'docs/locales/ko/pages/overview.md',),
- 'physmat': ('docs/overview.md', 'docs/locales/ko/pages/overview.md',),
- 'openphysics': ('docs/overview.md', 'docs/locales/ko/pages/overview.md',)}
+# A distribution ships its import package and the files below, and nothing else.
+# These top-level folders of packages/<name>/ are never shipped; tests, docs and
+# examples run from the checkout. Nothing here is a list of individual files.
+UNSHIPPED_DIRS = ("tests", "docs", "examples", "tools")
+SDIST_FILES = ("LICENSE", "NOTICE", "README.md", "pyproject.toml", "setup.py", "MANIFEST.in")
+GENERATED_SDIST_FILES = ("PKG-INFO", "setup.cfg")
+UNSHIPPED_FILES = (".gitignore",)
+EGG_INFO = re.compile(r"[^/]+\.egg-info/[^/]+")
+STUDIO_STATIC = "simcase/studio/static/"
 
 
 def run(*args, cwd, env=None):
@@ -269,39 +47,116 @@ def run(*args, cwd, env=None):
     subprocess.run(list(map(str, args)), cwd=cwd, env=env, check=True)
 
 
-def check_sdist_assets(sdist):
-    """Require usable README links/examples, with the exact checked-out contents."""
-    name, _ = parse_sdist_filename(sdist.name)
+@functools.cache
+def tracked_repository():
+    """Git-tracked files of the checkout, as repository-relative POSIX paths."""
+    listing = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
+                             check=True, capture_output=True).stdout.decode("utf-8")
+    return frozenset(p for p in listing.split("\0") if p)
+
+
+def source_commit():
+    return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True, encoding="utf-8").stdout.strip()
+
+
+def tracked(name):
+    """Git-tracked files of packages/<name>/, relative to that directory."""
+    prefix = f"packages/{name}/"
+    return {p[len(prefix):] for p in tracked_repository() if p.startswith(prefix)}
+
+
+def shipped_code(name):
+    """Tracked files of the import package(s) in packages/<name>/, which sdist and wheel carry.
+
+    Every tracked top-level entry must be a known file, an unshipped folder or an
+    import package (a folder with __init__.py), so a new kind of file has to be
+    classified here instead of shipping or vanishing silently.
+    """
+    files = tracked(name)
+    code = set()
+    for relative in files:
+        top, _, rest = relative.partition("/")
+        if not rest:
+            if top not in SDIST_FILES + UNSHIPPED_FILES:
+                raise RuntimeError(f"packages/{name}/{top}: unclassified top-level file; "
+                                   "ship it as package code or keep it in an unshipped folder")
+        elif top in UNSHIPPED_DIRS:
+            continue
+        elif f"{top}/__init__.py" in files:
+            code.add(relative)
+        else:
+            raise RuntimeError(f"packages/{name}/{top}/: unclassified top-level folder; "
+                               "only import packages and " + ", ".join(UNSHIPPED_DIRS) + " are allowed")
+    for required in ("LICENSE", "NOTICE", "README.md", "pyproject.toml"):
+        if required not in files:
+            raise RuntimeError(f"packages/{name}/{required} is not tracked")
+    return code
+
+
+def module_name(relative):
+    """Import name of a shipped Python file, e.g. 'simcase/studio/__init__.py' -> 'simcase.studio'."""
+    return relative[:-3].replace("/", ".").removesuffix(".__init__")
+
+
+def archive_members(sdist):
+    """Regular members of an sdist keyed by their path below the distribution root."""
     with tarfile.open(sdist) as archive:
-        # Strip the distribution-root component; no filesystem extraction occurs.
-        files = {p.name.split("/", 1)[1]: p for p in archive.getmembers()
-                 if p.isfile() and "/" in p.name}
-        required = {"LICENSE", "NOTICE", "README.md", "pyproject.toml", "PKG-INFO"}
-        if name == "simcase":
-            required.add("simcase/studio/static/index.html")
-        document_assets = DOCUMENT_ASSETS.get(name, ())
-        required.update(document_assets)
-        if missing := required - files.keys():
-            raise RuntimeError(f"{sdist.name} is missing {sorted(missing)}")
-        for relative in ("LICENSE", "NOTICE", *document_assets):
-            source = ROOT / "packages" / name / relative
-            if archive.extractfile(files[relative]).read() != source.read_bytes():
-                raise RuntimeError(f"{sdist.name}: {relative} differs from the checked-out source")
-        for relative, member in files.items():
-            if not relative.endswith(".md"):
-                continue
-            text = archive.extractfile(member).read().decode("utf-8")
-            # Current package docs use inline links/images with unspaced targets.
-            # This is an archive-path check, not a general Markdown/network validator.
-            for destination in re.findall(r"!?\[[^\]]*\]\(([^\s)]+)\)", text):
-                url = urlsplit(destination)
-                if url.scheme or url.netloc or not url.path:
-                    continue
-                target = posixpath.normpath(posixpath.join(
-                    posixpath.dirname(relative), unquote(url.path)))
-                if target not in files:
-                    raise RuntimeError(
-                        f"{sdist.name}: {relative} links to missing archive file {destination}")
+        members = archive.getmembers()
+        roots = {p.name.split("/", 1)[0] for p in members}
+        if len(roots) != 1:
+            raise RuntimeError(f"{sdist.name} must have exactly one top-level directory")
+        for member in members:
+            if not (member.isfile() or member.isdir()):
+                raise RuntimeError(f"{sdist.name}: {member.name} is not a regular file or directory")
+        return {p.name.split("/", 1)[1]: archive.extractfile(p).read()
+                for p in members if p.isfile() and "/" in p.name}
+
+
+def check_sdist(sdist):
+    """The sdist holds exactly the package code, its top-level files and generated metadata."""
+    name, _ = parse_sdist_filename(sdist.name)
+    source = ROOT / "packages" / name
+    files = archive_members(sdist)
+    expected = shipped_code(name) | {f for f in SDIST_FILES if f in tracked(name)}
+    for relative in sorted(expected):
+        if relative not in files:
+            raise RuntimeError(f"{sdist.name} is missing {relative}")
+        if files[relative] != (source / relative).read_bytes():
+            raise RuntimeError(f"{sdist.name}: {relative} differs from the checked-out source")
+    if "PKG-INFO" not in files:
+        raise RuntimeError(f"{sdist.name} is missing PKG-INFO")
+    unexpected = sorted(f for f in files if f not in expected and f not in GENERATED_SDIST_FILES
+                        and not EGG_INFO.fullmatch(f))
+    if unexpected:
+        raise RuntimeError(f"{sdist.name} ships files that are not package code: {unexpected}")
+    return {relative: hashlib.sha256(files[relative]).hexdigest() for relative in sorted(expected)}
+
+
+def check_wheel(wheel):
+    """The wheel holds exactly the package code plus its dist-info, with LICENSE and NOTICE."""
+    name, version, _, _ = parse_wheel_filename(wheel.name)
+    source = ROOT / "packages" / name
+    code = shipped_code(name)
+    with zipfile.ZipFile(wheel) as archive:
+        names = [n for n in archive.namelist() if not n.endswith("/")]
+        dist_info = {n for n in names if n.split("/", 1)[0].endswith(".dist-info")}
+        for relative in sorted(code):
+            if relative not in names:
+                raise RuntimeError(f"{wheel.name} is missing {relative}")
+            if archive.read(relative) != (source / relative).read_bytes():
+                raise RuntimeError(f"{wheel.name}: {relative} differs from the checked-out source")
+        if unexpected := sorted(set(names) - code - dist_info):
+            raise RuntimeError(f"{wheel.name} ships files that are not package code: {unexpected}")
+        # Every wheel must carry the package's own LICENSE and NOTICE unchanged.
+        for notice in ("LICENSE", "NOTICE"):
+            found = [p for p in dist_info if p.endswith(f".dist-info/licenses/{notice}")]
+            if len(found) != 1:
+                raise RuntimeError(f"{wheel.name} is missing dist-info/licenses/{notice}")
+            if archive.read(found[0]) != (source / notice).read_bytes():
+                raise RuntimeError(f"{wheel.name}: {notice} differs from the checked-out source")
+    return {relative: hashlib.sha256((source / relative).read_bytes()).hexdigest()
+            for relative in sorted(code)}
 
 
 def main():
@@ -327,28 +182,12 @@ def main():
         raise RuntimeError("wheel/sdist package identities and versions must match the seven packages")
     run(sys.executable, "-m", "twine", "check", "--strict", *wheels, *sdists, cwd=ROOT)
     for sdist in sdists:
-        check_sdist_assets(sdist)
+        check_sdist(sdist)
+    shipped = {}  # import-relative path -> SHA-256 of every shipped file
     for wheel in wheels:
-        with zipfile.ZipFile(wheel) as archive:
-            names = archive.namelist()
-            package_name = parse_wheel_filename(wheel.name)[0]
-            for relative in RUNTIME_MODULE_ASSETS.get(package_name, ()):
-                expected_bytes = (ROOT / "packages" / package_name / relative).read_bytes()
-                if archive.read(relative) != expected_bytes:
-                    raise RuntimeError(f"{wheel.name}: runtime module differs: {relative}")
-            if package_name == "simcase":
-                for relative in STUDIO_RESOURCE_ASSETS:
-                    if archive.read(relative) != (ROOT / "packages/simcase" / relative).read_bytes():
-                        raise RuntimeError(f"{wheel.name}: Studio resource differs: {relative}")
-            # Every wheel must carry the package's own LICENSE and NOTICE unchanged.
-            for notice in ("LICENSE", "NOTICE"):
-                found = [p for p in names if p.endswith(f".dist-info/licenses/{notice}")]
-                if len(found) != 1:
-                    raise RuntimeError(f"{wheel.name} is missing dist-info/licenses/{notice}")
-                if archive.read(found[0]) != (ROOT / "packages" / package_name / notice).read_bytes():
-                    raise RuntimeError(f"{wheel.name}: {notice} differs from the checked-out source")
-            if wheel.name.startswith("simcase-") and "simcase/studio/static/index.html" not in names:
-                raise RuntimeError("simcase wheel is missing the Studio page")
+        shipped.update(check_wheel(wheel))
+    if "simcase/studio/static/index.html" not in shipped:
+        raise RuntimeError("simcase wheel is missing the Studio page")
     artifacts = wheels + sdists
     (output / "SHA256SUMS").write_text("".join(
         f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in artifacts))
@@ -383,12 +222,10 @@ def main():
         # license inventory (docs/third-party.md).
         run(sys.executable, ROOT / "ci" / "check_licenses.py", "--python", python,
             "--report", output / "licenses-installed.json", cwd=ROOT)
-        # Verify the new explicit submodules before any numerical consumer runs.
-        runtime_expected = {
-            relative[:-3].replace("/", ".").removesuffix(".__init__"):
-                hashlib.sha256((ROOT / "packages" / package / relative).read_bytes()).hexdigest()
-            for package, relatives in RUNTIME_MODULE_ASSETS.items() for relative in relatives
-        }
+        # Every shipped module must import from the venv with the checked-out bytes
+        # before any numerical consumer runs. __main__ modules would run a CLI.
+        runtime_expected = {module_name(relative): digest for relative, digest in shipped.items()
+                            if relative.endswith(".py") and not relative.endswith("/__main__.py")}
         hash_manifest = output / "installed-module-hashes.json"
         hash_manifest.write_text(json.dumps(runtime_expected, indent=2) + "\n", encoding="utf-8")
         origin_probe = work / "transient_module_origins.py"
@@ -407,9 +244,8 @@ def main():
             + "print(json.dumps(report), flush=True)\n", encoding="utf-8")
         run(python, "-I", origin_probe, output / "transient-module-origins.json", cwd=work, env=env)
         # Verify installed static resources as well as Python module origins.
-        studio_resources = {relative: hashlib.sha256(
-            (ROOT / "packages/simcase" / relative).read_bytes()).hexdigest()
-            for relative in STUDIO_RESOURCE_ASSETS}
+        studio_resources = {relative: digest for relative, digest in shipped.items()
+                            if relative.startswith(STUDIO_STATIC)}
         resource_probe = work / "studio_resource_origins.py"
         resource_probe.write_text(
             "import hashlib, json, sys, simcase\nfrom pathlib import Path\n"
@@ -425,95 +261,108 @@ def main():
             + "Path(sys.argv[1]).write_text(json.dumps(report, indent=2)+'\\n', encoding='utf-8')\n",
             encoding="utf-8")
         run(python, "-I", resource_probe, output / "studio-resource-origins.json", cwd=work, env=env)
-        smoke = work / "wheel_smoke.py"
-        shutil.copy2(ROOT / "ci" / "wheel_smoke.py", smoke)
+        # Installed consumers, tests and examples come from this checkout's tracked
+        # files, copied outside it; distributions carry no tests or examples.
+        # Every copied byte is recorded.
+        repository = tracked_repository()
+        copied = {}
+
+        def copy(source, destination):
+            relative = source.relative_to(ROOT).as_posix()
+            if relative not in repository:
+                raise RuntimeError(f"{relative} is not a tracked file")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            copied[destination.relative_to(work).as_posix()] = {
+                "source": relative, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}
+            return destination
+
+        smoke = copy(ROOT / "ci" / "wheel_smoke.py", work / "wheel_smoke.py")
         run(python, "-I", smoke, cwd=work, env=env)
+        packages = ROOT / "packages"
         tests = work / "tests"
-        tests.mkdir()
+        examples = work / "examples"
         for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
-            shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
-        shutil.copy2(ROOT / "ci" / "test_transient_thermomechanical_wheel.py", tests / "test_transient_thermomechanical_wheel.py")
-        shutil.copy2(ROOT / "ci" / "test_cavity_wheel.py", tests / "test_cavity_wheel.py")
-        shutil.copy2(ROOT / "ci" / "test_multiphysics_wheel.py", tests / "test_multiphysics_wheel.py")
-        shutil.copy2(ROOT / "ci" / "test_thermal_traction_wheel.py", tests / "test_thermal_traction_wheel.py")
-        shutil.copy2(ROOT / "ci" / "test_thermoelasticity_wheel.py", tests / "test_thermoelasticity_wheel.py")
-        shutil.copy2(ROOT / "ci" / "test_thermal_simcase_wheel.py", tests / "test_thermal_simcase_wheel.py")
-        # Preserve the independent acceptance files verbatim in the installed suite.
+            copy(packages / package / "tests" / filename, tests / filename)
+        for filename in ("test_transient_thermomechanical_wheel.py", "test_cavity_wheel.py",
+                         "test_multiphysics_wheel.py", "test_thermal_traction_wheel.py",
+                         "test_thermoelasticity_wheel.py", "test_thermal_simcase_wheel.py"):
+            copy(ROOT / "ci" / filename, tests / filename)
+        # The original package tests and independent acceptance files, unchanged.
         for package, filenames in (
             ("simcase", ("thermal_simcase_independent_oracle.py",
-                         "test_thermal_simcase_independent_validation.py")),
+                         "test_thermal_simcase_independent_validation.py",
+                         "test_steady_boundary_schema.py", "test_steady_boundary_runtime.py",
+                         "test_steady_boundary_platform.py", "test_studio_steady_boundary.py",
+                         "test_steady_boundary_contract.py",
+                         "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
+                         "test_studio_transient.py", "test_transient_headless_windows.py",
+                         "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
+                         "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
+                         "test_studio_transient_server_http.py",
+                         "studio_transient_lifecycle_fixtures.py",
+                         "test_studio_transient_lifecycle.py",
+                         "studio_transient_independent_fixtures.py",
+                         "test_studio_transient_thermal_acceptance.py",
+                         "transient_headless_independent_cases.py",
+                         "transient_headless_independent_oracle.py",
+                         "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py")),
             ("galerkin", ("thermal_mechanical_independent_oracle.py",
                           "test_thermal_mechanical_independent_validation.py",
                           "thermal_flux_robin_independent_oracle.py",
-                          "test_thermal_flux_robin_independent_validation.py")),
+                          "test_thermal_flux_robin_independent_validation.py",
+                          "test_transient_heat.py",
+                          "test_transient_heat_tiny_domain.py",
+                          "test_transient_heat_general_state.py",
+                          "test_thermoelastic_traction.py",
+                          "test_thermoelastic_traction_convergence.py",
+                          "test_thermoelastic_traction_independent_validation.py",
+                          "thermoelastic_traction_independent_oracle.py",
+                          "thermoelastic_traction_independent_consumer.py")),
+            ("galerkin-refsol", ("test_transient_heat_reference.py",
+                                 "test_thermoelastic_traction_reference.py")),
         ):
             for filename in filenames:
-                shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
-        # Preserve producer contract/reference tests; independent all runs separately below.
-        for package, filename in (("galerkin", "test_transient_heat.py"),
-                                  ("galerkin-refsol", "test_transient_heat_reference.py")):
-            shutil.copy2(ROOT / "packages" / package / "tests" / filename, tests / filename)
-        # Run original headless contract/runtime/Studio/save tests from the verified sdist.
-        simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
-        with tarfile.open(simcase_sdist) as archive:
-            for filename in ("test_steady_boundary_schema.py", "test_steady_boundary_runtime.py",
-                             "test_steady_boundary_platform.py", "test_studio_steady_boundary.py",
-                             "test_steady_boundary_contract.py",
-                             "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
-                             "test_studio_transient.py", "test_transient_headless_windows.py",
-                             "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
-                             "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
-                             "test_studio_transient_server_http.py",
-                             "studio_transient_lifecycle_fixtures.py",
-                             "test_studio_transient_lifecycle.py",
-                             "studio_transient_independent_fixtures.py",
-                             "test_studio_transient_thermal_acceptance.py",
-                             "transient_headless_independent_cases.py",
-                             "transient_headless_independent_oracle.py",
-                             "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-                (tests / filename).write_bytes(archive.extractfile(member).read())
-        # Hash the verified archived Studio consumer and its complete oracle closure.
+                copy(packages / package / "tests" / filename, tests / filename)
+        for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
+                         "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
+                         "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
+                         "transient_heat_convergence.py", "transient_thermal_mechanical.py"):
+            copy(packages / "galerkin" / "examples" / filename, examples / filename)
+        for filename in ("thermal_slab.json", "thermal_mixed.json", "transient_thermal_uniform.json",
+                         "thermal_boundary.json"):
+            copy(packages / "simcase" / "examples" / filename, examples / filename)
+        # Independent consumers run as their own scripts, apart from the pytest counts.
+        acceptance = work / "transient-acceptance"
+        for filename in ("transient_heat_independent_oracle.py",
+                         "transient_heat_independent_cases.py",
+                         "transient_heat_independent_consumer.py"):
+            copy(packages / "galerkin" / "tests" / filename, acceptance / filename)
+        headless_acceptance = work / "transient-headless-acceptance"
+        for filename in ("transient_headless_independent_oracle.py",
+                         "transient_headless_independent_cases.py",
+                         "transient_headless_independent_consumer.py"):
+            copy(packages / "simcase" / "tests" / filename, headless_acceptance / filename)
+        steady_acceptance = work / "steady-boundary-acceptance"
+        for filename in ("steady_boundary_independent_oracle.py",
+                         "steady_boundary_independent_cases.py",
+                         "steady_boundary_independent_consumer.py"):
+            copy(packages / "simcase" / "tests" / filename, steady_acceptance / filename)
+        node_root = work / "studio-installed-node"
+        node_tests = [str(copy(packages / "simcase" / "tests" / filename, node_root / "tests" / filename))
+                      for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs")]
+        # The copies are working-tree bytes; say whether they match the commit.
+        sources = sorted({entry["source"] for entry in copied.values()})
+        unchanged = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *sources],
+                                   check=False).returncode == 0
+        (output / "consumer-file-hashes.json").write_text(json.dumps(
+            {"commit": source_commit(), "matches_commit": unchanged, "files": copied},
+            indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        # Hash the Studio consumer and its complete oracle closure separately.
         studio_consumer_files = ["studio_transient_independent_fixtures.py","test_studio_transient_thermal_acceptance.py","transient_headless_independent_cases.py","transient_headless_independent_oracle.py"]
         (output / "transient-studio-consumer-assets.json").write_text(
             json.dumps({name: hashlib.sha256((tests / name).read_bytes()).hexdigest()
                         for name in studio_consumer_files}, indent=2) + "\n", encoding="utf-8")
-        # Execute the verified archived example, not a source-tree copy.
-        examples = work / "examples"
-        examples.mkdir()
-        galerkin_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin")
-        with tarfile.open(galerkin_sdist) as archive:
-            for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
-                             "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
-                             "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
-                             "transient_heat_convergence.py", "transient_thermal_mechanical.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
-                (examples / filename).write_bytes(archive.extractfile(member).read())
-            # Preserve new original acceptance files from the verified archive.
-            for filename in ("test_transient_heat_tiny_domain.py",
-                             "test_transient_heat_general_state.py",
-                             "test_thermoelastic_traction.py",
-                             "test_thermoelastic_traction_convergence.py",
-                             "test_thermoelastic_traction_independent_validation.py",
-                             "thermoelastic_traction_independent_oracle.py",
-                             "thermoelastic_traction_independent_consumer.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-                (tests / filename).write_bytes(archive.extractfile(member).read())
-        refsol_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "galerkin-refsol")
-        with tarfile.open(refsol_sdist) as archive:
-            filename = "test_thermoelastic_traction_reference.py"
-            member = next(p for p in archive.getmembers()
-                          if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-            (tests / filename).write_bytes(archive.extractfile(member).read())
-        simcase_sdist = next(p for p in sdists if parse_sdist_filename(p.name)[0] == "simcase")
-        with tarfile.open(simcase_sdist) as archive:
-            for filename in ("thermal_slab.json", "thermal_mixed.json"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
-                (examples / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
         run(python, "-I", examples / "thermal_mechanical_workflow.py", cwd=work, env=env)
         run(python, "-I", examples / "transient_thermal_mechanical.py", cwd=work, env=env)
@@ -523,16 +372,6 @@ def main():
         run(python, "-I", "-m", "pytest", "-q", "-ra",
             "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)
-        # Use only byte-verified sdist acceptance files outside the checkout.
-        acceptance = work / "transient-acceptance"
-        acceptance.mkdir()
-        with tarfile.open(galerkin_sdist) as archive:
-            for filename in ("transient_heat_independent_oracle.py",
-                             "transient_heat_independent_cases.py",
-                             "transient_heat_independent_consumer.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-                (acceptance / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", acceptance / "transient_heat_independent_consumer.py",
             "--expected-installed-root", env_root,
             "--expected-module-sha256", runtime_expected["galerkin.transient_heat"],
@@ -540,20 +379,7 @@ def main():
         # Full fixed n8..n64 convergence example, not a shortened smoke or core substitute.
         run(python, "-I", examples / "transient_heat_convergence.py", cwd=work, env=env)
         # Keep headless independent cases separate from pytest counts and engine PDE all.
-        headless_acceptance = work / "transient-headless-acceptance"
-        headless_acceptance.mkdir()
-        with tarfile.open(simcase_sdist) as archive:
-            for filename in ("transient_headless_independent_oracle.py",
-                             "transient_headless_independent_cases.py",
-                             "transient_headless_independent_consumer.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-                (headless_acceptance / filename).write_bytes(archive.extractfile(member).read())
-            filename = "transient_thermal_uniform.json"
-            member = next(p for p in archive.getmembers()
-                          if p.isfile() and p.name.split("/", 1)[-1] == f"examples/{filename}")
-            document = examples / filename
-            document.write_bytes(archive.extractfile(member).read())
+        document = examples / "transient_thermal_uniform.json"
         run(python, "-I", headless_acceptance / "transient_headless_independent_consumer.py",
             "--expected-installed-root", env_root,
             "--expected-module-hashes", hash_manifest, cwd=work, env=env)
@@ -561,31 +387,16 @@ def main():
         run(python, "-I", "-m", "simcase", "run", document, "-q",
             "-o", work / "transient-headless-example", cwd=work, env=env)
         # Original steady-boundary independent cases run separately from pytest.
-        steady_acceptance = work / "steady-boundary-acceptance"
-        steady_acceptance.mkdir()
-        with tarfile.open(simcase_sdist) as archive:
-            for filename in ("steady_boundary_independent_oracle.py",
-                             "steady_boundary_independent_cases.py",
-                             "steady_boundary_independent_consumer.py"):
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == f"tests/{filename}")
-                (steady_acceptance / filename).write_bytes(archive.extractfile(member).read())
         run(python, "-I", steady_acceptance / "steady_boundary_independent_consumer.py",
             "--expected-installed-root", env_root,
             "--expected-module-hashes", hash_manifest, cwd=work, env=env)
-        # Consume the exact shipped steady boundary JSON through the installed CLI.
-        with tarfile.open(simcase_sdist) as archive:
-            member = next(p for p in archive.getmembers()
-                          if p.isfile() and p.name.split("/", 1)[-1] == "examples/thermal_boundary.json")
-            boundary_document = examples / "thermal_boundary.json"
-            boundary_document.write_bytes(archive.extractfile(member).read())
+        # Consume the steady boundary example JSON through the installed CLI.
+        boundary_document = examples / "thermal_boundary.json"
         run(python, "-I", "-m", "simcase", "validate", boundary_document, cwd=work, env=env)
         run(python, "-I", "-m", "simcase", "run", boundary_document, "-q",
             "-o", work / "steady-boundary-example", cwd=work, env=env)
         # Run the original Node script against verified installed static bytes.
         # Node VM cases remain distinct from the real browser/public-API check.
-        node_root = work / "studio-installed-node"
-        (node_root / "tests").mkdir(parents=True)
         static = node_root / "simcase" / "studio" / "static"
         static.mkdir(parents=True)
         copy_resources = work / "copy_installed_studio_resources.py"
@@ -601,15 +412,6 @@ def main():
             + "    (target / Path(relative).name).write_bytes(data)\n",
             encoding="utf-8")
         run(python, "-I", copy_resources, static, cwd=work, env=env)
-        node_tests = []
-        with tarfile.open(simcase_sdist) as archive:
-            for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs"):
-                relative = "tests/" + filename
-                member = next(p for p in archive.getmembers()
-                              if p.isfile() and p.name.split("/", 1)[-1] == relative)
-                node_test = node_root / relative
-                node_test.write_bytes(archive.extractfile(member).read())
-                node_tests.append(str(node_test))
         with (output / "studio-installed-node.tap").open("w", encoding="utf-8") as log:
             subprocess.run(["node", "--test", *node_tests], cwd=work, env=env,
                            stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -627,8 +429,7 @@ def main():
         }, allow_nan=False), encoding="utf-8")
         run("node", ROOT / "ci/tools/studio_thermal_browser.mjs",
             "--python", python, "--model", browser_model, "--transient-model", document,
-            "--source-commit", subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-                check=True, capture_output=True, text=True, encoding="utf-8").stdout.strip(),
+            "--source-commit", source_commit(),
             "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,
             "--output", output / "studio-browser", cwd=work, env=env)
     print(f"Validated {len(wheels)} wheels built from sdists; artifacts: {output}")

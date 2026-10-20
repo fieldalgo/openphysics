@@ -19,8 +19,8 @@ python -m pytest -q -s packages/simcase/tests/test_studio_transient_thermal_acce
 필드별 최대 절대오차 및 원 H/V 이력을 기록한다. JUnit·명령 exit·환경·source/module
 hash와 함께 보존한다. -s가 없으면 성공 출력이 capture되어 숫자가 누락될 수 있다.
 이때 다른 API/commit 실측을 차용하지 말고 누락으로 보고한다.
-archive 시험과 독립 oracle 의존파일을 source checkout 밖의 isolated 설치 환경에서
-실행하는 것은 별도 수용 단계다.
+별도 수용 단계로, 이 시험과 독립 oracle 의존파일을 checkout에서 그 밖의 디렉터리로
+복사해 설치된 wheel에 대해 python -I로 실행한다.
 
 ## 물리 정답과 불변 gate
 studio_transient_independent_fixtures.py는 기존

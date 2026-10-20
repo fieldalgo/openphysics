@@ -40,7 +40,8 @@ without NPZ and agreed with the analytic 60 W/m balance. No tolerance relaxation
 or skip/xfail converted the old failures into passes.
 
 Seven sdists were built into seven wheels. Existing seven sdist asset gates and
-wheel runtime/static byte comparisons passed. The integrated
+wheel runtime/static byte comparisons passed (before 2026-10-20 sdists also
+carried tests, docs and examples). The integrated
 `ci/check_distributions.py` command failed because **twine was unavailable**;
 full strict distribution validation is not claimed. No new dependency was
 installed. After environment recovery, the whole-root numerical suite was not

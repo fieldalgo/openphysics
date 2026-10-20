@@ -215,4 +215,5 @@ are infinitesimal rotation fields, not finite rotations.
 
 This module uses only existing NumPy/SciPy dependencies and original formulas;
 no external solver implementation is copied. The example/document live in the
-source tree; distribution inclusion is separately checked when packaging.
+source tree and are not shipped in the distributions; the installed checks copy
+the example from the checkout and run it against the installed wheels.

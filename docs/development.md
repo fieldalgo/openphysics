@@ -99,17 +99,31 @@ varies.
 
 **Distribution checks** (`ci/check_distributions.py`). Builds all seven packages
 (including the empty `openphysics` name reservation), each wheel from its sdist,
-with pinned build tools. It checks metadata with `twine check --strict`,
-that every sdist and wheel carries its package's LICENSE and NOTICE unchanged, Studio assets, and that every file in the checker's
-required list is present and byte-identical in its sdist. Relative Markdown links
-inside archives must resolve; external URLs are not fetched. Wheels are then
-installed into a fresh environment outside the checkout and exercised through
-their public API, CLI and saved files, the shipped examples and the independent
-acceptance consumers, with `python -I` so the checkout cannot leak in. The
-installed environment must pass `ci/check_licenses.py`. The
-Studio browser check runs a small real model in Chrome. Finally
+with pinned build tools, and checks metadata with `twine check --strict`.
+Distributions ship package code only. Each sdist holds exactly its import
+package, `README.md`, `LICENSE`, `NOTICE` and build files (`pyproject.toml`,
+`setup.py`, `MANIFEST.in`, and the generated `PKG-INFO`, `setup.cfg` and
+egg-info); each wheel holds exactly its import package and dist-info, with
+`LICENSE` and `NOTICE` under `.dist-info/licenses/`. Tests, docs, examples and
+tools stay in the repository and are never shipped (every `MANIFEST.in` prunes
+them). The expected contents come from the Git-tracked files of
+`packages/<name>/`, not from a hand-written list: every tracked file of the
+import package, and in the sdist each tracked top-level file above, must be
+present and byte-identical to the checkout, `LICENSE` and `NOTICE` included. Any other file
+in an archive fails the check, as does a tracked top-level file the checker
+does not know.
+
+Wheels are then installed into a fresh environment outside the checkout. Every
+shipped module (except `__main__`) and Studio static file must load from that
+environment with the checked-out bytes. The installed tests, examples and
+independent acceptance consumers, which exercise the public API, CLI and saved
+files, are copied from the checkout's tracked files to a temporary directory
+outside it (their hashes are recorded in `consumer-file-hashes.json`) and run
+with `python -I` against the installed wheels, so the checkout cannot leak in.
+The installed environment must pass `ci/check_licenses.py`. The Studio browser
+check runs a small real model in Chrome. Finally
 `ci/tools/audit_distribution_artifacts.py` re-checks the retained archives'
-checksums and wheel bytes.
+checksums and their exact sdist and wheel contents.
 
 **Licenses** (`ci/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the

@@ -205,7 +205,7 @@ def test_cli_success_and_invalid_plots_exit_codes(tmp_path):
 
 
 @pytest.mark.parametrize('filename,source', [('thermal_slab.json', 0.), ('thermal_mixed.json', 1e5)])
-def test_verified_archived_json_api_and_cli(tmp_path, filename, source):
+def test_example_json_api_and_cli(tmp_path, filename, source):
     path = Path(__file__).resolve().parents[1]/'examples'/filename
     doc = Document.load(path)
     assert doc['units'] == {'length': 'mm', 'temperature': 'K'}

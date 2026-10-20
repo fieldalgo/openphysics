@@ -112,7 +112,8 @@ python -m pytest -q
 
 Linux source 전체에 이 시험이 포함되고 전용 preflight는 로그/JUnit에 수치
 지표를 남긴다. Linux/macOS/Windows 설치 소비 시험은 공개 조합의 해석해 및
-module origin을 확인한다. 배포 검사는 양언어 문서/시험/예제를 요구하고 archive의
-예제를 실행한다. 기존 전체 Linux 및 narrow Windows 필수 검사는 유지한다.
+module origin을 확인한다. 배포본에는 문서/시험/예제가 들어가지 않는다. 배포 검사는
+checkout에서 추적되는 예제를 checkout 밖으로 복사해 설치된 wheel로 실행한다.
+기존 전체 Linux 및 narrow Windows 필수 검사는 유지한다.
 설정 자체는 수용 증명이 아니므로 exact 후보 및 main workflow 로그/artifact를
 확인해야 한다. 이 문서는 새 플랫폼/성능/자원 보장을 뜻하지 않는다.

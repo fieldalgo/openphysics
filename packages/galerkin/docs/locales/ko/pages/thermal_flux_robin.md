@@ -163,4 +163,4 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -
 
 비정상, 복사, 가변·이방성 k, 온도 의존 h, 3D, 새 연성 workflow, simcase/Studio 또는
 export 연결은 추가하지 않습니다. 기존 NumPy/SciPy만 사용하며 새 runtime 의존성이나
-외부 solver 소스는 없습니다. 공용 문서·예제 배포 자산은 배포 담당의 책임입니다.
+외부 solver 소스는 없습니다. 문서·예제는 배포본에 포함되지 않습니다.

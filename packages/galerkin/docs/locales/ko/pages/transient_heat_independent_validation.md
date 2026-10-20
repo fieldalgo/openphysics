@@ -252,7 +252,7 @@ core는 PDE를 제외한 명시적 진단이며 전체 수용을 대신할 수 �
 python -m pytest -q
 ```
 
-현재 manifest·문서 색인·배포 helper는 이 보고서, 원 oracle/cases/wrapper/consumer·runtime 모듈·예제를 archive/byte/origin 검사에 연결합니다. Helper는 격리 archive consumer를 `--suite all`로 실행하고 전체 수렴 예제를 실행합니다. 이는 구현된 검증이며 artifact 실행 성공 근거는 아닙니다. 정확한 CI 종료값과 artifact를 확인해야 합니다.
+배포 helper는 sdist와 wheel에 문서·시험·예제가 들어 있지 않은지 확인하며, 이 보고서·시험·예제는 배포하지 않습니다. Helper는 설치된 runtime 모듈의 byte와 출처를 확인하고, checkout에서 추적되는 oracle/cases/consumer와 예제를 checkout 밖으로 복사한 뒤, 설치된 wheel을 대상으로 격리 consumer를 `--suite all`로 실행하고 전체 수렴 예제를 실행합니다. 이는 구현된 검증이며 artifact 실행 성공 근거는 아닙니다. 정확한 CI 종료값과 artifact를 확인해야 합니다.
 후속 생산 SHA는 원 blob 비교와 영향별 재검증이 필요하며,
 동일 코드라는 이유로 전체 시험을 자동 반복하지 않는다.
 

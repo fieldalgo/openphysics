@@ -238,5 +238,6 @@ Passing a small algebraic residual is not an accuracy certificate near
 nu=0.5. This extension adds no pressure model, thermal expansion, nonlinear
 material, large deformation, contact, dynamics, 3D, simcase or Studio feature.
 It introduces no dependency and copies no external solver implementation.
-The new guide and example are source-tree assets; their sdist inclusion is
-reserved for the shared packaging integration.
+The guide and example stay in the source tree and are not shipped in the sdist;
+the installed checks copy the example from the checkout and run it against
+the installed wheels.
