@@ -1,12 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for ci/check_markdown_links.py on small synthetic trees."""
+"""Tests for tools/check_markdown_links.py on small synthetic trees."""
 
 import importlib.util
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
-    "check_markdown_links", Path(__file__).with_name("check_markdown_links.py"))
+    "check_markdown_links", Path(__file__).resolve().parents[1] / "check_markdown_links.py")
 links = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(links)
 

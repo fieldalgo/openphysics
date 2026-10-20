@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 PACKAGES = sorted(p.parent for p in (ROOT / "packages").glob("*/setup.py"))
 REF = "0123456789abcdef0123456789abcdef01234567"
 

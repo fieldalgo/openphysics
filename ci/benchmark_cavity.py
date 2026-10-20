@@ -39,7 +39,7 @@ def source_identity():
                 checkout_dirty=bool(git("status", "--porcelain")),
                 benchmark_sha256=digest(Path(__file__).resolve()),
                 galerkin_sources_sha256={str(p.relative_to(ROOT)): digest(p) for p in files},
-                pins_sha256=digest(ROOT / "ci/requirements-py312-linux.txt"))
+                pins_sha256=digest(ROOT / "tools/requirements-py312-linux.txt"))
 
 
 def machine_info():

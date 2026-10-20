@@ -1,7 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Rules of ci/check_licenses.py, exercised on synthetic installed environments."""
+"""Rules of tools/check_licenses.py, exercised on synthetic installed environments."""
 
 import importlib.util
 import json
@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-_spec = importlib.util.spec_from_file_location("check_licenses", ROOT / "ci" / "check_licenses.py")
+_spec = importlib.util.spec_from_file_location("check_licenses", ROOT / "tools" / "check_licenses.py")
 check_licenses = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check_licenses)
 
-INVENTORY = json.loads((ROOT / "ci" / "third_party_licenses.json").read_text(encoding="utf-8"))
+INVENTORY = json.loads((ROOT / "tools" / "third_party_licenses.json").read_text(encoding="utf-8"))
 
 
 def install(site, name, *, version="1.0", expression=None, license=None, classifiers=(),

@@ -7,8 +7,8 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
 각각을 어떻게 쓰는지와 어떤 조건인지 적습니다. Apache-2.0은 이들의 라이선스를 바꾸지
 않습니다.
 
-기계가 읽는 목록은 [`ci/third_party_licenses.json`](../../../../ci/third_party_licenses.json)입니다.
-`ci/check_licenses.py`가 검증 환경마다 설치된 메타데이터와 파일 목록을 이 목록과 대조합니다
+기계가 읽는 목록은 [`tools/third_party_licenses.json`](../../../../tools/third_party_licenses.json)입니다.
+`tools/check_licenses.py`가 검증 환경마다 설치된 메타데이터와 파일 목록을 이 목록과 대조합니다
 ([자동 검사](#자동-검사) 참고).
 
 ## 쓰는 방식
@@ -56,7 +56,7 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    다룹니다. 금지하지 않고 [묶인 구성 요소](#묶인-구성-요소)에 기록·검토합니다. OpenPhysics는
    이들을 수정·다시 빌드·다시 링크·복사·재배포하지 않고, 패키지 코드는 그 구성 요소를 가진
    패키지의 공개 Python API로만 닿습니다. 기록된 예외는 CI 진단 도구
-   `ci/tools/report_numeric_runtime.py` 하나입니다. 이 도구는 작업 로그에 커널 이름을 남기려고
+   `tools/report_numeric_runtime.py` 하나입니다. 이 도구는 작업 로그에 커널 이름을 남기려고
    numpy에 묶인 OpenBLAS를 ctypes로 로드합니다(Linux에서는 묶인 GCC 런타임과 libquadmath도 함께
    로드됨). 패키지 코드가 아니고, 텍스트 보고서만 CI 결과와 함께 남깁니다. 묶인 copyleft
    라이브러리의 API를 노출하는 것이 주된 목적인 휠(얇은 바인딩)은 OpenPhysics가 그 라이브러리에
@@ -75,8 +75,8 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 ## Python 배포판
 
 버전 범위는 패키지 요구 조건입니다. CI의 정확한 버전은
-`ci/requirements-py312-linux.txt`(Linux)와
-`ci/requirements-py312-windows-thermal.txt`(설치 플랫폼 검사)에 고정합니다.
+`tools/requirements-py312-linux.txt`(Linux)와
+`tools/requirements-py312-windows-thermal.txt`(설치 플랫폼 검사)에 고정합니다.
 
 ### Runtime
 
@@ -149,7 +149,7 @@ libffi, MPL-2.0 두 개를 포함한 Rust crate)를 정적으로 링크합니다
 ## 묶인 구성 요소
 
 CI에 고정한 제3자 휠이 자기 안에 넣어 배포하는 것입니다(정책 3층). 조사 기준:
-`ci/requirements-py312-linux.txt`에 고정한 버전의 CPython 3.12 휠, CI가 시험하는 플랫폼(manylinux
+`tools/requirements-py312-linux.txt`에 고정한 버전의 CPython 3.12 휠, CI가 시험하는 플랫폼(manylinux
 x86_64, macOS 14 arm64, Windows amd64)이고 runtime·optional·시험·도구 휠을 모두 봤습니다. Linux
 작업에서만 설치하는 도구 휠(cryptography, cffi, nh3)은 manylinux x86_64에서만 확인했습니다.
 macOS 14 미만용 numpy·scipy 휠과 numpy·scipy·shapely·matplotlib·pillow의 macOS x86_64 휠도 목록을
@@ -216,7 +216,7 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 
 | 출처 | 조건 | 쓰는 방식 |
 |---|---|---|
-| [refractiveindex.info 데이터베이스](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | 일부 표와 분산 계수를 physmat(`physmat/_tables.py`, `physmat/library.py`)에 포함. CI는 `ci/rii-revision.txt`에 고정한 커밋을 내려받으며 그 사본은 배포하지 않음. 인용과 기록별 출처: [physmat NOTICE](../../../../packages/physmat/NOTICE) |
+| [refractiveindex.info 데이터베이스](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | 일부 표와 분산 계수를 physmat(`physmat/_tables.py`, `physmat/library.py`)에 포함. CI는 `tools/rii-revision.txt`에 고정한 커밋을 내려받으며 그 사본은 배포하지 않음. 인용과 기록별 출처: [physmat NOTICE](../../../../packages/physmat/NOTICE) |
 | G. R. Hadley, J. Lightwave Technol. 20(7), 1210 (2002) | 출판된 사실 | `galerkin-refsol`의 benchmark 값. femwell(GPL-3.0)과 함께 공개된 표와 대조했고 숫자만 옮겼으며 코드·글은 옮기지 않음. [galerkin-refsol NOTICE](../../../../packages/galerkin-refsol/NOTICE) 참고 |
 | handbook 유형의 열·기계 상수 | 근사 예제 입력 | 인증된 측정값이 아님. [자산 출처](assets.md) 참고 |
 
@@ -233,7 +233,7 @@ AGPL 도구는 여기서 쓰지 않습니다.
 ## 자동 검사
 
 ```bash
-python ci/check_licenses.py --report .validation/licenses.json
+python tools/check_licenses.py --report .validation/licenses.json
 ```
 
 설치된 메타데이터와 배포판마다 RECORD 파일 목록을 `importlib.metadata`로 읽으므로 라이선스

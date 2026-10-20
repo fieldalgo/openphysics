@@ -5,7 +5,7 @@
 
 Reads metadata and RECORD file lists with importlib.metadata only, so no
 license tool is needed. Every installed distribution must have a reviewed entry
-in ci/third_party_licenses.json. The entry's SPDX expression must be allowed for
+in tools/third_party_licenses.json. The entry's SPDX expression must be allowed for
 the strictest way the environment reaches the distribution:
 
 - runtime: a base requirement of a first-party package (transitively)
@@ -57,7 +57,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).resolve().parents[1]
-INVENTORY = ROOT / "ci" / "third_party_licenses.json"
+INVENTORY = ROOT / "tools" / "third_party_licenses.json"
 DOCS = (ROOT / "docs" / "third-party.md", ROOT / "docs" / "locales" / "ko" / "pages" / "third-party.md")
 RANK = {"runtime": 0, "optional": 1, "test": 2, "tool": 3}
 COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EUPL|EPL|CDDL|SSPL|OSL|CPAL|RPL|CECILL|GENERAL PUBLIC|MOZILLA PUBLIC|AFFERO)",

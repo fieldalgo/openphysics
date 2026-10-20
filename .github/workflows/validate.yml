@@ -41,7 +41,7 @@ jobs:
           sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxinerama1
       - name: Install pinned validation environment
         run: |
-          python -m pip install -r ci/requirements-py312-linux.txt
+          python -m pip install -r tools/requirements-py312-linux.txt
           python -m pip install --no-deps --no-build-isolation \
             -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
             -e packages/gmshio -e packages/physmat -e packages/simcase
@@ -50,17 +50,17 @@ jobs:
       - name: Check installed licenses against the reviewed inventory
         run: |
           mkdir -p .validation
-          python ci/check_licenses.py --report .validation/licenses-validation-env.json
+          python tools/check_licenses.py --report .validation/licenses-validation-env.json
       - name: Check Markdown links
         run: |
-          python -m pytest -q -ra ci/test_markdown_links.py ci/test_readme_links.py
-          python ci/check_markdown_links.py
+          python -m pytest -q -ra tools/tests/test_markdown_links.py tools/tests/test_readme_links.py
+          python tools/check_markdown_links.py
       - name: Record CPU model and BLAS kernel
         run: |
           mkdir -p .validation
-          python ci/tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
+          python tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
       - name: Fetch pinned RII database
-        run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+        run: python tools/fetch_rii.py "$RUNNER_TEMP/rii"
       - name: Check steady boundary contract before transient and full acceptance
         run: |
           python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
@@ -74,7 +74,7 @@ jobs:
             tests/simcase/test_studio_steady_boundary.py
       - name: Check transient document acceptance before the full suite
         run: |
-          python ci/tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
+          python tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
           python -m pytest -q -ra --showlocals --junitxml=.validation/transient-preflight.xml \
             tests/galerkin/test_transient_heat_tiny_domain.py \
             tests/galerkin/test_transient_heat_general_state.py \
@@ -153,13 +153,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxinerama1
       - name: Install pinned build and validation tools
-        run: python -m pip install -r ci/requirements-py312-linux.txt
+        run: python -m pip install -r tools/requirements-py312-linux.txt
       - name: Record CPU model and BLAS kernel
         run: |
           mkdir -p .validation
-          python ci/tools/report_numeric_runtime.py --json .validation/installed-numeric-runtime.json
+          python tools/report_numeric_runtime.py --json .validation/installed-numeric-runtime.json
       - name: Fetch pinned RII database
-        run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+        run: python tools/fetch_rii.py "$RUNNER_TEMP/rii"
       - name: Run every test against the installed wheels
         env:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
@@ -199,12 +199,12 @@ jobs:
           python-version: "3.12.14"
       - name: Install pinned validation environment
         run: |
-          python -m pip install -r ci/requirements-py312-linux.txt
+          python -m pip install -r tools/requirements-py312-linux.txt
           python -m pip install --no-deps --no-build-isolation \
             -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
             -e packages/gmshio -e packages/physmat -e packages/simcase
       - name: Confirm the forced OpenBLAS kernel and record the CPU
-        run: python ci/tools/report_numeric_runtime.py --expect-core "${{ matrix.core }}"
+        run: python tools/report_numeric_runtime.py --expect-core "${{ matrix.core }}"
       - name: Numerically sensitive tracking, eigenspace, cavity and fiber reference tests
         run: |
           python -m pytest -q -ra -m "not slow" \

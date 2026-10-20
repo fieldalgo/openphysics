@@ -1,7 +1,7 @@
 {
   "_comment": [
     "Reviewed license inventory for every Python distribution that may be installed in",
-    "a validation or consumer environment. ci/check_licenses.py compares installed",
+    "a validation or consumer environment. tools/check_licenses.py compares installed",
     "metadata against it. Add a reviewed entry before adding a dependency; a missing",
     "entry fails the check. Human-readable table: docs/third-party.md.",
     "'bundled' describes what a distribution's wheels ship inside themselves (native",

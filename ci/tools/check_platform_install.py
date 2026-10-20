@@ -46,7 +46,7 @@ def main():
         "scope": "six installed packages; external Gmsh not executed",
     }, indent=2)+"\n", encoding="utf-8")
     # CPU model and BLAS kernel of this runner, for last-bit numerical differences.
-    subprocess.run([sys.executable, "-I", str(ROOT / "ci" / "tools" / "report_numeric_runtime.py"),
+    subprocess.run([sys.executable, "-I", str(ROOT / "tools" / "report_numeric_runtime.py"),
                     "--json", str(output / "numeric-runtime.json")], check=True)
     commands = []
     env = {**os.environ, "MPLBACKEND": "Agg", "OPENBLAS_NUM_THREADS": "1",
@@ -152,14 +152,14 @@ def main():
         python = work / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         # Exact existing validation pins, without the Linux-only external Gmsh
         # executable/keyring stack. No new runtime dependency is introduced.
-        pins = ROOT / "ci" / "requirements-py312-windows-thermal.txt"
+        pins = ROOT / "tools" / "requirements-py312-windows-thermal.txt"
         run(python, "-I", "-X", "utf8", "-m", "pip", "install", "-r", pins, cwd=work)
         run(python, "-I", "-X", "utf8", "-m", "pip", "install", "--no-index", "--no-deps",
             *wheel_files, cwd=work)
         run(python, "-I", "-m", "pip", "check", cwd=work)
         run(python, "-I", "-m", "pip", "freeze", "--all", cwd=work)
         # Installed environment on this OS against the reviewed license inventory.
-        run(sys.executable, "-I", "-X", "utf8", ROOT / "ci" / "check_licenses.py", "--python", python,
+        run(sys.executable, "-I", "-X", "utf8", ROOT / "tools" / "check_licenses.py", "--python", python,
             "--report", output / "licenses-installed.json", cwd=work)
         tests = work / "tests"
         tests.mkdir()
