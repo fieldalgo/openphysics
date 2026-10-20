@@ -147,17 +147,25 @@ These apply to every input:
   stays, and a vertex whose removal would change a boundary name (a corner of
   `box_sides`) is kept. Polygon clipping leaves such edges where a cut passes
   within a rounding error of a vertex. `Domain(snap_eps=0)` turns the drop off.
-- The encroachment test is local to each segment: each segment asks a tree of
-  the candidate circumcenters for those within its own half-length. Before,
-  every candidate asked for every segment midpoint within the half-length of
-  the longest segment, and next to one long segment that is nearly every pair.
-  The strict test and the meshes are unchanged. Measured on Linux on a strip
-  0.005 wide with mesh size 0.01 in a 40 x 20 box of size 1000, which stops at
-  `max_points=10003`: the largest query returns 8,192 pairs instead of
-  8,298,339, and the run takes 0.4 to 0.7 s and 91 MB instead of 2.6 to 5.3 s
-  and 1.04 GB (times of six runs; peak memory of the process, about 70 MB of it
-  the interpreter and imports). `tests/meshine/test_refine_cost.py` checks the
-  query against a brute force and the meshes against the old implementation.
+- The encroachment test and the corner probes are local. Each segment asks a
+  tree of the candidate circumcenters for those within its own half-length.
+  Before, every candidate asked for every segment midpoint within the
+  half-length of the longest segment, and next to one long segment that is
+  nearly every pair. The probes that tell whether a sharp corner opens into a
+  region go through one point-in-polygon pass per region, not one per corner.
+  The strict test and the meshes are unchanged. Measured on Linux as time and
+  peak memory of the process (about 70 MB of it the interpreter and imports),
+  times as the range of six runs, each run ending with the `max_points` error
+  before and after:
+  - a strip 0.005 wide with mesh size 0.01 in a 40 x 20 box of size 1000,
+    `max_points=10003`: 2.6 to 5.3 s and 1.04 GB before, 0.4 to 0.7 s and 91 MB
+    now. Its largest query returned 8,298,339 pairs and returns 8,192;
+  - a 511-point sawtooth with 10° tips, `min_angle=33`, `max_points=10201`: its
+    507 corner probes took about 2 s and take under 0.04 s.
+
+  `tests/meshine/test_refine_cost.py` builds these inputs, bounds the query
+  sizes, and checks the query against a brute force and the corners and meshes
+  against the old implementations.
 
 ## Self-checks
 
