@@ -261,10 +261,11 @@ python ci/check_licenses.py --report .validation/licenses.json
   조건만 남을 때(그런 라이브러리는 OpenPhysics 프로세스에 로드됨)
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
 
-CI는 고정된 Linux 환경, 설치한 휠만 담은 새 환경, 그리고 Linux·macOS·Windows 설치 플랫폼
-검사에서 이 검사를 돌리므로, 묶인 공유 라이브러리를 세 OS에서 각각 대조합니다. 제3자 휠 안에
-정적으로 링크된 코드(Windows OpenBLAS DLL 안의 GCC 런타임, matplotlib의 FreeType 등)는 이렇게
-보이지 않으므로 직접 검토해 [묶인 구성 요소](#묶인-구성-요소)에 기록합니다.
+CI는 고정된 Linux 환경, 설치한 휠만 담은 새 환경(배포 검사와 설치 시험), 그리고
+Linux·macOS·Windows 설치 플랫폼 검사에서 이 검사를 돌리므로, 묶인 공유 라이브러리를 세 OS에서
+각각 대조합니다. 제3자 휠 안에 정적으로 링크된 코드(Windows OpenBLAS DLL 안의 GCC 런타임,
+matplotlib의 FreeType 등)는 이렇게 보이지 않으므로 직접 검토해
+[묶인 구성 요소](#묶인-구성-요소)에 기록합니다.
 
 의존성을 추가할 때: upstream 저장소의 LICENSE 파일로 라이선스를 확인하고, SPDX 식과 출처
 URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인 것을 확인해 적고, 이 문서와 영어

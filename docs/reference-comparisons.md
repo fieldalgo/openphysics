@@ -43,7 +43,9 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 
 Without the tool the tests skip locally. CI sets
 `OPENPHYSICS_REQUIRE_CROSSCHECK=1`, so a missing tool fails instead, and keeps
-each record in `.validation/crosscheck/` inside the Linux job's artifact.
+each record in `.validation/crosscheck/` inside the Linux job's artifact. The
+installed-wheel run keeps its records in `.validation/installed-crosscheck/`
+inside the `installed-test-results` artifact.
 
 ## Record format
 

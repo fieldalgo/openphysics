@@ -131,6 +131,49 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
+  installed-tests:
+    # The whole tests/ folder against wheels built from the sdists and installed
+    # outside the checkout. No test is selected by name.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    # About 25 min in a local Linux run (build, install, full suite); the limit only
+    # stops hung jobs.
+    timeout-minutes: 50
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.14"
+      - name: Install Gmsh system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxinerama1
+      - name: Install pinned build and validation tools
+        run: python -m pip install -r ci/requirements-py312-linux.txt
+      - name: Record CPU model and BLAS kernel
+        run: |
+          mkdir -p .validation
+          python ci/tools/report_numeric_runtime.py --json .validation/installed-numeric-runtime.json
+      - name: Fetch pinned RII database
+        run: python ci/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Run every test against the installed wheels
+        env:
+          PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
+          OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
+          OPENPHYSICS_CROSSCHECK_DIR: .validation/installed-crosscheck
+        run: python ci/run_installed_tests.py --output .validation/installed
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: installed-test-results
+          path: .validation/
+          include-hidden-files: true
+          if-no-files-found: warn
+
   blas-kernels:
     # Hosted runners change CPU model between runs, and OpenBLAS picks its kernel
     # from the CPU, so last-bit results can differ for the same commit. Force two
@@ -180,7 +223,7 @@ jobs:
 
   tests:
     name: tests
-    needs: [linux-py312, blas-kernels, installed-platforms]
+    needs: [linux-py312, installed-tests, blas-kernels, installed-platforms]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -188,9 +231,11 @@ jobs:
       - name: Require complete Linux and installed-platform validation
         env:
           VALIDATION_RESULT: ${{ needs.linux-py312.result }}
+          INSTALLED_RESULT: ${{ needs.installed-tests.result }}
           KERNEL_RESULT: ${{ needs.blas-kernels.result }}
           PLATFORM_RESULT: ${{ needs.installed-platforms.result }}
         run: |
           test "$VALIDATION_RESULT" = success
+          test "$INSTALLED_RESULT" = success
           test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success
