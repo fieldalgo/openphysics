@@ -40,6 +40,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 |---|---|---|
 | Transient heat to quasistatic mechanics | [Stored-index API and independent gates](packages/galerkin/transient_thermal_mechanical.md) | [한국어](locales/ko/pages/packages/galerkin/transient_thermal_mechanical.md) |
 | 3D PEC cavity engine | [API, units and convergence](packages/galerkin/cavity_solver.md) | [한국어](locales/ko/pages/packages/galerkin/cavity_solver.md) |
+| 3D PEC cavity validation records (historical) | [Plan](packages/galerkin/cavity3d_validation.md), [mesh revalidation](packages/galerkin/cavity3d_alternating_validation.md), [convergence diagnosis](packages/galerkin/cavity3d_convergence_diagnosis.md) | [한국어](locales/ko/pages/packages/galerkin/cavity3d_validation.md) |
 | Lossy material cavity | [Complex resonances, Q, wall loss and references](packages/galerkin/material_cavity.md) | [한국어](locales/ko/pages/packages/galerkin/material_cavity.md) |
 | Cavity document and CLI | [Input and saved fields](packages/simcase/cavity3d.md) | [한국어](locales/ko/pages/packages/simcase/cavity3d.md) |
 | Vector subspace tracking | [Opt-in cluster sweeps](packages/simcase/vector_subspace_tracking.md) | [한국어](locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |

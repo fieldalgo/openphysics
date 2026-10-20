@@ -163,6 +163,10 @@ python -m pytest -q
 숨은 refinement·spectrum 보정·허용치 변경·skip·xfail은 없습니다. 원 고정 수렴
 시험 본문을 그대로 유지합니다.
 
+[검증 계획](cavity3d_validation.md), 정확한 소스 기준의 [mesh 재검증](cavity3d_alternating_validation.md),
+[수렴 진단](cavity3d_convergence_diagnosis.md)은 이 페이지 옆에 과거 기록으로 둡니다. 기록된 명령은
+당시 경로를 씁니다. 진단 스크립트는 `studies/cavity3d_convergence_diagnosis.py`입니다.
+
 별도 진단으로 선택·고유솔버 오차와 mesh 오차를 구분합니다. n=4에서 두 mesh 계열은
 완전 dense 일반화 spectrum과 상대 `4.7e-14` 이내로 일치하고 gradient 모드는
 정확히 27개입니다. 요청 개수를 5에서 11로 늘려도 첫 다섯 값은 `6.7e-16` 이내로

@@ -188,6 +188,12 @@ rate on this fixed sequence. The repair changes the actual mesh family, with no
 hidden refinement, spectral correction, tolerance change, skip or xfail. The
 original fixed convergence test body is retained unchanged.
 
+The [validation plan](cavity3d_validation.md), the exact-source
+[mesh revalidation](cavity3d_alternating_validation.md) and the
+[convergence diagnosis](cavity3d_convergence_diagnosis.md) are kept as historical
+records next to this page. Their recorded commands use the paths of the time;
+the diagnosis script is `studies/cavity3d_convergence_diagnosis.py`.
+
 Separate diagnostics distinguish selection and eigensolver error from this mesh
 error. At n=4 both mesh families agree with the complete dense generalized
 spectrum within `4.7e-14` relative and both have exactly 27 gradient modes. Raising
