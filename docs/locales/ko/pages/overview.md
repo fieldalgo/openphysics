@@ -134,7 +134,7 @@ python -m pytest -q
 | 범위 | 플랫폼 | 확인하는 것 |
 |---|---|---|
 | 전체 소스 회귀 | Linux, Python 3.12 | 전체 소스 시험, Studio JavaScript 검사, 일곱 배포의 build·설치, 강제한 두 BLAS kernel에서 수치에 민감한 시험 |
-| 설치 패키지 수용 | Linux·macOS·Windows, Python 3.12 | 여섯 구현 sdist를 wheel로 만들어 새 환경에서 시험: 패키지 바이트, 포함 자산, 공개 API·CLI·저장 동작, 열 저장/I-O 견고성 |
+| 설치 패키지 수용 | Linux·macOS·Windows, Python 3.12 | Linux: sdist에서 만든 일곱 wheel을 extra와 함께 checkout 밖에 설치하고 Python 시험 전체를 실행. 각 OS: 여섯 구현 sdist를 wheel로 만들어 새 환경에서 패키지 바이트, 포함 자산, 공개 API·CLI·저장 동작, 열 저장/I-O 견고성 시험 |
 
 설치 수용 검사는 macOS나 Windows 전체 회귀 시험이 아닙니다. 패키지 metadata는
 Python 3.10 이상을 허용하지만 CI는 Python 3.12만 시험합니다. `OS Independent` 분류와

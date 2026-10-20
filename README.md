@@ -138,7 +138,7 @@ python -m pytest -q
 | Scope | Platforms | What it covers |
 |---|---|---|
 | Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all seven distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
-| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Six implementation sdists built into wheels and tested in a fresh environment: package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
+| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all seven wheels, built from sdists and installed with their extras outside the checkout. Each OS: six implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
 
 Installed acceptance is not a full macOS or Windows regression. Package metadata
 permits Python 3.10+, but CI tests only Python 3.12; `OS Independent` classifiers

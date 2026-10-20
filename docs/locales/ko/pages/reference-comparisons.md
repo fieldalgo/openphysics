@@ -38,7 +38,8 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 
 도구가 없으면 로컬에서는 시험을 건너뜁니다. CI는 `OPENPHYSICS_REQUIRE_CROSSCHECK=1`을
 설정해 도구가 없으면 실패하게 하고, 기록을 Linux job artifact의 `.validation/crosscheck/`에
-남깁니다.
+남깁니다. 설치 wheel 실행은 기록을 `installed-test-results` artifact의
+`.validation/installed-crosscheck/`에 남깁니다.
 
 ## 기록 형식
 

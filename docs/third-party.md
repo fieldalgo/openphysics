@@ -295,12 +295,13 @@ The check reads installed metadata and each distribution's RECORD file list with
   a library would load into the OpenPhysics process);
 - this page or its Korean translation does not list every inventory entry.
 
-CI runs it on the pinned Linux environment, on the fresh environment holding the
-installed wheels, and in the installed-platform check on Linux, macOS and
-Windows, so the bundled shared libraries are compared on each of those OSes.
-Statically linked code inside third-party wheels (such as the GCC runtime in
-the Windows OpenBLAS DLLs, or FreeType in matplotlib) is not visible this way;
-it is reviewed by hand and recorded in [bundled components](#bundled-components).
+CI runs it on the pinned Linux environment, on the fresh environments holding the
+installed wheels (distribution check and installed tests), and in the
+installed-platform check on Linux, macOS and Windows, so the bundled shared
+libraries are compared on each of those OSes. Statically linked code inside
+third-party wheels (such as the GCC runtime in the Windows OpenBLAS DLLs, or
+FreeType in matplotlib) is not visible this way; it is reviewed by hand and
+recorded in [bundled components](#bundled-components).
 
 To add a dependency: confirm the license in the upstream repository's LICENSE
 file, add an entry with the SPDX expression and source URL to the inventory,

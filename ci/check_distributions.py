@@ -6,10 +6,12 @@
 Each sdist holds exactly its package code, README, LICENSE, NOTICE and build files,
 and each wheel exactly its package code, all byte-identical to the checkout. Tests,
 docs and examples are never shipped: the installed checks copy the tracked test and
-example files of this checkout. Run with the pinned validation requirements
-installed. No upload is performed. The temporary directory, test copies and
-working directory are outside the checkout so neither editable installs nor the
-root conftest can supply package code.
+example files of this checkout. The package test suites run against installed
+wheels in ci/run_installed_tests.py; this script runs the wheel-specific
+consumers, examples and independent acceptance scripts. Run with the pinned
+validation requirements installed. No upload is performed. The temporary
+directory, test copies and working directory are outside the checkout so neither
+editable installs nor the root conftest can supply package code.
 """
 
 import argparse
@@ -286,56 +288,22 @@ def main():
         packages = ROOT / "packages"
         tests = work / "tests"
         examples = work / "examples"
-        for package, filename in (("simcase", "test_studio.py"), ("gmshio", "test_generate.py")):
-            copy(ROOT / "tests" / package / filename, tests / filename)
-        for filename in ("test_transient_thermomechanical_wheel.py", "test_cavity_wheel.py",
-                         "test_multiphysics_wheel.py", "test_thermal_traction_wheel.py",
-                         "test_thermoelasticity_wheel.py", "test_thermal_simcase_wheel.py"):
-            copy(ROOT / "ci" / filename, tests / filename)
-        # The original package tests and independent acceptance files, unchanged.
-        for package, filenames in (
-            ("simcase", ("thermal_simcase_independent_oracle.py",
-                         "test_thermal_simcase_independent_validation.py",
-                         "test_steady_boundary_schema.py", "test_steady_boundary_runtime.py",
-                         "test_steady_boundary_platform.py", "test_studio_steady_boundary.py",
-                         "test_steady_boundary_contract.py",
-                         "test_transient_thermal_contract.py", "test_transient_thermal_runtime.py",
-                         "test_studio_transient.py", "test_transient_headless_windows.py",
-                         "test_studio_steady_thermal_http.py", "test_studio_thermal_acceptance.py",
-                         "studio_thermal_independent_fixtures.py", "test_studio_thermal_lifecycle.py",
-                         "test_studio_transient_server_http.py",
-                         "studio_transient_lifecycle_fixtures.py",
-                         "test_studio_transient_lifecycle.py",
-                         "studio_transient_independent_fixtures.py",
-                         "test_studio_transient_thermal_acceptance.py",
-                         "transient_headless_independent_cases.py",
-                         "transient_headless_independent_oracle.py",
-                         "steady_boundary_independent_cases.py", "steady_boundary_independent_oracle.py")),
-            ("galerkin", ("thermal_mechanical_independent_oracle.py",
-                          "test_thermal_mechanical_independent_validation.py",
-                          "thermal_flux_robin_independent_oracle.py",
-                          "test_thermal_flux_robin_independent_validation.py",
-                          "test_transient_heat.py",
-                          "test_transient_heat_tiny_domain.py",
-                          "test_transient_heat_general_state.py",
-                          "test_thermoelastic_traction.py",
-                          "test_thermoelastic_traction_convergence.py",
-                          "test_thermoelastic_traction_independent_validation.py",
-                          "thermoelastic_traction_independent_oracle.py",
-                          "thermoelastic_traction_independent_consumer.py")),
-            ("refsol", ("test_transient_heat_reference.py",
-                        "test_thermoelastic_traction_reference.py")),
-        ):
-            for filename in filenames:
-                copy(ROOT / "tests" / package / filename, tests / filename)
-        for filename in ("elasticity2d.py", "thermal_steady2d.py", "elasticity_traction.py",
-                         "prescribed_temperature_thermoelasticity.py", "thermal_flux_robin.py",
-                         "thermal_mechanical_workflow.py", "thermoelastic_traction.py",
-                         "transient_heat_convergence.py", "transient_thermal_mechanical.py"):
-            copy(packages / "galerkin" / "examples" / filename, examples / filename)
-        for filename in ("thermal_slab.json", "thermal_mixed.json", "transient_thermal_uniform.json",
-                         "thermal_boundary.json"):
-            copy(packages / "simcase" / "examples" / filename, examples / filename)
+        # Wheel-specific consumers. The package test suites (tests/) run against
+        # installed wheels in their own job, ci/run_installed_tests.py.
+        for source in sorted((ROOT / "ci").glob("test_*_wheel.py")):
+            copy(source, tests / source.name)
+        # Every tracked example of galerkin and simcase, flattened into examples/.
+        for package in ("galerkin", "simcase"):
+            for relative in sorted(tracked(package)):
+                if relative.startswith("examples/") and relative.count("/") == 1:
+                    destination = examples / relative.split("/", 1)[1]
+                    if destination.exists():
+                        raise RuntimeError(f"two examples are named {destination.name}")
+                    copy(packages / package / relative, destination)
+        traction_acceptance = work / "traction-acceptance"
+        for filename in ("thermoelastic_traction_independent_oracle.py",
+                         "thermoelastic_traction_independent_consumer.py"):
+            copy(ROOT / "tests" / "galerkin" / filename, traction_acceptance / filename)
         # Independent consumers run as their own scripts, apart from the pytest counts.
         acceptance = work / "transient-acceptance"
         for filename in ("transient_heat_independent_oracle.py",
@@ -364,17 +332,13 @@ def main():
         (output / "consumer-file-hashes.json").write_text(json.dumps(
             {"commit": source_commit(), "matches_commit": unchanged, "files": copied},
             indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        # Hash the Studio consumer and its complete oracle closure separately.
-        studio_consumer_files = ["studio_transient_independent_fixtures.py","test_studio_transient_thermal_acceptance.py","transient_headless_independent_cases.py","transient_headless_independent_oracle.py"]
-        (output / "transient-studio-consumer-assets.json").write_text(
-            json.dumps({name: hashlib.sha256((tests / name).read_bytes()).hexdigest()
-                        for name in studio_consumer_files}, indent=2) + "\n", encoding="utf-8")
         run(python, "-I", examples / "thermal_flux_robin.py", cwd=work, env=env)
         run(python, "-I", examples / "thermal_mechanical_workflow.py", cwd=work, env=env)
         run(python, "-I", examples / "transient_thermal_mechanical.py", cwd=work, env=env)
         run(python, "-I", examples / "thermoelastic_traction.py", cwd=work, env=env)
-        run(python, "-I", tests / "thermoelastic_traction_independent_consumer.py", cwd=work, env=env)
-        # No source conftest is copied; test_studio finds static files via simcase.__file__.
+        run(python, "-I", traction_acceptance / "thermoelastic_traction_independent_consumer.py",
+            cwd=work, env=env)
+        # No source conftest is copied.
         run(python, "-I", "-m", "pytest", "-q", "-ra",
             "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true", "--confcutdir", tests,
             f"--junitxml={output / 'wheel-tests.xml'}", tests, cwd=work, env=env)

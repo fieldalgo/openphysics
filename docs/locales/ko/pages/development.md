@@ -77,6 +77,7 @@ export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # 전체 소스 시험
 node --test tests/simcase/*.cjs            # Studio JavaScript 검사
 python ci/check_distributions.py           # 모든 패키지 빌드·검사·설치
+python ci/run_installed_tests.py           # 설치된 wheel로 tests/의 Python 시험 전체 실행
 python ci/check_licenses.py                # 설치된 라이선스를 검토 목록과 대조
 python ci/check_markdown_links.py          # 모든 Markdown 파일의 상대 링크와 #앵커
 ```
@@ -86,8 +87,8 @@ python ci/check_markdown_links.py          # 모든 Markdown 파일의 상대 �
 `-m "not slow"`로 뺄 수 있습니다. 일부만 통과한 결과가 CI를 대신하지는 않습니다.
 
 CI 스크립트의 출력 디렉터리는 새것이거나 비어 있어야 하므로, 이전 실행의 결과가
-섞이지 않습니다. `check_distributions.py`는 `--output`으로 다른 디렉터리를 주지 않으면
-`.validation/dist/`에 씁니다.
+섞이지 않습니다. `--output`으로 다른 디렉터리를 주지 않으면 `check_distributions.py`는
+`.validation/dist/`에, `run_installed_tests.py`는 `.validation/installed/`에 씁니다.
 
 설치 패키지 검사는 깨끗한 Python 3.12 환경이면 어느 OS에서나 실행됩니다.
 
@@ -101,16 +102,17 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 ## CI가 돌리는 것
 
 `Validate packages` 워크플로(`.github/workflows/validate.yml`)는 main push, Ready PR,
-수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 세 부분이 병렬로
+수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 네 부분이 병렬로
 실행됩니다.
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 일곱 개; Studio Node 검사; Studio 자원 관측 1회 |
+| `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 일곱 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 여섯 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
-필수 검사는 **`tests`** 하나입니다. 세 부분이 모두 성공해야 통과하며, 하나라도
+필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
@@ -135,13 +137,31 @@ wheel에는 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
 최상위 파일이나 폴더(예: `tests/` 폴더)를 Git이 추적하고 있으면 실패합니다.
 
 이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
-Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 공개
-API·CLI·저장 파일을 확인하는 설치 시험, 예제, 독립 수용 소비자는 checkout이 추적하는
-파일을 checkout 밖 임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록)
-설치된 wheel을 대상으로 `python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된
-환경은 `ci/check_licenses.py`를 통과해야 합니다. Studio 브라우저 검사는 Chrome에서 작은
-실제 모델을 돌립니다. 마지막으로 `ci/tools/audit_distribution_artifacts.py`가 보관된
-압축본의 체크섬과 sdist·wheel의 정확한 내용을 다시 확인합니다.
+Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 이 검사는
+`tests/`의 pytest 시험을 돌리지 않으며, 그 시험은 `installed-tests`가 돌립니다. 이 검사는
+공개 API·CLI·저장 파일을 확인하는 wheel 전용 소비자(`ci/test_*_wheel.py`), 고른 galerkin과
+simcase 예제, 독립 수용 소비자를 돌립니다. 이들은 checkout이 추적하는 파일을 checkout 밖
+임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록) 설치된 wheel을 대상으로
+`python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된 환경은
+`ci/check_licenses.py`를 통과해야 합니다. Studio Node 검사는 설치된 Studio 파일로 돌고,
+Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
+`ci/tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 sdist·wheel의 정확한
+내용을 다시 확인합니다.
+
+**설치 시험** (`ci/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
+sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 일곱 개를 각 metadata가
+선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
+`tests/`, `packages/*/examples/`, `packages/*/docs/` 아래의 추적 파일과 루트
+`pyproject.toml`만 복사하고 패키지 코드는 복사하지 않습니다. 복사한 파일의 해시는
+`suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
+실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
+모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가
+없는 시험 파일(`test_*.py`, `*_test.py`)이 있으면 실패합니다. 설치된 환경은 `ci/check_licenses.py`도
+통과해야 합니다. 이 job은 고정 requirements, Gmsh, 고정 RII 데이터베이스, 필수 레퍼런스
+교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬 Linux 실행에서 25분쯤
+걸렸고, 50분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬에서 돌리려면 Gmsh와
+`PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
+실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 계속 `linux-py312`에서 돕니다.
 
 **라이선스** (`ci/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
 환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
@@ -167,6 +187,9 @@ API·CLI·저장 파일을 확인하는 설치 시험, 예제, 독립 수용 소
 
 - Linux: `distributions-and-test-results`. 단계별 JUnit XML, 배포물 체크섬과 보고서,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
+- 설치 시험: `installed-test-results`. 빌드한 배포물, `installed-tests.xml`,
+  `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사 기록이 든
+  `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
   환경 정보, 체크섬, 설치 위치, JUnit XML, `numeric-runtime.json`이 들어 있습니다.
 

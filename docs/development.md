@@ -79,6 +79,7 @@ export MPLBACKEND=Agg OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 python -m pytest -q -ra                    # full source suite
 node --test tests/simcase/*.cjs            # Studio JavaScript checks
 python ci/check_distributions.py           # build, inspect and install all packages
+python ci/run_installed_tests.py           # every Python test in tests/ against installed wheels
 python ci/check_licenses.py                # installed licenses vs. the reviewed inventory
 python ci/check_markdown_links.py          # relative links and #anchors in all Markdown files
 ```
@@ -89,7 +90,8 @@ run; `-m "not slow"` skips them locally. A subset pass does not replace CI.
 
 Output directories of the CI scripts must be new or empty, so results from an
 earlier run cannot mix in. `check_distributions.py` writes to `.validation/dist/`
-unless `--output` names another directory.
+and `run_installed_tests.py` to `.validation/installed/`, unless `--output` names
+another directory.
 
 The installed-package check runs on any OS from a clean Python 3.12 environment:
 
@@ -104,15 +106,16 @@ The requirements file's historical name does not limit it to Windows.
 
 The `Validate packages` workflow (`.github/workflows/validate.yml`) runs on main
 pushes, Ready pull requests and manual dispatch. Branch pushes and draft PRs do
-not run it. It has three parts, run in parallel:
+not run it. It has four parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all seven distributions; Studio Node checks; one Studio resource observation |
+| `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all seven wheels, built from sdists and installed with all their extras outside the checkout |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Six packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
-The single required check is **`tests`**. It passes only when all three parts
+The single required check is **`tests`**. It passes only when all four parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
@@ -145,15 +148,37 @@ know, such as a `tests/` folder.
 
 Wheels are then installed into a fresh environment outside the checkout. Every
 shipped module (except `__main__`) and Studio static file must load from that
-environment with the checked-out bytes. The installed tests, examples and
+environment with the checked-out bytes. This check does not run the pytest
+suites in `tests/`; `installed-tests` runs them. It runs the wheel-specific
+consumers (`ci/test_*_wheel.py`), selected galerkin and simcase examples and the
 independent acceptance consumers, which exercise the public API, CLI and saved
-files, are copied from the checkout's tracked files to a temporary directory
-outside it (their hashes are recorded in `consumer-file-hashes.json`) and run
-with `python -I` against the installed wheels, so the checkout cannot leak in.
-The installed environment must pass `ci/check_licenses.py`. The Studio browser
-check runs a small real model in Chrome. Finally
+files. They are copied from the checkout's tracked files to a temporary
+directory outside it (their hashes are recorded in `consumer-file-hashes.json`)
+and run with `python -I` against the installed wheels, so the checkout cannot
+leak in. The installed environment must pass `ci/check_licenses.py`. The Studio
+Node checks run against the installed Studio files, and the Studio browser check
+runs a small real model in Chrome. Finally
 `ci/tools/audit_distribution_artifacts.py` re-checks the retained archives'
 checksums and their exact sdist and wheel contents.
+
+**Installed tests** (`ci/run_installed_tests.py`). Builds every package, each
+wheel from its sdist, and checks the archives with the same rules as the
+distribution check. All seven wheels are installed, each with every extra its
+metadata declares, into a fresh environment in a temporary directory outside the
+checkout. Next to it, the script copies the tracked files under `tests/`,
+`packages/*/examples/` and `packages/*/docs/` and the root `pyproject.toml`, but
+no package code; their hashes are recorded in `suite-file-hashes.json`. Every
+Python test in `tests/` then runs with `python -I -m pytest`; no test is
+selected by name. Besides any failing test, the run fails if a first-party
+module does not load from the installed environment, if any test is skipped or
+xfailed, or if a test file (`test_*.py`, `*_test.py`) produced no results. The installed environment must
+also pass `ci/check_licenses.py`. The job uses the pinned requirements, Gmsh,
+the pinned RII database and required reference cross-checks
+(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`). A local Linux run took about 25
+minutes; the 50-minute limit only stops hung runs. Running it locally needs Gmsh
+and `PHYSMAT_RII_PATH`, because tests that need them skip otherwise and a skip
+fails the run. It is verified on Linux only. The source suite still runs in
+`linux-py312`.
 
 **Licenses** (`ci/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the
@@ -183,6 +208,9 @@ Each job uploads its artifacts, even after a failure:
 - Linux: `distributions-and-test-results`, the `.validation/` directory with
   JUnit XML per stage, distribution checksums and reports, and
   `numeric-runtime.json`.
+- Installed tests: `installed-test-results`, the `.validation/` directory with
+  the built distributions, `installed-tests.xml`, `installed-origins.json`,
+  `suite-file-hashes.json`, the license report and the cross-check records.
 - Installed platforms: `installed-packages-<os>-<run_id>` with every command's
   exit and log, environment details, checksums, installed origins, JUnit XML and
   `numeric-runtime.json`.
