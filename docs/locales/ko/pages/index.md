@@ -8,7 +8,7 @@
 [기여 안내](contributing.md)(브랜치·리뷰·릴리스)를 읽으세요.
 
 기본 언어는 영어입니다. README와 기여·보안 진입 문서는 영어로 유지합니다. 영어·한국어
-문서는 `docs/` 안에서 제공하며(CI 도구 설명은 `ci/tools/docs/`), 영어는
+문서는 `docs/` 안에서 제공하며, 영어는
 `docs/<이름>.md`, 한국어는 `docs/locales/ko/pages/<이름>.md`에 둡니다. 패키지마다의
 문서(개요 포함)는 `docs/packages/<패키지>/`와 `docs/locales/ko/pages/packages/<패키지>/`에
 있습니다.
@@ -71,12 +71,13 @@
 | 처방 온도장 표면하중 | [열변형률과 전체 표면하중](../../../packages/galerkin/thermoelastic_traction.md) | [한국어](packages/galerkin/thermoelastic_traction.md) |
 | 열탄성 표면하중 수용검증 | [독립 하중·에너지](../../../packages/galerkin/thermoelastic_traction_independent_validation.md) | [한국어](packages/galerkin/thermoelastic_traction_independent_validation.md) |
 
-## Benchmark
+## Benchmark와 자원 관측
 
 | English | 한국어 |
 |---|---|
 | [Vector waveguide benchmark](../../../benchmark_vector.md) | [한국어](benchmark_vector.md) |
 | [Cavity benchmark](../../../benchmark_cavity.md) | [한국어](benchmark_cavity.md) |
+| [Transient Studio resource observer](../../../transient_resource_probe.md) | [한국어](transient_resource_probe.md) |
 
 ## 패키지 개요
 

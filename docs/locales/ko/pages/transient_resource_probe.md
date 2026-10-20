@@ -1,11 +1,11 @@
 # Transient Studio 자원 관측기
 [English](../../../transient_resource_probe.md)
 
-stdlib 도구 `ci/tools/probe_transient_studio_resources.py`는 이미 실행 중인 명시적 loopback 서버를 관측한다. 서버설치/시작·solver import·수치수용·용량인증을 하지 않는다. 시도마다 새 evidence 디렉터리를 사용한다.
+stdlib 도구 `tools/studio_resources/probe_transient_studio_resources.py`는 이미 실행 중인 명시적 loopback 서버를 관측한다. 서버설치/시작·solver import·수치수용·용량인증을 하지 않는다. 시도마다 새 evidence 디렉터리를 사용한다.
 
 ```sh
-python ci/tools/probe_transient_studio_resources.py --plan --output records/transient-shapes
-python ci/tools/probe_transient_studio_resources.py --base-url http://127.0.0.1:8000 --document input.json --source-commit FULL_SERVER_SHA --output records/transient-http
+python tools/studio_resources/probe_transient_studio_resources.py --plan --output records/transient-shapes
+python tools/studio_resources/probe_transient_studio_resources.py --base-url http://127.0.0.1:8000 --document input.json --source-commit FULL_SERVER_SHA --output records/transient-http
 ```
 
 input은 envelope가 아닌 document다. HTTP모드는 capabilities→validate→solve정확1회제출(재시도없음)→유계poll→manifest/마지막Tframe→동일전체query10회(최초1+반복10=frame GET총11회)→최대16행Hpage를 기록한다. 동일query의status/bytes/hash를 비교하되 transient 요청별encode는 허용되므로 hash만으로 getter/solve0을 증명하지 않는다. 429/거절/오류/timeout은 capacity성공이 아니고 timeout도 server solve취소가 아니다.
@@ -24,11 +24,11 @@ small n2/Nt3,medium n16/Nt8은준비shape. 16MiB raw후보바로아래/위의보
 도구는private store/추측metricsendpoint를읽지않는다. 내부memory/lease/counter는명시적미측정이다. 향후계측runner는생산원문/수치gate/steady계약을보존해야하며독립물리·수명·플랫폼CI와구분한다.
 
 ## 별도 fresh-process 계측 companion
-`ci/tools/profile_transient_studio_resources.py`는 실제 source Studio 서버를 새 child에 띄우고 HTTP client는 parent에둔다. `instrumented-report.json`, 선택응답원문, `child.stderr`를저장한다. opt-in이며steadyCI중복실행에자동연결하지않는다.
+`tools/studio_resources/profile_transient_studio_resources.py`는 실제 source Studio 서버를 새 child에 띄우고 HTTP client는 parent에둔다. `instrumented-report.json`, 선택응답원문, `child.stderr`를저장한다. opt-in이며steadyCI중복실행에자동연결하지않는다.
 
 ```sh
-python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
-python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
+python tools/studio_resources/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
+python tools/studio_resources/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
 ```
 
 HEAD정확일치/추적package무변경을검사한다. 기존declareddeps만사용,import/start실패는원문보존하고설치/재시도없음. 호출별freshprocess/실제solve1회다. 독립유효small/medium/near문서를각각실행한다. 선택over문서는413·추가solve0을기대하며429는그actor의실패로보존하고capacity성공으로세지않는다.
@@ -44,7 +44,7 @@ Linux /proc currentRSS, Linux/macOS정규화ru_maxrss누적highwater를분리한
 ## Retained Linux workload wrapper
 정상설정된Linux환경의exact통합checkout에서한번실행한다.
 ```sh
-python ci/tools/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
+python tools/studio_resources/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
 ```
 승인된validationrun이있으면이도구때문에별도workflow를중복dispatch하지않는다. 기존artifact에output전체를보존한다.
 
