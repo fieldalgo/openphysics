@@ -3,10 +3,12 @@
 **English** | [한국어](locales/ko/pages/assets.md)
 
 This inventory connects bundled non-code assets to repository history and
-generation inputs. The repository's original figures, screenshots and fixtures
-carry its [Apache-2.0 license](../LICENSE); separately identified material keeps
-the terms in [NOTICE](../NOTICE) and package notices. Historical pictures are
-illustrations, not results from a new validation run.
+generation inputs. The files listed below stay in the repository; the package
+sdists and wheels do not ship them. The repository's original figures,
+screenshots and fixtures carry its [Apache-2.0 license](../LICENSE); separately
+identified material keeps the terms in [NOTICE](../NOTICE) and package
+notices. Historical pictures are illustrations, not results from a new
+validation run.
 
 | Asset under `packages/` | Provenance and reproduction input |
 |---|---|

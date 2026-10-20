@@ -173,4 +173,4 @@ Frozen gates retain all original Dirichlet tests and add:
 No transient, radiation, variable/anisotropic k, temperature-dependent h,
 3D, new coupling workflow, simcase/Studio or export integration is added here.
 Existing NumPy/SciPy only; no new runtime dependency or third-party solver source.
-Shared document/example packaging assets remain the release owner's responsibility.
+Documents and examples are not shipped in the distributions.

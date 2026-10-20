@@ -235,5 +235,5 @@ k10/E70GPa/nu.3/alpha12e-6을 사용합니다. 열원은 -k Laplacian(T), 기계
 맞추지 않습니다. Component gate를 유지하며 copy/stale/invalid/component supports,
 냉각·음수·0 alpha, 공동 기준온도 이동, 경계별 반력, 비영 support work, 잘못된 PE·중심
 에너지의 실제 직접 수학 음성 대조도 포함합니다. 이 producer 검사는 독립 수용과
-release·설치 근거와 별개입니다. 가이드나 예제가 Windows·Actions·배포 포함·성능 성공을
-뜻하지 않습니다. 공유 release manifest는 별도 검토 대상입니다.
+release·설치 근거와 별개입니다. 가이드나 예제가 Windows·Actions·성능 성공을
+뜻하지 않습니다. 가이드와 예제는 배포본에 포함되지 않습니다.

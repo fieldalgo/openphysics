@@ -92,15 +92,16 @@ python -I /external/steady_boundary_independent_consumer.py --expected-installed
 ```
 
 External paths are placeholders, not fixed machine paths. Copy the oracle, cases
-and consumer from verified source archives. The mandatory nonempty UTF-8 hash
-mapping includes simcase.schema, simcase.steady_boundary_contract, simcase.thermal,
-simcase.runner, simcase.cli and galerkin.thermal. The consumer rejects origins
+and consumer from the checkout's tracked files to a directory outside it. The
+mandatory nonempty UTF-8 hash mapping includes simcase.schema,
+simcase.steady_boundary_contract, simcase.thermal, simcase.runner, simcase.cli
+and galerkin.thermal. The consumer rejects origins
 outside the expected installed root or byte mismatches, prints identities and
 counts, and fails if any test is skipped.
 
-Source/isolated-installed, exact CI, Windows/macOS, whole regression, source
-archive inclusion and main integration are all unverified for this new scope.
-The release coordinator owns archive/CI integration and full regression scheduling.
+Source/isolated-installed, exact CI, Windows/macOS, whole regression and main
+integration are all unverified for this new scope.
+The release coordinator owns CI integration and full regression scheduling.
 
 The prepared suite now declares eleven test methods (not collected passes). It also
 includes omitted reference-offset, fixed-corner-load removal, thermostat-only

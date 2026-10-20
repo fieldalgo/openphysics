@@ -187,7 +187,7 @@ before producing a successful combined JSON report; it does not print a
 predetermined pass. It retains all requested history, so the n64 companion
 needs substantial memory. No wall time is a dedicated-host performance baseline.
 
-The current manifests and distribution helper wire EN/KO pages, the example, original tests, independent consumers and runtime modules into inclusion and byte checks. The helper builds real sdist→wheel artifacts, verifies installed origins/source bytes, and runs the verified archive's independent `--suite all` consumer and full English convergence example. An implemented gate is distinct from a successful build/install run. Establish inclusion, installed and numerical success from the exact current CI exits, logs and artifacts. The narrow Windows save gate is not full transient-physics acceptance; release success is separate.
+The distribution helper builds real sdist→wheel artifacts and checks that their package code is byte-identical to the checkout and that they carry no documents, tests or examples; pages, the example and tests are not shipped. It verifies installed origins/source bytes, copies the checkout's tracked original tests, independent consumer files and example outside the checkout, and runs the independent `--suite all` consumer and full English convergence example with `python -I` against the installed wheels. An implemented gate is distinct from a successful build/install run. Establish packaging, installed and numerical success from the exact current CI exits, logs and artifacts. The narrow Windows save gate is not full transient-physics acceptance; release success is separate.
 
 ## Bounded spatial-residual refinement
 

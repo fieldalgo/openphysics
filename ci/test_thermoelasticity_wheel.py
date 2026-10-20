@@ -197,7 +197,7 @@ def test_unconstrained_rigid_mode_rejected():
         solve(mesh, np.full(mesh.num_nodes, TREF+THETA), 'stress', {})
 
 
-def test_actual_archived_english_example():
+def test_actual_english_example():
     example = Path(__file__).resolve().parents[1]/'examples/prescribed_temperature_thermoelasticity.py'
     completed = subprocess.run([sys.executable, '-I', str(example)], cwd=example.parent,
                                text=True, capture_output=True, check=True)

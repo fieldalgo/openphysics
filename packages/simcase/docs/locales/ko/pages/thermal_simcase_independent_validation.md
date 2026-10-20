@@ -16,7 +16,7 @@
 
 정확929 Linux 재실행에서 초기의 의도적 결과 손상 저장 반례5개와 후속 constructor·필수 artifact 검사가 해결됨을 확인했습니다. 원시 배열9개·두 field flag·원 K/f/반력/열수지·고정 수렴·SI 기준·CLI 종료·기존/교체/foreign 출력 보호·제한된 two-writer 검사를 유지했습니다. 추가 실제 installed CLI의 save_fields=false 실행은 exit0, NPZ 없이 model/summary/log만 생성하고 해석적60 W/m 열수지와 일치했습니다. 허용치 완화나 skip/xfail로 과거 실패를 통과로 바꾸지 않았습니다.
 
-sdist7개에서 wheel7개를 생성했습니다. 기존 sdist asset gate7개와 wheel runtime/static byte 비교는 통과했습니다. 통합 `ci/check_distributions.py`는 **twine 부재로 실패**했으므로 full strict 배포 검증 통과를 주장하지 않습니다. 새 의존성은 설치하지 않았습니다. 환경 복구 뒤 전체 root 수치시험은 반복하지 않았으며 이 전용 결과로 새 전체 결합 빌드를 인증하지 않습니다.
+sdist7개에서 wheel7개를 생성했습니다. 기존 sdist asset gate7개와 wheel runtime/static byte 비교는 통과했습니다(2026-10-20 전에는 sdist에 시험·문서·예제도 들어 있었습니다). 통합 `ci/check_distributions.py`는 **twine 부재로 실패**했으므로 full strict 배포 검증 통과를 주장하지 않습니다. 새 의존성은 설치하지 않았습니다. 환경 복구 뒤 전체 root 수치시험은 반복하지 않았으며 이 전용 결과로 새 전체 결합 빌드를 인증하지 않습니다.
 
 같은 hostname이었지만 원 scratch에 접근할 수 없게 됐습니다. 옛 미업로드 raw log·venv·미commit 작업은 **미회수**입니다. 따라서 아래 “All original failure logs remain retained”와 이에 대응하는 번역은 과거 실행 당시 관측이며 현재 raw log 접근 가능성을 뜻하지 않습니다. 원격 commit 소스·기록된 카운트·실패 trace는 남았습니다. 원격 blob을 검증해 정확929 source를 재구성했고 위 결과는 새 로그를 생성한 새 실행입니다. 작은 근거 기록은 명령·환경·hash·카운트·소실 한계를 구분합니다. 그 기록이나 재실행은 사라진 원 raw log가 아닙니다. 초기 CI 취소와 모든 과거 실패도 소급 성공시키지 않습니다.
 

@@ -77,9 +77,9 @@ def test_installed_elasticity_rejects_unremoved_rigid_modes(plane, constraints):
                                     plane=plane, dirichlet=bc)
 
 
-def test_archived_english_elasticity_example_runs_with_installed_packages():
+def test_english_elasticity_example_runs_with_installed_packages():
     example = Path(__file__).resolve().parents[1] / "examples" / "elasticity2d.py"
-    assert example.is_file(), "the checker must supply the byte-verified sdist example"
+    assert example.is_file(), "the checker must copy the checkout example"
     completed = subprocess.run([sys.executable, "-I", str(example)],
                                capture_output=True, text=True, check=True)
     lines = completed.stdout.splitlines()

@@ -20,9 +20,10 @@ The successful-case JSON labelled studio_transient_independent_exact records exa
 requested times, per-field maximum absolute errors and raw H/V histories. Keep this
 output together with JUnit, command exit, environment and source/module hashes.
 Without -s, successful pytest capture can hide those numbers: report missing values
-rather than borrowing measurements from another API or commit. Run the archived
-tests and their independent oracle dependencies in an isolated installed environment
-outside the source checkout as a separate acceptance stage.
+rather than borrowing measurements from another API or commit. As a separate
+acceptance stage, copy these tests and their independent oracle dependencies from
+the checkout to a directory outside it and run them with python -I against the
+installed wheels.
 
 ## Physical truth and unchanged gates
 studio_transient_independent_fixtures.py imports the existing

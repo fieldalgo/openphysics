@@ -183,7 +183,7 @@ Headless가이드를참조하며Studio저장API는추가하지않습니다.
   full13field수용이아님.
 - Crossrouteheldstreamingress·모든실패해제·slowsend/disconnectpin·
   eviction/byte계상/정상cachedbyte보존.
-- Exactsource/installedorigin·archiveasset/byte/link·배포Node·실제browser/HTTP·
+- Exactsource/installedorigin·sdist/wheel내용·byte·배포Node·실제browser/HTTP·
   Linux/macOS/Windows결과. Node/HTTP가실제Canvas근거는아니며Linux/
   universalwheel이다른OS통과를입증하지않음.
 

@@ -30,7 +30,9 @@ This is a project policy, not legal advice. License terms are judged at three
 levels.
 
 1. **What this repository creates, copies, builds, links or distributes**: the
-   source tree, the sdists and wheels of its packages, and CI artifacts. They
+   source tree, the sdists and wheels of its packages (package code, README,
+   LICENSE, NOTICE and build files; tests, docs and examples are not shipped),
+   and CI artifacts. They
    are original Apache-2.0 work apart from the third-party data recorded under
    [data and published numbers](#data-and-published-numbers) (CC0-1.0
    refractive-index tables embedded in physmat, published benchmark numbers in

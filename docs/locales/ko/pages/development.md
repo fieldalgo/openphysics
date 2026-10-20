@@ -94,14 +94,25 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 
 **배포 검사** (`ci/check_distributions.py`). 패키지 일곱 개(빈 `openphysics` 이름
 예약 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
-`twine check --strict`로 메타데이터를 확인하고, 모든 sdist·wheel에 패키지의 LICENSE와 NOTICE가 그대로 들어 있는지, Studio 자산, 검사기의
-필수 목록에 있는 모든 파일이 sdist에 있고 바이트가 같은지 확인합니다. 압축본 안의
-상대 Markdown 링크는 실제 파일을 가리켜야 하며, 외부 URL은 열어 보지 않습니다.
-이어서 wheel을 checkout 밖 새 환경에 설치하고 공개 API·CLI·저장 파일, 포함된 예제,
-독립 수용 소비자 시험으로 확인합니다. `python -I`로 실행해 checkout이 섞이지 않게
-합니다. 설치된 환경은 `ci/check_licenses.py`를 통과해야 합니다. Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
-`ci/tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 wheel 바이트를
-다시 확인합니다.
+`twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
+sdist에는 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
+`setup.py`, `MANIFEST.in`, 빌드가 만드는 `PKG-INFO`, `setup.cfg`, egg-info)만 있고,
+wheel에는 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
+`.dist-info/licenses/`에 들어갑니다. 시험·문서·예제·도구는 저장소에만 두고 배포하지
+않습니다(모든 `MANIFEST.in`이 이들을 뺍니다). 들어가야 할 내용은 손으로 적은 목록이
+아니라 `packages/<name>/`에서 Git이 추적하는 파일로 정합니다. import 패키지의 추적 파일
+전부와, sdist에서는 위에 적은 최상위 파일 중 Git이 추적하는 것이 모두 있어야 하고 checkout과 바이트가
+같아야 합니다(`LICENSE`, `NOTICE` 포함). 그 밖의 파일이 압축본에 있거나, 검사기가 모르는
+최상위 파일을 Git이 추적하고 있으면 실패합니다.
+
+이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
+Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 공개
+API·CLI·저장 파일을 확인하는 설치 시험, 예제, 독립 수용 소비자는 checkout이 추적하는
+파일을 checkout 밖 임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록)
+설치된 wheel을 대상으로 `python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된
+환경은 `ci/check_licenses.py`를 통과해야 합니다. Studio 브라우저 검사는 Chrome에서 작은
+실제 모델을 돌립니다. 마지막으로 `ci/tools/audit_distribution_artifacts.py`가 보관된
+압축본의 체크섬과 sdist·wheel의 정확한 내용을 다시 확인합니다.
 
 **라이선스** (`ci/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
 환경마다 `ci/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이

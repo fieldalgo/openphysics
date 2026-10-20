@@ -1,16 +1,8 @@
-include docs/overview.md
-include docs/locales/ko/pages/overview.md
-include refsol/thermoelastic_traction.py
-include tests/test_thermoelastic_traction_reference.py
-include refsol/transient_heat.py
-include tests/test_transient_heat_reference.py
-include tests/test_fiber_group_index.py
-include tests/test_fiber_fields.py
-include refsol/thermal_multilayer.py
-include tests/test_thermal_multilayer_reference.py
-include refsol/elasticity_multilayer.py
-include tests/test_elasticity_multilayer_reference.py
-include tests/test_material_cavity_reference.py
-include tests/test_wall_loss_reference.py
-include refsol/transient_heat_multilayer.py
-include tests/test_transient_heat_multilayer_reference.py
+# The sdist holds the package code, README.md, LICENSE, NOTICE and build files
+# only; ci/check_distributions.py checks this. Tests, docs, examples and tools
+# stay in the repository and are never shipped. setuptools would otherwise add
+# tests/test*.py on its own. This file is identical in every package.
+prune tests
+prune docs
+prune examples
+prune tools

@@ -133,8 +133,8 @@ directory. Run pytest there with `--confcutdir=.` and verify that imports resolv
 to that venv's site-packages, not the source checkout or its root conftest.
 All sixteen Python modules in the tested wheel were byte-compared with candidate
 source. This validates the core installed consumer, not every distribution or
-platform. New documentation asset inclusion remains a packaging responsibility;
-this independent work does not change the shared MANIFEST or release configuration.
+platform. This independent work did not change the shared MANIFEST or release
+configuration. (Documentation is not shipped in the distributions.)
 
 Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, pytest 9.1.1; BLAS/OpenMP/MKL threads
 one on a shared Linux host. Timings are not performance baselines. Logs, source

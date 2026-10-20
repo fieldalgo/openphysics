@@ -148,4 +148,4 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s packages/galerki
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q
 ```
 
-근접 비압축성 평면변형률 P1 locking, 거친 메시의 굽힘 강성, 소변형 가정과 부동소수점 메시 한계는 그대로입니다. 작은 대수 잔차 통과만으로 nu=0.5 근처의 정확도가 보증되지는 않습니다. 압력 모델, 열팽창, 비선형 재료, 대변형, 접촉, 동적, 3D, simcase나 Studio 기능을 추가하지 않습니다. 의존성을 추가하거나 외부 solver 구현을 복사하지 않습니다. 안내서·예제는 source-tree 자산이며 sdist 포함은 공용 패키징 통합 담당 범위입니다.
+근접 비압축성 평면변형률 P1 locking, 거친 메시의 굽힘 강성, 소변형 가정과 부동소수점 메시 한계는 그대로입니다. 작은 대수 잔차 통과만으로 nu=0.5 근처의 정확도가 보증되지는 않습니다. 압력 모델, 열팽창, 비선형 재료, 대변형, 접촉, 동적, 3D, simcase나 Studio 기능을 추가하지 않습니다. 의존성을 추가하거나 외부 solver 구현을 복사하지 않습니다. 안내서·예제는 source tree에만 있고 sdist에는 포함되지 않습니다. 설치 검사는 checkout의 예제를 복사해 설치된 wheel로 실행합니다.

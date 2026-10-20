@@ -262,7 +262,7 @@ regression and one final whole-root run separately:
 python -m pytest -q
 ```
 
-Current manifests, documentation indexes and the distribution helper connect these reports, original oracle/cases/wrapper/consumer, runtime modules and example to archive/byte/origin checks. The helper runs the isolated archived consumer with `--suite all` and the complete convergence example. This is implemented verification, not evidence of a successful artifact run; inspect exact CI exits and artifacts.
+The distribution helper checks that sdists and wheels carry no documents, tests or examples; these reports, the tests and the example are not shipped. It checks installed runtime module bytes and origins, copies the checkout's tracked oracle/cases/consumer and example outside the checkout, and runs the isolated consumer with `--suite all` and the complete convergence example against the installed wheels. This is implemented verification, not evidence of a successful artifact run; inspect exact CI exits and artifacts.
 Subsequent producer SHAs require original blob comparison and impact-specific
 retesting; identical code does not justify automatic whole-run repetition.
 

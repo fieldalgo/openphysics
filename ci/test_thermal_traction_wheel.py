@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Public thermal/traction consumers, run outside source with installed wheels.
 
-Direct closed forms, weak resultants and actual archived examples supplement,
+Direct closed forms, weak resultants and the actual examples supplement,
 and do not replace, the independent source convergence/acceptance evidence.
 """
 import re
@@ -123,16 +123,16 @@ def test_heat_rejects_invalid_source_callback(source):
         heat.solve_steady_heat(mesh, conductivity=12., dirichlet={0: 300.}, heat_source=source)
 
 
-def archived_example(name):
+def checkout_example(name):
     path = Path(__file__).resolve().parents[1] / 'examples' / name
-    assert path.is_file(), 'the checker must supply the byte-verified archived example'
+    assert path.is_file(), 'the checker must copy the checkout example'
     completed = subprocess.run([sys.executable, '-I', str(path)],
                                check=True, capture_output=True, text=True)
     return completed.stdout.splitlines()
 
 
-def test_archived_heat_example():
-    lines = archived_example('thermal_steady2d.py')
+def test_heat_example():
+    lines = checkout_example('thermal_steady2d.py')
     assert len(lines) == 4
     labels = ['Maximum temperature error (K):', 'Mean heat flux (W/m^2):',
               'Left/right heat input (W/m of thickness):', 'Heat imbalance (W/m of thickness):']
@@ -258,8 +258,8 @@ def test_traction_none_and_empty_mapping_keep_existing_results():
             np.testing.assert_array_equal(getattr(result, name), getattr(default, name))
 
 
-def test_archived_traction_example():
-    lines = archived_example('elasticity_traction.py')
+def test_traction_example():
+    lines = checkout_example('elasticity_traction.py')
     assert len(lines) == 6
     for j, plane in enumerate(('stress', 'strain')):
         first, forces, energies = lines[3*j:3*j+3]

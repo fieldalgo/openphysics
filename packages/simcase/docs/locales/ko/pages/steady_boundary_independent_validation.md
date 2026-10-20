@@ -84,16 +84,16 @@ python -m pytest -q packages/simcase/tests/test_steady_boundary_independent_vali
 python -I /external/steady_boundary_independent_consumer.py --expected-installed-root /wheel/venv --expected-module-hashes /external/source-hashes.json
 ```
 
-외부 경로는 고정 머신 경로가 아닌 예시이다. 검증된 source archive에서
-oracle/cases/consumer를 복사한다. 비어 있지 않은 UTF-8 hash mapping은
+외부 경로는 고정 머신 경로가 아닌 예시이다. oracle/cases/consumer는 checkout의
+추적 파일에서 checkout 밖 디렉터리로 복사한다. 비어 있지 않은 UTF-8 hash mapping은
 simcase.schema, simcase.steady_boundary_contract, simcase.thermal,
 simcase.runner, simcase.cli, galerkin.thermal을 필수 포함한다.
 consumer는 설치 루트 밖 origin/byte 불일치를 거절하고 identity/count를
 출력하며 skip이 있으면 실패한다.
 
-새 범위 source/isolatedinstalled, exact CI, Windows/macOS, 전체 회귀,
-source archive 포함 및 main 통합은 모두 미검증이다.
-배포 총괄이 archive/CI 연결과 전체 회귀 일정을 소유한다.
+새 범위 source/isolatedinstalled, exact CI, Windows/macOS, 전체 회귀 및
+main 통합은 모두 미검증이다.
+배포 총괄이 CI 연결과 전체 회귀 일정을 소유한다.
 
 준비된 suite는 현재11개 시험 메서드를 선언한다(수집/통과 수가 아님).
 reference offset 누락, 고정 corner 하중 제거, thermostat-only 총 외향량,

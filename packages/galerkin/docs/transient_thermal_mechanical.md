@@ -130,8 +130,9 @@ solver-to-solver agreement is not a physics oracle. Preregistered cases/gates:
 The Linux source suite includes these tests; its dedicated preflight records
 numerical metrics in logs/JUnit. The installed Linux/macOS/Windows consumer checks
 the same public composition against closed forms and verifies module origin.
-Distribution checks require both language documents, tests and the example and
-run the archived example. Existing full Linux and narrow Windows checks remain
+Distributions ship no documents, tests or examples; the distribution check copies
+the checkout's tracked example outside the checkout and runs it against the
+installed wheels. Existing full Linux and narrow Windows checks remain
 required. Configuration is not proof of acceptance: inspect the exact candidate
 and resulting main workflow logs/artifacts. No new platform, performance or
 resource guarantee follows from this guide.

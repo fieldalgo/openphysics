@@ -195,7 +195,7 @@ implementation, actual test execution, exact integrated CI, main landing and rel
   browser, resource or complete13-field acceptance.
 - Cross-route held-stream ingress, all failure releases, slow send/disconnect
   pins, eviction, byte accounting and steady cached-byte preservation.
-- Exact source/installed origins, archive assets/bytes/links, shipped Node,
+- Exact source/installed origins, sdist/wheel contents and bytes, shipped Node,
   actual browser/HTTP and Linux/macOS/Windows outcomes. Node/HTTP are not actual
   Canvas evidence; Linux or universal wheels do not establish other OS passes.
 

@@ -40,8 +40,8 @@ result = solve_steady_heat(
 절점이나 신뢰한 tag만이 아닌 실제 위상적 외부 경계에 있어야 합니다. 선택하지 않은
 자연 edge는 단열입니다. 경계 절점 tag로 Dirichlet 매핑을 만들 수 있습니다. 선택적
 처방 외향 flux·Robin edge-tag 입력, 추가 결과 필드와 바뀐 열수지 방정식은 소스 트리의
-`docs/thermal_flux_robin.md`를 보십시오. 해당 가이드·예제의 배포 포함은 별도 배포
-단계입니다. 한국어 설명은 [flux·Robin 가이드](thermal_flux_robin.md)에 있습니다.
+`docs/thermal_flux_robin.md`를 보십시오. 해당 가이드·예제는 배포본에
+포함되지 않습니다. 한국어 설명은 [flux·Robin 가이드](thermal_flux_robin.md)에 있습니다.
 아래 방정식은 그 입력들을 생략한 기본 경우를 설명합니다.
 
 온도는 K로 지정하며 Celsius 변환이나 기준 온도 차감을 입력에서 추론하지 않습니다.
@@ -172,5 +172,5 @@ A=1 K이며 네 측면에 T0를 처방합니다. 정확한 Q는 `-k Laplacian(T)
 비정상 열용량, 복사 입력, 영역 안에서 변하는 열전도율(영역별 구간 상수는
 [multimaterial](multimaterial.md)), 이방성 열전도율, 3D, 열탄성 연성, simcase·Studio
 지원을 포함하지 않습니다. 기존 NumPy/SciPy와 직접 유도한 수식만 사용합니다. 외부
-solver 소스나 새 runtime 의존성을 추가하지 않습니다. 문서·예제의 배포 포함은 별도
-패키징 책임이며 이 기능은 공유 MANIFEST나 CI 자산 명세를 바꾸지 않습니다.
+solver 소스나 새 runtime 의존성을 추가하지 않습니다. 문서·예제는 저장소에만
+있고 배포본에 포함되지 않습니다.

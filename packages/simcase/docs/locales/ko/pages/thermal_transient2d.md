@@ -316,7 +316,7 @@ Crank–Nicolson·열 Studio 렌더링·자동 연성·restart는 추가하지 �
 기존 [엔진 수치 gate](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin/docs/locales/ko/pages/transient_heat_validation.md)는
 불변이며 다른 패키지 링크에는 네트워크 접근이 필요합니다.
 Schema 검증·source adapter 시험·독립 직렬화 해석/단위/이력/음성 대조·
-격리 설치 consumer·실제 archive 포함/byte/링크·Studio 거부/stale-state 검사·
-native 저장 회귀를 각각 기록하세요. 구현·정적 개수·manifest 항목은 관측한 통과가
+격리 설치 consumer·정확한 sdist/wheel 내용과 byte·Studio 거부/stale-state 검사·
+native 저장 회귀를 각각 기록하세요. 구현이나 정적 개수는 관측한 통과가
 아닙니다. 최종 공개 API 수용에는 정확한 통합 source와 설치/CI 근거가 필요하며
 릴리스에는 결과 main 커밋의 검사 성공도 필요합니다.

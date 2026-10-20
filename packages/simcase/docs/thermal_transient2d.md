@@ -342,8 +342,8 @@ The existing [engine numerical gates](https://github.com/fieldalgo/openphysics/b
 remain unchanged; the cross-package link requires network access.
 Record separately: schema validation, source adapter tests, independent
 serializable analytic/unit/history/negative controls, isolated installed
-consumers, real archive inclusion/bytes/links, Studio refusal/stale-state
-checks, and native save regressions. An implementation, static count or
-manifest entry is not an observed pass. Final public-API acceptance requires
+consumers, exact sdist/wheel contents and bytes, Studio refusal/stale-state
+checks, and native save regressions. An implementation or static count is not
+an observed pass. Final public-API acceptance requires
 the exact integrated source and installed/CI evidence; release additionally
 requires green checks on the resulting main commit.
