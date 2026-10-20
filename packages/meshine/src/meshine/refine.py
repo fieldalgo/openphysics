@@ -597,16 +597,27 @@ def _terminated(P: np.ndarray, T: np.ndarray, cc: np.ndarray, pieces: np.ndarray
                 sines: np.ndarray) -> np.ndarray:
     """(T,) mask of skinny triangles to leave as they are: the circumcenter encroaches a
     first piece of an acute corner, and splitting it would leave vertices
-    |piece| * sin(angle / 2) apart, closer than the triangle's shortest edge."""
+    |piece| * sin(angle / 2) apart, closer than the triangle's shortest edge.
+
+    A tree of the circumcenters is asked, once per piece, for those within the piece's own
+    half-length, and only those pairs take the strict test: comparing every triangle with
+    every piece built an (S, K, 2) array of S skinny triangles by K pieces."""
+    out = np.zeros(len(T), dtype=bool)
     if not len(pieces):
-        return np.zeros(len(T), dtype=bool)
+        return out
     a, b = P[pieces[:, 0]], P[pieces[:, 1]]
     mid, length = 0.5 * (a + b), np.linalg.norm(a - b, axis=1)
     p = P[T]
     shortest = np.sqrt(np.minimum(np.minimum(((p[:, 1] - p[:, 2]) ** 2).sum(1), ((p[:, 2] - p[:, 0]) ** 2).sum(1)),
                                   ((p[:, 0] - p[:, 1]) ** 2).sum(1)))
-    encroached = np.linalg.norm(cc[:, None, :] - mid[None, :, :], axis=2) < 0.5 * length * (1 - 1e-9)
-    return (encroached & ((length * sines)[None, :] < shortest[:, None])).any(axis=1)
+    near = cKDTree(cc).query_ball_point(mid, 0.5 * length)
+    ki = np.repeat(np.arange(len(mid)), [len(lst) for lst in near])
+    ti = np.fromiter((t for lst in near for t in lst), dtype=np.int64, count=len(ki))
+    if len(ki):
+        hit = np.linalg.norm(cc[ti] - mid[ki], axis=1) < (0.5 * length * (1 - 1e-9))[ki]
+        hit &= (length * sines)[ki] < shortest[ti]
+        out[ti[hit]] = True
+    return out
 
 
 def _encroached(cand: np.ndarray, mids: np.ndarray, half: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
