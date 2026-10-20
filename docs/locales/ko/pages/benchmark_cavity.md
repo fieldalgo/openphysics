@@ -9,7 +9,7 @@
 import 위치를 검사합니다. 새 의존성, solver 최적화, API 변경이나 CI 시간 gate는 없습니다.
 
 ```bash
-python ci/benchmark_cavity.py --output /tmp/cavity-baseline.json
+python benchmarks/benchmark_cavity.py --output /tmp/cavity-baseline.json
 ```
 
 기본값은 여덟 조건 각각 세 번 반복입니다. 정육면체 `(1,1,1)` m와 직육면체
@@ -30,9 +30,9 @@ worker를 종료·회수하며 RSS는 parent에서 복사하지 않고 미확보
 짧은 검사 또는 의도적으로 실패하는 solve는 다음과 같습니다.
 
 ```bash
-python ci/benchmark_cavity.py --case cube --subdivisions 4 --repeats 1 \
+python benchmarks/benchmark_cavity.py --case cube --subdivisions 4 --repeats 1 \
   --output /tmp/cavity-smoke.json
-python ci/benchmark_cavity.py --case cube --subdivisions 1 --repeats 1 \
+python benchmarks/benchmark_cavity.py --case cube --subdivisions 1 --repeats 1 \
   --output /tmp/cavity-insufficient-dofs.json
 ```
 
@@ -94,7 +94,7 @@ worker는 기존 `sys.getprofile()` hook과 `sys.monitoring.PROFILER_ID`의 활�
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 BLIS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 OMP_THREAD_LIMIT=1 \
-python -m cProfile -o /tmp/cavity-rectangle16.prof ci/benchmark_cavity.py \
+python -m cProfile -o /tmp/cavity-rectangle16.prof benchmarks/benchmark_cavity.py \
   --worker rectangle --subdivisions 16 > /tmp/cavity-rectangle16-profile.json
 python -m pstats /tmp/cavity-rectangle16.prof
 ```

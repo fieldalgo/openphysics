@@ -4,8 +4,8 @@ From the repository root, use the editable installation and pinned environment
 described in the [development guide](development.md). No additional dependency is needed:
 
 ```bash
-python ci/benchmark_vector.py --repeats 3 --output /tmp/vector-baseline.json
-python ci/benchmark_vector.py --case te --case tm --repeats 5 \
+python benchmarks/benchmark_vector.py --repeats 3 --output /tmp/vector-baseline.json
+python benchmarks/benchmark_vector.py --case te --case tm --repeats 5 \
   --output /tmp/vector-slab.json --snapshots /tmp/vector-slab-fields
 ```
 
@@ -42,7 +42,7 @@ for child processes). Keep these measurements separate from uninstrumented runs:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  python -m cProfile -o /tmp/vector-te.prof ci/benchmark_vector.py --worker te
+  python -m cProfile -o /tmp/vector-te.prof benchmarks/benchmark_vector.py --worker te
 python -m pstats /tmp/vector-te.prof
 ```
 
