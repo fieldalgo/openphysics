@@ -205,7 +205,7 @@ jobs:
             -e packages/gmshio -e packages/physmat -e packages/simcase
       - name: Confirm the forced OpenBLAS kernel and record the CPU
         run: python ci/tools/report_numeric_runtime.py --expect-core "${{ matrix.core }}"
-      - name: Numerically sensitive tracking, eigenspace and fiber reference tests
+      - name: Numerically sensitive tracking, eigenspace, cavity and fiber reference tests
         run: |
           python -m pytest -q -ra -m "not slow" \
             tests/simcase/test_tracking.py \
@@ -214,6 +214,8 @@ jobs:
             tests/simcase/test_vector_sweep.py \
             tests/simcase/test_length_canonical.py \
             tests/galerkin/test_eigenspace_reliability.py \
+            tests/galerkin/test_material_cavity.py \
+            tests/galerkin/test_cavity_wall_loss.py \
             tests/refsol/test_fiber_group_index.py \
             tests/refsol/test_fiber_fields.py
 
