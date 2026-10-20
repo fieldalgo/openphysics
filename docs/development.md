@@ -206,7 +206,10 @@ fixtures. This is installed acceptance, not a full macOS or Windows regression.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers are measured once with fixed workloads. These are observations,
-not performance gates. Timing and profiling commands for the solvers are in the
+not performance gates. The observers are in `tools/studio_resources/`; the
+[transient resource observer guide](transient_resource_probe.md) describes the
+transient ones.
+Timing and profiling commands for the solvers are in the
 [vector](benchmark_vector.md) and [cavity](benchmark_cavity.md) benchmark guides.
 
 **Queueing.** Main runs share one concurrency group per workflow with

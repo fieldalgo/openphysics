@@ -1,11 +1,11 @@
 # Transient Studio resource observer
 [한국어](locales/ko/pages/transient_resource_probe.md)
 
-The stdlib-only `ci/tools/probe_transient_studio_resources.py` observes an already running, explicitly selected loopback server. It does not start/install a server, import a solver, replace numerical acceptance or certify capacity. Use a new evidence directory for every attempt.
+The stdlib-only `tools/studio_resources/probe_transient_studio_resources.py` observes an already running, explicitly selected loopback server. It does not start/install a server, import a solver, replace numerical acceptance or certify capacity. Use a new evidence directory for every attempt.
 
 ```sh
-python ci/tools/probe_transient_studio_resources.py --plan --output records/transient-shapes
-python ci/tools/probe_transient_studio_resources.py --base-url http://127.0.0.1:8000 --document input.json --source-commit FULL_SERVER_SHA --output records/transient-http
+python tools/studio_resources/probe_transient_studio_resources.py --plan --output records/transient-shapes
+python tools/studio_resources/probe_transient_studio_resources.py --base-url http://127.0.0.1:8000 --document input.json --source-commit FULL_SERVER_SHA --output records/transient-http
 ```
 
 The input is a document object, not the request envelope. HTTP mode records capabilities, validates, submits exactly one solve (never retries it), polls with bounded timeout/request count, saves the manifest and last temperature frame, repeats the identical complete frame query ten times (eleven frame GETs total: first1+repeat10), and reads one H history page of at most sixteen rows. Same-query status/length/hash must match. Transient frame encoding on demand is permitted; matching hashes cannot establish zero producer getter or solve calls. Status errors and non-2xx bodies remain evidence, never successful capacity samples. A timeout does not cancel the server solve.
@@ -35,11 +35,11 @@ Small n2/Nt3 and medium n16/Nt8 are preparation shapes. The script searches lega
 No private store access or guessed metric endpoints are used. Memory/lease/counter measurements are explicitly unavailable in this tool. A future instrumented runner must preserve exact production source, numerical gates and existing steady behavior; companion lifecycle/physics tests and supported-platform CI remain separate.
 
 ## Fresh-process instrumented companion
-The separate `ci/tools/profile_transient_studio_resources.py` starts the actual source Studio server in a fresh child, runs the HTTP client in the parent and writes `instrumented-report.json` plus raw selected responses and `child.stderr`. It is opt-in, not wired to duplicate steady CI runs.
+The separate `tools/studio_resources/profile_transient_studio_resources.py` starts the actual source Studio server in a fresh child, runs the HTTP client in the parent and writes `instrumented-report.json` plus raw selected responses and `child.stderr`. It is opt-in, not wired to duplicate steady CI runs.
 
 ```sh
-python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
-python ci/tools/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
+python tools/studio_resources/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document small-valid-transient.json --output records/transient-instrumented-small
+python tools/studio_resources/profile_transient_studio_resources.py --source-root . --expected-commit FULL_CHECKOUT_SHA --document near-valid-transient.json --reject-document over-budget-transient.json --output records/transient-instrumented-near
 ```
 
 The checkout must match the full expected HEAD and have no tracked package modifications. Use the existing declared runtime dependencies. Missing imports/startup fail once with evidence; the tool does not install or retry. Every invocation uses a fresh server process and one real solve. Choose independently valid small/medium/near-preflight inputs separately; no synthetic replacement producer is installed. The optional over-budget document must elicit413 without another public solve; a429 is preserved as a failure of this expected actor, not capacity success.
@@ -61,7 +61,7 @@ Current RSS is available on Linux through /proc; cumulative ru_maxrss is normali
 ## Retained Linux workload wrapper
 Run once for the exact integrated checkout, in the configured Linux validation environment:
 ```sh
-python ci/tools/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
+python tools/studio_resources/run_transient_resource_workloads.py --source-root . --expected-commit FULL_CHECKOUT_SHA --output .validation/transient-resource-observation
 ```
 Do not dispatch an extra workflow solely for this tool when an authorized validation run is already scheduled. Retain the entire output directory in that run's existing artifact.
 

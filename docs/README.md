@@ -9,9 +9,8 @@ checks, CI and the required `tests` check) and the
 [contributing guide](contributing.md) (branches, review and releases).
 
 English is the repository default. READMEs and contribution/security entry
-points are English. Bilingual documentation lives under `docs/` (CI tool notes
-under `ci/tools/docs/`): English pages at `docs/<name>.md` and Korean
-counterparts at `docs/locales/ko/pages/<name>.md`.
+points are English. Bilingual documentation lives under `docs/`: English pages
+at `docs/<name>.md` and Korean counterparts at `docs/locales/ko/pages/<name>.md`.
 Each package's pages, including its overview, are in `docs/packages/<package>/`
 and `docs/locales/ko/pages/packages/<package>/`. Code
 identifiers, equations, commands and recorded outputs keep their meaning in both
@@ -74,12 +73,13 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 | Prescribed-temperature traction | [Total traction with thermal strain](packages/galerkin/thermoelastic_traction.md) | [한국어](locales/ko/pages/packages/galerkin/thermoelastic_traction.md) |
 | Thermoelastic traction acceptance | [Independent loads and energy](packages/galerkin/thermoelastic_traction_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermoelastic_traction_independent_validation.md) |
 
-## Benchmarks
+## Benchmarks and resource observations
 
 | English | 한국어 |
 |---|---|
 | [Vector waveguide benchmark](benchmark_vector.md) | [한국어](locales/ko/pages/benchmark_vector.md) |
 | [Cavity benchmark](benchmark_cavity.md) | [한국어](locales/ko/pages/benchmark_cavity.md) |
+| [Transient Studio resource observer](transient_resource_probe.md) | [한국어](locales/ko/pages/transient_resource_probe.md) |
 
 ## Package overviews
 
