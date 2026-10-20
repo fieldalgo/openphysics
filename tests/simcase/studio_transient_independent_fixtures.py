@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Independent transient Studio fixtures and strict wire consumer.
 
 Only the existing NumPy element oracle defines mathematical expectations.

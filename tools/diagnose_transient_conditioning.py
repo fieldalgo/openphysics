@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Report tiny-domain heat conditioning without changing acceptance gates.
 
 This diagnostic preserves solver failures and inspects their original traceback

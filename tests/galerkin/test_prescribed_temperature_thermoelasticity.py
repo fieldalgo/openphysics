@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Prescribed-temperature mechanical-stage checks; no thermal solver is invoked."""
 import numpy as np
 import pytest

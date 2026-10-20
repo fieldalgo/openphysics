@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Direct three-dimensional-law checks independent of the FEM engine."""
 import ast
 from pathlib import Path

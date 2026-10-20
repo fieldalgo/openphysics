@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Opt-in fresh-process transient server observation, separate from steady CI.
 
 Imports only public simcase results plus the actual Studio transport adapters.

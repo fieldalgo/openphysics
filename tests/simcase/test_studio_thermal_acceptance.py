@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Independent HTTP physics/data acceptance for the additive steady Studio bridge.
 
 Prepared contract: exact server binding and execution remain separate evidence.

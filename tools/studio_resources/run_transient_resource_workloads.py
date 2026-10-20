@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Three bounded resource workloads; fresh parent/server processes per document.
 
 Generated documents exercise the existing uniform-source transient contract.
