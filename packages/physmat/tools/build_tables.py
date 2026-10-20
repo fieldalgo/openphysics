@@ -1,7 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Regenerate physmat/_tables.py from a local refractiveindex.info database (CC0 1.0).
+"""Regenerate src/physmat/_tables.py from a local refractiveindex.info database (CC0 1.0).
 
 Usage: python tools/build_tables.py /path/to/refractiveindex.info-database/database
 """
@@ -39,5 +39,5 @@ for key, (rel, (lo, hi)) in SOURCES.items():
     out.append(f"REFERENCES[{key!r}] = {ref!r}")
     rows = ",\n".join("    [" + ", ".join(f"{v:.6g}" for v in r) + "]" for r in arr)
     out.append(f"TABLES[{key!r}] = np.array([\n{rows}\n])\n")
-Path(__file__).resolve().parent.parent.joinpath("physmat", "_tables.py").write_text("\n".join(out))
+Path(__file__).resolve().parent.parent.joinpath("src", "physmat", "_tables.py").write_text("\n".join(out))
 print("wrote _tables.py")

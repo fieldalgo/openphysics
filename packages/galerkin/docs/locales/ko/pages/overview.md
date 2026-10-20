@@ -55,7 +55,7 @@
 ## 구성
 
 ```
-galerkin/
+src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
@@ -103,7 +103,7 @@ python -m pytest -q tests/galerkin -m "not slow"
 ```
 
 모든 명령은 저장소 루트에서 실행합니다. 편집 가능 설치가 `galerkin`을 경로에 넣으므로
-시험과 예제는 `PYTHONPATH=.` 없이 실행됩니다.
+시험과 예제는 `PYTHONPATH` 설정 없이 실행됩니다.
 
 예제는 시험 extra 없이도 실행되도록 자체 해석해를 갖고 있으며, 두 시험이 이 독립 구현을
 refsol과 대조해 둘이 어긋나지 않게 합니다. 전자기·공진기 솔버를 만들 때 기록한 측정은

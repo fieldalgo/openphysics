@@ -45,23 +45,25 @@ Optional tools and data:
 
 ## Repository layout
 
-Each package keeps its code, examples and docs in `packages/<name>/`. Its tests
-are outside the package, in `tests/<import name>/`, so nothing a test uses can
-enter a distribution:
+Each package keeps its code, examples and docs in `packages/<name>/`. The code
+uses a src layout: the import package is in `packages/<name>/src/<import name>/`.
+Its tests are outside the package, in `tests/<import name>/`, so nothing a test
+uses can enter a distribution:
 
-| Package | Tests |
-|---|---|
-| `packages/galerkin` | `tests/galerkin/` |
-| `packages/galerkin-refsol` | `tests/refsol/` |
-| `packages/meshine` | `tests/meshine/` |
-| `packages/gmshio` | `tests/gmshio/`, with its `.geo`/`.msh` fixtures in `tests/gmshio/data/` |
-| `packages/physmat` | `tests/physmat/` |
-| `packages/simcase` | `tests/simcase/`, including the Studio JavaScript checks (`*.cjs`) |
+| Package | Code | Tests |
+|---|---|---|
+| `packages/galerkin` | `src/galerkin/` | `tests/galerkin/` |
+| `packages/galerkin-refsol` | `src/refsol/` | `tests/refsol/` |
+| `packages/meshine` | `src/meshine/` | `tests/meshine/` |
+| `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`, with its `.geo`/`.msh` fixtures in `tests/gmshio/data/` |
+| `packages/physmat` | `src/physmat/` | `tests/physmat/` |
+| `packages/simcase` | `src/simcase/`, with the Studio static files in `src/simcase/studio/static/` | `tests/simcase/`, including the Studio JavaScript checks (`*.cjs`) |
 
-The empty `openphysics` name reservation has no tests. From the root,
+The empty `openphysics` name reservation has no code and no tests. From the root,
 `python -m pytest` collects `tests/` and `ci/tests/` (`testpaths` in the root
 `pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
-puts this checkout's packages first on the import path.
+puts each package's `src/` folder first on the import path, so the tests use
+this checkout's code.
 
 To run one package's tests, from the repository root:
 
@@ -133,18 +135,20 @@ varies.
 (including the empty `openphysics` name reservation), each wheel from its sdist,
 with pinned build tools, and checks metadata with `twine check --strict`.
 Distributions ship package code only. Each sdist holds exactly its import
-package, `README.md`, `LICENSE`, `NOTICE` and build files (`pyproject.toml`,
-`setup.py`, `MANIFEST.in`, and the generated `PKG-INFO`, `setup.cfg` and
-egg-info); each wheel holds exactly its import package and dist-info, with
-`LICENSE` and `NOTICE` under `.dist-info/licenses/`. Docs, examples and tools
-stay in `packages/<name>/` and are never shipped (every `MANIFEST.in` prunes
-them); tests are in the root `tests/` folder. The expected contents come from
-the Git-tracked files of `packages/<name>/`, not from a hand-written list: every
-tracked file of the import package, and in the sdist each tracked top-level file
-above, must be present and byte-identical to the checkout, `LICENSE` and
-`NOTICE` included. Any other file in an archive fails the check, as does a
-tracked top-level file or folder of `packages/<name>/` the checker does not
-know, such as a `tests/` folder.
+package under `src/`, `README.md`, `LICENSE`, `NOTICE` and build files
+(`pyproject.toml`, `setup.py`, `MANIFEST.in`, and the generated `PKG-INFO`,
+`setup.cfg` and egg-info); each wheel holds exactly its import package, at the
+top level, and dist-info, with `LICENSE` and `NOTICE` under
+`.dist-info/licenses/`. Docs, examples and tools stay in `packages/<name>/` and
+are never shipped (every `MANIFEST.in` prunes them); tests are in the root
+`tests/` folder. The expected contents come from the Git-tracked files of
+`packages/<name>/`, not from a hand-written list: every tracked file under
+`src/` (in the sdist at `src/<import name>/…`, in the wheel at
+`<import name>/…`), and in the sdist each tracked top-level file above, must be
+present and byte-identical to the checkout, `LICENSE` and `NOTICE` included.
+Any other file in an archive fails the check, as does a tracked top-level file
+or folder of `packages/<name>/` the checker does not know, such as a `tests/`
+folder, or anything in `src/` that is not an import package.
 
 Wheels are then installed into a fresh environment outside the checkout. Every
 shipped module (except `__main__`) and Studio static file must load from that

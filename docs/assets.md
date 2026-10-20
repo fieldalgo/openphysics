@@ -16,7 +16,7 @@ validation run.
 | `packages/meshine/examples/compare_with_gmsh.png` | `packages/meshine/examples/compare_with_gmsh.py`, example mesh comparison |
 | `packages/physmat/examples/materials.png` | `packages/physmat/examples/plot_materials.py`, plotted material functions; optical data retains the terms in `packages/physmat/NOTICE` |
 | `packages/simcase/docs/geometry.png`, `mesh.png`, `results.png` | Screenshots of the project's own earlier Studio and SOI-strip example, introduced with the UI in commit `f44d7f8373f09ba9a7dbcd04066a0087485a3fd2` and retained through the package rename |
-| `packages/simcase/examples/soi_strip_results.png` | SOI-strip example plot introduced with the document runner and input in commit `07d4a89`; the plot path is now `packages/simcase/simcase/runner.py` |
+| `packages/simcase/examples/soi_strip_results.png` | SOI-strip example plot introduced with the document runner and input in commit `07d4a89`; the plot path is now `packages/simcase/src/simcase/runner.py` |
 | `tests/gmshio/data/unit_square.geo`, `unit_square.msh` | Unit-square geometry and its mesh fixture, introduced together with the reader and assertions in commit `b2fe26a`; the `.geo` supplies the points, edges and physical tags |
 
 The four simcase pictures were visually checked against the repository's own

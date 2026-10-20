@@ -1,7 +1,7 @@
 # Measuring 3D PEC cavity time and memory
 
 Use the pinned Python environment in the [development guide](development.md) and run from the
-repository root. This source benchmark loads `packages/galerkin` from its own
+repository root. This source benchmark loads `packages/galerkin/src` from its own
 checkout explicitly and checks that import location. No new dependency, solver
 optimization, API change or CI timing gate is involved.
 

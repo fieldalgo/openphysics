@@ -34,4 +34,5 @@ test = ["pytest", "pyyaml"]
 plot = ["matplotlib"]
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["physmat*"]

@@ -44,22 +44,23 @@ python -m pip check
 
 ## 저장소 구성
 
-각 패키지의 코드·예제·문서는 `packages/<name>/`에 있습니다. 시험은 패키지 밖
+각 패키지의 코드·예제·문서는 `packages/<name>/`에 있습니다. 코드는 src 구성을 따르며,
+import 패키지는 `packages/<name>/src/<import 이름>/`에 있습니다. 시험은 패키지 밖
 `tests/<import 이름>/`에 두므로, 시험이 쓰는 것은 배포물에 들어갈 수 없습니다.
 
-| 패키지 | 시험 |
-|---|---|
-| `packages/galerkin` | `tests/galerkin/` |
-| `packages/galerkin-refsol` | `tests/refsol/` |
-| `packages/meshine` | `tests/meshine/` |
-| `packages/gmshio` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` |
-| `packages/physmat` | `tests/physmat/` |
-| `packages/simcase` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 |
+| 패키지 | 코드 | 시험 |
+|---|---|---|
+| `packages/galerkin` | `src/galerkin/` | `tests/galerkin/` |
+| `packages/galerkin-refsol` | `src/refsol/` | `tests/refsol/` |
+| `packages/meshine` | `src/meshine/` | `tests/meshine/` |
+| `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` |
+| `packages/physmat` | `src/physmat/` | `tests/physmat/` |
+| `packages/simcase` | `src/simcase/`. Studio 정적 파일은 `src/simcase/studio/static/` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 |
 
-빈 `openphysics` 이름 예약에는 시험이 없습니다. 루트에서 `python -m pytest`를 실행하면
+빈 `openphysics` 이름 예약에는 코드도 시험도 없습니다. 루트에서 `python -m pytest`를 실행하면
 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 `ci/tests/`를 모읍니다. `slow`
-표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 이 checkout의 패키지를 import 경로
-맨 앞에 둡니다.
+표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
+맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.
 
 패키지 하나의 시험만 돌리려면 저장소 루트에서:
 
@@ -125,16 +126,17 @@ job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈
 **배포 검사** (`ci/check_distributions.py`). 패키지 일곱 개(빈 `openphysics` 이름
 예약 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
 `twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
-sdist에는 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
+sdist에는 `src/` 아래의 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
 `setup.py`, `MANIFEST.in`, 빌드가 만드는 `PKG-INFO`, `setup.cfg`, egg-info)만 있고,
-wheel에는 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
+wheel에는 최상위에 둔 import 패키지와 dist-info만 있으며 `LICENSE`와 `NOTICE`는
 `.dist-info/licenses/`에 들어갑니다. 문서·예제·도구는 `packages/<name>/`에만 두고
 배포하지 않습니다(모든 `MANIFEST.in`이 이들을 뺍니다). 시험은 루트 `tests/` 폴더에
 있습니다. 들어가야 할 내용은 손으로 적은 목록이 아니라 `packages/<name>/`에서 Git이
-추적하는 파일로 정합니다. import 패키지의 추적 파일 전부와, sdist에서는 위에 적은 최상위
-파일 중 Git이 추적하는 것이 모두 있어야 하고 checkout과 바이트가 같아야 합니다(`LICENSE`,
-`NOTICE` 포함). 그 밖의 파일이 압축본에 있거나, 검사기가 모르는 `packages/<name>/`의
-최상위 파일이나 폴더(예: `tests/` 폴더)를 Git이 추적하고 있으면 실패합니다.
+추적하는 파일로 정합니다. `src/` 아래의 추적 파일 전부(sdist에서는 `src/<import 이름>/…`,
+wheel에서는 `<import 이름>/…`)와, sdist에서는 위에 적은 최상위 파일 중 Git이 추적하는 것이
+모두 있어야 하고 checkout과 바이트가 같아야 합니다(`LICENSE`, `NOTICE` 포함). 그 밖의
+파일이 압축본에 있거나, 검사기가 모르는 `packages/<name>/`의 최상위 파일이나 폴더(예:
+`tests/` 폴더) 또는 `src/` 안에 import 패키지가 아닌 것을 Git이 추적하고 있으면 실패합니다.
 
 이어서 wheel을 checkout 밖 새 환경에 설치합니다. 배포된 모든 모듈(`__main__` 제외)과
 Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드돼야 합니다. 이 검사는

@@ -3,7 +3,7 @@
 
 """Generate the Hadley (2002) rib-waveguide cross-section mesh and plot it.
 
-Run:  PYTHONPATH=. python3 examples/hadley_rib_mesh.py
+Run:  PYTHONPATH=src python3 examples/hadley_rib_mesh.py
 Writes hadley_rib_mesh.png next to this script.
 """
 

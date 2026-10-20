@@ -5,7 +5,7 @@
 번역 기준은 `7259635a150106a7b98869e7f5a7aa8561ba8028`의 영문 문서입니다.
 
 [개발 안내](development.md)의 고정 Python 환경을 사용하고 저장소 루트에서 실행합니다.
-이 소스 benchmark는 자신의 checkout에서 `packages/galerkin`을 명시적으로 로드하고
+이 소스 benchmark는 자신의 checkout에서 `packages/galerkin/src`를 명시적으로 로드하고
 import 위치를 검사합니다. 새 의존성, solver 최적화, API 변경이나 CI 시간 gate는 없습니다.
 
 ```bash

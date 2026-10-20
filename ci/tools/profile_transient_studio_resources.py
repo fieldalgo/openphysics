@@ -56,8 +56,8 @@ def child(args):
         # Source imports remain normal packages; no fabricated module namespace.
         root = args.source_root.resolve()
         for package in sorted((root/'packages').iterdir()):
-            if package.is_dir():
-                sys.path.insert(0, str(package))
+            if (package/'src').is_dir():
+                sys.path.insert(0, str(package/'src'))
         import simcase
         import uvicorn
         from simcase.studio import server

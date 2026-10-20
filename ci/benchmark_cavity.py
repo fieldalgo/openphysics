@@ -34,7 +34,7 @@ def source_identity():
     def git(*args):
         return subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
 
-    files = sorted((ROOT / "packages/galerkin/galerkin").rglob("*.py"))
+    files = sorted((ROOT / "packages/galerkin/src/galerkin").rglob("*.py"))
     return dict(revision=git("rev-parse", "HEAD"),
                 checkout_dirty=bool(git("status", "--porcelain")),
                 benchmark_sha256=digest(Path(__file__).resolve()),
@@ -98,12 +98,12 @@ def worker(case, subdivision, modes, target):
     start = None
     try:
         # This source benchmark must not silently use an editable install elsewhere.
-        sys.path.insert(0, str(ROOT / "packages/galerkin"))
+        sys.path.insert(0, str(ROOT / "packages/galerkin/src"))
         import galerkin
         import numpy as np
         import scipy
 
-        if not Path(galerkin.__file__).resolve().is_relative_to(ROOT / "packages/galerkin"):
+        if not Path(galerkin.__file__).resolve().is_relative_to(ROOT / "packages/galerkin/src"):
             raise RuntimeError("galerkin was not imported from the benchmark checkout")
         sample["galerkin_path"] = str(Path(galerkin.__file__).resolve())
         sample["versions"] = dict(numpy=np.__version__, scipy=scipy.__version__)

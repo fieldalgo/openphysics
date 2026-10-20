@@ -3,7 +3,7 @@
 
 """Side-by-side: meshine vs Gmsh (via gmshio) on the Hadley rib waveguide.
 
-Run:  PYTHONPATH=.:../gmshio python3 examples/compare_with_gmsh.py
+Run:  PYTHONPATH=src:../gmshio/src python3 examples/compare_with_gmsh.py
 Requires gmshio and a gmsh executable for the right-hand panel; the left
 panel is produced regardless.
 """

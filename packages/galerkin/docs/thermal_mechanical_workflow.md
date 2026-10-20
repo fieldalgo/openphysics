@@ -217,7 +217,7 @@ From an exact source checkout root with existing dependencies:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-PYTHONPATH=packages/galerkin \
+PYTHONPATH=packages/galerkin/src \
 python packages/galerkin/examples/thermal_mechanical_workflow.py
 
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
