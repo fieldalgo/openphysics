@@ -139,6 +139,15 @@ def test_saved_fields_summary_and_model(tmp_path):
     assert json.loads((out/'model.json').read_text()) == doc.data
 
 
+def test_vtu_export_refuses_the_region_layout(tmp_path):
+    """Documented limit: the export does not take region layouts yet (checked before meshio loads)."""
+    from simcase.export import export_fields
+    out = run(Document.from_dict(examples.EXAMPLES['thermal_regions']), verbose=False).save(tmp_path/'out')
+    with pytest.raises(ValueError, match='unsupported field layout'):
+        export_fields(out/'fields.npz', tmp_path/'fields.vtu')
+    assert not (tmp_path/'fields.vtu').exists()
+
+
 def test_cli_validates_and_runs_the_shipped_example(tmp_path, capsys):
     path = tmp_path/'regions.json'
     path.write_text(json.dumps(examples.EXAMPLES['thermal_regions']))

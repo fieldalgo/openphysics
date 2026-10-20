@@ -231,3 +231,5 @@ the engine validation in [multimaterial](https://github.com/fieldalgo/openphysic
 - A circle touching or shallowly crossing another boundary, or a sharp polygon
   corner, can make meshing run without end (see Mesh and solve).
 - Plane geometry of unit depth; no thermal properties from built-in materials.
+- The VTU export (`simcase.export`, extra `simcase[export]`) does not accept the
+  region layouts yet; it refuses them as an unsupported field layout.
