@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Independent public HTTP acceptance for saved transient thermal Studio data."""
 import copy
 import json

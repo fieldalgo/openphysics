@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Bounded public-HTTP observation; never a RAM or physical-accuracy gate.
 
 No runtime package imports, private store access, retries of solves, or server

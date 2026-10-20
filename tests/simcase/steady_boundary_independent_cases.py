@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Public steady boundary acceptance; analytic and element oracles are independent."""
 import copy
 import json

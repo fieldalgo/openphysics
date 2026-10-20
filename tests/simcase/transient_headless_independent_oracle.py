@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Independent transient headless mathematics; NumPy/stdlib only."""
 import numpy as np
 

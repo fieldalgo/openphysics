@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Installed independent consumer: python -I, explicit origins and hashes."""
 import argparse
 import hashlib

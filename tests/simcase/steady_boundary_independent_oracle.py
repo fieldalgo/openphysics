@@ -1,3 +1,6 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+
 """Independent constant-coefficient steady boundary mathematics (NumPy only)."""
 import numpy as np
 
