@@ -7,7 +7,7 @@ Each sdist holds exactly its package code, README, LICENSE, NOTICE and build fil
 and each wheel exactly its package code, all byte-identical to the checkout. Tests,
 docs and examples live outside packages/ and are never shipped: the installed checks
 copy the tracked test and example files of this checkout. The package test suites run against installed
-wheels in ci/run_installed_tests.py; this script runs the wheel-specific
+wheels in tools/run_installed_tests.py; this script runs the wheel-specific
 consumers, examples and independent acceptance scripts. Run with the pinned
 validation requirements installed. No upload is performed. The temporary
 directory, test copies and working directory are outside the checkout so neither
@@ -284,13 +284,13 @@ def main():
                 "source": relative, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}
             return destination
 
-        smoke = copy(ROOT / "ci" / "wheel_smoke.py", work / "wheel_smoke.py")
+        smoke = copy(ROOT / "tools" / "wheel_consumers" / "wheel_smoke.py", work / "wheel_smoke.py")
         run(python, "-I", smoke, cwd=work, env=env)
         tests = work / "tests"
         examples = work / "examples"
         # Wheel-specific consumers. The package test suites (tests/) run against
-        # installed wheels in their own job, ci/run_installed_tests.py.
-        for source in sorted((ROOT / "ci").glob("test_*_wheel.py")):
+        # installed wheels in their own job, tools/run_installed_tests.py.
+        for source in sorted((ROOT / "tools" / "wheel_consumers").glob("test_*_wheel.py")):
             copy(source, tests / source.name)
         # Every tracked example of galerkin and simcase, flattened into examples/.
         for relative in sorted(repository):
@@ -397,7 +397,7 @@ def main():
             "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
             "results": {"save_fields": True, "plots": False}
         }, allow_nan=False), encoding="utf-8")
-        run("node", ROOT / "ci/tools/studio_thermal_browser.mjs",
+        run("node", ROOT / "tools/studio_browser/studio_thermal_browser.mjs",
             "--python", python, "--model", browser_model, "--transient-model", document,
             "--source-commit", source_commit(),
             "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,

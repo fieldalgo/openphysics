@@ -11,7 +11,9 @@ after a standard-library or third-party module.
 
 | Path | What it holds | Run by required CI |
 |---|---|---|
-| `tools/*.py` | Checks (`check_*.py`, `fetch_rii.py`, `report_numeric_runtime.py`, `diagnose_transient_conditioning.py`) and maintainer scripts (`build_physmat_tables.py`) | The checks, yes; maintainer scripts, no |
+| `tools/*.py` | Checks (`check_*.py`, `run_installed_tests.py`, `audit_distribution_artifacts.py`, `fetch_rii.py`, `report_numeric_runtime.py`, `diagnose_transient_conditioning.py`) and maintainer scripts (`build_physmat_tables.py`) | The checks, yes; maintainer scripts, no |
 | `tools/requirements-*.txt`, `tools/rii-revision.txt` | Pinned validation environments and the pinned refractiveindex.info revision | Yes |
 | `tools/third_party_licenses.json` | Reviewed third-party license inventory read by `check_licenses.py` | Yes |
 | `tools/tests/` | Tests of these tools, collected by the root `pytest` run | Yes |
+| `tools/wheel_consumers/` | Consumers of the installed wheels (`wheel_smoke.py`, `test_*_wheel.py`, `test_platform_install.py`). `check_distributions.py` and `check_platform_install.py` copy them outside the checkout and run them against the installed packages. The root `pytest` run does not collect them, but `check_platform_install.py` also runs `test_thermal_simcase_wheel.py` in place, from the repository root with the root conftest, for its source-target check | Yes |
+| `tools/studio_browser/` | Real-browser Studio acceptance (Node and Chrome DevTools), run by `check_distributions.py` against the installed Studio | Yes |

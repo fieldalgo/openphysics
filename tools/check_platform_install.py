@@ -27,7 +27,7 @@ from packaging.utils import canonicalize_name, parse_wheel_filename
 
 PACKAGES = {"galerkin": "galerkin", "galerkin-refsol": "refsol", "meshine": "meshine",
             "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase"}
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def digest(data):
@@ -164,9 +164,9 @@ def main():
         tests = work / "tests"
         tests.mkdir()
         copies = {
-            ROOT / "ci" / "test_transient_thermomechanical_wheel.py": tests / "test_transient_thermomechanical_wheel.py",
-            ROOT / "ci" / "test_platform_install.py": tests / "test_platform_install.py",
-            ROOT / "ci" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
+            ROOT / "tools" / "wheel_consumers" / "test_transient_thermomechanical_wheel.py": tests / "test_transient_thermomechanical_wheel.py",
+            ROOT / "tools" / "wheel_consumers" / "test_platform_install.py": tests / "test_platform_install.py",
+            ROOT / "tools" / "wheel_consumers" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
             ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
             ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
             # Save/I-O robustness consumers (see the module docstring).
@@ -214,7 +214,7 @@ def main():
         # stay isolated and use the installed wheels built from the same checkout.
         for name, selection, test_file in (
                 ("source-target", "api_and_cli_preserve_existing_target",
-                 ROOT / "ci" / "test_thermal_simcase_wheel.py"),
+                 ROOT / "tools" / "wheel_consumers" / "test_thermal_simcase_wheel.py"),
                 ("steady-boundary-source-target", "test_boundary_api_and_cli_preserve_existing_target",
                  ROOT / "tests" / "simcase" / "test_steady_boundary_platform.py")):
             run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra", "--confcutdir", ROOT,
