@@ -12,7 +12,8 @@ segments, which is what the mesher constrains.
 Every geometric tolerance here is dimensionless and is scaled by the input's
 own extent. meshine is never told what a length is: the same waveguide is 4.0
 written in micrometres and 4e-6 written in metres, and an absolute tolerance
-quietly means something different in each. See ``MERGE_EPS`` and ``PARAM_EPS``.
+quietly means something different in each. See ``MERGE_EPS``, ``PARAM_EPS`` and
+``SNAP_EPS``.
 """
 
 from __future__ import annotations
@@ -36,6 +37,24 @@ MERGE_EPS = 1e-9
 #: position along a segment is dimensionless while a merge distance is a length: one
 #: constant cannot carry both dimensions and still be right under a change of unit.
 PARAM_EPS = 1e-9
+
+#: An input edge shorter than ``SNAP_EPS`` times the diagonal is removed where ``build``
+#: can do so without changing the topology: an end vertex that has exactly two segments,
+#: with the same owners and the same curve, is dropped and the two become one segment.
+#: That moves the boundary by less than the edge's length. The end where the boundary bends
+#: less goes first, so a corner next to a collinear vertex stays, and a vertex whose removal
+#: would change a boundary name (a corner of ``box_sides``) is kept. Polygon clipping leaves
+#: such edges where a cut passes within a rounding error of a vertex: simcase's thermal
+#: region example, with its heater circle moved to cross a side at 45 degrees, has one of
+#: 1.4e-8 of the diagonal.
+#: Refinement has to reach an edge's own scale, and there Qhull leaves points out of the
+#: triangulation. Measured before this constant existed, the shortest edges that meshed
+#: were 4.5e-8 of the diagonal next to a 90-degree corner, 7.1e-8 in the middle of a side,
+#: and 1.4e-7 and 1.7e-7 at a 45-degree corner; edges of 4e-8 and shorter never finished in
+#: any of the seven layouts tried. 3e-8 stays below every edge that meshed, so those meshes
+#: do not change. An edge between 3e-8 and the limit of its layout ends with the
+#: unresolved-point error of ``generate`` (measured from 3.5e-8 to 1.5e-7).
+SNAP_EPS = 3e-8
 
 
 class Circle:
@@ -84,10 +103,11 @@ class Segment:
 
 class Domain:
     def __init__(self, size: float = 0.1, *, merge_eps: float = MERGE_EPS,
-                 param_eps: float = PARAM_EPS):
+                 param_eps: float = PARAM_EPS, snap_eps: float = SNAP_EPS):
         self.default_size = float(size)
         self.merge_eps = float(merge_eps)
         self.param_eps = float(param_eps)
+        self.snap_eps = float(snap_eps)
         self.point_tol = 0.0                # a length; ``build`` derives it from the input
         self.points: list[np.ndarray] = []
         self.regions: list[Region] = []
@@ -174,13 +194,79 @@ class Domain:
                 self.regions[r].loops.append(chain)
                 self.regions[r].curves.append(curve)
 
+        def name(a: int, b: int) -> str:
+            """The boundary name of an outer segment from vertex a to vertex b."""
+            mid = 0.5 * (pts[a] + pts[b])
+            return boundary_names if isinstance(boundary_names, str) else boundary_names(tuple(mid))
+        pts = self._drop_short_edges(pts, segs, self.snap_eps * diag, name)
+
         for seg in segs.values():
             if len(seg.owners) == 1:
-                mid = 0.5 * (pts[seg.a] + pts[seg.b])
-                seg.name = boundary_names if isinstance(boundary_names, str) else boundary_names(tuple(mid))
+                seg.name = name(seg.a, seg.b)
             elif len(seg.owners) > 2:
                 raise ValueError("a segment is shared by more than two regions; regions overlap")
         return pts, list(segs.values()), self.regions
+
+    def _drop_short_edges(self, pts: np.ndarray, segs: dict[tuple[int, int], Segment],
+                          tol: float, name: Callable[[int, int], str]) -> np.ndarray:
+        """Remove each segment shorter than ``tol`` by dropping an end vertex that has
+        exactly one other segment with the same owners and curve, unless the joined segment
+        exists already or, on the outer boundary, ``name`` gives the three segments more
+        than one name; see ``SNAP_EPS``. The end that lies closer to its joined segment is
+        tried first. Points, segments and loops are renumbered only when a vertex is
+        dropped."""
+        at: dict[int, list[Segment]] = {}
+        for s in segs.values():
+            at.setdefault(s.a, []).append(s)
+            at.setdefault(s.b, []).append(s)
+
+        def bend(v: int) -> float:
+            """How far dropping v moves the boundary: its distance to the joined segment."""
+            if len(at[v]) != 2:
+                return np.inf
+            p, q = (t.a + t.b - v for t in at[v])
+            d, w = pts[q] - pts[p], pts[v] - pts[p]
+            length = float(np.hypot(*d))
+            return abs(d[0] * w[1] - d[1] * w[0]) / length if length > 0 else np.inf
+
+        drop = []
+        for s in list(segs.values()):
+            if s.key not in segs or np.linalg.norm(pts[s.a] - pts[s.b]) >= tol:
+                continue
+            for v in sorted((s.b, s.a), key=bend):
+                pair = at[v]
+                if (len(pair) != 2 or pair[0].curve is not pair[1].curve
+                        or set(pair[0].owners) != set(pair[1].owners)):
+                    continue
+                p, q = (t.a + t.b - v for t in pair)
+                if p == q or (min(p, q), max(p, q)) in segs:
+                    continue
+                if len(pair[0].owners) == 1 and len({name(p, q), *(name(t.a, t.b) for t in pair)}) > 1:
+                    continue
+                for t in pair:
+                    del segs[t.key]
+                    at[t.a + t.b - v].remove(t)
+                joined = Segment(p, q, pair[0].curve, list(pair[0].owners))
+                segs[joined.key] = joined
+                at[p].append(joined)
+                at[q].append(joined)
+                at[v] = []
+                drop.append(v)
+                break
+        if not drop:
+            return pts
+        keep = np.ones(len(pts), dtype=bool)
+        keep[drop] = False
+        new_id = np.cumsum(keep) - 1
+        renumbered = list(segs.values())
+        for s in renumbered:
+            s.a, s.b = int(new_id[s.a]), int(new_id[s.b])
+        segs.clear()
+        segs.update((s.key, s) for s in renumbered)
+        for reg in self.regions:
+            reg.loops = [[int(new_id[i]) for i in lp if keep[i]] for lp in reg.loops]
+        self.points = [p for p, k in zip(self.points, keep) if k]
+        return pts[keep]
 
     def _split(self, pts, a: int, b: int, region: str = "?") -> list[tuple[int, int]]:
         pa, pb = pts[a], pts[b]
