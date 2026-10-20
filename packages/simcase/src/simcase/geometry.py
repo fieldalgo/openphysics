@@ -79,20 +79,26 @@ def _isolated_circle(s: dict, index: int, polys: list, clip) -> bool:
     edge touches or crosses the circle, the two polylines cross, and refinement
     keeps splitting crossing segments without end. Such a circle is meshed as a
     polygon like every other shape.
+
+    A ring of another shape comes too close when its nearest point (on an edge, not
+    only at a vertex) is within the clearance outside the circle line and its farthest
+    vertex is not more than the clearance inside it. All rings are measured in one
+    vectorised shapely call and all their vertices in another, instead of a Python
+    loop over every vertex.
     """
     centre, r = Point(s["cx"], s["cy"]), s["r"]
     lo, hi = r * (1 - CIRCLE_CLEARANCE), r * (1 + CIRCLE_CLEARANCE)
     if not clip.contains(centre) or clip.exterior.distance(centre) <= hi:
         return False
-    for j, other in enumerate(polys):
-        if j == index or other.is_empty:
-            continue
-        for part in shapely.get_parts(other):
-            for line in (part.exterior, *part.interiors):
-                far = max(centre.distance(Point(c)) for c in line.coords)
-                if line.distance(centre) <= hi and far >= lo:
-                    return False
-    return True
+    others = [other for j, other in enumerate(polys) if j != index and not other.is_empty]
+    if not others:
+        return True
+    rings = shapely.get_rings(shapely.get_parts(others))     # exteriors and interiors
+    near = shapely.distance(rings, centre)
+    vertices, ring = shapely.get_coordinates(rings, return_index=True)
+    far = np.full(len(rings), -np.inf)
+    np.maximum.at(far, ring, shapely.distance(centre, shapely.points(vertices)))
+    return not np.any((near <= hi) & (far >= lo))
 
 
 def resolve_regions(doc: Document) -> list[tuple[str, str, object, float | None, dict | None]]:
