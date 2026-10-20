@@ -19,11 +19,68 @@ The idea, in the order the code applies it every round:
 Points are inserted in batches (with a separation filter so two new points do
 not land in each other's circumcircle) and the whole set is re-triangulated
 each round; that trades a little efficiency for a very small, robust code.
+
+Refinement ends with a RuntimeError instead of running on when an insertion would
+pass ``max_points``, after ``max_rounds`` rounds, or as soon as Qhull leaves a
+boundary point out of the triangulation: a segment that ends at such a point can
+never appear as an edge, however often it is split.
+
+Small input angles
+------------------
+Ruppert's termination argument needs every input angle to be at least 60 degrees.
+Two segments that meet at a smaller angle (``SHARP_CORNER``) form a sharp corner,
+whether it opens into a region, into a hole or out of the domain. Plain refinement
+does not finish two kinds of sharp corner:
+
+* An acute corner opens into a region at less than ``min_angle``. The triangle in
+  it always has the input angle and is always bad, and splitting it moves the
+  problem closer to the apex.
+* At a halving-incompatible corner, a vertex on one side encroaches the first piece
+  of the other side once that piece is more than 1/cos(angle) times longer.
+  Midpoint splits only halve pieces, so two sides whose length ratio is not within
+  that band of a power of two split each other forever.
+
+Trigger: an input vertex is treated when one of its sharp corners is acute or
+halving-incompatible on its first pieces. A first piece is the input side, or, where
+the side's far end is treated, the part up to the lattice vertex that end puts on
+it (rule 1), so the test repeats until it treats no further vertex. Where the sides
+are straight, plain refinement does not finish an input with a treated vertex (argued
+above), and every other vertex takes none of the paths below, so an input that meshed
+before gives the same mesh. A side on a ``Circle`` is the exception: each projected split
+turns its first piece by up to pi/n toward the tangent, so the original rules can
+finish a corner that is acute or incompatible on its input chord, and such an input
+now gets a different (valid) mesh.
+
+Rule 1, one halving lattice per treated vertex v. ``unit`` is the length of the
+shortest side of a sharp corner at v. Before the first round, each such side gets
+one vertex at ``unit * 2**k``, the largest below half its length. Later, a piece
+that touches v (and no other treated vertex) is split at the ``unit * 2**k``
+nearest its midpoint, a shell concentric with v, then projected onto its curve.
+The first pieces at v stay equal, so neither encroaches the other.
+
+Rule 2, at acute corners only. A triangle's angle at the apex is not tested when
+the triangle lies inside the corner; its other angles and its size still are. A
+triangle that is bad only by angle is left as it is when its circumcenter
+encroaches a first piece of an acute corner and splitting that piece would put
+vertices ``|piece| * sin(beta / 2)`` apart, closer than the triangle's own shortest
+edge (Shewchuk's terminator; ``beta`` is the angle between the corner's current
+first pieces, which turns when a side is curved). Refinement then ends through the
+normal "nothing bad" exit.
+
+Limits: the triangle in an acute corner keeps the input angle, and other
+triangles below ``min_angle`` stay next to the apex (measured, not proved: at most
+1.43 times the longest subsegment there, for two wedges of region sizes 0.01 and
+0.5 at one apex). The terminator leaves skinny triangles in any
+region, so beside a straight corner they can end a little below the input angle
+(measured 13.02 degrees beside a 14-degree corner). Termination is measured, not
+proved; an input the rules miss ends with one of the errors above.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
+from typing import NamedTuple
 
 import numpy as np
 from scipy.spatial import Delaunay, cKDTree
@@ -42,6 +99,27 @@ from .mesh import TriMesh
 #: ten orders of magnitude above this threshold.
 AREA_EPS = 1e-12
 
+#: Two segments that meet at a smaller angle than this form a sharp corner (see the module
+#: docstring). From 60 degrees up, halving the longer of two first pieces always brings it
+#: within 1/cos(angle) of the shorter one, so the plain rules finish such a corner.
+SHARP_CORNER = math.radians(60.0)
+
+#: Slack on the halving band of ``_halving_compatible``, in powers of two. The legs of a
+#: right triangle put the length ratio exactly on the band edge, where the vertex sits on
+#: the diametral circle and the strict encroachment test does not count it. Rounding must
+#: not move such a corner out of the band: that would treat a corner that already meshes.
+HALVING_SLACK = 1e-8
+
+
+class _Corner(NamedTuple):
+    """A sharp corner at an input vertex: the gap of ``width`` radians that turns
+    counter-clockwise from the side to vertex ``u`` (direction ``start``) to the side to ``w``."""
+    start: float
+    width: float
+    u: int
+    w: int
+    inside: bool                            # opens into a region, not into a hole or outside
+
 
 def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
              size_fn: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
@@ -52,11 +130,14 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     Parameters
     ----------
     min_angle : quality bound in degrees (Ruppert guarantees termination below ~20.7;
-                28-30 is a safe practical default for right-angled input)
+                28-30 is a safe practical default for right-angled input). An input
+                angle below it is kept in the one triangle that fills it.
     size_fn : optional callable h(x, y) -> target edge length, combined by minimum
               with the per-region sizes
     size_factor : a triangle is too big when circumradius > size_factor * h
                   (an equilateral triangle of edge h has circumradius 0.577 h)
+    max_rounds : RuntimeError when refinement has not finished after this many rounds
+    max_points : hard cap; RuntimeError before an insertion would pass it
     smooth : Laplacian smoothing sweeps of interior nodes after refinement
     """
     if min_angle >= 34:
@@ -70,34 +151,78 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     for s in segs.values():
         on_segment[[s.a, s.b]] = True
 
-    def add_points(new: np.ndarray, constrained: bool):
+    # small input angles (module docstring): acute, apex_piece and unit stay empty unless a vertex is treated
+    corners = _sharp_corners(P, seg_list, regions)
+    acute = {v: [c for c in cs if c.inside and c.width < theta] for v, cs in corners.items()}
+    acute = {v: cs for v, cs in acute.items() if cs}
+    apex_piece, unit = _treated_apices(P, corners, theta)    # piece key -> {treated apex: far end of its side}
+    inserted: dict[tuple[int, int], int] = {}     # split segment -> its new vertex, not yet in the loops
+
+    def add_points(new: np.ndarray, constrained: bool) -> list[int]:
         nonlocal P, on_segment
+        if len(P) + len(new) > max_points:
+            raise RuntimeError(f"more than {max_points} points; check sizes / min_angle")
         start = len(P)
         P = np.vstack([P, new])
         on_segment = np.concatenate([on_segment, np.full(len(new), constrained)])
-        return np.arange(start, len(P))
+        return list(range(start, len(P)))
 
-    def split(seg: Segment):
-        mid = 0.5 * (P[seg.a] + P[seg.b])
-        if seg.curve is not None:
-            mid = seg.curve.project(mid)
-        (m,) = add_points(mid[None, :], True)
-        del segs[seg.key]
-        for a, b in ((seg.a, m), (m, seg.b)):
-            child = Segment(a, b, seg.curve, list(seg.owners), seg.name)
-            segs[child.key] = child
-        for r in seg.owners:
-            for loop in regions[r].loops:
-                n = len(loop)
-                for k in range(n):
-                    u, v = loop[k], loop[(k + 1) % n]
-                    if (u, v) == (seg.a, seg.b) or (u, v) == (seg.b, seg.a):
-                        loop.insert(k + 1, int(m))
-                        break
+    def split(batch: list[Segment], at: list[np.ndarray] | None = None) -> list[int]:
+        """Split each segment of ``batch`` (all distinct) at its split point, or at the given
+        point, projected onto its curve, with one insertion for the whole batch. The new
+        vertices reach the region loops in ``update_loops``."""
+        points = np.array([split_point(s) for s in batch] if at is None else at)
+        for k, s in enumerate(batch):
+            if s.curve is not None:
+                points[k] = s.curve.project(points[k])
+        new = add_points(points, True)
+        for s, m in zip(batch, new):
+            del segs[s.key]
+            inserted[s.key] = m
+            tags = apex_piece.pop(s.key, {})
+            for a, b in ((s.a, m), (m, s.b)):
+                child = Segment(a, b, s.curve, list(s.owners), s.name)
+                segs[child.key] = child
+                kept = {v: u for v, u in tags.items() if v in (a, b)}
+                if kept:                            # a child keeps the apex tags it touches
+                    apex_piece[child.key] = kept
+        return new
+
+    def split_point(seg: Segment) -> np.ndarray:
+        tags = apex_piece.get(seg.key, {})
+        if len(tags) == 1:                          # rule 1: the shell about the one treated apex
+            (v,) = tags
+            return _shell_point(P[v], P[seg.a + seg.b - v], unit[v])
+        return 0.5 * (P[seg.a] + P[seg.b])
+
+    def update_loops():
+        """Put the vertices ``split`` added into the region loops, one pass per loop:
+        inserting each vertex as it is made costs a scan of its loop per split."""
+        def between(u: int, v: int) -> list[int]:
+            m = inserted.get((min(u, v), max(u, v)))
+            return [] if m is None else [*between(u, m), m, *between(m, v)]
+        if inserted:
+            for r in regions:
+                r.loops = [[w for k, u in enumerate(lp) for w in (u, *between(u, lp[(k + 1) % len(lp)]))]
+                           for lp in r.loops]
+            inserted.clear()
+
+    # rule 1 before the first round: one vertex on each treated side at its apex's lattice
+    # point; a side treated at both ends gets two, the farthest from seg.a first, so the
+    # second one splits the piece (seg.a, m) the first one left
+    for key, tags in list(apex_piece.items()):
+        seg = segs[key]
+        points = [_lattice_point(P[v], P[u], unit[v]) for v, u in tags.items()]
+        for point in sorted(points, key=lambda q: -np.linalg.norm(q - P[seg.a])):
+            (m,) = split([seg], [point])
+            seg = segs[(min(seg.a, m), max(seg.a, m))]
 
     tri = None
     for rnd in range(max_rounds):
+        update_loops()
         tri = Delaunay(P)
+        if len(tri.coplanar) and on_segment[tri.coplanar[:, 0]].any():
+            _refuse_unresolved_points(P, tri.coplanar[on_segment[tri.coplanar[:, 0]]], domain)
         simp = tri.simplices.astype(np.int64)
         edges = _edge_keys(simp, len(P))
 
@@ -115,8 +240,7 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
             if missing[i] or any(j not in (s.a, s.b) for j in near_all[i]):
                 to_split.append(s)
         if to_split:
-            for s in to_split:
-                split(s)
+            split(to_split)
             if verbose:
                 print(f"round {rnd}: split {len(to_split)} segments, {len(P)} points")
             continue
@@ -125,11 +249,18 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
         region_id, _degenerate = _classify(P, simp, regions, keys)
         inside = region_id >= 0
         T = simp[inside]
-        cc, R, amin, cent = _triangle_data(P, T)
+        cc, R, angles, cent = _triangle_data(P, T)
+        if acute:                                   # rule 2: the apex angle is not tested
+            _excuse_acute_corners(P, T, angles, cent, acute)
+        amin = angles.min(axis=1)
         h = sizes[region_id[inside]]
         if size_fn is not None:
             h = np.minimum(h, np.asarray(size_fn(cent[:, 0], cent[:, 1]), dtype=float))
-        bad = (amin < theta) | (R > size_factor * h)
+        too_big = R > size_factor * h
+        bad = (amin < theta) | too_big
+        skinny = bad & ~too_big
+        if acute and skinny.any():                  # rule 2: Shewchuk's terminator
+            bad[skinny] = ~_terminated(P, T[skinny], cc[skinny], *_first_pieces(P, acute, apex_piece))
         if not bad.any():
             break
         cand, cand_R = cc[bad], R[bad]
@@ -151,11 +282,12 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
             hit = dist < half[si_idx] * (1 - 1e-9)
             encroaches[ci_idx[hit]] = True
             seg_to_split = set(np.unique(si_idx[hit]).tolist())
-        for si in seg_to_split:
-            split(seg_objs[si])
+        if seg_to_split:
+            split([seg_objs[si] for si in seg_to_split])
         cand, cand_R = cand[~encroaches], cand_R[~encroaches]
 
         # drop circumcenters outside the domain, then enforce separation
+        update_loops()
         if len(cand):
             keep = np.zeros(len(cand), dtype=bool)
             for r in regions:
@@ -167,11 +299,10 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
         if verbose:
             print(f"round {rnd}: {bad.sum()} bad, inserted {int(len(cand) and accepted.sum())}, "
                   f"split {len(seg_to_split)} segments, {len(P)} points")
-        if len(P) > max_points:
-            raise RuntimeError(f"more than {max_points} points; check sizes / min_angle")
     else:
         raise RuntimeError(f"refinement did not converge in {max_rounds} rounds")
 
+    update_loops()
     tri = Delaunay(P)
     simp = tri.simplices.astype(np.int64)
     seg_arr = np.array([(s.a, s.b) for s in segs.values()], dtype=np.int64)
@@ -214,6 +345,26 @@ def _refuse_empty_mesh(P: np.ndarray, simp: np.ndarray, degenerate: np.ndarray,
         f"inside any of the {len(regions)} region(s) ({', '.join(sorted({r.name for r in regions}))}). "
         f"The regions enclose no area the triangulation covers: check that every loop is a "
         f"simple closed polygon and that each hole lies inside its own outer loop.")
+
+
+def _refuse_unresolved_points(P: np.ndarray, coplanar: np.ndarray, domain: Domain) -> None:
+    """Refuse a boundary point the triangulation dropped as indistinguishable from a neighbour.
+
+    Qhull leaves out a point it cannot separate from a nearby vertex at double precision.
+    A boundary edge ending at such a point can never appear in the triangulation, so the
+    segment loop would split it, and its halves, without end. Besides a vertex a hair off an
+    edge and a sliver edge, the sides of a sharp corner with a curved side that the trigger
+    calls compatible end here: they split each other toward the apex (module docstring).
+    """
+    i, _facet, j = (int(x) for x in coplanar[0])
+    raise RuntimeError(
+        f"meshine.generate: the triangulation cannot resolve {len(coplanar)} boundary point(s); "
+        f"the first is ({P[i, 0]:.17g}, {P[i, 1]:.17g}), {np.linalg.norm(P[i] - P[j]):.3g} from its "
+        f"neighbour in a domain of extent {domain.extent():.6g}. Two boundaries come closer than "
+        f"the triangulation separates at that extent: a vertex a hair off another edge or a "
+        f"sliver edge (snap them together or remove the sliver), or a sharp corner with a curved "
+        f"side whose two sides kept splitting each other toward the apex (for example a coarse "
+        f"Circle that touches another boundary; see the Limits in meshine's documentation).")
 
 
 def _longest_edge_squared(p: np.ndarray) -> np.ndarray:
@@ -284,6 +435,7 @@ def _classify(P: np.ndarray, simp: np.ndarray, regions: list[Region],
 
 
 def _triangle_data(P: np.ndarray, T: np.ndarray):
+    """(circumcenters, circumradii, (T, 3) angles in radians, centroids)."""
     p = P[T]
     a, b, c = p[:, 0], p[:, 1], p[:, 2]
     d = 2 * ((a[:, 0] * (b[:, 1] - c[:, 1])) + (b[:, 0] * (c[:, 1] - a[:, 1])) + (c[:, 0] * (a[:, 1] - b[:, 1])))
@@ -298,8 +450,164 @@ def _triangle_data(P: np.ndarray, T: np.ndarray):
     cos0 = (lb ** 2 + lc ** 2 - la ** 2) / (2 * lb * lc)
     cos1 = (la ** 2 + lc ** 2 - lb ** 2) / (2 * la * lc)
     cos2 = (la ** 2 + lb ** 2 - lc ** 2) / (2 * la * lb)
-    amin = np.arccos(np.clip(np.stack([cos0, cos1, cos2], 1), -1, 1)).min(axis=1)
-    return cc, R, amin, p.mean(axis=1)
+    angles = np.arccos(np.clip(np.stack([cos0, cos1, cos2], 1), -1, 1))
+    return cc, R, angles, p.mean(axis=1)
+
+
+# -- small input angles (module docstring) ---------------------------------------
+
+def _sharp_corners(P: np.ndarray, segs: list[Segment], regions: list[Region]) -> dict[int, list[_Corner]]:
+    """{input vertex: its sharp corners}: every gap below ``SHARP_CORNER`` between two
+    consecutive segments around the vertex, whether it opens into a region or not (a
+    corner that opens into a hole or out of the domain still has two sides that encroach
+    each other). ``inside`` probes the bisector at 1e-3 of the shorter side."""
+    around: dict[int, list[int]] = {}
+    for s in segs:
+        around.setdefault(s.a, []).append(s.b)
+        around.setdefault(s.b, []).append(s.a)
+    polys = None
+    corners: dict[int, list[_Corner]] = {}
+    for v, nbrs in around.items():
+        if len(nbrs) < 2:
+            continue
+        d = P[nbrs] - P[v]
+        phi = np.arctan2(d[:, 1], d[:, 0])
+        order = np.argsort(phi)
+        phi, nbrs = phi[order], [nbrs[i] for i in order]
+        width = np.diff(np.append(phi, phi[0] + 2 * np.pi))
+        for k in np.nonzero((width > 0) & (width < SHARP_CORNER))[0]:
+            u, w = nbrs[k], nbrs[(k + 1) % len(nbrs)]
+            mid = phi[k] + 0.5 * width[k]
+            r = 1e-3 * min(np.linalg.norm(P[u] - P[v]), np.linalg.norm(P[w] - P[v]))
+            probe = (P[v] + r * np.array([np.cos(mid), np.sin(mid)]))[None, :]
+            if polys is None:
+                polys = [[P[np.array(lp)] for lp in reg.loops] for reg in regions]
+            inside = any(points_in_loops(probe, loops)[0] for loops in polys)
+            corners.setdefault(v, []).append(_Corner(float(phi[k]), float(width[k]), u, w, bool(inside)))
+    return corners
+
+
+def _halving_compatible(L1: float, L2: float, width: float) -> bool:
+    """True when halving the longer of two first pieces of lengths L1 and L2 at a corner of
+    this width eventually leaves neither one encroached by the other's far vertex: the
+    length ratio is within 1/cos(width) of a power of two (``HALVING_SLACK``)."""
+    band = math.log2(1.0 / math.cos(width)) + HALVING_SLACK
+    frac = math.log2(max(L1, L2) / min(L1, L2)) % 1.0
+    return frac <= band or frac >= 1.0 - band
+
+
+def _treated_apices(P: np.ndarray, corners: dict[int, list[_Corner]], theta: float
+                    ) -> tuple[dict[tuple[int, int], dict[int, int]], dict[int, float]]:
+    """The trigger of the small-angle rules: (apex tags, unit).
+
+    A vertex is treated when one of its sharp corners is acute (opens into a region at
+    less than ``theta``) or halving-incompatible on its first pieces, where plain
+    refinement does not finish. A first piece is the whole side, unless the side's far
+    end is treated and puts its lattice vertex (``_lattice_point``) on it: then the piece
+    ends there, and a corner compatible on the input lengths can become incompatible. The
+    test repeats until it treats no further vertex. It can only spread from a vertex
+    treated on its input lengths, so an input with none treats no vertex and takes none
+    of the new paths. Each side of a sharp corner at a treated vertex v is tagged
+    ``{segment key: {v: far end}}``, and ``unit[v]`` is the length of its shortest such
+    side.
+    """
+    sides = {v: sorted({x for c in cs for x in (c.u, c.w)}) for v, cs in corners.items()}
+    unit: dict[int, float] = {}
+
+    def first_piece(v: int, x: int) -> float:
+        """Length of the piece at v of side v-x once the lattice of a treated x is in."""
+        if x in unit and v in sides[x]:
+            return float(np.linalg.norm(_lattice_point(P[x], P[v], unit[x]) - P[v]))
+        return float(np.linalg.norm(P[x] - P[v]))
+
+    while True:
+        new = []
+        for v, cs in corners.items():
+            if v in unit:
+                continue
+            piece = {x: first_piece(v, x) for x in sides[v]}
+            if any(c.inside and c.width < theta or not _halving_compatible(piece[c.u], piece[c.w], c.width)
+                   for c in cs):
+                new.append(v)
+        if not new:
+            break
+        for v in new:
+            unit[v] = min(float(np.linalg.norm(P[x] - P[v])) for x in sides[v])
+    unit = {v: unit[v] for v in corners if v in unit}           # in the order of the corners
+    tags: dict[tuple[int, int], dict[int, int]] = {}
+    for v in unit:
+        for x in sides[v]:
+            tags.setdefault((min(v, x), max(v, x)), {})[v] = x
+    return tags, unit
+
+
+def _lattice_point(apex: np.ndarray, other: np.ndarray, unit: float) -> np.ndarray:
+    """The point of segment apex-other at distance ``unit * 2**k`` from the apex, for the
+    largest k that keeps it below half the segment's length: in [L/4, L/2) of length L."""
+    length = float(np.linalg.norm(other - apex))
+    d = math.ldexp(unit, math.floor(math.log2(length / unit)) - 1)
+    if d >= 0.5 * length:
+        d *= 0.5
+    return apex + (other - apex) * (d / length)
+
+
+def _shell_point(apex: np.ndarray, other: np.ndarray, unit: float) -> np.ndarray:
+    """The point of segment apex-other at distance ``unit * 2**k`` from the apex, for the k
+    nearest its midpoint. It lies between one and two thirds of the way along, and on a
+    piece that already ends on the lattice it is the midpoint."""
+    d = other - apex
+    length = float(np.hypot(*d))
+    half = 0.5 * length / unit
+    lo = 2.0 ** np.floor(np.log2(half))
+    r = lo if half - lo <= 2 * lo - half else 2 * lo
+    return apex + d * (r * unit / length)
+
+
+def _excuse_acute_corners(P: np.ndarray, T: np.ndarray, angles: np.ndarray, cent: np.ndarray,
+                          acute: dict[int, list[_Corner]]) -> None:
+    """Set to pi the angle a triangle has at the apex of an acute corner when its centroid
+    lies inside that corner. No inserted vertex can raise that angle."""
+    rows, cols = np.nonzero(np.isin(T, list(acute)))
+    for t, k in zip(rows, cols):
+        v = int(T[t, k])
+        d = cent[t] - P[v]
+        phi = math.atan2(d[1], d[0])
+        if any((phi - c.start) % (2 * math.pi) < c.width for c in acute[v]):
+            angles[t, k] = np.pi
+
+
+def _first_pieces(P: np.ndarray, acute: dict[int, list[_Corner]],
+                  apex_piece: dict[tuple[int, int], dict[int, int]]) -> tuple[np.ndarray, np.ndarray]:
+    """((K, 2) current subsegments at the apex of each acute corner, one per side, (K,) sin
+    of half the angle between the two first pieces of their corner). The angle is measured
+    on the current pieces, not the input segments: a curved side turns as its piece shrinks."""
+    first = {(v, x): key for key, tags in apex_piece.items() for v, x in tags.items()}
+    pieces, sines = [], []
+    for v, cs in acute.items():
+        for c in cs:
+            a, b = (sum(first[(v, x)]) - v for x in (c.u, c.w))
+            du, dw = P[a] - P[v], P[b] - P[v]
+            cos = float(du @ dw) / (np.linalg.norm(du) * np.linalg.norm(dw))
+            half = 0.5 * math.acos(min(1.0, max(-1.0, cos)))
+            pieces += [(v, a), (v, b)]
+            sines += [math.sin(half)] * 2
+    return np.array(pieces, dtype=np.int64).reshape(-1, 2), np.array(sines)
+
+
+def _terminated(P: np.ndarray, T: np.ndarray, cc: np.ndarray, pieces: np.ndarray,
+                sines: np.ndarray) -> np.ndarray:
+    """(T,) mask of skinny triangles to leave as they are: the circumcenter encroaches a
+    first piece of an acute corner, and splitting it would leave vertices
+    |piece| * sin(angle / 2) apart, closer than the triangle's shortest edge."""
+    if not len(pieces):
+        return np.zeros(len(T), dtype=bool)
+    a, b = P[pieces[:, 0]], P[pieces[:, 1]]
+    mid, length = 0.5 * (a + b), np.linalg.norm(a - b, axis=1)
+    p = P[T]
+    shortest = np.sqrt(np.minimum(np.minimum(((p[:, 1] - p[:, 2]) ** 2).sum(1), ((p[:, 2] - p[:, 0]) ** 2).sum(1)),
+                                  ((p[:, 0] - p[:, 1]) ** 2).sum(1)))
+    encroached = np.linalg.norm(cc[:, None, :] - mid[None, :, :], axis=2) < 0.5 * length * (1 - 1e-9)
+    return (encroached & ((length * sines)[None, :] < shortest[:, None])).any(axis=1)
 
 
 def _separate(cand: np.ndarray, R: np.ndarray, factor: float = 0.7) -> np.ndarray:
