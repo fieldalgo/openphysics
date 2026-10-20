@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
-const html = fs.readFileSync(path.join(__dirname, '../../packages/simcase/simcase/studio/static/index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '../../packages/simcase/src/simcase/studio/static/index.html'), 'utf8');
 
 function page() {
   const elements = new Map(), colors = [];

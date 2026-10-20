@@ -48,6 +48,7 @@ simcase-studio = "simcase.studio.server:main"
 simcase-run = "simcase.cli:main"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["simcase*"]
 
 [tool.setuptools.package-data]

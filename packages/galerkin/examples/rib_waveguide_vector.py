@@ -50,7 +50,7 @@ takes tens of minutes at h = 0.025 — so the target is out of reach here. The
 limit is the mesher's speed, not the engine and not the reference.
 
 Run:  pip install -e '.[test]'          # brings in meshine and refsol
-      PYTHONPATH=. python3 examples/rib_waveguide_vector.py
+      PYTHONPATH=src python3 examples/rib_waveguide_vector.py
 """
 
 from __future__ import annotations

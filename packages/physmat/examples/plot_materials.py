@@ -3,7 +3,7 @@
 
 """Plot built-in dispersion curves and a Drude-Lorentz fit of gold.
 
-Run:  PYTHONPATH=. python3 examples/plot_materials.py
+Run:  PYTHONPATH=src python3 examples/plot_materials.py
 """
 
 from pathlib import Path

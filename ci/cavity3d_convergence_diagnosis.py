@@ -22,8 +22,8 @@ import scipy.linalg as la
 
 ROOT = Path(__file__).resolve().parents[1]
 for package in (ROOT / "packages").iterdir():
-    if (package / "pyproject.toml").exists():
-        sys.path.insert(0, str(package))
+    if (package / "src").is_dir():
+        sys.path.insert(0, str(package / "src"))
 
 from galerkin import solve_cavity_box  # noqa: E402
 from refsol.metallic import rect_cavity_resonances  # noqa: E402

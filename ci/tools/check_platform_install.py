@@ -99,12 +99,13 @@ def main():
                 assert metadata["Version"] == project["version"]
                 for member in members:
                     assert not member.issym() and not member.islnk()
-                for path in sorted((source / module).rglob("*")):
+                # Code lives in src/<module>/ in the sdist and in <module>/ in the wheel.
+                for path in sorted((source / "src" / module).rglob("*")):
                     if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
                         continue
-                    relative = path.relative_to(source).as_posix()
+                    relative = path.relative_to(source / "src").as_posix()
                     data = path.read_bytes()
-                    member = archive.getmember(prefix + "/" + relative)
+                    member = archive.getmember(prefix + "/src/" + relative)
                     assert archive.extractfile(member).read() == data, relative
                     manifest["files"][relative] = digest(data)
                 extraction = work / package

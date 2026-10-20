@@ -6,9 +6,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const {test}=require('node:test');
-const script=fs.readFileSync(path.join(__dirname,'../../packages/simcase/simcase/studio/static/thermal.js'),'utf8');
-const html=fs.readFileSync(path.join(__dirname,'../../packages/simcase/simcase/studio/static/index.html'),'utf8');
-const T=require('../../packages/simcase/simcase/studio/static/thermal.js');
+const script=fs.readFileSync(path.join(__dirname,'../../packages/simcase/src/simcase/studio/static/thermal.js'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../../packages/simcase/src/simcase/studio/static/index.html'),'utf8');
+const T=require('../../packages/simcase/src/simcase/studio/static/thermal.js');
 const copy=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 function cap(){return {capability_format:'studio-capabilities-v1','thermal.steady2d':{

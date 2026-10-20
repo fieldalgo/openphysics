@@ -21,7 +21,7 @@ mesh convergence proves that every link of the chain is wired correctly. The
 vector solver (M3a) drops into the same script by replacing `scalar_modes`.
 
 Run:  pip install -e '.[test]'          # brings in meshine and refsol
-      PYTHONPATH=. python3 examples/rib_waveguide_scalar.py
+      PYTHONPATH=src python3 examples/rib_waveguide_scalar.py
 """
 
 from __future__ import annotations

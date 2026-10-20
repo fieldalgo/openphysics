@@ -32,4 +32,5 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 test = ["pytest"]
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["refsol*"]

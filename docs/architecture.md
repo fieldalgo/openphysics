@@ -84,8 +84,8 @@ and validation limits are linked from the [documentation index](README.md).
 ## Connections in the code
 
 The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml),
-[runner](../packages/simcase/simcase/runner.py),
-[material bridge](../packages/simcase/simcase/materials.py),
-[mesh adapter](../packages/galerkin/galerkin/interop.py) and
-[Gmsh integration notes](../packages/galerkin/galerkin/gmsh.py).
+[runner](../packages/simcase/src/simcase/runner.py),
+[material bridge](../packages/simcase/src/simcase/materials.py),
+[mesh adapter](../packages/galerkin/src/galerkin/interop.py) and
+[Gmsh integration notes](../packages/galerkin/src/galerkin/gmsh.py).
 This architecture page adds no new implementation or numerical validation claim.

@@ -64,7 +64,7 @@ automatically appear there.
 ## Layout
 
 ```
-galerkin/
+src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
@@ -115,7 +115,7 @@ python -m pytest -q tests/galerkin -m "not slow"
 ```
 
 Run all commands from the repository root. An editable install puts `galerkin`
-on the path, so the tests and examples run without `PYTHONPATH=.`.
+on the path, so the tests and examples run without setting `PYTHONPATH`.
 
 The examples keep their own analytical solutions so they run without the test
 extra; two tests check those independent implementations against refsol so the

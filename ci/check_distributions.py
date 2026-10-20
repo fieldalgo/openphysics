@@ -42,7 +42,7 @@ UNSHIPPED_DIRS = ("docs", "examples", "tools")
 SDIST_FILES = ("LICENSE", "NOTICE", "README.md", "pyproject.toml", "setup.py", "MANIFEST.in")
 GENERATED_SDIST_FILES = ("PKG-INFO", "setup.cfg")
 UNSHIPPED_FILES = (".gitignore",)
-EGG_INFO = re.compile(r"[^/]+\.egg-info/[^/]+")
+EGG_INFO = re.compile(r"(src/)?[^/]+\.egg-info/[^/]+")
 STUDIO_STATIC = "simcase/studio/static/"
 
 
@@ -71,11 +71,11 @@ def tracked(name):
 
 
 def shipped_code(name):
-    """Tracked files of the import package(s) in packages/<name>/, which sdist and wheel carry.
+    """Tracked files of the import package(s) under packages/<name>/src/, as sdist paths.
 
-    Every tracked top-level entry must be a known file, an unshipped folder or an
-    import package (a folder with __init__.py), so a new kind of file has to be
-    classified here instead of shipping or vanishing silently.
+    Every tracked top-level entry must be a known file, an unshipped folder or src/,
+    and src/ may hold only import packages (folders with __init__.py), so a new kind
+    of file has to be classified here instead of shipping or vanishing silently.
     """
     files = tracked(name)
     code = set()
@@ -89,15 +89,23 @@ def shipped_code(name):
             continue
         elif top == "tests":
             raise RuntimeError(f"packages/{name}/tests/: tests belong in the repository's tests/ folder")
-        elif f"{top}/__init__.py" in files:
+        elif top == "src":
+            package, _, inner = rest.partition("/")
+            if not inner or f"src/{package}/__init__.py" not in files:
+                raise RuntimeError(f"packages/{name}/src/{package}: src/ holds only import packages")
             code.add(relative)
         else:
             raise RuntimeError(f"packages/{name}/{top}/: unclassified top-level folder; "
-                               "only import packages and " + ", ".join(UNSHIPPED_DIRS) + " are allowed")
+                               "only src/ and " + ", ".join(UNSHIPPED_DIRS) + " are allowed")
     for required in ("LICENSE", "NOTICE", "README.md", "pyproject.toml"):
         if required not in files:
             raise RuntimeError(f"packages/{name}/{required} is not tracked")
     return code
+
+
+def wheel_path(relative):
+    """Where a shipped file sits in the wheel: 'src/simcase/cli.py' -> 'simcase/cli.py'."""
+    return relative.removeprefix("src/")
 
 
 def module_name(relative):
@@ -143,16 +151,16 @@ def check_wheel(wheel):
     """The wheel holds exactly the package code plus its dist-info, with LICENSE and NOTICE."""
     name, version, _, _ = parse_wheel_filename(wheel.name)
     source = ROOT / "packages" / name
-    code = shipped_code(name)
+    code = {wheel_path(relative): relative for relative in shipped_code(name)}
     with zipfile.ZipFile(wheel) as archive:
         names = [n for n in archive.namelist() if not n.endswith("/")]
         dist_info = {n for n in names if n.split("/", 1)[0].endswith(".dist-info")}
-        for relative in sorted(code):
-            if relative not in names:
-                raise RuntimeError(f"{wheel.name} is missing {relative}")
-            if archive.read(relative) != (source / relative).read_bytes():
-                raise RuntimeError(f"{wheel.name}: {relative} differs from the checked-out source")
-        if unexpected := sorted(set(names) - code - dist_info):
+        for path, relative in sorted(code.items()):
+            if path not in names:
+                raise RuntimeError(f"{wheel.name} is missing {path}")
+            if archive.read(path) != (source / relative).read_bytes():
+                raise RuntimeError(f"{wheel.name}: {path} differs from the checked-out source")
+        if unexpected := sorted(set(names) - set(code) - dist_info):
             raise RuntimeError(f"{wheel.name} ships files that are not package code: {unexpected}")
         # Every wheel must carry the package's own LICENSE and NOTICE unchanged.
         for notice in ("LICENSE", "NOTICE"):
@@ -161,8 +169,8 @@ def check_wheel(wheel):
                 raise RuntimeError(f"{wheel.name} is missing dist-info/licenses/{notice}")
             if archive.read(found[0]) != (source / notice).read_bytes():
                 raise RuntimeError(f"{wheel.name}: {notice} differs from the checked-out source")
-    return {relative: hashlib.sha256((source / relative).read_bytes()).hexdigest()
-            for relative in sorted(code)}
+    return {path: hashlib.sha256((source / relative).read_bytes()).hexdigest()
+            for path, relative in sorted(code.items())}
 
 
 def main():
@@ -320,7 +328,7 @@ def main():
                          "steady_boundary_independent_cases.py",
                          "steady_boundary_independent_consumer.py"):
             copy(ROOT / "tests" / "simcase" / filename, steady_acceptance / filename)
-        # The Node tests read the Studio files at ../../packages/simcase/simcase/studio/static;
+        # The Node tests read the Studio files at ../../packages/simcase/src/simcase/studio/static;
         # mirror that layout with the installed bytes.
         node_root = work / "studio-installed-node"
         node_tests = [str(copy(ROOT / "tests" / "simcase" / filename, node_root / "tests" / "simcase" / filename))
@@ -367,7 +375,7 @@ def main():
             "-o", work / "steady-boundary-example", cwd=work, env=env)
         # Run the original Node script against verified installed static bytes.
         # Node VM cases remain distinct from the real browser/public-API check.
-        static = node_root / "packages" / "simcase" / "simcase" / "studio" / "static"
+        static = node_root / "packages" / "simcase" / "src" / "simcase" / "studio" / "static"
         static.mkdir(parents=True)
         copy_resources = work / "copy_installed_studio_resources.py"
         copy_resources.write_text(

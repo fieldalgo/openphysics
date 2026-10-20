@@ -48,4 +48,5 @@ figures = ["matplotlib>=3.7"]
 crosscheck = ["scikit-fem>=12,<13", "symfem==2025.12.0"]
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["galerkin*"]

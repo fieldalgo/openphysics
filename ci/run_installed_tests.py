@@ -150,7 +150,7 @@ def main():
             shutil.copy2(ROOT / relative, destination)
             copied[relative] = hashlib.sha256(destination.read_bytes()).hexdigest()
         for name in import_names:
-            if any((suite / "packages").glob(f"*/{name}")):
+            if any((suite / "packages").glob(f"*/{name}")) or any((suite / "packages").glob(f"*/src/{name}")):
                 raise RuntimeError(f"package code {name} must not be copied next to the tests")
         unchanged = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *copied],
                                    check=False).returncode == 0

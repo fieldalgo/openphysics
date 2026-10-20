@@ -82,8 +82,8 @@ flowchart TB
 ## 실제 코드와의 연결
 
 이 구조도는 [`simcase` 의존성](../../../../packages/simcase/pyproject.toml),
-[실행기](../../../../packages/simcase/simcase/runner.py),
-[재료 연결](../../../../packages/simcase/simcase/materials.py),
-[메시 어댑터](../../../../packages/galerkin/galerkin/interop.py),
-[Gmsh 연동 설명](../../../../packages/galerkin/galerkin/gmsh.py)을 기준으로 합니다.
+[실행기](../../../../packages/simcase/src/simcase/runner.py),
+[재료 연결](../../../../packages/simcase/src/simcase/materials.py),
+[메시 어댑터](../../../../packages/galerkin/src/galerkin/interop.py),
+[Gmsh 연동 설명](../../../../packages/galerkin/src/galerkin/gmsh.py)을 기준으로 합니다.
 이 문서 추가가 새 구현이나 수치 검증 결과를 의미하지는 않습니다.

@@ -198,7 +198,7 @@ support work를 포함해야 합니다. 이들은 고정 T에서의 endpoint 기
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-PYTHONPATH=packages/galerkin \
+PYTHONPATH=packages/galerkin/src \
 python packages/galerkin/examples/thermal_mechanical_workflow.py
 
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
