@@ -25,6 +25,7 @@
 | 포함된 이미지·fixture·데이터 | [Asset provenance](../../../assets.md) | [한국어](assets.md) |
 | 제3자 소프트웨어·데이터·라이선스 | [Third-party list](../../../third-party.md) | [한국어](third-party.md) |
 | 레퍼런스 도구 비교 | [Comparisons](../../../reference-comparisons.md) | [한국어](reference-comparisons.md) |
+| 예제 갤러리(그림과 그것을 그리는 스크립트) | [Gallery](../../../gallery.md) | [한국어](gallery.md) |
 
 ## 현재 구현의 사용 계약과 검증 근거
 
