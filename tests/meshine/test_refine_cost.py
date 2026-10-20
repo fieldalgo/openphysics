@@ -10,6 +10,9 @@
   asks a tree of the candidates, once per segment, with that segment's own radius.
 * Corner probes. ``_sharp_corners`` ran one point-in-polygon pass over every region for
   the probe of each sharp corner; the probes now go through one pass per region.
+* Shewchuk's terminator. ``_terminated`` compared every skinny triangle's circumcenter with
+  every first piece at an acute corner in one (S, K, 2) array; it now asks a tree of the
+  circumcenters, once per piece, with that piece's own radius.
 
 The old implementations are kept here as private references. ``generate`` must give the
 same mesh, or raise the same error, with them patched back in; nothing is stored, both
@@ -81,7 +84,20 @@ def _old_sharp_corners(P, segs, regions):
     return corners
 
 
-OLD = {"_encroached": _old_encroached, "_sharp_corners": _old_sharp_corners}
+def _old_terminated(P, T, cc, pieces, sines):
+    """``_terminated`` before this change: every circumcenter against every piece at once."""
+    if not len(pieces):
+        return np.zeros(len(T), dtype=bool)
+    a, b = P[pieces[:, 0]], P[pieces[:, 1]]
+    mid, length = 0.5 * (a + b), np.linalg.norm(a - b, axis=1)
+    p = P[T]
+    shortest = np.sqrt(np.minimum(np.minimum(((p[:, 1] - p[:, 2]) ** 2).sum(1), ((p[:, 2] - p[:, 0]) ** 2).sum(1)),
+                                  ((p[:, 0] - p[:, 1]) ** 2).sum(1)))
+    encroached = np.linalg.norm(cc[:, None, :] - mid[None, :, :], axis=2) < 0.5 * length * (1 - 1e-9)
+    return (encroached & ((length * sines)[None, :] < shortest[:, None])).any(axis=1)
+
+
+OLD = {"_encroached": _old_encroached, "_sharp_corners": _old_sharp_corners, "_terminated": _old_terminated}
 
 
 # ---- a spy on the tree queries ---------------------------------------------------------
@@ -93,6 +109,7 @@ class QueryLog:
     def __init__(self):
         self.calls: list[tuple[str | None, int]] = []
         self.inside: list[str] = []
+        self.entered: list[tuple[str, int]] = []        # (helper, index of its first query)
 
     def largest(self, where=...) -> int:
         counts = [n for at, n in self.calls if where is ... or at == where]
@@ -115,6 +132,7 @@ def spy_on_queries(monkeypatch, *helpers) -> QueryLog:
     monkeypatch.setattr(refine, "cKDTree", CountingTree)
     for name in helpers:
         def tagged(*args, _real=getattr(refine, name), _name=name, **kwargs):
+            log.entered.append((_name, len(log.calls)))
             log.inside.append(_name)
             try:
                 return _real(*args, **kwargs)
@@ -267,12 +285,38 @@ def zigzag_points():
     return [tuple(q) for q in pts]
 
 
-def zigzag():
-    """The sawtooth in a 40 x 20 box: mesh size 2, min_angle 33, at most 10,201 points."""
+def zigzag(crossing_rects=0, width=0.03):
+    """The sawtooth in a 40 x 20 box (mesh size 2, min_angle 33, at most 10,201 points),
+    optionally cut by ``crossing_rects`` vertical rectangles of the given width that reach
+    0.3 below the valleys and above the tips. The regions are resolved here: the top edge is
+    a function of x, so a rectangle cuts it at two points, notches the sawtooth from above
+    and adds a bump to the hole of the box."""
     pts = zigzag_points()
+    top = pts[2:][::-1]                                   # the top edge, x increasing
+    tx, ty = np.array(top).T
+    lo, hi = ZIGZAG_VALLEY - 0.3, ZIGZAG_TIP + 0.3
+    assert lo < ty.min() and ty.max() < hi
+    rects = [ZIGZAG_X[0] + 0.37 + j * (36.0 - 0.8) / crossing_rects for j in range(crossing_rects)]
+    saw, hole = list(pts[:2]), list(pts[:2])
+    k = len(top) - 1
+    for xa in reversed(rects):                          # along the top edge from x1 back to x0
+        xb = xa + width
+        while tx[k] > xb:
+            saw.append(top[k])
+            hole.append(top[k])
+            k -= 1
+        fa, fb = (float(np.interp(x, tx, ty)) for x in (xa, xb))
+        saw += [(xb, fb), (xb, lo), (xa, lo), (xa, fa)]
+        hole += [(xb, fb), (xb, hi), (xa, hi), (xa, fa)]
+        while tx[k] >= xa:                              # top vertices under the rectangle
+            k -= 1
+    saw += top[k::-1]
+    hole += top[k::-1]
     d = Domain(size=2.0)
-    d.add_region("background", rectangle(0, 0, 40, 20), holes=[pts])
-    d.add_region("saw", pts)
+    d.add_region("background", rectangle(0, 0, 40, 20), holes=[hole])
+    d.add_region("saw", saw)
+    for j, xa in enumerate(rects):
+        d.add_region(f"x{j}", rectangle(xa, lo, xa + width, hi))
     return d, {"boundary_names": box_sides(0, 40, 0, 20), "min_angle": 33.0, "max_points": 10201}
 
 
@@ -451,3 +495,84 @@ def test_the_corner_probes_in_one_batch_find_the_same_corners(name):
     new, old = refine._sharp_corners(P, segs, regions), _old_sharp_corners(P, segs, regions)
     assert list(new.items()) == list(old.items())
 
+
+# ---- B4: the terminator ----------------------------------------------------------------
+
+def random_terminator_case(seed):
+    """300 skinny triangles and 60 pieces in the unit square, the pieces 0.006 to 0.32 long.
+    Half of the triangles are tiny and half are large, so the shortest-edge test goes both
+    ways.
+
+    Ten of the pieces are horizontal about x = 0, 0.1 apart, and at most 0.08 long, so their
+    midpoint is exactly (0, y) and their length exactly twice the half-length. Each gets three
+    circumcenters on its own line y: exactly at ``0.5 * length * (1 - 1e-9)`` (not
+    encroaching), one ulp inside it on the left (encroaching), and exactly at ``0.5 *
+    length`` (not encroaching), each of a triangle whose shortest edge (0.3) is longer than
+    any piece, so that the distance decides. No other piece reaches these circumcenters:
+    the other midpoints lie at x >= 0.4."""
+    rng = np.random.default_rng(1000 + seed)
+    S, K = 300, 60
+    P = rng.uniform(0.0, 1.0, (3 * S + 2 * K, 2))
+    T = np.arange(3 * S).reshape(S, 3)
+    scale = np.where(rng.random(S) < 0.5, 1e-4, 1e-1)
+    P[T[:, 1]] = P[T[:, 0]] + scale[:, None] * rng.uniform(0.2, 1.0, (S, 2))
+    P[T[:, 2]] = P[T[:, 0]] + scale[:, None] * rng.uniform(-1.0, 0.2, (S, 2))
+    pieces = 3 * S + np.arange(2 * K).reshape(K, 2)
+    half = 10.0 ** rng.uniform(-2.5, -0.8, K)
+    angle = rng.uniform(0.0, np.pi, K)
+    center = np.column_stack([rng.uniform(0.4, 1.0, K), rng.uniform(0.0, 1.0, K)])
+    P[pieces[:, 0]] = center - half[:, None] * np.column_stack([np.cos(angle), np.sin(angle)])
+    P[pieces[:, 1]] = center + half[:, None] * np.column_stack([np.cos(angle), np.sin(angle)])
+    edge = rng.choice(K, 10, replace=False)
+    half[edge] = rng.uniform(0.005, 0.04, 10)
+    y = 0.05 + 0.1 * np.arange(10)
+    P[pieces[edge, 0]] = np.column_stack([-half[edge], y])
+    P[pieces[edge, 1]] = np.column_stack([half[edge], y])
+    sines = rng.uniform(0.01, 0.5, K)
+    cc = rng.uniform(0.0, 1.0, (S, 2))
+    rows = []
+    for j, piece in enumerate(edge):
+        length = np.linalg.norm(P[pieces[piece, 0]] - P[pieces[piece, 1]])
+        threshold = 0.5 * length * (1 - 1e-9)
+        for k, x in enumerate((threshold, -np.nextafter(threshold, 0.0), 0.5 * length)):
+            t = 3 * j + k
+            P[T[t]] = [(0.2, 0.2), (0.5, 0.2), (0.35, 0.46)]
+            cc[t] = (x, y[j])
+            rows.append((t, piece, x, k == 1))
+    return P, T, cc, pieces, sines, rows
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_the_terminator_tree_query_equals_the_full_comparison(seed):
+    """Not a pre-registered criterion: the tree query against the old (S, K, 2) comparison,
+    with circumcenters on, inside and outside the strict threshold."""
+    P, T, cc, pieces, sines, rows = random_terminator_case(seed)
+    got = refine._terminated(P, T, cc, pieces, sines)
+    assert np.array_equal(got, _old_terminated(P, T, cc, pieces, sines))
+    assert 0 < got.sum() < len(T)                                        # not vacuous
+    mid = 0.5 * (P[pieces[:, 0]] + P[pieces[:, 1]])
+    length = np.linalg.norm(P[pieces[:, 0]] - P[pieces[:, 1]], axis=1)
+    for t, piece, x, inside in rows:
+        dist = np.linalg.norm(cc[t] - mid[piece])
+        assert dist == abs(x), "the boundary circumcenter is not where the test computes it"
+        assert (dist < 0.5 * length[piece] * (1 - 1e-9)) == inside
+        assert got[t] == inside
+
+
+@pytest.mark.parametrize("rects", [0, 60])
+def test_the_terminator_queries_a_tree_with_each_piece_radius(monkeypatch, rects):
+    """Pre-registered: on the sawtooth, every ``_terminated`` call queries the tree instead
+    of building an (S, K, 2) array, and no such query returns more than 1e6 results.
+    Measured: at most 3,766 results, and 1,941 with 60 crossing rectangles. With the array,
+    the largest call compared S = 3654 skinny triangles with K = 1014 pieces, and S = 7167
+    with K = 1204 with the rectangles, where the run peaked at 1.47 GB (92 MB now)."""
+    log = spy_on_queries(monkeypatch, "_terminated")
+    domain, kwargs = zigzag(rects)
+    with pytest.raises(RuntimeError, match="more than 10201 points"):
+        generate(domain, **kwargs)
+    calls = [start for name, start in log.entered if name == "_terminated"]
+    assert calls, "the terminator was never reached: the input does not test it"
+    ends = calls[1:] + [len(log.calls)]
+    for start, end in zip(calls, ends):
+        assert any(at == "_terminated" for at, _n in log.calls[start:end]), "a call made no tree query"
+    assert log.largest("_terminated") <= 1_000_000
