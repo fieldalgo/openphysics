@@ -38,6 +38,7 @@
 |---|---|---|
 | 과도 열전도 → 준정적 역학 | [저장 index API 및 독립 기준](../../../packages/galerkin/transient_thermal_mechanical.md) | [한국어](packages/galerkin/transient_thermal_mechanical.md) |
 | 3D PEC 공동 엔진 | [API·단위·수렴](../../../packages/galerkin/cavity_solver.md) | [한국어](packages/galerkin/cavity_solver.md) |
+| 3D PEC 공동 검증 기록(과거) | [계획](../../../packages/galerkin/cavity3d_validation.md), [mesh 재검증](../../../packages/galerkin/cavity3d_alternating_validation.md), [수렴 진단](../../../packages/galerkin/cavity3d_convergence_diagnosis.md) | [한국어](packages/galerkin/cavity3d_validation.md) |
 | 손실 재료 공동 | [복소 공진·Q·벽 손실·정답](../../../packages/galerkin/material_cavity.md) | [한국어](packages/galerkin/material_cavity.md) |
 | 공동 모델 문서·CLI | [입력·저장 장 계약](../../../packages/simcase/cavity3d.md) | [한국어](packages/simcase/cavity3d.md) |
 | 벡터 부분공간 추적 | [선택형 군집 sweep](../../../packages/simcase/vector_subspace_tracking.md) | [한국어](packages/simcase/vector_subspace_tracking.md) |

@@ -287,7 +287,7 @@ units and normalization agree between JSON and NPZ loaded without pickle.
 The raw-array restoration and save_fields=false checks also pass.
 
 The signed-average and continuum-subspace diagnosis is reproduced by
-[cavity3d_convergence_diagnosis.py](cavity3d_convergence_diagnosis.py) and explained
+[cavity3d_convergence_diagnosis.py](../../../studies/cavity3d_convergence_diagnosis.py) and explained
 in [the diagnosis](cavity3d_convergence_diagnosis.md). It retains the failure and
 identifies the finite-mesh signed cancellation; it does not introduce an automatic
 replacement acceptance rule. Tool/environment differences from CI are unchanged.

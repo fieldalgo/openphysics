@@ -20,4 +20,5 @@ after a standard-library or third-party module.
 | `tools/studio_resources/` | Studio resource observers (`profile_studio_thermal.py`, `run_transient_resource_workloads.py` and the transient profiler) and the stdlib-only probe for an already running server ([guide](../docs/transient_resource_probe.md)) | The steady and transient observations, yes (one fixed run each, not a performance gate). The probe's own command line, no, but the transient observers import and run its functions, so it stays beside them |
 
 Scripts that people run but required CI does not are elsewhere: timing benchmarks in
-[benchmarks/](../benchmarks/README.md).
+[benchmarks/](../benchmarks/README.md) and diagnostic studies in
+[studies/](../studies/README.md).

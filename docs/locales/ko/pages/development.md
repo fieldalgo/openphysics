@@ -62,7 +62,9 @@ python -m pip check
 `docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 저장소 검사, 고정한 검증
 환경, 검토한 라이선스 목록, 관리용 스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는
 physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
-있습니다. 빈 `openphysics` 이름 예약에는 코드·시험·예제가 없습니다. 루트에서 `python -m pytest`를
+있습니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
+[studies/](../../../../studies/README.md)에는 진단 스크립트가 있습니다. 사람이 돌리며 필수 CI는 돌리지
+않습니다. 빈 `openphysics` 이름 예약에는 코드·시험·예제가 없습니다. 루트에서 `python -m pytest`를
 실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
 표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
 맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.

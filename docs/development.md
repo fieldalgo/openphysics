@@ -66,7 +66,9 @@ Each package's pages (contracts and validation reports) are in
 the pinned validation environments, the reviewed license inventory and
 maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
-them required CI runs. The empty `openphysics` name reservation has no code, tests or examples.
+them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
+[studies/](../studies/README.md) diagnostic scripts; people run them and
+required CI does not. The empty `openphysics` name reservation has no code, tests or examples.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
 of the tools (`testpaths` in the root
 `pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
