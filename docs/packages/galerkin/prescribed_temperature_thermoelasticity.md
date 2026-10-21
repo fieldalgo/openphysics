@@ -139,7 +139,7 @@ lambda_eff=E nu/(1-nu^2) PS or lambda PE, beta=E alpha/(1-nu) PS or
 E alpha/(1-2nu) PE. Exact nodal T is injected; this is mechanical convergence
 under an interpolated prescribed field, not heat FEM convergence.
 
-HQ fixed the gates before implementation: original n=8,16,32, both adjacent
+The gates were fixed before implementation: original n=8,16,32, both adjacent
 orders L2u>=1.8 and H1u/stress/mechanical energy norm>=0.9; independent8x8 vs
 10x10 quadrature differences <1% of errors; analytic physical energy12x12 vs
 16x16 agreement1e-8 energy scale; monotonically decreasing normalized energy

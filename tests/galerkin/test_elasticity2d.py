@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Elasticity acceptance gates fixed in HQ before implementation/results."""
+"""Elasticity acceptance gates fixed before implementation and results."""
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
