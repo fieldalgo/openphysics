@@ -51,6 +51,8 @@ jobs:
         run: |
           mkdir -p .validation
           python tools/check_licenses.py --report .validation/licenses-validation-env.json
+      - name: Check that the seven distributions share one release version
+        run: python tools/check_release_version.py
       - name: Check Markdown links
         run: |
           python -m pytest -q -ra tools/tests/test_markdown_links.py tools/tests/test_readme_links.py
