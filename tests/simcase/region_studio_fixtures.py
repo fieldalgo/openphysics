@@ -203,6 +203,101 @@ def covered_crossings(teeth=126, front=58, box=(8.0, 32.0, 1.0, 19.0)):
     return with_shapes(shapes)
 
 
+def chord_stars(polygons=8, rects='nested'):
+    """``polygons`` polygons of ``512 // polygons`` points each, each a star whose every edge
+    is a chord through the centre of the steady domain, so that nearly every pair of their
+    edges crosses; 16 nested circles across them; rects filling the document to 64 shapes,
+    ``'nested'`` (concentric frames), ``'plus'`` (alternately wide and tall bars, crossing
+    pairwise) or ``'thin'`` (long thin bars across the domain). With ``polygons`` dividing
+    512, exactly 64 shapes, 16 circles and 512 polygon points: the costliest layouts for
+    counting boundary crossings that a search within those numbers found."""
+    n = 512 // polygons
+
+    def star(radius, phase):
+        step = math.pi + math.pi / n                # each vertex nearly opposite the last
+        return [(20.0 + radius * math.cos(phase + i * step), 10.0 + radius * math.sin(phase + i * step))
+                for i in range(n)]
+    shapes = [polygon(f'p{j}', star(9.5 - 0.01 * j, 0.003 * j)) for j in range(polygons)]
+    shapes += [circle(f'c{q}', 20.0 + 0.05 * q, 10.0, 9.0 - 0.3 * q) for q in range(16)]
+    count = 64 - 16 - polygons
+    if rects == 'nested':
+        shapes += [rect(f'r{q}', 11.0 + 0.1 * q, 1.0 + 0.05 * q, 18.0 - 0.2 * q, 18.0 - 0.1 * q) for q in range(count)]
+    elif rects == 'plus':
+        shapes += [rect(f'r{q}', 11.0 + 0.37 * q, 9.5 - 0.01 * q, 1.0 + 0.2 * q, 1.0 + 0.02 * q) if q % 2 else
+                   rect(f'r{q}', 19.5 - 0.01 * q, 1.0 + 0.37 * q, 1.0 + 0.02 * q, 1.0 + 0.2 * q) for q in range(count)]
+    elif rects == 'thin':
+        shapes += [rect(f'r{q}', 1.0 + 0.01 * q, 1.0 + 0.37 * q, 38.0 - 0.02 * q, 0.01) for q in range(count)]
+    else:
+        raise ValueError(rects)
+    return with_shapes(shapes)
+
+
+def diagonal_fans(polygons=1, rects='thin'):
+    """``polygons`` polygons of ``512 // polygons`` points each, each a zigzag between two
+    opposite corners of the square [10, 30] x [0, 20], so that every edge's bounding box holds
+    every circle; the 16 nested circles of ``chord_stars``; rects filling the document to 64
+    shapes, ``'thin'`` (bars 0.01 high across the square) or ``'squares'`` (concentric
+    squares). With ``polygons`` dividing 512, exactly 64 shapes, 16 circles and 512 polygon
+    points: about twice as many segment pairs whose boxes meet as the chord stars, found when
+    the work bound replaced the time bound in the region_complexity tests. Not a valid
+    document (the zigzags intersect themselves)."""
+    n = 512 // polygons
+
+    def zigzag(j):
+        points = []
+        for i in range(n):
+            a = (i * 0.6180339887498949 + j * 0.7548776662466927) % 1.0 * 0.5
+            b = (i * 0.7548776662466927 + j * 0.5698402909980532) % 1.0 * 0.5
+            points.append((10.0 + a, b + 0.001 * i) if i % 2 == 0 else (30.0 - a, 20.0 - b - 0.001 * i))
+        return points
+    shapes = [polygon(f'p{j}', zigzag(j)) for j in range(polygons)]
+    shapes += [circle(f'c{q}', 20.0 + 0.05 * q, 10.0, 9.0 - 0.3 * q) for q in range(16)]
+    count = 64 - 16 - polygons
+    if rects == 'thin':
+        shapes += [rect(f'r{q}', 10.0, 0.2 + 0.4 * q, 20.0, 0.01) for q in range(count)]
+    elif rects == 'squares':
+        shapes += [rect(f'r{q}', 11.0 + 0.18 * q, 1.0 + 0.18 * q, 18.0 - 0.36 * q, 18.0 - 0.36 * q) for q in range(count)]
+    else:
+        raise ValueError(rects)
+    return with_shapes(shapes)
+
+
+def corner_fans(polygons=8, rects='corner'):
+    """``polygons`` polygons of ``512 // polygons`` points each, every other point the corner
+    (10, 0) of the square [10, 30] x [0, 20] and the others near the opposite corner, so that
+    every edge's bounding box holds every circle and every polygon edge meets every other at
+    (10, 0); the 16 nested circles of ``chord_stars``; rects filling the document to 64
+    shapes, ``'corner'`` (each with its lower-left corner at (10, 0)) or ``'squares'`` (those
+    of ``diagonal_fans``). With ``polygons`` dividing 512, exactly 64 shapes, 16 circles and
+    512 polygon points: a few more segment pairs whose boxes meet than the diagonal fans, and
+    more pairs that meet, found by a review of the work bound in the region_complexity tests.
+    Not a valid document (each polygon returns to the corner at every other point)."""
+    n = 512 // polygons
+
+    def fan(j):
+        points = []
+        for i in range(n):
+            a = (i * 0.6180339887498949 + j * 0.7548776662466927) % 1.0
+            b = (i * 0.7548776662466927 + j * 0.5698402909980532) % 1.0
+            if i % 2 == 0:
+                points.append((10.0, 0.0))
+            elif a < 0.5:
+                points.append((30.0 - 0.5 * a, 20.0 - 0.5 * b))
+            else:
+                points.append((30.0 - 0.5 * a + 0.25, 20.0 - 0.3 * a))
+        return points
+    shapes = [polygon(f'p{j}', fan(j)) for j in range(polygons)]
+    shapes += [circle(f'c{q}', 20.0 + 0.05 * q, 10.0, 9.0 - 0.3 * q) for q in range(16)]
+    count = 64 - 16 - polygons
+    if rects == 'corner':
+        shapes += [rect(f'r{q}', 10.0, 0.0, 20.0 - 0.3 * q, 20.0 - 0.25 * q) for q in range(count)]
+    elif rects == 'squares':
+        shapes += [rect(f'r{q}', 11.0 + 0.18 * q, 1.0 + 0.18 * q, 18.0 - 0.36 * q, 18.0 - 0.36 * q) for q in range(count)]
+    else:
+        raise ValueError(rects)
+    return with_shapes(shapes)
+
+
 # ---- small layouts that exercise the domain builder ------------------------------------------
 
 def clipped_circle():
