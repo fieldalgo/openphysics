@@ -318,6 +318,12 @@ result = solve_point(model, doc.sole_physics()[1])
 
 ## Heat and cavity documents
 
+Named-region steady and transient heat documents also mesh in canonical
+micrometres. Equivalent length inputs give identical SI meshes and fields in
+the same numerical environment; heat results retain metre coordinates and
+the saved model retains its original units. See the
+[region heat contract](thermal_regions2d.md#mesh-and-solve).
+
 The [cavity document contract](cavity3d.md) covers the `em.cavity3d` input,
 unit conversion, search limitations and the SI JSON/NPZ result layout.
 

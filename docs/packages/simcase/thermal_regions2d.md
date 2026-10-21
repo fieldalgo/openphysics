@@ -92,8 +92,11 @@ later shape) is refused when the document runs.
 
 ## Mesh and solve
 
-The geometry is meshed by meshine in document units (constrained Delaunay
-refinement with the requested minimum angle), then scaled exactly to metres.
+Geometry and global/per-region mesh sizes are first converted to micrometres
+with the same decimal-ratio conversion used by electromagnetic documents.
+meshine then performs constrained Delaunay refinement with the requested
+minimum angle. Its canonical coordinates are converted directly to SI metres
+for the heat solver, without a round trip through the document unit.
 Every shape boundary is a chain of element edges, so each triangle lies in
 one region. Curved boundaries are inscribed polygons: the meshed area of a
 circle is smaller than pi r^2 by O(h^2). The meshed problem is passed to
@@ -149,10 +152,19 @@ onto the edge or clear of it). Shapes clear of other boundaries still give the
 best triangles. Electromagnetic documents use the same mesher and behave the
 same way.
 
-meshine does not produce the same node positions for one geometry written in
-different length units. Results in mm, m and um therefore agree to
-discretization error, not node for node; the adapter's own conversion is an
-exact multiplication.
+For inputs that convert to the same micrometre numbers, mm, m, um, nm and
+custom length units now produce identical SI nodes, connectivity, region and
+boundary tags, and steady/transient fields in the same numerical environment.
+This includes an affine transient initial temperature: its domain origin uses
+the same canonical-to-SI conversion as the mesh. SI-suffixed material, load and
+temperature values and study times are unchanged. Saved `nodes_m` remain in
+metres, and `model.json` retains the original document units.
+
+This is not a promise for inputs that differ after conversion (even by one
+ulp), or across library versions/platforms. Canonical meshing can change a
+previous non-um document's discretization; analytical accuracy and convergence
+criteria still apply. meshine itself does not promise unit-invariant node
+positions.
 
 ## Results
 
@@ -180,7 +192,7 @@ comparison:
 | Check | Gate |
 | --- | --- |
 | Layered wall document (10 mm steel with Q = 2e5 W/m^3, 20 mm insulation, 400/300 K) against `refsol.thermal_multilayer.layered_slab`, mesh size 2, 1, 0.5, 0.25 mm | T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; heat balance <= 1e-10 |
-| Same wall in mm, m and um | Adapter nodes = meshine nodes x unit factor exactly; T and flux errors against the exact wall agree within 5% |
+| Same wall in mm, m, um and nm | SI nodes, triangles, T and flux identical; existing absolute analytical error bounds retained |
 | Shipped example against a direct `solve_steady_heat` call on the same mesh | Temperature and reaction identical; source heat = Q x meshed heater area to 1e-12; heater area within 1% of pi r^2; outward = source to 1e-10 |
 | Saved fields and summary | Formats, `triangle_regions`, boundary fields, region table, materials, total area, model copy |
 | CLI | validate and run exit 0; an existing output exits 1 |
@@ -264,3 +276,13 @@ the engine validation in [multimaterial](../galerkin/multimaterial.md).
 - Plane geometry of unit depth; no thermal properties from built-in materials.
 - The VTU export (`simcase.export`, extra `simcase[export]`) does not accept the
   region layouts yet; it refuses them as an unsupported field layout.
+
+### Canonical length regression
+
+`tests/simcase/test_thermal_length_canonical.py` compares a translated domain
+with rectangles, an isolated circle, a polygon, background and per-shape mesh
+sizes in mm, m, um, nm and a custom `in_m` unit. Steady flux/Robin loads and
+transient affine initial data exercise both solve paths. Every numeric saved
+array, region/material assignment and boundary tag must be identical; the
+original model and declared units must be preserved. Existing layered-wall
+analytical convergence tests remain required.

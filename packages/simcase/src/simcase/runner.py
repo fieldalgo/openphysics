@@ -115,12 +115,13 @@ def _solver_mesh(tri: TriMesh) -> Mesh:
 
 
 def micrometre_document(doc: Document) -> Document:
-    """The same em.modes2d document with every length in micrometres.
+    """The same EM or region heat document with every length in micrometres.
 
     Each number is converted once and exactly where it is representable
     (``units.length_to_micrometres``). A micrometre document comes back equal.
-    This lists every length the em.modes2d format carries; a length added to the
-    format must be added here, or it reaches the mesher in the document unit.
+    This lists geometry/mesh lengths shared by EM and region heat documents,
+    plus EM wavelength and dispersion lengths. SI-suffixed thermal properties
+    and study times stay unchanged. Add new length fields here.
     """
     d = copy.deepcopy(doc.data)
     um = lambda v, power=1: units.length_to_micrometres(v, doc.scale, power)   # noqa: E731
@@ -142,7 +143,8 @@ def micrometre_document(doc: Document) -> Document:
         for k in ("near", "far", "distance"):
             gr[k] = um(gr[k])
     for p in d["physics"].values():
-        p["wavelength"] = um(p["wavelength"])
+        if p.get("type") == "em.modes2d":
+            p["wavelength"] = um(p["wavelength"])
     st = d["study"]
     if st.get("type") == "sweep" and str(st.get("parameter", "")).endswith(".wavelength"):
         st["values"] = [um(v) for v in st["values"]]

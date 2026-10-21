@@ -71,24 +71,16 @@ def test_layered_wall_document_converges_to_the_exact_series_wall():
 
 
 def test_length_unit_changes_only_the_document_numbers():
-    """The adapter scales meshine output exactly; the mesher itself is not unit invariant.
-
-    meshine places interior nodes differently for the same geometry written in
-    mm, m or um, so the three solutions are compared through their error
-    against the exact series wall rather than node for node.
-    """
-    from simcase.thermal_regions import build_region_mesh
-    errors = {}
-    for unit, scale in (('mm', 1.), ('m', 1e-3), ('um', 1e3)):
-        doc = Document.from_dict(wall(1., unit, scale))
-        mesh, _, tri = build_region_mesh(doc)
-        np.testing.assert_array_equal(mesh.nodes, np.asarray(tri.nodes)*doc.scale.to_si(1., {'length': 1}))
-        assert mesh.nodes[:, 0].max() == pytest.approx(.03, rel=1e-15)
-        errors[unit] = _errors(run(doc, verbose=False))
-    t = np.array([e[0] for e in errors.values()])
-    q = np.array([e[1] for e in errors.values()])
-    assert np.ptp(t)/t.mean() < .05 and np.ptp(q)/q.mean() < .05
-    assert t.max() < 1.1e-6 and q.max() < .25
+    """Canonical meshing makes the SI mesh and solution independent of units."""
+    reference = run(Document.from_dict(wall()), verbose=False)
+    for unit, scale in (('mm', 1.), ('m', 1e-3), ('um', 1e3), ('nm', 1e6)):
+        result = run(Document.from_dict(wall(1., unit, scale)), verbose=False)
+        np.testing.assert_array_equal(result.mesh.nodes, reference.mesh.nodes)
+        np.testing.assert_array_equal(result.mesh.triangles, reference.mesh.triangles)
+        np.testing.assert_array_equal(result.temperature_k, reference.temperature_k)
+        np.testing.assert_array_equal(result.heat_flux_w_m2, reference.heat_flux_w_m2)
+        t, q = _errors(result)
+        assert t < 1.1e-6 and q < .25
 
 
 def test_region_document_equals_a_direct_engine_call_and_balances_heat():

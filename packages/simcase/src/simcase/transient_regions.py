@@ -14,6 +14,7 @@ import time
 
 import numpy as np
 
+from . import units
 from .schema import DocumentError
 from .thermal_regions import (build_region_mesh, covered_shapes, has_region_geometry, region_geometry,
                               region_materials_table, region_mesh_settings, region_source)
@@ -81,7 +82,7 @@ def validate_transient_region_thermal(doc):
     else:
         _number(spec, initial_path)
     dom = d['geometry']['domain']
-    to_si = lambda v: doc.scale.to_si(v, {'length': 1})
+    to_si = lambda v: units.length_to_micrometres(v, doc.scale)*units.UM_IN_SI
     x0, y0, x1, y1 = (to_si(dom[k]) for k in ('xmin', 'ymin', 'xmax', 'ymax'))
     corners = ((x0, y0), (x0, y1), (x1, y0), (x1, y1))
     initial = [_number(_initial_value(spec, x, y, (x0, y0)), initial_path+' at domain corner')
@@ -130,7 +131,7 @@ def transient_region_inputs(doc, mesh, region_materials):
     times = np.array(doc['study']['time_s'], dtype=float, copy=True)
     nodes = np.asarray(mesh.nodes, dtype=float)
     dom = doc['geometry']['domain']
-    origin = np.array([doc.scale.to_si(dom['xmin'], {'length': 1}), doc.scale.to_si(dom['ymin'], {'length': 1})])
+    origin = units.length_to_micrometres([dom['xmin'], dom['ymin']], doc.scale)*units.UM_IN_SI
     spec = p['initial_temperature_k']
     with np.errstate(over='ignore', invalid='ignore'):
         initial = (np.full(len(nodes), float(spec)) if not isinstance(spec, dict)
