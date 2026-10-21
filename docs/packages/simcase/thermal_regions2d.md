@@ -352,8 +352,70 @@ or `None` when meshing stopped at the `max_nodes` cap or one isolated circle
 alone is over `max_input_vertices`. The message names the quantity, the count
 and the limit.
 
-`tests/simcase/test_region_mesh_limits.py` checks this with criteria fixed
-before the change, measuring every node and triangle count in the test instead
+**Before validation: `region_complexity`.** Validating a region document
+resolves the shapes' booleans, and that cost grows with the boundaries that
+cross each other, even where later shapes cover the crossings and none of them
+reaches the mesh. Two 255-point sawtooth polygons whose edges cross 64,455
+times, under four covering rects and after 58 small ones, take 18.5 s and
+32 s in `Document.from_dict` alone (two measurements on Linux with Python 3.12
+and shapely 2.2.0). `region_complexity(data, *,
+max_shapes=None, max_circles=None, max_polygon_points=None)` reads the raw
+document (the dict JSON gives, before `Document.from_dict`) and returns
+`RegionComplexity(shapes, circles, polygon_points, boundary_crossings)`:
+
+- `shapes` is the length of `geometry.shapes`, `circles` the entries of type
+  `circle`, and `polygon_points` the summed lengths of the polygons' `points`;
+- these three come from the lengths alone; when one is over the maximum given
+  for it, `boundary_crossings` is `None` and no geometry is built;
+- otherwise `boundary_crossings` is the number of pairs of boundary segments
+  from different shapes that properly cross, whose interiors meet in exactly
+  one point: touching at an end point, a T-junction or a collinear overlap does
+  not count. A rect is its 4 edges, a circle the 128-gon simcase meshes it
+  with, and a polygon its edges. Each pair is decided with GEOS's robust
+  orientation predicates on the coordinates as given. That is the test
+  shapely's `crosses` makes for two segments, except where an end point lies
+  within rounding of the other segment: `crosses` rounds the intersection point
+  it computes and can call such a crossing a touch. The pairs are found with
+  one shapely STRtree query, and only the pairs whose bounding boxes meet are
+  tested. The caps bound that work: within 64 shapes, 16 circles and 512
+  polygon points a document has at most 2748 segments, so at most 3,774,378
+  pairs to test (see the tests below). The example above takes 0.04 to 0.08 s
+  on one machine and 0.07 to 0.14 s on a slower one; within those caps, the
+  costliest layouts found take 0.3 to 0.8 s (chord stars, polygons whose edges
+  are chords through one centre: up to 158,868 crossings) and 0.5 to 1.6 s
+  (diagonal and corner fans, below) on the slower machine.
+
+It never raises on malformed data: a document, `geometry` or `shapes` of the
+wrong type counts zero, and an entry that is not a dict, has an unknown type or
+has a coordinate that is not a finite number counts as a shape (and its points
+as points) but adds no segment; `Document.from_dict` raises on it later, a
+`DocumentError`, or shapely's `GEOSException` for a circle whose extent
+overflows a float. A shape with a coordinate beyond the range where shapely
+decides crossings exactly (nonzero and below 2^-300 or above 2^300 in
+magnitude) is not measured: each of its segments counts as crossing every
+segment of every other shape, an upper bound, so an extreme scale cannot hide
+crossings, and a document with such a shape reports a large count that says
+nothing about its real crossings.
+
+It counts the document's own numbers, the ones `Document.from_dict` resolves
+first. A run resolves the shapes again, twice, on the micrometre copy it meshes
+(see Mesh and solve). A decimal unit factor can re-round exact contacts in that
+copy, as the scaling check below shows, so the copy's crossings can differ from
+the count by such contacts. The micrometre copy counts the same on 22 valid
+millimetre documents in the tests (both examples at three mesh sizes, the region
+fixtures, the heaters above and three crossing layouts) and on the covered
+crossings above (measured once). Two of the costliest layouts change (158,868
+to 158,860 and 121,634 to 121,624), but they are not valid documents:
+`Document.from_dict` refuses their self-intersecting polygons before any boolean.
+These measurements are of millimetre documents. In another unit the factor to
+micrometres is another power of ten, and valid documents can differ too
+(measured once, on the test documents rewritten with every length scaled): the
+8 x 8 grid of touching rects counts 4 in metres and 0 on its micrometre copy,
+and 0 and 16 in kilometres; the heaters centred on the plate edge count 0 and
+16 in megametres.
+
+`tests/simcase/test_region_mesh_limits.py` checks the mesh limits with criteria
+fixed before the change, measuring every node and triangle count in the test instead
 of storing it: limits at the exact node, triangle and loop counts of both
 examples give the saved arrays and summary of the unlimited run, and one less
 is refused before the solver is called; each limit works alone; documents
@@ -363,7 +425,68 @@ onto the micrometre copy and the physics registry, not pre-registered, check
 that the count is the one of the domain each run hands to meshine in mm, nm and
 m documents and in the document above where the units change it, that a
 document that was never validated gets the count of its run, and that only a
-kind that accepts limits receives them.
+kind that accepts limits receives them. `tests/simcase/test_region_complexity.py`
+checks `region_complexity` against criteria fixed before it was written: the
+counts equal direct counts, and malformed input never raises; the crossings
+equal a brute force with shapely's `crosses` on every segment pair, on 12
+seeded random documents with exact contacts and on the hidden crossings above;
+realistic layouts (both examples, an 8 x 8 grid of touching rects, 64 stacked
+strips, 8 heaters across the plate edge) stay at or below 256 crossings, in
+fact at most 16 (heaters centred on the edge meet it only at vertices of their
+128-gons, which count 0; 0.3 mm higher they cross it 16 times); the hidden
+crossings count over 1024 (in under 0.5 s, and the costliest layouts found in
+under 1 s: a time criterion that failed, see below); scaling every coordinate
+by 1e-6 or 1e6 keeps the counts; and over
+a maximum nothing is built. The comparison with `crosses` holds on its corpus
+but not in general: a review found documents whose segments cross by less than
+a rounding error, where `crosses` reports a touch. A test added after the
+criteria therefore compares the count with exact rational arithmetic, on such
+documents at scales from 1e-80 to 1e80 and on the corpus above. One criterion
+failed when first run: scaling by 1e-6 and 1e6 changed the counts of the
+costliest layouts (for the one with 8 polygons, 158,868 became 158,874 and
+158,860; each of the four changes at 1e-6). In exact arithmetic, vertices of
+their circles' 128-gons lie on sides of their rects; in floating point each
+such contact is a touch, a crossing by about a rounding error or a near miss,
+and a decimal factor rounds it again, so a touch can become a crossing and a
+crossing a miss. The count still equals exact arithmetic at every scale, and
+scaling by powers of two, which rounds nothing, keeps every count. Layouts with
+contacts that rounding can turn into a proper crossing are therefore left out
+of that check; after the failure, copies of the four layouts with their
+circles moved off the rects' sides were added to it, and they keep their
+counts. The time criterion failed too. On a machine slower than the first, the
+chord stars took 0.3 to 0.8 s per call in the test, and in one of 26 runs one
+call took 1.015 s, over the bound. Diagonal fans, found afterwards (polygon
+edges that zigzag between two opposite corners of a square holding all 16
+circles, so that every edge's box holds every circle segment), give about
+twice as many segment pairs whose boxes meet (2.53 and 2.56 million against
+1.10 to 1.20 million) and took 0.5 to 1.6 s per call on that machine, over 1 s
+in 15 of 120 calls in twenty runs of the test. A review then found corner fans
+(polygons that return to one corner of that square at every other point, so
+that all their edges also meet there): a few more such pairs (up to 2.57
+million) and, with 8 polygons, the most pairs that meet (197,824 against at
+most 158,906 for the others). In ten later runs of the test they took
+0.5 to 1.3 s per call, over 1 s in 7 of 60 calls, and the diagonal fans 0.5 to
+1.6 s, 8 of 60. By owner decision (2026-10-27) the time criterion stays
+recorded as failed, and the tests print the times but no longer check them.
+They check a deterministic work bound that follows from the caps instead. A
+document within 64 shapes, 16 circles and 512
+polygon points gives at most 2748 boundary segments (16 circles of 128, one
+polygon with all 512 points and 47 rects of 4; one test document reaches it),
+so the STRtree query returns at most 2748² pairs, at most 3,774,378 pairs are
+tested, each costs at most five predicate evaluations (one, and four end-point
+tests for a pair that meets), and the other shapely calls make or take at most
+10,356 items (two end points and a prepared line per segment; a centre, a disc,
+a ring and its 129 coordinates per circle). The two pair numbers are what
+testing every pair would give: they hold for any document within the caps, but
+a brute force would meet them too. What rules a brute force out is a count made
+without shapely, which checks on each document that only the pairs whose
+bounding boxes meet are tested. A counting stand-in for shapely, which fails
+the test on any shapely call it does not count, measures this work on the
+hidden crossings, the chord stars, two diagonal fans, two corner fans and 12
+seeded random documents within the caps (6 that fill every cap). The most
+measured is 2,572,136 query pairs, 1,249,950 tested pairs and 2,041,246
+predicate evaluations, about a third of their bounds or less. The bound limits
+work, not time: the time per pair depends on the machine.
 
 ## Limits
 

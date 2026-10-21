@@ -324,7 +324,9 @@ result = solve_point(model, doc.sole_physics()[1])
 For heat region documents, `run` also takes optional mesh limits
 (`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
 counts the loop vertices a document passes to the mesher without meshing it.
-Both raise `MeshLimitError`; see [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers).
+Both raise `MeshLimitError`. `region_complexity` counts shapes, circles,
+polygon points and boundary crossings on the raw JSON, before
+`Document.from_dict`. See [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers).
 
 ## Heat and cavity documents
 

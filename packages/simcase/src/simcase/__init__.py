@@ -30,6 +30,7 @@ from .transient_thermal import TransientThermalRunResult
 from . import examples
 from .geometry import build_domain
 from .mesh_limits import MeshLimitError, check_mesh_limits
+from .complexity import RegionComplexity, region_complexity
 from .fields import VectorField
 from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
 from .schema import FORMAT, Document, DocumentError
@@ -42,4 +43,4 @@ __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
            "run", "RunResult", "ElectricJouleRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
-           "MeshLimitError", "check_mesh_limits"]
+           "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity"]

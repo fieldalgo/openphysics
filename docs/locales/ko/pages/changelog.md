@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: `region_complexity`가 `Document.from_dict` 전에 원시 열전도 영역 문서를 읽어 도형, 원, 다각형 점 수를 세고, 어느 것도 주어진 최댓값을 넘지 않으면 `from_dict`의 불리언 연산 비용을 좌우하는 도형 사이 경계 교차 수도 셉니다. 잘못된 데이터에서도 예외를 발생시키지 않습니다. [문서](packages/simcase/thermal_regions2d.md#호출자를-위한-메시-상한).
+
 - `simcase`: `run`이 정상·과도 열전도 영역 문서에 선택적인 `max_input_vertices`, `max_nodes`, `max_triangles`를 받아 풀이 전에 검사하고 `MeshLimitError`로 거절합니다. `check_mesh_limits`는 영역을 만들지 않고 문서의 루프 꼭짓점 수를 반환합니다. 메시 전 작업을 제한하는 것은 `max_input_vertices`뿐입니다. 두 열전도 종류는 물리 등록표(`PhysicsKind.accepts_mesh_limits`)를 통해 상한을 받고, 상한이 없으면 실행은 그대로입니다. [문서](packages/simcase/thermal_regions2d.md#호출자를-위한-메시-상한).
 
 - `meshine`: `generate`는 삽입이 `max_points`를 넘기려 하면 `RuntimeError` 하위 클래스인 `MeshSizeLimitError`를 발생시키고, 만들어진 입력 영역도 세분화 작업 전에 상한과 비교합니다. 그래서 점이 더 많은 입력은 세분화되거나, 삽입이 필요 없을 때 상한을 넘긴 채 반환되지 않고 그 자리에서 거절됩니다. 꼭짓점 수에 대해 O(V²)인 영역 만들기는 여전히 먼저 실행됩니다. [문서](packages/meshine/overview.md#안전장치).

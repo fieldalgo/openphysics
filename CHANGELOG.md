@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `simcase`: `region_complexity` reads a raw heat region document before `Document.from_dict` and counts its shapes, circles and polygon points and, when none passes its given maximum, the boundary crossings between shapes, which drive the cost of `from_dict`'s booleans. It never raises on malformed data. [Documentation](docs/packages/simcase/thermal_regions2d.md#mesh-limits-for-callers).
+
 - `simcase`: `run` takes optional `max_input_vertices`, `max_nodes` and `max_triangles` for steady and transient heat region documents, checks them before the solve and refuses with `MeshLimitError`; `check_mesh_limits` returns a document's loop-vertex count without building the domain. Only `max_input_vertices` bounds the work before meshing. The two heat kinds take the limits through the physics registry (`PhysicsKind.accepts_mesh_limits`); with no limit a run is unchanged. [Documentation](docs/packages/simcase/thermal_regions2d.md#mesh-limits-for-callers).
 
 - `meshine`: `generate` raises `MeshSizeLimitError`, a `RuntimeError` subclass, when an insertion would pass `max_points`, and checks the input domain as built against the cap before any refinement work, so an input with more points is refused there instead of being refined or, when it needs no insertion, returned over the cap. Building the domain, O(V²) in its vertices, still comes first. [Documentation](docs/packages/meshine/overview.md#safeguards).
