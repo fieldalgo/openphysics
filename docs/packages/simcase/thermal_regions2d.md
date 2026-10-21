@@ -6,8 +6,9 @@ A `thermal.steady2d` or `thermal.transient2d` document whose `geometry` has
 `background` or `shapes` describes several materials. It uses the same geometry as electromagnetic
 documents: named shapes, each naming a material, drawn in order over a
 background (later shapes cut earlier ones). Thermal properties come from the
-`materials` table. The mesh follows every region boundary. This is a headless
-API/CLI path; Studio refuses these documents (see Limits below).
+`materials` table. The mesh follows every region boundary. The headless API and
+CLI run these documents, and Studio's thermal routes validate and run them within
+Studio's region limits (see Limits below).
 
 Rectangle documents without `background`/`shapes` keep the
 [original contract](thermal_steady2d.md) and its
@@ -203,7 +204,7 @@ comparison:
 | Exact-circle rule | Only a circle clear of every other boundary, with no later shape inside it, is meshed as an exact circle |
 | A concave shape that clips to a polygon plus a line piece | Only the polygon part is meshed; heat balance <= 1e-10; an electromagnetic document keeps its exact circle |
 | Rectangle documents | Non-empty `materials` still refused; original result format |
-| Studio | Region documents are refused before any mesher or worker call |
+| Studio validation | The example validates with `ok: true` on Studio's thermal route with no mesher or worker call |
 
 Observed when first run (mesh size 2 → 0.25 mm):
 
@@ -246,7 +247,7 @@ Validation (`tests/simcase/test_transient_thermal_regions.py`):
 | Direct `solve_transient_heat` call on the same mesh | Temperature, flux, reaction and heat content identical |
 | Layered wall heated from a uniform 300 K (Q 2e5 / 5e4 W/m^3, ends 300 K) against `refsol.transient_heat_multilayer.LayeredWall.source_driven`, mesh size 4, 2, 1, 0.5 mm, dt = 1/64 s, observed at 20 s | T L2 order >= 1.8 and flux L2 order >= 0.9 on the last two intervals; at 0.5 mm halving dt changes each error by <= 5% |
 | One material everywhere against the rectangle transient document | Source heat equal to 1e-12; maximum temperature within 2e-3 K |
-| Saved fields, CLI, 11 invalid documents (one a shape outside the domain), Studio refusal | Formats, regions, materials; exit codes; `DocumentError`; no worker or mesher call |
+| Saved fields, CLI, 11 invalid documents (one a shape outside the domain), Studio validation | Formats, regions, materials; exit codes; `DocumentError`; Studio validates with no worker or mesher call |
 
 Two earlier configurations of the convergence gate failed because backward
 Euler's first-order time error was not separated from the space error:
@@ -490,8 +491,10 @@ work, not time: the time per pair depends on the machine.
 
 ## Limits
 
-- Studio refuses steady and transient region documents (its heat views read `mesh.subdivisions`);
-  use the CLI or Python API.
+- Studio's thermal routes validate and run steady and transient region documents
+  within Studio's region limits (shapes, circles, polygon points, boundary
+  crossings and loop vertices, then node and cell counts); see
+  [steady Studio, Region documents](thermal_studio.md#region-documents).
 - Piecewise-constant isotropic properties; perfect contact at interfaces.
 - Next to a circle that touches or shallowly crosses another boundary, or a
   sharp polygon corner, triangles in either region can be as sharp as the input

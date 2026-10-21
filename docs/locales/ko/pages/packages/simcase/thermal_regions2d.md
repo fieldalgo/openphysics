@@ -5,8 +5,8 @@
 `geometry`에 `background`나 `shapes`가 있는 `thermal.steady2d`·`thermal.transient2d`
 문서는 여러 재료를 기술합니다. 전자기 문서와 같은 기하를 씁니다: 이름 있는 도형마다 재료 이름을 달고,
 배경 위에 순서대로 그립니다(나중 도형이 앞 도형을 자릅니다). 열 물성은 `materials` 표에서
-옵니다. 메시는 모든 영역 경계를 따릅니다. headless API/CLI 경로이며 Studio는 이 문서를
-거부합니다(아래 한계 참고).
+옵니다. 메시는 모든 영역 경계를 따릅니다. headless API와 CLI가 이 문서를 실행하며,
+Studio의 열 route도 Studio의 영역 한도 안에서 검증·실행합니다(아래 한계 참고).
 
 `background`/`shapes`가 없는 사각형 문서는 [원래 계약](thermal_steady2d.md)과
 [경계 확장](thermal_steady_boundary2d.md)을 그대로 따릅니다.
@@ -171,7 +171,7 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
 | 정확한 원 규칙 | 다른 모든 경계와 떨어지고 안에 뒤 도형이 없는 원만 정확한 원으로 메시 |
 | 잘랐을 때 다각형과 선 조각이 되는 오목 도형 | 다각형 부분만 메시, 열수지 <= 1e-10, 전자기 문서의 정확한 원 유지 |
 | 사각형 문서 | 비어 있지 않은 `materials`는 여전히 거부, 원래 결과 형식 |
-| Studio | 영역 문서는 메시·작업자 호출 전에 거부 |
+| Studio 검증 | 예제가 Studio 열 route에서 메시·작업자 호출 없이 `ok: true`로 검증됨 |
 
 처음 실행했을 때 관측값(메시 크기 2 → 0.25 mm):
 
@@ -211,7 +211,7 @@ t0에서 초기장과 일치). 사용하는 모든 재료에 `conductivity_w_mk`
 | 같은 메시의 `solve_transient_heat` 직접 호출 | 온도·열유속·반력·열량 동일 |
 | 균일 300 K에서 가열하는 층상 벽(Q 2e5 / 5e4 W/m^3, 양끝 300 K) 대 `refsol.transient_heat_multilayer.LayeredWall.source_driven`, 메시 크기 4, 2, 1, 0.5 mm, dt = 1/64 s, 20 s 관측 | 마지막 두 구간에서 T L2 차수 >= 1.8, 열유속 L2 차수 >= 0.9; 0.5 mm에서 dt를 절반으로 하면 각 오차 변화 <= 5% |
 | 한 재료만 쓴 문서 대 사각형 과도 문서 | 열원 1e-12 일치, 최고 온도 2e-3 K 이내 |
-| 저장 필드, CLI, 잘못된 문서 11개(하나는 영역 밖 도형), Studio 거부 | 형식·영역·재료, 종료 코드, `DocumentError`, 작업자·메시 호출 없음 |
+| 저장 필드, CLI, 잘못된 문서 11개(하나는 영역 밖 도형), Studio 검증 | 형식·영역·재료, 종료 코드, `DocumentError`, 작업자·메시 호출 없이 Studio 검증 |
 
 수렴 기준의 앞선 두 구성은 후진 Euler의 1차 시간 오차가 공간 오차와 분리되지 않아 실패했습니다.
 
@@ -393,8 +393,9 @@ meshine에 넘기는 영역의 수와 같은지, 검증하지 않은 문서가 �
 
 ## 한계
 
-- Studio는 정상·과도 영역 문서를 거부합니다(열 화면이 `mesh.subdivisions`를 읽음). CLI나 Python API를
-  쓰십시오.
+- Studio의 열 route는 정상·과도 영역 문서를 Studio의 영역 한도(도형·원·다각형 점·경계 교차·루프
+  꼭짓점, 이어서 절점·요소 수) 안에서 검증·실행합니다.
+  [정상 Studio, 영역 문서](thermal_studio.md#영역-문서)를 참고하세요.
 - 구간 상수 등방 물성, 경계면 완전 접촉.
 - 다른 경계에 닿거나 얕게 가로지르는 원, 뾰족한 다각형 꼭짓점 옆의 삼각형은 어느 영역에서든 입력
   모서리만큼, 또는 조금 더 날카로울 수 있습니다(14° 다각형 모서리 옆에서 13.0° 측정). meshine이

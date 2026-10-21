@@ -81,3 +81,17 @@ case를 순차 실행하며 다음 job이 회수하기 전에 현재 result를 �
 60초 bounded 비동기 poll은 시험 관측 한도이며 solver 취소나 생산 timeout이 아니다.
 shared admission/pinned-response accounting·실브라우저 Canvas/current-frame minmax·
 플랫폼별 자원 실측은 별도 suite다. 본시험만으로 capacity/RSS/browser/3OS를 보장하지 않는다.
+
+## 영역 문서
+
+`tests/simcase/test_studio_region_acceptance.py`는 과도 route로 과도 영역 문서도
+검사하며 디코딩한 manifest·frame·history page만 씁니다. 기준값은 구현 전에 정했고,
+측정값은 Linux 한 번 실행(Python 3.12, numpy 2.5)에서 얻었습니다.
+
+| 사례 | 기준 | 측정 |
+| --- | --- | --- |
+| A3 변을 단열한(`dirichlet_temperature_k: {}`) 배포 과도 예제, Q = 0.01 K/s x 영역별 체적 열용량, T0 = 300 K | 모든 온도 frame이 300 + 0.01 t에서 1e-10 x 300 K 이내; 모든 열유속 frame이 1e-9 W/m² 미만; H page가 Σ c_r A_r (300 + 0.01 t)와 rtol 1e-10으로 같음(A_r은 manifest의 nodes·triangles·`triangle_regions`로 계산); Σ A_r = 영역 면적(rtol 1e-12) | 0; 7.1e-15 W/m²; 3.3e-16; 0 |
+| A4 전송 동일성, 과도 예제 | `triangle_regions`를 포함한 manifest 정적 배열, 모든 온도·열유속 frame, H·V page가 직접 `simcase.run`과 같음(JSON 왕복 뒤 `np.array_equal`) | 같음 |
+
+영역 job의 frame과 page에는 영역 result/layout 쌍이 붙습니다. 과도 영역 문서의 수렴은
+엔진의 영역 시험에 남습니다.

@@ -384,18 +384,18 @@ def test_the_documented_example_is_the_shipped_example(page):
     assert json.loads(block) == examples.EXAMPLES['thermal_regions']
 
 
-def test_studio_refuses_region_documents_without_running(monkeypatch):
+def test_studio_validates_region_documents_without_running(monkeypatch):
     from fastapi.testclient import TestClient
     from simcase.studio import server
     def forbidden(*a, **kw):
-        raise AssertionError('region documents must not reach the Studio worker or mesher')
+        raise AssertionError('validating a region document must not reach the Studio worker or mesher')
     monkeypatch.setattr(server, 'run', forbidden)
     monkeypatch.setattr(server, 'build_mesh', forbidden)
     client = TestClient(server.app)
     data = examples.EXAMPLES['thermal_regions']
     assert not client.post('/api/validate', json={'doc': data}).json()['ok']
     response = client.post('/api/thermal/validate', json={'doc': data, 'client_revision': 1, 'request_seq': 1})
-    assert response.status_code in (200, 400)
+    assert response.status_code == 200
     body = response.json()
-    assert body.get('ok') is not True
+    assert body.get('ok') is True
     assert 'thermal_regions' not in client.get('/api/examples').json()['examples']

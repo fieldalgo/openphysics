@@ -99,7 +99,8 @@ jobs:
             tests/simcase/test_studio_steady_thermal_http.py \
             tests/simcase/test_studio_thermal_acceptance.py \
             tests/simcase/test_studio_thermal_lifecycle.py \
-            tests/simcase/test_studio_rectangle_invariants.py
+            tests/simcase/test_studio_rectangle_invariants.py \
+            tests/simcase/test_studio_region_http.py
       - name: Check transient thermomechanical contract and separated convergence
         run: |
           python -m pytest -q --capture=tee-sys -o junit_logging=all --junitxml=.validation/transient-thermomechanical.xml \
@@ -110,7 +111,8 @@ jobs:
           python -m pytest -q -ra -o junit_logging=all -o junit_log_passing_tests=true --junitxml=.validation/studio-transient-preflight.xml \
             tests/simcase/test_studio_transient_server_http.py \
             tests/simcase/test_studio_transient_thermal_acceptance.py \
-            tests/simcase/test_studio_transient_lifecycle.py
+            tests/simcase/test_studio_transient_lifecycle.py \
+            tests/simcase/test_studio_region_acceptance.py
       - name: Run all Python tests including RII and convergence studies
         id: source_tests
         env:

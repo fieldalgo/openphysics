@@ -4,7 +4,7 @@
 
 **At a glance**
 
-- **What it does:** a Studio view for rectangular `thermal.transient2d` documents with its own capability, validation, run and manifest/frame/history routes. Pick an exact requested time (the final one by default), view nodal Kelvin and cell flux, and page heat-content H [J/m] and quadratic-functional V [J K/m] histories.
+- **What it does:** a Studio view for rectangular `thermal.transient2d` documents with its own capability, validation, run and manifest/frame/history routes. Pick an exact requested time (the final one by default), view nodal Kelvin and cell flux, and page heat-content H [J/m] and quadratic-functional V [J K/m] histories. The same routes validate and run transient heat documents with material regions within Studio's region limits (see [Region documents](#region-documents)).
 - **Limits:** no new solver, interpolation, downsampling, transient flux/Robin, restart, coupling, or cancel/delete/save/NPZ endpoints; changing the view never reruns the solver. Configured limits are `candidate-unmeasured`, not capacity guarantees.
 - **Validation:** see the [independent transient Studio acceptance](studio_transient_thermal_independent_validation.md). For a specific commit, see its CI run.
 
@@ -28,8 +28,11 @@ Initial data are scalar or affine; side Dirichlet values are constant or sampled
 at those times, otherwise insulated. Initial/BC agreement is checked without
 projection. Finite negative K is retained without clamp or DMP/positivity promise.
 There is no new solver, interpolation, downsampling, transient flux/Robin,
-arbitrary geometry/material expansion, restart, coupling, cancel/delete/save or
+arbitrary geometry/material expansion beyond the region documents below, restart,
+coupling, cancel/delete/save or
 NPZ endpoint. A view change never reruns the solver or modifies its document.
+Transient documents with material regions take a separate path on the same
+routes, described in [Region documents](#region-documents).
 
 ## User workflow
 
@@ -134,6 +137,44 @@ Transient reads may encode captured immutable rows on demand, with no producer
 getter reread or re-solve and no encoded-frame cache. Existing steady immutable
 encoded-response behavior is unchanged.
 
+## Region documents
+
+A `thermal.transient2d` document whose `geometry` has `shapes` or `background`
+takes Studio's region path on `/api/thermal/transient/validate` and
+`/api/thermal/transient/run`; every other document follows the rectangle path,
+unchanged. The geometry limits, the summary floor, the worker-thread validation
+and the job-time node and cell caps are those of steady region documents
+([steady Studio, Region documents](thermal_studio.md#region-documents)). The
+requested-time checks are the rectangle ones, with the same codes and messages.
+
+| Item | Region manifest |
+| --- | --- |
+| Result and layout IDs | `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1` |
+| Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, the same 16 top-level fields |
+| `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids` and `triangle_regions` (one region index per triangle) |
+| Descriptors | The 13 rectangle descriptors plus `triangle_regions`: shape `[M]`, unit `1`, location `triangles`, axis `static`, no views, `ui_supported=false` |
+| Frames and history pages | The rectangle IDs `studio-thermal-transient-frame-v1` and `-history-v1`, stamped with the region pair stored on the job; `triangle_regions` is not a frame or history field (400 `invalid_query`) |
+| Capability | A nested `regions` key in the transient block, with the region pair, the three payload formats above and the five region `limits` |
+
+The raw history of a region job also holds the region indices (8 bytes per
+triangle) within the 16 MiB raw cap. Its node and cell caps therefore come from
+the number of requested times nt:
+
+```text
+n_cap = min(10201, floor((16 MiB/8 - 3 nt) / (10 nt + 8)))
+m_cap = min(20000, 2 n_cap)
+```
+
+With D <= N and M <= m_cap, the raw history is at most (10 nt + 8) n_cap + 3 nt
+scalars, so it fits before the solve. The node cap is 10201 for nt <= 19, 3236
+for nt = 64 and 1627 for nt = 128.
+A mesh over a node or cell cap that nt set ends as the job error
+`history_limit_exceeded`, whose message names that cap and the number of times;
+over a cap that nt did not set it is `mesh_limit_exceeded`. For example, at 20
+times nt sets the node cap (10082) but the cell cap stays the plain 20000. The bound assumes D = N and M = 2N, so it
+can refuse a mesh whose real history would fit: the shipped transient region
+example at mesh size 0.5 mm with 128 times has 1649 nodes against 1627.
+
 ## Concurrency, memory and recovery
 
 | Limit | Contract |
@@ -149,6 +190,10 @@ guarantees. Shared ingress can explicitly refuse concurrent steady requests;
 optical routes remain unchanged. Permits release on success, schema/stream errors,
 disconnect/cancellation and all exceptions; stale duplicate release cannot free
 a later owner. No hidden retry queue or artificial solver cancellation.
+A region document's validation runs in a worker thread, and its permit is
+released only when that thread returns, also after a disconnect or cancellation,
+so a cancelled region request can still refuse other thermal requests with 429
+until its validation ends.
 
 Readers pin immutable raw backing or encoded responses through send completion.
 Logical eviction does not release the charge while a slow client still references
