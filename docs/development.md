@@ -94,6 +94,7 @@ python tools/check_distributions.py        # build, inspect and install all pack
 python tools/run_installed_tests.py        # every Python test in tests/ against installed wheels
 python tools/check_licenses.py             # installed licenses vs. the reviewed inventory
 python tools/check_markdown_links.py       # relative links and #anchors in all Markdown files
+python tools/check_release_version.py      # one version across the seven distributions
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -131,7 +132,9 @@ The single required check is **`tests`**. It passes only when all four parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
-**Linux job.** After the license check, a Markdown link check runs: every relative link and
+**Linux job.** After the license check, `tools/check_release_version.py` checks that
+the seven distributions share one version (see [Publishing](#publishing)), then a
+Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
 are not fetched). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
@@ -277,6 +280,15 @@ package:
 python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
+
+All seven distributions release together under one version. A version change
+sets it in every `packages/<name>/pyproject.toml` and in each import package's
+`__version__`, keeps the requirements between our own distributions inside that
+minor series (`>=0.1.0,<0.2` for 0.1.x) and renames the
+[changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
+`python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
+release; without `--tag`, as required CI runs it, it accepts an `[Unreleased]`
+section. The changelog also says what 0.x keeps stable.
 
 The README is also the PyPI description, but its links are relative to the
 package directory and would break there. Each package's `setup.py` therefore

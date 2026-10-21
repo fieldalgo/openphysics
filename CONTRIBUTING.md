@@ -88,7 +88,10 @@ record or the behavior on `main` before reporting it missing.
 
 ## Releases
 
-Land the version change through the same PR process, wait for the required
+All seven distributions share one version. The version change sets it in every
+package, keeps the requirements between them inside that minor series and dates
+the [changelog](CHANGELOG.md)'s `[Unreleased]` section; `tools/check_release_version.py`
+checks it. Land the version change through the same PR process, wait for the required
 checks on the resulting `main` commit, then tag it `vX.Y.Z` and publish release
 notes and verified artifacts. Build release artifacts with `OPENPHYSICS_DOCS_REF` set
 to that tag so the PyPI description links to the released files (see the
