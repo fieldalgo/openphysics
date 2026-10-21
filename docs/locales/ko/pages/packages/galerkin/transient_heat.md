@@ -6,40 +6,13 @@
 
 - **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점이며 나머지 경계는 단열입니다.
 - **한계:** 처방 열유속·Robin 경계, restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
-- **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. 아래 과거 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+- **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
-## 현재 checkout과 근거
+## 근거
 
-이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
-
-**과거 최초 제출(d21): source와 정적 검토만 완료한 상태였습니다.** 당시 Python
-parse/import/compile과 collection은 미실행이었습니다. 그 역사적 상태를 보존하며
-이전 수치 통과를 추론하지 않습니다.
-
-**2026-10-16 제한 후속 검증:** exact code snapshot
-d21e083d9723eec71ab5e32777ecd331d75cd981과
-b2f420f4d540503ad3711bdab996e12dcbce9e9d에서 각각 새 Python 5파일 compile과
-engine/reference 하위 모듈 import가 성공했습니다. 대상 collect-only는 snapshot마다
-동일한 node ID 70개(producer 58개, reference 12개)를 수집했습니다.
-**Collected는 passed가 아니며 시험 본문은 하나도 실행하지 않았습니다.**
-Git blob을 확인한 새 38파일 source 부분 복원본과 새 venv에서 기존 runtime 패키지인
-Python3.12.14, pytest9.1.1, NumPy2.5.4, SciPy1.18.1을 사용했습니다.
-Import 출처는 해당 exact source snapshot이며 설치 wheel 증명이 아닙니다.
-기존 checkout·venv·역사적 실행 기록을 복구한 것이 아닙니다.
-
-**2026-10-16 실제 소형 본문 후속 검증:** exact
-b2f420f4d540503ad3711bdab996e12dcbce9e9d의 대상 두 파일을 한 번 실행해
-**70 passed(producer 58 + reference 12), exit0, 실패/error/skip0**를 확인했습니다.
-이전 70 collected와 구분합니다. 원래 stdout·stderr·JUnit 바이트, 해시, 자원 사전값과
-모듈 출처를 보존했습니다. 동일한 Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1
-source 환경에서 BLAS/OMP/MKL1을 사용했으며 시험 수나 허용치를 줄이지 않았습니다.
-솔버 수정이나 시험 재실행은 필요하지 않았습니다. d21 snapshot의 시험 본문을 별도로
-실행한 것은 아닙니다.
-
-그 과거 체크포인트에서는 고정 시간/PDE 공간/5% 분리 gate, 완전한 source 회귀,
-설치 sdist/wheel 증명, 독립 수용과 플랫폼 시험이 미실행이었습니다. 소형 대조 70개는
-완전한 물리 수용이 아닙니다. 현재 checkout은 정확한 현재 CI 근거로 평가해야 하며,
-아래 명령은 재현 절차이지 새 통과 결과가 아닙니다.
+이 페이지는 API 계약을 정의합니다. 특정 커밋의 결과는 그 커밋의 CI
+종료값·로그·artifact입니다. 고정 기준과 재현 명령은
+[검증 가이드](transient_heat_validation.md)에 있습니다.
 
 ## 명시적 하위 모듈과 최소 사용법
 
@@ -228,9 +201,7 @@ old/new 경계 질량항을 모두 유지합니다. 반올림된 조립 K에서�
 여전히 오류입니다. 추가 분해 없이 단계당 삼각 풀이 최대 5회와 추가 행렬-벡터
 평가가 필요하며 수렴이나 성능을 보장하지 않습니다.
 
-새 제작자 시험 `test_transient_heat_tiny_domain.py`와
+제작자 시험 `test_transient_heat_tiny_domain.py`와
 `test_transient_heat_general_state.py`는 작은 균일장·ramp 및 비균일장, 이동 경계,
 전체 고정, 분리·재정렬 상태를 독립 dense consistent-mass 재구성과 함께 다룹니다.
-파일 추가는 실행이 아닙니다. 선택한 소스의 좁은 네 사례 진단은 성공 반환했지만
-전체 source·설치·공개 headless·플랫폼 수용은 아닙니다. 원래 실패 근거와 모든 고정
-수치 기준을 계속 보존합니다.
+검증 가이드의 모든 고정 수치 기준이 그대로 적용됩니다.
