@@ -77,17 +77,32 @@ def observable(name, unit, metric, value, gate=None):
 
 
 def make_record(*, case, physics, api, discretization, tool, tool_discretization,
-                matched, not_matched, observables, analytical_acceptance, stopwatch):
-    info = TOOLS[tool]
+                matched, not_matched, observables, analytical_acceptance, stopwatch, stored=None):
+    if stored is None:
+        info = TOOLS[tool]
+        reference = {"tool": tool, "version": metadata.version(tool), "license": info["license"],
+                     "source": info["source"], "use": info["use"],
+                     "discretization": tool_discretization}
+    else:
+        # No tool import or installed-version lookup for a stored comparison.
+        matches = [ref for ref in stored.record["references"] if ref["tool"] == tool]
+        if len(matches) != 1:
+            raise ValueError("stored record must identify the requested tool exactly once")
+        ref = matches[0]
+        if case != stored.record["case"] or physics != stored.record["physics"]:
+            raise ValueError("stored case/physics differ from the comparison")
+        if tool_discretization != ref["discretization"]:
+            raise ValueError("stored reference discretization differs")
+        reference = {"tool": tool, "version": ref["version"], "license": ref["license"],
+                     "source": ref["source"], "use": "stored values; reference tool not run",
+                     "discretization": ref["discretization"]}
     record = {
         "schema": SCHEMA,
         "case": case,
         "physics": physics,
         "openphysics": {"distribution": "galerkin", "version": metadata.version("galerkin"),
                         "api": api, "discretization": discretization},
-        "reference": {"tool": tool, "version": metadata.version(tool), "license": info["license"],
-                      "source": info["source"], "use": info["use"],
-                      "discretization": tool_discretization},
+        "reference": reference,
         "matched": list(matched),
         "not_matched": list(not_matched),
         "observables": list(observables),
@@ -99,6 +114,22 @@ def make_record(*, case, physics, api, discretization, tool, tool_discretization
                         "numpy": np.__version__, "scipy": metadata.version("scipy")},
         "role": "code-to-code comparison; not convergence evidence",
     }
+    if stored is not None:
+        if "reference" in stopwatch.seconds:
+            raise ValueError("stored comparison must not claim reference execution time")
+        record["wall_time_s"]["reference"] = None
+        record["not_measured"] = ["reference tool not run; historical cost in stored_reference"]
+        record["stored_reference"] = {
+            "schema": stored.record["schema"], "case": stored.record["case"],
+            "values_sha256": stored.record["values_sha256"],
+            "content_sha256": stored.record["content_sha256"],
+            "generated_utc": stored.record["generated_utc"], "cost": stored.record["cost"],
+            "provenance_status": stored.record["provenance_status"],
+            "reference": ref,
+        }
+        if stored.record["comparison"] == "different-discretization":
+            if any(item["gate"] is not None for item in record["observables"]):
+                raise ValueError("different-discretization stored comparisons are report-only")
     validate_record(record)
     return record
 

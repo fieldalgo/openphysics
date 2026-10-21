@@ -11,5 +11,6 @@
 # Tests live outside the packages, one folder per import package (tests/<name>/),
 # so nothing a test uses can enter a distribution. tools/tests/ tests the
 # repository tools and runs from the source tree only.
+pythonpath = ["tests/_support"]
 testpaths = ["tests", "tools/tests"]
 markers = ["slow: convergence studies that take more than a few seconds"]

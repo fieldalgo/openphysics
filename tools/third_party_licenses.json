@@ -39,6 +39,27 @@
     ]
   },
   "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase"],
+  "external_tools": {
+    "ngsolve": {
+      "spdx": "LGPL-2.1-only",
+      "url": "https://github.com/NGSolve/ngsolve/blob/master/LICENSE",
+      "reference": {
+        "mode": ["stored"],
+        "execution": "separate-process",
+        "modules": ["ngsolve", "netgen"],
+        "imported_by": [],
+        "values": [],
+        "generators": "lab",
+        "light": {
+          "verdict": false,
+          "reason": "Material cavity order-4 cases take 25-63 s and peak at 1.8 GB; no stored record has been added yet.",
+          "date": "2026-10-19", "runner": "separate reference environment",
+          "python": null, "os": "linux", "install_s": null,
+          "cases_s": 63, "peak_rss_mb": 1800, "pins_unchanged": null, "pip_check": null
+        }
+      }
+    }
+  },
   "distributions": {
     "annotated-doc": {"spdx": "MIT", "url": "https://github.com/fastapi/annotated-doc"},
     "annotated-types": {"spdx": "MIT", "url": "https://github.com/annotated-types/annotated-types"},
