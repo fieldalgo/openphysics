@@ -12,6 +12,14 @@ The project is under active development. Each feature has an explicit contract
 and validation scope; the name does not imply a general-purpose coupled
 multiphysics solver.
 
+## Start here: analyse your own waveguide
+
+The [waveguide tutorial](packages/simcase/waveguide_tutorial.md)
+([한국어](locales/ko/pages/packages/simcase/waveguide_tutorial.md)) takes a
+silicon strip from the supplied example to your own strip, rib or polygon
+cross-section: effective index, mode fields and group index, with the window,
+mesh and slab-mode checks that tell you whether to trust them.
+
 ## What you can solve
 
 | Area | Implemented scope | Guide |
