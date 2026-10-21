@@ -27,6 +27,11 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 구현 패키지 여섯 개와 `openphysics` 메타 배포판의 첫 PyPI 릴리스이며, 0.1.0으로
 계획돼 있습니다.
 
+### Added
+
+- 같은 메시의 명시적 정상 전기→열 연성과 메시 사본에 결합한 요소별 열원 입력을
+  추가했습니다. 해석해 수렴·에너지 수지·독립 도구 비교로 검증했습니다.
+
 ### Changed
 
 - `openphysics`는 메타 배포판입니다. 코드가 없고 여섯 구현 패키지를 의존성으로 요구합니다.

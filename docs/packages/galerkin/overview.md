@@ -23,6 +23,7 @@ references and fixed thresholds.
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](material_cavity.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_steady2d.md), [validation](thermal_independent_validation.md) | [thermal_steady2d.py](../../../examples/galerkin/thermal_steady2d.py) |
+| Same-mesh steady electric to heat (one-way) | `galerkin.joule_heating.solve_steady_joule_heat` | [API, units and validation](joule_heating.md) | [joule_heating.py](../../../examples/galerkin/joule_heating.py) |
 | Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_flux_robin.md), [validation](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../examples/galerkin/thermal_flux_robin.py) |
 | Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](transient_heat.md), [validation](transient_heat_validation.md), [independent validation](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../examples/galerkin/transient_heat_convergence.py) |
 | Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](elasticity2d.md), [validation](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../examples/galerkin/elasticity2d.py) |
@@ -157,5 +158,3 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
-
-[Steady Joule heating: explicit same-mesh electric to heat workflow](joule_heating.md).

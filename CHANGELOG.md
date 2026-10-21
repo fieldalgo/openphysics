@@ -24,11 +24,13 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- Add explicit same-mesh steady electric-to-heat coupling and mesh-bound
-  element heat sources, with analytical and independent reference validation.
-
 The first release of the six implementation packages and the `openphysics` meta
 distribution on PyPI, planned as 0.1.0.
+
+### Added
+
+- Add explicit same-mesh steady electric-to-heat coupling and mesh-bound
+  element heat sources, with analytical and independent reference validation.
 
 ### Changed
 
