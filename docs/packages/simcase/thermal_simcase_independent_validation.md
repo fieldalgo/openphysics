@@ -4,96 +4,20 @@
 
 - **What it checks:** independent acceptance of the headless `thermal.steady2d` document path (document, run, saved arrays) on a translated rectangle with a closed-form quadratic-source solution. The oracle reconstructs stiffness, load, flux and residuals from the saved raw arrays; metadata never generates the expected answer.
 - **Fixed gates:** on n=8/16/32/64, the last two intervals need temperature L2 order ≥ 1.8 and vector-flux order ≥ 0.9; independent 6×6 and 8×8 interior integration are compared; array, stiffness, load, reaction and heat criteria are ≤ 1e-10, and m/mm/µm equivalence ≤ 1e-9.
-- **Scope:** the current-status note directly below supersedes present-tense statements in the historical sections, which stay as evidence for their exact candidates. For a specific commit, see its CI run.
+- **Scope:** headless heat documents only; thermal plotting, Studio heat UI and heat-to-mechanical coupling are outside it. For a specific commit, see its CI run.
 
-## Current final Linux status — 2026-10-16
+## Evidence
 
-This current note supersedes present-tense status statements in the historical
-6080/4ec sections below. Those sections, equations, thresholds and failures are
-preserved as evidence for their exact candidates, not as the current result.
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result.
 
-The independent submission is commit
-**9b43ae368e89e7e840541d21201e56a311a465b3**, based on explicit producer
-**929ac8eb90d5598724ad066e7f8b8fc579ea8cd8** through a normal merge.
-This addendum changes documentation only. Against that producer, the submitted
-independent work added eight dedicated files and preserved all 232 producer
-blobs. This is the independent validator's evidence, not a producer test summary.
-
-In the reconstructed Linux cloud environment, the final dedicated source
-suite passed **139 tests**, and the actual sdist-to-wheel installed suite passed
-**139 tests** using `python -I`, copied tests outside the checkout and an external
-confcutdir. Each had zero failures/skips and one existing Starlette deprecation
-warning. The executable and six module origins (simcase, simcase.thermal,
-galerkin, galerkin.thermal, meshine, physmat) were checked inside the installed
-venv. Installed serializer and shipped HTML bytes were compared to exact Git
-blobs. The independent delayed-response Node suite passed **8 source + 8
-installed** checks, zero failures/skips. It executes the actual shipped script
-in a VM/DOM harness; it is not live-browser acceptance.
-
-The exact929 Linux reruns resolved the original five intentional corrupted-result
-save counterexamples and the later constructor/required-artifact checks.
-All nine raw arrays, both field flags, original K/f/reaction/heat balances,
-fixed convergence and SI gates, CLI exits, existing/replaced/foreign output
-protection and bounded two-writer checks remained enforced. An additional actual
-installed CLI run with save_fields=false exited zero, emitted model/summary/log
-without NPZ and agreed with the analytic 60 W/m balance. No tolerance relaxation
-or skip/xfail converted the old failures into passes.
-
-Seven sdists were built into seven wheels. Existing seven sdist asset gates and
-wheel runtime/static byte comparisons passed (before 2026-10-20 sdists also
-carried tests, docs and examples). The integrated
-`ci/check_distributions.py` command failed because **twine was unavailable**;
-full strict distribution validation is not claimed. No new dependency was
-installed. After environment recovery, the whole-root numerical suite was not
-repeated; these dedicated results do not certify a new complete combined build.
-
-The original scratch became unavailable despite the same hostname. Old
-unuploaded raw logs, venvs and uncommitted work were **not recovered**.
-Consequently “All original failure logs remain retained” below describes an
-observation at the historical run time, not current raw-log availability.
-Committed source, recorded counts and failure traces survived remotely.
-The exact929 source was reconstructed from verified remote blobs, and the
-results above are new executions with new logs. Compact evidence records
-commands, environment, hashes, counts and this loss limitation; neither that
-record nor a rerun is the missing original raw log. The historical initial
-cancelled CI and all old failures remain historical, not retroactive successes.
-
-Follow-up producer **94bd34b5711521d805bdce4bee17852895041344** changes only
-the producer fault-injection test and its English/Korean guide relative to929;
-production `simcase/thermal.py` is byte-identical, blob
-**7823d39f451cad1c6b53d2f8dde7899fd854321c**. The independent Linux review
-ran its stricter five fault cases in source and actual installed environments:
-**5 + 5 passed**. Selected original independent storage/CLI cases separately
-passed **34 + 34**, with 105 deselected per run, not a repeated139-case run.
-The new assertions require the intended injected error and completed replacement
-stage; a fixture rename/replace OSError must not count as cleanup acceptance.
-
-**Windows is unverified.** Two previously reported Windows failures have no
-established cause in this review: actual errno/winerror/stage evidence is needed.
-Linux execution and static inspection do not prove Windows support or a fix.
-GitHub Actions is enabled as of 2026-10-16. Windows acceptance still requires
-fresh runner evidence; the earlier failures remain part of this report.
-
-A separate deterministic Linux interleaving diagnostic found a remaining
-pathname TOCTOU limit: replacing model.json after cleanup's ownership check
-but before its unlink deleted the foreign replacement in both source and
-installed runs. This schedules a second writer at the check/use gap; it does
-not diagnose the two Windows failures. Inode pinning and checks protect the
-tested already-replaced cases but do not make pathname operations atomic.
-No production fix is claimed. The supported fresh-output contract requires a
-caller-controlled exclusive output: do not allow another writer to modify it
-until save and any cleanup have completed. Preservation of replacements already
-observed before a check is distinct from preservation during a check/use race;
-the latter is not guaranteed. The bounded simultaneous-save test establishes
-exclusive fresh-target acquisition, not general concurrent-writer protection. Hostile races, crash recovery, thermal Studio UI
-and heat-to-mechanical coupling remain outside this acceptance claim.
-
-## Historical evidence begins below
+## What the suite checks
 
 This dedicated suite checks the actual public Document/run/ThermalRunResult API,
 original weak algebra, saved numeric arrays, installed CLI and output ownership.
 It does not use a producer summary or existing thermal reference helper as its
-numerical answer. No production code or existing test/configuration is changed.
+numerical answer.
 
 ## Fixed independent equations and criteria
 
@@ -137,10 +61,16 @@ Gates were fixed before receiving the product candidate:
 - Expected refusal tests are normal assertions, not skip/xfail. Save failures
   must preserve unrelated content and cannot publish a completed invalid result.
 
-The stage1 mathematical preparation used analytic nodal P1 samples and synthetic
-storage, not a product solve. This product suite independently obtains actual
-runner fields and installed artifacts; synthetic interpolation evidence is not
-substituted for actual execution.
+Analytic nodal P1 samples and synthetic storage are mathematical preparation,
+not a product solve. This suite independently obtains actual runner fields and
+installed artifacts; synthetic interpolation evidence is not substituted for
+actual execution.
+
+## Measured values
+
+Measured reference values, not gates: on n8/16/32/64 the normalized errors are
+approximately T=[2.93423e-4,7.33557e-5,1.83389e-5,4.58473e-6] and
+flux=[7.42307e-3,3.71154e-3,1.85577e-3,9.27884e-4], giving orders 2/1.
 
 ## Dedicated files and execution
 
@@ -170,100 +100,62 @@ simcase/studio/static/index.html. The harness is not a live-browser integration
 claim. Server capability checks use actual FastAPI endpoints and ensure no
 optical worker, mesh builder or new job is created.
 
-## Initial candidate evidence and open failures
+## Covered controls
 
-Initial producer candidate: **6080eb86bbd70b668e9952c99ec21802af6ed5cd**,
-parent0a44797f73cf67bab14429c982144f0e0e4338aa. This candidate is **not accepted**.
-No later moving branch head inherits this status without blob comparison and
-relevant re-execution.
+Numerical controls cover actual slab/mixed positive and negative Q, original
+matrix/load/residual/reactions, signed side heat/global 60 W/m, unit invariance,
+raw NPZ/metadata, equal/conflicting corners and source convergence. All nine raw
+arrays are checked under both field flags, together with CCW/index/unique
+IDs/value-shape/bool/integer controls. With save_fields=false the CLI emits
+model/summary/log without NPZ.
 
-The first related run passed84 tests and failed1 because an independent test
-mistook the metadata Dirichlet tag-temperature map for a raw array with the same
-key. The assertion was corrected to validate that permitted finite tag map;
-physical tolerances were unchanged. An expanded run passed90 and failed6:
-five actual save-state refusals plus an isolated-environment missing existing
-Shapely import. The existing dependency path was made explicit in the own venv,
-without installing anything. Re-execution passed91 and failed the same five
-save-state cases. Initial copied installed-wheel tests independently reproduced
-91pass/5fail. All original failure logs remain retained.
+Intentional mutable-result corruption must be refused: run a valid document,
+then set one public solution heat_flux/load/reaction/residual entry to NaN, or
+replace cell heat_flux with shape (M,) instead of (M,2), then call save(fresh).
+The expected result is ValueError with no completed summary. This is
+serialization validation, not evidence that the normal heat solve produces NaN.
+Cached finite diagnostics and object-dtype rejection alone do not establish
+finite correctly shaped numeric output.
 
-Numerical checks pass for actual slab/mixed positive and negative Q, original
-matrix/load/residual/reactions, signed side heat/global60W/m, unit invariance,
-raw NPZ/metadata, equal/conflicting corners and source convergence. Actual
-n8/16/32/64 normalized errors are approximately
-T=[2.93423e-4,7.33557e-5,1.83389e-5,4.58473e-6] and
-flux=[7.42307e-3,3.71154e-3,1.85577e-3,9.27884e-4], giving orders2/1.
+The delayed-response Node tests require that, after a thermal JSON apply, a late
+old EM result does not repopulate resultData, a late mesh does not repopulate
+meshData, and a late successful validation does not replace the raw thermal
+document with old EM. Server-side headless refusal does not by itself establish
+client revision safety.
 
-Five refusal failures have a precise **intentional mutable-result corruption**
-precondition: run a valid document, then set one public solution heat_flux/load/
-reaction/residual entry toNaN, or replace cell heat_flux with shape(M,) instead
-of(M,2), then call save(fresh). Expected ValueError/no completed summary; actual
-6080 saves invalid raw arrays with a complete summary and removes .incomplete.
-This is serialization validation, not evidence that the normal heat solve
-produced NaN. Cached finite diagnostics and object-dtype rejection alone do
-not establish finite correctly shaped numeric output.
-
-All three actual-script delayed-response tests fail on6080: after a thermal JSON
-apply, a late old EM result repopulates resultData, a late mesh repopulates
-meshData, and a late successful validation replaces the raw thermal document
-with old EM. Server-side headless refusal passes; it does not establish client
-revision safety. The initial candidate explicitly has incomplete frontend guards;
-these are concrete reproduced acceptance failures in that disclosed area.
-
-Actual save protection passes existing file/empty/nonempty directory/dangling
-symlink refusal, both field flags, post-NPZ/pre-summary failure cleanup,
+Save protection covers existing file/empty/nonempty directory/dangling symlink
+refusal, both field flags, post-NPZ/pre-summary failure cleanup,
 unexpected-file+incomplete preservation, replaced-target preservation and a
-bounded two-writer exclusive-ownership test. These do not certify a portable
-atomic transaction, hostile filesystem races or crash recovery. Later candidate
-changes to save/guards/validation require relevant independent reruns.
+bounded two-writer exclusive-ownership test. Storage checks also require:
 
-Whole-source, additional boundary/CLI controls and final artifact inspection are
-reported separately once complete. No unfinished stage or failed initial
-candidate is labelled green. This suite covers headless heat documents, not
-thermal plotting, Studio heat UI or heat-to-mechanical coupling.
+1. If os.open on the freshly created directory raises OSError during ownership
+   construction, the empty exclusively owned target is cleaned up.
+2. If model.json is removed after the summary is written but before finish, save
+   refuses because a required owned artifact is missing.
+3. The same refusal applies to fields.npz when save_fields=true.
 
-## Explicit Linux reacceptance candidate 4ec9da9
+Fault-injection assertions require the intended injected error and the completed
+replacement stage; a fixture rename/replace OSError must not count as cleanup
+acceptance. No skip/xfail/tolerance relaxation hides these checks. Changes to
+save, guards or validation require relevant independent source and installed
+reruns.
 
-Candidate4ec9da9fcba661958a12f37bc445a543cb4ffc1c is a direct child of6080.
-It is normally merged into the independent branch, preserving the original
-failed candidate and dedicated tests. Read-only production delta contains the
-thermal serializer, inline Studio script, public thermal document and producer
-tests. The independent suite reads the new document's nine-array metadata
-vocabulary; physical shape, finiteness and numerical thresholds are unchanged.
+## Limits
 
-The original106 Python cases now pass on Linux, including all five original
-save-state counterexamples. All three identical actual-script stale-response
-cases pass. Thus the original failures are fixed **for this exact Linux
-candidate**, without retroactively passing6080. An expanded134-case suite adds
-all-nine metadata verification, nine nonfinite arrays under both field flags,
-CCW/index/unique IDs/value-shape/bool/integer controls and preservation of a
-replaced previously owned file. It reports131pass/3fail: the remaining failures
-are in the candidate's disclosed pending storage work, not numerical convergence.
+**Windows is unverified.** Windows acceptance requires fresh runner evidence;
+diagnosing a Windows failure needs actual errno/winerror/stage evidence. Linux
+execution and static inspection do not prove Windows support or a fix.
 
-The three concrete remaining checks are:
-
-1. Inject OSError from os.open on the freshly created directory during ownership
-   construction. Expected cleanup of the empty exclusively owned target; actual
-   empty directory remains without an incomplete marker.
-2. Remove model.json after summary is written but before finish. Expected
-   refusal because a required owned artifact is missing; actual save succeeds
-   and removes the marker.
-3. Do the same for fields.npz when save_fields=true. Actual save also succeeds
-   despite the absent mandatory raw archive.
-
-No skip/xfail/tolerance relaxation hides these checks. The current directory-fd
-and dup pinning design is POSIX-specific; Linux results do not establish Windows
-support. Portable handles, constructor-failure cleanup and required-owned-file
-checks are separately pending producer changes. Their later exact blobs require
-new source/installed storage and metadata/CLI tests. The suite does not select a
-moving branch head or assume later candidates pass because4ec improved.
-
-For the original6080 evidence, the first full-root run collected the then-current
-96 independent cases before the final10 controls were added:875pass/5fail/
-16optional skips plus9subtests. All106 were separately run in source and actual
-installed venvs:101pass/5fail. Whole-test collection is not misreported as
-including those later10. Existing Studio vector tests8pass are distinct from
-the independent stale-response tests3fail on6080. Initial independent-branch CI
-38742590017 was cancelled by normal branch-merge workflow concurrency, not
-reported as a green run. All earlier test/environment errors remain described
-above. The original raw/module/ownership evidence applies only to6080.
+A deterministic Linux interleaving diagnostic shows a remaining pathname TOCTOU
+limit: replacing model.json after cleanup's ownership check but before its
+unlink deletes the foreign replacement. Inode pinning and checks protect the
+tested already-replaced cases but do not make pathname operations atomic. The
+supported fresh-output contract requires a caller-controlled exclusive output:
+do not allow another writer to modify it until save and any cleanup have
+completed. Preservation of replacements already observed before a check is
+distinct from preservation during a check/use race; the latter is not
+guaranteed. The bounded simultaneous-save test establishes exclusive
+fresh-target acquisition, not general concurrent-writer protection. Save
+protection does not certify a portable atomic transaction. Hostile filesystem
+races, crash recovery, thermal Studio UI and heat-to-mechanical coupling are
+outside this acceptance claim.
