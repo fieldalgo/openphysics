@@ -30,9 +30,10 @@
   "physics": {
     "em1": {
       "type": "em.modes2d",
-      "formulation": "scalar",
+      "formulation": "vector",
       "wavelength": 1.55,
       "num_modes": 2,
+      "n_cladding": 1.45,
       "boundary": {
         "left": "pec",
         "right": "pec",
