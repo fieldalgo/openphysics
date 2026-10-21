@@ -6,7 +6,8 @@ OpenPhysics is a Python simulation toolkit for electromagnetic fields, heat
 conduction and solid mechanics. It brings finite-element solvers, meshing,
 material models and independent reference solutions into one repository.
 Use the Python APIs directly, run supported models from JSON, or explore 2D
-optical models and rectangular heat documents in the local browser Studio.
+optical models and heat documents, rectangular or with material regions, in the
+local browser Studio.
 
 The project is under active development. Each feature has an explicit contract
 and validation scope; the name does not imply a general-purpose coupled
@@ -46,7 +47,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | Steady electric conduction | Yes | Homogeneous rectangle | No |
 | Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
-| Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | No |
+| Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
 | Elasticity, thermal expansion, heat→mechanics | Yes | No | No |
 | Steady Joule heating | Yes | Homogeneous rectangle, constant or σ(T) | No |
 
@@ -72,8 +73,8 @@ time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#
 - `em.modes2d` supports passive absorption and [PML/leaky/constant-radius modes](packages/simcase/pml_modes.md);
   candidates require independent PML/mesh convergence checks. Variable curvature, nonlinear
   mechanics and geometry sweeps are not supported.
-- Studio rejects 3D models and heat documents with material regions, and has
-  no mechanics forms.
+- Studio rejects 3D models, takes heat documents with material regions only
+  within its region limits, and has no mechanics forms.
 - The VTU export rejects rectangular steady documents with flux or convection
   sides (`boundary-v2`), lossy cavities and waveguide modes. Steady region
   documents include their flux/Robin load arrays.
@@ -128,7 +129,7 @@ python -m simcase validate examples/simcase/slab_te_check.json
 python -m simcase run examples/simcase/slab_te_check.json -o slab_results
 ```
 
-Explore 2D optical models and rectangular heat documents in Studio:
+Explore 2D optical models and heat documents in Studio:
 
 ```bash
 python -m simcase.studio --no-browser

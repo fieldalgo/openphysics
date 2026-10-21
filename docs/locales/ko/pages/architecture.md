@@ -77,8 +77,8 @@ flowchart TB
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](packages/simcase/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
   생략한 기존 문서는 v1을 유지합니다.
-- **Studio:** 2D 광학 모델과 직사각형 문서용 전용 정상·과도 열전도 화면을 제공하는
-  로컬 브라우저 도구입니다. Generic 광학 route는 열/3D guard를 유지합니다. 구조 폼,
+- **Studio:** 2D 광학 모델과, 직사각형 문서 및 (Studio 영역 한도 안의) 재료 영역 문서용
+  전용 정상·과도 열전도 화면을 제공하는 로컬 브라우저 도구입니다. Generic 광학 route는 열/3D guard를 유지합니다. 구조 폼,
   3D 모델과 범용 열전도 폼 editor는 범위 밖입니다.
   [정상](packages/simcase/thermal_studio.md)·[과도](packages/simcase/thermal_transient_studio.md)
   Studio 가이드를 참고하세요.

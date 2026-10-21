@@ -5,7 +5,7 @@
 OpenPhysics는 전자기장, 열전도와 고체역학을 위한 Python 시뮬레이션 도구 모음입니다.
 유한요소 해석기, 메시 생성, 재료 모델과 독립 해석해를 한 저장소에서 제공합니다.
 Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행하거나,
-로컬 브라우저 Studio에서 2D 광학 모델과 직사각형 열전도 문서를 살펴볼 수 있습니다.
+로컬 브라우저 Studio에서 2D 광학 모델과 직사각형이거나 재료 영역이 있는 열전도 문서를 살펴볼 수 있습니다.
 
 현재 개발 중인 프로젝트입니다. 기능마다 입력·출력 계약과 검증 범위를 명시하며,
 이름이 범용 다중물리 완전 연성 해석기의 지원을 뜻하지는 않습니다.
@@ -43,7 +43,7 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 정상 전기전도 | 지원 | 균질 직사각형 | 미지원 |
 | 정상 열전도 | 지원 | 직사각형 `thermal.steady2d` | 전용 화면 |
 | 과도 열전도 | 지원 | 직사각형 `thermal.transient2d` | 전용 화면 |
-| 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 미지원 |
+| 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 영역 한도 안에서 전용 화면 |
 | 탄성·열팽창·열전도→기계 | 지원 | 미지원 | 미지원 |
 | 정상 Joule heating | 지원 | 균질 직사각형·상수/σ(T) | 미지원 |
 
@@ -67,7 +67,7 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
 - `em.modes2d`는 수동 흡수와 [PML·누설·일정 반경 모드](packages/simcase/pml_modes.md)를
   지원합니다. 후보는 별도 PML/메시 수렴 확인이 필요합니다. 가변 곡률·비선형 역학·형상 sweep은
   지원하지 않습니다.
-- Studio는 3D 모델과 재료 영역이 있는 열전도 문서를 거절하며 기계해석 폼이 없습니다.
+- Studio는 3D 모델을 거절하고, 재료 영역이 있는 열전도 문서는 영역 한도 안에서만 받으며, 기계해석 폼이 없습니다.
 - VTU 내보내기는 열유속·대류 변이 있는 직사각형 정상 문서(`boundary-v2`), 손실 공동,
   도파 모드를 거절합니다. 정상 영역 문서의 flux/Robin 하중 배열은 내보냅니다.
 
@@ -122,7 +122,7 @@ python -m simcase validate examples/simcase/slab_te_check.json
 python -m simcase run examples/simcase/slab_te_check.json -o slab_results
 ```
 
-Studio에서 2D 광학 모델과 직사각형 열전도 문서를 살펴볼 수 있습니다.
+Studio에서 2D 광학 모델과 열전도 문서를 살펴볼 수 있습니다.
 
 ```bash
 python -m simcase.studio --no-browser

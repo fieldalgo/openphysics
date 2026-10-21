@@ -4,8 +4,8 @@
 
 **한눈에 보기**
 
-- **하는 일:** 직사각형 `thermal.steady2d` 문서(균질 직사각형, P1, 상수 등방 k와 열원, 변 Dirichlet, 단열, 상수 외향 열유속·Robin)를 위한 JSON 우선 전용 Studio 화면입니다. 전용 route로 검증·실행하고 결과 메시, 절점 Kelvin, 요소 열유속을 보여 줍니다. 같은 route는 재료 영역이 있는 정상 열전도 문서도 Studio의 영역 한도 안에서 검증·실행합니다([영역 문서](#영역-문서) 참고).
-- **한계:** 과도 문서(별도 과도 Studio 안내 참고), 해석 전 메시 미리보기, 임의 형상, 연성, 결과 저장 endpoint가 없습니다. 설정한 자원 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다. Studio는 로컬 도구이며 다중 사용자 서비스가 아닙니다.
+- **하는 일:** 직사각형 `thermal.steady2d` 문서(균질 직사각형, P1, 상수 등방 k와 열원, 변 Dirichlet, 단열, 상수 외향 열유속·Robin)를 위한 JSON 우선 전용 Studio 화면입니다. 전용 route로 검증·실행하고 결과 메시, 절점 Kelvin, 요소 열유속을 보여 줍니다. 재료 영역이 있는 정상 열전도 문서도 Studio의 영역 한도 안에서 같은 방식으로 검증·실행·표시하며 영역 색, 경계, 범례, 영역 표를 보여 줍니다([영역 문서](#영역-문서) 참고).
+- **한계:** 과도 문서(별도 과도 Studio 안내 참고), 해석 전 메시 미리보기, 영역 문서를 넘는 임의 형상, 연성, 결과 저장 endpoint가 없습니다. 설정한 자원 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다. Studio는 로컬 도구이며 다중 사용자 서비스가 아닙니다.
 - **검증:** [정상 Studio 독립 검증](studio_thermal_independent_validation.md)을 참고하세요. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
 ## 제공 상태
@@ -203,6 +203,9 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 영역 쌍은 직사각형 client가 읽는 블록 바깥 `result_formats`에 넣지 않습니다.
 따라서 영역을 지원하지 않는 페이지는 중첩 블록을 무시하고, 영역 payload는
 job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
+페이지는 문서를 검증할 때 그 종류(직사각형 또는 영역)를 고정합니다. 서버가 유효한
+`regions` 블록을 알리지 않으면 요청을 보내기 전에 영역 문서를 거절하고, 그 블록의
+`run_enabled`가 true일 때만 실행하며, 다른 종류의 결과는 거절합니다.
 
 게시 전에 capture는 배열을 읽기 전에 쌍을 확인하고, 공개 속성을 한 번씩 읽고,
 복사 전에 shape와 절점·요소 한도를 검사한 뒤 영역을 검사합니다. 이름은 1~65개의
@@ -262,6 +265,18 @@ worker thread에서 돌므로 긴 형상 계산이 event loop를 막지 않습�
 세 번 계산합니다. 로컬 실행에서 수 세기는 `Document.from_dict`의 약 두 배가 걸렸습니다. 교차 한도에
 맞춘 덮인 교차에서 약 0.6 s 대 0.3 s였습니다.
 
+### 화면
+
+- **Mesh 탭:** 각 삼각형을 영역 색(Okabe-Ito 여덟 색을 영역 번호 순으로 반복)으로
+  메시 선 아래에 칠하고, 영역 경계는 굵은 선으로 그립니다. 범례는 모든 영역을
+  "이름 — 재료"로 나열하고, 메시 줄은 "N nodes, M cells, R regions"로 씁니다.
+- **Results 탭:** 온도·열유속 화면에도 영역 경계를 그립니다. 커서를 올리면 값 줄에
+  "; region 이름 (재료)"가 붙습니다.
+- **요약 패널:** 양(quantity) 행에서 영역·재료·열원 표를 뺍니다(영역 이름은 양이
+  아님). 전체 metadata는 **Full result metadata**에 그대로 있고, 그 뒤에 색·영역·재료·
+  k·Q·요소 수·면적·재료 `source` 문구를 담은 영역 표가 이어집니다.
+- 영역 이름과 재료 문구는 HTML이 아니라 텍스트로만 표시합니다.
+
 ### 알려진 한계
 
 - 너무 촘촘한 메시는 검증이 아니라 job에서, 메시 생성 뒤 해석 전에 실패합니다.
@@ -277,6 +292,10 @@ worker thread에서 돌므로 긴 형상 계산이 event loop를 막지 않습�
   들어가야 합니다. 확실한 초과는 검증에서 거절하고 나머지는 job 오류로 끝납니다.
 - meshine은 예각 별 모양 다각형이나 경계가 거의 겹치는 교차 다각형 같은 입력에서
   "cannot resolve"로 안전하게 실패할 수 있습니다(`solver_failed`).
+- 영역이 여덟 개를 넘으면 색이 반복됩니다. 범례·경계·표·커서 표시는 여전히 모든 영역의
+  이름을 밝힙니다.
+- 영역 지원 전에 캐시한 페이지는 job이 끝난 뒤 영역 결과를 거절합니다(`/static`에
+  `Cache-Control`이 없음). 페이지를 다시 읽으세요.
 - 일반 route가 열전도 문서를 거절하므로 영역 예제는 `/api/examples`에 나오지 않습니다.
 - 이 checkout보다 오래된 meshine(`MeshSizeLimitError` 없음)에서는 `run_enabled`가
   true인 채로 영역 실행이 `solver_failed`로 끝납니다.
@@ -315,7 +334,7 @@ Universal wheel이 OS 동작을 입증하지 않습니다.
 | --- | --- |
 | Server | 할당 전 strictJSON/limit; 공개API positive control; v1/v2/D0 metadata; 공개속성 한 번 복사·검사; 모든 terminal 경로 제한; 영역 지원 전 고정한 직사각형 byte·오류(`test_studio_rectangle_invariants.py`); 영역 한도·거절·worker thread·취소·capture 결함(`test_studio_region_http.py`) |
 | 물리 | 독립 선형/가산·열원/Robin 정답·SI변환·기존수렴·음성대조; wire를 거친 영역 문서(`test_studio_region_acceptance.py`) |
-| Frontend | dirty/revision/sequence/capability/render 결정적 truth-table; stale성공/오류/finally 무시 |
+| Frontend | dirty/revision/sequence/capability/render 결정적 truth-table; stale성공/오류/finally 무시; 중첩 영역 capability·문서 종류 고정·영역 payload 검사(`studio_steady_thermal.cjs`, `studio_transient_thermal.cjs`) |
 | 표시 | 절점/요소 구별 fixture·절점보간·flatflux/전역부호·상수/음수K |
 | 자원 | 용량해제·실패기록보존·byte/count/TTL 경계·별도 peak/직렬화실측 |
 | 배포/플랫폼 | 배포자산/import·source/설치소비자·정확필수CI·OS별결과 |

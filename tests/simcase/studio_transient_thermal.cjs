@@ -153,8 +153,16 @@ test('same revision old validation error/finally and reversed capability replies
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const staticRoot=path.join(__dirname,'../../packages/simcase/src/simcase/studio/static');
 const html=fs.readFileSync(path.join(staticRoot,'index.html'),'utf8');
+// Setting textContent or innerHTML replaces an element's children, as in a browser;
+// every innerHTML write is recorded.
+function contentSetters(el,writes){
+  let text='',markup='';
+  return Object.defineProperties(el,{
+    textContent:{get:()=>text,set(v){text=String(v);el.children=[];},enumerable:true,configurable:true},
+    innerHTML:{get:()=>markup,set(v){markup=String(v);el.children=[];writes.push(markup);},enumerable:true,configurable:true}});
+}
 function page(){
-  const elements=new Map(),requests=[];let activeTab='geometry';
+  const elements=new Map(),requests=[],htmlWrites=[];let activeTab='geometry';
   const names=['geometry','mesh','results','json'];
   const tabs=names.map(tab=>({dataset:{tab},classList:{toggle(){}},onclick:null}));
   const panels=names.map(name=>({id:'tab-'+name,classList:{toggle(cls,on){if(on)activeTab=name;}}}));
@@ -163,26 +171,27 @@ function page(){
       const calls=[],ctx=new Proxy({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
         clearRect:()=>calls.push('clear'),putImageData:()=>calls.push('pixels'),
         moveTo:()=>calls.push('path'),fillText:text=>calls.push(['text',text])},{get:(o,k)=>o[k]||(()=>{})});
-      elements.set(id,{width:320,height:240,calls,value:'',hidden:false,textContent:'',innerHTML:'',children:[],
+      elements.set(id,contentSetters({width:320,height:240,calls,value:'',hidden:false,children:[],
         appendChild(x){this.children.push(x);},getContext:()=>ctx,click(){return this.onclick?.();},
         getBoundingClientRect(){
           const tab=id==='meshCanvas'?'mesh':id==='geoCanvas'?'geometry':'results';
           const on=!id.endsWith('Canvas')||activeTab===tab;return {width:on?320:0,height:on?240:0,left:0,top:0};
-        }});
+        }},htmlWrites));
     }return elements.get(id);
   }
-  const child=()=>({textContent:'',children:[],appendChild(x){this.children.push(x);},click(){return this.onclick?.();}});
+  const child=tag=>contentSetters({tag,style:{},className:'',children:[],appendChild(x){this.children.push(x);},
+    setAttribute(){},click(){return this.onclick?.();}},htmlWrites);
   const context=vm.createContext({document:{getElementById:element,createElement:child,
     querySelectorAll:s=>s==='.view > div'?panels:s==='.tabs button'?tabs:[]},window:{devicePixelRatio:1,addEventListener(){}},
     console,URL,URLSearchParams,Blob,Uint8ClampedArray,setTimeout:cb=>cb(),
     fetch:(...args)=>{requests.push(args);return new Promise(()=>{});}});
   for(const script of ['thermal.js','transient_thermal.js'])vm.runInContext(fs.readFileSync(path.join(staticRoot,script),'utf8'),context);
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
-  return {element,requests,context,run:code=>vm.runInContext(code,context),tab:name=>tabs.find(b=>b.dataset.tab===name).onclick()};
+  return {element,requests,htmlWrites,context,run:code=>vm.runInContext(code,context),tab:name=>tabs.find(b=>b.dataset.tab===name).onclick()};
 }
-function installAPI(p,{rejectValidation=false,rejectRun=false,held=false}={}) {
+function installAPI(p,{rejectValidation=false,rejectRun=false,held=false,fixture=manifest(),capability=cap()}={}) {
   // All generated source is parsed by the same VM before invoking handlers.
-  p.run('globalThis.fixtureManifest='+JSON.stringify(manifest())+';globalThis.fixtureCap='+JSON.stringify(cap())+
+  p.run('globalThis.fixtureManifest='+JSON.stringify(fixture)+';globalThis.fixtureCap='+JSON.stringify(capability)+
     ';globalThis.apiCalls=[];globalThis.held=[];'+
     'globalThis.fetch=async(url,options)=>{apiCalls.push(url);'+
     'if(url==="/api/capabilities")return {ok:true,json:async()=>fixtureCap};'+
@@ -205,9 +214,9 @@ function installAPI(p,{rejectValidation=false,rejectRun=false,held=false}={}) {
     (held?'return new Promise((resolve,reject)=>held.push(error=>error?reject(Error(error)):resolve({ok:true,json:async()=>result})));':
       'return {ok:true,json:async()=>result};')+'};');
 }
-async function readyPage(options){
+async function readyPage(options={}){
   const p=page();installAPI(p,options);await p.run('transientController.loadCapability()');
-  p.element('json').value=JSON.stringify(doc());p.element('json').oninput();await p.element('applyJson').onclick();return p;
+  p.element('json').value=JSON.stringify(options.document||doc());p.element('json').oninput();await p.element('applyJson').onclick();return p;
 }
 test('shipped transient page runs default exact last frame, explicit H/V pages and actual tabs',async()=>{
   const p=await readyPage();assert.equal(p.element('runBtn').disabled,false);
@@ -349,4 +358,109 @@ for(const outcome of ['success','error'])test('shipped dirty status overrides ob
   assert.equal(p.element('fieldCanvas').onmousemove,null);
   assert.equal(p.element('transientControls').hidden,true);
   assert.equal(p.element('runBtn').disabled,true);
+});
+
+// ---- region documents (J7 and the transient parts of J1, J6, J8, J9) ----
+
+const REGION_LIMITS={max_shapes:64,max_circles:16,max_polygon_points:512,max_boundary_crossings:1024,max_input_vertices:2048};
+function regionBlock(){return {supported:true,run_enabled:true,result_formats:[X.RESULT_R],field_layouts:[X.LAYOUT_R],
+  payload_formats:[X.MANIFEST_R,'studio-thermal-transient-frame-v1','studio-thermal-transient-history-v1'],limits:{...REGION_LIMITS}};}
+// regionCap() advertises a valid block; regionCap(undefined) advertises none.
+function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[X.TYPE].regions=b;return value;}
+function regionDoc(){return {...doc(),geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
+  shapes:[{name:'steel_plate',type:'rect',x:.5,y:0,w:.5,h:1,material:'steel'}]}};}
+function regionManifest(Nt=5){
+  const m=manifest(Nt),s=m.summary;
+  m.payload_format=X.MANIFEST_R;m.result_format=s.result_format=X.RESULT_R;m.field_layout=s.field_layout=X.LAYOUT_R;
+  m.arrays.triangle_regions=[0,1];
+  m.fields.triangle_regions={shape:[2],unit:'1',location:'triangles',axis:'static',available_views:[],
+    initial_available:true,ui_supported:false};
+  s.field_units.triangle_regions='1';s.field_locations.triangle_regions='triangles';
+  s.field_time_axes.triangle_regions='static';s.field_shapes.triangle_regions=[2];
+  s.region_names=['steel_plate','background'];
+  s.regions={steel_plate:{material:'steel',triangles:1,area_m2:.5},background:{material:'insulation',triangles:1,area_m2:.5}};
+  s.materials={steel:{conductivity_w_mk:45,volumetric_heat_capacity_j_m3k:3.6e6,source:'document value'},
+    insulation:{conductivity_w_mk:.5,volumetric_heat_capacity_j_m3k:1.2e6}};
+  s.heat_source_w_m3={steel_plate:2e5,background:5e4};
+  return m;
+}
+const LIMITS=cap()[X.TYPE].limits;
+
+test('J1 transient: the nested region block leaves the rectangle capability unchanged; outer region pairs refuse it',()=>{
+  const {regions,...rest}=X.capability(regionCap());
+  assert.deepEqual(rest,X.capability(cap()));assert.deepEqual(regions,regionBlock());
+  const outer=regionCap();outer[X.TYPE].result_formats.push(X.RESULT_R);outer[X.TYPE].field_layouts.push(X.LAYOUT_R);
+  assert.equal(X.capability(outer),null);
+});
+
+test('J7 region manifest: 14 descriptors and 4 arrays; frames and pages only with the matching pair',()=>{
+  const raw=regionManifest(),accepted=X.regionManifest(raw,raw,LIMITS,REGION_LIMITS);
+  assert.equal(Object.keys(accepted.fields).length,14);assert.deepEqual(Object.keys(raw.arrays).length,4);
+  assert.equal(accepted.payload_format,X.MANIFEST_R);assert.equal(accepted.result_format,X.RESULT_R);
+  assert.deepEqual(accepted.regions.ids,[0,1]);assert.deepEqual(accepted.regions.edges,[[0,2]]);
+  assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.rhoC,r.q,r.cells]),
+    [['steel_plate','steel',45,3.6e6,2e5,1],['background','insulation',.5,1.2e6,5e4,1]]);
+  const rectangle=X.manifest(manifest(),manifest(),LIMITS);
+  const fq={field:'temperature_k',time_index:2,frame_seq:3},hq={field:'heat_content_j_per_m',start:0,stop:5,frame_seq:4};
+  assert.ok(X.frame(frame(accepted,fq),accepted,fq));assert.ok(X.history(history(accepted,hq),accepted,hq));
+  assert.ok(X.frame(frame(rectangle,fq),rectangle,fq));assert.ok(X.history(history(rectangle,hq),rectangle,hq));
+  assert.throws(()=>X.frame(frame(rectangle,fq),accepted,fq));assert.throws(()=>X.history(history(rectangle,hq),accepted,hq));
+  assert.throws(()=>X.frame(frame(accepted,fq),rectangle,fq));assert.throws(()=>X.history(history(accepted,hq),rectangle,hq));
+  assert.throws(()=>X.manifest(raw,raw,LIMITS));assert.throws(()=>X.regionManifest(manifest(),manifest(),LIMITS));
+  const model=X.model(accepted,X.frame(frame(accepted,fq),accepted,fq),'temperature_k');
+  assert.equal(model.regions,accepted.regions);assert.equal(X.meshModel(accepted).regions,accepted.regions);
+  assert.equal('regions' in X.meshModel(rectangle),false);
+  assert.equal('regions' in X.model(rectangle,X.frame(frame(rectangle,fq),rectangle,fq),'temperature_k'),false);
+  const faults={descriptor:m=>{m.fields.triangle_regions.ui_supported=true;},missing:m=>{delete m.fields.triangle_regions;},
+    shape:m=>{m.summary.field_shapes.triangle_regions=[3];},axis:m=>{m.summary.field_time_axes.triangle_regions='time_s';},
+    summary_pair:m=>{m.summary.result_format=X.RESULT;},ids:m=>{m.arrays.triangle_regions=[0,2];},
+    capacity:m=>{delete m.summary.materials.steel.volumetric_heat_capacity_j_m3k;},
+    count:m=>{m.summary.regions.steel_plate.triangles=2;}};
+  for(const [name,fault] of Object.entries(faults)){const m=regionManifest();fault(m);
+    assert.throws(()=>X.regionManifest(m,m,LIMITS,REGION_LIMITS),undefined,name);}
+});
+
+test('J9 transient: the family is pinned at validation and a missing block refuses region documents before any request',async()=>{
+  for(const [document,wire] of [[regionDoc(),manifest()],[doc(),regionManifest()]]){
+    let current;const c=X.createController({wait:async()=>{},request:async(method,url,body)=>{
+      if(url==='/api/capabilities')return regionCap();
+      if(url.endsWith('/validate'))return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};
+      if(url.endsWith('/run')){current={...copy(wire),client_revision:body.client_revision,request_seq:body.request_seq};return identity(current);}
+      return url.endsWith('/result')?copy(current):{...identity(current),status:'done'};
+    }});
+    await c.loadCapability();assert.equal(await c.validate(document),true);
+    assert.equal(await c.run(),false);assert.equal(c.result(),null);assert.ok(c.state().error);
+  }
+  let posted=0;const c=X.createController({request:async(method,url,body)=>{
+    if(url==='/api/capabilities')return regionCap(undefined);posted++;
+    return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};}});
+  await c.loadCapability();assert.equal(await c.validate(regionDoc()),false);assert.equal(posted,0);
+  assert.match(c.state().error,/does not advertise region documents/);
+  assert.equal(await c.validate(doc()),true);assert.equal(posted,1);
+});
+
+test('J6/J8 transient page: region table, legend, hover; a dirty edit clears legend and table',async()=>{
+  const p=await readyPage({fixture:regionManifest(),capability:regionCap(),document:regionDoc()});
+  await p.element('runBtn').onclick();await tick();
+  assert.match(p.element('resInfo').textContent,/^Saved index 4; t = 3 s; .*colours rescale per frame$/);
+  const host=p.element('resTable');assert.equal(host.children.length,3);
+  const table=host.children[2];assert.equal(table.className,'res region-table');
+  assert.deepEqual(table.children[0].children[0].children.map(c=>c.textContent),
+    ['Colour','Region','Material','k [W/(m·K)]','ρc [J/(m³·K)]','Q [W/m³]','Cells','Area [m²]','Material source']);
+  assert.equal(table.children[1].children.length,2);
+  assert.deepEqual(table.children[1].children[0].children.slice(1).map(c=>c.textContent),
+    ['steel_plate','steel','45','3600000','200000','1','0.5','document value']);
+  const man=p.run('transientController.result()'),state=p.run('transientController.state()');
+  const model=X.model(man,state.frame,state.view),t=require('../../packages/simcase/src/simcase/studio/static/thermal.js').transform(model,320,240);
+  p.element('fieldCanvas').onmousemove({clientX:t.X(.75),clientY:t.Y(.25)});
+  assert.ok(p.element('resInfo').textContent.endsWith('; region steel_plate (steel)'));
+  p.tab('mesh');await tick();
+  assert.equal(p.element('meshInfo').textContent,'Actual transient result mesh — 4 nodes, 2 cells, 2 regions; axes m');
+  const list=p.element('meshLegend').children[0];assert.equal(list.children.length,2);
+  assert.equal(list.children[1].children[1].textContent,'background — insulation');
+  assert.ok(p.htmlWrites.every(markup=>!markup.includes('steel_plate')));
+  p.element('json').value='{';p.element('json').oninput();await tick();
+  for(const id of ['meshLegend','resTable']){
+    assert.equal(p.element(id).textContent,'');assert.equal(p.element(id).children.length,0);
+  }
 });

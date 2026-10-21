@@ -81,7 +81,8 @@ repository; separate historical package repositories are not needed to use them.
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
   both new keys retain v1.
 - **Studio:** a local browser interface for 2D optical models and dedicated
-  steady and transient heat views for rectangular documents. Generic optical
+  steady and transient heat views for rectangular documents and documents with
+  material regions (within Studio's region limits). Generic optical
   routes keep their heat/3D guards. Structural forms, 3D models and a general
   thermal form editor are outside its scope. See the
   [steady](packages/simcase/thermal_studio.md) and

@@ -21,6 +21,15 @@
   };
   const ADDED = ['prescribed_outward_load_w_per_m','ambient_load_w_per_m',
     'convective_outward_w_per_m','system_rhs_w_per_m'];
+  // Region documents: their own pair and payload format, advertised in a nested
+  // capability block so that a rectangle-only client never sees them.
+  const REGION = {result_format:'thermal.steady2d-regions-result-v1',
+    field_layout:'thermal2d-p1-node-cell-regions-v1', payload_format:'studio-thermal-steady-regions-v1'};
+  const REGION_CAPABILITY = {result_formats:[REGION.result_format], field_layouts:[REGION.field_layout],
+    payload_formats:[REGION.payload_format]};
+  const REGION_LIMITS = ['max_shapes','max_circles','max_polygon_points','max_boundary_crossings','max_input_vertices'];
+  // Okabe-Ito colours, cycled by region index; names, legend and hover tell regions apart.
+  const PALETTE = ['#E69F00','#56B4E9','#009E73','#F0E442','#0072B2','#D55E00','#CC79A7','#999999'];
   function fail(message) { throw new Error('Thermal view: '+message); }
   const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
   const finite = x => typeof x === 'number' && Number.isFinite(x);
@@ -32,6 +41,26 @@
     return values.length === 1 && object(values[0]) ? values[0].type : null;
   }
   function route(s) { return typeof s === 'string' && /^\/api\/[a-zA-Z0-9_/-]+$/.test(s) && !s.includes('..'); }
+  function hasRegionGeometry(doc, type=TYPE) {
+    return soleType(doc)===type && object(doc.geometry)
+      && (Object.hasOwn(doc.geometry,'shapes') || Object.hasOwn(doc.geometry,'background'));
+  }
+  function freeze(x) {
+    if (x!==null && typeof x==='object') { Object.values(x).forEach(freeze); Object.freeze(x); }
+    return x;
+  }
+  const sameList = (a,b) => Array.isArray(a) && a.length===b.length && a.every((v,i)=>v===b[i]);
+  // A malformed or absent block disables region documents only; capability() is unchanged.
+  function regionCapability(r, expected=REGION_CAPABILITY) {
+    const keys=['supported','run_enabled','result_formats','field_layouts','payload_formats','limits'];
+    if (!object(r) || Object.keys(r).length!==keys.length || !keys.every(k=>Object.hasOwn(r,k))
+        || r.supported!==true || typeof r.run_enabled!=='boolean'
+        || !['result_formats','field_layouts','payload_formats'].every(k=>sameList(r[k],expected[k]))
+        || !object(r.limits) || Object.keys(r.limits).length!==REGION_LIMITS.length
+        || !REGION_LIMITS.every(k=>Object.hasOwn(r.limits,k) && Number.isSafeInteger(r.limits[k]) && r.limits[k]>0))
+      return null;
+    return freeze(clone(r));
+  }
   function capability(data) {
     const c = data?.[TYPE];
     if (data?.capability_format !== 'studio-capabilities-v1' || !object(c) || c.supported!==true
@@ -160,14 +189,99 @@
     return Object.freeze({...input, arrays, summary, lengthLabel:label});
   }
 
+  // The region table mirrors the server's checks without recomputing areas. Region
+  // names are only ever looked up with Object.hasOwn and stored in arrays, never used
+  // as keys of a plain object, so names such as __proto__ stay inert.
+  function regionTable(summary, ids, M, transient=false, limits=null) {
+    const names=summary?.region_names;
+    if (!Array.isArray(names) || !names.length || (limits && names.length>limits.max_shapes+1)
+        || names.some(n=>typeof n!=='string'||!n) || new Set(names).size!==names.length) fail('region names');
+    const R=names.length;
+    if (!Array.isArray(ids) || ids.length!==M || ids.some(v=>!integer(v)||v>=R)) fail('triangle region indices');
+    const regions=summary.regions, materials=summary.materials, source=summary.heat_source_w_m3;
+    if (!object(regions) || Object.keys(regions).length!==R || !names.every(n=>Object.hasOwn(regions,n)))
+      fail('summary regions and names disagree');
+    if (!object(materials)) fail('summary materials');
+    if (!finite(source) && !object(source)) fail('summary heat source');
+    const cells=new Array(R).fill(0);
+    for (const v of ids) cells[v]++;
+    const rows=names.map((name,index)=>{
+      const entry=regions[name];
+      if (!object(entry) || Object.keys(entry).length!==3
+          || !['material','triangles','area_m2'].every(k=>Object.hasOwn(entry,k))) fail('region entry keys');
+      if (!integer(entry.triangles) || entry.triangles!==cells[index]) fail('region cell count');
+      if (!finite(entry.area_m2) || entry.area_m2<0) fail('region area');
+      const material=entry.material;
+      if (typeof material!=='string' || !Object.hasOwn(materials,material) || !object(materials[material]))
+        fail('region material is not in the materials table');
+      const spec=materials[material], k=spec.conductivity_w_mk;
+      if (!finite(k) || k<=0) fail('region conductivity');
+      let q=0;
+      if (finite(source)) q=source;
+      else if (Object.hasOwn(source,name)) { q=source[name]; if (!finite(q)) fail('region heat source'); }
+      const row={index, name, color:PALETTE[index%PALETTE.length], material, k, q,
+        cells:entry.triangles, area_m2:entry.area_m2, source:typeof spec.source==='string'?spec.source:''};
+      if (transient) {
+        const c=spec.volumetric_heat_capacity_j_m3k;
+        if (!finite(c) || c<=0) fail('region heat capacity');
+        row.rhoC=c;
+      }
+      return Object.freeze(row);
+    });
+    return Object.freeze({names:Object.freeze(names.slice()), ids:Object.freeze(ids.slice()), rows:Object.freeze(rows)});
+  }
+  // Node pairs whose two triangles carry different region indices.
+  function regionEdges(triangles, ids, N) {
+    const first=new Map(), edges=[];
+    triangles.forEach((tri,t)=>{
+      for (let j=0;j<3;j++) {
+        const a=tri[j], b=tri[(j+1)%3], lo=Math.min(a,b), hi=Math.max(a,b), key=lo*N+hi;
+        const other=first.get(key);
+        if (other===undefined) first.set(key,t);
+        else if (ids[other]!==ids[t]) edges.push(Object.freeze([lo,hi]));
+      }
+    });
+    return Object.freeze(edges);
+  }
+  const METADATA = ['field_units','field_locations','field_shapes'];
+  function validateRegionPayload(input, expected, limits=null) {
+    finiteJSON(input);
+    if (!object(input) || input.payload_format!==REGION.payload_format
+        || input.result_format!==REGION.result_format || input.field_layout!==REGION.field_layout)
+      fail('unsupported region payload or result/layout pair');
+    const s=input.summary, a=input.arrays;
+    if (!object(s) || !object(a) || s.result_format!==REGION.result_format || s.field_layout!==REGION.field_layout)
+      fail('region summary and payload pairs disagree');
+    if (!Object.hasOwn(a,'triangle_regions') || METADATA.some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))
+      fail('missing triangle_regions');
+    // Relabel a copy as a v2 rectangle payload, top-level and summary pair alike, and
+    // reuse every unchanged v2 check (D=0, connectivity, CCW, units, ownership).
+    const v2=clone(input), V2='thermal.steady2d-result-v2';
+    v2.payload_format='studio-thermal-steady-v1';
+    v2.result_format=v2.summary.result_format=V2;
+    v2.field_layout=v2.summary.field_layout=PAIRS[V2];
+    delete v2.arrays.triangle_regions;
+    for (const m of METADATA) delete v2.summary[m].triangle_regions;
+    const accepted=validatePayload(v2, expected);
+    const M=accepted.arrays.triangles.length;
+    if (s.field_units.triangle_regions!=='1' || s.field_locations.triangle_regions!=='triangles'
+        || JSON.stringify(s.field_shapes.triangle_regions)!==JSON.stringify([M])) fail('triangle_regions metadata');
+    const table=regionTable(s, a.triangle_regions, M, false, limits);
+    const edges=regionEdges(accepted.arrays.triangles, table.ids, accepted.arrays.nodes_m.length);
+    return Object.freeze({...accepted, payload_format:input.payload_format, result_format:input.result_format,
+      field_layout:input.field_layout, summary:clone(s), regions:Object.freeze({...table, edges})});
+  }
+
   class Ownership {
     constructor() {
       this.revision=0; this.sequence=0; this.renderSeq=0; this.capSeq=0;
       this.job=null; this.resultId=null; this.validated=null; this.dirty=true; this.busy=false;
+      this.family=null;
     }
     invalidate() {
       this.revision++; this.sequence++; this.renderSeq++;
       this.job=this.resultId=null; this.validated=null; this.dirty=true; this.busy=false;
+      this.family=null;
     }
     begin(kind) {
       this.sequence++; this.busy=true;
@@ -216,9 +330,11 @@
     for (const [x,y] of nodes) { xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y); }
     if (![max-min,xmax-xmin,ymax-ymin].every(finite)||xmax<=xmin||ymax<=ymin)
       fail('display range overflow or degeneracy');
-    return {nodes,triangles:a.triangles,values,min,max,unit,field,
+    const model={nodes,triangles:a.triangles,values,min,max,unit,field,
       nodal:field==='temperature_k',domain:{xmin,xmax,ymin,ymax},lengthLabel:payload.lengthLabel,
       flux:a.heat_flux_w_m2};
+    if (payload.regions) model.regions=payload.regions;   // rectangle models keep their exact keys
+    return model;
   }
   function barycentric(p,a,b,c) {
     const det=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);
@@ -239,6 +355,13 @@
         return model.nodal ? interpolate(model,tri,w) : model.values[i];
     }
     return null;
+  }
+  function locate(model, point) {
+    for (let i=0;i<model.triangles.length;i++) {
+      const w=barycentric(point,...model.triangles[i].map(n=>model.nodes[n]));
+      if (w.every(v=>v>=-1e-10&&v<=1+1e-10)) return i;
+    }
+    return -1;
   }
   function transform(model,W,H) {
     const d=model.domain, s=Math.min((W-100)/(d.xmax-d.xmin),(H-85)/(d.ymax-d.ymin));
@@ -276,10 +399,27 @@
     if (!current()) return false; // Deferred views must not commit stale pixels or labels.
     canvas.width=W;canvas.height=H;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,W,H);
     if (!meshOnly) ctx.putImageData(image,0,0);
+    const regions=model.regions;
+    if (meshOnly&&regions) {
+      ctx.globalAlpha=.55;
+      model.triangles.forEach((tri,i)=>{
+        ctx.fillStyle=PALETTE[regions.ids[i]%PALETTE.length];ctx.beginPath();
+        tri.forEach((n,j)=>j?ctx.lineTo(T.X(model.nodes[n][0]),T.Y(model.nodes[n][1])):ctx.moveTo(T.X(model.nodes[n][0]),T.Y(model.nodes[n][1])));
+        ctx.closePath();ctx.fill();
+      });
+      ctx.globalAlpha=1;
+    }
     ctx.strokeStyle='rgba(40,45,60,.45)';ctx.lineWidth=.6;
     if (meshOnly) for (const tri of model.triangles) {
       ctx.beginPath();tri.forEach((n,j)=>j?ctx.lineTo(T.X(model.nodes[n][0]),T.Y(model.nodes[n][1])):ctx.moveTo(T.X(model.nodes[n][0]),T.Y(model.nodes[n][1])));
       ctx.closePath();ctx.stroke();
+    }
+    if (regions) {
+      ctx.strokeStyle='#17212b';ctx.lineWidth=meshOnly?1.6:1.2;
+      for (const [a,b] of regions.edges) {
+        ctx.beginPath();ctx.moveTo(T.X(model.nodes[a][0]),T.Y(model.nodes[a][1]));
+        ctx.lineTo(T.X(model.nodes[b][0]),T.Y(model.nodes[b][1]));ctx.stroke();
+      }
     }
     if (!meshOnly&&arrows&&!model.nodal&&maxQ>0) {
       ctx.strokeStyle='#17212b';ctx.lineWidth=1;
@@ -309,8 +449,10 @@
 
   function createController({request,wait=ms=>new Promise(r=>setTimeout(r,ms)),onState=()=>{},onResult=()=>{}}) {
     const gate=new Ownership();let cap=null,result=null,error=null;
+    const regionCap=()=>cap?regionCapability(cap.regions):null;
+    const familyRuns=()=>gate.family!=='regions'||regionCap()?.run_enabled===true;
     function emit() { onState({supported:!!cap,busy:gate.busy,dirty:gate.dirty,validated:!!gate.validated,
-      canRun:!!cap&&cap.run_enabled===true&&!gate.dirty&&!!gate.validated&&!gate.busy,result,error}); }
+      canRun:!!cap&&cap.run_enabled===true&&!gate.dirty&&!!gate.validated&&!gate.busy&&familyRuns(),result,error}); }
     function invalidate() { gate.invalidate();result=null;error=null;emit(); }
     async function loadCapability() {
       const seq=gate.beginCapability();
@@ -321,21 +463,27 @@
     }
     async function validate(doc, rawText) {
       if(!cap||soleType(doc)!==TYPE) { invalidate();return false; }
-      const token=gate.begin('validate');result=null;error=null;gate.validated=null;gate.dirty=true;emit();
+      const token=gate.begin('validate');result=null;error=null;gate.validated=null;gate.dirty=true;gate.family=null;emit();
       try {
         const raw=rawText===undefined?JSON.stringify(doc):rawText;
         const parsed=strictParse(raw);if(soleType(parsed)!==TYPE)fail('unsupported raw document type');
+        // The document family is pinned here, before any request; its payload must match.
+        const family=hasRegionGeometry(parsed)?'regions':'rectangle';
+        if(family==='regions'&&!regionCap())fail('this Studio server does not advertise region documents');
+        gate.family=family;
         const reply=await request('POST',cap.validate,{doc:parsed,client_revision:token.revision,request_seq:token.sequence},raw);
         if(!gate.current(token))return false;
         if(reply?.ok!==true)fail(reply?.error?.message||'invalid document');
-        if(reply.client_revision!==token.revision||reply.request_seq!==token.sequence||soleType(reply.doc)!==TYPE)
+        if(reply.client_revision!==token.revision||reply.request_seq!==token.sequence||soleType(reply.doc)!==TYPE
+            ||(hasRegionGeometry(reply.doc)?'regions':'rectangle')!==family)
           fail('validation response ownership/type');
         gate.acceptValidation(token,reply.doc);return true;
       } catch(e) { if(gate.current(token)){error=String(e.message||e);gate.validated=null;gate.dirty=true;}return false; }
       finally { if(gate.finish(token))emit(); }
     }
     async function run() {
-      if(!cap||cap.run_enabled!==true||gate.dirty||!gate.validated||gate.busy)return false;
+      if(!cap||cap.run_enabled!==true||gate.dirty||!gate.validated||gate.busy||!familyRuns())return false;
+      const family=gate.family;
       let token=gate.begin('run');result=null;error=null;emit();
       try {
         const reply=await request('POST',cap.run,{doc:clone(gate.validated),client_revision:token.revision,request_seq:token.sequence});
@@ -351,8 +499,10 @@
           if(state.status==='done') {
             const raw=await request('GET','/api/jobs/'+encodeURIComponent(token.job)+'/result');
             if(!gate.current(token))return false;
-            const accepted=validatePayload(raw,{job:token.job,result_id:token.resultId,
-              client_revision:token.revision,request_seq:token.sequence});
+            const owner={job:token.job,result_id:token.resultId,client_revision:token.revision,request_seq:token.sequence};
+            // A payload of the other family is refused by the other parser.
+            const accepted=family==='regions'?validateRegionPayload(raw,owner,regionCap()?.limits)
+              :validatePayload(raw,owner);
             result=accepted;onResult(accepted);return true;
           }
           if(!['running','reserved'].includes(state.status))fail('unknown job status');
@@ -366,5 +516,6 @@
       renderCurrent:t=>gate.renderCurrent(t)};
   }
   return {TYPE,PAIRS,BASE,ADDED,soleType,capability,validatePayload,Ownership,
-    strictParse,viewModel,barycentric,sample,transform,color,draw,createController};
+    strictParse,viewModel,barycentric,sample,transform,color,draw,createController,
+    REGION,PALETTE,hasRegionGeometry,regionCapability,validateRegionPayload,regionTable,regionEdges,locate};
 });

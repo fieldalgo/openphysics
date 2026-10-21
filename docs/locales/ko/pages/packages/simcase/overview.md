@@ -34,7 +34,7 @@ python -m simcase run model.json                          # -> model_results/
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
 | 영역이 있는 `thermal.transient2d` | 이름 있는 재료 영역의 과도 열전도, 재료별 열전도율·열용량 | `transient_thermal_regions` | [영역 문서](thermal_regions2d.md) |
 
-Studio는 2D 광학 모델을 편집·실행하고 직사각형 정상·과도 열전도의 전용 화면을 제공하며, 공진기 문서와 재료 영역이 있는 열전도 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
+Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료 영역이 있는(Studio 영역 한도 안의) 정상·과도 열전도 문서의 전용 화면을 제공하며, 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
 
 ## 문서
 
@@ -235,7 +235,7 @@ python -m simcase.studio --port 9000 --no-browser
 - 메시 생성: 서버를 통해 meshine으로 생성하고 영역별로 그리며 노드·삼각형 수, 최소각, 평균 품질을 표시합니다.
 - 실행(광학 모델): 백그라운드 작업 후 study 지점·모드를 선택하는 모드 장, n_eff 대 매개변수 차트, 파장 sweep 군굴절률 표를 제공합니다. 벡터 결과는 성분 선택과 상대 진폭을 추가하고 추적 sweep은 분지를 식별해 overlap과 군굴절률을 표시합니다.
 - JSON 탭: 문서를 직접 편집하고 적용합니다.
-- 열전도: 직사각형 `thermal.steady2d`·`thermal.transient2d` 문서용 전용 화면. 정상 열전도는 결과 메시, 절점 Kelvin, 요소 열유속을 보여 주고, 과도 열전도는 요청 시간 선택과 페이지 단위 열량(H)·이차 범함수(V) 이력을 더합니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
+- 열전도: `thermal.steady2d`·`thermal.transient2d` 문서용 전용 화면. 정상 열전도는 결과 메시, 절점 Kelvin, 요소 열유속을 보여 주고, 과도 열전도는 요청 시간 선택과 페이지 단위 열량(H)·이차 범함수(V) 이력을 더합니다. 재료 영역이 있는 문서는 영역 색과 경계, 범례, 영역 표, 커서 아래 영역도 보여 줍니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
 
 기존 편집기는 빌드 단계와 외부 라이브러리가 없는 단일 HTML 파일(canvas 그리기만 사용)입니다. UI가 커지면 프레임워크를 도입할 수 있습니다. 데스크톱 대신 웹을 사용하므로 어떤 프런트엔드든 같은 문서 형식의 UI를 공유하고 노트북·서버에서 같은 방식으로 실행하며 HTTP로 다른 서비스에 접근할 수 있습니다.
 

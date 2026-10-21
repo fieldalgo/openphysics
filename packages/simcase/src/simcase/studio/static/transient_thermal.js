@@ -7,6 +7,14 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(T) {
   'use strict';
   const TYPE='thermal.transient2d',RESULT='thermal.transient2d-result-v1',LAYOUT='thermal2d-transient-p1-node-cell-v1';
+  // Region documents: their own pair and manifest format; frames and pages keep their
+  // format IDs and carry the region pair.
+  const RESULT_R='thermal.transient2d-regions-result-v1',LAYOUT_R='thermal2d-transient-p1-node-cell-regions-v1';
+  const MANIFEST='studio-thermal-transient-v1',MANIFEST_R='studio-thermal-transient-regions-v1';
+  const REGION_CAPABILITY={result_formats:[RESULT_R],field_layouts:[LAYOUT_R],
+    payload_formats:[MANIFEST_R,'studio-thermal-transient-frame-v1','studio-thermal-transient-history-v1']};
+  const REGION_FIELD={shape:null,unit:'1',location:'triangles',axis:'static',available_views:[],
+    initial_available:true,ui_supported:false};
   const UI=['temperature_k','heat_flux_w_m2','heat_content_j_per_m','quadratic_functional_jk_per_m'];
   const SPEC={
     nodes_m:['m','nodes','static'],triangles:['1','triangle_connectivity','static'],
@@ -35,7 +43,7 @@
   function keys(x,expected){return object(x)&&same(Object.keys(x).sort(),expected.slice().sort());}
   function identity(x){return object(x)&&x.kind===TYPE&&id(x.job)&&id(x.result_id)&&integer(x.client_revision)&&integer(x.request_seq);}
   function matches(x,e){if(!identity(x)||['job','result_id','client_revision','request_seq'].some(k=>x[k]!==e[k]))fail('response identity');}
-  function typed(x,format){if(!identity(x)||x.payload_format!==format||x.result_format!==RESULT||x.field_layout!==LAYOUT
+  function typed(x,format,pair=[RESULT,LAYOUT]){if(!identity(x)||x.payload_format!==format||x.result_format!==pair[0]||x.field_layout!==pair[1]
       ||!finite(x.display_length_in_m)||x.display_length_in_m<=0)fail('unsupported type/version/scale');}
   function capability(raw) {
     const c=raw?.[TYPE];
@@ -106,12 +114,33 @@
     template(x.frame_url,x,'frame');template(x.history_url,x,'history');
     x.lengthLabel=label;return x;
   }
+  function regionManifest(raw,expected,limits,regionLimits=null) {
+    const x=copy(raw),s=x?.summary,metadata=['field_units','field_locations','field_shapes','field_time_axes'];
+    if(!object(x)||x.payload_format!==MANIFEST_R||x.result_format!==RESULT_R||x.field_layout!==LAYOUT_R
+        ||!object(s)||s.result_format!==RESULT_R||s.field_layout!==LAYOUT_R)fail('unsupported region manifest or pair');
+    if(!object(x.arrays)||!Object.hasOwn(x.arrays,'triangle_regions')||!object(x.fields)||!Object.hasOwn(x.fields,'triangle_regions')
+        ||metadata.some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))fail('missing triangle_regions');
+    // Relabel a copy as a rectangle manifest, summary pair included, and reuse every
+    // unchanged rectangle check.
+    const rect=copy(x);rect.payload_format=MANIFEST;rect.result_format=rect.summary.result_format=RESULT;
+    rect.field_layout=rect.summary.field_layout=LAYOUT;
+    delete rect.arrays.triangle_regions;delete rect.fields.triangle_regions;
+    for(const m of metadata)delete rect.summary[m].triangle_regions;
+    const accepted=manifest(rect,expected,limits),m=accepted.arrays.triangles.length;
+    if(!same(x.fields.triangle_regions,{...REGION_FIELD,shape:[m]})||s.field_units.triangle_regions!=='1'
+        ||s.field_locations.triangle_regions!=='triangles'||s.field_time_axes.triangle_regions!=='static'
+        ||!same(s.field_shapes.triangle_regions,[m]))fail('triangle_regions descriptor');
+    const table=T.regionTable(s,x.arrays.triangle_regions,m,true,regionLimits);
+    const edges=T.regionEdges(accepted.arrays.triangles,table.ids,accepted.arrays.nodes_m.length);
+    return {...accepted,payload_format:MANIFEST_R,result_format:RESULT_R,field_layout:LAYOUT_R,
+      fields:x.fields,summary:s,regions:Object.freeze({...table,edges})};
+  }
   function queryURL(man,kind,query) {
     const path=template(kind==='frame'?man.frame_url:man.history_url,man,kind);
     const p=new URLSearchParams({result_id:man.result_id,...query});return path+'?'+p.toString();
   }
   function frame(raw,man,q) {
-    const x=copy(raw);typed(x,'studio-thermal-transient-frame-v1');matches(x,man);
+    const x=copy(raw);typed(x,'studio-thermal-transient-frame-v1',[man.result_format,man.field_layout]);matches(x,man);
     if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
       'display_length_in_m','payload_format','frame_seq','field','time_index','time_s','unit','location','shape','arrays']))fail('frame fields');
     const desc=man.fields[q.field];
@@ -123,7 +152,7 @@
     numeric(x.arrays[q.field],x.shape,'frame');return x;
   }
   function history(raw,man,q) {
-    const x=copy(raw);typed(x,'studio-thermal-transient-history-v1');matches(x,man);
+    const x=copy(raw);typed(x,'studio-thermal-transient-history-v1',[man.result_format,man.field_layout]);matches(x,man);
     if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
       'display_length_in_m','payload_format','frame_seq','field','start','stop','time_indices','time_s','unit','location','shape','arrays']))fail('history fields');
     if(!['heat_content_j_per_m','quadratic_functional_jk_per_m'].includes(q.field)
@@ -139,7 +168,9 @@
   function model(man,f,view) {
     const flux=view!=='temperature_k';
     if((flux?'heat_flux_w_m2':'temperature_k')!==f.field)fail('view field mismatch');
-    return T.viewModel({arrays:{...man.arrays,...f.arrays},display_length_in_m:man.display_length_in_m,lengthLabel:man.lengthLabel},view);
+    const payload={arrays:{...man.arrays,...f.arrays},display_length_in_m:man.display_length_in_m,lengthLabel:man.lengthLabel};
+    if(man.regions)payload.regions=man.regions;
+    return T.viewModel(payload,view);
   }
   function meshModel(man) {
     const p=man.arrays.nodes_m.map(v=>v.map(x=>x/man.display_length_in_m));
@@ -147,14 +178,19 @@
     let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
     for(const [x,y]of p){xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}
     if(!finite(xmax-xmin)||!finite(ymax-ymin)||xmax<=xmin||ymax<=ymin)fail('display range overflow');
-    return {nodes:p,triangles:man.arrays.triangles,domain:{xmin,xmax,ymin,ymax},lengthLabel:man.lengthLabel,
+    const mesh={nodes:p,triangles:man.arrays.triangles,domain:{xmin,xmax,ymin,ymax},lengthLabel:man.lengthLabel,
       field:'Result mesh',unit:'m',min:0,max:0,nodal:true,values:[],flux:[]};
+    if(man.regions)mesh.regions=man.regions;
+    return mesh;
   }
   function createController({request,wait=ms=>new Promise(r=>setTimeout(r,ms)),onState=()=>{},onManifest=()=>{},onFrame=()=>{},onHistory=()=>{}}) {
     let cap=null,revision=0,op=0,capSeq=0,viewSeq=0,frameSeq=0,renderSeq=0;
     let validated=null,busy=false,dirty=true,man=null,accepted=null,error=null,index=null,view='temperature_k';
-    let readActive=false,pending=null,readKind=null;const panes={};
-    const state=()=>({cap,revision,op,busy,dirty,validated:!!validated,canRun:!!cap&&cap.run_enabled===true&&!dirty&&!!validated&&!busy,
+    let readActive=false,pending=null,readKind=null,family=null;const panes={};
+    const regionCap=()=>cap?T.regionCapability(cap.regions,REGION_CAPABILITY):null;
+    const familyRuns=()=>family!=='regions'||regionCap()?.run_enabled===true;
+    const state=()=>({cap,revision,op,busy,dirty,validated:!!validated,
+      canRun:!!cap&&cap.run_enabled===true&&!dirty&&!!validated&&!busy&&familyRuns(),
       manifest:man,frame:accepted,index,view,error,readActive,readKind,pages:{...panes}});
     const emit=()=>onState(state());
     const token=()=>({revision,op,man,viewSeq});
@@ -162,7 +198,7 @@
     function clearView(){accepted=null;error=null;renderSeq++;onFrame(null); }
     function invalidate() {
       revision++;op++;viewSeq++;renderSeq++;dirty=true;validated=null;busy=false;man=null;accepted=null;
-      pending=null;index=null;error=null;for(const k of Object.keys(panes))delete panes[k];onFrame(null);emit();
+      pending=null;index=null;error=null;family=null;for(const k of Object.keys(panes))delete panes[k];onFrame(null);emit();
     }
     async function loadCapability() {
       const seq=++capSeq;
@@ -173,20 +209,26 @@
     }
     async function validate(doc,rawText) {
       if(!cap||T.soleType(doc)!==TYPE){invalidate();return false;}
-      op++;viewSeq++;dirty=true;validated=null;man=null;pending=null;for(const k of Object.keys(panes))delete panes[k];
+      op++;viewSeq++;dirty=true;validated=null;man=null;pending=null;family=null;for(const k of Object.keys(panes))delete panes[k];
       clearView();busy=true;const r=revision,o=op;emit();
       try {const parsed=T.strictParse(rawText===undefined?JSON.stringify(doc):rawText);
         if(T.soleType(parsed)!==TYPE)fail('raw document type');
+        // The document family is pinned here, before any request; its manifest must match.
+        const kind=T.hasRegionGeometry(parsed,TYPE)?'regions':'rectangle';
+        if(kind==='regions'&&!regionCap())fail('this Studio server does not advertise region documents');
+        family=kind;
         const reply=await request('POST',cap.validate,{doc:parsed,client_revision:r,request_seq:o},rawText===undefined?JSON.stringify(doc):rawText);
         if(r!==revision||o!==op)return false;
         if(reply?.ok!==true)fail(reply?.error?.message||'invalid document');
-        if(reply.client_revision!==r||reply.request_seq!==o||T.soleType(reply.doc)!==TYPE)fail('validation ownership');
+        if(reply.client_revision!==r||reply.request_seq!==o||T.soleType(reply.doc)!==TYPE
+            ||(T.hasRegionGeometry(reply.doc,TYPE)?'regions':'rectangle')!==kind)fail('validation ownership');
         validated=copy(reply.doc);dirty=false;return true;
       }catch(e){if(r===revision&&o===op){error=String(e.message||e);validated=null;dirty=true;}return false;}
       finally{if(r===revision&&o===op){busy=false;emit();}}
     }
     async function run() {
-      if(!cap||cap.run_enabled!==true||dirty||!validated||busy)return false;
+      if(!cap||cap.run_enabled!==true||dirty||!validated||busy||!familyRuns())return false;
+      const kind=family;
       op++;viewSeq++;man=null;pending=null;for(const k of Object.keys(panes))delete panes[k];clearView();busy=true;
       const r=revision,o=op;emit();const own=()=>r===revision&&o===op;
       try {const reply=await request('POST',cap.run,{doc:copy(validated),client_revision:r,request_seq:o});
@@ -198,7 +240,10 @@
           if(status.status==='error')fail(status.error?.message||'transient job failed');
           if(status.status==='done'){
             const raw=await request('GET','/api/jobs/'+encodeURIComponent(reply.job)+'/result');
-            if(!own())return false;man=manifest(raw,reply,cap.limits);index=man.default_frame_index;view='temperature_k';
+            if(!own())return false;
+            // A manifest of the other family is refused by the other parser.
+            man=kind==='regions'?regionManifest(raw,reply,cap.limits,regionCap()?.limits):manifest(raw,reply,cap.limits);
+            index=man.default_frame_index;view='temperature_k';
             onManifest(man);select(index,view);return true;
           }
           if(!['reserved','running'].includes(status.status))fail('unknown job status');
@@ -244,5 +289,6 @@
       snapshot:()=>validated?copy(validated):null,supports:doc=>!!cap&&T.soleType(doc)===TYPE,
       renderToken,renderCurrent,rejectView};
   }
-  return {TYPE,RESULT,LAYOUT,UI,SPEC,copy,capability,template,queryURL,manifest,frame,history,model,meshModel,createController};
+  return {TYPE,RESULT,LAYOUT,UI,SPEC,copy,capability,template,queryURL,manifest,frame,history,model,meshModel,createController,
+    RESULT_R,LAYOUT_R,MANIFEST_R,regionManifest};
 });
