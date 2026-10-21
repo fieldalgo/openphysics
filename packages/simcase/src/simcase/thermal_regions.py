@@ -9,6 +9,7 @@ mesh follows the region boundaries (meshine, ``mesh.size``). The rectangle
 documents of thermal.py are not changed. See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
+from dataclasses import replace
 import json
 import math
 import time
@@ -265,7 +266,10 @@ def build_region_mesh(doc):
     from galerkin.mesh import Mesh
     from meshine import generate
     from .geometry import build_domain
-    domain, namer, region_materials = build_domain(doc)
+    from .runner import micrometre_document
+    from . import units
+    canonical = micrometre_document(doc)
+    domain, namer, region_materials = build_domain(canonical)
     tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']))
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
@@ -273,12 +277,14 @@ def build_region_mesh(doc):
     if unknown or set(tri.boundary_edges) != set(SIDES):
         raise DocumentError(f'mesh: exterior edges must all lie on the four domain sides; found tags '
                             f'{sorted(tri.boundary_edges)}')
-    factor = doc.scale.to_si(1.0, {'length': 1})
-    mesh = Mesh(np.asarray(tri.nodes, dtype=float)*factor, tri.triangles,
+    # Convert the canonical mesh directly to SI, never through document units.
+    mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
                 boundary={k: np.asarray(v) for k, v in tri.boundary_nodes.items()},
                 boundary_edges={k: np.asarray(v) for k, v in tri.boundary_edges.items()},
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names))
     region_materials = {r: region_materials[r] for r in mesh.region_names}
+    # Keep the diagnostic triangulation in document units, as before.
+    tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))
     return mesh, region_materials, tri
 
 

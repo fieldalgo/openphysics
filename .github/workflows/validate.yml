@@ -223,6 +223,7 @@ jobs:
             tests/simcase/test_subspace_sweep.py \
             tests/simcase/test_vector_sweep.py \
             tests/simcase/test_length_canonical.py \
+            tests/simcase/test_thermal_length_canonical.py \
             tests/galerkin/test_eigenspace_reliability.py \
             tests/galerkin/test_material_cavity.py \
             tests/galerkin/test_cavity_wall_loss.py \

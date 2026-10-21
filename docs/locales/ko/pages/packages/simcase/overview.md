@@ -171,6 +171,10 @@ result = solve_point(model, doc.sole_physics()[1])
 
 ## 열전도·공진기 문서
 
+정상·과도 열 영역 문서도 마이크로미터로 정규화한 뒤 메시합니다. 같은 수치 환경에서
+동등하게 환산되는 길이 입력은 SI 메시와 필드가 동일합니다. 열 결과의 좌표는 미터이며
+저장 모델은 원래 단위를 유지합니다. [열 영역 계약](thermal_regions2d.md)을 참조하세요.
+
 [공진기 문서 계약](cavity3d.md)은 `em.cavity3d` 입력, 단위 변환, 탐색 한계, SI JSON/NPZ 결과 구성을 설명합니다.
 
 [thermal.steady2d 계약](thermal_steady2d.md)은 명시 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 지지 열 반력은 안쪽 방향이며 그 음수가 온도 고정부의 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 외향 열유속·대류, v2 metadata와 raw 배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 v1을 유지합니다. Dirichlet이 비어 있으면 양의 Robin 고정이 필요합니다. 입력 Kelvin은 음이 아니어야 하며, 계산된 유한 음의 온도는 clamp하지 않습니다.
