@@ -56,8 +56,10 @@ runtime dependency. Gmsh is installed separately and retains its own license;
 see [NOTICE](../NOTICE).
 
 The seventh distribution, [`openphysics`](packages/openphysics/overview.md),
-is an empty name reservation. **`pip install openphysics` does not install the
-toolkit.** The six implementation packages already live in this public
+is a meta distribution with no code that requires the six implementation
+packages. 0.1.0 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
+name reservation, so **`pip install openphysics` does not install the toolkit
+yet.** The six implementation packages already live in this public
 repository; separate historical package repositories are not needed to use them.
 
 ## Entry points and current scope

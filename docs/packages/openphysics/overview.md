@@ -4,10 +4,8 @@
 
 [English / 한국어 documentation and translation status](https://github.com/fieldalgo/openphysics/blob/main/docs/README.md)
 
-Name reservation for the OpenPhysics suite.
-
-This distribution is intentionally empty. OpenPhysics is developed as six packages, each
-installable on its own:
+The OpenPhysics suite in one install. This distribution has no code of its own: it
+requires the six OpenPhysics packages, which release together with it.
 
 | package | what it is |
 |---|---|
@@ -18,8 +16,22 @@ installable on its own:
 | `physmat` | materials and optical dispersion |
 | `simcase` | model document, headless runner and the optional browser studio |
 
-Install whichever you need. Installing this distribution does not install any of them; to use
-the whole suite, install from a repository checkout as described in the
-[repository README](https://github.com/fieldalgo/openphysics/blob/main/README.md).
+```bash
+pip install openphysics                  # the six packages, headless
+pip install "openphysics[studio]"        # plus the local browser Studio
+pip install "openphysics[studio,export,rii]"
+```
+
+| extra | adds |
+|---|---|
+| `studio` | `simcase[studio]`: the local browser Studio (FastAPI, Uvicorn) |
+| `export` | `simcase[export]`: VTU export for ParaView (meshio) |
+| `rii` | `physmat[rii]`: reading a local refractiveindex.info database (PyYAML) |
+
+No extra installs Gmsh. `gmshio` runs Gmsh as a separate program; install it on its
+own (for example `pip install gmsh`) if you need it, under Gmsh's own license.
+
+Every package can also be installed on its own. Versions before 0.1.0 (`0.0.1`) were
+empty name reservations and install nothing.
 
 Source: https://github.com/fieldalgo/openphysics

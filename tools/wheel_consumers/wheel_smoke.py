@@ -23,8 +23,25 @@ for name in ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "sim
     direct = json.loads(dist.read_text("direct_url.json") or "{}")
     assert not direct.get("dir_info", {}).get("editable"), name
     assert dist.read_text("LICENSE") or any(str(p).endswith("/LICENSE") for p in dist.files), name
-assert not metadata.requires("openphysics"), "the name reservation must remain empty"
+# The openphysics meta distribution ships no code and requires exactly the six
+# packages, in the same release series, plus the extras it forwards. packaging
+# is installed here as a matplotlib requirement.
+from packaging.requirements import Requirement  # noqa: E402
+
+meta = {}
+for requirement in map(Requirement, metadata.requires("openphysics")):
+    extra = str(requirement.marker).split('"')[1] if requirement.marker else ""
+    assert str(requirement.specifier) == "<0.2,>=0.1.0", requirement
+    meta.setdefault(extra, set()).add((requirement.name, frozenset(requirement.extras)))
+assert meta == {
+    "": {(name, frozenset()) for name in
+         ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase")},
+    "studio": {("simcase", frozenset({"studio"}))},
+    "export": {("simcase", frozenset({"export"}))},
+    "rii": {("physmat", frozenset({"rii"}))},
+}, meta
 assert importlib.util.find_spec("openphysics") is None
+assert not [f for f in metadata.distribution("openphysics").files if str(f).endswith(".py")]
 
 for command in ("simcase", "simcase-run", "simcase-studio"):
     executable = shutil.which(command)

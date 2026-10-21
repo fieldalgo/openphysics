@@ -85,8 +85,9 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 ## Package overviews
 
 Package READMEs describe their own dependencies, public entry points and scope.
-The suite contains six implementations and one name-reservation distribution;
-installing the `openphysics` reservation does not install the suite.
+The suite contains six implementations and the `openphysics` meta distribution,
+which from 0.1.0 installs all six. Until 0.1.0 is published, the `openphysics` on
+PyPI is the empty 0.0.1 name reservation and installs nothing.
 
 | Package | English | 한국어 |
 |---|---|---|

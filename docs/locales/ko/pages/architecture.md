@@ -56,8 +56,9 @@ flowchart TB
 [NOTICE](../../../../NOTICE)를 참고하세요.
 
 일곱 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
-비어 있는 이름 예약 패키지입니다. **`pip install openphysics`로는 전체 도구가
-설치되지 않습니다.** 여섯 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
+코드 없이 여섯 구현 패키지를 의존성으로 요구하는 메타 배포판입니다. 0.1.0은 아직 게시되지
+않았습니다. PyPI의 `openphysics`는 빈 0.0.1 이름 예약이므로 **`pip install openphysics`로는
+아직 전체 도구가 설치되지 않습니다.** 여섯 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
 사용하기 위해 통합 전의 개별 패키지 저장소가 필요하지 않습니다.
 
 ## 진입점과 현재 지원 범위
