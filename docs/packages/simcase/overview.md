@@ -68,7 +68,8 @@ supported; `em.cavity3d` accepts lossy box materials.
   },
   "materials": {"myglass": {"n": 1.5}},
   "physics": {
-    "em1": {"type": "em.modes2d", "formulation": "scalar", "wavelength": 1.55, "num_modes": 2,
+    "em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55, "num_modes": 2,
+            "n_cladding": 1.45,
             "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}}
   },
   "mesh": {"size": 0.25, "grading": {"center": [0.0, 0.11], "near": 0.02, "far": 0.16, "distance": 1.0}},
@@ -109,7 +110,9 @@ group index.
 
 For optical modes the physics is lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
 an approximation for 2D high-contrast cores) or full `vector` for single points
-and tracked wavelength sweeps. Lossy materials are rejected in both paths. Scalar boundaries are
+and tracked wavelength sweeps. The supplied `soi_strip` uses `vector`. The scalar
+approximation is far off for such a core: the same document solved as `scalar`
+gives n_eff 2.611 at 1.55 um instead of 2.444. Lossy materials are rejected in both paths. Scalar boundaries are
 `pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
 and Ez; PMC is natural. These are different field conditions: changing only the
 formulation of a scalar slab can select a different polarization.
