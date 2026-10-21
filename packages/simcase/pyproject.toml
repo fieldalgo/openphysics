@@ -23,9 +23,9 @@ classifiers = [
 ]
 dependencies = [
   "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
-  "meshine>=0.1",
-  "physmat>=0.1",
-  "galerkin>=0.1",
+  "meshine>=0.1.0,<0.2",
+  "physmat>=0.1.0,<0.2",
+  "galerkin>=0.1.0,<0.2",
 ]
 
 [project.urls]
@@ -39,7 +39,7 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 studio = ["fastapi>=0.100", "uvicorn>=0.20"]
 # VTU export for ParaView (simcase.export); meshio is MIT and pure Python.
 export = ["meshio>=5.3,<6"]
-test = ["pytest", "httpx", "galerkin-refsol>=0.1"]
+test = ["pytest", "httpx", "galerkin-refsol>=0.1.0,<0.2"]
 
 [project.scripts]
 simcase = "simcase.cli:main"
