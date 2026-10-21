@@ -88,6 +88,7 @@ python tools/check_distributions.py        # 모든 패키지 빌드·검사·�
 python tools/run_installed_tests.py        # 설치된 wheel로 tests/의 Python 시험 전체 실행
 python tools/check_licenses.py             # 설치된 라이선스를 검토 목록과 대조
 python tools/check_markdown_links.py       # 모든 Markdown 파일의 상대 링크와 #앵커
+python tools/check_release_version.py      # 배포판 일곱 개의 버전이 하나인지
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -123,7 +124,8 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
-**Linux job.** 라이선스 검사 뒤 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
+**Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 일곱 개의 버전이
+하나인지 확인하고([배포](#배포pypi) 참고), 이어 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
 링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
 이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
 돌립니다. 소스 시험이 실패해도 배포 검사와 Node 검사는 근거를 남기려고 계속 돌지만,
@@ -247,6 +249,14 @@ PyPI 프로젝트의 trusted publisher를 리뷰를 거친 배포 워크플로�
 python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
+
+배포판 일곱 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
+`packages/<name>/pyproject.toml`과 각 import 패키지의 `__version__`을 바꾸고, 우리 배포판
+사이의 의존성은 그 마이너 계열 안(0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
+[변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
+릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
+필수 CI처럼 `--tag` 없이 돌리면 `[Unreleased]` 절도 받아들입니다. 0.x에서 안정적으로
+유지하는 것도 변경 기록에 있습니다.
 
 README는 PyPI 설명으로도 쓰이지만, 링크가 패키지 디렉터리 기준 상대 경로라 PyPI에서는
 깨집니다. 그래서 각 패키지의 `setup.py`는 링크를 한 리비전에 고정한 GitHub 주소로 바꾼
