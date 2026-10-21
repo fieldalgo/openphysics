@@ -4,24 +4,45 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openphysics"
-version = "0.0.1"
-description = "OpenPhysics - a multiphysics simulation suite (name reservation)"
+version = "0.1.0"
+description = "OpenPhysics multiphysics simulation suite: installs the six OpenPhysics packages"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "FieldAlgo", email = "yonghakim@fieldalgo.com" }]
 keywords = ["multiphysics", "finite-element", "simulation", "photonics"]
 classifiers = [
-  "Development Status :: 1 - Planning",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
+]
+# A meta distribution: it ships no code, only these requirements. The six
+# packages release in lockstep with it.
+dependencies = [
+  "galerkin>=0.1.0,<0.2",
+  "galerkin-refsol>=0.1.0,<0.2",
+  "meshine>=0.1.0,<0.2",
+  "gmshio>=0.1.0,<0.2",
+  "physmat>=0.1.0,<0.2",
+  "simcase>=0.1.0,<0.2",
 ]
 
 [project.urls]
 Homepage = "https://github.com/fieldalgo/openphysics"
 Repository = "https://github.com/fieldalgo/openphysics"
 Issues = "https://github.com/fieldalgo/openphysics/issues"
+
+[project.optional-dependencies]
+# The same extras as the packages that define them. No extra installs Gmsh:
+# gmshio runs it as a separate program, installed on its own (pip install gmsh).
+studio = ["simcase[studio]>=0.1.0,<0.2"]
+export = ["simcase[export]>=0.1.0,<0.2"]
+rii = ["physmat[rii]>=0.1.0,<0.2"]
 
 [tool.setuptools]
 packages = []

@@ -68,7 +68,7 @@ maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
 them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
 [studies/](../studies/README.md) diagnostic scripts; people run them and
-required CI does not. The empty `openphysics` name reservation has no code, tests or examples.
+required CI does not. The `openphysics` meta distribution has no code, tests or examples; it only declares the six packages as requirements.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
 of the tools (`testpaths` in the root
 `pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
@@ -142,7 +142,7 @@ minutes; its 45-minute limit only stops hung runs, since hosted runner speed
 varies.
 
 **Distribution checks** (`tools/check_distributions.py`). Builds all seven packages
-(including the empty `openphysics` name reservation), each wheel from its sdist,
+(including the `openphysics` meta distribution), each wheel from its sdist,
 with pinned build tools, and checks metadata with `twine check --strict`.
 Distributions ship package code only. Each sdist holds exactly its import
 package under `src/`, `README.md`, `LICENSE`, `NOTICE` and build files
@@ -269,8 +269,8 @@ No workflow publishes to PyPI, and tags trigger nothing. Before a release, choos
 the package and version, check that the version is not already on PyPI, validate
 the exact main commit, and set up that PyPI project's trusted publisher for an
 explicitly reviewed publishing workflow and GitHub environment. Each package
-builds from `packages/<name>`; the repository root is not a distribution and the
-`openphysics` reservation is not an umbrella installer. A build-only check for one
+builds from `packages/<name>`; the repository root is not a distribution, and
+`packages/openphysics` is the meta distribution that requires the other six. A build-only check for one
 package:
 
 ```bash

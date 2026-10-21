@@ -215,7 +215,10 @@ def main():
                    OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
         # First resolve just the runtime/optional requirements from our local wheels.
         # Constraints pin versions without pre-installing undeclared dependencies.
-        extras = {"simcase": "studio,test", "physmat": "rii", "gmshio": "gmsh"}
+        # The openphysics meta distribution resolves its six requirements and the
+        # extras it forwards from these same local wheels.
+        extras = {"simcase": "studio,test", "physmat": "rii", "gmshio": "gmsh",
+                  "openphysics": "studio,export,rii"}
         requirements = []
         for wheel in wheels:
             name, _, _, _ = parse_wheel_filename(wheel.name)

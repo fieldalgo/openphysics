@@ -14,7 +14,7 @@ python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"`를 유지하며 import나 배포판 이름이 아닙니다. 별도의 `openphysics` 배포판은 이름 예약용입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"`를 유지하며 import나 배포판 이름이 아닙니다. 별도의 `openphysics` 배포판은 0.1.0부터 여섯 패키지를 설치하는 메타 배포판이며, PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(선언 단위, study 지점별 n_eff, 군굴절률, 메시 통계, 시간), `fields.npz`(메시와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 문서 사본이 생성됩니다.
 
