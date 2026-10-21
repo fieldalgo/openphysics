@@ -4,23 +4,18 @@
 
 - **What it checks:** independent acceptance of `galerkin.thermoelasticity.solve_thermoelasticity` against an original three-dimensional continuum oracle, for an explicitly prescribed nodal-P1 Kelvin field in plane stress and plane strain.
 - **Fixed gates:** on n=8/16/32, both rates need displacement L2 ≥ 1.8 and displacement-gradient H1, full 3D stress L2 (including zz) and energy-norm orders ≥ 0.9; exact fields and energy/work identities agree to 1e-10, residuals to 1e-9.
-- **Scope:** the mechanical stage only. It does not validate a heat solver, temperature transfer, provenance, transient work or a full coupling workflow. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+- **Scope:** the mechanical stage only. It does not validate a heat solver, temperature transfer, provenance, transient work or a full coupling workflow. For the result of a specific commit, see its CI run.
 
 This acceptance uses an independent continuum oracle and preregistered gates.
 It covers the mechanical response to an explicitly prescribed nodal-P1 Kelvin
 field. It does not validate a heat solver, temperature transfer, provenance,
 transient work, or a complete sequential coupling workflow.
 
-The tested implementation is candidate `9f5ceef5f0aa5394272b25630791576d516924d8`.
-Final candidate `0c9237b2dfcfabd59fa0d14091bbb1e7165eda80` is a normal merge of
-that candidate and develop `6c38df4eac8db72f8ce3203a122f0ffd6afacc4e`.
-Direct recursive Git-tree comparison found only two changed existing files:
-`ci/README.md` and `ci/test_multiphysics_wheel.py`. All six dedicated
-thermoelasticity module/reference/test/doc/example blobs are identical.
-In particular, the solver blob is `eb806a1db8f7f8c4102f319771e242bdd10b6ea2`
-and the reference blob is `6230c95e9e1177e5bad378f7d3d3d56ee2685ff8`.
-This establishes identical numerical implementation; integration and release
-acceptance of other features remain separate decisions.
+## Evidence
+
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result.
 
 ## Original three-dimensional oracle
 
@@ -124,19 +119,11 @@ mesh arrays. Reproducible FNV-1a64 is a checksum, not a cryptographic signature
 or authenticated temperature provenance; correctly marked manual data is not
 identified as having come from a heat solver.
 
-Source and installed-wheel execution passed all 37 independent cases. The
-untouched candidate suites add 46 cases (39 engine and 7 reference), yielding
-83 related source passes. The initial source run had 26 passes and two harness
-broadcasting failures in the affine-temperature gradient norm; those original
-tracebacks were retained. Fixing the quadrature axis did not alter any gate or
-production file.
-
-At the finest mesh, normalized physical-energy errors (PS/PE) are .00018018 /
-.00035537 for linear temperature, .00180161 / .00237582 for sine, and .00048015 /
-.00090519 for polynomial. Linear-temperature displacement rates are at least
-1.8753; sine rates at least 1.9725; polynomial rates at least 1.9992. All
-registered gradient, stress, tangent-energy and temperature-interpolation gates
-pass on both adjacent refinements.
+Measured values at the finest mesh (n=32): normalized physical-energy errors
+(PS/PE) are .00018018 / .00035537 for linear temperature, .00180161 / .00237582
+for sine, and .00048015 / .00090519 for polynomial. Measured minimum
+displacement rates are 1.8753 for linear temperature, 1.9725 for sine and
+1.9992 for polynomial.
 
 Ephemeral runtime mutations are rejected by the real source and installed
 checks: wrong PE in-plane-alpha shortcut, factor-three thermal coefficient,
@@ -158,11 +145,6 @@ checkout, installs the local wheel without dependencies or an index, and runs
 reused in a dedicated venv; this is not a clean-room dependency installation.
 Shared-host timings are execution metadata, not performance baselines.
 
-Local whole-root regression on the first 37-case submitted suite passed
-657 tests and 9 subtests, with 16 optional-environment skips and one existing
-dependency deprecation warning. The final same-case suite additionally records
-an explicit strain norm and compares all nonlinear interpolation norms between
-quadrature orders. Its initial development run exposed an exact-temperature
-assertion accidentally including the new nonzero strain-error column (35 passes,
-two harness failures); restricting that check to temperature and its gradient
-retained all original thresholds. Source revalidation passed all 37 cases.
+The suite records an explicit strain norm and compares all nonlinear
+interpolation norms between quadrature orders. The exact-temperature assertion
+checks only temperature and its gradient.
