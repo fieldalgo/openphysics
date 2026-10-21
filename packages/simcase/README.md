@@ -46,9 +46,11 @@ prints a supplied example.
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
 
-Studio edits and runs 2D optical models and has dedicated views for the two heat
-types; it rejects cavity documents. Coupled or multiple-physics runs, geometry,
-mesh and material sweeps, lossy materials and mechanics documents are not supported.
+Studio edits and runs 2D optical models and has dedicated views for rectangular
+steady and transient heat; it rejects cavity documents and heat documents with
+material regions. Coupled or multiple-physics runs, geometry, mesh and material
+sweeps, lossy optical materials in `em.modes2d` and mechanics documents are not
+supported; `em.cavity3d` accepts lossy box materials.
 
 ## The document
 
@@ -339,6 +341,12 @@ between an ownership check and unlink is not guaranteed safe. Hostile
 filesystem races and atomic rollback are outside acceptance. CI runs the heat
 save and I/O robustness checks on Linux, macOS and Windows; see each contract
 for its save and platform limits.
+
+With the optional `simcase[export]` extra, `simcase.export` writes saved
+rectangular heat and vacuum PEC cavity fields as VTU files for ParaView, and a
+transient heat result as a `.pvd` time series; see
+[Viewing in ParaView](../../docs/packages/simcase/overview.md#viewing-in-paraview)
+for the supported layouts.
 
 ## The browser UI
 

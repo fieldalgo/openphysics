@@ -40,8 +40,9 @@ longitudinal coefficients, including degenerate eigenspace directions; read the
 eigenspace reliability contract before converting fields to real values.
 
 The [simcase](https://github.com/fieldalgo/openphysics/blob/main/packages/simcase/README.md)
-package wraps some of these solvers as JSON documents: 2D modes, the PEC cavity
-and rectangular steady and transient heat. Python-only capabilities do not
+package wraps some of these solvers as JSON documents: 2D modes, the box cavity
+(vacuum PEC or lossy materials and walls) and steady and transient heat
+(rectangular or with material regions). Python-only capabilities do not
 automatically appear there.
 
 ## Limits
@@ -56,8 +57,10 @@ automatically appear there.
   or anisotropic material. Mechanics is linear and small-strain. The traction
   APIs take global Cartesian loads; there is no dedicated scalar-pressure,
   local-frame or follower-load API.
-- The cavity solver handles a vacuum rectangular PEC box. Read its contract for
-  near-target search limitations.
+- `solve_cavity_box` handles a vacuum rectangular PEC box;
+  `solve_material_cavity_box` adds box-shaped lossy regions and
+  finite-conductivity walls. Read their contracts for near-target search
+  limitations.
 - The 3D sparse direct factorization is comfortable to about 25k edge degrees
   of freedom on four cores; larger problems need iterative solvers.
 

@@ -46,9 +46,11 @@ prints a supplied example.
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](thermal_regions2d.md) |
 
-Studio edits and runs 2D optical models and has dedicated views for the two heat
-types; it rejects cavity documents. Coupled or multiple-physics runs, geometry,
-mesh and material sweeps, lossy materials and mechanics documents are not supported.
+Studio edits and runs 2D optical models and has dedicated views for rectangular
+steady and transient heat; it rejects cavity documents and heat documents with
+material regions. Coupled or multiple-physics runs, geometry, mesh and material
+sweeps, lossy optical materials in `em.modes2d` and mechanics documents are not
+supported; `em.cavity3d` accepts lossy box materials.
 
 ## The document
 
@@ -344,8 +346,11 @@ for its save and platform limits.
 
 With the optional extra `pip install "simcase[export]"` (meshio, MIT),
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
-copy of saved steady heat, transient heat (one stored time, `time_index`,
-default the last) and cavity fields. 2D meshes get z = 0. `fields.npz` stays
+copy of saved rectangular steady heat with Dirichlet and insulated sides,
+rectangular transient heat (one stored time, `time_index`, default the last)
+and vacuum PEC cavity fields. Region documents, steady documents with flux or
+convection sides, lossy cavities and `em.modes2d` results are refused as an
+unsupported field layout. 2D meshes get z = 0. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
 because meshio's XDMF writer needs h5py.
