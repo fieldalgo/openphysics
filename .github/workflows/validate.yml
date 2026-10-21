@@ -98,7 +98,8 @@ jobs:
           python -m pytest -q -ra --junitxml=.validation/studio-thermal-preflight.xml \
             tests/simcase/test_studio_steady_thermal_http.py \
             tests/simcase/test_studio_thermal_acceptance.py \
-            tests/simcase/test_studio_thermal_lifecycle.py
+            tests/simcase/test_studio_thermal_lifecycle.py \
+            tests/simcase/test_studio_rectangle_invariants.py
       - name: Check transient thermomechanical contract and separated convergence
         run: |
           python -m pytest -q --capture=tee-sys -o junit_logging=all --junitxml=.validation/transient-thermomechanical.xml \
