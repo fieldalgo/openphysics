@@ -7,7 +7,8 @@ cross-section. You get the effective index n_eff, the mode fields and the group
 index over a wavelength sweep, and you learn the checks that tell you whether to
 trust them. Every Python block and `python -m simcase` command below is run by
 `tests/simcase/test_waveguide_tutorial.py` against the installed packages, and
-the printed numbers must match the outputs shown here.
+the printed numbers must match the outputs shown here to within one unit in the
+last printed digit (your machine may differ by that much).
 
 You need the runtime packages installed; see the
 [package overview](overview.md) for the install command. Studio (the browser
