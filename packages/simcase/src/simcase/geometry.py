@@ -147,11 +147,25 @@ def _rings(poly: Polygon):
 
 def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
     """meshine Domain, boundary namer, and {region name: material name}."""
+    return _domain_from_regions(doc)[:3]
+
+
+def _domain_from_regions(doc: Document, regions=None) -> tuple[Domain, callable, dict[str, str], int]:
+    """build_domain, plus the number of loop vertices it passes to meshine.
+
+    ``regions`` is ``resolve_regions(doc)``; None resolves them here, after the Domain is
+    made, the order build_domain has always had. The count is the sum of the lengths of
+    the loops given to ``Domain.add_region``, outer rings and holes: a shape inside the
+    background counts once as its own ring and once as the background's hole, and every
+    ``Circle`` occurrence counts as its ``n``. It is exact, and known before
+    ``Domain.build``, which only reads the queued loops.
+    """
     mesh_cfg = doc["mesh"]
     d = Domain(size=mesh_cfg["size"])
     dom = doc.domain
     materials: dict[str, str] = {}
     circle_lookup: dict[tuple[float, float, float], Circle] = {}
+    count = 0
 
     def circle_for(cx, cy, r):
         key = (round(cx, 12), round(cy, 12), round(r, 12))
@@ -159,14 +173,17 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
             circle_lookup[key] = Circle((cx, cy), r, n=max(16, int(2 * np.pi * r / (mesh_cfg["size"] / 2))))
         return circle_lookup[key]
 
-    regions = resolve_regions(doc)
+    if regions is None:
+        regions = resolve_regions(doc)
     min_area = _min_area(doc)
     exact_circles = {(rn): ex for rn, _m, _g, _s, ex in regions if ex}
 
     for name, material, geom, size, exact in regions:
         materials[name] = material
         if exact:
-            d.add_region(name, circle_for(*exact["center"], exact["r"]), size=size)
+            circle = circle_for(*exact["center"], exact["r"])
+            d.add_region(name, circle, size=size)
+            count += circle.n
             continue
         parts = list(geom.geoms) if isinstance(geom, MultiPolygon) else [geom]
         for part in parts:
@@ -185,4 +202,5 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
                         break
                 hole_objs.append(match if match is not None else h)
             d.add_region(name, outer, holes=hole_objs, size=size)
-    return d, box_sides(dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"]), materials
+            count += len(outer) + sum(h.n if isinstance(h, Circle) else len(h) for h in hole_objs)
+    return d, box_sides(dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"]), materials, count
