@@ -274,8 +274,6 @@ the engine validation in [multimaterial](../galerkin/multimaterial.md).
   corner or a little sharper (measured 13.0° beside a 14° polygon corner); an
   input meshine cannot resolve ends with an error (see Mesh and solve).
 - Plane geometry of unit depth; no thermal properties from built-in materials.
-- The VTU export (`simcase.export`, extra `simcase[export]`) does not accept the
-  region layouts yet; it refuses them as an unsupported field layout.
 
 ### Canonical length regression
 
@@ -286,3 +284,64 @@ transient affine initial data exercise both solve paths. Every numeric saved
 array, region/material assignment and boundary tag must be identical; the
 original model and declared units must be preserved. Existing layered-wall
 analytical convergence tests remain required.
+
+## VTU and PVD export
+
+Install `simcase[export]` (meshio, MIT) to view saved region results in ParaView.
+`export_fields(fields_npz, output, *, time_index=-1)` accepts both
+`thermal2d-p1-node-cell-regions-v1` and
+`thermal2d-transient-p1-node-cell-regions-v1`. `export_time_series(fields_npz,
+output_dir, *, name="fields")` accepts the transient layout and writes one VTU
+per stored time plus a PVD collection with exact `time_s` values in seconds.
+Neither function reruns the solver or changes the saved result.
+
+```python
+from simcase import Document, run
+from simcase.export import export_fields, export_time_series
+
+# Run from the repository root, with new output paths.
+steady = run(Document.load("examples/simcase/thermal_regions.json"), verbose=False)
+steady_dir = steady.save("out/region-steady")
+export_fields(steady_dir / "fields.npz", "out/region-steady/view.vtu")
+transient = run(Document.load("examples/simcase/transient_thermal_regions.json"), verbose=False)
+transient_dir = transient.save("out/region-transient")
+export_fields(transient_dir / "fields.npz", "out/region-transient/initial.vtu", time_index=0)
+export_time_series(transient_dir / "fields.npz", "out/region-transient/paraview")
+```
+
+Open `view.vtu` or `paraview/fields.pvd` in ParaView. Color by the **cell**
+array `triangle_regions` to distinguish regions (even when they use the same
+material), or by `temperature_k` to inspect the nodal temperature. IDs are the
+unchanged zero-based indices into `summary.json["region_names"]`;
+`summary.json["regions"][name]["material"]` identifies each material. The same
+summary is in the NPZ metadata. Names, properties and boundary tags are not
+copied into VTU; keep the original NPZ/summary for their meaning.
+
+| VTU association | Arrays and units |
+|---|---|
+| Points | `nodes_m`, embedded at z = 0, in metres regardless of document length unit |
+| Point data | `temperature_k` (K); stored nodal loads, reactions, residuals and storage rates (W/m of depth) |
+| Cell data | `heat_flux_w_m2` (W/m², zero z component); `triangle_regions` (dimensionless integer) |
+
+Steady region exports include `load_w_per_m`, `reaction_w_per_m`,
+`residual_w_per_m`, `prescribed_outward_load_w_per_m`, `ambient_load_w_per_m`,
+`convective_outward_w_per_m` and `system_rhs_w_per_m`. Their flux/Robin signs
+and outer-side boundary conditions remain those described above. Transient
+exports include `source_load_w_per_m`; reaction, residual and storage-rate
+arrays exist only from the second stored time. No initial rate is invented.
+Domain histories such as heat content, boundary-node subsets, names and units
+remain in NPZ/summary. No point/cell interpolation or region renumbering occurs.
+
+An existing VTU is refused; a series directory must be new or empty. Series
+failures remove files created by that call. Missing, non-integer, negative or
+incorrectly shaped `triangle_regions` arrays are rejected before output is
+created. This is an exporter for valid `save()` results, not a full validator
+for arbitrary NPZ archives. It does not support restart, XDMF, transient
+flux/Robin input or the separate rectangular steady `boundary-v2` layout.
+
+`tests/simcase/test_export_regions.py` checks all exported arrays against NPZ,
+all stored timesteps, initial-rate absence, region IDs distinct from material
+IDs, output protection and failure cleanup. Equivalent mm/m/um/nm/custom-unit
+problems must give exactly equal SI export arrays in the same numerical
+environment, subject to the canonical-length condition above. These consumers
+also run against installed wheels on Linux, macOS and Windows.

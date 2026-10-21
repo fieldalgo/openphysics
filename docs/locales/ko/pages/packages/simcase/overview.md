@@ -190,8 +190,11 @@ result = solve_point(model, doc.sole_physics()[1])
 선택 extra `pip install "simcase[export]"`(meshio, MIT)를 설치하면
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 직사각형 정상
 열전도(Dirichlet·단열 변), 직사각형 과도 열전도(저장된 시각 하나, `time_index`, 기본값은
-마지막), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 영역 문서, 열유속·대류 변이 있는 정상
-문서, 손실 공진기, `em.modes2d` 결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 둡니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
+마지막), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 정상·과도 재료 영역 배치도 지원하며
+정수 셀 데이터 `triangle_regions`와 저장된 정상 flux/Robin 하중 배열을 포함합니다.
+단위·영역 이름 대응·예제는 [영역 내보내기](thermal_regions2d.md#vtu와-pvd-내보내기)를 참고하세요.
+열유속·대류 변이 있는 직사각형 정상 문서(`boundary-v2`), 손실 공진기, `em.modes2d` 결과는
+지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 둡니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 

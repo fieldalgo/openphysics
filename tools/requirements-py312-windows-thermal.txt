@@ -23,3 +23,9 @@ setuptools==84.0.0
 shapely==2.2.0
 six==1.17.0
 wheel==0.48.0
+
+# Existing optional VTU export extra, also exercised by installed consumers.
+markdown-it-py==4.2.0
+mdurl==0.1.2
+meshio==5.3.5
+rich==15.0.0

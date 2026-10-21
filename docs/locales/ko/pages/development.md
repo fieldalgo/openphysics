@@ -184,7 +184,8 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 
 **설치 플랫폼** (`tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
 모듈 위치, 포함 자산, 공개 API·CLI·저장 간단 시험, 열 저장/I-O 견고성 시험(부분 실패
-정리, 동시 저장, 기존 대상 보호), source 대상 보호 fixture 두 개를 확인합니다. 설치
+정리, 동시 저장, 기존 대상 보호), source 대상 보호 fixture 두 개와 export extra를 설치한
+영역 VTU/PVD 소비자 시험(`tests/simcase/test_export_regions.py`)을 확인합니다. 설치
 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버를 고정 작업량으로 한 번

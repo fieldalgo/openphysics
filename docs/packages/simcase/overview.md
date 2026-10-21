@@ -361,9 +361,12 @@ With the optional extra `pip install "simcase[export]"` (meshio, MIT),
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
 copy of saved rectangular steady heat with Dirichlet and insulated sides,
 rectangular transient heat (one stored time, `time_index`, default the last)
-and vacuum PEC cavity fields. Region documents, steady documents with flux or
-convection sides, lossy cavities and `em.modes2d` results are refused as an
-unsupported field layout. 2D meshes get z = 0. `fields.npz` stays
+and vacuum PEC cavity fields. Steady/transient material-region layouts are
+also supported, with integer cell data `triangle_regions` and the saved
+steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
+for units, the region-name mapping and an example. Rectangular steady documents
+with flux/convection sides (`boundary-v2`), lossy cavities and `em.modes2d`
+results are refused as an unsupported field layout. 2D meshes get z = 0. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
 because meshio's XDMF writer needs h5py.

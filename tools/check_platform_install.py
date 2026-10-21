@@ -168,6 +168,7 @@ def main():
             ROOT / "tools" / "wheel_consumers" / "test_platform_install.py": tests / "test_platform_install.py",
             ROOT / "tools" / "wheel_consumers" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
             ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
+            ROOT / "tests/simcase/test_export_regions.py": tests / "test_export_regions.py",
             ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
@@ -198,6 +199,7 @@ def main():
             tests / "test_thermal_simcase_wheel.py",
             tests / "test_transient_thermomechanical_wheel.py",
             tests / "test_msh.py",
+            tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
         # Installed save/I-O robustness: every transient and steady-boundary platform
