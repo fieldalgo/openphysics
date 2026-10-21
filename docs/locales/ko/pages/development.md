@@ -241,11 +241,32 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 
 ## 배포(PyPI)
 
-PyPI에 올리는 워크플로는 없고, 태그도 아무것도 실행하지 않습니다. 릴리스 전에 패키지와
-버전을 정하고, 그 버전이 PyPI에 이미 있는지 확인하고, 정확한 main 커밋을 검증하고, 그
-PyPI 프로젝트의 trusted publisher를 리뷰를 거친 배포 워크플로와 GitHub environment에
-맞춰 설정합니다. 각 패키지는 `packages/<name>`에서 빌드합니다. 저장소 루트는 배포물이
-아니며, `packages/openphysics`는 나머지 여섯 개를 요구하는 메타 배포판입니다. 패키지 하나만 빌드해
+`Release` 워크플로(`.github/workflows/release.yml`)는 GitHub 릴리스가 게시되면 배포판
+일곱 개를 PyPI에 올립니다. 태그만 push해서는 아무것도 올라가지 않고, 검증 워크플로가 이
+워크플로를 시작하지도 않습니다. 작업은 순서대로 돕니다.
+
+1. **gate**: 릴리스 커밋에서 `validate.yml`이 이미 성공했는지 봅니다. 시험을 다시 돌리지는
+   않습니다. 그 전에 릴리스를 게시하면 여기서 실패하고 아무것도 올리지 않습니다. 검증이
+   성공한 뒤 워크플로를 다시 실행하세요.
+2. **build**: `tools/check_release_version.py --tag <tag>`, 이어서
+   `OPENPHYSICS_DOCS_REF`를 그 태그로 두고 `tools/check_distributions.py --build-only`.
+3. **install**: Linux·macOS·Windows에서 Python 3.12와 3.15로
+   `tools/check_release_install.py --wheels`를 실행하며, 제3자 의존성은 PyPI에서 해석합니다.
+   설치된 패키지의 smoke 검사이며 시험 전체가 아닙니다.
+4. **publish**: `v*` 태그만 받는 GitHub 환경 `pypi`에서 PyPI trusted publishing(OIDC, 저장한
+   토큰 없음)으로 올립니다. 의존 대상을 먼저, `openphysics`를 마지막에 올립니다. 각 PyPI
+   프로젝트에는 owner `fieldalgo`, repository `openphysics`, workflow `release.yml`,
+   environment `pypi`로 publisher가 등록돼 있어야 합니다.
+5. **verify**: PyPI의 파일이 빌드한 파일과 SHA-256이 같아야 하고, PyPI에서 설치해도 같은
+   플랫폼에서 3단계를 다시 통과해야 합니다.
+
+손으로 실행하면(Actions → Release → Run workflow) dry run입니다. 고른 브랜치의 커밋에서
+1–3단계만 돌고, 설명의 링크는 그 커밋을 가리키며, 아무것도 올리지 않습니다. 릴리스 순서:
+버전 변경을 반영하고, 그 `main` 커밋의 검증을 기다리고, `main`에서 dry run을 돌린 뒤, 그
+커밋에 `vX.Y.Z` 태그를 달고 그 태그로 GitHub 릴리스를 게시합니다.
+
+각 패키지는 `packages/<name>`에서 빌드합니다. 저장소 루트는 배포물이 아니며,
+`packages/openphysics`는 나머지 여섯 개를 요구하는 메타 배포판입니다. 패키지 하나만 빌드해
 확인하려면:
 
 ```bash

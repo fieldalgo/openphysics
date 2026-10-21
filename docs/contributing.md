@@ -97,9 +97,11 @@ checks it. Land the version change through the same PR process, wait for the req
 checks on the resulting `main` commit, then tag it `vX.Y.Z` and publish release
 notes and verified artifacts. Build release artifacts with `OPENPHYSICS_DOCS_REF` set
 to that tag so the PyPI description links to the released files (see the
-[development guide](development.md#publishing)). Branch updates never publish packages. Automated
-PyPI or documentation publication is not configured; release credentials and
-publication gates need separate setup. Create `maintenance/X.Y.x` from a released
+[development guide](development.md#publishing)). Branch updates and tags alone never publish
+packages: publishing the GitHub release starts the `Release` workflow, which
+uploads to PyPI only after the release commit's validation has passed. Run it by
+hand on `main` first as a dry run; it then uploads nothing. Documentation is not
+published automatically. Create `maintenance/X.Y.x` from a released
 tag only when that release needs a patch, and carry reviewed fixes from `main`.
 
 ## Repository structure
