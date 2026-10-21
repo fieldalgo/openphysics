@@ -25,6 +25,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | Electromagnetics | 2D scalar and full-vector waveguide modes; resolved-mode wavelength sweeps with complex fields and mode tracking | [Model runner](packages/simcase/README.md), [vector reliability](docs/packages/galerkin/eigenspace_reliability.md) |
 | Electrostatics and scattering | 2D electrostatic potential and frequency-domain Helmholtz scattering with a first-order absorbing boundary or a cylindrical PML, through the Python API | [galerkin](packages/galerkin/README.md), [milestone validation](docs/packages/galerkin/milestone_validation.md) |
 | 3D cavities | Rectangular-box eigenmodes, vacuum PEC or with lossy box materials and conducting walls (complex frequencies and Q), through a Python API or a single JSON study | [Cavity API](docs/packages/galerkin/cavity_solver.md), [material cavity](docs/packages/galerkin/material_cavity.md), [JSON contract](docs/packages/simcase/cavity3d.md) |
+| Electric conduction | Steady isotropic 2D Python API; region conductivity, voltage/current/insulation, explicit Neumann gauges, V/E/J and Joule heat | [Electric API and coupling contract](docs/packages/galerkin/electric_steady2d.md) |
 | Heat conduction | Steady isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](docs/packages/galerkin/thermal_steady2d.md), [flux/Robin](docs/packages/galerkin/thermal_flux_robin.md), [thermal JSON](docs/packages/simcase/thermal_steady2d.md), [boundary JSON](docs/packages/simcase/thermal_steady_boundary2d.md), [Studio](docs/packages/simcase/thermal_studio.md) |
 | Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](docs/packages/galerkin/transient_heat.md), [document](docs/packages/simcase/thermal_transient2d.md), [validation](docs/packages/galerkin/transient_heat_validation.md), [Studio](docs/packages/simcase/thermal_transient_studio.md) |
 | Material regions | Piecewise-constant isotropic materials on named 2D mesh regions for steady and transient heat, elasticity, thermal expansion and both heat→mechanics workflows in Python; steady and transient heat JSON documents with shapes over a background | [Region materials](docs/packages/galerkin/multimaterial.md), [region documents](docs/packages/simcase/thermal_regions2d.md) |
@@ -39,6 +40,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | 2D waveguide modes and sweeps | Yes | `em.modes2d` (lossless) | Yes |
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
+| Steady electric conduction | Yes | No | No |
 | Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | No |

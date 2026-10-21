@@ -139,3 +139,5 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 파일로 실행합니다. 따라서 GPL은 `galerkin` 또는 이를 사용하는 코드로 확장되지 않습니다.
 
 이 프로젝트는 Gmsh 프로젝트와 제휴하지 않으며 그 프로젝트의 보증이나 지원을 받지 않습니다.
+
+[정상 전기전도: Python API, Joule 발열과 Neumann 기준 전위](electric_steady2d.md).
