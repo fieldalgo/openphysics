@@ -6,31 +6,21 @@
 
 - **확인하는 것:** 자체 oracle(생산 코드·refsol 미사용)과 사전 등록한 사례로 `solve_transient_heat`를 독립 수용 검증합니다. 균일 단열, 이동 affine 장, 허용 초기 불일치, 이산 열원 끝점, 시간 고유모드, PDE 사인, 시간 보조 실행, 독립 구적입니다.
 - **고정 기준:** 시간 차수 0.9–1.1과 전체 이력의 후진 Euler 곱 일치 ≤ 1e-10, PDE 사인의 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9, 보조 실행 변화 ≤ 5%, 8차·10차 구적 1% 이내입니다.
-- **범위:** 대수·시간·공간·구적 오차를 따로 보고하며, 실패한 기준은 실패로 남고 시간 간격이나 허용치를 다시 맞추지 않습니다. 아래 과거 등록 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+- **범위:** 대수·시간·공간·구적 오차를 따로 보고하며, 실패한 기준은 실패로 남고 시간 간격이나 허용치를 다시 맞추지 않습니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
-## 현재 checkout과 근거
+## 근거
 
-이 페이지는 현재 checkout의 구현을 설명합니다. 명시된 과거 snapshot의 결과와 한계는 해당 버전에 적용됩니다. 다른 커밋의 검증 상태는 그 커밋의 CI 로그와 artifact에서 확인합니다.
+이 페이지는 기준과 재현 방법을 정의합니다. 특정 커밋의 결과는 그 커밋의 CI
+종료값·로그·artifact입니다. 아래 명령은 검사를 재현하는 절차이며 그 자체가 통과
+결과는 아닙니다. 실패한 기준은 실패로 남으며 source·설치·독립·플랫폼 결과는
+각각 평가합니다.
 
-## 과거 등록과 현재 재현
+## 동결 계약
 
-2026-10-16. 이 보고서는 정확한 초기 생산 후보
-`d21e083d9723eec71ab5e32777ecd331d75cd981`을 대상으로 한다.
-`galerkin/transient_heat.py`의 Git blob은
-`426015f84e2c43db964f3063c734d47aca41a9fa`이다.
-독립 수용 브랜치는
-이 정확한 후보에서 생성했다. 초기 코드 체크포인트는
-`55afd565b9f6feea38896dc567eef574adf21371`이다.
-그 과거 제출은 생산 코드·생산 담당 시험·refsol·기존 시험·공용 release 설정을 변경하지 않았습니다.
-
-**과거 제출 근거:** 원 d21 독립 수용 제출에서는 Python parse/compile·collection·NumPy 진단·source/설치 시험·runtime 음성대조·PDE 수렴·전체 회귀·Windows 시험을 실행하지 않았습니다. 통과 수·측정 차수·artifact hash·clean-whole 주장은 없었습니다. 이는 과거 한계이며 현재 실행 제한이 아닙니다. Actions는 활성화돼 있고 현재 checkout 결과는 정확한 CI 근거가 필요합니다.
-
-신규 생산 모듈을 읽기 전에 독립 사전등록
-`d42b43360bcaff9fe1d98c44105b15ab74ceec90`에서 수치 계약을 고정했다.
+신규 생산 모듈을 읽기 전에 독립 사전등록에서 수치 계약을 고정했다.
 oracle blob `69238292eb72c58c3d3385cc0a60a1db8c7fcd2b`는
 생산/refsol에서 변형한 것이 아니라 **바이트 그대로** 복사했다.
-모든 사전 gate를 유지한다. 이전 작은 n3 248확인/41이름과 생산 담당 자체시험은
-이 독립 수용 결과가 아니다. 기존 열탄성 traction/전체시험 이력은 별도 범위다.
+모든 사전 gate를 유지한다. 생산 담당 자체시험은 이 독립 수용 결과가 아니다.
 
 ## 소유 범위와 파일
 
@@ -43,7 +33,6 @@ oracle blob `69238292eb72c58c3d3385cc0a60a1db8c7fcd2b`는
 | test_transient_heat_independent_validation.py | pytest 발견 wrapper만 담당 |
 | transient_heat_independent_consumer.py | stdlib 격리 설치모듈 loader/origin/hash 검사 |
 
-영어 보고서와 이 완전한 한국어판이 나머지 두 추가 파일이다.
 생산 담당 시험이나 허용치를 편집하지 않는다. 현재 원문에는 test 메서드17개가
 선언되어 있다. 이는 정적 문자열 개수이며 **collection 또는 통과 횟수가 아니다**.
 unittest subtest와 후속 pytest/subtest 개수는 실제 관측값으로 따로 보고해야 한다.
@@ -136,8 +125,7 @@ T/flux 오차, 독립 구적 오차. 실행하면 raw 오차/차수와 모든 co
 
 ## Gate 변경 없이 B 계약 검토 반영
 
-구현 전 검토 `420bd73ea202eef65354b65ee0042598934cb0c2`의
-review blob `114a828d5d3b74cb66801c017000b36170e9812d`를 읽었다.
+구현 전 계약 검토를 다음과 같이 반영한다.
 R2 actual initial/old M_FC는 영 baseline에서 작은 허용 불일치와 유한한 작은 h로
 검사한다. 온도 허용치만으로는 놓칠 수 있어 원래 scale을 완화하지 않고 storage로
 비영 witness를 드러낸다. 초기 projection actor는 실제 solve를 호출하며,
@@ -255,17 +243,3 @@ python -m pytest -q
 배포 helper는 sdist와 wheel에 문서·시험·예제가 들어 있지 않은지 확인하며, 이 보고서·시험·예제는 배포하지 않습니다. Helper는 설치된 runtime 모듈의 byte와 출처를 확인하고, checkout에서 추적되는 oracle/cases/consumer와 예제를 checkout 밖으로 복사한 뒤, 설치된 wheel을 대상으로 격리 consumer를 `--suite all`로 실행하고 전체 수렴 예제를 실행합니다. 이는 구현된 검증이며 artifact 실행 성공 근거는 아닙니다. 정확한 CI 종료값과 artifact를 확인해야 합니다.
 후속 생산 SHA는 원 blob 비교와 영향별 재검증이 필요하며,
 동일 코드라는 이유로 전체 시험을 자동 반복하지 않는다.
-
-## 과거 d21 근거의 한계
-
-| 범위 | 원 d21 제출 결과 |
-|---|---|
-| 후보 API/source 읽기 | 완료; 정확한 모듈 blob 기록 |
-| 수용 oracle/cases/consumer 및 EN/KO 보고 | 작성; 정적검토만 수행 |
-| 동결 oracle/gate | 보존; producer/refsol 정답 의존 없음 |
-| Python syntax/pytest collection/NumPy/source/installed/runtime 음성 | 미실행; 통과 주장 없음 |
-| 시간/PDE/5% 분리·구적 gate | 미실행 |
-| 전체회귀/artifact/build/배포/Windows | 미실행 |
-| Actions | 조회·실행·활성화 없음 |
-
-원 수치 실패를 통과로 바꾸지 않습니다. 표는 과거 source-only 제출을 기록하며 현재 checkout의 CI 상태가 아닙니다. 최초 실패와 정확한 근거를 보존하고 main 통합·릴리스 전에 현재 source·설치·독립·플랫폼 결과를 각각 평가해야 합니다.
