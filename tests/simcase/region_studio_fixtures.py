@@ -13,6 +13,7 @@ The steady example's domain is 40 x 20 mm; the transient example's is 30 x 5 mm.
 """
 import copy
 import math
+import random
 
 from simcase import examples
 
@@ -203,6 +204,43 @@ def covered_crossings(teeth=126, front=58, box=(8.0, 32.0, 1.0, 19.0)):
     return with_shapes(shapes)
 
 
+def covered_crossings_with_circles(teeth=15, circles=16, r=1.2):
+    """``covered_crossings`` with ``circles`` fewer front rects and, after the covering
+    rects, ``circles`` identical circles of radius ``r`` at (1.5, 15) mm. Identical circles
+    share every edge, which is a collinear overlap, not a crossing, so they add no
+    boundary crossings but make each shape's boolean with the later ones costlier. At the
+    defaults: 64 shapes, 16 circles, 66 polygon points, about a thousand crossings."""
+    doc = covered_crossings(teeth=teeth, front=58 - circles)
+    doc['geometry']['shapes'] += [circle(f'ic{k}', 1.5, 15.0, r) for k in range(circles)]
+    return doc
+
+
+def collinear_overlaps(rects=47, circles=16, points=512, y0=8.0, y1=12.0):
+    """Boundaries that overlap without crossing: one polygon of ``points`` points whose
+    bottom and top edges are split into collinear points on y = y0 and y1, ``rects``
+    rects on the same two lines with staggered x, and ``circles`` identical circles. At
+    the defaults: 64 shapes, 16 circles, 512 polygon points and no boundary crossing."""
+    n = points // 2
+    xs = [2.0 + 36.0 * i / (n - 1) for i in range(n)]
+    shapes = [polygon('pa', [(x, y0) for x in xs] + [(x, y1) for x in reversed(xs)], 'copper')]
+    shapes += [rect(f'r{k}', 3.0 + 0.3 * k, y0, 20.0, y1 - y0, 'steel' if k % 2 else 'copper')
+               for k in range(rects)]
+    shapes += [circle(f'c{k}', 20.0, 10.0, 2.0) for k in range(circles)]
+    return with_shapes(shapes)
+
+
+def concentric_rings(count=7, r0=1.0, dr=0.3, size=0.15, min_angle=33.0):
+    """``count`` concentric circles in the steady domain, radii r0 + k dr, larger ones
+    first, so that each later circle cuts an annulus out of the one before (every circle
+    is a 128-gon), each with ``mesh_size`` ``size``, and ``min_angle``. At the defaults
+    meshine's refinement does not finish within its 80 rounds before the node cap."""
+    shapes = [circle(f'c{k}', 20.0, 10.0, r0 + (count - 1 - k) * dr, 'copper' if k % 2 else 'steel',
+                     mesh_size=size) for k in range(count)]
+    doc = with_shapes(shapes)
+    doc['mesh']['min_angle'] = min_angle
+    return doc
+
+
 def chord_stars(polygons=8, rects='nested'):
     """``polygons`` polygons of ``512 // polygons`` points each, each a star whose every edge
     is a chord through the centre of the steady domain, so that nearly every pair of their
@@ -295,6 +333,53 @@ def corner_fans(polygons=8, rects='corner'):
         shapes += [rect(f'r{q}', 11.0 + 0.18 * q, 1.0 + 0.18 * q, 18.0 - 0.36 * q, 18.0 - 0.36 * q) for q in range(count)]
     else:
         raise ValueError(rects)
+    return with_shapes(shapes)
+
+
+def sawtooth(teeth=254, tip_angle_deg=None, jitter=0.0, seed=1, crossing_rects=0, rect_width=0.03,
+             min_angle=None):
+    """One sawtooth polygon of 2 * teeth + 3 points across the steady domain: a straight
+    base at y = 4 mm and teeth from x = 2 to 38 mm whose tips reach y = 16 mm. At the
+    default the valleys are at y = 8 mm, so each tip is about 1 degree; with
+    ``tip_angle_deg`` the valleys rise until the tips have that angle. ``jitter`` moves
+    every tooth point up or down by up to that fraction of the tooth height (seeded),
+    ``crossing_rects`` thin vertical rects of ``rect_width`` cross the tooth band, and
+    ``min_angle`` sets mesh.min_angle. Such inputs need very fine meshes near their tips."""
+    x0, x1, ybase, yhi = 2.0, 38.0, 4.0, 16.0
+    w = (x1 - x0) / teeth
+    ylo = 8.0 if tip_angle_deg is None else yhi - (w / 2) / math.tan(math.radians(tip_angle_deg) / 2)
+    points = [[x0, ybase], [x1, ybase]]
+    for i in range(teeth, 0, -1):
+        points += [[x0 + i * w, ylo], [x0 + (i - 0.5) * w, yhi]]
+    points.append([x0, ylo])
+    if jitter:
+        rng = random.Random(seed)
+        amplitude = jitter * (yhi - ylo)
+        for point in points[3:-1]:
+            point[1] += rng.uniform(-amplitude, amplitude)
+    shapes = [polygon('saw', points)]
+    for j in range(crossing_rects):
+        shapes.append(rect(f'xr{j}', x0 + 0.37 + j * (36.0 - 0.8) / crossing_rects, ylo - 0.3, rect_width,
+                           yhi - ylo + 0.6, 'copper'))
+    doc = with_shapes(shapes)
+    if min_angle is not None:
+        doc['mesh']['min_angle'] = min_angle
+    return doc
+
+
+def crossing_stars(count=16, points=32, inner=6.0):
+    """16 isolated circles first, then ``count`` stars of ``points`` points (radii 9 and
+    ``inner`` mm) all centred in the steady domain and slightly rotated against each
+    other, so that their edges cross pairwise: 32 shapes and 512 polygon points at the
+    default."""
+    slots = [(x, y) for x in (1.6, 4.8, 8.0, 32.0, 35.2, 38.4) for y in (2.5, 7.5, 12.5, 17.5)]
+    shapes = [circle(f'pc{j}', x, y, 1.2) for j, (x, y) in enumerate(slots[:16])]
+    for j in range(count):
+        phase = j * 2 * math.pi / (points * count)
+        star = [(20.0 + (9.0 if i % 2 == 0 else inner) * math.cos(phase + 2 * math.pi * i / points),
+                 10.0 + (9.0 if i % 2 == 0 else inner) * math.sin(phase + 2 * math.pi * i / points))
+                for i in range(points)]
+        shapes.append(polygon(f'x{j}', star, 'steel' if j % 2 else 'copper'))
     return with_shapes(shapes)
 
 

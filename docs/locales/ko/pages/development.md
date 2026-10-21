@@ -137,7 +137,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 여덟 개; Studio Node 검사; Studio 자원 관측 1회 |
+| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 여덟 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
 | `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 여덟 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 일곱 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
@@ -206,9 +206,11 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 영역 VTU/PVD 소비자 시험(`tests/simcase/test_export_regions.py`)을 확인합니다. 설치
 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
 
-**자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버를 고정 작업량으로 한 번
-측정합니다. 관측값이며 성능 기준이 아닙니다. 관측 도구는 `tools/studio_resources/`에 있고,
-과도 관측 도구는 [과도 자원 관측 안내](transient_resource_probe.md)가 설명합니다. 솔버 시간 측정과 프로파일링 명령은
+**자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
+고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
+코드가 정해 둔 것과 다르거나 단계가 실패할 때만 실패합니다. 관측 도구는
+`tools/studio_resources/`에 있고, 과도 관측 도구는 [과도 자원 관측 안내](transient_resource_probe.md)가,
+영역 관측은 [영역 자원 관측](region_resource_probe.md)이 설명합니다. 솔버 시간 측정과 프로파일링 명령은
 [벡터](benchmark_vector.md)·[공동](benchmark_cavity.md) 벤치마크 안내에 있습니다.
 
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,

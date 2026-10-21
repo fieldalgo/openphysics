@@ -145,7 +145,7 @@ not run it. It has four parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all eight distributions; Studio Node checks; one Studio resource observation |
+| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all eight distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
 | `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all eight wheels, built from sdists and installed with all their extras outside the checkout |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Seven packages built from sdists into wheels and tested in a fresh environment outside the checkout |
@@ -235,10 +235,13 @@ fixtures, plus region VTU/PVD export consumers (the export extra is installed).
 This is installed acceptance, not a full macOS or Windows regression.
 
 **Resource observations.** After a green Linux run, the steady and transient
-Studio servers are measured once with fixed workloads. These are observations,
-not performance gates. The observers are in `tools/studio_resources/`; the
+Studio servers, and Studio with heat region documents, are measured once with
+fixed workloads. These are observations, not performance gates: the region
+observation fails only when a workload's outcome code differs from the fixed one
+or a stage fails. The observers are in `tools/studio_resources/`; the
 [transient resource observer guide](transient_resource_probe.md) describes the
-transient ones.
+transient ones and the [region resource observation](region_resource_probe.md)
+the region one.
 Timing and profiling commands for the solvers are in the
 [vector](benchmark_vector.md) and [cavity](benchmark_cavity.md) benchmark guides.
 

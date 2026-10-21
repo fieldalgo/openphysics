@@ -270,18 +270,23 @@ and the message says "more than". All values are candidates
   so a tiny global size is refused here.
 
 See [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers)
-for the engine functions Studio uses.
+for the engine functions Studio uses, and the
+[region resource observation](../../region_resource_probe.md) for measured
+validation and job times and memory on fixed workloads at and beyond these limits.
 
 ### Validation thread and concurrency
 
 Region validation (the raw counts, `Document.from_dict`, the loop-vertex count
 and, for a run, the run copy) runs in a worker thread, so long geometry work does
 not block the event loop; Python-level shapely and numpy calls that hold the GIL
-can still delay it briefly. The request keeps the shared thermal ingress permit
-until that thread returns, also when the client disconnects or the request is
-cancelled, so at most one region validation runs at a time and other thermal
-requests get 429 meanwhile; a cancelled request then ends without starting a job.
-A run validates again in the same way, then reserves the single job slot.
+can still delay it briefly, as can the job thread (in local runs other requests
+waited up to about 0.06 s during validation and 0.2 to 0.5 s while a job ran;
+see the [region resource observation](../../region_resource_probe.md)). The
+request keeps the shared thermal ingress permit until that thread returns,
+also when the client disconnects or the request is cancelled, so at most one
+region validation runs at a time and other thermal requests get 429 meanwhile;
+a cancelled request then ends without starting a job. A run validates again in
+the same way, then reserves the single job slot.
 
 The loop-vertex count is taken on the micrometre copy a run meshes, and
 `check_mesh_limits` validates that copy as a run does, so validation resolves
@@ -308,10 +313,12 @@ the crossing cap.
 
 - An over-fine mesh fails in the job, after meshing and before the solve, not
   at validation: validation refuses only on geometry, the summary floor and, for
-  transient documents, history length. The job slot is held meanwhile.
+  transient documents, history length. The job slot is held meanwhile; in local
+  runs, meshing took up to about 5 s before such a refusal (up to 2.9 s in the
+  latest run).
 - A refinement that does not converge within meshine's 80 rounds before the
   node cap stops it also fails in the job, as `solver_failed`, and also holds
-  the job slot while it runs.
+  the job slot while it runs: about 6 to 13 s in local runs.
 - Isolated circles take their point count from the global `mesh.size` (see above).
 - The loop-vertex count is taken before the mesher splits loops at T-junctions,
   so the mesher can process somewhat more points than counted.
@@ -320,7 +327,11 @@ the crossing cap.
   their `source` text, and must fit in 64 KiB. Certain overflows are refused at
   validation; the rest end as a job error.
 - meshine can fail closed with "cannot resolve" (`solver_failed`), for example
-  for acute star polygons or crossing polygons with near-coincident boundaries.
+  for acute star polygons, crossing polygons with near-coincident boundaries or
+  a sawtooth with 1-degree tips. That sawtooth fails only on the micrometre
+  copy simcase meshes; in millimetres, or scaled by other factors, it reaches the
+  node cap instead (see the
+  [region resource observation](../../region_resource_probe.md)).
 - Colours repeat after eight regions; the legend, boundaries, table and hover
   still name every region.
 - A page cached from before region support refuses region results after the
