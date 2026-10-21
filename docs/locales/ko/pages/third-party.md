@@ -159,9 +159,8 @@ matplotlib의 pybind11, fonttools·charset-normalizer의 Cython·mypyc 출력)�
 다른 플랫폼, Python 버전, 패키지 버전의 휠은 다를 수 있습니다.
 
 조사하지 않은 것: Linux aarch64, musllinux, Windows arm64, 32비트 Windows(win32), CPython 3.12 외
-버전, 선언한 범위 안의 고정 버전 외 버전. 패키지는 상한 없이 Python 3.10 이상을 받습니다. 고정한
-numpy·scipy·shapely는 cp313부터 cp315까지의 휠도 올리고, numpy 2.5.4와 scipy 1.18.1은 Python 3.12
-이상이 필요해 3.10·3.11에서는 더 오래된 릴리스가 설치됩니다.
+버전, 선언한 범위 안의 고정 버전 외 버전. 패키지는 상한 없이 Python 3.12 이상을 요구합니다. 고정한
+numpy·scipy·shapely는 cp313부터 cp315까지의 휠도 올립니다.
 
 | 휠 | 구성 요소 | 라이선스(SPDX) | 플랫폼과 링크 방식 |
 |---|---|---|---|

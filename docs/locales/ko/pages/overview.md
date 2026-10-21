@@ -152,7 +152,7 @@ python -m pytest -q
 | 설치 패키지 수용 | Linux·macOS·Windows, Python 3.12 | Linux: sdist에서 만든 일곱 wheel을 extra와 함께 checkout 밖에 설치하고 Python 시험 전체를 실행. 각 OS: 여섯 구현 sdist를 wheel로 만들어 새 환경에서 패키지 바이트, 포함 자산, 공개 API·CLI·저장 동작, 열 저장/I-O 견고성 시험 |
 
 설치 수용 검사는 macOS나 Windows 전체 회귀 시험이 아닙니다. 패키지 metadata는
-Python 3.10 이상을 허용하지만 CI는 Python 3.12만 시험합니다. `OS Independent` 분류와
+Python 3.12 이상을 요구하고 CI는 Python 3.12만 시험합니다. `OS Independent` 분류와
 `py3-none-any` wheel은 metadata이며 검증된 플랫폼 목록이 아닙니다. 커밋별 결과는
 GitHub Actions의 필수 검사 `tests`에서 확인하세요. 검사와 명령은
 [개발 안내](development.md)에 있습니다.

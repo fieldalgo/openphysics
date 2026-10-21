@@ -38,7 +38,7 @@ def test_engine_never_imports_refsol():
 
 
 def test_engine_dependencies_are_only_numpy_scipy():
-    # Python >=3.10 is required by this package; classify stdlib by Python itself.
+    # Python >=3.12 is required by this package; classify stdlib by Python itself.
     allowed = {"numpy", "scipy", "galerkin"} | sys.stdlib_module_names
     extra = set()
     for p in ENGINE.glob("*.py"):
