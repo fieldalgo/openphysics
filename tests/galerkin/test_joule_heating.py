@@ -9,7 +9,7 @@ import pytest
 
 from galerkin.electric import solve_steady_electric
 from galerkin.joule_heating import solve_steady_joule_heat
-from galerkin.mesh import rectangle_mesh, layered_rectangle_mesh
+from galerkin.mesh import Mesh, rectangle_mesh, layered_rectangle_mesh
 
 
 def ends(mesh, left, right):
@@ -157,3 +157,21 @@ def test_snapshots_survive_input_mutation_and_missing_support_rejected():
     np.testing.assert_array_equal(result.electrical.mesh.nodes, expected)
     with pytest.raises(ValueError, match='SteadyElectricResult'):
         couple(mesh, object(), dirichlet={})
+
+
+def test_disconnected_thermal_components_need_separate_support_and_balance():
+    part = rectangle_mesh(.02, .01, 4, 2)
+    n = part.num_nodes
+    mesh = Mesh(np.vstack([part.nodes, part.nodes+[.04, 0.]]),
+                np.vstack([part.triangles, part.triangles+n]),
+                part.boundary | {tag+'2': ids+n for tag, ids in part.boundary.items()},
+                part.boundary_edges | {tag+'2': edges+n for tag, edges in part.boundary_edges.items()})
+    volts = ends(part, 0., 2.) | {i+n: value/2 for i, value in ends(part, 0., 2.).items()}
+    electric = solve_steady_electric(mesh, conductivity=3., dirichlet=volts)
+    with pytest.raises(ValueError, match='requires Dirichlet or positive Robin'):
+        couple(mesh, electric, dirichlet=ends(part, 300., 300.))
+    temperatures = ends(part, 300., 300.) | {i+n: 310. for i in ends(part, 0., 0.)}
+    result = couple(mesh, electric, dirichlet=temperatures)
+    for ids, power in [(slice(0, n), 6.), (slice(n, None), 1.5)]:
+        assert np.sum(result.thermal.load[ids]) == pytest.approx(power, rel=1e-10)
+        assert -np.sum(result.thermal.reaction[ids]) == pytest.approx(power, rel=1e-10)

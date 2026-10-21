@@ -25,7 +25,8 @@ def _agree(actual, expected, name, *, balance_scale=0.):
     actual = np.asarray(actual)
     expected = np.asarray(expected)
     if (actual.shape != expected.shape or actual.dtype.kind not in "iuf"
-            or not np.all(np.isfinite(actual))):
+            or not np.all(np.isfinite(actual)) or not np.all(np.isfinite(expected))
+            or not np.isfinite(balance_scale)):
         raise ValueError(f"electrical {name} must be finite real with the expected shape")
     scale = max(float(np.max(abs(expected))), balance_scale, np.finfo(float).tiny)
     if np.max(abs(actual-expected)) > 1e-10*scale:
