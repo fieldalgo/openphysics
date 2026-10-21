@@ -59,3 +59,62 @@ Q는 W/m³ 그대로이며 암묵적 두께·단위 변환은 없습니다.
 성분별 전위 오프셋을 빼고 계산합니다. 이산 해의 Joule 전력과 같습니다.
 P1 요소 기울기는 H(div) 평형 유속이 아닙니다. 직접 경계 `J.n` 적분과 요소 간
 점프는 메시 수렴으로 평가해야 하며 조립 전극 반력을 대신할 수 없습니다.
+
+## 예제
+
+```python
+from galerkin.mesh import rectangle_mesh
+from galerkin.electric import solve_steady_electric
+
+mesh = rectangle_mesh(2., 1., 8, 4)  # metres
+volts = {int(i): 2. for i in mesh.boundary['left']}
+volts.update({int(i): 0. for i in mesh.boundary['right']})
+r = solve_steady_electric(mesh, conductivity=3., dirichlet=volts)
+# V=2-x, E=(1,0) V/m, J=(3,0) A/m², Q=3 W/m³, power=6 W/m.
+print(round(r.joule_power_per_length, 10))  # 6.0
+
+# Same current with pure Neumann data; a reference is required.
+n = solve_steady_electric(mesh, conductivity=3., dirichlet={},
+                         outward_current={'left': -3., 'right': 3.},
+                         reference_potential={0: 2.})
+```
+
+실행 가능한 [두 재료 예제](../../../../../../examples/galerkin/electric_steady2d.py)는
+Joule/공급 전력 0.026666667 W/m, 주입 전류 0.133333333 A/m를 출력합니다.
+이 서브모듈을 명시적으로 import합니다. `galerkin` 최상위에서 재노출하지 않습니다.
+
+## 검증과 한계
+
+시험·crosscheck 의존성을 설치한 뒤 저장소 루트에서 실행합니다.
+
+```sh
+python -m pytest -q tests/galerkin/test_electric_steady2d.py
+OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q -s tests/galerkin/test_crosscheck_skfem_electric.py
+python examples/galerkin/electric_steady2d.py
+```
+
+기준은 선형 평판·직렬/병렬 재료 경계 해석해(상대 `1e-10`), 성분별 전류·이산
+전력 수지(`1e-10`), 단위 정사각형 조화 전위
+`V=sin(pi*x)*sinh(pi*y)/sinh(pi)`의 내부 L2 수렴 차수(전위 >1.8, E 및 J >0.9)입니다.
+로컬 Linux에서 변당 4/8/16/32 분할의 전위 오차는
+0.02113/0.005517/0.001396/0.0003501 V, E 오차는
+0.4790/0.2454/0.1235/0.06184 V/m, 마지막 차수는 1.996/0.998이었습니다.
+총 Joule 전력을 정확한 `sigma*pi*coth(pi)/2`와도 비교합니다.
+부호·뒤집힌 변·분리 성분·게이지 누락/불필요 지정·아주 작은 부적합 전류·영 전류·
+전위 오프셋/부호/전압 제곱 비례를 검사합니다. 메시와 영역 순서도 보존합니다.
+
+독립 scikit-fem 12.0.2(BSD-3-Clause) 시험은 기하 입력만 공유하고 약한 형식·
+경계 하중·구속·Joule 하중을 별도로 조립합니다. 이종 재료 전압 전용, 이종 재료
+혼합 경계, 순수 Neumann에서 V/E/J/Q/하중/전력과 실제 전극 반력을 상대 `1e-10`으로
+비교합니다. 로컬 최대 차이는 각각 3.69e-15/4.89e-14/1.42e-14였습니다
+(Python 3.12, NumPy 2.5.4, SciPy 1.18.1). 같은 프로세스의 코드 대 코드 비교이며
+수렴 검증을 대신하지 않습니다. [비교 기록 도구](../../reference-comparisons.md)가
+JSON을 남깁니다. 기존 소스·설치 휠 CI가 새 시험 모듈을 모두 수집하며 필수 CI는
+레퍼런스 도구가 없으면 실패합니다. 로컬 통과로 CI·macOS/Windows 수용을 주장하지
+않습니다. 해당 커밋의 워크플로 결과를 확인해야 합니다.
+
+P1 장의 점별 법선 전류 연속성이나 국소 평형 유속은 보장하지 않습니다.
+경계 콜백은 변당 4점으로 샘플링하므로 빠른 변화는 메시로 해상해야 합니다.
+극단적 물성 대비·조건이 나쁜 메시에 보편적 정확도 보장은 없습니다. 비유한 계·
+자유 잔차·전류·전력 검사는 발견한 실패를 거절합니다. 비적합 메시·전도도 0인 영역·
+비선형 재료는 지원하지 않습니다.

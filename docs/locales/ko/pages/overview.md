@@ -189,3 +189,5 @@ refractiveindex.info 광학 데이터는 CC0 1.0이고 Gmsh는 자체 라이선�
 
 모든 의존성, 외부 프로그램, 데이터, 출판 자료의 라이선스와 쓰는 방식은
 [제3자 소프트웨어](third-party.md)에 있습니다.
+
+[2D 정상 전기전도 Python API](packages/galerkin/electric_steady2d.md)는 영역별 전기전도도, 전압·전류·절연 경계, Neumann 기준 전위, V/E/J와 요소별 Joule 발열을 지원합니다. JSON·CLI·Studio는 지원하지 않습니다.

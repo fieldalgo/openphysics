@@ -24,6 +24,10 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add the explicit `galerkin.electric` steady 2D conduction API with region
+  conductivity, outward current boundaries, componentwise Neumann gauges and
+  elementwise Joule heating for same-mesh thermal consumers.
+
 The first release of the six implementation packages and the `openphysics` meta
 distribution on PyPI, planned as 0.1.0.
 

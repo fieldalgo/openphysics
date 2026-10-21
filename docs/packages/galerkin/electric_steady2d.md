@@ -66,3 +66,66 @@ componentwise potential offset removed for numerical stability. It equals Joule
 power for the discrete solution. P1 cell gradients are not an equilibrated
 H(div) flux: raw boundary `J.n` and individual interelement jumps need mesh
 convergence and must not be substituted for assembled electrode reactions.
+
+## Example
+
+```python
+from galerkin.mesh import rectangle_mesh
+from galerkin.electric import solve_steady_electric
+
+mesh = rectangle_mesh(2., 1., 8, 4)  # metres
+volts = {int(i): 2. for i in mesh.boundary['left']}
+volts.update({int(i): 0. for i in mesh.boundary['right']})
+r = solve_steady_electric(mesh, conductivity=3., dirichlet=volts)
+# V=2-x, E=(1,0) V/m, J=(3,0) A/m², Q=3 W/m³, power=6 W/m.
+print(round(r.joule_power_per_length, 10))  # 6.0
+
+# Same current with pure Neumann data; a reference is required.
+n = solve_steady_electric(mesh, conductivity=3., dirichlet={},
+                         outward_current={'left': -3., 'right': 3.},
+                         reference_potential={0: 2.})
+```
+
+The executable [two-material example](../../../examples/galerkin/electric_steady2d.py)
+prints 0.026666667 W/m of Joule/supplied power and 0.133333333 A/m injected current.
+Import this submodule explicitly; it is not re-exported from `galerkin`.
+
+## Validation and limits
+
+Run from the repository root with the test and crosscheck dependencies installed:
+
+```sh
+python -m pytest -q tests/galerkin/test_electric_steady2d.py
+OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q -s tests/galerkin/test_crosscheck_skfem_electric.py
+python examples/galerkin/electric_steady2d.py
+```
+
+The gates are linear slab and series/parallel material-interface solutions
+(relative `1e-10`), component current and discrete power balance (`1e-10`), and
+interior L2 convergence for `V=sin(pi*x)*sinh(pi*y)/sinh(pi)` on the unit square
+(potential order >1.8; E and hence J order >0.9). A local Linux run on 4/8/16/32
+cells per side gave potential errors 0.02113/0.005517/0.001396/0.0003501 V
+and E errors 0.4790/0.2454/0.1235/0.06184 V/m; final rates 1.996/0.998.
+Integrated Joule power is also compared to the exact `sigma*pi*coth(pi)/2`.
+Tests include current signs, reversed edges, disconnected components, missing or
+unnecessary gauges, tiny incompatible currents, zero current, and offset/sign/
+voltage-squared invariance. Results preserve the original mesh and region order.
+
+The independent scikit-fem 12.0.2 (BSD-3-Clause) tests assemble their own weak
+forms, facet loads, constraints and Joule loads on shared geometric inputs.
+Voltage-only heterogeneous, mixed heterogeneous and pure Neumann cases compare
+V/E/J/Q/load/power and physical electrode reactions, gated at `1e-10` relative.
+Local maximum differences were 3.69e-15/4.89e-14/1.42e-14 respectively
+(Python 3.12, NumPy 2.5.4, SciPy 1.18.1). These are same-process code-to-code
+comparisons, not independent convergence evidence; JSON records are emitted by
+the [reference comparison machinery](../../reference-comparisons.md).
+Existing source and installed-wheel CI collect both new test modules; required
+CI fails when the reference dependency is absent. A local pass does not establish
+CI or macOS/Windows acceptance; inspect the exact commit's workflow results.
+
+No pointwise normal-current continuity or local equilibrated flux guarantee is
+made for P1 fields. Four-point edge quadrature samples callbacks, so callers must
+resolve rapidly varying boundary functions. Extreme contrasts and ill-conditioned
+meshes have no universal accuracy guarantee; finite-system, free-residual, current
+and power checks reject detected failures. Discontinuous geometry, nonconforming
+meshes, zero-conductivity subregions and nonlinear materials are unsupported.

@@ -157,3 +157,5 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
+
+[Steady electric conduction: Python API, Joule heat and Neumann gauges](electric_steady2d.md).
