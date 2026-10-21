@@ -12,6 +12,8 @@ meshine.Circle so its nodes stay on the exact circle (see _isolated_circle).
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import shapely
 from shapely.geometry import MultiPolygon, Point, Polygon, box
@@ -19,6 +21,7 @@ from shapely.ops import unary_union
 
 from meshine import Circle, Domain, box_sides
 
+from .mesh_limits import MeshLimitError
 from .schema import Document, DocumentError
 
 #: A sliver smaller than this fraction of the domain is not a region. Dimensionless
@@ -150,7 +153,15 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
     return _domain_from_regions(doc)[:3]
 
 
-def _domain_from_regions(doc: Document, regions=None) -> tuple[Domain, callable, dict[str, str], int]:
+def _circle_vertex_count(r: float, size: float) -> float:
+    """The vertex count an exact Circle of radius r gets at global mesh size ``size``, before
+    ``int`` and the floor of 16: 2 pi r / (size / 2), or infinity where size / 2 is zero."""
+    half = size / 2
+    return math.inf if half == 0 else 2 * np.pi * r / half
+
+
+def _domain_from_regions(doc: Document, regions=None, max_input_vertices: int | None = None
+                         ) -> tuple[Domain, callable, dict[str, str], int]:
     """build_domain, plus the number of loop vertices it passes to meshine.
 
     ``regions`` is ``resolve_regions(doc)``; None resolves them here, after the Domain is
@@ -159,6 +170,11 @@ def _domain_from_regions(doc: Document, regions=None) -> tuple[Domain, callable,
     background counts once as its own ring and once as the background's hole, and every
     ``Circle`` occurrence counts as its ``n``. It is exact, and known before
     ``Domain.build``, which only reads the queued loops.
+
+    With ``max_input_vertices`` (simcase.mesh_limits), a count over it raises
+    MeshLimitError, and so does an exact circle whose own count alone is over it, before
+    the Circle is made (a tiny global mesh.size would make it as large as memory allows,
+    or overflow). With None nothing is checked and the build is exactly build_domain's.
     """
     mesh_cfg = doc["mesh"]
     d = Domain(size=mesh_cfg["size"])
@@ -170,6 +186,15 @@ def _domain_from_regions(doc: Document, regions=None) -> tuple[Domain, callable,
     def circle_for(cx, cy, r):
         key = (round(cx, 12), round(cy, 12), round(r, 12))
         if key not in circle_lookup:
+            # int(x) > limit exactly when x >= limit + 1; a 16-gon over a smaller limit is
+            # left to the exact total below
+            estimate = None if max_input_vertices is None else _circle_vertex_count(r, mesh_cfg["size"])
+            if estimate is not None and estimate >= max_input_vertices + 1:
+                unit = doc.length_unit
+                raise MeshLimitError(
+                    "input_vertices", max_input_vertices, None,
+                    f"the isolated circle at ({cx:g}, {cy:g}) {unit} of radius {r:g} {unit} alone needs "
+                    f"4*pi*r/mesh.size = {estimate:.4g} loop vertices at mesh.size {mesh_cfg['size']:g} {unit}")
             circle_lookup[key] = Circle((cx, cy), r, n=max(16, int(2 * np.pi * r / (mesh_cfg["size"] / 2))))
         return circle_lookup[key]
 
@@ -203,4 +228,6 @@ def _domain_from_regions(doc: Document, regions=None) -> tuple[Domain, callable,
                 hole_objs.append(match if match is not None else h)
             d.add_region(name, outer, holes=hole_objs, size=size)
             count += len(outer) + sum(h.n if isinstance(h, Circle) else len(h) for h in hole_objs)
+    if max_input_vertices is not None and count > max_input_vertices:
+        raise MeshLimitError("input_vertices", max_input_vertices, count)
     return d, box_sides(dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"]), materials, count

@@ -543,10 +543,10 @@ class ThermalRunResult:
         return owned.path
 
 
-def run_thermal(doc, verbose=True):
+def run_thermal(doc, verbose=True, *, mesh_limits=None):
     from .thermal_regions import is_region_thermal, run_region_thermal
     if is_region_thermal(doc.data):
-        return run_region_thermal(doc, verbose=verbose)
+        return run_region_thermal(doc, verbose=verbose, mesh_limits=mesh_limits)
     from galerkin import rectangle_mesh, assemble_stiffness
     try:
         from galerkin.thermal import solve_steady_heat
@@ -695,8 +695,15 @@ def _summary(doc):
     return thermal_summary(doc)
 
 
+def _accepts_mesh_limits(data):
+    """Region documents take mesh limits (simcase.mesh_limits); rectangle documents do not."""
+    from .thermal_regions import is_region_thermal
+    return is_region_thermal(data)
+
+
 register(PhysicsKind(
     name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
     validate=_validate, run=run_thermal, summary=_summary,
     result_types=(ThermalRunResult,), defaults=defaults, fresh_output=True,
-    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d'))
+    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d',
+    accepts_mesh_limits=_accepts_mesh_limits))

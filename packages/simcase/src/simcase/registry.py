@@ -35,7 +35,8 @@ class PhysicsKind:
     precedence: int
     #: contract validation of a whole document; raises ``DocumentError``
     validate: Callable[[Any], None]
-    #: ``run(doc, verbose)``: the validated document end to end
+    #: ``run(doc, verbose)``: the validated document end to end; for a document
+    #: ``accepts_mesh_limits`` claims, also ``run(doc, verbose, mesh_limits=...)``
     run: Callable[..., Any]
     #: the one-paragraph text ``Document.summary`` and ``simcase validate`` print
     summary: Callable[[Any], str]
@@ -51,6 +52,10 @@ class PhysicsKind:
     stage_refusal: str | None = None
     #: the kind of documents no other kind claims
     fallback: bool = False
+    #: which of this kind's documents (their data) ``run`` takes mesh limits for
+    #: (``simcase.mesh_limits``); the runner then gets them as ``mesh_limits``.
+    #: None for a kind that takes them for no document
+    accepts_mesh_limits: Callable[[Any], bool] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}

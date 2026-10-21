@@ -220,11 +220,11 @@ class TransientThermalRunResult:
         return owned.path
 
 
-def run_transient_thermal(doc, verbose=True):
+def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
     """Validate a document snapshot and call the existing transient engine once."""
     from .transient_regions import is_transient_region_thermal, run_transient_region_thermal
     if is_transient_region_thermal(doc.data):
-        return run_transient_region_thermal(doc, verbose=verbose)
+        return run_transient_region_thermal(doc, verbose=verbose, mesh_limits=mesh_limits)
     from galerkin import rectangle_mesh
     from galerkin.transient_heat import solve_transient_heat
     doc.validate()
@@ -266,8 +266,15 @@ def _validate(doc):
     validate_transient_thermal(doc)
 
 
+def _accepts_mesh_limits(data):
+    """Region documents take mesh limits (simcase.mesh_limits); rectangle documents do not."""
+    from .transient_regions import is_transient_region_thermal
+    return is_transient_region_thermal(data)
+
+
 register(PhysicsKind(
     name='thermal.transient2d', types=frozenset({PHYSICS}), precedence=20,
     validate=_validate, run=run_transient_thermal, summary=transient_thermal_summary,
     result_types=(TransientThermalRunResult,), defaults=defaults, fresh_output=True,
-    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.transient2d'))
+    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.transient2d',
+    accepts_mesh_limits=_accepts_mesh_limits))

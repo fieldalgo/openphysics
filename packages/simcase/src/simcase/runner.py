@@ -29,6 +29,7 @@ from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
 from .geometry import build_domain
+from .mesh_limits import _is_region_document, _mesh_limits
 from . import units
 from .materials import material_table
 from .fields import VectorField
@@ -391,10 +392,28 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult | ElectricJouleRunResult:
-    """Run a document with the runner of its physics kind (``registry``)."""
+def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, max_triangles: int | None = None,
+        max_input_vertices: int | None = None
+        ) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult | ElectricJouleRunResult:
+    """Run a document with the runner of its physics kind (``registry``).
+
+    ``max_nodes``, ``max_triangles`` and ``max_input_vertices`` are optional mesh limits for
+    steady and transient heat region documents only (see simcase.mesh_limits): each limit
+    given is a positive int, checked before the solve, and a document over it raises
+    MeshLimitError. Giving one for any other document is a ValueError. Only
+    max_input_vertices bounds the work before meshing; give it for documents from others.
+    The limits reach the kind's runner as ``mesh_limits`` only when its
+    ``accepts_mesh_limits`` claims the document; without a limit every runner is called
+    as ``run(doc, verbose=verbose)``.
+    """
+    limits = _mesh_limits(max_nodes=max_nodes, max_triangles=max_triangles, max_input_vertices=max_input_vertices)
     doc.validate()
-    return kind_of(doc.data).run(doc, verbose=verbose)
+    kind = kind_of(doc.data)
+    if limits is None:
+        return kind.run(doc, verbose=verbose)
+    if not _is_region_document(doc.data):
+        raise ValueError("mesh limits apply only to thermal region documents")
+    return kind.run(doc, verbose=verbose, mesh_limits=limits)
 
 
 def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult:

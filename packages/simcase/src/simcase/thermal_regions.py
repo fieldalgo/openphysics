@@ -261,22 +261,37 @@ def region_summary(doc):
     return '\n'.join(lines)
 
 
-def build_region_mesh(doc):
-    """meshine mesh in SI metres with named regions and box-side tags."""
+def build_region_mesh(doc, limits=None):
+    """meshine mesh in SI metres with named regions and box-side tags.
+
+    ``limits`` (simcase.mesh_limits._MeshLimits) bounds the loop vertices of the micrometre
+    document that is meshed before meshine builds its domain, passes max_nodes to meshine
+    as max_points, and compares the exact node and triangle counts after meshing; each
+    check whose limit is None is skipped, and without limits the mesh is made exactly as
+    before."""
     from galerkin.mesh import Mesh
     from meshine import generate
     from .geometry import build_domain
     from .runner import micrometre_document
     from . import units
     canonical = micrometre_document(doc)
-    domain, namer, region_materials = build_domain(canonical)
-    tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']))
+    if limits is None:
+        domain, namer, region_materials = build_domain(canonical)
+        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']))
+    else:
+        tri, region_materials = _limited_mesh(canonical, limits, generate)
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
     unknown = set(tri.boundary_edges)-set(SIDES)
     if unknown or set(tri.boundary_edges) != set(SIDES):
         raise DocumentError(f'mesh: exterior edges must all lie on the four domain sides; found tags '
                             f'{sorted(tri.boundary_edges)}')
+    if limits is not None:
+        from .mesh_limits import MeshLimitError
+        if limits.max_nodes is not None and tri.num_nodes > limits.max_nodes:
+            raise MeshLimitError('nodes', limits.max_nodes, int(tri.num_nodes))
+        if limits.max_triangles is not None and tri.num_triangles > limits.max_triangles:
+            raise MeshLimitError('triangles', limits.max_triangles, int(tri.num_triangles))
     # Convert the canonical mesh directly to SI, never through document units.
     mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
                 boundary={k: np.asarray(v) for k, v in tri.boundary_nodes.items()},
@@ -286,6 +301,24 @@ def build_region_mesh(doc):
     # Keep the diagnostic triangulation in document units, as before.
     tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))
     return mesh, region_materials, tri
+
+
+def _limited_mesh(doc, limits, generate):
+    """(meshine mesh, region materials) of the micrometre document ``doc`` under ``limits``:
+    the loop vertices are counted before Domain.build, and max_points is passed only when
+    max_nodes is set, so meshine otherwise keeps its own default cap."""
+    from .geometry import _domain_from_regions
+    from .mesh_limits import MeshLimitError
+    domain, namer, region_materials, _count = _domain_from_regions(
+        doc, max_input_vertices=limits.max_input_vertices)
+    if limits.max_nodes is None:
+        return generate(domain, namer, min_angle=float(doc['mesh']['min_angle'])), region_materials
+    from meshine import MeshSizeLimitError     # here: an older meshine fails only limited runs
+    try:
+        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), max_points=limits.max_nodes)
+    except MeshSizeLimitError as exc:
+        raise MeshLimitError('nodes', limits.max_nodes) from exc
+    return tri, region_materials
 
 
 def region_inputs(doc, mesh, region_materials):
@@ -400,14 +433,14 @@ class RegionThermalRunResult(ThermalRunResult):
         return result
 
 
-def run_region_thermal(doc, verbose=True):
+def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     from galerkin.thermal import solve_steady_heat
     doc.validate()
     doc = doc.copy()
     doc.validate()
     name, _ = doc.sole_physics()
     t0 = time.perf_counter()
-    mesh, region_materials, tri = build_region_mesh(doc)
+    mesh, region_materials, tri = build_region_mesh(doc, mesh_limits)
     kwargs = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
     calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)

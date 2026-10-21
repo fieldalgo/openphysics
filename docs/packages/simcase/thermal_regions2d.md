@@ -264,6 +264,107 @@ flux L2 0.942, 0.477, 0.241, 0.121 W/m (orders 0.98, 0.99, 1.00), dt/2 change
 covered only by the exact-reproduction and engine-equality checks above and by
 the engine validation in [multimaterial](../galerkin/multimaterial.md).
 
+## Mesh limits for callers
+
+A caller that runs documents it did not write, such as a server, can bound what
+a region run meshes before anything is solved. `simcase.run` takes three
+optional keyword-only limits:
+
+```python
+from simcase import MeshLimitError, check_mesh_limits, run
+
+try:
+    result = run(doc, max_input_vertices=2048, max_nodes=10201, max_triangles=20000)
+except MeshLimitError as exc:
+    print(exc.quantity, exc.count, exc.limit)     # for example: input_vertices 2054 2048
+```
+
+- `max_input_vertices` bounds the loop vertices the geometry passes to meshine
+  (below). It is checked while the domain is assembled, before meshine builds it.
+- `max_nodes` is passed to meshine as `max_points`, so meshing stops at the
+  first insertion past it (meshine's `MeshSizeLimitError`); the exact node count
+  is compared again after meshing.
+- `max_triangles` is compared with the exact triangle count after meshing.
+
+Every check runs before the solve. Each limit is a positive `int` or `None`, and
+`None` is not checked: with no limit the run is exactly the unlimited one, and
+meshine keeps its own default cap of 300,000 points unless `max_nodes` is given.
+The limits apply to steady and transient region documents only; giving one for
+a rectangle heat document or an electromagnetic, cavity or electric/Joule
+document is a `ValueError`, and so is a `bool`, a float or a value below 1. The
+two heat kinds declare which of their documents take limits in the physics
+registry (`PhysicsKind.accepts_mesh_limits`), and `run` hands the limits to
+their runners through it; no other kind's runner changes. `max_nodes` needs
+a meshine that has `MeshSizeLimitError`: with an older meshine installed, a run
+that sets it raises `ImportError`, and every other run is unchanged.
+
+Only `max_input_vertices` bounds the work before meshing. `max_nodes` and
+`max_triangles` act once meshine has built the domain, which compares every
+loop vertex with every earlier one (O(V²)), and an isolated circle makes its
+vertices before that, or fails while making them at a `mesh.size` near zero.
+Without `max_input_vertices`, the steady example with its regions sized 2 mm
+and a global `mesh.size` of 0.004 is refused by `max_nodes` 10,201 only after
+tens of seconds (28 s and 45 s in two measurements on Linux), and at 5e-324 it
+still ends in an `OverflowError`, as with no limit.
+For documents from others, give `max_input_vertices` too.
+
+**Loop vertices.** A loop vertex is one entry of a loop given to meshine's
+`Domain.add_region` after the shapes' booleans, in outer rings and holes alike:
+
+- a shape inside the background counts twice, once as its own ring and once as
+  the background's hole;
+- a later shape can cut an earlier one into many parts, each with its own
+  loops: two crossing combs of 255 points each give 32,776;
+- a circle that another boundary touches or crosses, or that a later shape
+  overlaps, is a 128-gon;
+- an isolated circle, meshed as an exact meshine `Circle`, counts
+  max(16, int(4πr / `mesh.size`)) with the **global** `mesh.size`, even when it
+  sets its own `mesh_size`, and counts again as the hole of the region around
+  it. The shipped steady example at `mesh.size` 0.0246 has 2054 loop vertices,
+  2042 of them from the heater.
+
+The count is taken before meshine's own T-junction splits, so the loops meshine
+processes can be longer. It is the count of what is meshed: the document's
+micrometre copy (see Mesh and solve). The shapes' booleans and the circle rule
+do not depend on the unit, so the count is usually the same as in the
+document's own numbers, and it is the same on the 22 millimetre documents the
+tests use.
+Where 4πr / `mesh.size` lies within rounding of an integer it can differ: the
+steady example with regions sized 2 mm at `mesh.size` 4π·2/20 mm has 52 loop
+vertices in millimetres and 50 in the micrometre copy that is meshed, and 50 is
+what is counted. `check_mesh_limits(doc, *, max_input_vertices)` returns the
+count of a region document without building the domain or changing the
+document, or raises `MeshLimitError`. It validates the micrometre copy, as a run
+does, so it resolves the shapes' booleans twice: in that validation and to
+count. A `Document` that was never validated (`Document(data)`,
+`Document.copy()`) has no resolved length unit yet; it is counted on a validated
+copy, as its run would validate it first, which resolves them once more.
+An isolated circle whose own count is
+over the limit is refused before its vertices are made, with that count's
+estimate (in micrometres) in the message, so under `max_input_vertices` a
+`mesh.size` near zero (5e-324) raises `MeshLimitError`, not a division,
+overflow or memory error.
+
+**`MeshLimitError`** is a `ValueError`, not a `DocumentError`: the document is
+valid, and the caller's limit refuses it. `quantity` is `'input_vertices'`,
+`'nodes'` or `'triangles'`; `limit` is the limit; `count` is the exact count,
+or `None` when meshing stopped at the `max_nodes` cap or one isolated circle
+alone is over `max_input_vertices`. The message names the quantity, the count
+and the limit.
+
+`tests/simcase/test_region_mesh_limits.py` checks this with criteria fixed
+before the change, measuring every node and triangle count in the test instead
+of storing it: limits at the exact node, triangle and loop counts of both
+examples give the saved arrays and summary of the unlimited run, and one less
+is refused before the solver is called; each limit works alone; documents
+without regions and invalid values are refused; and the count equals the sum of
+the loops meshine receives on 22 documents. Tests added when the limits moved
+onto the micrometre copy and the physics registry, not pre-registered, check
+that the count is the one of the domain each run hands to meshine in mm, nm and
+m documents and in the document above where the units change it, that a
+document that was never validated gets the count of its run, and that only a
+kind that accepts limits receives them.
+
 ## Limits
 
 - Studio refuses steady and transient region documents (its heat views read `mesh.subdivisions`);
