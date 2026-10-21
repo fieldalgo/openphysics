@@ -17,7 +17,8 @@ Constrained Delaunay refinement (Ruppert) built on scipy; depends on numpy and s
 from . import shapes
 from .geometry import Circle, Domain, box_sides, rectangle
 from .mesh import TriMesh
-from .refine import generate
+from .refine import MeshSizeLimitError, generate
 
 __version__ = "0.1.0"
-__all__ = ["Domain", "Circle", "TriMesh", "generate", "box_sides", "rectangle", "shapes", "__version__"]
+__all__ = ["Domain", "Circle", "TriMesh", "generate", "MeshSizeLimitError", "box_sides", "rectangle", "shapes",
+           "__version__"]
