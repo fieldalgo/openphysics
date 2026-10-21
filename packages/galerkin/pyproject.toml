@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-dependencies = ["numpy>=1.24", "scipy>=1.10"]
+dependencies = ["numpy>=1.26", "scipy>=1.11.2"]
 
 [project.urls]
 Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin"
@@ -39,7 +39,7 @@ test = [
     "meshine>=0.1.0,<0.2",
     "gmshio>=0.1.0,<0.2",
 ]
-figures = ["matplotlib>=3.7"]
+figures = ["matplotlib>=3.8"]
 # Reference tools for code-to-code comparisons (tests/galerkin/test_crosscheck_*.py), test only.
 # Permissive licenses only, by choice; weak-copyleft or GPL reference tools run
 # separately and are never installed here. See docs/third-party.md in the repository.

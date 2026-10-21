@@ -34,6 +34,8 @@ distribution on PyPI, planned as 0.1.0.
   `simcase[studio]`, `simcase[export]` and `physmat[rii]`. No extra installs Gmsh.
   The earlier `openphysics` 0.0.1 was an empty name reservation, like the 0.0.1
   of the other six names.
-- Every package requires Python 3.12 or later.
+- Every package requires Python 3.12 or later. The minimum numpy, scipy, shapely
+  and matplotlib are now 1.26, 1.11.2, 2.0.2 and 3.8, their first releases with
+  Python 3.12 wheels.
 - Requirements between the packages are limited to the 0.1 series
   (`>=0.1.0,<0.2`).

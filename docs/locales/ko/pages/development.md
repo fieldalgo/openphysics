@@ -22,7 +22,10 @@ python -m pip check
 `tools/requirements-py312-linux.txt`는 검증 도구와 그 하위 의존성을 고정한 것이며,
 패키지의 실행 의존성이 아닙니다. 고정 버전은 리뷰를 거친 변경에서 의도적으로 바꾸고,
 소스 검사와 배포 검사를 다시 실행합니다. 패키지 메타데이터는 Python >=3.12를
-선언하고, CI는 Python 3.12만 시험합니다.
+선언하고, CI는 Python 3.12만 시험합니다. 하한 numpy 1.26, scipy 1.11.2, shapely 2.0.2,
+matplotlib 3.8은 Python 3.12 휠이 있는 첫 릴리스입니다. 정확히 그 버전들로 slow가 아닌
+시험 전체를 손으로 한 번 통과시켰고(2026-10-21, Linux, Python 3.12), CI는 고정 버전만
+시험합니다.
 
 항상 저장소 루트에서 실행합니다. `packages/`나 `tests/` 안에서 Python을 실행하면 같은 이름의
 디렉터리가 설치된 모듈을 가릴 수 있습니다.

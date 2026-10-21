@@ -22,7 +22,7 @@ classifiers = [
   "Environment :: Web Environment",
 ]
 dependencies = [
-  "numpy>=1.24", "scipy>=1.10", "shapely>=2.0", "matplotlib",
+  "numpy>=1.26", "scipy>=1.11.2", "shapely>=2.0.2", "matplotlib>=3.8",
   "meshine>=0.1.0,<0.2",
   "physmat>=0.1.0,<0.2",
   "galerkin>=0.1.0,<0.2",
