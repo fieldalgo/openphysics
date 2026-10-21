@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Steady isotropic heat conduction on conforming P1 triangles.
 
-Conductivity and constant heat source are one scalar or piecewise constant on
-named mesh regions (galerkin.materials). Import this submodule explicitly. See
+Conductivity is scalar or piecewise constant on named regions (galerkin.materials).
+Heat sources may also be mesh-bound ElementHeatSource values or coordinate callbacks. Import this submodule explicitly. See
 docs/packages/galerkin/thermal_steady2d.md and
 docs/packages/galerkin/multimaterial.md for SI units, boundary signs and
 validation limits. No other physics module is required.
@@ -18,6 +18,7 @@ from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 
 from .mesh import Mesh
+from .heat_source import ElementHeatSource
 from .materials import is_per_region, region_property
 from .assembly import assemble_stiffness, assemble_load
 from .postprocess import element_gradient
@@ -153,6 +154,8 @@ def _mesh_geometry(mesh):
 
 
 def _source_load(mesh, p, t, area, source):
+    if isinstance(source, ElementHeatSource):
+        return assemble_load(mesh, source.on_mesh(mesh))
     if is_per_region(source):
         return assemble_load(mesh, region_property(mesh, source, "heat_source"))
     if not callable(source):
@@ -307,7 +310,8 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
 
     conductivity is finite scalar k>0 in W/(m K), or {region name: k} with
     every mesh.region_names entry. heat_source is scalar Q, {region name: Q},
-    or a callback receiving (Q,2) metre coordinates and returning (Q,) W/m^3.
+    a callback receiving (Q,2) metre coordinates and returning (Q,) W/m^3,
+    or ElementHeatSource(mesh, values) with (M,) W/m^3 in exact cell order.
     dirichlet maps exterior integer node indices to scalar temperatures in K;
     every disconnected component requires Dirichlet or positive Robin support.
     outward_flux maps edge tags to g; convection maps tags to (h, ambient).

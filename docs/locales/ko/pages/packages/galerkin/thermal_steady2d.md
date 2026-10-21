@@ -32,7 +32,7 @@ result = solve_steady_heat(
 | mesh | `galerkin.mesh.Mesh`, 기준 좌표 `(N,2)` m, 정수 삼각형 `(M,3)` |
 | conductivity | 필수 유한 실수 스칼라 k>0, W/(m K), 또는 `mesh.region_names` 위 구간 상수 `{영역 이름: k}`([multimaterial](multimaterial.md)). tensor·영역 안에서 변하는 k 없음 |
 | dirichlet | 외부 정수 절점 ID→유한 스칼라 온도 K 매핑 |
-| heat_source | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백. 기본값 0 |
+| heat_source | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백 또는 메시 사본에 결합한 요소별 `(M,)` W/m^3의 `ElementHeatSource(mesh, values)`. 기본값 0 |
 
 기본 단열 경계에서는 연결 성분마다 적어도 하나의 처방 온도가 필요하며, 선택적 Robin
 확장도 성분을 고정할 수 있습니다. 절점을 몰래 pin하지 않고 spring이나 최소제곱
@@ -81,6 +81,11 @@ outward integrated boundary heat = -reaction
 반력은 양수, 오른쪽 반력은 음수입니다. 양의 균일 발열·같은 낮은 경계 온도에서는
 총 외향 열량이 양수이며 Q의 적분과 같습니다. 적분 반력은 절점 약형 경계량이지
 점별 경계 flux 밀도가 아닙니다.
+
+`galerkin.thermal`에서 `ElementHeatSource`를 import합니다. 열원 값과 정확한
+좌표·삼각형 순서·영역 대응의 사본을 유지하며 소비 시 불일치를 거절합니다.
+각 요소의 상수 Q는 꼭짓점마다 Q*area/3을 기여합니다. 일반 요소 배열을 그대로
+넣는 입력은 지원하지 않습니다. [Joule 발열 전달](joule_heating.md#요소-열원-api)을 보십시오.
 
 상수 Q는 기존 정확한 상수원 하중을 사용합니다. 콜백 Q는 원래 6x6 Gauss-Legendre
 Duffy 삼각형 규칙으로 **Q*N_i**를 적분하며, centroid Q의 면적/3을 각 절점에 주는
