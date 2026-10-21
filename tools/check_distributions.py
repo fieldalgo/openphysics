@@ -411,6 +411,8 @@ def main():
         }, allow_nan=False), encoding="utf-8")
         run("node", ROOT / "tools/studio_browser/studio_thermal_browser.mjs",
             "--python", python, "--model", browser_model, "--transient-model", document,
+            "--region-model", examples / "thermal_regions.json",
+            "--transient-region-model", examples / "transient_thermal_regions.json",
             "--source-commit", source_commit(),
             "--expected-installed-root", env_root, "--expected-module-hashes", hash_manifest,
             "--output", output / "studio-browser", cwd=work, env=env)

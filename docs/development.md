@@ -196,7 +196,9 @@ directory outside it (their hashes are recorded in `consumer-file-hashes.json`)
 and run with `python -I` against the installed wheels, so the checkout cannot
 leak in. The installed environment must pass `tools/check_licenses.py`. The
 Studio Node checks run against the installed Studio files, and the Studio browser check
-runs a small real model in Chrome. Finally
+runs small real models in Chrome: a steady and a transient rectangle document,
+then the shipped steady and transient region examples (region colours, legend,
+region table and hover). Finally
 `tools/audit_distribution_artifacts.py` re-checks the retained archives'
 checksums and their exact sdist and wheel contents.
 

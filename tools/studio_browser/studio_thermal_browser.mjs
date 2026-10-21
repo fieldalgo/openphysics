@@ -7,11 +7,14 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {createServer} from 'node:net';
 import {transientScenario} from './transient_studio_browser_scenario.mjs';
+import {regionScenario} from './region_studio_browser_scenario.mjs';
 
 const args=process.argv.slice(2);
 function arg(name){const i=args.indexOf(name);if(i<0||!args[i+1])throw Error('Missing '+name);return args[i+1];}
 const expectedRoot=resolve(arg('--expected-installed-root')), hashes=JSON.parse(await readFile(arg('--expected-module-hashes'),'utf8'));
 const out=resolve(arg('--output')), python=arg('--python'), model=JSON.parse(await readFile(arg('--model'),'utf8'));
+const regionModel=JSON.parse(await readFile(arg('--region-model'),'utf8'));
+const transientRegionModel=JSON.parse(await readFile(arg('--transient-region-model'),'utf8'));
 await mkdir(out,{recursive:false});
 const artifactWrites=[];
 const sourceCommit=arg('--source-commit');
@@ -72,7 +75,7 @@ try{
  // Invalidation can discard a hidden canvas backing store by resizing it to zero.
  // getImageData throws for that valid empty state. Inspect without resizing or
  // clearing the canvas ourselves, and also check that no result owner survives.
- const inspectDirty=()=>cdp.eval('(()=>{const c=document.querySelector("#fieldCanvas"),r=c.getBoundingClientRect();const emptyBackingStore=c.width===0||c.height===0;const cleared=emptyBackingStore||!c.getContext("2d").getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v!==0);return {cleared,emptyBackingStore,width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,resultAbsent:thermalController.result()===null,validationAbsent:thermalController.gate.validated===null,legacyAbsent:meshData===null&&resultData===null&&currentJob===null,labelsReset:document.querySelector("#resInfo").textContent==="no results available"&&["meshInfo","meshLegend"].every(id=>document.getElementById(id).textContent===""),hoverAbsent:c.onmousemove===null,controlsHidden:document.querySelector("#thermalControls").hidden,runDisabled:document.querySelector("#runBtn").disabled}})()');
+ const inspectDirty=()=>cdp.eval('(()=>{const c=document.querySelector("#fieldCanvas"),r=c.getBoundingClientRect();const emptyBackingStore=c.width===0||c.height===0;const cleared=emptyBackingStore||!c.getContext("2d").getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v!==0);return {cleared,emptyBackingStore,width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,resultAbsent:thermalController.result()===null,validationAbsent:thermalController.gate.validated===null,legacyAbsent:meshData===null&&resultData===null&&currentJob===null,labelsReset:document.querySelector("#resInfo").textContent==="no results available"&&["meshInfo","meshLegend"].every(id=>document.getElementById(id).textContent==="")&&document.querySelector("#resTable").children.length===0,hoverAbsent:c.onmousemove===null,controlsHidden:document.querySelector("#thermalControls").hidden,runDisabled:document.querySelector("#runBtn").disabled}})()');
  const requireDirty=state=>{if(!state.cleared||!state.resultAbsent||!state.validationAbsent||!state.legacyAbsent||!state.labelsReset||!state.hoverAbsent||!state.controlsHidden||!state.runDisabled)throw Error('Dirty JSON retained stale field ownership or pixels');};
  report.dirty.hiddenCanvas=await inspectDirty();requireDirty(report.dirty.hiddenCanvas);
  await click('[data-tab="results"]');
@@ -85,6 +88,7 @@ try{
  await writeFile(join(out,'final-dom.json'),JSON.stringify(await cdp.eval('({status:document.querySelector("#status").textContent,controls:{runDisabled:document.querySelector("#runBtn").disabled,thermalHidden:document.querySelector("#thermalControls").hidden},html:document.documentElement.outerHTML})'),null,2)+'\n','utf8');
  const transientModel=JSON.parse(await readFile(arg('--transient-model'),'utf8'));
  await transientScenario({cdp,click,wait,sleep,snapshot,report,model:transientModel,out});
+ await regionScenario({cdp,click,wait,sleep,snapshot,report,steadyModel:regionModel,transientModel:transientRegionModel,out});
  if(report.console.length)throw Error('Browser console exception/error');
  if(!report.http.some(x=>x.url.endsWith('/api/thermal/run')&&[200,202].includes(x.status))||!report.http.some(x=>/\/api\/jobs\/[^/]+\/result$/.test(x.url)&&x.status===200))throw Error('No successful real thermal run/result HTTP evidence');
  report.model=model; report.fakeApi=false; report.injectedPhysicalResult=false;
