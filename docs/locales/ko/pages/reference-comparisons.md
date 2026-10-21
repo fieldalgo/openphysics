@@ -15,10 +15,10 @@
 
 ## 도구
 
-| 도구 | 버전 | 라이선스 | 쓰는 방식 |
-|---|---|---|---|
-| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`, CI는 12.0.2 고정 | BSD-3-Clause | 시험 전용 extra `galerkin[crosscheck]`에서 시험 코드가 import |
-| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0`(CI의 sympy는 1.14.0) | MIT(sympy: BSD-3-Clause AND MIT) | 같음. [요소 정의](#요소-정의)에만 사용 |
+| 도구 | 버전 | 라이선스 | 쓰는 방식  Mode |
+|---|---|---|---|---|
+| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`, CI는 12.0.2 고정 | BSD-3-Clause | 시험 전용 extra `galerkin[crosscheck]`에서 시험 코드가 import  live |
+| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0`(CI의 sympy는 1.14.0) | MIT(sympy: BSD-3-Clause AND MIT) | 같음. [요소 정의](#요소-정의)에만 사용  live |
 
 시험 extra로 설치하고 CI에서 돌리는 도구는 정한 대로 허용형 라이선스 도구뿐입니다
 ([제3자 소프트웨어](third-party.md) 참고). 약한 copyleft(NGSolve 같은 LGPL)나 GPL 도구는 이

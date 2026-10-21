@@ -189,9 +189,11 @@ def reachability(dists, first_party, test_extras=frozenset({"test"})):
 def first_party_imports(modules):
     """Return first-party source, test, example and tool files that import any of the given modules."""
     offenders = []
-    for path in sorted(p for top in ("packages", "tests", "examples", "tools")
-                       for p in (ROOT / top).rglob("*.py")):
-        if any(part in {"build", ".eggs"} or part.endswith(".egg-info") for part in path.parts):
+    tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
+                             check=True, capture_output=True).stdout
+    for relative in sorted(set(p.decode("utf-8") for p in tracked.split(b"\0") if p)):
+        path = ROOT / relative
+        if path.suffix != ".py" or path.parts[len(ROOT.parts)] not in {"packages", "tests", "examples", "tools"}:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
@@ -305,6 +307,33 @@ def check_bundled(name, dist, items, platform):
     return errors, matched
 
 
+def reference_docs_errors(text, entries, where):
+    """Compare machine-readable Mode cells, without interpreting surrounding prose."""
+    modes = {}
+    mode_column = None
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            mode_column = None
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if "Mode" in cells:
+            mode_column = cells.index("Mode")
+            continue
+        if mode_column is None or len(cells) <= mode_column:
+            continue
+        for name in re.findall(r"`([A-Za-z0-9._-]+)`", cells[0]):
+            modes.setdefault(canonicalize_name(name), []).append(cells[mode_column].replace("`", ""))
+    errors = []
+    for name, entry in entries.items():
+        if "reference" not in entry:
+            continue
+        expected = set(entry["reference"]["mode"])
+        rows = modes.get(canonicalize_name(name), [])
+        if len(rows) != 1 or set(x.strip() for x in rows[0].split(",")) != expected:
+            errors.append(f"{where}: {name} Mode must equal {sorted(expected)} exactly once")
+    return errors
+
+
 def check(paths, inventory, check_docs=True, platform=None):
     policy = inventory["policy"]
     permissive = set(policy["permissive"])
@@ -367,6 +396,8 @@ def check(paths, inventory, check_docs=True, platform=None):
             errors.append(f"{name}: {bad} in {entry['spdx']!r} is never allowed")
             continue
         if "external_process" in entry:
+            if name not in policy.get("external_process_allowlist", []):
+                errors.append(f"{name}: external_process is not authorized by policy")
             record["use"] = "external-process"
             modules = set(entry["external_process"]["forbidden_imports"])
             if offenders := first_party_imports(modules):
@@ -382,7 +413,9 @@ def check(paths, inventory, check_docs=True, platform=None):
         for doc in DOCS:
             text = doc.read_text(encoding="utf-8")
             listed = {canonicalize_name(m) for m in re.findall(r"`([A-Za-z0-9._-]+)`", text)}
-            if missing := sorted(set(entries) - listed):
+            documented = {**inventory.get("external_tools", {}), **entries}
+            errors += reference_docs_errors(text, documented, doc.relative_to(ROOT).as_posix())
+            if missing := sorted(set(documented) - listed):
                 errors.append(f"{doc.relative_to(ROOT).as_posix()} does not list {missing}")
     return errors, report
 

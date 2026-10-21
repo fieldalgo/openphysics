@@ -118,13 +118,16 @@ def test_strictest_path_wins(tmp_path):
     assert errors == [] and report["shared"]["use"] == "runtime"
 
 
-def test_gpl_requires_external_process_entry(tmp_path):
+def test_gpl_requires_external_process_entry(tmp_path, monkeypatch):
     install(tmp_path, "mesher", license="GPLv2+",
             classifiers=["License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)"])
     errors, _ = run(tmp_path, {"mesher": {"spdx": "GPL-2.0-or-later"}})
     assert any("not allowed for tool use" in e for e in errors)
     external = {"spdx": "GPL-2.0-or-later",
                 "external_process": {"executable": "mesher", "forbidden_imports": ["mesher_never_imported"]}}
+    errors, _ = run(tmp_path, {"mesher": external})
+    assert any("not authorized by policy" in e for e in errors)
+    monkeypatch.setitem(INVENTORY["policy"], "external_process_allowlist", ["gmsh", "mesher"])
     errors, report = run(tmp_path, {"mesher": external})
     assert errors == [] and report["mesher"]["use"] == "external-process"
 
@@ -278,7 +281,8 @@ def test_gpl_with_exception_or_other_option_bundled_in_process_passes(tmp_path, 
     assert errors == []
 
 
-def test_external_process_entry_may_bundle_gpl_library(tmp_path):
+def test_external_process_entry_may_bundle_gpl_library(tmp_path, monkeypatch):
+    monkeypatch.setitem(INVENTORY["policy"], "external_process_allowlist", ["gmsh", "mesher"])
     library = "../../lib/libmesher.so.4.15"
     site = tmp_path / "prefix" / "lib" / "python3.12" / "site-packages"
     install(site, "mesher", license="GPLv2+", files=["mesher/__init__.py", library])

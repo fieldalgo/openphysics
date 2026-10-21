@@ -344,3 +344,41 @@ and that no relative link is left in any package description.
 `tests/_support/` contains unshipped modules only (no subdirectories). Root pytest `pythonpath`
 makes the [stored-value loader](stored-reference-values.md) available without a `tests/conftest.py`.
 The installed suite copies that configuration and the support modules, validating without a reference-tool install.
+
+<a id="reference-import-checks"></a>
+
+## Reference import checks
+
+`tools/check_reference_zones.py` checks only `git ls-files -z` paths. Stage new
+files before checking. Untracked environments do not participate. Every tracked
+`.py` must belong to packages, examples, tools, tests, studies or benchmarks;
+all conftest files are always-loaded. Test helpers are always-loaded; only
+`test_*.py`/`*_test.py` are test modules. Stored generators are
+`tests/<import>/reference_values/<tool>/generate_*.py`.
+
+The checker recognizes import statements, literal `__import__`,
+`importlib.import_module`, `pytest.importorskip`, `require_tool`, and import aliases.
+A module-level try/if/class is still eager. Function defaults and decorators are
+also eager; function bodies and the exact `if __name__ == "__main__":` body are not.
+A default-loaded module cannot eagerly import a helper with eager non-permissive
+imports (one level, resolved from the repository root and caller directory).
+Each reference importer must match its inventory `reference.imported_by` globs.
+
+For example, a listed test can call `require_tool("scikit-fem")` inside its fixture.
+A future restricted tool must follow that same lazy pattern; placing its import
+in a shared fixture module or module-level `try` fails. No new tool is installed
+by this checker. It checks literal syntax, not arbitrary generated names, alias
+reassignment, function-call execution or indirect chains beyond one import edge;
+manual review still covers those cases. It never reads installed solver source.
+
+Published non-test dependencies and extras cannot reach a test extra or any
+reference tool through first-party dependency edges. Non-permissive references
+cannot occur in any published dependency, including test extras. Environment
+markers are conservatively treated as reachable on some supported environment.
+Third-party transitive dependency licenses remain checked from installed metadata.
+The meta distribution cannot reach Gmsh. The scan is required in Linux source CI;
+installed-platform jobs keep their existing license-scan trigger.
+
+This is a source-policy API, not a physical solver API: there are no physical
+units or boundary conditions. Stored numerical units and comparison boundaries
+remain in [stored reference values](stored-reference-values.md).

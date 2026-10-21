@@ -307,3 +307,36 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 `tests/_support/`는 배포하지 않는 모듈만 담습니다(하위 폴더 없음). 루트 pytest `pythonpath`로
 [저장값 로더](stored-reference-values.md)를 찾으며 `tests/conftest.py`는 만들지 않습니다.
 설치 시험은 루트 설정과 지원 모듈을 함께 복사하므로 도구 설치 없이 동일하게 검증합니다.
+
+<a id="reference-import-checks"></a>
+
+## 레퍼런스 import 검사
+
+`tools/check_reference_zones.py`는 `git ls-files -z` 경로만 검사합니다. 새 파일은
+검사 전에 stage해야 하며 추적하지 않는 가상환경은 제외됩니다. 모든 추적 `.py`는
+packages·examples·tools·tests·studies·benchmarks 중 하나에 속해야 합니다.
+모든 conftest와 시험 도우미는 항상 불러오는 구역이며 `test_*.py`/`*_test.py`만
+시험 모듈입니다. 저장값 생성기는 `tests/<import>/reference_values/<tool>/generate_*.py`입니다.
+
+import 문, 리터럴 `__import__`·`importlib.import_module`·`pytest.importorskip`·
+`require_tool` 및 import 별칭을 인식합니다. 모듈 수준 try/if/class, 함수 기본값과
+데코레이터는 즉시 실행입니다. 함수 본문과 정확한 `if __name__ == "__main__":` 본문은
+늦은 실행으로 봅니다. 기본 로드 파일은 비허용형 도구를 즉시 불러오는 모듈을
+즉시 import할 수 없습니다(저장소 루트·호출 파일 폴더에서 한 단계 해석).
+각 레퍼런스 사용 파일은 목록의 `reference.imported_by` glob과 일치해야 합니다.
+
+예를 들어 등록된 시험은 fixture 안에서 `require_tool("scikit-fem")`을 호출할 수
+있습니다. 향후 제한 도구도 같은 늦은 호출을 따라야 하며 공용 fixture 모듈 또는
+모듈 수준 try에 import를 넣으면 실패합니다. 검사기가 새 도구를 설치하지는 않습니다.
+리터럴 구문 검사이므로 동적 이름 생성·별칭 재대입·함수 호출 실행·한 단계보다 긴
+간접 연결은 해석하지 않으며 수동 검토가 필요합니다. 설치된 솔버 소스는 읽지 않습니다.
+
+비시험 의존성·extra는 자사 패키지 의존 경로를 통해 시험 extra나 레퍼런스 도구에
+도달할 수 없습니다. 비허용형 레퍼런스는 시험 extra를 포함한 모든 배포 의존성에서
+금지됩니다. 환경 marker는 지원 환경 중 하나에서 도달 가능하다고 보수적으로 봅니다.
+제3자 전이 의존 라이선스는 설치 메타데이터 검사로 계속 확인합니다. 메타 배포판은
+Gmsh에 도달할 수 없습니다. 이 정적 검사는 Linux 소스 CI에서 필수이며 플랫폼 설치
+job의 기존 라이선스 스캔 실행 조건은 유지됩니다.
+
+이는 소스 정책 API이며 물리 솔버 API가 아니므로 물리 단위·경계조건은 없습니다.
+저장 수치 단위와 비교 경계는 [저장 레퍼런스 값](stored-reference-values.md)을 따릅니다.

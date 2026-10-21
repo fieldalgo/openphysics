@@ -311,3 +311,24 @@ Korean page, and record its package NOTICE if it is bundled or copied.
 `external_tools` in `tools/third_party_licenses.json` records provenance separately from installed dependencies.
 NGSolve is stored-only and has no value records yet. The loader and audit follow
 [stored reference values](stored-reference-values.md); dependency admission rules are unchanged.
+
+## Reference import boundaries
+
+| Tool | Mode | Scope |
+|---|---|---|
+| `scikit-fem` | live | Existing permissive comparison tests; required CI |
+| `symfem` | live | Existing permissive element comparisons; required CI |
+| `ngsolve` | stored | Separate generation environment; no value records committed yet |
+
+The static zone check reads git-tracked Python source without importing it.
+Non-permissive references may be loaded only lazily inside listed test functions,
+or in listed generators/studies. Shipped code, examples, conftest files and shared
+helpers cannot load them. Gmsh remains a separate-process backend and cannot be
+imported anywhere in this tree. Only `gmsh` has the inventory policy's
+`external_process_allowlist` exemption; adding an entry cannot grant one.
+These boundaries do not admit a new installed tool: the installed-license checker
+still rejects in-process GPL/AGPL until an actual qualifying tool is adopted.
+
+Run `python tools/check_reference_zones.py` or
+`python -m pytest -q tools/tests/test_reference_zones.py` from the repository root.
+See [development](development.md#reference-import-checks) for limits and examples.
