@@ -169,6 +169,9 @@ def check_wheel(wheel):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".validation" / "dist")
+    parser.add_argument("--build-only", action="store_true",
+                        help="stop after building, twine check and the content checks; "
+                             "the release workflow uses this to build what it uploads")
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -198,6 +201,9 @@ def main():
     artifacts = wheels + sdists
     (output / "SHA256SUMS").write_text("".join(
         f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in artifacts))
+    if args.build_only:
+        print(f"Built and checked {len(wheels)} wheels and {len(sdists)} sdists; artifacts: {output}")
+        return
 
     with tempfile.TemporaryDirectory(prefix="openphysics-wheel-check-") as directory:
         work = Path(directory).resolve()
