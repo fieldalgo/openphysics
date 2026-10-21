@@ -20,6 +20,7 @@
 | 문서 | English | 한국어 |
 |---|---|---|
 | 도구 개요·설치 | [Overview](../../../overview.md) | [한국어](overview.md) |
+| 튜토리얼: 내 도파관 해석하기 | [Tutorial](../../../packages/simcase/waveguide_tutorial.md) | [한국어](packages/simcase/waveguide_tutorial.md) |
 | 구조도와 패키지 관계 | [Architecture](../../../architecture.md) | [한국어](architecture.md) |
 | 개발과 검증 | [Development guide](../../../development.md) | [한국어](development.md) |
 | 기여 | [Contributing](../../../contributing.md) | [한국어](contributing.md) |

@@ -472,6 +472,7 @@ script / CLI  ->  runs the document      simcase.run
 | Topic | English | 한국어 |
 |---|---|---|
 | Package overview | [Overview](../../docs/packages/simcase/overview.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/overview.md) |
+| Waveguide tutorial | [Analyse your own waveguide](../../docs/packages/simcase/waveguide_tutorial.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/waveguide_tutorial.md) |
 | Vector subspace tracking | [Guide](../../docs/packages/simcase/vector_subspace_tracking.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
 | Cavity documents | [Contract](../../docs/packages/simcase/cavity3d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/cavity3d.md) |
 | Steady heat documents | [Contract](../../docs/packages/simcase/thermal_steady2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_steady2d.md) |

@@ -276,6 +276,7 @@ script / CLI  ->  runs the document      simcase.run
 | 주제 | English | 한국어 |
 |---|---|---|
 | 패키지 개요 | [Overview](../../../../../packages/simcase/overview.md) | [한국어](overview.md) |
+| 도파관 튜토리얼 | [Analyse your own waveguide](../../../../../packages/simcase/waveguide_tutorial.md) | [한국어](waveguide_tutorial.md) |
 | 벡터 부분공간 추적 | [Guide](../../../../../packages/simcase/vector_subspace_tracking.md) | [한국어](vector_subspace_tracking.md) |
 | 공진기 문서 | [Contract](../../../../../packages/simcase/cavity3d.md) | [한국어](cavity3d.md) |
 | 정상 열전도 문서 | [Contract](../../../../../packages/simcase/thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
