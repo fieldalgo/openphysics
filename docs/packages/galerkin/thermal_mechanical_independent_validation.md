@@ -6,21 +6,23 @@
 
 - **What it checks:** independent acceptance of `galerkin.thermal_mechanical.solve_steady_thermoelasticity`: Dirichlet/insulated steady heat, exact same-mesh nodal-P1 temperature transfer, then prescribed-temperature mechanics, in plane stress and plane strain.
 - **Fixed gates:** on n=8/16/32/64, every interval needs temperature and displacement L2 order ≥ 1.8 and flux, strain, full 3D stress and energy-norm orders ≥ 0.9; exact uniform/linear fields and heat balances agree to 1e-10, mechanical residual, force and moment to 1e-9.
-- **Scope:** one-way endpoint mechanics. Robin, outward flux, traction, transient heat, feedback, CLI/Studio and persistence are outside it. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+- **Scope:** one-way endpoint mechanics. Robin, outward flux, traction, transient heat, feedback, CLI/Studio and persistence are outside it. For the result of a specific commit, see its CI run.
 
-This report covers the public Python workflow on explicit production candidate
-**b4131d0dab425c2ba54380492e33109f78a92a0b**, a normal successor of initial
-**48920cc066708784864c95eb5bae597b0e2a2abd**. Independent test code is fixed at
-**ecc924b80603426cd751cf3fc0fa62b25cedd976**. Preparation math and gates were frozen
-before inspecting this implementation. Producer checks are regression evidence,
-not the independent oracle. The independent additions do not edit production/refsol/original tests/settings;
-the separately assigned follow-up below merges its producer-owned guard change.
+This report covers the public Python workflow. Preparation math and gates were
+frozen before inspecting the implementation. Producer checks are regression
+evidence, not the independent oracle.
 
 The workflow runs Dirichlet/insulated steady heat, exact same-mesh nodal-P1
 snapshot transfer, then prescribed-temperature mechanics. Robin, outward flux,
 mechanical traction, remeshing, iterations, feedback, transient heat, CLI/Studio
 and persistence are outside this acceptance. This is one-way endpoint mechanics,
 not a thermodynamically coupled simulation or a heating-path energy balance.
+
+## Evidence
+
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result.
 
 ## Independent law and weak functionals
 
@@ -183,9 +185,7 @@ Celsius inference, clipping, offset or reference-temperature repair is claimed.
 
 All stages see the same isolated owned mesh. Caller callback mutation cannot
 rewrite captured geometry/supports/region metadata. Observed owned geometry or
-region mutation fails at the stage boundary. Region validation/lifetime and
-cast-overflow checks are the b413 code delta; core thermal/thermoelastic blobs
-are unchanged from489. Snapshot keeps canonical immutable bytes, independent
+region mutation fails at the stage boundary. Snapshot keeps canonical immutable bytes, independent
 of later heat/caller/reference-mesh mutations. Reordered/scaled/stale geometry,
 changed schema/units/hash fail component reuse. Mutable results after return
 are expressly not recertified.
@@ -198,7 +198,7 @@ physical units or pre-freeze intent. A finite20K or falsely metre-labelled mesh
 cannot reveal its intended provenance. No automatic cross-mesh repair, thread
 safety, input-source authentication or post-return integrity certification.
 
-## Reproduction, failures and verification boundary
+## Reproduction and verification boundary
 
 ```bash
 # Run from the repository root, using an environment with existing dependencies.
@@ -228,58 +228,8 @@ conftests: root conftest intentionally forces checkout imports. Copy only this
 independent oracle/test outside the checkout and use confcutdir as above. Record
 actual module __file__ and hashes; successful import alone is insufficient.
 
-Linux Python3.12.14 / NumPy2.3.5 / SciPy1.17.0, isolated existing-dependency
-venvs, all six thread variables1. Source origin is this checkout; installed origin
-is the separate venv's site-packages. Both workflow files have Git blob
-**28ecea0150234cff77bcd3d7a0a2c39252a8caa1** and SHA256
-**77e196d31ffa99b396a54169794ece6a947d5bbc3db12a4bbaea8de85469d648**.
-The b413 wheel SHA256 is
-**44d63f83196503dc3d1e5a5ec41b2bd7c539a672ba907de14a9c074c2ce15391**.
-No new dependencies or GPL solver implementation sources were used.
-
-- Initial489 independent source81pass/0skip; this is historical, before b413.
-- First b413 independent source89pass/1fail/0skip: the region-name negative
-  fixture assigned the same already-mutated name, so no actual change occurred.
-  Changing the fixture to a different name fixed it; targeted3pass/87deselected.
-  No producer or gate change. Original failed log is preserved.
-- Final installed independent90pass/0fail/0skip, including all meshes and9runtime
-  wrong alternatives. Related source component/previous-independent/API
-  regression226pass/0fail/0skip; producer results are not independent counts.
-- Final first root run: **1001pass / 3fail / 16skip / 9subtests pass**,
-  1 Starlette deprecation warning. The independent90 cases all pass in its JUnit.
-  One failure is the unchanged dependency guard rejecting standard-library
-  collections/contextlib/copy/json. Two cavity CLI failures were this source
-  venv missing local simcase; installing the six existing local packages
-  no-index/no-deps fixed the two targeted CLI checks (2pass). The original
-  full-run result remains failed, not re-labelled as a clean whole run.
-  Exact follow-up **e2a1a26a2bb46aa9b0d3a860a34c55d5c960aa81** changes only
-  the producer-owned test_independence.py (blob a94ff620d18e0cce8cd5f8665ce12b03a0c984e1).
-  It is normally merged; source pytest collection observes **6 tests**, compared
-  with the old file’s actual2. Source guard **6pass/0fail/0skip** and installed
-  engine guard **6pass/0fail/0skip** include standard-library acceptance and
-  rejection probes for httpx/requests/refsol, retaining the separate refsol ban.
-  Installed ENGINE is explicitly bound to real site-packages during collection,
-  not an empty copied-test path. All **18 runtime Python modules** are directly
-  byte-identical between the verified source and original b413 wheel, including
-  the workflow; the independent oracle/test bytes also stay fixed. Consequently
-  numerical90, related226 and the whole run are not automatically repeated.
-  This target recovery is not a second clean whole-run result. The owner’s
-  separate final release combination/fullsource remains pending.
-
-Other original invocation failures are preserved: first explicit-file pytest
-selected package configuration and failed collection with ModuleNotFoundError
-(galerkin); explicit root -c pyproject.toml fixes collection. One heredoc used
-an incorrect relative path and wrote nothing; its following16pass were only the
-old uniform tests, not the new contracts. An origin script initially had a wrong
-sibling path (two cannot-open errors), then ran correctly. The first489 wheel binary was overwritten by the later build; its
-build log/hash survives, not the original binary. It built successfully but pip's subsequent network check was blocked; final b413
-wheel build/install used no-index and disabled pip version checks. These are
-invocation/fixture failures, not numerical gate relaxations.
-
-Source text/configuration was verified against exact candidate blobs. Seven
-unrelated binary PNG assets were absent in the hydrated source; no figure-asset
-packaging completeness is claimed. The galerkin numerical wheel contains the
-verified modules; shared release manifests/doc-asset shipping need separate
-release review. Timing on a shared host is metadata, not a performance baseline.
-Actions were not queried or run. Windows runner acceptance is stopped/unverified;
-Linux cannot substitute for it. No develop integration or deployment is claimed.
+The workflow adds no new dependencies, and no GPL solver implementation sources
+were used. The galerkin numerical wheel contains the runtime modules; shared
+release manifests and doc-asset shipping need separate release review, and no
+figure-asset packaging completeness is claimed. Windows acceptance is
+unverified; Linux cannot substitute for it.
