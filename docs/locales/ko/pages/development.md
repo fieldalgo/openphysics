@@ -227,7 +227,12 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
   Accelerate를 쓰므로 OpenBLAS 커널이 표시되지 않습니다.
 - `blas-kernels`는 `OPENBLAS_CORETYPE=Haswell`(AVX2, AMD Zen에서도 쓰는 커널)과
   `Sandybridge`(AVX)를 강제합니다. 먼저 강제한 커널이 실제로 쓰이는지 확인하므로,
-  다른 커널로 넘어가 조용히 통과할 수 없습니다. 로컬 재현:
+  다른 커널로 넘어가 조용히 통과할 수 없습니다. 이 job은 `OPENBLAS_L2_SIZE=2048`도
+  설정합니다. 그러지 않으면 OpenBLAS 0.3.34가 AVX-512 AMD 러너(Zen 4/5)에서 커널을
+  강제해도 GEMM 블로킹을 키워 Haswell 커널이 죽습니다
+  ([OpenMathLib/OpenBLAS#6021](https://github.com/OpenMathLib/OpenBLAS/issues/6021)).
+  고정한 numpy에 수정된 OpenBLAS가 들어오면 지웁니다
+  ([#78](https://github.com/fieldalgo/openphysics/issues/78)). 로컬 재현:
 
   ```bash
   OPENBLAS_CORETYPE=Sandybridge python -m pytest -q -m "not slow" <test files>
