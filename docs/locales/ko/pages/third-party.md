@@ -275,3 +275,23 @@ URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인
 `tools/third_party_licenses.json`의 `external_tools`는 설치 의존성과 별개인 출처 목록입니다.
 NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. 로더와 감사 형식은
 [저장 레퍼런스 값](stored-reference-values.md)을 따릅니다. 기존 의존성 허용 규칙은 그대로입니다.
+
+## 레퍼런스 import 경계
+
+| 도구 | Mode | 범위 |
+|---|---|---|
+| `scikit-fem` | live | 기존 허용형 비교 시험; 필수 CI |
+| `symfem` | live | 기존 허용형 요소 비교; 필수 CI |
+| `ngsolve` | stored | 별도 생성 환경; 아직 값 기록은 커밋되지 않음 |
+
+정적 구역 검사는 git 추적 Python 소스를 읽으며 실행하거나 import하지 않습니다.
+비허용형 레퍼런스는 목록에 등록된 시험 함수 안에서 늦게, 또는 등록된 생성기·연구에서만
+불러올 수 있습니다. 배포 코드·예제·conftest·공용 도우미에서는 불러올 수 없습니다.
+Gmsh는 별도 프로세스 백엔드이며 이 트리 어디에서도 import할 수 없습니다.
+목록 정책의 `external_process_allowlist` 예외는 `gmsh`뿐이며 항목 추가로 예외를 얻을 수 없습니다.
+이 경계는 새 설치 도구를 허용하지 않습니다. 실제 자격을 갖춘 도구 도입 전까지
+설치 라이선스 검사기는 같은 프로세스의 GPL·AGPL을 계속 거부합니다.
+
+저장소 루트에서 `python tools/check_reference_zones.py` 또는
+`python -m pytest -q tools/tests/test_reference_zones.py`를 실행합니다.
+한계·예제는 [개발 안내](development.md#reference-import-checks)를 참조하세요.

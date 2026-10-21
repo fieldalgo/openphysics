@@ -18,10 +18,10 @@ claims still come from analytical references and mesh-refinement studies.
 
 ## Tools
 
-| Tool | Version | License | How it is used |
-|---|---|---|---|
-| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]` |
-| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0` (sympy 1.14.0 in CI) | MIT (sympy: BSD-3-Clause AND MIT) | Same; [element definitions](#element-definitions) only |
+| Tool | Version | License | How it is used  Mode |
+|---|---|---|---|---|
+| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]`  live |
+| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0` (sympy 1.14.0 in CI) | MIT (sympy: BSD-3-Clause AND MIT) | Same; [element definitions](#element-definitions) only  live |
 
 By choice, only permissively licensed tools are installed as test extras and
 run in CI (see [third-party software](third-party.md)). Tools under weak
