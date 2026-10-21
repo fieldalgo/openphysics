@@ -301,3 +301,9 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 풀어 놓은 sdist에서 만드는 wheel은 sdist의 설명을 그대로 씁니다.
 `tools/tests/test_readme_links.py`는 일곱 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
 않았는지 검사합니다.
+
+## 저장값 시험 지원
+
+`tests/_support/`는 배포하지 않는 모듈만 담습니다(하위 폴더 없음). 루트 pytest `pythonpath`로
+[저장값 로더](stored-reference-values.md)를 찾으며 `tests/conftest.py`는 만들지 않습니다.
+설치 시험은 루트 설정과 지원 모듈을 함께 복사하므로 도구 설치 없이 동일하게 검증합니다.

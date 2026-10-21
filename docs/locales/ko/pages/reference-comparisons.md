@@ -128,3 +128,8 @@ symfem 2025.12.0, sympy 1.14.0으로 로컬 Linux에서 실행한 값입니다. 
 4. 새 도구라면 `galerkin[crosscheck]`, CI 고정 버전, 라이선스 목록,
    [제3자 소프트웨어](third-party.md)에 추가합니다.
 5. 이 표를 영어·한국어로 함께 고칩니다.
+
+## 저장값 비교
+
+도구를 실행하지 않는 비교는 [저장 레퍼런스 값](stored-reference-values.md) 형식을 씁니다.
+현재 scikit-fem·symfem은 live이고 NGSolve는 stored 방식입니다. 새 저장 도구와 기록은 함께 추가합니다.

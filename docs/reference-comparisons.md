@@ -141,3 +141,8 @@ P1 boundary mass. The symbolic integration takes about 20 s on one core.
 4. Add the tool to `galerkin[crosscheck]`, the CI pins, the license inventory and
    [third-party software](third-party.md) if it is new.
 5. Update this table in English and Korean.
+
+## Stored comparisons
+
+Comparisons without a live tool use the [stored reference values](stored-reference-values.md) contract.
+scikit-fem and symfem currently run live; NGSolve uses stored results. Add each new stored tool and its record together.

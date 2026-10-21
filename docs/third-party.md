@@ -305,3 +305,9 @@ To add a dependency: confirm the license in the upstream repository's LICENSE
 file, add an entry with the SPDX expression and source URL to the inventory,
 list what its wheels bundle on each CI platform, add a row here and in the
 Korean page, and record its package NOTICE if it is bundled or copied.
+
+## Stored-tool inventory
+
+`external_tools` in `tools/third_party_licenses.json` records provenance separately from installed dependencies.
+NGSolve is stored-only and has no value records yet. The loader and audit follow
+[stored reference values](stored-reference-values.md); dependency admission rules are unchanged.

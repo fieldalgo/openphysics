@@ -269,3 +269,9 @@ matplotlib의 FreeType 등)는 이렇게 보이지 않으므로 직접 검토해
 의존성을 추가할 때: upstream 저장소의 LICENSE 파일로 라이선스를 확인하고, SPDX 식과 출처
 URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인 것을 확인해 적고, 이 문서와 영어
 원문에 행을 추가하며, 번들하거나 복사하면 패키지 NOTICE에도 적습니다.
+
+## 저장값 도구 목록
+
+`tools/third_party_licenses.json`의 `external_tools`는 설치 의존성과 별개인 출처 목록입니다.
+NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. 로더와 감사 형식은
+[저장 레퍼런스 값](stored-reference-values.md)을 따릅니다. 기존 의존성 허용 규칙은 그대로입니다.

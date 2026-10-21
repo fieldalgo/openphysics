@@ -338,3 +338,9 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 A wheel built from an unpacked sdist reuses the sdist's description.
 `tools/tests/test_readme_links.py` checks that the seven `setup.py` files are identical
 and that no relative link is left in any package description.
+
+## Stored-value test support
+
+`tests/_support/` contains unshipped modules only (no subdirectories). Root pytest `pythonpath`
+makes the [stored-value loader](stored-reference-values.md) available without a `tests/conftest.py`.
+The installed suite copies that configuration and the support modules, validating without a reference-tool install.
