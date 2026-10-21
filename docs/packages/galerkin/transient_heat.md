@@ -6,41 +6,13 @@
 
 - **What it does:** `galerkin.transient_heat.solve_transient_heat` advances 2D heat conduction, c·dT/dt − div(k·grad T) = Q, on a fixed conforming P1 triangle mesh with consistent mass and backward Euler. Inputs are constant isotropic k [W/(m K)] and c [J/(m³ K)], a source Q [W/m³], explicit times [s], an initial field [K] and fixed Dirichlet nodes with time-dependent temperatures; other boundaries are insulated.
 - **Limits:** no prescribed flux or Robin boundary, restart or automatic heat-to-mechanics coupling. Finite negative Kelvin is not clamped, and no discrete maximum principle is promised.
-- **Validation:** the [validation contract](transient_heat_validation.md) and [independent acceptance](transient_heat_independent_validation.md) fix backward-Euler order 0.9–1.1 against the exact discrete eigenmode product, and temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on a manufactured sine solution. The historical notes below are kept as recorded; for a specific commit, see its CI run.
+- **Validation:** the [validation contract](transient_heat_validation.md) and [independent acceptance](transient_heat_independent_validation.md) fix backward-Euler order 0.9–1.1 against the exact discrete eigenmode product, and temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on a manufactured sine solution. For the result of a specific commit, see its CI run.
 
-## Current checkout and evidence
+## Evidence
 
-This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
-
-**Historical initial submission (d21): source and static review only.** Python parsing,
-imports, compilation and collection had not been executed at that submission.
-That historical status is retained; no earlier numerical pass is inferred.
-
-**Bounded follow-up, 2026-10-16:** exact code snapshots
-d21e083d9723eec71ab5e32777ecd331d75cd981 and
-b2f420f4d540503ad3711bdab996e12dcbce9e9d each compiled all five new Python
-files and imported the engine/reference submodules successfully. Targeted
-collect-only found 70 identical node IDs per snapshot: 58 producer cases and
-12 reference cases. **Collected does not mean passed: no test body ran.**
-A fresh, Git-blob-verified 38-file source subset and fresh venv used Python3.12.14,
-pytest9.1.1, NumPy2.5.4 and SciPy1.18.1 with existing runtime packages; imports
-were from those exact source snapshots, not an installed-wheel proof.
-This did not recover an old checkout, venv or historical execution records.
-
-**Actual small-body follow-up, 2026-10-16:** exact
-b2f420f4d540503ad3711bdab996e12dcbce9e9d ran the two targeted files once:
-**70 passed (58 producer + 12 reference), exit0, no failures/errors/skips**.
-This is distinct from the earlier 70 collected. The original stdout, stderr,
-JUnit bytes, hashes, resource preflight and module origins were preserved.
-The same Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1 source environment
-used BLAS/OMP/MKL1; no test count or tolerance was reduced. No solver fix or
-test rerun was needed. The d21 snapshot did not separately run test bodies.
-
-At that historical checkpoint, the fixed temporal/PDE spatial/5% separation gates,
-complete source regression, installed sdist/wheel proof, independent acceptance and
-platform tests were unexecuted. The 70 small controls are not complete physical
-acceptance. Use the exact current CI evidence to assess the present checkout;
-the commands below define reproduction, not a new pass result.
+This page defines the API contract. Results for a specific commit are that
+commit's CI exits, logs and artifacts; the fixed gates and reproduction
+commands are in the [validation guide](transient_heat_validation.md).
 
 ## Explicit submodule and minimal use
 
@@ -246,10 +218,8 @@ A failed final guard still raises. The bounded loop adds up to five triangular
 solves and additional matrix-vector evaluations per step, without an additional
 factorization; it guarantees neither convergence nor performance.
 
-New producer tests in `test_transient_heat_tiny_domain.py` and
+Producer tests in `test_transient_heat_tiny_domain.py` and
 `test_transient_heat_general_state.py` cover tiny uniform/ramp controls and
 nonuniform, moving-boundary, all-fixed and disconnected/reordered states with
-independent dense consistent-mass reconstruction. Addition is not execution.
-A narrow four-case diagnostic of the selected source returned successfully;
-this is not full source, installed, public-headless or platform acceptance.
-Original failing evidence and all fixed numerical gates remain applicable.
+independent dense consistent-mass reconstruction. All fixed numerical gates
+of the validation guide still apply.
