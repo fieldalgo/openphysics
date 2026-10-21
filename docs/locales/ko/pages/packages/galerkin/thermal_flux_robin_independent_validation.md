@@ -6,25 +6,15 @@
 
 - **확인하는 것:** 닫힌 형태의 strip 해와 별도 제조해로 `galerkin.thermal`의 처방 외향 열유속과 Robin 대류를 독립 수용 검증합니다. Oracle은 생산 조립이나 경계 참조 모듈을 import하지 않습니다.
 - **고정 기준:** n=8/16/32/64에서 마지막 두 구간 모두 내부 온도 L2 차수 ≥ 1.8, 열유속 L2 차수 ≥ 0.9가 필요합니다. 연산자·하중·잔차·반력·열수지 비교는 1e-10, 8차·10차 구적은 측정 오차의 1% 이내로 일치해야 합니다.
-- **범위:** 독립 정상 Python API만 다루며 문서, 과도 열전도, 연성 workflow는 포함하지 않습니다. 아래 후보 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+- **범위:** 독립 정상 Python API만 다루며 문서, 과도 열전도, 연성 workflow는 포함하지 않습니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
-이 보고서는 초기 후보 `23f528dbcffb42ec4120b762fde840f70d9aeffe`를 다룹니다.
-`galerkin/thermal.py` blob은 `20b2f5f0f94583e50775743e1ed9dfaf1c68d97c`,
-경계 reference blob은 `6dccfad22c1300a0df698dea502e1643d1a0c153`입니다.
-독립 oracle은 이 reference나 생산 조립·법선·하중·flux·열수지 helper를 import하지 않습니다.
-이 변경은 전용 oracle/시험/보고와 한국어 문서 추가만 소유합니다. 생산·기존 시험·공유 설정은
-그대로입니다. 초기 후보 근거와 후속 최종 후보·release 통합·완전 연성 workflow는 구분합니다.
+독립 oracle은 경계 reference나 생산 조립·법선·하중·flux·열수지 helper를 import하지 않습니다.
 
-후속 후보 `f575a7187108800545a3e33903b3a37942df9183`의 solver blob은
-`4633e03953d8f6369bdf0e7398d2ebd85b2b4684`입니다. docstring을 제거한 AST 직접
-비교에서 실행 solver는 초기 후보와 같았습니다. reference blob
-`8f50ada586777e2a2dbac9f4a90275d65d17ad51`은 기존 모든 정의를 유지하고
-sine_temperature/sine_flux/sine_source만 추가합니다. 본 oracle은 어느 것도 import하지
-않습니다. 최종 독립 branch는 이 후속 후보를 정상 merge하고 초기 이력을 보존하며
-관련 source·wheel 소비를 재검증합니다. 이 검증이 생산 코드를 작성·수정하지 않습니다.
-최종 후보 관련 source는292통과(독립55+기존 생산/기본/역사 검사237), 최종 wheel
-독립 실행은55통과입니다. runtime 음성 대조는 최종 source10/10·그 wheel10/10에서
-검출합니다. 이 개수는 아래 초기 후보 개수와 구분합니다.
+## 근거
+
+이 페이지는 기준과 재현 방법을 정의합니다. 특정 커밋의 결과는 그 커밋의 CI
+종료값·로그·artifact입니다. 아래 명령은 검사를 재현하는 절차이며 그 자체가 통과
+결과는 아닙니다.
 
 ## 보존식과 독립 복원 연산자
 
@@ -115,10 +105,9 @@ all-Robin과 왼쪽 Dirichlet/나머지 Robin에서 이 직접 장을 사용합�
 별도로, 경계 incident cell의 raw P1 구성식 flux와 해석 법선의 내적을 적분합니다.
 이는 일반적으로 정확히 보존적이지 않고 비영 이산화 오차가 있습니다. 오차가 감소하고
 마지막 두 차수>=.9, 최세밀 비영 2차 경계 상대 오차<=.02여야 합니다. weak 열수지
-검사를 대신하지 않습니다. 생산 담당이 보고한 초기 2실패/10통과의 roundoff 단조성
-시험 정의 오류는 역사 근거이며 이번 독립 suite에서 새로 관측한 실패가 아닙니다.
+검사를 대신하지 않습니다.
 
-관측한 마지막 내부 차수와 최세밀 raw endpoint 상대 오차입니다.
+측정한 마지막 내부 차수와 최세밀 raw endpoint 상대 오차입니다.
 
 | 장 | 마지막 두 온도 차수 | 마지막 두 flux 차수 | 최세밀 raw 경계 오차 |
 |---|---|---|---|
@@ -158,19 +147,10 @@ low-level Dirichlet/ambient Kelvin은 같은 유한실수 수학 정책을 유�
 실제 임시 runtime mutation은 outward 부호, H 부호, ambient load, 질량 lumping,
 hTamb의 별도 평균, 반력 부호, 전도율 scale, callback 법선, 안정 offset 보정,
 Neumann uniqueness의 암시적 pin을 손상시킵니다. 각 경우 기존 독립 assertion을
-실행하고 생산 파일은 쓰지 않습니다. 변형 assertion 실패는 대조 검출이지 원 후보
+실행하고 생산 파일은 쓰지 않습니다. 변형 assertion 실패는 대조 검출이지 원 solver
 결함이 아닙니다. 기대값은 변형/원래 생산 helper 어느 것도 정답으로 사용하지 않습니다.
 
-## 근거 범위와 재현
-
-첫 독립 source는20통과입니다. 확장53개도 통과했으며 최종 전용 suite는 실제 조립
-연산자·tiny anchor를 추가해55개입니다. 마지막 두 개 전의 관련 실행은255통과
-(독립53+기존202)였습니다. 최종 관련 실행은257통과(55+202), 설치 독립 실행은55통과입니다.
-실제 runtime 음성 대조는 source10/10·설치 wheel10/10에서 각각 예상 assertion 실패
-하나로 검출했습니다. 기록한 source 실행에 수치 실패는 없었습니다. 초기 shell 명령은
-pytest 전에 잘못된 log redirection으로 실패했으며 실행 오류로 별도 보존했습니다.
-확장 로그 하나에는 끝 summary가 없어 완전한 별도53통과 실행을 근거로 사용하고
-불완전 로그에서 성공을 추론하지 않았습니다.
+## 재현
 
 기존 의존성을 사용하여 저장소 루트에서 실행합니다.
 
@@ -184,12 +164,7 @@ python -m pytest -c pyproject.toml -q -s \
 `python -I -m pytest --confcutdir=. -q`로 실행하고 wheel import 경로와 모듈 byte
 동일성을 확인합니다. index에서 새로 resolve/install하지 않고 기존 환경 의존성을
 재사용합니다. source·설치·전체 회귀·정확 CI 개수는 별도 보고해야 합니다.
-공유 호스트 시간은 실행 metadata이며 성능 baseline이 아닙니다. 전체 CI/release gate는
-이 초기 후보의 독립 수치 근거와 별도입니다.
-
-추가 한국어 페이지는 해당 영문의 역사 명령·SHA·수식·gate·실패/한계를 바꾸지 않은
-번역입니다. 영문 링크는 페이지 기준 상대 경로로 확인합니다. 기존 영문 페이지·생산·
-기존 시험·공유 packaging/README 설정은 그대로입니다.
+공유 호스트 시간은 실행 metadata이며 성능 baseline이 아닙니다.
 
 한계는 상수 등방성 정상 2D 열전도, 지정한 매끈한 장과 다각형 기하입니다.
 과도 냉각 동역학·복사·비선형 대류/재료·임의 불연속 callback 정확도·구적점 사이

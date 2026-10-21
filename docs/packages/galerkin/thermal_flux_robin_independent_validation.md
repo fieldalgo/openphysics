@@ -6,30 +6,16 @@
 
 - **What it checks:** independent acceptance of prescribed outward flux and Robin convection in `galerkin.thermal`, on a closed-form strip and a separate manufactured solution. The oracle does not import the production assembly or the boundary reference.
 - **Fixed gates:** on n=8/16/32/64, both final intervals need interior temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9; operator, load, residual, reaction and heat-balance comparisons agree to 1e-10; quadrature 8 vs 10 agree within 1% of the measured error.
-- **Scope:** the standalone steady Python API only, not documents, transient heat or coupled workflows. The candidate notes below are kept as recorded; for a specific commit, see its CI run.
+- **Scope:** the standalone steady Python API only, not documents, transient heat or coupled workflows. For the result of a specific commit, see its CI run.
 
-This report covers initial candidate `23f528dbcffb42ec4120b762fde840f70d9aeffe`.
-Its `galerkin/thermal.py` blob is
-`20b2f5f0f94583e50775743e1ed9dfaf1c68d97c`; boundary reference blob is
-`6dccfad22c1300a0df698dea502e1643d1a0c153`. The independent oracle never imports
-that reference or production assembly, normal, load, flux or balance helpers.
-Only dedicated oracle/tests/report and Korean documentation additions belong to
-this independent change. Production, original tests and shared configuration are
-unchanged. Initial-candidate evidence is distinct from a later final candidate,
-release integration, and complete coupled workflows.
+The independent oracle never imports the boundary reference or the production
+assembly, normal, load, flux or balance helpers.
 
-Follow-up candidate `f575a7187108800545a3e33903b3a37942df9183` has solver blob
-`4633e03953d8f6369bdf0e7398d2ebd85b2b4684`. Direct AST comparison after removing
-docstrings found the executable solver identical to the initial candidate. Its
-reference blob `8f50ada586777e2a2dbac9f4a90275d65d17ad51` retains every existing
-reference definition and adds only sine_temperature/sine_flux/sine_source. This
-oracle imports none of them. The final independent branch normally merges that
-follow-up, preserves the initial history, and rechecks related source and wheel
-consumption. No producer code is authored or corrected by this validation. Final-candidate
-related source execution passes292 cases (55 independent plus237 unchanged
-producer/default/historical checks); final-wheel independent execution passes55.
-Runtime negative controls reject10/10 on final source and10/10 on its wheel.
-These counts are distinct from the initial-candidate counts below.
+## Evidence
+
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result.
 
 ## Conservation and independently reconstructed operators
 
@@ -128,11 +114,9 @@ Separately integrate the raw P1 constitutive flux dotted with the analytic
 boundary normal over incident boundary cells. This is generally not exactly
 conservative and has a nonzero discretization error. It must decrease, its final
 two orders must be>=.9, and the finest nonzero quadratic boundary relative error
-must remain<=.02. It does not replace the weak heat-balance check. The producer's
-reported early two failures/ten passes from a monotonic-roundoff test definition
-are historical evidence, not new failures in this independent suite.
+must remain<=.02. It does not replace the weak heat-balance check.
 
-Observed final interior rates and finest raw endpoint relative errors:
+Measured final interior rates and finest raw endpoint relative errors:
 
 | Field | Final two temperature orders | Final two flux orders | Finest raw boundary error |
 |---|---|---|---|
@@ -177,22 +161,10 @@ consistent mass (lumping), hTamb product (separate averaging), reaction sign,
 conductivity scaling, callback normals, stable offset correction and Neumann
 uniqueness (implicit pin). Each runs an unchanged independent assertion; no
 production file is written. A failed mutated assertion is a rejected control,
-not a defect in the unmodified candidate. Expected-value functions never use the
+not a defect in the unmodified solver. Expected-value functions never use the
 mutated or original producer helpers as truth.
 
-## Evidence scope and reproduction
-
-The first independent source run passed20 cases. Expanded53 cases passed;
-the final dedicated suite adds actual assembled-operator and tiny-anchor checks,
-for55 cases. Related execution before those last two additions passed255 cases
-(53 independent plus202 unchanged original checks). Final related execution
-passes257 cases (55+202); installed independent execution passes55 cases.
-Actual runtime negative controls are rejected10/10 in source and10/10 in the
-installed wheel, each with one expected failed assertion. No numerical failure occurred
-in these recorded source runs. An initial shell command used an invalid log
-redirection before pytest started; that execution failure is preserved separately.
-One expanded log ended without a summary; a separate complete53-pass run supplies
-the count, rather than inferring success from an incomplete log.
+## Reproduction
 
 From the repository root with existing dependencies:
 
@@ -207,13 +179,7 @@ checkout with `python -I -m pytest --confcutdir=. -q`, verifying wheel import or
 and module-byte identity. Existing environment dependencies are reused, not
 newly resolved or installed from an index. Source, installed, whole-regression
 and exact-CI counts must be reported separately. Shared-host timings are execution
-metadata rather than a performance baseline. A complete CI/release gate is
-separate from this initial candidate's independent numerical evidence.
-
-The added Korean pages translate their named English versions without changing
-historical commands, SHA, equations, gates or failure/limitation claims. Their
-English links are resolved relative to the page. Existing English pages,
-production, original tests and shared packaging/README settings remain unchanged.
+metadata rather than a performance baseline.
 
 Limits: constant isotropic steady 2D conduction and the specified smooth fields
 and polygonal geometry. No transient cooling dynamics, radiation, nonlinear
