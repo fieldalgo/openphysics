@@ -4,7 +4,7 @@
 
 **한눈에 보기**
 
-- **하는 일:** 직사각형 `thermal.steady2d` 문서(균질 직사각형, P1, 상수 등방 k와 열원, 변 Dirichlet, 단열, 상수 외향 열유속·Robin)를 위한 JSON 우선 전용 Studio 화면입니다. 전용 route로 검증·실행하고 결과 메시, 절점 Kelvin, 요소 열유속을 보여 줍니다.
+- **하는 일:** 직사각형 `thermal.steady2d` 문서(균질 직사각형, P1, 상수 등방 k와 열원, 변 Dirichlet, 단열, 상수 외향 열유속·Robin)를 위한 JSON 우선 전용 Studio 화면입니다. 전용 route로 검증·실행하고 결과 메시, 절점 Kelvin, 요소 열유속을 보여 줍니다. 같은 route는 재료 영역이 있는 정상 열전도 문서도 Studio의 영역 한도 안에서 검증·실행합니다([영역 문서](#영역-문서) 참고).
 - **한계:** 과도 문서(별도 과도 Studio 안내 참고), 해석 전 메시 미리보기, 임의 형상, 연성, 결과 저장 endpoint가 없습니다. 설정한 자원 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다. Studio는 로컬 도구이며 다중 사용자 서비스가 아닙니다.
 - **검증:** [정상 Studio 독립 검증](studio_thermal_independent_validation.md)을 참고하세요. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
@@ -16,7 +16,10 @@ route, typed SI결과, 실제 결과 메시, 절점 Kelvin과 요소 열유속 �
 변 Dirichlet·단열·상수 외향 flux/Robin조건을 다룹니다. 기존 광학동작과
 generic-route 열 guard는 유지합니다. 이 정상열 인터페이스는 과도 문서와 시간/history
 선택을 제외하며 별도 [과도 Studio 가이드](thermal_transient_studio.md)를 참조하세요.
-해석 전 메시 preview·임의 형상·자동 연성·새 결과저장 endpoint는 범위 밖입니다.
+해석 전 메시 preview·아래 영역 문서를 넘는 임의 형상·자동 연성·새 결과저장 endpoint는
+범위 밖입니다.
+재료 영역이 있는 정상 문서(`geometry.shapes` 또는 `geometry.background`)는 같은
+route에서 별도 경로를 따르며 [영역 문서](#영역-문서)에서 설명합니다.
 
 구현과 검증·release상태는 별개입니다. Source·설치 플랫폼·browser·자원 근거는
 정확한 checkout의 CI결과·artifact에서 확인하세요. 이 페이지는 새로운 통과나
@@ -166,13 +169,118 @@ UI무효화로 global job을 삭제하지 않습니다.
 활성/광학 작업은 축출하지 않습니다.
 
 Content-Length를 신뢰하지 않고 전체 파싱 전에 stream 요청 byte를 제한합니다.
-Job/thread/solver 할당 전에 절점·요소 수를 preflight합니다.
-Raw scalar 수는 v1=6N+5M+2D, v2=10N+5M+2D이지만 raw-byte 추정이나
+직사각형 문서는 job/thread/solver 할당 전에 정확한 절점·요소 수를 preflight합니다.
+영역 문서는 raw 형상 한도와 루프 꼭짓점 수를 job 전에, 정확한 절점·요소 수를
+메시 생성 뒤 해석 전에 검사합니다([영역 문서](#영역-문서) 참고).
+Raw scalar 수는 v1=6N+5M+2D, v2=10N+5M+2D, 영역 10N+6M+2D이지만 raw-byte 추정이나
 encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니다.
 복사·list·희소분해·직렬화·동시 작업의 overhead가 있습니다.
 실제 공유호스트 측정은 부하를 공개해야 하며 전용 성능 baseline을 주장하지 않습니다.
 전체 배열을 반복 직렬화하는 대신 제한된 encoded 결과를 유지합니다.
 새 save/upload/path/overwrite API나 자동 재시도 queue는 없습니다.
+
+## 영역 문서
+
+`geometry`에 `shapes`나 `background`가 있는 `thermal.steady2d` 문서는(엔진과 같은
+규칙, [재료 영역이 있는 열전도 문서](thermal_regions2d.md) 참고)
+`/api/thermal/validate`와 `/api/thermal/run`에서 Studio의 영역 경로를 따릅니다.
+그 밖의 문서는 직사각형 경로를 따르며 그 코드·byte·오류는 바뀌지 않습니다.
+`tests/simcase/test_studio_rectangle_invariants.py`가 이를 고정합니다.
+`mesh.subdivisions`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
+`mesh.subdivisions`). `geometry.shapes` 키가 남은 직사각형 문서도 그 키 때문에 영역
+문서가 되므로 같은 이유로 거절합니다.
+
+### Wire 형식
+
+| 항목 | 영역 결과 |
+| --- | --- |
+| Result·layout ID | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
+| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, 직사각형 payload와 같은 최상위 필드 11개 |
+| `arrays` | v2 배열 13개와 `triangle_regions`(삼각형마다 영역 번호 하나, 단위 `1`, 위치 `triangles`, shape `[M]`); D=0 허용(Robin만으로 고정) |
+| `summary` | 생산자 summary 그대로이며 `region_names`(번호 순서), `regions`(이름마다 `material`, `triangles`, `area_m2`), 전체 `materials` 표, `heat_source_w_m3`, `conductivity_range_w_mk`, `mesh`(`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`)를 포함 |
+| Capability | 정상 블록 안의 중첩 `regions` 키: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats`와 아래 `limits` 다섯 개 |
+
+영역 쌍은 직사각형 client가 읽는 블록 바깥 `result_formats`에 넣지 않습니다.
+따라서 영역을 지원하지 않는 페이지는 중첩 블록을 무시하고, 영역 payload는
+job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
+
+게시 전에 capture는 배열을 읽기 전에 쌍을 확인하고, 공개 속성을 한 번씩 읽고,
+복사 전에 shape와 절점·요소 한도를 검사한 뒤 영역을 검사합니다. 이름은 1~65개의
+서로 다른 비어 있지 않은 문자열이며 summary와 같아야 하고, 번호는 범위 안이어야
+합니다. 영역별 삼각형 수, 캡처한 메시에서 생산자와 같은 식으로 더한 영역별 면적
+(같은 수에 같은 식이므로 정확히 같음), 영역 면적의 합과 도메인 면적(1e-9), 문서가 지정한
+영역별 재료, 문서와 같은 summary 재료·열원을 확인합니다. 하나라도 어긋나면 job
+오류 `invalid_result`이며 아무것도 게시하지 않습니다.
+
+### 한도와 적용 위치
+
+| 단계 | 검사 | 거절 |
+| --- | --- | --- |
+| Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; `mesh.subdivisions` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
+| Event loop | 정상 경계(v2) 결과 runtime이 설치되어 있음(영역 결과는 항상 경계 배열을 담으므로) | `unsupported_result_format`(400) |
+| Event loop, run만 | 영역 실행용 공개 결과 API를 쓸 수 있음(블록의 `run_enabled`) | `unsupported_public_api`(400) |
+| Worker thread, `Document.from_dict` 전 | 도형 64개, 원 16개, 다각형 점 합계 512개 이하, 다음으로 경계 교차 1024개 이하(`simcase.region_complexity`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
+| Worker thread | `Document.from_dict` | `invalid_document` |
+| Worker thread | 도형 boolean 뒤 루프 꼭짓점 2048개 이하(`simcase.check_mesh_limits`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
+| Worker thread | 문서의 이름·단위·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
+| Job, 해석 전 | 메시 생성은 절점 10201개(`max_nodes`)를 넘으면 멈추고, 이어서 정확한 절점·요소 수를 10201·20000과 비교 | Job 오류 `mesh_limit_exceeded` |
+| Job | 메시 생성 뒤 드러나는 문서 오류(예: 뒤 도형이 완전히 덮은 도형의 열원) | Job 오류 `invalid_document` |
+| Job | 그 밖의 실행 실패(예: meshine이 풀지 못하는 형상, meshine의 80 round 안에 수렴하지 않는 세분) | Job 오류 `solver_failed` |
+
+형상 한도 네 개와 루프 꼭짓점 한도는 capability의 `limits`(`max_shapes`,
+`max_circles`, `max_polygon_points`, `max_boundary_crossings`,
+`max_input_vertices`)이고, 절점·요소 한도는 정상 블록의 `max_nodes`와
+`max_triangles`입니다. 모든 거절 메시지는 개수와 한도를 밝힙니다. 메시 생성이 절점
+한도에서 멈추면 개수를 알 수 없으므로 메시지는 "more than"이라고 씁니다. 모든 값은
+후보입니다(`candidate-unmeasured`).
+
+- **경계 교차**는 서로 다른 도형의 경계 선분 쌍 가운데 내부가 정확히 한 점에서
+  만나는 쌍입니다(사각형은 선분 4개, 원은 엔진이 만드는 128각형, 다각형은 그 변).
+  맞닿음과 같은 직선 위 겹침은 세지 않습니다. 교차는 뒤 도형이 덮어도 검증 시간을
+  쓰므로 검증 전에 raw JSON에서 셉니다.
+- **루프 꼭짓점**은 boolean 뒤 메시 생성기에 넘기는 루프의 점 하나입니다. 배경 안의
+  도형은 자기 자신과 배경의 구멍으로 두 번 세고, 다른 경계에 닿거나 교차하는 원은
+  128각형이므로 그런 원은 2048 안에 최대 7개까지 들어갑니다. 다른 경계와 떨어진 원은
+  자체 `mesh_size`가 있어도 전역 `mesh.size`로 정한 max(16, 4πr/`mesh.size`)개 점의
+  정확한 원으로 메시하므로, 아주 작은 전역 크기는 여기서 거절됩니다.
+
+Studio가 쓰는 엔진 함수는 [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을
+참고하세요.
+
+### 검증 thread와 동시성
+
+영역 검증(raw 개수, `Document.from_dict`, 루프 꼭짓점 수, run이면 실행용 복사)은
+worker thread에서 돌므로 긴 형상 계산이 event loop를 막지 않습니다. 다만 GIL을
+잡는 Python 수준 shapely·numpy 호출은 잠깐 지연시킬 수 있습니다. 요청은 그 thread가
+끝날 때까지 공유 열 ingress permit을 쥐고 있으며, client 연결이 끊기거나 요청이
+취소되어도 마찬가지입니다. 따라서 영역 검증은 한 번에 하나만 돌고 그동안 다른 열
+요청은 429를 받습니다. 취소된 요청은 그 뒤 job을 시작하지 않고 끝납니다. Run은 같은
+방식으로 다시 검증한 뒤 단일 job 자리를 예약합니다.
+
+루프 꼭짓점 수는 실행이 메시하는 마이크로미터 사본에서 세고, `check_mesh_limits`는 실행처럼
+그 사본을 검증합니다. 그래서 검증은 도형의 불리언 연산을 `Document.from_dict`, 사본 검증, 수 세기에서
+세 번 계산합니다. 로컬 실행에서 수 세기는 `Document.from_dict`의 약 두 배가 걸렸습니다. 교차 한도에
+맞춘 덮인 교차에서 약 0.6 s 대 0.3 s였습니다.
+
+### 알려진 한계
+
+- 너무 촘촘한 메시는 검증이 아니라 job에서, 메시 생성 뒤 해석 전에 실패합니다.
+  검증은 형상, summary 하한, 과도 문서의 이력 길이만 보고 거절합니다. 그동안 job
+  자리를 차지합니다.
+- 절점 한도에 닿기 전에 meshine의 80 round 안에 수렴하지 않는 세분도 job에서
+  `solver_failed`로 실패하며, 도는 동안 job 자리를 차지합니다.
+- 고립된 원의 점 수는 전역 `mesh.size`로 정합니다(위 참고).
+- 루프 꼭짓점 수는 메시 생성기가 T자 접점에서 루프를 나누기 전에 세므로, 생성기는
+  센 것보다 조금 더 많은 점을 처리할 수 있습니다.
+- 영역 결과에는 항상 배열 14개가 있으며 D=0도 유효합니다.
+- Summary는 쓰지 않는 재료와 그 `source` 문구까지 재료 표 전체를 복사하며 64 KiB 안에
+  들어가야 합니다. 확실한 초과는 검증에서 거절하고 나머지는 job 오류로 끝납니다.
+- meshine은 예각 별 모양 다각형이나 경계가 거의 겹치는 교차 다각형 같은 입력에서
+  "cannot resolve"로 안전하게 실패할 수 있습니다(`solver_failed`).
+- 일반 route가 열전도 문서를 거절하므로 영역 예제는 `/api/examples`에 나오지 않습니다.
+- 이 checkout보다 오래된 meshine(`MeshSizeLimitError` 없음)에서는 `run_enabled`가
+  true인 채로 영역 실행이 `solver_failed`로 끝납니다.
+- 측정은 Linux에서만 했으며 macOS와 Windows는 검증하지 않았습니다.
 
 ## 기여·검증 수명주기
 
@@ -205,8 +313,8 @@ Universal wheel이 OS 동작을 입증하지 않습니다.
 
 | 계층 | 필요한 근거이며 통과 주장이 아님 |
 | --- | --- |
-| Server | 할당 전 strictJSON/limit; 공개API positive control; v1/v2/D0 metadata; 공개속성 한 번 복사·검사; 모든 terminal 경로 제한 |
-| 물리 | 독립 선형/가산·열원/Robin 정답·SI변환·기존수렴·음성대조 |
+| Server | 할당 전 strictJSON/limit; 공개API positive control; v1/v2/D0 metadata; 공개속성 한 번 복사·검사; 모든 terminal 경로 제한; 영역 지원 전 고정한 직사각형 byte·오류(`test_studio_rectangle_invariants.py`); 영역 한도·거절·worker thread·취소·capture 결함(`test_studio_region_http.py`) |
+| 물리 | 독립 선형/가산·열원/Robin 정답·SI변환·기존수렴·음성대조; wire를 거친 영역 문서(`test_studio_region_acceptance.py`) |
 | Frontend | dirty/revision/sequence/capability/render 결정적 truth-table; stale성공/오류/finally 무시 |
 | 표시 | 절점/요소 구별 fixture·절점보간·flatflux/전역부호·상수/음수K |
 | 자원 | 용량해제·실패기록보존·byte/count/TTL 경계·별도 peak/직렬화실측 |

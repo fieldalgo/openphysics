@@ -4,7 +4,7 @@
 
 **한눈에 보기**
 
-- **하는 일:** 직사각형 `thermal.transient2d` 문서를 위한 Studio 화면으로, 전용 capability·검증·실행·manifest/frame/history route를 씁니다. 정확한 요청 시간(기본값은 마지막)을 골라 절점 Kelvin과 요소 열유속을 보고, 열량 H[J/m]와 이차 범함수 V[J K/m] 이력을 페이지 단위로 봅니다.
+- **하는 일:** 직사각형 `thermal.transient2d` 문서를 위한 Studio 화면으로, 전용 capability·검증·실행·manifest/frame/history route를 씁니다. 정확한 요청 시간(기본값은 마지막)을 골라 절점 Kelvin과 요소 열유속을 보고, 열량 H[J/m]와 이차 범함수 V[J K/m] 이력을 페이지 단위로 봅니다. 같은 route는 재료 영역이 있는 과도 열전도 문서도 Studio의 영역 한도 안에서 검증·실행합니다([영역 문서](#영역-문서) 참고).
 - **한계:** 새 솔버, 보간, downsample, 과도 열유속·Robin, restart, 연성, 취소·삭제·저장·NPZ endpoint가 없으며, 화면을 바꿔도 솔버를 다시 돌리지 않습니다. 설정한 한도는 `candidate-unmeasured`이며 용량 보장이 아닙니다.
 - **검증:** [과도 Studio 독립 수용 검증](studio_transient_thermal_independent_validation.md)을 참고하세요. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
@@ -25,8 +25,10 @@ release를 주장하지 않습니다.
 사용합니다. 초기장은scalar/affine이고변Dirichlet은상수/요청시간표본,나머지는
 단열입니다. 초기/BC일치는projection없이검사합니다. 유한한음수K를clamp없이
 유지하며DMP/양수성보장은없습니다. 새solver·보간·downsample·과도flux/Robin·
-임의형상/재료확장·restart·연성·cancel/delete/save/NPZ endpoint는없습니다.
+아래 영역 문서를 넘는 임의형상/재료확장·restart·연성·cancel/delete/save/NPZ endpoint는없습니다.
 View변경이solver를다시실행하거나문서를바꾸지않습니다.
+재료 영역이 있는 과도 문서는 같은 route에서 별도 경로를 따르며
+[영역 문서](#영역-문서)에서 설명합니다.
 
 ## 사용자 흐름
 
@@ -124,6 +126,41 @@ Frame_seq를포함한동일전체query는데이터/bytes가같습니다.
 과도조회는immutable캡처행을on-demandencoding할수있지만producergetter재조회·
 resolve·encodedframecache없음. 기존정상immutableencoded응답동작은불변입니다.
 
+## 영역 문서
+
+`geometry`에 `shapes`나 `background`가 있는 `thermal.transient2d` 문서는
+`/api/thermal/transient/validate`와 `/api/thermal/transient/run`에서 Studio의 영역
+경로를 따르며, 그 밖의 문서는 바뀌지 않은 직사각형 경로를 따릅니다. 형상 한도,
+summary 하한, worker thread 검증, job 단계의 절점·요소 한도는 정상 영역 문서와
+같습니다([정상 Studio, 영역 문서](thermal_studio.md#영역-문서)). 요청 시간 검사는
+직사각형 것과 같으며 코드와 메시지도 같습니다.
+
+| 항목 | 영역 manifest |
+| --- | --- |
+| Result·layout ID | `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1` |
+| Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, 같은 최상위 필드 16개 |
+| `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids`, `triangle_regions`(삼각형마다 영역 번호 하나) |
+| Descriptor | 직사각형 descriptor 13개와 `triangle_regions`: shape `[M]`, 단위 `1`, 위치 `triangles`, 축 `static`, view 없음, `ui_supported=false` |
+| Frame·history page | 직사각형 ID `studio-thermal-transient-frame-v1`·`-history-v1`에 job이 저장한 영역 쌍을 붙임; `triangle_regions`는 frame·history 필드가 아님(400 `invalid_query`) |
+| Capability | 과도 블록 안의 중첩 `regions` 키: 영역 쌍, 위 payload 형식 세 개, 영역 `limits` 다섯 개 |
+
+영역 job의 raw 이력은 16 MiB raw 한도 안에 영역 번호(삼각형마다 8 byte)도
+담습니다. 그래서 절점·요소 한도는 요청 시간 수 nt로 정합니다.
+
+```text
+n_cap = min(10201, floor((16 MiB/8 - 3 nt) / (10 nt + 8)))
+m_cap = min(20000, 2 n_cap)
+```
+
+D <= N이고 M <= m_cap이면 raw 이력은 많아야 (10 nt + 8) n_cap + 3 nt개 scalar이므로
+해석 전에 한도 안에 들어갑니다. 절점 한도는 nt <= 19에서 10201, nt = 64에서 3236,
+nt = 128에서 1627입니다. nt가 정한 절점·요소 한도를 넘는 메시는 job 오류
+`history_limit_exceeded`로 끝나며 메시지는 그 한도와 시간 수를 밝힙니다. nt가 정하지
+않은 한도를 넘으면 `mesh_limit_exceeded`입니다. 예를 들어 시간이 20개이면 nt가 절점
+한도(10082)를 정하지만 요소 한도는 일반 20000 그대로입니다. 이 한도는 D = N, M = 2N을
+가정하므로 실제 이력은 들어가는 메시도 거절할 수 있습니다. 예를 들어 배포 과도 영역
+예제를 메시 크기 0.5 mm, 시간 128개로 돌리면 절점이 1649개로 1627을 넘습니다.
+
 ## 동시성·메모리·회복
 
 | 제한 | 계약 |
@@ -138,6 +175,9 @@ resolve·encodedframecache없음. 기존정상immutableencoded응답동작은불
 Sharedingress로동시정상요청도명시적거절할수있고opticalroute는불변입니다.
 Permit은성공/schema·streamerror/disconnect/cancellation/모든예외에해제하며
 old중복해제가나중owner를해제하지않습니다. 숨은retryqueue·가짜solver취소없음.
+영역 문서의 검증은 worker thread에서 돌고, 그 permit은 연결이 끊기거나 요청이
+취소되어도 thread가 끝날 때에만 해제됩니다. 따라서 취소된 영역 요청도 검증이
+끝날 때까지 다른 열 요청을 429로 거절할 수 있습니다.
 
 Reader는send종료까지immutablerawbacking/encodedresponse를pin합니다.
 논리eviction뒤에도slowclient참조가남으면계상을유지합니다.

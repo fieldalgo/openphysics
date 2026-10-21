@@ -4,7 +4,7 @@
 
 **At a glance**
 
-- **What it does:** a dedicated, JSON-first Studio view for rectangular `thermal.steady2d` documents (homogeneous rectangle, P1, constant isotropic k and source, side Dirichlet, insulation, constant outward flux and Robin). It validates and runs through its own routes and shows the result mesh, nodal Kelvin and cell heat flux.
+- **What it does:** a dedicated, JSON-first Studio view for rectangular `thermal.steady2d` documents (homogeneous rectangle, P1, constant isotropic k and source, side Dirichlet, insulation, constant outward flux and Robin). It validates and runs through its own routes and shows the result mesh, nodal Kelvin and cell heat flux. The same routes validate and run steady heat documents with material regions within Studio's region limits (see [Region documents](#region-documents)).
 - **Limits:** no transient documents (see the separate transient Studio guide), pre-solve mesh preview, arbitrary geometry, coupling or result-saving endpoints. Configured resource limits are `candidate-unmeasured`, not capacity guarantees. Studio is a local tool, not a multi-user service.
 - **Validation:** see the [independent steady Studio validation](studio_thermal_independent_validation.md). For a specific commit, see its CI run.
 
@@ -17,8 +17,11 @@ with constant isotropic k and source, side Dirichlet, insulation and constant
 outward-flux/Robin conditions. Existing optical behavior and generic-route heat
 guards remain. This steady interface excludes transient documents and time/history
 selection; see the separate [transient Studio guide](thermal_transient_studio.md).
-Pre-solve mesh preview, arbitrary geometry, automatic coupling and new
-result-saving endpoints are outside this interface.
+Pre-solve mesh preview, arbitrary geometry beyond the region documents below,
+automatic coupling and new result-saving endpoints are outside this interface.
+Steady documents with
+material regions (`geometry.shapes` or `geometry.background`) take a separate
+path on the same routes, described in [Region documents](#region-documents).
 
 Implementation is separate from validation and release status. Inspect the
 exact checkout's CI results and artifacts for source, installed-platform,
@@ -180,13 +183,131 @@ must be released after success and every failure, including thread-start,
 encoding and publication failures. Active/optical jobs are not evicted.
 
 Bound streamed request bytes before full parsing, without trusting Content-Length.
-Preflight node/cell counts before job/thread/solver allocation. Raw scalar counts
-are v1=6N+5M+2D and v2=10N+5M+2D, but neither raw-byte estimates nor encoded
-caps bound Python/solver peak memory. Copies, lists, sparse factorization,
+For rectangle documents, preflight exact node/cell counts before job/thread/solver
+allocation. For region documents, the raw geometry caps and the loop-vertex count
+come before the job, and the exact node and cell counts after meshing, before the
+solve (see [Region documents](#region-documents)). Raw scalar counts are
+v1=6N+5M+2D, v2=10N+5M+2D and regions 10N+6M+2D, but neither raw-byte estimates
+nor encoded caps bound Python/solver peak memory. Copies, lists, sparse factorization,
 serialization and concurrent work add overhead. Actual shared-host measurements
 must disclose load; no dedicated performance baseline is claimed.
 Retain bounded encoded results rather than repeated full array serialization.
 There is no new save/upload/path/overwrite API or automatic retry queue.
+
+## Region documents
+
+A `thermal.steady2d` document whose `geometry` has `shapes` or `background`
+(the engine's own rule, see [heat documents with material regions](thermal_regions2d.md))
+takes Studio's region path on `/api/thermal/validate` and `/api/thermal/run`.
+Every other document follows the rectangle path, whose code, bytes and errors
+are unchanged; `tests/simcase/test_studio_rectangle_invariants.py` pins them.
+A region document with `mesh.subdivisions` is refused (`invalid_document`,
+path `mesh.subdivisions`), and so is a rectangle document with a stray
+`geometry.shapes` key, because that key makes it a region document.
+
+### Wire format
+
+| Item | Region result |
+| --- | --- |
+| Result and layout IDs | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
+| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, the same 11 top-level fields as the rectangle payload |
+| `arrays` | The thirteen v2 arrays plus `triangle_regions`: one region index per triangle (unit `1`, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
+| `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area_m2`), the whole `materials` table, `heat_source_w_m3`, `conductivity_range_w_mk` and `mesh` (`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`) |
+| Capability | A nested `regions` key in the steady block: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats` and the five `limits` below |
+
+The region pair is not added to the block's outer `result_formats`, which the
+rectangle client reads, so a page without region support ignores the nested
+block and refuses a region payload after the job (the format and pair are new).
+
+Before publishing, the capture checks the pair before reading any array, reads
+each public property once, checks shapes and node/cell caps before copying,
+then checks the regions: 1 to 65 unique nonempty names equal to the summary's;
+indices in range; each region's triangle count; each region's area equal to the
+producer's own sum over the captured mesh (exactly, as the same expression on
+the same numbers); the areas adding up to the domain within 1e-9; each region's
+material as the document assigns it; and summary materials and heat sources
+equal to the document's. Any failure is the job error `invalid_result`, and
+nothing is published.
+
+### Limits and where they apply
+
+| Stage | Check | Refusal |
+| --- | --- | --- |
+| Event loop, cost linear in the JSON | One `thermal.steady2d` entry; no `mesh.subdivisions` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
+| Event loop | The steady boundary (v2) result runtime is installed, since region results always carry the boundary arrays | `unsupported_result_format` (400) |
+| Event loop, run only | The public result API for region runs is available (the block's `run_enabled`) | `unsupported_public_api` (400) |
+| Worker thread, before `Document.from_dict` | At most 64 shapes, 16 circles and 512 polygon points in total, then at most 1024 boundary crossings (`simcase.region_complexity`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
+| Worker thread | `Document.from_dict` | `invalid_document` |
+| Worker thread | At most 2048 loop vertices after the shapes' booleans (`simcase.check_mesh_limits`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
+| Worker thread | The document's name, units, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
+| Job, before the solve | Meshing stops past 10201 nodes (`max_nodes`); the exact node and cell counts are then compared with 10201 and 20000 | Job error `mesh_limit_exceeded` |
+| Job | A document error found after meshing, such as a heat source on a shape that later shapes cover completely | Job error `invalid_document` |
+| Job | Any other run failure, such as a geometry meshine cannot resolve or a refinement that does not converge within meshine's 80 rounds | Job error `solver_failed` |
+
+The four geometry caps and the loop-vertex cap are the capability's
+`limits` (`max_shapes`, `max_circles`, `max_polygon_points`,
+`max_boundary_crossings`, `max_input_vertices`); the node and cell caps are the
+steady block's `max_nodes` and `max_triangles`. Every refusal message names the
+count and the limit; when meshing stops at the node cap the count is unknown
+and the message says "more than". All values are candidates
+(`candidate-unmeasured`).
+
+- A **boundary crossing** is a pair of boundary segments of different shapes
+  whose interiors meet in exactly one point (a rect is 4 segments, a circle the
+  128-gon the engine builds, a polygon its edges). Touching and collinear
+  overlap do not count. Crossings cost validation time even where later shapes
+  cover them, so they are counted on the raw JSON before validation.
+- A **loop vertex** is one point of a loop given to the mesher, after the
+  booleans: a shape inside the background counts as itself and as the
+  background's hole, and a circle that touches or crosses another boundary is a
+  128-gon, so at most 7 such circles fit within 2048. A circle clear of every
+  other boundary is meshed as an exact circle with max(16, 4πr/`mesh.size`)
+  points from the global `mesh.size`, even when it sets its own `mesh_size`,
+  so a tiny global size is refused here.
+
+See [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers)
+for the engine functions Studio uses.
+
+### Validation thread and concurrency
+
+Region validation (the raw counts, `Document.from_dict`, the loop-vertex count
+and, for a run, the run copy) runs in a worker thread, so long geometry work does
+not block the event loop; Python-level shapely and numpy calls that hold the GIL
+can still delay it briefly. The request keeps the shared thermal ingress permit
+until that thread returns, also when the client disconnects or the request is
+cancelled, so at most one region validation runs at a time and other thermal
+requests get 429 meanwhile; a cancelled request then ends without starting a job.
+A run validates again in the same way, then reserves the single job slot.
+
+The loop-vertex count is taken on the micrometre copy a run meshes, and
+`check_mesh_limits` validates that copy as a run does, so validation resolves
+the shapes' booleans three times: in `Document.from_dict`, in the copy's
+validation and for the count. In local runs the count took about twice as long
+as `Document.from_dict`: about 0.6 s against 0.3 s for the covered crossings at
+the crossing cap.
+
+### Known limits
+
+- An over-fine mesh fails in the job, after meshing and before the solve, not
+  at validation: validation refuses only on geometry, the summary floor and, for
+  transient documents, history length. The job slot is held meanwhile.
+- A refinement that does not converge within meshine's 80 rounds before the
+  node cap stops it also fails in the job, as `solver_failed`, and also holds
+  the job slot while it runs.
+- Isolated circles take their point count from the global `mesh.size` (see above).
+- The loop-vertex count is taken before the mesher splits loops at T-junctions,
+  so the mesher can process somewhat more points than counted.
+- Region results always carry 14 arrays; D=0 is legal.
+- The summary copies the whole materials table, including unused materials and
+  their `source` text, and must fit in 64 KiB. Certain overflows are refused at
+  validation; the rest end as a job error.
+- meshine can fail closed with "cannot resolve" (`solver_failed`), for example
+  for acute star polygons or crossing polygons with near-coincident boundaries.
+- Region examples are not listed in `/api/examples`, because the generic routes
+  refuse heat documents.
+- With a meshine older than this checkout's (no `MeshSizeLimitError`), region
+  runs end as `solver_failed` while `run_enabled` stays true.
+- Measurements are Linux only; macOS and Windows are unverified.
 
 ## Contribution and validation lifecycle
 
@@ -221,8 +342,8 @@ and resource measurements remain separate from HTTP/Node/installed checks.
 
 | Layer | Required evidence, not a claimed pass |
 | --- | --- |
-| Server | Strict JSON/limits before allocation; public API positive controls; v1/v2/D0 metadata; copied properties validated once; all terminal paths bounded |
-| Physics | Independent linear/additive and source/Robin solutions, SI conversion, original convergence and negative controls |
+| Server | Strict JSON/limits before allocation; public API positive controls; v1/v2/D0 metadata; copied properties validated once; all terminal paths bounded; rectangle bytes and errors pinned before region support (`test_studio_rectangle_invariants.py`); region limits, refusals, worker thread, cancellation and capture faults (`test_studio_region_http.py`) |
+| Physics | Independent linear/additive and source/Robin solutions, SI conversion, original convergence and negative controls; region documents through the wire (`test_studio_region_acceptance.py`) |
 | Frontend | Deterministic dirty/revision/sequence/capability/render truth-table; stale success/error/finally ignored |
 | Display | Distinct node/cell fixtures, nodal interpolation, flat flux/global signs, constant and negative K |
 | Resource | Capacity release, failed-job retention, byte/count/TTL edges and separately measured peak/serialization |

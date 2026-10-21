@@ -111,6 +111,26 @@ envelopes, including duplicate keys, nonfinite JSON, unknown keys and invalid
 counters. The public-export AST check rejects private numerical imports and
 `_raw_arrays` calls in Studio consumers.
 
+## Region documents
+
+`tests/simcase/test_studio_region_acceptance.py` checks steady region documents
+through the same HTTP routes, on the decoded wire arrays only. Studio adds no
+physics, so the references are closed-form states that P1 reproduces exactly and
+a direct `simcase.run` of the same document; mesh convergence of region documents
+stays with the engine's [region tests](thermal_regions2d.md#validation). The
+thresholds were fixed before the implementation; the measured values are from one
+Linux run (Python 3.12, numpy 2.5).
+
+| Case | Gate | Measured |
+| --- | --- | --- |
+| A1 two-layer slab, 30 x 10 mm, `layer_a` (x < 10 mm, k 45) and background (k 1.5), left 400 K, right 300 K, top and bottom insulated, no source, mesh 2 and 1 mm; q = 100/(0.01/45 + 0.02/1.5) W/m² | max nodal \|T - T_exact\| / 100 K <= 1e-9; every cell \|qx - q\|/q <= 1e-9 and \|qy\| <= 1e-9 q; a cell is `layer_a` exactly when its centroid has x < 0.01 m; summed left-side reaction = q x 0.01 m to rtol 1e-9 | 2.8e-15; 3.6e-14 and 2.9e-14; exact; 6.4e-15 |
+| A2 the shipped steady example | summed source load = 5e6 W/m³ x the heater area from the wire mesh (rtol 1e-12); that area = `summary.regions.heater.area_m2` (rtol 1e-12); \|area/(π 4e-6 m²) - 1\| < 0.01; normalized heat-balance defect < 1e-10; outward = source (rtol 1e-10) | 1.1e-16; 0; 0.0064; 6.8e-12; 1.4e-11 |
+| A4 transport identity, steady example | every wire array, `triangle_regions` included, equals the direct run's array after the JSON round trip (`np.array_equal`) | equal |
+| A5 node cap | with `max_nodes` = the mesh's node count N the job finishes; with N - 1 it ends `mesh_limit_exceeded` and the solver is never called | as required |
+
+The region path's protocol, limits, refusals and capture faults are in
+`tests/simcase/test_studio_region_http.py` (criteria S1-S15).
+
 ## Reproduce and interpret results
 
 From the repository root in the configured validation environment:

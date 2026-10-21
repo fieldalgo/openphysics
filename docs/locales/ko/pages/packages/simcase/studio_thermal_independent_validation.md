@@ -105,6 +105,24 @@ nonfinite JSON, unknown key, 잘못된 counter 등 malformed envelope를 거절�
 공개 export AST 검사는 Studio consumer의 private 수치 import와
 `_raw_arrays` 호출을 거절한다.
 
+## 영역 문서
+
+`tests/simcase/test_studio_region_acceptance.py`는 같은 HTTP route로 정상 영역 문서를
+검사하며 디코딩한 wire 배열만 씁니다. Studio는 물리를 더하지 않으므로 기준은 P1이
+정확히 재현하는 닫힌 형식 해와 같은 문서를 직접 `simcase.run`으로 푼 결과입니다.
+영역 문서의 메시 수렴은 엔진의 [영역 시험](thermal_regions2d.md#검증)에 남습니다.
+기준값은 구현 전에 정했고, 측정값은 Linux 한 번 실행(Python 3.12, numpy 2.5)에서 얻었습니다.
+
+| 사례 | 기준 | 측정 |
+| --- | --- | --- |
+| A1 두 층 평판, 30 x 10 mm, `layer_a`(x < 10 mm, k 45)와 배경(k 1.5), 왼쪽 400 K, 오른쪽 300 K, 위·아래 단열, 열원 없음, 메시 2·1 mm; q = 100/(0.01/45 + 0.02/1.5) W/m² | 절점 최대 \|T - T_exact\| / 100 K <= 1e-9; 모든 요소에서 \|qx - q\|/q <= 1e-9, \|qy\| <= 1e-9 q; 중심 x < 0.01 m인 요소만 `layer_a`; 왼쪽 반력 합 = q x 0.01 m(rtol 1e-9) | 2.8e-15; 3.6e-14, 2.9e-14; 정확히 일치; 6.4e-15 |
+| A2 배포 정상 예제 | 열원 하중 합 = 5e6 W/m³ x wire 메시로 구한 heater 면적(rtol 1e-12); 그 면적 = `summary.regions.heater.area_m2`(rtol 1e-12); \|면적/(π 4e-6 m²) - 1\| < 0.01; 정규화 열수지 결손 < 1e-10; 외향 = 열원(rtol 1e-10) | 1.1e-16; 0; 0.0064; 6.8e-12; 1.4e-11 |
+| A4 전송 동일성, 정상 예제 | `triangle_regions`를 포함한 모든 wire 배열이 JSON 왕복 뒤 직접 실행의 배열과 같음(`np.array_equal`) | 같음 |
+| A5 절점 한도 | `max_nodes`가 메시 절점 수 N이면 job이 끝나고, N - 1이면 `mesh_limit_exceeded`로 끝나며 solver를 호출하지 않음 | 요구대로 |
+
+영역 경로의 프로토콜·한도·거절·capture 결함은 `tests/simcase/test_studio_region_http.py`
+(기준 S1-S15)에 있습니다.
+
 ## 재현과 결과 해석
 
 설정된 검증 환경에서 저장소 루트 기준:

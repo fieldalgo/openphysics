@@ -28,6 +28,7 @@ from pydantic import BaseModel
 import physmat
 from simcase import __version__, Document, DocumentError, build_mesh, examples, run, unit_vocabulary
 from . import thermal_api as thermal
+from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
 
 STATIC = Path(__file__).parent / "static"
@@ -37,6 +38,7 @@ _workspace_instance = uuid.uuid4().hex
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _thermal_jobs = thermal.ThermalJobs()
+_region_limits = regions.RegionLimits()
 
 
 class DocBody(BaseModel):
@@ -316,6 +318,8 @@ def _thermal_error(exc):
 def studio_capabilities():
     caps = thermal.capabilities(_thermal_jobs.limits)
     caps[transient.KIND] = transient.capabilities(_thermal_jobs.limits)
+    for kind in (thermal.KIND, transient.KIND):
+        caps[kind]["regions"] = regions.capability(kind, _thermal_jobs.limits, _region_limits)
     return caps
 
 
@@ -326,7 +330,8 @@ async def validate_thermal(body: Request):
     jobs = _thermal_jobs
     try:
         permit = jobs.ingress.acquire()
-        spec = await thermal.read_request(body, jobs.limits, for_run=False)
+        spec = await thermal.read_request(body, jobs.limits, for_run=False,
+                                          region=regions.Route(thermal.KIND, jobs.limits, _region_limits))
         payload = thermal.validation_payload(spec, jobs.limits)
         return Response(payload, media_type="application/json", headers={"Cache-Control": "no-store"})
     except thermal.ThermalAPIError as exc:
@@ -372,7 +377,15 @@ async def start_thermal_run(body: Request):
     permit = None
     try:
         permit = jobs.ingress.acquire()
-        spec = await thermal.read_request(body, jobs.limits, for_run=True)
+        rlimits = _region_limits
+        spec = await thermal.read_request(body, jobs.limits, for_run=True,
+                                          region=regions.Route(thermal.KIND, jobs.limits, rlimits))
+        if isinstance(spec, regions.RegionInput):
+            lease = jobs.reserve()
+            token = uuid.uuid4().hex
+            identity = jobs.attach(lease, "thermal-"+token, "result-"+token, spec)
+            _start_thermal_thread(_run_region_job, (jobs, lease, spec, rlimits))
+            return JSONResponse(identity, headers={"Cache-Control": "no-store"})
         # copy() resets scale; validation restores it before the worker owns it.
         doc = spec.doc.copy()
         doc.validate()
@@ -482,7 +495,8 @@ async def validate_transient(body: Request):
     jobs, permit, spec = _thermal_jobs, None, None
     try:
         permit = jobs.ingress.acquire()
-        spec = await transient.read_request(body, jobs.limits, for_run=False)
+        spec = await transient.read_request(body, jobs.limits, for_run=False,
+                                            region=regions.Route(transient.KIND, jobs.limits, _region_limits))
         encoded = transient.validation_payload(spec, jobs.limits)
         return Response(encoded, media_type="application/json", headers={"Cache-Control": "no-store"})
     except thermal.ThermalAPIError as exc:
@@ -512,13 +526,53 @@ def _run_transient_job(jobs, lease, doc):
         jobs.release(lease)
 
 
+def _run_region_job(jobs, lease, spec, rlimits):
+    """A steady or transient region document: the run is bounded by the job's node and
+    triangle caps and the loop-vertex limit, so an over-fine mesh fails before the solve."""
+    stage = "solver_failed"
+    try:
+        try:
+            result = run(spec.run_doc, verbose=False, max_nodes=spec.plan.n_cap,
+                         max_triangles=spec.plan.m_cap, max_input_vertices=rlimits.max_input_vertices)
+        except Exception as exc:
+            mapped = regions.job_error(exc, spec.plan)
+            if mapped is None:
+                raise
+            raise mapped from exc
+        stage = "invalid_result"
+        if spec.kind == thermal.KIND:
+            encoded = regions.capture_steady(result, jobs.identity(lease), jobs.limits, rlimits, spec)
+            stage = "publication_failed"
+            jobs.complete(lease, encoded, result.log)
+        else:
+            manifest, arrays, scale = regions.capture_transient(result, jobs.identity(lease), jobs.limits,
+                                                                rlimits, spec)
+            stage = "publication_failed"
+            jobs.complete_transient(lease, manifest, arrays, result.log, scale, pair=regions.TRANSIENT_PAIR)
+    except Exception as exc:
+        try:
+            jobs.fail(lease, exc, stage)
+        except Exception:
+            pass
+    finally:
+        jobs.release(lease)
+
+
 @app.post("/api/thermal/transient/run")
 async def start_transient(body: Request):
     jobs, permit, spec, lease = _thermal_jobs, None, None, None
     identity = {}
     try:
         permit = jobs.ingress.acquire()
-        spec = await transient.read_request(body, jobs.limits, for_run=True)
+        rlimits = _region_limits
+        spec = await transient.read_request(body, jobs.limits, for_run=True,
+                                            region=regions.Route(transient.KIND, jobs.limits, rlimits))
+        if isinstance(spec, regions.RegionInput):
+            lease = jobs.reserve(transient.reservation(jobs.limits))
+            token = uuid.uuid4().hex
+            identity = jobs.attach(lease, "thermal-transient-"+token, "result-"+token, spec)
+            _start_thermal_thread(_run_region_job, (jobs, lease, spec, rlimits))
+            return JSONResponse(identity, headers={"Cache-Control": "no-store"})
         doc = spec.doc.copy()
         doc.validate()
         lease = jobs.reserve(transient.reservation(jobs.limits))

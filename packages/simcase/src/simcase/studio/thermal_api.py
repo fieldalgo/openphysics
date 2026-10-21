@@ -182,8 +182,11 @@ class ThermalInput:
         return {"client_revision": self.client_revision, "request_seq": self.request_seq}
 
 
-async def read_request(request, limits, *, for_run, preflight=None, runtime_check=None):
-    """Read ASGI chunks with an application cap, not Content-Length trust."""
+async def read_request(request, limits, *, for_run, preflight=None, runtime_check=None, region=None):
+    """Read ASGI chunks with an application cap, not Content-Length trust.
+
+    ``region`` (thermal_regions_api.Route) takes a document that declares region
+    geometry; every other document follows the rectangle path unchanged."""
     tags = {}
     try:
         if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
@@ -219,6 +222,8 @@ async def read_request(request, limits, *, for_run, preflight=None, runtime_chec
             raise ThermalAPIError("invalid_envelope", "expected exactly doc, client_revision and request_seq")
         tags = {"client_revision": _counter(raw["client_revision"], "client_revision"),
                 "request_seq": _counter(raw["request_seq"], "request_seq")}
+        if region is not None and region.applies(raw["doc"]):
+            return await region.read(raw["doc"], tags, for_run=for_run)
         (preflight or _preflight)(raw["doc"], limits)
         if for_run and not (runtime_check or runtime_available)():
             raise ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
@@ -557,7 +562,7 @@ class ThermalJobs:
         return self._publish(lease, "done", payload,
                              bounded_log(log, self.limits.log_bytes), None)
 
-    def complete_transient(self, lease, payload, arrays, log, display_scale):
+    def complete_transient(self, lease, payload, arrays, log, display_scale, pair=None):
         if type(payload) is not bytes:
             raise ValueError("encoded transient manifest required")
         with self._lock:
@@ -565,6 +570,8 @@ class ThermalJobs:
                                       None, raw=arrays)
             if published:
                 self._records[lease.job]["display_length_in_m"] = display_scale
+                if pair is not None:   # region records; rectangle records keep their shape
+                    self._records[lease.job]["pair"] = tuple(pair)
             return published
 
     def fail(self, lease, exc, code="solver_failed"):

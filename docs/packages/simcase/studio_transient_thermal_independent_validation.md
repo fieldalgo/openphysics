@@ -88,3 +88,18 @@ not a solver cancellation or production timeout. Shared admission, pinned-respon
 accounting, real browser Canvas/current-frame minmax and supported-platform resource
 measurements remain separate acceptance suites; passing these tests alone does not
 prove capacity, RSS, browser rendering or cross-platform support.
+
+## Region documents
+
+`tests/simcase/test_studio_region_acceptance.py` also checks transient region
+documents through the transient routes, on decoded manifests, frames and history
+pages only. Thresholds were fixed before the implementation; measured values are
+from one Linux run (Python 3.12, numpy 2.5).
+
+| Case | Gate | Measured |
+| --- | --- | --- |
+| A3 the shipped transient example with insulated sides (`dirichlet_temperature_k: {}`), Q = 0.01 K/s x each region's volumetric heat capacity, T0 = 300 K | every temperature frame within 1e-10 x 300 K of 300 + 0.01 t; every flux frame below 1e-9 W/m²; the H pages equal Σ c_r A_r (300 + 0.01 t) to rtol 1e-10, with A_r from the manifest's nodes, triangles and `triangle_regions`; Σ A_r = the domain area to rtol 1e-12 | 0; 7.1e-15 W/m²; 3.3e-16; 0 |
+| A4 transport identity, transient example | every static manifest array, `triangle_regions` included, every temperature and flux frame and the H and V pages equal a direct `simcase.run` (`np.array_equal` after the JSON round trip) | equal |
+
+Frames and pages of a region job carry the region result/layout pair; the
+convergence of transient region documents stays with the engine's region tests.

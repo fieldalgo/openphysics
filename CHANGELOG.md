@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `simcase` Studio: the steady and transient heat routes validate and run heat region documents, in a worker thread and within limits on shapes, circles, polygon points, boundary crossings and loop vertices before a run and on nodes and cells in the job. Region results have their own formats, `studio-thermal-steady-regions-v1` and `studio-thermal-transient-regions-v1`; rectangle documents keep their responses. [Documentation](docs/packages/simcase/thermal_studio.md#region-documents).
+
 - `simcase`: `region_complexity` reads a raw heat region document before `Document.from_dict` and counts its shapes, circles and polygon points and, when none passes its given maximum, the boundary crossings between shapes, which drive the cost of `from_dict`'s booleans. It never raises on malformed data. [Documentation](docs/packages/simcase/thermal_regions2d.md#mesh-limits-for-callers).
 
 - `simcase`: `run` takes optional `max_input_vertices`, `max_nodes` and `max_triangles` for steady and transient heat region documents, checks them before the solve and refuses with `MeshLimitError`; `check_mesh_limits` returns a document's loop-vertex count without building the domain. Only `max_input_vertices` bounds the work before meshing. The two heat kinds take the limits through the physics registry (`PhysicsKind.accepts_mesh_limits`); with no limit a run is unchanged. [Documentation](docs/packages/simcase/thermal_regions2d.md#mesh-limits-for-callers).

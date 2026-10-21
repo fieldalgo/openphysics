@@ -94,10 +94,13 @@ class TransientInput:
         return {"client_revision": self.client_revision, "request_seq": self.request_seq}
 
 
-async def read_request(request, limits, *, for_run):
+async def read_request(request, limits, *, for_run, region=None):
     # Same bounded strict reader, with a route-specific public preflight callback.
     spec = await common.read_request(request, limits, for_run=for_run,
-                                     preflight=preflight, runtime_check=lambda: runtime_available(limits))
+                                     preflight=preflight, runtime_check=lambda: runtime_available(limits),
+                                     region=region)
+    if not isinstance(spec, common.ThermalInput):
+        return spec  # a region document's input (thermal_regions_api.RegionInput)
     return TransientInput(spec.doc, spec.client_revision, spec.request_seq)
 
 
@@ -277,7 +280,8 @@ def encode_view(record, query, *, history):
     unit, location, axis = SPEC[key]
     times = arrays["time_s"]
     nt = len(times)
-    base = {**record["identity"], "result_format": PAIR[0], "field_layout": PAIR[1],
+    pair = record.get("pair", PAIR)  # region records store their own pair
+    base = {**record["identity"], "result_format": pair[0], "field_layout": pair[1],
             # Display scale is captured in immutable manifest, bounded <=4MiB.
             "display_length_in_m": record["display_length_in_m"],
             "frame_seq": query["frame_seq"], "field": key, "unit": unit, "location": location}

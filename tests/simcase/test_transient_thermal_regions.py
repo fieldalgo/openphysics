@@ -216,11 +216,11 @@ def test_invalid_transient_region_documents_are_refused(case):
         Document.from_dict(data)
 
 
-def test_studio_refuses_transient_region_documents(monkeypatch):
+def test_studio_validates_transient_region_documents_without_running(monkeypatch):
     from fastapi.testclient import TestClient
     from simcase.studio import server
     def forbidden(*a, **kw):
-        raise AssertionError('region documents must not reach the Studio worker or mesher')
+        raise AssertionError('validating a region document must not reach the Studio worker or mesher')
     monkeypatch.setattr(server, 'run', forbidden)
     monkeypatch.setattr(server, 'build_mesh', forbidden)
     client = TestClient(server.app)
@@ -228,4 +228,6 @@ def test_studio_refuses_transient_region_documents(monkeypatch):
     assert not client.post('/api/validate', json={'doc': data}).json()['ok']
     response = client.post('/api/thermal/transient/validate',
                            json={'doc': data, 'client_revision': 1, 'request_seq': 1})
-    assert response.json().get('ok') is not True
+    assert response.status_code == 200
+    assert response.json().get('ok') is True
+    assert 'transient_thermal_regions' not in client.get('/api/examples').json()['examples']
