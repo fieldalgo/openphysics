@@ -1,28 +1,30 @@
 # Rectangular cavity document and results
 
-The product contract supports one `em.cavity3d` study: a vacuum rectangular
-box with perfect electric conductor (PEC) conditions on all six faces. The
-public API contract is defined below. Actual engine integration checks cover
-CLI execution, unit conversion and saved-field reconstruction; these checks
-are separate from the engine's numerical convergence acceptance.
+An `em.cavity3d` document holds one rectangular-box study. The case described
+first is a vacuum box with perfect electric conductor (PEC) conditions on all
+six faces; [Materials and conducting walls](#materials-and-conducting-walls)
+adds constant, possibly lossy materials in axis-aligned boxes, a filled
+background and finite-conductivity walls. Engine integration checks cover CLI
+execution, unit conversion and saved-field reconstruction; these checks are
+separate from the engine's numerical convergence acceptance.
 
 ## Input
 
 The example is `examples/simcase/cavity_box.json`, also available from
-`python -m simcase example cavity_box`. The intended headless workflow is:
+`python -m simcase example cavity_box`. The headless workflow is:
 
 ```bash
 python -m simcase example cavity_box > cavity.json
 python -m simcase validate cavity.json
-# Requires the matching galerkin cavity API:
 python -m simcase run cavity.json -o cavity_results
 ```
 
 The input retains `"openphysics": "0.2"`. Declare `units.length` explicitly,
 including when it is `"m"`. The six `geometry.domain` coordinates are `xmin`,
 `xmax`, `ymin`, `ymax`, `zmin`, `zmax`, in that declared length unit. Each maximum
-must exceed its minimum; a nonzero origin is allowed. `geometry.background` is
-`{"material": "vacuum"}`, `geometry.shapes` is empty, and `materials` is empty.
+must exceed its minimum; a nonzero origin is allowed. For the vacuum PEC case,
+`geometry.background` is `{"material": "vacuum"}`, `geometry.shapes` is empty,
+and `materials` is empty.
 Box-shaped materials, a filled background and finite-conductivity walls are
 described in [Materials and conducting walls](#materials-and-conducting-walls);
 arbitrary geometry and other boundary types are unsupported.

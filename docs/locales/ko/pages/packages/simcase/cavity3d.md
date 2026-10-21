@@ -2,28 +2,28 @@
 
 [English](../../../../../packages/simcase/cavity3d.md)
 
-제품 계약은 하나의 `em.cavity3d` study를 지원합니다. 진공 직육면체의 여섯 면에
-모두 완전 전기 도체(PEC) 조건을 적용합니다. 공개 API 계약은 아래와 같습니다.
-실제 엔진 통합 검사는 CLI 실행, 단위 변환, 저장된 장 복원을 다루며, 엔진의 수치
+`em.cavity3d` 문서는 직육면체 study 하나를 담습니다. 먼저 설명하는 경우는 여섯 면에
+모두 완전 전기 도체(PEC) 조건을 적용한 진공 상자입니다. [재료와 도체 벽](#재료와-도체-벽)은
+축 정렬 직육면체 안의 일정하고 손실이 있을 수 있는 재료, 채워진 배경, 유한 전도도 벽을
+더합니다. 엔진 통합 검사는 CLI 실행, 단위 변환, 저장된 장 복원을 다루며, 엔진의 수치
 수렴 수용 검사와는 별개입니다.
 
 ## 입력
 
 예제는 `examples/simcase/cavity_box.json`이며 `python -m simcase example cavity_box`로도
-얻을 수 있습니다. 의도한 headless 실행 흐름은 다음과 같습니다.
+얻을 수 있습니다. headless 실행 흐름은 다음과 같습니다.
 
 ```bash
 python -m simcase example cavity_box > cavity.json
 python -m simcase validate cavity.json
-# Requires the matching galerkin cavity API:
 python -m simcase run cavity.json -o cavity_results
 ```
 
 입력은 `"openphysics": "0.2"`를 유지합니다. 단위가 `"m"`여도 `units.length`를
 명시적으로 선언합니다. `geometry.domain`의 여섯 좌표 `xmin`, `xmax`, `ymin`,
 `ymax`, `zmin`, `zmax`는 선언한 길이 단위를 사용합니다. 각 최댓값은 최솟값보다
-커야 하며 원점이 0이 아니어도 됩니다. `geometry.background`는
-`{"material": "vacuum"}`, `geometry.shapes`와 `materials`는 비어 있어야 합니다.
+커야 하며 원점이 0이 아니어도 됩니다. 진공 PEC 경우에는 `geometry.background`가
+`{"material": "vacuum"}`이고 `geometry.shapes`와 `materials`는 비어 있습니다.
 직육면체 재료, 채워진 배경, 유한 전도도 벽은 [재료와 도체 벽](#재료와-도체-벽)에서 설명합니다. 임의 형상과 다른 경계 종류는 지원하지 않습니다.
 
 이름이 있는 physics 항목이 정확히 하나여야 합니다.
