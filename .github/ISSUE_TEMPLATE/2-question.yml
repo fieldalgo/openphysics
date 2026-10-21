@@ -1,0 +1,30 @@
+name: Question
+description: A usage, method or research question.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions about how to use a solver, what a result means, or whether a method
+        applies to your problem are welcome. You do not need to know the answer or have
+        proved anything. Search existing issues and the documentation index first.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What you are trying to do, what you have read or tried, and any code, document or reference involved.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release or commit, if the question is about specific behavior.
+    validations:
+      required: false
