@@ -263,14 +263,14 @@ class TransientRegionRunResult(TransientThermalRunResult):
         return result
 
 
-def run_transient_region_thermal(doc, verbose=True):
+def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
     from galerkin.transient_heat import solve_transient_heat
     doc.validate()
     doc = doc.copy()
     doc.validate()
     name, _ = doc.sole_physics()
     started = time.perf_counter()
-    mesh, region_materials, tri = build_region_mesh(doc)
+    mesh, region_materials, tri = build_region_mesh(doc, mesh_limits)
     inputs = transient_region_inputs(doc, mesh, region_materials)
     mesh_seconds = time.perf_counter()-started
     started = time.perf_counter()

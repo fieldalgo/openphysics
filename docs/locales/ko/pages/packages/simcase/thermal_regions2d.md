@@ -227,6 +227,82 @@ dt/2 변화 4.4%(T)와 3e-8(열유속). 이 해상도에서 더 이른 과도 �
 검사와 [multimaterial](../galerkin/multimaterial.md)의
 엔진 검증으로만 다룹니다.
 
+## 호출자를 위한 메시 상한
+
+서버처럼 직접 쓰지 않은 문서를 실행하는 호출자는 영역 실행이 메시하는 크기를 풀이 전에 제한할 수
+있습니다. `simcase.run`은 선택적인 키워드 전용 상한 세 개를 받습니다.
+
+```python
+from simcase import MeshLimitError, check_mesh_limits, run
+
+try:
+    result = run(doc, max_input_vertices=2048, max_nodes=10201, max_triangles=20000)
+except MeshLimitError as exc:
+    print(exc.quantity, exc.count, exc.limit)     # for example: input_vertices 2054 2048
+```
+
+- `max_input_vertices`는 기하가 meshine에 넘기는 루프 꼭짓점 수(아래)를 제한합니다. 영역을 조립하는
+  동안, meshine이 영역을 만들기 전에 검사합니다.
+- `max_nodes`는 meshine에 `max_points`로 넘기므로, 이를 넘는 첫 삽입에서 메시가 멈춥니다(meshine의
+  `MeshSizeLimitError`). 메시 후에 정확한 절점 수를 한 번 더 비교합니다.
+- `max_triangles`는 메시 후 정확한 삼각형 수와 비교합니다.
+
+모든 검사는 풀이 전에 실행됩니다. 각 상한은 양의 `int` 또는 `None`이며 `None`은 검사하지 않습니다.
+상한이 없으면 실행은 상한 없는 실행과 정확히 같고, `max_nodes`를 주지 않으면 meshine은 자체 기본
+상한인 300,000점을 유지합니다. 상한은 정상·과도 영역 문서에만 적용됩니다. 사각형 열전도 문서나 전자기,
+공진기, 전기·줄 가열 문서에 상한을 주면 `ValueError`이고, `bool`, 부동소수점 수, 1보다 작은 값도
+마찬가지입니다. 두 열전도 종류는 어떤 문서가 상한을 받는지 물리 등록표(`PhysicsKind.accepts_mesh_limits`)에
+선언하고, `run`은 이를 통해 그 실행기에 상한을 넘깁니다. 다른 종류의 실행기는 바뀌지 않습니다.
+`max_nodes`에는 `MeshSizeLimitError`가 있는 meshine이 필요합니다. 더 오래된 meshine이 설치되어 있으면 이
+상한을 준 실행은 `ImportError`를 발생시키고, 다른 실행은 그대로입니다.
+
+메시 전 작업을 제한하는 것은 `max_input_vertices`뿐입니다. `max_nodes`와 `max_triangles`는 meshine이
+영역을 만든 뒤에 작동하는데, 영역 만들기는 모든 루프 꼭짓점을 앞선 모든 꼭짓점과 비교하므로 O(V²)이고,
+고립된 원은 그보다 먼저 꼭짓점을 만들거나 0에 가까운 `mesh.size`에서는 만드는 중에 실패합니다.
+`max_input_vertices` 없이 영역 크기를 2 mm로 두고 전역 `mesh.size`를 0.004로 한 정상 예제는 `max_nodes`
+10,201이 수십 초 뒤에야 거절하고(Linux에서 두 번 측정해 28 s와 45 s), 5e-324에서는 상한이 없을 때처럼
+`OverflowError`로 끝납니다. 다른 사람이 쓴 문서에는 `max_input_vertices`도 주세요.
+
+**루프 꼭짓점.** 루프 꼭짓점은 도형의 불리언 연산 후 meshine의 `Domain.add_region`에 넘기는 루프의
+항목 하나이며, 바깥 경계와 구멍을 똑같이 셉니다.
+
+- 배경 안의 도형은 자기 경계로 한 번, 배경의 구멍으로 한 번, 두 번 셉니다.
+- 나중 도형이 앞 도형을 여러 조각으로 자를 수 있고, 조각마다 루프가 따로 있습니다. 각각 255점인 두
+  빗 모양 다각형이 서로 가로지르면 32,776입니다.
+- 다른 경계가 닿거나 가로지르는 원, 또는 나중 도형과 겹치는 원은 128각형입니다.
+- 정확한 meshine `Circle`로 메시하는 고립된 원은 자기 `mesh_size`가 있어도 **전역** `mesh.size`로
+  max(16, int(4πr / `mesh.size`))개를 세고, 둘러싼 영역의 구멍으로 한 번 더 셉니다. 배포된 정상 예제는
+  `mesh.size` 0.0246에서 루프 꼭짓점이 2054개이고, 그중 2042개가 히터입니다.
+
+이 수는 meshine 자체의 T자 접합 분할 전에 세므로, meshine이 처리하는 루프는 더 길 수 있습니다.
+이 수는 실제로 메시하는 것, 곧 문서의 마이크로미터 사본(메시와 풀이 참고)의 수입니다. 도형의 불리언
+연산과 원 규칙은 단위에 의존하지 않으므로 보통 문서 자체의 숫자로 센 수와 같고, 시험이 쓰는 밀리미터
+문서 22개에서도 같습니다. 4πr / `mesh.size`가 정수에서 반올림 오차 이내에 있으면 다를 수 있습니다.
+영역 크기를 2 mm로 둔 정상 예제는 `mesh.size` 4π·2/20 mm에서 밀리미터로는 루프 꼭짓점이 52개,
+메시하는 마이크로미터 사본에서는 50개이며, 세는 수는 50입니다.
+`check_mesh_limits(doc, *, max_input_vertices)`는 영역 문서의 이 수를 영역을 만들거나 문서를
+바꾸지 않고 반환하거나, `MeshLimitError`를 발생시킵니다. 실행처럼 마이크로미터 사본을 검증하므로 도형의
+불리언 연산을 그 검증에서 한 번, 수를 세며 한 번, 두 번 계산합니다. 검증하지 않은 `Document`
+(`Document(data)`, `Document.copy()`)에는 아직 해석된 길이 단위가 없으므로, 그 실행이 먼저 검증하듯
+검증한 사본으로 세며 불리언 연산을 한 번 더 계산합니다. 자기 수만으로 상한을 넘는 고립된 원은
+꼭짓점을 만들기 전에 거절하고 메시지에 그 수의 추정값을(마이크로미터로) 적으므로, `max_input_vertices`를
+주면 0에 가까운 `mesh.size`(5e-324)는 나눗셈, 오버플로, 메모리 오류가 아니라 `MeshLimitError`를
+발생시킵니다.
+
+**`MeshLimitError`**는 `DocumentError`가 아닌 `ValueError`입니다. 문서는 유효하고, 호출자의 상한이
+거절하는 것입니다. `quantity`는 `'input_vertices'`, `'nodes'`, `'triangles'` 중 하나이고, `limit`은
+상한, `count`는 정확한 수입니다. 메시가 `max_nodes` 상한에서 멈췄거나 고립된 원 하나만으로
+`max_input_vertices`를 넘으면 `count`는 `None`입니다. 메시지는 양, 수, 상한을 명시합니다.
+
+`tests/simcase/test_region_mesh_limits.py`는 변경 전에 정한 기준으로 이를 검사하며, 절점 수와 삼각형
+수는 저장하지 않고 시험 안에서 측정합니다. 두 예제의 정확한 절점, 삼각형, 루프 꼭짓점 수를 상한으로
+주면 상한 없는 실행과 같은 저장 배열과 요약이 나오고, 하나 적으면 풀이기를 호출하기 전에 거절합니다.
+각 상한은 혼자서도 동작하고, 영역이 없는 문서와 잘못된 값은 거절하며, 22개 문서에서 이 수는
+meshine이 받는 루프 길이의 합과 같습니다. 상한을 마이크로미터 사본과 물리 등록표로 옮길 때 더한 시험은
+미리 정한 기준이 아니며, 이 수가 mm, nm, m 문서와 위에서 단위가 수를 바꾸는 문서에서 각 실행이
+meshine에 넘기는 영역의 수와 같은지, 검증하지 않은 문서가 그 실행의 수를 받는지, 상한을 받는 종류만
+상한을 받는지 검사합니다.
+
 ## 한계
 
 - Studio는 정상·과도 영역 문서를 거부합니다(열 화면이 `mesh.subdivisions`를 읽음). CLI나 Python API를

@@ -320,6 +320,11 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
+For heat region documents, `run` also takes optional mesh limits
+(`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
+counts the loop vertices a document passes to the mesher without meshing it.
+Both raise `MeshLimitError`; see [mesh limits for callers](../../docs/packages/simcase/thermal_regions2d.md#mesh-limits-for-callers).
+
 ## Heat and cavity documents
 
 The [cavity document contract](../../docs/packages/simcase/cavity3d.md) covers the `em.cavity3d` input,
