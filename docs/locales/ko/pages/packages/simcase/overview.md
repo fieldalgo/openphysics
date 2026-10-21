@@ -31,7 +31,7 @@ python -m simcase run model.json                          # -> model_results/
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
 | 영역이 있는 `thermal.transient2d` | 이름 있는 재료 영역의 과도 열전도, 재료별 열전도율·열용량 | `transient_thermal_regions` | [영역 문서](thermal_regions2d.md) |
 
-Studio는 2D 광학 모델을 편집·실행하고 두 열전도 유형의 전용 화면을 제공하며, 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 손실 재료, 기계해석 문서는 지원하지 않습니다.
+Studio는 2D 광학 모델을 편집·실행하고 직사각형 정상·과도 열전도의 전용 화면을 제공하며, 공진기 문서와 재료 영역이 있는 열전도 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, `em.modes2d`의 손실 광학 재료, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
 
 ## 문서
 
@@ -183,9 +183,10 @@ result = solve_point(model, doc.sole_physics()[1])
 ### ParaView로 보기
 
 선택 extra `pip install "simcase[export]"`(meshio, MIT)를 설치하면
-`simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 정상 열전도,
-과도 열전도(저장된 시각 하나, `time_index`, 기본값은 마지막), 공진기 장을 VTU 사본으로
-씁니다. 2D 메시는 z = 0으로 둡니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
+`simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 직사각형 정상
+열전도(Dirichlet·단열 변), 직사각형 과도 열전도(저장된 시각 하나, `time_index`, 기본값은
+마지막), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 영역 문서, 열유속·대류 변이 있는 정상
+문서, 손실 공진기, `em.modes2d` 결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 둡니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 
