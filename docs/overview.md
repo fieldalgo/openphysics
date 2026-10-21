@@ -159,7 +159,7 @@ python -m pytest -q
 | Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all seven wheels, built from sdists and installed with their extras outside the checkout. Each OS: six implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
 
 Installed acceptance is not a full macOS or Windows regression. Package metadata
-permits Python 3.10+, but CI tests only Python 3.12; `OS Independent` classifiers
+requires Python 3.12 or later, and CI tests only Python 3.12; `OS Independent` classifiers
 and `py3-none-any` wheels describe metadata, not a tested platform matrix. A
 commit's results are in its required `tests` check on GitHub Actions. The
 [development guide](development.md) lists the checks and commands.

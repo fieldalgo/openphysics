@@ -7,7 +7,7 @@ name = "galerkin"
 version = "0.1.0"
 description = "Pure-Python finite-element engine for electromagnetics, heat conduction and elasticity, validated against analytical solutions"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Yongha Kim" }]
@@ -16,8 +16,7 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
 ]

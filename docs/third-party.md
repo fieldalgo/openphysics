@@ -181,10 +181,8 @@ differ.
 
 Not surveyed: Linux aarch64, musllinux, Windows arm64, 32-bit Windows (win32),
 CPython versions other than 3.12, and versions inside the declared ranges other
-than the pins. The packages accept Python 3.10 and later with no upper bound;
-the pinned numpy, scipy and shapely also publish cp313 to cp315 wheels, and
-numpy 2.5.4 and scipy 1.18.1 need Python 3.12 or later, so 3.10 and 3.11
-install older releases.
+than the pins. The packages require Python 3.12 or later with no upper bound;
+the pinned numpy, scipy and shapely also publish cp313 to cp315 wheels.
 
 | Wheel | Component | License (SPDX) | Platforms and linkage |
 |---|---|---|---|

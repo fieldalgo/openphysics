@@ -23,7 +23,7 @@ python -m pip check
 `tools/requirements-py312-linux.txt` pins the validation tools and their transitive
 dependencies, not the packages' runtime requirements. Update pins deliberately
 in a reviewed change and rerun the source and distribution checks. Package
-metadata declares Python >=3.10; Python 3.10 and 3.11 are not tested in CI.
+metadata declares Python >=3.12; CI tests Python 3.12 only.
 
 Always run from the repository root: running Python inside `packages/` or
 `tests/` can shadow installed modules with directories of the same name.
