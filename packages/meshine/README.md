@@ -129,7 +129,13 @@ from 1° to 89° each mesh in at most about 2 s; coarser `Circle`s can fail (see
 These apply to every input:
 
 - `max_points` is a hard cap. `generate` raises before an insertion would pass
-  it, in every round; the segment-splitting rounds used to go unchecked.
+  it, in every round; the segment-splitting rounds used to go unchecked. The
+  input domain as built is checked too, before the corner analysis, the lattice
+  splits and the first triangulation, so an input with more points is refused
+  before any refinement work; building the domain, which is O(V²) in its
+  vertices (see Limits), still comes first. The error is `MeshSizeLimitError`,
+  a `RuntimeError` subclass exported by `meshine`; its message starts with
+  `more than <max_points> points`.
 - A boundary point the triangulation cannot resolve is refused at once. Qhull
   leaves a point out when two boundaries come closer than double precision
   separates at the domain's extent: a vertex a hair off another edge, a sliver
@@ -210,7 +216,10 @@ a polygon and meshine circles that touch a side or each other; there, every
 triangle below 28° lies within 1.5 times the longest constrained edge at the
 touch point. The trigger must leave every simcase example and every input that
 meshed before alone. The point cap, the unresolved-point error and the
-short-edge drop have their own checks. An input that used to hang runs in a
+short-edge drop have their own checks; `tests/meshine/test_size_limit.py` adds
+the error type, the refusal of an input over the cap before any refinement
+work, and a cap at the node count of an uncapped mesh, which gives the same
+mesh while one point less raises. An input that used to hang runs in a
 child process with a timeout. The pass criteria were fixed before the
 implementation, and one of them failed: the trigger was expected to treat
 simcase's 45° crossings, but those hung on a clipped edge of 1.4e-8 of the
@@ -236,7 +245,7 @@ grading; meshine's guarantee is the angle bound.
 - The halving-compatibility test is exact for straight sides only. A corner between `min_angle` and 60° with a side on a meshine `Circle` that the test calls compatible is not treated, and its sides can keep splitting each other toward the apex; it then ends with the unresolved-point error instead of a mesh. Measured: two `Circle`s with n = 8, 10 or 12 that touch each other and n = 32 touching n = 8 (chord corners of 28.1° to 45° at `min_angle` 28), an n = 8 `Circle` touching a side at `min_angle` 20, and a polygon edge that leaves an n = 32 `Circle` vertex at a 39.3° chord corner, each within about 4 s. Touching `Circle`s of n = 16, 32 and 64 mesh.
 - An edge between `SNAP_EPS` and the triangulation's resolution gets the unresolved-point error instead of a mesh (measured from 3.5e-8 to 1.5e-7 of the diagonal, on edges the earlier meshine never finished either). The resolution depends on the layout: the shortest edges the earlier meshine finished were 4.5e-8 of the diagonal next to a 90° corner and 1.4e-7 at a 45° corner. The drop handles only a vertex with two segments of the same owners and curve, and only where removing it keeps every boundary name; a short edge with no such end gets the error too. Where both ends are corners and no name changes, one corner is cut, by less than the edge's length. A vertex about 1e-9 to 1e-7 of the diagonal off an edge it does not belong to also gets the error; snap it onto the edge.
 - The unresolved-point check raises whenever Qhull drops a boundary point. That never happened in a mesh that finished before, but Qhull's choice is not guaranteed to be stable.
-- The cap now holds in every round, so a run whose segment rounds passed `max_points` just before a final round with nothing bad, which the old check accepted, is refused.
+- The cap now holds in every round, so a run whose segment rounds passed `max_points` just before a final round with nothing bad, which the old check accepted, is refused. An input domain that already has more than `max_points` points is refused before refinement, including one that needs no insertion, which used to come back over the cap.
 - Node-for-node identity and the dropped-point behaviour were measured on Linux with numpy 2.5.4 and scipy 1.18.1. Other Qhull builds may differ; macOS and Windows are unverified.
 - Building a domain compares every input vertex with every earlier one, O(V²) in the number of vertices.
 - Curved boundaries: circles are built in; other curves can be added as polylines (or by adding a `project` method to a loop object).

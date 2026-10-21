@@ -20,10 +20,10 @@ Points are inserted in batches (with a separation filter so two new points do
 not land in each other's circumcircle) and the whole set is re-triangulated
 each round; that trades a little efficiency for a very small, robust code.
 
-Refinement ends with a RuntimeError instead of running on when an insertion would
-pass ``max_points``, after ``max_rounds`` rounds, or as soon as Qhull leaves a
-boundary point out of the triangulation: a segment that ends at such a point can
-never appear as an edge, however often it is split.
+Refinement ends with a RuntimeError instead of running on when the built input or an
+insertion would pass ``max_points`` (``MeshSizeLimitError``), after ``max_rounds`` rounds,
+or as soon as Qhull leaves a boundary point out of the triangulation: a segment that ends
+at such a point can never appear as an edge, however often it is split.
 
 Small input angles
 ------------------
@@ -111,6 +111,12 @@ SHARP_CORNER = math.radians(60.0)
 HALVING_SLACK = 1e-8
 
 
+class MeshSizeLimitError(RuntimeError):
+    """``generate`` refused to pass ``max_points``: the input domain as built already has
+    more points, or an insertion would add more. A ``RuntimeError``, so a caller that catches
+    ``RuntimeError`` still catches it; the message starts with ``more than <max_points> points``."""
+
+
 class _Corner(NamedTuple):
     """A sharp corner at an input vertex: the gap of ``width`` radians that turns
     counter-clockwise from the side to vertex ``u`` (direction ``start``) to the side to ``w``."""
@@ -137,12 +143,15 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     size_factor : a triangle is too big when circumradius > size_factor * h
                   (an equilateral triangle of edge h has circumradius 0.577 h)
     max_rounds : RuntimeError when refinement has not finished after this many rounds
-    max_points : hard cap; RuntimeError before an insertion would pass it
+    max_points : hard cap; MeshSizeLimitError (a RuntimeError) when the input domain as built
+                 has more points, or before an insertion would pass it
     smooth : Laplacian smoothing sweeps of interior nodes after refinement
     """
     if min_angle >= 34:
         raise ValueError("min_angle above ~33 degrees cannot be guaranteed; use <= 33")
     pts, seg_list, regions = domain.build(boundary_names)
+    if len(pts) > max_points:       # before the corner analysis, the lattice splits and Qhull
+        raise MeshSizeLimitError(f"more than {max_points} points; the input domain has {len(pts)}")
     P = pts.copy()
     segs: dict[tuple[int, int], Segment] = {s.key: s for s in seg_list}
     sizes = np.array([r.size if r.size is not None else domain.default_size for r in regions])
@@ -161,7 +170,7 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     def add_points(new: np.ndarray, constrained: bool) -> list[int]:
         nonlocal P, on_segment
         if len(P) + len(new) > max_points:
-            raise RuntimeError(f"more than {max_points} points; check sizes / min_angle")
+            raise MeshSizeLimitError(f"more than {max_points} points; check sizes / min_angle")
         start = len(P)
         P = np.vstack([P, new])
         on_segment = np.concatenate([on_segment, np.full(len(new), constrained)])

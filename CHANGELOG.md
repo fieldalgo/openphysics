@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `meshine`: `generate` raises `MeshSizeLimitError`, a `RuntimeError` subclass, when an insertion would pass `max_points`, and checks the input domain as built against the cap before any refinement work, so an input with more points is refused there instead of being refined or, when it needs no insertion, returned over the cap. Building the domain, O(V²) in its vertices, still comes first. [Documentation](docs/packages/meshine/overview.md#safeguards).
+
 - `galerkin`: the steady and transient heat-to-mechanics workflows run their stages as a coupling-layer `OneWayChain` and pass each nodal Kelvin field through the same-mesh `transfer` before freezing it. Results, manifest JSON, stage errors and messages are unchanged. [Documentation](docs/packages/galerkin/thermal_mechanical_workflow.md#stage-errors-and-failure-boundary).
 
 - `galerkin`: the one-way Joule workflow and `ElementHeatSource` run on the coupling layer. The Joule heat is an element `Field` on the electrical mesh, carried to the thermal mesh by the same-mesh transfer; `ElementHeatSource.field` exposes it. Results, checks and error messages are unchanged. [Documentation](docs/packages/galerkin/joule_heating.md#element-source-api).

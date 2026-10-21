@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `meshine`: `generate`는 삽입이 `max_points`를 넘기려 하면 `RuntimeError` 하위 클래스인 `MeshSizeLimitError`를 발생시키고, 만들어진 입력 영역도 세분화 작업 전에 상한과 비교합니다. 그래서 점이 더 많은 입력은 세분화되거나, 삽입이 필요 없을 때 상한을 넘긴 채 반환되지 않고 그 자리에서 거절됩니다. 꼭짓점 수에 대해 O(V²)인 영역 만들기는 여전히 먼저 실행됩니다. [문서](packages/meshine/overview.md#안전장치).
+
 - `galerkin`: 정상·과도 열→역학 workflow가 단계를 연성 층의 `OneWayChain`으로 실행하고, 각 절점 Kelvin 장을 동결하기 전에 같은 메시 `transfer`에 통과시킵니다. 결과·manifest JSON·단계 오류와 메시지는 바뀌지 않습니다. [문서](packages/galerkin/thermal_mechanical_workflow.md).
 
 - `galerkin`: 한 방향 Joule workflow와 `ElementHeatSource`가 연성 층 위에서 동작합니다. Joule 열은 전기 메시 위의 요소 `Field`이고 같은 메시 전달로 열 메시에 옮겨지며, `ElementHeatSource.field`로 볼 수 있습니다. 결과·검산·오류 메시지는 바뀌지 않습니다. [문서](packages/galerkin/joule_heating.md#요소-열원-api).
