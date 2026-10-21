@@ -24,7 +24,7 @@ python -m simcase run model.json                          # -> model_results/
 
 | 물리 유형 | 해석 내용 | 예제 | 계약 |
 |---|---|---|---|
-| `em.modes2d` | 무손실 2D 도파 모드, 스칼라 또는 전체 벡터. 단일 지점과 모드 추적 파장 sweep | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | 이 페이지, [부분공간 추적](vector_subspace_tracking.md) |
+| `em.modes2d` | 무손실 2D 도파 모드, 스칼라 또는 전체 벡터. 단일 지점과 모드 추적 파장 sweep | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | 이 페이지, [부분공간 추적](vector_subspace_tracking.md) |
 | `em.cavity3d` | 직육면체 고유모드: 진공 PEC, 또는 손실 직육면체 재료와 도체 벽의 복소 주파수와 Q; SI JSON/NPZ 출력 | `cavity_box`, `cavity_lossy_slab` | [공진기 문서](cavity3d.md) |
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | 영역이 있는 `thermal.steady2d` | 이름 있는 재료 영역의 정상 열전도: 배경 위 도형, 재료 표, 영역 경계를 따르는 메시 | `thermal_regions` | [영역 문서](thermal_regions2d.md) |
@@ -64,7 +64,7 @@ CLI 요약, 저장 그림, Studio 형상/메시/결과 라벨은 선언 길이 �
 
 형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료 이름은 `materials`에서 먼저 찾고 다음으로 physmat 내장 재료(`"Si"`, `"SiO2"`, `"Au"`, ...)에서 찾으므로 sweep의 각 파장에 분산이 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다.
 
-광학 모드 물리는 무손실 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 제공 예제 `soi_strip`은 `vector`를 씁니다. 이런 코어에서 스칼라 근사는 크게 어긋납니다. 같은 문서를 `scalar`로 풀면 1.55 um에서 n_eff가 2.444가 아니라 2.611입니다. 두 경로 모두 손실 재료를 거절합니다. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
+광학 모드 물리는 무손실 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 제공 예제 `soi_strip`은 `vector`를 씁니다. 이런 코어에서 스칼라 근사는 크게 어긋납니다. 같은 문서를 `scalar`로 풀면 1.55 um에서 n_eff가 2.444가 아니라 2.611입니다. 저대비 Hadley 리브에서 `hadley_rib`(스칼라)은 자기 메시에서 출판값과 4e-5 차이지만 메시를 세분화하면 멀어지고(0.65배에서 1.4e-4), `hadley_rib_vector`는 출판값보다 2.0e-4 낮고 세분화하면 다가갑니다(0.65배에서 1.1e-4). 두 경로 모두 손실 재료를 거절합니다. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
 
 ### 벡터 장과 단일 지점 study
 
@@ -256,7 +256,7 @@ python -m pytest -q tests/simcase
 node --test tests/simcase/*.cjs   # Studio JavaScript checks
 ```
 
-문서는 JSON 왕복 변환을 유지하고, 잘못된 문서는 구체적인 메시지로 거절합니다. Boolean 형상은 영역을 정확히 채웁니다(면적 검사). 손대지 않은 원은 실제 원 위에 노드를 유지합니다. 세 문서를 전체 실행해 참조해와 대조합니다. 220 nm Si 슬랩은 refsol TE0을 1.5e-3까지 재현하고(P1 이산화), 계단형 광섬유는 LP01/LP11 스칼라 모드를 2e-4까지 재현하며, Hadley 리브는 출판 준-TE 값에 5e-4 이내로 접근합니다(남은 차이는 스칼라 근사). sweep에서는 n_eff가 감소하고 n_g > n_eff입니다. 열전도 문서는 아래에 연결한 별도 독립 검증 보고를 갖습니다.
+문서는 JSON 왕복 변환을 유지하고, 잘못된 문서는 구체적인 메시지로 거절합니다. Boolean 형상은 영역을 정확히 채웁니다(면적 검사). 손대지 않은 원은 실제 원 위에 노드를 유지합니다. 세 문서를 전체 실행해 참조해와 대조합니다. 220 nm Si 슬랩은 refsol TE0을 1.5e-3까지 재현하고(P1 이산화), 계단형 광섬유는 LP01/LP11 스칼라 모드를 2e-4까지 재현하며, 스칼라 Hadley 리브는 출판 준-TE 값에 5e-4 이내로 접근합니다(남은 차이는 스칼라 근사이며, 벡터 리브는 상대 2e-4 이내와 세분화 시 개선을 확인합니다). sweep에서는 n_eff가 감소하고 n_g > n_eff입니다. 열전도 문서는 아래에 연결한 별도 독립 검증 보고를 갖습니다.
 
 Studio endpoint는 FastAPI test client로 검사하며, n_eff가 슬랩 참조해와 일치하는 전체 실행 작업도 포함합니다. `studio` extra가 없으면 해당 시험은 skip됩니다. CI는 설치된 패키지로 실제 브라우저에서 작은 모델도 실행합니다.
 

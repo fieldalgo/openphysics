@@ -490,7 +490,9 @@ def test_fiber_scalar_matches_lp_modes():
 
 def test_rib_scalar_is_near_hadley():
     res = run(Document.from_dict(examples.HADLEY_RIB), verbose=False)
-    assert abs(res.neff[0, 0] - benchmarks.rib_neff(0.3)) < 5e-4      # scalar model: ~2.5e-4 off
+    # Scalar model: 4e-5 off on this mesh, but refining moves it away (1.4e-4 at
+    # 0.65x), so the closeness is cancellation; hadley_rib_vector converges to it.
+    assert abs(res.neff[0, 0] - benchmarks.rib_neff(0.3)) < 5e-4
 
 
 def test_sweep_produces_group_index_and_saves(tmp_path):

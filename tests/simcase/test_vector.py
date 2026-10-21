@@ -85,8 +85,7 @@ def test_vector_fiber_outer_wall_is_far_enough():
 
 @pytest.mark.slow
 def test_vector_hadley_document_matches_reference_and_refines():
-    d = copy.deepcopy(examples.HADLEY_RIB)
-    d["physics"]["em1"].update(formulation="vector", n_cladding=3.4)
+    d = copy.deepcopy(examples.HADLEY_RIB_VECTOR)
     exact = benchmarks.rib_neff(0.3)
     errors = [abs(run(_refined(d, s), False).neff[0, 0] - exact) for s in (1.0, 0.65)]
     assert errors[0] / exact < 2e-4

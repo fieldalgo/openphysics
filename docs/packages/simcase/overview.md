@@ -39,7 +39,7 @@ prints a supplied example.
 
 | Physics type | What it solves | Examples | Contract |
 |---|---|---|---|
-| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
+| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
 | `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](cavity3d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
@@ -112,7 +112,10 @@ For optical modes the physics is lossless `em.modes2d`, either `scalar` (exact f
 an approximation for 2D high-contrast cores) or full `vector` for single points
 and tracked wavelength sweeps. The supplied `soi_strip` uses `vector`. The scalar
 approximation is far off for such a core: the same document solved as `scalar`
-gives n_eff 2.611 at 1.55 um instead of 2.444. Lossy materials are rejected in both paths. Scalar boundaries are
+gives n_eff 2.611 at 1.55 um instead of 2.444. On the low-contrast Hadley rib,
+`hadley_rib` (scalar) lands 4e-5 from the published value on its mesh, but
+refining the mesh moves it away (1.4e-4 at 0.65x); `hadley_rib_vector` is 2.0e-4
+below it and approaches it on refinement (1.1e-4 at 0.65x). Lossy materials are rejected in both paths. Scalar boundaries are
 `pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
 and Ez; PMC is natural. These are different field conditions: changing only the
 formulation of a scalar slab can select a different polarization.
@@ -461,8 +464,9 @@ specific messages; boolean geometry tiles the domain exactly (areas checked);
 untouched circles keep their nodes on the true circle; and three documents
 run end to end against references: a 220 nm Si slab reproduces refsol's TE0
 to 1.5e-3 (P1 discretisation), a step-index fiber reproduces the LP01/LP11
-scalar modes to 2e-4, and the Hadley rib comes within 5e-4 of the published
-quasi-TE value (the remaining gap is the scalar approximation). Sweeps give
+scalar modes to 2e-4, and the scalar Hadley rib comes within 5e-4 of the published
+quasi-TE value (the remaining gap is the scalar approximation; the vector rib is
+checked to 2e-4 relative and to improve on refinement). Sweeps give
 falling n_eff and n_g > n_eff. The heat documents have their own independent
 validation reports, linked below.
 
