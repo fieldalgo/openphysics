@@ -6,43 +6,13 @@
 
 - **What it checks:** the producer-side gates for `solve_transient_heat`: exact controls, a temporal gate on the smallest Dirichlet eigenmode, and spatial gates on a manufactured sine solution.
 - **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%.
-- **Scope:** the eigenmode gate measures time error only, not PDE refinement. The historical execution notes below are kept as recorded; for a specific commit, see its CI run.
+- **Scope:** the eigenmode gate measures time error only, not PDE refinement. For the result of a specific commit, see its CI run.
 
-## Current checkout and evidence
+## Evidence
 
-This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
-
-## Execution boundary
-
-**Historical initial submission (d21): source and static review only.** Python parsing,
-imports, compilation and collection had not been executed at that submission.
-That historical status is retained; no earlier numerical pass is inferred.
-
-**Bounded follow-up, 2026-10-16:** exact code snapshots
-d21e083d9723eec71ab5e32777ecd331d75cd981 and
-b2f420f4d540503ad3711bdab996e12dcbce9e9d each compiled all five new Python
-files and imported the engine/reference submodules successfully. Targeted
-collect-only found 70 identical node IDs per snapshot: 58 producer cases and
-12 reference cases. **Collected does not mean passed: no test body ran.**
-A fresh, Git-blob-verified 38-file source subset and fresh venv used Python3.12.14,
-pytest9.1.1, NumPy2.5.4 and SciPy1.18.1 with existing runtime packages; imports
-were from those exact source snapshots, not an installed-wheel proof.
-This did not recover an old checkout, venv or historical execution records.
-
-**Actual small-body follow-up, 2026-10-16:** exact
-b2f420f4d540503ad3711bdab996e12dcbce9e9d ran the two targeted files once:
-**70 passed (58 producer + 12 reference), exit0, no failures/errors/skips**.
-This is distinct from the earlier 70 collected. The original stdout, stderr,
-JUnit bytes, hashes, resource preflight and module origins were preserved.
-The same Python3.12.14/pytest9.1.1/NumPy2.5.4/SciPy1.18.1 source environment
-used BLAS/OMP/MKL1; no test count or tolerance was reduced. No solver fix or
-test rerun was needed. The d21 snapshot did not separately run test bodies.
-
-At that historical checkpoint, the fixed temporal/PDE spatial/5% separation gates,
-complete source regression, installed sdist/wheel proof, independent acceptance and
-platform tests were unexecuted. The 70 small controls are not complete physical
-acceptance. Use the exact current CI evidence to assess the present checkout;
-the commands below define reproduction, not a new pass result.
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result.
 
 ## Truth boundaries and algebra
 
