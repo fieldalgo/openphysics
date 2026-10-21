@@ -21,6 +21,7 @@ languages; a translation does not establish a new numerical result.
 | Page | English | 한국어 |
 |---|---|---|
 | Suite overview and installation | [Overview](overview.md) | [한국어](locales/ko/pages/overview.md) |
+| Tutorial: analyse your own waveguide | [Tutorial](packages/simcase/waveguide_tutorial.md) | [한국어](locales/ko/pages/packages/simcase/waveguide_tutorial.md) |
 | Architecture and package map | [Architecture](architecture.md) | [한국어](locales/ko/pages/architecture.md) |
 | Development and validation | [Development guide](development.md) | [한국어](locales/ko/pages/development.md) |
 | Contributing | [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
