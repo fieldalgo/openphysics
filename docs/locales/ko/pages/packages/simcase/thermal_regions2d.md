@@ -236,8 +236,6 @@ dt/2 변화 4.4%(T)와 3e-8(열유속). 이 해상도에서 더 이른 과도 �
   모서리만큼, 또는 조금 더 날카로울 수 있습니다(14° 다각형 모서리 옆에서 13.0° 측정). meshine이
   해결하지 못하는 입력은 오류로 끝납니다(메시와 풀이 참고).
 - 단위 깊이 평면 기하. 내장 재료의 열 물성 없음.
-- VTU 내보내기(`simcase.export`, extra `simcase[export]`)는 아직 영역 배치를 받지 않으며,
-  지원하지 않는 field layout으로 거부합니다.
 
 ### 길이 정규화 회귀
 
@@ -246,3 +244,59 @@ dt/2 변화 4.4%(T)와 3e-8(열유속). 이 해상도에서 더 이른 과도 �
 정상 열유속·대류 하중과 과도 affine 초기장을 통해 두 풀이 경로를 검사합니다. 모든 수치 저장
 배열·영역/재료 배정·경계 태그가 정확히 같아야 하며 원문 모델과 선언 단위를 보존해야 합니다.
 기존 층상 벽 해석해 수렴 시험도 계속 필수입니다.
+
+## VTU와 PVD 내보내기
+
+`simcase[export]`(meshio, MIT)를 설치하면 저장한 영역 결과를 ParaView에서 볼 수 있습니다.
+`export_fields(fields_npz, output, *, time_index=-1)`는
+`thermal2d-p1-node-cell-regions-v1` 및
+`thermal2d-transient-p1-node-cell-regions-v1`을 받습니다.
+`export_time_series(fields_npz, output_dir, *, name="fields")`는 과도 배치를 받아
+저장된 시각마다 VTU를 만들고 정확한 `time_s`(초)를 기록한 PVD 컬렉션으로 연결합니다.
+두 함수 모두 솔버를 다시 실행하거나 저장 결과를 바꾸지 않습니다.
+
+```python
+from simcase import Document, run
+from simcase.export import export_fields, export_time_series
+
+# Run from the repository root, with new output paths.
+steady = run(Document.load("examples/simcase/thermal_regions.json"), verbose=False)
+steady_dir = steady.save("out/region-steady")
+export_fields(steady_dir / "fields.npz", "out/region-steady/view.vtu")
+transient = run(Document.load("examples/simcase/transient_thermal_regions.json"), verbose=False)
+transient_dir = transient.save("out/region-transient")
+export_fields(transient_dir / "fields.npz", "out/region-transient/initial.vtu", time_index=0)
+export_time_series(transient_dir / "fields.npz", "out/region-transient/paraview")
+```
+
+ParaView에서 `view.vtu` 또는 `paraview/fields.pvd`를 엽니다. **셀** 배열
+`triangle_regions`로 색을 지정하면 같은 재료를 쓰는 영역도 구분할 수 있고,
+`temperature_k`로 색을 지정하면 절점 온도를 봅니다. ID는 원래
+`summary.json["region_names"]`의 0부터 시작하는 인덱스이며,
+`summary.json["regions"][name]["material"]`이 재료를 가리킵니다. 같은 summary가 NPZ
+메타데이터에도 있습니다. 이름·물성·경계 태그는 VTU에 복사하지 않으므로 의미를 확인하려면
+원래 NPZ/summary를 보관하십시오.
+
+| VTU 위치 | 배열과 단위 |
+|---|---|
+| 점 좌표 | `nodes_m`, z = 0으로 확장; 문서 길이 단위와 무관하게 m |
+| 점 데이터 | `temperature_k`(K); 저장된 절점 하중·반력·잔차·저장률(단위 깊이당 W/m) |
+| 셀 데이터 | `heat_flux_w_m2`(W/m², z 성분 0); `triangle_regions`(무차원 정수) |
+
+정상 영역 내보내기는 `load_w_per_m`, `reaction_w_per_m`, `residual_w_per_m`,
+`prescribed_outward_load_w_per_m`, `ambient_load_w_per_m`, `convective_outward_w_per_m`,
+`system_rhs_w_per_m`을 포함합니다. flux/Robin 부호 및 바깥 변 경계조건은 위 설명과 같습니다.
+과도 내보내기는 `source_load_w_per_m`을 포함하며 반력·잔차·저장률은 두 번째 저장 시각부터만
+존재합니다. 초기 시각의 율을 만들어 넣지 않습니다. 열함량 같은 영역 전체 이력, 경계 절점
+부분집합, 이름·단위는 NPZ/summary에 남습니다. 점/셀 보간이나 영역 번호 변경은 없습니다.
+
+기존 VTU는 거부하고 시계열 폴더는 새것이거나 비어 있어야 합니다. 시계열 쓰기에 실패하면
+이번 호출이 만든 파일을 정리합니다. `triangle_regions`가 없거나 정수가 아니거나 음수이거나
+크기가 맞지 않으면 출력 생성 전에 거부합니다. 유효한 `save()` 결과를 위한 내보내기이며
+임의 NPZ의 전체 검증기는 아닙니다. restart·XDMF·과도 flux/Robin 입력 및 별도 직사각형
+정상 `boundary-v2` 배치는 지원하지 않습니다.
+
+`tests/simcase/test_export_regions.py`는 내보낸 모든 배열과 NPZ, 모든 저장 시각, 초기율
+부재, 재료 ID와 구별되는 영역 ID, 기존 출력 보호와 실패 정리를 검증합니다. 같은 수치 환경에서
+위 길이 정규화 조건을 충족하는 mm/m/um/nm/사용자 단위 문제는 정확히 같은 SI 내보내기
+배열을 내야 합니다. 이 소비자 시험은 Linux·macOS·Windows 설치 휠에서도 실행합니다.

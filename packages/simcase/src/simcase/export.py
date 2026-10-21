@@ -15,6 +15,10 @@ Supported layouts:
   one stored time (``time_index``, default the last), or every stored time with
   ``export_time_series``: one VTU per time plus a ParaView collection (``.pvd``)
   that records each ``time_s`` as its timestep
+- region heat (``thermal2d-p1-node-cell-regions-v1`` and
+  ``thermal2d-transient-p1-node-cell-regions-v1``): the same steady/transient
+  arrays plus static integer cell data ``triangle_regions``; steady boundary
+  loads are point data when present
 - 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
   ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
   normalization, unit m^-3/2)
@@ -36,9 +40,15 @@ __all__ = ["export_fields", "export_time_series", "SUPPORTED_LAYOUTS"]
 _STEADY = "thermal2d-p1-node-cell-v1"
 _TRANSIENT = "thermal2d-transient-p1-node-cell-v1"
 _CAVITY = "cavity3d-edge-v1"
-SUPPORTED_LAYOUTS = (_STEADY, _TRANSIENT, _CAVITY)
+_STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
+_TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
+_TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
+_REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
+SUPPORTED_LAYOUTS = (_STEADY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
-          "residual_w_per_m", "storage_rate_w_per_m")
+          "residual_w_per_m", "storage_rate_w_per_m",
+          "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
+          "convective_outward_w_per_m", "system_rhs_w_per_m")
 
 
 def _meshio():
@@ -81,15 +91,27 @@ def _transient_at(data, index):
     return point_data, cell_data
 
 
+def _region_cell_data(data, layout):
+    """Static dimensionless region IDs, without renumbering or interpolation."""
+    if layout not in _REGION_LAYOUTS:
+        return {}
+    regions = np.asarray(data.get("triangle_regions"))
+    if (regions.shape != (len(data["triangles"]),) or regions.dtype.kind not in "iu"
+            or np.any(regions < 0)):
+        raise ValueError("triangle_regions must contain one non-negative integer per triangle")
+    return {"triangle_regions": [regions]}
+
+
 def _thermal(data, layout, time_index):
     points = _points(data["nodes_m"])
     cells = [("triangle", np.asarray(data["triangles"], dtype=np.int64))]
-    if layout == _TRANSIENT:
+    if layout in _TRANSIENT_LAYOUTS:
         index = range(len(data["time_s"]))[time_index]  # IndexError for an invalid index
         point_data, cell_data = _transient_at(data, index)
     else:
         point_data = {name: np.asarray(data[name], dtype=float) for name in _NODAL if name in data}
         cell_data = {"heat_flux_w_m2": [_vector3(data["heat_flux_w_m2"])]}
+    cell_data.update(_region_cell_data(data, layout))
     return points, cells, point_data, cell_data
 
 
@@ -109,7 +131,10 @@ def _load(fields_npz):
 def export_fields(fields_npz, output, *, time_index=-1):
     """Write the fields of a saved result to the VTU file ``output``.
 
-    Refuses to overwrite an existing file. Returns the output path.
+    Region layouts also include static cell data ``triangle_regions``. Its IDs
+    index ``region_names`` in the saved metadata/summary; no names or material
+    properties are copied to VTU. Refuses to overwrite an existing file.
+    Returns the output path.
     """
     output = Path(output)
     if output.suffix.lower() != ".vtu":
@@ -118,7 +143,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
         raise FileExistsError(f"{output} already exists; choose a new file name")
     data = _load(fields_npz)
     layout = str(data.get("field_layout", ""))
-    if layout in (_STEADY, _TRANSIENT):
+    if layout in (_STEADY, _TRANSIENT, *_REGION_LAYOUTS):
         parts = _thermal(data, layout, time_index)
     elif layout == _CAVITY:
         parts = _cavity(data)
@@ -141,6 +166,7 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
     appear from the second time on. The ``.pvd`` lists each file by a relative
     POSIX path with ``time_s`` as its timestep (written with ``repr``, so the
     value round-trips exactly). On failure, files written so far are removed.
+    Region layouts include the same static ``triangle_regions`` in every VTU.
     Returns the ``.pvd`` path.
     """
     if not isinstance(name, str) or not name or name in (".", "..") or any(
@@ -152,14 +178,15 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
                               "choose a new or empty output directory")
     data = _load(fields_npz)
     layout = str(data.get("field_layout", ""))
-    if layout != _TRANSIENT:
-        raise ValueError(f"time series export needs layout {_TRANSIENT!r}, got {layout!r}")
+    if layout not in _TRANSIENT_LAYOUTS:
+        raise ValueError(f"time series export needs layout in {_TRANSIENT_LAYOUTS!r}, got {layout!r}")
     times = np.asarray(data["time_s"], dtype=float)
     if times.ndim != 1 or not len(times):
         raise ValueError("time_s must be a non-empty 1D array")
     meshio = _meshio()
     points = _points(data["nodes_m"])
     cells = [("triangle", np.asarray(data["triangles"], dtype=np.int64))]
+    region_data = _region_cell_data(data, layout)
     width = max(5, len(str(len(times) - 1)))
     created_dir = not output_dir.exists()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -170,6 +197,7 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
         for index, time in enumerate(times):
             file_name = f"{name}_{index:0{width}d}.vtu"
             point_data, cell_data = _transient_at(data, index)
+            cell_data.update(region_data)
             target = output_dir / file_name
             if os.path.lexists(target):
                 raise FileExistsError(f"{target} appeared during export")

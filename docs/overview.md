@@ -52,8 +52,9 @@ Python-only capabilities do not automatically appear in JSON or Studio.
 
 With the optional `simcase[export]` extra, saved results can be written as VTU
 files for ParaView: rectangular steady heat with Dirichlet and insulated sides,
-rectangular transient heat (one time, or every stored time as a `.pvd` series)
-and the vacuum PEC cavity. See [Viewing in ParaView](packages/simcase/overview.md#viewing-in-paraview).
+rectangular transient heat, steady/transient heat with material regions,
+and the vacuum PEC cavity. Transient heat supports one time or every stored
+time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#viewing-in-paraview).
 
 ### Current limits
 
@@ -70,8 +71,9 @@ and the vacuum PEC cavity. See [Viewing in ParaView](packages/simcase/overview.m
   mechanics and geometry sweeps are not supported.
 - Studio rejects 3D models and heat documents with material regions, and has
   no mechanics forms.
-- The VTU export rejects region documents, steady documents with flux or
-  convection sides, lossy cavities and waveguide modes.
+- The VTU export rejects rectangular steady documents with flux or convection
+  sides (`boundary-v2`), lossy cavities and waveguide modes. Steady region
+  documents include their flux/Robin load arrays.
 
 ## Packages
 

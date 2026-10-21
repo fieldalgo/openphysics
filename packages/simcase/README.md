@@ -349,7 +349,7 @@ save and I/O robustness checks on Linux, macOS and Windows; see each contract
 for its save and platform limits.
 
 With the optional `simcase[export]` extra, `simcase.export` writes saved
-rectangular heat and vacuum PEC cavity fields as VTU files for ParaView, and a
+rectangular/region heat and vacuum PEC cavity fields as VTU files for ParaView, and a
 transient heat result as a `.pvd` time series; see
 [Viewing in ParaView](../../docs/packages/simcase/overview.md#viewing-in-paraview)
 for the supported layouts.

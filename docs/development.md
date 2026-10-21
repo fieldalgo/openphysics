@@ -210,7 +210,8 @@ Policy and the full list are in [third-party software](third-party.md).
 installed licenses, package bytes, installed module origins, bundled assets, public API/CLI/save
 smoke tests, the heat save/I-O robustness tests (partial-failure cleanup,
 simultaneous writers, existing targets) and two source target-protection
-fixtures. This is installed acceptance, not a full macOS or Windows regression.
+fixtures, plus region VTU/PVD export consumers (the export extra is installed).
+This is installed acceptance, not a full macOS or Windows regression.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers are measured once with fixed workloads. These are observations,
