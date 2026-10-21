@@ -136,6 +136,9 @@ jobs:
       - name: Observe exact transient thermal Studio resources once
         if: ${{ success() }}
         run: python tools/studio_resources/run_transient_resource_workloads.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/transient-resource-observation
+      - name: Observe region Studio resources once
+        if: ${{ success() }}
+        run: python tools/studio_resources/run_region_resource_workloads.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/region-resource-observation
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

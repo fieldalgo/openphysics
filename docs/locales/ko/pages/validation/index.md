@@ -54,6 +54,7 @@
 - [벡터 모드 성능 측정](../benchmark_vector.md)
 - [3D PEC 공진기의 시간·메모리 측정](../benchmark_cavity.md)
 - [Transient Studio 자원 관측기](../transient_resource_probe.md)
+- [영역 Studio 자원 관측](../region_resource_probe.md)
 
 ## 내 모델로 확장하기
 
