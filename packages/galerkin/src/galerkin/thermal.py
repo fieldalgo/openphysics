@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Steady isotropic heat conduction on conforming P1 triangles.
 
-Conductivity and constant heat source are one scalar or piecewise constant on
-named mesh regions (galerkin.materials). Import this submodule explicitly. See
+Conductivity is scalar or piecewise constant on named regions (galerkin.materials).
+Heat sources may also be mesh-bound ElementHeatSource values or coordinate callbacks. Import this submodule explicitly. See
 docs/packages/galerkin/thermal_steady2d.md and
 docs/packages/galerkin/multimaterial.md for SI units, boundary signs and
 validation limits. No other physics module is required.
