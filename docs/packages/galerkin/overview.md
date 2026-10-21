@@ -157,3 +157,5 @@ code that uses it.
 
 This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
+
+[Steady Joule heating: explicit same-mesh electric to heat workflow](joule_heating.md).
