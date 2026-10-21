@@ -18,7 +18,6 @@
 
 사용법은 [Studio 가이드](thermal_studio.md), 환경·배포 요구사항은
 [개발 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/development.md)를 따른다.
-중간 구현 검토는 과거 이력이며 현재 runtime이나 수용 상태를 정의하지 않는다.
 
 ## HTTP suite의 검사 범위
 
@@ -132,7 +131,7 @@ store reset, TTL 소진 대기, mesh 축소, 자원 거절 skip을 하지 않는
 기존 정상경계·과도·일반 Studio gate를 유지한다.
 
 최종 수용에는 완료된 exact source·격리 설치 결과, 모든 물리·음성 대조,
-배포·origin 감사, 자원·수명 근거와 지원 플랫폼 검사가 아직 필요하다.
+배포·origin 감사, 자원·수명 근거와 지원 플랫폼 검사가 필요하다.
 frontend revision/render 소유권, 실제 Canvas 동작, 자원·직렬화 상한 실측은
 별도 근거이며 이 물리 suite만으로 인증하지 않는다.
 universal wheel이나 다른 OS pass는 플랫폼 검증이 아니다.

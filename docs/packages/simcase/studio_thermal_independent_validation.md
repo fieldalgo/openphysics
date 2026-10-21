@@ -19,8 +19,7 @@ establish complete acceptance or a release.
 
 See [the Studio guide](thermal_studio.md) for use and
 [the development guide](https://github.com/fieldalgo/openphysics/blob/main/docs/development.md) for environment/distribution
-requirements. Intermediate implementation reviews are historical and do not
-define the current runtime or its acceptance status.
+requirements.
 
 ## What the HTTP suite checks
 
@@ -138,7 +137,7 @@ convergence JSON and source/installed origins/hashes. Review the coordinated
 exact CI rather than start duplicate whole-suite runs. Keep existing
 steady-boundary, transient and generic Studio gates.
 
-Still required for final acceptance: completed exact source and
+Final acceptance requires completed exact source and
 isolated-installed results, all physical/negative controls, distribution/origin
 audits, resource/lifetime evidence and supported-platform checks.
 Frontend revision/render ownership, actual Canvas behavior and measured
