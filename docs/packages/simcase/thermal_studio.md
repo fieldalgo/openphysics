@@ -4,8 +4,8 @@
 
 **At a glance**
 
-- **What it does:** a dedicated, JSON-first Studio view for rectangular `thermal.steady2d` documents (homogeneous rectangle, P1, constant isotropic k and source, side Dirichlet, insulation, constant outward flux and Robin). It validates and runs through its own routes and shows the result mesh, nodal Kelvin and cell heat flux. The same routes validate and run steady heat documents with material regions within Studio's region limits (see [Region documents](#region-documents)).
-- **Limits:** no transient documents (see the separate transient Studio guide), pre-solve mesh preview, arbitrary geometry, coupling or result-saving endpoints. Configured resource limits are `candidate-unmeasured`, not capacity guarantees. Studio is a local tool, not a multi-user service.
+- **What it does:** a dedicated, JSON-first Studio view for rectangular `thermal.steady2d` documents (homogeneous rectangle, P1, constant isotropic k and source, side Dirichlet, insulation, constant outward flux and Robin). It validates and runs through its own routes and shows the result mesh, nodal Kelvin and cell heat flux. Steady heat documents with material regions are validated, run and shown the same way within Studio's region limits, with region colours, boundaries, a legend and a region table (see [Region documents](#region-documents)).
+- **Limits:** no transient documents (see the separate transient Studio guide), pre-solve mesh preview, arbitrary geometry beyond region documents, coupling or result-saving endpoints. Configured resource limits are `candidate-unmeasured`, not capacity guarantees. Studio is a local tool, not a multi-user service.
 - **Validation:** see the [independent steady Studio validation](studio_thermal_independent_validation.md). For a specific commit, see its CI run.
 
 ## Availability
@@ -218,6 +218,10 @@ path `mesh.subdivisions`), and so is a rectangle document with a stray
 The region pair is not added to the block's outer `result_formats`, which the
 rectangle client reads, so a page without region support ignores the nested
 block and refuses a region payload after the job (the format and pair are new).
+The page pins a document's family (rectangle or regions) when it validates it,
+refuses a region document before any request when the server advertises no
+valid `regions` block, runs it only while that block's `run_enabled` is true,
+and refuses a result of the other family.
 
 Before publishing, the capture checks the pair before reading any array, reads
 each public property once, checks shapes and node/cell caps before copying,
@@ -286,6 +290,20 @@ validation and for the count. In local runs the count took about twice as long
 as `Document.from_dict`: about 0.6 s against 0.3 s for the covered crossings at
 the crossing cap.
 
+### Views
+
+- **Mesh tab:** each triangle is filled with its region's colour (Okabe-Ito,
+  eight colours cycled by region index) under the mesh lines, and region
+  boundaries are drawn as thicker lines. The legend lists every region as
+  "name — material", and the mesh line reads "N nodes, M cells, R regions".
+- **Results tab:** the temperature and flux views also draw the region
+  boundaries. Hovering adds "; region name (material)" to the value line.
+- **Summary panel:** the quantity rows leave out the region, material and heat
+  source maps (a region name is not a quantity); the full metadata stays in
+  **Full result metadata**, and a region table follows it with colour, region,
+  material, k, Q, cells, area and the material's `source` text.
+- Region names and material text are shown as text only, never as HTML.
+
 ### Known limits
 
 - An over-fine mesh fails in the job, after meshing and before the solve, not
@@ -303,6 +321,10 @@ the crossing cap.
   validation; the rest end as a job error.
 - meshine can fail closed with "cannot resolve" (`solver_failed`), for example
   for acute star polygons or crossing polygons with near-coincident boundaries.
+- Colours repeat after eight regions; the legend, boundaries, table and hover
+  still name every region.
+- A page cached from before region support refuses region results after the
+  job (`/static` has no `Cache-Control`); reload the page.
 - Region examples are not listed in `/api/examples`, because the generic routes
   refuse heat documents.
 - With a meshine older than this checkout's (no `MeshSizeLimitError`), region
@@ -344,7 +366,7 @@ and resource measurements remain separate from HTTP/Node/installed checks.
 | --- | --- |
 | Server | Strict JSON/limits before allocation; public API positive controls; v1/v2/D0 metadata; copied properties validated once; all terminal paths bounded; rectangle bytes and errors pinned before region support (`test_studio_rectangle_invariants.py`); region limits, refusals, worker thread, cancellation and capture faults (`test_studio_region_http.py`) |
 | Physics | Independent linear/additive and source/Robin solutions, SI conversion, original convergence and negative controls; region documents through the wire (`test_studio_region_acceptance.py`) |
-| Frontend | Deterministic dirty/revision/sequence/capability/render truth-table; stale success/error/finally ignored |
+| Frontend | Deterministic dirty/revision/sequence/capability/render truth-table; stale success/error/finally ignored; nested region capability, family pin and region payload parsing (`studio_steady_thermal.cjs`, `studio_transient_thermal.cjs`) |
 | Display | Distinct node/cell fixtures, nodal interpolation, flat flux/global signs, constant and negative K |
 | Resource | Capacity release, failed-job retention, byte/count/TTL edges and separately measured peak/serialization |
 | Distribution/platform | Shipped assets/imports, source and installed consumers, exact required CI and separate OS results |

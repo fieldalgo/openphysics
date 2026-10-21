@@ -4,7 +4,7 @@
 
 **At a glance**
 
-- **What it does:** a Studio view for rectangular `thermal.transient2d` documents with its own capability, validation, run and manifest/frame/history routes. Pick an exact requested time (the final one by default), view nodal Kelvin and cell flux, and page heat-content H [J/m] and quadratic-functional V [J K/m] histories. The same routes validate and run transient heat documents with material regions within Studio's region limits (see [Region documents](#region-documents)).
+- **What it does:** a Studio view for rectangular `thermal.transient2d` documents with its own capability, validation, run and manifest/frame/history routes. Pick an exact requested time (the final one by default), view nodal Kelvin and cell flux, and page heat-content H [J/m] and quadratic-functional V [J K/m] histories. Transient heat documents with material regions are validated, run and shown the same way within Studio's region limits, with region colours, boundaries, a legend and a region table (see [Region documents](#region-documents)).
 - **Limits:** no new solver, interpolation, downsampling, transient flux/Robin, restart, coupling, or cancel/delete/save/NPZ endpoints; changing the view never reruns the solver. Configured limits are `candidate-unmeasured`, not capacity guarantees.
 - **Validation:** see the [independent transient Studio acceptance](studio_transient_thermal_independent_validation.md). For a specific commit, see its CI run.
 
@@ -174,6 +174,12 @@ over a cap that nt did not set it is `mesh_limit_exceeded`. For example, at 20
 times nt sets the node cap (10082) but the cell cap stays the plain 20000. The bound assumes D = N and M = 2N, so it
 can refuse a mesh whose real history would fit: the shipped transient region
 example at mesh size 0.5 mm with 128 times has 1649 nodes against 1627.
+
+The page shows a region manifest as it shows steady region results (see
+[steady Studio, Views](thermal_studio.md#views)): region colours and boundaries
+on the mesh, boundaries on every frame, the legend, "; region name (material)"
+in the hover line, and a region table that adds the volumetric heat capacity
+ρc. It pins the document's family at validation, as the steady page does.
 
 ## Concurrency, memory and recovery
 

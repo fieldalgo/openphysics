@@ -24,7 +24,7 @@ First choose the [model](../modeling/index.md) and [physical problem](../physics
 |---|---|
 | Python | Low-level engines, mechanics, explicit coupling and model-specific numerical control |
 | JSON/CLI | Validation, execution and saving of models defined by simcase |
-| Studio | Browser editing and visualization of supported optical/rectangular heat models |
+| Studio | Browser editing and visualization of supported optical models and heat models, rectangular or with material regions within Studio's region limits |
 
 After running, follow [results, export and trust](../results/index.md).
 

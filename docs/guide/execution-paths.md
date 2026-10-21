@@ -12,7 +12,7 @@ across interfaces, but the interfaces do not expose identical capabilities.
 | Direct Python package APIs | You need mechanics, explicit heat → mechanics coupling or low-level numerical control | Assemble the supported mesh, coefficient and boundary objects yourself |
 | Python `Document` + `run` | You want to automate supported simcase models in Python | Uses the same document contract as JSON/CLI |
 | JSON/CLI | You need repeatable model validation, batch execution and saved results | One supported physics entry per document; a document is not an arbitrary multiphysics graph |
-| Original Studio at `/` | You want browser editing of 2D optical or rectangular steady/transient heat models | No cavity, material-region heat, electric/Joule or mechanics editor |
+| Original Studio at `/` | You want browser editing of 2D optical or steady/transient heat models, rectangular or with material regions | No cavity, electric/Joule or mechanics editor; heat documents with material regions only within Studio's region limits |
 | Experimental workspace at `/workspace` | You want the bounded optical workflow and its session notebook | Fixed optical adapter; heated-waveguide screen is a setup preview |
 
 ## Find the route for a physical problem

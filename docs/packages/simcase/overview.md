@@ -50,10 +50,11 @@ prints a supplied example.
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](thermal_regions2d.md) |
 
-Studio edits and runs 2D optical models and has dedicated views for rectangular
-steady and transient heat; it rejects cavity documents and heat documents with
-material regions. Coupled or multiple-physics runs, geometry, mesh and material
-sweeps and mechanics documents are not
+Studio edits and runs 2D optical models and has dedicated views for steady and
+transient heat documents, rectangular or with material regions (the latter
+within Studio's region limits); it rejects cavity documents. Coupled or
+multiple-physics runs, geometry, mesh and material sweeps and mechanics
+documents are not
 supported; `em.cavity3d` accepts lossy box materials.
 
 For complex indices, attenuation units and selection, see [absorbing modes](lossy_modes.md).
@@ -432,10 +433,12 @@ document.
   Vector results add a component selector and relative amplitudes; tracked
   sweeps identify branches and display their overlap and group indices.
 - JSON tab: edit the document by hand and apply.
-- Heat: dedicated views for rectangular `thermal.steady2d` and
-  `thermal.transient2d` documents. Steady heat shows the result mesh, nodal
+- Heat: dedicated views for `thermal.steady2d` and `thermal.transient2d`
+  documents. Steady heat shows the result mesh, nodal
   Kelvin and cell heat flux; transient heat adds requested-time selection and
-  paged heat-content (H) and quadratic-functional (V) histories. See the [steady](thermal_studio.md) and
+  paged heat-content (H) and quadratic-functional (V) histories. Documents with
+  material regions also show region colours and boundaries, a legend, a region
+  table and the region under the cursor. See the [steady](thermal_studio.md) and
   [transient](thermal_transient_studio.md) Studio guides.
 
 The original editor is a single HTML file with no build step and no external libraries

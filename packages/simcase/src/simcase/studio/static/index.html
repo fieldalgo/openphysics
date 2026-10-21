@@ -49,6 +49,9 @@
   .legend { position:absolute; right:12px; top:44px; background:rgba(255,255,255,.92); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; }
   .legend div { display:flex; align-items:center; gap:6px; }
   .legend i { width:12px; height:12px; display:inline-block; border-radius:2px; border:1px solid rgba(0,0,0,.2); }
+  .region-list { max-height:40vh; overflow-y:auto; }
+  table.region-table td.swatch i { width:12px; height:12px; display:inline-block; border-radius:2px; border:1px solid rgba(0,0,0,.2); }
+  table.region-table td:nth-child(2), table.region-table td:nth-child(3), table.region-table td:last-child { text-align:left; }
   #json { flex:1; width:100%; border:0; padding:10px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize:none; }
   .props { padding:10px 12px; }
   .props h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
@@ -287,6 +290,7 @@ function renderTransientSummary(man) {
   host.appendChild(text);
   const details=document.createElement('details'),label=document.createElement('summary'),pre=document.createElement('pre');
   label.textContent='Full result metadata';pre.textContent=JSON.stringify(man.summary,null,2);details.appendChild(label);details.appendChild(pre);host.appendChild(details);
+  if(man.regions)renderRegionTable(host,man.regions,true);
 }
 function renderTransientHistory(page) {
   const state=transientController.state();if(!state.manifest||page.result_id!==state.manifest.result_id)return;
@@ -321,8 +325,10 @@ function drawTransientViews() {
     if(mr.width>0&&mr.height>0){
       ThermalStudio.draw(mesh,TransientThermalStudio.meshModel(man),{meshOnly:true,current});
       if(!current())return;
-      $('meshInfo').textContent='Actual transient result mesh — '+man.arrays.nodes_m.length+' nodes, '+man.arrays.triangles.length+' cells; axes '+man.lengthLabel;
+      $('meshInfo').textContent='Actual transient result mesh — '+man.arrays.nodes_m.length+' nodes, '+man.arrays.triangles.length+' cells'
+        +(man.regions?', '+man.regions.rows.length+' regions':'')+'; axes '+man.lengthLabel;
       $('meshLegend').textContent='';
+      if(man.regions)renderRegionLegend(man.regions);
     }
     const cv=$('fieldCanvas'),rect=cv.getBoundingClientRect();
     if(rect.width<=0||rect.height<=0){cv.onmousemove=null;return;}
@@ -338,9 +344,10 @@ function drawTransientViews() {
         if(!current())return;
         const r=cv.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
         const transform=ThermalStudio.transform(model,r.width,r.height);
-        const value=ThermalStudio.sample(model,transform.inverse(e.clientX-r.left,e.clientY-r.top));
+        const point=transform.inverse(e.clientX-r.left,e.clientY-r.top);
+        const value=ThermalStudio.sample(model,point);
         if(value!==null)$('resInfo').textContent='Saved index '+state.index+'; t = '+state.frame.time_s+' s; '+model.field+
-          ' = '+value+' '+model.unit+'; current-frame raw '+model.min+' … '+model.max;
+          ' = '+value+' '+model.unit+'; current-frame raw '+model.min+' … '+model.max+regionSuffix(model,point);
       };
     }catch(error){rejectTransientRender(token,error);}
   }).catch(error=>rejectTransientRender(token,error,true));
@@ -390,8 +397,10 @@ function drawThermalViews() {
         const rect=fieldCanvas.getBoundingClientRect();
         if(rect.width<=0||rect.height<=0)return;
         const T=ThermalStudio.transform(model,rect.width,rect.height);
-        const value=ThermalStudio.sample(model,T.inverse(event.clientX-rect.left,event.clientY-rect.top));
-        if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')';
+        const point=T.inverse(event.clientX-rect.left,event.clientY-rect.top);
+        const value=ThermalStudio.sample(model,point);
+        if(value!==null)$('resInfo').textContent=model.field+' = '+value+' '+model.unit+' (raw '+(model.nodal?'P1 interpolation':'cell value')+')'
+          +regionSuffix(model,point);
       };
       } catch(error) {
         if(!current())return;
@@ -405,8 +414,14 @@ function drawThermalViews() {
       if(!current())return;
       ThermalStudio.draw(meshCanvas,ThermalStudio.viewModel(payload),{meshOnly:true,current});
       if(!current())return;
+      if(payload.regions){
+        $('meshInfo').textContent='Actual result mesh — '+payload.arrays.nodes_m.length+' nodes, '+payload.arrays.triangles.length+' cells, '
+          +payload.regions.rows.length+' regions; axes '+payload.lengthLabel;
+        $('meshLegend').textContent='';renderRegionLegend(payload.regions);
+      } else {
       $('meshInfo').textContent='Actual result mesh — '+payload.arrays.nodes_m.length+' nodes, '+payload.arrays.triangles.length+' cells; axes '+payload.lengthLabel;
       $('meshLegend').textContent='';
+      }
     }
   }).catch(error=>{if(thermalController.renderCurrent(token)){status(error.message);log(error.message,'err');}});
 }
@@ -583,6 +598,38 @@ function drawSweep() {
     xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i][j])) : ctx.moveTo(X(x), Y(ys[i][j]))); ctx.stroke();
     xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(X(x), Y(ys[i][j]), 3, 0, 7); ctx.fill(); }); }
 }
+// Region names and materials come from the document: they are written with textContent only.
+function regionSuffix(model,point) {
+  if(!model.regions)return '';
+  const cell=ThermalStudio.locate(model,point);if(cell<0)return '';
+  const row=model.regions.rows[model.regions.ids[cell]];
+  return '; region '+row.name+' ('+row.material+')';
+}
+function renderRegionLegend(regions) {
+  const list=document.createElement('div');list.className='region-list';
+  for(const row of regions.rows){
+    const item=document.createElement('div'),swatch=document.createElement('i'),label=document.createElement('span');
+    swatch.style.background=row.color;label.textContent=row.name+' — '+row.material;
+    item.appendChild(swatch);item.appendChild(label);list.appendChild(item);
+  }
+  $('meshLegend').appendChild(list);
+}
+function renderRegionTable(host,regions,transient) {
+  const table=document.createElement('table');table.className='res region-table';
+  const head=document.createElement('thead'),body=document.createElement('tbody'),titles=document.createElement('tr');
+  const columns=['Colour','Region','Material','k [W/(m·K)]',...(transient?['ρc [J/(m³·K)]']:[]),'Q [W/m³]','Cells','Area [m²]','Material source'];
+  for(const title of columns){const th=document.createElement('th');th.textContent=title;titles.appendChild(th);}
+  head.appendChild(titles);table.appendChild(head);
+  for(const row of regions.rows){
+    const tr=document.createElement('tr'),swatch=document.createElement('td'),mark=document.createElement('i');
+    swatch.className='swatch';mark.style.background=row.color;swatch.appendChild(mark);tr.appendChild(swatch);
+    for(const value of [row.name,row.material,row.k,...(transient?[row.rhoC]:[]),row.q,row.cells,row.area_m2,row.source]){
+      const td=document.createElement('td');td.textContent=String(value);tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  table.appendChild(body);host.appendChild(table);
+}
 function renderThermalSummary(result) {
   const host=$('resTable');host.textContent='';
   const add=(parent,tag,text)=>{const el=document.createElement(tag);el.textContent=text;parent.appendChild(el);return el;};
@@ -600,9 +647,15 @@ function renderThermalSummary(result) {
         row((prefix+key).replaceAll('_',' '),String(value));
     }
   };
-  quantities(result.summary);
+  if(result.regions){
+    // Region names and material text are not quantities: the region table shows them.
+    const summary={...result.summary};
+    for(const key of ['regions','materials','region_names','heat_source_w_m3','conductivity_range_w_mk'])delete summary[key];
+    quantities(summary);
+  } else quantities(result.summary);
   const details=add(host,'details','');add(details,'summary','Full result metadata');
   add(details,'pre',JSON.stringify(result.summary,null,2));
+  if(result.regions)renderRegionTable(host,result.regions,false);
 }
 
 function fillResultTable() {

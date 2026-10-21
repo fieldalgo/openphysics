@@ -7,8 +7,8 @@ A `thermal.steady2d` or `thermal.transient2d` document whose `geometry` has
 documents: named shapes, each naming a material, drawn in order over a
 background (later shapes cut earlier ones). Thermal properties come from the
 `materials` table. The mesh follows every region boundary. The headless API and
-CLI run these documents, and Studio's thermal routes validate and run them within
-Studio's region limits (see Limits below).
+CLI run these documents, and Studio validates, runs and shows them within its
+region limits (see Limits below).
 
 Rectangle documents without `background`/`shapes` keep the
 [original contract](thermal_steady2d.md) and its
@@ -491,8 +491,8 @@ work, not time: the time per pair depends on the machine.
 
 ## Limits
 
-- Studio's thermal routes validate and run steady and transient region documents
-  within Studio's region limits (shapes, circles, polygon points, boundary
+- Studio validates, runs and shows steady and transient region documents
+  within its region limits (shapes, circles, polygon points, boundary
   crossings and loop vertices, then node and cell counts); see
   [steady Studio, Region documents](thermal_studio.md#region-documents).
 - Piecewise-constant isotropic properties; perfect contact at interfaces.

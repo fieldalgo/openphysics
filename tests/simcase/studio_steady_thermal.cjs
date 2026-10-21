@@ -37,30 +37,41 @@ function payload({v2=true,D=0,revision=0,sequence=1}={}){
     client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,display_length_in_m:1};
 }
 function canvas(W=200,H=160){
+  // Records paths, fills, strokes and globalAlpha assignments.
   const calls=[],ctx=new Proxy({createImageData:(w,h)=>({width:w,height:h,data:new Uint8ClampedArray(w*h*4)}),
     putImageData:image=>calls.push(['pixels',image]),moveTo:(...v)=>calls.push(['move',...v]),
-    lineTo:(...v)=>calls.push(['line',...v]),fillText:(...v)=>calls.push(['text',...v])},
-    {get:(o,k)=>o[k]||(()=>{})});
+    lineTo:(...v)=>calls.push(['line',...v]),fillText:(...v)=>calls.push(['text',...v]),
+    fill:()=>calls.push(['fill',ctx.fillStyle]),stroke:()=>calls.push(['stroke',ctx.lineWidth])},
+    {get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>{o[k]=v;if(k==='globalAlpha')calls.push(['alpha',v]);return true;}});
   return {width:W,height:H,calls,getContext:()=>ctx,getBoundingClientRect:()=>({width:W,height:H,left:0,top:0})};
 }
+// Setting textContent or innerHTML replaces an element's children, as in a browser;
+// every innerHTML write is recorded so that a test can show names never reach it.
+function contentSetters(el,writes){
+  let text='',markup='';
+  return Object.defineProperties(el,{
+    textContent:{get:()=>text,set(v){text=String(v);el.children=[];},enumerable:true,configurable:true},
+    innerHTML:{get:()=>markup,set(v){markup=String(v);el.children=[];writes.push(markup);},enumerable:true,configurable:true}});
+}
 function page({visibility=false}={}){
-  const elements=new Map(),requests=[];let activeTab='geometry';
+  const elements=new Map(),requests=[],htmlWrites=[];let activeTab='geometry';
   const panels=['geometry','mesh','results','json'].map(name=>({id:'tab-'+name,classList:{toggle(cls,on){if(on)activeTab=name;}}}));
-  function element(id){if(!elements.has(id))elements.set(id,Object.assign(canvas(320,240),{
-    value:'',hidden:false,innerHTML:'',textContent:'',children:[],appendChild(x){this.children.push(x);},
-    querySelectorAll:()=>[],click(){if(this.onclick)return this.onclick();}}));
+  function element(id){if(!elements.has(id))elements.set(id,contentSetters(Object.assign(canvas(320,240),{
+    value:'',hidden:false,children:[],appendChild(x){this.children.push(x);},
+    querySelectorAll:()=>[],click(){if(this.onclick)return this.onclick();}}),htmlWrites));
     const value=elements.get(id);
     if(visibility&&['fieldCanvas','meshCanvas','sweepCanvas','geoCanvas'].includes(id))value.getBoundingClientRect=()=>{
       const tab=id==='meshCanvas'?'mesh':id==='geoCanvas'?'geometry':'results';
       return {width:activeTab===tab?320:0,height:activeTab===tab?240:0,left:0,top:0};};
     return value;}
   const context=vm.createContext({document:{getElementById:element,querySelectorAll:selector=>selector==='.view > div'?panels:[],
-    createElement:()=>({textContent:'',children:[],appendChild(x){this.children.push(x);},click(){}})},window:{addEventListener(){},devicePixelRatio:1},
+    createElement:tag=>contentSetters({tag,style:{},className:'',children:[],appendChild(x){this.children.push(x);},
+      setAttribute(){},click(){}},htmlWrites)},window:{addEventListener(){},devicePixelRatio:1},
     Uint8ClampedArray,console,URL:{createObjectURL:()=>''},Blob:function(){},
     setTimeout:cb=>cb(),fetch:(...args)=>{requests.push(args);return new Promise(()=>{});}});
   vm.runInContext(script,context);
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
-  return {element,requests,run:code=>vm.runInContext(code,context)};
+  return {element,requests,htmlWrites,run:code=>vm.runInContext(code,context)};
 }
 test('strict raw parser rejects nested, escaped duplicate keys and overflow',()=>{
   for(const raw of ['{"a":1,"a":2}','{"a":{"b":1,"b":2}}','{"a":1,"\\u0061":2}','{"a":1e999}'])
@@ -342,4 +353,233 @@ test('shipped HTTP bridge treats validation 200 ok=false and run 400 as errors',
   assert.equal(p.run('thermalController.result()'),null);
   assert.equal(p.run('thermalController.gate.busy'),false);
   assert.match(p.element('status').textContent,/run rejected fixture/);
+});
+
+// ---- region documents (J1-J6, J8-J10; the transient cases are in studio_transient_thermal.cjs) ----
+
+const REGION_LIMITS={max_shapes:64,max_circles:16,max_polygon_points:512,max_boundary_crossings:1024,max_input_vertices:2048};
+function regionBlock(){return {supported:true,run_enabled:true,result_formats:[T.REGION.result_format],
+  field_layouts:[T.REGION.field_layout],payload_formats:[T.REGION.payload_format],limits:{...REGION_LIMITS}};}
+// regionCap() advertises a valid block; regionCap(undefined) advertises none.
+function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[T.TYPE].regions=b;return value;}
+function regionDoc(){return {openphysics:'0.2',name:'Regions',units:{length:'m',temperature:'K'},
+  geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
+    shapes:[{name:'heater',type:'rect',x:.5,y:0,w:.5,h:1,material:'copper'}]},
+  materials:{copper:{conductivity_w_mk:400},insulation:{conductivity_w_mk:.04}},physics:{heat1:{type:T.TYPE}},
+  mesh:{size:.5},study:{type:'single'}};}
+// Own properties only: a region may be named __proto__.
+const own=entries=>{const o={};for(const [k,v] of entries)Object.defineProperty(o,k,{value:v,enumerable:true,writable:true,configurable:true});return o;};
+function regionPayload({names=['heater','background'],ids=[0,1],materials=['copper','insulation'],revision=0,sequence=1}={}){
+  const p=payload({v2:true,D:0,revision,sequence});
+  p.payload_format=T.REGION.payload_format;
+  p.result_format=p.summary.result_format=T.REGION.result_format;
+  p.field_layout=p.summary.field_layout=T.REGION.field_layout;
+  p.arrays.triangle_regions=ids.slice();
+  p.summary.field_units.triangle_regions='1';p.summary.field_locations.triangle_regions='triangles';
+  p.summary.field_shapes.triangle_regions=[ids.length];
+  p.summary.region_names=names.slice();
+  p.summary.regions=own(names.map((n,i)=>[n,{material:materials[i],triangles:ids.filter(v=>v===i).length,area_m2:.5*ids.filter(v=>v===i).length}]));
+  p.summary.materials={copper:{conductivity_w_mk:400,source:'document value'},insulation:{conductivity_w_mk:.04}};
+  p.summary.heat_source_w_m3=own([[names[0],5e6]]);
+  return p;
+}
+const OWNER={job:'job1',result_id:'res1',client_revision:0,request_seq:1};
+
+test('J1 region capability is nested: rectangle fields unchanged, outer pairs refused, absent block refuses region documents only',async()=>{
+  const plain=T.capability(cap()),nested=T.capability(regionCap());
+  const {regions,...rest}=nested;assert.deepEqual(rest,plain);assert.deepEqual(regions,regionBlock());
+  assert.ok(T.regionCapability(nested.regions));
+  const outer=regionCap();outer[T.TYPE].result_formats.push(T.REGION.result_format);outer[T.TYPE].field_layouts.push(T.REGION.field_layout);
+  assert.equal(T.capability(outer),null);
+  const malformed=[undefined,null,{...regionBlock(),extra:1},{...regionBlock(),supported:false},{...regionBlock(),run_enabled:'yes'},
+    {...regionBlock(),payload_formats:['studio-thermal-steady-v1']},{...regionBlock(),limits:{...REGION_LIMITS,max_shapes:0}},
+    {...regionBlock(),limits:{...REGION_LIMITS,extra:1}},(()=>{const b=regionBlock();delete b.limits.max_boundary_crossings;return b;})()];
+  for(const block of malformed){
+    assert.equal(T.regionCapability(block),null);
+    let posted=0;const c=T.createController({request:async(method,url,body)=>{
+      if(method==='GET')return regionCap(block);posted++;
+      return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};}});
+    await c.loadCapability();
+    assert.equal(await c.validate(regionDoc()),false);assert.equal(posted,0);
+    assert.match(c.state().error,/does not advertise region documents/);
+    assert.equal(await c.validate(doc()),true);assert.equal(posted,1);
+  }
+});
+
+test('J2 region payload: D=0, a zero-cell region and literal hostile names are accepted; malformed ones refused',()=>{
+  const accepted=T.validateRegionPayload(regionPayload(),OWNER,REGION_LIMITS);
+  assert.equal(accepted.arrays.dirichlet_node_ids.length,0);assert.equal(accepted.payload_format,T.REGION.payload_format);
+  assert.equal(accepted.result_format,T.REGION.result_format);assert.equal(accepted.summary.result_format,T.REGION.result_format);
+  assert.deepEqual(accepted.regions.names,['heater','background']);assert.deepEqual(accepted.regions.ids,[0,1]);
+  assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.q,r.cells,r.color]),
+    [['heater','copper',400,5e6,1,T.PALETTE[0]],['background','insulation',.04,0,1,T.PALETTE[1]]]);
+  assert.deepEqual(accepted.regions.edges,[[0,2]]);
+  const empty=T.validateRegionPayload(regionPayload({names:['heater','background','hidden'],materials:['copper','insulation','copper']}),OWNER);
+  assert.equal(empty.regions.rows[2].cells,0);
+  for(const name of ['__proto__','constructor','toString','<img src=x onerror=1>']){
+    const value=T.validateRegionPayload(JSON.parse(JSON.stringify(regionPayload({names:[name,'background']}))),OWNER);
+    assert.equal(value.regions.rows[0].name,name);assert.equal(value.regions.rows[0].q,5e6);
+    assert.equal(Object.getPrototypeOf(value.summary.regions),Object.prototype);
+  }
+  const faults={
+    missing:p=>{delete p.arrays.triangle_regions;},
+    fractional:p=>{p.arrays.triangle_regions[0]=.5;},
+    range:p=>{p.arrays.triangle_regions[0]=2;},
+    negative:p=>{p.arrays.triangle_regions[0]=-1;},
+    length:p=>{p.arrays.triangle_regions.push(0);},
+    duplicate_name:p=>{p.summary.region_names=['heater','heater'];},
+    empty_name:p=>{p.summary.region_names=['','background'];},
+    regions_keys:p=>{delete p.summary.regions.background;},
+    entry_keys:p=>{p.summary.regions.heater.extra=1;},
+    cell_count:p=>{p.summary.regions.heater.triangles=2;},
+    material_not_own:p=>{p.summary.regions.heater.material='toString';},
+    metadata:p=>{p.summary.field_locations.triangle_regions='nodes';},
+    summary_pair:p=>{p.summary.result_format='thermal.steady2d-result-v2';},
+    rectangle_pair:p=>{p.payload_format='studio-thermal-steady-v1';p.result_format=p.summary.result_format='thermal.steady2d-result-v2';
+      p.field_layout=p.summary.field_layout=T.PAIRS['thermal.steady2d-result-v2'];},
+    too_many:p=>{},
+  };
+  for(const [name,fault] of Object.entries(faults)){
+    const p=regionPayload();fault(p);
+    assert.throws(()=>T.validateRegionPayload(p,OWNER,name==='too_many'?{...REGION_LIMITS,max_shapes:0}:REGION_LIMITS),name);
+  }
+  // A rectangle pair carrying triangle_regions is refused by the unchanged rectangle parser too.
+  const rect=payload();rect.arrays.triangle_regions=[0,0];assert.throws(()=>T.validatePayload(rect));
+});
+
+test('J3 a rectangle view model keeps its exact keys',()=>{
+  assert.deepEqual(Object.keys(T.viewModel(T.validatePayload(payload()))),
+    ['nodes','triangles','values','min','max','unit','field','nodal','domain','lengthLabel','flux']);
+  assert.deepEqual(Object.keys(T.viewModel(T.validateRegionPayload(regionPayload(),OWNER))),
+    ['nodes','triangles','values','min','max','unit','field','nodal','domain','lengthLabel','flux','regions']);
+});
+
+// Rectangle draw calls recorded on the commit before region support (thermal.js then).
+const RECTANGLE_CALLS={"mesh":[["move",62.5,117.5],["line",137.5,117.5],["line",137.5,42.5],["move",62.5,117.5],["line",137.5,42.5],["line",62.5,42.5],["text","x / y (m); +y upward",100,148],["text","Actual result mesh",12,18]],"temperature":[["text","x / y (m); +y upward",100,148],["text","temperature_k [K] 0 … 3",12,18],["text","0 … 3 K",12,51]],"qx":[["move",112.5,92.5],["line",123.5,92.5],["move",119.11208719054814,94.89712769302102],["line",123.5,92.5],["line",119.11208719054814,90.10287230697898],["move",87.5,67.5],["line",87.5,89.5],["move",85.10287230697898,85.11208719054814],["line",87.5,89.5],["line",89.89712769302102,85.11208719054814],["text","x / y (m); +y upward",100,148],["text","qx [W/m²] 0 … 2",12,18],["text","0 … 2 W/m²",12,51],["text","Cell flux; arrows max 22 px (view only), global +y upward",12,129]]};
+const kinds=(cv,...names)=>cv.calls.filter(c=>names.includes(c[0]));
+function sameCalls(actual,expected){
+  assert.equal(actual.length,expected.length);
+  actual.forEach((c,i)=>{assert.equal(c[0],expected[i][0]);
+    c.slice(1).forEach((v,j)=>typeof v==='number'?assert.ok(Math.abs(v-expected[i][j+1])<=1e-9):assert.equal(v,expected[i][j+1]));});
+}
+test('J4 region mesh fills each cell and strokes each region edge; rectangle draws are unchanged',()=>{
+  const p=T.validateRegionPayload(regionPayload(),OWNER),m=T.viewModel(p),cv=canvas();
+  assert.equal(T.draw(cv,m,{meshOnly:true}),true);
+  const fills=kinds(cv,'fill');assert.equal(fills.length,p.arrays.triangles.length);
+  assert.deepEqual(fills.map(f=>f[1]),[T.PALETTE[0],T.PALETTE[1]]);
+  assert.deepEqual(kinds(cv,'alpha').map(a=>a[1]),[.55,1]);
+  const lastFill=cv.calls.lastIndexOf(fills[fills.length-1]),reset=cv.calls.findIndex(c=>c[0]==='alpha'&&c[1]===1);
+  assert.ok(reset>lastFill&&reset<cv.calls.findIndex(c=>c[0]==='stroke'));
+  const strokes=kinds(cv,'stroke');
+  assert.equal(strokes.length,p.arrays.triangles.length+p.regions.edges.length);
+  assert.deepEqual(strokes.slice(-p.regions.edges.length).map(s=>s[1]),[1.6]);
+  const field=canvas();T.draw(field,T.viewModel(p,'qx'));
+  assert.equal(kinds(field,'fill').length,0);assert.ok(kinds(field,'stroke').some(s=>s[1]===1.2));
+  for(const [name,model,options] of [['mesh',T.viewModel(T.validatePayload(payload())),{meshOnly:true}],
+      ['temperature',T.viewModel(T.validatePayload(payload())),{}],['qx',T.viewModel(T.validatePayload(payload()),'qx'),{}]]){
+    const rect=canvas();T.draw(rect,model,options);
+    assert.equal(kinds(rect,'fill').length,0);assert.equal(kinds(rect,'alpha').length,0);
+    sameCalls(kinds(rect,'move','line','text'),RECTANGLE_CALLS[name]);
+  }
+  const stale=canvas();assert.equal(T.draw(stale,m,{meshOnly:true,current:()=>false}),false);assert.equal(stale.calls.length,0);
+  // An interface edge between two regions of a 4-triangle mesh, and none inside one region.
+  assert.deepEqual(T.regionEdges([[0,1,4],[1,2,4],[2,3,4],[3,0,4]],[0,0,1,1],5),[[2,4],[0,4]]);
+  assert.deepEqual(T.regionEdges([[0,1,4],[1,2,4],[2,3,4],[3,0,4]],[0,0,0,0],5),[]);
+});
+
+function regionPage(wire,{capability=regionCap(),regionDocument=regionDoc()}={}){
+  const p=page();
+  p.run('globalThis.fetch=async(url,options)=>({ok:true,json:async()=>{'
+    +'if(url==="/api/capabilities")return '+JSON.stringify(capability)+';'
+    +'if(url==="/api/thermal/validate"){const e=JSON.parse(options.body);return {ok:true,doc:e.doc,client_revision:e.client_revision,request_seq:e.request_seq};}'
+    +'if(url==="/api/thermal/run"){globalThis.accepted=JSON.parse(options.body);return {job:"job1",result_id:"res1",client_revision:accepted.client_revision,request_seq:accepted.request_seq};}'
+    +'const id={job:"job1",result_id:"res1",client_revision:accepted.client_revision,request_seq:accepted.request_seq};'
+    +'return url.endsWith("/result")?{...'+JSON.stringify(wire)+',...id}:{...id,status:"done",log:[]};}})');
+  p.document=regionDocument;return p;
+}
+async function runPage(p){
+  await p.run('thermalController.loadCapability()');
+  p.element('json').value=JSON.stringify(p.document);await p.element('applyJson').onclick();
+  await p.run('doRun()');await tick();
+}
+function hover(p,x,y){
+  const model=p.run('ThermalStudio.viewModel(thermalController.result(),document.getElementById("thermalField").value||"temperature_k")');
+  const t=T.transform(model,320,240);p.element('fieldCanvas').onmousemove({clientX:t.X(x),clientY:t.Y(y)});
+  return p.element('resInfo').textContent;
+}
+test('J5 region hover names the region and material; rectangle hover is unchanged',async()=>{
+  const p=regionPage(regionPayload());await runPage(p);
+  assert.match(p.element('status').textContent,/steady thermal result ready/);
+  assert.ok(hover(p,.75,.25).endsWith('; region heater (copper)'));
+  assert.ok(hover(p,.25,.75).endsWith('; region background (insulation)'));
+  const r=regionPage(payload(),{capability:cap(),regionDocument:doc()});await runPage(r);
+  assert.equal(hover(r,.75,.25),'temperature_k = 1 K (raw P1 interpolation)');
+});
+
+test('J6 region summary: no region name becomes a quantity row; metadata second, region table third',async()=>{
+  const wire=regionPayload({names:['source_block','background']});
+  const p=regionPage(wire);await runPage(p);
+  const host=p.element('resTable');
+  assert.equal(host.children.length,3);
+  assert.ok(host.children[0].children.every(row=>!JSON.stringify(row.children.map(c=>c.textContent)).includes('source block')));
+  assert.equal(host.children[1].children[0].textContent,'Full result metadata');
+  const table=host.children[2],body=table.children[1];
+  assert.equal(table.className,'res region-table');assert.equal(body.tag,'tbody');assert.equal(body.children.length,2);
+  assert.deepEqual(body.children[0].children.slice(1).map(c=>c.textContent),
+    ['source_block','copper','400','5000000','1','0.5','document value']);
+});
+
+test('J8 legend, table and literal hostile names; a dirty edit clears legend and table',async()=>{
+  const name='<img src=x onerror=1>';
+  const p=regionPage(regionPayload({names:[name,'background']}));await runPage(p);
+  p.run("showTab('mesh')");await tick();
+  assert.equal(p.element('meshInfo').textContent,'Actual result mesh — 4 nodes, 2 cells, 2 regions; axes m');
+  const list=p.element('meshLegend').children[0];
+  assert.equal(list.className,'region-list');assert.equal(list.children.length,2);
+  assert.equal(list.children[0].children[1].textContent,name+' — copper');
+  assert.equal(list.children[0].children[0].style.background,T.PALETTE[0]);
+  assert.ok(p.htmlWrites.every(markup=>!markup.includes('<img')&&!markup.includes('heater')));
+  p.run("showTab('results')");await tick();
+  assert.equal(p.element('resTable').children.length,3);
+  p.element('json').value='{';p.element('json').oninput();
+  for(const id of ['meshLegend','resTable']){
+    assert.equal(p.element(id).textContent,'');assert.equal(p.element(id).children.length,0);
+  }
+});
+
+test('J9 the family is pinned at validation: each family refuses the other payload',async()=>{
+  for(const [document,wire] of [[regionDoc(),payload()],[doc(),regionPayload()]]){
+    const c=T.createController({wait:async()=>{},request:async(method,url,body)=>{
+      if(url==='/api/capabilities')return regionCap();
+      if(url.endsWith('/validate'))return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};
+      const id={job:'job1',result_id:'res1',client_revision:body?.client_revision??c.gate.revision,request_seq:body?.request_seq??c.gate.sequence};
+      if(url.endsWith('/run'))return id;
+      return url.endsWith('/result')?{...wire,...id}:{...id,status:'done'};
+    }});
+    await c.loadCapability();assert.equal(await c.validate(document),true);
+    assert.equal(await c.run(),false);assert.equal(c.result(),null);assert.ok(c.state().error);
+  }
+  // A region document runs only while the region block allows it.
+  const block=regionBlock();block.run_enabled=false;
+  const c=T.createController({request:async(method,url,body)=>{
+    if(url==='/api/capabilities')return regionCap(block);
+    if(url.endsWith('/validate'))return {ok:true,doc:body.doc,client_revision:body.client_revision,request_seq:body.request_seq};
+    throw Error('must not run');}});
+  await c.loadCapability();
+  assert.equal(await c.validate(regionDoc()),true);assert.equal(await c.run(),false);
+  assert.equal(await c.validate(doc()),true);
+});
+
+test('J10 hasRegionGeometry on the server rule fixtures (two physics entries: false here, true on the server)',()=>{
+  const region=regionDoc(),rectangle=doc();
+  const shapesOnly=copy(region);delete shapesOnly.geometry.background;
+  const backgroundOnly=copy(region);delete backgroundOnly.geometry.shapes;
+  const geometryList=copy(region);geometryList.geometry=[region.geometry];
+  const noGeometry=copy(region);delete noGeometry.geometry;
+  const physicsNotDict=copy(region);physicsNotDict.physics=['heat1'];
+  const twoPhysics=copy(region);twoPhysics.physics.second={type:T.TYPE};
+  const decided=Object.fromEntries(Object.entries({rectangle,region,shapesOnly,backgroundOnly,geometryList,noGeometry,
+    physicsNotDict,twoPhysics}).map(([k,v])=>[k,T.hasRegionGeometry(v)]));
+  assert.deepEqual(decided,{rectangle:false,region:true,shapesOnly:true,backgroundOnly:true,geometryList:false,
+    noGeometry:false,physicsNotDict:false,twoPhysics:false});
 });

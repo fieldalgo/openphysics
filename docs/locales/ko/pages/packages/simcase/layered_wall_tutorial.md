@@ -89,6 +89,7 @@ python examples/simcase/layered_wall.py out/wall-fine --mesh-size-mm 1 --export
 ```
 
 각 실행 폴더를 분리해서 보존하세요. 다음으로 [저장 결과와 ParaView](../../results/saved-results.md),
-[수렴 확인](../../validation/convergence.md)을 읽습니다. 이 영역·대류 모델은 JSON/CLI/Python
-경로이며 thermal Studio 모델이 아닙니다. 정확한 도형·배정·지원 한계는
+[수렴 확인](../../validation/convergence.md)을 읽습니다. 이 튜토리얼은 영역·대류 모델을 Python과
+CLI로 실행하며, Studio도 이 모델을 [영역 문서](thermal_studio.md#영역-문서)로서 영역 한도 안에서
+검증·실행·표시합니다. 정확한 도형·배정·지원 한계는
 [영역 문서 계약](thermal_regions2d.md)을 따릅니다.

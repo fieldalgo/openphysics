@@ -92,6 +92,8 @@ python examples/simcase/layered_wall.py out/wall-fine --mesh-size-mm 1 --export
 
 Keep the run directories separate. Read [saved results and ParaView](../../results/saved-results.md)
 next, then [convergence checks](../../validation/convergence.md).
-This region/convection model is a JSON/CLI/Python workflow, not a thermal Studio model.
+This tutorial runs the region/convection model from Python and the CLI; Studio also
+validates, runs and shows it as a [region document](thermal_studio.md#region-documents)
+within its region limits.
 The exact supported shapes, mappings and limitations remain in the
 [region-document contract](thermal_regions2d.md).
