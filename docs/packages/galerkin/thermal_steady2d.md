@@ -31,7 +31,7 @@ result = solve_steady_heat(
 | mesh | `galerkin.mesh.Mesh`, reference coordinates `(N,2)` in m, integer triangles `(M,3)` |
 | conductivity | Required finite real scalar k>0, W/(m K), or `{region name: k}` piecewise constant on `mesh.region_names` ([multimaterial](multimaterial.md)); no tensors or k varying inside a region |
 | dirichlet | Mapping exterior integer node ID -> finite scalar temperature in K |
-| heat_source | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; default zero |
+| heat_source | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; or mesh-bound `ElementHeatSource(mesh, values)` for elementwise `(M,)` W/m^3; default zero |
 
 With the default insulated boundary, each connected component requires at least
 one prescribed temperature; the optional Robin extension can also anchor it. No node is silently pinned,
@@ -84,6 +84,12 @@ left reaction is positive and right reaction negative. For positive uniform
 generation with equal cool boundary temperatures, total outward heat is
 positive and equals the integral of Q. Integrated reaction is a nodal weak
 boundary quantity, not a pointwise boundary flux density.
+
+`ElementHeatSource` is imported from `galerkin.thermal`. It snapshots the source
+values and exact mesh coordinates, triangle order and region correspondence;
+changed geometry/order/regions are rejected when consumed. Each triangle's
+constant Q contributes Q*area/3 at each vertex. A bare cell array is not a
+valid source. See [Joule heat transfer](joule_heating.md#element-source-api).
 
 Constant Q uses the existing exact constant-source load routine. Callable Q
 uses an original 6x6 Gauss-Legendre Duffy triangle rule for **Q*N_i**, instead
