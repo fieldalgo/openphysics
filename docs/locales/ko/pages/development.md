@@ -176,7 +176,7 @@ Studio 정적 파일은 그 환경에서 checkout과 같은 바이트로 로드�
 임시 디렉터리로 복사해(해시는 `consumer-file-hashes.json`에 기록) 설치된 wheel을 대상으로
 `python -I`로 실행하므로 checkout이 섞이지 않습니다. 설치된 환경은
 `tools/check_licenses.py`를 통과해야 합니다. Studio Node 검사는 설치된 Studio 파일로 돌고,
-Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 마지막으로
+Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다. 정상·과도 직사각형 문서에 이어 배포 정상·과도 영역 예제(영역 색, 범례, 영역 표, 커서 표시)를 확인합니다. 마지막으로
 `tools/audit_distribution_artifacts.py`가 보관된 압축본의 체크섬과 sdist·wheel의 정확한
 내용을 다시 확인합니다.
 
