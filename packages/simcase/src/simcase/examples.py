@@ -102,13 +102,19 @@ VECTOR_FIBER = copy.deepcopy(FIBER)
 VECTOR_FIBER["name"] = "step-index fiber, full vector modes"
 VECTOR_FIBER["physics"]["em1"].update(formulation="vector", n_cladding=1.44, num_modes=6)
 
+HADLEY_RIB_VECTOR = copy.deepcopy(HADLEY_RIB)
+HADLEY_RIB_VECTOR["name"] = "Hadley 2002 rib waveguide, slab 0.3 um, full vector"
+# 3.4 is the substrate index. The side slabs guide modes above it, so this interval
+# also holds slab modes; num_modes = 1 keeps only the highest, the rib mode.
+HADLEY_RIB_VECTOR["physics"]["em1"].update(formulation="vector", n_cladding=3.4)
+
 VECTOR_SLAB_SWEEP = copy.deepcopy(VECTOR_SLAB)
 VECTOR_SLAB_SWEEP["name"] = "220 nm dielectric slab, tracked vector TE wavelength sweep"
 VECTOR_SLAB_SWEEP["study"] = dict(type="sweep", parameter="physics.em1.wavelength",
                                 values=[1.45, 1.50, 1.55, 1.60, 1.65])
 
 EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib": HADLEY_RIB,
-            "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER,
+            "hadley_rib_vector": HADLEY_RIB_VECTOR, "fiber": FIBER, "vector_slab": VECTOR_SLAB, "vector_fiber": VECTOR_FIBER,
             "vector_slab_sweep": VECTOR_SLAB_SWEEP}
 
 
