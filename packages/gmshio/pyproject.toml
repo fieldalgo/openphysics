@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Mathematics",
 ]
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.26"]
 
 [project.urls]
 Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/gmshio"
@@ -30,7 +30,7 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 [project.optional-dependencies]
 test = ["pytest"]
 gmsh = ["gmsh"]
-plot = ["matplotlib"]
+plot = ["matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

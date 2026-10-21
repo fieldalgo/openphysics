@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Mathematics",
 ]
-dependencies = ["numpy>=1.24", "scipy>=1.10"]
+dependencies = ["numpy>=1.26", "scipy>=1.11.2"]
 
 [project.urls]
 Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/meshine"
@@ -29,7 +29,7 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
 test = ["pytest"]
-plot = ["matplotlib"]
+plot = ["matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

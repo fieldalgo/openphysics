@@ -82,10 +82,10 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 
 | 배포판 | 요구하는 패키지(범위) | SPDX | 비고 |
 |---|---|---|---|
-| `numpy` | openphysics 외 전부(`>=1.24`) | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | 휠에 OpenBLAS와 GCC 런타임 라이브러리가 들어 있고, 그 가운데 libquadmath는 LGPL-2.1-or-later(GCC 예외 대상 아님). Linux와 macOS 14 미만에서는 별도 공유 라이브러리, macOS 14 이상에서는 없음(Apple Accelerate 사용), Windows에서는 GCC 런타임이 정적으로 링크된 OpenBLAS DLL과 `msvcp140.dll`. [묶인 구성 요소](#묶인-구성-요소) 참고 |
-| `scipy` | galerkin, galerkin-refsol, meshine, physmat, simcase(`>=1.10`) | BSD-3-Clause | 휠에 libquadmath(LGPL-2.1-or-later)를 포함한 GCC 런타임 라이브러리가 Linux와 모든 macOS에서 공유 라이브러리로 들어 있고, macOS 14 이상을 빼면 OpenBLAS도 들어 있음. Windows에서는 GCC 런타임이 OpenBLAS DLL과 확장 모듈 하나에 정적으로 들어 있음. Qhull은 정적 링크. [묶인 구성 요소](#묶인-구성-요소) 참고 |
-| `shapely` | simcase(`>=2.0`) | BSD-3-Clause | 휠에 GEOS(LGPL-2.1)가 Linux·macOS·Windows 모두 별도 공유 라이브러리로 들어 있고 shapely 자신의 확장 모듈이 동적으로 로드함. Windows 휠에는 `msvcp140.dll`도 있음. OpenPhysics는 shapely의 Python API만 부르고 어느 것도 재배포하지 않음. [묶인 구성 요소](#묶인-구성-요소) 참고 |
-| `matplotlib` | simcase(범위 없음), 그림 extra(`>=3.7`) | LicenseRef-Matplotlib | PSF 기반 허용형 라이선스. 확장 모듈에 FreeType(FTL OR GPL-2.0-or-later, FTL로 사용), HarfBuzz, libraqm, SheenBidi, Qhull이 정적으로 들어 있고, 데이터 파일에 OFL-1.1·BaKoMa·Bitstream Vera 조건의 글꼴이 있음 |
+| `numpy` | openphysics 외 전부(`>=1.26`) | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | 휠에 OpenBLAS와 GCC 런타임 라이브러리가 들어 있고, 그 가운데 libquadmath는 LGPL-2.1-or-later(GCC 예외 대상 아님). Linux와 macOS 14 미만에서는 별도 공유 라이브러리, macOS 14 이상에서는 없음(Apple Accelerate 사용), Windows에서는 GCC 런타임이 정적으로 링크된 OpenBLAS DLL과 `msvcp140.dll`. [묶인 구성 요소](#묶인-구성-요소) 참고 |
+| `scipy` | galerkin, galerkin-refsol, meshine, physmat, simcase(`>=1.11.2`) | BSD-3-Clause | 휠에 libquadmath(LGPL-2.1-or-later)를 포함한 GCC 런타임 라이브러리가 Linux와 모든 macOS에서 공유 라이브러리로 들어 있고, macOS 14 이상을 빼면 OpenBLAS도 들어 있음. Windows에서는 GCC 런타임이 OpenBLAS DLL과 확장 모듈 하나에 정적으로 들어 있음. Qhull은 정적 링크. [묶인 구성 요소](#묶인-구성-요소) 참고 |
+| `shapely` | simcase(`>=2.0.2`) | BSD-3-Clause | 휠에 GEOS(LGPL-2.1)가 Linux·macOS·Windows 모두 별도 공유 라이브러리로 들어 있고 shapely 자신의 확장 모듈이 동적으로 로드함. Windows 휠에는 `msvcp140.dll`도 있음. OpenPhysics는 shapely의 Python API만 부르고 어느 것도 재배포하지 않음. [묶인 구성 요소](#묶인-구성-요소) 참고 |
+| `matplotlib` | simcase와 그림 extra(`>=3.8`) | LicenseRef-Matplotlib | PSF 기반 허용형 라이선스. 확장 모듈에 FreeType(FTL OR GPL-2.0-or-later, FTL로 사용), HarfBuzz, libraqm, SheenBidi, Qhull이 정적으로 들어 있고, 데이터 파일에 OFL-1.1·BaKoMa·Bitstream Vera 조건의 글꼴이 있음 |
 | `contourpy`, `cycler`, `kiwisolver` | matplotlib | BSD-3-Clause | |
 | `fonttools`, `pyparsing`, `six` | matplotlib | MIT | |
 | `pillow` | matplotlib | MIT-CMU | 허용형 조건의 이미지·글꼴·압축 라이브러리를 포함함(FreeType: FTL OR GPL-2.0-or-later, FTL로 사용). Linux·macOS에서는 공유 라이브러리, Windows에서는 정적 링크 |

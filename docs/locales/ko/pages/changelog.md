@@ -33,5 +33,6 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
   extra `studio`, `export`, `rii`는 `simcase[studio]`, `simcase[export]`,
   `physmat[rii]`를 설치합니다. 어떤 extra도 Gmsh를 설치하지 않습니다. 이전의
   `openphysics` 0.0.1은 다른 여섯 이름의 0.0.1과 마찬가지로 빈 이름 예약이었습니다.
-- 모든 패키지가 Python 3.12 이상을 요구합니다.
+- 모든 패키지가 Python 3.12 이상을 요구합니다. numpy·scipy·shapely·matplotlib의 최소 버전은
+  Python 3.12 휠이 있는 첫 릴리스인 1.26, 1.11.2, 2.0.2, 3.8로 올렸습니다.
 - 패키지 사이의 의존성은 0.1 계열(`>=0.1.0,<0.2`)로 제한됩니다.

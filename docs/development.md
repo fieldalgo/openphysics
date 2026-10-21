@@ -23,7 +23,10 @@ python -m pip check
 `tools/requirements-py312-linux.txt` pins the validation tools and their transitive
 dependencies, not the packages' runtime requirements. Update pins deliberately
 in a reviewed change and rerun the source and distribution checks. Package
-metadata declares Python >=3.12; CI tests Python 3.12 only.
+metadata declares Python >=3.12; CI tests Python 3.12 only. The lower bounds
+numpy 1.26, scipy 1.11.2, shapely 2.0.2 and matplotlib 3.8 are the first
+releases with Python 3.12 wheels. The non-slow suite passed on exactly those
+versions once, by hand (2026-10-21, Linux, Python 3.12); CI tests only the pins.
 
 Always run from the repository root: running Python inside `packages/` or
 `tests/` can shadow installed modules with directories of the same name.
