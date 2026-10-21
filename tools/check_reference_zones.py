@@ -36,6 +36,8 @@ def zone(path):
     if p.parts[0] == 'tools':
         return 'always'
     if p.parts[0] == 'tests':
+        if len(p.parts) > 1 and p.parts[1] == '_support':
+            return 'always'
         if len(p.parts) == 5 and p.parts[2] == 'reference_values' and p.name.startswith('generate_'):
             return 'generator'
         if p.name.startswith('test_') or p.name.endswith('_test.py'):

@@ -29,7 +29,7 @@ def repo(tmp_path, files, *, listed=('tests/test_probe.py', 'studies/*'), spdx='
 
 
 @pytest.mark.parametrize('path', ['packages/demo/x.py', 'examples/x.py', 'tools/x.py',
-                                 'tests/conftest.py', 'tests/demo/crosscheck.py'])
+                                 'tests/conftest.py', 'tests/demo/crosscheck.py', 'tests/_support/test_helper.py'])
 def test_p1_p5_forbidden_zones(tmp_path, path):
     inv = repo(tmp_path, {path: 'def f():\n import probe\n'}, listed=(path,))
     assert any('non-permissive import' in e for e in zones.check(tmp_path, inv))
