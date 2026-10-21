@@ -6,31 +6,22 @@
 
 - **What it checks:** independent acceptance of `solve_transient_heat` with its own oracle (no producer or refsol code) and preregistered families: uniform insulation, moving affine field, accepted initial mismatch, discrete source endpoint, temporal eigenmode, PDE sine, temporal companion and independent quadrature.
 - **Fixed gates:** temporal orders 0.9–1.1 with the full history matching the backward-Euler product to ≤ 1e-10; PDE sine temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9; companion change ≤ 5%; quadrature 8 vs 10 within 1%.
-- **Scope:** algebra, temporal, spatial and quadrature errors are reported separately, and a failed gate stays a failure; neither time steps nor thresholds are retuned. The historical registration notes below are kept as recorded; for a specific commit, see its CI run.
+- **Scope:** algebra, temporal, spatial and quadrature errors are reported separately, and a failed gate stays a failure; neither time steps nor thresholds are retuned. For the result of a specific commit, see its CI run.
 
-## Current checkout and evidence
+## Evidence
 
-This page describes the implementation in this checkout. Named historical snapshots retain their original results and limitations. For validation of another commit, inspect that commit's CI logs and artifacts.
+This page defines the gates and how to reproduce them. Results for a specific
+commit are that commit's CI exits, logs and artifacts; the commands below
+reproduce the checks and are not themselves a pass result. A failed gate stays
+a failure; source, installed, independent and platform results are assessed
+separately.
 
-## Historical registration and current reproduction
+## Frozen contract
 
-2026-10-16. This report covers exact initial production candidate
-`d21e083d9723eec71ab5e32777ecd331d75cd981`, whose
-`galerkin/transient_heat.py` Git blob is
-`426015f84e2c43db964f3063c734d47aca41a9fa`.
-The independent acceptance branch was
-created at that exact candidate. Its initial code checkpoint is
-`55afd565b9f6feea38896dc567eef574adf21371`.
-That historical submission changed no production code, producer tests, refsol, existing tests or shared release configuration.
-
-**Historical submission evidence:** no Python parse/compile, collection, NumPy diagnostic, source/installed test, runtime negative, PDE convergence, whole regression or Windows test was executed for the original d21 acceptance submission. It supplied no pass count, measured order, artifact hash or clean-whole claim. These are historical limits, not current execution restrictions; Actions is enabled and present-checkout results require exact CI evidence.
-
-The numerical contract was frozen before reading the new producer module:
-independent preregistration `d42b43360bcaff9fe1d98c44105b15ab74ceec90`.
-The oracle blob `69238292eb72c58c3d3385cc0a60a1db8c7fcd2b` is copied
-**byte for byte**, not adapted from producer/refsol. All frozen gates remain.
-Earlier tiny n3 248 checks/41 names and producer self-checks are not this
-acceptance. Existing thermoelastic traction/whole-run histories are separate.
+The numerical contract was frozen in an independent preregistration before the
+producer module was read. The oracle blob `69238292eb72c58c3d3385cc0a60a1db8c7fcd2b`
+is copied **byte for byte**, not adapted from producer/refsol. All frozen gates
+remain. Producer self-checks are not this acceptance.
 
 ## Ownership and files
 
@@ -43,8 +34,7 @@ All executable files are in `tests/galerkin/`:
 | test_transient_heat_independent_validation.py | pytest discovery wrapper only |
 | transient_heat_independent_consumer.py | stdlib isolated installed-module loader/origin/hash checks |
 
-This English report and its complete Korean counterpart are the other two
-additions. No producer test or tolerance is edited. The source currently declares
+No producer test or tolerance is edited. The source currently declares
 17 test methods; this is a static text count, **not** a collected or passed
 count. unittest subtests and future pytest/subtest counts must be reported as
 actually observed.
@@ -140,9 +130,7 @@ Raw errors/orders and every companion ratio are printed when executed.
 
 ## B contract review incorporated without changing gates
 
-The pre-implementation review at
-`420bd73ea202eef65354b65ee0042598934cb0c2`,
-review blob `114a828d5d3b74cb66801c017000b36170e9812d`, was read.
+The pre-implementation contract review is incorporated as follows.
 R2 actual initial/old M_FC is tested using a tiny accepted mismatch and small
 finite h with zero baseline. Temperature tolerance alone could miss it;
 storage magnifies the witness without relaxing the original scale.
@@ -265,17 +253,3 @@ python -m pytest -q
 The distribution helper checks that sdists and wheels carry no documents, tests or examples; these reports, the tests and the example are not shipped. It checks installed runtime module bytes and origins, copies the checkout's tracked oracle/cases/consumer and example outside the checkout, and runs the isolated consumer with `--suite all` and the complete convergence example against the installed wheels. This is implemented verification, not evidence of a successful artifact run; inspect exact CI exits and artifacts.
 Subsequent producer SHAs require original blob comparison and impact-specific
 retesting; identical code does not justify automatic whole-run repetition.
-
-## Historical d21 evidence boundary
-
-| Scope | Original d21 submission result |
-|---|---|
-| Candidate API/source reading | completed; exact module blob recorded |
-| Acceptance oracle/cases/consumer and EN/KO report | written; static review only |
-| Frozen oracle/gates | preserved; producer/refsol truth dependency absent |
-| Python syntax/pytest collection/NumPy/source/installed/runtime negatives | unexecuted; no pass claim |
-| Temporal/PDE/5% separation and quadrature gates | unexecuted |
-| Whole regression/artifact/build/deployment/Windows | unexecuted |
-| Actions | no query, execution or activation |
-
-No original numerical failure is replaced by a pass. The table records the historical source-only submission, not the current checkout's CI status. Preserve first-run failures and exact evidence; assess current source, installed, independent and platform results separately before main integration or release.
