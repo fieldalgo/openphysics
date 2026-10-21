@@ -6,21 +6,17 @@
 
 - **확인하는 것:** 원래 3차원 연속체 oracle로 `galerkin.thermoelasticity.solve_thermoelasticity`를 독립 수용 검증합니다. 명시적으로 처방한 절점 P1 Kelvin 장을 평면응력·평면변형률에서 다룹니다.
 - **고정 기준:** n=8/16/32에서 두 수렴률 모두 변위 L2 ≥ 1.8, 변위 기울기 H1·3D 전체 응력 L2(zz 포함)·에너지 노름 차수 ≥ 0.9가 필요합니다. 정확 장과 에너지·일 항등식은 1e-10, 잔차는 1e-9로 일치해야 합니다.
-- **범위:** 기계 단계만 다룹니다. 열전도 솔버, 온도 전달, 출처, 과도 일, 전체 연성 workflow는 검증하지 않습니다. 아래 후보 기록은 그대로 보존하며, 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+- **범위:** 기계 단계만 다룹니다. 열전도 솔버, 온도 전달, 출처, 과도 일, 전체 연성 workflow는 검증하지 않습니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
 이 수용은 독립 연속체 oracle과 사전 등록 gate를 사용합니다. 명시적으로 처방한
 nodal-P1 Kelvin 장에 대한 기계 응답을 다룹니다. 열 솔버·온도 전달·출처·과도 일 또는
 완전 순차연성 workflow를 검증하지 않습니다.
 
-시험 구현은 후보 `9f5ceef5f0aa5394272b25630791576d516924d8`입니다.
-최종 후보 `0c9237b2dfcfabd59fa0d14091bbb1e7165eda80`는 그 후보와 develop
-`6c38df4eac8db72f8ce3203a122f0ffd6afacc4e`의 정상 merge입니다.
-recursive Git tree를 직접 비교했을 때 기존 변경은 `ci/README.md`,
-`ci/test_multiphysics_wheel.py` 두 개뿐입니다. 열탄성 전용 module/reference/test/doc/example
-6개 blob은 모두 같습니다. 특히 solver blob은
-`eb806a1db8f7f8c4102f319771e242bdd10b6ea2`, reference blob은
-`6230c95e9e1177e5bad378f7d3d3d56ee2685ff8`입니다. 수치 구현의 동일성을 입증하며,
-다른 기능의 통합·release 수용은 별도 결정입니다.
+## 근거
+
+이 페이지는 기준과 재현 방법을 정의합니다. 특정 커밋의 결과는 그 커밋의 CI
+종료값·로그·artifact입니다. 아래 명령은 검사를 재현하는 절차이며 그 자체가 통과
+결과는 아닙니다.
 
 ## 원래 3차원 oracle
 
@@ -109,15 +105,9 @@ write flag 거절·stale mesh·잘못된 shape·nonfinite/음수 절대온도·�
 재현 FNV-1a64는 checksum이지 암호서명이나 인증된 온도 출처가 아닙니다.
 올바르게 표시한 수동 데이터가 열 솔버에서 왔다고 식별하지 않습니다.
 
-source와 설치 wheel에서 독립 37개가 모두 통과했습니다. 수정하지 않은 후보 suite
-46개(엔진39·reference7)와 관련 source는 83통과입니다. 최초 source는 26통과와
-아핀 온도 gradient norm의 시험 broadcasting 실패 2개였으며 원 traceback을 보존했습니다.
-구적 축 수정은 gate나 생산 파일을 바꾸지 않았습니다.
-
-최세밀 mesh의 정규화 물리 에너지 오차(PS/PE)는 선형 온도 .00018018/.00035537,
-sine .00180161/.00237582, 다항식 .00048015/.00090519입니다. 선형 온도 변위
-차수는 최소 1.8753, sine은 1.9725, 다항식은 1.9992입니다. 등록한 gradient·응력·
-tangent energy·온도 보간 gate는 인접 두 refinement에서 모두 통과합니다.
+최세밀 mesh(n=32)의 측정값: 정규화 물리 에너지 오차(PS/PE)는 선형 온도
+.00018018/.00035537, sine .00180161/.00237582, 다항식 .00048015/.00090519입니다.
+측정한 최소 변위 차수는 선형 온도 1.8753, sine 1.9725, 다항식 1.9992입니다.
 
 실제 source·설치 검사는 임시 runtime mutation을 거절합니다. 잘못된 PE 면내-alpha
 shortcut, 열계수 3배, 열 RHS 부호, 열하중 누락, zz 응력 누락, centroid-only 물리
@@ -136,8 +126,5 @@ wheel을 설치한 뒤 `python -I -m pytest --confcutdir=. -q`를 실행합니�
 전용 venv에서 기존 환경 의존성을 재사용하므로 clean-room 의존성 설치는 아닙니다.
 공유 호스트 시간은 실행 metadata이며 성능 baseline이 아닙니다.
 
-첫 37-case 제출의 로컬 전체 루트 회귀는 657시험·9subtest 통과, optional 환경 skip16,
-기존 의존성 폐기예정 경고1이었습니다. 마지막 같은 사례 suite는 명시적 변형률 norm과
-모든 비선형 보간 norm의 구적 차수 비교를 추가합니다. 그 초기 개발 실행에서 exact-temperature
-assertion이 새 비영 변형률 오차 열을 포함한 오류가 드러났습니다(35통과·시험실패2).
-온도·gradient 열만 검사하도록 고쳐 기존 모든 기준을 유지했고, source 재검증은 37통과였습니다.
+suite는 명시적 변형률 norm을 기록하고 모든 비선형 보간 norm을 구적 차수 사이에서
+비교합니다. exact-temperature assertion은 온도와 그 gradient만 검사합니다.
