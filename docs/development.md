@@ -277,12 +277,36 @@ same mesher input in nm, um and m); say why in the test.
 
 ## Publishing
 
-No workflow publishes to PyPI, and tags trigger nothing. Before a release, choose
-the package and version, check that the version is not already on PyPI, validate
-the exact main commit, and set up that PyPI project's trusted publisher for an
-explicitly reviewed publishing workflow and GitHub environment. Each package
-builds from `packages/<name>`; the repository root is not a distribution, and
-`packages/openphysics` is the meta distribution that requires the other six. A build-only check for one
+The `Release` workflow (`.github/workflows/release.yml`) uploads the seven
+distributions to PyPI when a GitHub release is published. Pushing a tag alone
+uploads nothing, and validation never starts it. Its jobs run in order:
+
+1. **gate**: `validate.yml` has already passed on the release commit; the suite
+   is not run again. A release published before that fails here and uploads
+   nothing; re-run the workflow once validation has passed.
+2. **build**: `tools/check_release_version.py --tag <tag>`, then
+   `tools/check_distributions.py --build-only` with `OPENPHYSICS_DOCS_REF` set to
+   the tag.
+3. **install**: `tools/check_release_install.py --wheels` on Linux, macOS and
+   Windows with Python 3.12 and 3.15, third-party requirements resolved from
+   PyPI. It is a smoke check of the installed packages, not the test suite.
+4. **publish**: PyPI trusted publishing (OIDC; no token is stored) from the
+   `pypi` GitHub environment, which accepts only `v*` tags. Dependencies are
+   uploaded before the packages that require them, `openphysics` last. Each PyPI
+   project lists the publisher: owner `fieldalgo`, repository `openphysics`,
+   workflow `release.yml`, environment `pypi`.
+5. **verify**: PyPI's files must have the build's SHA-256, and installing from
+   PyPI passes step 3 again on the same platforms.
+
+Running it by hand (Actions → Release → Run workflow) is a dry run: steps 1–3 on
+the chosen branch's commit, descriptions linked to that commit, no upload. To
+release: land the version change, wait for validation of that `main` commit,
+dry-run the workflow on `main`, then tag the commit `vX.Y.Z` and publish a GitHub
+release from the tag.
+
+Each package builds from `packages/<name>`; the repository root is not a
+distribution, and `packages/openphysics` is the meta distribution that requires
+the other six. A build-only check for one
 package:
 
 ```bash
