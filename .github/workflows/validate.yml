@@ -192,6 +192,14 @@ jobs:
       OPENBLAS_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
       OPENBLAS_CORETYPE: ${{ matrix.core }}
+      # OpenBLAS 0.3.34 enlarges GEMM blocking on AVX-512 AMD hosts (Zen 4/5)
+      # even when the core type is forced, which overflows a stack buffer in
+      # the Haswell DGEMM kernel and crashes (OpenMathLib/OpenBLAS#6021).
+      # An L2 size other than 1024 KB turns that override off, so the forced
+      # kernel runs with its own blocking, as on a real Haswell or Sandybridge
+      # CPU. Remove this once the pinned numpy bundles an OpenBLAS with the
+      # fix (OpenMathLib/OpenBLAS#6027, planned for 0.3.35); see #78.
+      OPENBLAS_L2_SIZE: "2048"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5

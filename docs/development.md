@@ -251,7 +251,13 @@ differ for the same commit, pins and seeds, even with one thread.
   uses Accelerate, so no OpenBLAS kernel is reported there.
 - `blas-kernels` forces `OPENBLAS_CORETYPE=Haswell` (AVX2, also the kernel used
   on AMD Zen) and `Sandybridge` (AVX). It first confirms the forced kernel is
-  active, so a fallback cannot pass silently. To reproduce locally:
+  active, so a fallback cannot pass silently. The job also sets
+  `OPENBLAS_L2_SIZE=2048`: OpenBLAS 0.3.34 otherwise enlarges GEMM blocking on
+  AVX-512 AMD runners (Zen 4/5) even under a forced kernel, which crashes the
+  Haswell kernel
+  ([OpenMathLib/OpenBLAS#6021](https://github.com/OpenMathLib/OpenBLAS/issues/6021)).
+  Remove it once the pinned numpy bundles a fixed OpenBLAS
+  ([#78](https://github.com/fieldalgo/openphysics/issues/78)). To reproduce locally:
 
   ```bash
   OPENBLAS_CORETYPE=Sandybridge python -m pytest -q -m "not slow" <test files>
