@@ -34,4 +34,7 @@ pip install "openphysics[studio,export,rii]"
 각 패키지는 따로 설치할 수도 있습니다. 0.1.0 이전 버전(`0.0.1`)은 아무것도 설치하지 않는
 빈 이름 예약이었습니다.
 
+0.x는 알파입니다. Python API는 마이너 버전 사이에 바뀔 수 있습니다. 릴리스마다 바뀐 점과
+안정적으로 유지하는 점은 [변경 기록](../../changelog.md)에 있습니다.
+
 소스: https://github.com/fieldalgo/openphysics

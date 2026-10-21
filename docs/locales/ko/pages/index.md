@@ -24,6 +24,7 @@
 | 개발과 검증 | [Development guide](../../../development.md) | [한국어](development.md) |
 | 기여 | [Contributing](../../../contributing.md) | [한국어](contributing.md) |
 | 보안 | [Security](../../../security.md) | [한국어](security.md) |
+| 릴리스와 안정성 | [Changelog](../../../../CHANGELOG.md) | [한국어](changelog.md) |
 | 포함된 이미지·fixture·데이터 | [Asset provenance](../../../assets.md) | [한국어](assets.md) |
 | 제3자 소프트웨어·데이터·라이선스 | [Third-party list](../../../third-party.md) | [한국어](third-party.md) |
 | 레퍼런스 도구 비교 | [Comparisons](../../../reference-comparisons.md) | [한국어](reference-comparisons.md) |

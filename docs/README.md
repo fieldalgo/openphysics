@@ -25,6 +25,7 @@ languages; a translation does not establish a new numerical result.
 | Development and validation | [Development guide](development.md) | [한국어](locales/ko/pages/development.md) |
 | Contributing | [Contributing](contributing.md) | [한국어](locales/ko/pages/contributing.md) |
 | Security | [Security](security.md) | [한국어](locales/ko/pages/security.md) |
+| Releases and stability | [Changelog](../CHANGELOG.md) | [한국어](locales/ko/pages/changelog.md) |
 | Bundled images, fixtures and data | [Asset provenance](assets.md) | [한국어](locales/ko/pages/assets.md) |
 | Third-party software, data and licenses | [Third-party list](third-party.md) | [한국어](locales/ko/pages/third-party.md) |
 | Reference-tool comparisons | [Comparisons](reference-comparisons.md) | [한국어](locales/ko/pages/reference-comparisons.md) |

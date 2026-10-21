@@ -34,4 +34,7 @@ own (for example `pip install gmsh`) if you need it, under Gmsh's own license.
 Every package can also be installed on its own. Versions before 0.1.0 (`0.0.1`) were
 empty name reservations and install nothing.
 
+Version 0.x is an alpha: the Python API may change between minor versions. The
+[changelog](../../CHANGELOG.md) records each release and what stays stable.
+
 Source: https://github.com/fieldalgo/openphysics
