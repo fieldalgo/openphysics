@@ -211,7 +211,7 @@ publish packages.
 Full Linux scientific acceptance and installed-distribution validation on
 Linux, macOS and Windows are distinct requirements. A configured matrix is not
 three observed passes; inspect each exact job, environment, import origins,
-archive/wheel identities, failures, skips and artifacts. Narrow historical
+archive/wheel identities, failures, skips and artifacts. Narrow
 Windows checks do not certify full Windows physics or macOS. A universal wheel
 does not establish OS behavior. Report unavailable platforms as unverified;
 do not turn platform failures into unexplained skips. Actual browser interaction

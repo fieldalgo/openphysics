@@ -196,7 +196,7 @@ Main pending 한도는100이며 대기열 진입 순서는 commit 순서·무한
 Linux 전체 과학 수용과 Linux·macOS·Windows 설치 배포 검증은 별도 요구입니다.
 Matrix 설정이 실제3OS 통과는 아닙니다. 정확 job별 환경·import origin·
 archive/wheel identity·실패·skip·artifact를 확인하세요.
-과거 좁은 Windows 검사는 Windows 전체 물리나 macOS를 인증하지 않습니다.
+좁은 Windows 검사는 Windows 전체 물리나 macOS를 인증하지 않습니다.
 Universal wheel이 OS 동작을 입증하지 않습니다.
 실행할 수 없는 플랫폼은 미검증으로 기록하고 플랫폼 실패를 설명 없는 skip으로
 바꾸지 않습니다. 실제 browser 상호작용·자원 실측도 HTTP/Node/설치 검사와 별도입니다.
