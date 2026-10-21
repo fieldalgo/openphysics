@@ -1,0 +1,38 @@
+name: Feature or validation proposal
+description: A new capability, a validation or benchmark to add, or a documentation or performance improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the goal rather than a finished design. Search existing issues first.
+        Accepting a proposal is not a commitment to a schedule; changes still need
+        independent validation and the required checks before they land.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What you want to compute, check or improve, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: properties
+    attributes:
+      label: Expected properties
+      description: What a correct result must satisfy, such as analytical solutions, published benchmarks, conservation laws or convergence rates.
+    validations:
+      required: false
+  - type: textarea
+    id: done
+    attributes:
+      label: Possible completion criteria
+      description: How we could tell the work is done. A rough idea is fine.
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: References and related work
+      description: Papers, other tools, related issues.
+    validations:
+      required: false

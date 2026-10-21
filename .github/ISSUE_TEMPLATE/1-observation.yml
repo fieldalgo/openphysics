@@ -1,0 +1,78 @@
+name: Bug or accuracy observation
+description: Something fails, behaves unexpectedly, or gives a result you doubt.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Unconfirmed observations are welcome. A complete reproducer or an independent
+        reference is helpful but not required: fill in what you have and mark the rest
+        as not checked. Search existing issues first.
+
+        Remove credentials, personal information and confidential models before
+        attaching files. Report vulnerabilities privately (see SECURITY.md).
+  - type: textarea
+    id: observed
+    attributes:
+      label: What you observed
+      description: The error message, output or value, and how you got it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The expected behavior or value, and where the expectation comes from (analytical solution, paper, another solver, earlier version). Write "not known" if you have none.
+    validations:
+      required: false
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Code, a JSON document, commands or input files. A partial description is fine.
+    validations:
+      required: false
+  - type: dropdown
+    id: evidence
+    attributes:
+      label: Evidence so far
+      description: How far the observation has been checked. This does not decide whether it is a defect.
+      options:
+        - Observed once, not yet reproduced
+        - Reproduced in a fresh environment or process
+        - Compared with an independent reference
+        - Not sure
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release, exact commit SHA or pull-request number, and whether your copy has local changes. A branch name alone does not pin a version.
+      placeholder: "e.g. commit 1a2b3c4 on main, no local changes"
+    validations:
+      required: false
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it happens
+      options:
+        - On main or a release
+        - Only in a pull request or feature branch
+        - Not compared
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, operating system, and how the packages were installed. Relevant package versions if known.
+      placeholder: "Python 3.12, Ubuntu 24.04, editable install from the repository root"
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Mesh or convergence checks you tried, related issues, references.
+    validations:
+      required: false
