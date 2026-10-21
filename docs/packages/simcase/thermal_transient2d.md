@@ -26,10 +26,10 @@ Schema acceptance alone does not enable a browser route or renderer.
 
 Implementation, source tests, installed consumers, exact CI and main
 integration are different evidence stages. The code defines the contract
-below; it is not a new test result. A reported 41-case source subset does
-not certify the public API, installed distributions, complete numerical
-gates or platform acceptance. Inspect the exact combined candidate's command
-exits, original logs and artifacts. Do not carry an engine-only pass forward
+below; it is not a new test result. A source-test subset does not certify
+the public API, installed distributions, complete numerical gates or
+platform acceptance. For a specific commit, inspect its command exits,
+original logs and artifacts. Do not carry an engine-only pass forward
 as a headless save/CLI pass.
 
 ## Strict input document
