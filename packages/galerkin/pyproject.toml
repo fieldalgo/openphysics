@@ -32,12 +32,12 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 # it. tests/galerkin/test_independence.py enforces that separation.
 test = [
     "pytest",
-    "galerkin-refsol>=0.1",
+    "galerkin-refsol>=0.1.0,<0.2",
     # meshers, exercised through galerkin.from_mesher. Neither is a runtime
     # dependency; gmshio additionally wants a `gmsh` executable on PATH
     # (pip install gmsh), which it runs as a separate process and never links.
-    "meshine>=0.1",
-    "gmshio>=0.1",
+    "meshine>=0.1.0,<0.2",
+    "gmshio>=0.1.0,<0.2",
 ]
 figures = ["matplotlib>=3.7"]
 # Reference tools for code-to-code comparisons (tests/galerkin/test_crosscheck_*.py), test only.
