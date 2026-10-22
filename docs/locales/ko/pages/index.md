@@ -52,6 +52,7 @@
 | 정상 열전도 | [Kelvin·열유속·경계 부호](../../../packages/galerkin/thermal_steady2d.md) | [한국어](packages/galerkin/thermal_steady2d.md) |
 | 열전도 수용검증 | [독립 source·설치본 근거](../../../packages/galerkin/thermal_independent_validation.md) | [한국어](packages/galerkin/thermal_independent_validation.md) |
 | 영역별 재료 | [영역별 열·탄성·열탄성 재료, 층상 정답](../../../packages/galerkin/multimaterial.md) | [한국어](packages/galerkin/multimaterial.md) |
+| 공개 기준값 벤치마크 | [Timoshenko 바이메탈 띠와 NAFEMS T4를 정확한 정답과 대조](../../../packages/galerkin/public_benchmarks.md) | [한국어](packages/galerkin/public_benchmarks.md) |
 | 처방 온도장 기계단계 | [Snapshot·3D 감소·에너지](../../../packages/galerkin/prescribed_temperature_thermoelasticity.md) | [한국어](packages/galerkin/prescribed_temperature_thermoelasticity.md) |
 | 기계단계 수용검증 | [독립 원3D 재료 법칙](../../../packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) |
 | 처방 열유속·Robin 경계 | [외향 열유속·대류](../../../packages/galerkin/thermal_flux_robin.md) | [한국어](packages/galerkin/thermal_flux_robin.md) |

@@ -225,9 +225,10 @@ finite differences. Steady conduction without a source gives exactly
 dT = a_i + b_i ln(r/r_0) in each shell, so the coupled problem has an exact
 solution built from the two references.
 
-The bimetal strip (Timoshenko 1925) is a beam-theory approximation that
-ignores free-end stress concentrations; it is not used as an acceptance
-reference.
+The bimetal strip (Timoshenko 1925) is a beam-theory result; it is an exact
+plane-stress field only under its own end traction, and that is how
+[public benchmarks](public_benchmarks.md) uses it as an acceptance reference
+(free ends are compared away from the end zones).
 
 | Case | Mesh | Gate |
 | --- | --- | --- |

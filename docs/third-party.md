@@ -242,6 +242,7 @@ library directly.
 |---|---|---|
 | [refractiveindex.info database](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | A subset of tables and dispersion coefficients is embedded in physmat (`physmat/_tables.py`, `physmat/library.py`). CI fetches the commit pinned in `tools/rii-revision.txt`; that copy is not shipped. Citation and per-record sources: [physmat NOTICE](../packages/physmat/NOTICE) |
 | G. R. Hadley, J. Lightwave Technol. 20(7), 1210 (2002) | Published facts | Benchmark values in `galerkin-refsol`, cross-checked against tables published with femwell (GPL-3.0); only the numbers are reproduced, no code or text. See [galerkin-refsol NOTICE](../packages/galerkin-refsol/NOTICE) |
+| NAFEMS T4 benchmark target (18.3 °C at (0.6, 0.2) m), as quoted by the DIANA FEA tutorial (citing NAFEMS, *The Standard NAFEMS Benchmarks*, 1990) and FEATool `ex_heattransfer4.m` (citing Cameron, Casey and Simpson, *Benchmark Tests for Thermal Analysis*, NAFEMS, 1986) | Published facts | Problem statement and target in `refsol.thermal_convection`; only the numbers are reproduced, no text or code from either document. See [galerkin-refsol NOTICE](../packages/galerkin-refsol/NOTICE) |
 | Handbook-type thermal and mechanical constants | Approximate example inputs | Not certified measurements; see [asset provenance](assets.md) |
 
 ## Reference tools for comparisons

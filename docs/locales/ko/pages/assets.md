@@ -16,6 +16,7 @@
 | `docs/packages/simcase/geometry.png`, `mesh.png`, `results.png` | 자체 Studio의 이전 화면과 SOI-strip 예제 캡처. UI와 함께 커밋 `f44d7f8373f09ba9a7dbcd04066a0087485a3fd2`에 도입됐고 패키지 이름 변경 뒤에도 보존됨 |
 | `examples/simcase/soi_strip_results.png` | 문서 실행기·입력과 함께 커밋 `07d4a89`에 도입한 SOI-strip 예제 그림. 벡터 예제에서 `python -m simcase run examples/simcase/soi_strip.json`으로 다시 만듦. 현재 그래프 생성 경로는 `packages/simcase/src/simcase/runner.py` |
 | `docs/gallery/heated_plate.webp`, `heated_plate.png`, `coax.png`, `box_cavity.png` | `examples/simcase/gallery.py`가 `gallery_heated_plate.json`, `gallery_box_cavity.json`, 스크립트 안 동축 설정으로 그린 그림. 숫자와 버전은 [갤러리](gallery.md)에 있음. 판 재료값은 근사 예제 입력 |
+| `docs/gallery/public_benchmarks.png` | `examples/galerkin/public_benchmarks.py`가 그린 그림(기본 메시, n = 1..16). 숫자·버전·기준은 [공개 벤치마크](packages/galerkin/public_benchmarks.md)에 있음. 층 상수는 근사 예제 입력 |
 | `tests/gmshio/data/unit_square.geo`, `unit_square.msh` | reader·검사와 함께 커밋 `b2fe26a`에 도입한 단위 정사각형 형상과 메시 fixture. `.geo`에 점·변·physical tag를 명시함 |
 
 공개 검토에서 simcase 그림 네 개를 직접 열어 자체 UI·예제 내용과 대조했습니다.

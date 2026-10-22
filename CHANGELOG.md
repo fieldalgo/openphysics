@@ -24,6 +24,12 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add public-reference benchmarks against exact references: the Timoshenko
+  (1925) bimetal strip (`refsol.bimetal`) and NAFEMS T4 convective heat transfer
+  (`refsol.thermal_convection`, with the published 18.3 °C target), with mesh
+  convergence gates, a figure script and the validation page
+  `docs/packages/galerkin/public_benchmarks.md`. No engine code changed.
+
 - Add the explicit `galerkin.electric` steady 2D conduction API with region
   conductivity, outward current boundaries, componentwise Neumann gauges and
   elementwise Joule heating for same-mesh thermal consumers.

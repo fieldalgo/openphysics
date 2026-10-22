@@ -28,6 +28,8 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.material_cavity` | 균일 충전 또는 손실 유전·자성 판을 넣은 PEC 상자의 복소 공진과 Q(TE/TM-to-z 초월방정식 근), `exp(+j*omega*t)` | 진공 극한 = 직교 좌표 스펙트럼, 같은 두 층 = 균일 축척, 소손실 Q = 에너지 충전율 |
 | `refsol.wall_loss` | 직육면체 공동 모드의 벽별 1차 도체 손실 Q, 축퇴 편광 분리, 균일 충전 | Pozar TE101, 유한차분 curl의 수치 적분, 벽별 가법성, sqrt(sigma) 축척 |
 | `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭 | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한 |
+| `refsol.bimetal` | Timoshenko (1925) 바이메탈 온도계: 힘·모멘트 평형에서 얻은 곡률, 출판된 폐형식(Timoshenko, Villarceau, 단축 Stoney 극한), 끝면 표면하중을 포함한 정확한 평면응력 띠 장 | 무작위 데이터에서 세 폐형식 일치, Stoney 극한, 단면 힘·모멘트 0, 계면 연속, 유한차분 변형률 |
+| `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
 | `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세 | — |
 
 ## 사용법
@@ -112,4 +114,4 @@ Apache License 2.0 — [LICENSE](../../../../../../packages/galerkin-refsol/LICE
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-`refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과입니다. 출처는 [NOTICE](../../../../../../packages/galerkin-refsol/NOTICE)를 참조하세요.
+`refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과이고, `refsol.thermal_convection`의 NAFEMS T4 목표값은 출판된 벤치마크 수치입니다. 출처는 [NOTICE](../../../../../../packages/galerkin-refsol/NOTICE)를 참조하세요.

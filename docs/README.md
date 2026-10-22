@@ -56,6 +56,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 | Conduction acceptance | [Independent source/wheel evidence](packages/galerkin/thermal_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_independent_validation.md) |
 | Steady Joule heating | [Explicit electric to heat workflow](packages/galerkin/joule_heating.md) | [한국어](locales/ko/pages/packages/galerkin/joule_heating.md) |
 | Region materials | [Per-region heat, elastic and thermoelastic materials; layered references](packages/galerkin/multimaterial.md) | [한국어](locales/ko/pages/packages/galerkin/multimaterial.md) |
+| Public-reference benchmarks | [Timoshenko bimetal strip and NAFEMS T4 against exact references](packages/galerkin/public_benchmarks.md) | [한국어](locales/ko/pages/packages/galerkin/public_benchmarks.md) |
 | Prescribed-temperature mechanics | [Snapshots, 3D reduction and energy](packages/galerkin/prescribed_temperature_thermoelasticity.md) | [한국어](locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity.md) |
 | Mechanical-stage acceptance | [Independent original 3D law](packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md) |
 | Prescribed flux and Robin boundaries | [Outward flux and convection](packages/galerkin/thermal_flux_robin.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_flux_robin.md) |
