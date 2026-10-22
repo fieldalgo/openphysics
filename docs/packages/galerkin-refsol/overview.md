@@ -32,6 +32,8 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.material_cavity` | complex resonances and Q of a PEC box uniformly filled or loaded by a lossy dielectric/magnetic slab (TE/TM-to-z transcendental roots), `exp(+j*omega*t)` | vacuum limit equals the Cartesian spectrum, identical layers equal uniform rescaling, small-loss Q equals the energy filling factor |
 | `refsol.wall_loss` | first-order conductor-loss Q of rectangular cavity modes per wall, split degenerate polarizations, uniform filling | Pozar TE101, numerical quadrature of a finite-difference curl, per-wall additivity, sqrt(sigma) scaling |
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
+| `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
+| `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
@@ -159,4 +161,5 @@ Apache License 2.0 - see [LICENSE](../../../packages/galerkin-refsol/LICENSE) an
 Copyright 2026 Yongha Kim (FieldAlgo)
 
 The benchmark values in `refsol.benchmarks` are numerical results published by
-Hadley (2002); see [NOTICE](../../../packages/galerkin-refsol/NOTICE) for their provenance.
+Hadley (2002), and the NAFEMS T4 target in `refsol.thermal_convection` is a published
+benchmark number; see [NOTICE](../../../packages/galerkin-refsol/NOTICE) for their provenance.

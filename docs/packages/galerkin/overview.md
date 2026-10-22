@@ -33,6 +33,7 @@ references and fixed thresholds.
 | Steady heat, then mechanics on the same mesh (one-way) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [Contract](thermal_mechanical_workflow.md), [validation](thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../../examples/galerkin/thermal_mechanical_workflow.py) |
 | Quasistatic mechanics at selected stored transient-heat times (one-way) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [Contract](transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../../examples/galerkin/transient_thermal_mechanical.py) |
 | Piecewise-constant materials on named mesh regions for steady and transient heat, elasticity, thermoelasticity and both heat-to-mechanics workflows | `{region name: value}` in place of a scalar k, c, Q, E, nu or alpha | [Contract and validation](multimaterial.md) | — |
+| Public-reference benchmarks: Timoshenko (1925) bimetal strip and NAFEMS T4 | existing heat and mechanical stages; references `refsol.bimetal`, `refsol.thermal_convection` | [Validation](public_benchmarks.md) | [public_benchmarks.py](../../../examples/galerkin/public_benchmarks.py) |
 
 Units follow each contract: SI metres, seconds and Kelvin for heat and
 mechanics; heat flow per depth W/m, mechanical force per depth N/m and physical

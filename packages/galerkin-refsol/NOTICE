@@ -24,3 +24,19 @@ https://github.com/HelgeGehring/femwell). Only the measured/computed values
 themselves are reproduced here -- no code, text, or other expressive content
 from femwell is included in or derived from this package, and this package is
 not a derivative work of femwell.
+
+The NAFEMS T4 problem statement and its target temperature (18.3 degC at
+(0.6, 0.2) m) in refsol/thermal_convection.py are published benchmark facts,
+reproduced as quoted by two public documents that cite NAFEMS:
+
+    DIANA FEA, "Two-Dimensional Heat Transfer with Convection",
+    https://tutorials.dianafea.com/2DHeatTransferConvection.pdf
+    (citing NAFEMS, "The Standard NAFEMS Benchmarks", 1990)
+
+    FEATool Multiphysics, ex_heattransfer4.m,
+    https://www.featool.com/doc/ex__heattransfer4_8m
+    (citing A. D. Cameron, J. A. Casey, G. B. Simpson, "Benchmark Tests for
+    Thermal Analysis", NAFEMS, 1986)
+
+Only the numbers are reproduced; no text, code or figures from NAFEMS, DIANA
+FEA or FEATool are included in or derived from this package.

@@ -217,6 +217,7 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 |---|---|---|
 | [refractiveindex.info 데이터베이스](https://github.com/polyanskiy/refractiveindex.info-database) | CC0-1.0 | 일부 표와 분산 계수를 physmat(`physmat/_tables.py`, `physmat/library.py`)에 포함. CI는 `tools/rii-revision.txt`에 고정한 커밋을 내려받으며 그 사본은 배포하지 않음. 인용과 기록별 출처: [physmat NOTICE](../../../../packages/physmat/NOTICE) |
 | G. R. Hadley, J. Lightwave Technol. 20(7), 1210 (2002) | 출판된 사실 | `galerkin-refsol`의 benchmark 값. femwell(GPL-3.0)과 함께 공개된 표와 대조했고 숫자만 옮겼으며 코드·글은 옮기지 않음. [galerkin-refsol NOTICE](../../../../packages/galerkin-refsol/NOTICE) 참고 |
+| NAFEMS T4 벤치마크 목표값((0.6, 0.2) m에서 18.3 °C), DIANA FEA 튜토리얼(NAFEMS, *The Standard NAFEMS Benchmarks*, 1990 인용)과 FEATool `ex_heattransfer4.m`(Cameron, Casey, Simpson, *Benchmark Tests for Thermal Analysis*, NAFEMS, 1986 인용)에서 옮김 | 출판된 사실 | `refsol.thermal_convection`의 문제 설정과 목표값. 숫자만 옮겼으며 두 문서의 글·코드는 옮기지 않음. [galerkin-refsol NOTICE](../../../../packages/galerkin-refsol/NOTICE) 참고 |
 | handbook 유형의 열·기계 상수 | 근사 예제 입력 | 인증된 측정값이 아님. [자산 출처](assets.md) 참고 |
 
 ## 비교용 레퍼런스 도구

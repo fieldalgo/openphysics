@@ -29,6 +29,11 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ### Added
 
+- 정확한 정답과 대조하는 공개 기준값 벤치마크를 추가했습니다: Timoshenko (1925) 바이메탈
+  띠(`refsol.bimetal`)와 NAFEMS T4 대류 열전달(`refsol.thermal_convection`, 출판 목표값
+  18.3 °C 포함). 메시 수렴 기준, 그림 스크립트, 검증 문서
+  `docs/packages/galerkin/public_benchmarks.md`가 함께 들어갔고 엔진 코드는 바뀌지 않았습니다.
+
 - 같은 메시의 명시적 정상 전기→열 연성과 메시 사본에 결합한 요소별 열원 입력을
   추가했습니다. 해석해 수렴·에너지 수지·독립 도구 비교로 검증했습니다.
 

@@ -18,6 +18,8 @@ benchmarks  published reference values with citations (Hadley 2002 rib waveguide
 cavity      complete finite-frequency Cartesian spectrum of a vacuum PEC box
 material_cavity  complex resonances and Q of uniformly or slab-loaded lossy PEC boxes
 wall_loss   first-order conductor-loss Q of rectangular cavity modes, per wall
+bimetal     Timoshenko (1925) bimetal strip: curvature closed forms and exact plane-stress field
+thermal_convection  NAFEMS T4 convective rectangle: exact series and the published target
 """
 
 from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity, wall_loss

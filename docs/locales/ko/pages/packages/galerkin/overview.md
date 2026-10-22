@@ -30,6 +30,7 @@
 | 정상 열전도 후 같은 메시의 기계해석(단방향) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [계약](thermal_mechanical_workflow.md), [검증](thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../../../../../examples/galerkin/thermal_mechanical_workflow.py) |
 | 저장된 과도 열전도 시간 중 고른 시간의 준정적 기계해석(단방향) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [계약](transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../../../../../examples/galerkin/transient_thermal_mechanical.py) |
 | 정상·과도 열전도, 탄성, 열탄성, 두 열→역학 workflow의 이름 있는 메시 영역별 구간 상수 재료 | 스칼라 k, c, Q, E, nu, alpha 대신 `{영역 이름: 값}` | [계약과 검증](multimaterial.md) | — |
+| 공개 기준값 벤치마크: Timoshenko (1925) 바이메탈 띠와 NAFEMS T4 | 기존 열·기계 단계; 정답 `refsol.bimetal`, `refsol.thermal_convection` | [검증](public_benchmarks.md) | [public_benchmarks.py](../../../../../../examples/galerkin/public_benchmarks.py) |
 
 단위는 각 계약을 따릅니다. 열전도와 기계해석은 SI 미터·초·Kelvin을 쓰며, 깊이당 열량은 W/m,
 깊이당 기계 하중은 N/m, 깊이당 물리 탄성에너지는 J/m입니다. 벡터 모드는 축퇴 고유공간 방향을

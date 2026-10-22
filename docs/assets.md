@@ -18,6 +18,7 @@ validation run.
 | `docs/packages/simcase/geometry.png`, `mesh.png`, `results.png` | Screenshots of the project's own earlier Studio and SOI-strip example, introduced with the UI in commit `f44d7f8373f09ba9a7dbcd04066a0087485a3fd2` and retained through the package rename |
 | `examples/simcase/soi_strip_results.png` | SOI-strip example plot introduced with the document runner and input in commit `07d4a89`; regenerated from the vector example with `python -m simcase run examples/simcase/soi_strip.json`; the plot path is now `packages/simcase/src/simcase/runner.py` |
 | `docs/gallery/heated_plate.webp`, `heated_plate.png`, `coax.png`, `box_cavity.png` | Drawn by `examples/simcase/gallery.py` from `gallery_heated_plate.json`, `gallery_box_cavity.json` and the coax setup in the script; numbers and versions in the [gallery](gallery.md). The plate material values are approximate example inputs |
+| `docs/gallery/public_benchmarks.png` | Drawn by `examples/galerkin/public_benchmarks.py` (default meshes, n = 1..16); numbers, versions and gates in [public benchmarks](packages/galerkin/public_benchmarks.md). Layer constants are approximate example inputs |
 | `tests/gmshio/data/unit_square.geo`, `unit_square.msh` | Unit-square geometry and its mesh fixture, introduced together with the reader and assertions in commit `b2fe26a`; the `.geo` supplies the points, edges and physical tags |
 
 The four simcase pictures were visually checked against the repository's own
