@@ -32,7 +32,11 @@ def test_three_published_closed_forms_agree_with_the_force_moment_balance():
 
 
 def test_equal_materials_do_not_bend_and_sign_follows_the_expansion_mismatch():
-    assert bimetal.curvature([1e-3, 2e-3], [70e9, 70e9], [2e-5, 2e-5], 80.).curvature == 0.
+    # Identical layers expand freely: the curvature is zero up to the roundoff of the
+    # 2x2 solve (the free strain is alpha dT = 1.6e-3, so 1e-12 of it is 1e-15 1/m).
+    free = bimetal.curvature([1e-3, 2e-3], [70e9, 70e9], [2e-5, 2e-5], 80.)
+    assert abs(free.curvature) <= 1e-12*abs(free.axial_strain)/3e-3
+    np.testing.assert_allclose(free.axial_strain, 2e-5*80., rtol=1e-12)
     assert bimetal.curvature([1e-3, 1e-3], [70e9, 70e9], [1e-5, 2e-5], 80.).curvature > 0.
     assert bimetal.curvature([1e-3, 1e-3], [70e9, 70e9], [2e-5, 1e-5], 80.).curvature < 0.
     assert bimetal.curvature([1e-3, 1e-3], [70e9, 70e9], [1e-5, 2e-5], -80.).curvature < 0.
