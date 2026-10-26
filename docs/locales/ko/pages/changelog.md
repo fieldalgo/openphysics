@@ -24,6 +24,8 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `/workspace`에 실험적 모델 작업공간을 추가합니다. 고정 조건 광학 실행, 모델 편집 이력, 세션 파일과 버전이 있는 지원 범위 계약을 제공하며 기존 광학·열 편집기를 유지합니다.
+
 - Scalar/full-vector 모드 PML·일정 반경 굽힘: 복소 후보 진단, 물리창 추적, 총 감쇠, Studio 입력 및 독립 slab/원통 기준 검증.
 
 구현 패키지 여섯 개와 `openphysics` 메타 배포판의 첫 PyPI 릴리스이며, 0.1.0으로

@@ -430,7 +430,7 @@ document.
   paged heat-content (H) and quadratic-functional (V) histories. See the [steady](thermal_studio.md) and
   [transient](thermal_transient_studio.md) Studio guides.
 
-The page is a single HTML file with no build step and no external libraries
+The original editor is a single HTML file with no build step and no external libraries
 (canvas drawing only); a framework can come in when the UI grows. Web rather
 than desktop so that any front end shares one UI over the same document format,
 runs the same on a laptop or a server, and can reach other services over HTTP.
@@ -465,6 +465,8 @@ result routes; see the [steady](thermal_studio.md) and
 the UI a consumer of the engine rather than a part of it, so it can be lifted
 back out into its own distribution as a move rather than a rewrite; when the UI
 needs something the engine does not export, the engine exports it on purpose.
+
+The [experimental model workspace](workspace.md) is available at `/workspace` on the same server. It uses native JavaScript modules and a separate capability contract; the original optical and heat editors remain available.
 
 ## Self-checks
 

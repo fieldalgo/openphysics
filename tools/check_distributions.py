@@ -334,6 +334,8 @@ def main():
         node_root = work / "studio-installed-node"
         node_tests = [str(copy(ROOT / "tests" / "simcase" / filename, node_root / "tests" / "simcase" / filename))
                       for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs")]
+        node_tests.extend(str(copy(path, node_root / "tests" / "simcase" / path.name))
+                          for path in sorted((ROOT / "tests" / "simcase").glob("studio_workspace_*.cjs")))
         # The copies are working-tree bytes; say whether they match the commit.
         sources = sorted({entry["source"] for entry in copied.values()})
         unchanged = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *sources],
