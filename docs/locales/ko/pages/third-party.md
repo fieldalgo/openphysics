@@ -39,7 +39,12 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    - 약한 copyleft(LGPL·MPL·CeCILL-C)는 많아야 선택 extra, 시험 extra, 도구까지 허용하며,
      수정하지 않은 채 따로 설치되게 합니다. 기본 의존성으로는 쓰지 않고, OpenPhysics는 그것을
      수정·복사·정적 링크하지 않으며 자체 코드에서 직접 로드하지도 않습니다(ctypes, cffi, 컴파일된
-     확장). 이 저장소는 지금 이보다 엄격합니다. runtime·optional 의존성은 모두 허용형이고
+     확장).
+   - MPL-2.0만은 기본 의존성이나 브라우저로 보내는 파일로도 쓸 수 있습니다. 조건은 수정하지 않고
+     자기 파일로 두며(OpenPhysics 코드와 한 파일로 합치지 않음), 고지와 정확한 소스 위치를 밝히고,
+     "Incompatible With Secondary Licenses" 표시가 없는 것입니다. MPL-2.0의 copyleft는 파일
+     단위라 OpenPhysics 코드에는 조건이 생기지 않습니다(MPL-2.0 1.7, 3.2, 3.3절).
+   - 이 저장소는 지금 위 두 규칙보다 엄격합니다. runtime·optional 의존성은 모두 허용형이고
      [자동 검사](#자동-검사)가 그렇게 유지하며, 시험 extra `crosscheck`는 허용형 레퍼런스 도구만
      설치합니다.
    - GPL 프로그램은 별도 프로세스로만 씁니다. 외부 레퍼런스 도구로 돌리거나, 선택 extra의
