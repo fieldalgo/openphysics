@@ -151,7 +151,9 @@ def _require_studio_physics(doc: Document):
 
 
 @app.post("/api/validate")
-def validate(body: DocBody):
+def validate(body: DocBody, request: Request = None):
+    if request is not None:
+        _check_workspace_instance(request)
     try:
         doc = Document.from_dict(body.doc)
         if physics_type := _headless_thermal_type(doc):
@@ -168,7 +170,9 @@ def units():
 
 
 @app.post("/api/mesh")
-def mesh_preview(body: DocBody):
+def mesh_preview(body: DocBody, request: Request = None):
+    if request is not None:
+        _check_workspace_instance(request)
     try:
         doc = Document.from_dict(body.doc)
         _require_studio_physics(doc)
@@ -251,7 +255,9 @@ def _subspace_payload(res, representation: str) -> dict:
 
 
 @app.post("/api/run")
-def start_run(body: DocBody):
+def start_run(body: DocBody, request: Request = None):
+    if request is not None:
+        _check_workspace_instance(request)
     try:
         doc = Document.from_dict(body.doc)
     except DocumentError as exc:
@@ -361,7 +367,7 @@ async def start_thermal_run(body: Request):
 def _check_workspace_instance(request: Request):
     expected = request.query_params.get("workspace_instance")
     if expected is not None and expected != _workspace_instance:
-        raise HTTPException(409, "The Studio server restarted or changed; this job cannot be resumed.")
+        raise HTTPException(409, "The Studio server restarted or changed; reconnect before submitting new work. Previous jobs cannot be resumed on this server.")
 
 
 @app.get("/api/jobs/{job_id}")
