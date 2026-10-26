@@ -46,7 +46,14 @@ levels.
      extras, test extras and tools, installed separately and unmodified. It is
      never a base requirement, and OpenPhysics never modifies, copies or
      statically links it or loads it directly from its own code (ctypes, cffi
-     or compiled extensions). This repository is currently stricter: runtime
+     or compiled extensions).
+   - MPL-2.0 alone may also be a base requirement or a file served to a
+     browser, if it stays unmodified and in its own files (never merged into a
+     file with OpenPhysics code), its notice and exact source location are
+     published, and it is not marked "Incompatible With Secondary Licenses".
+     MPL-2.0 copyleft applies per file, so this places no terms on OpenPhysics
+     code (MPL-2.0 sections 1.7, 3.2 and 3.3).
+   - This repository is currently stricter than both rules above: runtime
      and optional dependencies are all permissive and the
      [automated check](#automated-check) keeps them so, and the `crosscheck`
      test extra installs only permissive reference tools.
