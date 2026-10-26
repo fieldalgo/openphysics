@@ -4,12 +4,12 @@ export function draggedWidth(startWidth, delta, side) {
  if (![startWidth,delta].every(Number.isFinite) || ![-1,1].includes(side)) throw new Error('Invalid width gesture');
  return Math.min(900, Math.max(300, Math.round(startWidth + side * delta * 20)));
 }
-export function installWidthEditor(host,{width,blocked,commit}) {
+export function installWidthEditor(host,{width,height=220,blocked,commit}) {
  const svg=host.querySelector('svg[data-geometry-view="physical"]');
  if(!svg)return ()=>{};
  const ns='http://www.w3.org/2000/svg';
  const make=(tag,attrs)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);return e;};
- const preview=make('rect',{y:153,height:22,fill:'none',stroke:'#fff0a8','stroke-dasharray':'3 2','pointer-events':'none',visibility:'hidden'});
+ const preview=make('rect',{y:175-height/10,height:height/10,fill:'none',stroke:'#fff0a8','stroke-dasharray':'3 2','pointer-events':'none',visibility:'hidden'});
  svg.append(preview);
  const message=document.createElement('p');message.className='muted';message.setAttribute('role','status');
  const help='Drag a core edge to resize symmetrically. Release to apply; Escape cancels. Arrow keys: 10 nm; Shift: 1 nm.';
@@ -24,7 +24,7 @@ export function installWidthEditor(host,{width,blocked,commit}) {
  };
  const cancel=()=>finish(false);for(const event of ['blur','resize','pagehide'])window.addEventListener(event,cancel);
  for(const side of [-1,1]){
-  const handle=make('rect',{x:300+side*width/20-4,y:150,width:8,height:28,fill:'#fff0a8',role:'slider',tabindex:0,'aria-label':side<0?'Resize core left edge':'Resize core right edge','aria-valuemin':300,'aria-valuemax':900,'aria-valuenow':width,'aria-valuetext':width+' nm','aria-orientation':'horizontal'});
+  const handle=make('rect',{x:300+side*width/20-4,y:172-height/10,width:8,height:height/10+6,fill:'#fff0a8',role:'slider',tabindex:0,'aria-label':side<0?'Resize core left edge':'Resize core right edge','aria-valuemin':300,'aria-valuemax':900,'aria-valuenow':width,'aria-valuetext':width+' nm','aria-orientation':'horizontal'});
   handle.style.cursor='ew-resize';handle.style.touchAction='none';svg.append(handle);handles.push(handle);
   handle.onclick=e=>e.stopPropagation();
   handle.onpointerdown=e=>{

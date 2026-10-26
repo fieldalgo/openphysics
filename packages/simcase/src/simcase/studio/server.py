@@ -83,6 +83,16 @@ def workspace_capabilities():
     }, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/workspace/capabilities/v2")
+def workspace_capabilities_v2():
+    return JSONResponse({
+        "schema_version": 2, "adapter": "optical-rectangle-v2", "simcase_version": __version__,
+        "optical": True, "coupled": False, "height_range_nm": [100, 500],
+        "settings": {"wavelength_nm": 1550, "core_mesh_nm": 30,
+                     "window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+    }, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
