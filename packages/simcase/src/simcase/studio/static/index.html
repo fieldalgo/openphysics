@@ -694,7 +694,7 @@ function renderProps() {
     row(`wavelength (${lengthUnit()})`, num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) +
     row('target index (optional)', num(`physics.${pk}.n_target`, p.n_target ?? '')) +
     (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
-      '<div class="hint">Set the exterior guiding threshold (e.g. the highest substrate or cover index), valid throughout the study. Vector: lossless dielectrics, single points or wavelength sweeps of isolated modes. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
+      '<div class="hint">Set the exterior guiding threshold, valid throughout the study. Passive absorption is supported. For metals, set a target index to search nearby candidates; check mesh and window convergence. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
       '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +
     '<h3 style="margin-top:12px">Boundaries</h3>' +
     ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join(''); }

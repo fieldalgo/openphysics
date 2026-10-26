@@ -128,7 +128,7 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     proportional to x = [2 pi n * transverse / wavelength; -1j * longitudinal]
     (galerkin's e_t = beta E_t and e_z = -i E_z), and the residual is
 
-        ||A x + beta^2 B x|| / (||A x|| + beta^2 ||B x||)  on free DOFs.
+        ||A x + beta^2 B x|| / (||A x|| + |beta^2| ||B x||)  on free DOFs.
 
     A diagnostic: a rotated mixture of eigenvectors with different eigenvalues
     is not an eigenvector of either value and has a large residual.

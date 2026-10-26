@@ -93,7 +93,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
     return A, B, space
 
 
-def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
+def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                 num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None):
     """Guided modes with effective index near n_target.
 
