@@ -20,14 +20,14 @@ export class OpticalJobMonitor {
  stop(){this.generation++;this.busy=false;this.onState({phase:'detached',message:'Stopped waiting. Server computation may continue; resume to retrieve its result.'});}
  async follow(record,instance){
   if(this.busy)throw new Error('Already watching a job.');
-  const pending=validatePending(record);if(instance!==pending.serverInstance)throw new Error('The server restarted or changed. This job cannot be resumed on this server.');
+  const pending=validatePending(record);if(instance!==pending.serverInstance)throw Object.assign(new Error('The server restarted or changed. Detach this job before starting another calculation.'),{status:409});
   const token=++this.generation;this.busy=true;const deadline=this.now()+this.limitMs;
   const active=()=>token===this.generation;
   try{
    while(active()){
     this.onState({phase:'running',message:'Computing job '+pending.job+' · elapsed '+Math.max(0,Math.floor((this.now()-Date.parse(pending.startedAt))/1000))+' s',pending});
     const job=await this.api('/api/jobs/'+pending.job+'?workspace_instance='+pending.serverInstance);if(!active())return;
-    if(job.status==='error')throw new Error(typeof job.error==='string'?job.error:'Solver failed.');
+    if(job.status==='error')throw Object.assign(new Error(typeof job.error==='string'?job.error:'Solver failed.'),{code:'solver-failed'});
     if(job.status==='done'){
      this.onState({phase:'loading',message:'Loading completed result '+pending.job,pending});
      const result=await this.api('/api/jobs/'+pending.job+'/result?workspace_instance='+pending.serverInstance);if(!active())return;
@@ -38,7 +38,7 @@ export class OpticalJobMonitor {
     if(this.now()>=deadline){this.onState({phase:'detached',message:'Stopped waiting after three minutes. Resume to check this job again.',pending});return;}
     await this.wait(700);
    }
-  }catch(error){if(active())this.onState({phase:'error',message:error.message+' No new result stored. You can retry this job.',pending});}
+  }catch(error){if(active()){const canResume=![404,409].includes(error.status)&&error.code!=='solver-failed';this.onState({phase:'error',canResume,message:error.message+' No new result stored. '+(canResume?'Resume to retry retrieving this job.':'Detach this job before starting another calculation.'),pending});}}
   finally{if(active())this.busy=false;}
  }
 }

@@ -144,6 +144,10 @@ its captured inputs, even after editing the current design or reloading the
 same tab. The pending-job record uses session storage, separately from input
 recovery and saved session files. Storage failures are reported. A server
 instance identifier prevents resuming a job against a restarted server.
+If the job is missing, its server changed, or the solver reported failure,
+**Resume job** is disabled; use **Detach job** before starting a new calculation.
+Temporary connection failures still allow resuming retrieval of the same job.
+Neither case changes retained results or current model inputs.
 
 Only one job is tracked per tab. Resume or **Detach job** before starting another.
 Detaching forgets this tab's job reference and does not cancel server work.
