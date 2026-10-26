@@ -13,6 +13,7 @@ import json
 import numpy as np
 
 from .mesh import Mesh
+from .core.checks import real_array
 from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
@@ -33,19 +34,8 @@ def _stage(name):
         raise WorkflowStageError(name, str(exc)) from exc
 
 
-def _real(value, name):
-    a = np.asarray(value)
-    if a.dtype.kind not in 'iuf' or not np.all(np.isfinite(a)):
-        raise ValueError(f'{name} must contain finite real numbers')
-    with np.errstate(over='ignore', invalid='ignore'):
-        result = np.array(a, dtype=float, copy=True)
-    if not np.all(np.isfinite(result)):
-        raise ValueError(f'{name} exceeds finite numeric range')
-    return result
-
-
 def _scalar(value, name):
-    a = _real(value, name)
+    a = real_array(value, name)
     if a.shape != ():
         raise ValueError(f'{name} must be scalar')
     return float(a)
@@ -77,7 +67,7 @@ def _supports(mapping, vector=False):
 def _isolated_mesh(mesh):
     if not isinstance(mesh, Mesh):
         raise ValueError('mesh must be a galerkin.mesh.Mesh with SI coordinates')
-    p = _real(mesh.nodes, 'mesh.nodes')
+    p = real_array(mesh.nodes, 'mesh.nodes')
     t = np.array(mesh.triangles, copy=True)
     if p.ndim != 2 or p.shape[1] != 2 or len(p) < 3:
         raise ValueError('mesh.nodes must have shape (N,2), N>=3')
@@ -201,7 +191,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         mechanical_bc = _supports(mechanical_dirichlet, vector=True)
         source = (heat_source if callable(heat_source)
                   else _material(owned, heat_source, 'heat_source'))
-        body = body_force if callable(body_force) else _real(body_force, 'body_force')
+        body = body_force if callable(body_force) else real_array(body_force, 'body_force')
         if not callable(body) and body.shape != (2,):
             raise ValueError('constant body_force must have shape (2,)')
         # Capture configuration before external callbacks can mutate caller inputs.

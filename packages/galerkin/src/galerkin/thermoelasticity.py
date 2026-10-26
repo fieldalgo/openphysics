@@ -12,15 +12,19 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
-from .elasticity import (_mesh_data, _constraints, _quadrature, _real,
-                         constitutive_matrix, _traction_load, element_constitutive)
+from .elasticity import constitutive_matrix, element_constitutive
+from .core.boundary import traction_load
+from .core.checks import real_array
+from .core.constraints import vector_dirichlet
+from .core.quadrature import triangle_product_rule
+from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
 _M = np.array([1., 1., 0.])
 
 
 def _scalar(value, name, nonnegative=False):
-    a = _real(value, name)
+    a = real_array(value, name)
     if a.shape != () or not np.isfinite(a) or (nonnegative and a < 0):
         raise ValueError(f"{name} must be a finite {'nonnegative ' if nonnegative else ''}real scalar")
     return float(a)
@@ -78,9 +82,9 @@ class TemperatureSnapshot:
     temperature_unit: str = field(default="K", init=False)
 
     def __post_init__(self):
-        p = _real(self.nodes, "snapshot nodes")
+        p = real_array(self.nodes, "snapshot nodes")
         t = np.asarray(self.triangles)
-        temp = _real(self.temperature_k, "temperature_k")
+        temp = real_array(self.temperature_k, "temperature_k")
         if p.ndim != 2 or p.shape[1] != 2 or len(p) < 3:
             raise ValueError("snapshot nodes must have shape (N,2), N>=3")
         if (t.ndim != 2 or t.shape[1] != 3 or not len(t) or t.dtype.kind not in "iu"
@@ -97,7 +101,7 @@ class TemperatureSnapshot:
 
 def freeze_temperature(mesh, temperature_k):
     """Validate mesh and copy a finite nonnegative (N,) Kelvin P1 nodal field."""
-    p, t, *_ = _mesh_data(mesh)
+    p, t, *_ = triangle_geometry(mesh, counterclockwise=False)
     return TemperatureSnapshot(p, t, temperature_k)
 
 
@@ -142,15 +146,15 @@ def _thermal_load(area, b, dofs, q_mean, num_nodes):
 
 
 def _external_body_load(p, triangles, area, dofs, body_force):
-    bary, weights = _quadrature()
+    bary, weights = triangle_product_rule()
     points = np.einsum("qa,tad->tqd", bary, p[triangles])
     if callable(body_force):
-        force = _real(body_force(points.reshape(-1,2)), "body_force")
+        force = real_array(body_force(points.reshape(-1,2)), "body_force")
         if force.shape != (points.shape[0]*points.shape[1],2):
             raise ValueError("body_force callable must return shape (Q,2)")
         force = force.reshape(points.shape)
     else:
-        force = _real(body_force, "body_force")
+        force = real_array(body_force, "body_force")
         if force.shape != (2,):
             raise ValueError("constant body_force must have shape (2,)")
         force = np.broadcast_to(force, points.shape)
@@ -206,7 +210,8 @@ def _material_record(value):
 def _solve_regions(mesh, temperature_snapshot, *, reference_temperature_k,
                    thermal_expansion_per_k, young_modulus, poisson_ratio,
                    plane, dirichlet, body_force, traction):
-    p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
+    p,t,area,boundary,count,labels = triangle_geometry(mesh, counterclockwise=False)
+    b,dofs = vector_strain(p,t)
     _verify_snapshot(temperature_snapshot,p,t)
     tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
     if plane not in ("stress", "strain"):
@@ -222,14 +227,14 @@ def _solve_regions(mesh, temperature_snapshot, *, reference_temperature_k,
         q = coefficient[:,None]*a
     if not np.all(np.isfinite(coefficient)) or not np.all(np.isfinite(a)) or not np.all(np.isfinite(q)):
         raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
-    fixed,values = _constraints(dirichlet,p,boundary,count,labels)
+    fixed,values = vector_dirichlet(dirichlet,p,boundary,count,labels)
     ke = np.einsum("tji,tjk,tkl,t->til",b,d,b,area)
     if not np.all(np.isfinite(ke)):
         raise ValueError("element stiffness exceeds finite numeric range")
     rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
     k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
     body = _external_body_load(p,t,area,dofs,body_force)
-    line = _traction_load(mesh,p,t,traction)
+    line = traction_load(mesh,p,t,traction)
     external = body+line
     qc = q.mean(axis=1)
     thermal = _thermal_load(area,b,dofs,qc,len(p))
@@ -336,7 +341,8 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
             thermal_expansion_per_k=thermal_expansion_per_k, young_modulus=young_modulus,
             poisson_ratio=poisson_ratio, plane=plane, dirichlet=dirichlet,
             body_force=body_force, traction=traction)
-    p,t,area,b,dofs,boundary,count,labels = _mesh_data(mesh)
+    p,t,area,boundary,count,labels = triangle_geometry(mesh, counterclockwise=False)
+    b,dofs = vector_strain(p,t)
     _verify_snapshot(temperature_snapshot,p,t)
     tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
     alpha = _scalar(thermal_expansion_per_k,"thermal_expansion_per_k")
@@ -348,14 +354,14 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
         q = coefficient*a
     if not np.isfinite(coefficient) or not np.all(np.isfinite(a)) or not np.all(np.isfinite(q)):
         raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
-    fixed,values = _constraints(dirichlet,p,boundary,count,labels)
+    fixed,values = vector_dirichlet(dirichlet,p,boundary,count,labels)
     ke = np.einsum("tji,jk,tkl,t->til",b,d,b,area)
     if not np.all(np.isfinite(ke)):
         raise ValueError("element stiffness exceeds finite numeric range")
     rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
     k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
     body = _external_body_load(p,t,area,dofs,body_force)
-    line = _traction_load(mesh,p,t,traction)
+    line = traction_load(mesh,p,t,traction)
     external = body+line
     thermal = _thermal_load(area,b,dofs,q[t].mean(axis=1),len(p))
     load = external+thermal

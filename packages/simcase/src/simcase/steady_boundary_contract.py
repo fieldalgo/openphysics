@@ -161,9 +161,9 @@ def steady_boundary_inputs(doc, mesh):
     if np.any(tol >= extent/2):
         raise DocumentError("mesh: insufficient coordinate precision to distinguish "
                             "opposite rectangle sides; use a smaller coordinate origin")
-    from galerkin.thermal import _mesh_geometry
+    from galerkin.core.triangles import triangle_geometry
     try:
-        p, t, area, _, count, _ = _mesh_geometry(mesh)
+        p, t, area, _, count, _ = triangle_geometry(mesh)
     except (ValueError, TypeError, IndexError, AttributeError, OverflowError) as exc:
         raise DocumentError(f"mesh: {exc}") from exc
     if count != 1:

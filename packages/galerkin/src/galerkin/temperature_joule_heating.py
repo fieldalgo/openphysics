@@ -7,10 +7,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .electric import ElementConductivity, _readonly, solve_steady_electric
+from .electric import ElementConductivity, solve_steady_electric
 from .joule_heating import solve_steady_joule_heat, SteadyJouleHeatResult
-from .materials import _finite_scalar, region_index
-from .thermal import _mesh_geometry, _real
+from .materials import region_index
+from .core.checks import finite_scalar, readonly_copy, real_array
+from .core.triangles import triangle_geometry
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,7 @@ class ConductivityModel:
     def __post_init__(self):
         if not callable(self.evaluate):
             raise ValueError("evaluate must be a deterministic vector callback")
-        bounds = _real(self.temperature_range, "temperature_range")
+        bounds = real_array(self.temperature_range, "temperature_range")
         if bounds.shape != (2,) or not 0 <= bounds[0] < bounds[1]:
             raise ValueError("temperature_range requires 0 <= min < max in K")
         object.__setattr__(self, "temperature_range", tuple(map(float, bounds)))
@@ -59,7 +60,7 @@ class JouleConvergenceError(RuntimeError):
         super().__init__(reason)
         self.reason = reason
         self.history = tuple(history)
-        self.last_temperature = _readonly(temperature)
+        self.last_temperature = readonly_copy(temperature)
 
 
 def _models(mesh, value):
@@ -74,7 +75,7 @@ def _models(mesh, value):
 
 
 def _conductivity(mesh, models, temperature):
-    nodal = _real(temperature, "temperature")
+    nodal = real_array(temperature, "temperature")
     sigma = np.empty(mesh.num_triangles)
     for name, cells, model in models:
         if not len(cells):
@@ -86,7 +87,7 @@ def _conductivity(mesh, models, temperature):
                              f"outside [{lo}, {hi}] K")
         # Divide before summing to avoid overflow of otherwise valid Kelvin inputs.
         mean = np.sum(values/3., axis=1)
-        result = _real(model.evaluate(_readonly(mean)), f"sigma in material {name!r}")
+        result = real_array(model.evaluate(readonly_copy(mean)), f"sigma in material {name!r}")
         if result.shape != mean.shape or np.any(result <= 0):
             raise ValueError(f"sigma in material {name!r} must have shape {mean.shape} and be > 0")
         sigma[cells] = result
@@ -109,17 +110,17 @@ def solve_temperature_joule_heat(
     nonlinear heat residual at the returned temperature must be <= 1e-8 relative
     to the Joule and thermal boundary loads. Failures raise JouleConvergenceError with history.
     """
-    relaxation = _finite_scalar(relaxation, "relaxation")
-    atol = _finite_scalar(temperature_atol, "temperature_atol")
-    rtol = _finite_scalar(relative_tolerance, "relative_tolerance")
+    relaxation = finite_scalar(relaxation, "relaxation")
+    atol = finite_scalar(temperature_atol, "temperature_atol")
+    rtol = finite_scalar(relative_tolerance, "relative_tolerance")
     if not 0 < relaxation <= 1 or atol <= 0 or rtol <= 0:
         raise ValueError("relaxation must be in (0,1]; tolerances must be positive")
     if isinstance(max_iterations, (bool, np.bool_)) or not isinstance(max_iterations, (int, np.integer)) or max_iterations < 1:
         raise ValueError("max_iterations must be a positive integer")
     mesh = copy.deepcopy(mesh)
-    _, _, _, boundary, _, _ = _mesh_geometry(mesh)
+    _, _, _, boundary, _, _ = triangle_geometry(mesh)
     models = _models(mesh, electrical_conductivity)
-    temperature = _real(initial_temperature, "initial_temperature")
+    temperature = real_array(initial_temperature, "initial_temperature")
     if temperature.shape == ():
         temperature = np.full(mesh.num_nodes, float(temperature))
     elif temperature.shape == (mesh.num_nodes,):
@@ -136,7 +137,7 @@ def solve_temperature_joule_heat(
     for node, value in thermal_dirichlet.items():
         if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)) or node not in boundary:
             raise ValueError("thermal Dirichlet nodes must be exterior integer indices")
-        temperature[node] = _finite_scalar(value, "thermal Dirichlet temperature")
+        temperature[node] = finite_scalar(value, "thermal Dirichlet temperature")
     free_t = np.setdiff1d(np.arange(mesh.num_nodes), list(thermal_dirichlet))
     history = []
     def electric(sigma):
@@ -177,7 +178,7 @@ def solve_temperature_joule_heat(
                 coupled.outward_heat_per_length-coupled.source_power_per_length))
             if (defect <= atol + rtol*max(_norm(temperature), _norm(trial))
                     and sigma_defect <= rtol and nonlinear_residual <= 1e-8):
-                return TemperatureJouleHeatResult(coupled, _readonly(temperature), tuple(history))
+                return TemperatureJouleHeatResult(coupled, readonly_copy(temperature), tuple(history))
             temperature = (1-relaxation)*temperature + relaxation*trial
         except Exception as exc:
             raise JouleConvergenceError(str(exc), history, failed_temperature) from exc

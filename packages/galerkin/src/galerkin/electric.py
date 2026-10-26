@@ -14,7 +14,9 @@ from .mesh import Mesh
 from .heat_source import ElementHeatSource
 from .postprocess import element_gradient
 from .solver import solve_dirichlet
-from .thermal import _mesh_geometry, _boundary_samples, _real
+from .core.boundary import scalar_boundary_samples
+from .core.checks import readonly_copy, real_array
+from .core.triangles import triangle_geometry
 
 
 @dataclass(frozen=True, init=False)
@@ -34,12 +36,6 @@ class ElementConductivity:
 
     def on_mesh(self, mesh):
         return self._field.on_mesh(mesh)
-
-
-def _readonly(value):
-    out = np.array(value, copy=True)
-    out.flags.writeable = False
-    return out
 
 
 def _snapshot(mesh):
@@ -85,7 +81,7 @@ def _potentials(data, n, name, boundary=None):
             raise ValueError(f"{name} node indices must be integers within the mesh")
         if boundary is not None and node not in boundary:
             raise ValueError("Dirichlet node must lie on the exterior mesh boundary")
-        v = _real(value, name)
+        v = real_array(value, name)
         if v.shape != ():
             raise ValueError(f"{name} values must be scalar volts")
         out[int(node)] = float(v)
@@ -105,7 +101,7 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
         Dirichlet support. Each such component must have zero net imposed current
         to 1e-12 relative to integral(abs(J.n)); incompatible data is never repaired.
     """
-    p, t, area, boundary, count, labels = _mesh_geometry(mesh)
+    p, t, area, boundary, count, labels = triangle_geometry(mesh)
     sigma = (conductivity.on_mesh(mesh) if isinstance(conductivity, ElementConductivity)
              else region_property(mesh, conductivity, "conductivity", positive=True))
     sigma = element_values(mesh, sigma)
@@ -119,7 +115,7 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
             offsets[labels[node]] = value
             anchored[labels[node]] = True
     # Only physical voltage constraints exclude natural edges; gauges do not.
-    samples = _boundary_samples(mesh, p, t, prescribed, outward_current, None)
+    samples = scalar_boundary_samples(mesh, p, t, prescribed, outward_current, None)
     outward = np.zeros(len(p))
     absolute_current = np.zeros(count)
     for _, edges, shape, weights, values in samples:
@@ -180,5 +176,5 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
     if abs(power-supplied) > 1e-10*max(abs(power), abs(supplied), np.finfo(float).tiny):
         raise ValueError("electric solve failed discrete power balance")
     return SteadyElectricResult(
-        _snapshot(mesh), *map(_readonly, (potential, electric, current, sigma, heat, load)),
-        power, *map(_readonly, (reaction, outward, residual)), supplied)
+        _snapshot(mesh), *map(readonly_copy, (potential, electric, current, sigma, heat, load)),
+        power, *map(readonly_copy, (reaction, outward, residual)), supplied)

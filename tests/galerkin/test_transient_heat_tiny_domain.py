@@ -13,7 +13,7 @@ from scipy.sparse.linalg import splu
 
 from galerkin import rectangle_mesh
 from galerkin.assembly import assemble_mass, assemble_stiffness
-from galerkin.thermal import _source_load
+from galerkin.core.loads import source_load
 from galerkin.transient_heat import solve_transient_heat
 
 TIMES = np.array([2., 2.03, 2.1, 2.4, 3.])
@@ -37,7 +37,7 @@ def _diagnostic(scenario, mesh, initial, q, fixed, ramp):
     n = mesh.num_nodes
     ones = np.ones(n)
     w = m@ones
-    f = _source_load(mesh, mesh.nodes, mesh.triangles, mesh.areas(), q)
+    f = source_load(mesh, mesh.nodes, mesh.triangles, mesh.areas(), q)
     free = np.setdiff1d(np.arange(n), fixed)
     previous = np.zeros(n)
     header = {

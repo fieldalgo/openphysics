@@ -153,14 +153,14 @@ def test_traction_does_not_authorize_stale_snapshot_or_free_component():
 @pytest.mark.parametrize('variant',['add_thermal_boundary','subtract_thermal_boundary','omit_thermal_rhs','wrong_thermal_sign'])
 def test_actual_helper_mutation_is_detected(monkeypatch,plane,variant):
     import galerkin.thermoelasticity as engine
-    original_line=engine._traction_load;original_thermal=engine._thermal_load
+    original_line=engine.traction_load;original_thermal=engine._thermal_load
     if 'boundary' in variant:
         sign=1 if variant.startswith('add') else -1
         q=70e9*12e-6*20/(1-.3 if plane=='stress' else 1-2*.3)
         def wrong_line(mesh,p,t,traction):
             extra=original_line(mesh,p,t,{tag:lambda points,n:sign*q*n for tag in traction})
             return original_line(mesh,p,t,traction)+extra
-        monkeypatch.setattr(engine,'_traction_load',wrong_line)
+        monkeypatch.setattr(engine,'traction_load',wrong_line)
     else:
         factor=0 if variant=='omit_thermal_rhs' else -1
         monkeypatch.setattr(engine,'_thermal_load',lambda *args:factor*original_thermal(*args))

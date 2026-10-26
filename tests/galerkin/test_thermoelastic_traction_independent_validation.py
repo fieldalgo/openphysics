@@ -354,7 +354,7 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
     if wrong=='flipped_hole':
         p,t=ring_geometry();mesh=mesh_from_raw(p,t,True);field=lambda p:patch(p,'strain')
     snapshot,cfg=solve_case(mesh,field,'strain',overlap=wrong=='drop_fixed_line')
-    thermal_real,line_real=production._thermal_load,production._traction_load
+    thermal_real,line_real=production._thermal_load,production.traction_load
     expected='physical_energy';altered={**cfg}
     if wrong in ('three_alpha','naive_PE','PE_as_PS'):
         if wrong=='three_alpha':altered['thermal_expansion_per_k']*=3
@@ -385,7 +385,7 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
         return load
     if wrong in ('thermal_sign','omit_g'):expected='load_thermal'
     if wrong in ('add_qn','subtract_qn','line_weight','endpoint_lumping','drop_fixed_line','flipped_hole'):expected='load_traction'
-    with mockpatch.object(production,'_thermal_load',badthermal),mockpatch.object(production,'_traction_load',badline):r=production.solve_thermoelasticity(mesh,snapshot,**altered)
+    with mockpatch.object(production,'_thermal_load',badthermal),mockpatch.object(production,'traction_load',badline):r=production.solve_thermoelasticity(mesh,snapshot,**altered)
     if wrong=='zz_omission':r.sigma_zz=np.zeros_like(r.sigma_zz);expected='sigma_zz'
     elif wrong=='PE_residual_U':
         b,w,_,_=triangle_rule(mesh.nodes[mesh.triangles],8);a=ALPHA*(np.einsum('qa,ta->tq',b,snapshot.temperature_k[mesh.triangles])-TREF)
