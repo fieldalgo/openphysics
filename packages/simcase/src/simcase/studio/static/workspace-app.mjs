@@ -18,7 +18,7 @@ import {installLayout} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,parseSession} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession} from './workspace-notebook.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
@@ -264,7 +264,7 @@ $('recover-notebook').onclick=async()=>{
 function currentView(){return {...fieldView,probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
-function refreshNotebook(){const stamp=notebookStamp();if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,()=>JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView())));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+function refreshNotebook(){const stamp=notebookStamp();if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
