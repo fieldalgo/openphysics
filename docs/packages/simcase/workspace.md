@@ -277,6 +277,12 @@ unavailable. Use Save session / Save selected run for portable files. The 16 MiB
 session and six-result limits still apply; invalid drafts, undo history, mesh,
 and preflight reports are not included. Probe and profile positions are included.
 
+
+Recovery captures input, run metadata, selection and view when an update is
+queued. Later model edits or opening an empty session cannot change that queued
+snapshot. Large result arrays remain read-only and are serialized after the
+coalescing delay; changing inputs does not copy field arrays on every keystroke.
+
 ## Pin reference runs
 
 Pin selected run protects that result from automatic notebook eviction. A new
