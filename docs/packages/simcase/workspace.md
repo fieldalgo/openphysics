@@ -25,6 +25,12 @@ before saving, opening or running. Undo/redo keeps up to 60 edits; result input
 restore creates a new edit. Panel widths can be adjusted on wide screens and
 are stored in this browser. Revisions identify local editing order, not Git commits.
 
+The model drawing has Zoom in/out, Pan and Fit view controls. Focus the drawing
+and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view retains
+its camera while navigating this tab. These are schematic display coordinates,
+not CAD or physical measurements. Camera changes do not change inputs, edit
+history, saved files or computed fields.
+
 ## Results and files
 
 The notebook retains the last six successful runs. Select a candidate to inspect
