@@ -69,7 +69,8 @@ time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#
   electrostatics and scattering are Python-only.
 - 2D heat and mechanics are plane models per unit depth. JSON heat documents
   set boundary conditions only on the four outer sides of the domain.
-- `em.modes2d` supports passive absorption; PML, leakage and bends are excluded. Nonlinear
+- `em.modes2d` supports passive absorption and [PML/leaky/constant-radius modes](packages/simcase/pml_modes.md);
+  candidates require independent PML/mesh convergence checks. Variable curvature, nonlinear
   mechanics and geometry sweeps are not supported.
 - Studio rejects 3D models and heat documents with material regions, and has
   no mechanics forms.
