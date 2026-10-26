@@ -181,10 +181,16 @@ commit's results are in its required `tests` check on GitHub Actions. The
 
 | Page | Content |
 |---|---|
-| [Documentation index](docs/README.md) | Every feature contract and validation report, English and Korean |
-| [Architecture](docs/architecture.md) | Package map and entry points |
-| [Development guide](docs/development.md) | Environment, repository layout, checks, CI and results |
-| [Asset provenance](docs/assets.md) | Sources of bundled figures, fixtures and data |
+| [Documentation home](docs/README.md) | Choose a reading route, in English or Korean |
+| [Getting started](docs/getting-started/index.md) | Installation, first model and examples |
+| [Build a model](docs/modeling/index.md) | Geometry, materials, mesh and package composition |
+| [Physics problems](docs/physics/index.md) | Electromagnetics, heat, electric/Joule and mechanics/coupling |
+| [Execution guide](docs/guide/index.md) | Python, JSON/CLI and Studio routes |
+| [Results and trust](docs/results/index.md) | Saved fields, export, conservation and convergence |
+| [API and document contracts](docs/reference/index.md) | Package inputs, outputs, units and limits |
+| [Theory and numerical methods](docs/theory/index.md) | Formulations behind the implemented solvers |
+| [Validation and benchmarks](docs/validation/index.md) | Independent references, measured scope and historical records |
+| [Developer guide](docs/development/index.md) | Environment, CI, contribution and documentation maintenance |
 
 Usage and validation guides under `docs/` have complete Korean counterparts;
 start from the [Korean index](docs/locales/ko/pages/index.md).
