@@ -44,3 +44,7 @@ test('application availability agrees with actual execution gates',()=>{
  const a=templatePhysics('optical');a.heat=true;assert.equal(templatePhysics('optical').heat,false);
  assert.throws(()=>templatePhysics('unimplemented'));
 });
+
+test('HTTP failure status reaches job recovery without replacing server detail',async()=>{
+ for(const status of [404,409,500])await assert.rejects(solverApi('/api/jobs/12345678',undefined,async()=>({ok:false,status,json:async()=>({detail:'Captured server detail'})})),error=>error.status===status&&error.message==='Captured server detail');
+});
