@@ -1,5 +1,6 @@
 # Narrow Windows headless validation only; existing Linux pins reused.
 # Runtime requirements and package versions are unchanged.
+array-api-compat==1.16.0
 build==1.6.1
 colorama==0.4.6
 contourpy==1.4.0

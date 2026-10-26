@@ -1,0 +1,17 @@
+# Optional array libraries for galerkin[jax] and galerkin[torch], CPython 3.12 on Linux.
+# Installed on top of requirements-py312-linux.txt by the CI jobs that run the
+# backend tests. torch is the CPU build from https://download.pytorch.org/whl/cpu,
+# installed first and separately (the PyPI Linux wheel pulls CUDA packages):
+#   python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1+cpu
+#   python -m pip install -r tools/requirements-py312-linux-backends.txt
+# sympy, mpmath, typing-extensions and setuptools are pinned in requirements-py312-linux.txt.
+filelock==4.2.4
+fsspec==2026.9.0
+jax==0.12.0.1
+jaxlib==0.12.0.1
+jinja2==3.1.6
+markupsafe==3.0.4
+ml_dtypes==0.6.0
+networkx==3.7
+opt_einsum==3.4.0
+torch==2.14.1+cpu

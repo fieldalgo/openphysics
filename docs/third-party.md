@@ -108,6 +108,7 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `pillow` | matplotlib | MIT-CMU | Bundles image, font and compression libraries under permissive terms (FreeType: FTL OR GPL-2.0-or-later, used under the FTL): shared libraries on Linux and macOS, statically linked on Windows |
 | `packaging` | matplotlib | Apache-2.0 OR BSD-2-Clause | |
 | `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | |
+| `array-api-compat` | galerkin (`>=1.15`) | MIT | Pure Python; lets one implementation run on NumPy, JAX and PyTorch arrays (`galerkin.core.backend`) |
 
 ### Optional extras
 
@@ -123,10 +124,23 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `pyyaml` | `physmat[rii]` | MIT |
 | `meshio` | `simcase[export]` (`>=5.3,<6`) | MIT |
 | `rich`, `markdown-it-py`, `mdurl` (and `pygments`, BSD-2-Clause) | meshio | MIT |
+| `jax`, `jaxlib` | `galerkin[jax]` (`>=0.12.0.1`) | Apache-2.0 |
+| `ml-dtypes` | jax | Apache-2.0 |
+| `opt-einsum` | jax | MIT |
+| `torch` | `galerkin[torch]` (`>=2.14.1`) | Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT |
+| `filelock` | torch | MIT |
+| `networkx`, `jinja2`, `fsspec` | torch | BSD-3-Clause |
+| `markupsafe` | jinja2 | BSD-3-Clause |
+| `sympy`, `mpmath` | torch | see [Test](#test) |
 
 `pydantic-core` statically links Rust crates under MIT, Apache-2.0,
 Unlicense OR MIT and Unicode-3.0 (icu_normalizer); its wheel carries only its
 own MIT license. `pyyaml` statically includes libyaml (MIT).
+
+CI installs the CPU build of `torch` from `download.pytorch.org/whl/cpu`, and its
+bundled libraries are recorded for that wheel. On Linux the PyPI `torch` wheel
+instead requires NVIDIA CUDA packages (`cuda-toolkit`, `nvidia-*-cu13`); they are
+torch's own dependencies and are neither installed by CI nor listed here.
 
 ### Test
 
@@ -209,6 +223,8 @@ the pinned numpy, scipy and shapely also publish cp313 to cp315 wheels.
 | | Windows launcher executables (`pip/_vendor/distlib/t*.exe`, `w*.exe`) | BSD-2-Clause (distlib's `PC/launcher.c`) | Installed on every OS, run only on Windows; they import no C runtime DLL. The wheel carries distlib's PSF-2.0 license text but not the launcher's BSD notice |
 | `setuptools` | Windows launcher executables (`setuptools/cli*.exe`, `gui*.exe`) | MIT (setuptools' `launcher.c`) | Installed on every OS, run only on Windows; they load the Microsoft C runtime (`VCRUNTIME140.dll`, Universal CRT) from the system |
 | `cryptography` | OpenSSL 4.0.3 | Apache-2.0 | Linux job only: statically linked into the `_rust` extension module (the wheel's SBOM records a `no-shared` build) |
+| `jaxlib` | BoringSSL, gRPC, Abseil, Protocol Buffers, Eigen, LLVM, oneDNN and the other components its `LICENSE.txt` reproduces | Apache-2.0 for jaxlib's own modules; statically contained components under their own permissive terms, Eigen MPL-2.0 (file-level weak copyleft, compiled and shipped by jaxlib's publisher) | Linux job only (`galerkin[jax]`): statically linked into jaxlib's own modules (`jaxlib/*.so`, including `cpu/` and `mlir/_mlir_libs/`); no separately built third-party library. Read from jaxlib 0.12.0.1 |
+| `torch` | Third-party code reproduced in `dist-info/licenses/third_party/`; GNU libgomp | torch's declared expression; libgomp GPL-3.0-or-later WITH GCC-exception-3.1 | Linux job only (`galerkin[torch]`, CPU wheel): static in torch's own `torch/lib/lib*.so`; libgomp as a separate shared library. Read from torch 2.14.1+cpu (`torch/lib/`: torch's own libraries, four of them test or example libraries, and `libgomp.so.1`) |
 | | Rust crates (pyo3, asn1, the openssl bindings and others) | Mostly MIT OR Apache-2.0; also BSD-3-Clause, Unicode-3.0 (unicode-ident) and Apache-2.0 OR GPL-2.0-only (self_cell, used under Apache-2.0) | Statically linked; listed in the wheel's CycloneDX SBOM |
 | `cffi` | libffi | MIT | Linux job only: statically linked into `_cffi_backend`; the wheel carries only cffi's own MIT-0 license |
 | `nh3` | Rust crates (ammonia, html5ever, ICU4X and others) | Mostly MIT OR Apache-2.0 or MIT; Unicode-3.0 (ICU4X); MPL-2.0 (cssparser, dtoa-short) | Linux job only (twine dependency): statically linked into the extension module and listed in the wheel's CycloneDX SBOM. MPL-2.0 is file-level weak copyleft; the crates are used as the wheel's publisher compiled them |

@@ -126,9 +126,16 @@ def main():
             extras = wheel_extras(wheel)
             suffix = f"[{','.join(extras)}]" if extras else ""
             requirements.append(f"{name}{suffix} @ {wheel.as_uri()}")
+        # galerkin[torch] is tested with the CPU build of torch, installed first from the
+        # PyTorch index (the PyPI Linux wheel pulls CUDA packages); the pins then hold it.
+        backends = ROOT / "tools" / "requirements-py312-linux-backends.txt"
+        torch_pin = next(line.strip() for line in backends.read_text(encoding="utf-8").splitlines()
+                         if line.startswith("torch=="))
+        distributions.run(python, "-I", "-m", "pip", "install", "--only-binary=:all:",
+                          "--index-url", "https://download.pytorch.org/whl/cpu", torch_pin, cwd=work, env=env)
         distributions.run(python, "-I", "-m", "pip", "install", "--only-binary=:all:",
                           "--find-links", dist, "-c", ROOT / "tools" / "requirements-py312-linux.txt",
-                          *requirements, cwd=work, env=env)
+                          "-c", backends, *requirements, cwd=work, env=env)
         distributions.run(python, "-I", "-m", "pip", "check", cwd=work, env=env)
         distributions.run(sys.executable, ROOT / "tools" / "check_licenses.py", "--python", python,
                           "--report", output / "licenses-installed.json", cwd=ROOT)
