@@ -48,7 +48,7 @@ The drawing, width handles and submitted mesh use the same height.
 
 ## Results and files
 
-The notebook retains the last six successful runs. Select a candidate to inspect
+The notebook retains up to six successful runs, preserving pinned references. Select a candidate to inspect
 its field or compare two runs. Candidate indices are not a mode-tracking result.
 Field colours use the vector magnitude normalized separately per candidate;
 they do not represent optical power or a common physical colour scale.
@@ -149,7 +149,7 @@ Use **Selected run name** and **Rename run** to label a completed calculation
 (up to 80 characters). Names appear in history and comparisons, persist in
 session JSON and CSV, and never change captured inputs or fields. **Save selected
 run** exports a standalone session containing that result and its original
-inputs; this is useful before the six-run retention limit removes an older run.
+inputs; this is useful before the six-run retention limit removes an older unpinned run.
 The footer distinguishes a changed session from saved input-only files. Saving
 inputs or a browser draft does not claim to save the result notebook. A selected
 run export does not mark the full notebook saved.
@@ -251,3 +251,14 @@ recent changes. Browser cleanup/private mode or a different port can make recove
 unavailable. Use Save session / Save selected run for portable files. The 16 MiB
 session and six-result limits still apply; invalid drafts, undo history, mesh,
 preflight reports, probe and profile positions are not included.
+
+### Pin reference runs
+
+Pin selected run protects that result from automatic notebook eviction. A new
+result replaces the oldest unpinned run, with at most six retained in total. If
+all six are pinned, Run is disabled until one is unpinned; document checks and
+mesh previews remain available. Pins are saved in sessions, browser recovery and
+the CSV run table. They do not alter inputs, fields or the input Undo history.
+Repeated retrieval of the same job preserves its existing name and pin. A failed
+retention operation leaves the previous notebook and selected result intact.
+Pinning is not a portable backup; export files before discarding browser data.
