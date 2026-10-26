@@ -12,6 +12,7 @@ test('invalid drafts, detached jobs and offline service block readiness without 
  const doc=input(),runs=[{signature:JSON.stringify(doc)}];
  assert.equal(opticalWorkflow({input:doc,invalid:true})[3].detail,'Correct input draft');
  assert.equal(opticalWorkflow({input:doc,pending:true})[3].detail,'Resume or detach job');
+ assert.equal(opticalWorkflow({input:doc,pending:true,resumeBlocked:true})[3].detail,'Detach unavailable job');
  assert.equal(opticalWorkflow({input:doc,pending:true,busy:true})[3].state,'busy');
  const steps=opticalWorkflow({input:doc,block:'offline',runs});assert.equal(steps[3].detail,'Unavailable');assert.equal(steps[4].detail,'Current input result');
  doc.setup.materials.Core='Platinum';assert.equal(opticalWorkflow({input:doc})[1].state,'attention');

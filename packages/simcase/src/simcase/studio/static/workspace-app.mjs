@@ -103,7 +103,7 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid;
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
- else $('status').textContent=solverBusy?'Optical computation running':pendingJob?'Pending job · resume or detach':retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
+ else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
  refreshPersistence();
 }
 function bindNumericInputs(){
@@ -160,7 +160,7 @@ function refreshPersistence(){
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,mesh:meshPreview.record,runs});
+ const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs});
  steps.forEach((step,index)=>{
   let button=host.children[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
   const selected=step.id==='Results'?['Results','Compare'].includes(ui.page):ui.page==='Model'&&ui.selection===step.id;
@@ -360,7 +360,7 @@ function renderOpticalStudy(){
  for(const note of record.notes){const line=document.createElement('p');line.textContent=note;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,runs})[3].detail)+pair('Wavelength','1550 nm')+pair('Candidates','2')+pair('Core mesh','30 nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Fixed optical adapter. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].detail)+pair('Wavelength','1550 nm')+pair('Candidates','2')+pair('Core mesh','30 nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Fixed optical adapter. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · lengths in µm';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
@@ -588,7 +588,7 @@ async function connectWorkspace(){
  $('connection-status').textContent=connection.message;render();
  try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v2'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v2';}
  catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;$('workspace-tools').open=true;}
- finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;render();refreshJobControls();}
+ finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;refreshJobControls();render();refreshJobControls();}
 }
 $('connect-workspace').onclick=connectWorkspace;
 const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});Object.assign(state,{height:220,width:500,voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
