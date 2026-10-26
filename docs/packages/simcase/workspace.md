@@ -10,6 +10,8 @@ You can also follow **Open experimental model workspace** from the classic home
 page, or open `/workspace` on the same local server. The existing optical and heat editors
 remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is needed.
 
+For build reviews and first-user checks, use the [acceptance checklist](workspace_acceptance.md).
+
 ## First optical study
 
 1. Choose **Applications → Optical waveguide**. The heated-waveguide card is
