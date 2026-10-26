@@ -119,6 +119,9 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         chosen=field[:,keep].copy()
         indices=np.flatnonzero(c.physical_nodes)
         pivot=indices[np.argmax(abs(chosen[indices]),axis=0)]
-        chosen/=chosen[pivot,np.arange(len(keep))]
+        peak = chosen[pivot,np.arange(len(keep))]
+        if not np.isfinite(peak).all() or np.any(peak == 0):
+            raise ModeSelectionError('zero or nonfinite physical field', diagnostics)
+        chosen /= peak
         result['fields']=chosen
     return result
