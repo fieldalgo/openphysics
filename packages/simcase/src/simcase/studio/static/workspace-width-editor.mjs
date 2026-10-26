@@ -15,14 +15,14 @@ export function installWidthEditor(host,{width,blocked,commit}) {
  const help='Drag a core edge to resize symmetrically. Release to apply; Escape cancels. Arrow keys: 10 nm; Shift: 1 nm.';
  message.textContent=help;host.append(message);
  let gesture=null;const handles=[];
- const position=e=>{const matrix=svg.getScreenCTM();if(!matrix)throw new Error('Drawing unavailable');return new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse()).x;};
+ const position=(e,inverse)=>{try{const x=new DOMPoint(e.clientX,e.clientY).matrixTransform(inverse).x;return Number.isFinite(x)?x:null;}catch{return null;}};
  const finish=apply=>{
   if(!gesture)return;const g=gesture;gesture=null;preview.setAttribute('visibility','hidden');
   if(g.handle.hasPointerCapture(g.id))g.handle.releasePointerCapture(g.id);
   message.textContent=apply?help:'Resize cancelled. Model unchanged.';
-  if(apply&&g.value!==width)commit(g.value);
+  if(apply&&!blocked()&&g.value!==width){commit(g.value);host.querySelector('[aria-label="'+g.handle.getAttribute('aria-label')+'"]')?.focus();}
  };
- const cancel=()=>finish(false);window.addEventListener('blur',cancel);
+ const cancel=()=>finish(false);for(const event of ['blur','resize','pagehide'])window.addEventListener(event,cancel);
  for(const side of [-1,1]){
   const handle=make('rect',{x:300+side*width/20-4,y:150,width:8,height:28,fill:'#fff0a8',role:'slider',tabindex:0,'aria-label':side<0?'Resize core left edge':'Resize core right edge','aria-valuemin':300,'aria-valuemax':900,'aria-valuenow':width,'aria-valuetext':width+' nm','aria-orientation':'horizontal'});
   handle.style.cursor='ew-resize';handle.style.touchAction='none';svg.append(handle);handles.push(handle);
@@ -30,16 +30,18 @@ export function installWidthEditor(host,{width,blocked,commit}) {
   handle.onpointerdown=e=>{
    if(e.button!==0||gesture)return;e.preventDefault();e.stopPropagation();
    if(blocked()){message.textContent='Resolve invalid inputs before resizing.';return;}
-   handle.focus();gesture={id:e.pointerId,handle,start:position(e),value:width,side};handle.setPointerCapture(e.pointerId);
+   let inverse;try{inverse=svg.getScreenCTM()?.inverse();}catch{return;}if(!inverse)return;const start=position(e,inverse);if(start===null)return;
+   handle.focus();gesture={id:e.pointerId,handle,start,inverse,value:width,side};handle.setPointerCapture(e.pointerId);
   };
   handle.onpointermove=e=>{
    if(!gesture||gesture.id!==e.pointerId)return;
-   gesture.value=draggedWidth(width,position(e)-gesture.start,side);
+   const x=position(e,gesture.inverse);if(x===null){cancel();return;}
+   gesture.value=draggedWidth(width,x-gesture.start,side);
    preview.setAttribute('x',300-gesture.value/20);preview.setAttribute('width',gesture.value/10);preview.setAttribute('visibility','visible');
    message.textContent='Preview: '+gesture.value+' nm. Release to apply; Escape cancels.';
   };
-  handle.onpointerup=e=>{if(gesture?.id===e.pointerId)finish(true);};
-  handle.onpointercancel=cancel;handle.onlostpointercapture=cancel;
+  handle.onpointerup=e=>{if(gesture?.id!==e.pointerId)return;const x=position(e,gesture.inverse);if(x===null){cancel();return;}gesture.value=x===gesture.start?width:draggedWidth(width,x-gesture.start,side);finish(true);};
+  handle.onpointercancel=e=>{if(gesture?.id===e.pointerId)cancel();};handle.onlostpointercapture=handle.onpointercancel;
   handle.onkeydown=e=>{
    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();return;}
    if(gesture||e.ctrlKey||e.metaKey||e.altKey||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
@@ -48,5 +50,5 @@ export function installWidthEditor(host,{width,blocked,commit}) {
    if(value!==width){commit(value);host.querySelector('[aria-label="'+handle.getAttribute('aria-label')+'"]')?.focus();}
   };
  }
- return ()=>{cancel();window.removeEventListener('blur',cancel);message.remove();preview.remove();handles.forEach(handle=>handle.remove());};
+ return ()=>{cancel();for(const event of ['blur','resize','pagehide'])window.removeEventListener(event,cancel);message.remove();preview.remove();handles.forEach(handle=>handle.remove());};
 }
