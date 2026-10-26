@@ -17,7 +17,9 @@ class VectorField:
     longitudinal: (N, modes), complex E_z at nodes (including its relative phase).
     electric: (T, modes, 3), complex Ex/Ey/Ez at triangle centroids.
 
-    The maximum centroid |E| is one. Amplitudes are relative, not V/m or
+    With PML, transverse coefficients are computational covariant integrals
+    and the normalization applies only to physical centroids; see pml_modes.md.
+    By default the maximum centroid |E| is one. Amplitudes are relative, not V/m or
     power-normalized. Centroid samples are per element: no averaging across a
     dielectric interface. Raw coefficients retain the full finite-element field.
     """
@@ -26,10 +28,11 @@ class VectorField:
     transverse: np.ndarray
     longitudinal: np.ndarray
     electric: np.ndarray
+    normalization: str = "max_centroid_magnitude"
 
     def to_dict(self) -> dict:
         """JSON-safe display samples, with shape (modes, triangles, components)."""
         values = self.electric.transpose(1, 0, 2)
         return {"location": "triangle_centroids", "components": ["Ex", "Ey", "Ez"],
-                "normalization": "max_centroid_magnitude", "amplitude_unit": "relative",
+                "normalization": self.normalization, "amplitude_unit": "relative",
                 "real": values.real.tolist(), "imag": values.imag.tolist()}

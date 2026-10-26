@@ -183,7 +183,12 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     beta2 = -(sigma + 1.0 / nu)
     if complex_problem:
         beta = np.sqrt(beta2.astype(complex))
-        keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0))
+        if coordinate_factors is not None:
+            if not np.isfinite(beta).all() or np.any(beta == 0):
+                raise RuntimeError("modal coordinate search returned a nonfinite or zero propagation root")
+            keep = np.arange(len(beta))  # let the caller record every candidate and exclusion
+        else:
+            keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0))
         keep = keep[np.lexsort((beta[keep].imag, -beta[keep].real))]
     else:
         beta2 = beta2.real

@@ -248,3 +248,22 @@ test('circles on a hidden zero-size canvas do not throw', () => {
   p.run(`const strict = { beginPath() {}, arc(x, y, r) { if (r < 0) throw new RangeError('negative radius ' + r); } };
     shapePath(strict, { type: 'circle', cx: 0, cy: 0, r: 4 }, transformFor({ xmin: -20, xmax: 20, ymin: -20, ymax: 20 }, 0, 0));`);
 });
+
+test('PML candidates expose reasons and total bend loss and mask artificial fields', () => {
+  const p = page(), data = structuredClone(result);
+  data.neff_imag = [[-.001]]; data.propagation_loss_db_cm = [[352.1]];
+  data.summary.open_boundary = [{physical_bounds:[[0,0],[.5,1]], candidates:[
+    {candidate:1, neff_real:2.05, neff_imag:-.001, physical_l2_fraction:.9,
+     pencil_residual:1e-12, reasons:['selected_near_target'], attenuation_status:'resolved_sign'},
+    {candidate:2, neff_real:1.4, neff_imag:-.2, physical_l2_fraction:.01,
+     pencil_residual:2e-12, reasons:['low_physical_l2_fraction'], attenuation_status:'resolved_sign'}]}];
+  data.summary.bend_loss_db_90deg = [[.55]];
+  p.run(`resultData = ${JSON.stringify(data)}; fillResultTable(); populateResultSelectors(); drawField();`);
+  const table = p.element('resTable').innerHTML;
+  assert(table.includes('stability not checked'));
+  assert(table.includes('low_physical_l2_fraction'));
+  assert(table.includes('dB/90°'));
+  assert(!table.includes('Material absorption only'));
+  assert.deepEqual(p.colors, ['#d0d5dd', .5]);
+  assert(p.element('resInfo').textContent.includes('PML candidate'));
+});

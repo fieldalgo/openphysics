@@ -26,7 +26,7 @@ from .fields import VectorField
 
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
           num_modes: int = 1, formulation: str = "scalar", n_cladding: float | None = None,
-          *, n_target: float | None = None):
+          *, n_target: float | None = None, pml: dict | None = None, bend: dict | None = None):
     """Relative fields and n_eff; wavelength and mesh use the same length unit.
 
     eps_tri uses the modal time convention (negative imaginary part for loss).
@@ -45,6 +45,11 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
         raise ValueError("n_target must be finite and positive")
     if np.any(eps_tri.real <= 0) and n_target is None:
         raise ValueError("non-positive real permittivity requires explicit n_target candidate selection")
+    if bend is not None and pml is None:
+        raise ValueError("bend modes require PML")
+    if pml is not None:
+        from .physics_pml_modes import solve as solve_open
+        return solve_open(mesh, eps_tri, wavelength, boundary, num_modes, formulation, n_target, pml, bend)
     if formulation == "vector":
         return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target)
     k0 = 2 * np.pi / wavelength
@@ -120,7 +125,7 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_
 
 
 def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
-                            neff: np.ndarray, field: VectorField) -> np.ndarray:
+                            neff: np.ndarray, field: VectorField, *, pml=None, bend=None) -> np.ndarray:
     """Relative residual of each column as an eigenpair of the original vector pencil.
 
     Uses the same wavelength-scaled mesh, k0 = 2 pi and PEC constraints as the
@@ -136,7 +141,12 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     from galerkin import assemble_mode_system
 
     scaled = Mesh(mesh.nodes / wavelength, mesh.triangles.copy(), mesh.boundary, mesh.boundary_edges)
-    A, B, space = assemble_mode_system(scaled, eps_tri, 2 * np.pi)
+    coords = None
+    if pml is not None:
+        from .physics_pml_modes import coordinates
+        coords = coordinates(mesh, pml, bend)
+    A, B, space = assemble_mode_system(scaled, eps_tri, 2 * np.pi,
+                                      coordinate_factors=None if coords is None else coords.factors)
     pec_sides = [side for side, kind in boundary.items() if kind == "pec"]
     pec = np.unique(np.concatenate([mesh.boundary[s] for s in pec_sides])) if pec_sides else np.zeros(0, int)
     edge_ids = {tuple(edge): i for i, edge in enumerate(space.edges)}
@@ -148,7 +158,8 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     residuals = []
     for j, n in enumerate(np.asarray(neff)):
         beta = 2 * np.pi * n
-        x = np.concatenate([beta * field.transverse[:, j] / wavelength, -1j * field.longitudinal[:, j]])[free]
+        longitudinal = field.longitudinal[:, j] * (1 if coords is None else coords.node_h)
+        x = np.concatenate([beta * field.transverse[:, j] / wavelength, -1j * longitudinal])[free]
         ax, bx = A @ x, B @ x
         residuals.append(float(np.linalg.norm(ax + beta ** 2 * bx)
                                / (np.linalg.norm(ax) + abs(beta ** 2) * np.linalg.norm(bx))))

@@ -34,4 +34,4 @@ PML 밖의 물리 종방향 전기장은 `1j*ez/h`입니다.
 (`test_pml_modes.py`), 별도 scikit-fem 조립과 dense QZ의 직선/굽힘
 scalar/vector 비교(`test_crosscheck_skfem_pml_modes.py`)입니다. 동일 이산화
 상대 기준은 1e-9이며 조립 일치는 물리 수렴을 대신하지 않습니다.
-문서 입력과 Studio의 상위 계약은 이 기능 브랜치에서 개발 중입니다.
+문서 입력·Studio·추적의 상위 계약은 [PML 모드](../simcase/pml_modes.md)를 참조하세요.

@@ -40,5 +40,4 @@ mesh convergence and PML/window variation (`test_pml_modes.py`), and separate
 scikit-fem assembly plus dense QZ for straight/bent scalar/vector pencils
 (`test_crosscheck_skfem_pml_modes.py`). Same-discretization relative gate is
 1e-9; agreement between assemblies does not establish physical convergence.
-The higher-level document/Studio contract is still under development on this
-feature branch.
+See the [document, Studio and tracking contract](../simcase/pml_modes.md).
