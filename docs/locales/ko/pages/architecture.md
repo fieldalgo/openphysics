@@ -87,4 +87,7 @@ flowchart TB
 [재료 연결](../../../../packages/simcase/src/simcase/materials.py),
 [메시 어댑터](../../../../packages/galerkin/src/galerkin/interop.py),
 [Gmsh 연동 설명](../../../../packages/galerkin/src/galerkin/gmsh.py)을 기준으로 합니다.
+`simcase`는 [물리 등록표](../../../../packages/simcase/src/simcase/registry.py)로 문서를 물리
+타입별로 나눠 보냅니다. 물리마다 계약 검증·실행기·요약·결과 형식을 그곳에 등록하므로, 새 물리를
+더할 때 실행기나 스키마를 고치지 않습니다.
 이 문서 추가가 새 구현이나 수치 검증 결과를 의미하지는 않습니다.

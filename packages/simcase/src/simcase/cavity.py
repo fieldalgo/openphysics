@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .schema import Document, DocumentError
+from .registry import PhysicsKind, register
 
 if TYPE_CHECKING:
     from galerkin import CavityResult
@@ -444,3 +445,23 @@ def run_cavity(doc: Document, *, verbose: bool = True) -> CavityRunResult:
     if verbose:
         print("\n".join(log))
     return CavityRunResult(doc, cavity, timings, log)
+
+
+def _validate(doc: Document) -> None:
+    from .schema import check_format_units_and_tags
+    check_format_units_and_tags(doc)
+    validate_cavity(doc)
+
+
+def _defaults() -> dict:
+    from .schema import DEFAULTS
+    defaults = copy.deepcopy(DEFAULTS)
+    defaults.update(physics={}, mesh={}, results={"save_fields": True, "plots": False})
+    return defaults
+
+
+register(PhysicsKind(
+    name="em.cavity3d", types=frozenset({"em.cavity3d"}), precedence=40,
+    validate=_validate, run=run_cavity, summary=cavity_summary,
+    result_types=(CavityRunResult,), defaults=_defaults,
+    stage_refusal="{stage} is a 2D stage; use run(document) for em.cavity3d"))

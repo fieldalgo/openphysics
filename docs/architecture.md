@@ -90,4 +90,8 @@ The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml)
 [material bridge](../packages/simcase/src/simcase/materials.py),
 [mesh adapter](../packages/galerkin/src/galerkin/interop.py) and
 [Gmsh integration notes](../packages/galerkin/src/galerkin/gmsh.py).
+`simcase` dispatches each document by its physics type through the
+[physics registry](../packages/simcase/src/simcase/registry.py): each physics family
+registers its contract validation, runner, summary and result types there, so a new
+physics does not edit the runner or the schema.
 This architecture page adds no new implementation or numerical validation claim.

@@ -46,6 +46,7 @@ from typing import Any
 from . import units
 from .units import Scale, UnitError
 from .tracking import tracking_settings
+from .registry import kind_of, physics_types
 
 FORMAT = "0.2"
 DEFAULT_PHYSICS = "em1"
@@ -69,11 +70,10 @@ DEFAULTS: dict[str, Any] = {
 
 SHAPE_TYPES = {"rect": {"x", "y", "w", "h"}, "circle": {"cx", "cy", "r"}, "polygon": {"points"}}
 BOUNDARY_TYPES = {"pec", "pmc"}
-PHYSICS_TYPES = {"em.modes2d", "em.cavity3d", "thermal.steady2d", "thermal.transient2d"}
 FORMULATIONS = {"scalar", "vector"}
 
 
-def _steady_boundary_requested(data) -> bool:
+def steady_boundary_requested(data) -> bool:
     """New mappings opt into strict v2 by presence, including empty objects."""
     physics = data.get("physics") if isinstance(data, dict) else None
     return isinstance(physics, dict) and any(
@@ -86,18 +86,38 @@ class DocumentError(ValueError):
     pass
 
 
-def _reject_tagged_values(node, path: str = "") -> None:
+def __getattr__(name: str):
+    # Derived from the registry on access: the kinds register when their modules
+    # import, and those modules import this one.
+    if name == "PHYSICS_TYPES":
+        return set(physics_types())
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def check_format_units_and_tags(doc: "Document") -> None:
+    """The format version, the unit system and no tagged values: shared by most kinds."""
+    d = doc.data
+    if str(d.get("openphysics")) != FORMAT:
+        raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
+    try:
+        doc.scale = units.resolve(d.get("units"))
+    except UnitError as exc:
+        raise DocumentError(str(exc)) from None
+    reject_tagged_values(d)
+
+
+def reject_tagged_values(node, path: str = "") -> None:
     """``[value, "unit"]`` is reserved for a future tagged quantity, so refuse it now."""
     if isinstance(node, dict):
         for k, v in node.items():
-            _reject_tagged_values(v, f"{path}.{k}" if path else str(k))
+            reject_tagged_values(v, f"{path}.{k}" if path else str(k))
     elif isinstance(node, list):
         if len(node) == 2 and isinstance(node[1], str) and isinstance(node[0], (int, float)):
             raise DocumentError(
                 f"{path}: tagged quantities ([value, unit]) are reserved and not accepted in "
                 f"openphysics {FORMAT}; write a bare number in the units the document declares")
         for i, v in enumerate(node):
-            _reject_tagged_values(v, f"{path}.{i}")
+            reject_tagged_values(v, f"{path}.{i}")
 
 
 def _merge(defaults: dict, given: dict) -> dict:
@@ -177,21 +197,8 @@ class Document:
     def from_dict(cls, d: dict) -> "Document":
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
-        from .thermal import is_thermal, defaults as thermal_defaults
-        from .transient_thermal_contract import is_transient_thermal, defaults as transient_defaults
-        from .electric_joule import is_electric_joule
-        defaults = DEFAULTS
-        if is_electric_joule(d):
-            defaults = thermal_defaults()
-        elif is_transient_thermal(d):
-            defaults = transient_defaults()
-        elif is_thermal(d):
-            defaults = thermal_defaults()
-        elif isinstance(d.get("physics"), dict) and any(
-                isinstance(p, dict) and p.get("type") == "em.cavity3d"
-                for p in d["physics"].values()):
-            defaults = copy.deepcopy(DEFAULTS)
-            defaults.update(physics={}, mesh={}, results={"save_fields": True, "plots": False})
+        kind = kind_of(d)
+        defaults = DEFAULTS if kind.defaults is None else kind.defaults()
         doc = cls(_merge(defaults, d))
         doc.validate()
         return doc
@@ -250,57 +257,13 @@ class Document:
     # -- validation ----------------------------------------------------------
 
     def validate(self) -> None:
+        """The contract of the document's physics kind (``registry``)."""
+        kind_of(self.data).validate(self)
+
+    def validate_em_modes2d(self) -> None:
+        """The ``em.modes2d`` contract; also reports a document no kind claims."""
         d = self.data
-        from .electric_joule import is_electric_joule, validate_electric_joule
-        if is_electric_joule(d):
-            validate_electric_joule(self)
-            return
-        from .transient_thermal_contract import is_transient_thermal, validate_transient_thermal
-        if is_transient_thermal(d):
-            from .transient_regions import (is_transient_region_thermal,
-                                            validate_transient_region_thermal)
-            if is_transient_region_thermal(d):
-                _reject_tagged_values(d)
-                validate_transient_region_thermal(self)
-                return
-            validate_transient_thermal(self)
-            return
-        from .thermal_regions import is_region_thermal, validate_region_thermal
-        if is_region_thermal(d):
-            if str(d.get("openphysics")) != FORMAT:
-                raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
-            try:
-                self.scale = units.resolve(d.get("units"))
-            except UnitError as exc:
-                raise DocumentError(str(exc)) from None
-            _reject_tagged_values(d)
-            validate_region_thermal(self)
-            return
-        if _steady_boundary_requested(d):
-            from .steady_boundary_contract import validate_steady_boundary
-            validate_steady_boundary(self)
-            # Schema normalization is separate from the non-mutating validator.
-            self.scale = units.resolve(d["units"])
-            self.sole_physics()[1].setdefault("heat_source_w_m3", 0.0)
-            self.notes = []
-            return
-        if str(d.get("openphysics")) != FORMAT:
-            raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
-        try:
-            self.scale = units.resolve(d.get("units"))
-        except UnitError as exc:
-            raise DocumentError(str(exc)) from None
-        _reject_tagged_values(d)
-        from .thermal import is_thermal, validate_thermal
-        if is_thermal(d):
-            validate_thermal(self)
-            return
-        if isinstance(d.get("physics"), dict) and any(
-                isinstance(p, dict) and p.get("type") == "em.cavity3d"
-                for p in d["physics"].values()):
-            from .cavity import validate_cavity
-            validate_cavity(self)
-            return
+        check_format_units_and_tags(self)
         g = d["geometry"]
         dom = g.get("domain")
         if not dom or any(k not in dom for k in ("xmin", "xmax", "ymin", "ymax")):
@@ -342,8 +305,8 @@ class Document:
             if not isinstance(p, dict):
                 raise DocumentError(f"{where} must be a settings map; physics is keyed by name since 0.2, "
                                     "so a setting now lives at physics.<name>.<setting>")
-            if p.get("type") not in PHYSICS_TYPES:
-                raise DocumentError(f"{where}.type {p.get('type')!r} not supported ({sorted(PHYSICS_TYPES)})")
+            if p.get("type") not in physics_types():
+                raise DocumentError(f"{where}.type {p.get('type')!r} not supported ({sorted(physics_types())})")
             if p["formulation"] not in FORMULATIONS:
                 raise DocumentError(f"{where}.formulation must be one of {sorted(FORMULATIONS)}")
             if "n_target" in p:
@@ -437,37 +400,9 @@ class Document:
                     raise DocumentError("a scalar sweep cannot switch to vector; use a vector wavelength sweep")
 
     def summary(self) -> str:
-        from .electric_joule import is_electric_joule, document_summary
-        if is_electric_joule(self.data):
-            return document_summary(self)
-        from .transient_thermal_contract import is_transient_thermal, transient_thermal_summary
-        if is_transient_thermal(self.data):
-            return transient_thermal_summary(self)
-        from .thermal_regions import is_region_thermal, region_summary
-        if is_region_thermal(self.data):
-            return region_summary(self)
-        if _steady_boundary_requested(self.data):
-            from .steady_boundary_contract import steady_result_versions
-            self.validate()
-            name, p = self.sole_physics()
-            result_format, field_layout = steady_result_versions(self)
-            return (
-                f'{self["name"]} (openphysics 0.2)\n'
-                f'  physics {name}: thermal.steady2d, single steady heat\n'
-                f'  domain {self.domain} {self.length_unit}; mesh {self["mesh"]["subdivisions"]}\n'
-                f'  k={p["conductivity_w_mk"]} W/(m K), Q={p["heat_source_w_m3"]} W/m^3\n'
-                f'  Dirichlet {p["dirichlet_temperature_k"]} K; '
-                f'outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
-                f'convection {p.get("convection", {})}\n'
-                '  q.n = g_out + h*(T-T_ambient); unselected natural sides insulated\n'
-                f'  result: {result_format}; layout: {field_layout}\n'
-                '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth')
-        from .thermal import is_thermal, thermal_summary
-        if is_thermal(self.data):
-            return thermal_summary(self)
-        if any(p.get("type") == "em.cavity3d" for p in self.data["physics"].values()):
-            from .cavity import cavity_summary
-            return cavity_summary(self)
+        return kind_of(self.data).summary(self)
+
+    def em_modes2d_summary(self) -> str:
         g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
         length = self.length_unit
         lines = [f"{self.data['name']}  (openphysics {FORMAT})",
