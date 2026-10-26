@@ -1,3 +1,4 @@
+import {OpticalPreflight} from './workspace-preflight.mjs';
 import {opticalWorkflow} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
@@ -258,10 +259,35 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical interface</h2>'+pair('Equation','Vector optical eigenproblem')+pair('Wavelength','1550 nm')+pair('Candidates','2')+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
  if(ui.page==='Connections'&&isOptical()){$('inspector').innerHTML='<h2>Active interfaces</h2>'+pair('Optical modes','Enabled')+pair('Couplings','None')+'<p>This application computes optical modes only.</p>';document.querySelector('.workspace > .note').textContent='One optical interface; no thermal or mechanical field transfer is configured.';}
  if(ui.page==='Model'&&ui.selection==='Mesh'&&isOptical())renderMeshPreview();
+ if(ui.page==='Model'&&ui.selection==='Study'&&isOptical())renderOpticalStudy();
+}
+
+const preflight=new OpticalPreflight(solverApi,()=>{if(ui.page==='Model'&&ui.selection==='Study')render();});
+function renderOpticalStudy(){
+ const host=$('canvas'),panel=$('inspector');host.innerHTML='<h2>Optical study</h2><p>Review the current input, optionally check it, then run explicitly.</p>'+pair('Core dimensions',state.width+' × '+state.height+' nm')+pair('Core material',setup.materials.Core)+pair('Background',setup.materials.Oxide);
+ const actions=document.createElement('div');actions.className='study-actions';
+ for(const name of ['Geometry','Materials']){const edit=document.createElement('button');edit.textContent='Edit '+name.toLowerCase();edit.onclick=()=>select(name);actions.append(edit);}
+ const check=document.createElement('button');check.textContent=preflight.busy?'Checking inputs…':'Check inputs';check.disabled=preflight.busy||solverBusy||!!opticalBlock()||numericDrafts.invalid;
+ check.onclick=()=>preflight.check(current(),opticalDocument(),connection.instance);actions.append(check);
+ const exportDoc=document.createElement('button');exportDoc.textContent='Export solver JSON';exportDoc.disabled=!!opticalSupport(state,setup)||numericDrafts.invalid;
+ exportDoc.onclick=()=>{try{rejectInvalidInput();downloadFile(new Blob([JSON.stringify(opticalDocument(),null,2)],{type:'application/json'}),'studio-optical-solver.json');notice('Solver document exported in micrometres. This is a simcase input, not a workspace session.');}catch(error){notice(error.message);}};actions.append(exportDoc);host.append(actions);
+ const block=opticalBlock();if(block){const message=document.createElement('p');message.textContent=block;message.className='validation-warning';host.append(message);}
+ if(preflight.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent='Input check failed: '+preflight.error+' Previous check retained.';host.append(error);}
+ const record=preflight.record;
+ if(record){const report=document.createElement('section');report.className='validation-report';const heading=document.createElement('h3');const same=!numericDrafts.invalid&&record.signature===signature()&&record.serverInstance===connection.instance;
+ heading.textContent=(same?'Current inputs':'Earlier inputs or server')+' · '+(record.ok?'document accepted':'document rejected');report.append(heading);
+ const captured=document.createElement('p');captured.textContent=record.input.model.width+' × '+record.input.model.height+' nm · '+record.input.setup.materials.Core+' · '+new Date(record.checkedAt).toLocaleTimeString();report.append(captured);
+ const summary=document.createElement('pre');summary.textContent=record.ok?record.summary:record.error;report.append(summary);
+ for(const note of record.notes){const line=document.createElement('p');line.textContent=note;report.append(line);}host.append(report);
+ }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
+ const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,runs})[3].detail)+pair('Wavelength','1550 nm')+pair('Candidates','2')+pair('Core mesh','30 nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Fixed optical adapter. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
+ if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · lengths in µm';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
 
 let meshView='Full window';
-const meshPreview=new MeshPreview(solverApi,()=>{if(ui.page==='Model'&&ui.selection==='Mesh')render();});
+const meshPreview=new MeshPreview((path,body)=>solverApi(path+'?workspace_instance='+encodeURIComponent(connection.instance),body),()=>{if(ui.page==='Model'&&ui.selection==='Mesh')render();});
 function renderMeshPreview(){
  document.querySelector('.workspace > .note').textContent='Actual mesh in µm; preview is attached to captured inputs. Green triangles mark the core.';
  const host=$('canvas'),panel=$('inspector');host.innerHTML='<h2>Optical mesh</h2><p>Generate the actual triangular mesh without solving optical modes.</p>';
@@ -412,9 +438,9 @@ $('run-optical').onclick=async()=>{
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  const operation=++jobOperation;edits.record(current());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
-  const validation=await solverApi('/api/validate',{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
+  const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
   jobPhase='submitting';$('job-message').textContent='Submitting calculation…';
-  const started=await solverApi('/api/run',{doc});
+  const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance),{doc});
   const record=validatePending({version:1,job:started.job,input:capture.input,revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString()});
   setPending(record);await jobMonitor.follow(record,serverInstance);
  }catch(error){jobPhase='error';$('job-message').textContent='Calculation request failed: '+error.message+' If submission reached the server, work may continue.';notice($('job-message').textContent);}

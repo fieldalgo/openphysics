@@ -188,3 +188,23 @@ Connection details, input recovery and layout help are grouped in an expandable
 panel. A connection failure opens it automatically. Numeric error descriptions
 are separate from their field labels; workflow buttons retain keyboard focus as
 status labels update. The workflow is shown for the optical application only.
+
+### Check and export the submitted document
+
+Study → Check inputs calls the public document validation endpoint without meshing
+or starting a job. The report retains its input snapshot and server identity;
+editing inputs or reconnecting to another server makes the report earlier evidence.
+A transport failure retains the previous report alongside the new error. Validation
+acceptance is not material-accuracy, mesh-convergence or solver acceptance. Run
+always validates its own captured document again.
+
+Export solver JSON downloads the actual simcase `openphysics: "0.2"` input with
+lengths in micrometres. It can be read by the simcase Python/CLI APIs; it is not a
+workspace project/session and does not contain computed results. The expandable
+solver document shows the same payload; with an invalid editor draft it shows the
+last valid inputs and export is disabled.
+
+Workspace validate, mesh and run requests carry the connected server instance.
+A restarted/different server rejects stale requests before parsing the model or
+starting a job. Check connection before new work; old jobs do not migrate between
+server processes. Classic callers without an instance query keep their existing API.

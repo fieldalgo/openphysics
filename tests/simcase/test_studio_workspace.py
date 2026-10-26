@@ -80,3 +80,14 @@ def test_workspace_job_requests_refuse_restarted_server(client):
         assert 'restarted' in response.json()['detail']
         assert client.get(endpoint, params={'workspace_instance': caps['server_instance']}).status_code == 404
         assert client.get(endpoint).status_code == 404
+
+
+@pytest.mark.parametrize("endpoint", ["/api/validate", "/api/mesh", "/api/run"])
+def test_workspace_submission_rejects_restart_before_document_or_job_work(client, monkeypatch, endpoint):
+    from simcase.studio import server
+    calls = []
+    monkeypatch.setattr(server.Document, "from_dict", lambda doc: calls.append(doc))
+    response = client.post(endpoint, params={"workspace_instance": "stale-instance"}, json={"doc": {}})
+    assert response.status_code == 409
+    assert "restarted" in response.json()["detail"]
+    assert calls == []
