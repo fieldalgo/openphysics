@@ -45,6 +45,16 @@ def namespace(*arrays):
     return ac.array_namespace(*live) if live else ac.array_namespace(np.empty(0))
 
 
+def live_namespace(*values):
+    """The namespace of the JAX or PyTorch values among ``values``; NumPy if there are none.
+
+    Unlike :func:`namespace`, NumPy arrays and scalars may sit beside live
+    values: they are static data (geometry, constants) to be lifted with
+    :func:`lift`. JAX and PyTorch values together are still refused (TypeError).
+    """
+    return namespace(*(v for v in values if is_live(v)))
+
+
 def backend_of(xp):
     """The ``Backend`` of a namespace from :func:`namespace`."""
     if ac.is_numpy_namespace(xp):
@@ -58,6 +68,21 @@ def backend_of(xp):
 
 def as_array(xp, value, dtype=None):
     """``value`` in namespace ``xp`` without leaving it (a live value keeps its derivative path)."""
+    return xp.asarray(value, dtype=dtype)
+
+
+def lift(xp, value, dtype=None):
+    """``value`` as an array of ``xp`` (of ``dtype`` if given); untouched when ``xp`` is NumPy.
+
+    For mixing static NumPy data with live values: PyTorch does not combine
+    tensors with NumPy arrays, so they are lifted first. A value already live
+    is passed through (cast only if ``dtype`` differs). On NumPy the very same
+    object is returned, so NumPy callers keep their exact arithmetic.
+    """
+    if value is None or backend_of(xp) is Backend.NUMPY:
+        return value
+    if is_live(value):
+        return value if dtype is None or value.dtype == dtype else xp.astype(value, dtype)
     return xp.asarray(value, dtype=dtype)
 
 
@@ -78,6 +103,40 @@ def is_concrete(value):
     except jax.errors.ConcretizationTypeError:
         return False
     return True
+
+
+def is_live(value):
+    """Whether ``value`` is a JAX or PyTorch array (one that may carry a derivative).
+
+    Checked by type, without importing either library.
+    """
+    jax, torch = sys.modules.get("jax"), sys.modules.get("torch")
+    return ((jax is not None and isinstance(value, jax.Array))
+            or (torch is not None and isinstance(value, torch.Tensor)))
+
+
+def to_numpy(value):
+    """A NumPy array of ``value``'s numbers, for checks: no derivative passes through it.
+
+    Works on eager JAX arrays, ``jax.grad`` tracers outside ``jit`` and PyTorch
+    tensors that require grad; a ``jax.jit`` tracer has no numbers and is
+    refused with :class:`TracedValueError`.
+    """
+    if not is_live(value):
+        return np.asarray(value)
+    if not is_concrete(value):
+        raise TracedValueError("reading values needs concrete arrays; call this outside jax.jit")
+    torch = sys.modules.get("torch")
+    if torch is not None and isinstance(value, torch.Tensor):
+        return value.detach().cpu().resolve_conj().numpy()
+    return np.asarray(sys.modules["jax"].lax.stop_gradient(value))
+
+
+def require_float64(xp, name):
+    """Raise ValueError if ``xp`` cannot hold float64 (JAX without ``jax_enable_x64``)."""
+    if backend_of(xp) is Backend.JAX and not sys.modules["jax"].config.jax_enable_x64:
+        raise ValueError(f"{name}: JAX computes in float32 unless jax_enable_x64 is set; "
+                         "galerkin needs float64")
 
 
 def check_finite(xp, name, value):

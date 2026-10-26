@@ -11,7 +11,8 @@ import pytest
 import scipy.sparse as sp
 
 from galerkin.core.backend import (DIFFERENTIABLE_BACKENDS, Backend, TracedValueError, backend_of,
-                                   check_finite, is_concrete, namespace, scatter_add)
+                                   check_finite, is_concrete, is_live, lift, live_namespace, namespace,
+                                   require_float64, scatter_add, to_numpy)
 from galerkin.core.sparse import CooMatrix
 
 
@@ -180,3 +181,63 @@ def test_scatter_add_base_accumulates_like_repeated_add_at():
     assert np.array_equal(out, expected)
     with pytest.raises(ValueError, match="base has shape"):
         scatter_add(np, 4, parts[0][0], parts[0][1], base=np.zeros(5))
+
+
+@pytest.mark.parametrize("name", MAKERS)
+def test_is_live_lift_and_to_numpy(name):
+    a = MAKERS[name]([1., 2.])
+    assert is_live(a) == (name != "numpy")
+    xp = live_namespace(a, np.ones(2), 3.0)
+    assert backend_of(xp) is Backend(name)
+    static = np.array([4., 5.])
+    lifted = lift(xp, static)
+    assert (lifted is static) if name == "numpy" else backend_of(namespace(lifted)) is Backend(name)
+    assert lift(xp, a) is a
+    np.testing.assert_array_equal(to_numpy(a), [1., 2.])
+
+
+def test_live_namespace_refuses_two_libraries():
+    with pytest.raises(TypeError):
+        live_namespace(_jax_array([1.]), _torch_array([1.]))
+
+
+def test_to_numpy_reads_grad_tracers_and_tensors_that_require_grad():
+    jax, torch = _jax(), _torch()
+    seen = []
+
+    def total(x):
+        seen.append(to_numpy(x * 2))
+        return x.sum()
+    jax.grad(total)(jax.numpy.ones(2))
+    np.testing.assert_array_equal(seen[0], [2., 2.])
+    np.testing.assert_array_equal(to_numpy(torch.ones(2, dtype=torch.float64, requires_grad=True)), [1., 1.])
+    with pytest.raises(TracedValueError):
+        jax.jit(lambda x: to_numpy(x))(jax.numpy.ones(2))
+
+
+def test_require_float64_refuses_jax_without_x64():
+    jax = _jax()
+    require_float64(jax.numpy, "x")
+    jax.config.update("jax_enable_x64", False)
+    try:
+        with pytest.raises(ValueError, match="jax_enable_x64"):
+            require_float64(jax.numpy, "x")
+    finally:
+        jax.config.update("jax_enable_x64", True)
+    require_float64(np, "x")
+
+
+@pytest.mark.parametrize("name", MAKERS)
+def test_coo_matvec_and_sum(name):
+    rng = np.random.default_rng(6)
+    rows, cols, values = rng.integers(0, 5, 30), rng.integers(0, 5, 30), rng.standard_normal(30)
+    x = rng.standard_normal(5)
+    A = CooMatrix(rows, cols, MAKERS[name](values), (5, 5))
+    dense = CooMatrix(rows, cols, values, (5, 5)).to_dense()
+    np.testing.assert_allclose(_to_numpy(A.matvec(MAKERS[name](x))), dense @ x, rtol=1e-14, atol=1e-14)
+    np.testing.assert_allclose(_to_numpy((A + A).to_dense()), 2 * dense, rtol=1e-15, atol=1e-15)
+    if name == "numpy":   # the SciPy CSR product, bit for bit
+        assert np.array_equal(A.matvec(x), A.to_scipy() @ x)
+    else:                 # NumPy static data mixed with live values
+        np.testing.assert_allclose(_to_numpy(CooMatrix(rows, cols, values, (5, 5)).matvec(MAKERS[name](x))),
+                                   dense @ x, rtol=1e-14, atol=1e-14)

@@ -5,16 +5,19 @@ from typing import Mapping
 
 import numpy as np
 
-from .checks import real_array
+from .backend import is_live, namespace, to_numpy
+from .checks import real_array, real_value
 
 
-def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection):
+def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *, live=False):
     """Sample scalar natural conditions on selected exterior edges (4-point Gauss rules).
 
     ``outward_flux`` maps boundary_edges tags to a constant or callable(points,
     normals); ``convection`` maps tags to (h, ambient) pairs of the same kinds.
     Selected edge identities are validated before any callable runs. Returns a
-    list of (kind, edges, shape, weights, values) tuples.
+    list of (kind, edges, shape, weights, values) tuples. With live=True a JAX
+    or PyTorch constant or callback result stays in its library (otherwise it
+    is refused); sampled values are then arrays of that library.
     """
     owners = {}
     for cell, tri in enumerate(t):
@@ -61,14 +64,17 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection):
             points = np.einsum("qa,ead->eqd", shape, p[edges])
             normal = np.repeat(np.asarray(normals), len(w), axis=0)
             def evaluate(value, name):
+                check = real_value if live else real_array
                 if callable(value):
-                    out = real_array(value(points.reshape(-1, 2).copy(), normal.copy()), name)
-                    if out.shape != (len(edges)*len(w),):
+                    out = check(value(points.reshape(-1, 2).copy(), normal.copy()), name)
+                    if tuple(out.shape) != (len(edges)*len(w),):
                         raise ValueError(f"{name} callback must return exactly shape (Q,)")
                     return out.reshape(len(edges), len(w))
-                out = real_array(value, name)
-                if out.shape != ():
+                out = check(value, name)
+                if tuple(out.shape) != ():
                     raise ValueError(f"{name} constant must be scalar")
+                if is_live(out):
+                    return namespace(out).broadcast_to(out, points.shape[:2])
                 return np.full(points.shape[:2], float(out))
             if kind == "outward_flux":
                 values = (evaluate(condition, "outward flux"),)
@@ -77,7 +83,7 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection):
                     raise ValueError("convection condition must be a pair (h, ambient_temperature)")
                 h = evaluate(condition[0], "convection h")
                 ambient = evaluate(condition[1], "ambient temperature")
-                if np.any(h < 0):
+                if np.any(to_numpy(h) < 0):
                     raise ValueError("convection h must be nonnegative")
                 values = (h, ambient)
             length = np.linalg.norm(p[edges[:, 1]]-p[edges[:, 0]], axis=1)
