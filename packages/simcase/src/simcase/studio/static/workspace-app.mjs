@@ -155,7 +155,7 @@ const signature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
 function refreshPersistence(){
   const clean=!edits.dirty;
-  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'saved':'unsaved'):(clean?'Saved inputs':'Unsaved inputs'))+' · Revision '+edits.revision;
+  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
   refreshNotebook();refreshWorkflow();
 }
 function refreshWorkflow(){
@@ -312,7 +312,7 @@ $('confirm-recovery-replace').onclick=async()=>{
 function currentView(){return {...fieldView,probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
-function refreshNotebook(){const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+function refreshNotebook(){const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session matches last file open or download request'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);

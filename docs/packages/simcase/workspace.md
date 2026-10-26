@@ -85,6 +85,12 @@ sessions to 16 MiB. CSV and PNG exports are available. These version-2 workspace
 formats are separate from headless simcase JSON documents. After reload, explicitly choose Recover last session for the committed browser
 snapshot, or Open session for a portable file. Pending writes are not a backup.
 
+A download request does not confirm that the browser wrote a file to disk.
+Check the browser download before relying on it as a portable backup. The input
+and session indicators compare against the last save/open snapshot or download
+request; an unchanged indicator does not certify download completion. Browser
+recovery reports its own committed storage state separately.
+
 Version-1 inputs and sessions remain readable: their fixed core height becomes
 220 nm. New files record height and its nm unit explicitly; older editors reject
 version 2 instead of silently ignoring height. Each result retains its captured
