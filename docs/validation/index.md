@@ -54,3 +54,7 @@ records and plans do not establish a current pass; resource observations are not
 - [Measuring vector mode performance](../benchmark_vector.md)
 - [Measuring 3D PEC cavity time and memory](../benchmark_cavity.md)
 - [Transient Studio resource observer](../transient_resource_probe.md)
+
+## Apply this to your model
+
+- [Check convergence of your calculation](convergence.md)

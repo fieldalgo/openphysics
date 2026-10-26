@@ -49,3 +49,8 @@ Python and JSON/CLI support rectangular and region models. Studio supports recta
 [Build a model](../modeling/index.md) · [Results and trust](../results/index.md) · [All physics](index.md)
 
 [Heat-to-mechanics coupling](mechanics.md)
+
+## Apply this to your model
+
+- [Model a two-material wall, run it and inspect the heat flow](../packages/simcase/layered_wall_tutorial.md)
+- [Choose units, signs and boundary conditions](../modeling/boundaries-units.md)

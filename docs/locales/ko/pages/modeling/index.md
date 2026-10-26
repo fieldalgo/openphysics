@@ -37,3 +37,8 @@ JSON 문서로 묶고, Python 경로에서는 각 패키지 API를 직접 조합
 - [simcase — 모델 문서와 헤드리스 실행기](../packages/simcase/overview.md)
 - [OpenPhysics 구조](../architecture.md)
 - [물리 문제별 안내](../physics/index.md)
+
+## 내 모델로 확장하기
+
+- [두 재료 벽 만들기: 모델부터 열 흐름 확인까지](../packages/simcase/layered_wall_tutorial.md)
+- [단위·부호·경계조건 선택하기](boundaries-units.md)

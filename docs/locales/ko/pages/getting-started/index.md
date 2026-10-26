@@ -27,3 +27,7 @@
 ## 3. 다음 해석 선택
 
 [사용 안내](../guide/index.md)에서 해석을 선택하고 [API·문서 계약](../reference/index.md)에서 입력을 확인하세요.
+
+## 내 모델로 확장하기
+
+- [두 재료 벽 만들기: 모델부터 열 흐름 확인까지](../packages/simcase/layered_wall_tutorial.md)

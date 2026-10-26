@@ -55,8 +55,9 @@ automatically appear there.
 - Transient heat has no flux/Robin input, restart or automatic coupling.
   Finite negative Kelvin is not clamped by the linear API.
 - Heat and elastic materials are isotropic and constant within each named mesh
-  region ([multimaterial](multimaterial.md)); there is no temperature-dependent
-  or anisotropic material. Mechanics is linear and small-strain. The traction
+  region ([multimaterial](multimaterial.md)); these thermal and elastic coefficients do not vary with temperature.
+  The separate [Joule workflow](temperature_joule_heating.md)
+  supports bounded temperature-dependent isotropic electrical conductivity. Mechanics is linear and small-strain. The traction
   APIs take global Cartesian loads; there is no dedicated scalar-pressure,
   local-frame or follower-load API.
 - `solve_cavity_box` handles a vacuum rectangular PEC box;

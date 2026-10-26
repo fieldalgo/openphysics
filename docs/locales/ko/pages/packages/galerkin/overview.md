@@ -48,7 +48,9 @@
 - 과도 열전도에는 열유속/Robin 입력, restart, 자동 연성이 없습니다. 선형 API는 유한한 음의
   Kelvin을 clamp하지 않습니다.
 - 열·탄성 재료는 등방성이며 이름 있는 메시 영역마다 상수입니다([multimaterial](multimaterial.md)).
-  온도 의존·이방성 재료는 없습니다. 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
+  이 열·탄성 계수는 온도에 따라 변하지 않습니다. 별도
+  [Joule workflow](temperature_joule_heating.md)는 유효 범위가 있는 온도 의존 등방성 전기전도도를
+  지원합니다. 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
   Cartesian 하중을 받으며 scalar pressure 전용·로컬 프레임·follower 하중 API는 없습니다.
 - `solve_cavity_box`는 진공 직육면체 PEC 상자를 다루고, `solve_material_cavity_box`는
   직육면체 손실 영역과 유한 전도도 벽을 더합니다. 목표 근처 탐색 한계는 각 계약을 읽으세요.
