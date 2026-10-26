@@ -95,7 +95,7 @@ def test_complex_output_units_fields_and_pencil(tmp_path, formulation):
 
 
 @pytest.mark.parametrize("formulation", ["scalar", "vector"])
-def test_complex_sweep_keeps_imaginary_derivative(formulation):
+def test_complex_sweep_keeps_imaginary_derivative(formulation, tmp_path):
     d = document(formulation).data
     d["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.54, 1.55, 1.56])
     result = run(Document.from_dict(d), False)
@@ -105,6 +105,10 @@ def test_complex_sweep_keeps_imaginary_derivative(formulation):
     np.testing.assert_allclose(result.group_index()[:, 0], expected, atol=2e-3, rtol=0)
     assert np.any(result.group_index().imag != 0)
     json.dumps(result.summary(), allow_nan=False)
+    result.save(tmp_path)
+    with np.load(tmp_path / "fields.npz", allow_pickle=False) as saved:
+        np.testing.assert_array_equal(saved["group_index"], result.group_index())
+        assert json.loads(str(saved["mode_tracking_json"])) == result.mode_tracking
 
 
 def test_metal_interface_spp_convergence():
