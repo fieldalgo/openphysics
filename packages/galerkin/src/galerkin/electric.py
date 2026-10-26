@@ -11,9 +11,29 @@ from scipy.sparse.linalg import MatrixRankWarning
 from .assembly import assemble_stiffness, assemble_load
 from .materials import region_property, element_values
 from .mesh import Mesh
+from .heat_source import ElementHeatSource
 from .postprocess import element_gradient
 from .solver import solve_dirichlet
 from .thermal import _mesh_geometry, _boundary_samples, _real
+
+
+@dataclass(frozen=True, init=False)
+class ElementConductivity:
+    """Positive finite element S/m bound to an exact mesh geometry and order."""
+    _field: ElementHeatSource
+
+    def __init__(self, mesh, values):
+        field = ElementHeatSource(mesh, values)
+        if np.any(field.values <= 0):
+            raise ValueError("element conductivity must be strictly positive")
+        object.__setattr__(self, "_field", field)
+
+    @property
+    def values(self):
+        return self._field.values
+
+    def on_mesh(self, mesh):
+        return self._field.on_mesh(mesh)
 
 
 def _readonly(value):
@@ -76,7 +96,8 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
                           reference_potential=None):
     """Solve div(-sigma grad V)=0 on a conforming 2D P1 mesh in metres.
 
-    conductivity: positive scalar or exact region-name table, S/m.
+    conductivity: positive scalar, exact region-name table or mesh-bound
+        ElementConductivity, S/m. Bare element arrays remain invalid.
     dirichlet: exterior node -> scalar voltage in V.
     outward_current: edge tag -> scalar J.n in A/m², or callback
         (points_m, outward_normals) -> (Q,). Unspecified edges are insulated.
@@ -85,7 +106,8 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
         to 1e-12 relative to integral(abs(J.n)); incompatible data is never repaired.
     """
     p, t, area, boundary, count, labels = _mesh_geometry(mesh)
-    sigma = region_property(mesh, conductivity, "conductivity", positive=True)
+    sigma = (conductivity.on_mesh(mesh) if isinstance(conductivity, ElementConductivity)
+             else region_property(mesh, conductivity, "conductivity", positive=True))
     sigma = element_values(mesh, sigma)
     prescribed = _potentials(dirichlet, len(p), "dirichlet", boundary)
     gauges = _potentials({} if reference_potential is None else reference_potential,

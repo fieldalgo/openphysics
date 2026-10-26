@@ -89,3 +89,5 @@ No claim is made for temperature-dependent materials, feedback iteration,
 transient heating, arbitrary mesh transfer, 3D or a UI. The 2D rates are per unit
 out-of-plane depth. Raw P1 boundary flux is not an exactly equilibrated flux;
 use assembled reactions for the discrete energy budget.
+
+[Temperature-dependent coupling](temperature_joule_heating.md) is a separate Python workflow.

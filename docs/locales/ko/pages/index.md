@@ -98,3 +98,5 @@ PyPI의 `openphysics`는 아무것도 설치하지 않는 빈 0.0.1 이름 예�
 | physmat | [English](../../../packages/physmat/overview.md) | [한국어](packages/physmat/overview.md) |
 | simcase | [English](../../../packages/simcase/overview.md) | [한국어](packages/simcase/overview.md) |
 | openphysics | [English](../../../packages/openphysics/overview.md) | [한국어](packages/openphysics/overview.md) |
+
+- [Temperature-dependent Joule heating](packages/galerkin/temperature_joule_heating.md)

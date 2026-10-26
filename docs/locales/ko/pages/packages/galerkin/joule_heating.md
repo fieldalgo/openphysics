@@ -77,3 +77,5 @@ CI가 세 시험 모듈을 모두 수집하며 필수 crosscheck 설정은 도�
 온도의존 물성·피드백 반복·과도 연성·다른 메시 전달·3D·UI는 범위 밖입니다.
 2D 양은 두께당 값이며 P1 원시 경계 유속은 정확한 평형 유속이 아니므로
 이산 에너지 수지는 조립 reaction으로 평가합니다.
+
+[Temperature-dependent coupling](temperature_joule_heating.md) is a separate Python workflow.
