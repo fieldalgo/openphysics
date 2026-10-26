@@ -80,3 +80,5 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 - [저장한 장 읽기와 ParaView 내보내기](../results/saved-results.md)
 - [내 계산의 수렴 확인하기](../validation/convergence.md)
 - [모델·솔버·결과 오류 진단하기](troubleshooting.md)
+
+- [Python·JSON/CLI·Studio 실행 경로 선택](execution-paths.md)

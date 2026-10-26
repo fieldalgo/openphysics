@@ -40,3 +40,5 @@ simcase overview and the specific physics contract for the supported scope.
 - [Read saved fields and export them to ParaView](saved-results.md)
 - [Check convergence of your calculation](../validation/convergence.md)
 - [Diagnose model, solver and result errors](../guide/troubleshooting.md)
+
+- [Interpret waveguide modes and loss](waveguide-modes.md)
