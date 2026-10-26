@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .core.checks import refuse_live
 from .electric import SteadyElectricResult
 from .heat_source import ElementHeatSource
 from .thermal import SteadyHeatResult, solve_steady_heat
@@ -48,6 +49,7 @@ def solve_steady_joule_heat(mesh, *, electrical_result, conductivity, dirichlet,
     """
     if not isinstance(electrical_result, SteadyElectricResult):
         raise ValueError("electrical_result must be a SteadyElectricResult")
+    refuse_live(electrical_result.joule_heating, "solve_steady_joule_heat electrical_result")
     electric = copy.deepcopy(electrical_result)
     # deepcopy owns the buffers but resets NumPy's writeable flag. Preserve
     # the electrical result's public read-only-array contract in this snapshot.
@@ -64,6 +66,8 @@ def solve_steady_joule_heat(mesh, *, electrical_result, conductivity, dirichlet,
     heat = solve_steady_heat(owned_mesh, conductivity=conductivity, dirichlet=dirichlet,
                              heat_source=source, outward_flux=outward_flux,
                              convection=convection)
+    # This transfer computes with NumPy; a live thermal input would lose its derivative here.
+    refuse_live(heat.temperature, "solve_steady_joule_heat thermal inputs")
     # The heat assembly independently integrates the electric element field.
     # Check both the nodal distribution and total power; totals alone can hide
     # incorrect element-to-node correspondence.

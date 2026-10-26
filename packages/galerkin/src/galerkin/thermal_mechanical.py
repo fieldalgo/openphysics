@@ -13,7 +13,7 @@ import json
 import numpy as np
 
 from .mesh import Mesh
-from .core.checks import real_array
+from .core.checks import real_array, refuse_live
 from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
@@ -203,6 +203,8 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
                   'heat_source_w_m3': _input_record(source), 'body_force_n_m3': _input_record(body)}
     with _stage('heat'):
         heat = solve_steady_heat(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
+        # The mechanical stage computes with NumPy; a live heat input would lose its derivative.
+        refuse_live(heat.temperature, "solve_steady_thermoelasticity heat inputs")
         _check_mesh(owned, state)
     with _stage('transfer'):
         raw = np.asarray(heat.temperature)
