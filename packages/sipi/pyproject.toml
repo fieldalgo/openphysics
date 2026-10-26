@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sipi"
+version = "0.1.0"
+description = "Signal- and power-integrity analysis for PCB interconnects: quasi-static transmission-line cross-sections on the galerkin engine"
+dynamic = ["readme"]  # README.md with absolute links, built by setup.py
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11.2",
+  "galerkin>=0.1.0,<0.2",
+  "meshine>=0.1.0,<0.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/sipi"
+Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/sipi"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sipi*"]

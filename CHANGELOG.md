@@ -1,7 +1,7 @@
 # Changelog
 
-All seven OpenPhysics distributions (`galerkin`, `galerkin-refsol`, `meshine`,
-`gmshio`, `physmat`, `simcase` and the `openphysics` meta distribution) release
+All eight OpenPhysics distributions (`galerkin`, `galerkin-refsol`, `meshine`,
+`gmshio`, `physmat`, `simcase`, `sipi` and the `openphysics` meta distribution) release
 together under one version number. This file records what each release changes.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 [한국어](docs/locales/ko/pages/changelog.md)
@@ -23,6 +23,8 @@ What each package implements, and its limits, is in the
 [overview](docs/overview.md).
 
 ## [Unreleased]
+
+- Add `sipi`, a signal- and power-integrity package: quasi-static (quasi-TEM) PCB cross-sections with layered dielectrics and rectangular traces, giving C, L and dielectric-loss G matrices, single-line impedance and effective permittivity, and coupled-pair even/odd modes. Validated against exact parallel-plate, coaxial and Cohn stripline solutions and Hammerstad–Jensen microstrip; conductor loss is not included. Installed with `openphysics[sipi]`; [documentation](docs/packages/sipi/overview.md).
 
 - Add an experimental model workspace at `/workspace`, with fixed optical runs, editable model history, session files and a versioned capability contract. Existing optical and heat editors remain available.
 

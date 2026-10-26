@@ -12,19 +12,20 @@ import subprocess
 import sys
 
 
-for name in ("galerkin", "refsol", "meshine", "gmshio", "physmat", "simcase"):
+for name in ("galerkin", "refsol", "meshine", "gmshio", "physmat", "simcase", "sipi"):
     module = importlib.import_module(name)
     path = Path(module.__file__).resolve()
     assert path.is_relative_to(Path(sys.prefix).resolve()), (name, path, sys.prefix)
     print(f"Installed import: {name} -> {path}", flush=True)
 
-for name in ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics"):
+for name in ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi",
+             "openphysics"):
     dist = metadata.distribution(name)
     direct = json.loads(dist.read_text("direct_url.json") or "{}")
     assert not direct.get("dir_info", {}).get("editable"), name
     assert dist.read_text("LICENSE") or any(str(p).endswith("/LICENSE") for p in dist.files), name
 # The openphysics meta distribution ships no code and requires exactly the six
-# packages, in the same release series, plus the extras it forwards. packaging
+# packages, in the same release series, plus the extras it forwards (sipi is one). packaging
 # is installed here as a matplotlib requirement.
 from packaging.requirements import Requirement  # noqa: E402
 
@@ -39,6 +40,7 @@ assert meta == {
     "studio": {("simcase", frozenset({"studio"}))},
     "export": {("simcase", frozenset({"export"}))},
     "rii": {("physmat", frozenset({"rii"}))},
+    "sipi": {("sipi", frozenset())},
 }, meta
 assert importlib.util.find_spec("openphysics") is None
 assert not [f for f in metadata.distribution("openphysics").files if str(f).endswith(".py")]
@@ -61,3 +63,9 @@ assert summary["units"] == {"length": "um"}, summary
 for filename in ("fields.npz", "results.png", "log.txt", "model.json"):
     assert Path("results", filename).stat().st_size > 0, filename
 print("Wheel CLI, entry points, imports, metadata and saved output passed.")
+
+from sipi import CrossSection, Layer, Trace  # noqa: E402
+
+line = CrossSection([Layer("substrate", 1e-3, 4.0), Layer("air", 10e-3)],
+                    [Trace("s", 0.0, 2e-3, 1e-3)], width=20e-3).analyze()
+assert 1.0 < line.eps_eff < 4.0 and 20.0 < line.z0 < 80.0, (line.z0, line.eps_eff)

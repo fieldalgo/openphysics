@@ -2,8 +2,8 @@
 
 [English](../../../../CHANGELOG.md) | **한국어**
 
-OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmshio`,
-`physmat`, `simcase`, 그리고 `openphysics` 메타 배포판)는 하나의 버전 번호로 함께
+OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmshio`,
+`physmat`, `simcase`, `sipi`, 그리고 `openphysics` 메타 배포판)는 하나의 버전 번호로 함께
 릴리스됩니다. 이 문서는 릴리스마다 바뀐 점을 기록합니다. 형식은
 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따릅니다. 기준 문서는 영어판
 `CHANGELOG.md`입니다.
@@ -23,6 +23,8 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 각 패키지가 구현하는 범위와 한계는 [개요](overview.md)에 있습니다.
 
 ## [Unreleased]
+
+- 신호·전원 무결성 패키지 `sipi`를 추가합니다. 층 유전체와 직사각형 트레이스로 된 PCB 단면을 준정적(quasi-TEM)으로 풀어 C·L·유전 손실 G 행렬, 단일선 임피던스와 유효 유전율, 결합선 even/odd 모드를 계산합니다. 평행판·동축 정확해, Cohn 스트립라인 정확해, Hammerstad–Jensen 마이크로스트립 식과 비교해 검증했으며 도체 손실은 포함하지 않습니다. `openphysics[sipi]`로 설치합니다. [문서](packages/sipi/overview.md).
 
 - `/workspace`에 실험적 모델 작업공간을 추가합니다. 고정 조건 광학 실행, 모델 편집 이력, 세션 파일과 버전이 있는 지원 범위 계약을 제공하며 기존 광학·열 편집기를 유지합니다.
 

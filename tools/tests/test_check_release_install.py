@@ -38,9 +38,9 @@ def sums(path, files=FILES):
 def test_local_requirements_name_every_wheel_by_url(tmp_path):
     version, requirements = install.local_requirements(wheels(tmp_path / "dist"))
     assert version == "0.1.0"
-    assert len(requirements) == 7
+    assert len(requirements) == 8
     assert all(" @ file:" in r for r in requirements)
-    assert [r for r in requirements if r.startswith("openphysics[studio,export,rii] @ ")]
+    assert [r for r in requirements if r.startswith("openphysics[studio,export,rii,sipi] @ ")]
     assert [r for r in requirements if r.startswith("galerkin-refsol @ ")]
 
 

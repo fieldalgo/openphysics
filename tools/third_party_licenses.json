@@ -39,7 +39,7 @@
       "bundled_files of entries without external_process load into the OpenPhysics process: a GPL term passes only with a listed runtime exception (runtime_exceptions) or inside an OR with another option"
     ]
   },
-  "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase"],
+  "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase", "sipi"],
   "external_tools": {
     "ngsolve": {
       "spdx": "LGPL-2.1-only",

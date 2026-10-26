@@ -19,6 +19,10 @@
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 
 
+## PCB 전송선(신호·전원 무결성)
+
+- [sipi — 준정적 PCB 단면: C, L, G, 임피던스와 결합선 모드](../packages/sipi/overview.md). Python API만 있으며 도체 손실, S-파라미터, 3D 구조는 구현하지 않았습니다.
+
 ## Python 계약과 수식
 
 - [진공 직육면체 PEC 공동 솔버](../packages/galerkin/cavity_solver.md)

@@ -32,7 +32,8 @@ import zipfile
 from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
+PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi",
+            "openphysics")
 # packages/<name>/ holds what its distribution ships and nothing else: the import
 # package under src/ and the files below. Tests, docs, examples and tools live at
 # the repository root. Nothing here is a list of individual files.
@@ -189,7 +190,7 @@ def main():
     wheel_ids = {parse_wheel_filename(p.name)[:2] for p in wheels}
     sdist_ids = {parse_sdist_filename(p.name) for p in sdists}
     if wheel_ids != sdist_ids or {name for name, _ in wheel_ids} != expected:
-        raise RuntimeError("wheel/sdist package identities and versions must match the seven packages")
+        raise RuntimeError("wheel/sdist package identities and versions must match the eight packages")
     run(sys.executable, "-m", "twine", "check", "--strict", *wheels, *sdists, cwd=ROOT)
     for sdist in sdists:
         check_sdist(sdist)
@@ -224,7 +225,7 @@ def main():
         # The openphysics meta distribution resolves its six requirements and the
         # extras it forwards from these same local wheels.
         extras = {"simcase": "studio,test", "physmat": "rii", "gmshio": "gmsh",
-                  "openphysics": "studio,export,rii"}
+                  "openphysics": "studio,export,rii,sipi"}
         requirements = []
         for wheel in wheels:
             name, _, _, _ = parse_wheel_filename(wheel.name)

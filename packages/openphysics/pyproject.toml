@@ -43,6 +43,7 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 studio = ["simcase[studio]>=0.1.0,<0.2"]
 export = ["simcase[export]>=0.1.0,<0.2"]
 rii = ["physmat[rii]>=0.1.0,<0.2"]
+sipi = ["sipi>=0.1.0,<0.2"]
 
 [tool.setuptools]
 packages = []

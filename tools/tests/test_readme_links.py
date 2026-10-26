@@ -25,7 +25,7 @@ hook = load(ROOT / "packages" / "galerkin" / "setup.py")
 
 def test_every_package_has_the_same_hook():
     names = {p.name for p in PACKAGES}
-    assert names == {"galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics"}
+    assert names == {"galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi", "openphysics"}
     reference = (ROOT / "packages" / "galerkin" / "setup.py").read_bytes()
     for package in PACKAGES:
         assert (package / "setup.py").read_bytes() == reference, package.name

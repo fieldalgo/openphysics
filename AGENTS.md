@@ -7,7 +7,7 @@ The [documentation home](docs/README.md) links reader routes and implementation
 contracts. Follow the [documentation map](docs/development/documentation.md) when
 adding or organizing pages.
 
-- The six implementation packages live under `packages/` and retain independent
+- The seven implementation packages live under `packages/` and retain independent
   distribution metadata and licenses; their tests are in `tests/<import name>/`,
   examples in `examples/<name>/` and docs in `docs/packages/<name>/`.
   Keep integrations behind their package API.

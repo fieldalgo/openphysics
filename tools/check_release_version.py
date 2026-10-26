@@ -1,9 +1,9 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Check that the seven distributions agree on one release version.
+"""Check that the eight distributions agree on one release version.
 
-All seven distributions release in lockstep. This check fails unless
+All eight distributions release in lockstep. This check fails unless
 
 - every packages/<name>/pyproject.toml declares the same version,
 - every import package's ``__version__`` (read from its source, not imported)

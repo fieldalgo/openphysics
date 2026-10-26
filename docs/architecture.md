@@ -3,7 +3,7 @@
 **English** | [한국어](locales/ko/pages/architecture.md)
 
 OpenPhysics is the repository and toolkit. **`galerkin` is its finite-element
-engine**, one of six implementation packages under `packages/`. The packages
+engine**, one of seven implementation packages under `packages/`. The packages
 have separate distributions and can be used independently where their
 dependencies permit. See the [installation guide](overview.md).
 
@@ -21,6 +21,7 @@ flowchart TB
         Mat["physmat<br/>Material properties · Optical dispersion"]
         GIO["gmshio<br/>Gmsh integration · Mesh reader"]
         Ref["galerkin-refsol<br/>Independent analytical references"]
+        SIPI["sipi<br/>SI/PI · Transmission-line cross-sections"]
 
         Sim -->|uses| Gal
         Sim -->|uses| Mesh
@@ -28,6 +29,8 @@ flowchart TB
         Mesh -.->|from_mesher adapter| Gal
         GIO -.->|from_mesher adapter| Gal
         Ref -.->|expected solutions in tests| Gal
+        SIPI -->|uses| Gal
+        SIPI -->|uses| Mesh
     end
 
     Input --> Sim
@@ -48,6 +51,7 @@ available for the other packages; the diagram highlights the solver entry point.
 | [meshine](packages/meshine/overview.md) | 2D triangular meshes for material regions. |
 | [physmat](packages/physmat/overview.md) | Material models and properties, optical dispersion, refractiveindex.info access and fitting. |
 | [gmshio](packages/gmshio/overview.md) | Optional Gmsh executable integration and mesh-file reading. Existing mesh files can be read without running Gmsh. |
+| [sipi](packages/sipi/overview.md) | Signal and power integrity: layered PCB cross-sections, quasi-static C/L/G matrices, impedance and coupled-line modes, built on galerkin and meshine. |
 | [galerkin-refsol](packages/galerkin-refsol/overview.md) | Independent analytical solutions and published benchmarks, imported as `refsol`. Tests compare solver results with these references; the reference package does not import the solver it grades. |
 
 `galerkin.from_mesher` adapts supported mesh objects or array dictionaries into
@@ -55,11 +59,11 @@ the engine's mesh types. It does not make either mesher a mandatory solver
 runtime dependency. Gmsh is installed separately and retains its own license;
 see [NOTICE](../NOTICE).
 
-The seventh distribution, [`openphysics`](packages/openphysics/overview.md),
-is a meta distribution with no code that requires the six implementation
-packages. 0.1.0 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
+The eighth distribution, [`openphysics`](packages/openphysics/overview.md),
+is a meta distribution with no code that requires six of the implementation
+packages and offers `sipi` as an extra. 0.1.0 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
 name reservation, so **`pip install openphysics` does not install the toolkit
-yet.** The six implementation packages already live in this public
+yet.** The seven implementation packages already live in this public
 repository; separate historical package repositories are not needed to use them.
 
 ## Entry points and current scope

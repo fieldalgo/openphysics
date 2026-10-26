@@ -27,6 +27,7 @@ pip install "openphysics[studio,export,rii]"
 | `studio` | `simcase[studio]`: the local browser Studio (FastAPI, Uvicorn) |
 | `export` | `simcase[export]`: VTU export for ParaView (meshio) |
 | `rii` | `physmat[rii]`: reading a local refractiveindex.info database (PyYAML) |
+| `sipi` | `sipi`: signal and power integrity of PCB cross-sections (no further dependencies) |
 
 No extra installs Gmsh. `gmshio` runs Gmsh as a separate program; install it on its
 own (for example `pip install gmsh`) if you need it, under Gmsh's own license.
