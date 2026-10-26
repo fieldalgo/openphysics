@@ -91,3 +91,5 @@ out-of-plane depth. Raw P1 boundary flux is not an exactly equilibrated flux;
 use assembled reactions for the discrete energy budget.
 
 [Temperature-dependent coupling](temperature_joule_heating.md) is a separate Python workflow.
+
+[Homogeneous rectangle JSON/CLI input and save contract](../simcase/electric_joule.md). This exposes a subset of the Python API.

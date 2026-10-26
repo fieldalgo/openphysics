@@ -99,7 +99,8 @@ def material_preview(body: MaterialPreview):
 
 def _headless_thermal_type(doc: Document):
     return next((p.get("type") for p in doc["physics"].values()
-                 if p.get("type") in ("thermal.steady2d", "thermal.transient2d")), None)
+                 if p.get("type") in ("thermal.steady2d", "thermal.transient2d",
+                                    "electric.steady2d", "joule.steady2d", "joule.temperature2d")), None)
 
 
 def _require_studio_physics(doc: Document):

@@ -43,12 +43,12 @@ mesh and slab-mode checks that tell you whether to trust them.
 | 2D waveguide modes and sweeps | Yes | `em.modes2d` (passive absorption supported) | Yes |
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
-| Steady electric conduction | Yes | No | No |
+| Steady electric conduction | Yes | Homogeneous rectangle | No |
 | Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | No |
 | Elasticity, thermal expansion, heat→mechanics | Yes | No | No |
-| Steady Joule heating | Yes | No | No |
+| Steady Joule heating | Yes | Homogeneous rectangle, constant or σ(T) | No |
 
 Python-only capabilities do not automatically appear in JSON or Studio.
 
@@ -210,3 +210,5 @@ license and how it is used, is listed in
 [third-party software](third-party.md).
 
 Temperature-dependent two-way coupling: [Python API](packages/galerkin/temperature_joule_heating.md).
+
+Electric conduction and constant/temperature-dependent Joule heating: [JSON/CLI contract and examples](packages/simcase/electric_joule.md).

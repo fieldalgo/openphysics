@@ -61,3 +61,5 @@ python examples/galerkin/temperature_joule_heating.py
 연속 온도 RMS L2 오차는 n=8/16/32에서 1.52995e-3, 3.83592e-4, 9.59884e-5 K
 (마지막 차수 1.999)였다. 강한 피드백 alpha=7은 완화 1/0.5에서
 59/128회에 수렴했다. 실패 이력 보존도 시험한다.
+
+[균질 직사각형 JSON/CLI 입력·저장 계약](../simcase/electric_joule.md). Python API 전체 범위를 JSON에 노출하지는 않습니다.

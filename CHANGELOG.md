@@ -24,6 +24,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add headless rectangle electric and constant/temperature-dependent Joule JSON/CLI documents, SI result snapshots and failed-iteration evidence; reuse the existing solvers.
+
+
 - Add temperature-dependent 2D steady Joule heating with bounded material models,
   relaxed Picard iteration, failure histories and independent reference tests.
 

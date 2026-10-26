@@ -179,8 +179,11 @@ class Document:
             raise DocumentError('document: expected an object')
         from .thermal import is_thermal, defaults as thermal_defaults
         from .transient_thermal_contract import is_transient_thermal, defaults as transient_defaults
+        from .electric_joule import is_electric_joule
         defaults = DEFAULTS
-        if is_transient_thermal(d):
+        if is_electric_joule(d):
+            defaults = thermal_defaults()
+        elif is_transient_thermal(d):
             defaults = transient_defaults()
         elif is_thermal(d):
             defaults = thermal_defaults()
@@ -248,6 +251,10 @@ class Document:
 
     def validate(self) -> None:
         d = self.data
+        from .electric_joule import is_electric_joule, validate_electric_joule
+        if is_electric_joule(d):
+            validate_electric_joule(self)
+            return
         from .transient_thermal_contract import is_transient_thermal, validate_transient_thermal
         if is_transient_thermal(d):
             from .transient_regions import (is_transient_region_thermal,
@@ -425,6 +432,9 @@ class Document:
                     raise DocumentError("a scalar sweep cannot switch to vector; use a vector wavelength sweep")
 
     def summary(self) -> str:
+        from .electric_joule import is_electric_joule, document_summary
+        if is_electric_joule(self.data):
+            return document_summary(self)
         from .transient_thermal_contract import is_transient_thermal, transient_thermal_summary
         if is_transient_thermal(self.data):
             return transient_thermal_summary(self)

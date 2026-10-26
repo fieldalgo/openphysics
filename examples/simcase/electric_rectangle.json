@@ -1,0 +1,39 @@
+{
+  "openphysics": "0.2",
+  "name": "Homogeneous rectangle resistor",
+  "units": {
+    "length": "m"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 1.0,
+      "ymin": 0.0,
+      "ymax": 0.2
+    }
+  },
+  "materials": {},
+  "mesh": {
+    "subdivisions": [
+      24,
+      6
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "electric": {
+      "type": "electric.steady2d",
+      "conductivity_s_m": 2.0,
+      "dirichlet_potential_v": {
+        "left": 1.0,
+        "right": 0.0
+      }
+    }
+  }
+}

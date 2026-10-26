@@ -50,3 +50,5 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - 패키지 사이의 의존성은 0.1 계열(`>=0.1.0,<0.2`)로 제한됩니다.
 
 - 온도 의존 2D 정상 Joule heating: 유효 범위 물성, 완화 Picard 반복, 실패 이력 및 독립 검증 추가.
+
+- 전기전도·상수/온도 의존 Joule heating의 직사각형 JSON/CLI, SI 결과 저장과 실패 반복 근거를 추가했다. 기존 솔버를 재사용한다.

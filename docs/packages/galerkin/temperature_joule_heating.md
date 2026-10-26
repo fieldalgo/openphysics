@@ -4,7 +4,7 @@
 
 ## Scope and equations
 
-Python only: fixed conforming 2D P1 triangles in metres, DC, isotropic sigma(T),
+Python solver: fixed conforming 2D P1 triangles in metres, DC, isotropic sigma(T),
 constant positive thermal conductivity k (scalar or named-region table).
 Solve div(J)=0, E=-grad(V), J=sigma E, Q=J.E and -div(k grad(T))=Q.
 The existing [electric contract](electric_steady2d.md) and
@@ -114,3 +114,5 @@ Validation: 28 feature tests; scikit-fem maximum relative difference 1.04e-12 (<
 continuous-temperature RMS L2 errors 1.52995e-3, 3.83592e-4, 9.59884e-5 K
 at n=8/16/32 (final order 1.999). Strong feedback alpha=7 converged in
 59/128 iterations at relaxation 1/0.5. Failure histories are tested.
+
+[Homogeneous rectangle JSON/CLI input and save contract](../simcase/electric_joule.md). This exposes a subset of the Python API.

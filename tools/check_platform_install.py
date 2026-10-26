@@ -166,6 +166,7 @@ def main():
         copies = {
             ROOT / "tools" / "wheel_consumers" / "test_transient_thermomechanical_wheel.py": tests / "test_transient_thermomechanical_wheel.py",
             ROOT / "tools" / "wheel_consumers" / "test_platform_install.py": tests / "test_platform_install.py",
+            ROOT / "tools" / "wheel_consumers" / "test_electric_joule_wheel.py": tests / "test_electric_joule_wheel.py",
             ROOT / "tools" / "wheel_consumers" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
             ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
             ROOT / "tests/simcase/test_export_regions.py": tests / "test_export_regions.py",
@@ -197,6 +198,7 @@ def main():
             "--confcutdir", tests, "--basetemp", output / "consumer-files",
             "--junitxml=" + str(output / "installed-tests.xml"),
             tests / "test_thermal_simcase_wheel.py",
+            tests / "test_electric_joule_wheel.py",
             tests / "test_transient_thermomechanical_wheel.py",
             tests / "test_msh.py",
             tests / "test_export_regions.py",

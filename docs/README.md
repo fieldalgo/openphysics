@@ -52,6 +52,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 | Elasticity acceptance | [Independent continuum checks](packages/galerkin/elasticity2d_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity2d_independent_validation.md) |
 | Boundary traction | [Loads and normals](packages/galerkin/elasticity_traction.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity_traction.md) |
 | Traction acceptance | [Independent forces, work and convergence](packages/galerkin/elasticity_traction_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity_traction_independent_validation.md) |
+| Electric/Joule documents | [JSON/CLI and saved results](packages/simcase/electric_joule.md) | [한국어](locales/ko/pages/packages/simcase/electric_joule.md) |
 | Steady electric conduction | [API, SI units, Neumann and Joule contract](packages/galerkin/electric_steady2d.md) | [한국어](locales/ko/pages/packages/galerkin/electric_steady2d.md) |
 | Steady conduction | [Kelvin, heat flux and boundary signs](packages/galerkin/thermal_steady2d.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_steady2d.md) |
 | Conduction acceptance | [Independent source/wheel evidence](packages/galerkin/thermal_independent_validation.md) | [한국어](locales/ko/pages/packages/galerkin/thermal_independent_validation.md) |
