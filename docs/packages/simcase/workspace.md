@@ -273,7 +273,18 @@ Each write checks the previously observed revision in the same database transact
 If another tab has saved since this tab loaded or recovered the notebook, automatic
 storage stops without overwriting that record. Save session to preserve this tab,
 then Recover last session to review and adopt the newer notebook. Cancelling the
-review or Retry recovery storage does not bypass this protection. Reload older tabs
+review or Retry recovery storage does not bypass this protection.
+
+To keep this tab's notebook instead, choose **Use current notebook for recovery**.
+Review the stored snapshot and current run count, then explicitly replace browser
+recovery. This preserves current model inputs, results and Undo; it does not import
+or solve anything. It can also replace an unreadable recovery record. Save session
+first if you need a portable copy of either notebook. A changed workspace, active
+storage write, or a newer database revision during review prevents replacement;
+review again against the latest state. Quota/database failures still require a
+portable file. Empty notebooks cannot replace a completed recovery snapshot.
+
+Reload older tabs
 after updating Studio: an older running version may still overwrite the shared record.
 This is not a backup archive. A quota or
 transaction failure retains the previous committed record; Retry recovery storage

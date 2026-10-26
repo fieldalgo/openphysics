@@ -66,6 +66,11 @@ export class NotebookAutosave {
   }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error.code,message:error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
  }
+ async replaceReviewed(record,stamp,makeText){
+  if(this.writing)throw new Error('Recovery storage is busy. Wait for it to finish, then review again.');
+  this.store.adopt(record);this.savedStamp=null;this.desired=null;
+  this.schedule(stamp,makeText);await this.flush();
+ }
  retry(){this.failedStamp=null;return this.flush();}
  get pending(){return this.writing||!!this.desired&&this.desired.stamp!==this.savedStamp;}
 }

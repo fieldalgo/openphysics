@@ -259,7 +259,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  if(state.phase==='saving')message.textContent='Saving browser recovery…';
  if(state.phase==='current')message.textContent='Current notebook already in browser recovery';
  if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
- if(state.phase==='error'){message.textContent=state.code==='recovery-conflict'?'Browser recovery changed in another tab':'Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Previous completed snapshot is retained if the database transaction failed.';}
+ if(state.phase==='error'){message.textContent=state.code==='recovery-conflict'?'Browser recovery changed in another tab':'Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
 }});
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
@@ -277,10 +277,39 @@ $('recover-notebook').onclick=async()=>{
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
 
+let pendingRecoveryReplacement=null;
+const recoveryDialog=document.createElement('dialog');recoveryDialog.id='recovery-replace-confirm';
+recoveryDialog.innerHTML='<h2>Replace browser recovery?</h2><p>This replaces the shared recovery snapshot for this browser and server address. Save either notebook to a session file first if you need both. Current inputs, results and Undo stay in this tab.</p><dl class="load-summary" id="recovery-replace-summary"></dl><button id="cancel-recovery-replace">Keep stored recovery</button> <button id="confirm-recovery-replace">Replace browser recovery</button>';
+document.body.append(recoveryDialog);
+$('cancel-recovery-replace').onclick=()=>{pendingRecoveryReplacement=null;workspaceLoads.invalidate();recoveryDialog.close();notice('Browser recovery replacement cancelled. Both notebooks kept.');};
+recoveryDialog.oncancel=()=>{pendingRecoveryReplacement=null;workspaceLoads.invalidate();};
+$('replace-notebook').onclick=async()=>{
+ try{
+  rejectInvalidInput();if(!runs.length)throw new Error('Complete or import a run before replacing notebook recovery.');
+  if(solverBusy||notebookAutosave.writing)throw new Error('Wait for calculation and recovery storage to finish, then review again.');
+  const loaded=await workspaceLoads.read(()=>notebookStore.load());if(!loaded)return;
+  const record=loaded.value;let prior='No stored notebook';
+  try{const recovered=readNotebookRecovery(record);if(recovered)prior=recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();}
+  catch{prior='Unreadable stored notebook';}
+  pendingRecoveryReplacement={record,context:loadContext(),stamp:notebookStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView())};
+  const summary=$('recovery-replace-summary');summary.replaceChildren();
+  for(const [name,value] of [['Stored recovery',prior],['Replace with',runs.length+' runs · '+state.width+' × '+state.height+' nm · '+setup.materials.Core],['Current inputs and Undo','Kept'],['Other tabs','Their next automatic save will detect this replacement']]){
+   const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);
+  }
+  recoveryDialog.showModal();
+ }catch(error){notice('Cannot replace browser recovery: '+error.message);}
+};
+$('confirm-recovery-replace').onclick=async()=>{
+ const pending=pendingRecoveryReplacement;pendingRecoveryReplacement=null;workspaceLoads.invalidate();recoveryDialog.close();if(!pending)return;
+ if(pending.context!==loadContext()){notice('Workspace changed during review. Review browser recovery again; stored notebook kept.');return;}
+ try{await notebookAutosave.replaceReviewed(pending.record,pending.stamp,pending.makeText);}
+ catch(error){notice('Browser recovery not replaced: '+error.message);}
+};
+
 function currentView(){return {...fieldView,probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
-function refreshNotebook(){const stamp=notebookStamp();if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+function refreshNotebook(){const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
