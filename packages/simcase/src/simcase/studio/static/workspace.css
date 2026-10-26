@@ -40,3 +40,13 @@ main{position:relative}.panel-divider{display:none}.layout-help{display:flex;fle
 
 /* Shared rows keep matching physical coordinates aligned when run labels wrap. */
 .compare-grid{row-gap:0}.compare-grid>article{display:grid;grid-template-rows:subgrid;grid-row:span 3;gap:0}
+
+/* Bound long run names and keep comparison controls close to their plots. */
+.compare-selection{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:8px 0}
+.compare-selection label,.compare-options label{min-width:0;margin:0}
+.compare-selection select{min-width:0;max-width:100%;text-overflow:ellipsis}
+.compare-options{flex-wrap:wrap;padding:10px 0;gap:12px}
+.compare-options label{flex:0 1 160px}
+.compare-grid>article{min-width:0}
+.compare-grid h3,.run-item{overflow-wrap:anywhere}
+@media(max-width:580px){.compare-selection{grid-template-columns:1fr;gap:10px}.compare-options label{flex:1 1 100px}}
