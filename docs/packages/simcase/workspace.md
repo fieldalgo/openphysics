@@ -282,3 +282,10 @@ Keyboard focus stays on the corresponding tree, geometry, material and run contr
 after a selection refresh. Input Undo/Redo shortcuts do not act behind an open
 confirmation dialog. Selecting an optical PEC edge keeps its specific boundary
 identity visible above the optical interface properties.
+
+An open line-profile panel draws an amber dashed slice on each field plot when
+that line intersects the visible window. The graph uses the full domain even
+when the field view is zoomed to the core. Export profile PNG includes axes,
+normalization, candidate, line location, job IDs, geometry, materials and origins.
+Field PNG exports also annotate an active profile line. Comparison plot rows stay
+aligned when run labels wrap to multiple lines.

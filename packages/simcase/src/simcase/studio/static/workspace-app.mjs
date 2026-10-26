@@ -361,7 +361,8 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
  const X=x=>left+(x-xmin)*scale,Y=y=>top+(ymax-y)*scale;
  ctx.save();ctx.beginPath();ctx.rect(left,top,pw,ph);ctx.clip();
  run.field.triangles.forEach((triangle,i)=>{ctx.beginPath();triangle.forEach((n,j)=>{const p=run.field.nodes[n];if(j)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.closePath();ctx.fillStyle=fieldColor(values[i]);ctx.fill();});
- ctx.strokeStyle='#f5f1da';ctx.setLineDash([4,3]);ctx.lineWidth=1;const width=run.input.model.width/1000;ctx.strokeRect(X(-width/2),Y(run.input.model.height/1000),width*scale,run.input.model.height/1000*scale);ctx.restore();
+ ctx.strokeStyle='#f5f1da';ctx.setLineDash([4,3]);ctx.lineWidth=1;const width=run.input.model.width/1000;ctx.strokeRect(X(-width/2),Y(run.input.model.height/1000),width*scale,run.input.model.height/1000*scale);
+ if(profileState.open){ctx.strokeStyle='#e7bc73';ctx.setLineDash([8,4]);ctx.lineWidth=1.5;ctx.beginPath();if(profileState.axis==='x'&&profileState.coordinate>=ymin&&profileState.coordinate<=ymax){ctx.moveTo(X(xmin),Y(profileState.coordinate));ctx.lineTo(X(xmax),Y(profileState.coordinate));}else if(profileState.axis==='y'&&profileState.coordinate>=xmin&&profileState.coordinate<=xmax){ctx.moveTo(X(profileState.coordinate),Y(ymin));ctx.lineTo(X(profileState.coordinate),Y(ymax));}ctx.stroke();}ctx.restore();
  ctx.strokeStyle='#91a8b7';ctx.strokeRect(left,top,pw,ph);ctx.fillStyle='#cfdae0';ctx.font='12px Segoe UI';ctx.textAlign='center';
  for(let i=0;i<3;i++){const x=xmin+(xmax-xmin)*i/2;ctx.fillText(x.toFixed(2),X(x),top+ph+18);}
  ctx.fillText('x [µm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(let i=0;i<3;i++){const y=ymin+(ymax-ymin)*i/2;ctx.fillText(y.toFixed(2),left-8,Y(y)+4);}
@@ -386,7 +387,7 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
 }
 
 
-function renderLineProfile(host,profileRuns){
+function renderLineProfile(host,profileRuns,updateFields=()=>drawField()){
  const details=document.createElement('details');details.className='line-profile';details.open=profileState.open;
  const summary=document.createElement('summary');summary.textContent='Line profile and CSV';details.append(summary);
  const form=document.createElement('form');form.className='profile-controls';form.innerHTML='<label>Profile direction<select id="profile-axis" aria-label="Profile direction"><option value="x">Horizontal · along x</option><option value="y">Vertical · along y</option></select></label><label>Fixed coordinate [µm]<input id="profile-coordinate" type="number" step="any" required></label><button type="submit">Show profile</button>';details.append(form);
@@ -394,19 +395,26 @@ function renderLineProfile(host,profileRuns){
  const canvas=document.createElement('canvas');canvas.style.cssText='display:block;width:100%;height:260px';canvas.setAttribute('role','img');details.append(canvas);
  const legend=document.createElement('div');legend.className='profile-legend';details.append(legend);
  const note=document.createElement('p');note.textContent='Step segments use the stored value of each intersected triangle. No interpolation, absolute power or mode matching. Each candidate uses its own max|E| normalization.';details.append(note);
- const csv=document.createElement('button');csv.type='button';csv.textContent='Export profile CSV';csv.disabled=true;details.append(csv);host.append(details);
+ const csv=document.createElement('button');csv.type='button';csv.textContent='Export profile CSV';csv.disabled=true;details.append(csv);const png=document.createElement('button');png.type='button';png.textContent='Export profile PNG';png.style.marginLeft='8px';png.disabled=true;details.append(png);host.append(details);
  $('profile-axis').value=profileState.axis;$('profile-coordinate').value=profileState.coordinate;
  const range=()=>{const extent=$('profile-axis').value==='x'?1.2:1.5;$('profile-coordinate').min=-extent;$('profile-coordinate').max=extent;};range();$('profile-axis').onchange=range;
  let series=[],cacheKey='';
  profileRedraw=()=>{if(!details.open)return;try{
   const key=JSON.stringify([profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component]);if(key!==cacheKey){series=profileRuns.map(run=>({run,segments:lineProfile(run.field,fieldScalars(run.field,fieldView.mode,fieldView.component).values,profileState.axis,profileState.coordinate)}));cacheKey=key;}
-  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} µm · candidate ${fieldView.mode+1} · ${q} / max|E| (0–1).`;
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} µm · candidate ${fieldView.mode+1} · ${q} / max|E| (0–1). Full-domain profile; the amber dashed line marks its location in the field view when visible.`;
   legend.replaceChildren();series.forEach((item,i)=>{const line=document.createElement('p');line.style.color=i?'#e7bc73':'#80d7c0';line.textContent=`${i?'B':'A'} · ${item.run.label?item.run.label+' · ':''}${item.run.job} · ${item.run.origin} · ${item.segments.length} intervals`;legend.append(line);});
-  drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);
- }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;}};
- form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value);profileRedraw();};
- details.ontoggle=()=>{profileState.open=details.open;profileRedraw();};
+  drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);png.disabled=csv.disabled;
+ }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;png.disabled=true;}};
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value);profileRedraw();updateFields();};
+ details.ontoggle=()=>{profileState.open=details.open;profileRedraw();updateFields();};
  csv.onclick=()=>downloadFile(new Blob([profileCsv(series,profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component)],{type:'text/csv'}),'studio-profile.csv');
+ png.onclick=()=>{
+  const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height+180;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,0,0);ctx.font='14px Segoe UI';ctx.fillStyle='#cfdae0';
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';ctx.fillText(`Line ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} um | candidate ${fieldView.mode+1} | ${q} / max|E|`,12,canvas.height+24);
+  ctx.fillText('Relative amplitude 0 to 1 per candidate. Stored triangle values; no interpolation.',12,canvas.height+48);
+  series.forEach((item,i)=>{ctx.fillStyle=i?'#e7bc73':'#80d7c0';ctx.fillText(`${i?'B':'A'}: ${item.run.job} | ${item.run.input.model.width} x ${item.run.input.model.height} nm | ${item.run.input.setup.materials.Core} | ${item.run.origin}`,12,canvas.height+76+i*24);});
+  ctx.fillStyle='#cfdae0';ctx.fillText('Full domain. No absolute-power or cross-design mode matching claim.',12,canvas.height+142);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-profile.png');},'image/png');
+ };
  profileResize=new ResizeObserver(profileRedraw);profileResize.observe(canvas);profileRedraw();
 }
 
@@ -431,7 +439,7 @@ function renderRunList(){
   }catch(error){notice(error.message);}};panel.append(exportRun);
   const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore selected run inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
-   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
+   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+profileState.coordinate+' um (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
@@ -451,7 +459,7 @@ function renderComparison(){
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
  const redraw=()=>{drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
- fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b]);
+ fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw);
 }
 let pendingRunImport=null;
 const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.innerHTML='<h2>Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p>Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);
