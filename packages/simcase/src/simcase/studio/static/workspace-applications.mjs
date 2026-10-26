@@ -3,7 +3,7 @@
 
 // Workspace adapter availability, not a claim about the entire solver library.
 export const APPLICATIONS=Object.freeze([
- Object.freeze({id:'optical',title:'Optical waveguide',status:'Live optical calculation',available:true,description:'Edit the core, calculate optical modes, compare fields and save results.',scope:'2D core in silica · editable width/height · fixed wavelength',physics:Object.freeze({electric:false,heat:false,structure:false,optics:true})}),
+ Object.freeze({id:'optical',title:'Optical waveguide',status:'Live optical calculation',available:true,description:'Edit the core, calculate optical modes, compare fields and save results.',scope:'2D core in silica · editable width/height, wavelength and core mesh',physics:Object.freeze({electric:false,heat:false,structure:false,optics:true})}),
  Object.freeze({id:'multi',title:'Heated optical waveguide',status:'Setup only · calculation unavailable',available:false,description:'Arrange electric, thermal, structural and optical interfaces in one model.',scope:'Conceptual regions and boundaries · coupled adapter pending',physics:Object.freeze({electric:true,heat:true,structure:true,optics:true})})
 ]);
 export function templatePhysics(id){
@@ -25,6 +25,6 @@ export function renderApplications(host){
   button.append(title,status,description,scope);cards.append(button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
- contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: silicon or silicon nitride core in silica; height 100–500 nm, wavelength 1550 nm, two candidates.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a template changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
+ contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: silicon or silicon nitride core in silica; height 100–500 nm, wavelength 1400–1700 nm, core mesh 20–60 nm, two candidates.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a template changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
  host.append(heading,intro,cards,contract);
 }

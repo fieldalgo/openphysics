@@ -18,6 +18,7 @@ For build reviews and first-user checks, use the [acceptance checklist](workspac
    setup only; it does not run coupled physics.
 2. In **Geometry**, set width and height or drag the core edges. In **Materials**,
    choose Silicon or Silicon nitride for the core; keep the silica background.
+   Optionally set the wavelength in **Optical modes** and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
 4. Select **Run optical study**. Results keep the input snapshot used by that run,
@@ -41,9 +42,18 @@ and edit its properties in the inspector. The optical application runs a real
 coupling diagram, voltage and mechanical selections do not run coupled physics.
 
 The optical adapter accepts a Si or SiN rectangular core in silica, with width
-300–900 nm and height 100–500 nm. Wavelength is fixed at 1550 nm, core mesh at 30 nm,
-the window at [-1.5, 1.5, -1.2, 1.2] µm, PEC boundaries and two candidates.
-These fixed settings are visible with the result. Use the existing editor for
+300–900 nm and height 100–500 nm. Set the wavelength (1400–1700 nm) in
+**Optical modes** and the core mesh size (20–60 nm) in **Mesh**; new models start
+at 1550 nm and 30 nm. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
+boundaries and two candidates. Each result shows the wavelength and core mesh it used.
+
+Material indices are evaluated at the chosen wavelength; the lower limit stays
+inside the silicon data range. A coarser core mesh is faster and gives smaller
+session files, but changes n_eff: for a 500 × 220 nm silicon core at 1400 nm,
+20 nm and 60 nm meshes differ by about 0.01. Compare designs at the same mesh
+size, and refine the mesh to judge whether a difference is resolved. The fixed
+window and PEC edges matter more at longer wavelengths and for small cores; these
+settings do not certify mesh or window convergence. Use the existing editor for
 other supported optical studies; this workspace does not expose all engine APIs.
 
 Invalid numeric drafts stay visible across navigation. Resolve or discard them
@@ -96,13 +106,20 @@ Version-1 inputs and sessions remain readable: their fixed core height becomes
 version 2 instead of silently ignoring height. Each result retains its captured
 height, including field outlines, comparisons and CSV/PNG exports.
 
-The workspace checks `/api/workspace/capabilities/v2` before enabling Run. Contract
-version 2 and adapter `optical-rectangle-v2` declare the 100–500 nm height range
-and the fixed settings above,
+Version-3 inputs and sessions add the wavelength and core mesh size with nm units.
+Version-1 and version-2 files open at 1550 nm and 30 nm, the settings their results
+were computed with; older editors reject version 3 instead of ignoring the new
+values. Results keep their captured wavelength and core mesh in history labels,
+comparisons and CSV/PNG exports.
+
+The workspace checks `/api/workspace/capabilities/v3` before enabling Run. Contract
+version 3 and adapter `optical-rectangle-v3` declare the 100–500 nm height,
+1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
+and candidate settings,
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
-captures its core height and the reported simcase package version and preserves it in session JSON.
-The original capability endpoint remains available for fixed-height clients.
+captures its core height, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
+The earlier capability endpoints remain available for older clients.
 This is not a complete engine dependency or Git provenance record. Older
 version-1 sessions without this field remain readable with unknown provenance.
 

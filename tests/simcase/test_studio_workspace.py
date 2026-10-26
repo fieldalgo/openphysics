@@ -65,6 +65,20 @@ def test_rectangle_capability_v2_preserves_v1(client):
     assert client.get('/api/workspace/capabilities').json()['settings']['height_nm'] == 220
 
 
+
+def test_optical_study_capability_v3_preserves_earlier_contracts(client):
+    response = client.get('/api/workspace/capabilities/v3')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 3
+    assert caps['adapter'] == 'optical-rectangle-v3'
+    assert caps['wavelength_range_nm'] == [1400, 1700]
+    assert caps['core_mesh_range_nm'] == [20, 60]
+    assert caps['settings'] == {'window_um': [-1.5, 1.5, -1.2, 1.2], 'boundary': 'PEC', 'candidates': 2}
+    assert caps['server_instance'] == client.get('/api/workspace/capabilities/v2').json()['server_instance']
+    assert client.get('/api/workspace/capabilities/v2').json()['settings']['wavelength_nm'] == 1550
+
 def test_workspace_instance_is_stable_for_server_lifetime(client):
     caps = client.get('/api/workspace/capabilities/v2').json()
     assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])
