@@ -24,6 +24,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add temperature-dependent 2D steady Joule heating with bounded material models,
+  relaxed Picard iteration, failure histories and independent reference tests.
+
 - Add public-reference benchmarks against exact references: the Timoshenko
   (1925) bimetal strip (`refsol.bimetal`) and NAFEMS T4 convective heat transfer
   (`refsol.thermal_convection`, with the published 18.3 °C target), with mesh

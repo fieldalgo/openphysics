@@ -30,7 +30,7 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 재료 영역 | Python에서 정상·과도 열전도, 탄성, 열팽창, 두 열전도→기계 workflow에 쓰는 2D 메시 이름 영역별 상수·등방 재료, 배경 위에 도형을 놓는 정상·과도 열전도 JSON 문서 | [영역 재료](packages/galerkin/multimaterial.md), [영역 문서](packages/simcase/thermal_regions2d.md) |
 | 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](packages/galerkin/elasticity2d.md), [표면하중](packages/galerkin/elasticity_traction.md) |
 | 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](packages/galerkin/prescribed_temperature_thermoelasticity.md), [전체 표면하중](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md) |
-| Joule heating | 온도독립 영역별 물성, 요소별 발열 전달과 열 에너지 수지를 검증하는 같은 메시의 명시적 정상 전기→열 Python workflow | [Joule workflow](packages/galerkin/joule_heating.md) |
+| Joule heating | 온도독립 또는 온도의존 전기전도도, 요소별 발열 전달과 열 에너지 수지를 검증하는 같은 메시의 명시적 정상 전기→열 Python workflow | [Joule workflow](packages/galerkin/joule_heating.md) |
 | 과도 열응력 | 같은 고정 메시에서 저장된 과도 열전도 시간 중 고른 시간마다 준정적 선형 미소변형 기계해석, 명시적인 두 번째 Python 호출 | [과도 열전도→기계](packages/galerkin/transient_thermal_mechanical.md) |
 
 ### 기능별 사용 경로
@@ -194,3 +194,5 @@ refractiveindex.info 광학 데이터는 CC0 1.0이고 Gmsh는 자체 라이선�
 [제3자 소프트웨어](third-party.md)에 있습니다.
 
 [2D 정상 전기전도 Python API](packages/galerkin/electric_steady2d.md)는 영역별 전기전도도, 전압·전류·절연 경계, Neumann 기준 전위, V/E/J와 요소별 Joule 발열을 지원합니다. JSON·CLI·Studio는 지원하지 않습니다.
+
+[온도 의존 양방향 Joule heating API](packages/galerkin/temperature_joule_heating.md)

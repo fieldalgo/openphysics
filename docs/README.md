@@ -103,3 +103,5 @@ PyPI is the empty 0.0.1 name reservation and installs nothing.
 | physmat | [English](packages/physmat/overview.md) | [한국어](locales/ko/pages/packages/physmat/overview.md) |
 | simcase | [English](packages/simcase/overview.md) | [한국어](locales/ko/pages/packages/simcase/overview.md) |
 | openphysics | [English](packages/openphysics/overview.md) | [한국어](locales/ko/pages/packages/openphysics/overview.md) |
+
+- [Temperature-dependent Joule heating](packages/galerkin/temperature_joule_heating.md)

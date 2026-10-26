@@ -33,7 +33,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | Material regions | Piecewise-constant isotropic materials on named 2D mesh regions for steady and transient heat, elasticity, thermal expansion and both heat→mechanics workflows in Python; steady and transient heat JSON documents with shapes over a background | [Region materials](packages/galerkin/multimaterial.md), [region documents](packages/simcase/thermal_regions2d.md) |
 | Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](packages/galerkin/elasticity2d.md), [traction](packages/galerkin/elasticity_traction.md) |
 | Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](packages/galerkin/prescribed_temperature_thermoelasticity.md), [total traction](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md) |
-| Joule heating | Explicit same-mesh steady electric→heat Python workflow; temperature-independent region properties, elementwise power transfer and thermal energy balance | [Joule workflow](packages/galerkin/joule_heating.md) |
+| Joule heating | Explicit same-mesh steady electric→heat Python workflow; constant or temperature-dependent conductivity, elementwise power transfer and thermal energy balance | [Joule workflow](packages/galerkin/joule_heating.md) |
 | Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](packages/galerkin/transient_thermal_mechanical.md) |
 
 ### Where each feature is available
@@ -208,3 +208,5 @@ license.
 Every dependency, external program, dataset and published reference, with its
 license and how it is used, is listed in
 [third-party software](third-party.md).
+
+Temperature-dependent two-way coupling: [Python API](packages/galerkin/temperature_joule_heating.md).
