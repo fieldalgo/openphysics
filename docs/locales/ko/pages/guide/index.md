@@ -82,3 +82,7 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 - [모델·솔버·결과 오류 진단하기](troubleshooting.md)
 
 - [Python·JSON/CLI·Studio 실행 경로 선택](execution-paths.md)
+
+- [슬래브 해석해로 도파로 검증하기](../validation/slab-tutorial.md)
+- [열팽창·응력·반력 해석하기](../results/thermoelastic-controls.md)
+- [재현 가능한 계산 기록 보관하기](../results/run-records.md)

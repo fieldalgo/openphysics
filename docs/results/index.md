@@ -42,3 +42,6 @@ simcase overview and the specific physics contract for the supported scope.
 - [Diagnose model, solver and result errors](../guide/troubleshooting.md)
 
 - [Interpret waveguide modes and loss](waveguide-modes.md)
+
+- [Interpret thermal expansion, stress and reactions](thermoelastic-controls.md)
+- [Keep a reproducible calculation record](run-records.md)

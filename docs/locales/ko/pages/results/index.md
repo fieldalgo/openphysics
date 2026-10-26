@@ -42,3 +42,6 @@ JSON/CLI의 저장 파일과 export 지원은 모델마다 다릅니다. `simcas
 - [모델·솔버·결과 오류 진단하기](../guide/troubleshooting.md)
 
 - [도파로 모드와 손실 해석](waveguide-modes.md)
+
+- [열팽창·응력·반력 해석하기](thermoelastic-controls.md)
+- [재현 가능한 계산 기록 보관하기](run-records.md)

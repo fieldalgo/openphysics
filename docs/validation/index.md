@@ -58,3 +58,5 @@ records and plans do not establish a current pass; resource observations are not
 ## Apply this to your model
 
 - [Check convergence of your calculation](convergence.md)
+
+- [Verify a waveguide against the slab solution](slab-tutorial.md)

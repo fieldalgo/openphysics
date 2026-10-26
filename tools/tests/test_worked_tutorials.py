@@ -18,6 +18,7 @@ PAGES = [
     'modeling/boundaries-units.md', 'results/saved-results.md',
     'validation/convergence.md', 'guide/troubleshooting.md',
     'modeling/materials.md', 'guide/execution-paths.md', 'results/waveguide-modes.md',
+    'validation/slab-tutorial.md', 'results/thermoelastic-controls.md', 'results/run-records.md',
 ]
 
 
@@ -109,3 +110,54 @@ def _execute_document_python(page):
     for code in re.findall(r'^```python\n(.*?)^```', text, re.M | re.S):
         exec(compile(code, page, 'exec'), namespace)
     return namespace
+
+
+def test_slab_tutorial_separates_mesh_and_window_errors():
+    example = runpy.run_path(str(ROOT / 'examples/galerkin/slab_convergence.py'))
+    reference, rows = example['main']()
+    assert reference == pytest.approx(2.851738987, abs=5e-10)
+    mesh_errors = [row[4] for row in rows if row[0] == 'mesh']
+    assert all(3.5 < a / b < 4.5 for a, b in zip(mesh_errors, mesh_errors[1:]))
+    window_errors = [row[4] for row in rows if row[0] == 'window']
+    assert window_errors[0] > 100 * window_errors[-1]
+    assert window_errors[-1] < 1e-4
+
+
+def test_thermoelastic_controls_match_uniform_3d_reductions():
+    example = runpy.run_path(str(ROOT / 'examples/galerkin/thermoelastic_controls.py'))
+    mesh, results = example['main']()
+    a, young, nu = 12e-6 * 20, 70e9, .3
+    for name, factor, inplane, zz, energy in (
+        ('free_plane_stress', a, 0., 0., 0.),
+        ('free_plane_strain', (1 + nu) * a, 0., -young * a, .5 * young * a*a),
+        ('blocked_plane_strain', 0., -young*a/(1-2*nu),
+         -young*a/(1-2*nu), 1.5*young*a*a/(1-2*nu)),
+    ):
+        r = results[name]
+        np.testing.assert_allclose(r.displacement, factor * mesh.nodes, atol=1e-14, rtol=0)
+        np.testing.assert_allclose(r.stress[:, :2], inplane, atol=1e-5, rtol=0)
+        np.testing.assert_allclose(r.stress[:, 2], 0., atol=1e-5, rtol=0)
+        np.testing.assert_allclose(r.sigma_zz, zz, atol=1e-5, rtol=0)
+        assert r.physical_elastic_energy == pytest.approx(energy, abs=1e-8, rel=1e-12)
+        np.testing.assert_allclose(r.reaction.sum(axis=0), 0., atol=1e-5, rtol=0)
+        moment = np.sum(mesh.nodes[:, 0]*r.reaction[:, 1] - mesh.nodes[:, 1]*r.reaction[:, 0])
+        assert abs(moment) < 1e-5
+    assert np.linalg.norm(results['blocked_plane_strain'].reaction) > 1e6
+
+
+def test_run_record_preserves_inputs_and_detects_changed_output(tmp_path, monkeypatch):
+    script = ROOT / 'examples/simcase/record_wall_run.py'
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, 'argv', [str(script), 'out/wall-recorded'])
+    runpy.run_path(str(script), run_name='__main__')
+    folder = tmp_path / 'out/wall-recorded'
+    assert (folder / 'input.json').read_bytes() == (script.parent / 'layered_wall.json').read_bytes()
+    record = json.loads((folder / 'run-record.json').read_text())
+    assert record['convergence'] == 'not_checked'
+    assert record['package_versions']['simcase']
+    assert 'run-record.json' not in record['sha256']
+    _execute_document_python('results/run-records.md')
+    with (folder / 'summary.json').open('a') as stream:
+        stream.write('\n')
+    with pytest.raises(ValueError, match='Changed result file: summary.json'):
+        _execute_document_python('results/run-records.md')
