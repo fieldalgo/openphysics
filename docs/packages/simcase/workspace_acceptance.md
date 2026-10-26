@@ -48,7 +48,8 @@ coupled physics distinguishable.
 | Use current notebook for recovery; cancel, then review and confirm | Cancel keeps the stored record. Confirm replaces only browser recovery, preserving the current model, results and Undo. |
 | Change stored recovery in another tab while replacement review is open | Confirmation cannot overwrite the new revision; review again. |
 | Stop waiting during a calculation, edit inputs, Resume | The captured job is retrieved without replacing current model inputs. Stop waiting does not cancel server computation. |
-| Restart the test server while a job remains attached | The old server identity is rejected; unrelated new-server jobs cannot become its result. Preserve a portable session before this test. |
+| Restart the test server while a job remains attached | The old server identity is rejected; Resume is disabled. Recover a notebook and navigate between pages: the job panel, Study step and footer still require Detach. Detaching preserves inputs and retained results and allows a new explicit Run. Preserve a portable session before this test. |
+| Temporarily lose the connection while retrieving a job | Existing results remain visible; Resume retries retrieval of the same captured job after reconnecting. A missing job or a solver-reported failure instead requires Detach. |
 | Import a saved run into an existing notebook | Review states additions/replacements; current inputs and input Undo remain. A conflicting payload leaves the whole notebook intact. |
 | Pin all six retained runs | New Run is blocked; input checks and mesh preview remain available. Unpinning one restores capacity. |
 | Select the heated-waveguide template | Setup and connection editing are available; coupled execution remains unavailable and no fabricated thermal/mechanical results appear. |
@@ -82,6 +83,24 @@ were supplied from the worktree with existing dependencies. Full repository CI,
 all-package independent installation, other operating systems/browsers, all
 viewport/zoom combinations and a human usability pilot were not established by
 this observation. No new third-party dependency was added.
+
+## Recovery observation, 2026-10-27
+
+On Windows, a separately installed `c8ac6d5` simcase wheel was checked after a
+restart of its test server. The old job could not resume. Reloading and recovering
+the notebook retained the unavailable-job guidance in the job panel, Study and
+footer. Detaching the old job preserved the current 880 × 500 nm model and one
+pinned 650 × 350 nm result, and enabled a new explicit Run. A preceding source
+check stopped observation, edited inputs and resumed the same completed job;
+its result retained the submitted inputs without replacing the edited model.
+
+All six implementation packages came from wheels in the test environment;
+third-party dependencies reused the existing system environment. This was not a
+fresh installation of every dependency. The final installed static files matched
+29 source files; 216 Studio JavaScript contracts and 12 workspace HTTP/CLI checks
+passed outside the checkout. The earlier complete two-design task was not
+repeated at this revision. Other browsers, viewport/zoom combinations and a human
+usability pilot remain unverified by this observation.
 
 ## Release decision
 
