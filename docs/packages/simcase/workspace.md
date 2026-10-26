@@ -38,6 +38,8 @@ history, saved files or computed fields.
 
 In optical Geometry / Bodies, drag either highlighted core edge to resize symmetrically. A dashed preview does not change the model until release; Escape or pointer cancellation discards it. One completed drag creates one undoable edit. Width is bounded to 300–900 nm and drag updates snap to 1 nm. Focus a handle and use arrow keys (10 nm, Shift: 1 nm) or Home/End. Invalid numeric drafts block resizing.
 
+Resizing uses the drawing transform captured at gesture start, so zoom and pan do not change the unit conversion. The release position is applied even if no final move event arrives. Window resize, focus loss and page hiding cancel the preview; invalid inputs are checked again before committing.
+
 ## Results and files
 
 The notebook retains the last six successful runs. Select a candidate to inspect
