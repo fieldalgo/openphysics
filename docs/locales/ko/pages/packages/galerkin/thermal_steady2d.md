@@ -183,3 +183,5 @@ A=1 K이며 네 측면에 T0를 처방합니다. 정확한 Q는 `-k Laplacian(T)
 지원을 포함하지 않습니다. 기존 NumPy/SciPy와 직접 유도한 수식만 사용합니다. 외부
 solver 소스나 새 runtime 의존성을 추가하지 않습니다. 문서·예제는 저장소에만
 있고 배포본에 포함되지 않습니다.
+
+JAX·PyTorch 입력과 그 미분은 [JAX·PyTorch로 미분하기](differentiation.md)에 있습니다.

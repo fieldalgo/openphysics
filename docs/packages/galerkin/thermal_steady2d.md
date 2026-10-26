@@ -206,3 +206,6 @@ is included. Only existing NumPy/SciPy and original mathematical formulas are
 used. No third-party solver source or new runtime dependency is introduced.
 Documents and examples stay in the repository and are not shipped in the
 distributions.
+
+JAX and PyTorch inputs and the derivatives they carry are described in
+[Derivatives with JAX and PyTorch](differentiation.md).

@@ -168,9 +168,9 @@ def test_actual_runtime_negative_controls(monkeypatch,mutation):
             H=diags(np.asarray(H.sum(axis=1)).ravel()).tocsr()
         return H,G,B,S
     if mutation=='reversed_normal':
-        def samples_wrong(mesh,p,t,prescribed,outward_flux,convection):
+        def samples_wrong(mesh,p,t,prescribed,outward_flux,convection,**options):
             wrong={tag:(lambda p,n,fn=fn:fn(p,-n)) for tag,fn in outward_flux.items()}
-            return samples_original(mesh,p,t,prescribed,wrong,convection)
+            return samples_original(mesh,p,t,prescribed,wrong,convection,**options)
         monkeypatch.setattr(thermal,'scalar_boundary_samples',samples_wrong)
     else:monkeypatch.setattr(thermal,'_boundary_system',mutated)
     with pytest.raises((AssertionError,ValueError)):
