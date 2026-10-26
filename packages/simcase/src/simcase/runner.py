@@ -292,8 +292,8 @@ class RunResult:
                               vector_transverse=np.stack([f.transverse for f in self.vector_fields]),
                               vector_longitudinal=np.stack([f.longitudinal for f in self.vector_fields]),
                               vector_electric=np.stack([f.electric for f in self.vector_fields]))
-                if self.mode_tracking is not None:
-                    arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
+            if self.mode_tracking is not None:
+                arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
             np.savez_compressed(outdir / "fields.npz", **arrays)
         if self.doc["results"].get("plots", True):
             self.plot(outdir / "results.png")
@@ -335,7 +335,7 @@ class RunResult:
             for j in range(self.neff.shape[1]):
                 ax.plot(self.values, self.neff[:, j].real, "o-", label=f"mode {j + 1}")
             ax.set_xlabel(self.parameter + (f" ({length})" if value_unit else ""))
-            ax.set_ylabel("n_eff"); ax.legend(fontsize=8)
+            ax.set_ylabel("Re n_eff" if np.iscomplexobj(self.neff) else "n_eff"); ax.legend(fontsize=8)
             ng = self.group_index()
             if ng is not None:
                 ax2 = ax.twinx()
