@@ -100,9 +100,9 @@ function refreshInputIssues(){
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max} ${field.unit}.`;
  }
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid;
- $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||numericDrafts.invalid;
+ $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
- else $('status').textContent=solverBusy?'Optical computation running':opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required';
+ else $('status').textContent=solverBusy?'Optical computation running':pendingJob?'Pending job · resume or detach':retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
  refreshPersistence();
 }
 function bindNumericInputs(){
@@ -157,7 +157,7 @@ function refreshPersistence(){
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock(),busy:solverBusy,pending:!!pendingJob,mesh:meshPreview.record,runs});
+ const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,mesh:meshPreview.record,runs});
  steps.forEach((step,index)=>{
   let button=host.children[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
   const selected=step.id==='Results'?['Results','Compare'].includes(ui.page):ui.page==='Model'&&ui.selection===step.id;
@@ -261,9 +261,10 @@ $('recover-notebook').onclick=async()=>{
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
 
-function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'']),selected:solverRun?.job||null,comparison:compareIds,view:fieldView});}
+function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:fieldView});}
 function refreshNotebook(){const stamp=notebookStamp();if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,()=>JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView)));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
+const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();if(isOptical())$('sequence').innerHTML='<span>Optical modes</span><span>Run validates a captured input snapshot</span><span>Mesh/window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span>Results are attached to captured inputs</span><span>Mode matching / convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
@@ -299,7 +300,7 @@ function renderOpticalStudy(){
  check.onclick=()=>preflight.check(current(),opticalDocument(),connection.instance);actions.append(check);
  const exportDoc=document.createElement('button');exportDoc.textContent='Export solver JSON';exportDoc.disabled=!!opticalSupport(state,setup)||numericDrafts.invalid;
  exportDoc.onclick=()=>{try{rejectInvalidInput();downloadFile(new Blob([JSON.stringify(opticalDocument(),null,2)],{type:'application/json'}),'studio-optical-solver.json');notice('Solver document exported in micrometres. This is a simcase input, not a workspace session.');}catch(error){notice(error.message);}};actions.append(exportDoc);host.append(actions);
- const block=opticalBlock();if(block){const message=document.createElement('p');message.textContent=block;message.className='validation-warning';host.append(message);}
+ const block=opticalBlock()||retentionBlock();if(block){const message=document.createElement('p');message.textContent=block;message.className='validation-warning';host.append(message);}
  if(preflight.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent='Input check failed: '+preflight.error+' Previous check retained.';host.append(error);}
  const record=preflight.record;
  if(record){const report=document.createElement('section');report.className='validation-report';const heading=document.createElement('h3');const same=!numericDrafts.invalid&&record.signature===signature()&&record.serverInstance===connection.instance;
@@ -412,11 +413,12 @@ function renderLineProfile(host,profileRuns){
 function downloadFile(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Run notebook</h2>';
- const title=document.createElement('h3');title.textContent=`History · ${runs.length} / ${RUN_LIMIT}`;panel.append(title);
+ const title=document.createElement('h3');title.textContent=`History · ${runs.length} / ${RUN_LIMIT} · ${runs.filter(r=>r.pinned).length} pinned`;panel.append(title);
  for(const run of [...runs].reverse()){
-  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin!=='local'?' · '+run.origin:''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
+  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.pinned?'Pinned · ':''}${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin!=='local'?' · '+run.origin:''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
  }
  if(solverRun){
+  const pin=document.createElement('button');pin.id='pin-run';pin.textContent=solverRun.pinned?'Unpin selected run':'Pin selected run';pin.disabled=(solverBusy||!!pendingJob)&&!solverRun.pinned;pin.onclick=()=>{solverRun.pinned=!solverRun.pinned;render();$('pin-run')?.focus();notice(solverRun.pinned?'Run pinned against automatic notebook eviction. Save session for a portable backup.':'Run unpinned; it may be replaced when the notebook reaches six runs.');};panel.append(pin);
   const nameForm=document.createElement('form');nameForm.className='run-name';
   const nameLabel=document.createElement('label');nameLabel.textContent='Selected run name';const nameInput=document.createElement('input');nameInput.type='text';nameInput.maxLength=80;nameInput.value=solverRun.label||'';nameInput.placeholder='Optional name';nameLabel.append(nameInput);
   const rename=document.createElement('button');rename.type='submit';rename.textContent='Rename run';nameForm.append(nameLabel,rename);panel.append(nameForm);
@@ -432,7 +434,7 @@ function renderRunList(){
   };panel.append(exportPng);
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent='Latest six runs retained. Save session or Save selected run before older runs are evicted. No cross-design mode tracking.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent='Six runs retained. Pinned runs stay; the oldest unpinned run is replaced by a new result. Save session or selected runs for portable backups. No cross-design mode tracking.';panel.append(limit);
 }
 function renderComparison(){
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
@@ -464,8 +466,8 @@ const jobMonitor=new OpticalJobMonitor({api:solverApi,onState:state=>{
 },onResult:(result,pending)=>{
  if(!Array.isArray(result.neff?.[0])||result.neff[0].length!==2||!result.neff[0].every(Number.isFinite))throw new Error('Unsupported optical result.');
  const input=pending.input;
- solverRun=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.height),input,neff:[...result.neff[0]],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
- solverRun.inputRevision=pending.revision;runs=appendRun(runs,solverRun);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
+ const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.height),input,neff:[...result.neff[0]],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
+ completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
 }});
 function refreshJobControls(){
  $('job-input').textContent=pendingJob?pendingJob.job+' · '+pendingJob.input.model.width+' × '+pendingJob.input.model.height+' nm · '+pendingJob.input.setup.materials.Core+' · captured inputs':'';
@@ -473,8 +475,8 @@ function refreshJobControls(){
  $('stop-waiting').disabled=!pendingJob||!solverBusy||!jobMonitor.busy;
  $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready;
  $('forget-job').disabled=!pendingJob||solverBusy;
- $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||numericDrafts.invalid;
- if(pendingJob&&!solverBusy)$('status').textContent='Pending job · resume or detach before starting another calculation';
+ $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
+ if(pendingJob&&!solverBusy)$('status').textContent='Pending job · resume or detach before starting another calculation';else if(!solverBusy&&retentionBlock())$('status').textContent=retentionBlock();
 }
 function setPending(record){pendingJob=record;try{storePending(sessionStorage,record);$('job-storage').textContent='';}catch(error){$('job-storage').textContent='Job recovery storage unavailable: '+error.message+' Keep this tab open to retrieve the result.';}}
 try{pendingJob=readPending(sessionStorage);if(pendingJob){jobPhase='detached';$('job-message').textContent='Saved job '+pendingJob.job+' is available. Resume retrieves its captured result without changing your current inputs.';}}catch(error){$('job-message').textContent='Job recovery record could not be read: '+error.message;jobPhase='error';}
@@ -486,7 +488,7 @@ $('resume-job').onclick=async()=>{
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
 $('run-optical').onclick=async()=>{
- if(solverBusy||pendingJob||opticalBlock())return;
+ if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  const operation=++jobOperation;edits.record(current());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{

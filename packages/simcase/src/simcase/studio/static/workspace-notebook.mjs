@@ -13,8 +13,8 @@ export function validateRunLabel(value=''){
 }
 export function csvCell(value){const text=String(value);const safe=typeof value==='string'&&/^\s*[=+@-]/.test(text)?"'"+text:text;return '"'+safe.replaceAll('"','""')+'"';}
 export function runTableCsv(runs){
- const rows=[['job','name','completed_at','core_width_nm','core_height_nm','core_material','candidate','neff','origin']];
- for(const r of runs)r.neff.forEach((n,i)=>rows.push([r.job,r.label||'',r.completedAt,r.input.model.width,r.input.model.height,r.input.setup.materials.Core,i+1,n,r.origin]));
+ const rows=[['job','name','pinned','completed_at','core_width_nm','core_height_nm','core_material','candidate','neff','origin']];
+ for(const r of runs)r.neff.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,r.input.model.width,r.input.model.height,r.input.setup.materials.Core,i+1,n,r.origin]));
  return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
 }
 export function validateRun(record,imported=false){
@@ -23,6 +23,7 @@ export function validateRun(record,imported=false){
 
  if(record.input?.units?.width!=='nm'||record.input?.units?.temperature!=='K'||record.input?.units?.voltage!=='V')throw new Error('Invalid run units.');
  if(record.serverVersion!=null&&(typeof record.serverVersion!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(record.serverVersion)))throw new Error('Invalid server version.');
+ if(record.pinned!==undefined&&typeof record.pinned!=='boolean')throw new Error('Invalid run pin state.');
  const input=validateProject(record.input);
  const settings=record.settings?.adapter==='optical-fixed-v1'?OPTICAL_SETTINGS:opticalSettings(input.model.height);
  if(!record.settings||record.settings.height_nm!==input.model.height||Object.keys(settings).some(k=>JSON.stringify(record.settings[k])!==JSON.stringify(settings[k])))throw new Error('Unsupported run settings or height mismatch.');
@@ -32,9 +33,14 @@ export function validateRun(record,imported=false){
  if(!f)throw new Error('Missing run fields.');
  const field=readOpticalField({nodes:f.nodes,triangles:f.triangles,vector_fields:[{location:'triangle_centroids',components:['Ex','Ey','Ez'],normalization:'max_centroid_magnitude',amplitude_unit:'relative',real:f.real,imag:f.imag}]});
  for(let mode=0;mode<2;mode++)fieldScalars(field,mode);
- return {label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:JSON.stringify(input),neff:[...record.neff],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
+ return {pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:JSON.stringify(input),neff:[...record.neff],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
 }
-export function appendRun(runs,run){return [...runs.filter(r=>r.job!==run.job),run].slice(-RUN_LIMIT);}
+export function appendRun(runs,run){
+ const previous=runs.find(r=>r.job===run.job);
+ const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];
+ while(next.length>RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All notebook slots are pinned. Unpin a run before retaining another result.');next.splice(oldest,1);}
+ return next;
+}
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'}){
  return {format:'openphysics-studio-session',version:2,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:{...view}};
 }

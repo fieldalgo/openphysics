@@ -31,3 +31,15 @@ test('optional run names survive sessions; unsafe names are rejected and CSV quo
  for(const value of ['x'.repeat(81),'bad\nname',null,123])assert.throws(()=>validateRunLabel(value));
  assert.equal(validateRunLabel('  reference  '),'reference');assert.equal(validateRunLabel(),'');
 });
+
+
+test('pinned references survive retention and a fully pinned notebook rejects a new result atomically',()=>{
+ const original=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));original[0].pinned=true;
+ const next=appendRun(original,run('abcdef12'));assert.equal(next.length,6);assert.ok(next.some(r=>r.job==='00000000'));assert.ok(!next.some(r=>r.job==='00000001'));assert.equal(original.length,6);
+ const pinned=original.map(r=>({...r,pinned:true}));assert.throws(()=>appendRun(pinned,run('abcdef12')),/pinned/);assert.equal(pinned.length,6);assert.equal(pinned[0].job,'00000000');
+});
+test('resuming an existing run preserves its name and pin, and session pin metadata is validated',()=>{
+ const first={...run(),label:'Reference',pinned:true};const again=appendRun([first],run());assert.equal(again.length,1);assert.equal(again[0].label,'Reference');assert.equal(again[0].pinned,true);
+ const doc=createSession(input(),[first],first.job,[first.job,first.job]);assert.equal(parseSession(JSON.stringify(doc)).runs[0].pinned,true);doc.runs[0].pinned='yes';assert.throws(()=>parseSession(JSON.stringify(doc)),/pin/);
+ const old=createSession(input(),[run()],'12345678',['12345678',null]);delete old.runs[0].pinned;assert.equal(parseSession(JSON.stringify(old)).runs[0].pinned,false);
+});
