@@ -268,8 +268,14 @@ fields are labeled `recovered`, not newly computed. Recovery starts a new input
 undo history and keeps the document unsaved until you save a file/session. No
 solver is started. Input-only recovery and pending-job recovery remain separate.
 
-This is the latest single snapshot for the browser origin, shared across tabs;
-another tab's later snapshot can replace it. It is not a backup archive. A quota or
+This is the latest single snapshot for the browser origin, shared across tabs.
+Each write checks the previously observed revision in the same database transaction.
+If another tab has saved since this tab loaded or recovered the notebook, automatic
+storage stops without overwriting that record. Save session to preserve this tab,
+then Recover last session to review and adopt the newer notebook. Cancelling the
+review or Retry recovery storage does not bypass this protection. Reload older tabs
+after updating Studio: an older running version may still overwrite the shared record.
+This is not a backup archive. A quota or
 transaction failure retains the previous committed record; Retry recovery storage
 retries the latest requested state. Closing the tab while pending/saving can lose
 recent changes. Browser cleanup/private mode or a different port can make recovery
