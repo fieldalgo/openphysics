@@ -15,7 +15,7 @@ and edit its properties in the inspector. The optical application runs a real
 coupling diagram, voltage and mechanical selections do not run coupled physics.
 
 The optical adapter accepts a Si or SiN rectangular core in silica, with width
-300–900 nm. Height is fixed at 220 nm, wavelength at 1550 nm, core mesh at 30 nm,
+300–900 nm and height 100–500 nm. Wavelength is fixed at 1550 nm, core mesh at 30 nm,
 the window at [-1.5, 1.5, -1.2, 1.2] µm, PEC boundaries and two candidates.
 These fixed settings are visible with the result. Use the existing editor for
 other supported optical studies; this workspace does not expose all engine APIs.
@@ -30,7 +30,7 @@ and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view reta
 its camera while navigating this tab. Heated-waveguide views remain schematic. The optical-only view shows a
 2D cross section with equal x/y scale and dimensions in nm. Its core rectangle
 and domain come from the same geometry contract as the submitted document: core
-y = 0–220 nm, centered in x; window x = ±1500 nm and y = ±1200 nm. Only the
+y = 0 to the chosen height, centered in x; window x = ±1500 nm and y = ±1200 nm. Only the
 core and silica background appear, without a heater or perspective projection.
 Select Boundaries to inspect the four fixed PEC edges; these are read-only
 optical conditions, not thermal/mechanical assignments. This is not a CAD editor. Camera changes do not change inputs, edit
@@ -39,6 +39,9 @@ history, saved files or computed fields.
 In optical Geometry / Bodies, drag either highlighted core edge to resize symmetrically. A dashed preview does not change the model until release; Escape or pointer cancellation discards it. One completed drag creates one undoable edit. Width is bounded to 300–900 nm and drag updates snap to 1 nm. Focus a handle and use arrow keys (10 nm, Shift: 1 nm) or Home/End. Invalid numeric drafts block resizing.
 
 Resizing uses the drawing transform captured at gesture start, so zoom and pan do not change the unit conversion. The release position is applied even if no final move event arrives. Window resize, focus loss and page hiding cancel the preview; invalid inputs are checked again before committing.
+
+Height is edited numerically in the Geometry inspector and supports undo/redo.
+The drawing, width handles and submitted mesh use the same height.
 
 ## Results and files
 
@@ -49,15 +52,22 @@ they do not represent optical power or a common physical colour scale.
 
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
-sessions to 16 MiB. CSV and PNG exports are available. These version-1 workspace
+sessions to 16 MiB. CSV and PNG exports are available. These version-2 workspace
 formats are separate from headless simcase JSON documents. Reloading does not
 automatically restore a notebook: save a session first.
 
-The workspace checks `/api/workspace/capabilities` before enabling Run. Contract
-version 1 and adapter `optical-fixed-v1` declare the fixed settings above,
+Version-1 inputs and sessions remain readable: their fixed core height becomes
+220 nm. New files record height and its nm unit explicitly; older editors reject
+version 2 instead of silently ignoring height. Each result retains its captured
+height, including field outlines, comparisons and CSV/PNG exports.
+
+The workspace checks `/api/workspace/capabilities/v2` before enabling Run. Contract
+version 2 and adapter `optical-rectangle-v2` declare the 100–500 nm height range
+and the fixed settings above,
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
-captures the reported simcase package version and preserves it in session JSON.
+captures its core height and the reported simcase package version and preserves it in session JSON.
+The original capability endpoint remains available for fixed-height clients.
 This is not a complete engine dependency or Git provenance record. Older
 version-1 sessions without this field remain readable with unknown provenance.
 

@@ -16,10 +16,13 @@ const bool = (value, name) => {
   return value;
 };
 export function validateProject(doc) {
-  if (!doc || doc.format !== 'openphysics-studio-workspace' || doc.version !== 1) throw new Error('Unsupported project format or version.');
+  if (!doc || doc.format !== 'openphysics-studio-workspace' || ![1,2].includes(doc.version)) throw new Error('Unsupported project format or version.');
   const s = doc.model, c = doc.setup;
   if (!s || !c || !c.materials) throw new Error('Project inputs are missing.');
+  if(doc.version===2&&doc.units?.height!=='nm')throw new Error('Invalid height units.');
+  if(doc.version===1&&s.height!==undefined)throw new Error('Height requires project version 2.');
   const model = {
+    height: doc.version===1?220:number(s.height,100,500,'core height'),
     width: number(s.width, 300, 900, 'core width'),
     voltage: number(s.voltage, 0, 10, 'voltage'),
     electric: bool(s.electric, 'electric interface'),
@@ -37,7 +40,7 @@ export function validateProject(doc) {
     fixed: choices(c.fixed, ['', 'Left end fixed', 'Both ends fixed'], 'fixed support'),
     terminal: choices(c.terminal, ['', 'Heater start / heater end'], 'terminal pair'),
   };
-  return {format: 'openphysics-studio-workspace', version: 1, units: {width: 'nm', voltage: 'V', temperature: 'K'}, model, setup};
+  return {format: 'openphysics-studio-workspace', version: 2, units: {height:'nm',width: 'nm', voltage: 'V', temperature: 'K'}, model, setup};
 }
 export function parseProject(text) {
   if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('Project exceeds 64 KiB.');
@@ -47,5 +50,5 @@ export function parseProject(text) {
   return validateProject(doc);
 }
 export function snapshot(state, setup) {
-  return validateProject({format:'openphysics-studio-workspace',version:1,model:{...state,electric:state.electric!==false},setup});
+  return validateProject({format:'openphysics-studio-workspace',version:2,units:{height:'nm'},model:{height:220,...state,electric:state.electric!==false},setup});
 }

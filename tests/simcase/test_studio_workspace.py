@@ -51,3 +51,15 @@ def test_every_workspace_import_is_shipped_and_served_with_explicit_mime(client)
     assert client.get('/workspace-assets/workspace.css').headers['content-type'].startswith('text/css')
     for name in ('server.py','workspace-project.test.mjs','unknown.mjs','workspace.html'):
         assert client.get('/workspace-assets/'+name).status_code==404
+
+
+def test_rectangle_capability_v2_preserves_v1(client):
+    response = client.get('/api/workspace/capabilities/v2')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 2
+    assert caps['adapter'] == 'optical-rectangle-v2'
+    assert caps['height_range_nm'] == [100, 500]
+    assert caps['coupled'] is False
+    assert client.get('/api/workspace/capabilities').json()['settings']['height_nm'] == 220
