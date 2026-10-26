@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import physmat
-from simcase import Document, DocumentError, build_mesh, examples, run, unit_vocabulary
+from simcase import __version__, Document, DocumentError, build_mesh, examples, run, unit_vocabulary
 from . import thermal_api as thermal
 from . import transient_thermal_api as transient
 
@@ -53,6 +53,33 @@ class MaterialPreview(BaseModel):
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/workspace")
+@app.get("/workspace/")
+def workspace_index():
+    return FileResponse(STATIC / "workspace.html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/workspace-assets/{filename}")
+def workspace_asset(filename: str):
+    allowed = {p.name for p in STATIC.glob("workspace-*.mjs")}
+    allowed.add("workspace.css")
+    if filename not in allowed:
+        raise HTTPException(404, "Unknown workspace asset")
+    mime = "text/css" if filename.endswith(".css") else "text/javascript"
+    return FileResponse(STATIC / filename, media_type=mime,
+                        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/api/workspace/capabilities")
+def workspace_capabilities():
+    return JSONResponse({
+        "schema_version": 1, "adapter": "optical-fixed-v1", "simcase_version": __version__,
+        "optical": True, "coupled": False,
+        "settings": {"height_nm": 220, "wavelength_nm": 1550, "core_mesh_nm": 30,
+                     "window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+    }, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/examples")
