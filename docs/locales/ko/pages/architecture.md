@@ -3,7 +3,7 @@
 [English](../../../architecture.md) | **한국어**
 
 OpenPhysics는 저장소이자 전체 도구 모음입니다. **`galerkin`은 그 안의 유한요소
-해석 엔진**이며, `packages/` 아래 여섯 구현 패키지 중 하나입니다. 각 패키지는
+해석 엔진**이며, `packages/` 아래 일곱 구현 패키지 중 하나입니다. 각 패키지는
 별도의 배포 단위를 가지며 의존성을 충족하면 독립적으로 사용할 수 있습니다.
 [설치 안내](overview.md)를 참고하세요.
 
@@ -21,6 +21,7 @@ flowchart TB
         Mat["physmat<br/>재료 물성 · 광학 분산"]
         GIO["gmshio<br/>Gmsh 연동 · 메시 파일 읽기"]
         Ref["galerkin-refsol<br/>독립 해석해와 기준값"]
+        SIPI["sipi<br/>SI/PI · 전송선 단면"]
 
         Sim -->|사용| Gal
         Sim -->|사용| Mesh
@@ -28,6 +29,8 @@ flowchart TB
         Mesh -.->|from_mesher 어댑터| Gal
         GIO -.->|from_mesher 어댑터| Gal
         Ref -.->|시험에서 기대 해와 비교| Gal
+        SIPI -->|사용| Gal
+        SIPI -->|사용| Mesh
     end
 
     Input --> Sim
@@ -48,6 +51,7 @@ flowchart TB
 | [meshine](packages/meshine/overview.md) | 재료 영역을 위한 2D 삼각형 메시 생성. |
 | [physmat](packages/physmat/overview.md) | 재료 모델과 물성, 광학 분산, refractiveindex.info 접근과 fitting. |
 | [gmshio](packages/gmshio/overview.md) | 선택적 Gmsh 실행파일 연동과 메시 파일 읽기. 기존 메시 파일은 Gmsh를 실행하지 않고 읽을 수 있습니다. |
+| [sipi](packages/sipi/overview.md) | 신호·전원 무결성: 층 구조 PCB 단면의 준정적 C/L/G 행렬, 임피던스, 결합선 모드. galerkin과 meshine 위에 있습니다. |
 | [galerkin-refsol](packages/galerkin-refsol/overview.md) | 독립 해석해와 출판된 benchmark. `refsol`로 import합니다. 시험에서 해석기 결과를 기준해와 비교하며, 기준해 패키지는 평가 대상 해석기를 import하지 않습니다. |
 
 `galerkin.from_mesher`는 지원하는 메시 객체나 배열 사전을 엔진의 메시 타입으로
@@ -55,10 +59,10 @@ flowchart TB
 것은 아닙니다. Gmsh는 별도로 설치하며 자체 라이선스를 유지합니다.
 [NOTICE](../../../../NOTICE)를 참고하세요.
 
-일곱 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
-코드 없이 여섯 구현 패키지를 의존성으로 요구하는 메타 배포판입니다. 0.1.0은 아직 게시되지
+여덟 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
+코드 없이 구현 패키지 여섯 개를 의존성으로(`sipi`는 extra로) 요구하는 메타 배포판입니다. 0.1.0은 아직 게시되지
 않았습니다. PyPI의 `openphysics`는 빈 0.0.1 이름 예약이므로 **`pip install openphysics`로는
-아직 전체 도구가 설치되지 않습니다.** 여섯 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
+아직 전체 도구가 설치되지 않습니다.** 일곱 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
 사용하기 위해 통합 전의 개별 패키지 저장소가 필요하지 않습니다.
 
 ## 진입점과 현재 지원 범위

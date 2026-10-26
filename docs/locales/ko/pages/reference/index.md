@@ -16,6 +16,7 @@
 - [openphysics](../packages/openphysics/overview.md)
 - [physmat — 물리 솔버용 재료 물성](../packages/physmat/overview.md)
 - [simcase — 모델 문서와 헤드리스 실행기](../packages/simcase/overview.md)
+- [sipi — PCB 단면의 신호·전원 무결성](../packages/sipi/overview.md)
 
 ## galerkin 계약
 

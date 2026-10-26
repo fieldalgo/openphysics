@@ -19,6 +19,10 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 - [Rectangular cavity document and results](../packages/simcase/cavity3d.md)
 
 
+## PCB transmission lines (signal and power integrity)
+
+- [sipi — quasi-static PCB cross-sections: C, L, G, impedance and coupled-line modes](../packages/sipi/overview.md). Python API only; conductor loss, S-parameters and 3D structures are not implemented.
+
 ## Python contracts and formulations
 
 - [Vacuum rectangular PEC cavity solver](../packages/galerkin/cavity_solver.md)

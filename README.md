@@ -97,8 +97,9 @@ package has its own distribution, version, dependencies and license notices.
 | [gmshio](packages/gmshio/README.md) | Optional Gmsh executable integration, MSH reader and mesh adapters |
 | [physmat](packages/physmat/README.md) | Material properties, optical dispersion and Drude–Lorentz fitting |
 | [simcase](packages/simcase/README.md) | JSON documents, headless runner and optional local Studio |
+| [sipi](packages/sipi/README.md) | Signal and power integrity: quasi-static PCB transmission-line cross-sections |
 
-The seventh distribution, [openphysics](packages/openphysics/README.md)
+The eighth distribution, [openphysics](packages/openphysics/README.md)
 (`0.0.1`), only reserves the project name: it contains no engine and does not
 install these packages. The repository root is not an installable distribution.
 **Use the checkout installation below; `pip install openphysics` does not install
@@ -113,7 +114,7 @@ git clone https://github.com/fieldalgo/openphysics.git
 cd openphysics
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine -e packages/gmshio -e "packages/physmat[rii]" -e "packages/simcase[studio,test]"
+python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine -e packages/gmshio -e "packages/physmat[rii]" -e "packages/simcase[studio,test]" -e packages/sipi
 ```
 
 Run commands from the repository root. Running Python inside `packages/` can
@@ -176,8 +177,8 @@ python -m pytest -q
 
 | Scope | Platforms | What it covers |
 |---|---|---|
-| Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all seven distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
-| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all seven wheels, built from sdists and installed with their extras outside the checkout. Each OS: six implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
+| Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all eight distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
+| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all eight wheels, built from sdists and installed with their extras outside the checkout. Each OS: seven implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
 
 Installed acceptance is not a full macOS or Windows regression. Package metadata
 requires Python 3.12 or later, and CI tests only Python 3.12; `OS Independent` classifiers

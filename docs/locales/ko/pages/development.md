@@ -15,7 +15,7 @@ CI는 Ubuntu 24.04에서 Python 3.12.14와 Node.js 24.19.0을 고정해 사용�
 python -m pip install -r tools/requirements-py312-linux.txt
 python -m pip install --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
-  -e packages/gmshio -e packages/physmat -e packages/simcase
+  -e packages/gmshio -e packages/physmat -e packages/simcase -e packages/sipi
 python -m pip check
 ```
 
@@ -76,6 +76,7 @@ NumPy·JAX).
 | `packages/meshine` | `src/meshine/` | `tests/meshine/` | `examples/meshine/` |
 | `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`. `.geo`/`.msh` fixture는 `tests/gmshio/data/` | `examples/gmshio/` |
 | `packages/physmat` | `src/physmat/` | `tests/physmat/` | `examples/physmat/` |
+| `packages/sipi` | `src/sipi/` | `tests/sipi/` | `examples/sipi/` |
 | `packages/simcase` | `src/simcase/`. Studio 정적 파일은 `src/simcase/studio/static/` | `tests/simcase/`. Studio JavaScript 검사(`*.cjs`) 포함 | `examples/simcase/`(JSON 문서와 `docs/gallery/`를 그리는 `gallery.py`) |
 
 패키지마다의 문서(계약과 검증 보고서)는 `docs/packages/<name>/`에, 한국어 문서는
@@ -84,7 +85,7 @@ NumPy·JAX).
 physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
 있습니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
 [studies/](../../../../studies/README.md)에는 진단 스크립트가 있습니다. 사람이 돌리며 필수 CI는 돌리지
-않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고 여섯 패키지를 의존성으로 선언할 뿐입니다. 루트에서 `python -m pytest`를
+않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고 여섯 패키지를 의존성으로, `sipi`를 extra로 선언할 뿐입니다. 루트에서 `python -m pytest`를
 실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
 표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
 맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.
@@ -108,7 +109,7 @@ python tools/check_distributions.py        # 모든 패키지 빌드·검사·�
 python tools/run_installed_tests.py        # 설치된 wheel로 tests/의 Python 시험 전체 실행
 python tools/check_licenses.py             # 설치된 라이선스를 검토 목록과 대조
 python tools/check_markdown_links.py       # 모든 Markdown 파일의 상대 링크와 #앵커
-python tools/check_release_version.py      # 배포판 일곱 개의 버전이 하나인지
+python tools/check_release_version.py      # 배포판 여덟 개의 버전이 하나인지
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -136,15 +137,15 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 일곱 개; Studio Node 검사; Studio 자원 관측 1회 |
-| `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 일곱 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
+| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 여덟 개; Studio Node 검사; Studio 자원 관측 1회 |
+| `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 여덟 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
-| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 여섯 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
+| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 일곱 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
 필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
-**Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 일곱 개의 버전이
+**Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 여덟 개의 버전이
 하나인지 확인하고([배포](#배포pypi) 참고), 이어 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
 링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
 이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
@@ -152,7 +153,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 job은 실패로 남습니다. 보통 16~22분 걸립니다. 45분 제한은 멈춘 실행을 끊기 위한
 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
 
-**배포 검사** (`tools/check_distributions.py`). 패키지 일곱 개(`openphysics` 메타
+**배포 검사** (`tools/check_distributions.py`). 패키지 여덟 개(`openphysics` 메타
 배포판 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
 `twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
 sdist에는 `src/` 아래의 import 패키지, `README.md`, `LICENSE`, `NOTICE`, 빌드 파일(`pyproject.toml`,
@@ -180,7 +181,7 @@ Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다.
 내용을 다시 확인합니다.
 
 **설치 시험** (`tools/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
-sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 일곱 개를 각 metadata가
+sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 여덟 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
 `tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
 `packages/` 아래는 복사하지 않습니다. 복사한 파일의 해시는
@@ -265,7 +266,7 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 ## 배포(PyPI)
 
 `Release` 워크플로(`.github/workflows/release.yml`)는 GitHub 릴리스가 게시되면 배포판
-일곱 개를 PyPI에 올립니다. 태그만 push해서는 아무것도 올라가지 않고, 검증 워크플로가 이
+여덟 개를 PyPI에 올립니다. 태그만 push해서는 아무것도 올라가지 않고, 검증 워크플로가 이
 워크플로를 시작하지도 않습니다. 작업은 순서대로 돕니다.
 
 1. **gate**: 릴리스 커밋에서 `validate.yml`이 이미 성공했는지 봅니다. 시험을 다시 돌리지는
@@ -289,7 +290,7 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 커밋에 `vX.Y.Z` 태그를 달고 그 태그로 GitHub 릴리스를 게시합니다.
 
 각 패키지는 `packages/<name>`에서 빌드합니다. 저장소 루트는 배포물이 아니며,
-`packages/openphysics`는 나머지 여섯 개를 요구하는 메타 배포판입니다. 패키지 하나만 빌드해
+`packages/openphysics`는 나머지 일곱 개 중 여섯 개를 요구하고 `sipi`는 `sipi` extra로 넘기는 메타 배포판입니다. 패키지 하나만 빌드해
 확인하려면:
 
 ```bash
@@ -297,7 +298,7 @@ python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
 
-배포판 일곱 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
+배포판 여덟 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
 `packages/<name>/pyproject.toml`과 각 import 패키지의 `__version__`을 바꾸고, 우리 배포판
 사이의 의존성은 그 마이너 계열 안(0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
@@ -317,7 +318,7 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 ```
 
 풀어 놓은 sdist에서 만드는 wheel은 sdist의 설명을 그대로 씁니다.
-`tools/tests/test_readme_links.py`는 일곱 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
+`tools/tests/test_readme_links.py`는 여덟 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
 않았는지 검사합니다.
 
 ## 저장값 시험 지원

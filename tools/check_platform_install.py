@@ -26,7 +26,8 @@ import zipfile
 from packaging.utils import canonicalize_name, parse_wheel_filename
 
 PACKAGES = {"galerkin": "galerkin", "galerkin-refsol": "refsol", "meshine": "meshine",
-            "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase"}
+            "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase",
+            "sipi": "sipi"}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -43,7 +44,7 @@ def main():
     (output / "environment.json").write_text(json.dumps({
         "platform": platform.platform(), "python": sys.version,
         "commit": os.environ.get("GITHUB_SHA"),
-        "scope": "six installed packages; external Gmsh not executed",
+        "scope": "seven installed packages; external Gmsh not executed",
     }, indent=2)+"\n", encoding="utf-8")
     # CPU model and BLAS kernel of this runner, for last-bit numerical differences.
     subprocess.run([sys.executable, "-I", str(ROOT / "tools" / "report_numeric_runtime.py"),
@@ -78,7 +79,7 @@ def main():
         wheels.mkdir()
         expected = {}
         wheel_owners = {}
-        manifest = {"packages": {}, "files": {}, "scope": "six installed packages; no external Gmsh execution"}
+        manifest = {"packages": {}, "files": {}, "scope": "seven installed packages; no external Gmsh execution"}
         for package, module in PACKAGES.items():
             source = ROOT / "packages" / package
             project = tomllib.loads((source / "pyproject.toml").read_text(encoding="utf-8"))["project"]
@@ -128,7 +129,7 @@ def main():
             wheel_owners[wheel_path.name] = module
             manifest["packages"][module] = package
         wheel_files = sorted(wheels.glob("*.whl"))
-        assert len(wheel_files) == len(PACKAGES) == 6
+        assert len(wheel_files) == len(PACKAGES) == 7
         wheel_entries = {}
         for wheel in wheel_files:
             with zipfile.ZipFile(wheel) as archive:

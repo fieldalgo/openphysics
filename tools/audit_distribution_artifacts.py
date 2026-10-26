@@ -34,7 +34,7 @@ def audit(source_root, artifacts):
             or len(set(wheel_ids)) != len(expected)
             or set(wheel_ids) != set(sdist_ids)
             or {name for name, _ in wheel_ids} != expected):
-        raise RuntimeError("expected matching unique wheel/sdist pairs for all seven packages")
+        raise RuntimeError("expected matching unique wheel/sdist pairs for all eight packages")
     actual = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels + sdists}
     recorded = {}
     for line in (artifacts / "SHA256SUMS").read_text(encoding="utf-8").splitlines():

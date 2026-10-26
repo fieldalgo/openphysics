@@ -8,14 +8,14 @@ the newest CPython it tests. Unlike tools/check_distributions.py, which installs
 against the pinned validation requirements without an index, third-party
 requirements are resolved from PyPI here, as ``pip install openphysics`` would.
 
-``--wheels DIR`` installs the seven wheels in DIR (built by
+``--wheels DIR`` installs the eight wheels in DIR (built by
 ``check_distributions.py --build-only``) by file URL, so pip can only take our
 packages from there. ``--from-pypi VERSION --sha256sums FILE`` first waits until
-PyPI serves all seven distributions at VERSION, requires PyPI's SHA-256 of every
+PyPI serves all eight distributions at VERSION, requires PyPI's SHA-256 of every
 uploaded file to equal FILE, and then installs from PyPI without a cache.
 
-Either way it installs ``openphysics[studio,export,rii]`` into a fresh venv in a
-temporary directory outside the checkout, runs ``pip check``, requires all seven
+Either way it installs ``openphysics[studio,export,rii,sipi]`` into a fresh venv in a
+temporary directory outside the checkout, runs ``pip check``, requires all eight
 distributions at the release version, runs tools/wheel_consumers/wheel_smoke.py
 from a copy, and writes a JSON report with the resolved environment.
 """
@@ -36,8 +36,9 @@ import urllib.request
 import venv
 
 ROOT = Path(__file__).resolve().parents[1]
-DISTRIBUTIONS = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "openphysics")
-EXTRAS = "studio,export,rii"
+DISTRIBUTIONS = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi",
+                 "openphysics")
+EXTRAS = "studio,export,rii,sipi"
 PYPI = "https://pypi.org/pypi"
 
 
@@ -121,7 +122,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--wheels", type=Path, help="directory with the seven built wheels")
+    source.add_argument("--wheels", type=Path, help="directory with the eight built wheels")
     source.add_argument("--from-pypi", metavar="VERSION", help="install this version from PyPI")
     parser.add_argument("--sha256sums", type=Path, help="SHA256SUMS of the built files (with --from-pypi)")
     parser.add_argument("--wait", type=int, default=1800, help="seconds to wait for PyPI (with --from-pypi)")
@@ -168,7 +169,7 @@ def main(argv=None):
         report["installed"] = dict(sorted(installed.items()))
         wrong = {name: installed.get(name) for name in DISTRIBUTIONS if installed.get(name) != version}
         if wrong:
-            raise SystemExit(f"expected all seven distributions at {version}, got {wrong}")
+            raise SystemExit(f"expected all eight distributions at {version}, got {wrong}")
         smoke = work / "wheel_smoke.py"
         shutil.copy2(ROOT / "tools" / "wheel_consumers" / "wheel_smoke.py", smoke)
         report["wheel_smoke_sha256"] = hashlib.sha256(smoke.read_bytes()).hexdigest()

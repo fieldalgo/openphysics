@@ -1,4 +1,4 @@
-# Publishes the seven distributions to PyPI when a GitHub release is published, and
+# Publishes the eight distributions to PyPI when a GitHub release is published, and
 # rehearses everything but the upload when run by hand (Actions -> Release -> Run
 # workflow): a dry run builds, checks and installs, and uploads nothing.
 #
@@ -148,11 +148,11 @@ jobs:
         run: |
           cd dist
           sha256sum --check --strict SHA256SUMS
-          test "$(wc -l < SHA256SUMS)" -eq 14
+          test "$(wc -l < SHA256SUMS)" -eq 16
           mkdir ../first ../second ../last
           # Packages without a requirement on another of ours.
           mv galerkin-* galerkin_refsol-* meshine-* gmshio-* physmat-* ../first/
-          mv simcase-* ../second/
+          mv simcase-* sipi-* ../second/
           mv openphysics-* ../last/
           test -z "$(ls -A | grep -v '^SHA256SUMS$')"
           ls -l ../first ../second ../last
@@ -164,7 +164,7 @@ jobs:
         with:
           packages-dir: first/
           print-hash: true
-      - name: Upload simcase
+      - name: Upload simcase and sipi
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: second/

@@ -48,7 +48,7 @@ jobs:
           python -m pip install -r tools/requirements-py312-linux-backends.txt
           python -m pip install --no-deps --no-build-isolation \
             -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
-            -e packages/gmshio -e packages/physmat -e packages/simcase
+            -e packages/gmshio -e packages/physmat -e packages/simcase -e packages/sipi
           python -m pip check
           gmsh --version
       # The backend tests skip when a library is absent; here an absent one must
@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p .validation
           python tools/check_licenses.py --report .validation/licenses-validation-env.json
-      - name: Check that the seven distributions share one release version
+      - name: Check that the eight distributions share one release version
         run: python tools/check_release_version.py
       - name: Check Markdown links
         run: |
@@ -220,7 +220,7 @@ jobs:
           python -m pip install -r tools/requirements-py312-linux.txt
           python -m pip install --no-deps --no-build-isolation \
             -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
-            -e packages/gmshio -e packages/physmat -e packages/simcase
+            -e packages/gmshio -e packages/physmat -e packages/simcase -e packages/sipi
       - name: Confirm the forced OpenBLAS kernel and record the CPU
         run: python tools/report_numeric_runtime.py --expect-core "${{ matrix.core }}"
       - name: Numerically sensitive tracking, eigenspace, cavity and fiber reference tests
