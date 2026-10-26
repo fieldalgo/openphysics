@@ -133,9 +133,10 @@ print(f"{solve(nitride)[0]:.4f}")
 1.6658
 ```
 
-The mode solver is lossless. A material with absorption, such as the built-in
-metals `Au`, `Ag`, `Cu` and `Al`, is refused with an error instead of being
-solved without its loss. The refractiveindex.info database that `physmat` can read
+Both formulations accept passive absorbing materials. See [absorbing modes](lossy_modes.md)
+for an n+ik example, complex indices, positive dB/cm loss and the retained
+exp(+i omega t-i beta z) convention. Metals require explicit `n_target` selection;
+use full-vector modes for surface plasmons. The refractiveindex.info database that `physmat` can read
 is not available from a document.
 
 ## 5. Check the window and the mesh
@@ -269,7 +270,7 @@ materials and the mesh, run, and view n_eff, the sweep and the \|E\|, \|Ex\|,
 
 ## Limits
 
-- Lossless dielectrics only: no metals, absorbing materials, gain or leaky modes.
+- Passive absorption is supported. Gain, leaky modes and lossy subspace-v1 tracking are excluded.
 - The window edge is a wall (PEC or PMC), not an open boundary; there are no
   perfectly matched layers, so bend and leakage losses are not computed.
 - Straight waveguides only: no bends, no propagation along the guide.

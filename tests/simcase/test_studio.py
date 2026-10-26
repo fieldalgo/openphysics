@@ -206,6 +206,24 @@ def _finished_job(client, doc):
     pytest.fail("vector sweep job did not complete")
 
 
+@pytest.mark.parametrize("formulation", ["scalar", "vector"])
+def test_absorbing_modes_preserve_complex_results_in_studio(client, formulation):
+    doc = copy.deepcopy(examples.VECTOR_SLAB)
+    doc["materials"]["film"] = {"n": 3.48, "k": .01}
+    doc["physics"]["em1"]["formulation"] = formulation
+    if formulation == "scalar":
+        doc["physics"]["em1"]["boundary"].update(left="pmc", right="pmc")
+    job, status = _finished_job(client, doc)
+    assert status["status"] == "done", status
+    payload = client.get(f"/api/jobs/{job}/result").json()
+    assert payload["summary"]["mode_result_schema"] == "openphysics.modes2d/2"
+    assert payload["neff_imag"][0][0] < 0
+    assert payload["propagation_loss_db_cm"][0][0] > 0
+    assert payload["neff_imag"] == payload["summary"]["neff_imag"]
+    if formulation == "scalar":
+        assert payload["scalar_fields_complex"][0]["imag"]
+
+
 def test_tracked_vector_sweep_api_returns_branches_fields_and_group_indices(client):
     doc = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
     doc["physics"]["em1"]["num_modes"] = 2

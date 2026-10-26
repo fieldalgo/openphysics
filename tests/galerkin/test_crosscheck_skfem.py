@@ -230,19 +230,18 @@ def test_vector_waveguide_modes_same_mesh(skfem, loss):
     reference = reference[np.argsort(-reference.real)][:4]
     emit(make_record(
         case="waveguide-vector-rect-core-lossy" if loss else "waveguide-vector-rect-core",
-        analytical_acceptance="tests/galerkin/test_hadley.py and tests/galerkin/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
+        analytical_acceptance="tests/simcase/test_lossy_modes.py" if loss else "tests/galerkin/test_hadley.py and tests/galerkin/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
         physics="2D full-vector dielectric waveguide modes (Si core 1.6 x 1.0 in SiO2, 1.55 um)",
         api="galerkin.waveguide.solve_modes",
         discretization="lowest-order Nedelec (E_t) x P1 (E_z), beta^2 formulation",
         tool="scikit-fem", tool_discretization="ElementTriN1 * ElementTriP1, same bilinear forms",
-        matched=["same nodes and triangles (4 x 3 window, 16 x 12)", "piecewise-constant eps per triangle",
+        matched=["same nodes and triangles (4 x 3 window, 16 x 12)", f"piecewise-constant eps; core Im epsilon = {-loss}",
                  "PEC on the whole outer boundary (tangential E_t and E_z)", "same generalized eigenproblem"],
         not_matched=["eigensolver (galerkin shift-invert ARPACK, reference dense QZ)"],
         observables=[observable("effective index, four highest guided modes", "1",
                                 "max relative difference", relative_difference(n_eff, reference),
-                                SAME)]))
-    if loss:
-        assert relative_difference(n_eff.imag, reference.imag) < SAME
+                                SAME)] + ([observable("imaginary effective index", "1", "max relative difference",
+                                                      relative_difference(n_eff.imag, reference.imag), SAME)] if loss else [])))
 
 
 def test_pec_cavity_eigenvalues_same_mesh(skfem):
@@ -279,3 +278,42 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
                      "reference dense with a kernel cut-off)"],
         observables=[observable("eigenvalue k^2, lowest eight", "m^-2", "max relative difference",
                                 relative_difference(np.sort(ours.eigenvalues_m2), reference), SAME)]))
+
+
+def test_scalar_absorbing_waveguide_same_mesh(skfem):
+    import scipy.linalg as la
+    from skfem.helpers import dot, grad
+    from simcase.physics_em_modes2d import solve
+    mesh = rectangle_mesh(2., 1., 12, 8)
+    eps, k0 = 4.-.1j, 2*np.pi/1.55
+    clock = Stopwatch()
+    with clock("openphysics"):
+        ours = solve(mesh, np.full(mesh.num_triangles, eps), 1.55,
+                     dict(left="pec", right="pec", top="pec", bottom="pec"), 2)["neff"]
+    basis = skfem.Basis(_reference_mesh(skfem, mesh), skfem.ElementTriP1())
+
+    @skfem.BilinearForm(dtype=complex)
+    def left(u, v, w):
+        return k0**2*eps*u*v-dot(grad(u), grad(v))
+
+    @skfem.BilinearForm
+    def mass(u, v, w):
+        return u*v
+
+    with clock("reference"):
+        free = basis.complement_dofs(basis.get_dofs().all())
+        a = left.assemble(basis)[free][:, free].toarray()
+        b = mass.assemble(basis)[free][:, free].toarray()
+        values = la.eigvals(a, b)
+        reference = np.sqrt(values.astype(complex))/k0
+        reference = reference[np.argsort(-reference.real)][:2]
+    emit(make_record(case="waveguide-scalar-rectangle-lossy", physics="scalar absorbing rectangle, PEC walls",
+                     api="simcase.physics_em_modes2d.solve", discretization="P1 triangles",
+                     tool="scikit-fem", tool_discretization="ElementTriP1",
+                     analytical_acceptance="tests/simcase/test_lossy_modes.py",
+                     stopwatch=clock, matched=["same mesh, PEC walls, epsilon=4-.1i, wavelength=1.55"],
+                     not_matched=["sparse ARPACK versus dense QZ"],
+                     observables=[observable("complex effective index", "1", "max relative difference",
+                                             relative_difference(ours, reference), SAME),
+                                  observable("imaginary effective index", "1", "max relative difference",
+                                             relative_difference(ours.imag, reference.imag), SAME)]))

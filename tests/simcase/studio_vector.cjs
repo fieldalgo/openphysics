@@ -39,6 +39,17 @@ const result = { nodes:[[0,0],[1,0],[1,1],[0,1]], triangles:[[0,1,2],[0,2,3]],
   fields:[], vector_fields:[vector], parameter:null, values:[1550], neff:[[2.05]],
   summary:{units:{length:'nm'}}, timings:{mesh:0,solve:0}, group_index:null };
 
+test('absorbing modes display the imaginary index and positive loss with units', () => {
+  const p = page(), data = structuredClone(result);
+  data.neff_imag = [[-0.01]];
+  data.propagation_loss_db_cm = [[3521.]];
+  p.run(`resultData = ${JSON.stringify(data)}; fillResultTable();`);
+  const table = p.element('resTable').innerHTML;
+  assert(table.includes('Im n_eff: -1.0000e-2'));
+  assert(table.includes('3521.0000 dB/cm'));
+  assert(table.includes('Material absorption only'));
+});
+
 test('complex vector components retain their common magnitude scale', () => {
   const p = page();
   p.run(`resultData = ${JSON.stringify(result)}; populateResultSelectors(); drawField();`);

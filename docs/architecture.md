@@ -67,7 +67,7 @@ repository; separate historical package repositories are not needed to use them.
 - **Python:** the broadest API surface, including standalone electromagnetic,
   steady and transient thermal, elasticity and prescribed-temperature thermoelastic models,
   plus the documented steady heat-to-mechanics workflow and transient heat-to-mechanics call.
-- **JSON / CLI through `simcase`:** lossless `em.modes2d`, `em.cavity3d` and the
+- **JSON / CLI through `simcase`:** passive absorbing `em.modes2d`, `em.cavity3d` and the
   documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
   automatically become document features. The [steady boundary contract](packages/simcase/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
