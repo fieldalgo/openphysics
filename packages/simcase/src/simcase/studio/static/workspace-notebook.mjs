@@ -41,8 +41,15 @@ export function appendRun(runs,run){
  while(next.length>RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All notebook slots are pinned. Unpin a run before retaining another result.');next.splice(oldest,1);}
  return next;
 }
+export function validateView(view={mode:0,component:'magnitude',window:'Core region'}){
+ if(!view||![0,1].includes(view.mode)||!['magnitude','Ex','Ey','Ez'].includes(view.component)||!['Core region','Full window'].includes(view.window))throw new Error('Unsupported saved field view.');
+ const result={mode:view.mode,component:view.component,window:view.window};
+ if(view.probe!==undefined){const p=view.probe;if(!p||typeof p.active!=='boolean'||!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x < -1.5||p.x > 1.5||p.y < -1.2||p.y > 1.2)throw new Error('Invalid saved probe position.');result.probe={x:p.x,y:p.y,active:p.active};}
+ if(view.profile!==undefined){const p=view.profile,extent=p?.axis==='x'?1.2:1.5;if(!p||!['x','y'].includes(p.axis)||typeof p.open!=='boolean'||!Number.isFinite(p.coordinate)||Math.abs(p.coordinate)>extent)throw new Error('Invalid saved profile line.');result.profile={axis:p.axis,coordinate:p.coordinate,open:p.open};}
+ return result;
+}
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'}){
- return {format:'openphysics-studio-session',version:2,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:{...view}};
+ return {format:'openphysics-studio-session',version:2,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:validateView(view)};
 }
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
@@ -53,9 +60,8 @@ export function parseSession(text,{recovered=false}={}){
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');
  if(doc.selected!==null&&!ids.includes(doc.selected))throw new Error('Selected run is missing.');
  if(!Array.isArray(doc.comparison)||doc.comparison.length!==2||!doc.comparison.every(id=>id===null||ids.includes(id)))throw new Error('Invalid comparison selection.');
- const view=doc.view||{mode:0,component:'magnitude',window:'Core region'};
- if(![0,1].includes(view.mode)||!['magnitude','Ex','Ey','Ez'].includes(view.component)||!['Core region','Full window'].includes(view.window))throw new Error('Unsupported saved field view.');
- return {input,runs,selected:doc.selected,comparison:[...doc.comparison],view:{mode:view.mode,component:view.component,window:view.window}};
+ const view=validateView(doc.view||{mode:0,component:'magnitude',window:'Core region'});
+ return {input,runs,selected:doc.selected,comparison:[...doc.comparison],view};
 }
 
 
