@@ -1,3 +1,4 @@
+import {opticalWorkflow} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -104,7 +105,7 @@ function refreshInputIssues(){
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
   const el=$(field.id);if(!el)continue;el.step='any';const issue=numericDrafts.get(key);if(issue)el.value=issue.raw;
-  const hint=document.createElement('p');hint.id=field.id+'-hint';hint.className='input-hint';el.closest('label').append(hint);el.setAttribute('aria-describedby',hint.id);
+  const hint=document.createElement('p');hint.id=field.id+'-hint';hint.className='input-hint';el.closest('label').after(hint);el.setAttribute('aria-describedby',hint.id);
   el.oninput=()=>{const parsed=numericDrafts.update(key,el.value);if(parsed.ok){if(key==='temperature')setup.temperature=parsed.value;else state[key]=parsed.value;
    if(key==='width'||key==='height'){const slider=$('width');if(slider&&key==='width'){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
@@ -148,8 +149,18 @@ const signature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
 function refreshPersistence(){
   const clean=!edits.dirty;
-  $('project').textContent='Multiphysics workspace / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'saved':'unsaved'):(clean?'Saved inputs':'Unsaved inputs'))+' · Revision '+edits.revision;
-  refreshNotebook();
+  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'saved':'unsaved'):(clean?'Saved inputs':'Unsaved inputs'))+' · Revision '+edits.revision;
+  refreshNotebook();refreshWorkflow();
+}
+function refreshWorkflow(){
+ const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
+ const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock(),busy:solverBusy,pending:!!pendingJob,mesh:meshPreview.record,runs});
+ steps.forEach((step,index)=>{
+  let button=host.children[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
+  const selected=step.id==='Results'?['Results','Compare'].includes(ui.page):ui.page==='Model'&&ui.selection===step.id;
+  if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
+  button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.detail;
+ });
 }
 function rejectInvalidInput(){
   numericDrafts.assertValid();
@@ -226,7 +237,7 @@ function refreshNotebook(){const changed=savedNotebookState!==notebookStamp();$(
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
- const block=opticalBlock();if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span>Results are attached to captured inputs</span><span>Mode matching / convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ const block=opticalBlock();if(isOptical())$('sequence').innerHTML='<span>Optical modes</span><span>Run validates a captured input snapshot</span><span>Mesh/window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span>Results are attached to captured inputs</span><span>Mode matching / convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run optical study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D rectangular core, height 100–500 nm; silica background; wavelength 1550 nm; 30 nm core mesh; 3 × 2.4 µm window; PEC outer edges; two candidates. Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -414,7 +425,7 @@ async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
  try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v2'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v2';}
- catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;}
+ catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;$('workspace-tools').open=true;}
  finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;render();refreshJobControls();}
 }
 $('connect-workspace').onclick=connectWorkspace;

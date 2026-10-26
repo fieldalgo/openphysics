@@ -174,3 +174,17 @@ An optical-only model tree shows Geometry, Materials, Optical modes, Mesh and
 Study. Connections explains that no coupled interfaces are present and links
 back to application choice. The heated-waveguide template retains the broader
 setup tree and still cannot execute coupled physics.
+
+### Guided optical workflow
+
+The Geometry, Materials, Mesh, Study and Results bar follows the current inputs.
+It identifies invalid drafts, unavailable execution, a pending job, and mesh or
+results captured from earlier inputs. A mesh preview is optional: Run creates its
+own mesh. Ready to run is an input/connection state, not numerical validation or
+convergence certification. Results opens the newest retained matching input when
+one exists; navigation itself never runs a solver. Earlier results remain available.
+
+Connection details, input recovery and layout help are grouped in an expandable
+panel. A connection failure opens it automatically. Numeric error descriptions
+are separate from their field labels; workflow buttons retain keyboard focus as
+status labels update. The workflow is shown for the optical application only.
