@@ -270,7 +270,11 @@ materials and the mesh, run, and view n_eff, the sweep and the \|E\|, \|Ex\|,
 
 ## Limits
 
-- Passive absorption is supported. Gain, leaky modes and lossy subspace-v1 tracking are excluded.
+- Passive absorption is supported. Gain and complex subspace-v1 tracking are excluded.
+- For substrate leakage and constant-radius bends, use the [PML mode contract](pml_modes.md):
+  specify face thicknesses and a target index, inspect all candidate diagnostics, then vary
+  mesh, window, thickness and strength independently. Physical-window normalization and
+  tracking apply; total attenuation includes both absorption and radiation.
 - The window edge is a wall (PEC or PMC), not an open boundary; there are no
   perfectly matched layers, so bend and leakage losses are not computed.
 - Straight waveguides only: no bends, no propagation along the guide.
