@@ -126,3 +126,19 @@ replace existing results. Late responses after stopping are ignored. The panel
 reports elapsed time rather than inventing a completion percentage. No server
 cancellation or durable server job persistence is implemented. Save completed
 sessions before restarting the server or closing the tab.
+
+## Inspecting field samples
+
+In Results or Compare, click inside a field plot or enter x/y coordinates in µm
+and select **Inspect point**. The crosshair and readout use physical coordinates.
+Compare samples both meshes at the same location. The value is the normalized
+stored centroid sample of the containing triangle, not an interpolated point
+field. The readout identifies that triangle and its centroid; a point outside
+the captured mesh reports no sample. At shared edges, the last drawn triangle
+is chosen consistently. Degenerate cells are ignored.
+
+Candidate/component changes update the readout with the same vector-normalized
+scale used by the plot. **Clear point** removes the marker. Probe selection is
+view state for the current tab and is not stored in session JSON. Field PNG
+exports include the marker and its coordinates when selected. These samples do
+not establish convergence or physical field amplitudes.

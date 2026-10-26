@@ -1,3 +1,4 @@
+import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
 import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
 import {installWidthEditor} from './workspace-width-editor.mjs';
@@ -216,7 +217,7 @@ document.addEventListener('keydown',event=>{
  else if(event.key.toLowerCase()==='y'){event.preventDefault();if(edits.canRedo)$('redo-edit').click();}
 });
 
-let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};
+let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
@@ -243,14 +244,23 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
 
 function fieldColor(t){const stops=[[18,38,59],[23,111,139],[69,187,159],[249,235,130]];const z=Math.min(2.999999,Math.max(0,t)*3),i=Math.floor(z),a=z-i;return 'rgb('+stops[i].map((v,k)=>Math.round(v+(stops[i+1][k]-v)*a)).join(',')+')';}
 let fieldResize=null;
+function addProbeControls(host,redraw){
+ const form=document.createElement('form');form.className='probe-controls';
+ form.innerHTML='<strong>Inspect displayed sample</strong><label>x [µm]<input id="probe-x" type="number" step="any" min="-1.5" max="1.5" required></label><label>y [µm]<input id="probe-y" type="number" step="any" min="-1.2" max="1.2" required></label><button type="submit">Inspect point</button><button type="button" id="clear-probe">Clear point</button><span>Click a plot or enter coordinates. Values belong to triangle centroids; no interpolation.</span>';
+ host.append(form);$('probe-x').value=fieldProbe.x;$('probe-y').value=fieldProbe.y;
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;fieldProbe.x=Number($('probe-x').value);fieldProbe.y=Number($('probe-y').value);fieldProbe.active=true;redraw();};
+ $('clear-probe').onclick=()=>{fieldProbe.active=false;redraw();};
+}
+function probeOutput(host,id){const output=document.createElement('p');output.id=id;output.className='probe-output';output.setAttribute('role','status');host.append(output);return output;}
+
 function renderField(){
  if(fieldResize)fieldResize.disconnect();
  const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${solverRun.neff[i].toFixed(6)}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:340px"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
  $('canvas').append(host);
  for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();};
- fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();
+ probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();
 }
-function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('field-description')){
+function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('field-description'),sampleTarget=$('field-probe'),redraw=()=>drawField()){
  if(!canvas||!run)return;
  const {values,maximum}=fieldScalars(run.field,fieldView.mode,fieldView.component);
  const box=canvas.getBoundingClientRect(),w=box.width,h=340;if(w<1)return;
@@ -268,6 +278,21 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
  ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [µm]',0,0);ctx.restore();
  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';const description=`Candidate ${fieldView.mode+1}: ${q} / max|E|, relative amplitude (0–1). Each candidate uses its own vector maximum. Triangle-centroid samples, constant color per triangle; dashed outline = core. Not absolute power.${maximum===0?' Zero field returned.':''}`;
  if(descriptionTarget)descriptionTarget.textContent=description;canvas.setAttribute('aria-label',description);
+ if(sampleTarget){
+  sampleTarget.textContent='No point selected.';
+  if(fieldProbe.active){
+   const sample=probeField(run.field,values,fieldProbe.x,fieldProbe.y);
+   sampleTarget.textContent=sample?`At (${fieldProbe.x.toFixed(4)}, ${fieldProbe.y.toFixed(4)}) µm: ${q} / max|E| = ${sample.value.toPrecision(6)} · triangle ${sample.index+1}, centroid (${sample.centroid[0].toFixed(4)}, ${sample.centroid[1].toFixed(4)}) µm. Stored centroid value, not interpolated.`:'No triangle contains this point in the captured result.';
+   if(fieldProbe.x>=xmin&&fieldProbe.x<=xmax&&fieldProbe.y>=ymin&&fieldProbe.y<=ymax){const px=X(fieldProbe.x),py=Y(fieldProbe.y);ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px-6,py);ctx.lineTo(px+6,py);ctx.moveTo(px,py-6);ctx.lineTo(px,py+6);ctx.stroke();}
+  }
+  canvas.style.cursor='crosshair';canvas.onclick=event=>{
+   const rect=canvas.getBoundingClientRect(),px=(event.clientX-rect.left)*w/rect.width,py=(event.clientY-rect.top)*h/rect.height;
+   if(px<left||px>left+pw||py<top||py>top+ph)return;
+   fieldProbe.x=xmin+(px-left)/scale;fieldProbe.y=ymax-(py-top)/scale;fieldProbe.active=true;
+   if($('probe-x'))$('probe-x').value=fieldProbe.x.toFixed(6);if($('probe-y'))$('probe-y').value=fieldProbe.y.toFixed(6);redraw();
+  };
+ }
+
 }
 
 
@@ -281,7 +306,7 @@ function renderRunList(){
  if(solverRun){
   const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore selected run inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
-   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+140;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
+   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>{const lines=['job,completed_at,core_width_nm,core_height_nm,core_material,candidate,neff,origin'];for(const r of runs)r.neff.forEach((n,i)=>lines.push([r.job,r.completedAt,r.input.model.width,r.input.model.height,r.input.setup.materials.Core,i+1,n,r.origin].join(',')));downloadFile(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}),'studio-runs.csv');};panel.append(csv);
@@ -293,13 +318,13 @@ function renderComparison(){
  if(!runs.some(r=>r.job===compareIds[0]))compareIds[0]=runs.at(-2).job;
  if(!runs.some(r=>r.job===compareIds[1]))compareIds[1]=runs.at(-1).job;
  const bar=document.createElement('div');bar.className='toolbar';
- for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=`${r.input.model.width} × ${r.input.model.height} nm · ${r.job}`;o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
+ for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=`${r.input.model.width} × ${r.input.model.height} nm · ${r.input.setup.materials.Core} · ${r.job}`;o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
  const opts=document.createElement('div');opts.className='toolbar';opts.innerHTML=`<label>Candidate rank <select id="compare-mode"><option value="0" ${fieldView.mode===0?'selected':''}>1</option><option value="1" ${fieldView.mode===1?'selected':''}>2</option></select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
  const description=document.createElement('p');description.textContent=`Width: ${a.input.model.width} → ${b.input.model.width} nm. Height: ${a.input.model.height} → ${b.input.model.height} nm. Core: ${a.input.setup.materials.Core} → ${b.input.setup.materials.Core}. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.neff[fieldView.mode]-a.neff[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}Candidate ranks are not matched modes.`;host.append(description);
- const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${run.input.model.width} × ${run.input.model.height} nm · ${run.origin}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);grid.append(article);});host.append(grid);
+ const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.origin}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
- const redraw=()=>{drawField($('compare-field-a'),a,null);drawField($('compare-field-b'),b,null);};
+ const redraw=()=>{drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();
 }
