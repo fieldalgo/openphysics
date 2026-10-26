@@ -254,14 +254,14 @@ def test_a_micrometre_document_still_reaches_physmat_unchanged():
     assert units.to_micrometres(1.55, doc.scale) == 1.55
 
 
-def test_a_lossy_material_is_refused_rather_than_solved_lossless():
-    """The scalar path cannot do loss; it must say so instead of dropping Im(eps)."""
+def test_a_metal_requires_explicit_target_rather_than_a_dielectric_filter():
+    """Do not apply the dielectric interval automatically to a metal."""
     d = copy.deepcopy(examples.SLAB_TE_CHECK)
     d["geometry"]["shapes"][0]["material"] = "Au"
     doc = Document.from_dict(d)
     model = build_mesh(doc)
     assert np.iscomplexobj(model.eps_per_triangle(1.55))          # loss reaches the physics
-    with pytest.raises(NotImplementedError, match="lossy"):
+    with pytest.raises(ValueError, match="n_target"):
         solve_point(model, doc.sole_physics()[1])
 
 

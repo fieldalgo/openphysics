@@ -339,6 +339,10 @@ class Document:
                 raise DocumentError(f"{where}.type {p.get('type')!r} not supported ({sorted(PHYSICS_TYPES)})")
             if p["formulation"] not in FORMULATIONS:
                 raise DocumentError(f"{where}.formulation must be one of {sorted(FORMULATIONS)}")
+            if "n_target" in p:
+                _material_number(p["n_target"], f"{where}.n_target")
+                if p["n_target"] <= 0:
+                    raise DocumentError(f"{where}.n_target must be positive")
             for side in ("left", "right", "top", "bottom"):
                 if p["boundary"].get(side) not in BOUNDARY_TYPES:
                     raise DocumentError(f"{where}.boundary.{side} must be one of {sorted(BOUNDARY_TYPES)}")

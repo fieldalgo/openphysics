@@ -7,7 +7,7 @@ Physics
 -------
 A guide that does not change along z carries fields of the form
 
-    E(x, y, z) = [E_t(x, y) + zhat E_z(x, y)] exp(-i beta z)
+    E(x, y, z, t) = [E_t(x, y) + zhat E_z(x, y)] exp(+i omega t-i beta z)
 
 and the question is which propagation constants beta the cross-section supports.
 Unlike the PEC waveguide of M3-prep there is no metal wall here: the mode is held
@@ -23,7 +23,8 @@ splits as grad = grad_t - i beta zhat, and rescale the unknowns
     e_z = -i E_z       longitudinal -> H1:      nodal P1 elements
 
 The scaling clears beta out of the interior of the curl term, leaving a *linear*
-generalized eigenvalue problem in beta^2 with real symmetric matrices:
+generalized eigenvalue problem in beta^2 with transpose-symmetric matrices
+(complex symmetric, not Hermitian, when the permittivity is complex):
 
     [ S(1/mu) - k0^2 Mt(eps)   0 ] [e_t]            [ Mt(1/mu)  G(1/mu)              ] [e_t]
     [ 0                        0 ] [e_z]  =  -beta^2[ G(1/mu)^T K(1/mu) - k0^2 M(eps)] [e_z]
@@ -96,6 +97,13 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
                 num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None):
     """Guided modes with effective index near n_target.
 
+    Complex eps_r is expressed in the exp(+i omega t) convention: passive
+    absorption has Im eps_r < 0 and the forward root has Im n_eff < 0.
+    n_target may be complex. Lossy candidates keep their complex eigenvalues
+    and are ordered by descending Re n_eff; a finite PEC window and a shift
+    do not establish confinement or completeness. The real-material path is
+    retained. Returned fields have arbitrary amplitude, not unit power.
+
     n_target: shift-invert target for beta/k0 — the core index is the natural
               choice, since guided modes lie just below it.
     pec_nodes: nodes carrying n x E = 0; defaults to every boundary node. An open
@@ -118,6 +126,12 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     complex combination of degenerate modes need not have that componentwise
     phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
     """
+    eps_r = np.asarray(eps_r)
+    if not np.isfinite(eps_r).all():
+        raise ValueError("eps_r must be finite")
+    complex_problem = bool(np.any(eps_r.imag != 0))
+    if not complex_problem:
+        eps_r = eps_r.real
     A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r)
     n_e, n_n = space.num_edges, mesh.num_nodes
 
@@ -138,15 +152,22 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
     # Shift-invert as a standard problem: nu = 1 / (lam - sigma), lam = -beta^2
     sigma = -(k0 * n_target) ** 2
     lu = spla.splu((A - sigma * B).tocsc())
-    op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=float)
+    op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
     nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
                          ncv=min(n, max(4 * num_modes, 40)), maxiter=20000)
 
-    beta2 = -(sigma + 1.0 / nu).real
-    keep = np.where(beta2 > 0.0)[0]
-    keep = keep[np.argsort(beta2[keep])[::-1]]
+    beta2 = -(sigma + 1.0 / nu)
+    if complex_problem:
+        beta = np.sqrt(beta2.astype(complex))
+        keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0))
+        keep = keep[np.lexsort((beta[keep].imag, -beta[keep].real))]
+    else:
+        beta2 = beta2.real
+        keep = np.where(beta2 > 0.0)[0]
+        keep = keep[np.argsort(beta2[keep])[::-1]]
+        beta = np.sqrt(np.maximum(beta2, 0.0))
 
-    n_eff = np.sqrt(beta2[keep]) / k0
+    n_eff = beta[keep] / k0
     et = np.zeros((len(keep), n_e), dtype=complex)
     ez = np.zeros((len(keep), n_n), dtype=complex)
     for i, j in enumerate(keep):
@@ -158,6 +179,6 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float,
         # Preserve each eigenvector; do not mix nearby, distinct eigenpairs.
         x = np.zeros(n_e + n_n, dtype=complex)
         x[free] = v
-        et[i] = x[:n_e] / np.sqrt(beta2[j])   # e_t = beta E_t  ->  E_t
+        et[i] = x[:n_e] / beta[j]   # e_t = beta E_t  ->  E_t
         ez[i] = x[n_e:]
     return n_eff, space, et, ez

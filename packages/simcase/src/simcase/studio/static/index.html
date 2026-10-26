@@ -609,8 +609,9 @@ function fillResultTable() {
   const nm = resultData.neff[0].length, ng = resultData.group_index;
   const tracked = !!resultData.summary.mode_tracking, ngCount = ng ? (tracked ? nm : 1) : 0;
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
-  resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map(x => `<td>${x.toFixed(6)}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}</td>`).join('') + '</tr>'; });
+  resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map((x,j) => `<td>${x.toFixed(6)}${resultData.neff_imag ? `<br>Im n_eff: ${resultData.neff_imag[i][j].toExponential(4)}<br>${resultData.propagation_loss_db_cm[i][j].toFixed(4)} dB/cm` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}${resultData.summary.group_index_imag ? `<br>Im n_g: ${resultData.summary.group_index_imag[i][j].toExponential(4)}` : ''}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
+  if (resultData.neff_imag) h += '<div class="hint">Material absorption only; exp(+iωt−iβz), Im n_eff &lt; 0 means attenuation. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';
   if (tracked) h += '<div class="hint" style="margin:0 10px">Branch numbers follow the modes seeded at the first wavelength. Refine the wavelength spacing to check group-index accuracy.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
   $('resTable').innerHTML = h;

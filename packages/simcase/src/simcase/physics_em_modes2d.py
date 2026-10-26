@@ -8,8 +8,10 @@ Scalar formulation (P1 nodal):   (k0^2 M_eps - K) phi = beta^2 M phi,  n_eff = b
     2D high-contrast cores. Boundary "pec" -> phi = 0, "pmc" -> natural (Neumann).
 
 Vector formulation: mixed edge/nodal guided modes from galerkin. PEC fixes
-    tangential E and E_z; PMC is natural. Only real positive permittivity is
-    supported. An explicit exterior cladding index defines the guided interval.
+    tangential E and E_z; PMC is natural. Passive complex permittivity uses
+    exp(+i omega t-i beta z), hence Im eps <= 0. An exterior cladding index
+    defines the real-index candidate interval; n_target explicitly selects
+    nearby candidates instead (needed for metals). Neither proves confinement.
 """
 
 from __future__ import annotations
@@ -23,14 +25,28 @@ from .fields import VectorField
 
 
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
-          num_modes: int = 1, formulation: str = "scalar", n_cladding: float | None = None):
-    if formulation == "vector" and not np.isfinite(eps_tri).all():
+          num_modes: int = 1, formulation: str = "scalar", n_cladding: float | None = None,
+          *, n_target: float | None = None):
+    """Relative fields and n_eff; wavelength and mesh use the same length unit.
+
+    eps_tri uses the modal time convention (negative imaginary part for loss).
+    Document materials are converted from physmat n+ik by the runner. Scalar
+    fields have unit peak, vector fields unit maximum centroid magnitude.
+    """
+    eps_tri = np.asarray(eps_tri)
+    if not np.isfinite(eps_tri).all():
         raise ValueError("vector modes require finite positive dielectric permittivity")
-    if np.iscomplexobj(eps_tri) and np.abs(eps_tri.imag).max() > 0:
-        raise NotImplementedError("lossy materials (Im eps != 0) need a complex eigensolver; not supported")
-    eps_tri = np.real(eps_tri)
+    if np.any(eps_tri.imag > 0):
+        raise ValueError("passive modes use Im eps <= 0 with exp(+i omega t - i beta z)")
+    lossy = bool(np.any(eps_tri.imag != 0))
+    if not lossy:
+        eps_tri = eps_tri.real
+    if n_target is not None and (not np.isfinite(n_target) or n_target <= 0):
+        raise ValueError("n_target must be finite and positive")
+    if np.any(eps_tri.real <= 0) and n_target is None:
+        raise ValueError("non-positive real permittivity requires explicit n_target candidate selection")
     if formulation == "vector":
-        return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding)
+        return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target)
     k0 = 2 * np.pi / wavelength
     K = assemble_stiffness(mesh, 1.0)
     M = assemble_mass(mesh, 1.0)
@@ -42,15 +58,16 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
     A_f, M_f = A[free][:, free], M[free][:, free].tocsc()
 
-    sigma = (k0 * np.sqrt(eps_tri.max())) ** 2
+    sigma = (k0 * n_target) ** 2 if n_target is not None else (k0 * np.sqrt(eps_tri.real.max())) ** 2
     k = min(num_modes, len(free) - 2)
-    vals, vecs = spla.eigsh(A_f, k=k, M=M_f, sigma=sigma, which="LM",
+    eigensolver = spla.eigs if lossy else spla.eigsh
+    vals, vecs = eigensolver(A_f, k=k, M=M_f, sigma=sigma, which="LM",
                             v0=np.ones(len(free)), ncv=min(len(free), max(4 * k, 40)), maxiter=10000)
-    order = np.argsort(-vals)
+    order = np.argsort(-np.sqrt(vals.astype(complex)).real) if lossy else np.argsort(-vals)
     vals, vecs = vals[order], vecs[:, order]
-    neff = np.sqrt(np.maximum(vals, 0.0)) / k0
-    guided = neff > np.sqrt(eps_tri.min())          # above the lowest material index = guided
-    fields = np.zeros((mesh.num_nodes, k))
+    neff = (np.sqrt(vals.astype(complex)) if lossy else np.sqrt(np.maximum(vals, 0.0))) / k0
+    guided = neff.real > np.sqrt(max(0., eps_tri.real.min()))
+    fields = np.zeros((mesh.num_nodes, k), dtype=vecs.dtype)
     fields[free] = vecs
     # normalise each field to unit maximum with positive peak
     for j in range(k):
@@ -59,11 +76,11 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     return {"neff": neff, "guided": guided, "fields": fields}
 
 
-def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding):
-    if not np.isfinite(eps_tri).all() or np.any(eps_tri <= 0):
+def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target=None):
+    if not np.isfinite(eps_tri).all() or (n_target is None and np.any(eps_tri.real <= 0)):
         raise ValueError("vector modes require finite positive dielectric permittivity")
-    n_core = float(np.sqrt(eps_tri.max()))
-    if n_cladding is None or not np.isfinite(n_cladding) or not 0 < n_cladding < n_core:
+    n_core = float(np.sqrt(max(0., eps_tri.real.max())))
+    if n_cladding is None or not np.isfinite(n_cladding) or not 0 < n_cladding or (n_target is None and n_cladding >= n_core):
         raise ValueError("vector n_cladding must be positive and below the maximum material index")
     # A wavelength-sized coordinate system keeps mixed edge/nodal blocks equally
     # conditioned when the same physical document is expressed in nm, um or m.
@@ -78,9 +95,14 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding):
     candidates = min(max(2 * num_modes, 6), free_count - 2)
     if candidates < 1:
         raise ValueError("mesh has too few unconstrained degrees of freedom for vector modes")
-    neff, space, et, ez = solve_modes(scaled, eps_tri, 2 * np.pi, n_target=n_core,
+    neff, space, et, ez = solve_modes(scaled, eps_tri, 2 * np.pi, n_target=n_core if n_target is None else n_target,
                                      num_modes=candidates, pec_nodes=pec, pec_edges=pec_edges)
-    keep = np.flatnonzero(np.isfinite(neff) & (neff > n_cladding) & (neff < n_core))[:num_modes]
+    if n_target is None:
+        keep = np.flatnonzero(np.isfinite(neff) & (neff.real > n_cladding) & (neff.real < n_core))[:num_modes]
+    else:
+        candidates = np.flatnonzero(np.isfinite(neff) & (neff.real > 0))
+        keep = candidates[np.argsort(abs(neff[candidates] - n_target))[:num_modes]]
+        keep = keep[np.argsort(-neff[keep].real)]
     if not len(keep):
         raise ValueError("no guided vector modes found between n_cladding and the maximum material index; "
                          "check the cladding index, mesh and computational domain")
@@ -114,7 +136,7 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     from galerkin import assemble_mode_system
 
     scaled = Mesh(mesh.nodes / wavelength, mesh.triangles.copy(), mesh.boundary, mesh.boundary_edges)
-    A, B, space = assemble_mode_system(scaled, np.real(eps_tri), 2 * np.pi)
+    A, B, space = assemble_mode_system(scaled, eps_tri, 2 * np.pi)
     pec_sides = [side for side, kind in boundary.items() if kind == "pec"]
     pec = np.unique(np.concatenate([mesh.boundary[s] for s in pec_sides])) if pec_sides else np.zeros(0, int)
     edge_ids = {tuple(edge): i for i, edge in enumerate(space.edges)}
@@ -124,10 +146,10 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     free = np.setdiff1d(np.arange(space.num_edges + mesh.num_nodes), fixed)
     A, B = A[free][:, free], B[free][:, free]
     residuals = []
-    for j, n in enumerate(np.asarray(neff, dtype=float)):
+    for j, n in enumerate(np.asarray(neff)):
         beta = 2 * np.pi * n
         x = np.concatenate([beta * field.transverse[:, j] / wavelength, -1j * field.longitudinal[:, j]])[free]
         ax, bx = A @ x, B @ x
         residuals.append(float(np.linalg.norm(ax + beta ** 2 * bx)
-                               / (np.linalg.norm(ax) + beta ** 2 * np.linalg.norm(bx))))
+                               / (np.linalg.norm(ax) + abs(beta ** 2) * np.linalg.norm(bx))))
     return np.array(residuals)

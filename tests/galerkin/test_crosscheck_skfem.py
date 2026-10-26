@@ -189,7 +189,8 @@ def test_elasticity_p2_reference_is_reported(skfem):
                                 "relative difference", abs(ours_tip - theirs_tip) / abs(theirs_tip))]))
 
 
-def test_vector_waveguide_modes_same_mesh(skfem):
+@pytest.mark.parametrize("loss", [0., .03])
+def test_vector_waveguide_modes_same_mesh(skfem, loss):
     import scipy.linalg as la
     from skfem.helpers import curl, dot, grad
     width, height = 4.0, 3.0
@@ -199,6 +200,8 @@ def test_vector_waveguide_modes_same_mesh(skfem):
     centroids = mesh.nodes[mesh.triangles].mean(axis=1)
     core = (np.abs(centroids[:, 0]) < 0.8) & (np.abs(centroids[:, 1]) < 0.5)
     eps = np.where(core, 3.48**2, 1.44**2)
+    if loss:
+        eps = eps - 1j * loss * core
     k0 = 2 * np.pi / 1.55
     clock = Stopwatch()
     with clock("openphysics"):
@@ -207,11 +210,11 @@ def test_vector_waveguide_modes_same_mesh(skfem):
     basis = skfem.Basis(_reference_mesh(skfem, mesh), skfem.ElementTriN1() * skfem.ElementTriP1())
     eps_q = np.repeat(eps[:, None], basis.default_parameters()["x"].shape[-1], axis=1)
 
-    @skfem.BilinearForm
+    @skfem.BilinearForm(dtype=complex if loss else float)
     def left(et, ez, vt, vz, w):
         return curl(et) * curl(vt) - k0**2 * w.eps * dot(et, vt)
 
-    @skfem.BilinearForm
+    @skfem.BilinearForm(dtype=complex if loss else float)
     def right(et, ez, vt, vz, w):
         return (dot(et, vt) + dot(et, grad(vz)) + dot(grad(ez), vt) + dot(grad(ez), grad(vz))
                 - k0**2 * w.eps * ez * vz)
@@ -221,11 +224,12 @@ def test_vector_waveguide_modes_same_mesh(skfem):
         a = left.assemble(basis, eps=eps_q)[free][:, free].toarray()
         b = right.assemble(basis, eps=eps_q)[free][:, free].toarray()
         lam = la.eigvals(a, b)
-    lam = np.real(lam[np.isfinite(lam)])
-    reference = np.sqrt(np.clip(-lam, 0, None)) / k0
-    reference = np.sort(reference[(reference > 1.44) & (reference < 3.48)])[::-1][:4]
+    lam = lam[np.isfinite(lam)]
+    reference = np.sqrt(-lam.astype(complex)) / k0 if loss else np.sqrt(np.clip(-lam.real, 0, None)) / k0
+    reference = reference[(reference.real > 1.44) & (reference.real < 3.48)]
+    reference = reference[np.argsort(-reference.real)][:4]
     emit(make_record(
-        case="waveguide-vector-rect-core",
+        case="waveguide-vector-rect-core-lossy" if loss else "waveguide-vector-rect-core",
         analytical_acceptance="tests/galerkin/test_hadley.py and tests/galerkin/test_fiber_modes.py (published and closed-form mode indices)", stopwatch=clock,
         physics="2D full-vector dielectric waveguide modes (Si core 1.6 x 1.0 in SiO2, 1.55 um)",
         api="galerkin.waveguide.solve_modes",
@@ -235,8 +239,10 @@ def test_vector_waveguide_modes_same_mesh(skfem):
                  "PEC on the whole outer boundary (tangential E_t and E_z)", "same generalized eigenproblem"],
         not_matched=["eigensolver (galerkin shift-invert ARPACK, reference dense QZ)"],
         observables=[observable("effective index, four highest guided modes", "1",
-                                "max relative difference", relative_difference(np.real(n_eff), reference),
+                                "max relative difference", relative_difference(n_eff, reference),
                                 SAME)]))
+    if loss:
+        assert relative_difference(n_eff.imag, reference.imag) < SAME
 
 
 def test_pec_cavity_eigenvalues_same_mesh(skfem):

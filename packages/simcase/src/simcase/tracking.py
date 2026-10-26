@@ -69,14 +69,17 @@ class ModeTracker:
     neither beta nor an extra wavelength factor belongs in this product.
     """
 
-    def __init__(self, mesh, num_modes, settings):
+    def __init__(self, mesh, num_modes, settings, *, scalar=False):
         self.num_modes = num_modes
         self.settings = settings
+        self.scalar = scalar
         self.edge_mass = assemble_edge_mass(EdgeSpace(mesh))
         self.node_mass = assemble_mass(mesh)
         self.previous = None
 
     def product(self, left, right):
+        if self.scalar:
+            return left.conj().T @ (self.node_mass @ right)
         return (left.transverse.conj().T @ (self.edge_mass @ right.transverse)
                 + left.longitudinal.conj().T @ (self.node_mass @ right.longitudinal))
 
@@ -145,7 +148,7 @@ class ModeTracker:
                      f"{self.settings['degeneracy_tolerance']:g}",
                      "use single studies; individual branches need degenerate-subspace tracking")
 
-        aligned = VectorField(field.edges, field.transverse[:, selected] * phase,
+        aligned = field[:, selected] * phase if self.scalar else VectorField(field.edges, field.transverse[:, selected] * phase,
                               field.longitudinal[:, selected] * phase,
                               field.electric[:, selected, :] * phase[None, :, None])
         self.previous = aligned
