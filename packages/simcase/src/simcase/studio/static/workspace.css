@@ -37,3 +37,6 @@ main{position:relative}.panel-divider{display:none}.layout-help{display:flex;fle
 .study-actions{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.validation-report{margin-top:18px;padding:14px;border:1px solid var(--line);background:var(--panel)}.validation-report pre,.solver-document pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 Consolas,monospace}.validation-warning{color:#e7bc73}.solver-document{margin-top:18px}.solver-document summary{cursor:pointer;color:var(--accent)}
 
 .line-profile{margin:20px 0;padding:14px;border:1px solid var(--line);background:var(--panel)}.line-profile summary{cursor:pointer;color:var(--accent);font-weight:600}.profile-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.profile-controls label{margin:12px 0 0;max-width:220px}.profile-controls button{margin-top:12px}.profile-legend p{margin:6px 0;font-size:12px}
+
+/* Shared rows keep matching physical coordinates aligned when run labels wrap. */
+.compare-grid{row-gap:0}.compare-grid>article{display:grid;grid-template-rows:subgrid;grid-row:span 3;gap:0}
