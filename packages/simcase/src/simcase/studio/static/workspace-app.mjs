@@ -1,3 +1,4 @@
+import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
 import {installWidthEditor} from './workspace-width-editor.mjs';
 import {sectionSvg} from './workspace-section.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
@@ -64,7 +65,7 @@ function render(){disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical())
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+(isOptical()?`<label>Core height [nm]<input id="height-number" type="number" min="100" max="500" step="any" value="${state.height}"></label>`:'')+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
 else if(ui.selection==='Electric currents')inspector+=`<label>Applied voltage [V]<input id="voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label>`+pair('Terminal','Heater input')+pair('Ground','Heater output')+pair('Output','Joule heat [W/m³]');
-else if(ui.selection==='Materials')inspector+=pair('Core','Silicon')+pair('Cladding','Silica')+pair('Heater','Unassigned')+'<p>Conductivity, thermal expansion, elasticity and optical material laws require validated assignments.</p>';
+else if(ui.selection==='Materials')inspector+=pair('Core',setup.materials.Core||'Unassigned')+pair('Cladding',setup.materials.Oxide||'Unassigned')+pair('Heater',setup.materials.Heater||'Unassigned')+'<p>Conductivity, thermal expansion, elasticity and optical material laws require validated assignments.</p>';
 else if(ui.selection==='Solid mechanics')inspector+=pair('Load','Thermal strain')+pair('Constraints','Not assigned')+pair('Output','Displacement [m]');
 else if(ui.selection==='Heat transfer')inspector+=pair('Source','Joule heat')+pair('Heat loss','Not assigned')+pair('Output','Temperature [K]');
 else if(ui.selection==='Optical modes')inspector+=pair('Wavelength','1550 nm')+pair('Inputs',isOptical()?'Material at 1550 nm, geometry':'n(T), geometry')+pair('Output','Modes / effective index');
@@ -115,7 +116,13 @@ if(ui.page==='Model'&&pick.mode==='Bodies'&&['Geometry','Materials'].includes(ui
  controls.querySelectorAll('[data-body]').forEach(b=>b.onclick=()=>{ui.body=b.dataset.body;ui.selection='Materials';render();});
 }
 let form='';
-if(ui.selection==='Materials')form=`<h2>${ui.body} material</h2><label>Selected body<select id="body-choice">${options(isOptical()?['Core','Oxide']:['Core','Oxide','Heater'],ui.body)}</select></label><label>Material label<select id="material-choice">${options(['','Silicon','Silica','Silicon nitride','Platinum'],setup.materials[ui.body])}</select></label><p>Labels only. Property values, temperature laws and compatibility are not validated.</p>`;
+if(ui.selection==='Materials'){
+ const allowed=isOptical()?(ui.body==='Core'?['Silicon','Silicon nitride']:['Silica']):['','Silicon','Silica','Silicon nitride','Platinum'];
+ const assigned=setup.materials[ui.body];
+ const values=allowed.includes(assigned)?allowed:[assigned,...allowed];
+ form=`<h2>${ui.body} material</h2><label>Selected body<select id="body-choice">${options(isOptical()?['Core','Oxide']:['Core','Oxide','Heater'],ui.body)}</select></label><label>${isOptical()?'Optical material':'Material label'}<select id="material-choice">${options(values,assigned)}</select></label>`;
+ form+=isOptical()?`<p>${allowed.includes(assigned)?'Used by the optical solver at 1550 nm.':'Current assignment is unsupported. Choose a supported material before running.'}</p><p>Core: Silicon (Si) or Silicon nitride (Si3N4). Background: Silica (SiO2). Optical material properties are resolved by the server; thermal and mechanical laws are not assigned here.</p>`:'<p>Setup labels only. Coupled property values, temperature laws and compatibility are not validated.</p>';
+}
 if(ui.selection==='Electric currents')form=`<h2>Electric currents</h2><label>Applied voltage [V]<input id="setup-voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label><label>Terminal / ground<select id="terminal">${options(['','Heater start / heater end'],setup.terminal)}</select></label><p>Named end faces are placeholders until CAD selection is connected.</p>`;
 if(ui.selection==='Heat transfer')form=`<h2>Heat transfer</h2><label>Thermal boundary<select id="cooling">${options(['','Oxide bottom: fixed temperature'],setup.cooling)}</select></label><label>Boundary temperature [K]<input id="temperature" type="number" min="1" max="2000" step="0.01" value="${setup.temperature}"></label><p>Temperature range is a UI input bound, not material validity.</p>`;
 if(ui.selection==='Solid mechanics')form=`<h2>Solid mechanics</h2><label>Fixed support<select id="fixed">${options(['','Left end fixed','Both ends fixed'],setup.fixed)}</select></label><p>Conceptual end selections. Other faces are intended to remain free. Geometry mapping is pending.</p>`;
@@ -146,7 +153,7 @@ function applyProject(doc,{saved=true,resetHistory=false}={}){
   doc=edits.replace(doc,{saved,resetHistory});numericDrafts.clear();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
-  render();updateHistory();refreshPersistence();
+  checkpointRecovery();render();updateHistory();refreshPersistence();
   notice('Project inputs restored. Results and CAD geometry are not included.');
 }
 function requestLoad(doc,{saved=true}={}){
@@ -176,12 +183,24 @@ $('save-draft').onclick=()=>{try{rejectInvalidInput();const text=signature();loc
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text));}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
 
 
+let recoverable=null;
+function showRecovery(){
+ $('recover-inputs').disabled=!recoverable;
+ $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are saved automatically for recovery in this browser. Save session to retain results.';
+}
+function checkpointRecovery(){
+ try{writeRecovery(localStorage,current());recoverable=readRecovery(localStorage);showRecovery();}
+ catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save file or Save session.';}
+}
+try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
+$('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false});}catch(error){notice(error.message);}};
+
 function updateHistory(){ $('undo-edit').disabled=!edits.canUndo;$('redo-edit').disabled=!edits.canRedo; }
-function trackEdit(group=null){edits.record(current(),group);updateHistory();refreshPersistence();}
+function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before)checkpointRecovery();updateHistory();refreshPersistence();}
 function restoreEdit(doc,label){
  numericDrafts.clear();
  Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
- render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
+ checkpointRecovery();render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
 }
 $('undo-edit').onclick=()=>restoreEdit(edits.undo(),'Undo');
 $('redo-edit').onclick=()=>restoreEdit(edits.redo(),'Redo');
@@ -205,7 +224,8 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D rectangular core, height 100–500 nm; silica background; wavelength 1550 nm; 30 nm core mesh; 3 × 2.4 µm window; PEC outer edges; two candidates. Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
   const msg=document.createElement('p');msg.textContent=block||'Optical input supported. Solver validation runs before submission.';info.append(msg);
-  if(ui.selection==='Study'&&!block)$('canvas').innerHTML='<h2>Optical study</h2><p>Input snapshot is captured when Run is pressed.</p>';
+  if(ui.selection==='Study'&&!block)$('canvas').innerHTML='<h2>Optical study</h2><p>Input snapshot is captured when Run is pressed.</p>'+pair('Core dimensions',state.width+' × '+state.height+' nm')+pair('Core material',setup.materials.Core)+pair('Background',setup.materials.Oxide)+'<button id=review-geometry>Edit geometry</button> <button id=review-materials>Edit materials</button>';
+   if($('review-geometry'))$('review-geometry').onclick=()=>select('Geometry');if($('review-materials'))$('review-materials').onclick=()=>select('Materials');
   $('canvas').append(info);if(ui.selection==='Study'&&!block)$('inspector').innerHTML='<h2>Optical execution</h2>'+pair('State',solverBusy?'Computing':solverRun?'Completed run available':'Ready for validation')+'<p>Run captures current inputs. Other physics remain unavailable.</p>';
  }
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Width/height editable; window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';

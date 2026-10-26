@@ -93,3 +93,18 @@ The workspace tests cover version/settings negotiation, input drafts, edit
 history, notebook/session validation, field data and HTTP assets. Distribution
 checks also run workspace JavaScript tests against copied installed assets.
 These checks do not replace the required full CI or independent physics validation.
+
+## Input recovery and material review
+
+Valid input edits are saved automatically to a separate browser recovery record.
+After reloading, **Recover recent inputs** offers a confirmed replacement; it
+never runs a calculation. This is one latest record per browser origin, shared
+by its tabs. Invalid drafts, completed fields and undo history are not recovered.
+Recovery does not mark a file as saved. Storage failures are shown with a file
+save alternative; keep session files for durable results and comparisons.
+
+The optical Materials inspector offers silicon/silicon nitride for the core and
+silica for the background. Unsupported imported assignments remain visible and
+block execution until corrected. These choices reach the optical solver;
+heated-waveguide assignments remain setup labels. Study summarizes the current
+core dimensions and materials with links back to their editors.
