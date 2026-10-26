@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .mesh import Mesh
+from .core.checks import refuse_live
 
 
 def _copy(value):
@@ -22,6 +23,7 @@ class ElementHeatSource:
     are allowed (negative means cooling). Coordinates, connectivity and region
     ordering must match when consumed; boundary conditions may change.
     Construct a new source after changing a mesh. No interpolation is done.
+    Values are NumPy: JAX and PyTorch arrays are refused (TypeError).
     """
 
     values: np.ndarray
@@ -33,6 +35,7 @@ class ElementHeatSource:
     def __init__(self, mesh, values):
         if not isinstance(mesh, Mesh):
             raise ValueError("mesh must be a galerkin.mesh.Mesh")
+        refuse_live(values, "element heat source")
         data = np.asarray(values)
         if (data.shape != (mesh.num_triangles,) or data.dtype.kind not in "iuf"
                 or not np.all(np.isfinite(data))):

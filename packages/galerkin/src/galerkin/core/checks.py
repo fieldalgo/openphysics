@@ -1,7 +1,22 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Numeric input checks shared by the physics modules."""
+"""Numeric input checks shared by the physics modules.
+
+``real_array`` and ``finite_scalar`` return NumPy numbers, so they refuse JAX
+and PyTorch arrays rather than silently cutting a derivative. A solver that
+differentiates uses ``real_value``, which runs the same checks on a snapshot
+and returns the value itself.
+"""
 import numpy as np
+
+from .backend import is_live, namespace, require_float64, to_numpy
+
+
+def refuse_live(value, name):
+    """Raise TypeError if ``value`` is a JAX or PyTorch array: the caller computes with NumPy."""
+    if is_live(value):
+        raise TypeError(f"{name}: this computation runs on NumPy and would cut the derivative "
+                        "of a JAX or PyTorch value; pass NumPy numbers")
 
 
 def real_array(value, name):
@@ -10,7 +25,9 @@ def real_array(value, name):
     Rejects booleans (alone or as elements of a list or tuple, before NumPy can
     coerce them to numbers), non-real dtypes, nonfinite values and values that
     overflow on conversion to float. The result never aliases ``value``.
+    JAX and PyTorch arrays are refused (TypeError); see ``real_value``.
     """
+    refuse_live(value, name)
     if isinstance(value, (bool, np.bool_)) or (
             isinstance(value, (list, tuple)) and any(isinstance(v, (bool, np.bool_)) for v in value)):
         raise ValueError(f"{name} must not contain booleans")
@@ -24,8 +41,23 @@ def real_array(value, name):
     return out
 
 
+def real_value(value, name):
+    """``real_array(value, name)``, except that a JAX or PyTorch value stays live.
+
+    A live value gets the same checks on a snapshot of its numbers and is
+    returned as a float64 array in its own library, carrying its derivative.
+    """
+    if not is_live(value):
+        return real_array(value, name)
+    real_array(to_numpy(value), name)
+    xp = namespace(value)
+    require_float64(xp, name)
+    return xp.astype(value, xp.float64)
+
+
 def finite_scalar(value, label):
-    """A finite real scalar as float; booleans are rejected."""
+    """A finite real scalar as float; booleans and JAX or PyTorch arrays are rejected."""
+    refuse_live(value, label)
     a = np.asarray(value)
     if a.shape != () or a.dtype.kind not in "iuf" or isinstance(value, (bool, np.bool_)):
         raise ValueError(f"{label} must be a finite real scalar")

@@ -203,3 +203,75 @@ def test_torch_second_derivative_is_refused():
     (grad,) = torch.autograd.grad((x ** 2).sum(), v, create_graph=True)
     with pytest.raises(RuntimeError, match="once_differentiable"):
         grad.sum().backward()
+
+
+def _laplacian_terms(n=6):
+    """A 1-D Laplacian split into two COO terms, plus a load."""
+    rows = np.concatenate([np.arange(n), np.arange(n - 1), np.arange(1, n)])
+    cols = np.concatenate([np.arange(n), np.arange(1, n), np.arange(n - 1)])
+    values = np.concatenate([np.full(n, 2.0), np.full(2 * (n - 1), -1.0)])
+    extra = np.arange(n), np.arange(n), np.linspace(0.1, 0.6, n)
+    return (CooMatrix(rows, cols, values, (n, n)), CooMatrix(*extra, (n, n)),
+            np.linspace(1.0, 2.0, n))
+
+
+def test_solve_dirichlet_numpy_is_galerkin_solver_bit_for_bit():
+    from galerkin.core.solve import solve_dirichlet
+    from galerkin.solver import solve_dirichlet as scipy_solve_dirichlet
+    K, H, f = _laplacian_terms()
+    bc = {(0,): 1.5, (5,): -0.25}
+    expected = scipy_solve_dirichlet(K.to_scipy() + H.to_scipy(), f, bc)
+    assert np.array_equal(solve_dirichlet([K, H], f, bc), expected)
+
+
+@pytest.mark.parametrize("name", ["jax", "torch"])
+def test_solve_dirichlet_live_values_and_gradients(name):
+    from galerkin.core.solve import solve_dirichlet
+    K, H, f = _laplacian_terms()
+    w = np.linspace(-1.0, 1.0, 6)
+
+    def numpy_objective(scale, g0, f2):
+        load = f.copy()
+        load[2] = f2
+        x = solve_dirichlet([K, CooMatrix(H.rows, H.cols, scale * H.values, H.shape)], load, {(0,): g0, (5,): 0.5})
+        return float(w @ x)
+    values = (1.3, 1.5, 0.7)
+    if name == "jax":
+        jax = _jax()
+        jnp = jax.numpy
+
+        def objective(scale, g0, f2):
+            load = jnp.asarray(f).at[2].set(f2)
+            x = solve_dirichlet([K, CooMatrix(H.rows, H.cols, scale * jnp.asarray(H.values), H.shape)],
+                                load, {(0,): g0, (5,): 0.5})
+            return jnp.asarray(w) @ x
+        got = jax.grad(lambda v: objective(*v))([jnp.asarray(v) for v in values])
+        value = float(objective(*values))
+    else:
+        torch = _torch()
+        leaves = [torch.tensor(v, dtype=torch.float64, requires_grad=True) for v in values]
+        load = torch.cat([torch.as_tensor(f[:2]), leaves[2][None], torch.as_tensor(f[3:])])
+        x = solve_dirichlet([K, CooMatrix(H.rows, H.cols, leaves[0] * torch.as_tensor(H.values), H.shape)],
+                            load, {(0,): leaves[1], (5,): 0.5})
+        objective = torch.as_tensor(w) @ x
+        objective.backward()
+        got, value = [float(t.grad) for t in leaves], float(objective.detach())
+    assert abs(value - numpy_objective(*values)) < 1e-13
+    h = 1e-6
+    for i in range(3):
+        up, down = list(values), list(values)
+        up[i] += h
+        down[i] -= h
+        fd = (numpy_objective(*up) - numpy_objective(*down)) / (2 * h)
+        assert abs(float(got[i]) - fd) <= 1e-7 * max(1.0, abs(fd))
+
+
+def test_solve_dirichlet_last_value_wins_on_every_library():
+    from galerkin.core.solve import solve_dirichlet
+    K, H, f = _laplacian_terms()
+    bc = {(0, 5): 1.0, (5,): 2.0}
+    expected = solve_dirichlet(K, f, bc)
+    assert expected[5] == 2.0 and expected[0] == 1.0
+    jax = _jax()
+    got = solve_dirichlet(K, jax.numpy.asarray(f), {(0, 5): jax.numpy.asarray(1.0), (5,): 2.0})
+    np.testing.assert_allclose(np.asarray(got), expected, rtol=1e-14)

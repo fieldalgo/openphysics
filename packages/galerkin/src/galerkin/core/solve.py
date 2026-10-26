@@ -28,8 +28,9 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import splu
 
-from .backend import Backend, backend_of, namespace
+from .backend import Backend, backend_of, lift, live_namespace, scatter_add
 from .sparse import CooMatrix
+from ..solver import solve_dirichlet as _scipy_solve_dirichlet
 
 
 def _factor(rows, cols, values, shape):
@@ -67,12 +68,68 @@ def solve(A: CooMatrix, b):
     singular matrix raises ValueError.
     """
     _check(A, b)
-    backend = backend_of(namespace(A.values, b))
+    xp = live_namespace(A.values, b)
+    backend = backend_of(xp)
     if backend is Backend.NUMPY:
         return _apply(_factor(A.rows, A.cols, A.values, A.shape), b)
+    values, b = lift(xp, A.values), lift(xp, b)
     if backend is Backend.JAX:
-        return _jax_solve(A.rows, A.cols, A.shape, A.values, b)
-    return _torch_function().apply(A.rows, A.cols, A.shape, A.values, b)
+        return _jax_solve(A.rows, A.cols, A.shape, values, b)
+    return _torch_function().apply(A.rows, A.cols, A.shape, values, b)
+
+
+def solve_dirichlet(terms, b, dirichlet):
+    """``x`` with ``(sum of terms) x = b`` on free nodes and ``x = g`` on fixed ones.
+
+    ``terms`` is a CooMatrix or a sequence of them, summed. ``dirichlet`` maps a
+    tuple of node indices to a scalar or a matching array, as for
+    :func:`galerkin.solver.solve_dirichlet`; a node listed twice takes its last
+    value. On NumPy the terms are converted to SciPy CSR and added left to right
+    and that function solves them, so results round exactly as before. With JAX
+    or PyTorch values the free block is solved with :func:`solve`, and the
+    derivative reaches the matrix entries, ``b`` and the prescribed values.
+    """
+    terms = [terms] if isinstance(terms, CooMatrix) else list(terms)
+    values = [v for v in dirichlet.values()]
+    xp = live_namespace(b, *(t.values for t in terms), *values)
+    if backend_of(xp) is Backend.NUMPY:
+        matrix = terms[0].to_scipy()
+        for term in terms[1:]:
+            matrix = matrix + term.to_scipy()
+        return _scipy_solve_dirichlet(matrix, b, dirichlet)
+    A = terms[0]
+    for term in terms[1:]:
+        A = A + term
+    A, b = CooMatrix(A.rows, A.cols, lift(xp, A.values), A.shape), lift(xp, b)
+    n = A.shape[0]
+    dtype = xp.result_type(A.values.dtype, b.dtype)
+    nodes, prescribed = [], []
+    for key, value in dirichlet.items():
+        index = np.asarray(key, dtype=int).reshape(-1)
+        nodes.append(index)
+        prescribed.append(xp.broadcast_to(lift(xp, value, dtype), index.shape))
+    if nodes:
+        nodes, prescribed = np.concatenate(nodes), xp.concat(prescribed)
+        _, last = np.unique(nodes[::-1], return_index=True)
+        keep = len(nodes) - 1 - last
+        fixed, prescribed = nodes[keep], prescribed[keep]
+    else:
+        fixed, prescribed = np.zeros(0, dtype=int), xp.zeros(0, dtype=dtype)
+    is_fixed = np.zeros(n, dtype=bool)
+    is_fixed[fixed] = True
+    free = np.flatnonzero(~is_fixed)
+    position = np.full(n, -1)
+    position[free] = np.arange(len(free))
+    given = scatter_add(xp, n, fixed, prescribed)
+    if not len(free):
+        return given
+    free_row = ~is_fixed[A.rows]
+    ff = np.flatnonzero(free_row & ~is_fixed[A.cols])
+    fd = np.flatnonzero(free_row & is_fixed[A.cols])
+    block = CooMatrix(position[A.rows[ff]], position[A.cols[ff]], A.values[ff], (len(free), len(free)))
+    coupling = scatter_add(xp, len(free), position[A.rows[fd]], A.values[fd] * given[A.cols[fd]])
+    x = solve(block, xp.astype(b, dtype)[free] - coupling)
+    return scatter_add(xp, n, free, x, base=given)
 
 
 # -- JAX -----------------------------------------------------------------------

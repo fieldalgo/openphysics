@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .backend import Backend, backend_of, namespace, scatter_add
+from .backend import Backend, backend_of, lift, live_namespace, namespace, scatter_add
 
 
 @dataclass(frozen=True)
@@ -51,3 +51,22 @@ class CooMatrix:
                             "would cut their derivatives")
         import scipy.sparse as sp
         return sp.coo_matrix((self.values, (self.rows, self.cols)), shape=self.shape).tocsr()
+
+    def matvec(self, x):
+        """``A @ x`` for x of shape (n,), in the values' library.
+
+        On NumPy this is the SciPy CSR product of :meth:`to_scipy`, so it rounds
+        as the hand-written assembly's ``K @ x`` did; elsewhere a scatter-add.
+        """
+        xp = live_namespace(self.values, x)
+        if backend_of(xp) is Backend.NUMPY:
+            return self.to_scipy() @ x
+        return scatter_add(xp, self.shape[0], self.rows, lift(xp, self.values) * lift(xp, x)[self.cols])
+
+    def __add__(self, other):
+        """The sum as one CooMatrix (entries concatenated, duplicates add)."""
+        if not isinstance(other, CooMatrix) or other.shape != self.shape:
+            return NotImplemented
+        xp = live_namespace(self.values, other.values)
+        return CooMatrix(np.concatenate([self.rows, other.rows]), np.concatenate([self.cols, other.cols]),
+                         xp.concat([lift(xp, self.values), lift(xp, other.values)]), self.shape)
