@@ -1,3 +1,4 @@
+import {installWidthEditor} from './workspace-width-editor.mjs';
 import {sectionSvg} from './workspace-section.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
 import {checkWorkspaceCapabilities} from './workspace-connection.mjs';
@@ -16,13 +17,14 @@ import {renderApplications,templatePhysics} from './workspace-applications.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core'};const state={width:500,voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera()};
-let refreshViewport=null;
+let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
 const connection={ready:false,message:'Checking Studio compatibility…',version:null};
 const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div>`;
 function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Couplings'?'Connections':'Model';render();}
 
 const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
+function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installWidthEditor($('canvas'),{width:state.width,blocked:()=>numericDrafts.invalid,commit:value=>{edits.endGroup();state.width=value;trackEdit();edits.endGroup();render();notice('Core width updated. Run explicitly to compute new results.');}});}
 function geom(){
 if(isOptical())return sectionSvg(state.width,ui.body,pick.boundary,pick.mode);
 const w=state.width/500;
@@ -58,7 +60,7 @@ const button=document.createElement('button');button.textContent=text;button.id=
 }
 }
 function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[]),...(state.heat&&state.structure?['Solid mechanics']:[]),...(state.optics?['Optical modes']:[])];}
-function render(){if(isOptical()){ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function render(){disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical()){ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
 else if(ui.selection==='Electric currents')inspector+=`<label>Applied voltage [V]<input id="voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label>`+pair('Terminal','Heater input')+pair('Ground','Heater output')+pair('Output','Joule heat [W/m³]');
@@ -73,8 +75,8 @@ else if(ui.page==='Applications')renderApplications($('canvas'));
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>';
-const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
-document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});decorate();pickingPanel();solverPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?installViewport($('canvas'),cameras[ui.view]):null;}
+const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
+document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});decorate();pickingPanel();solverPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?installViewport($('canvas'),cameras[ui.view]):null;bindWidthEditor();}
 
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
@@ -99,7 +101,7 @@ function bindNumericInputs(){
   const el=$(field.id);if(!el)continue;el.step='any';const issue=numericDrafts.get(key);if(issue)el.value=issue.raw;
   const hint=document.createElement('p');hint.id=field.id+'-hint';hint.className='input-hint';el.closest('label').append(hint);el.setAttribute('aria-describedby',hint.id);
   el.oninput=()=>{const parsed=numericDrafts.update(key,el.value);if(parsed.ok){if(key==='temperature')setup.temperature=parsed.value;else state[key]=parsed.value;
-   if(key==='width'){const slider=$('width');if(slider){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();}}
+   if(key==='width'){const slider=$('width');if(slider){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
   el.onkeydown=e=>{if(e.key==='Escape'){numericDrafts.clear(key);el.value=key==='temperature'?setup.temperature:state[key];refreshInputIssues();}};
  }
