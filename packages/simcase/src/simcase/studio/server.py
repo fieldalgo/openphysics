@@ -559,8 +559,11 @@ def main(argv=None):
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--workspace", action="store_true",
+                    help="open the experimental model workspace instead of the classic editor")
     args = ap.parse_args(argv)
-    url = f"http://{args.host}:{args.port}/"
+    path = "/workspace" if args.workspace else "/"
+    url = f"http://{args.host}:{args.port}{path}"
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     print(f"simcase studio at {url}")

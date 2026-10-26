@@ -398,6 +398,7 @@ edits and asks a local server to mesh and run it with the same engine.
 ```bash
 python -m pip install -e "packages/simcase[studio]"  # from the repository root, after the runtime install
 simcase-studio                # http://127.0.0.1:8765, opens the browser
+simcase-studio --workspace    # experimental model workspace at /workspace
 python -m simcase.studio --port 9000 --no-browser
 ```
 

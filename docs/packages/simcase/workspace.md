@@ -2,9 +2,12 @@
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/workspace.md)
 
-Start `simcase-studio` with the optional `simcase[studio]` dependencies installed,
-then follow **Open experimental model workspace** from the home page, or open
-`/workspace` on the same local server. The existing optical and heat editors
+With the optional `simcase[studio]` dependencies installed, run
+`simcase-studio --workspace` to open this workspace directly in your browser.
+For another port, use `simcase-studio --workspace --port 8770`; add `--no-browser`
+to print the address without opening a browser.
+You can also follow **Open experimental model workspace** from the classic home
+page, or open `/workspace` on the same local server. The existing optical and heat editors
 remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is needed.
 
 ## First optical study
