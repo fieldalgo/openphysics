@@ -91,3 +91,32 @@ def test_workspace_submission_rejects_restart_before_document_or_job_work(client
     assert response.status_code == 409
     assert "restarted" in response.json()["detail"]
     assert calls == []
+
+
+@pytest.mark.parametrize("extra,path,opens_browser", [
+    ([], "/", True),
+    (["--workspace"], "/workspace", True),
+    (["--workspace", "--no-browser"], "/workspace", False),
+])
+def test_launcher_selects_landing_page_without_changing_server_routes(monkeypatch, capsys, extra, path, opens_browser):
+    from simcase.studio import server
+    import uvicorn
+    import webbrowser
+
+    opened, served = [], []
+
+    class ImmediateTimer:
+        def __init__(self, delay, callback):
+            self.callback = callback
+
+        def start(self):
+            self.callback()
+
+    monkeypatch.setattr(server.threading, "Timer", ImmediateTimer)
+    monkeypatch.setattr(webbrowser, "open", opened.append)
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: served.append((app, options)))
+    server.main(["--host", "127.0.0.1", "--port", "9876", *extra])
+    url = "http://127.0.0.1:9876" + path
+    assert opened == ([url] if opens_browser else [])
+    assert url in capsys.readouterr().out
+    assert served == [(server.app, {"host": "127.0.0.1", "port": 9876, "log_level": "warning"})]

@@ -218,6 +218,7 @@ writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 ```bash
 python -m pip install -e "packages/simcase[studio]"  # from the repository root, after the runtime install
 simcase-studio                # http://127.0.0.1:8765, opens the browser
+simcase-studio --workspace    # experimental model workspace at /workspace
 python -m simcase.studio --port 9000 --no-browser
 ```
 
