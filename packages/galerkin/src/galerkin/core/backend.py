@@ -94,13 +94,16 @@ def check_finite(xp, name, value):
     return value
 
 
-def scatter_add(xp, size, index, values):
+def scatter_add(xp, size, index, values, base=None):
     """A new array ``out`` of leading length ``size`` with ``out[index[k]] += values[k]``.
 
     ``index`` is a 1-D integer array (static structure, NumPy or ``xp``);
     ``values`` has shape ``(len(index), *trailing)`` and may be live. Repeated
-    indices add. No argument is modified, so derivatives flow through ``values``
-    on JAX and PyTorch.
+    indices add, in index order on NumPy. ``base`` (same library, shape
+    ``(size, *trailing)``) is the starting array instead of zeros, so several
+    calls accumulate exactly as repeated ``np.add.at`` into one array would. No
+    argument is modified, so derivatives flow through ``values`` and ``base`` on
+    JAX and PyTorch.
     """
     index = np.asarray(index)
     if index.ndim != 1 or index.dtype.kind not in "iu":
@@ -108,13 +111,18 @@ def scatter_add(xp, size, index, values):
     if values.shape[0] != index.shape[0]:
         raise ValueError(f"scatter_add has {index.shape[0]} indices but {values.shape[0]} values")
     shape = (size, *values.shape[1:])
+    if base is not None and tuple(base.shape) != shape:
+        raise ValueError(f"scatter_add base has shape {tuple(base.shape)}, expected {shape}")
     backend = backend_of(xp)
     if backend is Backend.NUMPY:
-        out = np.zeros(shape, dtype=np.result_type(values.dtype, np.float64))
+        dtype = np.result_type(values.dtype, np.float64, *(() if base is None else (base.dtype,)))
+        out = np.zeros(shape, dtype=dtype) if base is None else np.array(base, dtype=dtype, copy=True)
         np.add.at(out, index, values)          # into a fresh array only this call sees
         return out
     if backend is Backend.JAX:
-        return xp.zeros(shape, dtype=values.dtype).at[index].add(values)
+        start = xp.zeros(shape, dtype=values.dtype) if base is None else base
+        return start.at[index].add(values)
     torch = sys.modules["torch"]
     target = torch.as_tensor(index, device=values.device)
-    return torch.zeros(shape, dtype=values.dtype, device=values.device).index_add(0, target, values)
+    start = torch.zeros(shape, dtype=values.dtype, device=values.device) if base is None else base
+    return start.index_add(0, target, values)

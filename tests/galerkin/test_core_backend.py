@@ -163,3 +163,20 @@ def test_coo_matrix_to_scipy_refuses_live_values(name):
 def test_coo_matrix_validates(kwargs, match):
     with pytest.raises(ValueError, match=match):
         CooMatrix(**kwargs)
+
+
+def test_scatter_add_base_accumulates_like_repeated_add_at():
+    rng = np.random.default_rng(6)
+    parts = [(rng.integers(0, 4, 30), rng.standard_normal(30)) for _ in range(3)]
+    expected = np.zeros(4)
+    for index, values in parts:
+        np.add.at(expected, index, values)
+    out = None
+    for index, values in parts:
+        previous = out
+        out = scatter_add(np, 4, index, values, base=out)
+        if previous is not None:
+            assert out is not previous          # base is not modified in place
+    assert np.array_equal(out, expected)
+    with pytest.raises(ValueError, match="base has shape"):
+        scatter_add(np, 4, parts[0][0], parts[0][1], base=np.zeros(5))
