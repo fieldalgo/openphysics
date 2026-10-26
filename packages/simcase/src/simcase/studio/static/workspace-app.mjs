@@ -71,7 +71,7 @@ const button=document.createElement('button');button.textContent=text;button.id=
 function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[]),...(state.heat&&state.structure?['Solid mechanics']:[]),...(state.optics?['Optical modes']:[])];}
 function render(){const focused=document.activeElement,focusId=focused?.id;const focusData=['node','body','pick-mode','pick-body','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n)).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
-if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+(isOptical()?`<label>Core height [nm]<input id="height-number" type="number" min="100" max="500" step="any" value="${state.height}"></label>`:'')+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
+if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+(isOptical()?`<label>Core height [nm]<input id="height-number" type="number" min="100" max="500" step="any" value="${state.height}"></label>`:'')+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
 else if(ui.selection==='Electric currents')inspector+=`<label>Applied voltage [V]<input id="voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label>`+pair('Terminal','Heater input')+pair('Ground','Heater output')+pair('Output','Joule heat [W/m³]');
 else if(ui.selection==='Materials')inspector+=pair('Core',setup.materials.Core||'Unassigned')+pair('Cladding',setup.materials.Oxide||'Unassigned')+pair('Heater',setup.materials.Heater||'Unassigned')+'<p>Conductivity, thermal expansion, elasticity and optical material laws require validated assignments.</p>';
 else if(ui.selection==='Solid mechanics')inspector+=pair('Load','Thermal strain')+pair('Constraints','Not assigned')+pair('Output','Displacement [m]');
@@ -178,9 +178,9 @@ function applyProject(doc,{saved=true,resetHistory=false}={}){
   checkpointRecovery();render();updateHistory();refreshPersistence();
   notice('Project inputs restored. Results and CAD geometry are not included.');
 }
-function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null}={}){
+function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,opener=document.activeElement}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,recoveryRecord,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,recoveryRecord,opener,context:loadContext()};
   $('load-confirm').querySelector('h2').textContent=session?'Replace inputs and run history?':'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=session?'Save a session first to retain current results. Session import replaces run history and clears input undo history.':'Save your current design first if you want to keep it.';
   const summary=$('load-summary');summary.replaceChildren();
@@ -189,11 +189,13 @@ function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inp
   for(const [name,value] of entries){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
   if(!$('load-confirm').open)$('load-confirm').showModal();
 }
-const dialog=document.createElement('dialog');dialog.id='load-confirm';
-dialog.innerHTML='<h2>Replace current inputs?</h2><p>Save your current design first if you want to keep it.</p><dl id="load-summary" class="load-summary"></dl><button id="cancel-load">Keep current</button> <button id="confirm-load">Replace inputs</button>';
+const dialog=document.createElement('dialog');dialog.id='load-confirm';dialog.setAttribute('aria-labelledby','load-confirm-title');dialog.setAttribute('aria-describedby','load-confirm-description');
+dialog.innerHTML='<h2 id="load-confirm-title">Replace current inputs?</h2><p id="load-confirm-description">Save your current design first if you want to keep it.</p><dl id="load-summary" class="load-summary"></dl><button id="cancel-load">Keep current</button> <button id="confirm-load">Replace inputs</button>';
 document.body.append(dialog);
-$('cancel-load').onclick=()=>{pendingLoad=null;workspaceLoads.invalidate();dialog.close();notice('Open cancelled. Current inputs kept.');};
-dialog.oncancel=()=>{pendingLoad=null;workspaceLoads.invalidate();};
+function restoreDialogFocus(opener){if(opener?.isConnected&&!opener.disabled)opener.focus({preventScroll:true});}
+function cancelLoad(){const opener=pendingLoad?.opener;pendingLoad=null;workspaceLoads.invalidate();dialog.close();restoreDialogFocus(opener);notice('Open cancelled. Current inputs kept.');}
+$('cancel-load').onclick=cancelLoad;
+dialog.oncancel=event=>{event.preventDefault();cancelLoad();};
 $('confirm-load').onclick=()=>{
  const pending=pendingLoad;pendingLoad=null;workspaceLoads.invalidate();dialog.close();if(!pending)return;
  if(pending.context!==loadContext()){notice('Workspace changed while reviewing the replacement. Open it again; current inputs and results kept.');return;}
@@ -212,7 +214,7 @@ $('save-project').onclick=()=>{try{
 $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click();}catch(e){notice(e.message);}};
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
- if(loaded)requestLoad(loaded.value,{label:file.name});
+ if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
 $('save-draft').onclick=()=>{try{rejectInvalidInput();const text=signature();localStorage.setItem(DRAFT_KEY,text);edits.record(current());edits.markSaved();refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
@@ -272,17 +274,18 @@ $('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNoteboo
 $('recover-notebook').onclick=async()=>{
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,opener:$('recover-notebook'),label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
 
 let pendingRecoveryReplacement=null;
-const recoveryDialog=document.createElement('dialog');recoveryDialog.id='recovery-replace-confirm';
-recoveryDialog.innerHTML='<h2>Replace browser recovery?</h2><p>This replaces the shared recovery snapshot for this browser and server address. Save either notebook to a session file first if you need both. Current inputs, results and Undo stay in this tab.</p><dl class="load-summary" id="recovery-replace-summary"></dl><button id="cancel-recovery-replace">Keep stored recovery</button> <button id="confirm-recovery-replace">Replace browser recovery</button>';
+const recoveryDialog=document.createElement('dialog');recoveryDialog.id='recovery-replace-confirm';recoveryDialog.setAttribute('aria-labelledby','recovery-replace-title');recoveryDialog.setAttribute('aria-describedby','recovery-replace-description');
+recoveryDialog.innerHTML='<h2 id="recovery-replace-title">Replace browser recovery?</h2><p id="recovery-replace-description">This replaces the shared recovery snapshot for this browser and server address. Save either notebook to a session file first if you need both. Current inputs, results and Undo stay in this tab.</p><dl class="load-summary" id="recovery-replace-summary"></dl><button id="cancel-recovery-replace">Keep stored recovery</button> <button id="confirm-recovery-replace">Replace browser recovery</button>';
 document.body.append(recoveryDialog);
-$('cancel-recovery-replace').onclick=()=>{pendingRecoveryReplacement=null;workspaceLoads.invalidate();recoveryDialog.close();notice('Browser recovery replacement cancelled. Both notebooks kept.');};
-recoveryDialog.oncancel=()=>{pendingRecoveryReplacement=null;workspaceLoads.invalidate();};
+function cancelRecoveryReplacement(){pendingRecoveryReplacement=null;workspaceLoads.invalidate();recoveryDialog.close();restoreDialogFocus($('replace-notebook'));notice('Browser recovery replacement cancelled. Both notebooks kept.');}
+$('cancel-recovery-replace').onclick=cancelRecoveryReplacement;
+recoveryDialog.oncancel=event=>{event.preventDefault();cancelRecoveryReplacement();};
 $('replace-notebook').onclick=async()=>{
  try{
   rejectInvalidInput();if(!runs.length)throw new Error('Complete or import a run before replacing notebook recovery.');
@@ -509,7 +512,7 @@ function renderComparison(){
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw);
 }
 let pendingRunImport=null;
-const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.innerHTML='<h2>Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p>Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);
+const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.setAttribute('aria-labelledby','run-import-title');runImportDialog.setAttribute('aria-describedby','run-import-summary run-import-description');runImportDialog.innerHTML='<h2 id="run-import-title">Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p id="run-import-description">Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);
 const runListStamp=()=>JSON.stringify(runs.map(run=>[run.job,run.completedAt,run.label,run.pinned]));
 $('run-import-file').onchange=async event=>{
  const file=event.target.files[0];event.target.value='';if(!file)return;
@@ -517,7 +520,8 @@ $('run-import-file').onchange=async event=>{
   $('run-import-summary').textContent=`${file.name}: ${merged.added.length} new, ${merged.reused.length} matching, ${merged.evicted.length} older unpinned runs replaced. ${merged.runs.length} runs will remain. Save a session first if you need all current results.`;runImportDialog.showModal();
  }catch(error){pendingRunImport=null;notice('Run import failed: '+error.message+' Current notebook kept.');}
 };
-$('cancel-run-import').onclick=()=>{workspaceLoads.invalidate();pendingRunImport=null;runImportDialog.close();notice('Run import cancelled. Current notebook kept.');};runImportDialog.oncancel=()=>{workspaceLoads.invalidate();pendingRunImport=null;};
+function cancelRunImport(){workspaceLoads.invalidate();pendingRunImport=null;runImportDialog.close();restoreDialogFocus($('import-runs'));notice('Run import cancelled. Current notebook kept.');}
+$('cancel-run-import').onclick=cancelRunImport;runImportDialog.oncancel=event=>{event.preventDefault();cancelRunImport();};
 $('confirm-run-import').onclick=()=>{
  const pending=pendingRunImport;pendingRunImport=null;workspaceLoads.invalidate();runImportDialog.close();if(!pending)return;
  if(solverBusy||pendingJob||runListStamp()!==pending.stamp){notice('Notebook changed while reviewing the import. Open the file again to review current changes.');return;}
@@ -530,7 +534,7 @@ $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringif
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});
- if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');requestLoad(loaded.value.input,{session:loaded.value,label:file.name});
+ if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');requestLoad(loaded.value.input,{session:loaded.value,label:file.name,opener:$('open-session')});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;
