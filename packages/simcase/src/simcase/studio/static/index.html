@@ -550,6 +550,7 @@ function drawField() {
   const identity = tracking ? `tracked branch ${m + 1}` : `mode ${m + 1}`;
   const match = point ? (point.overlaps === null ? ', seed point' : `, overlap ${point.overlaps[m].toFixed(3)}`) : '';
   $('resInfo').textContent = `${fieldLabel}, ${identity} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}${match}` +
+    (resultData.neff_imag ? `, Im n_eff = ${resultData.neff_imag[p][m].toExponential(4)}, ${resultData.propagation_loss_db_cm[p][m].toFixed(4)} dB/cm` : '') +
     (vector ? ' (relative amplitude, common |E| scale)' : '');
 }
 function drawSweep() {
@@ -568,7 +569,7 @@ function drawSweep() {
   ctx.fillStyle = '#6b7280'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
   ctx.fillText(studyLabel(resultData), W / 2, H - 8); ctx.fillText(xs[0], X(xs[0]), H - m.b + 14); ctx.fillText(xs[xs.length - 1], X(xs[xs.length - 1]), H - m.b + 14);
   ctx.textAlign = 'right'; ctx.fillText(ymin.toFixed(4), m.l - 4, Y(ymin) + 4); ctx.fillText(ymax.toFixed(4), m.l - 4, Y(ymax) + 4);
-  ctx.textAlign = 'left'; ctx.fillText(sub ? 'cluster mean n_eff' : 'n_eff', m.l + 4, m.t - 6);
+  ctx.textAlign = 'left'; ctx.fillText(sub ? 'cluster mean n_eff' : (resultData.neff_imag ? 'Re n_eff' : 'n_eff'), m.l + 4, m.t - 6);
   const palette = ['#2f6fed', '#e8590c', '#0b7a5a', '#8e44ad'];
   for (let j = 0; j < nm; j++) { ctx.strokeStyle = palette[j % 4]; ctx.fillStyle = palette[j % 4]; ctx.lineWidth = 1.5; ctx.beginPath();
     xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i][j])) : ctx.moveTo(X(x), Y(ys[i][j]))); ctx.stroke();
@@ -691,6 +692,7 @@ function renderProps() {
     h += `<div class="actions"><button data-act="delmat" class="danger">delete</button></div>`; }
   else if (selected.startsWith('physics:')) { const pk = selected.slice(8), p = doc.physics[pk]; h = `<h3>Physics · ${pk}</h3>` + row('type', sel(`physics.${pk}.type`, p.type, ['em.modes2d'])) + row('formulation', sel(`physics.${pk}.formulation`, p.formulation, ['scalar', 'vector'])) +
     row(`wavelength (${lengthUnit()})`, num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) +
+    row('target index (optional)', num(`physics.${pk}.n_target`, p.n_target ?? '')) +
     (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
       '<div class="hint">Set the exterior guiding threshold (e.g. the highest substrate or cover index), valid throughout the study. Vector: lossless dielectrics, single points or wavelength sweeps of isolated modes. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
       '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +

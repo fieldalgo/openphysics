@@ -40,7 +40,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 
 | Feature | Python API | JSON / CLI | Studio |
 |---|---|---|---|
-| 2D waveguide modes and sweeps | Yes | `em.modes2d` (lossless) | Yes |
+| 2D waveguide modes and sweeps | Yes | `em.modes2d` (passive absorption supported) | Yes |
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
 | Steady electric conduction | Yes | No | No |
@@ -69,7 +69,7 @@ time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#
   electrostatics and scattering are Python-only.
 - 2D heat and mechanics are plane models per unit depth. JSON heat documents
   set boundary conditions only on the four outer sides of the domain.
-- `em.modes2d` is lossless: lossy optical materials are rejected. Nonlinear
+- `em.modes2d` supports passive absorption; PML, leakage and bends are excluded. Nonlinear
   mechanics and geometry sweeps are not supported.
 - Studio rejects 3D models and heat documents with material regions, and has
   no mechanics forms.

@@ -146,3 +146,8 @@ P1 boundary mass. The symbolic integration takes about 20 s on one core.
 
 Comparisons without a live tool use the [stored reference values](stored-reference-values.md) contract.
 scikit-fem and symfem currently run live; NGSolve uses stored results. Add each new stored tool and its record together.
+
+Absorbing scalar and vector waveguides are also compared against scikit-fem
+12.0.2 complex assembly and dense QZ. The complex index and its imaginary part
+separately retain the 1e-9 relative gate. Analytical acceptance, mesh/window
+convergence and units are in [absorbing modes](packages/simcase/lossy_modes.md).

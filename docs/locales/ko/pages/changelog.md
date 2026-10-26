@@ -29,6 +29,8 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ### Added
 
+- 수동 복소 scalar/full-vector 도파관 모드, 복소 분리 모드 sweep, dB/cm 손실과 Studio/JSON/NPZ 출력. [부호와 한계](packages/simcase/lossy_modes.md).
+
 - 정확한 정답과 대조하는 공개 기준값 벤치마크를 추가했습니다: Timoshenko (1925) 바이메탈
   띠(`refsol.bimetal`)와 NAFEMS T4 대류 열전달(`refsol.thermal_convection`, 출판 목표값
   18.3 °C 포함). 메시 수렴 기준, 그림 스크립트, 검증 문서

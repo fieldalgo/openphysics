@@ -67,8 +67,9 @@ def test_complex_slab_convergence_and_lossless_limit(formulation, pol):
     assert abs(small.neff[0, 0].imag/expected-1) < 2e-3
 
 
-def test_complex_output_units_fields_and_pencil(tmp_path):
-    doc = document()
+@pytest.mark.parametrize("formulation", ["scalar", "vector"])
+def test_complex_output_units_fields_and_pencil(tmp_path, formulation):
+    doc = document(formulation)
     result = run(doc, False)
     summary = result.summary()
     json.dumps(summary, allow_nan=False)
@@ -79,7 +80,13 @@ def test_complex_output_units_fields_and_pencil(tmp_path):
     result.save(tmp_path)
     with np.load(tmp_path/"fields.npz", allow_pickle=False) as saved:
         np.testing.assert_array_equal(saved["neff"], result.neff)
-        np.testing.assert_array_equal(saved["vector_electric"], result.vector_fields[0].electric[None])
+        if formulation == "scalar":
+            np.testing.assert_array_equal(saved["fields"], np.stack(result.fields))
+            assert np.max(abs(saved["fields"].imag)) > 1e-6
+        else:
+            np.testing.assert_array_equal(saved["vector_electric"], result.vector_fields[0].electric[None])
+    if formulation == "scalar":
+        return
     from simcase import build_mesh
     model = build_mesh(doc)
     residual = vector_pencil_residuals(model.mesh, model.eps_per_triangle(1.55).conj(), 1.55,
@@ -121,3 +128,55 @@ def test_metal_interface_spp_convergence():
     assert errors[-1] < 2e-4
     assert np.log2(errors[-2]/errors[-1]) > 1.7
     assert n.imag < 0
+
+
+@pytest.mark.parametrize("formulation", ["scalar", "vector"])
+def test_absorbing_units_are_equivalent(formulation):
+    from test_length_canonical import _written_in
+    doc = document(formulation)
+    reference = run(doc, False)
+    for symbol, scale in [("nm", "1000"), ("m", "1e-6")]:
+        other = run(Document.from_dict(_written_in(doc.data, symbol, scale)), False)
+        np.testing.assert_array_equal(other.neff, reference.neff)
+        np.testing.assert_array_equal(other.propagation_loss_db_cm(), reference.propagation_loss_db_cm())
+
+
+@pytest.mark.parametrize("pol", ["TE", "TM"])
+def test_absorbing_slab_window_convergence(pol):
+    values = []
+    for pad in (1.5, 2.5):
+        d = document(pol=pol).data
+        d["geometry"]["domain"].update(ymin=-pad, ymax=.22+pad)
+        values.append(run(Document.from_dict(d), False).neff[0, 0])
+    assert abs(values[0]-values[1]) < 2e-5
+    assert abs(values[0].imag-values[1].imag) < 2e-6
+
+
+def test_real_spectrum_subspace_method_explicitly_refuses_loss():
+    from simcase import ModeTrackingError
+    d = document().data
+    d["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.54, 1.55, 1.56],
+                      tracking=dict(method="electric-l2-subspace-v1", cluster_span_max=1e-5,
+                                    external_gap_min=1e-3))
+    with pytest.raises(ModeTrackingError, match="requires a real spectrum"):
+        run(Document.from_dict(d), False)
+
+
+@pytest.mark.parametrize("formulation", ["scalar", "vector"])
+def test_uniform_pec_box_complex_cutoff_convergence(formulation):
+    from galerkin import rectangle_mesh
+    from simcase.physics_em_modes2d import solve
+    eps, wavelength = 4.-.1j, 1.55
+    cutoff = 1/2**2 + (1/1**2 if formulation == "scalar" else 0)
+    expected = np.sqrt(eps-wavelength**2*cutoff/4)
+    errors = []
+    for count in (8, 16, 32):
+        mesh = rectangle_mesh(2., 1., 2*count, count)
+        result = solve(mesh, np.full(mesh.num_triangles, eps), wavelength,
+                       dict(left="pec", right="pec", top="pec", bottom="pec"), 1,
+                       formulation, 1.)
+        errors.append(abs(result["neff"][0]-expected))
+    print("uniform PEC", formulation, errors)
+    assert errors[0] > errors[1] > errors[2]
+    assert errors[-1] < 1e-3
+    assert np.log2(errors[-2]/errors[-1]) > 1.7

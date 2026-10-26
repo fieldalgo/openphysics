@@ -133,3 +133,7 @@ symfem 2025.12.0, sympy 1.14.0으로 로컬 Linux에서 실행한 값입니다. 
 
 도구를 실행하지 않는 비교는 [저장 레퍼런스 값](stored-reference-values.md) 형식을 씁니다.
 현재 scikit-fem·symfem은 live이고 NGSolve는 stored 방식입니다. 새 저장 도구와 기록은 함께 추가합니다.
+
+흡수 scalar·vector 도파관도 scikit-fem 12.0.2의 복소 조립·밀집 QZ와
+비교합니다. 복소 굴절률과 허수부에 각각 상대차 1e-9 기준을 유지합니다.
+해석해·메시/창 수렴·단위는 [흡수 모드](packages/simcase/lossy_modes.md)에 있습니다.

@@ -65,7 +65,7 @@ flowchart TB
 
 - **Python:** 가장 넓은 API 범위를 제공합니다. 독립 전자기·정상 및 과도 열전도·탄성·
   처방 온도 열탄성 모델, 문서화된 정상 열전도→기계 workflow와 과도 열전도→기계 호출을 포함합니다.
-- **`simcase`의 JSON / CLI:** 무손실 `em.modes2d`, `em.cavity3d`와 문서화된
+- **`simcase`의 JSON / CLI:** 수동 흡수 `em.modes2d`, `em.cavity3d`와 문서화된
   `thermal.steady2d`와 직사각형 `thermal.transient2d` 부분집합을 지원합니다. Python 전용 확장이 자동으로
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](packages/simcase/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두

@@ -40,7 +40,7 @@ prints a supplied example.
 
 | Physics type | What it solves | Examples | Contract |
 |---|---|---|---|
-| `em.modes2d` | Lossless 2D waveguide modes, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
+| `em.modes2d` | 2D waveguide modes with passive absorption, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
 | `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](cavity3d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
@@ -50,8 +50,10 @@ prints a supplied example.
 Studio edits and runs 2D optical models and has dedicated views for rectangular
 steady and transient heat; it rejects cavity documents and heat documents with
 material regions. Coupled or multiple-physics runs, geometry, mesh and material
-sweeps, lossy optical materials in `em.modes2d` and mechanics documents are not
+sweeps and mechanics documents are not
 supported; `em.cavity3d` accepts lossy box materials.
+
+For complex indices, attenuation units and selection, see [absorbing modes](lossy_modes.md).
 
 ## The document
 
@@ -109,14 +111,14 @@ existing dotted path under `physics.`. Geometry, mesh and material sweeps are
 rejected because the mesh is built once. Sweeping a wavelength also yields the
 group index.
 
-For optical modes the physics is lossless `em.modes2d`, either `scalar` (exact for TE slab modes,
+For optical modes the physics is `em.modes2d`, either `scalar` (exact for TE slab modes,
 an approximation for 2D high-contrast cores) or full `vector` for single points
 and tracked wavelength sweeps. The supplied `soi_strip` uses `vector`. The scalar
 approximation is far off for such a core: the same document solved as `scalar`
 gives n_eff 2.611 at 1.55 um instead of 2.444. On the low-contrast Hadley rib,
 `hadley_rib` (scalar) lands 4e-5 from the published value on its mesh, but
 refining the mesh moves it away (1.4e-4 at 0.65x); `hadley_rib_vector` is 2.0e-4
-below it and approaches it on refinement (1.1e-4 at 0.65x). Lossy materials are rejected in both paths. Scalar boundaries are
+below it and approaches it on refinement (1.1e-4 at 0.65x). Both paths accept passive absorption; see the lossy-mode contract for signs and complex output. Scalar boundaries are
 `pec` (field = 0) or `pmc` (natural). Vector PEC fixes tangential electric field
 and Ez; PMC is natural. These are different field conditions: changing only the
 formulation of a scalar slab can select a different polarization.

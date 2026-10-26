@@ -39,6 +39,8 @@ distribution on PyPI, planned as 0.1.0.
 
 ### Added
 
+- Passive complex scalar/full-vector waveguide modes, complex resolved sweeps, dB/cm attenuation, and Studio/JSON/NPZ output; [signs and limits](docs/packages/simcase/lossy_modes.md).
+
 - Add explicit same-mesh steady electric-to-heat coupling and mesh-bound
   element heat sources, with analytical and independent reference validation.
 
