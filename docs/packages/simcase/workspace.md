@@ -327,3 +327,12 @@ change model revisions or run a solver. Legacy sessions without these optional
 fields restore a hidden probe at (0, 0.15) µm and a closed horizontal profile at
 y = 0.15 µm. Invalid/out-of-domain saved view metadata rejects the whole import
 before changing current inputs or results.
+
+
+File, session and browser-recovery reads share one current load intent. A later
+choice or cancellation invalidates an older pending read, including its errors.
+If inputs, view, run history or job state change while reading, choose the source
+again. The replacement dialog lists the source, old/new dimensions, core material,
+result counts and Undo behavior. It checks the workspace again when confirmed;
+a completed job arriving during review cannot be silently discarded by an old
+replacement prompt. Import runs continues to preserve current model inputs.
