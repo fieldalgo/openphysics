@@ -1,3 +1,4 @@
+import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
 import {opticalWorkflow} from './workspace-workflow.mjs';
@@ -144,7 +145,7 @@ if(ui.page==='Model'&&ui.selection==='Study'){
 
 
 
-let pendingProject = null,pendingSession=null,pendingSaved=true;
+let pendingProject = null,pendingSession=null,pendingSessionSource='file',pendingSaved=true;
 const notice = text => $('file-status').textContent = text;
 const current = () => snapshot(state, setup);
 const signature = () => JSON.stringify(current());
@@ -186,7 +187,7 @@ dialog.innerHTML='<h2>Replace current inputs?</h2><p>Save your current design fi
 document.body.append(dialog);
 $('cancel-load').onclick=()=>{pendingProject=null;pendingSession=null;dialog.close();notice('Open cancelled. Current inputs kept.');};
 dialog.oncancel=()=>{pendingProject=null;pendingSession=null;};
-$('confirm-load').onclick=()=>{const doc=pendingProject;pendingProject=null;dialog.close();if(pendingSession){const session=pendingSession;pendingSession=null;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];Object.assign(fieldView,session.view);applyProject(session.input,{saved:true,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=notebookStamp();refreshNotebook();notice('Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.');}else if(doc)applyProject(doc,{saved:pendingSaved});};
+$('confirm-load').onclick=()=>{const doc=pendingProject;pendingProject=null;dialog.close();if(pendingSession){const session=pendingSession,source=pendingSessionSource;pendingSession=null;pendingSessionSource='file';runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];Object.assign(fieldView,session.view);applyProject(session.input,{saved:pendingSaved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=source==='file'?notebookStamp():null;refreshNotebook();notice(source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. Save session for a portable file; input undo history starts here.');}else if(doc)applyProject(doc,{saved:pendingSaved});};
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -204,7 +205,7 @@ $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage
 let recoverable=null;
 function showRecovery(){
  $('recover-inputs').disabled=!recoverable;
- $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are saved automatically for recovery in this browser. Save session to retain results.';
+ $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are saved automatically for recovery in this browser. Save session for a portable result file.';
 }
 function checkpointRecovery(){
  try{writeRecovery(localStorage,current());recoverable=readRecovery(localStorage);showRecovery();}
@@ -234,8 +235,34 @@ document.addEventListener('keydown',event=>{
 });
 
 let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null;
+let notebookRecoveryRecord=null,notebookLoadVersion=0;
+const notebookStore=indexedNotebookStore();
+const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
+ const message=$('autosave-status');
+ if(state.phase==='pending')message.textContent='Browser recovery pending';
+ if(state.phase==='saving')message.textContent='Saving browser recovery…';
+ if(state.phase==='current')message.textContent='Current notebook already in browser recovery';
+ if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
+ if(state.phase==='error'){message.textContent='Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Previous completed snapshot is retained if the database transaction failed.';}
+}});
+async function loadNotebookRecovery(){
+ const version=notebookLoadVersion;
+ try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
+  if(recovered){$('autosave-status').textContent='Previous browser session available · '+recovered.session.runs.length+' runs';$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
+  else $('autosave-status').textContent='Completed sessions will be saved for browser recovery';
+ }catch(error){if(version!==notebookLoadVersion)return;$('autosave-status').textContent='Browser recovery unavailable · save a session file';$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
+}
+$('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNotebookRecovery();
+$('recover-notebook').onclick=async()=>{
+ if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
+ $('recover-notebook').disabled=true;
+ try{rejectInvalidInput();const record=await notebookStore.load(),recovered=readNotebookRecovery(record);if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();pendingSession=recovered.session;pendingSessionSource='browser';requestLoad(recovered.session.input,{saved:false});}
+ catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
+ finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
+};
+
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'']),selected:solverRun?.job||null,comparison:compareIds,view:fieldView});}
-function refreshNotebook(){const changed=savedNotebookState!==notebookStamp();$('notebook-status').textContent=runs.length?(changed?'Session changed · save to keep results, names and comparison':'Session snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+function refreshNotebook(){const stamp=notebookStamp();if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,()=>JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView)));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session file snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
@@ -254,7 +281,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Run provenance</h2>'+pair('Computation','Optical modes only')+pair('Input',same?'Current snapshot':'Earlier snapshot')+'<p>Selected completed run. Save session includes fields; Save file includes inputs only.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';
   const desc=document.createElement('p');desc.textContent=`Job ${solverRun.job}${solverRun.serverVersion?' · simcase '+solverRun.serverVersion:''}${Number.isInteger(solverRun.inputRevision)?' · input revision '+solverRun.inputRevision:''} · ${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · core ${solverRun.input.model.width} × ${solverRun.input.model.height} nm · λ 1550 nm`;$('canvas').append(desc);
   renderField();solverRun.neff.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
-  const note=document.createElement('p');note.textContent=(solverRun.origin==='imported'?'Imported file result — not recomputed or authenticated. ':'Actual local solver output. ')+' Ranked candidates are not mode-matched between designs. Save session to keep results. No thermal or mechanical solve was performed.';$('canvas').append(note);
+  const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Browser recovery result — not recomputed or authenticated. ':'Imported file result — not recomputed or authenticated. ')+' Ranked candidates are not mode-matched between designs. Save session to keep results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Applications → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
  if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical interface</h2>'+pair('Equation','Vector optical eigenproblem')+pair('Wavelength','1550 nm')+pair('Candidates','2')+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
@@ -387,7 +414,7 @@ function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Run notebook</h2>';
  const title=document.createElement('h3');title.textContent=`History · ${runs.length} / ${RUN_LIMIT}`;panel.append(title);
  for(const run of [...runs].reverse()){
-  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin==='imported'?' · imported':''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
+  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin!=='local'?' · '+run.origin:''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
  }
  if(solverRun){
   const nameForm=document.createElement('form');nameForm.className='run-name';
@@ -425,7 +452,7 @@ function renderComparison(){
 }
 $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
-$('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
+$('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;pendingSessionSource='file';requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;
 let jobPhase='idle',jobOperation=0;
@@ -480,6 +507,6 @@ async function connectWorkspace(){
  finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;render();refreshJobControls();}
 }
 $('connect-workspace').onclick=connectWorkspace;
-const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});Object.assign(state,{height:220,width:500,voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();})();
+const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});Object.assign(state,{height:220,width:500,voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
 
 installLayout(document.querySelector('main'),document.getElementById('reset-layout'),document.getElementById('layout-status'));

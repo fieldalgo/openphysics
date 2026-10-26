@@ -228,3 +228,26 @@ isolated endpoints are not a separate point-probe claim.
 Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
 winding, overlaps and empty regions. Actual exported comparison intervals were
 independently checked against complex vector norms and triangle containment.
+
+### Automatic notebook recovery
+
+Once the tab has completed or imported results, valid input/selection/name changes
+queue a browser IndexedDB snapshot containing the current inputs, up to six
+completed runs, names, comparison and field view. Writes are debounced and serialized;
+the footer reports pending, saving, committed or failed storage separately from
+portable file save status. An empty new tab does not erase the prior notebook.
+
+After reload, expand Connection, recovery and layout help → Recover last session.
+The complete record is validated before the existing replacement dialog; recovered
+fields are labeled `recovered`, not newly computed. Recovery starts a new input
+undo history and keeps the document unsaved until you save a file/session. No
+solver is started. Input-only recovery and pending-job recovery remain separate.
+
+This is the latest single snapshot for the browser origin, shared across tabs;
+another tab's later snapshot can replace it. It is not a backup archive. A quota or
+transaction failure retains the previous committed record; Retry recovery storage
+retries the latest requested state. Closing the tab while pending/saving can lose
+recent changes. Browser cleanup/private mode or a different port can make recovery
+unavailable. Use Save session / Save selected run for portable files. The 16 MiB
+session and six-result limits still apply; invalid drafts, undo history, mesh,
+preflight reports, probe and profile positions are not included.
