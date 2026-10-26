@@ -262,3 +262,18 @@ the CSV run table. They do not alter inputs, fields or the input Undo history.
 Repeated retrieval of the same job preserves its existing name and pin. A failed
 retention operation leaves the previous notebook and selected result intact.
 Pinning is not a portable backup; export files before discarding browser data.
+
+### Import runs without replacing the model
+
+Results/Compare → Import runs from file accepts a session or selected-run file.
+Review the number of new, matching and replaced unpinned runs before applying.
+Current model inputs and input Undo are preserved; the imported selection opens
+beside a retained result for comparison. Imported runs remain labeled `imported`.
+Use Open session when you intend to replace both inputs and the notebook instead.
+
+Matching job IDs retain their current names, pins and provenance only when their
+input, settings, effective indices, field arrays and server version agree. A
+conflicting payload rejects the whole import. Incoming runs and pinned references
+are never silently dropped to fit the six-run limit; if they exceed capacity,
+unpin a reference or export/import a selected-run file. Older unpinned current
+runs may be replaced after the review. Pending jobs block run imports.

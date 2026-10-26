@@ -3,10 +3,10 @@
 
 const {before}=require('node:test');
 let snapshot;
-let OPTICAL_SETTINGS,appendRun,createSession,parseSession;
+let OPTICAL_SETTINGS,appendRun,mergeRuns,createSession,parseSession;
 before(async()=>{
 ({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));
-({OPTICAL_SETTINGS,appendRun,createSession,parseSession}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));
+({OPTICAL_SETTINGS,appendRun,mergeRuns,createSession,parseSession}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));
 });
 const test=require('node:test');const assert=require('node:assert/strict');
 
@@ -42,4 +42,19 @@ test('resuming an existing run preserves its name and pin, and session pin metad
  const first={...run(),label:'Reference',pinned:true};const again=appendRun([first],run());assert.equal(again.length,1);assert.equal(again[0].label,'Reference');assert.equal(again[0].pinned,true);
  const doc=createSession(input(),[first],first.job,[first.job,first.job]);assert.equal(parseSession(JSON.stringify(doc)).runs[0].pinned,true);doc.runs[0].pinned='yes';assert.throws(()=>parseSession(JSON.stringify(doc)),/pin/);
  const old=createSession(input(),[run()],'12345678',['12345678',null]);delete old.runs[0].pinned;assert.equal(parseSession(JSON.stringify(old)).runs[0].pinned,false);
+});
+
+
+test('run import protects pinned and incoming runs while reporting evicted prior unpinned runs',()=>{
+ const existing=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));existing[0].pinned=true;
+ const merged=mergeRuns(existing,[run('abcdef12'),run('abcdef13')]);assert.equal(merged.runs.length,6);assert.deepEqual(merged.evicted,['00000001','00000002']);assert.deepEqual(merged.added,['abcdef12','abcdef13']);assert.equal(merged.runs.at(-1).origin,'imported');assert.equal(existing.length,6);assert.equal(existing[1].job,'00000001');
+});
+test('matching imports retain local metadata and conflicting payloads reject atomically',()=>{
+ const saved={...run(),label:'Reference',pinned:true};const existing=createSession(input(),[saved],saved.job,[saved.job,saved.job]).runs;
+ const merged=mergeRuns(existing,[run()]);assert.deepEqual(merged.reused,[saved.job]);assert.equal(merged.runs[0],existing[0]);assert.equal(merged.runs[0].label,'Reference');assert.equal(merged.runs[0].origin,'local');
+ const conflict=run();conflict.neff[0]=2.5;assert.throws(()=>mergeRuns(existing,[run('abcdef12'),conflict]),/Conflicting/);assert.equal(existing.length,1);assert.equal(existing[0].neff[0],2.4);
+});
+test('imports cannot silently drop an incoming run or a pinned reference when slots are exhausted',()=>{
+ const existing=[{...run('deadbeef'),pinned:true}];const incoming=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));
+ assert.throws(()=>mergeRuns(existing,incoming),/exceed six/);assert.equal(existing[0].job,'deadbeef');assert.throws(()=>mergeRuns(existing,[]),/no completed/);assert.throws(()=>mergeRuns([], [run(),run()]),/Duplicate/);
 });
