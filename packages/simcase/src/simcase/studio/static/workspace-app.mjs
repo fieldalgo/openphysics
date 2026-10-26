@@ -18,7 +18,7 @@ import {installLayout} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,createSession,parseSession} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,parseSession} from './workspace-notebook.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
@@ -228,7 +228,7 @@ document.addEventListener('change',()=>{trackEdit();edits.endGroup();});
 document.addEventListener('click',()=>{trackEdit();edits.endGroup();});
 document.addEventListener('focusout',()=>edits.endGroup());
 document.addEventListener('keydown',event=>{
- if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
+ if(!(event.ctrlKey||event.metaKey)||event.altKey||document.querySelector('dialog[open]'))return;
  if(event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
  if(event.key.toLowerCase()==='z'){event.preventDefault();if(event.shiftKey){if(edits.canRedo)$('redo-edit').click();}else if(edits.canUndo)$('undo-edit').click();}
  else if(event.key.toLowerCase()==='y'){event.preventDefault();if(edits.canRedo)$('redo-edit').click();}
@@ -413,6 +413,7 @@ function renderLineProfile(host,profileRuns){
 function downloadFile(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Run notebook</h2>';
+ const importRuns=document.createElement('button');importRuns.textContent='Import runs from file';importRuns.disabled=solverBusy||!!pendingJob;importRuns.onclick=()=>$('run-import-file').click();panel.append(importRuns);
  const title=document.createElement('h3');title.textContent=`History · ${runs.length} / ${RUN_LIMIT} · ${runs.filter(r=>r.pinned).length} pinned`;panel.append(title);
  for(const run of [...runs].reverse()){
   const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.pinned?'Pinned · ':''}${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin!=='local'?' · '+run.origin:''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
@@ -452,6 +453,24 @@ function renderComparison(){
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b]);
 }
+let pendingRunImport=null;
+const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.innerHTML='<h2>Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p>Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);
+const runListStamp=()=>JSON.stringify(runs.map(run=>[run.job,run.completedAt,run.label,run.pinned]));
+$('run-import-file').onchange=async event=>{
+ const file=event.target.files[0];event.target.value='';if(!file)return;
+ try{if(solverBusy||pendingJob)throw new Error('Finish or detach the pending job before importing runs.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const session=parseSession(await file.text());if(solverBusy||pendingJob)throw new Error('A job started while reading the file.');const merged=mergeRuns(runs,session.runs);pendingRunImport={session,merged,stamp:runListStamp()};
+  $('run-import-summary').textContent=`${file.name}: ${merged.added.length} new, ${merged.reused.length} matching, ${merged.evicted.length} older unpinned runs replaced. ${merged.runs.length} runs will remain. Save a session first if you need all current results.`;runImportDialog.showModal();
+ }catch(error){pendingRunImport=null;notice('Run import failed: '+error.message+' Current notebook kept.');}
+};
+$('cancel-run-import').onclick=()=>{pendingRunImport=null;runImportDialog.close();notice('Run import cancelled. Current notebook kept.');};runImportDialog.oncancel=()=>{pendingRunImport=null;};
+$('confirm-run-import').onclick=()=>{
+ const pending=pendingRunImport;pendingRunImport=null;runImportDialog.close();if(!pending)return;
+ if(solverBusy||pendingJob||runListStamp()!==pending.stamp){notice('Notebook changed while reviewing the import. Open the file again to review current changes.');return;}
+ const previous=solverRun;const next=pending.merged.runs;const selected=next.find(run=>run.job===pending.session.selected)||next.findLast(run=>pending.session.runs.some(imported=>imported.job===run.job));
+ runs=next;solverRun=selected||runs.at(-1);const other=runs.find(run=>run.job===previous?.job&&run.job!==solverRun.job)||runs.findLast(run=>run.job!==solverRun.job)||solverRun;
+ compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
+};
+
 $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;pendingSessionSource='file';requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};

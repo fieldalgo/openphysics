@@ -57,3 +57,19 @@ export function parseSession(text,{recovered=false}={}){
  if(![0,1].includes(view.mode)||!['magnitude','Ex','Ey','Ez'].includes(view.component)||!['Core region','Full window'].includes(view.window))throw new Error('Unsupported saved field view.');
  return {input,runs,selected:doc.selected,comparison:[...doc.comparison],view:{mode:view.mode,component:view.component,window:view.window}};
 }
+
+
+export function mergeRuns(existing,incoming){
+ if(!incoming.length)throw new Error('The session contains no completed runs.');
+ const result=[...existing],incomingIds=new Set(),added=[],reused=[];
+ const identity=run=>JSON.stringify({input:run.input,settings:run.settings,neff:run.neff,field:run.field,serverVersion:run.serverVersion??null});
+ for(const raw of incoming){
+  const run=validateRun(raw,true);if(incomingIds.has(run.job))throw new Error('Duplicate imported run identifier.');incomingIds.add(run.job);
+  const prior=existing.find(r=>r.job===run.job);
+  if(prior){if(identity(prior)!==identity(run))throw new Error('Conflicting result for job '+run.job+'. Existing notebook kept.');reused.push(run.job);}
+  else{result.push(run);added.push(run.job);}
+ }
+ const evicted=[];
+ while(result.length>RUN_LIMIT){const index=result.findIndex(run=>!run.pinned&&!incomingIds.has(run.job));if(index<0)throw new Error('Imported runs and pinned references exceed six slots. Unpin a reference or import a selected-run file.');evicted.push(result[index].job);result.splice(index,1);}
+ return {runs:result,added,reused,evicted};
+}
