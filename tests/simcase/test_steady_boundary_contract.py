@@ -374,7 +374,7 @@ def test_near_side_interior_node_cannot_become_dirichlet_by_coordinate_mask():
 @pytest.mark.parametrize("include_interior", [False, True])
 def test_dirichlet_identity_uses_exterior_endpoints_not_nearby_interior(include_interior):
     # Fixture geometry validity is intentionally checked by the real helper;
-    # this direct branch coverage must not mock or bypass _mesh_geometry.
+    # this direct branch coverage must not mock or bypass galerkin.core.triangles.triangle_geometry.
     d = document()
     origin = 1e12
     d.data["geometry"]["domain"] = {

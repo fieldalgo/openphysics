@@ -15,7 +15,9 @@ from scipy.sparse.linalg import splu
 
 from .mesh import Mesh
 from .materials import is_per_region, region_index, region_property
-from .thermal import _mesh_geometry, _real as _base_real, _source_load
+from .core.checks import real_array
+from .core.loads import source_load
+from .core.triangles import triangle_geometry
 from .assembly import assemble_mass, assemble_stiffness
 from .postprocess import element_gradient
 
@@ -31,19 +33,8 @@ class TransientHeatStepError(ValueError):
             f"time_s={self.time_s!r}")
 
 
-def _real(value, name):
-    # Preserve explicit bool rejection before heterogeneous Python sequences can
-    # coerce bools to a floating dtype. Already-normalized float arrays carry no
-    # recoverable history of how their elements were constructed.
-    if (isinstance(value, (bool, np.bool_))
-            or (isinstance(value, (list, tuple))
-                and any(isinstance(v, (bool, np.bool_)) for v in value))):
-        raise ValueError(f"{name} must not contain booleans")
-    return _base_real(value, name)
-
-
 def _scalar(value, name, positive=False):
-    a = _real(value, name)
+    a = real_array(value, name)
     if a.shape != () or (positive and a <= 0):
         raise ValueError(f"{name} must be a finite {'positive ' if positive else ''}real scalar")
     return float(a)
@@ -115,7 +106,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     k = conductivity if regional[0] else _scalar(conductivity, "conductivity", True)
     capacity = (volumetric_heat_capacity if regional[1]
                 else _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True))
-    times = _real(time_s, "time_s").copy()
+    times = real_array(time_s, "time_s").copy()
     if times.ndim != 1 or len(times) < 2 or np.any(times < 0):
         raise ValueError("time_s must be nonnegative 1D seconds with at least two entries")
     with np.errstate(over="ignore", invalid="ignore"):
@@ -123,7 +114,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     if not np.all(np.isfinite(steps)) or np.any(steps <= 0):
         raise ValueError("time_s differences must be finite and strictly positive")
 
-    p, t, area, exterior, count, labels = _mesh_geometry(mesh)
+    p, t, area, exterior, count, labels = triangle_geometry(mesh)
     p, t = p.copy(), t.copy()
     # Geometry is validated before Mesh can cast indices or repair orientation.
     record_k, record_c = k, capacity
@@ -143,7 +134,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             region_property(private_mesh, heat_source, "heat_source")
     else:
         private_mesh = Mesh(p.copy(), t.copy(), boundary={})
-    initial = _real(initial_temperature_k, "initial_temperature_k").copy()
+    initial = real_array(initial_temperature_k, "initial_temperature_k").copy()
     if initial.shape != (len(p),):
         raise ValueError("initial_temperature_k must have exactly shape (N,)")
     if not isinstance(dirichlet, Mapping):
@@ -192,9 +183,9 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         bc = np.array([_scalar(conditions[int(node)](now), "Dirichlet callback")
                        if callable(conditions[int(node)]) else conditions[int(node)]
                        for node in fixed], dtype=float)
-        load = _source_load(
+        load = source_load(
             private_mesh, p, t, area,
-            (lambda points: _real(source(points.copy(), now), "heat_source callback"))
+            (lambda points: real_array(source(points.copy(), now), "heat_source callback"))
             if callable(source) else source)
         _finite(bc, load)
         return bc, load

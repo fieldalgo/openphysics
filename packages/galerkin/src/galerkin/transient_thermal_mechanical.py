@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .mesh import Mesh
+from .core.checks import real_array
 from .materials import is_per_region, region_property
 from .thermal_mechanical import _isolated_mesh, _mesh_state, _check_mesh, _supports
 from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
@@ -29,24 +30,8 @@ class TransientThermoelasticError(ValueError):
         super().__init__(f"transient thermoelasticity [{stage}]{where}")
 
 
-def _real(value, name):
-    if isinstance(value, (bool, np.bool_)) or (
-        isinstance(value, (list, tuple))
-        and any(isinstance(v, (bool, np.bool_)) for v in value)
-    ):
-        raise ValueError(f"{name} must not contain booleans")
-    a = np.asarray(value)
-    if a.dtype.kind not in "iuf" or not np.all(np.isfinite(a)):
-        raise ValueError(f"{name} must contain finite real numbers")
-    with np.errstate(over="ignore", invalid="ignore"):
-        out = np.array(a, dtype=float, copy=True)
-    if not np.all(np.isfinite(out)):
-        raise ValueError(f"{name} exceeds finite numeric range")
-    return out
-
-
 def _scalar(value, name):
-    a = _real(value, name)
+    a = real_array(value, name)
     if a.shape != ():
         raise ValueError(f"{name} must be scalar")
     return float(a)
@@ -124,20 +109,20 @@ def solve_transient_thermoelasticity(
             raise ValueError("heat must be a TransientHeatResult")
         owned = _isolated_mesh(mesh)
         state = _mesh_state(owned)
-        nodes = _real(heat.nodes_m, "heat.nodes_m")
+        nodes = real_array(heat.nodes_m, "heat.nodes_m")
         triangles = np.asarray(heat.triangles)
         if (triangles.dtype.kind not in "iu"
                 or not np.array_equal(nodes, owned.nodes)
                 or not np.array_equal(triangles, owned.triangles)):
             raise ValueError("heat and mechanics require identical ordered nodes and triangles")
-        times = _real(heat.time_s, "heat.time_s")
+        times = real_array(heat.time_s, "heat.time_s")
         with np.errstate(over="ignore", invalid="ignore"):
             differences = np.diff(times) if times.ndim == 1 else np.array([])
         if (times.ndim != 1 or len(times) < 2 or np.any(times < 0)
                 or not np.all(np.isfinite(differences)) or np.any(differences <= 0)):
             raise ValueError("heat.time_s must have at least two strictly increasing nonnegative seconds")
         # Validate consumed fields only; heat diagnostics/provenance are not certified.
-        temperatures = _real(heat.temperature_k, "heat.temperature_k")
+        temperatures = real_array(heat.temperature_k, "heat.temperature_k")
         if temperatures.shape != (len(times), len(owned.nodes)):
             raise ValueError("heat.temperature_k must have shape (stored times, nodes)")
         selected = _indices(time_indices, len(times))
@@ -157,7 +142,7 @@ def solve_transient_thermoelasticity(
         # Reject bool values explicitly before the shared support normalizer casts.
         for value in mechanical_dirichlet.values():
             _scalar(value, "mechanical Dirichlet displacement")
-        body = _real(body_force, "body_force")
+        body = real_array(body_force, "body_force")
         if body.shape != (2,):
             raise ValueError("body_force must be a constant Cartesian (2,) vector")
     except Exception as exc:

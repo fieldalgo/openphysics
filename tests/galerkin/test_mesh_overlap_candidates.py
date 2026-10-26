@@ -23,8 +23,7 @@ import numpy as np
 import pytest
 from scipy.spatial import Delaunay, cKDTree
 
-import galerkin.elasticity as elasticity
-import galerkin.thermal as thermal
+import galerkin.core.triangles as triangles
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.thermal import solve_steady_heat
@@ -46,7 +45,7 @@ def _strict(centers, radii, i, ids):
 
 def _new_pairs(centers, radii):
     candidates, kept = set(), set()
-    for i, ids in thermal._overlap_candidates(centers, radii):
+    for i, ids in triangles.overlap_candidates(centers, radii):
         assert np.all(ids > i) and np.all(np.diff(ids) > 0)
         candidates.update((i, int(k)) for k in ids)
         kept.update((i, int(k)) for k in _strict(centers, radii, i, ids))
@@ -156,7 +155,7 @@ def test_candidates_do_not_depend_on_the_query_block(name):
 
     def listed(block):
         return [(i, ids.tolist()) for i, ids in
-                thermal._overlap_candidates(centers, radii, block=block)]
+                triangles.overlap_candidates(centers, radii, block=block)]
     whole = listed(len(centers))
     for block in (1, 7, 4096):
         assert listed(block) == whole
@@ -233,8 +232,10 @@ def _counting_tree(returned):
     return CountingTree
 
 
-GEOMETRY = {"thermal": (thermal._mesh_geometry, [thermal]),
-            "elasticity": (elasticity._mesh_data, [thermal, elasticity])}
+# Both solvers check meshes with galerkin.core.triangles.triangle_geometry;
+# elasticity accepts either triangle orientation.
+GEOMETRY = {"thermal": (triangles.triangle_geometry, [triangles]),
+            "elasticity": (lambda mesh: triangles.triangle_geometry(mesh, counterclockwise=False), [triangles])}
 
 
 @pytest.mark.parametrize("check", GEOMETRY)

@@ -15,15 +15,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-
-def _finite_scalar(value, label):
-    a = np.asarray(value)
-    if a.shape != () or a.dtype.kind not in "iuf" or isinstance(value, (bool, np.bool_)):
-        raise ValueError(f"{label} must be a finite real scalar")
-    a = float(a)
-    if not np.isfinite(a):
-        raise ValueError(f"{label} must be a finite real scalar")
-    return a
+from .core.checks import finite_scalar
 
 
 def region_index(mesh):
@@ -55,7 +47,7 @@ def region_property(mesh, value, label, *, positive=False, lower=None, upper=Non
     callers keep their original floating-point path bit for bit.
     """
     def check(v, where):
-        v = _finite_scalar(v, f"{label}{where}")
+        v = finite_scalar(v, f"{label}{where}")
         if positive and v <= 0:
             raise ValueError(f"{label}{where} must be a finite real scalar > 0")
         if lower is not None and not v > lower:
