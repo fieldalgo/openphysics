@@ -46,6 +46,10 @@ Optional tools and data:
 - **Chrome or Chromium**: the installed Studio browser check uses an already
   installed browser. If none is found, the check fails; it is never skipped.
 
+The source Studio Node step runs every `tests/simcase/*.cjs` contract, including
+the experimental workspace. Distribution validation additionally copies the
+`studio_workspace_*.cjs` tests and checks them against verified installed static bytes.
+
 ## Repository layout
 
 `packages/<name>/` holds what the distribution `<name>` ships and nothing else:

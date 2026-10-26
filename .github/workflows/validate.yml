@@ -116,9 +116,9 @@ jobs:
         run: |
           python tools/check_distributions.py
           python tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
-      - name: Check Studio vector rendering
+      - name: Check all Studio JavaScript contracts
         if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
-        run: node --test tests/simcase/studio_vector.cjs tests/simcase/studio_thermal.cjs tests/simcase/thermal_simcase_independent_stale.cjs tests/simcase/studio_steady_boundary.cjs tests/simcase/studio_steady_thermal.cjs tests/simcase/studio_transient_thermal.cjs
+        run: node --test tests/simcase/*.cjs
       - name: Observe exact steady thermal Studio resources once
         if: ${{ success() }}
         run: python tools/studio_resources/profile_studio_thermal.py --source-root "$GITHUB_WORKSPACE" --expected-commit "$GITHUB_SHA" --output .validation/studio-resource-observation
