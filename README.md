@@ -18,6 +18,14 @@ silicon strip from the supplied example to your own strip, rib or polygon
 cross-section: effective index, mode fields and group index, with the window,
 mesh and slab-mode checks that tell you whether to trust them.
 
+For an interactive first study, the experimental [Studio workspace](docs/packages/simcase/workspace.md)
+([한국어](docs/locales/ko/pages/packages/simcase/workspace.md)) lets you change a
+rectangular optical core, inspect its mesh, run modes, compare designs and save
+or recover a session. After installing `simcase[studio]` in the configured
+runtime, launch it with `simcase-studio --workspace`. The coupled-physics
+application card is setup only; its electrical, thermal and mechanical studies
+are not connected to this workspace yet.
+
 ## What you can solve
 
 | Area | Implemented scope | Guide |
