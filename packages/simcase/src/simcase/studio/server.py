@@ -32,6 +32,7 @@ from . import transient_thermal_api as transient
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version="0.1.0")
 
+_workspace_instance = uuid.uuid4().hex
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _thermal_jobs = thermal.ThermalJobs()
@@ -87,6 +88,7 @@ def workspace_capabilities():
 def workspace_capabilities_v2():
     return JSONResponse({
         "schema_version": 2, "adapter": "optical-rectangle-v2", "simcase_version": __version__,
+        "server_instance": _workspace_instance,
         "optical": True, "coupled": False, "height_range_nm": [100, 500],
         "settings": {"wavelength_nm": 1550, "core_mesh_nm": 30,
                      "window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
@@ -356,6 +358,12 @@ async def start_thermal_run(body: Request):
             permit.release()
 
 
+def _check_workspace_instance(request: Request):
+    expected = request.query_params.get("workspace_instance")
+    if expected is not None and expected != _workspace_instance:
+        raise HTTPException(409, "The Studio server restarted or changed; this job cannot be resumed.")
+
+
 @app.get("/api/jobs/{job_id}")
 async def job_status(job_id: str, request: Request):
     if job_id.startswith("thermal-"):
@@ -366,6 +374,7 @@ async def job_status(job_id: str, request: Request):
             return ThermalResponse(pin.payload, pin)
         except thermal.ThermalAPIError as exc:
             return _thermal_error(exc)
+    _check_workspace_instance(request)
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:
@@ -383,6 +392,7 @@ async def job_result(job_id: str, request: Request):
             return ThermalResponse(pin.payload, pin)
         except thermal.ThermalAPIError as exc:
             return _thermal_error(exc)
+    _check_workspace_instance(request)
     with _jobs_lock:
         job = _jobs.get(job_id)
     if job is None:

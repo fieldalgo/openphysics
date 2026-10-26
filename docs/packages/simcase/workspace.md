@@ -108,3 +108,21 @@ silica for the background. Unsupported imported assignments remain visible and
 block execution until corrected. These choices reach the optical solver;
 heated-waveguide assignments remain setup labels. Study summarizes the current
 core dimensions and materials with links back to their editors.
+
+## Running, stopping the wait and resuming
+
+The job panel shows the submitted dimensions/material, job ID, elapsed time and
+result-loading state. **Stop waiting** stops browser polling only; the optical
+server continues its computation. **Resume job** retrieves that same job with
+its captured inputs, even after editing the current design or reloading the
+same tab. The pending-job record uses session storage, separately from input
+recovery and saved session files. Storage failures are reported. A server
+instance identifier prevents resuming a job against a restarted server.
+
+Only one job is tracked per tab. Resume or **Detach job** before starting another.
+Detaching forgets this tab's job reference and does not cancel server work.
+Polling stops after three minutes and can be resumed; failed requests do not
+replace existing results. Late responses after stopping are ignored. The panel
+reports elapsed time rather than inventing a completion percentage. No server
+cancellation or durable server job persistence is implemented. Save completed
+sessions before restarting the server or closing the tab.

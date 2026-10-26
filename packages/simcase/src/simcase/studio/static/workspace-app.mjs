@@ -1,3 +1,4 @@
+import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
 import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
 import {installWidthEditor} from './workspace-width-editor.mjs';
 import {sectionSvg} from './workspace-section.mjs';
@@ -20,7 +21,7 @@ import {renderApplications,templatePhysics} from './workspace-applications.mjs';
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera()};
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
-const connection={ready:false,message:'Checking Studio compatibility…',version:null};
+const connection={ready:false,message:'Checking Studio compatibility…',version:null,instance:null};
 const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div>`;
 function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Couplings'?'Connections':'Model';render();}
 
@@ -92,7 +93,7 @@ function refreshInputIssues(){
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max} ${field.unit}.`;
  }
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid;
- $('run-optical').disabled=solverBusy||!!opticalBlock()||numericDrafts.invalid;
+ $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
  else $('status').textContent=solverBusy?'Optical computation running':opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required';
  refreshPersistence();
@@ -219,7 +220,7 @@ let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldVi
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
- const block=opticalBlock();if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span>Results are attached to captured inputs</span><span>Mode matching / convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!block;
+ const block=opticalBlock();if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span>Results are attached to captured inputs</span><span>Mode matching / convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run optical study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D rectangular core, height 100–500 nm; silica background; wavelength 1550 nm; 30 nm core mesh; 3 × 2.4 µm window; PEC outer edges; two candidates. Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -306,28 +307,57 @@ $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringif
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
+let pendingJob=null;
+let jobPhase='idle',jobOperation=0;
+const jobMonitor=new OpticalJobMonitor({api:solverApi,onState:state=>{
+ const wasBusy=solverBusy;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
+ $('job-message').textContent=state.message;
+ if(state.phase==='done')setPending(null);
+ notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
+},onResult:(result,pending)=>{
+ if(!Array.isArray(result.neff?.[0])||result.neff[0].length!==2||!result.neff[0].every(Number.isFinite))throw new Error('Unsupported optical result.');
+ const input=pending.input;
+ solverRun=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.height),input,neff:[...result.neff[0]],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
+ solverRun.inputRevision=pending.revision;runs=appendRun(runs,solverRun);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
+}});
+function refreshJobControls(){
+ $('job-input').textContent=pendingJob?pendingJob.job+' · '+pendingJob.input.model.width+' × '+pendingJob.input.model.height+' nm · '+pendingJob.input.setup.materials.Core+' · captured inputs':'';
+ $('job-panel').hidden=!pendingJob&&!solverBusy&&jobPhase==='idle';
+ $('stop-waiting').disabled=!pendingJob||!solverBusy||!jobMonitor.busy;
+ $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready;
+ $('forget-job').disabled=!pendingJob||solverBusy;
+ $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||numericDrafts.invalid;
+ if(pendingJob&&!solverBusy)$('status').textContent='Pending job · resume or detach before starting another calculation';
+}
+function setPending(record){pendingJob=record;try{storePending(sessionStorage,record);$('job-storage').textContent='';}catch(error){$('job-storage').textContent='Job recovery storage unavailable: '+error.message+' Keep this tab open to retrieve the result.';}}
+try{pendingJob=readPending(sessionStorage);if(pendingJob){jobPhase='detached';$('job-message').textContent='Saved job '+pendingJob.job+' is available. Resume retrieves its captured result without changing your current inputs.';}}catch(error){$('job-message').textContent='Job recovery record could not be read: '+error.message;jobPhase='error';}
+$('stop-waiting').onclick=()=>{if(jobMonitor.busy){jobOperation++;jobMonitor.stop();}};
+$('resume-job').onclick=async()=>{
+ if(!pendingJob||solverBusy||!connection.ready)return;
+ jobOperation++;try{await jobMonitor.follow(pendingJob,connection.instance);}catch(error){$('job-message').textContent=error.message;}
+ refreshJobControls();
+};
+$('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
 $('run-optical').onclick=async()=>{
- if(solverBusy||opticalBlock())return;
+ if(solverBusy||pendingJob||opticalBlock())return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
- edits.record(current());const capture=edits.capture(),input=capture.input,captured=capture.signature,serverVersion=connection.version,doc=opticalDocument();solverBusy=true;render();notice('Validating optical input…');
+ const operation=++jobOperation;edits.record(current());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
   const validation=await solverApi('/api/validate',{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
-  const started=await solverApi('/api/run',{doc});if(typeof started.job!=='string'||!/^[0-9a-f]{8}$/.test(started.job))throw new Error('Unexpected job identifier.');
-  notice('Computing job '+started.job+' · edits remain available');const deadline=Date.now()+180000;
-  while(true){const job=await solverApi('/api/jobs/'+started.job);if(job.status==='error')throw new Error(job.error||'Solver failed.');if(job.status==='done')break;if(Date.now()>deadline)throw new Error('Stopped waiting. Server job may still run; cancellation is not available.');await new Promise(resolve=>setTimeout(resolve,700));}
-  const result=await solverApi('/api/jobs/'+started.job+'/result');
-  if(!Array.isArray(result.neff?.[0])||result.neff[0].length!==2||!result.neff[0].every(Number.isFinite))throw new Error('Unsupported optical result; no new result displayed.');
-  solverRun=validateRun({job:started.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.height),input,signature:captured,neff:[...result.neff[0]],field:readOpticalField(result),origin:'local',serverVersion});solverRun.inputRevision=capture.revision;runs=appendRun(runs,solverRun);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';notice('Optical computation complete. Result retains its input snapshot.');
- }catch(error){notice('Calculation failed: '+error.message+' No new result stored. Server work may continue after disconnection.');}
- finally{solverBusy=false;render();}
+  jobPhase='submitting';$('job-message').textContent='Submitting calculation…';
+  const started=await solverApi('/api/run',{doc});
+  const record=validatePending({version:1,job:started.job,input:capture.input,revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString()});
+  setPending(record);await jobMonitor.follow(record,serverInstance);
+ }catch(error){jobPhase='error';$('job-message').textContent='Calculation request failed: '+error.message+' If submission reached the server, work may continue.';notice($('job-message').textContent);}
+ finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
 };
 
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
- try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v2'));connection.ready=true;connection.version=caps.version;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v2';}
+ try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v2'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v2';}
  catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;}
- finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;render();}
+ finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;render();refreshJobControls();}
 }
 $('connect-workspace').onclick=connectWorkspace;
 const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});Object.assign(state,{height:220,width:500,voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();})();

@@ -63,3 +63,20 @@ def test_rectangle_capability_v2_preserves_v1(client):
     assert caps['height_range_nm'] == [100, 500]
     assert caps['coupled'] is False
     assert client.get('/api/workspace/capabilities').json()['settings']['height_nm'] == 220
+
+
+def test_workspace_instance_is_stable_for_server_lifetime(client):
+    caps = client.get('/api/workspace/capabilities/v2').json()
+    assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])
+    assert client.get('/api/workspace/capabilities/v2').json()['server_instance'] == caps['server_instance']
+
+
+def test_workspace_job_requests_refuse_restarted_server(client):
+    caps = client.get('/api/workspace/capabilities/v2').json()
+    wrong = '0' * 32 if caps['server_instance'] != '0' * 32 else '1' * 32
+    for endpoint in ('/api/jobs/1234abcd', '/api/jobs/1234abcd/result'):
+        response = client.get(endpoint, params={'workspace_instance': wrong})
+        assert response.status_code == 409
+        assert 'restarted' in response.json()['detail']
+        assert client.get(endpoint, params={'workspace_instance': caps['server_instance']}).status_code == 404
+        assert client.get(endpoint).status_code == 404
