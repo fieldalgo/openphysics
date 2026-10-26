@@ -11,11 +11,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from .core.backend import is_live, namespace
 from .mesh import Mesh
 
 
 def element_gradient(mesh: Mesh, V: np.ndarray) -> np.ndarray:
-    """Per-triangle grad V as a (T, 2) array. The electric field is E = -grad V."""
+    """Per-triangle grad V as a (T, 2) array. The electric field is E = -grad V.
+
+    V may be a JAX or PyTorch array; the result is then in its library and
+    carries its derivative (mesh geometry stays NumPy).
+    """
     tris = mesh.triangles
     p = mesh.nodes[tris]
     x, y = p[:, :, 0], p[:, :, 1]
@@ -24,6 +29,13 @@ def element_gradient(mesh: Mesh, V: np.ndarray) -> np.ndarray:
     c = np.stack([x[:, 2] - x[:, 1], x[:, 0] - x[:, 2], x[:, 1] - x[:, 0]], axis=1)
     area = mesh.areas()
 
+    if is_live(V):
+        xp = namespace(V)
+        Ve = V[tris]
+        twice = xp.asarray(2.0 * area)
+        grad_x = xp.sum(xp.asarray(b) * Ve, axis=1) / twice
+        grad_y = xp.sum(xp.asarray(c) * Ve, axis=1) / twice
+        return xp.stack([grad_x, grad_y], axis=1)
     Ve = V[tris]  # (T, 3)
     grad_x = (b * Ve).sum(axis=1) / (2.0 * area)
     grad_y = (c * Ve).sum(axis=1) / (2.0 * area)

@@ -123,3 +123,5 @@ P1 장의 점별 법선 전류 연속성이나 국소 평형 유속은 보장하
 [온도 의존 Joule heating](temperature_joule_heating.md)을 참조한다. 원시 배열은 계속 거부한다.
 
 [균질 직사각형 JSON/CLI 입력·저장 계약](../simcase/electric_joule.md). Python API 전체 범위를 JSON에 노출하지는 않습니다.
+
+JAX·PyTorch 입력과 그 미분은 [JAX·PyTorch로 미분하기](differentiation.md)에 있습니다.

@@ -39,6 +39,7 @@ coupled physics distinguishable.
 | Check inputs, then change the model | Check report identifies its captured input and becomes stale. Run validates a fresh snapshot. |
 | Run at 600 × 300 nm; name and pin the result | Actual fields and two candidate indices appear with job, input and version provenance. |
 | Run at 700 × 300 nm; Compare A/B | Captured dimensions and material are identifiable. Candidate ranks are explicitly not matched modes. |
+| Run at 1600 nm / 40 nm core mesh, then 1400 nm / 25 nm; Compare | Results, history and comparison name each captured wavelength and core mesh. Values outside 1400–1700 nm or 20–60 nm stay as blocked drafts. |
 | Change candidate/component; inspect a point and a line | Both plots use the same physical coordinates. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
 | Save session and selected run; reopen each | Inputs, result count, names, pins, comparison and view state match the file's scope. File origin is shown; opening does not recompute. |
 | Wait for Browser recovery saved; reload; Recover last session | Results and view state return as recovered. No solver starts; input Undo starts at the recovered document. |
@@ -119,6 +120,21 @@ No browser console errors or warnings were observed. Repeating both captured
 solver documents through the installed Python API gave identical effective
 indices in this environment. This is same-stack transport consistency, not an
 independent numerical reference or a new platform/browser support claim.
+
+## Wavelength and mesh observation, 2026-10-26
+
+Source checkout on Linux (Python 3.12, Chromium via Playwright, agent-operated).
+An out-of-range 1300 nm draft blocked Run with the 1400–1700 nm hint. Runs at
+1600 nm / 40 nm and 1400 nm / 25 nm on a 500 × 220 nm silicon core completed;
+history labels and the comparison named both wavelengths and mesh sizes. The
+saved session (version 3, about 0.8 MB) reopened in a new tab with both runs and
+1400 nm restored. No browser console errors or warnings were observed. The
+workspace solver documents for 300 × 220 and 500 × 220 nm silicon and 900 × 500 nm
+silicon/silicon nitride cores completed at every corner of 1400/1700 nm and
+20/60 nm through the local HTTP API (at most 1.5 s, at most 1.3 MB result
+payload). Doubling the window changed the fundamental n_eff by at most 1.6e-3
+at 1700 nm in these cases. Windows/macOS, other browsers and human users were not
+part of this observation.
 
 ## Release decision
 

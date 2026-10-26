@@ -26,6 +26,8 @@ What each package implements, and its limits, is in the
 
 - Add `sipi.PowerPlane`: DC voltage drop (IR drop) on a copper power plane with voltage sources, current sinks and cutouts, validated against an exact strip, an annulus and the two-pad infinite-sheet resistance. Vias, several layers and temperature-dependent copper are not modelled; [documentation](docs/packages/sipi/overview.md#power-planes-dc-voltage-drop-ir-drop).
 
+- `galerkin`: steady heat and steady electric conduction accept JAX or PyTorch values for conductivity, heat source, Dirichlet and reference potentials and boundary data, and return results in that library with derivatives (reverse mode, through an adjoint sparse solve). NumPy results are unchanged. Solvers that do not differentiate yet refuse JAX and PyTorch values instead of silently dropping the derivative. [Documentation](docs/packages/galerkin/differentiation.md).
+
 - Add `sipi`, a signal- and power-integrity package: quasi-static (quasi-TEM) PCB cross-sections with layered dielectrics and rectangular traces, giving C, L and dielectric-loss G matrices, single-line impedance and effective permittivity, and coupled-pair even/odd modes. Validated against exact parallel-plate, coaxial and Cohn stripline solutions and Hammerstad–Jensen microstrip; conductor loss is not included. Installed with `openphysics[sipi]`; [documentation](docs/packages/sipi/overview.md).
 
 - Add an experimental model workspace at `/workspace`, with fixed optical runs, editable model history, session files and a versioned capability contract. Existing optical and heat editors remain available.
