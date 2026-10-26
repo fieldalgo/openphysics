@@ -69,12 +69,13 @@ class ModeTracker:
     neither beta nor an extra wavelength factor belongs in this product.
     """
 
-    def __init__(self, mesh, num_modes, settings, *, scalar=False):
+    def __init__(self, mesh, num_modes, settings, *, scalar=False, physical_weights=1.0, seed_target=None):
         self.num_modes = num_modes
         self.settings = settings
         self.scalar = scalar
-        self.edge_mass = assemble_edge_mass(EdgeSpace(mesh))
-        self.node_mass = assemble_mass(mesh)
+        self.seed_target = seed_target
+        self.edge_mass = assemble_edge_mass(EdgeSpace(mesh), physical_weights)
+        self.node_mass = assemble_mass(mesh, physical_weights)
         self.previous = None
 
     def product(self, left, right):
@@ -102,6 +103,9 @@ class ModeTracker:
         phase = np.ones(self.num_modes, dtype=complex)
         if self.previous is None:
             selected = np.arange(self.num_modes)
+            if self.seed_target is not None:
+                selected = np.argsort(abs(neff-self.seed_target))[:self.num_modes]
+                selected = selected[np.argsort(-neff[selected].real)]
         else:
             cross = self.product(self.previous, field)
             old_norm = np.diag(self.product(self.previous, self.previous)).real
@@ -138,8 +142,9 @@ class ModeTracker:
                          "reduce the wavelength step or use single studies for unresolved modes")
             phase = np.exp(-1j * np.angle(cross[rows, selected]))
 
+        boundary = count - 1 if self.seed_target is None else int(np.argmax(abs(neff-self.seed_target)))
         for mode, column in enumerate(selected):
-            if count >= self.settings["search_modes"] and column == count - 1:
+            if count >= self.settings["search_modes"] and column == boundary:
                 fail(f"mode {mode + 1} reaches the candidate search boundary",
                      "increase study.tracking.search_modes to check for an unseen partner")
             others = np.delete(neff, column)
@@ -150,7 +155,7 @@ class ModeTracker:
 
         aligned = field[:, selected] * phase if self.scalar else VectorField(field.edges, field.transverse[:, selected] * phase,
                               field.longitudinal[:, selected] * phase,
-                              field.electric[:, selected, :] * phase[None, :, None])
+                              field.electric[:, selected, :] * phase[None, :, None], field.normalization)
         self.previous = aligned
         evidence = dict(candidate_count=count, candidate_ranks=(selected + 1).tolist(),
                         overlaps=None if overlap is None else overlap.tolist(), margins=margins)

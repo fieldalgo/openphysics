@@ -46,6 +46,7 @@ results of a specific commit, inspect that commit's CI run and artifacts.
 | Lossy material cavity | [Complex resonances, Q, wall loss and references](packages/galerkin/material_cavity.md) | [한국어](locales/ko/pages/packages/galerkin/material_cavity.md) |
 | Cavity document and CLI | [Input and saved fields](packages/simcase/cavity3d.md) | [한국어](locales/ko/pages/packages/simcase/cavity3d.md) |
 | Absorbing waveguide modes | [Complex indices, loss and tracking](packages/simcase/lossy_modes.md) | [한국어](locales/ko/pages/packages/simcase/lossy_modes.md) |
+| PML and bent waveguide modes | [Candidates, attenuation and tracking](packages/simcase/pml_modes.md) | [한국어](locales/ko/pages/packages/simcase/pml_modes.md) |
 | Vector subspace tracking | [Opt-in cluster sweeps](packages/simcase/vector_subspace_tracking.md) | [한국어](locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
 | Complex vector eigenspaces | [Preservation and limits](packages/galerkin/eigenspace_reliability.md) | [한국어](locales/ko/pages/packages/galerkin/eigenspace_reliability.md) |
 | Static elasticity | [Plane models and constraints](packages/galerkin/elasticity2d.md) | [한국어](locales/ko/pages/packages/galerkin/elasticity2d.md) |

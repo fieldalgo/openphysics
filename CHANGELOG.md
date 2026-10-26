@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Scalar/full-vector modal PML and constant-radius bends, with complex candidate diagnostics, physical-window tracking, total attenuation, Studio controls and independent slab/cylindrical validation.
+
 - Add temperature-dependent 2D steady Joule heating with bounded material models,
   relaxed Picard iteration, failure histories and independent reference tests.
 

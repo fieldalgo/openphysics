@@ -32,6 +32,8 @@ def mode_coordinates(mesh, *, thickness, strength=3.0, order=2,
     sides = ("left", "right", "bottom", "top")
     if not isinstance(thickness, dict) or set(thickness)-set(sides):
         raise ValueError("PML thickness must map left/right/bottom/top to lengths")
+    if any(isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, float, np.number)) for v in thickness.values()):
+        raise ValueError("PML thicknesses must be numeric lengths, not booleans")
     widths = np.array([thickness.get(s, 0.) for s in sides], dtype=float)
     if not np.isfinite(widths).all() or np.any(widths < 0) or not np.any(widths > 0):
         raise ValueError("PML thicknesses must be finite, nonnegative, with at least one positive")
@@ -40,6 +42,12 @@ def mode_coordinates(mesh, *, thickness, strength=3.0, order=2,
     if isinstance(order, bool) or order not in (2, 3, 4):
         raise ValueError("PML order must be 2, 3 or 4")
     bounds = np.array([mesh.nodes.min(axis=0), mesh.nodes.max(axis=0)])
+    if set(mesh.boundary) != set(sides):
+        raise ValueError("modal coordinates require a rectangular mesh with four named outer faces")
+    for side, dim, upper in (("left",0,0),("right",0,1),("bottom",1,0),("top",1,1)):
+        if not np.allclose(mesh.nodes[mesh.boundary[side],dim], bounds[upper,dim], rtol=0,
+                           atol=1e-12*np.max(bounds[1]-bounds[0])):
+            raise ValueError("modal coordinates require rectangular outer faces")
     inner = bounds.copy()
     inner[0] += widths[[0, 2]]
     inner[1] -= widths[[1, 3]]
@@ -79,7 +87,10 @@ def mode_coordinates(mesh, *, thickness, strength=3.0, order=2,
 
 def scalar_coordinate_system(mesh, eps_r, k0, factors):
     """A u=beta^2 B u for the scalar Helmholtz approximation in these coordinates."""
-    sx, sy, h = np.asarray(factors).T
+    factors = np.asarray(factors)
+    if factors.shape != (mesh.num_triangles, 3) or not np.isfinite(factors).all() or np.any(factors == 0):
+        raise ValueError("coordinate factors must be finite nonzero (triangles, 3)")
+    sx, sy, h = factors.T
     tensor = np.zeros((mesh.num_triangles, 2, 2), dtype=complex)
     tensor[:, 0, 0], tensor[:, 1, 1] = h*sy/sx, h*sx/sy
     A = k0**2*assemble_mass(mesh, np.asarray(eps_r)*h*sx*sy)-assemble_stiffness(mesh, tensor)

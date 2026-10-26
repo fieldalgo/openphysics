@@ -348,6 +348,8 @@ class Document:
                     raise DocumentError(f"{where}.boundary.{side} must be one of {sorted(BOUNDARY_TYPES)}")
             if not (isinstance(p["wavelength"], (int, float)) and p["wavelength"] > 0):
                 raise DocumentError(f"{where}.wavelength must be a positive number (use study.sweep for several)")
+            from .pml_contract import validate as validate_pml
+            validate_pml(p, d["geometry"]["domain"], where, DocumentError)
             if p["formulation"] == "vector":
                 for key in ("wavelength", "n_cladding", "num_modes"):
                     value = p.get(key)
@@ -397,6 +399,9 @@ class Document:
                     f"study.parameter {st['parameter']!r} is not under 'physics.'. The mesh is built once for "
                     "the whole study, so sweeping geometry, mesh or materials would solve every point on the "
                     "first point's mesh. Only physics parameters may be swept.")
+            open_names = [name for name, p in d["physics"].items() if "pml" in p]
+            if open_names and (len(d["physics"]) != 1 or st["parameter"] != f"physics.{open_names[0]}.wavelength"):
+                raise DocumentError("PML sweeps support only wavelength with fixed geometry and coordinates")
             vector_names = [name for name, p in d["physics"].items() if p["formulation"] == "vector"]
             if vector_names:
                 if len(d["physics"]) != 1 or st["parameter"] != f"physics.{vector_names[0]}.wavelength":

@@ -5,8 +5,9 @@
 `em.modes2d` accepts passive complex isotropic permittivity for scalar and
 full-vector finite-window modes. The scalar approximation is exact for the TE
 slab equation, not for general high-contrast 2D structures or surface plasmons.
-Use full-vector modes for those structures. PML, radiation/leakage loss, bent
-guides, gain media and exceptional-point tracking are outside this contract.
+Use full-vector modes for those structures. PML, radiation/leakage and constant-radius
+bends have a [separate contract](pml_modes.md). Gain media and exceptional-point
+tracking remain unsupported.
 
 ## Phasor, input and units
 

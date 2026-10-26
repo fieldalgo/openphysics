@@ -182,6 +182,9 @@ def _run_job(job_id: str, doc: Document):
         with _jobs_lock:
             _jobs[job_id].update(status="error", error=f"{type(exc).__name__}: {exc}",
                                  traceback=traceback.format_exc())
+            diagnostic = getattr(exc, "diagnostics", getattr(exc.__cause__, "diagnostics", None))
+            if diagnostic is not None:
+                _jobs[job_id]["open_boundary"] = diagnostic
 
 
 def _subspace_payload(res, representation: str) -> dict:

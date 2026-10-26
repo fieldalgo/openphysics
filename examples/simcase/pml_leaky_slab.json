@@ -1,0 +1,90 @@
+{
+  "openphysics": "0.2",
+  "name": "pml leaky slab",
+  "units": {
+    "length": "um"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": -0.05,
+      "xmax": 0.05,
+      "ymin": -2.0,
+      "ymax": 2.47
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -0.05,
+        "y": 0.0,
+        "w": 0.1,
+        "h": 0.22,
+        "material": "film",
+        "mesh_size": 0.012
+      },
+      {
+        "name": "substrate",
+        "type": "rect",
+        "x": -0.05,
+        "y": 0.47,
+        "w": 0.1,
+        "h": 2.0,
+        "material": "film"
+      }
+    ]
+  },
+  "materials": {
+    "film": {
+      "n": 3.48
+    },
+    "clad": {
+      "n": 1.444
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "wavelength": 1.55,
+      "num_modes": 1,
+      "n_cladding": 1.444,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      },
+      "n_target": 2.852,
+      "pml": {
+        "thickness": {
+          "bottom": 1.0,
+          "top": 1.0
+        },
+        "strength": 3.0,
+        "order": 2,
+        "min_physical_fraction": 0.1
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.02,
+    "grading": {
+      "center": [
+        0.0,
+        0.11
+      ],
+      "near": 0.01,
+      "far": 0.02,
+      "distance": 1.0
+    }
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "plots": false
+  }
+}

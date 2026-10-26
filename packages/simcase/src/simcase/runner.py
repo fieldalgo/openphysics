@@ -145,6 +145,11 @@ def micrometre_document(doc: Document) -> Document:
     for p in d["physics"].values():
         if p.get("type") == "em.modes2d":
             p["wavelength"] = um(p["wavelength"])
+            if "pml" in p:
+                p["pml"]["thickness"] = {k: um(v) for k,v in p["pml"]["thickness"].items()}
+            if "bend" in p:
+                for key in ("radius", "origin"):
+                    if key in p["bend"]: p["bend"][key] = um(p["bend"][key])
     st = d["study"]
     if st.get("type") == "sweep" and str(st.get("parameter", "")).endswith(".wavelength"):
         st["values"] = [um(v) for v in st["values"]]
@@ -187,10 +192,23 @@ def _solve_in_micrometres(model: MeshedModel, physics: dict) -> dict:
     mesh, wl_solve = model.mesh, wl
     if model.solver_mesh is not None:
         mesh, wl_solve = model.solver_mesh, units.to_micrometres(wl, model.doc.scale)
+    pml, bend = copy.deepcopy(physics.get("pml")), copy.deepcopy(physics.get("bend"))
+    if model.solver_mesh is not None:
+        um = lambda v: units.length_to_micrometres(v, model.doc.scale)
+        if pml is not None: pml["thickness"] = {k: um(v) for k,v in pml["thickness"].items()}
+        if bend is not None:
+            for key in ("radius", "origin"):
+                if key in bend: bend[key] = um(bend[key])
     # physmat uses n+ik; the retained modal phasor is exp(+i omega t-i beta z).
-    return physics_em_modes2d.solve(mesh, np.conjugate(eps), wl_solve, physics["boundary"],
+    result = physics_em_modes2d.solve(mesh, np.conjugate(eps), wl_solve, physics["boundary"],
                                     int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"),
-                                    n_target=physics.get("n_target"))
+                                    n_target=physics.get("n_target"), pml=pml, bend=bend)
+    if "open_boundary" in result:
+        diagnostic = result["open_boundary"]
+        if model.solver_mesh is not None:
+            diagnostic["physical_bounds"] = units.lengths_from_micrometres(np.array(diagnostic["physical_bounds"]), model.doc.scale).tolist()
+        diagnostic["length_unit"] = model.doc.length_unit
+    return result
 
 
 def _field_in_document_units(field: VectorField, model: MeshedModel) -> VectorField:
@@ -220,6 +238,7 @@ class RunResult:
     log: list[str] = field(default_factory=list)
     vector_fields: list[VectorField] | None = None
     mode_tracking: dict | None = None
+    open_boundary: list[dict] | None = None
 
     # -- derived -----------------------------------------------------------
 
@@ -229,6 +248,12 @@ class RunResult:
                                 else [self.doc.sole_physics()[1]["wavelength"]] * len(self.neff))
         wavelength_m = units.to_micrometres(wavelength, self.doc.scale) * 1e-6
         return -40 * np.pi / (100 * np.log(10)) * self.neff.imag / wavelength_m[:, None]
+
+    def bend_loss_db_90deg(self) -> np.ndarray | None:
+        bend = self.doc.sole_physics()[1].get("bend")
+        if bend is None: return None
+        radius_cm = units.to_micrometres(bend["radius"], self.doc.scale) * 1e-4
+        return self.propagation_loss_db_cm() * (np.pi * radius_cm / 2)
 
     def group_index(self) -> np.ndarray | None:
         """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength."""
@@ -269,6 +294,13 @@ class RunResult:
                        else ("real_index_interval" if self.vector_fields is not None else "descending_real_index"))
             if ng is not None:
                 out["group_index_imag"] = ng.imag.tolist()
+        if self.open_boundary is not None:
+            out.update(open_boundary=copy.deepcopy(self.open_boundary),
+                       normalization="physical_max_centroid_magnitude" if self.vector_fields is not None else "physical_nodal_peak",
+                       field_representation="pml-vector-edge-nodal-v1" if self.vector_fields is not None else "pml-scalar-nodal-v1",
+                       selection="pml_heuristic_near_target", attenuation="total_absorption_and_radiation")
+            loss = self.bend_loss_db_90deg()
+            if loss is not None: out["bend_loss_db_90deg"] = loss.tolist()
         if self.mode_tracking is not None:
             out["mode_tracking"] = copy.deepcopy(self.mode_tracking)
         return out
@@ -294,6 +326,9 @@ class RunResult:
                               vector_electric=np.stack([f.electric for f in self.vector_fields]))
             if self.mode_tracking is not None:
                 arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
+            if self.open_boundary is not None:
+                arrays["open_boundary_json"] = json.dumps(self.open_boundary)
+                arrays["field_representation"] = "pml-vector-edge-nodal-v1" if self.vector_fields is not None else "pml-scalar-nodal-v1"
             np.savez_compressed(outdir / "fields.npz", **arrays)
         if self.doc["results"].get("plots", True):
             self.plot(outdir / "results.png")
@@ -325,6 +360,19 @@ class RunResult:
             f = np.linalg.norm(self.vector_fields[i].electric[:, 0, :], axis=1)
             ax.tripcolor(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles,
                          facecolors=f, shading="flat", cmap="inferno")
+        if self.open_boundary is not None:
+            # Mask artificial PML values in saved figures as in Studio.
+            from matplotlib.tri import Triangulation
+            bounds = np.asarray(self.open_boundary[i]["physical_bounds"])
+            centers = self.mesh_nodes[self.mesh_triangles].mean(axis=1)
+            mask = np.any((centers < bounds[0]) | (centers > bounds[1]), axis=1)
+            triangulation = Triangulation(self.mesh_nodes[:, 0], self.mesh_nodes[:, 1], self.mesh_triangles, mask=mask)
+            ax.clear()
+            ax.set_facecolor("#d0d5dd")
+            if self.vector_fields is None:
+                ax.tricontourf(triangulation, f, levels=30, cmap="inferno")
+            else:
+                ax.tripcolor(triangulation, facecolors=f, shading="flat", cmap="inferno")
         ax.set_aspect("equal")
         pname, phys = self.doc.sole_physics()
         label = f"{self.parameter or 'lambda'} = {self.values[i]}{value_unit}"
@@ -393,10 +441,11 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
 
     parameter, values = study_points(doc)
     neffs, fields = [], []
+    open_diagnostics = [] if "pml" in doc.sole_physics()[1] else None
     vector_fields = [] if doc.sole_physics()[1]["formulation"] == "vector" else None
     tracker, tracking = None, None
     scalar_tracking = (vector_fields is None and parameter is not None and parameter.endswith(".wavelength")
-                       and any(np.any(model.eps_per_triangle(v).imag != 0) for v in values))
+                       and (open_diagnostics is not None or any(np.any(model.eps_per_triangle(v).imag != 0) for v in values)))
     if scalar_tracking:
         w = np.asarray(values, dtype=float)
         if len(w) < 3 or not np.isfinite(w).all() or not (np.all(np.diff(w) > 0) or np.all(np.diff(w) < 0)):
@@ -406,7 +455,13 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
         settings = tracking_settings(requested, doc["study"].get("tracking"))
         if settings.get("method") == SUBSPACE_METHOD:
             return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh)
-        tracker = ModeTracker(_tracking_mesh(model), requested, settings, scalar=scalar_tracking)
+        weights = 1.0
+        if open_diagnostics is not None:
+            from .physics_pml_modes import coordinates
+            p = doc.sole_physics()[1]
+            weights = coordinates(model.mesh, p["pml"], p.get("bend")).physical.astype(float)
+        tracker = ModeTracker(_tracking_mesh(model), requested, settings, scalar=scalar_tracking, physical_weights=weights,
+                              seed_target=doc.sole_physics()[1]["n_target"] if open_diagnostics is not None else None)
         tracking = dict(method="scalar-l2-assignment-v1" if scalar_tracking else "electric-l2-assignment-v1",
                         settings=settings, points=[])
         say(f"{'scalar' if scalar_tracking else 'vector'} sweep: tracking resolved modes by L2 overlap; check wavelength-step convergence")
@@ -425,12 +480,24 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
                 raise ModeTrackingError(f"{'scalar' if scalar_tracking else 'vector'} sweep at {location}: {exc}") from exc
             key = "fields" if scalar_tracking else "vector_field"
             res["neff"], res[key], evidence = tracker.step(res["neff"], res[key], location)
-            res["guided"] = res["guided"][np.asarray(evidence["candidate_ranks"])-1]
+            selected = np.asarray(evidence["candidate_ranks"])-1
+            res["guided"] = res["guided"][selected]
+            if "open_boundary" in res:
+                diagnostic = res["open_boundary"]
+                diagnostic["search_requested_modes"] = diagnostic["requested_modes"]
+                diagnostic.update(requested_modes=tracker.num_modes, returned_modes=len(selected))
+                diagnostic["selected_candidates"] = [diagnostic["selected_candidates"][i] for i in selected]
+                for candidate in diagnostic["candidates"]:
+                    if candidate["selected"] and candidate["candidate"] not in diagnostic["selected_candidates"]:
+                        candidate.update(selected=False, reasons=["not_selected_by_tracking"])
             if not scalar_tracking:
                 res["vector_field"] = _field_in_document_units(res["vector_field"], model)
             tracking["points"].append(evidence)
         else:
             res = solve_point(model, physics)
+        if open_diagnostics is not None:
+            diagnostic = res["open_boundary"]
+            open_diagnostics.append(diagnostic)
         neffs.append(res["neff"])
         if vector_fields is None:
             fields.append(res["fields"])
@@ -442,13 +509,13 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
         value_unit = f" {doc.length_unit}" if parameter and parameter.endswith(".wavelength") else ""
         tag = f"{parameter} = {v}{value_unit}: " if parameter else ""
         say(f"  {tag}n_eff = " + ", ".join(f"{n:.6f}" for n in res["neff"]) +
-            ("" if res["guided"].all() else "  (some modes below cladding index: not guided)"))
+            ("  (PML candidates; stability not checked)" if open_diagnostics is not None else "" if res["guided"].all() else "  (some modes below cladding index: not guided)"))
     t_solve = time.time() - t0
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
 
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
-                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking)
+                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking, open_diagnostics)
 
 
 
