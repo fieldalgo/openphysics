@@ -78,6 +78,9 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
+    from .electric_joule import is_electric_joule
+    if is_electric_joule(doc.data):
+        raise DocumentError("build_mesh is an EM stage; use run(document) for electric/Joule physics")
     from .transient_thermal_contract import is_transient_thermal
     if is_transient_thermal(doc.data):
         raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.transient2d')
@@ -168,6 +171,9 @@ def study_points(doc: Document) -> tuple[str | None, list]:
 
 def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
+    from .electric_joule import TYPES
+    if physics.get("type") in TYPES:
+        raise DocumentError("solve_point is an EM stage; use run(document) for electric/Joule physics")
     if physics.get('type') == 'thermal.transient2d':
         raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.transient2d')
     if physics.get('type') == 'thermal.steady2d':
@@ -359,6 +365,9 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
             print(msg)
 
     doc.validate()
+    from .electric_joule import is_electric_joule, run_electric_joule
+    if is_electric_joule(doc.data):
+        return run_electric_joule(doc, verbose=verbose)
     from .transient_thermal_contract import is_transient_thermal
     if is_transient_thermal(doc.data):
         from .transient_thermal import run_transient_thermal

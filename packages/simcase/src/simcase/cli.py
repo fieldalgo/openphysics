@@ -49,7 +49,9 @@ def main(argv=None) -> int:
     if subspace and os.path.lexists(out):
         print(f"error: subspace sweep output already exists: {out}; choose a fresh output directory", file=sys.stderr)
         return 1
-    if is_thermal(doc.data) or is_transient_thermal(doc.data):
+    from .electric_joule import is_electric_joule, failure_evidence
+    from galerkin.temperature_joule_heating import JouleConvergenceError
+    if is_thermal(doc.data) or is_transient_thermal(doc.data) or is_electric_joule(doc.data):
         try:
             require_fresh_output(out)
         except OSError as exc:
@@ -57,6 +59,9 @@ def main(argv=None) -> int:
             return 1
     try:
         result = run(doc, verbose=not args.quiet)
+    except JouleConvergenceError as exc:
+        print(json.dumps(failure_evidence(exc), allow_nan=False), file=sys.stderr)
+        return 1
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

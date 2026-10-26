@@ -40,11 +40,12 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 2D 도파 모드와 sweep | 지원 | `em.modes2d`(수동 흡수 지원) | 지원 |
 | 2D 정전기와 산란 | 지원 | 미지원 | 미지원 |
 | 3D 공동: 진공 PEC, 손실 재료와 도체 벽 | 지원 | `em.cavity3d` | 미지원 |
+| 정상 전기전도 | 지원 | 균질 직사각형 | 미지원 |
 | 정상 열전도 | 지원 | 직사각형 `thermal.steady2d` | 전용 화면 |
 | 과도 열전도 | 지원 | 직사각형 `thermal.transient2d` | 전용 화면 |
 | 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 미지원 |
 | 탄성·열팽창·열전도→기계 | 지원 | 미지원 | 미지원 |
-| 정상 Joule heating | 지원 | 미지원 | 미지원 |
+| 정상 Joule heating | 지원 | 균질 직사각형·상수/σ(T) | 미지원 |
 
 Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은 아닙니다.
 
@@ -193,6 +194,8 @@ refractiveindex.info 광학 데이터는 CC0 1.0이고 Gmsh는 자체 라이선�
 모든 의존성, 외부 프로그램, 데이터, 출판 자료의 라이선스와 쓰는 방식은
 [제3자 소프트웨어](third-party.md)에 있습니다.
 
-[2D 정상 전기전도 Python API](packages/galerkin/electric_steady2d.md)는 영역별 전기전도도, 전압·전류·절연 경계, Neumann 기준 전위, V/E/J와 요소별 Joule 발열을 지원합니다. JSON·CLI·Studio는 지원하지 않습니다.
+[2D 정상 전기전도 Python API](packages/galerkin/electric_steady2d.md)는 영역별 전기전도도, 전압·전류·절연 경계, Neumann 기준 전위, V/E/J와 요소별 Joule 발열을 지원합니다. 균질 직사각형의 [JSON/CLI](packages/simcase/electric_joule.md)를 지원하며 Studio는 제외합니다.
 
 [온도 의존 양방향 Joule heating API](packages/galerkin/temperature_joule_heating.md)
+
+전기전도·상수/온도 의존 Joule heating: [JSON/CLI 계약·예제](packages/simcase/electric_joule.md).

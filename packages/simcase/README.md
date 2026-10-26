@@ -41,6 +41,9 @@ prints a supplied example.
 |---|---|---|---|
 | `em.modes2d` | 2D waveguide modes with passive absorption, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](../../docs/packages/simcase/vector_subspace_tracking.md) |
 | `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](../../docs/packages/simcase/cavity3d.md) |
+| `electric.steady2d` | Homogeneous rectangle steady conduction | `electric_rectangle` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
+| `joule.steady2d` | Constant-property steady Joule heating | `joule_rectangle` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
+| `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](../../docs/packages/simcase/thermal_steady2d.md), [boundaries](../../docs/packages/simcase/thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |

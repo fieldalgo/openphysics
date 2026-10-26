@@ -79,3 +79,5 @@ CI가 세 시험 모듈을 모두 수집하며 필수 crosscheck 설정은 도�
 이산 에너지 수지는 조립 reaction으로 평가합니다.
 
 [온도 의존 양방향 연성](temperature_joule_heating.md)은 별도 Python workflow다.
+
+[균질 직사각형 JSON/CLI 입력·저장 계약](../simcase/electric_joule.md). Python API 전체 범위를 JSON에 노출하지는 않습니다.

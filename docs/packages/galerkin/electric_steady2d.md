@@ -132,3 +132,5 @@ meshes, zero-conductivity subregions and nonlinear materials are unsupported.
 
 For explicit mesh-bound element conductivities and temperature feedback, see
 [temperature-dependent Joule heating](temperature_joule_heating.md). Bare arrays remain invalid.
+
+[Homogeneous rectangle JSON/CLI input and save contract](../simcase/electric_joule.md). This exposes a subset of the Python API.
