@@ -1,3 +1,4 @@
+import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
 import {opticalWorkflow} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
@@ -66,7 +67,7 @@ const button=document.createElement('button');button.textContent=text;button.id=
 }
 }
 function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[]),...(state.heat&&state.structure?['Solid mechanics']:[]),...(state.optics?['Optical modes']:[])];}
-function render(){disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n)).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function render(){profileResize?.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n)).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+(isOptical()?`<label>Core height [nm]<input id="height-number" type="number" min="100" max="500" step="any" value="${state.height}"></label>`:'')+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
 else if(ui.selection==='Electric currents')inspector+=`<label>Applied voltage [V]<input id="voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label>`+pair('Terminal','Heater input')+pair('Ground','Heater output')+pair('Output','Joule heat [W/m³]');
@@ -304,7 +305,7 @@ function renderMeshPreview(){
 }
 
 function fieldColor(t){const stops=[[18,38,59],[23,111,139],[69,187,159],[249,235,130]];const z=Math.min(2.999999,Math.max(0,t)*3),i=Math.floor(z),a=z-i;return 'rgb('+stops[i].map((v,k)=>Math.round(v+(stops[i+1][k]-v)*a)).join(',')+')';}
-let fieldResize=null;
+let fieldResize=null,profileResize=null,profileRedraw=()=>{};const profileState={axis:'x',coordinate:.15,open:false};
 function addProbeControls(host,redraw){
  const form=document.createElement('form');form.className='probe-controls';
  form.innerHTML='<strong>Inspect displayed sample</strong><label>x [µm]<input id="probe-x" type="number" step="any" min="-1.5" max="1.5" required></label><label>y [µm]<input id="probe-y" type="number" step="any" min="-1.2" max="1.2" required></label><button type="submit">Inspect point</button><button type="button" id="clear-probe">Clear point</button><span>Click a plot or enter coordinates. Values belong to triangle centroids; no interpolation.</span>';
@@ -318,8 +319,8 @@ function renderField(){
  if(fieldResize)fieldResize.disconnect();
  const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${solverRun.neff[i].toFixed(6)}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:340px"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
  $('canvas').append(host);
- for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();};
- probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();
+ for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();profileRedraw();};
+ probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();renderLineProfile(host,[solverRun]);
 }
 function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('field-description'),sampleTarget=$('field-probe'),redraw=()=>drawField()){
  if(!canvas||!run)return;
@@ -356,6 +357,30 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
 
 }
 
+
+function renderLineProfile(host,profileRuns){
+ const details=document.createElement('details');details.className='line-profile';details.open=profileState.open;
+ const summary=document.createElement('summary');summary.textContent='Line profile and CSV';details.append(summary);
+ const form=document.createElement('form');form.className='profile-controls';form.innerHTML='<label>Profile direction<select id="profile-axis" aria-label="Profile direction"><option value="x">Horizontal · along x</option><option value="y">Vertical · along y</option></select></label><label>Fixed coordinate [µm]<input id="profile-coordinate" type="number" step="any" required></label><button type="submit">Show profile</button>';details.append(form);
+ const description=document.createElement('p');description.setAttribute('role','status');details.append(description);
+ const canvas=document.createElement('canvas');canvas.style.cssText='display:block;width:100%;height:260px';canvas.setAttribute('role','img');details.append(canvas);
+ const legend=document.createElement('div');legend.className='profile-legend';details.append(legend);
+ const note=document.createElement('p');note.textContent='Step segments use the stored value of each intersected triangle. No interpolation, absolute power or mode matching. Each candidate uses its own max|E| normalization.';details.append(note);
+ const csv=document.createElement('button');csv.type='button';csv.textContent='Export profile CSV';csv.disabled=true;details.append(csv);host.append(details);
+ $('profile-axis').value=profileState.axis;$('profile-coordinate').value=profileState.coordinate;
+ const range=()=>{const extent=$('profile-axis').value==='x'?1.2:1.5;$('profile-coordinate').min=-extent;$('profile-coordinate').max=extent;};range();$('profile-axis').onchange=range;
+ let series=[],cacheKey='';
+ profileRedraw=()=>{if(!details.open)return;try{
+  const key=JSON.stringify([profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component]);if(key!==cacheKey){series=profileRuns.map(run=>({run,segments:lineProfile(run.field,fieldScalars(run.field,fieldView.mode,fieldView.component).values,profileState.axis,profileState.coordinate)}));cacheKey=key;}
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} µm · candidate ${fieldView.mode+1} · ${q} / max|E| (0–1).`;
+  legend.replaceChildren();series.forEach((item,i)=>{const line=document.createElement('p');line.style.color=i?'#e7bc73':'#80d7c0';line.textContent=`${i?'B':'A'} · ${item.run.label?item.run.label+' · ':''}${item.run.job} · ${item.run.origin} · ${item.segments.length} intervals`;legend.append(line);});
+  drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);
+ }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;}};
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value);profileRedraw();};
+ details.ontoggle=()=>{profileState.open=details.open;profileRedraw();};
+ csv.onclick=()=>downloadFile(new Blob([profileCsv(series,profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component)],{type:'text/csv'}),'studio-profile.csv');
+ profileResize=new ResizeObserver(profileRedraw);profileResize.observe(canvas);profileRedraw();
+}
 
 function downloadFile(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function renderRunList(){
@@ -396,7 +421,7 @@ function renderComparison(){
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
  const redraw=()=>{drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
- fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();
+ fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b]);
 }
 $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};

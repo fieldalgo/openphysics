@@ -208,3 +208,23 @@ Workspace validate, mesh and run requests carry the connected server instance.
 A restarted/different server rejects stale requests before parsing the model or
 starting a job. Check connection before new work; old jobs do not migrate between
 server processes. Classic callers without an instance query keep their existing API.
+
+### Line profiles
+
+Results and Compare include an expandable Line profile and CSV panel. Choose a
+horizontal line (constant y) or vertical line (constant x), enter its fixed
+coordinate in micrometres, and select Show profile. Both comparison runs use the
+same line and 0–1 relative scale; each candidate retains its own max|E| denominator.
+Changing candidate/component updates the profile. Line choices are tab-local view
+state, not saved session settings.
+
+Each plotted step is the stored centroid value of the triangle intersected by
+that interval. There is no field interpolation, smoothing, absolute-power estimate
+or mode tracking. Shared/coincident edges follow the last painted triangle; mesh
+gaps remain gaps. CSV exports interval endpoints, triangle number, centroid,
+normalized value, job, origin and candidate/component. Values at an interval's
+isolated endpoints are not a separate point-probe claim.
+
+Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
+winding, overlaps and empty regions. Actual exported comparison intervals were
+independently checked against complex vector norms and triangle containment.
