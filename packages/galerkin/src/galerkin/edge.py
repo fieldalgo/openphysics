@@ -104,7 +104,7 @@ def assemble_curlcurl(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
     """
     mesh = space.mesh
     g, area = _tri_grads(mesh)
-    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (len(area),))
+    coeff = np.broadcast_to(np.asarray(coeff), (len(area),))
 
     # Local edge e = (i, j) = (e+1, e+2) mod 3
     i_loc = [1, 2, 0]
@@ -129,12 +129,14 @@ def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
 
     W_e . W_e' is quadratic in the barycentric coordinates and the midpoint rule
     integrates degree 2 exactly, so this matrix is exact, not approximate.
-    coeff: scalar or per-triangle array (T,), e.g. a relative permittivity eps_r.
+    coeff: scalar, per-triangle (T,), or tensor (T, 2, 2); complex allowed.
     """
     mesh = space.mesh
     g, area = _tri_grads(mesh)
     T = len(area)
-    coeff = np.broadcast_to(np.asarray(coeff), (T,))
+    coeff = np.asarray(coeff)
+    if coeff.ndim != 3:
+        coeff = np.broadcast_to(coeff, (T,))
 
     # Quadrature points: edge midpoints. Barycentric values (3 points x 3 nodes)
     lam = 0.5 * (np.ones((3, 3)) - np.eye(3))   # point m: lambda_m = 0, others 1/2
@@ -150,7 +152,10 @@ def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
     W *= space.signs[:, :, None, None]
 
     # M^e = (A/3) sum_qp W_e(qp) . W_e'(qp)
-    Me = np.einsum("teqd,tfqd->tef", W, W) * (coeff * area / 3.0)[:, None, None]
+    if coeff.ndim == 3:
+        Me = np.einsum("teqd,tdk,tfqk->tef", W, coeff, W) * (area / 3.0)[:, None, None]
+    else:
+        Me = np.einsum("teqd,tfqd->tef", W, W) * (coeff * area / 3.0)[:, None, None]
 
     te = space.tri_edges
     rows = np.repeat(te, 3, axis=1).ravel()
@@ -170,19 +175,24 @@ def assemble_edge_grad(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
 
         int_T W_ij . grad lambda_k dx = (A/3) (grad lambda_j - grad lambda_i) . grad lambda_k
 
-    coeff: scalar or per-triangle array (T,), e.g. 1/mu_r.
+    coeff: scalar, per-triangle (T,), or tensor (T, 2, 2); complex allowed.
     """
     mesh = space.mesh
     g, area = _tri_grads(mesh)
     T = len(area)
-    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (T,))
+    coeff = np.asarray(coeff)
+    if coeff.ndim != 3:
+        coeff = np.broadcast_to(coeff, (T,))
 
     i_loc = [1, 2, 0]
     j_loc = [2, 0, 1]
-    Ge = np.empty((T, 3, 3))
+    Ge = np.empty((T, 3, 3), dtype=np.result_type(coeff, float))
     for e, (i, j) in enumerate(zip(i_loc, j_loc)):
-        Ge[:, e, :] = np.einsum("td,tkd->tk", g[:, j, :] - g[:, i, :], g)
-    Ge *= (coeff * area / 3.0)[:, None, None]
+        if coeff.ndim == 3:
+            Ge[:, e, :] = np.einsum("td,tdf,tkf->tk", g[:, j, :] - g[:, i, :], coeff, g)
+        else:
+            Ge[:, e, :] = np.einsum("td,tkd->tk", g[:, j, :] - g[:, i, :], g)
+    Ge *= ((area if coeff.ndim == 3 else coeff * area) / 3.0)[:, None, None]
     Ge *= space.signs[:, :, None]
 
     rows = np.repeat(space.tri_edges, 3, axis=1).ravel()
