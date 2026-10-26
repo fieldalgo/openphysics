@@ -129,3 +129,6 @@ resolve rapidly varying boundary functions. Extreme contrasts and ill-conditione
 meshes have no universal accuracy guarantee; finite-system, free-residual, current
 and power checks reject detected failures. Discontinuous geometry, nonconforming
 meshes, zero-conductivity subregions and nonlinear materials are unsupported.
+
+For explicit mesh-bound element conductivities and temperature feedback, see
+[temperature-dependent Joule heating](temperature_joule_heating.md). Bare arrays remain invalid.
