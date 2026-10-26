@@ -127,13 +127,82 @@ transmission line," *IRE Trans. MTT* 3(5), 1955; E. Hammerstad and Ø. Jensen,
 
 SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refinement candidates retain input order. This can change tied meshes from earlier versions; it removes one native/WebAssembly difference, without promising identical meshes across every numerical library version.
 
+## Power planes: DC voltage drop (IR drop)
+
+`PowerPlane` solves the DC voltage on a copper plane fed by regulators and
+loaded by devices. The plane is thin, so its potential does not vary through the
+thickness t and the in-plane problem is `div(sigma t grad V) = 0`. It is solved
+with galerkin's steady 2D conduction ([contract](../galerkin/electric_steady2d.md)),
+using t as the extrusion depth.
+
+```python
+from sipi import PowerPlane, Source, Sink, circle, rectangle_outline
+
+plane = PowerPlane(rectangle_outline(0, 0, 60e-3, 40e-3), thickness=35e-6,
+                   holes=[rectangle_outline(25e-3, 10e-3, 32e-3, 32e-3)],
+                   sources=[Source("vrm", circle((6e-3, 6e-3), 2e-3), voltage=1.0)],
+                   sinks=[Sink("cpu", circle((48e-3, 26e-3), 3e-3), current=10.0),
+                          Sink("mem", circle((50e-3, 8e-3), 1.5e-3), current=3.0)])
+r = plane.solve()
+r.drop("cpu"), r.terminals["cpu"]["min"], r.power_loss, r.max_current_density
+```
+
+[`examples/sipi/plane_ir_drop.py`](../../../examples/sipi/plane_ir_drop.py)
+prints this plane. The CPU drop is 13.2 mV and the plane loss 0.17 W.
+
+- **Plane.** The outline is a polygon or a `circle`; `holes` are insulated cutouts.
+  Conductivity defaults to `COPPER_CONDUCTIVITY` = 5.80e7 S/m, annealed copper
+  at 20 °C (100 % IACS).
+- **Terminals.** Each terminal's contact is a hole edge (a `circle` or polygon),
+  a straight piece of the outline (`edge(p0, p1)`, both points outline vertices)
+  or the whole outline (`"outline"`).
+  - A `Source` holds its contact at a fixed voltage.
+  - A `Sink` draws its current uniformly over its contact, `J.n = I / (P t)`, with
+    P the contact length. A real pad is equipotential with an unknown current
+    distribution, so the uniform draw is a simplification. Its effect shrinks as
+    pads get small against their distance to other terminals; case D3 below
+    measures it together with the plane size.
+- **Results.**
+  - Nodal `potential`, element `current_density` (A/m²) and `sheet_current`
+    (A/m), and `power_loss` (W).
+  - For every terminal: the mean, minimum and maximum contact voltage and the
+    current into the plane (negative at sinks).
+  - `drop(sink)` is the source voltage minus the sink's mean voltage.
+    `resistance(sink)` is that drop divided by the sink's own current. With
+    several loads the drop includes the other loads' current, so this is an
+    effective value, not an isolated path resistance.
+- **Mesh options.**
+  - `edge_size`: target edge length on terminal contacts; default smallest
+    terminal size / 12.
+  - `far_size`: largest edge length; default outline extent / 30.
+  - `grade`: growth per unit distance from terminals; default 0.2.
+  - The peak current density sits at contact edges and depends on the mesh
+    there; refine before relying on it.
+
+Not modelled: vias and several layers, temperature-dependent copper
+(galerkin has a [σ(T) Joule iteration](../galerkin/temperature_joule_heating.md)
+that this API does not use yet), current through the thickness, AC effects.
+
+### Validation (`tests/sipi/test_sipi_plane.py`)
+
+The criteria were fixed before the first run. Measured on 2026-10-26, Linux,
+Python 3.12, pinned environment.
+
+| Case | Reference | Criterion | Measured |
+|---|---|---|---|
+| D1 strip 50 × 5 mm, source and load on the ends | `R = L / (sigma t W)` (exact in P1) | 1e-9 | 2e-14 (R, drop, loss, peak J) |
+| D2 annulus a = 1 mm, b = 10 mm, source inside, load on the outline | `dV = I ln(b/a) / (2 pi sigma t)` | ≤ 1e-3 at the finest of three meshes, decreasing | −1.9e-3, −6.1e-4, −3.4e-4 |
+| D3 two pads, a = 0.5 mm, d = 10 mm, square plane 100 and 200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ (equipotential discs, infinite sheet) | each within 1 %; doubling the plane changes R by ≤ 0.5 % | +0.27 %, −0.19 %; change −0.46 % |
+| D4 two loads and a cutout | Joule loss = Σ terminal voltage × current | 1e-9 | passed |
+
 ## Not implemented
 
 - Conductor loss `R` (skin effect, surface roughness). `R` is not returned.
 - Frequency-dependent dielectrics (for example Djordjevic–Sarkar); `tan_delta`
   is constant.
 - S-parameters, Touchstone files, time-domain responses.
-- 3D structures: vias, plane resonances, power-delivery networks.
+- 3D structures and power-delivery networks beyond DC planes: vias, several layers,
+  plane resonances, AC PDN impedance, decoupling.
 - Layout import (Gerber, ODB++, IPC-2581), non-rectangular conductors in
   `CrossSection`, JSON documents and a Studio view.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.
