@@ -277,3 +277,8 @@ conflicting payload rejects the whole import. Incoming runs and pinned reference
 are never silently dropped to fit the six-run limit; if they exceed capacity,
 unpin a reference or export/import a selected-run file. Older unpinned current
 runs may be replaced after the review. Pending jobs block run imports.
+
+Keyboard focus stays on the corresponding tree, geometry, material and run control
+after a selection refresh. Input Undo/Redo shortcuts do not act behind an open
+confirmation dialog. Selecting an optical PEC edge keeps its specific boundary
+identity visible above the optical interface properties.
