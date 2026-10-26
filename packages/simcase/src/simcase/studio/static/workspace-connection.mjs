@@ -6,5 +6,6 @@ export function checkWorkspaceCapabilities(caps){
  if(typeof caps.simcase_version!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(caps.simcase_version))throw new Error('Studio did not provide a valid package version.');
  if(JSON.stringify(caps.height_range_nm)!==JSON.stringify([100,500]))throw new Error('Unsupported height range.');
  for(const key of ['wavelength_nm','core_mesh_nm','window_um','boundary','candidates'])if(JSON.stringify(caps.settings?.[key])!==JSON.stringify(OPTICAL_SETTINGS[key]))throw new Error('Optical settings differ from this workspace contract.');
- return {version:caps.simcase_version};
+ if(typeof caps.server_instance!=='string'||! /^[a-f0-9]{32}$/.test(caps.server_instance))throw new Error('Invalid server instance.');
+ return {version:caps.simcase_version,instance:caps.server_instance};
 }
