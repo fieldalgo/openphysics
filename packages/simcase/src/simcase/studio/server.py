@@ -63,12 +63,13 @@ def workspace_index():
 
 @app.get("/workspace-assets/{filename}")
 def workspace_asset(filename: str):
-    allowed = {p.name for p in STATIC.glob("workspace-*.mjs")}
-    allowed.add("workspace.css")
-    if filename not in allowed:
+    assets = {path.name: path for path in STATIC.glob("workspace-*.mjs")}
+    assets["workspace.css"] = STATIC / "workspace.css"
+    path = assets.get(filename)
+    if path is None:
         raise HTTPException(404, "Unknown workspace asset")
-    mime = "text/css" if filename.endswith(".css") else "text/javascript"
-    return FileResponse(STATIC / filename, media_type=mime,
+    mime = "text/css" if path.suffix == ".css" else "text/javascript"
+    return FileResponse(path, media_type=mime,
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
