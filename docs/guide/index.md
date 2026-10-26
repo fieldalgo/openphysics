@@ -7,6 +7,12 @@
 Choose the calculation you want to perform. Each link leads to the maintained usage
 and result contract. Python features do not automatically imply JSON/CLI or Studio support.
 
+## First Python calculations
+
+- [First heat calculation: a conducting slab](../packages/galerkin/thermal_tutorial.md)
+- [First Joule calculation: electric power becomes heat](../packages/galerkin/joule_tutorial.md)
+- [First thermal expansion calculation: heat then mechanics](../packages/galerkin/thermoelastic_tutorial.md)
+
 ## Choose an execution interface
 
 First choose the [model](../modeling/index.md) and [physical problem](../physics/index.md).

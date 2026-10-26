@@ -6,6 +6,10 @@
 
 Choose plane stress or plane strain and define displacement constraints and loads. Prescribed-temperature mechanics, steady heat-to-mechanics and selected transient-heat snapshots are distinct explicit workflows on the same mesh.
 
+## First Python calculations
+
+- [First thermal expansion calculation: heat then mechanics](../packages/galerkin/thermoelastic_tutorial.md)
+
 ## Execution routes and limits
 
 Python only: no mechanics JSON/CLI or Studio forms. Mechanics is linear and small-strain; heat-to-mechanics is one-way, with no mechanical feedback to heat. The steady coupled workflow does not inherit the separate flux/Robin/traction extensions. Transient snapshots are quasistatic, not structural dynamics.

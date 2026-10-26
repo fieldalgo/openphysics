@@ -7,6 +7,12 @@
 수행하려는 해석에 따라 읽으세요. 각 링크는 지원 입력과 저장 결과를 설명하는 원문입니다.
 Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공되는 것은 아닙니다.
 
+## 첫 Python 해석 튜토리얼
+
+- [첫 열전도 해석: 온도가 다른 두 면 사이의 슬래브](../packages/galerkin/thermal_tutorial.md)
+- [첫 Joule 발열 해석: 전력을 열로 전달하기](../packages/galerkin/joule_tutorial.md)
+- [첫 열탄성 해석: 열전도에서 역학으로](../packages/galerkin/thermoelastic_tutorial.md)
+
 ## 실행 인터페이스 선택
 
 [모델 구성](../modeling/index.md)과 [물리 문제](../physics/index.md)를 먼저 정한 뒤 선택하세요.

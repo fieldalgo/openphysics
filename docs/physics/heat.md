@@ -6,6 +6,10 @@
 
 Choose steady or transient heat, then rectangular or material-region geometry. Boundary signs, Kelvin temperatures, time samples and per-depth quantities are part of the model contract.
 
+## First Python calculations
+
+- [First heat calculation: a conducting slab](../packages/galerkin/thermal_tutorial.md)
+
 ## Execution routes and limits
 
 Python and JSON/CLI support rectangular and region models. Studio supports rectangular heat only. Transient heat has no flux/Robin input or restart. For a subsequent mechanical solve, use the explicit coupling route below.

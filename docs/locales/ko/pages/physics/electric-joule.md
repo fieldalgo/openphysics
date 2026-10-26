@@ -6,6 +6,10 @@
 
 DC 전기 해석, 전기에서 열로의 단방향 전달, 온도 의존 전도도 반복을 구분합니다. 각각 입력과 수렴 조건이 다르며, 온도 의존 반복이 범용 다중물리 연계 기능을 의미하지는 않습니다.
 
+## 첫 Python 해석 튜토리얼
+
+- [첫 Joule 발열 해석: 전력을 열로 전달하기](../packages/galerkin/joule_tutorial.md)
+
 ## 실행 경로와 한계
 
 Python 전기 API는 영역 전도도와 명시적 Neumann gauge를 지원합니다. JSON/CLI는 균질 직사각형과 문서에 명시된 전도도 모델로 제한되며 shapes·sweep·plot·Studio 실행을 지원하지 않습니다. 온도 의존 JSON은 지정된 선형 비저항 모델을 쓰며 임의 Python callback을 실행하지 않습니다.
