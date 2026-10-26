@@ -55,15 +55,18 @@ undo and file recovery checks separate from visual inspection.
 
 ## Local observation, 2026-10-26
 
-The `c46970f` build was exercised on Windows in an embedded desktop browser.
-A newly installed simcase wheel completed two optical designs (600/700 nm width,
+On Windows, an installed `2d9966e` simcase wheel was exercised in an embedded
+desktop browser and completed two optical designs (600/700 nm width,
 300 nm height), naming/pinning, comparison, probe/profile, portable save, reload
 and browser recovery. Two retained runs and one pin were restored. Repeating
 those captured documents through the Python API produced the same effective
 indices in that environment. This checks transport/workflow consistency, not
 independent physics accuracy or mesh/window convergence.
 
-Related source Studio Python checks passed (313); source Studio Node checks
+After the comparison-layout and launch-option updates, the final `c46970f`
+package was built and checked separately. The layout was also inspected in the
+source-backed browser; the complete fresh-user flow was not repeated on this
+final wheel. Related source Studio Python checks passed (313); source Studio Node checks
 passed (202). Installed workspace modules passed 73 Node checks and 12 HTTP/CLI
 checks; installed workspace bytes matched the source. Other engine packages
 were supplied from the worktree with existing dependencies. Full repository CI,
