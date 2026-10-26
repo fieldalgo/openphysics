@@ -57,7 +57,7 @@ python examples/galerkin/temperature_joule_heating.py
 물리적 근거로 선택해야 하며 수용 허용오차나 물성 범위를 완화해서는 안 된다.
 경계 콜백도 결정적이어야 한다. 수렴·유일해·모든 재료의 안정성은 보장하지 않는다.
 
-Validation: 28 feature tests; scikit-fem maximum relative difference 1.04e-12 (<1e-9);
-continuous-temperature RMS L2 errors 1.52995e-3, 3.83592e-4, 9.59884e-5 K
-at n=8/16/32 (final order 1.999). Strong feedback alpha=7 converged in
-59/128 iterations at relaxation 1/0.5. Failure histories are tested.
+검증: 신규 기능 시험 28개. scikit-fem 최대 상대차 1.04e-12 (<1e-9).
+연속 온도 RMS L2 오차는 n=8/16/32에서 1.52995e-3, 3.83592e-4, 9.59884e-5 K
+(마지막 차수 1.999)였다. 강한 피드백 alpha=7은 완화 1/0.5에서
+59/128회에 수렴했다. 실패 이력 보존도 시험한다.
