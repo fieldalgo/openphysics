@@ -51,6 +51,16 @@ export function validateView(view={mode:0,component:'magnitude',window:'Core reg
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'}){
  return {format:'openphysics-studio-session',version:2,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:validateView(view)};
 }
+// Capture editable metadata now; serialize large, read-only field arrays after debounce.
+// UI operations replace results rather than modifying their field samples in place.
+export function captureSession(input,runs,selected,comparison,view){
+ const capturedInput=validateProject(input),capturedView=validateView(view);
+ const capturedRuns=runs.map(run=>({...run,input:validateProject(run.input),
+  settings:JSON.parse(JSON.stringify(run.settings)),neff:[...run.neff]}));
+ const capturedComparison=[...comparison];
+ return ()=>JSON.stringify(createSession(capturedInput,capturedRuns,selected,capturedComparison,capturedView));
+}
+
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{throw new Error('Session is not valid JSON.');}
