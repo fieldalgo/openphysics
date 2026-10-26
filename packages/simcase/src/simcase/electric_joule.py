@@ -12,6 +12,7 @@ from .schema import Document, DocumentError
 from .steady_boundary_contract import SIDES, _number, _object, validate_steady_boundary, steady_boundary_inputs
 from .thermal import _OwnedOutput
 from . import units
+from .registry import PhysicsKind, register
 
 TYPES = {'electric.steady2d', 'joule.steady2d', 'joule.temperature2d'}
 FIELD_LAYOUT = 'electric-joule2d-p1-v1'
@@ -303,3 +304,15 @@ def run_electric_joule(doc, verbose=True):
     if verbose:
         print('\n'.join(log))
     return ElectricJouleRunResult(doc, arrays, metadata, log)
+
+
+def _defaults():
+    from .thermal import defaults
+    return defaults()
+
+
+register(PhysicsKind(
+    name='electric_joule', types=frozenset(TYPES), precedence=10,
+    validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
+    result_types=(ElectricJouleRunResult,), defaults=_defaults, fresh_output=True,
+    stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics'))

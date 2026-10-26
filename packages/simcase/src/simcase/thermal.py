@@ -15,6 +15,7 @@ import time
 import numpy as np
 
 from .schema import DocumentError
+from .registry import PhysicsKind, register
 
 PHYSICS = 'thermal.steady2d'
 RESULT_FORMAT = 'thermal.steady2d-result-v1'
@@ -647,3 +648,55 @@ def run_thermal(doc, verbose=True):
     result.summary()  # Validate complete output even without saving raw fields.
     return result
 
+
+
+def _validate(doc):
+    """Region documents, strict boundary documents, then the single rectangle."""
+    from .schema import check_format_units_and_tags, steady_boundary_requested
+    from .thermal_regions import is_region_thermal, validate_region_thermal
+    if is_region_thermal(doc.data):
+        check_format_units_and_tags(doc)
+        validate_region_thermal(doc)
+        return
+    if steady_boundary_requested(doc.data):
+        from .steady_boundary_contract import validate_steady_boundary
+        from . import units
+        validate_steady_boundary(doc)
+        # Schema normalization is separate from the non-mutating validator.
+        doc.scale = units.resolve(doc.data["units"])
+        doc.sole_physics()[1].setdefault("heat_source_w_m3", 0.0)
+        doc.notes = []
+        return
+    check_format_units_and_tags(doc)
+    validate_thermal(doc)
+
+
+def _summary(doc):
+    from .schema import steady_boundary_requested
+    from .thermal_regions import is_region_thermal, region_summary
+    if is_region_thermal(doc.data):
+        return region_summary(doc)
+    if steady_boundary_requested(doc.data):
+        from .steady_boundary_contract import steady_result_versions
+        doc.validate()
+        name, p = doc.sole_physics()
+        result_format, field_layout = steady_result_versions(doc)
+        return (
+            f'{doc["name"]} (openphysics 0.2)\n'
+            f'  physics {name}: thermal.steady2d, single steady heat\n'
+            f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
+            f'  k={p["conductivity_w_mk"]} W/(m K), Q={p["heat_source_w_m3"]} W/m^3\n'
+            f'  Dirichlet {p["dirichlet_temperature_k"]} K; '
+            f'outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
+            f'convection {p.get("convection", {})}\n'
+            '  q.n = g_out + h*(T-T_ambient); unselected natural sides insulated\n'
+            f'  result: {result_format}; layout: {field_layout}\n'
+            '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth')
+    return thermal_summary(doc)
+
+
+register(PhysicsKind(
+    name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
+    validate=_validate, run=run_thermal, summary=_summary,
+    result_types=(ThermalRunResult,), defaults=defaults, fresh_output=True,
+    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d'))

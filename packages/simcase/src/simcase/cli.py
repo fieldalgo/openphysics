@@ -41,17 +41,17 @@ def main(argv=None) -> int:
         print(doc.summary())
         return 0
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
-    from .thermal import is_thermal, require_fresh_output
-    from .transient_thermal_contract import is_transient_thermal
+    from .registry import kind_of
+    from .thermal import require_fresh_output
     tracking = doc["study"].get("tracking") if "study" in doc.data else None
     subspace = (isinstance(tracking, dict) and tracking.get("method") == "electric-l2-subspace-v1"
                 and doc["study"].get("type") == "sweep")
     if subspace and os.path.lexists(out):
         print(f"error: subspace sweep output already exists: {out}; choose a fresh output directory", file=sys.stderr)
         return 1
-    from .electric_joule import is_electric_joule, failure_evidence
+    from .electric_joule import failure_evidence
     from galerkin.temperature_joule_heating import JouleConvergenceError
-    if is_thermal(doc.data) or is_transient_thermal(doc.data) or is_electric_joule(doc.data):
+    if kind_of(doc.data).fresh_output:
         try:
             require_fresh_output(out)
         except OSError as exc:

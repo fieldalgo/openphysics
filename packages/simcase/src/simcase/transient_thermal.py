@@ -16,8 +16,10 @@ import numpy as np
 from .schema import DocumentError
 from .thermal import _OwnedOutput, require_fresh_output
 from .transient_thermal_contract import (
-    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, transient_solver_inputs,
+    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, defaults, transient_solver_inputs, transient_thermal_summary,
+    validate_transient_thermal,
 )
+from .registry import PhysicsKind, register
 
 
 _FIELD_SPEC = {
@@ -252,3 +254,20 @@ def run_transient_thermal(doc, verbose=True):
     if verbose:
         print('\n'.join(log))
     return result
+
+
+def _validate(doc):
+    from .schema import reject_tagged_values
+    from .transient_regions import is_transient_region_thermal, validate_transient_region_thermal
+    if is_transient_region_thermal(doc.data):
+        reject_tagged_values(doc.data)
+        validate_transient_region_thermal(doc)
+        return
+    validate_transient_thermal(doc)
+
+
+register(PhysicsKind(
+    name='thermal.transient2d', types=frozenset({PHYSICS}), precedence=20,
+    validate=_validate, run=run_transient_thermal, summary=transient_thermal_summary,
+    result_types=(TransientThermalRunResult,), defaults=defaults, fresh_output=True,
+    stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.transient2d'))

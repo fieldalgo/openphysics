@@ -32,6 +32,7 @@ from .geometry import build_domain
 from . import units
 from .materials import material_table
 from .fields import VectorField
+from .registry import PhysicsKind, kind_of, kind_of_type, register
 from .schema import Document, DocumentError
 from .tracking import ModeTracker, ModeTrackingError, tracking_settings
 from .subspace_tracking import SUBSPACE_METHOD, SubspaceTracker
@@ -39,6 +40,7 @@ from .subspace_tracking import SUBSPACE_METHOD, SubspaceTracker
 
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
+    from .electric_joule import ElectricJouleRunResult
     from .subspace_result import SubspaceSweepResult
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
@@ -78,17 +80,9 @@ class MeshedModel:
 def build_mesh(doc: Document) -> MeshedModel:
     """Geometry -> mesh -> materials. The first stage of ``run``."""
     doc.validate()
-    from .electric_joule import is_electric_joule
-    if is_electric_joule(doc.data):
-        raise DocumentError("build_mesh is an EM stage; use run(document) for electric/Joule physics")
-    from .transient_thermal_contract import is_transient_thermal
-    if is_transient_thermal(doc.data):
-        raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.transient2d')
-    from .thermal import is_thermal
-    if is_thermal(doc.data):
-        raise DocumentError('build_mesh is an EM 2D stage; use run(document) for thermal.steady2d')
-    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
-        raise DocumentError("build_mesh is a 2D stage; use run(document) for em.cavity3d")
+    refusal = kind_of(doc.data).stage_refusal
+    if refusal is not None:
+        raise DocumentError(refusal.format(stage="build_mesh"))
     # Geometry and meshing run in micrometres whatever the document declares: the
     # same device written in nm, um or m then gives meshine the same doubles, and
     # so the same mesh. Coordinates go back to the document unit afterwards.
@@ -176,15 +170,9 @@ def study_points(doc: Document) -> tuple[str | None, list]:
 
 def solve_point(model: MeshedModel, physics: dict) -> dict:
     """One physics solve on an already meshed model."""
-    from .electric_joule import TYPES
-    if physics.get("type") in TYPES:
-        raise DocumentError("solve_point is an EM stage; use run(document) for electric/Joule physics")
-    if physics.get('type') == 'thermal.transient2d':
-        raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.transient2d')
-    if physics.get('type') == 'thermal.steady2d':
-        raise DocumentError('solve_point is an EM 2D stage; use run(document) for thermal.steady2d')
-    if physics.get("type") == "em.cavity3d":
-        raise DocumentError("solve_point is a 2D stage; use run(document) for em.cavity3d")
+    kind = kind_of_type(physics.get("type"))
+    if kind is not None and kind.stage_refusal is not None:
+        raise DocumentError(kind.stage_refusal.format(stage="solve_point"))
     res = _solve_in_micrometres(model, physics)
     if "vector_field" in res:
         res["vector_field"] = _field_in_document_units(res["vector_field"], model)
@@ -403,8 +391,14 @@ class RunResult:
         plt.close(fig)
 
 
-def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult:
-    """Run a document, returning RunResult for 2D or CavityRunResult for 3D."""
+def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult | ElectricJouleRunResult:
+    """Run a document with the runner of its physics kind (``registry``)."""
+    doc.validate()
+    return kind_of(doc.data).run(doc, verbose=verbose)
+
+
+def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult:
+    """The 2D mode pipeline: ``build_mesh``, then ``solve_point`` over the study."""
     log: list[str] = []
 
     def say(msg):
@@ -412,20 +406,6 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
         if verbose:
             print(msg)
 
-    doc.validate()
-    from .electric_joule import is_electric_joule, run_electric_joule
-    if is_electric_joule(doc.data):
-        return run_electric_joule(doc, verbose=verbose)
-    from .transient_thermal_contract import is_transient_thermal
-    if is_transient_thermal(doc.data):
-        from .transient_thermal import run_transient_thermal
-        return run_transient_thermal(doc, verbose=verbose)
-    from .thermal import is_thermal, run_thermal
-    if is_thermal(doc.data):
-        return run_thermal(doc, verbose=verbose)
-    if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
-        from .cavity import run_cavity
-        return run_cavity(doc, verbose=verbose)
     say(doc.summary())
     for note in doc.notes:
         say(f"  warning: {note}")
@@ -569,3 +549,9 @@ def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> 
                                parameter, list(values), np.array(neffs), [], {"mesh": t_mesh, "solve": t_solve},
                                log, fields, tracking, cluster_offsets=np.asarray(offsets),
                                frame_transforms=transforms)
+
+
+register(PhysicsKind(
+    name="em.modes2d", types=frozenset({"em.modes2d"}), precedence=100,
+    validate=Document.validate_em_modes2d, run=_run_em_modes2d, summary=Document.em_modes2d_summary,
+    result_types=(RunResult,), fallback=True))
