@@ -157,3 +157,20 @@ run export does not mark the full notebook saved.
 Undo/redo applies to design inputs. Outside text fields, Ctrl/Cmd+Z undoes and
 Ctrl/Cmd+Shift+Z or Ctrl+Y redoes. In text fields, native text editing is retained.
 Run names and comparison choices are session metadata, outside input undo.
+
+## Mesh preview and active interfaces
+
+For an optical model, choose **Mesh → Generate mesh** to call the existing
+server mesh builder without solving modes. The preview shows actual triangles,
+region colouring, node/triangle counts, minimum angle and mean quality. Select
+Full window or Core region; coordinates are in µm with equal x/y scale.
+Changing the design leaves the prior preview visible with an earlier-input
+label until explicitly regenerated. Failed generation preserves the last good
+preview. Mesh previews live only in the tab and are not saved in session JSON.
+The optical solve builds its own mesh using the same input contract; previewing
+is not mesh reuse or a convergence certification.
+
+An optical-only model tree shows Geometry, Materials, Optical modes, Mesh and
+Study. Connections explains that no coupled interfaces are present and links
+back to application choice. The heated-waveguide template retains the broader
+setup tree and still cannot execute coupled physics.
