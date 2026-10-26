@@ -58,3 +58,14 @@ test('imports cannot silently drop an incoming run or a pinned reference when sl
  const existing=[{...run('deadbeef'),pinned:true}];const incoming=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));
  assert.throws(()=>mergeRuns(existing,incoming),/exceed six/);assert.equal(existing[0].job,'deadbeef');assert.throws(()=>mergeRuns(existing,[]),/no completed/);assert.throws(()=>mergeRuns([], [run(),run()]),/Duplicate/);
 });
+
+
+test('probe and profile view settings round trip without mutating their input objects',()=>{
+ const view={mode:1,component:'Ey',window:'Full window',probe:{x:.2,y:.4,active:true},profile:{axis:'y',coordinate:-.2,open:true}};
+ const doc=createSession(input(),[run()],'12345678',['12345678',null],view);assert.deepEqual(parseSession(JSON.stringify(doc)).view,view);doc.view.probe.x=1;assert.equal(view.probe.x,.2);
+});
+test('saved probe and profile coordinates are bounded and malformed view state rejects the whole session',()=>{
+ const base=createSession(input(),[run()],'12345678',['12345678',null]);
+ for(const field of [{probe:{x:2,y:0,active:true}},{probe:{x:0,y:0,active:'yes'}},{profile:{axis:'x',coordinate:1.3,open:true}},{profile:{axis:'z',coordinate:0,open:false}},{profile:null}]){const doc={...base,view:{...base.view,...field}};assert.throws(()=>parseSession(JSON.stringify(doc)),/saved/);}
+ const edge={...base,view:{...base.view,probe:{x:1.5,y:-1.2,active:true},profile:{axis:'y',coordinate:1.5,open:false}}};assert.equal(parseSession(JSON.stringify(edge)).view.profile.coordinate,1.5);
+});

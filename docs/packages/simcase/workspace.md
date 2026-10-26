@@ -139,7 +139,7 @@ is chosen consistently. Degenerate cells are ignored.
 
 Candidate/component changes update the readout with the same vector-normalized
 scale used by the plot. **Clear point** removes the marker. Probe selection is
-view state for the current tab and is not stored in session JSON. Field PNG
+view state stored in session JSON and browser notebook recovery. Field PNG
 exports include the marker and its coordinates when selected. These samples do
 not establish convergence or physical field amplitudes.
 
@@ -215,8 +215,7 @@ Results and Compare include an expandable Line profile and CSV panel. Choose a
 horizontal line (constant y) or vertical line (constant x), enter its fixed
 coordinate in micrometres, and select Show profile. Both comparison runs use the
 same line and 0–1 relative scale; each candidate retains its own max|E| denominator.
-Changing candidate/component updates the profile. Line choices are tab-local view
-state, not saved session settings.
+Changing candidate/component updates the profile. Line choices are view state saved with the session and browser notebook recovery.
 
 Each plotted step is the stored centroid value of the triangle intersected by
 that interval. There is no field interpolation, smoothing, absolute-power estimate
@@ -250,7 +249,7 @@ retries the latest requested state. Closing the tab while pending/saving can los
 recent changes. Browser cleanup/private mode or a different port can make recovery
 unavailable. Use Save session / Save selected run for portable files. The 16 MiB
 session and six-result limits still apply; invalid drafts, undo history, mesh,
-preflight reports, probe and profile positions are not included.
+and preflight reports are not included. Probe and profile positions are included.
 
 ### Pin reference runs
 
@@ -289,3 +288,10 @@ when the field view is zoomed to the core. Export profile PNG includes axes,
 normalization, candidate, line location, job IDs, geometry, materials and origins.
 Field PNG exports also annotate an active profile line. Comparison plot rows stay
 aligned when run labels wrap to multiple lines.
+
+Session view metadata now also preserves the probe coordinates/visibility and
+profile direction, fixed coordinate and expanded state. These settings do not
+change model revisions or run a solver. Legacy sessions without these optional
+fields restore a hidden probe at (0, 0.15) µm and a closed horizontal profile at
+y = 0.15 µm. Invalid/out-of-domain saved view metadata rejects the whole import
+before changing current inputs or results.
