@@ -28,6 +28,20 @@ numpy 1.26, scipy 1.11.2, shapely 2.0.2 and matplotlib 3.8 are the first
 releases with Python 3.12 wheels. The non-slow suite passed on exactly those
 versions once, by hand (2026-10-21, Linux, Python 3.12); CI tests only the pins.
 
+The optional array libraries for `galerkin[jax]` and `galerkin[torch]` are pinned
+separately. CI installs the CPU build of torch first, because the PyPI Linux
+wheel pulls CUDA packages:
+
+```bash
+python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1+cpu
+python -m pip install -r tools/requirements-py312-linux-backends.txt
+```
+
+Without them the JAX and PyTorch cases of the backend tests skip; the Linux CI
+job checks that both import before it runs the suite, and the installed-wheel
+run fails on any skip. The array-api-compat floor 1.15 was checked once by hand
+with `tests/galerkin/test_core_backend.py` (2026-10-26, Linux, NumPy and JAX).
+
 Always run from the repository root: running Python inside `packages/` or
 `tests/` can shadow installed modules with directories of the same name.
 

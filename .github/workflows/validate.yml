@@ -42,11 +42,19 @@ jobs:
       - name: Install pinned validation environment
         run: |
           python -m pip install -r tools/requirements-py312-linux.txt
+          # Optional array libraries for galerkin[jax] and galerkin[torch]; torch is
+          # the CPU build (the PyPI Linux wheel pulls CUDA packages).
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1+cpu
+          python -m pip install -r tools/requirements-py312-linux-backends.txt
           python -m pip install --no-deps --no-build-isolation \
             -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
             -e packages/gmshio -e packages/physmat -e packages/simcase
           python -m pip check
           gmsh --version
+      # The backend tests skip when a library is absent; here an absent one must
+      # fail the job instead of turning those tests into silent skips.
+      - name: Verify the optional array libraries import
+        run: python -c "import array_api_compat, jax, torch; print(jax.__version__, torch.__version__)"
       - name: Check installed licenses against the reviewed inventory
         run: |
           mkdir -p .validation

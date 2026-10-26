@@ -91,6 +91,7 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 | `pillow` | matplotlib | MIT-CMU | 허용형 조건의 이미지·글꼴·압축 라이브러리를 포함함(FreeType: FTL OR GPL-2.0-or-later, FTL로 사용). Linux·macOS에서는 공유 라이브러리, Windows에서는 정적 링크 |
 | `packaging` | matplotlib | Apache-2.0 OR BSD-2-Clause | |
 | `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | |
+| `array-api-compat` | galerkin(`>=1.15`) | MIT | 순수 Python. 같은 구현이 NumPy·JAX·PyTorch 배열에서 돌게 함(`galerkin.core.backend`) |
 
 ### 선택 extra
 
@@ -106,10 +107,22 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 | `pyyaml` | `physmat[rii]` | MIT |
 | `meshio` | `simcase[export]`(`>=5.3,<6`) | MIT |
 | `rich`, `markdown-it-py`, `mdurl` (and `pygments`, BSD-2-Clause) | meshio | MIT |
+| `jax`, `jaxlib` | `galerkin[jax]`(`>=0.12.0.1`) | Apache-2.0 |
+| `ml-dtypes` | jax | Apache-2.0 |
+| `opt-einsum` | jax | MIT |
+| `torch` | `galerkin[torch]`(`>=2.14.1`) | Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT |
+| `filelock` | torch | MIT |
+| `networkx`, `jinja2`, `fsspec` | torch | BSD-3-Clause |
+| `markupsafe` | jinja2 | BSD-3-Clause |
+| `sympy`, `mpmath` | torch | [시험](#시험) 참고 |
 
 `pydantic-core`는 MIT, Apache-2.0, Unlicense OR MIT, Unicode-3.0(icu_normalizer) 조건의 Rust
 crate를 정적으로 링크하며, 휠에는 자기 MIT 라이선스만 들어 있습니다. `pyyaml`은 libyaml(MIT)을
 정적으로 포함합니다.
+
+CI는 `torch`의 CPU 빌드를 `download.pytorch.org/whl/cpu`에서 설치하고, 묶인 라이브러리도 그 휠
+기준으로 기록합니다. Linux의 PyPI `torch` 휠은 대신 NVIDIA CUDA 패키지(`cuda-toolkit`,
+`nvidia-*-cu13`)를 요구합니다. 이것은 torch 자신의 의존성이며 CI가 설치하지도, 여기 적지도 않습니다.
 
 ### 시험
 
@@ -187,6 +200,8 @@ numpy·scipy·shapely는 cp313부터 cp315까지의 휠도 올립니다.
 | | Windows 런처 실행 파일(`pip/_vendor/distlib/t*.exe`, `w*.exe`) | BSD-2-Clause(distlib `PC/launcher.c`) | 모든 OS에 설치되고 Windows에서만 실행됨. C 런타임 DLL을 import하지 않음. 휠에는 distlib의 PSF-2.0 라이선스 문서만 있고 런처의 BSD 고지는 없음 |
 | `setuptools` | Windows 런처 실행 파일(`setuptools/cli*.exe`, `gui*.exe`) | MIT(setuptools `launcher.c`) | 모든 OS에 설치되고 Windows에서만 실행됨. Microsoft C 런타임(`VCRUNTIME140.dll`, Universal CRT)은 시스템 것을 로드함 |
 | `cryptography` | OpenSSL 4.0.3 | Apache-2.0 | Linux 작업에서만 설치: `_rust` 확장 모듈에 정적으로 링크(휠 SBOM에 `no-shared` 빌드로 기록) |
+| `jaxlib` | BoringSSL, gRPC, Abseil, Protocol Buffers, Eigen, LLVM, oneDNN 등 `LICENSE.txt`가 옮겨 적은 구성 요소 | jaxlib 자체 모듈은 Apache-2.0. 정적으로 들어 있는 구성 요소는 각자의 허용형 조건이고 Eigen은 MPL-2.0(파일 단위 약한 copyleft, jaxlib 배포자가 컴파일해 배포) | Linux 작업에서만(`galerkin[jax]`): jaxlib 자체 모듈(`jaxlib/*.so`, `cpu/`·`mlir/_mlir_libs/` 포함)에 정적으로 링크. 따로 빌드한 제3자 라이브러리 없음. jaxlib 0.12.0.1에서 확인 |
+| `torch` | `dist-info/licenses/third_party/`가 옮겨 적은 제3자 코드, GNU libgomp | torch가 선언한 식. libgomp는 GPL-3.0-or-later WITH GCC-exception-3.1 | Linux 작업에서만(`galerkin[torch]`, CPU 휠): torch 자체 `torch/lib/lib*.so`에 정적으로, libgomp는 별도 공유 라이브러리. torch 2.14.1+cpu에서 확인(`torch/lib/`: torch 자체 라이브러리, 그중 4개는 시험·예제용, 그리고 `libgomp.so.1`) |
 | | Rust crate(pyo3, asn1, openssl 바인딩 등) | 대부분 MIT OR Apache-2.0. BSD-3-Clause, Unicode-3.0(unicode-ident), Apache-2.0 OR GPL-2.0-only(self_cell, Apache-2.0로 사용)도 있음 | 정적 링크. 휠의 CycloneDX SBOM에 목록이 있음 |
 | `cffi` | libffi | MIT | Linux 작업에서만 설치: `_cffi_backend`에 정적으로 링크. 휠에는 cffi 자신의 MIT-0 라이선스만 있음 |
 | `nh3` | Rust crate(ammonia, html5ever, ICU4X 등) | 대부분 MIT OR Apache-2.0 또는 MIT. Unicode-3.0(ICU4X), MPL-2.0(cssparser, dtoa-short) | Linux 작업에서만 설치(twine 의존성): 확장 모듈에 정적으로 링크하고 휠의 CycloneDX SBOM에 목록이 있음. MPL-2.0은 파일 단위 약한 copyleft이고, 휠을 올린 쪽이 컴파일한 그대로 씀 |

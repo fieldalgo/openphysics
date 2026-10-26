@@ -26,22 +26,24 @@ def _imported_modules(path):
 
 
 def test_engine_source_is_scanned():
-    assert len(list(ENGINE.glob("*.py"))) > 1, f"no engine modules found in {ENGINE}"
+    assert len(list(ENGINE.rglob("*.py"))) > 1, f"no engine modules found in {ENGINE}"
 
 
 def test_engine_never_imports_refsol():
-    offenders = {p.name for p in ENGINE.glob("*.py")
+    offenders = {p.name for p in ENGINE.rglob("*.py")
                  if "refsol" in _imported_modules(p)}
     assert not offenders, (
         f"the engine imports its own grader in {sorted(offenders)}; refsol belongs "
         "to the tests only")
 
 
-def test_engine_dependencies_are_only_numpy_scipy():
+def test_engine_dependencies_are_numpy_scipy_and_array_api_compat():
     # Python >=3.12 is required by this package; classify stdlib by Python itself.
-    allowed = {"numpy", "scipy", "galerkin"} | sys.stdlib_module_names
+    # array_api_compat (galerkin.core.backend) is the one addition; JAX and PyTorch are
+    # optional and reached through sys.modules, never imported by name.
+    allowed = {"numpy", "scipy", "array_api_compat", "galerkin"} | sys.stdlib_module_names
     extra = set()
-    for p in ENGINE.glob("*.py"):
+    for p in ENGINE.rglob("*.py"):
         extra |= {m for m in _imported_modules(p)
                   if m not in allowed and not m.startswith(".")}
     assert not extra, f"unexpected engine dependency: {sorted(extra)}"
@@ -50,7 +52,7 @@ def test_engine_dependencies_are_only_numpy_scipy():
 def test_dependency_guard_accepts_standard_library(tmp_path, monkeypatch):
     (tmp_path / "probe.py").write_text("import json\nimport collections\n", encoding="utf-8")
     monkeypatch.setitem(globals(), "ENGINE", tmp_path)
-    test_engine_dependencies_are_only_numpy_scipy()
+    test_engine_dependencies_are_numpy_scipy_and_array_api_compat()
     test_engine_never_imports_refsol()
 
 
@@ -59,7 +61,7 @@ def test_dependency_guard_rejects_unapproved_import(tmp_path, monkeypatch, modul
     (tmp_path / "probe.py").write_text(f"import {module}\n", encoding="utf-8")
     monkeypatch.setitem(globals(), "ENGINE", tmp_path)
     with pytest.raises(AssertionError, match=module):
-        test_engine_dependencies_are_only_numpy_scipy()
+        test_engine_dependencies_are_numpy_scipy_and_array_api_compat()
     if module == "refsol":
         with pytest.raises(AssertionError, match="own grader"):
             test_engine_never_imports_refsol()

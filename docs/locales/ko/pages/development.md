@@ -27,6 +27,19 @@ matplotlib 3.8은 Python 3.12 휠이 있는 첫 릴리스입니다. 정확히 �
 시험 전체를 손으로 한 번 통과시켰고(2026-10-21, Linux, Python 3.12), CI는 고정 버전만
 시험합니다.
 
+`galerkin[jax]`와 `galerkin[torch]`용 선택 배열 라이브러리는 따로 고정합니다. PyPI의 Linux torch
+휠은 CUDA 패키지를 끌어오므로 CI는 torch CPU 빌드를 먼저 설치합니다.
+
+```bash
+python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1+cpu
+python -m pip install -r tools/requirements-py312-linux-backends.txt
+```
+
+이것이 없으면 백엔드 시험의 JAX·PyTorch 경우가 skip됩니다. Linux CI 작업은 전체 시험 전에 둘 다
+import되는지 확인하고, 설치 휠 실행은 skip이 하나라도 있으면 실패합니다. array-api-compat 하한
+1.15는 `tests/galerkin/test_core_backend.py`로 손으로 한 번 확인했습니다(2026-10-26, Linux,
+NumPy·JAX).
+
 항상 저장소 루트에서 실행합니다. `packages/`나 `tests/` 안에서 Python을 실행하면 같은 이름의
 디렉터리가 설치된 모듈을 가릴 수 있습니다.
 

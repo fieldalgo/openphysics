@@ -20,7 +20,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-dependencies = ["numpy>=1.26", "scipy>=1.11.2"]
+# array-api-compat lets one implementation run on NumPy, JAX and PyTorch arrays
+# (galerkin.core.backend). JAX and PyTorch stay optional below.
+dependencies = ["numpy>=1.26", "scipy>=1.11.2", "array-api-compat>=1.15"]
 
 [project.urls]
 Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/galerkin"
@@ -40,6 +42,11 @@ test = [
     "gmshio>=0.1.0,<0.2",
 ]
 figures = ["matplotlib>=3.8"]
+# Optional array libraries for derivatives (galerkin.core.backend). NumPy, the
+# default, computes values only. Floors are the versions CI verifies; JAX double
+# precision needs jax.config.update("jax_enable_x64", True) before arrays are made.
+jax = ["jax>=0.12.0.1", "jaxlib>=0.12.0.1"]
+torch = ["torch>=2.14.1"]
 # Reference tools for code-to-code comparisons (tests/galerkin/test_crosscheck_*.py), test only.
 # Permissive licenses only, by choice; weak-copyleft or GPL reference tools run
 # separately and are never installed here. See docs/third-party.md in the repository.
