@@ -28,3 +28,12 @@ test('stop during result download prevents publication; timeouts and failures re
  const timeout=new OpticalJobMonitor({api:async()=>({status:'running'}),now:()=>0,limitMs:0,onState:s=>states.push(s)});await timeout.follow(r,r.serverInstance);assert.equal(states.at(-1).phase,'detached');assert.equal(timeout.busy,false);
  for(const response of [{status:'unknown'},{status:'error',error:'test failure'}]){const fail=new OpticalJobMonitor({api:async()=>response,onState:s=>states.push(s)});await fail.follow(r,r.serverInstance);assert.equal(states.at(-1).phase,'error');assert.equal(fail.busy,false);}
 });
+
+test('missing jobs, restarted servers and failed solvers require detach; transport errors remain resumable',async()=>{
+ const r=record();
+ for(const [failure,canResume] of [[Object.assign(Error('missing'),{status:404}),false],[Object.assign(Error('restarted'),{status:409}),false],[Error('network'),true],[Object.assign(Error('temporary'),{status:500}),true]]){
+  let terminal,results=0;const monitor=new OpticalJobMonitor({api:async()=>{throw failure;},onState:s=>terminal=s,onResult:()=>results++});await monitor.follow(r,r.serverInstance);assert.equal(terminal.canResume,canResume);assert.match(terminal.message,canResume?/Resume to retry/:/Detach this job/);assert.equal(results,0);assert.equal(monitor.busy,false);
+ }
+ let terminal;const monitor=new OpticalJobMonitor({api:async()=>({status:'error',error:'No convergence'}),onState:s=>terminal=s});await monitor.follow(r,r.serverInstance);assert.equal(terminal.canResume,false);assert.match(terminal.message,/Detach this job/);
+ await assert.rejects(monitor.follow(r,'b'.repeat(32)),error=>error.status===409&&/Detach/.test(error.message));
+});

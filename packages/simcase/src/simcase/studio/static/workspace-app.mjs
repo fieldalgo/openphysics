@@ -538,9 +538,9 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;
-let jobPhase='idle',jobOperation=0;
+let jobPhase='idle',jobOperation=0,jobResumeBlocked=false;
 const jobMonitor=new OpticalJobMonitor({api:solverApi,onState:state=>{
- const wasBusy=solverBusy;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
+ const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  $('job-message').textContent=state.message;
  if(state.phase==='done')setPending(null);
  notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
@@ -551,20 +551,21 @@ const jobMonitor=new OpticalJobMonitor({api:solverApi,onState:state=>{
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
 }});
 function refreshJobControls(){
+ if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}
  $('job-input').textContent=pendingJob?pendingJob.job+' · '+pendingJob.input.model.width+' × '+pendingJob.input.model.height+' nm · '+pendingJob.input.setup.materials.Core+' · captured inputs':'';
  $('job-panel').hidden=!pendingJob&&!solverBusy&&jobPhase==='idle';
  $('stop-waiting').disabled=!pendingJob||!solverBusy||!jobMonitor.busy;
- $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready;
+ $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready||jobResumeBlocked;
  $('forget-job').disabled=!pendingJob||solverBusy;
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
- if(pendingJob&&!solverBusy)$('status').textContent='Pending job · resume or detach before starting another calculation';else if(!solverBusy&&retentionBlock())$('status').textContent=retentionBlock();
+ if(pendingJob&&!solverBusy)$('status').textContent=jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach before starting another calculation';else if(!solverBusy&&retentionBlock())$('status').textContent=retentionBlock();
 }
-function setPending(record){pendingJob=record;try{storePending(sessionStorage,record);$('job-storage').textContent='';}catch(error){$('job-storage').textContent='Job recovery storage unavailable: '+error.message+' Keep this tab open to retrieve the result.';}}
+function setPending(record){pendingJob=record;jobResumeBlocked=false;try{storePending(sessionStorage,record);$('job-storage').textContent='';}catch(error){$('job-storage').textContent='Job recovery storage unavailable: '+error.message+' Keep this tab open to retrieve the result.';}}
 try{pendingJob=readPending(sessionStorage);if(pendingJob){jobPhase='detached';$('job-message').textContent='Saved job '+pendingJob.job+' is available. Resume retrieves its captured result without changing your current inputs.';}}catch(error){$('job-message').textContent='Job recovery record could not be read: '+error.message;jobPhase='error';}
 $('stop-waiting').onclick=()=>{if(jobMonitor.busy){jobOperation++;jobMonitor.stop();}};
 $('resume-job').onclick=async()=>{
- if(!pendingJob||solverBusy||!connection.ready)return;
- jobOperation++;try{await jobMonitor.follow(pendingJob,connection.instance);}catch(error){$('job-message').textContent=error.message;}
+ if(!pendingJob||solverBusy||!connection.ready||jobResumeBlocked)return;
+ jobOperation++;try{await jobMonitor.follow(pendingJob,connection.instance);}catch(error){if([404,409].includes(error.status))jobResumeBlocked=true;$('job-message').textContent=error.message;}
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
