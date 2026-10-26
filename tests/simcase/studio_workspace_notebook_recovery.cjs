@@ -88,3 +88,26 @@ test('autosave exposes the committed revision and conflict without replacing sav
  saver.schedule('a',()=> 'A');await saver.flush();assert.equal(states.at(-1).record.revision,'committed');
  fail=true;saver.schedule('b',()=> 'B');await saver.flush();assert.equal(states.at(-1).code,'recovery-conflict');assert.equal(saver.savedStamp,'a');assert.equal(saver.pending,true);
 });
+
+test('explicit recovery replacement can repair a reviewed unreadable record without loading its session',async()=>{
+ const invalid={version:99,savedAt:'bad',session:'broken'},store=indexedNotebookStore(database(invalid));
+ assert.throws(()=>readNotebookRecovery(invalid));
+ const saver=new NotebookAutosave(store,timing);const reviewed=await store.load();
+ await saver.replaceReviewed(reviewed,'current',()=> 'valid current snapshot');
+ assert.equal((await store.load()).session,'valid current snapshot');assert.equal(saver.savedStamp,'current');
+});
+test('replacement cannot overwrite a change made after review, even when its stamp was previously saved',async()=>{
+ const db=database(null),store=indexedNotebookStore(db),other=indexedNotebookStore(db);store.adopt(null);
+ const states=[],saver=new NotebookAutosave(store,{...timing,onState:s=>states.push(s)});
+ saver.schedule('same',()=> 'current');await saver.flush();const reviewed=await store.load();
+ other.adopt(reviewed);await other.save({version:1,savedAt:'2026-10-26T00:00:00Z',session:'other'});
+ await saver.replaceReviewed(reviewed,'same',()=> 'current');assert.equal(states.at(-1).code,'recovery-conflict');assert.equal((await store.load()).session,'other');
+ await saver.replaceReviewed(await store.load(),'same',()=> 'current');assert.equal((await store.load()).session,'current');assert.equal(saver.pending,false);
+});
+test('replacement refuses an active write and supersedes a queued older snapshot',async()=>{
+ let complete,stored,adoptions=0;
+ const saver=new NotebookAutosave({adopt:()=>adoptions++,save:r=>new Promise(resolve=>{stored=r;complete=resolve;})},timing);
+ saver.schedule('old',()=> 'old');const writing=saver.flush();
+ await assert.rejects(saver.replaceReviewed(null,'new',()=> 'new'),/busy/);assert.equal(adoptions,0);complete();await writing;
+ saver.schedule('queued',()=> 'queued');const replacement=saver.replaceReviewed(null,'new',()=> 'new');assert.equal(stored.session,'new');assert.equal(adoptions,1);complete();await replacement;assert.equal(saver.savedStamp,'new');assert.equal(saver.pending,false);
+});

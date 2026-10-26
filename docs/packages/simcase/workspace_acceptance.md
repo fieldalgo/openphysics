@@ -42,6 +42,11 @@ coupled physics distinguishable.
 | Change candidate/component; inspect a point and a line | Both plots use the same physical coordinates. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
 | Save session and selected run; reopen each | Inputs, result count, names, pins, comparison and view state match the file's scope. File origin is shown; opening does not recompute. |
 | Wait for Browser recovery saved; reload; Recover last session | Results and view state return as recovered. No solver starts; input Undo starts at the recovered document. |
+| Open an empty session while a completed notebook save is queued | The queued recovery keeps its captured results; the empty session does not erase them. |
+| Open a replacement dialog, then let an in-flight calculation complete | Confirming the stale review preserves the new result and asks for another review. |
+| Save different names in two tabs of the same origin | The stale tab reports a recovery conflict; Retry and cancelling a recovery preview do not overwrite the newer record. |
+| Use current notebook for recovery; cancel, then review and confirm | Cancel keeps the stored record. Confirm replaces only browser recovery, preserving the current model, results and Undo. |
+| Change stored recovery in another tab while replacement review is open | Confirmation cannot overwrite the new revision; review again. |
 | Stop waiting during a calculation, edit inputs, Resume | The captured job is retrieved without replacing current model inputs. Stop waiting does not cancel server computation. |
 | Restart the test server while a job remains attached | The old server identity is rejected; unrelated new-server jobs cannot become its result. Preserve a portable session before this test. |
 | Import a saved run into an existing notebook | Review states additions/replacements; current inputs and input Undo remain. A conflicting payload leaves the whole notebook intact. |
