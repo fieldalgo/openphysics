@@ -31,7 +31,11 @@ and the checks a user should run (mesh refinement and box truncation).
 [Templates, JSON input and target-impedance design](../../docs/packages/sipi/design.md)
 reuse the same engine with input validation and a separate mesh-refinement check.
 
+Power integrity: `PowerPlane` solves the DC voltage drop (IR drop) on a copper
+plane fed by regulators and loaded by devices, checked against exact strip,
+annulus and two-pad references.
+
 Not implemented: conductor loss, frequency-dependent dielectrics, S-parameters
-and Touchstone files, 3D structures (vias, planes) and layout import.
+and Touchstone files, AC PDN impedance, vias, several layers and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

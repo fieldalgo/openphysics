@@ -26,6 +26,7 @@ The Python electric API supports region conductivity and explicit Neumann gauges
 - [Steady 2D electric conduction](../packages/galerkin/electric_steady2d.md)
 - [Steady Joule heating](../packages/galerkin/joule_heating.md)
 - [Temperature-dependent steady Joule heating](../packages/galerkin/temperature_joule_heating.md)
+- [PCB power planes: DC voltage drop with sipi.PowerPlane](../packages/sipi/overview.md#power-planes-dc-voltage-drop-ir-drop), built on the steady 2D conduction above
 
 
 ## Validation evidence
