@@ -21,6 +21,9 @@
 - [첫 Joule 발열 해석: 전력을 열로 전달하기](../packages/galerkin/joule_tutorial.md)
 - [첫 열탄성 해석: 열전도에서 역학으로](../packages/galerkin/thermoelastic_tutorial.md)
 
+- [과도 열전도 튜토리얼: 입력 에너지는 어디에 저장될까?](../packages/galerkin/transient_tutorial.md)
+- [온도 의존 Joule 튜토리얼: 되먹임과 수렴](../packages/galerkin/temperature_joule_tutorial.md)
+
 ## 3. 다음 해석 선택
 
 [사용 안내](../guide/index.md)에서 해석을 선택하고 [API·문서 계약](../reference/index.md)에서 입력을 확인하세요.

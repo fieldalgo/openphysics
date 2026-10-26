@@ -80,3 +80,5 @@ Continue with the [heat contract](thermal_steady2d.md),
 [heat documents](../simcase/thermal_steady2d.md) for the separate JSON/CLI route.
 Next: [generate heat electrically](joule_tutorial.md) or
 [transfer temperature to mechanics](thermoelastic_tutorial.md).
+
+Next tutorial: [Transient heat tutorial: where the input energy goes](transient_tutorial.md).

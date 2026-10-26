@@ -75,3 +75,5 @@ python examples/galerkin/thermal_steady2d.py
 JSON/CLI를 사용하려면 별도 [열 모델 문서](../simcase/thermal_steady2d.md)를 따릅니다.
 다음 실습은 [전기로 발열시키기](joule_tutorial.md) 또는
 [온도를 역학으로 전달하기](thermoelastic_tutorial.md)입니다.
+
+다음 실습: [과도 열전도 튜토리얼: 입력 에너지는 어디에 저장될까?](transient_tutorial.md).

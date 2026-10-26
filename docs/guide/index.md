@@ -13,6 +13,9 @@ and result contract. Python features do not automatically imply JSON/CLI or Stud
 - [First Joule calculation: electric power becomes heat](../packages/galerkin/joule_tutorial.md)
 - [First thermal expansion calculation: heat then mechanics](../packages/galerkin/thermoelastic_tutorial.md)
 
+- [Transient heat tutorial: where the input energy goes](../packages/galerkin/transient_tutorial.md)
+- [Temperature-dependent Joule tutorial: feedback and convergence](../packages/galerkin/temperature_joule_tutorial.md)
+
 ## Choose an execution interface
 
 First choose the [model](../modeling/index.md) and [physical problem](../physics/index.md).

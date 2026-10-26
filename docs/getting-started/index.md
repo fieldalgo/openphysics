@@ -21,6 +21,9 @@ and Studio support differ; check the overview feature matrix and each workflowâ€
 - [First Joule calculation: electric power becomes heat](../packages/galerkin/joule_tutorial.md)
 - [First thermal expansion calculation: heat then mechanics](../packages/galerkin/thermoelastic_tutorial.md)
 
+- [Transient heat tutorial: where the input energy goes](../packages/galerkin/transient_tutorial.md)
+- [Temperature-dependent Joule tutorial: feedback and convergence](../packages/galerkin/temperature_joule_tutorial.md)
+
 ## 3. Choose the next workflow
 
 Choose a workflow in the [user guide](../guide/index.md), then check its [API and document contract](../reference/index.md).
