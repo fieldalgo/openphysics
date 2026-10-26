@@ -102,6 +102,24 @@ passed outside the checkout. The earlier complete two-design task was not
 repeated at this revision. Other browsers, viewport/zoom combinations and a human
 usability pilot remain unverified by this observation.
 
+## Clean installation observation, 2026-10-27
+
+A fresh Windows Python 3.12.3 virtual environment with system site packages
+disabled installed seven `ff0b2f6` wheels, built from sdists. Runtime and Studio
+dependencies used the repository's existing portable/web pins; `pip check` and
+the reviewed license inventory passed. Installed assets matched 29 source files,
+and 216 JavaScript contracts plus 12 workspace HTTP/CLI checks passed outside the
+checkout. These checks do not replace the full repository CI.
+
+The installed `simcase-studio --workspace` entry point completed 600/700 × 300 nm
+silicon designs in a fresh browser origin. Naming/pinning the baseline, comparison,
+candidate/component changes, probe/profile, session download, reload/recovery
+and reopening the downloaded file preserved two runs, one pin and the view state.
+No browser console errors or warnings were observed. Repeating both captured
+solver documents through the installed Python API gave identical effective
+indices in this environment. This is same-stack transport consistency, not an
+independent numerical reference or a new platform/browser support claim.
+
 ## Release decision
 
 Retain each task's actual outcome, time, interventions and failure reason.
