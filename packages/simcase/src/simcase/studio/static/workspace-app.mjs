@@ -1,3 +1,4 @@
+import {LatestWorkspaceLoad} from './workspace-load.mjs';
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
@@ -145,7 +146,9 @@ if(ui.page==='Model'&&ui.selection==='Study'){
 
 
 
-let pendingProject = null,pendingSession=null,pendingSessionSource='file',pendingSaved=true;
+let pendingLoad=null;
+const workspaceLoads=new LatestWorkspaceLoad(()=>loadContext());
+function loadContext(){return JSON.stringify({notebook:notebookStamp(),revision:edits.revision,invalid:numericDrafts.issues,jobOperation,pendingJob:pendingJob?.job||null});}
 const notice = text => $('file-status').textContent = text;
 const current = () => snapshot(state, setup);
 const signature = () => JSON.stringify(current());
@@ -169,25 +172,37 @@ function rejectInvalidInput(){
   numericDrafts.assertValid();
 }
 function applyProject(doc,{saved=true,resetHistory=false}={}){
-  doc=edits.replace(doc,{saved,resetHistory});numericDrafts.clear();
+  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
   notice('Project inputs restored. Results and CAD geometry are not included.');
 }
-function requestLoad(doc,{saved=true}={}){
-  pendingSaved=saved;
-  // Validate completely before changing any current model inputs.
-  pendingProject=doc;
-  $('load-confirm').querySelector('h2').textContent=pendingSession?'Replace inputs and run history?':'Replace current inputs?';$('load-confirm').querySelector('p').textContent=pendingSession?'Save a session first to retain current results. Session import replaces run history and clears input undo history.':'Save your current design first if you want to keep it.';
-  $('load-confirm').showModal();
+function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs'}={}){
+  workspaceLoads.invalidate();
+  pendingLoad={input:doc,saved,session,source,context:loadContext()};
+  $('load-confirm').querySelector('h2').textContent=session?'Replace inputs and run history?':'Replace current inputs?';
+  $('load-confirm').querySelector('p').textContent=session?'Save a session first to retain current results. Session import replaces run history and clears input undo history.':'Save your current design first if you want to keep it.';
+  const summary=$('load-summary');summary.replaceChildren();
+  const physics=model=>[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']].filter(([key])=>model[key]).map(([,name])=>name).join(' + ')||'None';
+  const entries=[['Source',label],['Physics',`${physics(current().model)} → ${physics(doc.model)}`],['Core dimensions',`${state.width} × ${state.height} → ${doc.model.width} × ${doc.model.height} nm`],['Core material',`${setup.materials.Core||'Unassigned'} → ${doc.setup.materials.Core||'Unassigned'}`],['Completed results',session?`${runs.length} → ${session.runs.length} (replace notebook)`:`Keep ${runs.length} retained runs`],['Input Undo',session?'Starts at the opened session':'Replacement can be undone']];
+  for(const [name,value] of entries){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
+  if(!$('load-confirm').open)$('load-confirm').showModal();
 }
 const dialog=document.createElement('dialog');dialog.id='load-confirm';
-dialog.innerHTML='<h2>Replace current inputs?</h2><p>Save your current design first if you want to keep it.</p><button id="cancel-load">Keep current</button> <button id="confirm-load">Replace inputs</button>';
+dialog.innerHTML='<h2>Replace current inputs?</h2><p>Save your current design first if you want to keep it.</p><dl id="load-summary" class="load-summary"></dl><button id="cancel-load">Keep current</button> <button id="confirm-load">Replace inputs</button>';
 document.body.append(dialog);
-$('cancel-load').onclick=()=>{pendingProject=null;pendingSession=null;dialog.close();notice('Open cancelled. Current inputs kept.');};
-dialog.oncancel=()=>{pendingProject=null;pendingSession=null;};
-$('confirm-load').onclick=()=>{const doc=pendingProject;pendingProject=null;dialog.close();if(pendingSession){const session=pendingSession,source=pendingSessionSource;pendingSession=null;pendingSessionSource='file';runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);applyProject(session.input,{saved:pendingSaved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=source==='file'?notebookStamp():null;refreshNotebook();notice(source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. Save session for a portable file; input undo history starts here.');}else if(doc)applyProject(doc,{saved:pendingSaved});};
+$('cancel-load').onclick=()=>{pendingLoad=null;workspaceLoads.invalidate();dialog.close();notice('Open cancelled. Current inputs kept.');};
+dialog.oncancel=()=>{pendingLoad=null;workspaceLoads.invalidate();};
+$('confirm-load').onclick=()=>{
+ const pending=pendingLoad;pendingLoad=null;workspaceLoads.invalidate();dialog.close();if(!pending)return;
+ if(pending.context!==loadContext()){notice('Workspace changed while reviewing the replacement. Open it again; current inputs and results kept.');return;}
+ if(pending.session){
+  const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
+  applyProject(session.input,{saved:pending.saved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=pending.source==='file'?notebookStamp():null;refreshNotebook();
+  notice(pending.source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. Save session for a portable file; input undo history starts here.');
+ }else applyProject(pending.input,{saved:pending.saved});
+};
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -195,11 +210,11 @@ $('save-project').onclick=()=>{try{
 }catch(e){notice(e.message);}};
 $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click();}catch(e){notice(e.message);}};
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
-  if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');
-  requestLoad(parseProject(await file.text()));
+ const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
+ if(loaded)requestLoad(loaded.value,{label:file.name});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
 $('save-draft').onclick=()=>{try{rejectInvalidInput();const text=signature();localStorage.setItem(DRAFT_KEY,text);edits.record(current());edits.markSaved();refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
-$('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text));}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
+$('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
 
 
 let recoverable=null;
@@ -212,7 +227,7 @@ function checkpointRecovery(){
  catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save file or Save session.';}
 }
 try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
-$('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false});}catch(error){notice(error.message);}};
+$('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
 
 function updateHistory(){ $('undo-edit').disabled=!edits.canUndo;$('redo-edit').disabled=!edits.canRedo; }
 function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before)checkpointRecovery();updateHistory();refreshPersistence();}
@@ -256,7 +271,7 @@ $('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNoteboo
 $('recover-notebook').onclick=async()=>{
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const record=await notebookStore.load(),recovered=readNotebookRecovery(record);if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();pendingSession=recovered.session;pendingSessionSource='browser';requestLoad(recovered.session.input,{saved:false});}
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>readNotebookRecovery(await notebookStore.load()));if(!loaded)return;const recovered=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
@@ -439,7 +454,7 @@ function renderRunList(){
    if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Selected run exceeds the session size limit.');
    downloadFile(new Blob([text],{type:'application/json'}),'studio-run-'+solverRun.job+'.json');notice('Selected run exported with its captured inputs and fields. Current design remains unchanged.');
   }catch(error){notice(error.message);}};panel.append(exportRun);
-  const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore selected run inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false});panel.append(restore);
+  const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore selected run inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false,label:'Run '+solverRun.job+(solverRun.label?' · '+solverRun.label:'')});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+profileState.coordinate+' um (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
@@ -468,13 +483,13 @@ const runImportDialog=document.createElement('dialog');runImportDialog.id='run-i
 const runListStamp=()=>JSON.stringify(runs.map(run=>[run.job,run.completedAt,run.label,run.pinned]));
 $('run-import-file').onchange=async event=>{
  const file=event.target.files[0];event.target.value='';if(!file)return;
- try{if(solverBusy||pendingJob)throw new Error('Finish or detach the pending job before importing runs.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const session=parseSession(await file.text());if(solverBusy||pendingJob)throw new Error('A job started while reading the file.');const merged=mergeRuns(runs,session.runs);pendingRunImport={session,merged,stamp:runListStamp()};
+ try{const loaded=await workspaceLoads.read(async()=>{if(solverBusy||pendingJob)throw new Error('Finish or detach the pending job before importing runs.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});if(!loaded)return;const session=loaded.value;if(solverBusy||pendingJob)throw new Error('A job started while reading the file.');const merged=mergeRuns(runs,session.runs);workspaceLoads.invalidate();pendingRunImport={session,merged,stamp:runListStamp()};
   $('run-import-summary').textContent=`${file.name}: ${merged.added.length} new, ${merged.reused.length} matching, ${merged.evicted.length} older unpinned runs replaced. ${merged.runs.length} runs will remain. Save a session first if you need all current results.`;runImportDialog.showModal();
  }catch(error){pendingRunImport=null;notice('Run import failed: '+error.message+' Current notebook kept.');}
 };
-$('cancel-run-import').onclick=()=>{pendingRunImport=null;runImportDialog.close();notice('Run import cancelled. Current notebook kept.');};runImportDialog.oncancel=()=>{pendingRunImport=null;};
+$('cancel-run-import').onclick=()=>{workspaceLoads.invalidate();pendingRunImport=null;runImportDialog.close();notice('Run import cancelled. Current notebook kept.');};runImportDialog.oncancel=()=>{workspaceLoads.invalidate();pendingRunImport=null;};
 $('confirm-run-import').onclick=()=>{
- const pending=pendingRunImport;pendingRunImport=null;runImportDialog.close();if(!pending)return;
+ const pending=pendingRunImport;pendingRunImport=null;workspaceLoads.invalidate();runImportDialog.close();if(!pending)return;
  if(solverBusy||pendingJob||runListStamp()!==pending.stamp){notice('Notebook changed while reviewing the import. Open the file again to review current changes.');return;}
  const previous=solverRun;const next=pending.merged.runs;const selected=next.find(run=>run.job===pending.session.selected)||next.findLast(run=>pending.session.runs.some(imported=>imported.job===run.job));
  runs=next;solverRun=selected||runs.at(-1);const other=runs.find(run=>run.job===previous?.job&&run.job!==solverRun.job)||runs.findLast(run=>run.job!==solverRun.job)||solverRun;
@@ -483,7 +498,10 @@ $('confirm-run-import').onclick=()=>{
 
 $('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
-$('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;pendingSessionSource='file';requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
+$('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
+ const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});
+ if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');requestLoad(loaded.value.input,{session:loaded.value,label:file.name});
+}catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;
 let jobPhase='idle',jobOperation=0;
