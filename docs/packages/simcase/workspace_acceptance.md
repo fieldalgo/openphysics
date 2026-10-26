@@ -53,6 +53,10 @@ coupled physics distinguishable.
 | Pin all six retained runs | New Run is blocked; input checks and mesh preview remain available. Unpinning one restores capacity. |
 | Select the heated-waveguide template | Setup and connection editing are available; coupled execution remains unavailable and no fabricated thermal/mechanical results appear. |
 
+Check that the width slider exposes its purpose and unit, and each load/import/
+recovery dialog exposes its title and description. Escape cancels a dialog and
+returns focus to its opener without changing the model or stored recovery.
+
 Also check keyboard selection, visible focus, panel dividers, long run names,
 1280 × 800 and 1920 × 1080 layouts, and 200% zoom in every browser intended for
 support. Record untested combinations explicitly. Keep numeric field validation,
