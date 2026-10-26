@@ -40,7 +40,10 @@ In optical Geometry / Bodies, drag either highlighted core edge to resize symmet
 
 Resizing uses the drawing transform captured at gesture start, so zoom and pan do not change the unit conversion. The release position is applied even if no final move event arrives. Window resize, focus loss and page hiding cancel the preview; invalid inputs are checked again before committing.
 
-Height is edited numerically in the Geometry inspector and supports undo/redo.
+Height is edited numerically in the Geometry inspector or by dragging the top
+edge (100–500 nm, 1 nm snapping). The bottom remains at y = 0. Use Up/Down
+(10 nm, Shift: 1 nm) or Home/End on the top handle. Height supports undo/redo
+and the same preview, cancellation and invalid-input rules as width.
 The drawing, width handles and submitted mesh use the same height.
 
 ## Results and files

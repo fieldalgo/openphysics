@@ -24,7 +24,7 @@ const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div
 function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Couplings'?'Connections':'Model';render();}
 
 const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
-function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installWidthEditor($('canvas'),{width:state.width,height:state.height,blocked:()=>numericDrafts.invalid,commit:value=>{edits.endGroup();state.width=value;trackEdit();edits.endGroup();render();notice('Core width updated. Run explicitly to compute new results.');}});}
+function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installWidthEditor($('canvas'),{width:state.width,height:state.height,blocked:()=>numericDrafts.invalid,commitHeight:value=>{edits.endGroup();state.height=value;trackEdit();edits.endGroup();render();notice('Core height updated. Run explicitly to compute new results.');},commit:value=>{edits.endGroup();state.width=value;trackEdit();edits.endGroup();render();notice('Core width updated. Run explicitly to compute new results.');}});}
 function geom(){
 if(isOptical())return sectionSvg(state.width,ui.body,pick.boundary,pick.mode,state.height);
 const w=state.width/500;
