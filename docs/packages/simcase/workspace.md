@@ -142,3 +142,18 @@ scale used by the plot. **Clear point** removes the marker. Probe selection is
 view state for the current tab and is not stored in session JSON. Field PNG
 exports include the marker and its coordinates when selected. These samples do
 not establish convergence or physical field amplitudes.
+
+## Naming and preserving runs
+
+Use **Selected run name** and **Rename run** to label a completed calculation
+(up to 80 characters). Names appear in history and comparisons, persist in
+session JSON and CSV, and never change captured inputs or fields. **Save selected
+run** exports a standalone session containing that result and its original
+inputs; this is useful before the six-run retention limit removes an older run.
+The footer distinguishes a changed session from saved input-only files. Saving
+inputs or a browser draft does not claim to save the result notebook. A selected
+run export does not mark the full notebook saved.
+
+Undo/redo applies to design inputs. Outside text fields, Ctrl/Cmd+Z undoes and
+Ctrl/Cmd+Shift+Z or Ctrl+Y redoes. In text fields, native text editing is retained.
+Run names and comparison choices are session metadata, outside input undo.
