@@ -66,21 +66,41 @@ from .edge import (EdgeSpace, assemble_curlcurl, assemble_edge_mass,
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
-                         space: EdgeSpace | None = None):
+                         space: EdgeSpace | None = None, *, coordinate_factors=None):
     """Block matrices (A, B) of the mode eigenproblem A x = -beta^2 B x.
 
     eps_r, mu_r: scalar or per-triangle (T,) relative material parameters.
+    coordinate_factors: optional (T, 3) diagonal coordinate Jacobian (sx,sy,h).
     Returns (A, B, space); x = (e_t over edges, e_z over nodes), no BC applied.
     """
     space = space or EdgeSpace(mesh)
     inv_mu = 1.0 / np.asarray(mu_r, dtype=float)
 
-    S = assemble_curlcurl(space, inv_mu)
-    Mt_eps = assemble_edge_mass(space, eps_r)
-    Mt_mu = assemble_edge_mass(space, inv_mu)
-    G = assemble_edge_grad(space, inv_mu)
-    K = assemble_stiffness(mesh, inv_mu)
-    M = assemble_mass(mesh, eps_r)
+    if coordinate_factors is None:
+        S = assemble_curlcurl(space, inv_mu)
+        Mt_eps = assemble_edge_mass(space, eps_r)
+        Mt_mu = assemble_edge_mass(space, inv_mu)
+        G = assemble_edge_grad(space, inv_mu)
+        K = assemble_stiffness(mesh, inv_mu)
+        M = assemble_mass(mesh, eps_r)
+    else:
+        # J=diag(sx,sy,h). eps'=eps det(J) J^-1 J^-T (likewise mu).
+        # The transverse curl rotates axes: beta and grad use (1/mu_y,1/mu_x).
+        f = np.asarray(coordinate_factors)
+        if f.shape != (mesh.num_triangles, 3) or not np.isfinite(f).all() or np.any(f == 0):
+            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
+        sx, sy, h = f.T
+        eps = np.broadcast_to(np.asarray(eps_r), (mesh.num_triangles,))
+        d = np.zeros((mesh.num_triangles, 2, 2), dtype=np.result_type(f, eps, float))
+        e = np.zeros_like(d)
+        d[:, 0, 0], d[:, 1, 1] = inv_mu * sy/(sx*h), inv_mu * sx/(sy*h)
+        e[:, 0, 0], e[:, 1, 1] = eps*sy*h/sx, eps*sx*h/sy
+        S = assemble_curlcurl(space, inv_mu*h/(sx*sy))
+        Mt_eps = assemble_edge_mass(space, e)
+        Mt_mu = assemble_edge_mass(space, d)
+        G = assemble_edge_grad(space, d)
+        K = assemble_stiffness(mesh, d)
+        M = assemble_mass(mesh, eps*sx*sy/h)
 
     n_e, n_n = space.num_edges, mesh.num_nodes
     zero_en = sp.csr_matrix((n_e, n_n))
@@ -94,7 +114,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
 
 
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
-                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None):
+                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None):
     """Guided modes with effective index near n_target.
 
     Complex eps_r is expressed in the exp(+i omega t) convention: passive
@@ -115,6 +135,10 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
               walls: a one-edge PMC wall can have two PEC corner nodes without
               being a PEC edge. pec_nodes still constrains the nodal E_z values.
 
+    coordinate_factors: optional per-element diagonal coordinate Jacobian.
+    Returned fields then are covariant computational components; for a bend
+    the physical longitudinal field outside PML is 1j*ez/h.
+
     Returns (n_eff, space, et, ez) sorted by descending effective index:
       n_eff (m,)      beta / k0
       et    (m, n_e)  edge dofs of E_t  -> use eval_edge_field(space, et[i])
@@ -129,10 +153,10 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     eps_r = np.asarray(eps_r)
     if not np.isfinite(eps_r).all():
         raise ValueError("eps_r must be finite")
-    complex_problem = bool(np.any(eps_r.imag != 0))
+    complex_problem = bool(np.any(eps_r.imag != 0)) or coordinate_factors is not None
     if not complex_problem:
         eps_r = eps_r.real
-    A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r)
+    A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r, coordinate_factors=coordinate_factors)
     n_e, n_n = space.num_edges, mesh.num_nodes
 
     if pec_nodes is None:
