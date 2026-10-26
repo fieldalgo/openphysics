@@ -50,6 +50,9 @@ Studio는 모드별 Re n_eff·Im n_eff·dB/cm를 표시합니다. Scalar 장 화
 크기이며 응답의 `scalar_fields_complex`가 실수부·허수부 절점장을 보존합니다.
 Vector 성분은 기존 복소 인코딩을 유지합니다.
 
+저장 PNG의 sweep 곡선은 유효굴절률·군지수의 실수부를 Re 축 이름으로 표시한다.
+JSON/NPZ는 복소수의 두 성분을 모두 보존한다.
+
 ## 선택·정규화·추적
 
 기본 vector 유전체 검색은 `n_cladding < Re n_eff < sqrt(max Re epsilon)`

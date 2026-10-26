@@ -266,7 +266,7 @@ class RunResult:
                        phasor="exp(+i omega t-i beta z)",
                        propagation_loss_db_cm=self.propagation_loss_db_cm().tolist(),
                        selection="near_target" if self.doc.sole_physics()[1].get("n_target") is not None
-                       else "real_index_interval")
+                       else ("real_index_interval" if self.vector_fields is not None else "descending_real_index"))
             if ng is not None:
                 out["group_index_imag"] = ng.imag.tolist()
         if self.mode_tracking is not None:
@@ -339,8 +339,9 @@ class RunResult:
             ng = self.group_index()
             if ng is not None:
                 ax2 = ax.twinx()
-                ax2.plot(self.values, ng[:, 0], "s--", color="C3", ms=4, label="n_g (mode 1)")
-                ax2.set_ylabel("group index", color="C3")
+                ax2.plot(self.values, ng[:, 0].real, "s--", color="C3", ms=4,
+                         label="Re n_g (mode 1)" if np.iscomplexobj(ng) else "n_g (mode 1)")
+                ax2.set_ylabel("Re group index" if np.iscomplexobj(ng) else "group index", color="C3")
             ax.set_title("study")
         fig.suptitle(f"{self.doc['name']}  ({pname}: {phys['type']}, {phys['formulation']})")
         fig.tight_layout()
@@ -408,7 +409,7 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
         tracker = ModeTracker(_tracking_mesh(model), requested, settings, scalar=scalar_tracking)
         tracking = dict(method="scalar-l2-assignment-v1" if scalar_tracking else "electric-l2-assignment-v1",
                         settings=settings, points=[])
-        say("vector sweep: tracking resolved modes by electric L2 overlap; check wavelength-step convergence")
+        say(f"{'scalar' if scalar_tracking else 'vector'} sweep: tracking resolved modes by L2 overlap; check wavelength-step convergence")
     t0 = time.time()
     for v in values:
         d = doc.copy()
@@ -421,7 +422,7 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
             try:
                 res = _solve_in_micrometres(model, physics)
             except (ValueError, RuntimeError) as exc:
-                raise ModeTrackingError(f"vector sweep at {location}: {exc}") from exc
+                raise ModeTrackingError(f"{'scalar' if scalar_tracking else 'vector'} sweep at {location}: {exc}") from exc
             key = "fields" if scalar_tracking else "vector_field"
             res["neff"], res[key], evidence = tracker.step(res["neff"], res[key], location)
             res["guided"] = res["guided"][np.asarray(evidence["candidate_ranks"])-1]

@@ -51,6 +51,8 @@ version and existing lossless numeric outputs are unchanged.
 Studio shows Re n_eff, Im n_eff and dB/cm for each returned mode. Its scalar
 display is magnitude; `scalar_fields_complex` retains real/imaginary nodal data
 in the response. Vector components retain their existing complex encoding.
+Saved PNG sweep curves show the real parts of effective and group indices,
+with explicit Re labels; JSON/NPZ retain both complex components.
 
 ## Selection, normalization and tracking
 
