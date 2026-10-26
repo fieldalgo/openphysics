@@ -13,7 +13,7 @@ import {installLayout} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRun,appendRun,createSession,parseSession} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,createSession,parseSession} from './workspace-notebook.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
@@ -147,6 +147,7 @@ const edits=new WorkspaceStore(current());
 function refreshPersistence(){
   const clean=!edits.dirty;
   $('project').textContent='Multiphysics workspace / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'saved':'unsaved'):(clean?'Saved inputs':'Unsaved inputs'))+' · Revision '+edits.revision;
+  refreshNotebook();
 }
 function rejectInvalidInput(){
   numericDrafts.assertValid();
@@ -170,7 +171,7 @@ dialog.innerHTML='<h2>Replace current inputs?</h2><p>Save your current design fi
 document.body.append(dialog);
 $('cancel-load').onclick=()=>{pendingProject=null;pendingSession=null;dialog.close();notice('Open cancelled. Current inputs kept.');};
 dialog.oncancel=()=>{pendingProject=null;pendingSession=null;};
-$('confirm-load').onclick=()=>{const doc=pendingProject;pendingProject=null;dialog.close();if(pendingSession){const session=pendingSession;pendingSession=null;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];Object.assign(fieldView,session.view);applyProject(session.input,{saved:true,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();notice('Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.');}else if(doc)applyProject(doc,{saved:pendingSaved});};
+$('confirm-load').onclick=()=>{const doc=pendingProject;pendingProject=null;dialog.close();if(pendingSession){const session=pendingSession;pendingSession=null;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];Object.assign(fieldView,session.view);applyProject(session.input,{saved:true,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=notebookStamp();refreshNotebook();notice('Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.');}else if(doc)applyProject(doc,{saved:pendingSaved});};
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -217,7 +218,9 @@ document.addEventListener('keydown',event=>{
  else if(event.key.toLowerCase()==='y'){event.preventDefault();if(edits.canRedo)$('redo-edit').click();}
 });
 
-let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};
+let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null;
+function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'']),selected:solverRun?.job||null,comparison:compareIds,view:fieldView});}
+function refreshNotebook(){const changed=savedNotebookState!==notebookStamp();$('notebook-status').textContent=runs.length?(changed?'Session changed · save to keep results, names and comparison':'Session snapshot saved or restored'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
@@ -301,16 +304,25 @@ function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Run notebook</h2>';
  const title=document.createElement('h3');title.textContent=`History · ${runs.length} / ${RUN_LIMIT}`;panel.append(title);
  for(const run of [...runs].reverse()){
-  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin==='imported'?' · imported':''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
+  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=`${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.job}${run.origin==='imported'?' · imported':''}`;b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
  }
  if(solverRun){
+  const nameForm=document.createElement('form');nameForm.className='run-name';
+  const nameLabel=document.createElement('label');nameLabel.textContent='Selected run name';const nameInput=document.createElement('input');nameInput.type='text';nameInput.maxLength=80;nameInput.value=solverRun.label||'';nameInput.placeholder='Optional name';nameLabel.append(nameInput);
+  const rename=document.createElement('button');rename.type='submit';rename.textContent='Rename run';nameForm.append(nameLabel,rename);panel.append(nameForm);
+  nameForm.onsubmit=event=>{event.preventDefault();try{solverRun.label=validateRunLabel(nameInput.value);render();notice('Run name updated. Save session to retain it; captured inputs and fields are unchanged.');}catch(error){notice(error.message);}};
+  const exportRun=document.createElement('button');exportRun.textContent='Save selected run';exportRun.style.marginTop='10px';exportRun.onclick=()=>{try{
+   const text=JSON.stringify(createSession(solverRun.input,[solverRun],solverRun.job,[solverRun.job,solverRun.job],fieldView));
+   if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Selected run exceeds the session size limit.');
+   downloadFile(new Blob([text],{type:'application/json'}),'studio-run-'+solverRun.job+'.json');notice('Selected run exported with its captured inputs and fields. Current design remains unchanged.');
+  }catch(error){notice(error.message);}};panel.append(exportRun);
   const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore selected run inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`Core ${solverRun.input.model.width} x ${solverRun.input.model.height} nm | wavelength 1550 nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
  }
- const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>{const lines=['job,completed_at,core_width_nm,core_height_nm,core_material,candidate,neff,origin'];for(const r of runs)r.neff.forEach((n,i)=>lines.push([r.job,r.completedAt,r.input.model.width,r.input.model.height,r.input.setup.materials.Core,i+1,n,r.origin].join(',')));downloadFile(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}),'studio-runs.csv');};panel.append(csv);
- const limit=document.createElement('p');limit.textContent='Latest six runs retained. Save session before older runs are evicted. No cross-design mode tracking.';panel.append(limit);
+ const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
+ const limit=document.createElement('p');limit.textContent='Latest six runs retained. Save session or Save selected run before older runs are evicted. No cross-design mode tracking.';panel.append(limit);
 }
 function renderComparison(){
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
@@ -318,17 +330,17 @@ function renderComparison(){
  if(!runs.some(r=>r.job===compareIds[0]))compareIds[0]=runs.at(-2).job;
  if(!runs.some(r=>r.job===compareIds[1]))compareIds[1]=runs.at(-1).job;
  const bar=document.createElement('div');bar.className='toolbar';
- for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=`${r.input.model.width} × ${r.input.model.height} nm · ${r.input.setup.materials.Core} · ${r.job}`;o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
+ for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=`${r.label?r.label+' · ':''}${r.input.model.width} × ${r.input.model.height} nm · ${r.input.setup.materials.Core} · ${r.job}`;o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
  const opts=document.createElement('div');opts.className='toolbar';opts.innerHTML=`<label>Candidate rank <select id="compare-mode"><option value="0" ${fieldView.mode===0?'selected':''}>1</option><option value="1" ${fieldView.mode===1?'selected':''}>2</option></select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
  const description=document.createElement('p');description.textContent=`Width: ${a.input.model.width} → ${b.input.model.width} nm. Height: ${a.input.model.height} → ${b.input.model.height} nm. Core: ${a.input.setup.materials.Core} → ${b.input.setup.materials.Core}. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.neff[fieldView.mode]-a.neff[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}Candidate ranks are not matched modes.`;host.append(description);
- const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.origin}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
+ const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${run.label?run.label+' · ':''}${run.input.model.width} × ${run.input.model.height} nm · ${run.input.setup.materials.Core} · ${run.origin}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
  const redraw=()=>{drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();
 }
-$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
+$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,fieldView));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');const doc=parseSession(await file.text());if(solverBusy)throw new Error('Calculation started while reading the file.');pendingSession=doc;requestLoad(doc.input);}catch(e){pendingSession=null;notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 

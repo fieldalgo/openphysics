@@ -21,3 +21,13 @@ test('empty and oversized session handling',()=>{const d=createSession(input(),[
 test('saved field view persists and settings key order is immaterial',()=>{const r=run();r.settings=Object.fromEntries(Object.entries(OPTICAL_SETTINGS).reverse());const view={mode:1,component:'Ey',window:'Full window'};const d=createSession(input(),[r],r.job,[r.job,r.job],view);assert.deepEqual(parseSession(JSON.stringify(d)).view,view);d.view.mode=3;assert.throws(()=>parseSession(JSON.stringify(d)));});
 
 test('package version survives sessions while old files remain version-unknown',()=>{const r=run();assert.equal(parseSession(JSON.stringify(createSession(input(),[r],r.job,[r.job,r.job]))).runs[0].serverVersion,null);r.serverVersion='0.1.0';const session=createSession(input(),[r],r.job,[r.job,r.job]);assert.equal(parseSession(JSON.stringify(session)).runs[0].serverVersion,'0.1.0');session.runs[0].serverVersion='<script>';assert.throws(()=>parseSession(JSON.stringify(session)));});
+
+
+test('optional run names survive sessions; unsafe names are rejected and CSV quotes text safely',async()=>{
+ const {validateRunLabel,runTableCsv}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs');
+ const r=run();r.label='Baseline, "wide"';const restored=parseSession(JSON.stringify(createSession(input(),[r],r.job,[r.job,r.job])));assert.equal(restored.runs[0].label,r.label);
+ assert.ok(runTableCsv(restored.runs).includes('"Baseline, ""wide"""'));
+ r.label='=1+1';assert.ok(runTableCsv([r]).includes('"\'=1+1"'));
+ for(const value of ['x'.repeat(81),'bad\nname',null,123])assert.throws(()=>validateRunLabel(value));
+ assert.equal(validateRunLabel('  reference  '),'reference');assert.equal(validateRunLabel(),'');
+});

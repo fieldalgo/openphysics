@@ -7,6 +7,16 @@ export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
 export const OPTICAL_SETTINGS=Object.freeze({adapter:'optical-fixed-v1',height_nm:220,wavelength_nm:1550,core_mesh_nm:30,window_um:[-1.5,1.5,-1.2,1.2],boundary:'PEC',candidates:2,solver_version:'not reported'});
 export function opticalSettings(height=220){if(!Number.isFinite(height)||height<100||height>500)throw new Error('Unsupported height.');return {...OPTICAL_SETTINGS,adapter:'optical-rectangle-v2',height_nm:height};}
+export function validateRunLabel(value=''){
+ if(typeof value!=='string'||value.length>80||/[\u0000-\u001f\u007f-\u009f]/.test(value))throw new Error('Run name must be at most 80 characters without control characters.');
+ return value.trim();
+}
+export function csvCell(value){const text=String(value);const safe=typeof value==='string'&&/^\s*[=+@-]/.test(text)?"'"+text:text;return '"'+safe.replaceAll('"','""')+'"';}
+export function runTableCsv(runs){
+ const rows=[['job','name','completed_at','core_width_nm','core_height_nm','core_material','candidate','neff','origin']];
+ for(const r of runs)r.neff.forEach((n,i)=>rows.push([r.job,r.label||'',r.completedAt,r.input.model.width,r.input.model.height,r.input.setup.materials.Core,i+1,n,r.origin]));
+ return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
+}
 export function validateRun(record,imported=false){
  if(!record||typeof record.job!=='string'||!/^[a-f0-9]{8}$/.test(record.job))throw new Error('Invalid run identifier.');
  if(typeof record.completedAt!=='string'||!Number.isFinite(Date.parse(record.completedAt)))throw new Error('Invalid run timestamp.');
@@ -22,7 +32,7 @@ export function validateRun(record,imported=false){
  if(!f)throw new Error('Missing run fields.');
  const field=readOpticalField({nodes:f.nodes,triangles:f.triangles,vector_fields:[{location:'triangle_centroids',components:['Ex','Ey','Ez'],normalization:'max_centroid_magnitude',amplitude_unit:'relative',real:f.real,imag:f.imag}]});
  for(let mode=0;mode<2;mode++)fieldScalars(field,mode);
- return {serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:JSON.stringify(input),neff:[...record.neff],field,origin:imported?'imported':record.origin==='imported'?'imported':'local'};
+ return {label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:JSON.stringify(input),neff:[...record.neff],field,origin:imported?'imported':record.origin==='imported'?'imported':'local'};
 }
 export function appendRun(runs,run){return [...runs.filter(r=>r.job!==run.job),run].slice(-RUN_LIMIT);}
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'}){
