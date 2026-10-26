@@ -165,10 +165,15 @@ def _run_job(job_id: str, doc: Document):
             "nodes": res.mesh_nodes.tolist(), "triangles": res.mesh_triangles.tolist(),
             "regions": res.mesh_regions.tolist(), "region_names": res.region_names,
             "parameter": res.parameter, "values": [float(v) for v in res.values],
-            "neff": res.neff.tolist(), "group_index": None if ng is None else ng.tolist(),
-            "fields": [f.T.tolist() for f in res.fields],   # per point: (modes, N)
+            "neff": res.neff.real.tolist(), "group_index": None if ng is None else ng.real.tolist(),
+            "fields": [(abs(f) if np.iscomplexobj(f) else f).T.tolist() for f in res.fields],
             "timings": res.timings, "summary": res.summary(),
         }
+        if np.iscomplexobj(res.neff):
+            payload.update(neff_imag=res.neff.imag.tolist(),
+                           propagation_loss_db_cm=res.propagation_loss_db_cm().tolist(),
+                           scalar_fields_complex=[{"real": f.T.real.tolist(), "imag": f.T.imag.tolist()}
+                                                  for f in res.fields])
         if res.vector_fields is not None:
             payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:

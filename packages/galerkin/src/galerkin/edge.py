@@ -134,7 +134,7 @@ def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
     mesh = space.mesh
     g, area = _tri_grads(mesh)
     T = len(area)
-    coeff = np.broadcast_to(np.asarray(coeff, dtype=float), (T,))
+    coeff = np.broadcast_to(np.asarray(coeff), (T,))
 
     # Quadrature points: edge midpoints. Barycentric values (3 points x 3 nodes)
     lam = 0.5 * (np.ones((3, 3)) - np.eye(3))   # point m: lambda_m = 0, others 1/2

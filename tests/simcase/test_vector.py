@@ -211,9 +211,8 @@ def test_invalid_vector_sweep_is_rejected_before_meshing(target):
         Document.from_dict(d)
 
 
-def test_vector_loss_and_nonpositive_permittivity_are_refused():
-    for material, error, text in [({"n": 3.48, "k": 0.01}, NotImplementedError, "lossy"),
-                                  ({"n": 0.0}, ValueError, "positive")]:
+def test_vector_nonpositive_permittivity_requires_explicit_target():
+    for material, error, text in [({"n": 0.0}, ValueError, "positive")]:
         d = copy.deepcopy(examples.VECTOR_SLAB)
         d["materials"]["film"] = material
         with pytest.raises(error, match=text):

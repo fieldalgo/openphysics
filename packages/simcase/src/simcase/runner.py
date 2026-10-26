@@ -187,8 +187,10 @@ def _solve_in_micrometres(model: MeshedModel, physics: dict) -> dict:
     mesh, wl_solve = model.mesh, wl
     if model.solver_mesh is not None:
         mesh, wl_solve = model.solver_mesh, units.to_micrometres(wl, model.doc.scale)
-    return physics_em_modes2d.solve(mesh, eps, wl_solve, physics["boundary"],
-                                    int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"))
+    # physmat uses n+ik; the retained modal phasor is exp(+i omega t-i beta z).
+    return physics_em_modes2d.solve(mesh, np.conjugate(eps), wl_solve, physics["boundary"],
+                                    int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"),
+                                    n_target=physics.get("n_target"))
 
 
 def _field_in_document_units(field: VectorField, model: MeshedModel) -> VectorField:
@@ -221,11 +223,20 @@ class RunResult:
 
     # -- derived -----------------------------------------------------------
 
+    def propagation_loss_db_cm(self) -> np.ndarray:
+        """Power attenuation in dB/cm for exp(+i omega t-i beta z)."""
+        wavelength = np.asarray(self.values if self.parameter is not None and self.parameter.endswith(".wavelength")
+                                else [self.doc.sole_physics()[1]["wavelength"]] * len(self.neff))
+        wavelength_m = units.to_micrometres(wavelength, self.doc.scale) * 1e-6
+        return -40 * np.pi / (100 * np.log(10)) * self.neff.imag / wavelength_m[:, None]
+
     def group_index(self) -> np.ndarray | None:
         """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength."""
         if self.parameter is None or not self.parameter.endswith(".wavelength") or len(self.values) < 2:
             return None
         if self.vector_fields is not None and self.mode_tracking is None:
+            return None
+        if np.iscomplexobj(self.neff) and self.mode_tracking is None:
             return None
         wl = np.asarray(self.values, dtype=float)
         order = 2 if self.mode_tracking is not None else 1
@@ -238,7 +249,7 @@ class RunResult:
             "mesh": {"nodes": int(len(self.mesh_nodes)), "triangles": int(len(self.mesh_triangles)),
                      "regions": {n: self.region_materials[n] for n in self.region_names}},
             "study": {"parameter": self.parameter, "values": [float(v) for v in self.values]},
-            "neff": self.neff.tolist(),
+            "neff": self.neff.real.tolist(),
             "timings_s": {k: round(v, 3) for k, v in self.timings.items()},
         }
         ng = self.group_index()
@@ -249,7 +260,15 @@ class RunResult:
                        n_cladding=physics["n_cladding"], requested_modes=physics["num_modes"],
                        returned_modes=int(self.neff.shape[1]))
         if ng is not None:
-            out["group_index"] = ng.tolist()
+            out["group_index"] = ng.real.tolist()
+        if np.iscomplexobj(self.neff):
+            out.update(mode_result_schema="openphysics.modes2d/2", neff_imag=self.neff.imag.tolist(),
+                       phasor="exp(+i omega t-i beta z)",
+                       propagation_loss_db_cm=self.propagation_loss_db_cm().tolist(),
+                       selection="near_target" if self.doc.sole_physics()[1].get("n_target") is not None
+                       else "real_index_interval")
+            if ng is not None:
+                out["group_index_imag"] = ng.imag.tolist()
         if self.mode_tracking is not None:
             out["mode_tracking"] = copy.deepcopy(self.mode_tracking)
         return out
@@ -314,7 +333,7 @@ class RunResult:
         if sweep:
             ax = axes[2]
             for j in range(self.neff.shape[1]):
-                ax.plot(self.values, self.neff[:, j], "o-", label=f"mode {j + 1}")
+                ax.plot(self.values, self.neff[:, j].real, "o-", label=f"mode {j + 1}")
             ax.set_xlabel(self.parameter + (f" ({length})" if value_unit else ""))
             ax.set_ylabel("n_eff"); ax.legend(fontsize=8)
             ng = self.group_index()
@@ -375,13 +394,20 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
     neffs, fields = [], []
     vector_fields = [] if doc.sole_physics()[1]["formulation"] == "vector" else None
     tracker, tracking = None, None
-    if vector_fields is not None and parameter is not None:
+    scalar_tracking = (vector_fields is None and parameter is not None and parameter.endswith(".wavelength")
+                       and any(np.any(model.eps_per_triangle(v).imag != 0) for v in values))
+    if scalar_tracking:
+        w = np.asarray(values, dtype=float)
+        if len(w) < 3 or not np.isfinite(w).all() or not (np.all(np.diff(w) > 0) or np.all(np.diff(w) < 0)):
+            raise ModeTrackingError("lossy scalar wavelength sweeps need at least 3 strictly monotone values")
+    if (vector_fields is not None or scalar_tracking) and parameter is not None:
         requested = int(doc.sole_physics()[1]["num_modes"])
         settings = tracking_settings(requested, doc["study"].get("tracking"))
         if settings.get("method") == SUBSPACE_METHOD:
             return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh)
-        tracker = ModeTracker(_tracking_mesh(model), requested, settings)
-        tracking = dict(method="electric-l2-assignment-v1", settings=settings, points=[])
+        tracker = ModeTracker(_tracking_mesh(model), requested, settings, scalar=scalar_tracking)
+        tracking = dict(method="scalar-l2-assignment-v1" if scalar_tracking else "electric-l2-assignment-v1",
+                        settings=settings, points=[])
         say("vector sweep: tracking resolved modes by electric L2 overlap; check wavelength-step convergence")
     t0 = time.time()
     for v in values:
@@ -396,8 +422,11 @@ def run(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult 
                 res = _solve_in_micrometres(model, physics)
             except (ValueError, RuntimeError) as exc:
                 raise ModeTrackingError(f"vector sweep at {location}: {exc}") from exc
-            res["neff"], res["vector_field"], evidence = tracker.step(res["neff"], res["vector_field"], location)
-            res["vector_field"] = _field_in_document_units(res["vector_field"], model)
+            key = "fields" if scalar_tracking else "vector_field"
+            res["neff"], res[key], evidence = tracker.step(res["neff"], res[key], location)
+            res["guided"] = res["guided"][np.asarray(evidence["candidate_ranks"])-1]
+            if not scalar_tracking:
+                res["vector_field"] = _field_in_document_units(res["vector_field"], model)
             tracking["points"].append(evidence)
         else:
             res = solve_point(model, physics)
@@ -442,6 +471,9 @@ def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> 
             res = _solve_in_micrometres(model, physics)
         except (ValueError, RuntimeError) as exc:
             raise ModeTrackingError(f"vector subspace sweep at {location}: {exc}") from exc
+        if np.iscomplexobj(res["neff"]):
+            raise ModeTrackingError("electric-l2-subspace-v1 requires a real spectrum; "
+                                    "use resolved-mode assignment for lossy sweeps")
         neff, field, transform, point_offsets, evidence = tracker.step(res["neff"], res["vector_field"], location)
         field = _field_in_document_units(field, model)
         if offsets is None:
