@@ -7,6 +7,27 @@ then follow **Open experimental model workspace** from the home page, or open
 `/workspace` on the same local server. The existing optical and heat editors
 remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is needed.
 
+## First optical study
+
+1. Choose **Applications → Optical waveguide**. The heated-waveguide card is
+   setup only; it does not run coupled physics.
+2. In **Geometry**, set width and height or drag the core edges. In **Materials**,
+   choose Silicon or Silicon nitride for the core; keep the silica background.
+3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
+   do not calculate optical fields. Inspect or export the solver JSON if needed.
+4. Select **Run optical study**. Results keep the input snapshot used by that run,
+   even if you edit the model while waiting. Stop waiting pauses observation only.
+5. Name and **Pin selected run** as a reference. Change the model and run again,
+   then use **Compare** to choose A/B, candidate, component, probe and line profile.
+6. **Save session** creates a portable file with the model, retained results and
+   view settings. Wait for **Browser recovery saved** before relying on local
+   recovery. After reload, expand recovery help and choose **Recover last session**.
+
+Use **Import runs from file** to add results to the current notebook while keeping
+the model. Use **Open session** to replace both model and notebook. Current/earlier
+input labels identify which design a result belongs to; candidate ranks do not
+establish mode correspondence between designs.
+
 ## Working with a model
 
 Choose an application, select a body or boundary in the model tree or drawing,
@@ -56,8 +77,8 @@ they do not represent optical power or a common physical colour scale.
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
 sessions to 16 MiB. CSV and PNG exports are available. These version-2 workspace
-formats are separate from headless simcase JSON documents. Reloading does not
-automatically restore a notebook: save a session first.
+formats are separate from headless simcase JSON documents. After reload, explicitly choose Recover last session for the committed browser
+snapshot, or Open session for a portable file. Pending writes are not a backup.
 
 Version-1 inputs and sessions remain readable: their fixed core height becomes
 220 nm. New files record height and its nm unit explicitly; older editors reject
@@ -175,7 +196,7 @@ Study. Connections explains that no coupled interfaces are present and links
 back to application choice. The heated-waveguide template retains the broader
 setup tree and still cannot execute coupled physics.
 
-### Guided optical workflow
+## Guided optical workflow
 
 The Geometry, Materials, Mesh, Study and Results bar follows the current inputs.
 It identifies invalid drafts, unavailable execution, a pending job, and mesh or
@@ -189,7 +210,7 @@ panel. A connection failure opens it automatically. Numeric error descriptions
 are separate from their field labels; workflow buttons retain keyboard focus as
 status labels update. The workflow is shown for the optical application only.
 
-### Check and export the submitted document
+## Check and export the submitted document
 
 Study → Check inputs calls the public document validation endpoint without meshing
 or starting a job. The report retains its input snapshot and server identity;
@@ -209,7 +230,7 @@ A restarted/different server rejects stale requests before parsing the model or
 starting a job. Check connection before new work; old jobs do not migrate between
 server processes. Classic callers without an instance query keep their existing API.
 
-### Line profiles
+## Line profiles
 
 Results and Compare include an expandable Line profile and CSV panel. Choose a
 horizontal line (constant y) or vertical line (constant x), enter its fixed
@@ -228,7 +249,7 @@ Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
 winding, overlaps and empty regions. Actual exported comparison intervals were
 independently checked against complex vector norms and triangle containment.
 
-### Automatic notebook recovery
+## Automatic notebook recovery
 
 Once the tab has completed or imported results, valid input/selection/name changes
 queue a browser IndexedDB snapshot containing the current inputs, up to six
@@ -251,7 +272,7 @@ unavailable. Use Save session / Save selected run for portable files. The 16 MiB
 session and six-result limits still apply; invalid drafts, undo history, mesh,
 and preflight reports are not included. Probe and profile positions are included.
 
-### Pin reference runs
+## Pin reference runs
 
 Pin selected run protects that result from automatic notebook eviction. A new
 result replaces the oldest unpinned run, with at most six retained in total. If
@@ -262,7 +283,7 @@ Repeated retrieval of the same job preserves its existing name and pin. A failed
 retention operation leaves the previous notebook and selected result intact.
 Pinning is not a portable backup; export files before discarding browser data.
 
-### Import runs without replacing the model
+## Import runs without replacing the model
 
 Results/Compare → Import runs from file accepts a session or selected-run file.
 Review the number of new, matching and replaced unpinned runs before applying.

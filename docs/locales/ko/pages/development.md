@@ -45,6 +45,10 @@ matplotlib 3.8은 Python 3.12 휠이 있는 첫 릴리스입니다. 정확히 �
 - **Chrome 또는 Chromium**: 설치 Studio 브라우저 검사는 이미 설치된 브라우저를
   사용합니다. 찾지 못하면 검사가 실패하며, 건너뛰지 않습니다.
 
+소스 Studio Node 단계는 실험적 작업공간을 포함한 `tests/simcase/*.cjs` 계약을
+모두 실행합니다. 배포 검증은 `studio_workspace_*.cjs` 시험도 복사하여 검증된
+설치 정적 파일에 대해 실행합니다.
+
 ## 저장소 구성
 
 `packages/<name>/`에는 배포판 `<name>`이 싣는 것만 있습니다. `pyproject.toml`,
