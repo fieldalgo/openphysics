@@ -1,3 +1,4 @@
+import {sectionSvg} from './workspace-section.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
 import {checkWorkspaceCapabilities} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
@@ -21,7 +22,9 @@ const connection={ready:false,message:'Checking Studio compatibility…',version
 const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div>`;
 function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Couplings'?'Connections':'Model';render();}
 
+const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
 function geom(){
+if(isOptical())return sectionSvg(state.width,ui.body,pick.boundary,pick.mode);
 const w=state.width/500;
 const attrs=body=>`data-pick-body="${body}" role="button" tabindex="0" aria-label="Select ${body} body" stroke="${ui.body===body?'#fff0a8':'#7a939f'}" stroke-width="${ui.body===body?3:1}"`;
 const edge=(id,path,label)=>`<g data-pick-edge="${id}" role="button" tabindex="0" aria-label="Select ${label}">${path==='M65 260 H535'?'<rect x="65" y="250" width="470" height="20" fill="transparent"/>':''}<path d="${path}" fill="none" stroke="transparent" stroke-width="20"/><path d="${path}" fill="none" stroke="${pick.boundary===id?'#fff0a8':'#b5c9d3'}" stroke-width="${pick.boundary===id?5:2}" pointer-events="none"/></g>`;
@@ -33,16 +36,17 @@ return `<svg viewBox="0 0 600 350" role="group" aria-label="Selectable schematic
 function bindPicking(){
 const bind=(el,fn)=>{el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};};
 $('canvas').querySelectorAll('[data-pick-body]').forEach(el=>{if(pick.mode!=='Bodies'){el.removeAttribute('tabindex');el.setAttribute('role','img');el.onclick=null;return;}bind(el,()=>{ui.body=el.dataset.pickBody;pick.boundary=null;ui.selection='Materials';render();});});
-$('canvas').querySelectorAll('[data-pick-edge]').forEach(el=>bind(el,()=>{pick.boundary=el.dataset.pickEdge;ui.selection=pick.boundary.startsWith('heater')?'Electric currents':pick.boundary==='oxide-bottom'?'Heat transfer':'Solid mechanics';render();}));
+$('canvas').querySelectorAll('[data-pick-edge]').forEach(el=>bind(el,()=>{pick.boundary=el.dataset.pickEdge;ui.selection=pick.boundary.startsWith('optical-')?'Optical modes':pick.boundary.startsWith('heater')?'Electric currents':pick.boundary==='oxide-bottom'?'Heat transfer':'Solid mechanics';render();}));
 }
 function pickingPanel(){
 if(ui.page!=='Model'||!$('canvas').querySelector('svg'))return;
 const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=['Bodies','Boundaries'].map(v=>`<button data-pick-mode="${v}" aria-pressed="${pick.mode===v}">${v}</button>`).join('')+'<span>Click geometry or use Tab + Enter</span>';$('canvas').prepend(bar);
 bar.querySelectorAll('[data-pick-mode]').forEach(el=>el.onclick=()=>{pick.mode=el.dataset.pickMode;pick.boundary=null;render();});
-const hint=document.createElement('p');hint.className='muted';hint.textContent=pick.mode==='Bodies'?`Selected body: ${ui.body}`:ui.view==='Section'?'Cross section: oxide bottom. Switch to Perspective for longitudinal ends.':'Select a highlighted boundary to assign its condition.';$('canvas').append(hint);
+const hint=document.createElement('p');hint.className='muted';hint.textContent=pick.mode==='Bodies'?`Selected body: ${ui.body}`:isOptical()?'Optical window: select one of four fixed PEC edges.':ui.view==='Section'?'Cross section: oxide bottom. Switch to Perspective for longitudinal ends.':'Select a highlighted boundary to assign its condition.';$('canvas').append(hint);
 bindPicking();
 if(pick.mode==='Boundaries'&&pick.boundary){
 const info=document.createElement('section');info.className='boundary-selection';
+if(pick.boundary.startsWith('optical-')){const heading=document.createElement('h3');heading.textContent='Optical '+pick.boundary.slice(8)+' boundary';const note=document.createElement('p');note.textContent='PEC · fixed by the optical adapter. This edge is not a thermal boundary or a mechanical support.';info.append(heading,note);$('inspector').prepend(info);return;}
 const id=pick.boundary;const labels={'heater-start':'Heater start','heater-end':'Heater end','oxide-bottom':'Oxide bottom','left-end':'Left end','right-end':'Right end'};
 info.innerHTML=`<h3>Selected boundary: ${labels[id]}</h3>`;
 let text,action;
@@ -54,14 +58,14 @@ const button=document.createElement('button');button.textContent=text;button.id=
 }
 }
 function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[]),...(state.heat&&state.structure?['Solid mechanics']:[]),...(state.optics?['Optical modes']:[])];}
-function render(){if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function render(){if(isOptical()){ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
-if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
+if(ui.selection==='Geometry')inspector+=`<label>Core width <output>${state.width} nm</output><input id="width" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies',isOptical()?'Core / silica background':'Core / oxide / heater')+pair('Representation',isOptical()?'2D optical input · nm':'Concept preview');
 else if(ui.selection==='Electric currents')inspector+=`<label>Applied voltage [V]<input id="voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label>`+pair('Terminal','Heater input')+pair('Ground','Heater output')+pair('Output','Joule heat [W/m³]');
 else if(ui.selection==='Materials')inspector+=pair('Core','Silicon')+pair('Cladding','Silica')+pair('Heater','Unassigned')+'<p>Conductivity, thermal expansion, elasticity and optical material laws require validated assignments.</p>';
 else if(ui.selection==='Solid mechanics')inspector+=pair('Load','Thermal strain')+pair('Constraints','Not assigned')+pair('Output','Displacement [m]');
 else if(ui.selection==='Heat transfer')inspector+=pair('Source','Joule heat')+pair('Heat loss','Not assigned')+pair('Output','Temperature [K]');
-else if(ui.selection==='Optical modes')inspector+=pair('Wavelength','1550 nm')+pair('Inputs','n(T), geometry')+pair('Output','Modes / effective index');
+else if(ui.selection==='Optical modes')inspector+=pair('Wavelength','1550 nm')+pair('Inputs',isOptical()?'Material at 1550 nm, geometry':'n(T), geometry')+pair('Output','Modes / effective index');
 else inspector+=pair('Status','Not executed')+'<p>Settings and validation will be implemented behind package APIs.</p>';
 inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;
 if(ui.page==='Connections')$('canvas').innerHTML='<h2>Physics connections</h2><p>One-way sequence · design configuration</p><div class="flow"><button data-select="Electric currents"><strong>Electric currents</strong>Voltage → current density</button><label><input data-toggle="heat" type="checkbox" '+(state.heat?'checked':'')+'> Joule heating → Heat transfer</label><div class="arrow">Q [W/m³] → T [K]</div><label><input data-toggle="structure" type="checkbox" '+(state.structure?'checked':'')+' '+(!state.heat?'disabled':'')+'> Thermal expansion → Solid mechanics</label><div class="arrow">T [K] → displacement [m]</div><label><input data-toggle="optics" type="checkbox" '+(state.optics?'checked':'')+'> Optical modes · material / geometry update</label></div><p>Field mapping, deformed mesh and material laws are pending. Two-way feedback is not configured.</p>';
@@ -105,11 +109,11 @@ function options(values,current){return values.map(v=>`<option value="${v}" ${v=
 function issues(){const out=[];for(const b of ['Core','Oxide',...(state.electric===false?[]:['Heater'])])if(!setup.materials[b])out.push(['Materials',b+' material missing']);if(state.electric!==false&&!setup.terminal)out.push(['Electric currents','Terminal / ground pair missing']);if(state.heat&&!setup.cooling)out.push(['Heat transfer','Thermal boundary missing']);if(state.heat&&state.structure&&!setup.fixed)out.push(['Solid mechanics','Mechanical constraint missing']);return out;}
 function decorate(){
 if(ui.page==='Model'&&pick.mode==='Bodies'&&['Geometry','Materials'].includes(ui.selection)){
- const controls=document.createElement('div');controls.className='toolbar';controls.innerHTML=['Core','Oxide','Heater'].map(b=>`<button data-body="${b}" aria-pressed="${ui.body===b}">${b}</button>`).join('');$('canvas').prepend(controls);
+ const controls=document.createElement('div');controls.className='toolbar';controls.innerHTML=(isOptical()?['Core','Oxide']:['Core','Oxide','Heater']).map(b=>`<button data-body="${b}" aria-pressed="${ui.body===b}">${b}</button>`).join('');$('canvas').prepend(controls);
  controls.querySelectorAll('[data-body]').forEach(b=>b.onclick=()=>{ui.body=b.dataset.body;ui.selection='Materials';render();});
 }
 let form='';
-if(ui.selection==='Materials')form=`<h2>${ui.body} material</h2><label>Selected body<select id="body-choice">${options(['Core','Oxide','Heater'],ui.body)}</select></label><label>Material label<select id="material-choice">${options(['','Silicon','Silica','Silicon nitride','Platinum'],setup.materials[ui.body])}</select></label><p>Labels only. Property values, temperature laws and compatibility are not validated.</p>`;
+if(ui.selection==='Materials')form=`<h2>${ui.body} material</h2><label>Selected body<select id="body-choice">${options(isOptical()?['Core','Oxide']:['Core','Oxide','Heater'],ui.body)}</select></label><label>Material label<select id="material-choice">${options(['','Silicon','Silica','Silicon nitride','Platinum'],setup.materials[ui.body])}</select></label><p>Labels only. Property values, temperature laws and compatibility are not validated.</p>`;
 if(ui.selection==='Electric currents')form=`<h2>Electric currents</h2><label>Applied voltage [V]<input id="setup-voltage" type="number" min="0" max="10" step="0.1" value="${state.voltage}"></label><label>Terminal / ground<select id="terminal">${options(['','Heater start / heater end'],setup.terminal)}</select></label><p>Named end faces are placeholders until CAD selection is connected.</p>`;
 if(ui.selection==='Heat transfer')form=`<h2>Heat transfer</h2><label>Thermal boundary<select id="cooling">${options(['','Oxide bottom: fixed temperature'],setup.cooling)}</select></label><label>Boundary temperature [K]<input id="temperature" type="number" min="1" max="2000" step="0.01" value="${setup.temperature}"></label><p>Temperature range is a UI input bound, not material validity.</p>`;
 if(ui.selection==='Solid mechanics')form=`<h2>Solid mechanics</h2><label>Fixed support<select id="fixed">${options(['','Left end fixed','Both ends fixed'],setup.fixed)}</select></label><p>Conceptual end selections. Other faces are intended to remain free. Geometry mapping is pending.</p>`;
@@ -202,7 +206,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   if(ui.selection==='Study'&&!block)$('canvas').innerHTML='<h2>Optical study</h2><p>Input snapshot is captured when Run is pressed.</p>';
   $('canvas').append(info);if(ui.selection==='Study'&&!block)$('inspector').innerHTML='<h2>Optical execution</h2>'+pair('State',solverBusy?'Computing':solverRun?'Completed run available':'Ready for validation')+'<p>Run captures current inputs. Other physics remain unavailable.</p>';
  }
- const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':'Conceptual geometry only · no CAD kernel or computed deformation';
+ const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Width editable; height/window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Run provenance</h2>'+pair('Computation','Optical modes only')+pair('Input',same?'Current snapshot':'Earlier snapshot')+'<p>Selected completed run. Save session includes fields; Save file includes inputs only.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';

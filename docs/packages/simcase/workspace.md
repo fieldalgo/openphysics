@@ -27,8 +27,13 @@ are stored in this browser. Revisions identify local editing order, not Git comm
 
 The model drawing has Zoom in/out, Pan and Fit view controls. Focus the drawing
 and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view retains
-its camera while navigating this tab. These are schematic display coordinates,
-not CAD or physical measurements. Camera changes do not change inputs, edit
+its camera while navigating this tab. Heated-waveguide views remain schematic. The optical-only view shows a
+2D cross section with equal x/y scale and dimensions in nm. Its core rectangle
+and domain come from the same geometry contract as the submitted document: core
+y = 0–220 nm, centered in x; window x = ±1500 nm and y = ±1200 nm. Only the
+core and silica background appear, without a heater or perspective projection.
+Select Boundaries to inspect the four fixed PEC edges; these are read-only
+optical conditions, not thermal/mechanical assignments. This is not a CAD editor. Camera changes do not change inputs, edit
 history, saved files or computed fields.
 
 ## Results and files

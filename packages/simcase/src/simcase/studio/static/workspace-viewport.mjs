@@ -25,28 +25,27 @@ export class SchematicCamera {
 }
 
 export function installViewport(host, camera) {
-  const svg = host.querySelector('svg[aria-label="Selectable schematic geometry"]');
+  const svg = host.querySelector('svg[role="group"]');
   if (!svg) return;
   const bar = document.createElement('div');
   bar.className = 'toolbar viewport-tools';
   bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', 'Schematic view controls');
+  bar.setAttribute('aria-label', 'Geometry view controls');
   const output = document.createElement('output');
   output.setAttribute('aria-live', 'polite');
   const refresh = () => {
     // Width edits replace the SVG while retaining these controls.
-    const current = host.querySelector('svg[aria-label="Selectable schematic geometry"]');
+    const current = host.querySelector('svg[role="group"]');
     if (!current) return;
     current.setAttribute('viewBox', camera.box.join(' '));
     current.setAttribute('tabindex', '0');
-    current.setAttribute('aria-label', 'Selectable schematic geometry');
     current.setAttribute('aria-describedby', 'schematic-navigation-help');
     current.onkeydown = event => {
       if (event.target !== current || event.ctrlKey || event.metaKey || event.altKey) return;
       const action = keys[event.key];
       if (action) { event.preventDefault(); action(); refresh(); }
     };
-    output.textContent = Math.round(camera.zoom * 100) + '% · schematic';
+    output.textContent = Math.round(camera.zoom * 100) + (current.dataset.geometryView==='physical'?'% · optical section (nm)':'% · schematic');
     zoomOut.disabled = camera.zoom <= 1;
     zoomIn.disabled = camera.zoom >= 4;
   };
