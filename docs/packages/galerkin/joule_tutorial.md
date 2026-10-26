@@ -80,3 +80,5 @@ Read the [electric contract](electric_steady2d.md) and
 The [JSON/CLI route](../simcase/electric_joule.md) supports a bounded homogeneous
 rectangle model and has no Studio execution. Its example uses different dimensions
 and coefficients, so it does not reproduce the numbers above unchanged.
+
+Next tutorial: [Temperature-dependent Joule tutorial: feedback and convergence](temperature_joule_tutorial.md).

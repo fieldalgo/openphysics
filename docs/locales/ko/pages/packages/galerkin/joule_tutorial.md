@@ -74,3 +74,5 @@ DC 문제이므로 AC 평균 계수 1/2를 곱하지 않습니다.
 [Joule 계약·검증](joule_heating.md)에 있습니다.
 [JSON/CLI 경로](../simcase/electric_joule.md)는 제한된 균질 직사각형 모델을 지원하며
 Studio 실행은 없습니다. 해당 예제는 크기와 계수가 다르므로 그대로 실행하면 위 수치와 다릅니다.
+
+다음 실습: [온도 의존 Joule 튜토리얼: 되먹임과 수렴](temperature_joule_tutorial.md).

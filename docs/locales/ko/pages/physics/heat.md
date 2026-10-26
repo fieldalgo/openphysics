@@ -10,6 +10,8 @@
 
 - [첫 열전도 해석: 온도가 다른 두 면 사이의 슬래브](../packages/galerkin/thermal_tutorial.md)
 
+- [과도 열전도 튜토리얼: 입력 에너지는 어디에 저장될까?](../packages/galerkin/transient_tutorial.md)
+
 ## 실행 경로와 한계
 
 Python과 JSON/CLI는 직사각형·영역 모델을 지원하지만 Studio는 직사각형 열전도만 지원합니다. 과도 열전도는 flux/Robin 입력과 restart를 제공하지 않습니다. 후속 역학 해석은 아래의 명시적 연계 경로를 사용하세요.

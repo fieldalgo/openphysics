@@ -13,6 +13,9 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 - [첫 Joule 발열 해석: 전력을 열로 전달하기](../packages/galerkin/joule_tutorial.md)
 - [첫 열탄성 해석: 열전도에서 역학으로](../packages/galerkin/thermoelastic_tutorial.md)
 
+- [과도 열전도 튜토리얼: 입력 에너지는 어디에 저장될까?](../packages/galerkin/transient_tutorial.md)
+- [온도 의존 Joule 튜토리얼: 되먹임과 수렴](../packages/galerkin/temperature_joule_tutorial.md)
+
 ## 실행 인터페이스 선택
 
 [모델 구성](../modeling/index.md)과 [물리 문제](../physics/index.md)를 먼저 정한 뒤 선택하세요.
