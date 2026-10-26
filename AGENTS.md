@@ -3,7 +3,9 @@
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and release policy,
 the [package overview](README.md) for setup and architecture, and the
 [development guide](docs/development.md) for dependencies, commands and CI scope.
-The [documentation index](docs/README.md) links implementation contracts.
+The [documentation home](docs/README.md) links reader routes and implementation
+contracts. Follow the [documentation map](docs/development/documentation.md) when
+adding or organizing pages.
 
 - The six implementation packages live under `packages/` and retain independent
   distribution metadata and licenses; their tests are in `tests/<import name>/`,
