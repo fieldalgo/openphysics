@@ -28,7 +28,11 @@ Cohn stripline solutions and the Hammerstad–Jensen microstrip formulas; the
 [documentation](../../docs/packages/sipi/overview.md) lists the measured errors
 and the checks a user should run (mesh refinement and box truncation).
 
+Power integrity: `PowerPlane` solves the DC voltage drop (IR drop) on a copper
+plane fed by regulators and loaded by devices, checked against exact strip,
+annulus and two-pad references.
+
 Not implemented: conductor loss, frequency-dependent dielectrics, S-parameters
-and Touchstone files, 3D structures (vias, planes) and layout import.
+and Touchstone files, AC PDN impedance, vias, several layers and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

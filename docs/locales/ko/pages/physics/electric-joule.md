@@ -26,6 +26,7 @@ Python 전기 API는 영역 전도도와 명시적 Neumann gauge를 지원합니
 - [2D 정상 전기전도](../packages/galerkin/electric_steady2d.md)
 - [정상 Joule heating](../packages/galerkin/joule_heating.md)
 - [온도 의존 정상 Joule heating](../packages/galerkin/temperature_joule_heating.md)
+- [PCB 전원면 DC 전압강하: sipi.PowerPlane](../packages/sipi/overview.md#전원면-dc-전압강하ir-drop), 위 정상 2D 전도 위에서 계산
 
 
 ## 검증 근거

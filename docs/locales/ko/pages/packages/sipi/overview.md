@@ -101,11 +101,66 @@ Linux, Python 3.12, 고정 환경 `tools/requirements-py312-linux.txt`에서 했
 2(2), 1954; "Shielded coupled-strip transmission line," *IRE Trans. MTT* 3(5), 1955; E. Hammerstad and
 Ø. Jensen, "Accurate models for microstrip computer-aided design," *IEEE MTT-S Digest*, 1980.
 
+## 전원면: DC 전압강하(IR drop)
+
+`PowerPlane`은 레귤레이터가 공급하고 소자가 전류를 쓰는 구리 전원면의 DC 전압을 풉니다. 판이 얇아
+두께 t 방향으로 전위가 변하지 않으므로 면내 문제 `div(sigma t grad V) = 0`이 됩니다. 이 문제를
+galerkin의 정상 2D 전도([계약](../galerkin/electric_steady2d.md))로 풀며, t를 깊이로 씁니다.
+
+```python
+from sipi import PowerPlane, Source, Sink, circle, rectangle_outline
+
+plane = PowerPlane(rectangle_outline(0, 0, 60e-3, 40e-3), thickness=35e-6,
+                   holes=[rectangle_outline(25e-3, 10e-3, 32e-3, 32e-3)],
+                   sources=[Source("vrm", circle((6e-3, 6e-3), 2e-3), voltage=1.0)],
+                   sinks=[Sink("cpu", circle((48e-3, 26e-3), 3e-3), current=10.0),
+                          Sink("mem", circle((50e-3, 8e-3), 1.5e-3), current=3.0)])
+r = plane.solve()
+r.drop("cpu"), r.terminals["cpu"]["min"], r.power_loss, r.max_current_density
+```
+
+[`examples/sipi/plane_ir_drop.py`](../../../../../../examples/sipi/plane_ir_drop.py)가 이 판을 출력합니다.
+CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
+
+- **판.** 외곽선은 다각형이나 `circle`이고, `holes`는 절연된 절개입니다. 전도도 기본값은
+  `COPPER_CONDUCTIVITY` = 5.80e7 S/m로, 20 °C 풀림 구리(100 % IACS)입니다.
+- **단자.** 각 단자의 접촉부는 구멍 테두리(`circle`이나 다각형), 외곽선의 직선 구간(`edge(p0, p1)`,
+  두 점 모두 외곽선 꼭짓점), 외곽선 전체(`"outline"`) 중 하나입니다.
+  - `Source`는 접촉부를 고정 전압으로 둡니다.
+  - `Sink`는 접촉부 둘레에 전류를 고르게 뽑습니다(`J.n = I / (P t)`, P는 접촉부 길이). 실제 패드는
+    등전위이고 전류 분포를 모르므로 균일 전류는 단순화입니다. 패드가 다른 단자까지의 거리보다 작을수록
+    영향이 줄어듭니다. 아래 D3 사례가 판 크기 영향과 함께 이를 측정합니다.
+- **결과.**
+  - 절점 `potential`, 요소 `current_density`(A/m²)와 `sheet_current`(A/m), `power_loss`(W).
+  - 단자마다 접촉부 평균·최소·최대 전압과 판으로 들어가는 전류(부하는 음수).
+  - `drop(sink)`는 소스 전압에서 부하 평균 전압을 뺀 값입니다. `resistance(sink)`는 그 강하를 부하 자신의
+    전류로 나눈 값입니다. 부하가 여럿이면 강하에 다른 부하 전류도 섞이므로 분리된 경로 저항이 아니라
+    유효값입니다.
+- **메시 옵션.**
+  - `edge_size`: 단자 접촉부 목표 변 길이, 기본값은 가장 작은 단자 크기 / 12.
+  - `far_size`: 가장 큰 변 길이, 기본값은 외곽 크기 / 30.
+  - `grade`: 단자에서 멀어질 때 단위 거리당 증가율, 기본값 0.2.
+  - 최대 전류밀도는 접촉부 가장자리에서 나오고 그곳 메시에 따라 달라집니다. 믿기 전에 세분하세요.
+
+모델에 없는 것: 비아와 여러 층, 온도 의존 구리(galerkin에는 [σ(T) Joule 반복](../galerkin/temperature_joule_heating.md)이
+있지만 이 API는 아직 쓰지 않음), 두께 방향 전류, 교류 효과.
+
+### 검증 (`tests/sipi/test_sipi_plane.py`)
+
+기준은 첫 실행 전에 정했습니다. 측정은 2026-10-26, Linux, Python 3.12, 고정 환경에서 했습니다.
+
+| 사례 | 기준해 | 판정 기준 | 측정값 |
+|---|---|---|---|
+| D1 50 × 5 mm 띠, 양 끝이 소스와 부하 | `R = L / (sigma t W)`(P1에서 정확) | 1e-9 | 2e-14(R, 강하, 손실, 최대 J) |
+| D2 원환 a = 1 mm, b = 10 mm, 안쪽 소스, 외곽선 부하 | `dV = I ln(b/a) / (2 pi sigma t)` | 세 메시 중 가장 고운 것에서 ≤ 1e-3, 감소 | −1.9e-3, −6.1e-4, −3.4e-4 |
+| D3 두 패드 a = 0.5 mm, d = 10 mm, 정사각 판 100·200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ(무한 시트의 등전위 원판) | 각각 1 % 이내, 판을 두 배로 할 때 R 변화 ≤ 0.5 % | +0.27 %, −0.19 %, 변화 −0.46 % |
+| D4 부하 둘과 절개 | Joule 손실 = Σ 단자 전압 × 전류 | 1e-9 | 통과 |
+
 ## 구현하지 않은 것
 
 - 도체 손실 `R`(표피효과, 표면 거칠기). `R`은 반환하지 않습니다.
 - 주파수 의존 유전체(예: Djordjevic–Sarkar). `tan_delta`는 상수입니다.
 - S-파라미터, Touchstone 파일, 시간 영역 응답.
-- 3D 구조: 비아, 평면 공진, 전원 분배망.
+- DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
 - 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 비직사각형 도체, JSON 문서와 Studio 화면.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
