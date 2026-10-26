@@ -20,3 +20,5 @@ main{position:relative}.panel-divider{display:none}.layout-help{display:flex;fle
 @media(max-width:1000px){main.comparing{display:block}}
 
 #input-problems{padding:12px 22px;background:#382b24;border-bottom:1px solid #dca179}#input-problems[hidden]{display:none}#input-problems>div{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:8px}.input-hint{font-size:12px;margin:6px 0}input[aria-invalid=true]{border-color:#e8a176;outline:1px solid #e8a176}input[aria-invalid=true]+.input-hint{color:#f1b58f}
+
+.viewport-tools{flex-wrap:wrap;padding:10px 0}.viewport-tools output{color:var(--accent)}.canvas svg:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
