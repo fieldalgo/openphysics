@@ -540,7 +540,12 @@ function drawField() {
   const scaleValues = vector ? vectorMagnitudes(vector, m, 'magnitude') : f;
   let vmax = 0; for (const v of scaleValues) vmax = Math.max(vmax, Math.abs(v)); vmax = vmax || 1;
   const nodes = resultData.nodes, tris = resultData.triangles;
-  drawTriangles(ctx, T, nodes, tris, t => { if (vector) return cmap(f[t] / vmax);
+  const physical = resultData.summary.open_boundary?.[p]?.physical_bounds;
+  if (physical) vmax = 1;
+  drawTriangles(ctx, T, nodes, tris, t => {
+    if (physical) { const c = [0,1].map(dim => tris[t].reduce((sum,i) => sum+nodes[i][dim],0)/3);
+      if (c.some((v,dim) => v < physical[0][dim] || v > physical[1][dim])) return '#d0d5dd'; }
+    if (vector) return cmap(f[t] / vmax);
     const [a, b, c] = tris[t]; return cmap((Math.abs(f[a]) + Math.abs(f[b]) + Math.abs(f[c])) / (3 * vmax)); }, false);
   ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
   drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
@@ -548,10 +553,12 @@ function drawField() {
   const fieldLabel = vector ? (component === 'magnitude' ? '|E|' : ['|Ex|', '|Ey|', '|Ez|'][+component]) : '|field|';
   const tracking = resultData.summary.mode_tracking, point = tracking?.points[p];
   const identity = tracking ? `tracked branch ${m + 1}` : `mode ${m + 1}`;
+  const openPoint = resultData.summary.open_boundary?.[p];
+  const openCandidate = openPoint?.candidates.find(c => c.candidate === openPoint.selected_candidates?.[m]);
   const match = point ? (point.overlaps === null ? ', seed point' : `, overlap ${point.overlaps[m].toFixed(3)}`) : '';
   $('resInfo').textContent = `${fieldLabel}, ${identity} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}${match}` +
     (resultData.neff_imag ? `, Im n_eff = ${resultData.neff_imag[p][m].toExponential(4)}, ${resultData.propagation_loss_db_cm[p][m].toFixed(4)} dB/cm` : '') +
-    (vector ? ' (relative amplitude, common |E| scale)' : '');
+    (vector ? ' (relative amplitude, common |E| scale)' : '') + (resultData.summary.open_boundary ? ` — PML candidate, stability not checked${openCandidate ? ', '+openCandidate.attenuation_status : ''}` : '');
 }
 function drawSweep() {
   if(transientSupported()&&transientController.result())return;
@@ -612,7 +619,16 @@ function fillResultTable() {
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + studyLabel(resultData) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
   resultData.values.forEach((v, i) => { h += `<tr><td>${v}</td>` + resultData.neff[i].map((x,j) => `<td>${x.toFixed(6)}${resultData.neff_imag ? `<br>Im n_eff: ${resultData.neff_imag[i][j].toExponential(4)}<br>${resultData.propagation_loss_db_cm[i][j].toFixed(4)} dB/cm` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}${resultData.summary.group_index_imag ? `<br>Im n_g: ${resultData.summary.group_index_imag[i][j].toExponential(4)}` : ''}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
-  if (resultData.neff_imag) h += '<div class="hint">Material absorption only; exp(+iωt−iβz), Im n_eff &lt; 0 means attenuation. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';
+  if (resultData.neff_imag && !resultData.summary.open_boundary) h += '<div class="hint">Material absorption only; exp(+iωt−iβz), Im n_eff &lt; 0 means attenuation. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';
+  if (resultData.summary.open_boundary) {
+    h += '<div class="hint">PML candidates: stability not checked. Total attenuation includes material absorption and radiation. Fractions are positive L2 diagnostics, not energy. Grey field regions are artificial PML; normalization and tracking use the physical window.</div>';
+    resultData.summary.open_boundary.forEach((point,i) => {
+      h += `<details><summary>Point ${i+1}: all ${point.candidates.length} searched candidates</summary><table class="res"><tr><th>Candidate</th><th>Re / Im n_eff</th><th>Physical L2</th><th>Residual</th><th>Selection / reason</th></tr>`;
+      point.candidates.forEach(c => { h += `<tr><td>${c.candidate}</td><td>${c.neff_real.toFixed(6)} / ${c.neff_imag.toExponential(3)}</td><td>${c.physical_l2_fraction.toFixed(4)}</td><td>${c.pencil_residual.toExponential(2)}</td><td>${c.reasons.join(', ')}; ${c.attenuation_status}</td></tr>`; });
+      h += '</table></details>';
+    });
+    if (resultData.summary.bend_loss_db_90deg) h += '<div class="hint">Bend total attenuation (dB/90°, reference radius): '+resultData.summary.bend_loss_db_90deg.map(row => row.map(x => x.toExponential(4)).join(', ')).join(' / ')+'</div>';
+  }
   if (tracked) h += '<div class="hint" style="margin:0 10px">Branch numbers follow the modes seeded at the first wavelength. Refine the wavelength spacing to check group-index accuracy.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
   $('resTable').innerHTML = h;
@@ -696,6 +712,13 @@ function renderProps() {
     (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
       '<div class="hint">Set the exterior guiding threshold, valid throughout the study. Passive absorption is supported. For metals, set a target index to search nearby candidates; check mesh and window convergence. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
       '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +
+    row('open boundary PML', `<select data-kind="pml-toggle" data-physics="${pk}"><option value="off" ${!p.pml ? 'selected' : ''}>off</option><option value="on" ${p.pml ? 'selected' : ''}>on</option></select>`) +
+    (p.pml ? ['left','right','bottom','top'].map(side => row(`PML ${side} (${lengthUnit()})`, num(`physics.${pk}.pml.thickness.${side}`, p.pml.thickness[side] ?? 0))).join('') +
+      row('PML strength', num(`physics.${pk}.pml.strength`, p.pml.strength ?? 3)) + row('PML order (2–4)', num(`physics.${pk}.pml.order`, p.pml.order ?? 2, 1)) +
+      row('minimum physical L2 fraction', num(`physics.${pk}.pml.min_physical_fraction`, p.pml.min_physical_fraction ?? .1)) +
+      '<div class="hint">Set a positive target index. The domain includes PML strips; extend materials through them. Outer PML faces require PEC. Candidate fractions are heuristic; vary mesh, window, thickness and strength independently.</div>' +
+      row('constant-radius bend', `<select data-kind="bend-toggle" data-physics="${pk}"><option value="off" ${!p.bend ? 'selected' : ''}>off</option><option value="on" ${p.bend ? 'selected' : ''}>on</option></select>`) +
+      (p.bend ? row(`radius (${lengthUnit()})`, num(`physics.${pk}.bend.radius`, p.bend.radius)) + row('outward axis', sel(`physics.${pk}.bend.axis`, p.bend.axis ?? 'x', ['x','y'])) + row(`reference origin (${lengthUnit()})`, num(`physics.${pk}.bend.origin`, p.bend.origin ?? 0)) : '') : '') +
     '<h3 style="margin-top:12px">Boundaries</h3>' +
     ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join(''); }
   else if (selected === 'units') {
@@ -725,6 +748,15 @@ function renderProps() {
   }));
   P.querySelectorAll('[data-kind="matname"]').forEach(el => el.addEventListener('change', renameMaterial));
   P.querySelectorAll('[data-kind="grading"]').forEach(el => el.addEventListener('change', e => { invalidateDocument(); doc.mesh.grading = e.target.value === 'on' ? { center: [0, 0], near: doc.mesh.size / 5, far: doc.mesh.size, distance: 1 } : null; refresh(); }));
+  P.querySelectorAll('[data-kind="pml-toggle"], [data-kind="bend-toggle"]').forEach(el => el.addEventListener('change', e => {
+    invalidateDocument(); const p = doc.physics[e.target.dataset.physics], d = doc.geometry.domain;
+    if (e.target.dataset.kind === 'pml-toggle') {
+      if (e.target.value === 'off') { delete p.pml; delete p.bend; }
+      else p.pml = {thickness: {left: (d.xmax-d.xmin)/10, right: (d.xmax-d.xmin)/10, bottom: (d.ymax-d.ymin)/10, top: (d.ymax-d.ymin)/10}, strength: 3, order: 2, min_physical_fraction: .1};
+    } else if (e.target.value === 'off') delete p.bend;
+    else p.bend = {radius: 5*Math.max(d.xmax-d.xmin,d.ymax-d.ymin), axis: 'x', origin: d.xmin};
+    meshData = null; refresh();
+  }));
   P.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', onAction));
 }
 function matHint(name) { const m = materials.find(x => x.name === name || x.aliases.includes(name)); if (m) return `<div class="hint">${m.source}<br>valid ${m.range_um[0]}–${m.range_um[1] ?? '∞'} um</div>`;
@@ -864,7 +896,7 @@ async function doRun() {
         if (isHeadlessThermalType(data.summary?.physics_type)) throw new Error('Studio cannot render headless thermal results');
         subspaceOf(data);
         resultData = data; populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
-      if (j.status === 'error') { log(j.error, 'err'); status('run failed'); break; } } }
+      if (j.status === 'error') { log(j.error, 'err'); if (j.open_boundary) log(JSON.stringify(j.open_boundary), 'err'); status('run failed'); break; } } }
   catch (e) { if (revision === documentRevision) { log('run failed: ' + e.message, 'err'); status('run failed'); } }
   finally { if (revision === documentRevision) $('runBtn').disabled = false; }
 }

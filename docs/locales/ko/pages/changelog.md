@@ -24,6 +24,8 @@ OpenPhysics 배포판 일곱 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- Scalar/full-vector 모드 PML·일정 반경 굽힘: 복소 후보 진단, 물리창 추적, 총 감쇠, Studio 입력 및 독립 slab/원통 기준 검증.
+
 구현 패키지 여섯 개와 `openphysics` 메타 배포판의 첫 PyPI 릴리스이며, 0.1.0으로
 계획돼 있습니다.
 

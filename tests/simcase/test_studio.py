@@ -259,3 +259,20 @@ def test_vector_sweep_rejects_path_beyond_numeric_leaf_with_http_400(client):
     response = client.post("/api/run", json={"doc": doc})
     assert response.status_code == 400
     assert "does not exist" in response.json()["detail"]
+
+
+def test_pml_studio_returns_candidate_diagnostics_and_bend_loss(client):
+    from test_pml_contract import document
+    doc = document('vector', True).data
+    response = client.post('/api/run', json={'doc':doc})
+    assert response.status_code == 200
+    job = response.json()['job']
+    for _ in range(400):
+        status = client.get(f'/api/jobs/{job}').json()
+        if status['status'] in ('done','error'): break
+        time.sleep(.025)
+    assert status['status'] == 'done', status
+    summary = client.get(f'/api/jobs/{job}/result').json()['summary']
+    assert summary['open_boundary'][0]['stability'] == 'not_checked'
+    assert summary['bend_loss_db_90deg'][0][0] > 0
+    assert summary['field_representation'] == 'pml-vector-edge-nodal-v1'
