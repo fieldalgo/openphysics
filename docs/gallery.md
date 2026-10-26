@@ -80,6 +80,6 @@ frequencies are compared with the analytical box modes from `galerkin-refsol`:
 - The script guards against a broken picture: the heated plate must warm up, the
   coax rate must exceed 1.8 and the cavity frequencies must agree within 1%.
   These are not the validation thresholds.
-- Region-material results are not in the gallery: the ParaView export does not
-  yet accept region layouts.
+- Region-material results are not pictured in this gallery. Saved steady and
+  transient region results do support [VTU/PVD export](packages/simcase/thermal_regions2d.md#vtu-and-pvd-export).
 - Picture files are listed in the [asset inventory](assets.md).

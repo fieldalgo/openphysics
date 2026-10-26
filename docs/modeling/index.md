@@ -38,3 +38,8 @@ supported. In particular, optical dispersion models do not define thermal or ele
 - [simcase — the model document and its headless runner](../packages/simcase/overview.md)
 - [OpenPhysics architecture](../architecture.md)
 - [Physics problems](../physics/index.md)
+
+## Apply this to your model
+
+- [Model a two-material wall, run it and inspect the heat flow](../packages/simcase/layered_wall_tutorial.md)
+- [Choose units, signs and boundary conditions](boundaries-units.md)

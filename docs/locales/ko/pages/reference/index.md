@@ -50,3 +50,5 @@
 - [직사각형의 headless 과도 열전도](../packages/simcase/thermal_transient2d.md)
 - [Studio 과도 열전도](../packages/simcase/thermal_transient_studio.md)
 - [벡터 파장 sweep의 선택형 부분공간 추적](../packages/simcase/vector_subspace_tracking.md)
+
+- [실험적 workspace와 파일 계약](../packages/simcase/workspace.md)

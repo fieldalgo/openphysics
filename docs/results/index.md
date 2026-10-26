@@ -34,3 +34,9 @@ simcase overview and the specific physics contract for the supported scope.
 - [Stored reference values](../stored-reference-values.md)
 - [Reference-tool comparisons](../reference-comparisons.md)
 - [Development and validation](../development.md)
+
+## Apply this to your model
+
+- [Read saved fields and export them to ParaView](saved-results.md)
+- [Check convergence of your calculation](../validation/convergence.md)
+- [Diagnose model, solver and result errors](../guide/troubleshooting.md)

@@ -66,3 +66,17 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 - [과도 열전도에서 준정적 역학으로](../packages/galerkin/transient_thermal_mechanical.md)
 - [정상 Joule heating](../packages/galerkin/joule_heating.md)
 - [온도 의존 정상 Joule heating](../packages/galerkin/temperature_joule_heating.md)
+
+## 실험적 모델 workspace
+
+[Workspace 안내](../packages/simcase/workspace.md)는 제한된 광학 실행과 입력·session 저장을
+설명합니다. 가열 도파관 화면은 설정 미리보기이며 연계 물리를 실행하지 않습니다.
+기존 광학·열 Studio와 파일 형식 및 지원 범위가 다릅니다.
+
+## 내 모델로 확장하기
+
+- [두 재료 벽 만들기: 모델부터 열 흐름 확인까지](../packages/simcase/layered_wall_tutorial.md)
+- [단위·부호·경계조건 선택하기](../modeling/boundaries-units.md)
+- [저장한 장 읽기와 ParaView 내보내기](../results/saved-results.md)
+- [내 계산의 수렴 확인하기](../validation/convergence.md)
+- [모델·솔버·결과 오류 진단하기](troubleshooting.md)

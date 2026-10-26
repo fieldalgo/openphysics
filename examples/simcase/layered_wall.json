@@ -1,0 +1,28 @@
+{
+  "openphysics": "0.2",
+  "name": "Two-layer wall with convection",
+  "units": {"length": "mm", "temperature": "K"},
+  "geometry": {
+    "domain": {"xmin": 0, "xmax": 40, "ymin": 0, "ymax": 10},
+    "background": {"material": "low_k"},
+    "shapes": [
+      {"name": "left_layer", "type": "rect", "x": 0, "y": 0, "w": 10, "h": 10,
+       "material": "high_k"}
+    ]
+  },
+  "materials": {
+    "high_k": {"conductivity_w_mk": 10, "source": "illustrative tutorial coefficient"},
+    "low_k": {"conductivity_w_mk": 1, "source": "illustrative tutorial coefficient"}
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.steady2d",
+      "heat_source_w_m3": 0,
+      "dirichlet_temperature_k": {"left": 350},
+      "convection": {"right": {"h_w_m2k": 50, "ambient_temperature_k": 300}}
+    }
+  },
+  "mesh": {"size": 2, "min_angle": 28},
+  "study": {"type": "single"},
+  "results": {"save_fields": true, "plots": false}
+}

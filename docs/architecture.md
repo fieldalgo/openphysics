@@ -68,7 +68,11 @@ repository; separate historical package repositories are not needed to use them.
   steady and transient thermal, elasticity and prescribed-temperature thermoelastic models,
   plus the documented steady heat-to-mechanics workflow and transient heat-to-mechanics call.
 - **JSON / CLI through `simcase`:** passive absorbing `em.modes2d`, `em.cavity3d` and the
-  documented `thermal.steady2d` and rectangular `thermal.transient2d` subsets. Python-only extensions do not
+  documented `thermal.steady2d` and `thermal.transient2d` subsets, including
+  [material-region heat documents](packages/simcase/thermal_regions2d.md).
+  [Electric/Joule documents](packages/simcase/electric_joule.md) add homogeneous
+  rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`.
+  Python-only extensions do not
   automatically become document features. The [steady boundary contract](packages/simcase/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting
   both new keys retain v1.

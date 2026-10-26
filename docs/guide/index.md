@@ -66,3 +66,18 @@ After running, follow [results, export and trust](../results/index.md).
 - [Transient heat to quasistatic mechanics](../packages/galerkin/transient_thermal_mechanical.md)
 - [Steady Joule heating](../packages/galerkin/joule_heating.md)
 - [Temperature-dependent steady Joule heating](../packages/galerkin/temperature_joule_heating.md)
+
+## Experimental model workspace
+
+[Workspace guidance](../packages/simcase/workspace.md) covers the bounded optical
+runner and input/session saving. The heated-waveguide screen is a setup preview,
+not a coupled solve. Its file formats and capabilities differ from the original
+optical and thermal Studio editors.
+
+## Apply this to your model
+
+- [Model a two-material wall, run it and inspect the heat flow](../packages/simcase/layered_wall_tutorial.md)
+- [Choose units, signs and boundary conditions](../modeling/boundaries-units.md)
+- [Read saved fields and export them to ParaView](../results/saved-results.md)
+- [Check convergence of your calculation](../validation/convergence.md)
+- [Diagnose model, solver and result errors](troubleshooting.md)

@@ -27,3 +27,7 @@ and Studio support differ; check the overview feature matrix and each workflowâ€
 ## 3. Choose the next workflow
 
 Choose a workflow in the [user guide](../guide/index.md), then check its [API and document contract](../reference/index.md).
+
+## Apply this to your model
+
+- [Model a two-material wall, run it and inspect the heat flow](../packages/simcase/layered_wall_tutorial.md)

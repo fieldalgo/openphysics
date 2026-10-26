@@ -49,3 +49,8 @@ Python과 JSON/CLI는 직사각형·영역 모델을 지원하지만 Studio는 �
 [모델 구성](../modeling/index.md) · [결과와 신뢰성](../results/index.md) · [전체 물리 문제](index.md)
 
 [열→역학 연계](mechanics.md)
+
+## 내 모델로 확장하기
+
+- [두 재료 벽 만들기: 모델부터 열 흐름 확인까지](../packages/simcase/layered_wall_tutorial.md)
+- [단위·부호·경계조건 선택하기](../modeling/boundaries-units.md)
