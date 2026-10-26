@@ -83,3 +83,7 @@ optical and thermal Studio editors.
 - [Diagnose model, solver and result errors](troubleshooting.md)
 
 - [Choose Python, JSON/CLI or Studio](execution-paths.md)
+
+- [Verify a waveguide against the slab solution](../validation/slab-tutorial.md)
+- [Interpret thermal expansion, stress and reactions](../results/thermoelastic-controls.md)
+- [Keep a reproducible calculation record](../results/run-records.md)
