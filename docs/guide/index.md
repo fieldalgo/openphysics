@@ -81,3 +81,5 @@ optical and thermal Studio editors.
 - [Read saved fields and export them to ParaView](../results/saved-results.md)
 - [Check convergence of your calculation](../validation/convergence.md)
 - [Diagnose model, solver and result errors](troubleshooting.md)
+
+- [Choose Python, JSON/CLI or Studio](execution-paths.md)

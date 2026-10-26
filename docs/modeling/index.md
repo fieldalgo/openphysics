@@ -43,3 +43,5 @@ supported. In particular, optical dispersion models do not define thermal or ele
 
 - [Model a two-material wall, run it and inspect the heat flow](../packages/simcase/layered_wall_tutorial.md)
 - [Choose units, signs and boundary conditions](boundaries-units.md)
+
+- [Choose material data and its valid range](materials.md)

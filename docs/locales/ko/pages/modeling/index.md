@@ -42,3 +42,5 @@ JSON 문서로 묶고, Python 경로에서는 각 패키지 API를 직접 조합
 
 - [두 재료 벽 만들기: 모델부터 열 흐름 확인까지](../packages/simcase/layered_wall_tutorial.md)
 - [단위·부호·경계조건 선택하기](boundaries-units.md)
+
+- [재료 데이터와 유효 범위 선택](materials.md)

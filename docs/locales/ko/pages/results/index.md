@@ -40,3 +40,5 @@ JSON/CLI의 저장 파일과 export 지원은 모델마다 다릅니다. `simcas
 - [저장한 장 읽기와 ParaView 내보내기](saved-results.md)
 - [내 계산의 수렴 확인하기](../validation/convergence.md)
 - [모델·솔버·결과 오류 진단하기](../guide/troubleshooting.md)
+
+- [도파로 모드와 손실 해석](waveguide-modes.md)

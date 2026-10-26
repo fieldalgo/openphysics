@@ -17,6 +17,7 @@ PAGES = [
     'packages/simcase/layered_wall_tutorial.md',
     'modeling/boundaries-units.md', 'results/saved-results.md',
     'validation/convergence.md', 'guide/troubleshooting.md',
+    'modeling/materials.md', 'guide/execution-paths.md', 'results/waveguide-modes.md',
 ]
 
 
@@ -81,3 +82,30 @@ def test_saved_result_document_blocks_preserve_exported_fields(tmp_path, monkeyp
             np.testing.assert_array_equal(viewed.point_data['temperature_k'], fields['temperature_k'])
             np.testing.assert_array_equal(viewed.cell_data['triangle_regions'][0], fields['triangle_regions'])
             np.testing.assert_array_equal(viewed.cell_data['heat_flux_w_m2'][0][:, :2], fields['heat_flux_w_m2'])
+
+
+def test_material_selection_document_checks_source_and_range():
+    import physmat
+    namespace = _execute_document_python('modeling/materials.md')
+    si = namespace['si']
+    assert namespace['k_w_mk'] == 148.0
+    assert si.properties['thermal_conductivity'].source
+    assert si.source
+    assert si.get('thermal_conductivity', T=400.0) == namespace['k_w_mk']
+    with pytest.raises(physmat.OutOfRange):
+        si.index(0.5)
+
+
+def test_waveguide_interpretation_document_has_passive_loss():
+    namespace = _execute_document_python('results/waveguide-modes.md')
+    assert np.all(np.isfinite(namespace['neff']))
+    assert np.all(namespace['neff'].imag < 0)
+    assert np.all(np.asarray(namespace['loss_db_cm']) > 0)
+
+
+def _execute_document_python(page):
+    text = (ROOT / 'docs' / page).read_text(encoding='utf-8')
+    namespace = {}
+    for code in re.findall(r'^```python\n(.*?)^```', text, re.M | re.S):
+        exec(compile(code, page, 'exec'), namespace)
+    return namespace
