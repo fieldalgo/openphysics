@@ -12,6 +12,7 @@ import numpy as np
 
 from .mesh import Mesh
 from .core.checks import real_array
+from .coupling import Field, OneWayChain, transfer
 from .materials import is_per_region, region_property
 from .thermal_mechanical import _isolated_mesh, _mesh_state, _check_mesh, _supports
 from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
@@ -28,6 +29,10 @@ class TransientThermoelasticError(ValueError):
         self.time_s = time_s
         where = "" if time_index is None else f" at time index {time_index}, time_s={time_s!r}"
         super().__init__(f"transient thermoelasticity [{stage}]{where}")
+
+
+def _stage_error(stage, exc, **context):
+    return TransientThermoelasticError(stage, **context)
 
 
 def _scalar(value, name):
@@ -100,7 +105,8 @@ def solve_transient_thermoelasticity(
     snapshots are validated and frozen before any mechanics call. No partial
     aggregate is returned after failure; exceptions chain the original cause.
     """
-    try:
+    chain = OneWayChain(_stage_error)
+    with chain.stage("input"):
         if not isinstance(units, Mapping) or dict(units) != {
             'length': 'm', 'time': 's', 'temperature': 'K'
         }:
@@ -145,21 +151,19 @@ def solve_transient_thermoelasticity(
         body = real_array(body_force, "body_force")
         if body.shape != (2,):
             raise ValueError("body_force must be a constant Cartesian (2,) vector")
-    except Exception as exc:
-        raise TransientThermoelasticError("input") from exc
 
     snapshots = []
     for index in selected:
-        try:
-            snapshots.append(freeze_temperature(owned, temperatures[index]))
-        except Exception as exc:
-            raise TransientThermoelasticError(
-                "transfer", time_index=index, time_s=float(times[index])) from exc
+        with chain.stage("transfer", time_index=index, time_s=float(times[index])):
+            # Same-mesh identity transfer of the stored nodal Kelvin field.
+            nodal = transfer(Field(owned, temperatures[index], location="node", unit="K",
+                                   name="heat.temperature_k"), owned)
+            snapshots.append(freeze_temperature(owned, nodal.values))
     # The entire input history copy is temporary; only selected snapshots survive.
     del temperatures
     steps = []
     for index, snapshot in zip(selected, snapshots):
-        try:
+        with chain.stage("mechanics", time_index=index, time_s=float(times[index])):
             mechanics = solve_thermoelasticity(
                 owned, snapshot, reference_temperature_k=tref,
                 thermal_expansion_per_k=alpha, young_modulus=e,
@@ -167,8 +171,5 @@ def solve_transient_thermoelasticity(
                 body_force=body,
             )
             _check_mesh(owned, state)
-        except Exception as exc:
-            raise TransientThermoelasticError(
-                "mechanics", time_index=index, time_s=float(times[index])) from exc
         steps.append(TransientThermoelasticStep(int(index), float(times[index]), snapshot, mechanics))
     return TransientThermoelasticResult(owned, tuple(steps))

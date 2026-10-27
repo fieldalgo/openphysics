@@ -152,6 +152,10 @@ Input checks/copies precede heat. Component heat validation/solve failure is hea
 freeze/domain failure is transfer; component mechanical validation/solve failure
 is mechanics; canonical serialization failure is manifest. Detected private mesh
 mutation is labelled at the component boundary where it was observed.
+The stages run as a `OneWayChain` of the [coupling layer](coupling.md); the
+manifest's completed stage statuses are the chain's completed stages after
+`input`. The checked nodal Kelvin array becomes a node `Field` in K and passes
+the same-mesh identity transfer before it is frozen.
 
 ```python
 from galerkin.thermal_mechanical import WorkflowStageError
