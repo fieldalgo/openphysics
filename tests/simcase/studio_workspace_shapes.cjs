@@ -61,3 +61,16 @@ test('run tables keep legacy columns for one rectangle and describe every shape'
  assert.ok(rows[1].includes('"500","220","1550","30","Silicon","Core: rect Silicon x -250…250, y 0…220 nm"'));
  assert.ok(rows[3].includes('"","","1550","30","","Slab: rect Silicon x -1500…1500, y 0…90 nm | Rod: circle Silicon nitride centre (0, 500), r 150 nm"'));
 });
+test('alignment meets reference edges exactly and refuses leaving the window',()=>{
+ const slot=rect('Slot',-50,0,100,220,'Air'),left=rect('Left',300.3,40,250.1,180),right={name:'Right',type:'polygon',material:'Silicon',points:[[0,500],[250,500],[250,720],[0,720]]};
+ const placedLeft=S.alignShape(left,'left-of',slot);assert.equal(S.shapeBounds(placedLeft).xmax,-50);assert.equal(placedLeft.y,40);
+ const placedRight=S.alignShape(right,'right-of',slot);assert.equal(S.shapeBounds(placedRight).xmin,50);assert.deepEqual(placedRight.points[0],[50,500]);
+ const d=opticalDocument(state([placedLeft,S.alignShape(S.alignShape(placedRight,'rest-y'),'right-of',slot),slot]),setup).geometry.shapes;
+ assert.equal(d[0].points[1][0],d[2].points[0][0]);assert.equal(d[1].points[0][0],d[2].points[1][0]);
+ assert.equal(S.alignShape(left,'centre-x').x,-125.05);assert.equal(S.alignShape(right,'rest-y').points[0][1],0);
+ assert.deepEqual(S.shapeBounds(S.alignShape(slot,'on-top',left)),{xmin:-50,xmax:50,ymin:220,ymax:440});
+ assert.equal(S.shapeBounds(S.alignShape(slot,'below',left)).ymax,40);
+ const rod={name:'Rod',type:'circle',material:'Silicon nitride',cx:900,cy:-300,r:100};assert.equal(S.alignShape(rod,'centre-on',slot).cx,0);
+ assert.throws(()=>S.alignShape(rect('Wide',-1500,0,3000,100),'right-of',slot),/outside the window/);
+ assert.throws(()=>S.alignShape(slot,'left-of'),/reference/);assert.throws(()=>S.alignShape(slot,'spin',left));
+});

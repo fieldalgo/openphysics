@@ -124,3 +124,19 @@ export function duplicateShape(shape,shapes){
  const moved=shape.type==='circle'?{...shape,cx:shape.cx+offset}:shape.type==='rect'?{...shape,x:shape.x+offset}:{...shape,points:shape.points.map(([x,y])=>[x+offset,y])};
  try{return validateShape({...moved,name});}catch{return validateShape({...shape,points:shape.points?.map(p=>[...p]),name});}
 }
+// Exact translation (rounded once in nm) used by alignment; the caller validates the window.
+export function translateShape(shape,dx,dy){
+ if(shape.type==='rect')return {...shape,x:tidy(shape.x+dx),y:tidy(shape.y+dy)};
+ if(shape.type==='circle')return {...shape,cx:tidy(shape.cx+dx),cy:tidy(shape.cy+dy)};
+ return {...shape,points:shape.points.map(([x,y])=>[tidy(x+dx),tidy(y+dy)])};
+}
+export const ALIGN_ACTIONS=Object.freeze({'centre-x':'Centre on x = 0','rest-y':'Rest on y = 0','left-of':'Place left of','right-of':'Place right of','on-top':'Place on top of','below':'Place below','centre-on':'Centre on'});
+// Bounds edges move to exact coordinates; a result outside the window is refused, not clamped.
+export function alignShape(shape,action,reference=null){
+ const b=shapeBounds(shape),r=reference&&shapeBounds(reference),cx=(b.xmin+b.xmax)/2,cy=(b.ymin+b.ymax)/2;
+ if(!ALIGN_ACTIONS[action])throw new Error('Unknown alignment.');
+ if(!['centre-x','rest-y'].includes(action)&&!r)throw new Error('Choose a reference shape.');
+ const [dx,dy]={'centre-x':[-cx,0],'rest-y':[0,-b.ymin],'left-of':r&&[r.xmin-b.xmax,0],'right-of':r&&[r.xmax-b.xmin,0],'on-top':r&&[0,r.ymax-b.ymin],'below':r&&[0,r.ymin-b.ymax],'centre-on':r&&[(r.xmin+r.xmax)/2-cx,0]}[action];
+ const moved=translateShape(shape,dx,dy);
+ try{return validateShape(moved);}catch{throw new Error(`${ALIGN_ACTIONS[action]}${reference?' '+reference.name:''} would move ${shape.name} outside the window.`);}
+}
