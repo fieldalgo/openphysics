@@ -14,7 +14,7 @@ reproduces those matrices bit for bit.
 """
 import numpy as np
 
-from .backend import namespace
+from .backend import Backend, backend_of, namespace
 from ..assembly3d import tet_gradients
 
 # Local edge e of a triangle is the edge opposite node e: (e+1, e+2) mod 3.
@@ -35,6 +35,20 @@ def coefficient(value):
     if isinstance(value, (bool, int, float, complex, list, tuple)):
         value = np.asarray(value)
     return namespace(value), value
+
+
+def _einsum(xp, spec, *operands):
+    """``xp.einsum``; on PyTorch the operands are first brought to one dtype.
+
+    NumPy and JAX promote mixed real and complex operands themselves; PyTorch's
+    einsum refuses them (a real basis with a complex coefficient).
+    """
+    if backend_of(xp) is Backend.TORCH:
+        dtype = operands[0].dtype
+        for operand in operands[1:]:
+            dtype = xp.result_type(dtype, operand.dtype)
+        operands = [xp.astype(operand, dtype) for operand in operands]
+    return xp.einsum(spec, *operands)
 
 
 def _lift(xp, array):
@@ -65,7 +79,7 @@ def p1_stiffness(mesh, eps=1.0):
     b, c, area = _triangle_bc(mesh)
     if eps.ndim == 3:
         g = _lift(xp, np.stack([b, c], axis=2))
-        return xp.einsum("tie,tef,tjf->tij", g, eps, g) / _lift(xp, 4.0 * area)[:, None, None]
+        return _einsum(xp, "tie,tef,tjf->tij", g, eps, g) / _lift(xp, 4.0 * area)[:, None, None]
     eps = xp.broadcast_to(eps, (len(area),))
     bb = _lift(xp, b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :])
     return (eps / _lift(xp, 4.0 * area))[:, None, None] * bb
@@ -117,7 +131,7 @@ def tet_stiffness(mesh, eps=1.0):
     xp, eps = coefficient(eps)
     g, vol = tet_gradients(mesh)
     if eps.ndim == 3:
-        return xp.einsum("tmd,tde,tne->tmn", _lift(xp, g), eps, _lift(xp, g)) * _lift(xp, vol)[:, None, None]
+        return _einsum(xp, "tmd,tde,tne->tmn", _lift(xp, g), eps, _lift(xp, g)) * _lift(xp, vol)[:, None, None]
     c = xp.broadcast_to(eps, (mesh.num_tets,))
     return _lift(xp, np.einsum("tmd,tnd->tmn", g, g)) * (c * _lift(xp, vol))[:, None, None]
 
@@ -163,7 +177,7 @@ def nedelec_mass(space, coeff=1.0):
     g, area = _triangle_gradients(space.mesh)
     W = _nedelec_midpoint_values(space, g)
     if coeff.ndim == 3:
-        return xp.einsum("teqd,tdk,tfqk->tef", _lift(xp, W), coeff, _lift(xp, W)) * _lift(xp, area / 3.0)[:, None, None]
+        return _einsum(xp, "teqd,tdk,tfqk->tef", _lift(xp, W), coeff, _lift(xp, W)) * _lift(xp, area / 3.0)[:, None, None]
     coeff = xp.broadcast_to(coeff, (len(area),))
     return _lift(xp, np.einsum("teqd,tfqd->tef", W, W)) * (coeff * _lift(xp, area) / 3.0)[:, None, None]
 
@@ -177,7 +191,7 @@ def nedelec_grad(space, coeff=1.0):
     g, area = _triangle_gradients(space.mesh)
     diff = np.stack([g[:, j, :] - g[:, i, :] for i, j in zip(_TRI_I, _TRI_J)], axis=1)   # (T, 3, 2)
     if coeff.ndim == 3:
-        Ge = xp.einsum("ted,tdf,tkf->tek", _lift(xp, diff), coeff, _lift(xp, g))
+        Ge = _einsum(xp, "ted,tdf,tkf->tek", _lift(xp, diff), coeff, _lift(xp, g))
         scale = _lift(xp, area) / 3.0
     else:
         coeff = xp.broadcast_to(coeff, (len(area),))
@@ -230,5 +244,5 @@ def vector_p1_stiffness(bmat, d, area):
     """
     xp, d = coefficient(d)
     if d.ndim == 2:
-        return xp.einsum("tji,jk,tkl,t->til", _lift(xp, bmat), d, _lift(xp, bmat), _lift(xp, area))
-    return xp.einsum("tji,tjk,tkl,t->til", _lift(xp, bmat), d, _lift(xp, bmat), _lift(xp, area))
+        return _einsum(xp, "tji,jk,tkl,t->til", _lift(xp, bmat), d, _lift(xp, bmat), _lift(xp, area))
+    return _einsum(xp, "tji,tjk,tkl,t->til", _lift(xp, bmat), d, _lift(xp, bmat), _lift(xp, area))
