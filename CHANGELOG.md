@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: the one-way Joule workflow and `ElementHeatSource` run on the coupling layer. The Joule heat is an element `Field` on the electrical mesh, carried to the thermal mesh by the same-mesh transfer; `ElementHeatSource.field` exposes it. Results, checks and error messages are unchanged. [Documentation](docs/packages/galerkin/joule_heating.md#element-source-api).
+
 - `galerkin`: new `galerkin.coupling` layer: `Field` holds node or element values of one mesh with an SI unit, `transfer` carries it to the same mesh unchanged, and `OneWayChain` runs the stages of a one-way workflow with stage-labelled failures. It documents the kernel interface; the finite-element engine is the first kernel. Existing workflows are unchanged. [Documentation](docs/packages/galerkin/coupling.md).
 
 - `galerkin`: the PEC box cavity (`solve_cavity_box`) accepts JAX or PyTorch box lengths and returns frequencies, eigenvalues, edge coefficients and centroid fields in that library with reverse-mode derivatives, exact through the axis scaling of the mesh. Degenerate modes get NaN derivatives and a `DegenerateModeWarning`. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#box-cavity-derivatives-with-respect-to-the-lengths).

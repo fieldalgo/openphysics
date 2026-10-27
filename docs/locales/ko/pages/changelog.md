@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 한 방향 Joule workflow와 `ElementHeatSource`가 연성 층 위에서 동작합니다. Joule 열은 전기 메시 위의 요소 `Field`이고 같은 메시 전달로 열 메시에 옮겨지며, `ElementHeatSource.field`로 볼 수 있습니다. 결과·검산·오류 메시지는 바뀌지 않습니다. [문서](packages/galerkin/joule_heating.md#요소-열원-api).
+
 - `galerkin`: 새 `galerkin.coupling` 층. `Field`는 한 메시의 절점 또는 요소 값을 SI 단위와 함께 담고, `transfer`는 그것을 같은 메시로 그대로 옮기며, `OneWayChain`은 한 방향 workflow의 단계를 실행하고 실패에 단계 이름을 붙입니다. 커널 인터페이스를 문서로 정하며, 유한요소 엔진이 첫 커널입니다. 기존 workflow는 바뀌지 않습니다. [문서](packages/galerkin/coupling.md).
 
 - `galerkin`: PEC 상자 공진기(`solve_cavity_box`)가 JAX나 PyTorch 상자 길이를 받고, 주파수, 고유값, 모서리 계수, 중심 필드를 그 라이브러리로 돌려주며 역방향 미분을 붙입니다. 메시의 축 방향 배율을 거쳐 정확합니다. 축퇴 모드는 NaN 미분과 `DegenerateModeWarning`을 받습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#상자-공진기-길이에-대한-미분).
