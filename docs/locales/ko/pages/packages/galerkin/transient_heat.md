@@ -157,6 +157,10 @@ History만 O(Nt*(N+M)) 메모리를 사용하며 sparse system/factor와 임시 
 streaming, restart는 없습니다. 큰 요청은 할당에 실패할 수 있으며 부분 성공 history를
 반환하지 않습니다.
 
+JAX·PyTorch 입력이면 history가 그 라이브러리 배열(읽기 전용 아님)로 나오고 역방향
+미분을 지닙니다. 그 메모리와 `checkpoint_every` 옵션은
+[JAX·PyTorch로 미분하기](differentiation.md)에 있습니다.
+
 ## 열량 회계와 이차 functional
 
 모든 절점 rate는 단위 면외 깊이당 W/m이며 전체 W가 아닙니다. 실제 m 두께를 rate와

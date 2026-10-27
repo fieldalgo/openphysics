@@ -167,6 +167,10 @@ copies add memory, including at final result construction. No hidden
 downsampling, streaming or restart is implemented. A large request may fail
 allocation; no partial successful history is returned.
 
+JAX or PyTorch inputs give histories in that library, not read-only, with
+reverse-mode derivatives; their memory and the `checkpoint_every` option are in
+[Derivatives with JAX and PyTorch](differentiation.md).
+
 ## Heat accounting and quadratic functional
 
 All nodal rates are per unit out-of-plane depth W/m, not total W. Multiply
