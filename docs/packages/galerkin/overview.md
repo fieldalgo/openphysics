@@ -33,6 +33,7 @@ references and fixed thresholds.
 | Total traction on the prescribed-temperature mechanical stage | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](thermoelastic_traction.md), [validation](thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](../../../examples/galerkin/thermoelastic_traction.py) |
 | Steady heat, then mechanics on the same mesh (one-way) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [Contract](thermal_mechanical_workflow.md), [validation](thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../../examples/galerkin/thermal_mechanical_workflow.py) |
 | Quasistatic mechanics at selected stored transient-heat times (one-way) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [Contract](transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../../examples/galerkin/transient_thermal_mechanical.py) |
+| Node and element fields on one mesh, same-mesh transfer and one-way chains between physics (kernel interface) | `galerkin.coupling.Field`, `transfer`, `OneWayChain` | [Contract](coupling.md) | — |
 | Piecewise-constant materials on named mesh regions for steady and transient heat, elasticity, thermoelasticity and both heat-to-mechanics workflows | `{region name: value}` in place of a scalar k, c, Q, E, nu or alpha | [Contract and validation](multimaterial.md) | — |
 | Public-reference benchmarks: Timoshenko (1925) bimetal strip and NAFEMS T4 | existing heat and mechanical stages; references `refsol.bimetal`, `refsol.thermal_convection` | [Validation](public_benchmarks.md) | [public_benchmarks.py](../../../examples/galerkin/public_benchmarks.py) |
 
@@ -90,6 +91,7 @@ src/galerkin/
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
+  coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```
