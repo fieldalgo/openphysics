@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 새 `galerkin.coupling` 층. `Field`는 한 메시의 절점 또는 요소 값을 SI 단위와 함께 담고, `transfer`는 그것을 같은 메시로 그대로 옮기며, `OneWayChain`은 한 방향 workflow의 단계를 실행하고 실패에 단계 이름을 붙입니다. 커널 인터페이스를 문서로 정하며, 유한요소 엔진이 첫 커널입니다. 기존 workflow는 바뀌지 않습니다. [문서](packages/galerkin/coupling.md).
+
 - `galerkin`: PEC 상자 공진기(`solve_cavity_box`)가 JAX나 PyTorch 상자 길이를 받고, 주파수, 고유값, 모서리 계수, 중심 필드를 그 라이브러리로 돌려주며 역방향 미분을 붙입니다. 메시의 축 방향 배율을 거쳐 정확합니다. 축퇴 모드는 NaN 미분과 `DegenerateModeWarning`을 받습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#상자-공진기-길이에-대한-미분).
 
 - `galerkin`: 도파관 모드(`solve_modes`)가 eps_r, mu_r(스칼라 또는 요소 배열, 실수·복소수)와 k0에 JAX나 PyTorch 값을 받고, n_eff와 두 필드 배열을 그 라이브러리로 돌려주며 고유값과 필드의 역방향 미분을 붙입니다. 축퇴 모드는 NaN 미분과 `DegenerateModeWarning`을 받습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#도파관-모드-고유값-필드-축퇴-모드).

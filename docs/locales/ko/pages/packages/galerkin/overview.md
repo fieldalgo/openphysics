@@ -30,6 +30,7 @@
 | 처방 온도장 기계단계의 전체 표면하중 | `galerkin.thermoelasticity.solve_thermoelasticity` | [계약](thermoelastic_traction.md), [검증](thermoelastic_traction_independent_validation.md) | [thermoelastic_traction.py](../../../../../../examples/galerkin/thermoelastic_traction.py) |
 | 정상 열전도 후 같은 메시의 기계해석(단방향) | `galerkin.thermal_mechanical.solve_steady_thermoelasticity` | [계약](thermal_mechanical_workflow.md), [검증](thermal_mechanical_independent_validation.md) | [thermal_mechanical_workflow.py](../../../../../../examples/galerkin/thermal_mechanical_workflow.py) |
 | 저장된 과도 열전도 시간 중 고른 시간의 준정적 기계해석(단방향) | `galerkin.transient_thermal_mechanical.solve_transient_thermoelasticity` | [계약](transient_thermal_mechanical.md) | [transient_thermal_mechanical.py](../../../../../../examples/galerkin/transient_thermal_mechanical.py) |
+| 한 메시의 절점·요소 field, 같은 메시 전달과 물리 사이 한 방향 체인(커널 인터페이스) | `galerkin.coupling.Field`, `transfer`, `OneWayChain` | [계약](coupling.md) | — |
 | 정상·과도 열전도, 탄성, 열탄성, 두 열→역학 workflow의 이름 있는 메시 영역별 구간 상수 재료 | 스칼라 k, c, Q, E, nu, alpha 대신 `{영역 이름: 값}` | [계약과 검증](multimaterial.md) | — |
 | 공개 기준값 벤치마크: Timoshenko (1925) 바이메탈 띠와 NAFEMS T4 | 기존 열·기계 단계; 정답 `refsol.bimetal`, `refsol.thermal_convection` | [검증](public_benchmarks.md) | [public_benchmarks.py](../../../../../../examples/galerkin/public_benchmarks.py) |
 
@@ -80,6 +81,7 @@ src/galerkin/
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
+  coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```

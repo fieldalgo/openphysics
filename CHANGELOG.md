@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: new `galerkin.coupling` layer: `Field` holds node or element values of one mesh with an SI unit, `transfer` carries it to the same mesh unchanged, and `OneWayChain` runs the stages of a one-way workflow with stage-labelled failures. It documents the kernel interface; the finite-element engine is the first kernel. Existing workflows are unchanged. [Documentation](docs/packages/galerkin/coupling.md).
+
 - `galerkin`: the PEC box cavity (`solve_cavity_box`) accepts JAX or PyTorch box lengths and returns frequencies, eigenvalues, edge coefficients and centroid fields in that library with reverse-mode derivatives, exact through the axis scaling of the mesh. Degenerate modes get NaN derivatives and a `DegenerateModeWarning`. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#box-cavity-derivatives-with-respect-to-the-lengths).
 
 - `galerkin`: waveguide modes (`solve_modes`) accept JAX or PyTorch values for eps_r, mu_r (scalars or element arrays, real or complex) and k0, and return n_eff and both field arrays in that library with reverse-mode derivatives of eigenvalues and fields. Degenerate modes get NaN derivatives and a `DegenerateModeWarning`. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#waveguide-modes-eigenvalues-fields-and-degenerate-modes).
