@@ -5,6 +5,13 @@
 export class SchematicCamera {
   constructor() { this.fit(); }
   fit() { this.zoom = 1; this.x = 300; this.y = 175; }
+  // Show a drawing-unit box as large as the zoom limits allow, centred.
+  fitTo([x, y, width, height]) {
+    if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return;
+    this.zoom = Math.min(4, Math.max(1, Math.min(600 / width, 350 / height)));
+    this.x = x + width / 2; this.y = y + height / 2;
+    this.constrain();
+  }
   scale(factor) {
     if (!Number.isFinite(factor) || factor <= 0) return;
     this.zoom = Math.min(4, Math.max(1, this.zoom * factor));
@@ -24,7 +31,7 @@ export class SchematicCamera {
   get box() { return [this.x - 300 / this.zoom, this.y - 175 / this.zoom, 600 / this.zoom, 350 / this.zoom]; }
 }
 
-export function installViewport(host, camera) {
+export function installViewport(host, camera, { fit = () => camera.fit(), fitShapes = null } = {}) {
   const svg = host.querySelector('svg[role="group"]');
   if (!svg) return;
   const bar = document.createElement('div');
@@ -51,7 +58,7 @@ export function installViewport(host, camera) {
   };
   const keys = {
     '+': () => camera.scale(1.25), '=': () => camera.scale(1.25),
-    '-': () => camera.scale(0.8), Home: () => camera.fit(),
+    '-': () => camera.scale(0.8), Home: fit,
     ArrowLeft: () => camera.pan(-0.1, 0), ArrowRight: () => camera.pan(0.1, 0),
     ArrowUp: () => camera.pan(0, -0.1), ArrowDown: () => camera.pan(0, 0.1),
   };
@@ -62,6 +69,7 @@ export function installViewport(host, camera) {
   };
   const zoomOut = button('Zoom out', '-'), zoomIn = button('Zoom in', '+');
   button('Fit view', 'Home');
+  if (fitShapes) { const el = document.createElement('button'); el.type = 'button'; el.textContent = 'Fit shapes'; el.onclick = () => { fitShapes(); refresh(); }; bar.append(el); }
   button('Pan left', 'ArrowLeft'); button('Pan right', 'ArrowRight');
   button('Pan up', 'ArrowUp'); button('Pan down', 'ArrowDown');
   bar.append(output);
