@@ -275,3 +275,28 @@ def test_solve_dirichlet_last_value_wins_on_every_library():
     jax = _jax()
     got = solve_dirichlet(K, jax.numpy.asarray(f), {(0, 5): jax.numpy.asarray(1.0), (5,): 2.0})
     np.testing.assert_allclose(np.asarray(got), expected, rtol=1e-14)
+
+
+def test_jax_solve_is_built_once():
+    """One traced function for every solve: a function built per call would be traced
+    and cached anew at each solve, so memory would grow with the number of solves."""
+    jax = _jax()
+    import galerkin.core.solve as module
+    rows, cols, values, b = _system()
+    A = CooMatrix(rows, cols, jax.numpy.asarray(values), (b.size, b.size))
+    solve(A, jax.numpy.asarray(b))
+    first = module._JAX_SOLVE
+    solve(A, jax.numpy.asarray(2 * b))
+    assert module._JAX_SOLVE is first
+
+
+def test_torch_solve_keeps_no_factor_on_the_graph():
+    """The factor is computed again in backward: an attribute on the graph would stay in
+    memory for every solve, even under torch.utils.checkpoint."""
+    torch = _torch()
+    rows, cols, values, b = _system()
+    v = torch.as_tensor(values).requires_grad_()
+    x = solve(CooMatrix(rows, cols, v, (b.size, b.size)), torch.as_tensor(b))
+    assert not any(hasattr(x.grad_fn, name) for name in ("lu", "factor"))
+    x.sum().backward()
+    assert v.grad is not None

@@ -133,39 +133,58 @@ def solve_dirichlet(terms, b, dirichlet):
 
 
 # -- JAX -----------------------------------------------------------------------
+#
+# One custom_vjp function and two host callbacks for the whole session, with the
+# pattern passed as integer arrays: JAX caches what it traces by function
+# identity, so functions created per call would be traced and kept anew at every
+# solve (memory growing with the number of solves, e.g. time steps).
+
+def _host_solve(trans):
+    def call(rows, cols, values, rhs):
+        n = rhs.shape[0]
+        dtype = np.result_type(values.dtype, rhs.dtype)
+        return _apply(_factor(np.asarray(rows), np.asarray(cols), values, (n, n)), rhs, trans).astype(dtype)
+    return call
+
+
+_HOST_SOLVE = {"N": _host_solve("N"), "T": _host_solve("T")}
+_JAX_SOLVE = None
+
 
 def _jax_solve(rows, cols, shape, values, b):
+    global _JAX_SOLVE
+    jnp = sys.modules["jax"].numpy
+    if _JAX_SOLVE is None:
+        _JAX_SOLVE = _build_jax_solve()
+    return _JAX_SOLVE(jnp.asarray(rows, dtype=jnp.int32), jnp.asarray(cols, dtype=jnp.int32), values, b)
+
+
+def _build_jax_solve():
     jax = sys.modules["jax"]
     jnp = jax.numpy
-    dtype = jnp.result_type(values.dtype, b.dtype)
 
-    def host(trans):
-        def call(v, rhs):
-            return _apply(_factor(rows, cols, v, shape), rhs, trans).astype(dtype)
-        return call
+    def run(rows, cols, v, rhs, trans):
+        dtype = jnp.result_type(v.dtype, rhs.dtype)
+        return jax.pure_callback(_HOST_SOLVE[trans], jax.ShapeDtypeStruct(rhs.shape, dtype),
+                                 rows, cols, v, rhs, vmap_method="sequential")
 
-    def run(v, rhs, trans):
-        return jax.pure_callback(host(trans), jax.ShapeDtypeStruct(rhs.shape, dtype),
-                                 v, rhs, vmap_method="sequential")
-
-    # The pattern (rows, cols, shape) is closed over: only values and b are traced.
     @jax.custom_vjp
-    def inner(v, rhs):
-        return run(v, rhs, "N")
+    def solve_jax(rows, cols, v, rhs):
+        return run(rows, cols, v, rhs, "N")
 
-    def forward(v, rhs):
-        x = run(v, rhs, "N")
-        return x, (v, x)
+    def forward(rows, cols, v, rhs):
+        x = run(rows, cols, v, rhs, "N")
+        return x, (rows, cols, v, rhs, x)
 
     def backward(residuals, g):
-        v, x = residuals
-        lam = run(v, g, "T")                                     # A^T lam = g
+        rows, cols, v, rhs, x = residuals
+        lam = run(rows, cols, v, g, "T")                         # A^T lam = g
         lam2, x2 = (lam, x) if lam.ndim == 2 else (lam[:, None], x[:, None])
         grad_values = -jnp.sum(lam2[rows] * x2[cols], axis=1)
-        return _jax_like(jnp, grad_values, values.dtype), _jax_like(jnp, lam, b.dtype)
+        return None, None, _jax_like(jnp, grad_values, v.dtype), _jax_like(jnp, lam, rhs.dtype)
 
-    inner.defvjp(forward, backward)
-    return inner(values, b)
+    solve_jax.defvjp(forward, backward)
+    return solve_jax
 
 
 def _jax_like(jnp, grad, dtype):
@@ -192,21 +211,26 @@ def _torch_function():
         return grad.to(dtype)
 
     class SparseSolve(torch.autograd.Function):
+        # The factor is not kept between the passes: it is computed again in
+        # backward from the saved values, as on JAX. A factor held on the graph
+        # (a Python attribute, not a saved tensor) would stay in memory for every
+        # solve, even under torch.utils.checkpoint.
         @staticmethod
         def forward(ctx, rows, cols, shape, values, b):
             lu = _factor(rows, cols, values.detach().cpu().numpy(), shape)
             dtype = torch.promote_types(values.dtype, b.dtype)
             x = torch.as_tensor(_apply(lu, b.detach().cpu().numpy()), device=b.device).to(dtype)
-            ctx.lu, ctx.rows, ctx.cols = lu, rows, cols
+            ctx.rows, ctx.cols, ctx.shape = rows, cols, shape
             ctx.dtypes = (values.dtype, b.dtype)
-            ctx.save_for_backward(x)
+            ctx.save_for_backward(values, x)
             return x
 
         @staticmethod
         @once_differentiable
         def backward(ctx, g):
-            (x,) = ctx.saved_tensors
-            lam = torch.as_tensor(_apply(ctx.lu, g.detach().cpu().numpy(), "H"), device=g.device)
+            values, x = ctx.saved_tensors
+            lu = _factor(ctx.rows, ctx.cols, values.detach().cpu().numpy(), ctx.shape)
+            lam = torch.as_tensor(_apply(lu, g.detach().cpu().numpy(), "H"), device=g.device)
             lam2, x2 = (lam, x) if lam.ndim == 2 else (lam[:, None], x[:, None])
             rows = torch.as_tensor(ctx.rows, device=g.device)
             cols = torch.as_tensor(ctx.cols, device=g.device)
