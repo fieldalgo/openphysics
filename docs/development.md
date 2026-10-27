@@ -162,8 +162,8 @@ are not fetched). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
 contract fails within minutes. The full suite then runs everything again. The
 distribution and Node steps still run after a failed source suite so their
-evidence is kept, but the job stays failed. The job usually takes 16 to 22
-minutes; its 45-minute limit only stops hung runs, since hosted runner speed
+evidence is kept, but the job stays failed. The job usually takes 23 to 45
+minutes; its 90-minute limit only stops hung runs, since hosted runner speed
 varies.
 
 **Distribution checks** (`tools/check_distributions.py`). Builds all eight packages
