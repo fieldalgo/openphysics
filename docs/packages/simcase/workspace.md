@@ -115,6 +115,36 @@ focus loss and page hiding discard it. Moves are clamped to the window, and each
 completed gesture is one undoable edit. The drawing transform is captured at
 gesture start, so zoom and pan do not change the unit conversion.
 
+## Steady heat plate
+
+Choose **Applications → Steady heat conduction** to edit a steady heat problem
+without JSON. The plate is one homogeneous rectangle with its lower-left corner at
+(0, 0), sized in mm, with constant isotropic conductivity k [W/(m·K)] and a uniform
+heat source Q [W/m³]. Select a side in the drawing or open **Heat transfer** to give
+each side one condition: insulated (zero flux), a fixed temperature [K], an outward
+heat flux [W/m²] (positive leaves the plate) or convection with h [W/(m²·K)] and an
+ambient temperature [K]. **Mesh** sets the structured divisions along x and y and
+shows the node and triangle counts against this server's limits.
+
+Run is enabled when the inputs determine the temperature level (a fixed temperature
+or convection with h > 0 on some side), adjacent fixed sides agree at their corner,
+and the mesh fits the server limits; the reason is shown otherwise. Invalid values
+stay as highlighted drafts that block running and saving until corrected or
+restored. **Run heat study** builds a `thermal.steady2d` document (see **Study** for
+the exact JSON), validates it through the same public thermal routes as the classic
+Studio page and solves it. Results show temperature (P1, interpolated in each
+triangle) or heat flux |q|, qx or qy (constant per triangle) on the actual result
+mesh with optional flux arrows, minimum and maximum temperature, and the value at a
+clicked point. A result keeps the inputs it was computed with; after an edit it is
+labelled as an earlier snapshot and **Restore run inputs** brings them back.
+
+Heat inputs are saved in input files, drafts, browser input recovery and undo
+history (project version 5, plate lengths in mm). Heat results stay in the tab:
+sessions, run history, comparison and browser notebook recovery remain optical-only.
+Transient heat, region-wise or temperature-dependent materials and arbitrary
+geometry are not part of this application; the classic page keeps the JSON
+interfaces for them.
+
 ## Results and files
 
 The notebook retains up to six successful runs, preserving pinned references. Select a candidate to inspect

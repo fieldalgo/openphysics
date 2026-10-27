@@ -24,8 +24,9 @@ import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
+import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 
-(()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+(()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
@@ -34,10 +35,12 @@ const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div
 function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Couplings'?'Connections':'Model';render();}
 
 const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
+const isHeat=()=>state.electric===false&&state.heat&&!state.structure&&!state.optics;
 function setShape(index,shape){state.shapes=state.shapes.map((s,i)=>i===index?shape:s);}
 function selectedShape(){ui.shape=Math.min(Math.max(0,ui.shape|0),state.shapes.length-1);return state.shapes[ui.shape];}
 function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installShapeEditor($('canvas'),{shape:selectedShape(),index:ui.shape,snap:ui.snap,blocked:()=>numericDrafts.invalid,commit:(shape,label)=>{edits.endGroup();setShape(ui.shape,shape);trackEdit();edits.endGroup();render();notice(label+'. Run explicitly to compute new results.');}});}
 function geom(){
+if(isHeat())return heatSvg();
 if(isOptical())return sectionSvg(state.shapes,{selected:ui.shape,selectedEdge:pick.boundary,mode:pick.mode});
 const w=state.width/500;
 const attrs=body=>`data-pick-body="${body}" role="button" tabindex="0" aria-label="Select ${body} body" stroke="${ui.body===body?'#fff0a8':'#7a939f'}" stroke-width="${ui.body===body?3:1}"`;
@@ -74,7 +77,117 @@ const button=document.createElement('button');button.textContent=text;button.id=
 }
 }
 function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[]),...(state.heat&&state.structure?['Solid mechanics']:[]),...(state.optics?['Optical modes']:[])];}
-function render(){const focused=document.activeElement,focusId=focused?.id;const focusData=['node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n)).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>Optical adapter available · coupled solvers pending</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+
+// ---- Steady heat plate: a form over the public thermal.steady2d routes (thermal.js controller). ----
+const HEAT_NODES=['Geometry','Materials','Heat transfer','Mesh','Study'];
+const heatDrafts=new Map();let heatSide='left',heatField='temperature_k',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
+const heatController=globalThis.ThermalStudio?.createController({
+ request:async(method,url,body)=>{const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;},
+ onState:next=>{heatState=next;refreshHeatControls();},
+ onResult:payload=>{heatRun={input:JSON.parse(JSON.stringify(heatCapture)),signature:JSON.stringify(heatCapture),payload,completedAt:new Date().toISOString()};heatProbe=null;ui.page='Results';render();notice('Heat calculation complete. Result retains its input snapshot; it is kept in this tab only.');}
+})||null;
+let heatCapture=null;
+const heatLimits=()=>heatController?.state().cap?.limits||null;
+const heatSignature=()=>JSON.stringify(state.thermal);
+function heatBlock(){if(!heatController)return 'Heat calculation needs the Studio page script; reload the workspace.';if(!heatController.state().cap)return 'Heat calculation is unavailable from this server.';if(heatController.state().cap.run_enabled!==true)return 'This server does not enable heat runs.';if(heatDrafts.size)return 'Correct or restore the highlighted heat inputs before running.';return thermalBlock(state.thermal,heatLimits());}
+function setThermal(next,message){
+ let checked;try{checked=validateThermal(next);}catch(error){notice(error.message);return false;}
+ state.thermal=checked;heatController?.invalidate();edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
+}
+const heatValue=path=>path.split('.').reduce((o,k)=>o?.[k],state.thermal);
+function heatInput(path,label,attrs=''){const draft=heatDrafts.get(path);return `<label>${label}<input data-heat="${path}" type="number" step="any" ${attrs} value="${escapeHtml(draft?draft.raw:heatValue(path))}" aria-invalid="${!!draft}"></label>${draft?`<p class="input-hint" role="alert">${escapeHtml(draft.message)} Last valid value is retained.</p>`:''}`;}
+function heatSideForm(side){
+ const c=state.thermal.sides[side];
+ const fields=c.type==='temperature'?heatInput(`sides.${side}.temperature`,'Temperature [K]','min="0"'):c.type==='flux'?heatInput(`sides.${side}.flux`,'Outward heat flux [W/m²] (positive leaves the plate)'):c.type==='convection'?heatInput(`sides.${side}.h`,'Heat transfer coefficient h [W/(m²·K)]','min="0"')+heatInput(`sides.${side}.ambient`,'Ambient temperature [K]','min="0"'):'';
+ return `<fieldset class="heat-side" data-side-box="${side}"><legend>${side[0].toUpperCase()+side.slice(1)} side</legend><label>Condition<select data-heat-type="${side}">${Object.entries(SIDE_TYPES).map(([k,v])=>`<option value="${k}" ${k===c.type?'selected':''}>${v}</option>`).join('')}</select></label>${fields}</fieldset>`;
+}
+function heatInspector(){
+ const t=state.thermal,limits=heatLimits(),block=thermalBlock(t,limits);let html='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
+ if(ui.selection==='Geometry')html+=heatInput('width','Plate width [mm]','min="0.001"')+heatInput('height','Plate height [mm]','min="0.001"')+pair('Origin','Lower-left corner at (0, 0)')+'<p>One homogeneous rectangle. Select a side in the drawing to edit its condition.</p>';
+ else if(ui.selection==='Materials')html+=heatInput('conductivity','Thermal conductivity k [W/(m·K)]','min="0"')+heatInput('source','Uniform heat source Q [W/m³]')+'<p>Constant isotropic k and source over the whole plate. Temperature-dependent or region-wise properties are not available in this application.</p>';
+ else if(ui.selection==='Heat transfer')html+=SIDES.map(heatSideForm).join('')+'<p>At least one fixed temperature or convection with h > 0 sets the temperature level. Adjacent fixed sides must agree at their corner.</p>';
+ else if(ui.selection==='Mesh')html+=heatInput('nx','Divisions along x','min="1" step="1"')+heatInput('ny','Divisions along y','min="1" step="1"')+pair('Nodes',`${(t.nx+1)*(t.ny+1)}${limits?' of '+limits.max_nodes:''}`)+pair('Triangles',`${2*t.nx*t.ny}${limits?' of '+limits.max_triangles:''}`)+'<p>Structured P1 triangles. The actual mesh is shown with the result; there is no separate preview.</p>';
+ else html+=pair('Plate',escapeHtml(thermalSummary(t)))+SIDES.map(side=>pair(side,escapeHtml(sideText(t.sides[side])))).join('')+pair('Mesh',`${t.nx} × ${t.ny} divisions`);
+ if(block)html+=`<p class="validation-warning">${escapeHtml(block)}</p>`;
+ if(heatDrafts.size)html+='<button id="discard-heat-drafts">Restore last valid values</button>';
+ return html+'<p class="muted">Editing this design does not run a simulation.</p>';
+}
+function bindHeatPanel(){
+ document.querySelectorAll('[data-heat]').forEach(el=>el.onchange=()=>{
+  const path=el.dataset.heat,raw=el.value.trim(),value=Number(raw),keys=path.split('.');
+  const next=JSON.parse(JSON.stringify(state.thermal));let target=next;for(const k of keys.slice(0,-1))target=target[k];target[keys.at(-1)]=raw===''?NaN:value;
+  try{validateThermal(next);}catch(error){heatDrafts.set(path,{raw:el.value,message:error.message});render();return;}
+  heatDrafts.delete(path);setThermal(next,'Heat input updated.');
+ });
+ document.querySelectorAll('[data-heat-type]').forEach(el=>el.onchange=()=>{
+  const side=el.dataset.heatType,type=el.value,defaults={insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:295}};
+  for(const key of [...heatDrafts.keys()])if(key.startsWith(`sides.${side}.`))heatDrafts.delete(key);
+  setThermal({...state.thermal,sides:{...state.thermal.sides,[side]:defaults[type]}},`${side[0].toUpperCase()+side.slice(1)} side: ${SIDE_TYPES[type].toLowerCase()}.`);
+ });
+ const discard=$('discard-heat-drafts');if(discard)discard.onclick=()=>{heatDrafts.clear();render();notice('Invalid heat drafts discarded. Last valid inputs retained.');};
+}
+function heatSvg(){
+ const t=state.thermal,scale=Math.min(440/t.width,230/t.height),w=t.width*scale,h=t.height*scale,x0=300-w/2,y0=175-h/2;
+ const edges={left:[x0,y0+h,x0,y0],right:[x0+w,y0+h,x0+w,y0],bottom:[x0,y0+h,x0+w,y0+h],top:[x0,y0,x0+w,y0]};
+ const labels={left:[x0-8,175,'end'],right:[x0+w+8,175,'start'],bottom:[300,y0+h+16,'middle'],top:[300,y0-8,'middle']};
+ let grid='';if(ui.selection==='Mesh'){const sx=Math.max(1,Math.ceil(t.nx/60)),sy=Math.max(1,Math.ceil(t.ny/60));for(let i=1;i<t.nx;i+=sx)grid+=`<path d="M${x0+w*i/t.nx} ${y0} V${y0+h}"/>`;for(let j=1;j<t.ny;j+=sy)grid+=`<path d="M${x0} ${y0+h*j/t.ny} H${x0+w}"/>`;}
+ const sides=SIDES.map(side=>{const [a,b,c,d]=edges[side],on=ui.selection==='Heat transfer'&&heatSide===side,[lx,ly,anchor]=labels[side];return `<g data-heat-side="${side}" role="button" tabindex="0" aria-label="Select ${side} side: ${escapeHtml(sideText(t.sides[side]))}"><path d="M${a} ${b} L${c} ${d}" stroke="transparent" stroke-width="14"/><path d="M${a} ${b} L${c} ${d}" stroke="${on?'#fff0a8':t.sides[side].type==='insulated'?'#7a939f':'#e7bc73'}" stroke-width="${on?4:2.5}" ${t.sides[side].type==='insulated'?'stroke-dasharray="5 4"':''} pointer-events="none"/><text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#e2e9ed" font-size="10" pointer-events="none">${escapeHtml(sideText(t.sides[side]))}</text></g>`;}).join('');
+ return `<svg data-geometry-view="heat" viewBox="0 0 600 350" role="group" aria-label="Heat plate, ${escapeHtml(thermalSummary(t))}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#5b3f36" stroke="none"/><g stroke="#e2c9a6" stroke-opacity=".35" stroke-width=".6">${grid}</g>${sides}<text x="300" y="22" text-anchor="middle" fill="#e2e9ed" font-size="11">${escapeHtml(thermalSummary(t))} · ${t.nx} × ${t.ny} divisions</text><text x="${x0}" y="${y0+h+30}" fill="#a2b2bd" font-size="10">(0, 0)</text><text x="${x0+w}" y="${y0-20}" text-anchor="end" fill="#a2b2bd" font-size="10">(${t.width}, ${t.height}) mm</text></svg>`;
+}
+function bindHeatSides(){document.querySelectorAll('[data-heat-side]').forEach(el=>{const choose=()=>{heatSide=el.dataset.heatSide;ui.selection='Heat transfer';render();document.querySelector(`[data-side-box="${heatSide}"] select`)?.focus();};el.onclick=choose;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};});}
+function refreshHeatControls(){
+ const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat();if(!isHeat())return;
+ const block=heatBlock();button.disabled=!!block||heatState.busy;button.textContent=heatState.busy?'Computing…':'Run heat study';
+ if(numericDrafts.invalid||heatDrafts.size)$('status').textContent='Input errors · correct or restore the last valid values';
+ else $('status').textContent=heatState.busy?'Heat calculation running':block?'Heat input not ready · '+block:'Heat solver ready · explicit Run required';
+ const message=$('heat-message');if(message)message.textContent=heatState.error?'Heat request failed: '+heatState.error+' Inputs and earlier results are unchanged.':heatState.busy?'Validating and solving the current inputs…':'';
+}
+async function runHeat(){
+ if(!heatController||heatState.busy||heatBlock())return;
+ const doc=heatDocument(state.thermal);heatCapture=JSON.parse(JSON.stringify(state.thermal));edits.record(current());
+ notice('Validating heat input…');
+ if(!await heatController.validate(doc)){notice('Heat input rejected: '+(heatController.state().error||'validation failed')+' Inputs unchanged.');refreshHeatControls();return;}
+ if(heatSignature()!==JSON.stringify(heatCapture)){notice('Inputs changed during validation; run again.');return;}
+ notice('Solving heat conduction…');await heatController.run();
+}
+function heatStudy(){
+ const host=$('canvas');host.innerHTML='<h2>Steady heat study</h2><p>Review the plate, then run. Run validates the current inputs through the public thermal API and then solves them.</p>'+pair('Plate',escapeHtml(thermalSummary(state.thermal)))+SIDES.map(side=>pair(side[0].toUpperCase()+side.slice(1),escapeHtml(sideText(state.thermal.sides[side])))).join('')+pair('Mesh',`${state.thermal.nx} × ${state.thermal.ny} divisions, ${(state.thermal.nx+1)*(state.thermal.ny+1)} nodes`);
+ const block=heatBlock();if(block)host.insertAdjacentHTML('beforeend',`<p class="validation-warning">${escapeHtml(block)}</p>`);
+ host.insertAdjacentHTML('beforeend','<p id="heat-message" role="status"></p>');
+ const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent='Solver document · lengths in mm, temperatures in K';const body=document.createElement('pre');try{body.textContent=JSON.stringify(heatDocument(state.thermal),null,2);}catch(error){body.textContent=error.message;}details.append(title,body);host.append(details);
+}
+function heatResults(){
+ const host=$('canvas');if(!heatRun){host.innerHTML='<h2>No heat result in this tab</h2><p>Edit the plate and run a heat study. Heat results are not stored in session files.</p>';$('inspector').innerHTML='<h2>Heat results</h2><p>No completed heat run.</p>';return;}
+ const same=heatRun.signature===heatSignature(),run=heatRun,s=run.payload.summary||{};
+ host.innerHTML='<h2>Steady temperature and heat flux</h2>';
+ const desc=document.createElement('p');desc.textContent=`${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${thermalSummary(run.input)} · ${SIDES.map(side=>side+': '+sideText(run.input.sides[side])).join(' · ')} · ${run.input.nx} × ${run.input.ny} divisions`;host.append(desc);
+ const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature_k','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
+ const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='heat-field-canvas';canvas.style.cssText='display:block;width:100%;height:360px;cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
+ const probe=document.createElement('p');probe.id='heat-probe';probe.setAttribute('role','status');host.append(probe);
+ const note=document.createElement('p');note.textContent='Temperature is interpolated linearly inside each triangle (P1); heat flux is constant per triangle. Colours span this result\'s own minimum to maximum. Click the plot to read a value. Heat results are kept in this tab only; save the input file to keep the design.';host.append(note);
+ const T=globalThis.ThermalStudio;
+ const draw=()=>{if(!canvas.isConnected)return;try{const model=T.viewModel(run.payload,heatField);T.draw(canvas,model,{arrows:heatArrows});canvas.setAttribute('aria-label',`${model.field} ${model.min} to ${model.max} ${model.unit}`);
+  if(heatProbe){const v=T.sample(model,heatProbe);probe.textContent=v===null?'No triangle contains this point.':`At (${heatProbe[0].toFixed(4)}, ${heatProbe[1].toFixed(4)}) ${model.lengthLabel}: ${heatField==='temperature_k'?'T':heatField==='magnitude'?'|q|':heatField} = ${v.toPrecision(6)} ${model.unit}${model.nodal?' (P1 interpolation)':' (triangle value)'}`;}else probe.textContent='No point selected.';
+  canvas.onclick=event=>{const r=canvas.getBoundingClientRect(),tr=T.transform(model,Math.round(r.width),Math.round(r.height));heatProbe=tr.inverse(event.clientX-r.left,event.clientY-r.top);draw();};
+ }catch(error){probe.textContent='Plot unavailable: '+error.message;}};
+ $('heat-field').onchange=()=>{heatField=$('heat-field').value;draw();};$('heat-arrows').onchange=()=>{heatArrows=$('heat-arrows').checked;draw();};
+ heatResize=new ResizeObserver(draw);heatResize.observe(canvas);draw();
+ const t=run.payload.arrays.temperature_k;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+ $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',run.payload.arrays.nodes_m.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
+ const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>setThermal(run.input,'Heat inputs restored from the run.');$('inspector').append(restore);
+}
+function renderHeat(){
+ document.querySelector('main').classList.remove('comparing');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
+ $('sequence').innerHTML='<span>Steady heat · thermal.steady2d</span><span>Run validates the current inputs, then solves</span><span>Mesh convergence not certified</span>';
+ document.querySelector('.workspace > .toolbar').style.display=ui.page==='Model'?'flex':'none';
+ document.querySelector('.workspace > .note').textContent=ui.page==='Results'?'Heat results belong to the inputs captured at Run.':'Plate dimensions in mm, temperatures in K, other quantities in SI. Select a side to edit its condition.';
+ if(ui.page==='Model'&&ui.selection==='Study')heatStudy();
+ if(ui.page==='Results')heatResults();
+ if(ui.page==='Compare'){$('canvas').innerHTML='<h2>Compare</h2><p>Comparison is available for optical runs. Heat results are shown one at a time in Results.</p>';}
+ if(ui.page==='Connections'){$('canvas').innerHTML='<h2>Heat-only model</h2><p>This application solves steady heat conduction only. No electric, mechanical or optical coupling is configured.</p>';}
+ bindHeatSides();refreshHeatControls();
+}
+function render(){const focused=document.activeElement,focusId=focused?.id;const focusData=['node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+(isHeat()?HEAT_NODES:names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n))).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>'+(isHeat()?'Steady heat solver available · coupling pending':'Optical adapter available · coupled solvers pending')+'</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -84,7 +197,7 @@ else if(ui.selection==='Solid mechanics')inspector+=pair('Load','Thermal strain'
 else if(ui.selection==='Heat transfer')inspector+=pair('Source','Joule heat')+pair('Heat loss','Not assigned')+pair('Output','Temperature [K]');
 else if(ui.selection==='Optical modes')inspector+=pair('Wavelength',state.wavelength+' nm')+pair('Inputs',isOptical()?'Material at '+state.wavelength+' nm, geometry':'n(T), geometry')+pair('Output','Modes / effective index');
 else inspector+=pair('Status','Not executed')+'<p>Settings and validation will be implemented behind package APIs.</p>';
-inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();
+if(isHeat())inspector=heatInspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML='<h2>Physics connections</h2><p>One-way sequence · design configuration</p><div class="flow"><button data-select="Electric currents"><strong>Electric currents</strong>Voltage → current density</button><label><input data-toggle="heat" type="checkbox" '+(state.heat?'checked':'')+'> Joule heating → Heat transfer</label><div class="arrow">Q [W/m³] → T [K]</div><label><input data-toggle="structure" type="checkbox" '+(state.structure?'checked':'')+' '+(!state.heat?'disabled':'')+'> Thermal expansion → Solid mechanics</label><div class="arrow">T [K] → displacement [m]</div><label><input data-toggle="optics" type="checkbox" '+(state.optics?'checked':'')+'> Optical modes · material / geometry update</label></div><p>Field mapping, deformed mesh and material laws are pending. Two-way feedback is not configured.</p>';
 else if(ui.page==='Applications')renderApplications($('canvas'));
@@ -92,7 +205,7 @@ else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>';
 const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
-document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
+document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
@@ -224,10 +337,10 @@ function refreshWorkflow(){
  });
 }
 function rejectInvalidInput(){
-  numericDrafts.assertValid();
+  numericDrafts.assertValid();if(heatDrafts.size)throw new Error('Correct or restore the highlighted heat inputs before saving or opening files.');
 }
 function applyProject(doc,{saved=true,resetHistory=false}={}){
-  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();
+  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
@@ -290,7 +403,7 @@ $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)request
 function updateHistory(){ $('undo-edit').disabled=!edits.canUndo;$('redo-edit').disabled=!edits.canRedo; }
 function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before)checkpointRecovery();updateHistory();refreshPersistence();}
 function restoreEdit(doc,label){
- numericDrafts.clear();
+ numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();
  Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
 }
@@ -653,6 +766,7 @@ async function connectWorkspace(){
  finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;refreshJobControls();render();refreshJobControls();}
 }
 $('connect-workspace').onclick=connectWorkspace;
-const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
+$('run-heat').onclick=()=>{runHeat().catch(error=>notice('Heat run failed: '+error.message));};heatController?.loadCapability();
+const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
 
 installLayout(document.querySelector('main'),document.getElementById('reset-layout'),document.getElementById('layout-status'));

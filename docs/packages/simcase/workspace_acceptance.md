@@ -42,6 +42,8 @@ coupled physics distinguishable.
 | Add a 3000 × 90 nm silicon slab, draw it earlier than the core, add an air circle and a polygon | The list, drawing and draw order agree; an overlap note names the shape that wins. Out-of-window or crossing values stay as blocked drafts or are refused with the shape unchanged. |
 | Drag the core, move it with arrow keys, drag a rectangle edge; Undo and Redo | Each completed gesture is one undoable edit; Escape cancels a preview. The numeric inspector follows every change. |
 | Run the multi-shape design; generate its mesh; save and reopen the session; open a version-3 input file | Results, history and comparison name the shape summary; field outlines show every shape. Reopened shapes match. The version-3 file opens as one centred rectangle. |
+| Choose Steady heat conduction; set 40 × 20 mm, Q = 2e5 W/m³, a convective top; try a negative height, mismatched corner temperatures and a 200 × 100 mesh | Each problem blocks Run with its reason; correcting it restores readiness. |
+| Run the heat study; probe the plot; switch to \|q\|; edit k; Undo; save and reopen the input file | Temperature and flux appear on the result mesh with point values; the edit marks the result as an earlier snapshot; the reopened file restores the plate. |
 | Run at 1600 nm / 40 nm core mesh, then 1400 nm / 25 nm; Compare | Results, history and comparison name each captured wavelength and core mesh. Values outside 1400–1700 nm or 20–60 nm stay as blocked drafts. |
 | Change candidate/component; inspect a point and a line | Both plots use the same physical coordinates. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
 | Save session and selected run; reopen each | Inputs, result count, names, pins, comparison and view state match the file's scope. File origin is shown; opening does not recompute. |
@@ -175,6 +177,27 @@ PEC walls at y = ±1.2 µm, solved outside simcase (lithium niobate 600 nm, sapp
 differences were 2.2e-4, 9.8e-5, 6.3e-4 and 8.7e-4, smaller than at 30 nm. A
 design with an InP rod between calcium fluoride and magnesium fluoride layers also
 ran. Browser observations for this revision are recorded in the pull request.
+
+## Steady heat plate observation, 2026-10-27
+
+Source checkout on Linux (Python 3.12, Chromium via Playwright, agent-operated).
+The heat application listed Geometry, Materials, Heat transfer, Mesh and Study and
+replaced the optical Run button. A negative height stayed as a blocking draft;
+mismatched left/bottom fixed temperatures and a 200 × 100 mesh (20301 nodes against
+10201) each blocked Run with their reason. A 40 × 20 mm plate with Q = 2e5 W/m³, fixed
+280/315 K sides, an insulated bottom and a convective top ran through the public
+thermal routes (thermal.steady2d-result-v2, 861 nodes); clicking the plot gave
+T = 300.663 K and |q| = 11014.3 W/m² at the centre. Editing k marked the result as an
+earlier snapshot and Undo restored it. The version-5 input file reopened in a new
+tab with the same plate, and the optical template still worked afterwards. No browser
+console errors or warnings were observed.
+
+Through the local HTTP API, the document generated for a 40 mm slab with insulated
+top and bottom matched the exact 1D solution T(x) = 280 + 35 x/L + Q x (L − x)/(2k)
+at every node within 1.7e-13 K, which checks the mm-to-metre conversion. A plate with
+an outward flux, two convective sides and a fixed side balanced its heat:
+60 W/m generated plus 10 W/m entering equals 16.88 W/m convected plus 53.12 W/m
+through the fixed side.
 
 ## Release decision
 

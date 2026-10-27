@@ -4,6 +4,7 @@
 // Workspace adapter availability, not a claim about the entire solver library.
 export const APPLICATIONS=Object.freeze([
  Object.freeze({id:'optical',title:'Optical waveguide',status:'Live optical calculation',available:true,description:'Edit the core, calculate optical modes, compare fields and save results.',scope:'2D cross section in silica · rectangles, circles, polygons · wavelength and core mesh',physics:Object.freeze({electric:false,heat:false,structure:false,optics:true})}),
+ Object.freeze({id:'heat',title:'Steady heat conduction',status:'Live heat calculation',available:true,description:'Edit a rectangular plate, its conductivity, heat source and side conditions, then compute temperature and heat flux.',scope:'2D rectangle · uniform k and source · fixed temperature, insulation, flux or convection per side',physics:Object.freeze({electric:false,heat:true,structure:false,optics:false})}),
  Object.freeze({id:'multi',title:'Heated optical waveguide',status:'Setup only · calculation unavailable',available:false,description:'Arrange electric, thermal, structural and optical interfaces in one model.',scope:'Conceptual regions and boundaries · coupled adapter pending',physics:Object.freeze({electric:true,heat:true,structure:true,optics:true})})
 ]);
 export function templatePhysics(id){
@@ -25,6 +26,6 @@ export function renderApplications(host){
   button.append(title,status,description,scope);cards.append(button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
- contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, two candidates.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a template changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
+ contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, two candidates.</li><li>Steady heat: one homogeneous rectangle with constant conductivity and source; each side insulated, at fixed temperature, with outward flux or with convection. Results stay in the tab.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a template changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
  host.append(heading,intro,cards,contract);
 }
