@@ -2,8 +2,9 @@
 
 **English** | [한국어](locales/ko/pages/reference-comparisons.md)
 
-Selected problems are solved twice: with galerkin and with an independent
-finite-element tool. The comparison is recorded separately from each feature's
+Selected problems are solved twice: with galerkin and with an independent tool,
+either run live in the tests or, for a tool too heavy for CI, read from stored
+results. The comparison is recorded separately from each feature's
 analytical acceptance references, which stay unchanged.
 
 - **Same discretization** (same mesh, element, coefficients and boundary data):
@@ -18,10 +19,11 @@ claims still come from analytical references and mesh-refinement studies.
 
 ## Tools
 
-| Tool | Version | License | How it is used  Mode |
+| Tool | Version | License | How it is used | Mode |
 |---|---|---|---|---|
-| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]`  live |
-| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0` (sympy 1.14.0 in CI) | MIT (sympy: BSD-3-Clause AND MIT) | Same; [element definitions](#element-definitions) only  live |
+| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`; CI pins 12.0.2 | BSD-3-Clause | Imported in tests from the test-only extra `galerkin[crosscheck]` | live |
+| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0` (sympy 1.14.0 in CI) | MIT (sympy: BSD-3-Clause AND MIT) | Same; [element definitions](#element-definitions) only | live |
+| [modesolver](https://github.com/thomas-e-murphy/modesolver) | 3.0.2, git `6f54c5e` | MIT | Vector finite differences; run in a separate environment, results stored ([below](#stored-comparisons)) | stored |
 
 By choice, only permissively licensed tools are installed as test extras and
 run in CI (see [third-party software](third-party.md)). Tools under weak
@@ -145,7 +147,20 @@ P1 boundary mass. The symbolic integration takes about 20 s on one core.
 ## Stored comparisons
 
 Comparisons without a live tool use the [stored reference values](stored-reference-values.md) contract.
-scikit-fem and symfem currently run live; NGSolve uses stored results. Add each new stored tool and its record together.
+scikit-fem and symfem currently run live; NGSolve and modesolver use stored results. Add each new stored tool and its record together.
+
+| Case | OpenPhysics | modesolver 3.0.2 | Observable at 1.55 um | Difference | Gate |
+|---|---|---|---|---|---|
+| `soi_strip_modes` | `simcase` vector `em.modes2d`, edge and nodal finite elements, `soi_strip` mesh with every length halved | Vector finite differences, uniform grids h = 0.01, 0.005, 0.0025 um, Richardson-extrapolated | TE0 n_eff; TE0 n_g; TM0 n_eff | 3.6e-4; 7.8e-4; 1.3e-4 | reported |
+
+The record is `tests/simcase/reference_values/modesolver/soi_strip_modes.json`.
+The two tools share the geometry, PEC window, wavelengths and physmat material
+indices; they differ in discretization, interface treatment and eigensolver.
+TE0 n_eff converges from opposite sides: the finite differences fall to 2.44856
+on the finest grid and the finite elements rise to 2.44634, while the two
+extrapolations, 2.44670 and 2.44755, lie between them. On the example mesh
+itself the TE0 difference is 2.6e-3. modesolver has no PyPI release, and its
+finest grid takes about 5 minutes and 7.8 GB per solve, so it is not run in CI.
 
 Absorbing scalar and vector waveguides are also compared against scikit-fem
 12.0.2 complex assembly and dense QZ. The complex index and its imaginary part

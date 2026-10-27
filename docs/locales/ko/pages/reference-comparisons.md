@@ -2,7 +2,8 @@
 
 [English](../../../reference-comparisons.md) | **한국어**
 
-몇몇 문제를 galerkin과 독립된 유한요소 도구로 두 번 풉니다. 비교 결과는 각 기능의 해석해
+몇몇 문제를 galerkin과 독립된 도구로 두 번 풉니다. 독립 도구는 시험에서 직접 실행하거나, CI에서 돌리기에
+너무 무거운 도구라면 저장해 둔 결과를 읽습니다. 비교 결과는 각 기능의 해석해
 수용 기준과 따로 기록하며, 해석해 기준은 그대로 둡니다.
 
 - **같은 이산화**(같은 메시·요소·계수·경계 자료): 두 도구가 같은 이산해를 내야 합니다.
@@ -15,10 +16,11 @@
 
 ## 도구
 
-| 도구 | 버전 | 라이선스 | 쓰는 방식  Mode |
+| 도구 | 버전 | 라이선스 | 쓰는 방식 | Mode |
 |---|---|---|---|---|
-| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`, CI는 12.0.2 고정 | BSD-3-Clause | 시험 전용 extra `galerkin[crosscheck]`에서 시험 코드가 import  live |
-| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0`(CI의 sympy는 1.14.0) | MIT(sympy: BSD-3-Clause AND MIT) | 같음. [요소 정의](#요소-정의)에만 사용  live |
+| [scikit-fem](https://github.com/kinnala/scikit-fem) | `>=12,<13`, CI는 12.0.2 고정 | BSD-3-Clause | 시험 전용 extra `galerkin[crosscheck]`에서 시험 코드가 import | live |
+| [symfem](https://github.com/mscroggs/symfem) | `==2025.12.0`(CI의 sympy는 1.14.0) | MIT(sympy: BSD-3-Clause AND MIT) | 같음. [요소 정의](#요소-정의)에만 사용 | live |
+| [modesolver](https://github.com/thomas-e-murphy/modesolver) | 3.0.2, git `6f54c5e` | MIT | 벡터 유한차분. 별도 환경에서 실행하고 결과를 저장([아래](#저장값-비교)) | stored |
 
 시험 extra로 설치하고 CI에서 돌리는 도구는 정한 대로 허용형 라이선스 도구뿐입니다
 ([제3자 소프트웨어](third-party.md) 참고). 약한 copyleft(NGSolve 같은 LGPL)나 GPL 도구는 이
@@ -132,7 +134,17 @@ symfem 2025.12.0, sympy 1.14.0으로 로컬 Linux에서 실행한 값입니다. 
 ## 저장값 비교
 
 도구를 실행하지 않는 비교는 [저장 레퍼런스 값](stored-reference-values.md) 형식을 씁니다.
-현재 scikit-fem·symfem은 live이고 NGSolve는 stored 방식입니다. 새 저장 도구와 기록은 함께 추가합니다.
+현재 scikit-fem·symfem은 live이고 NGSolve와 modesolver는 stored 방식입니다. 새 저장 도구와 기록은 함께 추가합니다.
+
+| 사례 | OpenPhysics | modesolver 3.0.2 | 1.55 um 관측량 | 차이 | 기준 |
+|---|---|---|---|---|---|
+| `soi_strip_modes` | `simcase` 벡터 `em.modes2d`, 변·절점 유한요소, 모든 길이를 절반으로 줄인 `soi_strip` 메시 | 벡터 유한차분, 균일 격자 h = 0.01, 0.005, 0.0025 um, Richardson 외삽 | TE0 n_eff, TE0 n_g, TM0 n_eff | 3.6e-4, 7.8e-4, 1.3e-4 | 보고만 |
+
+기록은 `tests/simcase/reference_values/modesolver/soi_strip_modes.json`입니다. 두 도구는 형상, PEC 창,
+파장, physmat 재료 굴절률이 같고 이산화·경계면 처리·고유값 풀이가 다릅니다. TE0 n_eff는 서로 반대쪽에서
+수렴합니다. 유한차분은 가장 촘촘한 격자에서 2.44856까지 내려오고 유한요소는 2.44634까지 올라가며, 두
+외삽값 2.44670과 2.44755는 그 사이에 있습니다. 예제 메시 그대로에서는 TE0 차이가 2.6e-3입니다.
+modesolver는 PyPI 배포가 없고 가장 촘촘한 격자에서 풀이당 약 5분·7.8 GB가 들어 CI에서 돌리지 않습니다.
 
 흡수 scalar·vector 도파관도 scikit-fem 12.0.2의 복소 조립·밀집 QZ와
 비교합니다. 복소 굴절률과 허수부에 각각 상대차 1e-9 기준을 유지합니다.

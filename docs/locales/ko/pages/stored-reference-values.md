@@ -3,7 +3,8 @@
 [English](../../../stored-reference-values.md) | **한국어**
 
 저장 결과를 읽으면 독립 도구를 설치하거나 실행하지 않고 비교할 수 있습니다. 코드 간 비교
-근거이며 해석해 수용 기준이나 메시 수렴 근거를 대신하지 않습니다. 현재 물리 값 기록은 없습니다.
+근거이며 해석해 수용 기준이나 메시 수렴 근거를 대신하지 않습니다. 첫 물리 값 기록은 SOI strip modesolver 비교
+`tests/simcase/reference_values/modesolver/soi_strip_modes.json`입니다.
 
 ## 배치와 사용
 
