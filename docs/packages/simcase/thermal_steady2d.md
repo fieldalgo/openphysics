@@ -13,9 +13,9 @@ Candidate implementation is distinct from incomplete P2 numerical/installed acce
 
 `thermal.steady2d` solves `-div(k grad T) = Q` in a single homogeneous
 2D rectangle of unit out-of-plane thickness. It uses the existing P1 thermal
-engine. This document describes the headless API and CLI; Studio rejects these
-models and clears older optical results. There is no thermal Studio editor or
-renderer in this version.
+engine. This document describes the headless API and CLI; Studio validates, runs and
+shows these documents through its own heat routes (see
+[Steady heat in Studio](thermal_studio.md)).
 
 ## Input
 

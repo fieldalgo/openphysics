@@ -168,8 +168,8 @@ with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
 The temporary output is removed when the context ends; choose an owned,
 nonexistent persistent target to retain results. CLI exit codes are 0 for
 success, 2 for invalid input and 1 for solver/save or existing-target failures.
-No thermal PNG is produced. Studio rejects thermal documents and clears stale
-optical state; headless support does not imply Studio support.
+No thermal PNG is produced. Studio validates, runs and shows these documents
+through its own heat routes; see [Steady heat in Studio](thermal_studio.md).
 
 `summary()` returns a JSON-safe dictionary. `result_format`, `field_layout`
 and `boundary_enabled` identify the captured layout. Public array properties
