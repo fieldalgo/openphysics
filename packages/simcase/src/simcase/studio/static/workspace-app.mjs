@@ -7,9 +7,9 @@ import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
 import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
-import {installShapeEditor} from './workspace-shape-editor.mjs';
+import {installShapeEditor,SNAP_STEPS} from './workspace-shape-editor.mjs';
 import {sectionSvg,MATERIAL_FILL,WINDOW_VIEW,shapesView} from './workspace-section.mjs';
-import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners} from './workspace-shapes.mjs';
+import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS} from './workspace-shapes.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
 import {checkWorkspaceCapabilities} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
@@ -25,7 +25,7 @@ import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} 
 import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
 
-(()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+(()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
@@ -36,7 +36,7 @@ function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Coupl
 const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
 function setShape(index,shape){state.shapes=state.shapes.map((s,i)=>i===index?shape:s);}
 function selectedShape(){ui.shape=Math.min(Math.max(0,ui.shape|0),state.shapes.length-1);return state.shapes[ui.shape];}
-function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installShapeEditor($('canvas'),{shape:selectedShape(),index:ui.shape,blocked:()=>numericDrafts.invalid,commit:(shape,label)=>{edits.endGroup();setShape(ui.shape,shape);trackEdit();edits.endGroup();render();notice(label+'. Run explicitly to compute new results.');}});}
+function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installShapeEditor($('canvas'),{shape:selectedShape(),index:ui.shape,snap:ui.snap,blocked:()=>numericDrafts.invalid,commit:(shape,label)=>{edits.endGroup();setShape(ui.shape,shape);trackEdit();edits.endGroup();render();notice(label+'. Run explicitly to compute new results.');}});}
 function geom(){
 if(isOptical())return sectionSvg(state.shapes,{selected:ui.shape,selectedEdge:pick.boundary,mode:pick.mode});
 const w=state.width/500;
@@ -138,7 +138,14 @@ function shapeInspector(){
  const block=shapesBlock(state.shapes);
  return `<div class="shape-list" role="group" aria-label="Shapes in draw order">${list}</div><div class="toolbar shape-actions">${add}<button type="button" id="duplicate-shape" ${n>=MAX_SHAPES?'disabled':''}>Duplicate</button><button type="button" id="delete-shape" ${n<=1?'disabled':''}>Delete</button><button type="button" id="shape-earlier" ${ui.shape===0?'disabled':''}>Draw earlier</button><button type="button" id="shape-later" ${ui.shape===n-1?'disabled':''}>Draw later</button></div>`+
   `<h3>${escapeHtml(shape.name)} · ${shape.type==='rect'?'rectangle':shape.type}</h3><label>Name<input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></label><label>Material<select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></label>${props.map(field).join('')}${vertices}`+
-  pair('Draw order',`${ui.shape+1} of ${n} · later shapes win where they overlap`)+(block?`<p class="validation-warning">${escapeHtml(block)}</p>`:'')+(overlaps?`<ul class="shape-notes">${overlaps}</ul>`:'')+pair('Background','Silica · fills the rest of the window')+pair('Up to',`${MAX_SHAPES} shapes inside x ±1500 nm, y ±1200 nm`);
+  alignControls(shape)+pair('Draw order',`${ui.shape+1} of ${n} · later shapes win where they overlap`)+(block?`<p class="validation-warning">${escapeHtml(block)}</p>`:'')+(overlaps?`<ul class="shape-notes">${overlaps}</ul>`:'')+pair('Background','Silica · fills the rest of the window')+pair('Up to',`${MAX_SHAPES} shapes inside x ±1500 nm, y ±1200 nm`);
+}
+function referenceShape(){const others=state.shapes.map((s,i)=>i).filter(i=>i!==ui.shape);if(!others.length)return null;if(!others.includes(ui.reference))ui.reference=others.includes(ui.shape-1)?ui.shape-1:others[0];return ui.reference;}
+function alignControls(shape){
+ const ref=referenceShape(),others=state.shapes.map((s,i)=>[s,i]).filter(([,i])=>i!==ui.shape);
+ const own=['centre-x','rest-y'].map(a=>`<button type="button" data-align="${a}">${ALIGN_ACTIONS[a]}</button>`).join('');
+ const relative=ref===null?'<p class="muted">Add another shape to align against it.</p>':`<label>Reference shape<select id="shape-reference">${others.map(([s,i])=>`<option value="${i}" ${i===ref?'selected':''}>${i+1}. ${escapeHtml(s.name)}</option>`).join('')}</select></label><div class="toolbar shape-actions">${['left-of','right-of','on-top','below','centre-on'].map(a=>`<button type="button" data-align="${a}">${ALIGN_ACTIONS[a]}</button>`).join('')}</div>`;
+ return `<h3>Align ${escapeHtml(shape.name)}</h3><div class="toolbar shape-actions">${own}</div>${relative}<label>Drag step<select id="snap-step">${SNAP_STEPS.map(v=>`<option value="${v}" ${v===ui.snap?'selected':''}>${v} nm</option>`).join('')}</select></label><p class="input-hint">Alignment moves the shape so its bounding edges meet exactly; it is refused if the shape would leave the window.</p>`;
 }
 function clearShapeDrafts(){for(const [key,field] of Object.entries(INPUT_FIELDS))if(field.prop)numericDrafts.clear(key);}
 function commitShapes(next,selected,message){
@@ -155,6 +162,9 @@ function bindShapePanel(){
  $('shape-earlier').onclick=()=>reorder(-1);$('shape-later').onclick=()=>reorder(1);
  $('shape-name').onchange=()=>{const el=$('shape-name');if(!commitShapes(state.shapes.map((s,i)=>i===ui.shape?{...s,name:el.value.trim()}:s),ui.shape,'Shape renamed.'))el.value=selectedShape().name;};
  $('shape-material').onchange=()=>commitShapes(state.shapes.map((s,i)=>i===ui.shape?{...s,material:$('shape-material').value}:s),ui.shape,'Material updated.');
+ document.querySelectorAll('[data-align]').forEach(b=>b.onclick=()=>{if(!guard())return;const ref=['centre-x','rest-y'].includes(b.dataset.align)?null:state.shapes[referenceShape()];try{const moved=alignShape(selectedShape(),b.dataset.align,ref);commitShapes(state.shapes.map((s,i)=>i===ui.shape?moved:s),ui.shape,`${moved.name}: ${ALIGN_ACTIONS[b.dataset.align].toLowerCase()}${ref?' '+ref.name:''}.`);}catch(error){notice(error.message+' Shape unchanged.');}});
+ const reference=$('shape-reference');if(reference)reference.onchange=()=>{ui.reference=+reference.value;};
+ $('snap-step').onchange=()=>{ui.snap=+$('snap-step').value;render();notice(`Dragging now moves in ${ui.snap} nm steps. The model is unchanged.`);};
  const points=$('shape-points');if(points)points.onchange=()=>{try{
   const parsed=points.value.trim().split(/\n+/).map((line,i)=>{const parts=line.split(/[\s,;]+/).filter(Boolean);if(parts.length!==2)throw new Error(`Vertex line ${i+1} needs x and y.`);return parts.map(v=>{const n=Number(v);if(!Number.isFinite(n))throw new Error(`Vertex line ${i+1} must contain numbers.`);return n;});});
   const next=state.shapes.map((s,i)=>i===ui.shape?{...s,points:validatePolygon(parsed)}:s);validateShapes(next);commitShapes(next,ui.shape,'Vertices updated.');

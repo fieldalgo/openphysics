@@ -79,7 +79,9 @@ and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view reta
 its camera while navigating this tab. Heated-waveguide views remain schematic. The optical-only view shows a
 2D cross section with equal x/y scale and dimensions in nm, drawn from the same
 shapes as the submitted document: every shape in draw order over the silica
-window x = ±1500 nm, y = ±1200 nm. Select Boundaries to inspect the four fixed PEC
+window x = ±1500 nm, y = ±1200 nm. The view opens fitted to the window; **Fit view**
+returns there and **Fit shapes** zooms to the current design. A faint grid marks
+every 100 nm, with stronger lines every 500 nm; it is for reading positions only. Select Boundaries to inspect the four fixed PEC
 edges; these are read-only optical conditions, not thermal/mechanical assignments.
 This is not a CAD editor. Camera changes do not change inputs, edit history, saved
 files or computed fields.
@@ -92,9 +94,16 @@ edges may not cross or touch). Values outside the window or below 10 nm stay as
 invalid drafts that block saving and running; another shape cannot be selected
 until they are corrected or restored.
 
+**Align** moves the selected shape so its bounding edges meet exactly: centre it on
+x = 0, rest it on y = 0, or place it left of, right of, on top of or below a
+reference shape, or centre it on that shape. Touching edges are then identical in
+the submitted document. An alignment that would leave the window is refused and
+the shape stays. **Drag step** (1, 5, 10 or 50 nm) sets how far a drag moves and
+the grid edges and vertices snap to; it is a view setting, not part of the model.
+
 With Bodies selected, click a shape in the drawing to select it. Drag the selected
 shape to move it, drag a yellow handle to move one rectangle edge, a circle
-radius or a polygon vertex, and release to apply. Dragging snaps to 5 nm; with the
+radius or a polygon vertex, and release to apply. Dragging follows the drag step (5 nm by default); with the
 shape or a handle focused, arrow keys move by 10 nm (Shift: 1 nm). A preview does
 not change the model until release; Escape, pointer cancellation, window resize,
 focus loss and page hiding discard it. Moves are clamped to the window, and each

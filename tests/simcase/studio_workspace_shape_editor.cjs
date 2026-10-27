@@ -22,3 +22,6 @@ test('edge, radius and vertex handles respect the minimum size and the window',(
  assert.deepEqual(E.moveVertex(tri,2,-9999,50).points,[[0,0],[100,0],[-1500,50]]);assert.deepEqual(tri.points[2],[0,100]);
  assert.throws(()=>E.moveVertex(tri,3,0,0));assert.equal(E.snapNm(12.4),10);assert.equal(E.snapNm(-13),-15);assert.equal(E.snapNm(7,1),7);
 });
+test('drag steps are a fixed menu and snapping follows the chosen step',()=>{
+ assert.deepEqual([...E.SNAP_STEPS],[1,5,10,50]);assert.equal(E.snapNm(137,50),150);assert.equal(E.snapNm(137,10),140);assert.equal(E.snapNm(137.4,1),137);
+});
