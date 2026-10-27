@@ -13,6 +13,7 @@ this file is written as an ordinary consumer of the engine, not as a part of it.
 
 from __future__ import annotations
 
+import json
 import threading
 import traceback
 import uuid
@@ -118,6 +119,17 @@ def workspace_capabilities_v4():
         "materials": {"Silicon": "Si", "Silicon nitride": "Si3N4", "Silica": "SiO2", "Air": "vacuum"},
         "settings": {"window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
     }, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/workspace/capabilities/v5")
+def workspace_capabilities_v5():
+    caps = json.loads(workspace_capabilities_v4().body)
+    caps.update(schema_version=5, adapter="optical-shapes-v5", materials={
+        "Silicon": "Si", "Silicon nitride": "Si3N4", "Silica": "SiO2", "Air": "vacuum",
+        "Sapphire (ordinary)": "Al2O3", "Lithium niobate (ordinary)": "LiNbO3",
+        "Indium phosphide": "InP", "Gallium arsenide": "GaAs",
+        "Calcium fluoride": "CaF2", "Magnesium fluoride (ordinary)": "MgF2"})
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/examples")

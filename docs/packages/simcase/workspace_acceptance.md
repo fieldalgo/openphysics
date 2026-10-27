@@ -165,6 +165,17 @@ eigenvalue equation; the PEC window splits the pair. The worst case tried, silic
 filling the window at 20 nm, took 22 s with a 14 MB result. Windows/macOS, other
 browsers and human users were not part of this observation.
 
+## Fitted view, alignment and materials observation, 2026-10-27
+
+Source checkout on Linux (Python 3.12). Through the local HTTP API at 1550 nm, a
+3000 nm-wide slab of each added guiding material ran from the workspace document.
+Its fundamental index was compared with the exact TE0 index of the same slab between
+PEC walls at y = ±1.2 µm, solved outside simcase (lithium niobate 600 nm, sapphire
+800 nm, InP 300 nm, GaAs 250 nm thick). At a 20 nm core mesh the relative
+differences were 2.2e-4, 9.8e-5, 6.3e-4 and 8.7e-4, smaller than at 30 nm. A
+design with an InP rod between calcium fluoride and magnesium fluoride layers also
+ran. Browser observations for this revision are recorded in the pull request.
+
 ## Release decision
 
 Retain each task's actual outcome, time, interventions and failure reason.

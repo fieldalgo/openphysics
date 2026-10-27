@@ -43,16 +43,21 @@ and edit its properties in the inspector. The optical application runs a real
 coupling diagram, voltage and mechanical selections do not run coupled physics.
 
 The optical adapter accepts up to eight shapes inside the window x = ±1500 nm,
-y = ±1200 nm: rectangles, circles and polygons with 3–12 vertices, each of silicon,
-silicon nitride, silica or air, in a silica background. At least one silicon or
-silicon nitride shape is needed to guide light. Shapes are drawn in list order and
+y = ±1200 nm: rectangles, circles and polygons with 3–12 vertices in a silica
+background. Each shape is silicon, silicon nitride, silica, air, sapphire, lithium
+niobate, indium phosphide, gallium arsenide, calcium fluoride or magnesium fluoride,
+with lossless physmat data across 1400–1700 nm. Sapphire, lithium niobate and
+magnesium fluoride are uniaxial crystals; the workspace uses their ordinary index
+as an isotropic material, so it does not model birefringence or crystal
+orientation. At least one shape of a material above the silica index (silicon,
+silicon nitride, sapphire, lithium niobate, InP or GaAs) is needed to guide light. Shapes are drawn in list order and
 **later shapes win where they overlap**, as in the simcase geometry contract; for a
 rib, draw the slab first and the ridge after it. Rectangles and polygons are
 submitted as their corner coordinates, so shapes that share an edge in nm share it
 exactly in the solver document. Set the wavelength (1400–1700 nm) in
 **Optical modes** and the core mesh size (20–60 nm) in **Mesh**; new models start
 with one 500 × 220 nm silicon core at 1550 nm and 30 nm. The core mesh size applies
-to silicon and silicon nitride shapes; silica and air shapes use the graded
+to those guiding materials; silica, air, CaF2 and MgF2 shapes use the graded
 background mesh. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
 boundaries and two candidates. Each result shows the shapes, wavelength and core
 mesh it used.
@@ -146,11 +151,13 @@ width, height and core material, which is the geometry their results were comput
 with. Results from the earlier adapters stay valid only with that single core;
 older editors reject version 4 instead of ignoring the shapes. The run table CSV
 keeps the core width, height and material columns for single-rectangle designs and
-adds a `shapes` column describing every shape.
+adds a `shapes` column describing every shape. Results computed with the
+`optical-shapes-v4` adapter (silicon, silicon nitride, silica and air only) keep that
+adapter name; new results record `optical-shapes-v5`.
 
-The workspace checks `/api/workspace/capabilities/v4` before enabling Run. Contract
-version 4 and adapter `optical-shapes-v4` declare the window in nm, at most eight
-shapes and twelve polygon vertices, the shape types and materials, the
+The workspace checks `/api/workspace/capabilities/v5` before enabling Run. Contract
+version 5 and adapter `optical-shapes-v5` declare the window in nm, at most eight
+shapes and twelve polygon vertices, the shape types and the ten materials, the
 1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
 and candidate settings,
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible

@@ -3,7 +3,7 @@
 import {OPTICAL_SETTINGS} from './workspace-notebook.mjs';
 import {WINDOW_NM,MAX_SHAPES,MAX_POINTS,SHAPE_MATERIALS} from './workspace-shapes.mjs';
 export function checkWorkspaceCapabilities(caps){
- if(caps?.schema_version!==4||caps.adapter!=='optical-shapes-v4'||caps.optical!==true||caps.coupled!==false)throw new Error('Unsupported workspace contract. Update Studio and retry.');
+ if(caps?.schema_version!==5||caps.adapter!=='optical-shapes-v5'||caps.optical!==true||caps.coupled!==false)throw new Error('Unsupported workspace contract. Update Studio and retry.');
  if(typeof caps.simcase_version!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(caps.simcase_version))throw new Error('Studio did not provide a valid package version.');
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  if(!same(caps.window_nm,[WINDOW_NM.xmin,WINDOW_NM.xmax,WINDOW_NM.ymin,WINDOW_NM.ymax])||caps.max_shapes!==MAX_SHAPES||caps.max_polygon_vertices!==MAX_POINTS||!same(caps.shape_types,['rect','circle','polygon'])||!same(caps.materials,SHAPE_MATERIALS))throw new Error('Unsupported shape contract.');
