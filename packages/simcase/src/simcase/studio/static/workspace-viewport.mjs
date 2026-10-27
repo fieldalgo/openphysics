@@ -31,7 +31,7 @@ export class SchematicCamera {
   get box() { return [this.x - 300 / this.zoom, this.y - 175 / this.zoom, 600 / this.zoom, 350 / this.zoom]; }
 }
 
-export function installViewport(host, camera, { fit = () => camera.fit(), fitShapes = null } = {}) {
+export function installViewport(host, camera, { fit = () => camera.fit(), fitShapes = null, onChange = null } = {}) {
   const svg = host.querySelector('svg[role="group"]');
   if (!svg) return;
   const bar = document.createElement('div');
@@ -45,6 +45,8 @@ export function installViewport(host, camera, { fit = () => camera.fit(), fitSha
     const current = host.querySelector('svg[role="group"]');
     if (!current) return;
     current.setAttribute('viewBox', camera.box.join(' '));
+    // Labels and handles keep their screen size at any zoom (see workspace.css and the shape editor).
+    current.style.setProperty('--view-scale', String(1 / camera.zoom));
     current.setAttribute('tabindex', '0');
     current.setAttribute('aria-describedby', 'schematic-navigation-help');
     current.onkeydown = event => {
@@ -55,6 +57,7 @@ export function installViewport(host, camera, { fit = () => camera.fit(), fitSha
     output.textContent = Math.round(camera.zoom * 100) + (current.dataset.geometryView==='physical'?'% · optical section (nm)':'% · schematic');
     zoomOut.disabled = camera.zoom <= 1;
     zoomIn.disabled = camera.zoom >= 4;
+    onChange?.();
   };
   const keys = {
     '+': () => camera.scale(1.25), '=': () => camera.scale(1.25),
