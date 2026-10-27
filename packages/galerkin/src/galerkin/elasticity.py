@@ -6,6 +6,10 @@ E and nu are one homogeneous material or piecewise constant on named mesh
 regions (galerkin.materials, docs/packages/galerkin/multimaterial.md).
 Import this submodule explicitly; see docs/packages/galerkin/elasticity2d.md for the contract.
 No scalar or edge finite-element space is used here.
+
+E, nu, Dirichlet displacements, body force and traction may be JAX or PyTorch
+values (callbacks may return them); the result arrays are then in that library
+and carry reverse-mode derivatives. NumPy inputs compute exactly as before.
 """
 from __future__ import annotations
 
@@ -16,8 +20,13 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
 from .materials import is_per_region, region_property
+from .core import forms, kernels
+from .core import live as live_inputs
+from .core import solve as core_solve
+from .core.backend import lift, live_namespace, scatter_add
 from .core.boundary import traction_load
-from .core.checks import real_array
+from .core.checks import real_array, real_value
+from .core.sparse import CooMatrix
 from .core.constraints import vector_dirichlet
 from .core.quadrature import triangle_product_rule
 from .core.triangles import triangle_geometry, vector_strain
@@ -102,6 +111,12 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
                      body_force=(0., 0.), traction=None):
     """Solve -div(sigma)=body_force with optional prescribed boundary traction.
 
+    E, nu, Dirichlet displacements, body_force and traction may be JAX or
+    PyTorch values, or callbacks returning them; the result is then in that
+    library with reverse-mode derivatives (docs/packages/galerkin/differentiation.md).
+    The NumPy solve below runs on their numbers first, with all its checks.
+
+
     body_force: constant (2,) or callable accepting (Q,2) coordinates in m
     and returning exactly (Q,2), in N/m^3. Dirichlet: mapping from
     (node, component=0|1) to scalar displacement in m. E (Pa) and nu are
@@ -115,6 +130,92 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
     """
+    body_force, traction = live_inputs.recorded(body_force), live_inputs.recorded(traction)
+    result = _solve_numpy(mesh, young_modulus=live_inputs.numbers(young_modulus),
+                          poisson_ratio=live_inputs.numbers(poisson_ratio), plane=plane,
+                          dirichlet=live_inputs.numbers(dirichlet),
+                          body_force=live_inputs.numbers(body_force),
+                          traction=live_inputs.numbers(traction))
+    inputs = (young_modulus, poisson_ratio, dirichlet, body_force, traction)
+    if not any(live_inputs.is_live_input(v) for v in inputs):
+        return result
+    return _live_result(mesh, result, plane, *inputs)
+
+
+def constitutive_live(xp, e, nu, plane):
+    """constitutive_matrix for live E and nu: (3,3) for scalars, (T,3,3) for (T,) arrays."""
+    mu = e / (2 * (1 + nu))
+    lam = (e * nu / ((1 + nu) * (1 - 2 * nu)) if plane == "strain"
+           else e * nu / (1 - nu * nu))
+    zero = xp.zeros_like(mu)
+    rows = [[lam + 2*mu, lam, zero], [lam, lam + 2*mu, zero], [zero, zero, mu]]
+    return xp.stack([xp.stack(row, axis=-1) for row in rows], axis=-2)
+
+
+def live_materials(xp, mesh, cells, young_modulus, poisson_ratio):
+    """Live E and nu: 0-d arrays for scalars, (T,) arrays if either is a region table."""
+    if is_per_region(young_modulus) or is_per_region(poisson_ratio):
+        e = region_property(mesh, young_modulus, "young_modulus", positive=True, live=True)
+        nu = region_property(mesh, poisson_ratio, "poisson_ratio", lower=-1., upper=.5, live=True)
+        return tuple(xp.broadcast_to(lift(xp, v, xp.float64), (cells,)) for v in (e, nu))
+    return tuple(lift(xp, real_value(v, name), xp.float64) for v, name in
+                 ((young_modulus, "young_modulus"), (poisson_ratio, "poisson_ratio")))
+
+
+def live_stiffness(xp, b, dofs, d, area, size):
+    """The vector-P1 stiffness for a live D as a coalesced CooMatrix in ``xp``."""
+    k = forms.matrix(dofs, dofs, kernels.vector_p1_stiffness(b, d, area), (size, size)).coalesce()
+    return CooMatrix(k.rows, k.cols, lift(xp, k.values), k.shape)
+
+
+def live_body_load(xp, p, t, area, dofs, body_force):
+    """The body-force load (2N,) from a constant or a recorded callback, in ``xp``."""
+    bary, weights = triangle_product_rule()
+    points = np.einsum("qa,tad->tqd", bary, p[t])
+    body = live_inputs.replayed(body_force)
+    force = lift(xp, real_value(body(points.reshape(-1, 2)) if callable(body) else body, "body_force"))
+    force = xp.reshape(force, points.shape) if callable(body) else xp.broadcast_to(force, points.shape)
+    fe = xp.einsum("qa,q,tqd,t->tad", *(lift(xp, a) for a in (bary, weights)), force, lift(xp, area))
+    return scatter_add(xp, 2*len(p), dofs.ravel(), xp.reshape(fe, (-1,)))
+
+
+def live_displacement(xp, stiffness, load, u0, dirichlet, p, boundary, count, labels):
+    """u0 + K^{-1}(f - K u0) with the live Dirichlet values: u0 up to rounding, exact derivatives.
+
+    u0 is the checked NumPy displacement (2N,). Returns (u, fixed DOFs).
+    """
+    fixed, _ = vector_dirichlet(live_inputs.numbers(dirichlet), p, boundary, count, labels)
+    prescribed = (xp.stack([lift(xp, v, xp.float64) for v in dirichlet.values()]) if len(fixed)
+                  else xp.zeros(0, dtype=xp.float64))
+    u0 = lift(xp, u0)
+    delta = core_solve.solve_dirichlet(stiffness, load - stiffness.matvec(u0),
+                                       {tuple(fixed): prescribed - u0[fixed]} if len(fixed) else {})
+    return u0 + delta, fixed
+
+
+def _live_result(mesh, result, plane, young_modulus, poisson_ratio, dirichlet, body_force, traction):
+    """``result`` in the inputs' library, through ``live_displacement`` (see there)."""
+    xp = live_namespace(*live_inputs.leaves(young_modulus, poisson_ratio, dirichlet,
+                                             body_force, traction))
+    p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
+    b, dofs = vector_strain(p, t)
+    d = constitutive_live(xp, *live_materials(xp, mesh, len(t), young_modulus, poisson_ratio), plane)
+    n = 2*len(p)
+    stiffness = live_stiffness(xp, b, dofs, d, area, n)
+    load = (live_body_load(xp, p, t, area, dofs, body_force)
+            + lift(xp, traction_load(mesh, p, t, live_inputs.replayed(traction), live=True)))
+    u, fixed = live_displacement(xp, stiffness, load, result.displacement.reshape(-1), dirichlet,
+                                 p, boundary, count, labels)
+    residual = stiffness.matvec(u) - load
+    reaction = scatter_add(xp, n, fixed, residual[fixed])
+    strain = xp.einsum("tij,tj->ti", lift(xp, b), u[dofs])
+    stress = (xp.einsum("ij,tj->ti", d, strain) if d.ndim == 2
+              else xp.einsum("tij,tj->ti", d, strain))
+    return ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress,
+                            *(xp.reshape(a, (-1, 2)) for a in (load, reaction, residual)), plane)
+
+
+def _solve_numpy(mesh, *, young_modulus, poisson_ratio, plane, dirichlet, body_force, traction):
     per_region = is_per_region(young_modulus) or is_per_region(poisson_ratio)
     if not per_region:
         d = constitutive_matrix(young_modulus, poisson_ratio, plane=plane)

@@ -197,3 +197,5 @@ nu=0.5는 거부하며 엄격한 nu<0.5 입력 검사를 통과해도 정확도�
 기존 NumPy/SciPy 의존성과 직접 유도한 식만 사용하며 외부 solver 구현을 복사하지
 않습니다. 예제·문서는 소스 트리에 있고 배포본에 포함되지 않습니다. 설치 검사는
 checkout의 예제를 복사해 설치된 wheel로 실행합니다.
+
+JAX·PyTorch 입력과 그 미분은 [JAX·PyTorch로 미분하기](differentiation.md)에 있습니다.

@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: elasticity and thermoelasticity accept JAX or PyTorch values for E, nu, alpha, the reference temperature, Dirichlet displacements, body force and traction, with reverse-mode derivatives. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md).
+
 - `galerkin`: transient heat conduction accepts JAX or PyTorch values for conductivity, heat capacity, heat source, Dirichlet temperatures and the initial field, with reverse-mode derivatives through every time step; `checkpoint_every` trades recomputation for memory. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#transient-heat-memory-and-checkpointing).
 
 - `galerkin`: steady heat and steady electric conduction accept JAX or PyTorch values for conductivity, heat source, Dirichlet and reference potentials and boundary data, and return results in that library with derivatives (reverse mode, through an adjoint sparse solve). NumPy results are unchanged. Solvers that do not differentiate yet refuse JAX and PyTorch values instead of silently dropping the derivative. [Documentation](docs/packages/galerkin/differentiation.md).

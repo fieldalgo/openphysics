@@ -6,15 +6,23 @@ This module does not call a heat solver or authenticate temperature provenance.
 alpha, E and nu are scalars or piecewise constant on named mesh regions
 (galerkin.materials, docs/packages/galerkin/multimaterial.md).
 See docs/packages/galerkin/prescribed_temperature_thermoelasticity.md for units and reductions.
+
+Tref, alpha, E, nu, Dirichlet displacements, body force and traction may be JAX
+or PyTorch values (callbacks may return them); the result arrays are then in that
+library and carry reverse-mode derivatives. The temperature snapshot is a NumPy
+container. NumPy inputs compute exactly as before.
 """
 from dataclasses import dataclass, field
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
-from .elasticity import constitutive_matrix, element_constitutive
+from .elasticity import (constitutive_live, constitutive_matrix, element_constitutive,
+                         live_body_load, live_displacement, live_materials, live_stiffness)
+from .core import live as live_inputs
+from .core.backend import is_live, lift, live_namespace, scatter_add
 from .core.boundary import traction_load
-from .core.checks import real_array
+from .core.checks import real_array, real_value
 from .core.constraints import vector_dirichlet
 from .core.quadrature import triangle_product_rule
 from .core.triangles import triangle_geometry, vector_strain
@@ -334,7 +342,109 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     geometry update is provided. A global Pa callback returning -p*normal is valid
     on the fixed reference boundary. Cross-mesh interpolation is unsupported. Near-incompressible plane-strain P1 locking remains possible.
     alpha, E and nu may each be {region name: value} over mesh.region_names.
+
+    Tref, alpha, E, nu, Dirichlet displacements, body_force and traction may be
+    JAX or PyTorch values, or callbacks returning them; the result is then in
+    that library with reverse-mode derivatives
+    (docs/packages/galerkin/differentiation.md). The NumPy solve runs on their
+    numbers first, with all its checks.
     """
+    body_force, traction = live_inputs.recorded(body_force), live_inputs.recorded(traction)
+    materials = dict(reference_temperature_k=reference_temperature_k,
+                     thermal_expansion_per_k=thermal_expansion_per_k,
+                     young_modulus=young_modulus, poisson_ratio=poisson_ratio)
+    result = _solve_numpy(mesh, temperature_snapshot, plane=plane,
+                          dirichlet=live_inputs.numbers(dirichlet),
+                          body_force=live_inputs.numbers(body_force),
+                          traction=live_inputs.numbers(traction),
+                          **{k: live_inputs.numbers(v) for k, v in materials.items()})
+    inputs = (*materials.values(), dirichlet, body_force, traction)
+    if not any(live_inputs.is_live_input(v) for v in inputs):
+        return result
+    return _live_result(mesh, temperature_snapshot, result, plane, dirichlet, body_force,
+                        traction, **materials)
+
+
+def _record_live(value):
+    """A result record of a live input: the value itself, or a {region name: value} copy."""
+    return {str(k): v for k, v in value.items()} if is_per_region(value) else value
+
+
+def _live_result(mesh, snapshot, result, plane, dirichlet, body_force, traction, *,
+                 reference_temperature_k, thermal_expansion_per_k, young_modulus, poisson_ratio):
+    """``result`` in the inputs' library: the elasticity adjoint correction of the
+    checked NumPy displacement, then every derived field from the same formulas."""
+    xp = live_namespace(*live_inputs.leaves(reference_temperature_k, thermal_expansion_per_k,
+                                             young_modulus, poisson_ratio, dirichlet,
+                                             body_force, traction))
+    p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
+    b, dofs = vector_strain(p, t)
+    regional = any(is_per_region(v) for v in
+                   (thermal_expansion_per_k, young_modulus, poisson_ratio))
+    tref = lift(xp, real_value(reference_temperature_k, "reference_temperature_k"), xp.float64)
+    temperature = lift(xp, snapshot.temperature_k)
+    m_vector = lift(xp, _M)
+    if regional:
+        alpha = xp.broadcast_to(lift(xp, region_property(
+            mesh, thermal_expansion_per_k, "thermal_expansion_per_k", live=True), xp.float64), (len(t),))
+        e, nu = (xp.broadcast_to(lift(xp, region_property(mesh, value, name, live=True, **bounds),
+                                      xp.float64), (len(t),))
+                 for value, name, bounds in ((young_modulus, "young_modulus", dict(positive=True)),
+                                             (poisson_ratio, "poisson_ratio", dict(lower=-1., upper=.5))))
+        a = alpha[:, None]*(temperature[t]-tref)
+        q = _thermal_coefficient(e, nu, plane)[:, None]*a
+        a_nodes, qc = a, xp.mean(q, axis=1)
+        ac = xp.mean(a, axis=1)
+    else:
+        alpha = lift(xp, real_value(thermal_expansion_per_k, "thermal_expansion_per_k"), xp.float64)
+        e, nu = live_materials(xp, mesh, len(t), young_modulus, poisson_ratio)
+        a = alpha*(temperature-tref)
+        q = _thermal_coefficient(e, nu, plane)*a
+        a_nodes, qc, ac = a[t], xp.mean(q[t], axis=1), xp.mean(a[t], axis=1)
+    d = constitutive_live(xp, e, nu, plane)
+    n = 2*len(p)
+    stiffness = live_stiffness(xp, b, dofs, d, area, n)
+    body = live_body_load(xp, p, t, area, dofs, body_force)
+    line = lift(xp, traction_load(mesh, p, t, live_inputs.replayed(traction), live=True))
+    external = body+line
+    local = xp.einsum("tji,j,t->ti", lift(xp, b), m_vector, lift(xp, area)*qc)
+    thermal = scatter_add(xp, n, dofs.ravel(), xp.reshape(local, (-1,)))
+    u, fixed = live_displacement(xp, stiffness, external+thermal, result.displacement.reshape(-1),
+                                 dirichlet, p, boundary, count, labels)
+    residual = stiffness.matvec(u)-external-thermal
+    reaction = scatter_add(xp, n, fixed, residual[fixed])
+    strain = xp.einsum("tij,tj->ti", lift(xp, b), u[dofs])
+    th = ac[:, None]*m_vector
+    stress = (xp.einsum("ij,tj->ti", d, strain) if d.ndim == 2
+              else xp.einsum("tij,tj->ti", d, strain))-qc[:, None]*m_vector
+    trace = strain[:, 0]+strain[:, 1]
+    if plane == "strain":
+        zz = e*nu/((1+nu)*(1-2*nu))*trace-qc
+        ez = xp.zeros_like(qc)
+    else:
+        zz = xp.zeros_like(qc)
+        ez = ((1+nu)*ac-nu*trace)/(1-nu)
+    bary = lift(xp, np.array([[2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3]]))
+    aq = a_nodes@bary.T
+    effective = aq if plane == "stress" else ((1+nu)[:, None] if regional else 1+nu)*aq
+    delta = strain[:, None, :]-effective[..., None]*m_vector
+    density = .5*(xp.einsum("tqi,ij,tqj->tq", delta, d, delta) if d.ndim == 2
+                  else xp.einsum("tqi,tij,tqj->tq", delta, d, delta))
+    if plane == "strain":
+        density = density+.5*(e[:, None] if regional else e)*aq**2
+    energy = xp.sum(lift(xp, area)[:, None]*density)/3
+    return ThermoelasticResult(
+        xp.reshape(u, (-1, 2)), strain, th, strain-th, stress, zz, ez,
+        *(xp.reshape(v, (-1, 2)) for v in (external, thermal, reaction, residual)), energy, snapshot,
+        tref, *(_record_live(v) if is_per_region(v) else lift(xp, real_value(v, "material"), xp.float64)
+                for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)),
+        plane, xp.reshape(body, (-1, 2)), xp.reshape(line, (-1, 2)))
+
+
+def _solve_numpy(mesh, temperature_snapshot, *, reference_temperature_k,
+                 thermal_expansion_per_k, young_modulus, poisson_ratio,
+                 plane, dirichlet, body_force, traction):
+    """The NumPy solve of ``solve_thermoelasticity`` (NumPy inputs only)."""
     if any(is_per_region(v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)):
         return _solve_regions(mesh, temperature_snapshot,
             reference_temperature_k=reference_temperature_k,

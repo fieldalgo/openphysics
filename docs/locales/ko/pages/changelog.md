@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 탄성과 열탄성이 E, nu, alpha, 기준 온도, Dirichlet 변위, 체적력, 견인력에 JAX나 PyTorch 값을 받고 역방향 미분을 돌려줍니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md).
+
 - `galerkin`: 과도 열전도가 전도도, 열용량, 열원, Dirichlet 온도, 초기 온도장에 JAX나 PyTorch 값을 받고, 모든 시간 단계를 거치는 역방향 미분을 돌려줍니다. `checkpoint_every`로 재계산과 메모리를 맞바꿀 수 있습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#과도-열-메모리와-checkpoint).
 
 - `galerkin`: 정상 열전도와 정상 전기 전도가 전도도, 열원, Dirichlet·기준 전위, 경계 데이터에 JAX나 PyTorch 값을 받고, 결과를 그 라이브러리로 미분과 함께 돌려줍니다(adjoint 희소 풀이를 통한 역방향 모드). NumPy 결과는 바뀌지 않습니다. 아직 미분하지 않는 solver는 미분을 조용히 버리지 않고 JAX·PyTorch 값을 거부합니다. [문서](packages/galerkin/differentiation.md).
