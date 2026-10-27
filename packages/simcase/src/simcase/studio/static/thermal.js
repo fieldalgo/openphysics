@@ -296,10 +296,12 @@
     }
     ctx.fillStyle='#17212b';ctx.font='12px system-ui';ctx.textAlign='center';
     ctx.fillText('x / y ('+model.lengthLabel+'); +y upward',W/2,H-12);
-    ctx.textAlign='left';ctx.fillText(meshOnly?'Actual result mesh':model.field+' ['+model.unit+'] '+model.min+' … '+model.max,12,18);
+    // Labels show six significant digits; colours still use the exact range.
+    const label=v=>String(Number(v.toPrecision(6)));
+    ctx.textAlign='left';ctx.fillText(meshOnly?'Actual result mesh':model.field+' ['+model.unit+'] '+label(model.min)+' … '+label(model.max),12,18);
     if (!meshOnly) {
       for(let i=0;i<100;i++){ctx.fillStyle='rgb('+color(model.min+(model.max-model.min)*(i/99),model.min,model.max).join(',')+')';ctx.fillRect(12+i*1.5,27,2,10);}
-      ctx.fillStyle='#17212b';ctx.fillText(model.max===model.min?'constant field':model.min+' … '+model.max+' '+model.unit,12,51);
+      ctx.fillStyle='#17212b';ctx.fillText(model.max===model.min?'constant field':label(model.min)+' … '+label(model.max)+' '+model.unit,12,51);
       if(!model.nodal)ctx.fillText('Cell flux; arrows max 22 px (view only), global +y upward',12,H-31);
     }
     return true;
