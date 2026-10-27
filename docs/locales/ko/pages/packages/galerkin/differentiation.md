@@ -6,8 +6,9 @@
 
 정상 열전도(`galerkin.thermal.solve_steady_heat`), 정상 전기 전도
 (`galerkin.electric.solve_steady_electric`), 과도 열전도
-(`galerkin.transient_heat.solve_transient_heat`)는 NumPy 숫자 대신 JAX나 PyTorch
-값을 받습니다. 그러면 결과 배열도 그 라이브러리의 배열이 되고, 그 입력에 대한 미분이
+(`galerkin.transient_heat.solve_transient_heat`), 탄성(`galerkin.elasticity.solve_elasticity`),
+열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`)은 NumPy 숫자 대신 JAX나
+PyTorch 값을 받습니다. 그러면 결과 배열도 그 라이브러리의 배열이 되고, 그 입력에 대한 미분이
 풀이를 거쳐 흐릅니다. 기본값은 여전히 NumPy이며 계산은 이전과 똑같습니다.
 NumPy는 미분하지 않습니다.
 
@@ -22,6 +23,8 @@ NumPy는 미분하지 않습니다.
 | `solve_steady_heat` | `conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `dirichlet` 온도; `outward_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
+| `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
 
 시간 격자 `time_s`는 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
 라이브러리의 값을 돌려줘야 합니다. 첫 시각에 NumPy 숫자를 돌려주고 나중에 살아 있는
@@ -66,6 +69,12 @@ dk, dh = jax.grad(right_temperature, argnums=(0, 1))(2.0, 5.0)
 쓰면 `.backward()`로 같은 기울기를 얻습니다.
 
 ## 미분을 계산하는 방법
+
+정상 열·전기 solver는 살아 있는 연립방정식을 바로 조립해 풉니다. 과도 열, 탄성, 열탄성은
+먼저 입력의 숫자로 NumPy 풀이를 모든 검사와 함께 돌리고, 그 해 x0에 풀이 한 번으로
+미분을 붙입니다: x = x0 + A⁻¹(b − A x0). 값은 x0와 반올림 수준으로 같습니다. 콜백은 한
+번만 부르고, 그 결과를 살아 있는 계산에 다시 씁니다.
+
 
 조립은 `galerkin.core.kernels`와 `galerkin.core.forms`의 닫힌 식 요소 커널로,
 입력의 라이브러리에서 이루어집니다. 희소 연립방정식은 여전히 SciPy 희소 LU로
@@ -112,10 +121,10 @@ JAX 0.12.0.1, PyTorch 2.14.1 CPU). 결과 이력 자체는 O(Nt (N + M))이며 �
 - forward 모드 미분(`jax.jvp`, `jax.jacfwd`)과 2차 미분.
 - `jax_enable_x64`가 꺼진 JAX, 그리고 한 호출에 섞인 JAX와 PyTorch 값.
 - 아직 미분하지 않는 solver는 미분을 조용히 끊지 않고 JAX·PyTorch 값을
-  `TypeError`로 거부합니다. 탄성과 열탄성은 입력 검사에서,
-  `ElementHeatSource`와 `ElementConductivity`, Joule 결합과
-  열→역학 workflow(열 단계의 `WorkflowStageError`로 알림), 그리고 살아 있는 열 이력을
-  받은 과도 역학(`TransientThermoelasticError`)이 거부합니다. JSON 문서와 명령행은
+  `TypeError`로 거부합니다. NumPy 컨테이너인 `ElementHeatSource`, `ElementConductivity`,
+  `freeze_temperature`의 `TemperatureSnapshot`, Joule 결합과 열→역학 workflow(열 단계의
+  `WorkflowStageError`로 알림), 그리고 살아 있는 열 이력을 받은
+  과도 역학(`TransientThermoelasticError`)이 거부합니다. JSON 문서와 명령행은
   NumPy로 돕니다.
 
 ## 한계
@@ -150,6 +159,16 @@ PyTorch 2.14.1 CPU):
   중심차분과 맞습니다.
 - 4단계에서 `checkpoint_every` 1과 3이 전 단계 보관과 같은 값(1e-14)과 기울기(1e-12)를
   냅니다.
+
+`tests/galerkin/test_mechanics_gradients.py`(같은 날짜와 버전):
+
+- 탄성과 열탄성의 모든 필드가 JAX와 PyTorch에서 NumPy와 1e-12로 맞습니다. 스칼라·영역
+  재료, 평면변형률·평면응력 모두입니다.
+- P1이 정확히 재현하는 닫힌 식과 1e-10으로 맞습니다. 끝단 견인력을 받는 평면응력 막대
+  (u = sigma L / E, 옆 방향 -nu sigma H / E)의 E, nu, sigma 미분과, 자유 열팽창
+  (u = alpha (T - Tref) L)의 Tref, alpha, E 미분입니다.
+- E, nu, Dirichlet 변위, 체적력·견인력 콜백과 상수, 영역표, 그리고 열탄성의 Tref와
+  alpha 미분이 중심차분과 맞습니다.
 
 adjoint 풀이 자체는 `tests/galerkin/test_core_solve.py`에서 각 라이브러리가 밀집
 `linalg.solve`를 자동미분한 값과, 중심차분과 비교합니다.

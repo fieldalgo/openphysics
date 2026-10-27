@@ -191,3 +191,6 @@ checkout's tracked example outside the checkout and execute it with isolated
 Python against the installed wheels. Check configuration is not an execution
 result; confirm actual build, installation and validation outcomes for the
 exact candidate.
+
+JAX and PyTorch inputs and the derivatives they carry are described in
+[Derivatives with JAX and PyTorch](differentiation.md).

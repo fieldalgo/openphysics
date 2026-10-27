@@ -12,7 +12,6 @@ import numpy as np
 import pytest
 
 from galerkin.electric import solve_steady_electric
-from galerkin.elasticity import solve_elasticity
 from galerkin.heat_source import ElementHeatSource
 from galerkin.mesh import layered_rectangle_mesh, rectangle_mesh
 from galerkin.thermal import solve_steady_heat
@@ -250,20 +249,6 @@ def test_mixing_jax_and_torch_is_refused():
     with pytest.raises(TypeError, match="namespaces"):
         solve_steady_heat(MESH, conductivity=jax.numpy.asarray(2.0),
                           dirichlet={i: torch.tensor(300.0, dtype=torch.float64) for i in LEFT})
-
-
-@pytest.mark.parametrize("name", BACKENDS)
-def test_solvers_that_do_not_differentiate_refuse_live_values(name):
-    from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
-    (e, alpha) = _live(name, [2e9, 1e-5])
-    with pytest.raises(TypeError, match="cut the derivative"):
-        solve_elasticity(MESH, young_modulus=e, poisson_ratio=0.3, plane="stress",
-                         dirichlet={(i, c): 0.0 for i in LEFT for c in (0, 1)})
-    with pytest.raises(TypeError, match="cut the derivative"):
-        solve_thermoelasticity(MESH, freeze_temperature(MESH, np.full(MESH.num_nodes, 310.0)),
-                               reference_temperature_k=293.15, thermal_expansion_per_k=alpha,
-                               young_modulus=70e9, poisson_ratio=0.3, plane="strain",
-                               dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
 
 
 @pytest.mark.parametrize("name", BACKENDS)

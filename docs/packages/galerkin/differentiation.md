@@ -5,9 +5,11 @@
 [galerkin overview](overview.md)
 
 Steady heat conduction (`galerkin.thermal.solve_steady_heat`), steady electric
-conduction (`galerkin.electric.solve_steady_electric`) and transient heat
-conduction (`galerkin.transient_heat.solve_transient_heat`) accept JAX or PyTorch
-values in place of NumPy numbers. The result arrays are then arrays of that library, and
+conduction (`galerkin.electric.solve_steady_electric`), transient heat conduction
+(`galerkin.transient_heat.solve_transient_heat`), elasticity
+(`galerkin.elasticity.solve_elasticity`) and thermoelasticity
+(`galerkin.thermoelasticity.solve_thermoelasticity`) accept JAX or PyTorch values
+in place of NumPy numbers. The result arrays are then arrays of that library, and
 derivatives with respect to those inputs flow through the solve. NumPy remains the
 default and computes exactly as before; it does not differentiate.
 
@@ -22,6 +24,8 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 | `solve_steady_heat` | `conductivity` (scalar or `{region name: value}`); `heat_source` (scalar, region table or a callback returning live values); `dirichlet` temperatures; `outward_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
 | `solve_steady_electric` | `conductivity` (scalar or region table); `dirichlet` and `reference_potential` volts; `outward_current` (scalar or callback returning live values) |
 | `solve_transient_heat` | `conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source` (scalar, region table or a callback `(points, time)` returning live values); `dirichlet` temperatures (scalars or callbacks `(time)` returning live values); `initial_temperature_k` |
+| `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
+| `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
 
 The time grid `time_s` is structure, like the mesh. A transient callback must
 return values of one library for the whole run: a callback that returns NumPy
@@ -66,6 +70,13 @@ The same function written with `torch.tensor(..., dtype=torch.float64,
 requires_grad=True)` inputs gives the same gradients through `.backward()`.
 
 ## How the derivative is computed
+
+The steady heat and electric solvers assemble and solve their live systems
+directly. Transient heat, elasticity and thermoelasticity first run their NumPy
+solve on the numbers of the inputs, with every check, and then attach the
+derivative to that solution x0 with one more solve: x = x0 + A⁻¹(b − A x0), equal
+to x0 up to rounding. Callbacks run once; their results are kept for the live pass.
+
 
 Assembly runs in the input's library through the closed-form element kernels of
 `galerkin.core.kernels` and `galerkin.core.forms`. The sparse system is still
@@ -115,12 +126,13 @@ linearly with the number of steps in both modes; checkpointing lowers the slope.
 - Forward-mode differentiation (`jax.jvp`, `jax.jacfwd`) and second derivatives.
 - JAX without `jax_enable_x64`, and JAX and PyTorch values in one call.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
-  `TypeError` rather than silently cutting the derivative: elasticity and
-  thermoelasticity in their input checks, `ElementHeatSource` and
-  `ElementConductivity`, the Joule and heat-to-mechanics workflows (the latter
+  `TypeError` rather than silently cutting the derivative: the NumPy containers
+  `ElementHeatSource`, `ElementConductivity` and `freeze_temperature`'s
+  `TemperatureSnapshot`, the Joule and heat-to-mechanics workflows (the latter
   reports it as a `WorkflowStageError` of the heat stage), and transient
   mechanics given a live heat history (a `TransientThermoelasticError`). JSON
   documents and the command line run on NumPy.
+
 ## Limits
 
 - Not yet guarded: the low-level assembly functions (`galerkin.assembly`,
@@ -157,6 +169,17 @@ PyTorch 2.14.1 CPU):
   field and region tables of k, c and Q.
 - `checkpoint_every` of 1 and 3 on 4 steps gives the same values (1e-14) and
   gradients (1e-12) as keeping every step.
+
+`tests/galerkin/test_mechanics_gradients.py` (same date and versions):
+
+- Every field of elasticity and thermoelasticity on JAX and PyTorch matches NumPy to
+  1e-12, for scalar and region materials in plane strain and plane stress.
+- Closed forms that P1 reproduces exactly, to 1e-10: a plane-stress bar under end
+  traction (u = sigma L / E, lateral -nu sigma H / E) with respect to E, nu and
+  sigma, and free thermal expansion (u = alpha (T - Tref) L) with respect to Tref,
+  alpha and E.
+- Central differences for E, nu, Dirichlet displacements, body-force and traction
+  callbacks and constants, region tables, and for thermoelasticity Tref and alpha.
 
 The adjoint solve itself is checked against each library's automatic
 differentiation of its dense `linalg.solve` and against central differences in
