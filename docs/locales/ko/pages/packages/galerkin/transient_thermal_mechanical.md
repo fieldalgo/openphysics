@@ -70,7 +70,9 @@ mesh/지지조건/매개변수/소비 온도 이력을 복사한다. 첫 역학 
 `time_index`, `time_s`가 있다. 전역 입력 실패는 index/time이 없고 선택 transfer/
 mechanics 실패는 원 저장 index/time 및 `__cause__`를 보존한다. 부분 성공
 aggregate는 반환하지 않는다. 뒤 시점 역학 실패 전에 앞 해석이 끝났을 수 있고,
-예외 traceback은 해제될 때까지 임시 메모리를 보유할 수 있다.
+예외 traceback은 해제될 때까지 임시 메모리를 보유할 수 있다. 단계는 [연성 층](coupling.md)의
+`OneWayChain`으로 실행하고, 선택한 각 Kelvin 행은 K 단위의 절점 `Field`로 같은 메시 항등 전달을
+거친 뒤 동결된다.
 
 결과는 선택 snapshot/역학만 보유하고 입력 heat 객체/진단을 보유하지 않는다.
 선택 S개, 노드 N개, 요소 M개이면 geometry 복제를 포함하여 O(S*(N+M))다.

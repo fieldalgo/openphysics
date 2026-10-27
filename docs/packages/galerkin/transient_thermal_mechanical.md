@@ -81,7 +81,9 @@ after return. Mutating them does not alter the immutable snapshots.
 transfer and mechanics failures carry the original stored index/time and chain
 the cause in `__cause__`. No successful partial aggregate is returned. A later
 mechanics failure can follow earlier completed solves; exception tracebacks may
-retain their temporary memory until released.
+retain their temporary memory until released. The stages run as a `OneWayChain`
+of the [coupling layer](coupling.md), and each selected Kelvin row passes the
+same-mesh identity transfer as a node `Field` in K before it is frozen.
 
 The result retains only selected snapshots and mechanics, not the input heat
 object or its diagnostics. With S selected times, N nodes and M elements, retained

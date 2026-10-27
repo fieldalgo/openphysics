@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 정상·과도 열→역학 workflow가 단계를 연성 층의 `OneWayChain`으로 실행하고, 각 절점 Kelvin 장을 동결하기 전에 같은 메시 `transfer`에 통과시킵니다. 결과·manifest JSON·단계 오류와 메시지는 바뀌지 않습니다. [문서](packages/galerkin/thermal_mechanical_workflow.md).
+
 - `galerkin`: 한 방향 Joule workflow와 `ElementHeatSource`가 연성 층 위에서 동작합니다. Joule 열은 전기 메시 위의 요소 `Field`이고 같은 메시 전달로 열 메시에 옮겨지며, `ElementHeatSource.field`로 볼 수 있습니다. 결과·검산·오류 메시지는 바뀌지 않습니다. [문서](packages/galerkin/joule_heating.md#요소-열원-api).
 
 - `galerkin`: 새 `galerkin.coupling` 층. `Field`는 한 메시의 절점 또는 요소 값을 SI 단위와 함께 담고, `transfer`는 그것을 같은 메시로 그대로 옮기며, `OneWayChain`은 한 방향 workflow의 단계를 실행하고 실패에 단계 이름을 붙입니다. 커널 인터페이스를 문서로 정하며, 유한요소 엔진이 첫 커널입니다. 기존 workflow는 바뀌지 않습니다. [문서](packages/galerkin/coupling.md).

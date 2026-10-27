@@ -6,7 +6,6 @@ No persistence, unit conversion, source authentication, or thermodynamic couplin
 Import this submodule explicitly; existing component APIs remain unchanged.
 """
 from collections.abc import Mapping
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 import copy
 import json
@@ -14,6 +13,7 @@ import numpy as np
 
 from .mesh import Mesh
 from .core.checks import real_array, refuse_live
+from .coupling import Field, OneWayChain, transfer
 from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
@@ -26,12 +26,8 @@ class WorkflowStageError(ValueError):
         super().__init__(f"steady thermoelasticity [{stage}]: {message}")
 
 
-@contextmanager
-def _stage(name):
-    try:
-        yield
-    except Exception as exc:
-        raise WorkflowStageError(name, str(exc)) from exc
+def _stage_error(stage, exc):
+    return WorkflowStageError(stage, str(exc))
 
 
 def _scalar(value, name):
@@ -173,7 +169,8 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
     Heat uses Dirichlet + insulation. Mechanics uses component Dirichlet and
     zero total natural traction; body force N/m^3. See the complete EN/KO guide.
     """
-    with _stage('input'):
+    chain = OneWayChain(_stage_error)
+    with chain.stage('input'):
         if not isinstance(units, Mapping) or dict(units) != {'length': 'm', 'temperature': 'K'}:
             raise ValueError("units must be exactly {'length':'m','temperature':'K'}; convert inputs explicitly")
         owned = _isolated_mesh(mesh)
@@ -201,12 +198,12 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
                   'thermal_dirichlet': [[i, v] for i, v in sorted(heat_bc.items())],
                   'mechanical_dirichlet': [[i, c, v] for (i, c), v in sorted(mechanical_bc.items())],
                   'heat_source_w_m3': _input_record(source), 'body_force_n_m3': _input_record(body)}
-    with _stage('heat'):
+    with chain.stage('heat'):
         heat = solve_steady_heat(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
         # The mechanical stage computes with NumPy; a live heat input would lose its derivative.
         refuse_live(heat.temperature, "solve_steady_thermoelasticity heat inputs")
         _check_mesh(owned, state)
-    with _stage('transfer'):
+    with chain.stage('transfer'):
         raw = np.asarray(heat.temperature)
         if raw.shape != (len(owned.nodes),):
             raise ValueError(f'heat temperature_k must have shape ({len(owned.nodes)},), got {raw.shape}')
@@ -225,15 +222,19 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         if temperature[minimum_node] < 0:
             raise ValueError(f'temperature transfer requires nonnegative Kelvin; minimum {temperature[minimum_node]} K at node {minimum_node}')
         _check_mesh(owned, state)
-        snapshot = freeze_temperature(owned, temperature)
+        # Same-mesh identity transfer of the nodal Kelvin field; the snapshot
+        # below adds its immutable fingerprinted form for mechanics.
+        nodal = transfer(Field(owned, temperature, location='node', unit='K',
+                               name='heat temperature_k'), owned)
+        snapshot = freeze_temperature(owned, nodal.values)
         if not np.array_equal(snapshot.temperature_k, temperature):
             raise ValueError('temperature transfer did not preserve exact nodal values')
-    with _stage('mechanics'):
+    with chain.stage('mechanics'):
         mechanics = solve_thermoelasticity(owned, snapshot, reference_temperature_k=tref,
             thermal_expansion_per_k=alpha, young_modulus=e, poisson_ratio=nu, plane=plane,
             dirichlet=mechanical_bc, body_force=body)
         _check_mesh(owned, state)
-    with _stage('manifest'):
+    with chain.stage('manifest'):
         manifest = {'schema': 'galerkin-steady-thermoelasticity-v1',
             'units': {'length': 'm', 'temperature': 'K'}, 'inputs': inputs,
             'mesh': {'nodes': len(owned.nodes), 'triangles': len(owned.triangles),
@@ -243,7 +244,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
                      'regions': None if state[4] is None else state[4].tolist(), 'region_names': state[5]},
             'transfer': {'policy': 'same_mesh_exact_nodal_P1_copy', 'schema_version': snapshot.schema_version,
                          'temperature_hash': snapshot.temperature_hash, 'snapshot_hash': snapshot.snapshot_hash},
-            'stages': {'heat': 'completed', 'transfer': 'completed', 'mechanics': 'completed'},
+            'stages': {stage: 'completed' for stage in chain.completed if stage != 'input'},
             'origin': 'workflow_owned_heat_call', 'authentication': 'not_certified',
             'callback_policy': 'caller_provided_unfingerprinted',
             'post_return_integrity': 'not_certified_mutable_component_results',

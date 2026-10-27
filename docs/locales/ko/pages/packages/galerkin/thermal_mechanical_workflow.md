@@ -137,6 +137,9 @@ Checksum은 재현 식별자이며 서명·물리 단위·외부 출처·callbac
 전에 수행합니다. Component 열 검증·해석 실패는 heat, freeze/domain 실패는 transfer,
 component 기계 검증·해석 실패는 mechanics, canonical 직렬화 실패는 manifest입니다.
 내부 메시 변경은 관측한 component 경계의 단계로 표시합니다.
+단계는 [연성 층](coupling.md)의 `OneWayChain`으로 실행합니다. manifest의 완료 단계 상태는
+`input` 다음으로 체인이 끝낸 단계입니다. 검사를 마친 절점 Kelvin 배열은 K 단위의 절점 `Field`가 되어
+같은 메시 항등 전달을 거친 뒤 동결됩니다.
 
 ```python
 from galerkin.thermal_mechanical import WorkflowStageError
