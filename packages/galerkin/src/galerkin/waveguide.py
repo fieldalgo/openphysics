@@ -51,9 +51,28 @@ The right-hand matrix is symmetric but *indefinite*, which ARPACK's generalized
 drivers assume away (scipy requires a positive semi-definite mass matrix). So the
 shift-invert operator (A - sigma B)^-1 B is formed explicitly and handed over as an
 ordinary standard eigenproblem, which carries no such assumption.
+
+Derivatives
+-----------
+eps_r, mu_r and k0 may be JAX or PyTorch values: solve_modes then returns n_eff,
+et and ez in that library with reverse-mode derivatives of the eigenvalues and of
+the fields (docs/packages/galerkin/differentiation.md). The NumPy eigensolve runs
+on their numbers first; each returned pair (lambda0, x0) then takes one Newton
+step on the eigenproblem bordered by the normalization x^T B x = 1,
+
+    [x; lambda] = [x0; lambda0] - J^{-1} F,   J = [[A - lambda0 B, -B x0], [-x0^T B, 0]],
+
+with the live A and B: the values stay those of the NumPy solve up to rounding
+and the derivatives are the exact implicit ones. The returned gauge (unit 2-norm,
+largest entry real and positive) is then applied again, so field derivatives
+follow it; quantities that do not depend on the gauge (overlaps, power ratios)
+have gauge-free derivatives. A degenerate eigenvalue has no derivative: its mode
+gets NaN derivatives and a DegenerateModeWarning.
 """
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import scipy.sparse as sp
@@ -63,6 +82,20 @@ from .mesh import Mesh
 from .assembly import assemble_stiffness, assemble_mass
 from .edge import (EdgeSpace, assemble_curlcurl, assemble_edge_mass,
                    assemble_edge_grad)
+from .core import forms, kernels
+from .core import live as live_inputs
+from .core import solve as core_solve
+from .core.backend import lift, live_namespace, scatter_add, to_numpy
+from .core.checks import contains_live
+from .core.sparse import CooMatrix
+
+
+class DegenerateModeWarning(RuntimeWarning):
+    """A returned mode belongs to a degenerate eigenvalue: its derivatives are NaN."""
+
+
+#: Relative eigenvalue gap below which two returned modes count as degenerate.
+DEGENERATE_GAP = 1e-8
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
@@ -113,9 +146,29 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
     return A, B, space
 
 
+def _free_dofs(mesh, space, pec_nodes, pec_edges):
+    """Unconstrained DOFs of (e_t edges, e_z nodes) for the PEC nodes and edges."""
+    n_e = space.num_edges
+    if pec_nodes is None:
+        pec_nodes = np.unique(np.concatenate(
+            [mesh.boundary[k] for k in mesh.boundary]))
+    pec_nodes = np.asarray(pec_nodes, dtype=int)
+    if pec_edges is None:
+        pec_edges = space.boundary_edge_ids(pec_nodes)
+    pec_edges = np.asarray(pec_edges, dtype=int)
+    fixed = np.unique(np.concatenate(
+        [pec_edges, n_e + pec_nodes]))
+    return np.setdiff1d(np.arange(n_e + mesh.num_nodes), fixed)
+
+
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                 num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None):
     """Guided modes with effective index near n_target.
+
+    eps_r, mu_r and k0 may be JAX or PyTorch values; n_eff, et and ez are then
+    in that library with derivatives (see the module docstring for the method,
+    the field gauge and degenerate modes). coordinate_factors must be NumPy;
+    n_target only selects the modes and carries no derivative.
 
     Complex eps_r is expressed in the exp(+i omega t) convention: passive
     absorption has Im eps_r < 0 and the forward root has Im n_eff < 0.
@@ -150,6 +203,135 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     complex combination of degenerate modes need not have that componentwise
     phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
     """
+    if contains_live(coordinate_factors):
+        raise TypeError("coordinate_factors: derivatives with respect to modal coordinates are "
+                        "not provided; pass NumPy factors")
+    numeric = _solve_modes_numpy(mesh, live_inputs.numbers(eps_r), live_inputs.numbers(k0),
+                                 live_inputs.numbers(n_target), num_modes, live_inputs.numbers(mu_r),
+                                 pec_nodes, pec_edges=pec_edges, coordinate_factors=coordinate_factors)
+    if not any(contains_live(v) for v in (eps_r, k0, mu_r)):
+        return numeric
+    return _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors, *numeric)
+
+
+def _live_blocks(xp, space, eps_r, mu_r, k0, coordinate_factors):
+    """assemble_mode_system in ``xp`` from the element kernels: (A, B) as coalesced CooMatrix."""
+    mesh = space.mesh
+    t = mesh.num_triangles
+    eps = xp.broadcast_to(lift(xp, eps_r), (t,))
+    inv_mu = xp.broadcast_to(1.0 / lift(xp, mu_r), (t,))
+    if coordinate_factors is None:
+        curl, mass_eps, mass_mu, grad = inv_mu, eps, inv_mu, inv_mu
+        stiff, mass = inv_mu, eps
+    else:
+        f = np.asarray(coordinate_factors)
+        if f.shape != (t, 3) or not np.isfinite(f).all() or np.any(f == 0):
+            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
+        sx, sy, h = (lift(xp, c) for c in f.T)
+
+        def diagonal(a, b):
+            zero = xp.zeros_like(a)
+            return xp.stack([xp.stack([a, zero], axis=-1), xp.stack([zero, b], axis=-1)], axis=-2)
+        d = diagonal(inv_mu * sy/(sx*h), inv_mu * sx/(sy*h))
+        curl, mass_eps = inv_mu*h/(sx*sy), diagonal(eps*sy*h/sx, eps*sx*h/sy)
+        mass_mu, grad, stiff, mass = d, d, d, eps*sx*sy/h
+    te, tn = space.tri_edges, mesh.triangles
+    n_e, n_n = space.num_edges, mesh.num_nodes
+    blocks_a = [(forms.matrix(te, te, kernels.nedelec_curlcurl(space, curl), (n_e, n_e)), 0, 0, 1.0),
+                (forms.matrix(te, te, kernels.nedelec_mass(space, mass_eps), (n_e, n_e)), 0, 0, -k0**2)]
+    g = forms.matrix(te, tn, kernels.nedelec_grad(space, grad), (n_e, n_n))
+    blocks_b = [(forms.matrix(te, te, kernels.nedelec_mass(space, mass_mu), (n_e, n_e)), 0, 0, 1.0),
+                (g, 0, n_e, 1.0), (CooMatrix(g.cols, g.rows, g.values, (n_n, n_e)), n_e, 0, 1.0),
+                (forms.matrix(tn, tn, kernels.p1_stiffness(mesh, stiff), (n_n, n_n)), n_e, n_e, 1.0),
+                (forms.matrix(tn, tn, kernels.p1_mass(mesh, mass), (n_n, n_n)), n_e, n_e, -k0**2)]
+
+    def joined(blocks):
+        return CooMatrix(np.concatenate([b.rows + r for b, r, _, _ in blocks]),
+                         np.concatenate([b.cols + c for b, _, c, _ in blocks]),
+                         xp.concat([lift(xp, b.values) * scale for b, _, _, scale in blocks]),
+                         (n_e + n_n, n_e + n_n)).coalesce()
+    return joined(blocks_a), joined(blocks_b)
+
+
+def _pivot(v):
+    """The entry the NumPy solve made real and positive.
+
+    It is the largest in magnitude; symmetric modes often have several equally
+    large entries, and the one the solve chose is the one left with zero phase.
+    """
+    size = np.abs(v)
+    candidates = np.flatnonzero(size >= size.max() * (1 - 1e-12))
+    return int(candidates[np.argmin(np.abs(np.angle(v[candidates])))])
+
+
+def _restricted(matrix, position, size):
+    keep = np.flatnonzero((position[matrix.rows] >= 0) & (position[matrix.cols] >= 0))
+    return CooMatrix(position[matrix.rows[keep]], position[matrix.cols[keep]],
+                     matrix.values[keep], (size, size))
+
+
+def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
+                n_eff0, space, et0, ez0):
+    """The NumPy modes with derivatives: a bordered Newton step per mode (module docstring)."""
+    leaves = live_inputs.leaves(eps_r, k0, mu_r)
+    xp = live_namespace(*leaves)
+    complex_dtype = xp.complex128
+    n_e, n_n = space.num_edges, mesh.num_nodes
+    free = _free_dofs(mesh, space, pec_nodes, pec_edges)
+    position = np.full(n_e + n_n, -1)
+    position[free] = np.arange(len(free))
+    n = len(free)
+    k0_live = lift(xp, k0, xp.float64)
+    A, B = (_restricted(m, position, n) for m in _live_blocks(xp, space, eps_r, mu_r, k0_live,
+                                                              coordinate_factors))
+    B_numbers = CooMatrix(B.rows, B.cols, to_numpy(B.values), B.shape)
+    real_problem = np.isrealobj(n_eff0)
+    k0_number = float(to_numpy(k0_live))
+    lam0 = -(k0_number * np.asarray(n_eff0)) ** 2
+    degenerate = [i for i in range(len(lam0)) if any(
+        j != i and abs(lam0[i] - lam0[j]) <= DEGENERATE_GAP * max(abs(lam0[i]), abs(lam0[j]))
+        for j in range(len(lam0)))]
+    if degenerate:
+        warnings.warn(f"modes {degenerate} belong to degenerate eigenvalues (relative gap <= "
+                      f"{DEGENERATE_GAP:g}); their derivatives are NaN", DegenerateModeWarning,
+                      stacklevel=3)
+    n_eff, et, ez = [], [], []
+    rows = np.concatenate([A.rows, B.rows, np.arange(n), np.full(n, n)])
+    cols = np.concatenate([A.cols, B.cols, np.full(n, n), np.arange(n)])
+    for i in range(len(lam0)):
+        beta0 = k0_number * n_eff0[i]
+        v = np.concatenate([et0[i] * beta0, ez0[i]])[free]
+        if i in degenerate:
+            n_eff.append(core_solve.nan_derivative(xp, np.asarray(n_eff0[i]), leaves))
+            et.append(core_solve.nan_derivative(xp, et0[i], leaves))
+            ez.append(core_solve.nan_derivative(xp, ez0[i], leaves))
+            continue
+        x0 = lift(xp, v / np.sqrt(v @ B_numbers.matvec(v)))       # x0^T B x0 = 1
+        bx = B.matvec(x0)
+        residual = xp.concat([A.matvec(x0) - lam0[i] * bx, xp.reshape(0.5 * (1 - x0 @ bx), (1,))])
+        bordered = CooMatrix(rows, cols, xp.concat([xp.astype(A.values, complex_dtype),
+                                                    xp.astype(-lam0[i] * B.values, complex_dtype),
+                                                    -bx, -bx]), (n + 1, n + 1))
+        step = core_solve.solve(bordered, residual)
+        x, lam = x0 - step[:n], lam0[i] - step[n]
+        beta = xp.sqrt(-lam)
+        pivot = _pivot(v)
+        x = x * xp.conj(x[pivot]) / (xp.abs(x[pivot]) * xp.sqrt(xp.sum(xp.abs(x) ** 2)))
+        full = scatter_add(xp, n_e + n_n, free, x)
+        n_eff.append(xp.real(beta) / k0_live if real_problem else beta / k0_live)
+        et.append(full[:n_e] / beta)
+        ez.append(full[n_e:])
+    if not n_eff:
+        empty = (xp.zeros(0, dtype=xp.float64 if real_problem else complex_dtype),
+                 xp.zeros((0, n_e), dtype=complex_dtype), xp.zeros((0, n_n), dtype=complex_dtype))
+        return empty[0], space, empty[1], empty[2]
+    return xp.stack(n_eff), space, xp.stack(et), xp.stack(ez)
+
+
+def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
+                       num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None,
+                       coordinate_factors=None):
+    """The NumPy eigensolve of ``solve_modes`` (NumPy inputs only)."""
     eps_r = np.asarray(eps_r)
     if not np.isfinite(eps_r).all():
         raise ValueError("eps_r must be finite")
@@ -159,16 +341,7 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r, coordinate_factors=coordinate_factors)
     n_e, n_n = space.num_edges, mesh.num_nodes
 
-    if pec_nodes is None:
-        pec_nodes = np.unique(np.concatenate(
-            [mesh.boundary[k] for k in mesh.boundary]))
-    pec_nodes = np.asarray(pec_nodes, dtype=int)
-    if pec_edges is None:
-        pec_edges = space.boundary_edge_ids(pec_nodes)
-    pec_edges = np.asarray(pec_edges, dtype=int)
-    fixed = np.unique(np.concatenate(
-        [pec_edges, n_e + pec_nodes]))
-    free = np.setdiff1d(np.arange(n_e + n_n), fixed)
+    free = _free_dofs(mesh, space, pec_nodes, pec_edges)
 
     A, B = A[free][:, free].tocsc(), B[free][:, free].tocsc()
     n = A.shape[0]

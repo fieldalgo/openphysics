@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: waveguide modes (`solve_modes`) accept JAX or PyTorch values for eps_r, mu_r (scalars or element arrays, real or complex) and k0, and return n_eff and both field arrays in that library with reverse-mode derivatives of eigenvalues and fields. Degenerate modes get NaN derivatives and a `DegenerateModeWarning`. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#waveguide-modes-eigenvalues-fields-and-degenerate-modes).
+
 - `galerkin`: elasticity and thermoelasticity accept JAX or PyTorch values for E, nu, alpha, the reference temperature, Dirichlet displacements, body force and traction, with reverse-mode derivatives. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md).
 
 - `galerkin`: transient heat conduction accepts JAX or PyTorch values for conductivity, heat capacity, heat source, Dirichlet temperatures and the initial field, with reverse-mode derivatives through every time step; `checkpoint_every` trades recomputation for memory. NumPy results are unchanged. [Documentation](docs/packages/galerkin/differentiation.md#transient-heat-memory-and-checkpointing).

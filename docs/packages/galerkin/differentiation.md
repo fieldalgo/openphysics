@@ -7,8 +7,9 @@
 Steady heat conduction (`galerkin.thermal.solve_steady_heat`), steady electric
 conduction (`galerkin.electric.solve_steady_electric`), transient heat conduction
 (`galerkin.transient_heat.solve_transient_heat`), elasticity
-(`galerkin.elasticity.solve_elasticity`) and thermoelasticity
-(`galerkin.thermoelasticity.solve_thermoelasticity`) accept JAX or PyTorch values
+(`galerkin.elasticity.solve_elasticity`), thermoelasticity
+(`galerkin.thermoelasticity.solve_thermoelasticity`) and waveguide modes
+(`galerkin.waveguide.solve_modes`) accept JAX or PyTorch values
 in place of NumPy numbers. The result arrays are then arrays of that library, and
 derivatives with respect to those inputs flow through the solve. NumPy remains the
 default and computes exactly as before; it does not differentiate.
@@ -26,6 +27,7 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 | `solve_transient_heat` | `conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source` (scalar, region table or a callback `(points, time)` returning live values); `dirichlet` temperatures (scalars or callbacks `(time)` returning live values); `initial_temperature_k` |
 | `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
 | `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
+| `solve_modes` | `eps_r` and `mu_r` (scalars or per-element arrays, real or complex) and `k0`; `n_eff`, `et` and `ez` are returned in that library. `n_target` only selects the modes and has no derivative; `coordinate_factors` must be NumPy |
 
 The time grid `time_s` is structure, like the mesh. A transient callback must
 return values of one library for the whole run: a callback that returns NumPy
@@ -76,7 +78,7 @@ directly. Transient heat, elasticity and thermoelasticity first run their NumPy
 solve on the numbers of the inputs, with every check, and then attach the
 derivative to that solution x0 with one more solve: x = x0 + A⁻¹(b − A x0), equal
 to x0 up to rounding. Callbacks run once; their results are kept for the live pass.
-
+Waveguide modes do the same with an eigenpair (next section).
 
 Assembly runs in the input's library through the closed-form element kernels of
 `galerkin.core.kernels` and `galerkin.core.forms`. The sparse system is still
@@ -118,11 +120,47 @@ themselves take O(Nt (N + M)), the first row:
 These are single measurements on one machine, not limits. Peak memory grows
 linearly with the number of steps in both modes; checkpointing lowers the slope.
 
+## Waveguide modes: eigenvalues, fields and degenerate modes
+
+`solve_modes` runs the NumPy eigensolve on the numbers of the inputs. Each
+returned pair (λ0, x0), with λ0 = −(k0 n_eff)² and x0 = [et β, ez] on the free
+degrees of freedom, then takes one Newton step on the eigenproblem A x = λ B x
+bordered by the normalization xᵀ B x = 1, solved with the live A and B:
+
+    [x; λ] = [x0; λ0] − J⁻¹ F,   J = [[A − λ0 B, −B x0], [−x0ᵀ B, 0]],
+    F = [(A − λ0 B) x0, ½ (1 − x0ᵀ B x0)].
+
+The values stay those of the NumPy solve up to rounding; the derivatives are the
+exact implicit ones, for real and lossy (complex) problems alike.
+
+Fields carry a gauge: an eigenvector is fixed only up to a complex factor. The
+solver returns x with unit 2-norm and its largest entry real and positive; the
+live pass applies the same rule to x again, so `et` and `ez` and their
+derivatives follow that gauge. When several entries are equally largest (a
+symmetric mode), the one the NumPy solve left with zero phase is kept. A
+quantity that does not depend on the gauge, such as an overlap magnitude or the
+ratio |E_z|²/|E_t|², has a gauge-free derivative; prefer such quantities in an
+objective.
+
+A degenerate eigenvalue has no derivative: its eigenvectors are any combination
+of the pair. When two returned eigenvalues differ by at most 1e-8 relative
+(`galerkin.waveguide.DEGENERATE_GAP`), both modes get their exact values,
+a `DegenerateModeWarning`, and NaN derivatives, so a backward pass that uses
+them gives NaN instead of a wrong number. Outputs that the objective does not
+use contribute nothing, so the other modes keep their derivatives. Break the
+symmetry or use a quantity of the whole degenerate subspace instead.
+
+Only the 2D waveguide is covered. Cavities (`solve_cavity_box`,
+`solve_material_cavity_box`) and the other electromagnetic solvers do not
+differentiate yet.
+
 ## Refused, not approximated
 
 - `jax.jit` around these solvers: checks need concrete numbers
   (`galerkin.core.backend.TracedValueError`). `jax.grad` and PyTorch autograd work
   without `jit`.
+- JAX or PyTorch `coordinate_factors` in `solve_modes` (a `TypeError`): derivatives
+  with respect to PML stretching or bend coordinates are not provided.
 - Forward-mode differentiation (`jax.jvp`, `jax.jacfwd`) and second derivatives.
 - JAX without `jax_enable_x64`, and JAX and PyTorch values in one call.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
@@ -136,7 +174,8 @@ linearly with the number of steps in both modes; checkpointing lowers the slope.
 ## Limits
 
 - Not yet guarded: the low-level assembly functions (`galerkin.assembly`,
-  `assembly3d`, `edge`, `edge3d`) and the electromagnetic solvers convert their
+  `assembly3d`, `edge`, `edge3d`) and the electromagnetic solvers other than
+  `solve_modes` convert their
   inputs with NumPy. A JAX value passed to them loses its derivative; do not pass
   live values there.
 - With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
@@ -180,6 +219,22 @@ PyTorch 2.14.1 CPU):
   alpha and E.
 - Central differences for E, nu, Dirichlet displacements, body-force and traction
   callbacks and constants, region tables, and for thermoelasticity Tref and alpha.
+
+`tests/galerkin/test_mode_gradients.py` (2026-10-27, Linux, NumPy 2.5, JAX 0.12.0.1,
+PyTorch 2.14.1 CPU):
+
+- `n_eff`, `et` and `ez` on JAX and PyTorch match NumPy to 1e-12, for a real guide,
+  a lossy core and complex coordinate factors (a stretched quarter and a bend-like h).
+- A homogeneous PEC guide, where the discretization keeps (k0 n_eff)² = k0² ε μ − kc²
+  with kc fixed by the mesh (checked to 1e-11): the derivatives of three modes with
+  respect to ε, μ and k0 match μ/(2 n_eff), ε/(2 n_eff) and kc²/(k0³ n_eff) to 1e-9.
+- Central differences of the NumPy solve for n_eff (real and imaginary parts), the
+  gauge-free ratio |ez|²/|et|² and a raw `ez` entry in the returned gauge, with
+  respect to the core and cladding indices, μ, k0 and the core loss; a directional
+  difference for per-element ε and μ arrays.
+- A square guide on a mesh with the square's symmetry: the degenerate fundamental
+  pair warns and gives NaN derivatives; a non-degenerate mode in the same call
+  matches central differences.
 
 The adjoint solve itself is checked against each library's automatic
 differentiation of its dense `linalg.solve` and against central differences in
