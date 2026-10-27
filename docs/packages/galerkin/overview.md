@@ -85,16 +85,26 @@ src/galerkin/
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   material_cavity.py # Box cavity with lossy materials and impedance walls: complex resonances and Q
+  mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  electric.py     # Steady electric conduction
+  materials.py    # Scalar or {region name: value} material lookup
+  heat_source.py  # Elementwise volumetric heat sources bound to one mesh
+  joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
+  core/           # Shared layer: checks, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```
+
+The modules sit in layers: physics modules over coupling, coupling over core,
+core over the base mesh and assembly modules. [Architecture](../../architecture.md#inside-galerkin-core-physics-and-coupling)
+describes them and the steps for [adding a physics](../../architecture.md#adding-a-physics).
 
 The analytical, convergence and independent-validation tests, the examples
 and the documentation are outside the package, at the repository root:

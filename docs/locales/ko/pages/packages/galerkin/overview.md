@@ -75,16 +75,27 @@ src/galerkin/
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   material_cavity.py # Box cavity with lossy materials and impedance walls: complex resonances and Q
+  mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  electric.py     # Steady electric conduction
+  materials.py    # Scalar or {region name: value} material lookup
+  heat_source.py  # Elementwise volumetric heat sources bound to one mesh
+  joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
+  core/           # Shared layer: checks, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```
+
+모듈은 층으로 놓입니다. 물리 모듈 아래 coupling, coupling 아래 core, core 아래 메시·조립
+기반 모듈이 있습니다.
+[아키텍처](../../architecture.md#galerkin-안-core-physics-coupling)에 층 설명과
+[새 물리 추가하기](../../architecture.md#새-물리-추가하기) 절차가 있습니다.
 
 해석해·수렴·독립 검증 시험, 예제, 문서는 패키지 밖, 저장소 루트의 `tests/galerkin/`,
 `examples/galerkin/`, `docs/packages/galerkin/`(한국어는

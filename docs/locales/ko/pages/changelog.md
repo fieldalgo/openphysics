@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- 문서: [아키텍처](architecture.md#galerkin-안-core-physics-coupling) 문서가 galerkin의 core·physics·coupling 층, 아직 core로 옮기지 않은 것, 새 물리 추가 절차를 설명합니다. 코드 변경은 없습니다.
+
 - `simcase` Studio: 정상·과도 열전도 route가 열전도 영역 문서를 worker thread에서 검증하고 실행합니다. 실행 전에는 도형, 원, 다각형 점, 경계 교차, 루프 꼭짓점 수를, job에서는 절점과 셀 수를 한도와 비교합니다. 영역 결과는 자체 형식 `studio-thermal-steady-regions-v1`과 `studio-thermal-transient-regions-v1`을 쓰고, 직사각형 문서의 응답은 그대로입니다. 페이지는 영역 결과를 영역 색, 경계, 범례, 재료 표, 커서 아래 영역 표시와 함께 보여 줍니다. [문서](packages/simcase/thermal_studio.md#영역-문서).
 
 - `simcase`: `region_complexity`가 `Document.from_dict` 전에 원시 열전도 영역 문서를 읽어 도형, 원, 다각형 점 수를 세고, 어느 것도 주어진 최댓값을 넘지 않으면 `from_dict`의 불리언 연산 비용을 좌우하는 도형 사이 경계 교차 수도 셉니다. 잘못된 데이터에서도 예외를 발생시키지 않습니다. [문서](packages/simcase/thermal_regions2d.md#호출자를-위한-메시-상한).
