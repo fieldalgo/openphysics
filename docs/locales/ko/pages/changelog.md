@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 도파관 모드(`solve_modes`)가 eps_r, mu_r(스칼라 또는 요소 배열, 실수·복소수)와 k0에 JAX나 PyTorch 값을 받고, n_eff와 두 필드 배열을 그 라이브러리로 돌려주며 고유값과 필드의 역방향 미분을 붙입니다. 축퇴 모드는 NaN 미분과 `DegenerateModeWarning`을 받습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#도파관-모드-고유값-필드-축퇴-모드).
+
 - `galerkin`: 탄성과 열탄성이 E, nu, alpha, 기준 온도, Dirichlet 변위, 체적력, 견인력에 JAX나 PyTorch 값을 받고 역방향 미분을 돌려줍니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md).
 
 - `galerkin`: 과도 열전도가 전도도, 열용량, 열원, Dirichlet 온도, 초기 온도장에 JAX나 PyTorch 값을 받고, 모든 시간 단계를 거치는 역방향 미분을 돌려줍니다. `checkpoint_every`로 재계산과 메모리를 맞바꿀 수 있습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#과도-열-메모리와-checkpoint).

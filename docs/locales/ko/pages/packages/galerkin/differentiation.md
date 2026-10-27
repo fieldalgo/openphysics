@@ -7,7 +7,8 @@
 정상 열전도(`galerkin.thermal.solve_steady_heat`), 정상 전기 전도
 (`galerkin.electric.solve_steady_electric`), 과도 열전도
 (`galerkin.transient_heat.solve_transient_heat`), 탄성(`galerkin.elasticity.solve_elasticity`),
-열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`)은 NumPy 숫자 대신 JAX나
+열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`), 도파관 모드
+(`galerkin.waveguide.solve_modes`)는 NumPy 숫자 대신 JAX나
 PyTorch 값을 받습니다. 그러면 결과 배열도 그 라이브러리의 배열이 되고, 그 입력에 대한 미분이
 풀이를 거쳐 흐릅니다. 기본값은 여전히 NumPy이며 계산은 이전과 똑같습니다.
 NumPy는 미분하지 않습니다.
@@ -25,6 +26,7 @@ NumPy는 미분하지 않습니다.
 | `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
 | `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
+| `solve_modes` | `eps_r`와 `mu_r`(스칼라 또는 요소별 배열, 실수·복소수)와 `k0`; `n_eff`, `et`, `ez`를 그 라이브러리로 돌려줌. `n_target`은 모드를 고르기만 하므로 미분이 없음; `coordinate_factors`는 NumPy여야 함 |
 
 시간 격자 `time_s`는 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
 라이브러리의 값을 돌려줘야 합니다. 첫 시각에 NumPy 숫자를 돌려주고 나중에 살아 있는
@@ -73,8 +75,8 @@ dk, dh = jax.grad(right_temperature, argnums=(0, 1))(2.0, 5.0)
 정상 열·전기 solver는 살아 있는 연립방정식을 바로 조립해 풉니다. 과도 열, 탄성, 열탄성은
 먼저 입력의 숫자로 NumPy 풀이를 모든 검사와 함께 돌리고, 그 해 x0에 풀이 한 번으로
 미분을 붙입니다: x = x0 + A⁻¹(b − A x0). 값은 x0와 반올림 수준으로 같습니다. 콜백은 한
-번만 부르고, 그 결과를 살아 있는 계산에 다시 씁니다.
-
+번만 부르고, 그 결과를 살아 있는 계산에 다시 씁니다. 도파관 모드는 고유쌍으로 같은
+일을 합니다(다음 절).
 
 조립은 `galerkin.core.kernels`와 `galerkin.core.forms`의 닫힌 식 요소 커널로,
 입력의 라이브러리에서 이루어집니다. 희소 연립방정식은 여전히 SciPy 희소 LU로
@@ -113,11 +115,43 @@ JAX 0.12.0.1, PyTorch 2.14.1 CPU). 결과 이력 자체는 O(Nt (N + M))이며 �
 한 기계에서 한 번 잰 값이며 한도가 아닙니다. 두 방식 모두 최대 메모리는 단계 수에
 비례해 늘어나고, checkpoint는 그 기울기를 낮춥니다.
 
+## 도파관 모드: 고유값, 필드, 축퇴 모드
+
+`solve_modes`는 입력의 숫자로 NumPy 고유값 풀이를 돌립니다. 돌려받은 각 쌍 (λ0, x0)
+(λ0 = −(k0 n_eff)², x0 = 자유 자유도 위의 [et β, ez])은 정규화 xᵀ B x = 1을 덧붙인
+고유값 문제 A x = λ B x에서 Newton 한 걸음을 밟습니다. 이 연립방정식은 살아 있는 A와
+B로 풉니다:
+
+    [x; λ] = [x0; λ0] − J⁻¹ F,   J = [[A − λ0 B, −B x0], [−x0ᵀ B, 0]],
+    F = [(A − λ0 B) x0, ½ (1 − x0ᵀ B x0)].
+
+값은 반올림 수준에서 NumPy 풀이와 같고, 미분은 정확한 음함수 미분입니다. 실수 문제와
+손실(복소) 문제 모두 같습니다.
+
+필드에는 게이지가 있습니다. 고유벡터는 복소 상수배까지만 정해집니다. solver는 2-노름이
+1이고 가장 큰 성분이 양의 실수인 x를 돌려줍니다. 살아 있는 계산은 x에 같은 규칙을 다시
+적용하므로 `et`, `ez`와 그 미분은 이 게이지를 따릅니다. 가장 큰 성분이 여럿이면(대칭
+모드) NumPy 풀이가 위상 0으로 남긴 성분을 씁니다. 겹침의 크기나 |E_z|²/|E_t|² 비율처럼
+게이지에 무관한 양은 미분도 게이지에 무관합니다. 목적함수에는 그런 양을 쓰는 편이
+좋습니다.
+
+축퇴 고유값에는 미분이 없습니다. 고유벡터가 그 쌍의 어떤 결합이든 될 수 있기 때문입니다.
+돌려준 두 고유값의 상대 차이가 1e-8 이하이면(`galerkin.waveguide.DEGENERATE_GAP`) 두
+모드는 정확한 값과 `DegenerateModeWarning`, NaN 미분을 받습니다. 그래서 그 모드를 쓰는
+역방향 계산은 틀린 숫자 대신 NaN을 냅니다. 목적함수가 쓰지 않는 출력은 아무것도 더하지
+않으므로 다른 모드는 미분을 유지합니다. 대칭을 깨거나, 축퇴 부분공간 전체의 양을
+쓰십시오.
+
+2차원 도파관만 다룹니다. 공진기(`solve_cavity_box`, `solve_material_cavity_box`)와
+다른 전자기 solver는 아직 미분하지 않습니다.
+
 ## 근사하지 않고 거부하는 것
 
 - 이 solver를 감싼 `jax.jit`: 검사에 구체적인 숫자가 필요합니다
   (`galerkin.core.backend.TracedValueError`). `jit` 없이 `jax.grad`와 PyTorch
   autograd는 동작합니다.
+- `solve_modes`에 JAX·PyTorch `coordinate_factors`(`TypeError`): PML 늘림이나 굽힘
+  좌표에 대한 미분은 제공하지 않습니다.
 - forward 모드 미분(`jax.jvp`, `jax.jacfwd`)과 2차 미분.
 - `jax_enable_x64`가 꺼진 JAX, 그리고 한 호출에 섞인 JAX와 PyTorch 값.
 - 아직 미분하지 않는 solver는 미분을 조용히 끊지 않고 JAX·PyTorch 값을
@@ -130,7 +164,7 @@ JAX 0.12.0.1, PyTorch 2.14.1 CPU). 결과 이력 자체는 O(Nt (N + M))이며 �
 ## 한계
 
 - 아직 막지 않은 곳: 낮은 수준 조립 함수(`galerkin.assembly`, `assembly3d`,
-  `edge`, `edge3d`)와 전자기 solver는 입력을 NumPy로 바꿉니다. 여기에 넘긴 JAX
+  `edge`, `edge3d`)와 `solve_modes`를 뺀 전자기 solver는 입력을 NumPy로 바꿉니다. 여기에 넘긴 JAX
   값은 미분을 잃으므로, 살아 있는 값을 넘기지 마십시오.
 - 살아 있는 입력에서는 `joule_power_per_length`와 `supplied_power_per_length`가
   Python float 대신 그 라이브러리의 0차원 배열이며, 결과 배열을 읽기 전용으로
@@ -169,6 +203,20 @@ PyTorch 2.14.1 CPU):
   (u = alpha (T - Tref) L)의 Tref, alpha, E 미분입니다.
 - E, nu, Dirichlet 변위, 체적력·견인력 콜백과 상수, 영역표, 그리고 열탄성의 Tref와
   alpha 미분이 중심차분과 맞습니다.
+
+`tests/galerkin/test_mode_gradients.py`(2026-10-27, Linux, NumPy 2.5, JAX 0.12.0.1,
+PyTorch 2.14.1 CPU):
+
+- JAX와 PyTorch의 `n_eff`, `et`, `ez`가 NumPy와 1e-12로 맞습니다. 실수 도파관, 손실
+  코어, 복소 좌표 인자(늘린 4분의 1 영역과 굽힘 같은 h) 모두입니다.
+- 균일하게 채운 PEC 도파관에서는 이산화가 (k0 n_eff)² = k0² ε μ − kc²를 지키고 kc는
+  메시로만 정해집니다(1e-11로 확인). 세 모드의 ε, μ, k0 미분이 μ/(2 n_eff),
+  ε/(2 n_eff), kc²/(k0³ n_eff)와 1e-9로 맞습니다.
+- n_eff(실수부·허수부), 게이지에 무관한 비율 |ez|²/|et|², 돌려준 게이지의 `ez` 성분
+  하나가 코어·클래딩 굴절률, μ, k0, 코어 손실에 대해 NumPy 풀이의 중심차분과 맞습니다.
+  요소별 ε·μ 배열은 방향 차분과 비교합니다.
+- 정사각형 대칭을 가진 메시 위 정사각 도파관: 축퇴한 기본 모드 쌍은 경고와 NaN 미분을
+  내고, 같은 호출의 축퇴하지 않은 모드는 중심차분과 맞습니다.
 
 adjoint 풀이 자체는 `tests/galerkin/test_core_solve.py`에서 각 라이브러리가 밀집
 `linalg.solve`를 자동미분한 값과, 중심차분과 비교합니다.
