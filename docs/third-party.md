@@ -255,6 +255,7 @@ library directly.
 |---|---|---|
 | Gmsh (pip distribution `gmsh` in `gmshio[gmsh]` and CI, or a [`gmsh`](https://gmsh.info) executable installed by the user) | GPL-2.0-or-later, with an exception that permits combining Gmsh with Netgen, METIS, OpenCASCADE and ParaView (Gmsh `LICENSE.txt`) | `gmshio` writes a `.geo` script, runs `gmsh` as a separate process and reads the `.msh` file with an original parser written from the published format description. The pip distribution's `gmsh` command is a launcher script that loads Gmsh's own Python module and `libgmsh` in that separate process. Package code never imports `gmsh` (checked) and nothing is bundled; see [gmshio NOTICE](../packages/gmshio/NOTICE) |
 | NGSolve with Netgen (pip distributions `ngsolve` and `netgen-mesher`) | LGPL-2.1-only (their package metadata) | Reference tool for the [material cavity comparison](packages/galerkin/material_cavity.md#reference-tool-comparisons). Installed from PyPI wheels into a separate environment and run as a separate process; not a dependency and not installed by this repository's CI. Only numerical results are reported and no code is copied. Its wheels also install `netgen-occt` (LGPL by its classifier) and, outside macOS, `ngsolve-openblas` (BSD-3-Clause) |
+| modesolver 3.0.2 (git `6f54c5e`, no PyPI release) | MIT | Reference tool for the [SOI strip comparison](reference-comparisons.md#stored-comparisons). Installed from its git commit into a separate environment; not a dependency and not installed by this repository's CI. Only its numerical results are stored, in `tests/simcase/reference_values/modesolver/`; no code is copied |
 | Node.js | MIT | Runs the Studio JavaScript checks in CI |
 | Chrome or Chromium | Chrome terms / BSD-3-Clause | Already-installed browser for the Studio browser check in CI |
 | GitHub Actions `actions/checkout`, `actions/setup-python`, `actions/setup-node`, `actions/upload-artifact` | MIT | CI only, pinned by commit |
@@ -333,7 +334,7 @@ Korean page, and record its package NOTICE if it is bundled or copied.
 ## Stored-tool inventory
 
 `external_tools` in `tools/third_party_licenses.json` records provenance separately from installed dependencies.
-NGSolve is stored-only and has no value records yet. The loader and audit follow
+NGSolve is stored-only and has no value records yet. modesolver is stored-only with one record, `soi_strip_modes`. The loader and audit follow
 [stored reference values](stored-reference-values.md); dependency admission rules are unchanged.
 
 ## Reference import boundaries
@@ -343,6 +344,7 @@ NGSolve is stored-only and has no value records yet. The loader and audit follow
 | `scikit-fem` | live | Existing permissive comparison tests; required CI |
 | `symfem` | live | Existing permissive element comparisons; required CI |
 | `ngsolve` | stored | Separate generation environment; no value records committed yet |
+| `modesolver` | stored | Separate generation environment; one value record (`tests/simcase/reference_values/modesolver/soi_strip_modes.json`) |
 
 The static zone check reads git-tracked Python source without importing it.
 Non-permissive references may be loaded only lazily inside listed test functions,

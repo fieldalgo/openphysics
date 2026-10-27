@@ -227,6 +227,7 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 |---|---|---|
 | Gmsh(`gmshio[gmsh]`와 CI의 pip 배포판 `gmsh`, 또는 사용자가 설치한 [`gmsh`](https://gmsh.info) 실행 파일) | GPL-2.0-or-later. Gmsh를 Netgen, METIS, OpenCASCADE, ParaView와 결합하도록 허용하는 예외 포함(Gmsh `LICENSE.txt`) | `gmshio`가 `.geo` 스크립트를 쓰고 `gmsh`를 별도 프로세스로 실행한 뒤, 공개된 형식 설명으로 새로 작성한 파서로 `.msh` 파일을 읽음. pip 배포판의 `gmsh` 명령은 그 별도 프로세스 안에서 Gmsh 자신의 Python 모듈과 `libgmsh`를 로드하는 실행 스크립트임. 패키지 코드는 `gmsh`를 import하지 않고(검사함) 아무것도 번들하지 않음. [gmshio NOTICE](../../../../packages/gmshio/NOTICE) 참고 |
 | NGSolve와 Netgen(pip 배포판 `ngsolve`, `netgen-mesher`) | LGPL-2.1-only(패키지 메타데이터 기준) | [재료 공동 비교](packages/galerkin/material_cavity.md#레퍼런스-도구-비교)의 레퍼런스 도구. PyPI 휠로 별도 환경에 설치하고 별도 프로세스로 실행함. 의존성이 아니고 이 저장소의 CI가 설치하지 않음. 수치 결과만 보고하고 코드는 복사하지 않음. 그 휠은 `netgen-occt`(분류자 기준 LGPL)와 macOS 외에서 `ngsolve-openblas`(BSD-3-Clause)도 설치함 |
+| modesolver 3.0.2(git `6f54c5e`, PyPI 배포 없음) | MIT | [SOI strip 비교](reference-comparisons.md#저장값-비교)의 레퍼런스 도구. git 커밋에서 별도 환경에 설치함. 의존성이 아니고 이 저장소의 CI가 설치하지 않음. 수치 결과만 `tests/simcase/reference_values/modesolver/`에 저장하고 코드는 복사하지 않음 |
 | Node.js | MIT | CI에서 Studio JavaScript 검사 실행 |
 | Chrome 또는 Chromium | Chrome 약관 / BSD-3-Clause | CI Studio 브라우저 검사에 이미 설치된 브라우저 사용 |
 | GitHub Actions `actions/checkout`, `actions/setup-python`, `actions/setup-node`, `actions/upload-artifact` | MIT | CI 전용. 커밋으로 고정 |
@@ -294,7 +295,7 @@ URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인
 ## 저장값 도구 목록
 
 `tools/third_party_licenses.json`의 `external_tools`는 설치 의존성과 별개인 출처 목록입니다.
-NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. 로더와 감사 형식은
+NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. modesolver 항목은 stored 방식이며 값 기록 `soi_strip_modes` 하나가 있습니다. 로더와 감사 형식은
 [저장 레퍼런스 값](stored-reference-values.md)을 따릅니다. 기존 의존성 허용 규칙은 그대로입니다.
 
 ## 레퍼런스 import 경계
@@ -304,6 +305,7 @@ NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. 로더�
 | `scikit-fem` | live | 기존 허용형 비교 시험; 필수 CI |
 | `symfem` | live | 기존 허용형 요소 비교; 필수 CI |
 | `ngsolve` | stored | 별도 생성 환경; 아직 값 기록은 커밋되지 않음 |
+| `modesolver` | stored | 별도 생성 환경; 값 기록 하나(`tests/simcase/reference_values/modesolver/soi_strip_modes.json`) |
 
 정적 구역 검사는 git 추적 Python 소스를 읽으며 실행하거나 import하지 않습니다.
 비허용형 레퍼런스는 목록에 등록된 시험 함수 안에서 늦게, 또는 등록된 생성기·연구에서만

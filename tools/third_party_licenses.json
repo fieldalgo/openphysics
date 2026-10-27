@@ -59,6 +59,25 @@
           "cases_s": 63, "peak_rss_mb": 1800, "pins_unchanged": null, "pip_check": null
         }
       }
+    },
+    "modesolver": {
+      "spdx": "MIT",
+      "url": "https://github.com/thomas-e-murphy/modesolver/blob/6f54c5e82a8de9d7c78a1c86eef2d658b45bc443/LICENSE.md",
+      "reference": {
+        "mode": ["stored"],
+        "execution": "in-process",
+        "modules": ["modesolver"],
+        "imported_by": [],
+        "values": ["tests/simcase/reference_values/modesolver/soi_strip_modes.json"],
+        "generators": "lab",
+        "light": {
+          "verdict": false,
+          "reason": "No PyPI release (git install only); the finest SOI strip grid takes about 5 min per solve and peaks at 7.8 GB.",
+          "date": "2026-10-21", "runner": "separate reference environment",
+          "python": "3.12.3", "os": "linux", "install_s": null,
+          "cases_s": 334, "peak_rss_mb": 7789, "pins_unchanged": null, "pip_check": null
+        }
+      }
     }
   },
   "distributions": {
