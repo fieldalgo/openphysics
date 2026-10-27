@@ -226,6 +226,30 @@ def nedelec3d_mass(space, coeff=1.0):
             * _lift(xp, space.signs[:, :, None] * space.signs[:, None, :]))
 
 
+def nedelec3d_components(space):
+    """Curl-curl and mass element matrices split by Cartesian component: NumPy (3, T, 6, 6) each.
+
+    Summed over the component they are ``nedelec3d_curlcurl`` and
+    ``nedelec3d_mass`` with coefficient 1. Scaling the mesh along the axes,
+    x_a -> d_a x_a, maps them exactly to sum_a d_a^2 / (d_x d_y d_z) K_a and
+    (d_x d_y d_z) sum_a M_a / d_a^2 (edge functions transform covariantly).
+    """
+    g, vol = tet_gradients(space.mesh)
+    curls = 2.0 * np.cross(g[:, _TET_I, :], g[:, _TET_J, :]) * space.signs[:, :, None]
+    signs = space.signs[:, :, None] * space.signs[:, None, :]
+    d = np.eye(4)
+    i, j = _TET_I[:, None], _TET_J[:, None]
+    k, l = _TET_I[None, :], _TET_J[None, :]
+    stiffness, mass = [], []
+    for a in range(3):
+        stiffness.append(np.einsum("te,tf->tef", curls[:, :, a], curls[:, :, a]) * vol[:, None, None])
+        G = g[:, :, None, a] * g[:, None, :, a]
+        Me = ((1 + d[i, k]) * G[:, j, l] - (1 + d[i, l]) * G[:, j, k]
+              - (1 + d[j, k]) * G[:, i, l] + (1 + d[j, l]) * G[:, i, k])
+        mass.append(Me * (vol / 20.0)[:, None, None] * signs)
+    return np.stack(stiffness), np.stack(mass)
+
+
 def nedelec3d_grad(space, coeff=1.0):
     """``int c W_e . grad phi_n``, element shape (T, 6 edges, 4 nodes). Mirrors assemble_edge_grad_3d."""
     xp, coeff = coefficient(coeff)
