@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 과도 열전도가 전도도, 열용량, 열원, Dirichlet 온도, 초기 온도장에 JAX나 PyTorch 값을 받고, 모든 시간 단계를 거치는 역방향 미분을 돌려줍니다. `checkpoint_every`로 재계산과 메모리를 맞바꿀 수 있습니다. NumPy 결과는 바뀌지 않습니다. [문서](packages/galerkin/differentiation.md#과도-열-메모리와-checkpoint).
+
 - `galerkin`: 정상 열전도와 정상 전기 전도가 전도도, 열원, Dirichlet·기준 전위, 경계 데이터에 JAX나 PyTorch 값을 받고, 결과를 그 라이브러리로 미분과 함께 돌려줍니다(adjoint 희소 풀이를 통한 역방향 모드). NumPy 결과는 바뀌지 않습니다. 아직 미분하지 않는 solver는 미분을 조용히 버리지 않고 JAX·PyTorch 값을 거부합니다. [문서](packages/galerkin/differentiation.md).
 
 - 신호·전원 무결성 패키지 `sipi`를 추가합니다. 층 유전체와 직사각형 트레이스로 된 PCB 단면을 준정적(quasi-TEM)으로 풀어 C·L·유전 손실 G 행렬, 단일선 임피던스와 유효 유전율, 결합선 even/odd 모드를 계산합니다. 평행판·동축 정확해, Cohn 스트립라인 정확해, Hammerstad–Jensen 마이크로스트립 식과 비교해 검증했으며 도체 손실은 포함하지 않습니다. `openphysics[sipi]`로 설치합니다. [문서](packages/sipi/overview.md).
