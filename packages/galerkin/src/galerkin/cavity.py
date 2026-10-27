@@ -1,8 +1,26 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Vacuum PEC box resonances near a specified frequency, with SI output."""
+"""Vacuum PEC box resonances near a specified frequency, with SI output.
 
+Derivatives
+-----------
+lengths_m may hold JAX or PyTorch values: frequencies, eigenvalues, edge
+coefficients and centroid fields are then in that library with reverse-mode
+derivatives with respect to the three lengths
+(docs/packages/galerkin/differentiation.md). Moving the box walls moves every
+node, but only by an axis scaling x_a -> d_a x_a, under which the edge-element
+matrices are exactly sum_a d_a^2 / (d_x d_y d_z) K_a and
+(d_x d_y d_z) sum_a M_a / d_a^2 with fixed component matrices
+(galerkin.core.kernels.nedelec3d_components). The NumPy solve runs on the
+numbers; each mode then takes the bordered Newton step of galerkin.core.eigen
+with those live matrices. Its normalization x^T M x = 1 is the solver's, and the
+sign rule is locally constant. A mode within DEGENERATE_GAP of another eigenvalue
+(cubes and many boxes have them) gets NaN derivatives and a
+DegenerateModeWarning. The mesh and space in the result hold numbers.
+"""
+
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,8 +29,16 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 from .mesh3d import Mesh3D, box_mesh
-from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
+from .edge3d import (LOCAL_EDGES, EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
+from .assembly3d import tet_gradients
+from .core import eigen, forms, kernels
+from .core import live as live_inputs
+from .core import solve as core_solve
+from .core.backend import lift, live_namespace, scatter_add
+from .core.checks import contains_live, real_value
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
+from .core.sparse import CooMatrix
 
 _C0 = 299792458.0
 _RESIDUAL_LIMIT = 1e-8
@@ -118,6 +144,9 @@ def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
                      target_frequency_hz) -> CavityResult:
     """Solve a vacuum rectangular box with PEC on all six walls.
 
+    lengths_m may hold JAX or PyTorch values (see the module docstring); the
+    target only selects modes and carries no derivative.
+
     lengths_m: three finite positive SI lengths. The box starts at the origin.
     subdivisions: three positive integers; each cell becomes six tetrahedra,
         with Kuhn diagonals reflected according to the cell's coordinate parity.
@@ -135,6 +164,71 @@ def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
     RuntimeError without a partial result. See docs/packages/galerkin/cavity_solver.md for the
     fixed search and validation policy.
     """
+    result = _solve_cavity_box_numpy(live_inputs.numbers(lengths_m), subdivisions,
+                                     num_modes=num_modes,
+                                     target_frequency_hz=live_inputs.numbers(target_frequency_hz))
+    if not contains_live(lengths_m):
+        return result
+    return _live_result(lengths_m, result)
+
+
+def _restricted(matrix, free, size):
+    position = np.full(size, -1)
+    position[free] = np.arange(len(free))
+    keep = np.flatnonzero((position[matrix.rows] >= 0) & (position[matrix.cols] >= 0))
+    return CooMatrix(position[matrix.rows[keep]], position[matrix.cols[keep]],
+                     matrix.values[keep], (len(free), len(free)))
+
+
+def _live_result(lengths_m, result):
+    """The NumPy result with derivatives with respect to the box lengths (module docstring)."""
+    leaves = live_inputs.leaves(lengths_m)
+    xp = live_namespace(*leaves)
+    lengths = xp.reshape(real_value(lengths_m, "lengths_m"), (3,))
+    scale = lengths / lift(xp, np.asarray(live_inputs.numbers(lengths_m), dtype=float).reshape(3))
+    volume = scale[0] * scale[1] * scale[2]
+    space, count = result.space, result.requested_modes
+    free = np.setdiff1d(np.arange(space.num_edges), result.pec_edge_ids)
+    curl_parts, mass_parts = kernels.nedelec3d_components(space)
+
+    def matrix(parts, factors):
+        element = sum(factor * lift(xp, part) for factor, part in zip(factors, parts))
+        full = forms.matrix(space.tet_edges, space.tet_edges, element,
+                            (space.num_edges, space.num_edges)).coalesce()
+        return _restricted(full, free, space.num_edges)
+    stiffness = matrix(curl_parts, [scale[a] ** 2 / volume for a in range(3)])
+    mass = matrix(mass_parts, [volume / scale[a] ** 2 for a in range(3)])
+    degenerate = eigen.degenerate_modes(eigen.scipy_matrix(stiffness), eigen.scipy_matrix(mass),
+                                        result.eigenvalues_m2)
+    if degenerate:
+        warnings.warn(f"modes {degenerate} belong to degenerate eigenvalues (relative gap <= "
+                      f"{DEGENERATE_GAP:g}); their derivatives are NaN", DegenerateModeWarning,
+                      stacklevel=3)
+    coefficients, eigenvalues = [], []
+    for k in range(count):
+        if k in degenerate:
+            x = core_solve.nan_derivative(xp, result.edge_coefficients[free, k], leaves)
+            lam = core_solve.nan_derivative(xp, np.asarray(result.eigenvalues_m2[k]), leaves)
+        else:
+            x, lam = eigen.refine(xp, stiffness, mass, result.edge_coefficients[free, k],
+                                  result.eigenvalues_m2[k])
+        coefficients.append(scatter_add(xp, space.num_edges, free, x))
+        eigenvalues.append(lam)
+    eigenvalues = xp.stack(eigenvalues)
+    coefficients = xp.stack(coefficients, axis=1)
+    g, _ = tet_gradients(space.mesh)
+    local = np.asarray(LOCAL_EDGES)
+    basis = lift(xp, 0.25 * (g[:, local[:, 1], :] - g[:, local[:, 0], :]))   # (T, 6, 3) at centroids
+    signs = lift(xp, space.signs)
+    electric = xp.stack([xp.einsum("te,ted->td", signs * coefficients[:, k][space.tet_edges], basis)
+                         for k in range(count)]) / scale
+    return CavityResult(result.mesh, space, (_C0 / (2 * np.pi)) * xp.sqrt(eigenvalues), eigenvalues,
+                        coefficients, electric, lift(xp, result.relative_residuals),
+                        result.pec_edge_ids, count, result.target_frequency_hz)
+
+
+def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_frequency_hz):
+    """The NumPy solve of ``solve_cavity_box`` (NumPy inputs only)."""
     lengths = np.asarray(_triple(lengths_m, "lengths_m", _positive_real))
     cells = _triple(subdivisions, "subdivisions", _positive_integer)
     count = _positive_integer(num_modes, "num_modes")

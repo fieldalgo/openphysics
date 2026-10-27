@@ -8,8 +8,9 @@ Steady heat conduction (`galerkin.thermal.solve_steady_heat`), steady electric
 conduction (`galerkin.electric.solve_steady_electric`), transient heat conduction
 (`galerkin.transient_heat.solve_transient_heat`), elasticity
 (`galerkin.elasticity.solve_elasticity`), thermoelasticity
-(`galerkin.thermoelasticity.solve_thermoelasticity`) and waveguide modes
-(`galerkin.waveguide.solve_modes`) accept JAX or PyTorch values
+(`galerkin.thermoelasticity.solve_thermoelasticity`), waveguide modes
+(`galerkin.waveguide.solve_modes`) and the PEC box cavity
+(`galerkin.cavity.solve_cavity_box`) accept JAX or PyTorch values
 in place of NumPy numbers. The result arrays are then arrays of that library, and
 derivatives with respect to those inputs flow through the solve. NumPy remains the
 default and computes exactly as before; it does not differentiate.
@@ -28,6 +29,7 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 | `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
 | `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
 | `solve_modes` | `eps_r` and `mu_r` (scalars or per-element arrays, real or complex) and `k0`; `n_eff`, `et` and `ez` are returned in that library. `n_target` only selects the modes and has no derivative; `coordinate_factors` must be NumPy |
+| `solve_cavity_box` | `lengths_m` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency_hz` only selects the modes |
 
 The time grid `time_s` is structure, like the mesh. A transient callback must
 return values of one library for the whole run: a callback that returns NumPy
@@ -154,9 +156,32 @@ mode. Outputs that the objective does not
 use contribute nothing, so the other modes keep their derivatives. Break the
 symmetry or use a quantity of the whole degenerate subspace instead.
 
-Only the 2D waveguide is covered. Cavities (`solve_cavity_box`,
-`solve_material_cavity_box`) and the other electromagnetic solvers do not
-differentiate yet.
+`solve_material_cavity_box` and the electromagnetic solvers other than
+`solve_modes` and `solve_cavity_box` do not differentiate yet.
+
+## Box cavity: derivatives with respect to the lengths
+
+A vacuum box has no material to vary; its inputs are the three lengths.
+Moving a wall moves every node, which in general would need derivatives with
+respect to node positions. A box mesh only scales along the axes, x_a → d_a x_a
+with d_a = L_a / L_a0, and edge functions transform covariantly under that map,
+so the curl-curl and mass matrices are exactly
+
+    K = Σ_a d_a² / (d_x d_y d_z) K_a,   M = (d_x d_y d_z) Σ_a M_a / d_a²,
+
+with component matrices K_a, M_a of the solved mesh
+(`galerkin.core.kernels.nedelec3d_components`). Each mode then takes the
+bordered Newton step of the waveguide with these live K and M. The solver's
+normalization xᵀ M x = 1 is the one the step keeps, and its sign rule (largest
+coefficient positive) does not change under a small step, so field derivatives
+follow the returned convention without a further gauge. Centroid fields are
+evaluated on the solved mesh and divided by d_a, component by component.
+
+Boxes have many degenerate modes (any two equal side lengths give pairs); they
+follow the same rule as the waveguide: NaN derivatives and a
+`DegenerateModeWarning`, also when `num_modes` cuts the pair. `result.mesh` and
+`result.space` hold the numbers of the solved geometry; node coordinates carry
+no derivative.
 
 ## Refused, not approximated
 
@@ -179,7 +204,7 @@ differentiate yet.
 
 - Not yet guarded: the low-level assembly functions (`galerkin.assembly`,
   `assembly3d`, `edge`, `edge3d`) and the electromagnetic solvers other than
-  `solve_modes` convert their
+  `solve_modes` and `solve_cavity_box` convert their
   inputs with NumPy. A JAX value passed to them loses its derivative; do not pass
   live values there.
 - With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
@@ -240,6 +265,20 @@ PyTorch 2.14.1 CPU):
   pair warns and gives NaN derivatives; a non-degenerate mode in the same call
   matches central differences. With `num_modes=1`, which returns one member of
   the pair, that mode still warns and gives NaN.
+
+`tests/galerkin/test_cavity_gradients.py` (same date and versions):
+
+- Frequencies, eigenvalues, edge coefficients, centroid fields and residuals on JAX
+  and PyTorch match NumPy to 1e-12, on the dense (43 free edges) and iterative
+  (291 free edges) eigensolver paths.
+- The identity the discretization keeps exactly, Σ_a L_a ∂λ/∂L_a = −2λ (and −f for
+  frequencies), to 1e-12 for four modes.
+- Central differences of the NumPy solve for an eigenvalue, a frequency, an edge
+  coefficient and a field quantity with respect to all three lengths, on both
+  paths, and for one live length beside two numbers.
+- A box with a square cross-section: the degenerate pair warns and gives NaN, the
+  simple fundamental matches central differences, and a pair cut by
+  `num_modes=1` still warns and gives NaN.
 
 The adjoint solve itself is checked against each library's automatic
 differentiation of its dense `linalg.solve` and against central differences in

@@ -27,7 +27,8 @@ checked separately; a small residual alone does not certify mesh accuracy.
 returns a `CavityResult`.
 
 - `lengths_m`: three finite, strictly positive real lengths in metres
-  (Python or NumPy numeric scalars).
+  (Python or NumPy numeric scalars). JAX or PyTorch values give derivatives
+  with respect to the lengths ([Derivatives](differentiation.md#box-cavity-derivatives-with-respect-to-the-lengths)).
 - `subdivisions`: three strictly positive integers.
 - `num_modes`: strictly positive integer, counting individual eigenvectors and
   retaining repeated eigenvalues. Booleans are not accepted as numeric inputs.
