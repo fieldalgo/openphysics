@@ -1,0 +1,237 @@
+{
+ "case": "soi_strip_modes",
+ "comparison": "different-discretization",
+ "consumers": [
+  "tests/simcase/test_reference_modesolver_soi_strip.py"
+ ],
+ "content_sha256": "0b2760f76abda6d92193b0b42128826bf8e5f5eb83e7ee46c3e05f440d701f1b",
+ "cost": {
+  "compile_s": null,
+  "compute_s": null,
+  "not_measured": [
+   "per-solve compute time apart from wall time",
+   "BLAS thread count"
+  ],
+  "peak_rss_mb": 7789.2,
+  "threads": null,
+  "wall_time_s": 1046.0
+ },
+ "environment": {
+  "backend/device": "cpu, SciPy SuperLU",
+  "cpu": "Intel Xeon 2.1 GHz, 4 vCPU",
+  "dtype": "float64",
+  "numpy": "2.5.4",
+  "os": "Linux",
+  "python": "3.12.3"
+ },
+ "failed_or_discarded": [],
+ "generated_utc": "2026-10-21T05:36:34Z",
+ "generator": {
+  "clean": true,
+  "command": "python generate_modesolver.py OUTPUT.json; python make_reference_record.py OUTPUT.json generate_modesolver.py RECORD.json",
+  "path": "private research repository",
+  "product_commit": "c933fa64030143d676ae2ca4edd434f7ffac0bd7",
+  "sha256": "2f2ae6b3807d0c396063ed1153fbb2a58001e058d7b3e6dcf38d52b22b89c9dc"
+ },
+ "inputs": {
+  "background_material": "SiO2",
+  "boundary": "pec on all four walls",
+  "core_material": "Si",
+  "core_um": {
+   "h": 0.22,
+   "w": 0.5,
+   "x": -0.25,
+   "y": 0.0
+  },
+  "group_index": "n_eff - lambda * dn_eff/dlambda at 1.55 um, dn_eff/dlambda from the central difference of 1.50 and 1.60 um",
+  "modes": [
+   "TE0",
+   "TM0"
+  ],
+  "wavelengths_um": [
+   1.5,
+   1.55,
+   1.6
+  ],
+  "window_um": {
+   "xmax": 1.5,
+   "xmin": -1.5,
+   "ymax": 1.2,
+   "ymin": -1.2
+  }
+ },
+ "matched": [
+  "geometry and window",
+  "PEC on all walls (modesolver boundary EEEE)",
+  "material indices: physmat Si (Salzberg-Villa) and SiO2 (Malitson) evaluated at each wavelength",
+  "wavelengths and the group-index difference formula"
+ ],
+ "not_matched": [
+  "discretization: finite differences on a uniform grid against edge finite elements on a graded mesh",
+  "interfaces: staircase cell-centred permittivity against mesh-conforming interfaces",
+  "eigen solver"
+ ],
+ "not_recorded": {
+  "cost.compile_s": "no compile step was timed; source: generator output",
+  "cost.compute_s": "only total wall time was recorded; source: generator output",
+  "cost.threads": "BLAS threads were left at the default and not logged; source: generator output"
+ },
+ "not_run": [
+  "macOS and Windows",
+  "a repeated run for determinism"
+ ],
+ "physics": "em.modes2d vector, lossless SOI strip TE0/TM0",
+ "provenance_status": "complete",
+ "reference_self_check": [
+  "TE0 n_eff falls monotonically over h = 0.01, 0.005, 0.0025 um (observed order 0.56)",
+  "h = 0.02 um is outside the converging range: TE0 rises from 0.02 to 0.01 um"
+ ],
+ "references": [
+  {
+   "arrays": [
+    "grid_h_um",
+    "wavelength_um",
+    "neff"
+   ],
+   "build": "git 6f54c5e82a8de9d7c78a1c86eef2d658b45bc443; the module's __version__ reads 3.0.0",
+   "discretization": {
+    "grids_um": [
+     0.02,
+     0.01,
+     0.005,
+     0.0025
+    ],
+    "kind": "vector finite differences (Fallahkhair, Li, Murphy 2008)",
+    "permittivity": "cell-centred staircase"
+   },
+   "execution": "in-process",
+   "independence": {
+    "inputs_from_product": true,
+    "product_loaded": true
+   },
+   "install": {
+    "command": "pip install git+https://github.com/thomas-e-murphy/modesolver@6f54c5e82a8de9d7c78a1c86eef2d658b45bc443",
+    "kind": "pip VCS",
+    "lock": "full pip freeze kept in the private research repository"
+   },
+   "license": "MIT",
+   "modified": {
+    "description": "unmodified upstream source at the pinned commit",
+    "value": false
+   },
+   "settings": {
+    "boundary": "EEEE",
+    "function": "modesolver.wgmodes",
+    "grid": "uniform dx = dy, core edges on cell boundaries",
+    "guess": "n_Si at the wavelength",
+    "kept": "two largest n_eff of four",
+    "nmodes": 4,
+    "solver": "SuperLU (pypardiso and MUMPS absent)"
+   },
+   "source": "https://github.com/thomas-e-murphy/modesolver",
+   "tool": "modesolver",
+   "version": "3.0.2"
+  }
+ ],
+ "regeneration": [],
+ "role": "code-to-code comparison; not analytical acceptance or convergence evidence",
+ "schema": "openphysics.reference-values/1",
+ "values": [
+  {
+   "data": [
+    0.02,
+    0.01,
+    0.005,
+    0.0025
+   ],
+   "dtype": "<f8",
+   "name": "grid_h_um",
+   "shape": [
+    4
+   ],
+   "unit": "um"
+  },
+  {
+   "data": [
+    [
+     [
+      2.476886893799871,
+      1.840800885810654
+     ],
+     [
+      2.419623523115715,
+      1.7736527795851829
+     ],
+     [
+      2.3622545269049806,
+      1.715373078830338
+     ]
+    ],
+    [
+     [
+      2.506442429971701,
+      1.8485030333041248
+     ],
+     [
+      2.4507594790467295,
+      1.7805124891504651
+     ],
+     [
+      2.3949161304233892,
+      1.7213519630369583
+     ]
+    ],
+    [
+     [
+      2.5053980325225154,
+      1.8448021381353663
+     ],
+     [
+      2.449449290069653,
+      1.7767112033320664
+     ],
+     [
+      2.3933104178912665,
+      1.7175729601153273
+     ]
+    ],
+    [
+     [
+      2.5046582039657315,
+      1.8426558044388837
+     ],
+     [
+      2.4485619945421737,
+      1.7744876885422174
+     ],
+     [
+      2.392258088511072,
+      1.71534762064319
+     ]
+    ]
+   ],
+   "dtype": "<f8",
+   "name": "neff",
+   "shape": [
+    4,
+    3,
+    2
+   ],
+   "unit": "1"
+  },
+  {
+   "data": [
+    1.5,
+    1.55,
+    1.6
+   ],
+   "dtype": "<f8",
+   "name": "wavelength_um",
+   "shape": [
+    3
+   ],
+   "unit": "um"
+  }
+ ],
+ "values_sha256": "3136f6e5b09b4de42e750d885bb81594e0d5fd47f6e30a9e3ce087bd0c55564b"
+}
