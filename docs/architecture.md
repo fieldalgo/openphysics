@@ -92,6 +92,81 @@ These layers do not imply a general-purpose, fully coupled multiphysics solver.
 The [overview](overview.md#current-limits) lists current limits; exact contracts
 and validation limits are linked from the [documentation index](README.md).
 
+## Inside galerkin: core, physics and coupling
+
+galerkin is one distribution with layers inside it. Imports point downward:
+physics modules use coupling and core, coupling uses core, and core uses the
+base modules (mesh types and the public assembly functions). A physics module
+never imports another physics module's private helpers. Two modules sit beside
+core rather than under it: `core.loads` reads region materials through
+`galerkin.materials`, which itself uses core's array backends, and accepts the
+`ElementHeatSource` container of `galerkin.heat_source`, which holds a coupling
+`Field`.
+
+```mermaid
+flowchart TB
+    Sim["simcase<br/>physics registry"]
+    subgraph G["galerkin"]
+        Phys["physics modules<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule and heat-to-mechanics workflows"]
+        Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
+        Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
+        Base["base modules<br/>mesh · mesh3d<br/>public assembly: assembly · assembly3d · edge · edge3d · solver"]
+    end
+    Sim -->|dispatches to| Phys
+    Phys --> Coup
+    Phys --> Core
+    Coup --> Core
+    Core --> Base
+    Phys --> Base
+```
+
+| Layer | Package path | Holds |
+|---|---|---|
+| core | [`galerkin.core`](../packages/galerkin/src/galerkin/core/__init__.py) | Input checks, mesh and element data, boundary sampling, loads, constraints and quadrature. Element kernels (`kernels`), assembly into a sparse matrix (`forms`, `sparse`), and the sparse solve and eigenpair refinement with hand-written adjoints (`solve`, `eigen`). It dispatches on NumPy, JAX and PyTorch in one place (`backend`). |
+| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity`, … | One formulation each: inputs and units, the checks of its contract, assembly (from core kernels, or the public functions where not yet moved), the solve and the result dataclass. |
+| coupling | [`galerkin.coupling`](../packages/galerkin/src/galerkin/coupling/__init__.py) | Node and element `Field`s on one mesh with an SI unit, same-mesh `transfer` and the `OneWayChain` driver, which runs stages handed to it and imports no physics. The Joule and heat-to-mechanics workflows run on it. The [kernel interface](packages/galerkin/coupling.md) states what a solver must expose for another solver to consume its result. |
+
+The public assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
+remain the NumPy assembly path and keep their results. `core.kernels` with
+`core.forms` reproduce the same matrices bit for bit from closed-form element
+kernels in the input's array library. Through that route, seven solvers
+differentiate on JAX and PyTorch ([derivatives](packages/galerkin/differentiation.md)).
+
+Not yet moved onto core: `material_cavity`, `mode_coordinates` and `pml` assemble
+with the public functions only. The coupling layer passes fields one way on a
+single mesh. A fixed-point driver waits for a third coupled pair, and
+grid-to-mesh projection waits for a second engine
+([limits](packages/galerkin/coupling.md#limits)).
+
+## Adding a physics
+
+1. **Formulation in galerkin.** Add one module. Build element matrices with
+   `core.kernels`, or write a kernel of the same shape (`(T, i, j)` arrays, no
+   loop over cells). Assemble with `core.forms` and solve with `core.solve`.
+   Validate inputs with `core.checks`, and do not copy helpers from another
+   physics module. [Contributing](../CONTRIBUTING.md#making-a-change) sets the
+   validation evidence: independent analytical references and mesh-convergence
+   checks. Record them in a contract and a validation page under
+   `docs/packages/galerkin/`.
+2. **Results for other physics.** Return node or element values that a
+   `galerkin.coupling.Field` can carry, on the solved mesh with SI units, per
+   the [kernel interface](packages/galerkin/coupling.md). A one-way workflow is
+   a `OneWayChain` of existing stages.
+3. **Derivatives (optional).** Keep values live from input to solve: use
+   `core.backend` and kernels whose coefficients may be JAX or PyTorch arrays.
+   Alternatively, run the NumPy body on numbers and attach the derivative with
+   one more adjoint solve, as the elasticity and eigen solvers do. Until then,
+   refuse live values with `core.checks.refuse_live` rather than cut the
+   derivative silently ([pattern and limits](packages/galerkin/differentiation.md)).
+4. **Documents (optional).** Register a `PhysicsKind` in
+   [`simcase.registry`](../packages/simcase/src/simcase/registry.py) with its
+   contract validation, runner, summary and result types. The runner, schema and
+   command line need no change. Python-only physics stays out of documents
+   until it is registered.
+
+Keep English and Korean pages together, and keep numerical thresholds as
+validated ([contributing](../CONTRIBUTING.md)).
+
 ## Connections in the code
 
 The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml),
@@ -102,5 +177,5 @@ The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml)
 `simcase` dispatches each document by its physics type through the
 [physics registry](../packages/simcase/src/simcase/registry.py): each physics family
 registers its contract validation, runner, summary and result types there, so a new
-physics does not edit the runner or the schema.
+physics does not edit the runner or the schema ([adding a physics](#adding-a-physics)).
 This architecture page adds no new implementation or numerical validation claim.

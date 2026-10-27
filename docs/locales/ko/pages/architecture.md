@@ -87,6 +87,67 @@ flowchart TB
 현재 한계는 [도구 개요](overview.md#현재-한계)에 있고, 정확한 사용 계약과 검증 한계는
 [문서 색인](index.md)에 연결돼 있습니다.
 
+## galerkin 안: core, physics, coupling
+
+galerkin은 배포판 하나이고, 안이 여러 층으로 나뉩니다. import는 아래쪽으로만 향합니다.
+물리 모듈은 coupling과 core를 쓰고, coupling은 core를 쓰며, core는 기반 모듈(메시 형식, 공개 조립
+함수)을 씁니다. 물리 모듈은 다른 물리 모듈의 비공개 도우미를 가져다 쓰지 않습니다.
+core 아래가 아니라 곁에 놓인 모듈이 둘 있습니다. `core.loads`는 `galerkin.materials`로 영역 재료를
+읽는데, 이 모듈은 core의 배열 backend를 씁니다. 또 `core.loads`는 `galerkin.heat_source`의
+`ElementHeatSource` 컨테이너를 받는데, 이 컨테이너는 coupling `Field`를 담습니다.
+
+```mermaid
+flowchart TB
+    Sim["simcase<br/>물리 등록표"]
+    subgraph G["galerkin"]
+        Phys["물리 모듈<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule·열→역학 workflow"]
+        Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
+        Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
+        Base["기반 모듈<br/>mesh · mesh3d<br/>공개 조립: assembly · assembly3d · edge · edge3d · solver"]
+    end
+    Sim -->|디스패치| Phys
+    Phys --> Coup
+    Phys --> Core
+    Coup --> Core
+    Core --> Base
+    Phys --> Base
+```
+
+| 층 | 패키지 경로 | 담는 것 |
+|---|---|---|
+| core | [`galerkin.core`](../../../../packages/galerkin/src/galerkin/core/__init__.py) | 입력 검사, 메시·요소 데이터, 경계 샘플링, 하중, 구속 조건, 적분 규칙. 요소 커널(`kernels`), 희소 행렬로의 조립(`forms`, `sparse`), 손으로 쓴 adjoint를 갖춘 희소 풀이와 고유쌍 보정(`solve`, `eigen`). NumPy·JAX·PyTorch 분기는 한곳(`backend`)에서 합니다. |
+| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널, 아직 옮기지 않은 곳은 공개 함수), 풀이, 결과 dataclass. |
+| coupling | [`galerkin.coupling`](../../../../packages/galerkin/src/galerkin/coupling/__init__.py) | 한 메시 위의 절점·요소 `Field`(SI 단위), 같은 메시 `transfer`, `OneWayChain` 드라이버. 드라이버는 넘겨받은 단계를 실행할 뿐 물리 모듈을 import하지 않습니다. Joule와 열→역학 workflow가 이 층 위에서 돕니다. [커널 인터페이스](packages/galerkin/coupling.md)는 다른 solver가 결과를 받아 쓰려면 한 solver가 무엇을 내놓아야 하는지 정합니다. |
+
+공개 조립 함수(`assemble_stiffness`, `assemble_curlcurl_3d` 등)는 NumPy 조립 경로로 남아 있고 결과도
+그대로입니다. `core.kernels`와 `core.forms`는 닫힌 식 요소 커널로 같은 행렬을 비트 단위로 재현하며,
+입력이 속한 배열 라이브러리에서 계산합니다. 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다
+([미분](packages/galerkin/differentiation.md)).
+
+아직 core로 옮기지 않은 것도 있습니다. `material_cavity`, `mode_coordinates`, `pml`은 공개 함수로만
+조립합니다. coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
+쌍이 생길 때, 격자↔메시 투영은 둘째 엔진이 붙을 때 다룹니다([한계](packages/galerkin/coupling.md#한계)).
+
+## 새 물리 추가하기
+
+1. **galerkin의 정식화.** 모듈 하나를 더합니다. 요소 행렬은 `core.kernels`로 만들거나, 같은 모양의
+   커널(`(T, i, j)` 배열, 셀 루프 없음)을 씁니다. 조립은 `core.forms`, 풀이는 `core.solve`로 합니다.
+   입력 검사는 `core.checks`로 하고, 다른 물리 모듈의 도우미를 복사하지 않습니다.
+   검증 근거는 [기여 안내](contributing.md#변경하기)가 정합니다: 독립 해석 기준과 메시 수렴
+   검사입니다. 이를 `docs/packages/galerkin/` 아래 계약 문서와 검증 문서에 기록합니다.
+2. **다른 물리에 넘길 결과.** [커널 인터페이스](packages/galerkin/coupling.md)에 따라, 푼 메시 위의
+   SI 단위 절점·요소 값을 `galerkin.coupling.Field`가 담을 수 있는 형태로 돌려줍니다. 한 방향
+   workflow는 기존 단계를 `OneWayChain`으로 잇습니다.
+3. **미분(선택).** 입력부터 풀이까지 값을 살려 두려면 `core.backend`와, 계수가 JAX·PyTorch 배열일 수
+   있는 커널을 씁니다. 아니면 탄성·고유값 solver처럼 NumPy 본문을 숫자로 돌린 뒤 adjoint 풀이를 한 번
+   더 해 미분을 붙입니다. 그때까지는 미분을 조용히 끊지 말고 `core.checks.refuse_live`로 살아 있는
+   값을 거부합니다([방식과 한계](packages/galerkin/differentiation.md)).
+4. **문서(선택).** [`simcase.registry`](../../../../packages/simcase/src/simcase/registry.py)에 계약 검증,
+   실행기, 요약, 결과 형식을 담은 `PhysicsKind`를 등록합니다. 실행기·스키마·명령행은 고치지 않습니다.
+   등록하기 전까지 Python 전용 물리는 문서 기능이 되지 않습니다.
+
+영어와 한국어 문서는 함께 고치고, 수치 기준은 검증한 대로 유지합니다([기여 안내](contributing.md)).
+
 ## 실제 코드와의 연결
 
 이 구조도는 [`simcase` 의존성](../../../../packages/simcase/pyproject.toml),
@@ -96,5 +157,5 @@ flowchart TB
 [Gmsh 연동 설명](../../../../packages/galerkin/src/galerkin/gmsh.py)을 기준으로 합니다.
 `simcase`는 [물리 등록표](../../../../packages/simcase/src/simcase/registry.py)로 문서를 물리
 타입별로 나눠 보냅니다. 물리마다 계약 검증·실행기·요약·결과 형식을 그곳에 등록하므로, 새 물리를
-더할 때 실행기나 스키마를 고치지 않습니다.
+더할 때 실행기나 스키마를 고치지 않습니다([새 물리 추가하기](#새-물리-추가하기)).
 이 문서 추가가 새 구현이나 수치 검증 결과를 의미하지는 않습니다.
