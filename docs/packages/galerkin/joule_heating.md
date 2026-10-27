@@ -54,6 +54,11 @@ Q. Scalar, region-mapping and coordinate-function heat inputs retain their
 existing meaning. A bare array remains invalid. Boundary tags may change for a
 new thermal problem, but geometry/order/region correspondence may not.
 
+The source is an element field of the [coupling layer](coupling.md)
+(`source.field`, unit W/m^3). The Joule workflow builds that field on the
+electrical mesh and carries it to the thermal mesh with the same-mesh identity
+transfer; any other mesh raises the `ValueError` above.
+
 ## Validation and limits
 
 Element transfer checks cover exact local loads, total power, geometry and order

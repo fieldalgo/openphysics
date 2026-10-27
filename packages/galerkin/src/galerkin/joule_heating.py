@@ -7,8 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from .core.checks import refuse_live
+from .coupling import Field, transfer
 from .electric import SteadyElectricResult
-from .heat_source import ElementHeatSource
+from .heat_source import MESH_MISMATCH, ElementHeatSource
 from .thermal import SteadyHeatResult, solve_steady_heat
 
 
@@ -58,8 +59,12 @@ def solve_steady_joule_heat(mesh, *, electrical_result, conductivity, dirichlet,
                   *electric.mesh.boundary_edges.values()]:
         if isinstance(value, np.ndarray):
             value.setflags(write=False)
-    source = ElementHeatSource(electric.mesh, electric.joule_heating)
-    source.on_mesh(mesh)
+    # The Joule field lives on the electrical mesh; the identity transfer
+    # refuses any other thermal mesh. No interpolation or averaging.
+    joule = Field(electric.mesh, electric.joule_heating, location="element", unit="W/m^3",
+                  name="element heat source")
+    joule = transfer(joule, mesh, message=MESH_MISMATCH)
+    source = ElementHeatSource(mesh, joule.values)
     if np.any(source.values < 0):
         raise ValueError("Joule heating must be nonnegative")
     owned_mesh = copy.deepcopy(mesh)

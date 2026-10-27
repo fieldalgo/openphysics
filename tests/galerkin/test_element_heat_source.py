@@ -78,3 +78,13 @@ def test_signed_cooling_and_zero_are_valid_thermal_sources():
         scalar = solve(mesh, value)
         np.testing.assert_array_equal(element.load, scalar.load)
         np.testing.assert_array_equal(element.temperature, scalar.temperature)
+
+
+def test_source_is_an_element_field_in_w_per_m3():
+    from galerkin.coupling import Field
+    mesh = rectangle_mesh(1., 1., 2, 2)
+    source = ElementHeatSource(mesh, np.arange(mesh.num_triangles))
+    assert isinstance(source.field, Field)
+    assert (source.field.location, source.field.unit) == ("element", "W/m^3")
+    assert source.values is source.field.values
+    assert source.field.signature.matches(mesh)
