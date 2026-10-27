@@ -22,3 +22,5 @@ error.log
 /*.npz
 /*.png
 *_results/
+# Tutorial result folders such as out/wall-recorded; keeps run records' dirty flag clean.
+/out/
