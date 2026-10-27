@@ -90,17 +90,18 @@ export function installShapeEditor(host,{shape,index,blocked,commit,snap=5}){
   const h=make('rect',{...attrs,fill:'#fff0a8',role:'slider',tabindex:0,'aria-label':label,'aria-valuetext':value,'data-handle':label,'vector-effect':'non-scaling-stroke'});
   h.style.cursor=cursor;svg.append(h);handles.push(h);wire(h,update,label.replace(/^Resize|^Move/,m=>m==='Move'?'Moved':'Resized'),keyStep);
  };
+ const scale=(svg.viewBox?.baseVal?.width||600)/600;
  const b=shapeBounds(shape),[sx0,sy0]=[300+b.xmin/10,175-b.ymax/10],[sx1,sy1]=[300+b.xmax/10,175-b.ymin/10];
  if(shape.type==='rect'){
-  const t=2;
+  const t=2*scale;
   handle({x:sx0-t,y:sy0+t,width:2*t,height:Math.max(1,sy1-sy0-2*t)},`Resize ${shape.name} left edge`,p=>resizeRect(shape,'left',grid(p[0])),dx=>resizeRect(shape,'left',shape.x+dx),'ew-resize',`x ${shape.x} nm`);
   handle({x:sx1-t,y:sy0+t,width:2*t,height:Math.max(1,sy1-sy0-2*t)},`Resize ${shape.name} right edge`,p=>resizeRect(shape,'right',grid(p[0])),dx=>resizeRect(shape,'right',shape.x+shape.w+dx),'ew-resize',`x ${shape.x+shape.w} nm`);
   handle({x:sx0+t,y:sy0-t,width:Math.max(1,sx1-sx0-2*t),height:2*t},`Resize ${shape.name} top edge`,p=>resizeRect(shape,'top',grid(p[1])),(dx,dy)=>resizeRect(shape,'top',shape.y+shape.h+dy),'ns-resize',`y ${shape.y+shape.h} nm`);
   handle({x:sx0+t,y:sy1-t,width:Math.max(1,sx1-sx0-2*t),height:2*t},`Resize ${shape.name} bottom edge`,p=>resizeRect(shape,'bottom',grid(p[1])),(dx,dy)=>resizeRect(shape,'bottom',shape.y+dy),'ns-resize',`y ${shape.y} nm`);
  }else if(shape.type==='circle'){
-  handle({x:sx1-3,y:175-shape.cy/10-3,width:6,height:6},`Resize ${shape.name} radius`,p=>resizeCircle(shape,grid(Math.hypot(p[0]-shape.cx,p[1]-shape.cy))),dx=>resizeCircle(shape,shape.r+dx),'ew-resize',`radius ${shape.r} nm`);
+  handle({x:sx1-3*scale,y:175-shape.cy/10-3*scale,width:6*scale,height:6*scale},`Resize ${shape.name} radius`,p=>resizeCircle(shape,grid(Math.hypot(p[0]-shape.cx,p[1]-shape.cy))),dx=>resizeCircle(shape,shape.r+dx),'ew-resize',`radius ${shape.r} nm`);
  }else{
-  shapeCorners(shape).forEach(([x,y],i)=>handle({x:300+x/10-3,y:175-y/10-3,width:6,height:6},`Move ${shape.name} vertex ${i+1}`,p=>moveVertex(shape,i,grid(p[0]),grid(p[1])),(dx,dy)=>moveVertex(shape,i,x+dx,y+dy),'move',`(${x}, ${y}) nm`));
+  shapeCorners(shape).forEach(([x,y],i)=>handle({x:300+x/10-3*scale,y:175-y/10-3*scale,width:6*scale,height:6*scale},`Move ${shape.name} vertex ${i+1}`,p=>moveVertex(shape,i,grid(p[0]),grid(p[1])),(dx,dy)=>moveVertex(shape,i,x+dx,y+dy),'move',`(${x}, ${y}) nm`));
  }
  return ()=>{cancel();for(const event of ['blur','resize','pagehide'])window.removeEventListener(event,cancel);message.remove();handles.forEach(h=>h.remove());restore();target.style.cursor='';};
 }
