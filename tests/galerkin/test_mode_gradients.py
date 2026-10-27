@@ -223,6 +223,20 @@ def test_degenerate_pair_has_nan_derivatives_and_others_keep_theirs(name):
     np.testing.assert_allclose(got, expected, rtol=2e-6)
 
 
+@pytest.mark.parametrize("name", BACKENDS)
+def test_a_pair_cut_by_num_modes_is_still_degenerate(name):
+    """num_modes=1 returns one member of the pair: its partner, not returned, still counts."""
+    mesh = _square_mesh(10, 2.0)
+    core = (abs(mesh.nodes[mesh.triangles].mean(axis=1) - 1.0) < 0.41).all(axis=1).astype(float)
+    lib = _library(name)
+
+    def run(nc):
+        c = lib.asarray(core) if name == "jax" else lib.as_tensor(core)
+        return solve_modes(mesh, c * nc**2 + (1 - c) * 1.44**2, 2 * np.pi, 2.0, num_modes=1)
+    with pytest.warns(DegenerateModeWarning, match=r"modes \[0\]"):
+        assert np.isnan(_gradient(name, lambda nc: _gauge_free(run(nc), 0), [2.0])[0])
+
+
 # -- refusals ------------------------------------------------------------------
 
 @pytest.mark.parametrize("name", BACKENDS)
