@@ -18,3 +18,13 @@ test('finite zoom limits and independent cameras survive repeated interaction',(
  for(let i=0;i<100;i++)a.scale(.8);
  assert.deepEqual(a.box,[0,0,600,350]);assert.deepEqual(b.box,[0,0,600,350]);
 });
+test('optical fit shows the window or the design as large as the zoom limits allow',async()=>{
+ const {WINDOW_VIEW,shapesView,sectionSvg}=await import('../../packages/simcase/src/simcase/studio/static/workspace-section.mjs');
+ const c=new SchematicCamera();c.fitTo(WINDOW_VIEW);assert.ok(Math.abs(c.zoom-350/272)<1e-12);const [x,y,w,h]=c.box;
+ assert.ok(x<=150&&x+w>=450&&y<=40&&y+h>=306,'window, title and coordinate line stay visible');
+ const core=[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}];
+ c.fitTo(shapesView(core));const b=c.box;assert.ok(b[0]<=275&&b[0]+b[2]>=325&&b[1]<=153&&b[1]+b[3]>=175);assert.ok(c.zoom>3);
+ c.fitTo(shapesView([{name:'Dot',type:'circle',material:'Silicon',cx:1400,cy:-1100,r:50}]));assert.equal(c.zoom,4);assert.deepEqual(c.box.map(v=>Math.round(v*1000)/1000),[365,241.25,150,87.5]);
+ for(const bad of [[0,0,0,10],[NaN,0,1,1],[0,0,-5,5]]){const before=c.box;c.fitTo(bad);assert.deepEqual(c.box,before);}
+ const svg=sectionSvg(core);assert.equal((svg.match(/<path d="M[\d.]+ 55 V295"/g)||[]).length,29);assert.equal((svg.match(/stroke-opacity="0.22"/g)||[]).length,10);assert.ok(svg.indexOf('data-grid')<svg.indexOf('data-pick-shape'));
+});
