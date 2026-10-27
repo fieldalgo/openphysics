@@ -4,7 +4,8 @@
 
 Stored results let tests compare with an independent tool without installing or
 running it. They are code-to-code evidence, never analytical acceptance or mesh
-convergence evidence. No physics value records are included yet.
+convergence evidence. The first physics record is the SOI strip modesolver
+comparison, `tests/simcase/reference_values/modesolver/soi_strip_modes.json`.
 
 ## Layout and use
 
