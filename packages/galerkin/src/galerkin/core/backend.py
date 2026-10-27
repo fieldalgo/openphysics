@@ -83,6 +83,9 @@ def lift(xp, value, dtype=None):
         return value
     if is_live(value):
         return value if dtype is None or value.dtype == dtype else xp.astype(value, dtype)
+    if (backend_of(xp) is Backend.TORCH and isinstance(value, np.ndarray)
+            and not value.flags.writeable):
+        value = np.array(value)         # PyTorch cannot share a read-only NumPy buffer
     return xp.asarray(value, dtype=dtype)
 
 
