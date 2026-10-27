@@ -34,11 +34,14 @@ test('GET and backend errors preserve the explicit API contract',async()=>{
  await assert.rejects(solverApi('/api/run',{},async()=>({ok:true,json:async()=>{throw Error('HTML');}})),/not JSON/);
  await assert.rejects(solverApi('/api/run',{},async()=>{throw Error('Disconnected');}),/Disconnected/);
 });
-test('application availability agrees with actual execution gates',()=>{
+test('application availability agrees with actual execution gates',async()=>{
  const setup={materials:{Core:'Silicon',Oxide:'Silica'}};
  for(const app of APPLICATIONS){
-  const model={width:500,...templatePhysics(app.id)};
-  assert.equal(opticalBlock(model,setup)==='',app.available);
+  const model={width:500,...templatePhysics(app.id)},heat=await import('../../packages/simcase/src/simcase/studio/static/workspace-heat.mjs');
+  const heatOnly=model.heat&&!model.electric&&!model.structure&&!model.optics;
+  const runnable=heatOnly?heat.thermalBlock(heat.validateThermal(heat.DEFAULT_THERMAL))==='':opticalBlock(model,setup)==='';
+  assert.equal(runnable,app.available,app.id);
+  if(heatOnly)assert.equal(heat.heatDocument(heat.DEFAULT_THERMAL).physics.heat1.type,'thermal.steady2d');
   if(!app.available)assert.throws(()=>opticalDocument(model,setup));
  }
  const a=templatePhysics('optical');a.heat=true;assert.equal(templatePhysics('optical').heat,false);
