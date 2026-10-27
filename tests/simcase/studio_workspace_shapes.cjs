@@ -74,3 +74,19 @@ test('alignment meets reference edges exactly and refuses leaving the window',()
  assert.throws(()=>S.alignShape(rect('Wide',-1500,0,3000,100),'right-of',slot),/outside the window/);
  assert.throws(()=>S.alignShape(slot,'left-of'),/reference/);assert.throws(()=>S.alignShape(slot,'spin',left));
 });
+test('added materials map to physmat, guide only above silica and keep v4 runs honest',async()=>{
+ const {createSession,parseSession}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs');
+ const expected={Silicon:'Si','Silicon nitride':'Si3N4',Silica:'SiO2',Air:'vacuum','Sapphire (ordinary)':'Al2O3','Lithium niobate (ordinary)':'LiNbO3','Indium phosphide':'InP','Gallium arsenide':'GaAs','Calcium fluoride':'CaF2','Magnesium fluoride (ordinary)':'MgF2'};
+ assert.deepEqual({...S.SHAPE_MATERIALS},expected);
+ for(const [name,id] of Object.entries(expected)){
+  const shapes=[rect('Core',-250,0,500,220,name)],block=opticalBlock(state(shapes),setup);
+  assert.equal(block==='',S.GUIDING_MATERIALS.includes(name),name);
+  if(!block){const s=opticalDocument(state(shapes),setup).geometry.shapes[0];assert.equal(s.material,id);assert.equal(s.mesh_size,.03);}
+ }
+ assert.deepEqual([...S.GUIDING_MATERIALS].sort(),['Gallium arsenide','Indium phosphide','Lithium niobate (ordinary)','Sapphire (ordinary)','Silicon','Silicon nitride']);
+ const field={nodes:[[0,0],[1,0],[0,1]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
+ const make=material=>{const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,shapes:[rect('Core',-250,0,500,220,material)]},setup);return {input,run:{job:'abcdef12',completedAt:'2026-10-27T00:00:00Z',input,settings:{...opticalSettings(),adapter:'optical-shapes-v4'},neff:[2,1.8],field,origin:'local'}};};
+ const ok=make('Silicon nitride');assert.equal(parseSession(JSON.stringify(createSession(ok.input,[ok.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v4');
+ const newer=make('Lithium niobate (ordinary)');assert.throws(()=>createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]));
+ newer.run.settings=opticalSettings();assert.equal(parseSession(JSON.stringify(createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v5');
+});

@@ -8,7 +8,7 @@ export const toNm=(sx,sy)=>[(sx-300)*10,(175-sy)*10];
 // Drawing-unit box of the window with its title and coordinate line, for Fit view.
 export const WINDOW_VIEW=Object.freeze([145,38,310,272]);
 export function shapesView(shapes){const b=designBounds(shapes),pad=20,[x0,y0]=toSvg(b.xmin,b.ymax),[x1,y1]=toSvg(b.xmax,b.ymin);const w=Math.max(x1-x0+2*pad,60),h=Math.max(y1-y0+2*pad,35);return [(x0+x1-w)/2,(y0+y1-h)/2,w,h];}
-export const MATERIAL_FILL=Object.freeze({Silicon:'#80d7c0','Silicon nitride':'#9fb7e8',Silica:'#4d6d7a',Air:'#15232c','':'#a05a5a'});
+export const MATERIAL_FILL=Object.freeze({Silicon:'#80d7c0','Silicon nitride':'#9fb7e8',Silica:'#4d6d7a',Air:'#15232c','Sapphire (ordinary)':'#c2a6e0','Lithium niobate (ordinary)':'#e7bc73','Indium phosphide':'#e08f8f','Gallium arsenide':'#d9d27a','Calcium fluoride':'#6f8f9a','Magnesium fluoride (ordinary)':'#5f7f8a','':'#a05a5a'});
 const escape=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 export function shapeSvgAttributes(shape){
  if(shape.type==='circle'){const [cx,cy]=toSvg(shape.cx,shape.cy);return {tag:'circle',attrs:{cx,cy,r:shape.r/10}};}

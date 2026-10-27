@@ -42,7 +42,7 @@ test('projects carry wavelength and core mesh since version 3; earlier versions 
 });
 test('runs keep the captured wavelength and core mesh; mismatched provenance is rejected',()=>{
  const input=snapshot(model({wavelength:1600,coreMesh:45}),setup()),r=run(input);
- assert.equal(r.settings.adapter,'optical-shapes-v4');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.wavelength_nm,1600);assert.equal(r.settings.core_mesh_nm,45);
+ assert.equal(r.settings.adapter,'optical-shapes-v5');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.wavelength_nm,1600);assert.equal(r.settings.core_mesh_nm,45);
  const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,4);
  const restored=parseSession(JSON.stringify(session));assert.equal(restored.runs[0].input.model.wavelength,1600);assert.equal(restored.runs[0].settings.core_mesh_nm,45);
  for(const change of [d=>d.runs[0].settings.wavelength_nm=1550,d=>d.runs[0].settings.core_mesh_nm=30,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){

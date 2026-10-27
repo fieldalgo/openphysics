@@ -5,8 +5,11 @@
 // as in the simcase geometry contract; the silica background fills the rest.
 export const WINDOW_NM=Object.freeze({xmin:-1500,xmax:1500,ymin:-1200,ymax:1200});
 export const MAX_SHAPES=8,MAX_POINTS=12,MIN_SIZE_NM=10;
-export const SHAPE_MATERIALS=Object.freeze({Silicon:'Si','Silicon nitride':'Si3N4',Silica:'SiO2',Air:'vacuum'});
-export const GUIDING_MATERIALS=Object.freeze(['Silicon','Silicon nitride']);
+// Lossless physmat data covering 1400–1700 nm. Uniaxial crystals use their ordinary index (isotropic model).
+export const SHAPE_MATERIALS=Object.freeze({Silicon:'Si','Silicon nitride':'Si3N4',Silica:'SiO2',Air:'vacuum','Sapphire (ordinary)':'Al2O3','Lithium niobate (ordinary)':'LiNbO3','Indium phosphide':'InP','Gallium arsenide':'GaAs','Calcium fluoride':'CaF2','Magnesium fluoride (ordinary)':'MgF2'});
+export const V4_MATERIALS=Object.freeze(['Silicon','Silicon nitride','Silica','Air']);
+// Above the silica index across the band, so they can guide light and get the core mesh size.
+export const GUIDING_MATERIALS=Object.freeze(['Silicon','Silicon nitride','Sapphire (ordinary)','Lithium niobate (ordinary)','Indium phosphide','Gallium arsenide']);
 const NAME=/^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
 const finite=(value,name)=>{if(typeof value!=='number'||!Number.isFinite(value))throw new Error(`Invalid ${name}.`);return value;};
 // Shared edges must reach the solver as identical numbers, so corners are rounded once in nm.
@@ -77,7 +80,7 @@ export function validateShapes(list){
 // Run readiness, separate from structural validity: drafts may hold unassigned materials.
 export function shapesBlock(shapes){
  const missing=shapes.find(s=>!s.material);if(missing)return `Assign a material to ${missing.name}.`;
- if(!shapes.some(s=>GUIDING_MATERIALS.includes(s.material)))return 'Add a silicon or silicon nitride shape to guide light above the silica index.';
+ if(!shapes.some(s=>GUIDING_MATERIALS.includes(s.material)))return 'Add a shape of a material above the silica index (for example silicon or silicon nitride) to guide light.';
  return '';
 }
 export function overlappingPairs(shapes){

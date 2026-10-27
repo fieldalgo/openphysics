@@ -3,14 +3,16 @@
 
 import {validateProject} from './workspace-project.mjs';
 import {readOpticalField,fieldScalars} from './workspace-field.mjs';
-import {legacyCoreShape,shapesBlock,shapeText} from './workspace-shapes.mjs';
+import {legacyCoreShape,shapesBlock,shapeText,V4_MATERIALS} from './workspace-shapes.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
 export const OPTICAL_SETTINGS=Object.freeze({adapter:'optical-fixed-v1',height_nm:220,wavelength_nm:1550,core_mesh_nm:30,window_um:[-1.5,1.5,-1.2,1.2],boundary:'PEC',candidates:2,solver_version:'not reported'});
-export function opticalSettings(wavelength=1550,coreMesh=30){if(!Number.isFinite(wavelength)||wavelength<1400||wavelength>1700||!Number.isFinite(coreMesh)||coreMesh<20||coreMesh>60)throw new Error('Unsupported wavelength or core mesh size.');const {height_nm,...fixed}=OPTICAL_SETTINGS;return {...fixed,adapter:'optical-shapes-v4',wavelength_nm:wavelength,core_mesh_nm:coreMesh};}
+export function opticalSettings(wavelength=1550,coreMesh=30){if(!Number.isFinite(wavelength)||wavelength<1400||wavelength>1700||!Number.isFinite(coreMesh)||coreMesh<20||coreMesh>60)throw new Error('Unsupported wavelength or core mesh size.');const {height_nm,...fixed}=OPTICAL_SETTINGS;return {...fixed,adapter:'optical-shapes-v5',wavelength_nm:wavelength,core_mesh_nm:coreMesh};}
 // Earlier adapters computed one centred rectangular core; v1/v2 also fixed 1550 nm / 30 nm.
 const LEGACY_ADAPTERS=['optical-fixed-v1','optical-rectangle-v2','optical-rectangle-v3'];
 function expectedSettings(adapter,model,setup){
+ // v4 offered four materials; its runs keep their adapter name.
+ if(adapter==='optical-shapes-v4'){if(!model.shapes.every(s=>V4_MATERIALS.includes(s.material)))throw new Error('Unsupported run settings or input mismatch.');return {...opticalSettings(model.wavelength,model.coreMesh),adapter};}
  if(!LEGACY_ADAPTERS.includes(adapter))return opticalSettings(model.wavelength,model.coreMesh);
  const core=legacyCoreShape(model.width,model.height,setup.materials.Core);
  if(!core.material||JSON.stringify(model.shapes)!==JSON.stringify([core]))throw new Error('Unsupported run settings or input mismatch.');

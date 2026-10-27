@@ -40,5 +40,5 @@ test('results of earlier adapters stay valid only for the single core they compu
  }
  const old=run(legacyV1(),OPTICAL_SETTINGS);const imported=parseSession(JSON.stringify({...session,version:1,input:legacyV1(),runs:[old]}));
  assert.equal(imported.runs[0].input.model.height,220);assert.equal(imported.runs[0].settings.adapter,'optical-fixed-v1');
- const current=run(input,opticalSettings());assert.equal(parseSession(JSON.stringify(createSession(input,[current],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v4');
+ const current=run(input,opticalSettings());assert.equal(parseSession(JSON.stringify(createSession(input,[current],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v5');
 });

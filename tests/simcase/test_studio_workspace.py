@@ -94,6 +94,23 @@ def test_shape_capability_v4_declares_shape_contract(client):
     assert caps['settings'] == {'window_um': [-1.5, 1.5, -1.2, 1.2], 'boundary': 'PEC', 'candidates': 2}
     assert caps['server_instance'] == client.get('/api/workspace/capabilities/v3').json()['server_instance']
 
+
+def test_material_capability_v5_extends_v4_materials(client):
+    v4 = client.get('/api/workspace/capabilities/v4').json()
+    response = client.get('/api/workspace/capabilities/v5')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 5 and caps['adapter'] == 'optical-shapes-v5'
+    assert {k: v for k, v in caps['materials'].items() if k in v4['materials']} == v4['materials']
+    assert caps['materials']['Lithium niobate (ordinary)'] == 'LiNbO3' and len(caps['materials']) == 10
+    import physmat
+    for name in caps['materials'].values():
+        index = physmat.get(name).index([1.4, 1.55, 1.7])
+        assert (abs(index.imag) == 0).all() and (index.real >= 1).all()
+    unchanged = {k: v for k, v in caps.items() if k not in ('schema_version', 'adapter', 'materials')}
+    assert unchanged == {k: v for k, v in v4.items() if k not in ('schema_version', 'adapter', 'materials')}
+
 def test_workspace_instance_is_stable_for_server_lifetime(client):
     caps = client.get('/api/workspace/capabilities/v2').json()
     assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])
