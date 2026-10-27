@@ -5,7 +5,7 @@ from typing import Mapping
 
 import numpy as np
 
-from .backend import is_live, namespace, to_numpy
+from .backend import is_live, lift, namespace, scatter_add, to_numpy
 from .checks import real_array, real_value
 
 
@@ -91,11 +91,13 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *,
     return samples
 
 
-def traction_load(mesh, p, triangles, traction):
+def traction_load(mesh, p, triangles, traction, *, live=False):
     """Consistent Cartesian nodal line load (2N,), N/m of out-of-plane thickness.
 
     ``traction`` maps boundary_edges tags to a global (2,) vector in Pa or to
     callable(points, outward_normals) -> (Q,2); None or {} gives zero load.
+    With live=True a JAX or PyTorch vector or callback result stays in its
+    library (otherwise it is refused), and so does the load.
     """
     load = np.zeros((len(p), 2))
     if traction is None:
@@ -145,19 +147,26 @@ def traction_load(mesh, p, triangles, traction):
         inward = np.einsum("ed,ed->e", normals, p[opposite]-p[edges[:, 0]]) > 0
         normals[inward] *= -1
         points = np.einsum("qa,ead->eqd", shape, p[edges])
+        check = real_value if live else real_array
         if callable(field):
-            value = real_array(field(points.reshape(-1, 2),
+            value = check(field(points.reshape(-1, 2),
                                 np.repeat(normals, len(weights), axis=0)), "traction callable")
-            if value.shape != (points.shape[0]*points.shape[1], 2):
+            if tuple(value.shape) != (points.shape[0]*points.shape[1], 2):
                 raise ValueError("traction callable must return shape (Q, 2)")
             value = value.reshape(points.shape)
         else:
-            value = real_array(field, "traction vector")
-            if value.shape != (2,):
+            value = check(field, "traction vector")
+            if tuple(value.shape) != (2,):
                 raise ValueError("constant traction must be a global Cartesian vector of shape (2,)")
-            value = np.broadcast_to(value, points.shape)
+            value = (namespace(value).broadcast_to(value, points.shape) if is_live(value)
+                     else np.broadcast_to(value, points.shape))
+        if is_live(value) or is_live(load):
+            xp = namespace(value) if is_live(value) else namespace(load)
+            fe = xp.einsum("qa,q,eqd,e->ead", *(lift(xp, a) for a in (shape, weights, value, length)))
+            load = scatter_add(xp, len(p), edges.ravel(), xp.reshape(fe, (-1, 2)), base=lift(xp, load))
+            continue
         fe = np.einsum("qa,q,eqd,e->ead", shape, weights, value, length)
         np.add.at(load, edges.ravel(), fe.reshape(-1, 2))
-    if not np.all(np.isfinite(load)):
+    if not np.all(np.isfinite(to_numpy(load))):
         raise ValueError("assembled traction load exceeds floating-point range")
-    return load.ravel()
+    return load.reshape(-1)
