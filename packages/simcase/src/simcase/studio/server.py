@@ -106,6 +106,20 @@ def workspace_capabilities_v3():
     }, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/workspace/capabilities/v4")
+def workspace_capabilities_v4():
+    return JSONResponse({
+        "schema_version": 4, "adapter": "optical-shapes-v4", "simcase_version": __version__,
+        "server_instance": _workspace_instance,
+        "optical": True, "coupled": False,
+        "wavelength_range_nm": [1400, 1700], "core_mesh_range_nm": [20, 60],
+        "window_nm": [-1500, 1500, -1200, 1200], "max_shapes": 8, "max_polygon_vertices": 12,
+        "shape_types": ["rect", "circle", "polygon"],
+        "materials": {"Silicon": "Si", "Silicon nitride": "Si3N4", "Silica": "SiO2", "Air": "vacuum"},
+        "settings": {"window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+    }, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()

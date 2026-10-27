@@ -1,12 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
+import {validateShapes,legacyCoreShape,shapesBlock,solverShapes,gradingCentre} from './workspace-shapes.mjs';
 
-export function opticalGeometry(widthNm,heightNm=220){
- if(!Number.isFinite(widthNm)||widthNm<300||widthNm>900)throw new Error('Core width must be 300–900 nm.');
- if(!Number.isFinite(heightNm)||heightNm<100||heightNm>500)throw new Error('Core height must be 100–500 nm.');
- const width=widthNm/1000;
- return {domain:{xmin:-1.5,xmax:1.5,ymin:-1.2,ymax:1.2},core:{x:-width/2,y:0,w:width,h:heightNm/1000}};
-}
 export function opticalStudy(wavelengthNm=1550,coreMeshNm=30){
  if(!Number.isFinite(wavelengthNm)||wavelengthNm<1400||wavelengthNm>1700)throw new Error('Wavelength must be 1400–1700 nm.');
  if(!Number.isFinite(coreMeshNm)||coreMeshNm<20||coreMeshNm>60)throw new Error('Core mesh size must be 20–60 nm.');
@@ -14,11 +9,12 @@ export function opticalStudy(wavelengthNm=1550,coreMeshNm=30){
 }
 export function opticalBlock(state,setup){
  if(state.electric!==false||state.heat||state.structure||!state.optics)return 'Choose Applications → Optical waveguide. Coupled physics are not connected.';
- if(!['Silicon','Silicon nitride'].includes(setup.materials.Core)||setup.materials.Oxide!=='Silica')return 'Supported materials: silicon or silicon nitride core in silica.';
- return '';
+ if(setup.materials.Oxide!=='Silica')return 'The optical background must be silica.';
+ return shapesBlock(designShapes(state,setup));
 }
+export function designShapes(state,setup){return validateShapes(state.shapes??[legacyCoreShape(state.width,state.height??220,setup.materials.Core)]);}
 export function opticalDocument(state,setup){
  const block=opticalBlock(state,setup);if(block)throw new Error(block);
- const {domain,core}=opticalGeometry(state.width,state.height??220),study=opticalStudy(state.wavelength??1550,state.coreMesh??30);
- return {openphysics:'0.2',name:'Workspace optical study',units:{length:'um'},geometry:{domain,background:{material:'SiO2'},shapes:[{name:'core',type:'rect',...core,material:setup.materials.Core==='Silicon'?'Si':'Si3N4',mesh_size:study.coreMesh}]},physics:{em1:{type:'em.modes2d',formulation:'vector',wavelength:study.wavelength,num_modes:2,n_cladding:1.45,boundary:{left:'pec',right:'pec',top:'pec',bottom:'pec'}}},mesh:{size:0.25,grading:{center:[0,core.h/2],near:study.coreMesh,far:0.16,distance:1}},study:{type:'single'},results:{save_fields:true,plots:false}};
+ const shapes=designShapes(state,setup),study=opticalStudy(state.wavelength??1550,state.coreMesh??30);
+ return {openphysics:'0.2',name:'Workspace optical study',units:{length:'um'},geometry:{domain:{xmin:-1.5,xmax:1.5,ymin:-1.2,ymax:1.2},background:{material:'SiO2'},shapes:solverShapes(shapes,study.coreMesh)},physics:{em1:{type:'em.modes2d',formulation:'vector',wavelength:study.wavelength,num_modes:2,n_cladding:1.45,boundary:{left:'pec',right:'pec',top:'pec',bottom:'pec'}}},mesh:{size:0.25,grading:{center:gradingCentre(shapes),near:study.coreMesh,far:0.16,distance:1}},study:{type:'single'},results:{save_fields:true,plots:false}};
 }

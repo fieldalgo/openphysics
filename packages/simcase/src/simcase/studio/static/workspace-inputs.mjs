@@ -6,6 +6,14 @@ export const INPUT_FIELDS=Object.freeze({
  width:Object.freeze({label:'Core width',unit:'nm',min:300,max:900,id:'width-number',node:'Geometry'}),
  wavelength:Object.freeze({label:'Wavelength',unit:'nm',min:1400,max:1700,id:'wavelength-number',node:'Optical modes'}),
  coreMesh:Object.freeze({label:'Core mesh size',unit:'nm',min:20,max:60,id:'core-mesh-number',node:'Mesh'}),
+ // Selected-shape properties; whole-shape limits (window, minimum size) are checked after parsing.
+ shapeX:Object.freeze({label:'Left x',unit:'nm',min:-1500,max:1490,id:'shape-x',node:'Geometry',prop:'x'}),
+ shapeY:Object.freeze({label:'Bottom y',unit:'nm',min:-1200,max:1190,id:'shape-y',node:'Geometry',prop:'y'}),
+ shapeW:Object.freeze({label:'Width',unit:'nm',min:10,max:3000,id:'shape-w',node:'Geometry',prop:'w'}),
+ shapeH:Object.freeze({label:'Height',unit:'nm',min:10,max:2400,id:'shape-h',node:'Geometry',prop:'h'}),
+ shapeCx:Object.freeze({label:'Centre x',unit:'nm',min:-1490,max:1490,id:'shape-cx',node:'Geometry',prop:'cx'}),
+ shapeCy:Object.freeze({label:'Centre y',unit:'nm',min:-1190,max:1190,id:'shape-cy',node:'Geometry',prop:'cy'}),
+ shapeR:Object.freeze({label:'Radius',unit:'nm',min:10,max:1200,id:'shape-r',node:'Geometry',prop:'r'}),
  voltage:Object.freeze({label:'Applied voltage',unit:'V',min:0,max:10,id:'setup-voltage',node:'Electric currents'}),
  temperature:Object.freeze({label:'Boundary temperature',unit:'K',min:1,max:2000,id:'temperature',node:'Heat transfer'})
 });
@@ -20,6 +28,8 @@ export function parseNumeric(key,raw){
 }
 export class NumericDrafts {
  #pending=new Map();
+ reject(key,raw,message){if(!INPUT_FIELDS[key])throw new Error('Unknown numeric field.');this.#pending.set(key,{key,raw:String(raw),message});return {ok:false,message};}
+ get shapeInvalid(){return [...this.#pending.keys()].some(key=>INPUT_FIELDS[key].prop);}
  update(key,raw){const result=parseNumeric(key,raw);if(result.ok)this.#pending.delete(key);else this.#pending.set(key,{key,raw:String(raw),message:result.message});return result;}
  get(key){const d=this.#pending.get(key);return d?{...d}:null;}
  get issues(){return [...this.#pending.values()].map(d=>({...d}));}

@@ -21,14 +21,14 @@ export class MeshPreview {
   finally{this.busy=false;this.onChange();}
  }
 }
-export function drawMesh(canvas,mesh,view='Full window'){
+export function drawMesh(canvas,mesh,view='Full window',region=[-.65,.65,-.25,.75]){
  const box=canvas.getBoundingClientRect(),w=box.width,h=360;if(w<1)return;
  const ratio=Math.min(globalThis.devicePixelRatio||1,2);canvas.width=Math.round(w*ratio);canvas.height=h*ratio;const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.fillStyle='#12202a';ctx.fillRect(0,0,w,h);
- const [xmin,xmax,ymin,ymax]=view==='Core region'?[-.65,.65,-.25,.75]:[-1.5,1.5,-1.2,1.2];
+ const [xmin,xmax,ymin,ymax]=view==='Core region'?region:[-1.5,1.5,-1.2,1.2];
  const scale=Math.min((w-74)/(xmax-xmin),(h-65)/(ymax-ymin)),pw=(xmax-xmin)*scale,ph=(ymax-ymin)*scale,left=54+(w-74-pw)/2,top=20;
  const X=x=>left+(x-xmin)*scale,Y=y=>top+(ymax-y)*scale;
  ctx.save();ctx.beginPath();ctx.rect(left,top,pw,ph);ctx.clip();
- mesh.triangles.forEach((triangle,i)=>{ctx.beginPath();triangle.forEach((n,j)=>{const p=mesh.nodes[n];if(j)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.closePath();ctx.fillStyle=mesh.regions[i]===mesh.names.core?'#3c887d':'#203744';ctx.fill();ctx.strokeStyle='#8aa6b5';ctx.lineWidth=.4;ctx.stroke();});ctx.restore();
+ mesh.triangles.forEach((triangle,i)=>{ctx.beginPath();triangle.forEach((n,j)=>{const p=mesh.nodes[n];if(j)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.closePath();ctx.fillStyle=mesh.regions[i]===mesh.names.background?'#203744':'#3c887d';ctx.fill();ctx.strokeStyle='#8aa6b5';ctx.lineWidth=.4;ctx.stroke();});ctx.restore();
  ctx.strokeStyle='#91a8b7';ctx.strokeRect(left,top,pw,ph);ctx.fillStyle='#cfdae0';ctx.font='12px Segoe UI';ctx.textAlign='center';
  for(let i=0;i<3;i++){const x=xmin+(xmax-xmin)*i/2;ctx.fillText(x.toFixed(2),X(x),top+ph+18);}ctx.fillText('x [µm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(let i=0;i<3;i++){const y=ymin+(ymax-ymin)*i/2;ctx.fillText(y.toFixed(2),left-8,Y(y)+4);}
  ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [µm]',0,0);ctx.restore();

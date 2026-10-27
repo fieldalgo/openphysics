@@ -1,27 +1,25 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 const {test,before}=require('node:test');const assert=require('node:assert/strict');
-let opticalSection,sectionSvg,opticalDocument;
+let sectionSvg,toSvg,toNm,opticalDocument;
 before(async()=>{
- ({opticalSection,sectionSvg}=await import('../../packages/simcase/src/simcase/studio/static/workspace-section.mjs'));
+ ({sectionSvg,toSvg,toNm}=await import('../../packages/simcase/src/simcase/studio/static/workspace-section.mjs'));
  ({opticalDocument}=await import('../../packages/simcase/src/simcase/studio/static/workspace-optical.mjs'));
 });
-test('section and submitted rectangle agree at minimum, decimal and maximum widths',()=>{
- for(const width of [300,550.5,900]){
-  const section=opticalSection(width),c=section.core;
-  assert.deepEqual(section.domain,{x:150,y:55,width:300,height:240});
-  assert.ok(Math.abs(c.width-width/10)<1e-12);assert.equal(c.height,22);
-  assert.equal(c.y,153);assert.equal(c.x+c.width/2,300);
-  const d=opticalDocument({width,electric:false,heat:false,structure:false,optics:true},{materials:{Core:'Silicon',Oxide:'Silica'}});
-  const shape=d.geometry.shapes[0];assert.ok(Math.abs((c.x-300)/100-shape.x)<1e-14);
-  assert.equal((175-c.y-c.height)/100,shape.y);assert.equal(c.height/100,shape.h);
-  assert.ok(Math.abs(c.width/c.height-width/220)<1e-14);
- }
+const shapes=[{name:'Slab',type:'rect',material:'Silicon',x:-1500,y:0,w:3000,h:90},{name:'Rod',type:'circle',material:'Silicon nitride',cx:0,cy:500,r:150},{name:'Wedge <b>',type:'polygon',material:'Air',points:[[-300,-600],[300,-600],[0,-300]]}];
+test('drawing and submitted document use the same nanometre coordinates',()=>{
+ assert.deepEqual(toSvg(-1500,1200),[150,55]);assert.deepEqual(toSvg(1500,-1200),[450,295]);toNm(...toSvg(123,-456)).forEach((v,i)=>assert.ok(Math.abs(v-[123,-456][i])<1e-9));
+ const named=shapes.map((s,i)=>({...s,name:'S'+i}));
+ const svg=sectionSvg(named),d=opticalDocument({wavelength:1550,coreMesh:30,shapes:named,electric:false,heat:false,structure:false,optics:true},{materials:{Oxide:'Silica'}});
+ assert.ok(svg.includes('points="150,175 450,175 450,166 150,166"'));assert.deepEqual(d.geometry.shapes[0].points,[[-1.5,0],[1.5,0],[1.5,.09],[-1.5,.09]]);
+ assert.ok(svg.includes('cx="300" cy="125" r="15"'));assert.deepEqual(d.geometry.shapes[1],{name:'s2',material:'Si3N4',mesh_size:.03,type:'circle',cx:0,cy:.5,r:.15});
+ assert.ok(svg.includes('points="270,235 330,235 300,205"'));assert.deepEqual(d.geometry.shapes[2],{name:'s3',material:'vacuum',type:'polygon',points:[[-.3,-.6],[.3,-.6],[0,-.3]]});
 });
-test('physical view contains only submitted bodies and four inspectable PEC edges',()=>{
- const svg=sectionSvg(500,'Core','optical-left','Boundaries');
- assert.equal((svg.match(/data-pick-body=/g)||[]).length,2);
- assert.equal((svg.match(/data-pick-edge=/g)||[]).length,4);
- assert.ok(!svg.includes('data-pick-body="Heater"'));assert.ok(svg.includes('500 × 220 nm'));
- for(const width of [0,299,901,NaN,Infinity,'500'])assert.throws(()=>opticalSection(width));
+test('every shape is selectable in draw order, names are escaped and boundaries stay inspectable',()=>{
+ const svg=sectionSvg(shapes.map((s,i)=>i===2?{...s,name:'Wedge'}:s),{selected:1});
+ assert.equal((svg.match(/data-pick-shape=/g)||[]).length,3);assert.ok(svg.indexOf('data-pick-shape="0"')<svg.indexOf('data-pick-shape="2"'));
+ assert.ok(svg.includes('Select shape Rod (circle, Silicon nitride)'));assert.ok(svg.includes('Rod · 300 × 300 nm extent'));
+ const escaped=sectionSvg([{...shapes[0],name:'A<b>'}]);assert.ok(!escaped.includes('<b>'));assert.ok(escaped.includes('A&lt;b&gt;'));
+ const boundaries=sectionSvg(shapes.slice(0,1),{mode:'Boundaries',selectedEdge:'optical-left'});
+ assert.equal((boundaries.match(/data-pick-edge=/g)||[]).length,4);assert.ok(!boundaries.includes('role="button" tabindex="0" aria-label="Select shape'));
 });

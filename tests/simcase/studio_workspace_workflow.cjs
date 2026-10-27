@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 const {test,before}=require('node:test');const assert=require('node:assert/strict');let opticalWorkflow;
 before(async()=>({opticalWorkflow}=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs')));
-const input=()=>({model:{width:500,height:220},setup:{materials:{Core:'Silicon',Oxide:'Silica'}}});
+const input=()=>({model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},setup:{materials:{Core:'Silicon',Oxide:'Silica'}}});
 test('mesh preview is optional and an earlier result is never labeled current after an input edit',()=>{
  const doc=input(),run={signature:JSON.stringify(doc)};
  let steps=opticalWorkflow({input:doc,runs:[run]});assert.equal(steps[2].detail,'Optional preview');assert.equal(steps[3].detail,'Ready to run');assert.equal(steps[4].detail,'Current input result');
- doc.model.height=300;steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Preview earlier inputs');assert.equal(steps[4].detail,'Earlier inputs only');assert.equal(steps[3].detail,'Ready to run');
+ doc.model.shapes=[{...doc.model.shapes[0],h:300}];assert.equal(opticalWorkflow({input:doc})[0].detail,'500 × 300 nm · Silicon');steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Preview earlier inputs');assert.equal(steps[4].detail,'Earlier inputs only');assert.equal(steps[3].detail,'Ready to run');
 });
 test('invalid drafts, detached jobs and offline service block readiness without hiding completed results',()=>{
  const doc=input(),runs=[{signature:JSON.stringify(doc)}];
@@ -15,5 +15,5 @@ test('invalid drafts, detached jobs and offline service block readiness without 
  assert.equal(opticalWorkflow({input:doc,pending:true,resumeBlocked:true})[3].detail,'Detach unavailable job');
  assert.equal(opticalWorkflow({input:doc,pending:true,busy:true})[3].state,'busy');
  const steps=opticalWorkflow({input:doc,block:'offline',runs});assert.equal(steps[3].detail,'Unavailable');assert.equal(steps[4].detail,'Current input result');
- doc.setup.materials.Core='Platinum';assert.equal(opticalWorkflow({input:doc})[1].state,'attention');
+ assert.equal(opticalWorkflow({input:doc})[1].detail,'Silicon in silica');doc.model.shapes=[{...doc.model.shapes[0],material:'Air'}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');doc.model.shapes=[{...doc.model.shapes[0],material:''}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');
 });

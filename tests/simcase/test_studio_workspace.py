@@ -79,6 +79,21 @@ def test_optical_study_capability_v3_preserves_earlier_contracts(client):
     assert caps['server_instance'] == client.get('/api/workspace/capabilities/v2').json()['server_instance']
     assert client.get('/api/workspace/capabilities/v2').json()['settings']['wavelength_nm'] == 1550
 
+
+def test_shape_capability_v4_declares_shape_contract(client):
+    response = client.get('/api/workspace/capabilities/v4')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 4
+    assert caps['adapter'] == 'optical-shapes-v4'
+    assert caps['window_nm'] == [-1500, 1500, -1200, 1200]
+    assert caps['max_shapes'] == 8 and caps['max_polygon_vertices'] == 12
+    assert caps['shape_types'] == ['rect', 'circle', 'polygon']
+    assert caps['materials'] == {'Silicon': 'Si', 'Silicon nitride': 'Si3N4', 'Silica': 'SiO2', 'Air': 'vacuum'}
+    assert caps['settings'] == {'window_um': [-1.5, 1.5, -1.2, 1.2], 'boundary': 'PEC', 'candidates': 2}
+    assert caps['server_instance'] == client.get('/api/workspace/capabilities/v3').json()['server_instance']
+
 def test_workspace_instance_is_stable_for_server_lifetime(client):
     caps = client.get('/api/workspace/capabilities/v2').json()
     assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])
