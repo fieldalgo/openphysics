@@ -52,6 +52,17 @@ class CooMatrix:
         import scipy.sparse as sp
         return sp.coo_matrix((self.values, (self.rows, self.cols)), shape=self.shape).tocsr()
 
+    def coalesce(self):
+        """The same matrix with each (row, col) pair once, duplicates added.
+
+        A smaller pattern for repeated products: assembled matrices hold one entry
+        per element contribution. Values stay in their library (a scatter-add).
+        """
+        n, m = self.shape
+        keys, inverse = np.unique(self.rows.astype(np.int64) * m + self.cols, return_inverse=True)
+        values = scatter_add(self.xp, len(keys), inverse.ravel(), self.values)
+        return CooMatrix(keys // m, keys % m, values, self.shape)
+
     def matvec(self, x):
         """``A @ x`` for x of shape (n,), in the values' library.
 

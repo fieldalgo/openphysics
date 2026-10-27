@@ -241,3 +241,24 @@ def test_coo_matvec_and_sum(name):
     else:                 # NumPy static data mixed with live values
         np.testing.assert_allclose(_to_numpy(CooMatrix(rows, cols, values, (5, 5)).matvec(MAKERS[name](x))),
                                    dense @ x, rtol=1e-14, atol=1e-14)
+
+
+@pytest.mark.parametrize("name", MAKERS)
+def test_coo_coalesce_adds_duplicates_once(name):
+    rng = np.random.default_rng(7)
+    rows, cols, values = rng.integers(0, 4, 40), rng.integers(0, 5, 40), rng.standard_normal(40)
+    A = CooMatrix(rows, cols, MAKERS[name](values), (4, 5))
+    C = A.coalesce()
+    keys = C.rows * 5 + C.cols
+    assert np.array_equal(keys, np.unique(rows * 5 + cols))
+    np.testing.assert_allclose(_to_numpy(C.to_dense()), _to_numpy(A.to_dense()), rtol=1e-14, atol=1e-14)
+
+
+def test_coo_coalesce_carries_derivatives():
+    jax = _jax()
+    rows, cols = np.array([0, 1, 0, 1]), np.array([0, 1, 0, 0])
+
+    def total(v):
+        return (CooMatrix(rows, cols, v, (2, 2)).coalesce().values ** 2).sum()
+    # coalesced values (v0 + v2, v3, v1): gradient 2 * their sums
+    np.testing.assert_allclose(jax.grad(total)(jax.numpy.array([1., 2., 3., 4.])), [8., 4., 8., 8.])
