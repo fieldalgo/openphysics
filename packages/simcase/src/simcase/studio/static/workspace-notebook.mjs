@@ -3,14 +3,21 @@
 
 import {validateProject} from './workspace-project.mjs';
 import {readOpticalField,fieldScalars} from './workspace-field.mjs';
+import {legacyCoreShape,shapesBlock,shapeText} from './workspace-shapes.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
 export const OPTICAL_SETTINGS=Object.freeze({adapter:'optical-fixed-v1',height_nm:220,wavelength_nm:1550,core_mesh_nm:30,window_um:[-1.5,1.5,-1.2,1.2],boundary:'PEC',candidates:2,solver_version:'not reported'});
-export function opticalSettings(height=220,wavelength=1550,coreMesh=30){if(!Number.isFinite(height)||height<100||height>500)throw new Error('Unsupported height.');if(!Number.isFinite(wavelength)||wavelength<1400||wavelength>1700||!Number.isFinite(coreMesh)||coreMesh<20||coreMesh>60)throw new Error('Unsupported wavelength or core mesh size.');return {...OPTICAL_SETTINGS,adapter:'optical-rectangle-v3',height_nm:height,wavelength_nm:wavelength,core_mesh_nm:coreMesh};}
-// Runs from earlier adapters were computed at the fixed 1550 nm / 30 nm settings.
-function expectedSettings(adapter,model){
- if(adapter==='optical-fixed-v1'||adapter==='optical-rectangle-v2'){if(model.wavelength!==1550||model.coreMesh!==30)throw new Error('Unsupported run settings or input mismatch.');return adapter==='optical-fixed-v1'?OPTICAL_SETTINGS:{...OPTICAL_SETTINGS,adapter,height_nm:model.height};}
- return opticalSettings(model.height,model.wavelength,model.coreMesh);
+export function opticalSettings(wavelength=1550,coreMesh=30){if(!Number.isFinite(wavelength)||wavelength<1400||wavelength>1700||!Number.isFinite(coreMesh)||coreMesh<20||coreMesh>60)throw new Error('Unsupported wavelength or core mesh size.');const {height_nm,...fixed}=OPTICAL_SETTINGS;return {...fixed,adapter:'optical-shapes-v4',wavelength_nm:wavelength,core_mesh_nm:coreMesh};}
+// Earlier adapters computed one centred rectangular core; v1/v2 also fixed 1550 nm / 30 nm.
+const LEGACY_ADAPTERS=['optical-fixed-v1','optical-rectangle-v2','optical-rectangle-v3'];
+function expectedSettings(adapter,model,setup){
+ if(!LEGACY_ADAPTERS.includes(adapter))return opticalSettings(model.wavelength,model.coreMesh);
+ const core=legacyCoreShape(model.width,model.height,setup.materials.Core);
+ if(!core.material||JSON.stringify(model.shapes)!==JSON.stringify([core]))throw new Error('Unsupported run settings or input mismatch.');
+ if(adapter!=='optical-rectangle-v3'&&(model.wavelength!==1550||model.coreMesh!==30))throw new Error('Unsupported run settings or input mismatch.');
+ if(adapter==='optical-fixed-v1')return OPTICAL_SETTINGS;
+ const settings={...OPTICAL_SETTINGS,adapter,height_nm:model.height};
+ return adapter==='optical-rectangle-v3'?{...settings,wavelength_nm:model.wavelength,core_mesh_nm:model.coreMesh}:settings;
 }
 export function validateRunLabel(value=''){
  if(typeof value!=='string'||value.length>80||/[\u0000-\u001f\u007f-\u009f]/.test(value))throw new Error('Run name must be at most 80 characters without control characters.');
@@ -18,8 +25,9 @@ export function validateRunLabel(value=''){
 }
 export function csvCell(value){const text=String(value);const safe=typeof value==='string'&&/^\s*[=+@-]/.test(text)?"'"+text:text;return '"'+safe.replaceAll('"','""')+'"';}
 export function runTableCsv(runs){
- const rows=[['job','name','pinned','completed_at','core_width_nm','core_height_nm','wavelength_nm','core_mesh_nm','core_material','candidate','neff','origin']];
- for(const r of runs)r.neff.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,r.input.model.width,r.input.model.height,r.input.model.wavelength,r.input.model.coreMesh,r.input.setup.materials.Core,i+1,n,r.origin]));
+ const rows=[['job','name','pinned','completed_at','core_width_nm','core_height_nm','wavelength_nm','core_mesh_nm','core_material','shapes','candidate','neff','origin']];
+ for(const r of runs){const shapes=r.input.model.shapes,single=shapes.length===1&&shapes[0].type==='rect'?shapes[0]:null;
+  r.neff.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,single?single.w:'',single?single.h:'',r.input.model.wavelength,r.input.model.coreMesh,single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin]));}
  return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
 }
 export function validateRun(record,imported=false){
@@ -30,9 +38,9 @@ export function validateRun(record,imported=false){
  if(record.serverVersion!=null&&(typeof record.serverVersion!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(record.serverVersion)))throw new Error('Invalid server version.');
  if(record.pinned!==undefined&&typeof record.pinned!=='boolean')throw new Error('Invalid run pin state.');
  const input=validateProject(record.input);
- const settings=expectedSettings(record.settings?.adapter,input.model);
- if(!record.settings||record.settings.height_nm!==input.model.height||Object.keys(settings).some(k=>JSON.stringify(record.settings[k])!==JSON.stringify(settings[k])))throw new Error('Unsupported run settings or input mismatch.');
- if(input.model.electric||input.model.heat||input.model.structure||!input.model.optics||!['Silicon','Silicon nitride'].includes(input.setup.materials.Core)||input.setup.materials.Oxide!=='Silica')throw new Error('Run is not a supported optical-only input.');
+ const settings=expectedSettings(record.settings?.adapter,input.model,input.setup);
+ if(!record.settings||record.settings.height_nm!==settings.height_nm||Object.keys(settings).some(k=>JSON.stringify(record.settings[k])!==JSON.stringify(settings[k])))throw new Error('Unsupported run settings or input mismatch.');
+ if(input.model.electric||input.model.heat||input.model.structure||!input.model.optics||shapesBlock(input.model.shapes)||input.setup.materials.Oxide!=='Silica')throw new Error('Run is not a supported optical-only input.');
  if(!Array.isArray(record.neff)||record.neff.length!==2||!record.neff.every(Number.isFinite))throw new Error('Invalid effective indices.');
  const f=record.field;
  if(!f)throw new Error('Missing run fields.');
@@ -54,7 +62,7 @@ export function validateView(view={mode:0,component:'magnitude',window:'Core reg
  return result;
 }
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'}){
- return {format:'openphysics-studio-session',version:3,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:validateView(view)};
+ return {format:'openphysics-studio-session',version:4,input:validateProject(input),runs:runs.map(r=>validateRun(r)),selected,comparison:[...comparison],view:validateView(view)};
 }
 // Capture editable metadata now; serialize large, read-only field arrays after debounce.
 // UI operations replace results rather than modifying their field samples in place.
@@ -69,7 +77,7 @@ export function captureSession(input,runs,selected,comparison,view){
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{throw new Error('Session is not valid JSON.');}
- if(doc?.format!=='openphysics-studio-session'||![1,2,3].includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
+ if(doc?.format!=='openphysics-studio-session'||![1,2,3,4].includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
  const input=validateProject(doc.input),runs=doc.runs.map(r=>{const run=validateRun(r,true);if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');

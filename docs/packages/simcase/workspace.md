@@ -16,8 +16,9 @@ For build reviews and first-user checks, use the [acceptance checklist](workspac
 
 1. Choose **Applications → Optical waveguide**. The heated-waveguide card is
    setup only; it does not run coupled physics.
-2. In **Geometry**, set width and height or drag the core edges. In **Materials**,
-   choose Silicon or Silicon nitride for the core; keep the silica background.
+2. In **Geometry**, edit the core numerically or drag it and its edges. Add
+   rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
+   each shape's material; the silica background stays.
    Optionally set the wavelength in **Optical modes** and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
@@ -41,11 +42,20 @@ and edit its properties in the inspector. The optical application runs a real
 2D mode calculation. The heated-waveguide application is a setup preview: its
 coupling diagram, voltage and mechanical selections do not run coupled physics.
 
-The optical adapter accepts a Si or SiN rectangular core in silica, with width
-300–900 nm and height 100–500 nm. Set the wavelength (1400–1700 nm) in
+The optical adapter accepts up to eight shapes inside the window x = ±1500 nm,
+y = ±1200 nm: rectangles, circles and polygons with 3–12 vertices, each of silicon,
+silicon nitride, silica or air, in a silica background. At least one silicon or
+silicon nitride shape is needed to guide light. Shapes are drawn in list order and
+**later shapes win where they overlap**, as in the simcase geometry contract; for a
+rib, draw the slab first and the ridge after it. Rectangles and polygons are
+submitted as their corner coordinates, so shapes that share an edge in nm share it
+exactly in the solver document. Set the wavelength (1400–1700 nm) in
 **Optical modes** and the core mesh size (20–60 nm) in **Mesh**; new models start
-at 1550 nm and 30 nm. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
-boundaries and two candidates. Each result shows the wavelength and core mesh it used.
+with one 500 × 220 nm silicon core at 1550 nm and 30 nm. The core mesh size applies
+to silicon and silicon nitride shapes; silica and air shapes use the graded
+background mesh. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
+boundaries and two candidates. Each result shows the shapes, wavelength and core
+mesh it used.
 
 Material indices are evaluated at the chosen wavelength; the lower limit stays
 inside the silicon data range. A coarser core mesh is faster and gives smaller
@@ -53,7 +63,10 @@ session files, but changes n_eff: for a 500 × 220 nm silicon core at 1400 nm,
 20 nm and 60 nm meshes differ by about 0.01. Compare designs at the same mesh
 size, and refine the mesh to judge whether a difference is resolved. The fixed
 window and PEC edges matter more at longer wavelengths and for small cores; these
-settings do not certify mesh or window convergence. Use the existing editor for
+settings do not certify mesh or window convergence. Large silicon or silicon nitride
+areas at a fine core mesh take longer and produce large results: a silicon block
+filling the window at 20 nm took about 22 s and returned 14 MB in a Linux check, so
+a session with several such runs can exceed 16 MiB. Save selected runs instead. Use the existing editor for
 other supported optical studies; this workspace does not expose all engine APIs.
 
 Invalid numeric drafts stay visible across navigation. Resolve or discard them
@@ -64,23 +77,29 @@ are stored in this browser. Revisions identify local editing order, not Git comm
 The model drawing has Zoom in/out, Pan and Fit view controls. Focus the drawing
 and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view retains
 its camera while navigating this tab. Heated-waveguide views remain schematic. The optical-only view shows a
-2D cross section with equal x/y scale and dimensions in nm. Its core rectangle
-and domain come from the same geometry contract as the submitted document: core
-y = 0 to the chosen height, centered in x; window x = ±1500 nm and y = ±1200 nm. Only the
-core and silica background appear, without a heater or perspective projection.
-Select Boundaries to inspect the four fixed PEC edges; these are read-only
-optical conditions, not thermal/mechanical assignments. This is not a CAD editor. Camera changes do not change inputs, edit
-history, saved files or computed fields.
+2D cross section with equal x/y scale and dimensions in nm, drawn from the same
+shapes as the submitted document: every shape in draw order over the silica
+window x = ±1500 nm, y = ±1200 nm. Select Boundaries to inspect the four fixed PEC
+edges; these are read-only optical conditions, not thermal/mechanical assignments.
+This is not a CAD editor. Camera changes do not change inputs, edit history, saved
+files or computed fields.
 
-In optical Geometry / Bodies, drag either highlighted core edge to resize symmetrically. A dashed preview does not change the model until release; Escape or pointer cancellation discards it. One completed drag creates one undoable edit. Width is bounded to 300–900 nm and drag updates snap to 1 nm. Focus a handle and use arrow keys (10 nm, Shift: 1 nm) or Home/End. Invalid numeric drafts block resizing.
+In optical Geometry, the inspector lists shapes in draw order. Add, duplicate,
+delete or move a shape earlier/later; rename it and choose its material. Edit
+rectangles by left x, bottom y, width and height, circles by centre and radius,
+and polygons as one `x, y` vertex per line (applied when the field loses focus;
+edges may not cross or touch). Values outside the window or below 10 nm stay as
+invalid drafts that block saving and running; another shape cannot be selected
+until they are corrected or restored.
 
-Resizing uses the drawing transform captured at gesture start, so zoom and pan do not change the unit conversion. The release position is applied even if no final move event arrives. Window resize, focus loss and page hiding cancel the preview; invalid inputs are checked again before committing.
-
-Height is edited numerically in the Geometry inspector or by dragging the top
-edge (100–500 nm, 1 nm snapping). The bottom remains at y = 0. Use Up/Down
-(10 nm, Shift: 1 nm) or Home/End on the top handle. Height supports undo/redo
-and the same preview, cancellation and invalid-input rules as width.
-The drawing, width handles and submitted mesh use the same height.
+With Bodies selected, click a shape in the drawing to select it. Drag the selected
+shape to move it, drag a yellow handle to move one rectangle edge, a circle
+radius or a polygon vertex, and release to apply. Dragging snaps to 5 nm; with the
+shape or a handle focused, arrow keys move by 10 nm (Shift: 1 nm). A preview does
+not change the model until release; Escape, pointer cancellation, window resize,
+focus loss and page hiding discard it. Moves are clamped to the window, and each
+completed gesture is one undoable edit. The drawing transform is captured at
+gesture start, so zoom and pan do not change the unit conversion.
 
 ## Results and files
 
@@ -91,7 +110,7 @@ they do not represent optical power or a common physical colour scale.
 
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
-sessions to 16 MiB. CSV and PNG exports are available. These version-2 workspace
+sessions to 16 MiB. CSV and PNG exports are available. These workspace
 formats are separate from headless simcase JSON documents. After reload, explicitly choose Recover last session for the committed browser
 snapshot, or Open session for a portable file. Pending writes are not a backup.
 
@@ -112,13 +131,22 @@ were computed with; older editors reject version 3 instead of ignoring the new
 values. Results keep their captured wavelength and core mesh in history labels,
 comparisons and CSV/PNG exports.
 
-The workspace checks `/api/workspace/capabilities/v3` before enabling Run. Contract
-version 3 and adapter `optical-rectangle-v3` declare the 100–500 nm height,
+Version-4 inputs and sessions store the shape list with nm units. Version-1 to
+version-3 files open as one centred rectangular core resting on y = 0 with their
+width, height and core material, which is the geometry their results were computed
+with. Results from the earlier adapters stay valid only with that single core;
+older editors reject version 4 instead of ignoring the shapes. The run table CSV
+keeps the core width, height and material columns for single-rectangle designs and
+adds a `shapes` column describing every shape.
+
+The workspace checks `/api/workspace/capabilities/v4` before enabling Run. Contract
+version 4 and adapter `optical-shapes-v4` declare the window in nm, at most eight
+shapes and twelve polygon vertices, the shape types and materials, the
 1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
 and candidate settings,
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
-captures its core height, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
+captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
 The earlier capability endpoints remain available for older clients.
 This is not a complete engine dependency or Git provenance record. Older
 version-1 sessions without this field remain readable with unknown provenance.
