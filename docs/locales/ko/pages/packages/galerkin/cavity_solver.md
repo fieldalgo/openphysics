@@ -26,7 +26,8 @@ print(result.frequencies_hz)
 `solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`는
 `CavityResult`를 반환합니다.
 
-- `lengths_m`: m 단위의 유한한 양의 실수 길이 세 개(Python 또는 NumPy 수치 scalar)
+- `lengths_m`: m 단위의 유한한 양의 실수 길이 세 개(Python 또는 NumPy 수치 scalar). JAX나
+  PyTorch 값을 주면 길이에 대한 미분을 얻습니다([미분](differentiation.md#상자-공진기-길이에-대한-미분)).
 - `subdivisions`: 양의 정수 세 개
 - `num_modes`: 개별 고유벡터 수를 세는 양의 정수. 중복 고유값도 유지합니다. bool은 수치 입력으로 받지 않습니다.
 - `target_frequency_hz`: 필수인 유한한 양의 Hz 주파수
