@@ -62,12 +62,14 @@ step on the eigenproblem bordered by the normalization x^T B x = 1,
 
     [x; lambda] = [x0; lambda0] - J^{-1} F,   J = [[A - lambda0 B, -B x0], [-x0^T B, 0]],
 
-with the live A and B: the values stay those of the NumPy solve up to rounding
-and the derivatives are the exact implicit ones. The returned gauge (unit 2-norm,
-largest entry real and positive) is then applied again, so field derivatives
-follow it; quantities that do not depend on the gauge (overlaps, power ratios)
-have gauge-free derivatives. A degenerate eigenvalue has no derivative: its mode
-gets NaN derivatives and a DegenerateModeWarning.
+with the live A and B (galerkin.core.eigen): the values stay those of the NumPy
+solve up to its residual and the derivatives are the exact implicit ones. The
+returned gauge (unit 2-norm, largest entry real and positive) is then applied
+again, so field derivatives follow it; quantities that do not depend on the
+gauge (overlaps, power ratios) have gauge-free derivatives. A degenerate
+eigenvalue has no derivative: a mode whose eigenvalue lies within a relative
+DEGENERATE_GAP of another eigenvalue of the pencil, returned or not, gets NaN
+derivatives and a DegenerateModeWarning.
 """
 
 from __future__ import annotations
@@ -82,20 +84,13 @@ from .mesh import Mesh
 from .assembly import assemble_stiffness, assemble_mass
 from .edge import (EdgeSpace, assemble_curlcurl, assemble_edge_mass,
                    assemble_edge_grad)
-from .core import forms, kernels
+from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
 from .core.backend import lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live
 from .core.sparse import CooMatrix
-
-
-class DegenerateModeWarning(RuntimeWarning):
-    """A returned mode belongs to a degenerate eigenvalue: its derivatives are NaN."""
-
-
-#: Relative eigenvalue gap below which two returned modes count as degenerate.
-DEGENERATE_GAP = 1e-8
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
@@ -284,20 +279,16 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
     k0_live = lift(xp, k0, xp.float64)
     A, B = (_restricted(m, position, n) for m in _live_blocks(xp, space, eps_r, mu_r, k0_live,
                                                               coordinate_factors))
-    B_numbers = CooMatrix(B.rows, B.cols, to_numpy(B.values), B.shape)
+    A_numbers, B_numbers = eigen.scipy_matrix(A), eigen.scipy_matrix(B)
     real_problem = np.isrealobj(n_eff0)
     k0_number = float(to_numpy(k0_live))
     lam0 = -(k0_number * np.asarray(n_eff0)) ** 2
-    degenerate = [i for i in range(len(lam0)) if any(
-        j != i and abs(lam0[i] - lam0[j]) <= DEGENERATE_GAP * max(abs(lam0[i]), abs(lam0[j]))
-        for j in range(len(lam0)))]
+    degenerate = eigen.degenerate_modes(A_numbers, B_numbers, lam0)
     if degenerate:
         warnings.warn(f"modes {degenerate} belong to degenerate eigenvalues (relative gap <= "
                       f"{DEGENERATE_GAP:g}); their derivatives are NaN", DegenerateModeWarning,
                       stacklevel=3)
     n_eff, et, ez = [], [], []
-    rows = np.concatenate([A.rows, B.rows, np.arange(n), np.full(n, n)])
-    cols = np.concatenate([A.cols, B.cols, np.full(n, n), np.arange(n)])
     for i in range(len(lam0)):
         beta0 = k0_number * n_eff0[i]
         v = np.concatenate([et0[i] * beta0, ez0[i]])[free]
@@ -306,14 +297,7 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
             et.append(core_solve.nan_derivative(xp, et0[i], leaves))
             ez.append(core_solve.nan_derivative(xp, ez0[i], leaves))
             continue
-        x0 = lift(xp, v / np.sqrt(v @ B_numbers.matvec(v)))       # x0^T B x0 = 1
-        bx = B.matvec(x0)
-        residual = xp.concat([A.matvec(x0) - lam0[i] * bx, xp.reshape(0.5 * (1 - x0 @ bx), (1,))])
-        bordered = CooMatrix(rows, cols, xp.concat([xp.astype(A.values, complex_dtype),
-                                                    xp.astype(-lam0[i] * B.values, complex_dtype),
-                                                    -bx, -bx]), (n + 1, n + 1))
-        step = core_solve.solve(bordered, residual)
-        x, lam = x0 - step[:n], lam0[i] - step[n]
+        x, lam = eigen.refine(xp, A, B, v / np.sqrt(v @ (B_numbers @ v)), lam0[i])  # x0^T B x0 = 1
         beta = xp.sqrt(-lam)
         pivot = _pivot(v)
         x = x * xp.conj(x[pivot]) / (xp.abs(x[pivot]) * xp.sqrt(xp.sum(xp.abs(x) ** 2)))

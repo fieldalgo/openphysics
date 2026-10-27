@@ -143,10 +143,14 @@ ratio |E_z|²/|E_t|², has a gauge-free derivative; prefer such quantities in an
 objective.
 
 A degenerate eigenvalue has no derivative: its eigenvectors are any combination
-of the pair. When two returned eigenvalues differ by at most 1e-8 relative
-(`galerkin.waveguide.DEGENERATE_GAP`), both modes get their exact values,
-a `DegenerateModeWarning`, and NaN derivatives, so a backward pass that uses
-them gives NaN instead of a wrong number. Outputs that the objective does not
+of the pair. When a returned eigenvalue lies within 1e-8 relative
+(`galerkin.waveguide.DEGENERATE_GAP`) of another eigenvalue of the discrete
+problem, whether or not that one was returned (`num_modes` may cut a pair), the
+mode keeps its exact values and gets a `DegenerateModeWarning` and NaN
+derivatives, so a backward pass that uses it gives NaN instead of a wrong
+number. The nearest other eigenvalue is found densely for small problems and by
+shift-invert Arnoldi next to each mode otherwise, one more factorization per
+mode. Outputs that the objective does not
 use contribute nothing, so the other modes keep their derivatives. Break the
 symmetry or use a quantity of the whole degenerate subspace instead.
 
@@ -234,7 +238,8 @@ PyTorch 2.14.1 CPU):
   difference for per-element ε and μ arrays.
 - A square guide on a mesh with the square's symmetry: the degenerate fundamental
   pair warns and gives NaN derivatives; a non-degenerate mode in the same call
-  matches central differences.
+  matches central differences. With `num_modes=1`, which returns one member of
+  the pair, that mode still warns and gives NaN.
 
 The adjoint solve itself is checked against each library's automatic
 differentiation of its dense `linalg.solve` and against central differences in
