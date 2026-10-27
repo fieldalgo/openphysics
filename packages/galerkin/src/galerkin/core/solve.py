@@ -240,3 +240,62 @@ def _torch_function():
 
     _TORCH_FUNCTION = SparseSolve
     return _TORCH_FUNCTION
+
+
+# -- Derivatives that do not exist -----------------------------------------------
+
+_NAN_DERIVATIVE = {}
+
+
+def nan_derivative(xp, value, inputs):
+    """``value`` (NumPy numbers) in ``xp``, with a NaN derivative for every live input.
+
+    For outputs whose derivative is undefined (a degenerate eigenvalue): the
+    value is exact, and a backward pass that uses it yields NaN instead of a
+    silently wrong number. A zero cotangent (the output does not enter the
+    objective) contributes zero, so other outputs keep their derivatives.
+    Built once per library, as for the solve.
+    """
+    backend = backend_of(xp)
+    inputs = tuple(inputs)
+    if backend is Backend.NUMPY or not inputs:
+        return lift(xp, value)
+    if backend not in _NAN_DERIVATIVE:
+        _NAN_DERIVATIVE[backend] = (_build_nan_jax() if backend is Backend.JAX else _build_nan_torch())
+    return _NAN_DERIVATIVE[backend](lift(xp, value), inputs)
+
+
+def _build_nan_jax():
+    jax = sys.modules["jax"]
+    jnp = jax.numpy
+
+    @jax.custom_vjp
+    def through(value, inputs):
+        return value
+
+    def forward(value, inputs):
+        return value, inputs
+
+    def backward(inputs, g):
+        used = jnp.any(g != 0)
+        return jnp.zeros_like(g), tuple(jnp.where(used, jnp.nan, jnp.zeros_like(i)) for i in inputs)
+
+    through.defvjp(forward, backward)
+    return through
+
+
+def _build_nan_torch():
+    torch = sys.modules["torch"]
+
+    class Through(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, value, *inputs):
+            ctx.save_for_backward(*inputs)
+            return value.clone()
+
+        @staticmethod
+        def backward(ctx, g):
+            used = bool((g != 0).any())
+            return (None, *(torch.full_like(i, float("nan") if used else 0.0) for i in ctx.saved_tensors))
+
+    return lambda value, inputs: Through.apply(value, *inputs)
