@@ -164,8 +164,8 @@ with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
 Context가 끝나면 임시 출력을 제거합니다. 결과를 보존하려면 호출자가 소유하고
 아직 존재하지 않는 영구 경로를 선택하세요. CLI 종료 코드는 성공 0,
 잘못된 입력 2, solver/save 또는 기존 대상 실패 1입니다.
-열 PNG를 생성하지 않습니다. Studio는 열 문서를 거절하고 오래된 광학 상태를
-지우며 headless 지원이 Studio 지원을 뜻하지 않습니다.
+열 PNG를 생성하지 않습니다. Studio는 전용 열 경로로 이 문서를 검증·실행하고
+결과를 보여 줍니다([Studio 정상 열전도](thermal_studio.md) 참고).
 
 `summary()`는 JSON-safe dictionary를 반환합니다. `result_format`,
 `field_layout`, `boundary_enabled`는 캡처한 layout을 식별합니다.

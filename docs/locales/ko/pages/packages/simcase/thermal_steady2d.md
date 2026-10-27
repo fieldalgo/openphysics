@@ -13,8 +13,8 @@
 
 `thermal.steady2d`는 면외 방향 단위 두께를 갖는 단일 균질 2D 직사각형에서
 `-div(k grad T) = Q`를 풉니다. 기존 P1 열전도 엔진을 사용합니다. 이 문서는
-headless API와 CLI를 설명합니다. Studio는 이 모델을 거절하고 이전 광학 결과를
-지웁니다. 이 버전에는 열전도용 Studio 편집기나 렌더러가 없습니다.
+headless API와 CLI를 설명합니다. Studio는 전용 열 경로로 이 문서를 검증·실행하고
+결과를 보여 줍니다([Studio 정상 열전도](thermal_studio.md) 참고).
 
 ## 입력
 
