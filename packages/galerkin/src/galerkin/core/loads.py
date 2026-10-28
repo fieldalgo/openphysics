@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..assembly import assemble_load
 from . import forms, kernels
 from .materials import is_per_region, region_property
 from .backend import is_live, namespace, scatter_add
@@ -25,7 +24,8 @@ class ElementSource:
     values: np.ndarray
 
 
-def _live_centroid_load(mesh, t, size, values):
+def _centroid_load(mesh, t, size, values):
+    """One-point centroid load (value times A/3 at each vertex), in the values' library."""
     return forms.vector(t, kernels.p1_load(mesh, values), size, order="columns")
 
 
@@ -38,20 +38,16 @@ def source_load(mesh, p, t, area, source, *, live=False):
     (otherwise it is refused) and so does the load; ElementSource is NumPy.
     """
     if isinstance(source, ElementSource):
-        return assemble_load(mesh, source.values)
+        return _centroid_load(mesh, t, len(p), source.values)
     if is_per_region(source):
         values = region_property(mesh, source, "heat_source", live=live)
-        if is_live(values):
-            return _live_centroid_load(mesh, t, len(p), values)
-        return assemble_load(mesh, values)
+        return _centroid_load(mesh, t, len(p), values)
     check = real_value if live else real_array
     if not callable(source):
         value = check(source, "heat_source")
         if tuple(value.shape) != ():
             raise ValueError("constant heat_source must be scalar")
-        if is_live(value):
-            return _live_centroid_load(mesh, t, len(p), value)
-        return assemble_load(mesh, float(value))
+        return _centroid_load(mesh, t, len(p), value if is_live(value) else float(value))
     # Original Duffy-product rule: integrate Q*N_i, not centroid Q times A/3.
     bary, weights = triangle_product_rule()
     points = np.einsum("qa,tad->tqd", bary, p[t])
