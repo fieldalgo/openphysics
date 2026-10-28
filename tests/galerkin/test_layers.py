@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE = Path(__file__).resolve().parents[2] / "packages" / "galerkin" / "src" / "galerkin"
+import galerkin
+
+# The imported package: the source tree in a checkout, site-packages in the installed-wheel run.
+PACKAGE = Path(galerkin.__file__).resolve().parent
 BASE = {"mesh", "mesh3d", "assembly", "assembly3d", "edge", "edge3d", "solver"}
 
 
