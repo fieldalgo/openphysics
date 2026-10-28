@@ -19,21 +19,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from .mesh3d import Mesh3D
-
-
-def tet_gradients(mesh: Mesh3D):
-    """Barycentric gradients (T, 4, 3) and volumes (T,).
-
-    With E the matrix whose rows are p1-p0, p2-p0, p3-p0, a point satisfies
-    x - p0 = (lam1, lam2, lam3) E, so grad lam_{i+1} is column i of E^-1 and
-    grad lam_0 = -(grad lam_1 + grad lam_2 + grad lam_3).
-    """
-    E = mesh._edge_matrix()                       # (T, 3, 3)
-    vol = np.abs(np.linalg.det(E)) / 6.0
-    grads = np.empty((mesh.num_tets, 4, 3))
-    grads[:, 1:, :] = np.transpose(np.linalg.inv(E), (0, 2, 1))
-    grads[:, 0, :] = -grads[:, 1:, :].sum(axis=1)
-    return grads, vol
+from .core.tets import tet_gradients  # noqa: F401 (public here)
 
 
 def _scatter(vals, rows, cols, shape):

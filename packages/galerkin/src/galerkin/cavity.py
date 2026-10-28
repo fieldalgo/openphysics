@@ -31,7 +31,7 @@ import scipy.sparse.linalg as spla
 from .mesh3d import Mesh3D, box_mesh
 from .edge3d import (LOCAL_EDGES, EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
-from .assembly3d import tet_gradients
+from .core.tets import tet_gradients
 from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
