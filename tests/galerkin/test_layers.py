@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Imports inside galerkin point downward: core over the base modules, coupling over core.
+"""Imports inside galerkin point downward: base, core, the public assembly facades and coupling.
 
 See docs/architecture.md ("Inside galerkin"). Read from the source, so a new
 import across a layer fails here rather than in a later import cycle.
@@ -14,7 +14,10 @@ import galerkin
 
 # The imported package: the source tree in a checkout, site-packages in the installed-wheel run.
 PACKAGE = Path(galerkin.__file__).resolve().parent
-BASE = {"mesh", "mesh3d", "assembly", "assembly3d", "edge", "edge3d", "solver"}
+BASE = {"mesh", "mesh3d"}
+# The public assembly modules sit on core: they keep their names for callers and
+# take element data and solves from core, never the other way round.
+FACADES = {"assembly", "assembly3d", "edge", "edge3d", "solver"}
 
 
 def _galerkin_imports(path):
@@ -35,14 +38,24 @@ def _galerkin_imports(path):
     return out
 
 
+def _files(layer):
+    if layer == "base":
+        return sorted(PACKAGE / f"{name}.py" for name in BASE)
+    if layer == "facades":
+        return sorted(PACKAGE / f"{name}.py" for name in FACADES)
+    return sorted((PACKAGE / layer).glob("*.py"))
+
+
 @pytest.mark.parametrize("layer,allowed", [
-    ("core", {"core"}),
-    ("coupling", {"coupling", "core"}),
+    ("base", BASE),
+    ("core", BASE | {"core"}),
+    ("facades", BASE | {"core"} | FACADES),
+    ("coupling", BASE | {"core", "coupling"}),
 ])
 def test_layer_imports_only_the_layers_below(layer, allowed):
-    files = sorted((PACKAGE / layer).glob("*.py"))
-    assert files
+    files = _files(layer)
+    assert files and all(path.exists() for path in files)
     for path in files:
         bad = sorted(name for name in _galerkin_imports(path)
-                     if name and name.split(".")[0] not in BASE | allowed)
+                     if name and name.split(".")[0] not in allowed)
         assert not bad, f"{path.name} imports {bad}"

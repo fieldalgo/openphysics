@@ -95,13 +95,15 @@ and validation limits are linked from the [documentation index](README.md).
 ## Inside galerkin: core, physics and coupling
 
 galerkin is one distribution with layers inside it. Imports point downward:
-physics modules use coupling and core, coupling uses core, and core uses the
-base modules (mesh types and the public assembly functions). A physics module
+physics modules use coupling, core and the public assembly modules; coupling
+uses core; the public assembly modules (`assembly`, `assembly3d`, `edge`,
+`edge3d`, `solver`) keep their names for callers and sit on core; core uses only
+the mesh types (`mesh`, `mesh3d`), which import nothing else from galerkin. A physics module
 never imports another physics module's private helpers. Material lookup lives in
 core (`galerkin.materials` keeps its public names), and a physics module hands
 core its mesh-bound containers as plain checked values (`core.loads.ElementSource`).
-`tests/galerkin/test_layers.py` fails if core or coupling imports a module above
-it.
+`tests/galerkin/test_layers.py` fails if the mesh types, core, the public
+assembly modules or coupling import a module above them.
 
 ```mermaid
 flowchart TB
@@ -110,14 +112,16 @@ flowchart TB
         Phys["physics modules<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule and heat-to-mechanics workflows"]
         Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
         Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
-        Base["base modules<br/>mesh · mesh3d<br/>public assembly: assembly · assembly3d · edge · edge3d · solver"]
+        Pub["public assembly<br/>assembly · assembly3d · edge · edge3d · solver"]
+        Base["mesh types<br/>mesh · mesh3d"]
     end
     Sim -->|dispatches to| Phys
     Phys --> Coup
     Phys --> Core
+    Phys --> Pub
     Coup --> Core
+    Pub --> Core
     Core --> Base
-    Phys --> Base
 ```
 
 | Layer | Package path | Holds |
@@ -132,8 +136,8 @@ remain the NumPy assembly path and keep their results. `core.kernels` with
 kernels in the input's array library. Through that route, seven solvers
 differentiate on JAX and PyTorch ([derivatives](packages/galerkin/differentiation.md)).
 
-Not yet moved onto core: `material_cavity`, `mode_coordinates` and `pml` assemble
-with the public functions only. The coupling layer passes fields one way on a
+Not yet moved onto core: `material_cavity` and `mode_coordinates` assemble with
+the public functions only (`pml` computes coefficients and assembles nothing). The coupling layer passes fields one way on a
 single mesh. A fixed-point driver waits for a third coupled pair, and
 grid-to-mesh projection waits for a second engine
 ([limits](packages/galerkin/coupling.md#limits)).
