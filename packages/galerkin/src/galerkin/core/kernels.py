@@ -15,7 +15,7 @@ reproduces those matrices bit for bit.
 import numpy as np
 
 from .backend import Backend, backend_of, namespace
-from ..assembly3d import tet_gradients
+from .tets import tet_gradients
 
 # Local edge e of a triangle is the edge opposite node e: (e+1, e+2) mod 3.
 _TRI_I = (1, 2, 0)

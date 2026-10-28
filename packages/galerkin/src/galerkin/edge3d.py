@@ -42,7 +42,8 @@ import numpy as np
 import scipy.sparse as sp
 
 from .mesh3d import Mesh3D
-from .assembly3d import tet_gradients, _scatter
+from .assembly3d import _scatter
+from .core.tets import tet_gradients
 
 LOCAL_EDGES = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
 _I = np.array([e[0] for e in LOCAL_EDGES])
