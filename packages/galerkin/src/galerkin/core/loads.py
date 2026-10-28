@@ -1,15 +1,28 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 """Volumetric load vectors on P1 triangles."""
+from dataclasses import dataclass
+
 import numpy as np
 
 from ..assembly import assemble_load
-from ..heat_source import ElementHeatSource
-from ..materials import is_per_region, region_property
 from . import forms, kernels
+from .materials import is_per_region, region_property
 from .backend import is_live, namespace, scatter_add
 from .checks import real_array, real_value
 from .quadrature import triangle_product_rule
+
+
+@dataclass(frozen=True)
+class ElementSource:
+    """Per-triangle source values in W/m^3, NumPy, already checked against the mesh.
+
+    Physics modules build it from their own mesh-bound containers (for heat,
+    ``galerkin.heat_source.ElementHeatSource.on_mesh``), so this layer needs no
+    knowledge of them.
+    """
+
+    values: np.ndarray
 
 
 def _live_centroid_load(mesh, t, size, values):
@@ -19,13 +32,13 @@ def _live_centroid_load(mesh, t, size, values):
 def source_load(mesh, p, t, area, source, *, live=False):
     """Consistent P1 nodal load of a volumetric source (named heat_source in messages).
 
-    ``source`` is an ElementHeatSource, a {region name: value} mapping, a scalar,
+    ``source`` is an ElementSource, a {region name: value} mapping, a scalar,
     or a callable taking (Q,2) coordinates and returning (Q,) values. With
     live=True a JAX or PyTorch value or callback result stays in its library
-    (otherwise it is refused) and so does the load; ElementHeatSource is NumPy.
+    (otherwise it is refused) and so does the load; ElementSource is NumPy.
     """
-    if isinstance(source, ElementHeatSource):
-        return assemble_load(mesh, source.on_mesh(mesh))
+    if isinstance(source, ElementSource):
+        return assemble_load(mesh, source.values)
     if is_per_region(source):
         values = region_property(mesh, source, "heat_source", live=live)
         if is_live(values):

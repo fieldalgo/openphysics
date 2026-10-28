@@ -97,11 +97,11 @@ and validation limits are linked from the [documentation index](README.md).
 galerkin is one distribution with layers inside it. Imports point downward:
 physics modules use coupling and core, coupling uses core, and core uses the
 base modules (mesh types and the public assembly functions). A physics module
-never imports another physics module's private helpers. Two modules sit beside
-core rather than under it: `core.loads` reads region materials through
-`galerkin.materials`, which itself uses core's array backends, and accepts the
-`ElementHeatSource` container of `galerkin.heat_source`, which holds a coupling
-`Field`.
+never imports another physics module's private helpers. Material lookup lives in
+core (`galerkin.materials` keeps its public names), and a physics module hands
+core its mesh-bound containers as plain checked values (`core.loads.ElementSource`).
+`tests/galerkin/test_layers.py` fails if core or coupling imports a module above
+it.
 
 ```mermaid
 flowchart TB

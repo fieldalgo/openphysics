@@ -92,9 +92,9 @@ flowchart TB
 galerkin은 배포판 하나이고, 안이 여러 층으로 나뉩니다. import는 아래쪽으로만 향합니다.
 물리 모듈은 coupling과 core를 쓰고, coupling은 core를 쓰며, core는 기반 모듈(메시 형식, 공개 조립
 함수)을 씁니다. 물리 모듈은 다른 물리 모듈의 비공개 도우미를 가져다 쓰지 않습니다.
-core 아래가 아니라 곁에 놓인 모듈이 둘 있습니다. `core.loads`는 `galerkin.materials`로 영역 재료를
-읽는데, 이 모듈은 core의 배열 backend를 씁니다. 또 `core.loads`는 `galerkin.heat_source`의
-`ElementHeatSource` 컨테이너를 받는데, 이 컨테이너는 coupling `Field`를 담습니다.
+재료 조회는 core에 있고(`galerkin.materials`는 공개 이름을 그대로 둡니다), 물리 모듈은 메시에 묶인
+자기 컨테이너를 검사를 마친 값으로 바꿔 core에 넘깁니다(`core.loads.ElementSource`).
+core나 coupling이 위쪽 모듈을 import하면 `tests/galerkin/test_layers.py`가 실패합니다.
 
 ```mermaid
 flowchart TB
