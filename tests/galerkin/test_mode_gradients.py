@@ -179,6 +179,46 @@ def test_homogeneous_guide_matches_the_closed_form(name):
         np.testing.assert_allclose(_gradient(name, mode, (eps, mu, k0)), exact, rtol=1e-9)
 
 
+@pytest.mark.parametrize("eps", [2.0, 2.0 - 0.1j])
+def test_complex_mu_matches_the_closed_form(eps):
+    """NumPy inputs: a filled PEC guide sees only eps*mu, so a lossy mu_r counts as much as a lossy eps_r."""
+    mesh = rectangle_mesh(2.0, 1.0, 8, 5)
+    k0 = 3.0
+    n_lossless = solve_modes(mesh, 2.6, k0, np.sqrt(2.6), num_modes=3, mu_r=1.0)[0]
+    kc2 = k0**2 * (2.6 - n_lossless**2)                         # fixed by the mesh alone
+    for mu in (1.3 - 0.05j, np.full(mesh.num_triangles, 1.3 - 0.05j)):
+        n = solve_modes(mesh, eps, k0, np.sqrt(eps * 1.3).real, num_modes=3, mu_r=mu)[0]
+        assert np.iscomplexobj(n)
+        np.testing.assert_allclose(n**2, eps * (1.3 - 0.05j) - kc2 / k0**2, rtol=1e-10)
+
+
+@pytest.mark.parametrize("name", BACKENDS)
+def test_complex_scalars_made_from_a_live_value(name):
+    """0-d complex eps_r and mu_r computed from a live real parameter: values and the closed-form derivative."""
+    mesh = rectangle_mesh(2.0, 1.0, 8, 5)
+    k0, t0 = 3.0, 0.7
+    n_lossless = solve_modes(mesh, 2.6, k0, np.sqrt(2.6), num_modes=3, mu_r=1.0)[0]
+    kc2 = k0**2 * (2.6 - n_lossless**2)
+
+    def materials(t):
+        return 2.0 - 0.1j * t, 1.3 - 0.05j * t
+
+    def mode(t):
+        eps, mu = materials(t)
+        return solve_modes(mesh, eps, k0, 1.4, num_modes=3, mu_r=mu)[0]
+    lib = _library(name)
+    t = _live(name, [t0])[0]
+    live = mode(t)
+    expected = mode(t0)
+    np.testing.assert_allclose(_numbers(live), expected, rtol=1e-12)
+    eps, mu = materials(t0)
+    np.testing.assert_allclose(expected**2, eps * mu - kc2 / k0**2, rtol=1e-10)
+    for i in range(3):
+        exact = (-0.1j * mu - 0.05j * eps) / (2 * expected[i])  # d n / dt from n^2 = eps mu - kc^2/k0^2
+        got = _gradient(name, lambda s: lib.real(mode(s)[i]) + 3 * lib.imag(mode(s)[i]), [t0])[0]
+        np.testing.assert_allclose(got, exact.real + 3 * exact.imag, rtol=1e-9)
+
+
 # -- degenerate modes ----------------------------------------------------------
 
 def _square_mesh(cells, size):

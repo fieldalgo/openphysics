@@ -97,12 +97,14 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
                          space: EdgeSpace | None = None, *, coordinate_factors=None):
     """Block matrices (A, B) of the mode eigenproblem A x = -beta^2 B x.
 
-    eps_r, mu_r: scalar or per-triangle (T,) relative material parameters.
+    eps_r, mu_r: scalar or per-triangle (T,) relative material parameters, real
+        or complex.
     coordinate_factors: optional (T, 3) diagonal coordinate Jacobian (sx,sy,h).
     Returns (A, B, space); x = (e_t over edges, e_z over nodes), no BC applied.
     """
     space = space or EdgeSpace(mesh)
-    inv_mu = 1.0 / np.asarray(mu_r, dtype=float)
+    mu = np.asarray(mu_r)
+    inv_mu = 1.0 / (mu if np.iscomplexobj(mu) else mu.astype(float))
 
     if coordinate_factors is None:
         S = assemble_curlcurl(space, inv_mu)
@@ -119,7 +121,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
             raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
         sx, sy, h = f.T
         eps = np.broadcast_to(np.asarray(eps_r), (mesh.num_triangles,))
-        d = np.zeros((mesh.num_triangles, 2, 2), dtype=np.result_type(f, eps, float))
+        d = np.zeros((mesh.num_triangles, 2, 2), dtype=np.result_type(f, eps, inv_mu, float))
         e = np.zeros_like(d)
         d[:, 0, 0], d[:, 1, 1] = inv_mu * sy/(sx*h), inv_mu * sx/(sy*h)
         e[:, 0, 0], e[:, 1, 1] = eps*sy*h/sx, eps*sx*h/sy
@@ -165,8 +167,9 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     the field gauge and degenerate modes). coordinate_factors must be NumPy;
     n_target only selects the modes and carries no derivative.
 
-    Complex eps_r is expressed in the exp(+i omega t) convention: passive
-    absorption has Im eps_r < 0 and the forward root has Im n_eff < 0.
+    Complex eps_r and mu_r are expressed in the exp(+i omega t) convention:
+    passive absorption has Im eps_r < 0 (Im mu_r < 0) and the forward root has
+    Im n_eff < 0.
     n_target may be complex. Lossy candidates keep their complex eigenvalues
     and are ordered by descending Re n_eff; a finite PEC window and a shift
     do not establish confinement or completeness. The real-material path is
@@ -316,12 +319,15 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                        num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None,
                        coordinate_factors=None):
     """The NumPy eigensolve of ``solve_modes`` (NumPy inputs only)."""
-    eps_r = np.asarray(eps_r)
+    eps_r, mu_r = np.asarray(eps_r), np.asarray(mu_r)
     if not np.isfinite(eps_r).all():
         raise ValueError("eps_r must be finite")
-    complex_problem = bool(np.any(eps_r.imag != 0)) or coordinate_factors is not None
+    if not np.isfinite(mu_r).all():
+        raise ValueError("mu_r must be finite")
+    complex_problem = (bool(np.any(eps_r.imag != 0) or np.any(mu_r.imag != 0))
+                       or coordinate_factors is not None)
     if not complex_problem:
-        eps_r = eps_r.real
+        eps_r, mu_r = eps_r.real, mu_r.real
     A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r, coordinate_factors=coordinate_factors)
     n_e, n_n = space.num_edges, mesh.num_nodes
 
