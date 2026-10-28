@@ -212,17 +212,24 @@ def nedelec3d_curlcurl(space, coeff=1.0):
     return _lift(xp, np.einsum("ted,tfd->tef", curls, curls)) * (c * _lift(xp, vol))[:, None, None]
 
 
+def _whitney_mass(G):
+    """20/V times the unsigned Whitney mass matrix (T, 6, 6) from G[t, a, b] = grad lam_a . grad lam_b.
+
+    With int_T lam_a lam_b dV = V (1 + delta_ab) / 20, for edges e = (i, j), f = (k, l).
+    """
+    d = np.eye(4)
+    i, j = _TET_I[:, None], _TET_J[:, None]
+    k, l = _TET_I[None, :], _TET_J[None, :]
+    return ((1 + d[i, k]) * G[:, j, l] - (1 + d[i, l]) * G[:, j, k]
+            - (1 + d[j, k]) * G[:, i, l] + (1 + d[j, l]) * G[:, i, k])
+
+
 def nedelec3d_mass(space, coeff=1.0):
     """``int c W_e . W_f`` (exact); coeff scalar or (T,). Used by assemble_edge_mass_3d."""
     xp, coeff = coefficient(coeff)
     g, vol = tet_gradients(space.mesh)
     c = xp.broadcast_to(_real_coefficient(xp, coeff), (space.mesh.num_tets,))
-    G = np.einsum("tad,tbd->tab", g, g)
-    d = np.eye(4)
-    i, j = _TET_I[:, None], _TET_J[:, None]
-    k, l = _TET_I[None, :], _TET_J[None, :]
-    Me = ((1 + d[i, k]) * G[:, j, l] - (1 + d[i, l]) * G[:, j, k]
-          - (1 + d[j, k]) * G[:, i, l] + (1 + d[j, l]) * G[:, i, k])
+    Me = _whitney_mass(np.einsum("tad,tbd->tab", g, g))
     return (_lift(xp, Me) * (c * _lift(xp, vol) / 20.0)[:, None, None]
             * _lift(xp, space.signs[:, :, None] * space.signs[:, None, :]))
 
@@ -238,16 +245,10 @@ def nedelec3d_components(space):
     g, vol = tet_gradients(space.mesh)
     curls = 2.0 * np.cross(g[:, _TET_I, :], g[:, _TET_J, :]) * space.signs[:, :, None]
     signs = space.signs[:, :, None] * space.signs[:, None, :]
-    d = np.eye(4)
-    i, j = _TET_I[:, None], _TET_J[:, None]
-    k, l = _TET_I[None, :], _TET_J[None, :]
     stiffness, mass = [], []
     for a in range(3):
         stiffness.append(np.einsum("te,tf->tef", curls[:, :, a], curls[:, :, a]) * vol[:, None, None])
-        G = g[:, :, None, a] * g[:, None, :, a]
-        Me = ((1 + d[i, k]) * G[:, j, l] - (1 + d[i, l]) * G[:, j, k]
-              - (1 + d[j, k]) * G[:, i, l] + (1 + d[j, l]) * G[:, i, k])
-        mass.append(Me * (vol / 20.0)[:, None, None] * signs)
+        mass.append(_whitney_mass(g[:, :, None, a] * g[:, None, :, a]) * (vol / 20.0)[:, None, None] * signs)
     return np.stack(stiffness), np.stack(mass)
 
 
