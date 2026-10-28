@@ -92,8 +92,8 @@ for (_a, _b), _w in (((0.059715871789770, 0.470142064105115), 0.132394152788506)
 
 def _fe_at_quadrature(mesh, space, et, ez):
     """Whitney E_t and P1 E_z (= 1j ez) at quadrature points: (T, q, modes, 3)."""
-    from galerkin.edge import _tri_grads
-    grads, _ = _tri_grads(mesh)
+    from galerkin.core.kernels import triangle_gradients
+    grads, _ = triangle_gradients(mesh)
     out = np.zeros((mesh.num_triangles, len(_QUADRATURE), et.shape[0], 3), dtype=complex)
     for q, (lam, _) in enumerate(_QUADRATURE):
         for e, (i, j) in enumerate(zip((1, 2, 0), (2, 0, 1))):

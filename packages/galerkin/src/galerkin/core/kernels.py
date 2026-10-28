@@ -8,9 +8,10 @@ array library of its coefficient (NumPy for Python scalars), ready for
 computed with NumPy; only coefficients may be live, so a JAX or PyTorch
 coefficient carries its derivative into the element matrices.
 
-On NumPy the arithmetic is, operation for operation, that of the hand-written
-assembly it mirrors (named in each docstring), so assembling these kernels
-reproduces those matrices bit for bit.
+The public assembly functions (galerkin.assembly, assembly3d, edge, edge3d)
+assemble these kernels with ``forms``; each kernel names the function built
+from it. tests/galerkin/test_crosscheck_symfem_coefficients.py checks them
+against exact integrals for every coefficient form those functions accept.
 """
 import numpy as np
 
@@ -56,7 +57,7 @@ def _lift(xp, array):
 
 
 def _real_coefficient(xp, coeff):
-    """As ``np.asarray(coeff, dtype=float)`` in galerkin.edge3d: a complex coefficient is refused."""
+    """The coefficient as float64; a complex one is refused (the 3D edge kernels are real)."""
     if xp.isdtype(coeff.dtype, "complex floating"):
         raise TypeError("this 3D edge kernel takes a real coefficient")
     return xp.astype(coeff, xp.float64)
@@ -74,7 +75,7 @@ def _triangle_bc(mesh):
 
 
 def p1_stiffness(mesh, eps=1.0):
-    """``int eps grad phi_j . grad phi_i``; eps scalar, (T,) or (T, 2, 2). Mirrors assemble_stiffness."""
+    """``int eps grad phi_j . grad phi_i``; eps scalar, (T,) or (T, 2, 2). Used by assemble_stiffness."""
     xp, eps = coefficient(eps)
     b, c, area = _triangle_bc(mesh)
     if eps.ndim == 3:
@@ -89,7 +90,7 @@ _P1_MASS = np.array([[2.0, 1.0, 1.0], [1.0, 2.0, 1.0], [1.0, 1.0, 2.0]]) / 12.0
 
 
 def p1_mass(mesh, coeff=1.0):
-    """``int c phi_i phi_j``; coeff scalar or (T,). Mirrors assemble_mass."""
+    """``int c phi_i phi_j``; coeff scalar or (T,). Used by assemble_mass."""
     xp, coeff = coefficient(coeff)
     area = mesh.areas()
     coeff = xp.broadcast_to(coeff, (len(area),))
@@ -97,7 +98,7 @@ def p1_mass(mesh, coeff=1.0):
 
 
 def p1_boundary_mass(mesh, edges, coeff=1.0):
-    """``int_edge c phi_i phi_j ds`` on boundary edges (E, 2); coeff scalar or (E,). Mirrors assemble_boundary_mass."""
+    """``int_edge c phi_i phi_j ds`` on boundary edges (E, 2); coeff scalar or (E,). Used by assemble_boundary_mass."""
     xp, coeff = coefficient(coeff)
     edges = np.asarray(edges, dtype=int)
     p = mesh.nodes[edges]
@@ -110,7 +111,7 @@ def p1_boundary_mass(mesh, edges, coeff=1.0):
 def p1_load(mesh, rho=0.0):
     """``int rho phi_i`` with the centroid rule; rho scalar, (T,) or callable(x, y).
 
-    Mirrors assemble_load; assemble it with ``forms.vector(..., order="columns")``.
+    Used by assemble_load, which assembles it with ``forms.vector(..., order="columns")``.
     """
     tris = mesh.triangles
     area = mesh.areas()
@@ -127,7 +128,7 @@ def p1_load(mesh, rho=0.0):
 # -- P1 tetrahedra (galerkin.assembly3d) ---------------------------------------
 
 def tet_stiffness(mesh, eps=1.0):
-    """``int eps grad phi_n . grad phi_m``; eps scalar, (T,) or (T, 3, 3). Mirrors assemble_stiffness_3d."""
+    """``int eps grad phi_n . grad phi_m``; eps scalar, (T,) or (T, 3, 3). Used by assemble_stiffness_3d."""
     xp, eps = coefficient(eps)
     g, vol = tet_gradients(mesh)
     if eps.ndim == 3:
@@ -137,7 +138,7 @@ def tet_stiffness(mesh, eps=1.0):
 
 
 def tet_mass(mesh, coeff=1.0):
-    """``int c phi_m phi_n``; coeff scalar or (T,). Mirrors assemble_mass_3d."""
+    """``int c phi_m phi_n``; coeff scalar or (T,). Used by assemble_mass_3d."""
     xp, coeff = coefficient(coeff)
     vol = mesh.volumes()
     c = xp.broadcast_to(coeff, (mesh.num_tets,))
@@ -146,16 +147,16 @@ def tet_mass(mesh, coeff=1.0):
 
 # -- Lowest-order Nédélec on triangles (galerkin.edge) -------------------------
 
-def _triangle_gradients(mesh):
-    """Barycentric gradients (T, 3, 2) and areas, as galerkin.edge computes them."""
+def triangle_gradients(mesh):
+    """Barycentric gradients grad lambda (T, 3, 2) and triangle areas (T,), NumPy."""
     b, c, area = _triangle_bc(mesh)
     return np.stack([b, c], axis=2) / (2.0 * area)[:, None, None], area
 
 
 def nedelec_curlcurl(space, coeff=1.0):
-    """``int c curl W_e curl W_f``; coeff scalar or (T,). Mirrors assemble_curlcurl."""
+    """``int c curl W_e curl W_f``; coeff scalar or (T,). Used by assemble_curlcurl."""
     xp, coeff = coefficient(coeff)
-    g, area = _triangle_gradients(space.mesh)
+    g, area = triangle_gradients(space.mesh)
     coeff = xp.broadcast_to(coeff, (len(area),))
     curls = np.stack([2.0 * (g[:, i, 0] * g[:, j, 1] - g[:, i, 1] * g[:, j, 0])
                       for i, j in zip(_TRI_I, _TRI_J)], axis=1) * space.signs
@@ -172,9 +173,9 @@ def _nedelec_midpoint_values(space, g):
 
 
 def nedelec_mass(space, coeff=1.0):
-    """``int c W_e . W_f`` (exact edge-midpoint rule); coeff scalar, (T,) or (T, 2, 2). Mirrors assemble_edge_mass."""
+    """``int c W_e . W_f`` (exact edge-midpoint rule); coeff scalar, (T,) or (T, 2, 2). Used by assemble_edge_mass."""
     xp, coeff = coefficient(coeff)
-    g, area = _triangle_gradients(space.mesh)
+    g, area = triangle_gradients(space.mesh)
     W = _nedelec_midpoint_values(space, g)
     if coeff.ndim == 3:
         return _einsum(xp, "teqd,tdk,tfqk->tef", _lift(xp, W), coeff, _lift(xp, W)) * _lift(xp, area / 3.0)[:, None, None]
@@ -183,12 +184,12 @@ def nedelec_mass(space, coeff=1.0):
 
 
 def nedelec_grad(space, coeff=1.0):
-    """``int c W_e . grad phi_n``, element shape (T, 3 edges, 3 nodes). Mirrors assemble_edge_grad.
+    """``int c W_e . grad phi_n``, element shape (T, 3 edges, 3 nodes). Used by assemble_edge_grad.
 
     Rows are ``space.tri_edges``, columns ``space.mesh.triangles``.
     """
     xp, coeff = coefficient(coeff)
-    g, area = _triangle_gradients(space.mesh)
+    g, area = triangle_gradients(space.mesh)
     diff = np.stack([g[:, j, :] - g[:, i, :] for i, j in zip(_TRI_I, _TRI_J)], axis=1)   # (T, 3, 2)
     if coeff.ndim == 3:
         Ge = _einsum(xp, "ted,tdf,tkf->tek", _lift(xp, diff), coeff, _lift(xp, g))
@@ -203,7 +204,7 @@ def nedelec_grad(space, coeff=1.0):
 # -- Lowest-order Nédélec on tetrahedra (galerkin.edge3d) ----------------------
 
 def nedelec3d_curlcurl(space, coeff=1.0):
-    """``int c curl W_e . curl W_f``; coeff scalar or (T,). Mirrors assemble_curlcurl_3d."""
+    """``int c curl W_e . curl W_f``; coeff scalar or (T,). Used by assemble_curlcurl_3d."""
     xp, coeff = coefficient(coeff)
     g, vol = tet_gradients(space.mesh)
     c = xp.broadcast_to(_real_coefficient(xp, coeff), (space.mesh.num_tets,))
@@ -212,7 +213,7 @@ def nedelec3d_curlcurl(space, coeff=1.0):
 
 
 def nedelec3d_mass(space, coeff=1.0):
-    """``int c W_e . W_f`` (exact); coeff scalar or (T,). Mirrors assemble_edge_mass_3d."""
+    """``int c W_e . W_f`` (exact); coeff scalar or (T,). Used by assemble_edge_mass_3d."""
     xp, coeff = coefficient(coeff)
     g, vol = tet_gradients(space.mesh)
     c = xp.broadcast_to(_real_coefficient(xp, coeff), (space.mesh.num_tets,))
@@ -251,7 +252,7 @@ def nedelec3d_components(space):
 
 
 def nedelec3d_grad(space, coeff=1.0):
-    """``int c W_e . grad phi_n``, element shape (T, 6 edges, 4 nodes). Mirrors assemble_edge_grad_3d."""
+    """``int c W_e . grad phi_n``, element shape (T, 6 edges, 4 nodes). Used by assemble_edge_grad_3d."""
     xp, coeff = coefficient(coeff)
     g, vol = tet_gradients(space.mesh)
     c = xp.broadcast_to(_real_coefficient(xp, coeff), (space.mesh.num_tets,))

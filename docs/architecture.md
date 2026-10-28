@@ -127,16 +127,20 @@ flowchart TB
 | Layer | Package path | Holds |
 |---|---|---|
 | core | [`galerkin.core`](../packages/galerkin/src/galerkin/core/__init__.py) | Input checks, mesh and element data, boundary sampling, loads, constraints and quadrature. Element kernels (`kernels`), assembly into a sparse matrix (`forms`, `sparse`), and the sparse solve and eigenpair refinement with hand-written adjoints (`solve`, `eigen`). It dispatches on NumPy, JAX and PyTorch in one place (`backend`). |
-| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity`, … | One formulation each: inputs and units, the checks of its contract, assembly (from core kernels, or the public functions where not yet moved), the solve and the result dataclass. |
+| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity`, … | One formulation each: inputs and units, the checks of its contract, assembly (from core kernels, directly or through the public functions), the solve and the result dataclass. |
 | coupling | [`galerkin.coupling`](../packages/galerkin/src/galerkin/coupling/__init__.py) | Node and element `Field`s on one mesh with an SI unit, same-mesh `transfer` and the `OneWayChain` driver, which runs stages handed to it and imports no physics. The Joule and heat-to-mechanics workflows run on it. The [kernel interface](packages/galerkin/coupling.md) states what a solver must expose for another solver to consume its result. |
 
-The public assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
-remain the NumPy assembly path and keep their results. `core.kernels` with
-`core.forms` reproduce the same matrices bit for bit from closed-form element
-kernels in the input's array library. Through that route, seven solvers
-differentiate on JAX and PyTorch ([derivatives](packages/galerkin/differentiation.md)).
+Each element formula lives once, as a closed-form kernel in `core.kernels`. The
+public assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
+assemble those kernels with `core.forms` and return SciPy matrices; they take
+NumPy values and refuse JAX or PyTorch ones. Physics modules that differentiate
+assemble the same kernels in the input's array library, and through that route
+seven solvers differentiate on JAX and PyTorch
+([derivatives](packages/galerkin/differentiation.md)). The kernels are checked
+against exact integrals for every coefficient form
+([element definitions](reference-comparisons.md#element-definitions)).
 
-Not yet moved onto core: `material_cavity` and `mode_coordinates` assemble with
+Not differentiable yet: `material_cavity` and `mode_coordinates` assemble through
 the public functions only (`pml` computes coefficients and assembles nothing). The coupling layer passes fields one way on a
 single mesh. A fixed-point driver waits for a third coupled pair, and
 grid-to-mesh projection waits for a second engine

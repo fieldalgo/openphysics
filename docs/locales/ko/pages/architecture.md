@@ -119,15 +119,16 @@ flowchart TB
 | 층 | 패키지 경로 | 담는 것 |
 |---|---|---|
 | core | [`galerkin.core`](../../../../packages/galerkin/src/galerkin/core/__init__.py) | 입력 검사, 메시·요소 데이터, 경계 샘플링, 하중, 구속 조건, 적분 규칙. 요소 커널(`kernels`), 희소 행렬로의 조립(`forms`, `sparse`), 손으로 쓴 adjoint를 갖춘 희소 풀이와 고유쌍 보정(`solve`, `eigen`). NumPy·JAX·PyTorch 분기는 한곳(`backend`)에서 합니다. |
-| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널, 아직 옮기지 않은 곳은 공개 함수), 풀이, 결과 dataclass. |
+| physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널을 직접 또는 공개 함수를 거쳐), 풀이, 결과 dataclass. |
 | coupling | [`galerkin.coupling`](../../../../packages/galerkin/src/galerkin/coupling/__init__.py) | 한 메시 위의 절점·요소 `Field`(SI 단위), 같은 메시 `transfer`, `OneWayChain` 드라이버. 드라이버는 넘겨받은 단계를 실행할 뿐 물리 모듈을 import하지 않습니다. Joule와 열→역학 workflow가 이 층 위에서 돕니다. [커널 인터페이스](packages/galerkin/coupling.md)는 다른 solver가 결과를 받아 쓰려면 한 solver가 무엇을 내놓아야 하는지 정합니다. |
 
-공개 조립 함수(`assemble_stiffness`, `assemble_curlcurl_3d` 등)는 NumPy 조립 경로로 남아 있고 결과도
-그대로입니다. `core.kernels`와 `core.forms`는 닫힌 식 요소 커널로 같은 행렬을 비트 단위로 재현하며,
-입력이 속한 배열 라이브러리에서 계산합니다. 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다
-([미분](packages/galerkin/differentiation.md)).
+요소 공식은 `core.kernels`의 닫힌 식 커널로 한 벌만 있습니다. 공개 조립 함수(`assemble_stiffness`,
+`assemble_curlcurl_3d` 등)는 이 커널을 `core.forms`로 조립해 SciPy 행렬을 돌려줍니다. NumPy 값을 받고
+JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널을 입력이 속한 배열 라이브러리에서 조립하며,
+이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다([미분](packages/galerkin/differentiation.md)).
+커널은 모든 계수 형태에서 정확한 적분과 비교합니다([요소 정의](reference-comparisons.md#요소-정의)).
 
-아직 core로 옮기지 않은 것도 있습니다. `material_cavity`, `mode_coordinates`는 공개 함수로만
+아직 미분하지 않는 것도 있습니다. `material_cavity`, `mode_coordinates`는 공개 함수를 거쳐서만
 조립합니다(`pml`은 계수만 계산하고 조립하지 않습니다). coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
 쌍이 생길 때, 격자↔메시 투영은 둘째 엔진이 붙을 때 다룹니다([한계](packages/galerkin/coupling.md#한계)).
 

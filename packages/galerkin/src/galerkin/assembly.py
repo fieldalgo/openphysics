@@ -25,6 +25,8 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
+from .core import forms, kernels
+from .core.checks import refuse_live
 from .mesh import Mesh
 
 
@@ -40,38 +42,9 @@ def assemble_stiffness(mesh: Mesh, eps=1.0) -> sp.csr_matrix:
     coordinate stretching, so one tensor-coefficient code path serves both
     anisotropic media and PMLs.
     """
-    tris = mesh.triangles
-    p = mesh.nodes[tris]  # (T, 3, 2)
-    T = len(tris)
-
-    x = p[:, :, 0]  # (T, 3)
-    y = p[:, :, 1]
-
-    # b_i = y_j - y_k, c_i = x_k - x_j  (i, j, k cyclic)
-    b = np.stack([y[:, 1] - y[:, 2], y[:, 2] - y[:, 0], y[:, 0] - y[:, 1]], axis=1)
-    c = np.stack([x[:, 2] - x[:, 1], x[:, 0] - x[:, 2], x[:, 1] - x[:, 0]], axis=1)
-
-    area = np.abs(0.5 * (b[:, 0] * c[:, 1] - b[:, 1] * c[:, 0]))
-
-    eps = np.asarray(eps)
-    if eps.ndim == 3:
-        # Tensor coefficient: grad phi_i = (b_i, c_i)/(2A), hence
-        #   K^e_ij = A (grad phi_i)^T Lam grad phi_j = g_i^T Lam g_j / (4A),
-        #   g_i = (b_i, c_i)
-        g = np.stack([b, c], axis=2)  # (T, 3, 2)
-        Ke = np.einsum("tie,tef,tjf->tij", g, eps, g) / (4.0 * area)[:, None, None]
-    else:
-        eps = np.broadcast_to(eps, (T,))
-        # Isotropic closed form: K^e = eps/(4A) * (b b^T + c c^T)
-        Ke = (eps / (4.0 * area))[:, None, None] * (
-            b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :])
-
-    # Scatter as COO and convert to CSR (duplicate entries are summed)
-    rows = np.repeat(tris, 3, axis=1).ravel()
-    cols = np.tile(tris, (1, 3)).ravel()
-    K = sp.coo_matrix((Ke.ravel(), (rows, cols)),
-                      shape=(mesh.num_nodes, mesh.num_nodes))
-    return K.tocsr()
+    refuse_live(eps, "assemble_stiffness eps")
+    t = mesh.triangles
+    return forms.matrix(t, t, kernels.p1_stiffness(mesh, eps), (mesh.num_nodes,) * 2).to_scipy()
 
 
 def assemble_mass(mesh: Mesh, coeff=1.0) -> sp.csr_matrix:
@@ -82,21 +55,9 @@ def assemble_mass(mesh: Mesh, coeff=1.0) -> sp.csr_matrix:
         M^e = c A/12 * [[2,1,1],[1,2,1],[1,1,2]]
     coeff: scalar or per-triangle array (T,), e.g. a refractive index n^2.
     """
-    tris = mesh.triangles
-    T = len(tris)
-    area = mesh.areas()
-    coeff = np.broadcast_to(np.asarray(coeff), (T,))
-
-    base = np.array([[2.0, 1.0, 1.0],
-                     [1.0, 2.0, 1.0],
-                     [1.0, 1.0, 2.0]]) / 12.0
-    Me = (coeff * area)[:, None, None] * base  # (T, 3, 3)
-
-    rows = np.repeat(tris, 3, axis=1).ravel()
-    cols = np.tile(tris, (1, 3)).ravel()
-    M = sp.coo_matrix((Me.ravel(), (rows, cols)),
-                      shape=(mesh.num_nodes, mesh.num_nodes))
-    return M.tocsr()
+    refuse_live(coeff, "assemble_mass coeff")
+    t = mesh.triangles
+    return forms.matrix(t, t, kernels.p1_mass(mesh, coeff), (mesh.num_nodes,) * 2).to_scipy()
 
 
 def assemble_boundary_mass(mesh: Mesh, edges: np.ndarray, coeff=1.0) -> sp.csr_matrix:
@@ -107,20 +68,10 @@ def assemble_boundary_mass(mesh: Mesh, edges: np.ndarray, coeff=1.0) -> sp.csr_m
         B^e = c L/6 * [[2,1],[1,2]]
     coeff: scalar (complex allowed) or per-edge array (E,).
     """
+    refuse_live(coeff, "assemble_boundary_mass coeff")
     edges = np.asarray(edges, dtype=int)
-    E = len(edges)
-    p = mesh.nodes[edges]                     # (E, 2, 2)
-    length = np.linalg.norm(p[:, 1] - p[:, 0], axis=1)
-    coeff = np.broadcast_to(np.asarray(coeff), (E,))
-
-    base = np.array([[2.0, 1.0], [1.0, 2.0]]) / 6.0
-    Be = (coeff * length)[:, None, None] * base  # (E, 2, 2)
-
-    rows = np.repeat(edges, 2, axis=1).ravel()
-    cols = np.tile(edges, (1, 2)).ravel()
-    B = sp.coo_matrix((Be.ravel(), (rows, cols)),
-                      shape=(mesh.num_nodes, mesh.num_nodes))
-    return B.tocsr()
+    return forms.matrix(edges, edges, kernels.p1_boundary_mass(mesh, edges, coeff),
+                        (mesh.num_nodes,) * 2).to_scipy()
 
 
 def assemble_load(mesh: Mesh, rho=0.0) -> np.ndarray:
@@ -130,18 +81,8 @@ def assemble_load(mesh: Mesh, rho=0.0) -> np.ndarray:
     For P1, a one-point centroid rule (value at the centroid times A/3 to
     each vertex) is sufficient.
     """
-    tris = mesh.triangles
-    area = mesh.areas()
-
-    if callable(rho):
-        centroid = mesh.nodes[tris].mean(axis=1)  # (T, 2)
-        rho_e = rho(centroid[:, 0], centroid[:, 1])
-    else:
-        rho_e = np.broadcast_to(np.asarray(rho, dtype=float), (len(tris),))
-
-    f = np.zeros(mesh.num_nodes)
-    contrib = (rho_e * area / 3.0)
-    np.add.at(f, tris[:, 0], contrib)
-    np.add.at(f, tris[:, 1], contrib)
-    np.add.at(f, tris[:, 2], contrib)
+    if not callable(rho):
+        refuse_live(rho, "assemble_load rho")
+    f = forms.vector(mesh.triangles, kernels.p1_load(mesh, rho), mesh.num_nodes, order="columns")
+    refuse_live(f, "assemble_load rho callback")
     return f

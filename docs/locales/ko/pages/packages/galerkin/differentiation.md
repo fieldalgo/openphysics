@@ -187,10 +187,10 @@ curl-curl 행렬과 질량 행렬은 정확히
 
 ## 한계
 
-- 아직 막지 않은 곳: 낮은 수준 조립 함수(`galerkin.assembly`, `assembly3d`,
-  `edge`, `edge3d`)와 `solve_modes`, `solve_cavity_box`를 뺀 전자기 solver는 입력을 NumPy로
-  바꿉니다. 여기에 넘긴 JAX
-  값은 미분을 잃으므로, 살아 있는 값을 넘기지 마십시오.
+- 아직 막지 않은 곳: `solve_modes`, `solve_cavity_box`를 뺀 전자기 solver는 입력을 NumPy로
+  바꿉니다. 여기에 넘긴 JAX 값은 미분을 잃으므로, 살아 있는 값을 넘기지 마십시오. 낮은 수준
+  조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는 값을 `TypeError`로
+  거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
 - 살아 있는 입력에서는 `joule_power_per_length`와 `supplied_power_per_length`가
   Python float 대신 그 라이브러리의 0차원 배열이며, 결과 배열을 읽기 전용으로
   만들지 않습니다.
