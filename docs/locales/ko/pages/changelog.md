@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `galerkin.core`가 메시 형식만 import합니다. 사면체 기울기는 `galerkin.core.tets`로 옮겼고(`galerkin.tet_gradients`, `galerkin.assembly3d.tet_gradients`는 그대로), SciPy Dirichlet 풀이 본문은 `galerkin.core.solve`로 옮겼으며(`galerkin.solver.solve_dirichlet`의 서명은 그대로), `core.loads`는 중심점 하중을 `core.kernels`로 만듭니다. 공개 조립 모듈은 이제 core 위에 있고, 층 시험이 메시 형식과 이 모듈들도 검사합니다. 결과는 바뀌지 않습니다.
 - `galerkin`: `solve_modes`와 `assemble_mode_system`이 복소 `mu_r`를 유지합니다. 전에는 NumPy 경로가 허수부를 버리고(배열은 경고, 스칼라는 `TypeError`) JAX·PyTorch 경로는 유지해서, 두 경로가 서로 다른 문제를 풀었습니다. 이제 손실 있는 `mu_r`도 손실 있는 `eps_r`처럼 문제를 복소로 만들고, 유한하지 않은 `mu_r`는 거부합니다. 0차원 복소 JAX·PyTorch 입력(예: `2 - 0.1j * t`)도 수를 읽을 때 더는 실패하지 않습니다. 실수 입력의 결과는 같습니다.
 - 문서: [아키텍처](architecture.md#galerkin-안-core-physics-coupling) 문서가 galerkin의 core·physics·coupling 층, 아직 core로 옮기지 않은 것, 새 물리 추가 절차를 설명합니다.
 - `galerkin`: `galerkin.core`가 더는 위쪽 모듈을 import하지 않습니다. 재료 조회는 `galerkin.core.materials`로 옮겼고(`galerkin.materials`는 같은 공개 이름을 유지), `core.loads`는 `ElementHeatSource`를 import하는 대신 검사를 마친 요소 열원 값(`ElementSource`)을 받습니다. import 방향을 검사하는 시험을 더했습니다. 결과는 바뀌지 않습니다.

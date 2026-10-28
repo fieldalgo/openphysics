@@ -90,11 +90,12 @@ flowchart TB
 ## galerkin 안: core, physics, coupling
 
 galerkin은 배포판 하나이고, 안이 여러 층으로 나뉩니다. import는 아래쪽으로만 향합니다.
-물리 모듈은 coupling과 core를 쓰고, coupling은 core를 쓰며, core는 기반 모듈(메시 형식, 공개 조립
-함수)을 씁니다. 물리 모듈은 다른 물리 모듈의 비공개 도우미를 가져다 쓰지 않습니다.
+물리 모듈은 coupling, core, 공개 조립 모듈을 쓰고, coupling은 core를 씁니다. 공개 조립 모듈(`assembly`,
+`assembly3d`, `edge`, `edge3d`, `solver`)은 호출자를 위해 이름을 유지하며 core 위에 있습니다. core는 메시
+형식(`mesh`, `mesh3d`)만 쓰고, 메시 형식은 galerkin의 다른 모듈을 import하지 않습니다. 물리 모듈은 다른 물리 모듈의 비공개 도우미를 가져다 쓰지 않습니다.
 재료 조회는 core에 있고(`galerkin.materials`는 공개 이름을 그대로 둡니다), 물리 모듈은 메시에 묶인
 자기 컨테이너를 검사를 마친 값으로 바꿔 core에 넘깁니다(`core.loads.ElementSource`).
-core나 coupling이 위쪽 모듈을 import하면 `tests/galerkin/test_layers.py`가 실패합니다.
+메시 형식, core, 공개 조립 모듈, coupling 중 하나가 위쪽 모듈을 import하면 `tests/galerkin/test_layers.py`가 실패합니다.
 
 ```mermaid
 flowchart TB
@@ -103,14 +104,16 @@ flowchart TB
         Phys["물리 모듈<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule·열→역학 workflow"]
         Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
         Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
-        Base["기반 모듈<br/>mesh · mesh3d<br/>공개 조립: assembly · assembly3d · edge · edge3d · solver"]
+        Pub["공개 조립<br/>assembly · assembly3d · edge · edge3d · solver"]
+        Base["메시 형식<br/>mesh · mesh3d"]
     end
     Sim -->|디스패치| Phys
     Phys --> Coup
     Phys --> Core
+    Phys --> Pub
     Coup --> Core
+    Pub --> Core
     Core --> Base
-    Phys --> Base
 ```
 
 | 층 | 패키지 경로 | 담는 것 |
@@ -124,8 +127,8 @@ flowchart TB
 입력이 속한 배열 라이브러리에서 계산합니다. 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다
 ([미분](packages/galerkin/differentiation.md)).
 
-아직 core로 옮기지 않은 것도 있습니다. `material_cavity`, `mode_coordinates`, `pml`은 공개 함수로만
-조립합니다. coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
+아직 core로 옮기지 않은 것도 있습니다. `material_cavity`, `mode_coordinates`는 공개 함수로만
+조립합니다(`pml`은 계수만 계산하고 조립하지 않습니다). coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
 쌍이 생길 때, 격자↔메시 투영은 둘째 엔진이 붙을 때 다룹니다([한계](packages/galerkin/coupling.md#한계)).
 
 ## 새 물리 추가하기
