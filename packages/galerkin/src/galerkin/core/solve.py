@@ -30,7 +30,7 @@ from scipy.sparse.linalg import splu
 
 from .backend import Backend, backend_of, lift, live_namespace, scatter_add
 from .sparse import CooMatrix
-from ..solver import solve_dirichlet as _scipy_solve_dirichlet
+import scipy.sparse.linalg as spla
 
 
 def _factor(rows, cols, values, shape):
@@ -96,7 +96,7 @@ def solve_dirichlet(terms, b, dirichlet):
         matrix = terms[0].to_scipy()
         for term in terms[1:]:
             matrix = matrix + term.to_scipy()
-        return _scipy_solve_dirichlet(matrix, b, dirichlet)
+        return scipy_solve_dirichlet(matrix, b, dirichlet)
     A = terms[0]
     for term in terms[1:]:
         A = A + term
@@ -299,3 +299,29 @@ def _build_nan_torch():
             return (None, *(torch.full_like(i, float("nan") if used else 0.0) for i in ctx.saved_tensors))
 
     return lambda value, inputs: Through.apply(value, *inputs)
+
+
+def scipy_solve_dirichlet(K, f, dirichlet):
+    """``galerkin.solver.solve_dirichlet`` on SciPy CSR and NumPy data (its body)."""
+    n = K.shape[0]
+    # Complex support: solve in complex arithmetic if K, f, or any boundary
+    # value is complex.
+    dtype = np.result_type(K.dtype, np.asarray(f).dtype,
+                           *[np.asarray(v).dtype for v in dirichlet.values()])
+    V = np.zeros(n, dtype=dtype)
+    is_fixed = np.zeros(n, dtype=bool)
+
+    for nodes, value in dirichlet.items():
+        idx = np.asarray(nodes, dtype=int)
+        V[idx] = value  # scalar, or an array of the same length as idx
+        is_fixed[idx] = True
+
+    free = np.where(~is_fixed)[0]
+    fixed = np.where(is_fixed)[0]
+
+    K_FF = K[free][:, free]
+    K_FD = K[free][:, fixed]
+    rhs = f[free] - K_FD @ V[fixed]
+
+    V[free] = spla.spsolve(K_FF.tocsc(), rhs)
+    return V

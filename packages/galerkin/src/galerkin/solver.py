@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import numpy as np
 import scipy.sparse as sp
-import scipy.sparse.linalg as spla
+
+from .core.solve import scipy_solve_dirichlet
 
 
 def solve_dirichlet(K: sp.csr_matrix, f: np.ndarray,
@@ -30,25 +31,4 @@ def solve_dirichlet(K: sp.csr_matrix, f: np.ndarray,
                {tuple(mesh.boundary['inner']): 1.0,
                 tuple(mesh.boundary['outer']): 0.0}
     """
-    n = K.shape[0]
-    # Complex support: solve in complex arithmetic if K, f, or any boundary
-    # value is complex.
-    dtype = np.result_type(K.dtype, np.asarray(f).dtype,
-                           *[np.asarray(v).dtype for v in dirichlet.values()])
-    V = np.zeros(n, dtype=dtype)
-    is_fixed = np.zeros(n, dtype=bool)
-
-    for nodes, value in dirichlet.items():
-        idx = np.asarray(nodes, dtype=int)
-        V[idx] = value  # scalar, or an array of the same length as idx
-        is_fixed[idx] = True
-
-    free = np.where(~is_fixed)[0]
-    fixed = np.where(is_fixed)[0]
-
-    K_FF = K[free][:, free]
-    K_FD = K[free][:, fixed]
-    rhs = f[free] - K_FD @ V[fixed]
-
-    V[free] = spla.spsolve(K_FF.tocsc(), rhs)
-    return V
+    return scipy_solve_dirichlet(K, f, dirichlet)
