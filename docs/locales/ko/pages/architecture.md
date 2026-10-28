@@ -143,8 +143,8 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
    SI 단위 절점·요소 값을 `galerkin.coupling.Field`가 담을 수 있는 형태로 돌려줍니다. 한 방향
    workflow는 기존 단계를 `OneWayChain`으로 잇습니다.
 3. **미분(선택).** 입력부터 풀이까지 값을 살려 두려면 `core.backend`와, 계수가 JAX·PyTorch 배열일 수
-   있는 커널을 씁니다. 아니면 탄성·고유값 solver처럼 NumPy 본문을 숫자로 돌린 뒤 adjoint 풀이를 한 번
-   더 해 미분을 붙입니다. 그때까지는 미분을 조용히 끊지 말고 `core.checks.refuse_live`로 살아 있는
+   있는 커널을 씁니다. NumPy와 살아 있는 입력에 본문은 하나만 둡니다. 탄성·고유값 solver처럼 숫자로 모든
+   검사와 함께 푼 뒤 adjoint 풀이를 한 번 더 해 미분을 붙입니다. 그때까지는 미분을 조용히 끊지 말고 `core.checks.refuse_live`로 살아 있는
    값을 거부합니다([방식과 한계](packages/galerkin/differentiation.md)).
 4. **문서(선택).** [`simcase.registry`](../../../../packages/simcase/src/simcase/registry.py)에 계약 검증,
    실행기, 요약, 결과 형식을 담은 `PhysicsKind`를 등록합니다. 실행기·스키마·명령행은 고치지 않습니다.

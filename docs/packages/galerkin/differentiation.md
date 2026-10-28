@@ -76,11 +76,12 @@ requires_grad=True)` inputs gives the same gradients through `.backward()`.
 ## How the derivative is computed
 
 The steady heat and electric solvers assemble and solve their live systems
-directly. Transient heat, elasticity and thermoelasticity first run their NumPy
-solve on the numbers of the inputs, with every check, and then attach the
-derivative to that solution x0 with one more solve: x = x0 + A⁻¹(b − A x0), equal
-to x0 up to rounding. Callbacks run once; their results are kept for the live pass.
-Waveguide modes do the same with an eigenpair (next section).
+directly. Elasticity and thermoelasticity build their system once, in the
+inputs' library, and solve it on the numbers of the inputs first, with every
+check; one more solve then attaches the derivative to that solution x0:
+x = x0 + A⁻¹(b − A x0), equal to x0 up to rounding. Transient heat runs its NumPy
+solve first and does the same at every step. Callbacks run once. Waveguide modes
+do the same with an eigenpair (next section).
 
 Assembly runs in the input's library through the closed-form element kernels of
 `galerkin.core.kernels` and `galerkin.core.forms`. The sparse system is still

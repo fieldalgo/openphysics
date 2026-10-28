@@ -162,8 +162,9 @@ grid-to-mesh projection waits for a second engine
    a `OneWayChain` of existing stages.
 3. **Derivatives (optional).** Keep values live from input to solve: use
    `core.backend` and kernels whose coefficients may be JAX or PyTorch arrays.
-   Alternatively, run the NumPy body on numbers and attach the derivative with
-   one more adjoint solve, as the elasticity and eigen solvers do. Until then,
+   Keep one body for NumPy and live inputs: solve on the numbers, with every
+   check, and attach the derivative with one more adjoint solve, as the
+   elasticity and eigen solvers do. Until then,
    refuse live values with `core.checks.refuse_live` rather than cut the
    derivative silently ([pattern and limits](packages/galerkin/differentiation.md)).
 4. **Documents (optional).** Register a `PhysicsKind` in

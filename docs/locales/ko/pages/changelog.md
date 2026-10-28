@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `solve_elasticity`, `solve_thermoelasticity`, 도파관 모드 연립방정식은 NumPy 본문과 따로 살아 있는 본문을 두는 대신, NumPy와 JAX·PyTorch 입력에 `core.kernels`로 만든 본문 하나를 씁니다. NumPy 결과는 비트 단위로 같습니다.
 - `galerkin`: 요소 공식은 이제 `galerkin.core.kernels`에 한 벌만 있습니다. 공개 조립 함수(`assemble_stiffness`, `assemble_mass`, `assemble_boundary_mass`, `assemble_load`, 그 3D 함수와 변 요소 함수)는 이 커널을 조립하며 같은 행렬을 돌려줍니다. 이제 JAX·PyTorch 값을 NumPy로 바꾸는 대신(미분이 끊김) `TypeError`로 거부하고, `assemble_curlcurl_3d`, `assemble_edge_mass_3d`, `assemble_edge_grad_3d`, `assemble_load`는 복소 계수 배열의 허수부를 `ComplexWarning`과 함께 버리는 대신 `TypeError`로 거부합니다. 새 symfem 비교가 셀별·텐서·복소 계수의 커널을 정확한 적분과 비교합니다([요소 정의](reference-comparisons.md#계수)).
 - `galerkin`: `galerkin.core`가 메시 형식만 import합니다. 사면체 기울기는 `galerkin.core.tets`로 옮겼고(`galerkin.tet_gradients`, `galerkin.assembly3d.tet_gradients`는 그대로), SciPy Dirichlet 풀이 본문은 `galerkin.core.solve`로 옮겼으며(`galerkin.solver.solve_dirichlet`의 서명은 그대로), `core.loads`는 중심점 하중을 `core.kernels`로 만듭니다. 공개 조립 모듈은 이제 core 위에 있고, 층 시험이 메시 형식과 이 모듈들도 검사합니다. 결과는 바뀌지 않습니다.
 - `galerkin`: `solve_modes`와 `assemble_mode_system`이 복소 `mu_r`를 유지합니다. 전에는 NumPy 경로가 허수부를 버리고(배열은 경고, 스칼라는 `TypeError`) JAX·PyTorch 경로는 유지해서, 두 경로가 서로 다른 문제를 풀었습니다. 이제 손실 있는 `mu_r`도 손실 있는 `eps_r`처럼 문제를 복소로 만들고, 유한하지 않은 `mu_r`는 거부합니다. 0차원 복소 JAX·PyTorch 입력(예: `2 - 0.1j * t`)도 수를 읽을 때 더는 실패하지 않습니다. 실수 입력의 결과는 같습니다.
