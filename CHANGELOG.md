@@ -24,6 +24,7 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: `solve_modes` and `assemble_mode_system` keep a complex `mu_r`. The NumPy path used to drop its imaginary part (with a warning for arrays, a `TypeError` for a scalar) while the JAX and PyTorch path kept it, so the two solved different problems; a lossy `mu_r` now makes the problem complex as a lossy `eps_r` does, and a non-finite `mu_r` is refused. A 0-d complex JAX or PyTorch input (for example `2 - 0.1j * t`) no longer fails when its numbers are read. Real inputs give the same results.
 - Docs: the [architecture](docs/architecture.md#inside-galerkin-core-physics-and-coupling) page describes galerkin's core, physics and coupling layers, what is not yet on core, and the steps for adding a physics.
 - `galerkin`: `galerkin.core` no longer imports modules above it. Material lookup moved to `galerkin.core.materials` (`galerkin.materials` keeps the same public names), and `core.loads` takes element heat sources as checked values (`ElementSource`) instead of importing `ElementHeatSource`. A test checks the import direction. Results are unchanged.
 

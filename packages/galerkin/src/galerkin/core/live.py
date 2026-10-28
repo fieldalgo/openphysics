@@ -22,7 +22,8 @@ def numbers(value):
     """``value`` with JAX and PyTorch arrays replaced by NumPy numbers.
 
     Mappings, lists and tuples are converted entry by entry; a 0-d array becomes
-    a float. A value holding no live array is returned as the same object.
+    a float, or a complex number when it is complex. A value holding no live
+    array is returned as the same object.
     """
     if isinstance(value, Mapping):
         if not any(contains_live(v) for v in value.values()):
@@ -31,9 +32,12 @@ def numbers(value):
     if not contains_live(value):
         return value
     if isinstance(value, (list, tuple)):
-        return np.array([numbers(v) for v in value], dtype=float)
+        a = np.array([numbers(v) for v in value])
+        return a if np.iscomplexobj(a) else a.astype(float)
     a = to_numpy(value)
-    return float(a) if a.ndim == 0 else a
+    if a.ndim:
+        return a
+    return complex(a) if np.iscomplexobj(a) else float(a)
 
 
 class Recorded:
