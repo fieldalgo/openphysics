@@ -38,7 +38,8 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
   python -m pytest -q tests/galerkin/test_crosscheck_skfem.py \
     tests/galerkin/test_crosscheck_skfem_lossy_cavity.py \
     tests/galerkin/test_crosscheck_skfem_multimaterial.py \
-    tests/galerkin/test_crosscheck_symfem_elements.py
+    tests/galerkin/test_crosscheck_symfem_elements.py \
+    tests/galerkin/test_crosscheck_symfem_coefficients.py
 ```
 
 Without the tool the tests skip locally. CI sets
@@ -130,6 +131,33 @@ each fail it.
 Values from a local Linux run with symfem 2025.12.0 and sympy 1.14.0. Not
 compared: the P1 load vector (galerkin uses a one-point centroid rule) and the
 P1 boundary mass. The symbolic integration takes about 20 s on one core.
+
+### Coefficients
+
+`test_crosscheck_symfem_coefficients.py` uses the same meshes and conventions
+and checks how the assembly applies coefficients. Each cell gets its own exact
+coefficient: a scalar, a non-symmetric tensor (which fixes the side of the
+tensor each function sits on, `grad phi_i . (C grad phi_j)` and
+`W_e . (C W_f)`), a complex scalar or a complex tensor. symfem integrates the
+basis components exactly once per cell, and the reference contracts them with
+the exact coefficients. Every coefficient form a public function accepts is
+compared twice, through the public function and through `galerkin.core.kernels`
+with `core.forms.matrix`, so the check does not depend on which of the two
+builds the other. Gate `1e-12` as above; the coefficients are rounded to
+float64 once. Transposing the tensor in the edge x gradient coupling, or
+dropping the imaginary part of a mass coefficient, each fails it.
+
+| Case | Matrix | Coefficient forms | Largest difference | Gate |
+|---|---|---|---|---|
+| `elements-coefficients-triangles` | P1 stiffness | cells, tensor, complex cells, complex tensor | 1.8e-16 | 1e-12 |
+| | P1 mass; Nedelec curl-curl | cells, complex cells | 1.7e-17; 5.3e-16 | 1e-12 |
+| | Nedelec mass; edge x P1 gradient coupling | cells, tensor, complex cells, complex tensor | 2.1e-16; 2.1e-16 | 1e-12 |
+| `elements-coefficients-tetrahedra` | P1 stiffness | cells, tensor | 3.0e-16 | 1e-12 |
+| | P1 mass; Nedelec curl-curl; Nedelec mass; edge x P1 gradient coupling | cells | 6.8e-17; 1.8e-16; 1.1e-16; 2.7e-16 | 1e-12 |
+
+The public and core routes gave the same differences. The 3D functions take
+real scalar coefficients only (the P1 stiffness also takes tensors), so complex
+3D coefficients are not compared. Same local run; about 20 s.
 
 ## Adding a case
 
