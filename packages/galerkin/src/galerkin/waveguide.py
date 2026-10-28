@@ -81,14 +81,12 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 from .mesh import Mesh
-from .assembly import assemble_stiffness, assemble_mass
-from .edge import (EdgeSpace, assemble_curlcurl, assemble_edge_mass,
-                   assemble_edge_grad)
+from .edge import EdgeSpace
 from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
 from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
-from .core.backend import lift, live_namespace, scatter_add, to_numpy
+from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live
 from .core.sparse import CooMatrix
 
@@ -103,35 +101,8 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
     Returns (A, B, space); x = (e_t over edges, e_z over nodes), no BC applied.
     """
     space = space or EdgeSpace(mesh)
-    mu = np.asarray(mu_r)
-    inv_mu = 1.0 / (mu if np.iscomplexobj(mu) else mu.astype(float))
-
-    if coordinate_factors is None:
-        S = assemble_curlcurl(space, inv_mu)
-        Mt_eps = assemble_edge_mass(space, eps_r)
-        Mt_mu = assemble_edge_mass(space, inv_mu)
-        G = assemble_edge_grad(space, inv_mu)
-        K = assemble_stiffness(mesh, inv_mu)
-        M = assemble_mass(mesh, eps_r)
-    else:
-        # J=diag(sx,sy,h). eps'=eps det(J) J^-1 J^-T (likewise mu).
-        # The transverse curl rotates axes: beta and grad use (1/mu_y,1/mu_x).
-        f = np.asarray(coordinate_factors)
-        if f.shape != (mesh.num_triangles, 3) or not np.isfinite(f).all() or np.any(f == 0):
-            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
-        sx, sy, h = f.T
-        eps = np.broadcast_to(np.asarray(eps_r), (mesh.num_triangles,))
-        d = np.zeros((mesh.num_triangles, 2, 2), dtype=np.result_type(f, eps, inv_mu, float))
-        e = np.zeros_like(d)
-        d[:, 0, 0], d[:, 1, 1] = inv_mu * sy/(sx*h), inv_mu * sx/(sy*h)
-        e[:, 0, 0], e[:, 1, 1] = eps*sy*h/sx, eps*sx*h/sy
-        S = assemble_curlcurl(space, inv_mu*h/(sx*sy))
-        Mt_eps = assemble_edge_mass(space, e)
-        Mt_mu = assemble_edge_mass(space, d)
-        G = assemble_edge_grad(space, d)
-        K = assemble_stiffness(mesh, d)
-        M = assemble_mass(mesh, eps*sx*sy/h)
-
+    blocks = {name: m.to_scipy() for name, m in _mode_blocks(np, space, eps_r, mu_r, coordinate_factors).items()}
+    S, Mt_eps, Mt_mu, G, K, M = (blocks[n] for n in ("S", "Mt_eps", "Mt_mu", "G", "K", "M"))
     n_e, n_n = space.num_edges, mesh.num_nodes
     zero_en = sp.csr_matrix((n_e, n_n))
     zero_nn = sp.csr_matrix((n_n, n_n))
@@ -141,6 +112,42 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
     B = sp.bmat([[Mt_mu, G],
                  [G.T,   K - k0 ** 2 * M]]).tocsr()
     return A, B, space
+
+
+def _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors):
+    """The six blocks S, Mt_eps, Mt_mu, G, K, M of the mode system as CooMatrix in ``xp``.
+
+    J = diag(sx, sy, h) maps eps' = eps det(J) J^-1 J^-T (likewise mu); the
+    transverse curl rotates axes, so beta and grad use (1/mu_y, 1/mu_x).
+    """
+    mesh = space.mesh
+    t = mesh.num_triangles
+    eps = xp.broadcast_to(lift(xp, eps_r), (t,))
+    inv_mu = xp.broadcast_to(1.0 / (np.asarray(mu_r) if backend_of(xp) is Backend.NUMPY
+                                     else lift(xp, mu_r)), (t,))
+    if coordinate_factors is None:
+        curl, mass_eps, mass_mu, grad = inv_mu, eps, inv_mu, inv_mu
+        stiff, mass = inv_mu, eps
+    else:
+        f = np.asarray(coordinate_factors)
+        if f.shape != (t, 3) or not np.isfinite(f).all() or np.any(f == 0):
+            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
+        sx, sy, h = (lift(xp, c) for c in f.T)
+
+        def diagonal(a, b):
+            zero = xp.zeros_like(a)
+            return xp.stack([xp.stack([a, zero], axis=-1), xp.stack([zero, b], axis=-1)], axis=-2)
+        d = diagonal(inv_mu * sy/(sx*h), inv_mu * sx/(sy*h))
+        curl, mass_eps = inv_mu*h/(sx*sy), diagonal(eps*sy*h/sx, eps*sx*h/sy)
+        mass_mu, grad, stiff, mass = d, d, d, eps*sx*sy/h
+    te, tn = space.tri_edges, mesh.triangles
+    n_e, n_n = space.num_edges, mesh.num_nodes
+    return {"S": forms.matrix(te, te, kernels.nedelec_curlcurl(space, curl), (n_e, n_e)),
+            "Mt_eps": forms.matrix(te, te, kernels.nedelec_mass(space, mass_eps), (n_e, n_e)),
+            "Mt_mu": forms.matrix(te, te, kernels.nedelec_mass(space, mass_mu), (n_e, n_e)),
+            "G": forms.matrix(te, tn, kernels.nedelec_grad(space, grad), (n_e, n_n)),
+            "K": forms.matrix(tn, tn, kernels.p1_stiffness(mesh, stiff), (n_n, n_n)),
+            "M": forms.matrix(tn, tn, kernels.p1_mass(mesh, mass), (n_n, n_n))}
 
 
 def _free_dofs(mesh, space, pec_nodes, pec_edges):
@@ -213,40 +220,19 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
 
 
 def _live_blocks(xp, space, eps_r, mu_r, k0, coordinate_factors):
-    """assemble_mode_system in ``xp`` from the element kernels: (A, B) as coalesced CooMatrix."""
-    mesh = space.mesh
-    t = mesh.num_triangles
-    eps = xp.broadcast_to(lift(xp, eps_r), (t,))
-    inv_mu = xp.broadcast_to(1.0 / lift(xp, mu_r), (t,))
-    if coordinate_factors is None:
-        curl, mass_eps, mass_mu, grad = inv_mu, eps, inv_mu, inv_mu
-        stiff, mass = inv_mu, eps
-    else:
-        f = np.asarray(coordinate_factors)
-        if f.shape != (t, 3) or not np.isfinite(f).all() or np.any(f == 0):
-            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
-        sx, sy, h = (lift(xp, c) for c in f.T)
+    """(A, B) of ``assemble_mode_system`` in ``xp`` as coalesced CooMatrix, from ``_mode_blocks``."""
+    blocks = _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors)
+    n_e, n_n = space.num_edges, space.mesh.num_nodes
+    g = blocks["G"]
+    blocks_a = [(blocks["S"], 0, 0, 1.0), (blocks["Mt_eps"], 0, 0, -k0**2)]
+    blocks_b = [(blocks["Mt_mu"], 0, 0, 1.0), (g, 0, n_e, 1.0),
+                (CooMatrix(g.cols, g.rows, g.values, (n_n, n_e)), n_e, 0, 1.0),
+                (blocks["K"], n_e, n_e, 1.0), (blocks["M"], n_e, n_e, -k0**2)]
 
-        def diagonal(a, b):
-            zero = xp.zeros_like(a)
-            return xp.stack([xp.stack([a, zero], axis=-1), xp.stack([zero, b], axis=-1)], axis=-2)
-        d = diagonal(inv_mu * sy/(sx*h), inv_mu * sx/(sy*h))
-        curl, mass_eps = inv_mu*h/(sx*sy), diagonal(eps*sy*h/sx, eps*sx*h/sy)
-        mass_mu, grad, stiff, mass = d, d, d, eps*sx*sy/h
-    te, tn = space.tri_edges, mesh.triangles
-    n_e, n_n = space.num_edges, mesh.num_nodes
-    blocks_a = [(forms.matrix(te, te, kernels.nedelec_curlcurl(space, curl), (n_e, n_e)), 0, 0, 1.0),
-                (forms.matrix(te, te, kernels.nedelec_mass(space, mass_eps), (n_e, n_e)), 0, 0, -k0**2)]
-    g = forms.matrix(te, tn, kernels.nedelec_grad(space, grad), (n_e, n_n))
-    blocks_b = [(forms.matrix(te, te, kernels.nedelec_mass(space, mass_mu), (n_e, n_e)), 0, 0, 1.0),
-                (g, 0, n_e, 1.0), (CooMatrix(g.cols, g.rows, g.values, (n_n, n_e)), n_e, 0, 1.0),
-                (forms.matrix(tn, tn, kernels.p1_stiffness(mesh, stiff), (n_n, n_n)), n_e, n_e, 1.0),
-                (forms.matrix(tn, tn, kernels.p1_mass(mesh, mass), (n_n, n_n)), n_e, n_e, -k0**2)]
-
-    def joined(blocks):
-        return CooMatrix(np.concatenate([b.rows + r for b, r, _, _ in blocks]),
-                         np.concatenate([b.cols + c for b, _, c, _ in blocks]),
-                         xp.concat([lift(xp, b.values) * scale for b, _, _, scale in blocks]),
+    def joined(parts):
+        return CooMatrix(np.concatenate([b.rows + r for b, r, _, _ in parts]),
+                         np.concatenate([b.cols + c for b, _, c, _ in parts]),
+                         xp.concat([lift(xp, b.values) * scale for b, _, _, scale in parts]),
                          (n_e + n_n, n_e + n_n)).coalesce()
     return joined(blocks_a), joined(blocks_b)
 
