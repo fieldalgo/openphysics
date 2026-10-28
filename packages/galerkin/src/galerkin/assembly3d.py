@@ -15,16 +15,12 @@ is the same algebra one dimension up.
 
 from __future__ import annotations
 
-import numpy as np
 import scipy.sparse as sp
 
-from .mesh3d import Mesh3D
+from .core import forms, kernels
+from .core.checks import refuse_live
 from .core.tets import tet_gradients  # noqa: F401 (public here)
-
-
-def _scatter(vals, rows, cols, shape):
-    return sp.coo_matrix((vals.ravel(), (rows.ravel(), cols.ravel())),
-                         shape=shape).tocsr()
+from .mesh3d import Mesh3D
 
 
 def assemble_stiffness_3d(mesh: Mesh3D, eps=1.0) -> sp.csr_matrix:
@@ -32,24 +28,13 @@ def assemble_stiffness_3d(mesh: Mesh3D, eps=1.0) -> sp.csr_matrix:
 
     eps: scalar, per-tetrahedron (T,), or per-tetrahedron 3x3 tensors (T, 3, 3).
     """
-    g, vol = tet_gradients(mesh)
-    eps = np.asarray(eps)
-    if eps.ndim == 3:
-        Ke = np.einsum("tmd,tde,tne->tmn", g, eps, g) * vol[:, None, None]
-    else:
-        c = np.broadcast_to(eps, (mesh.num_tets,))
-        Ke = np.einsum("tmd,tnd->tmn", g, g) * (c * vol)[:, None, None]
+    refuse_live(eps, "assemble_stiffness_3d eps")
     t = mesh.tets
-    return _scatter(Ke, np.repeat(t, 4, axis=1), np.tile(t, (1, 4)),
-                    (mesh.num_nodes,) * 2)
+    return forms.matrix(t, t, kernels.tet_stiffness(mesh, eps), (mesh.num_nodes,) * 2).to_scipy()
 
 
 def assemble_mass_3d(mesh: Mesh3D, coeff=1.0) -> sp.csr_matrix:
     """M_mn = int c phi_m phi_n dV, exact: M^e = c V/20 * (1 + delta_mn)."""
-    vol = mesh.volumes()
-    c = np.broadcast_to(np.asarray(coeff), (mesh.num_tets,))
-    base = (np.ones((4, 4)) + np.eye(4)) / 20.0
-    Me = (c * vol)[:, None, None] * base
+    refuse_live(coeff, "assemble_mass_3d coeff")
     t = mesh.tets
-    return _scatter(Me, np.repeat(t, 4, axis=1), np.tile(t, (1, 4)),
-                    (mesh.num_nodes,) * 2)
+    return forms.matrix(t, t, kernels.tet_mass(mesh, coeff), (mesh.num_nodes,) * 2).to_scipy()

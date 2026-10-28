@@ -202,11 +202,12 @@ no derivative.
 
 ## Limits
 
-- Not yet guarded: the low-level assembly functions (`galerkin.assembly`,
-  `assembly3d`, `edge`, `edge3d`) and the electromagnetic solvers other than
-  `solve_modes` and `solve_cavity_box` convert their
-  inputs with NumPy. A JAX value passed to them loses its derivative; do not pass
-  live values there.
+- Not yet guarded: the electromagnetic solvers other than `solve_modes` and
+  `solve_cavity_box` convert their inputs with NumPy. A JAX value passed to them
+  loses its derivative; do not pass live values there. The low-level assembly
+  functions (`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`) refuse live
+  values with a `TypeError`; assemble `galerkin.core.kernels` with
+  `galerkin.core.forms` to keep them live.
 - With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
   0-d arrays of that library instead of Python floats, and result arrays are not
   made read-only.

@@ -41,9 +41,10 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
-from .mesh3d import Mesh3D
-from .assembly3d import _scatter
+from .core import forms, kernels
+from .core.checks import refuse_live
 from .core.tets import tet_gradients
+from .mesh3d import Mesh3D
 
 LOCAL_EDGES = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
 _I = np.array([e[0] for e in LOCAL_EDGES])
@@ -89,53 +90,35 @@ class EdgeSpace3D:
         return np.unique(self._ids(np.unique(pairs, axis=0)))
 
 
-def _edge_scatter(space: EdgeSpace3D, Me):
-    te = space.tet_edges
-    return _scatter(Me, np.repeat(te, 6, axis=1), np.tile(te, (1, 6)),
-                    (space.num_edges,) * 2)
-
-
 def assemble_curlcurl_3d(space: EdgeSpace3D, coeff=1.0) -> sp.csr_matrix:
-    """S_ef = int c (curl W_e) . (curl W_f) dV — closed form, curls are constant."""
-    mesh = space.mesh
-    g, vol = tet_gradients(mesh)
-    c = np.broadcast_to(np.asarray(coeff, dtype=float), (mesh.num_tets,))
+    """S_ef = int c (curl W_e) . (curl W_f) dV — closed form, curls are constant.
 
-    curls = 2.0 * np.cross(g[:, _I, :], g[:, _J, :])          # (T, 6, 3)
-    curls = curls * space.signs[:, :, None]
-    Se = np.einsum("ted,tfd->tef", curls, curls) * (c * vol)[:, None, None]
-    return _edge_scatter(space, Se)
+    coeff: real scalar or per-tetrahedron array (T,); a complex coefficient raises TypeError.
+    """
+    refuse_live(coeff, "assemble_curlcurl_3d coeff")
+    te = space.tet_edges
+    return forms.matrix(te, te, kernels.nedelec3d_curlcurl(space, coeff), (space.num_edges,) * 2).to_scipy()
 
 
 def assemble_edge_mass_3d(space: EdgeSpace3D, coeff=1.0) -> sp.csr_matrix:
-    """M_ef = int c W_e . W_f dV — exact closed form (see the module docstring)."""
-    mesh = space.mesh
-    g, vol = tet_gradients(mesh)
-    c = np.broadcast_to(np.asarray(coeff, dtype=float), (mesh.num_tets,))
+    """M_ef = int c W_e . W_f dV — exact closed form (see the module docstring).
 
-    G = np.einsum("tad,tbd->tab", g, g)                       # (T, 4, 4)
-    d = np.eye(4)
-    i, j = _I[:, None], _J[:, None]                           # edge e
-    k, l = _I[None, :], _J[None, :]                           # edge f
-    Me = ((1 + d[i, k]) * G[:, j, l] - (1 + d[i, l]) * G[:, j, k]
-          - (1 + d[j, k]) * G[:, i, l] + (1 + d[j, l]) * G[:, i, k])
-    Me *= (c * vol / 20.0)[:, None, None]
-    Me *= space.signs[:, :, None] * space.signs[:, None, :]
-    return _edge_scatter(space, Me)
+    coeff: real scalar or per-tetrahedron array (T,); a complex coefficient raises TypeError.
+    """
+    refuse_live(coeff, "assemble_edge_mass_3d coeff")
+    te = space.tet_edges
+    return forms.matrix(te, te, kernels.nedelec3d_mass(space, coeff), (space.num_edges,) * 2).to_scipy()
 
 
 def assemble_edge_grad_3d(space: EdgeSpace3D, coeff=1.0) -> sp.csr_matrix:
-    """G_en = int c W_e . grad phi_n dV, shape (num_edges, num_nodes)."""
-    mesh = space.mesh
-    g, vol = tet_gradients(mesh)
-    c = np.broadcast_to(np.asarray(coeff, dtype=float), (mesh.num_tets,))
+    """G_en = int c W_e . grad phi_n dV, shape (num_edges, num_nodes).
 
-    Ge = np.einsum("ted,tnd->ten", g[:, _J, :] - g[:, _I, :], g)   # (T, 6, 4)
-    Ge *= (c * vol / 4.0)[:, None, None]
-    Ge *= space.signs[:, :, None]
-    return _scatter(Ge, np.repeat(space.tet_edges, 4, axis=1),
-                    np.tile(mesh.tets, (1, 6)),
-                    (space.num_edges, mesh.num_nodes))
+    coeff: real scalar or per-tetrahedron array (T,); a complex coefficient raises TypeError.
+    """
+    refuse_live(coeff, "assemble_edge_grad_3d coeff")
+    mesh = space.mesh
+    return forms.matrix(space.tet_edges, mesh.tets, kernels.nedelec3d_grad(space, coeff),
+                        (space.num_edges, mesh.num_nodes)).to_scipy()
 
 
 def eval_edge_field_3d(space: EdgeSpace3D, dofs: np.ndarray) -> np.ndarray:

@@ -13,9 +13,8 @@ with no loop over cells. These functions place them:
   vectors from basis values at quadrature points, for kernels that have no
   closed form.
 
-The pattern and the order of additions are those the hand-written assembly in
-``galerkin.assembly``, ``assembly3d``, ``edge`` and ``edge3d`` uses, so a
-closed-form kernel assembled here reproduces those matrices bit for bit on NumPy.
+The public assembly functions in ``galerkin.assembly``, ``assembly3d``,
+``edge`` and ``edge3d`` are these calls on the closed-form kernels.
 """
 import numpy as np
 

@@ -1,12 +1,16 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""galerkin.core.forms and core.kernels reproduce the hand-written assembly.
+"""galerkin.core.forms and core.kernels, and the public assembly functions built on them.
 
-On NumPy every kernel assembled through forms gives the same CSR matrix, bit
-for bit, as the function it mirrors. On JAX and PyTorch the same kernels agree
-with NumPy to 1e-12 relative and carry derivatives with respect to their
-coefficients; those cases skip when the library is absent (the CI job that
-installs both checks that they import).
+On NumPy the public functions (galerkin.assembly, assembly3d, edge, edge3d)
+give, bit for bit, the CSR matrix of their kernel assembled through forms: this
+checks their DOF tables, shapes and dtypes. Whether the kernels integrate the
+right thing is checked against exact integrals in
+test_crosscheck_symfem_elements.py and test_crosscheck_symfem_coefficients.py.
+The public functions refuse JAX and PyTorch values instead of converting them.
+On JAX and PyTorch the kernels agree with NumPy to 1e-12 relative and carry
+derivatives with respect to their coefficients; those cases skip when the
+library is absent (the CI job that installs both checks that they import).
 """
 import numpy as np
 import pytest
@@ -128,12 +132,38 @@ def test_nedelec3d_kernels_are_edge3d(coeff):
               assemble_edge_grad_3d(space, value))
 
 
-def test_nedelec3d_refuses_complex_coefficients_like_edge3d():
+@pytest.mark.parametrize("value", [1.0 + 1j, "cells"])
+def test_real_coefficient_functions_refuse_complex_ones(value):
+    """A complex array used to lose its imaginary part with only a ComplexWarning; now every form raises."""
     space = EdgeSpace3D(MESH3D)
-    with pytest.raises(TypeError):
-        assemble_curlcurl_3d(space, 1.0 + 1j)
-    with pytest.raises(TypeError):
-        kernels.nedelec3d_curlcurl(space, 1.0 + 1j)
+    mesh = MESH2D["rectangle"]
+    if value == "cells":
+        value = np.full(MESH3D.num_tets, 1.0 + 1j)
+    for build in (assemble_curlcurl_3d, assemble_edge_mass_3d, assemble_edge_grad_3d,
+                  kernels.nedelec3d_curlcurl):
+        with pytest.raises(TypeError, match="real coefficient"):
+            build(space, value)
+    rho = 1.0 + 1j if np.ndim(value) == 0 else np.full(mesh.num_triangles, 1.0 + 1j)
+    with pytest.raises(TypeError, match="real coefficient"):
+        assemble_load(mesh, rho)
+
+
+@pytest.mark.parametrize("library", ["jax", "torch"])
+def test_public_assembly_refuses_live_values(library):
+    """The NumPy functions would cut the derivative of a JAX or PyTorch value; they refuse it."""
+    mesh, space, space3d = MESH2D["rectangle"], EdgeSpace(MESH2D["rectangle"]), EdgeSpace3D(MESH3D)
+    c2, c3 = _live(library, np.ones(mesh.num_triangles)), _live(library, np.ones(MESH3D.num_tets))
+    calls = [lambda: assemble_stiffness(mesh, c2), lambda: assemble_mass(mesh, c2),
+             lambda: assemble_load(mesh, c2), lambda: assemble_curlcurl(space, c2),
+             lambda: assemble_edge_mass(space, c2), lambda: assemble_edge_grad(space, c2),
+             lambda: assemble_boundary_mass(mesh, np.array([[0, 1], [1, 2], [2, 3]]), c2[:3]),
+             lambda: assemble_load(mesh, lambda x, y: c2),
+             lambda: assemble_stiffness_3d(MESH3D, c3), lambda: assemble_mass_3d(MESH3D, c3),
+             lambda: assemble_curlcurl_3d(space3d, c3), lambda: assemble_edge_mass_3d(space3d, c3),
+             lambda: assemble_edge_grad_3d(space3d, c3)]
+    for call in calls:
+        with pytest.raises(TypeError, match="cut the derivative"):
+            call()
 
 
 @pytest.mark.parametrize("plane", ["stress", "strain"])
@@ -162,7 +192,7 @@ def test_generic_quadrature_matches_closed_forms():
     mass = forms.integrate_bilinear(values, values, weights, mesh.areas(), c)
     np.testing.assert_allclose(mass, kernels.p1_mass(mesh, c), rtol=1e-14, atol=0)
     # Constant gradients: P1 stiffness from the quadrature path.
-    g, area = kernels._triangle_gradients(mesh)
+    g, area = kernels.triangle_gradients(mesh)
     grads = np.broadcast_to(g[:, None], (T, 3, 3, 2))             # (T, Q, i, 2)
     stiff = forms.integrate_bilinear(grads, grads, weights, area, c)
     np.testing.assert_allclose(stiff, kernels.p1_stiffness(mesh, c), rtol=1e-13, atol=1e-13 * np.abs(stiff).max())

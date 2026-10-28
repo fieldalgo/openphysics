@@ -30,6 +30,8 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
+from .core import forms, kernels
+from .core.checks import refuse_live
 from .mesh import Mesh
 
 
@@ -86,42 +88,14 @@ class EdgeSpace:
         return ids
 
 
-def _tri_grads(mesh: Mesh):
-    """Barycentric gradients grad lambda (T, 3, 2) and triangle areas."""
-    p = mesh.nodes[mesh.triangles]
-    x, y = p[:, :, 0], p[:, :, 1]
-    b = np.stack([y[:, 1] - y[:, 2], y[:, 2] - y[:, 0], y[:, 0] - y[:, 1]], axis=1)
-    c = np.stack([x[:, 2] - x[:, 1], x[:, 0] - x[:, 2], x[:, 1] - x[:, 0]], axis=1)
-    area = np.abs(0.5 * (b[:, 0] * c[:, 1] - b[:, 1] * c[:, 0]))
-    grads = np.stack([b, c], axis=2) / (2.0 * area)[:, None, None]
-    return grads, area
-
-
 def assemble_curlcurl(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
     """S_ee' = int c (curl W_e)(curl W_e') dx — closed form since curls are constant.
 
     coeff: scalar or per-triangle array (T,). For Maxwell this is 1/mu_r.
     """
-    mesh = space.mesh
-    g, area = _tri_grads(mesh)
-    coeff = np.broadcast_to(np.asarray(coeff), (len(area),))
-
-    # Local edge e = (i, j) = (e+1, e+2) mod 3
-    i_loc = [1, 2, 0]
-    j_loc = [2, 0, 1]
-    curls = np.stack([
-        2.0 * (g[:, i, 0] * g[:, j, 1] - g[:, i, 1] * g[:, j, 0])
-        for i, j in zip(i_loc, j_loc)], axis=1)      # (T, 3)
-    curls = curls * space.signs
-
-    Se = (coeff * area)[:, None, None] * curls[:, :, None] * curls[:, None, :]
-
+    refuse_live(coeff, "assemble_curlcurl coeff")
     te = space.tri_edges
-    rows = np.repeat(te, 3, axis=1).ravel()
-    cols = np.tile(te, (1, 3)).ravel()
-    S = sp.coo_matrix((Se.ravel(), (rows, cols)),
-                      shape=(space.num_edges, space.num_edges))
-    return S.tocsr()
+    return forms.matrix(te, te, kernels.nedelec_curlcurl(space, coeff), (space.num_edges,) * 2).to_scipy()
 
 
 def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
@@ -131,38 +105,9 @@ def assemble_edge_mass(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
     integrates degree 2 exactly, so this matrix is exact, not approximate.
     coeff: scalar, per-triangle (T,), or tensor (T, 2, 2); complex allowed.
     """
-    mesh = space.mesh
-    g, area = _tri_grads(mesh)
-    T = len(area)
-    coeff = np.asarray(coeff)
-    if coeff.ndim != 3:
-        coeff = np.broadcast_to(coeff, (T,))
-
-    # Quadrature points: edge midpoints. Barycentric values (3 points x 3 nodes)
-    lam = 0.5 * (np.ones((3, 3)) - np.eye(3))   # point m: lambda_m = 0, others 1/2
-
-    i_loc = [1, 2, 0]
-    j_loc = [2, 0, 1]
-    # W_e(qp) = lambda_i(qp) grad lambda_j - lambda_j(qp) grad lambda_i
-    #   -> (T, 3 edges, 3 qp, 2)
-    W = np.empty((T, 3, 3, 2))
-    for e, (i, j) in enumerate(zip(i_loc, j_loc)):
-        W[:, e] = (lam[None, :, i, None] * g[:, None, j, :]
-                   - lam[None, :, j, None] * g[:, None, i, :])
-    W *= space.signs[:, :, None, None]
-
-    # M^e = (A/3) sum_qp W_e(qp) . W_e'(qp)
-    if coeff.ndim == 3:
-        Me = np.einsum("teqd,tdk,tfqk->tef", W, coeff, W) * (area / 3.0)[:, None, None]
-    else:
-        Me = np.einsum("teqd,tfqd->tef", W, W) * (coeff * area / 3.0)[:, None, None]
-
+    refuse_live(coeff, "assemble_edge_mass coeff")
     te = space.tri_edges
-    rows = np.repeat(te, 3, axis=1).ravel()
-    cols = np.tile(te, (1, 3)).ravel()
-    M = sp.coo_matrix((Me.ravel(), (rows, cols)),
-                      shape=(space.num_edges, space.num_edges))
-    return M.tocsr()
+    return forms.matrix(te, te, kernels.nedelec_mass(space, coeff), (space.num_edges,) * 2).to_scipy()
 
 
 def assemble_edge_grad(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
@@ -177,35 +122,16 @@ def assemble_edge_grad(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
 
     coeff: scalar, per-triangle (T,), or tensor (T, 2, 2); complex allowed.
     """
+    refuse_live(coeff, "assemble_edge_grad coeff")
     mesh = space.mesh
-    g, area = _tri_grads(mesh)
-    T = len(area)
-    coeff = np.asarray(coeff)
-    if coeff.ndim != 3:
-        coeff = np.broadcast_to(coeff, (T,))
-
-    i_loc = [1, 2, 0]
-    j_loc = [2, 0, 1]
-    Ge = np.empty((T, 3, 3), dtype=np.result_type(coeff, float))
-    for e, (i, j) in enumerate(zip(i_loc, j_loc)):
-        if coeff.ndim == 3:
-            Ge[:, e, :] = np.einsum("td,tdf,tkf->tk", g[:, j, :] - g[:, i, :], coeff, g)
-        else:
-            Ge[:, e, :] = np.einsum("td,tkd->tk", g[:, j, :] - g[:, i, :], g)
-    Ge *= ((area if coeff.ndim == 3 else coeff * area) / 3.0)[:, None, None]
-    Ge *= space.signs[:, :, None]
-
-    rows = np.repeat(space.tri_edges, 3, axis=1).ravel()
-    cols = np.tile(mesh.triangles, (1, 3)).ravel()
-    G = sp.coo_matrix((Ge.ravel(), (rows, cols)),
-                      shape=(space.num_edges, mesh.num_nodes))
-    return G.tocsr()
+    return forms.matrix(space.tri_edges, mesh.triangles, kernels.nedelec_grad(space, coeff),
+                        (space.num_edges, mesh.num_nodes)).to_scipy()
 
 
 def eval_edge_field(space: EdgeSpace, dofs: np.ndarray) -> np.ndarray:
     """Edge dofs -> vector field evaluated at triangle centroids, (T, 2)."""
     mesh = space.mesh
-    g, _ = _tri_grads(mesh)
+    g, _ = kernels.triangle_gradients(mesh)
     lam_c = np.full(3, 1.0 / 3.0)                # centroid
     i_loc = [1, 2, 0]
     j_loc = [2, 0, 1]
