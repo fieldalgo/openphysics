@@ -157,9 +157,9 @@ def test_actual_helper_mutation_is_detected(monkeypatch,plane,variant):
     if 'boundary' in variant:
         sign=1 if variant.startswith('add') else -1
         q=70e9*12e-6*20/(1-.3 if plane=='stress' else 1-2*.3)
-        def wrong_line(mesh,p,t,traction):
-            extra=original_line(mesh,p,t,{tag:lambda points,n:sign*q*n for tag in traction})
-            return original_line(mesh,p,t,traction)+extra
+        def wrong_line(mesh,p,t,traction,**kw):
+            extra=original_line(mesh,p,t,{tag:lambda points,n:sign*q*n for tag in traction},**kw)
+            return original_line(mesh,p,t,traction,**kw)+extra
         monkeypatch.setattr(engine,'traction_load',wrong_line)
     else:
         factor=0 if variant=='omit_thermal_rhs' else -1
