@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 import numpy as np
 import scipy.sparse.linalg as spla
-from .assembly import assemble_mass, assemble_stiffness
+from .core import forms, kernels
 
 
 @dataclass(frozen=True)
@@ -93,8 +93,13 @@ def scalar_coordinate_system(mesh, eps_r, k0, factors):
     sx, sy, h = factors.T
     tensor = np.zeros((mesh.num_triangles, 2, 2), dtype=complex)
     tensor[:, 0, 0], tensor[:, 1, 1] = h*sy/sx, h*sx/sy
-    A = k0**2*assemble_mass(mesh, np.asarray(eps_r)*h*sx*sy)-assemble_stiffness(mesh, tensor)
-    B = assemble_mass(mesh, sx*sy/h)
+    cells, shape = mesh.triangles, (mesh.num_nodes, mesh.num_nodes)
+
+    def assembled(element):
+        return forms.matrix(cells, cells, element, shape).to_scipy()
+    A = (k0**2*assembled(kernels.p1_mass(mesh, np.asarray(eps_r)*h*sx*sy))
+         - assembled(kernels.p1_stiffness(mesh, tensor)))
+    B = assembled(kernels.p1_mass(mesh, sx*sy/h))
     return A, B
 
 

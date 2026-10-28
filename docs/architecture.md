@@ -132,8 +132,10 @@ remain the NumPy assembly path and keep their results. `core.kernels` with
 kernels in the input's array library. Through that route, seven solvers
 differentiate on JAX and PyTorch ([derivatives](packages/galerkin/differentiation.md)).
 
-Not yet moved onto core: `material_cavity`, `mode_coordinates` and `pml` assemble
-with the public functions only. The coupling layer passes fields one way on a
+`material_cavity` and `mode_coordinates` assemble through core kernels only, with
+the same matrices as before; `material_cavity` adds its own wall-impedance surface
+kernel. `pml` computes stretching coefficients and assembles nothing. These three
+do not differentiate yet. The coupling layer passes fields one way on a
 single mesh. A fixed-point driver waits for a third coupled pair, and
 grid-to-mesh projection waits for a second engine
 ([limits](packages/galerkin/coupling.md#limits)).

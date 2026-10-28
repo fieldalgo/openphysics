@@ -124,8 +124,9 @@ flowchart TB
 입력이 속한 배열 라이브러리에서 계산합니다. 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다
 ([미분](packages/galerkin/differentiation.md)).
 
-아직 core로 옮기지 않은 것도 있습니다. `material_cavity`, `mode_coordinates`, `pml`은 공개 함수로만
-조립합니다. coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
+`material_cavity`와 `mode_coordinates`는 core 커널로만 조립하며 행렬은 전과 같습니다. `material_cavity`는
+벽 임피던스용 표면 커널을 따로 더합니다. `pml`은 늘림 계수만 계산하고 조립은 하지 않습니다. 이 셋은
+아직 미분하지 않습니다. coupling 층은 한 메시 위에서 한 방향으로만 필드를 넘깁니다. 고정점 드라이버는 세 번째 연성
 쌍이 생길 때, 격자↔메시 투영은 둘째 엔진이 붙을 때 다룹니다([한계](packages/galerkin/coupling.md#한계)).
 
 ## 새 물리 추가하기

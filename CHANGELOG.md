@@ -24,7 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- Docs: the [architecture](docs/architecture.md#inside-galerkin-core-physics-and-coupling) page describes galerkin's core, physics and coupling layers, what is not yet on core, and the steps for adding a physics.
+- `galerkin`: `material_cavity` and `mode_coordinates` assemble through `galerkin.core` kernels instead of the public assembly functions; their matrices and results are unchanged bit for bit.
+- Docs: the [architecture](docs/architecture.md#inside-galerkin-core-physics-and-coupling) page describes galerkin's core, physics and coupling layers, what does not differentiate yet, and the steps for adding a physics.
 - `galerkin`: `galerkin.core` no longer imports modules above it. Material lookup moved to `galerkin.core.materials` (`galerkin.materials` keeps the same public names), and `core.loads` takes element heat sources as checked values (`ElementSource`) instead of importing `ElementHeatSource`. A test checks the import direction. Results are unchanged.
 
 - `simcase` Studio: the steady and transient heat routes validate and run heat region documents, in a worker thread and within limits on shapes, circles, polygon points, boundary crossings and loop vertices before a run and on nodes and cells in the job. Region results have their own formats, `studio-thermal-steady-regions-v1` and `studio-thermal-transient-regions-v1`; rectangle documents keep their responses. The page shows region results with region colours, boundaries, a legend, a material table and the region under the pointer. [Documentation](docs/packages/simcase/thermal_studio.md#region-documents).

@@ -24,8 +24,8 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 from .mesh3d import Mesh3D
-from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
-                     eval_edge_field_3d)
+from .edge3d import EdgeSpace3D, eval_edge_field_3d
+from .core import forms, kernels
 from .cavity import (_C0, _DENSE_LIMIT, _GRADIENT_LIMIT, _RESIDUAL_LIMIT,
                      _cavity_mesh, _positive_integer, _positive_real, _triple)
 
@@ -148,6 +148,12 @@ def _regions(regions, lengths, cells):
     return checked
 
 
+def _edge_matrix(space, element):
+    """Global edge matrix (SciPy CSR) from (T, 6, 6) element matrices of a core kernel."""
+    return forms.matrix(space.tet_edges, space.tet_edges, element,
+                        (space.num_edges, space.num_edges)).to_scipy()
+
+
 def _material_matrices(space, free, eps, mu):
     """Sum real indicator assemblies times complex constants, one per material."""
     pairs, labels = np.unique(np.column_stack([eps, mu]), axis=0, return_inverse=True)
@@ -156,9 +162,10 @@ def _material_matrices(space, free, eps, mu):
     mass = sp.csc_matrix((len(free), len(free)), dtype=complex)
     for label, (eps_value, mu_value) in enumerate(pairs):
         mask = (labels == label).astype(float)
-        stiffness = stiffness + (assemble_curlcurl_3d(space, mask)[free][:, free]
-                                 / mu_value).tocsc()
-        mass = mass + (assemble_edge_mass_3d(space, mask)[free][:, free] * eps_value).tocsc()
+        stiffness = stiffness + (_edge_matrix(space, kernels.nedelec3d_curlcurl(space, mask))
+                                 [free][:, free] / mu_value).tocsc()
+        mass = mass + (_edge_matrix(space, kernels.nedelec3d_mass(space, mask))[free][:, free]
+                       * eps_value).tocsc()
     return stiffness.tocsc(), mass.tocsc()
 
 
@@ -395,7 +402,7 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
         raise RuntimeError(f"requested {count} modes but this mesh has only "
                            f"{physical_count} physical degrees of freedom; refine subdivisions")
     stiffness, mass = _material_matrices(space, free, eps, mu)
-    vacuum_mass = assemble_edge_mass_3d(space)[free][:, free].tocsc()
+    vacuum_mass = _edge_matrix(space, kernels.nedelec3d_mass(space))[free][:, free].tocsc()
     wall_mass = {w: _wall_mass(space, walls[w])[free][:, free].tocsc() for w in lossy_walls}
     # Physical k0^2 are at least about the vacuum fundamental / max|eps mu|.
     kernel_cutoff = 1e-8 * fundamental / float(np.max(np.abs(eps * mu)))
