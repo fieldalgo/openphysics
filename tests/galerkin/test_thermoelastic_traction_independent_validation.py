@@ -364,7 +364,7 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
     def badthermal(*args,**kw):
         result=thermal_real(*args,**kw)
         return -result if wrong=='thermal_sign' else np.zeros_like(result) if wrong=='omit_g' else result
-    def badline(m,p,t,mapping):
+    def badline(m,p,t,mapping,**kw):
         if wrong=='endpoint_lumping':
             owners={(a,b):c for a,b,c in exterior_segments(p,t)};load=np.zeros_like(p)
             for tag,fn in mapping.items():
@@ -374,7 +374,7 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
                     load[[a,b]]+=np.linalg.norm(p[b]-p[a])*values/2
             return load.ravel()
         if wrong=='flipped_hole':mapping={tag:(lambda pp,nn,fn=fn:-fn(pp,nn)) if tag=='inner' else fn for tag,fn in mapping.items()}
-        load=line_real(m,p,t,mapping)
+        load=line_real(m,p,t,mapping,**kw)
         if wrong=='line_weight':load=1.1*load
         elif wrong=='drop_fixed_line':
             load=load.copy()

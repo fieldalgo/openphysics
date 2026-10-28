@@ -10,32 +10,22 @@ See docs/packages/galerkin/prescribed_temperature_thermoelasticity.md for units 
 Tref, alpha, E, nu, Dirichlet displacements, body force and traction may be JAX
 or PyTorch values (callbacks may return them); the result arrays are then in that
 library and carry reverse-mode derivatives. The temperature snapshot is a NumPy
-container. NumPy inputs compute exactly as before.
+container. One body serves NumPy and live inputs, solving as galerkin.elasticity
+does.
 """
 from dataclasses import dataclass, field
 import numpy as np
-from scipy.sparse import coo_matrix
-from scipy.sparse.linalg import splu
 
-from .elasticity import (constitutive_live, constitutive_matrix, element_constitutive,
-                         live_body_load, live_displacement, live_materials, live_stiffness)
+from .elasticity import (at_fixed, body_load, constitutive, displacement, element_materials,
+                         lame, stress_of, vector_stiffness, _check_finite, _check_plane)
 from .core import live as live_inputs
-from .core.backend import is_live, lift, live_namespace, scatter_add
+from .core.backend import Backend, backend_of, lift, live_namespace, namespace, scatter_add, to_numpy
 from .core.boundary import traction_load
 from .core.checks import real_array, real_value
-from .core.constraints import vector_dirichlet
-from .core.quadrature import triangle_product_rule
 from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
 _M = np.array([1., 1., 0.])
-
-
-def _scalar(value, name, nonnegative=False):
-    a = real_array(value, name)
-    if a.shape != () or not np.isfinite(a) or (nonnegative and a < 0):
-        raise ValueError(f"{name} must be a finite {'nonnegative ' if nonnegative else ''}real scalar")
-    return float(a)
 
 
 def _immutable(array, dtype):
@@ -147,146 +137,49 @@ def _thermal_coefficient(young_modulus, poisson_ratio, plane):
 
 
 def _thermal_load(area, b, dofs, q_mean, num_nodes):
-    local = np.einsum("tji,j,t->ti", b, _M, area*q_mean)
-    load = np.zeros(2*num_nodes)
-    np.add.at(load, dofs.ravel(), local.ravel())
-    return load
+    """Thermal-equivalent nodal load (2N,) of the element-mean thermal stress q_mean (T,), in its library."""
+    xp = namespace(q_mean)
+    local = xp.einsum("tji,j,t->ti", lift(xp, b), lift(xp, _M), lift(xp, area)*q_mean)
+    return scatter_add(xp, 2*num_nodes, dofs.ravel(), xp.reshape(local, (-1,)))
 
 
-def _external_body_load(p, triangles, area, dofs, body_force):
-    bary, weights = triangle_product_rule()
-    points = np.einsum("qa,tad->tqd", bary, p[triangles])
-    if callable(body_force):
-        force = real_array(body_force(points.reshape(-1,2)), "body_force")
-        if force.shape != (points.shape[0]*points.shape[1],2):
-            raise ValueError("body_force callable must return shape (Q,2)")
-        force = force.reshape(points.shape)
-    else:
-        force = real_array(body_force, "body_force")
-        if force.shape != (2,):
-            raise ValueError("constant body_force must have shape (2,)")
-        force = np.broadcast_to(force, points.shape)
-    local = np.einsum("qa,q,tqd,t->tad", bary, weights, force, area)
-    load = np.zeros(2*len(p))
-    np.add.at(load, dofs.ravel(), local.ravel())
-    return load
+def _per_cell(value):
+    """A (T,) value as a column for (T, k) arithmetic; scalars as they are."""
+    return value[:, None] if getattr(value, "ndim", 0) == 1 else value
 
 
-def _physical_energy(total_strain, a_element_nodes, area, d, e, nu, plane):
-    bary = np.array([[2/3,1/6,1/6], [1/6,2/3,1/6], [1/6,1/6,2/3]])
-    aq = a_element_nodes @ bary.T
-    effective = aq if plane == "stress" else (1+nu)*aq
-    delta = total_strain[:,None,:]-effective[...,None]*_M
-    density = .5*np.einsum("tqi,ij,tqj->tq", delta, d, delta)
+_CENTROID_BARY = np.array([[2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3]])
+
+
+def _physical_energy(xp, total_strain, a_element_nodes, area, d, e, nu, plane):
+    """Reduced physical 3D elastic energy per thickness, J/m (exact for P1 with the 3-point rule)."""
+    aq = a_element_nodes @ lift(xp, _CENTROID_BARY).T
+    effective = aq if plane == "stress" else _per_cell(1+nu)*aq
+    delta = total_strain[:, None, :]-effective[..., None]*lift(xp, _M)
+    density = .5*(xp.einsum("tqi,ij,tqj->tq", delta, d, delta) if d.ndim == 2
+                  else xp.einsum("tqi,tij,tqj->tq", delta, d, delta))
     if plane == "strain":
-        density += .5*e*aq**2
-    if not np.all(np.isfinite(density)) or np.any(density < 0):
+        density = density + .5*_per_cell(e)*aq**2
+    numbers = to_numpy(density)
+    if not np.all(np.isfinite(numbers)) or np.any(numbers < 0):
         raise ValueError("nonfinite or negative physical elastic energy; check numeric scaling")
-    value = float(np.sum(area[:,None]*density)/3)
-    if not np.isfinite(value):
+    value = xp.sum(lift(xp, area)[:, None]*density)/3
+    if not np.isfinite(to_numpy(value)):
         raise ValueError("integrated physical elastic energy exceeds floating-point range")
-    return value
+    return float(value) if backend_of(xp) is Backend.NUMPY else value
 
 
-def _region_energy(total_strain, a_element_nodes, area, d, e, nu, plane):
-    """_physical_energy with per-triangle d (T,3,3), e (T,) and nu (T,)."""
-    bary = np.array([[2/3,1/6,1/6], [1/6,2/3,1/6], [1/6,1/6,2/3]])
-    aq = a_element_nodes @ bary.T
-    effective = aq if plane == "stress" else (1+nu)[:,None]*aq
-    delta = total_strain[:,None,:]-effective[...,None]*_M
-    density = .5*np.einsum("tqi,tij,tqj->tq", delta, d, delta)
-    if plane == "strain":
-        density += .5*e[:,None]*aq**2
-    if not np.all(np.isfinite(density)) or np.any(density < 0):
-        raise ValueError("nonfinite or negative physical elastic energy; check numeric scaling")
-    value = float(np.sum(area[:,None]*density)/3)
-    if not np.isfinite(value):
-        raise ValueError("integrated physical elastic energy exceeds floating-point range")
-    return value
+def _material_record(xp, value):
+    """The input as echoed in the result.
 
-
-def _material_record(value):
-    """Python float, or a plain {region name: float} copy for result records.
-
-    Called after region_property validated the value, so float() cannot fail.
-    A scalar is converted too: an int, numpy scalar or 0-d array would
-    otherwise be echoed as given (a 0-d array aliased to the caller's object).
+    NumPy: a Python float, or a plain {region name: float} copy. With JAX or
+    PyTorch values: a {region name: value} copy, or the scalar as a float64
+    array of that library.
     """
-    return {str(k): float(v) for k, v in value.items()} if is_per_region(value) else float(value)
-
-
-def _solve_regions(mesh, temperature_snapshot, *, reference_temperature_k,
-                   thermal_expansion_per_k, young_modulus, poisson_ratio,
-                   plane, dirichlet, body_force, traction):
-    p,t,area,boundary,count,labels = triangle_geometry(mesh, counterclockwise=False)
-    b,dofs = vector_strain(p,t)
-    _verify_snapshot(temperature_snapshot,p,t)
-    tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
-    if plane not in ("stress", "strain"):
-        raise ValueError("plane must be 'stress' or 'strain'")
-    n = len(t)
-    alpha = np.broadcast_to(region_property(mesh,thermal_expansion_per_k,"thermal_expansion_per_k"),(n,))
-    e = np.broadcast_to(region_property(mesh,young_modulus,"young_modulus",positive=True),(n,))
-    nu = np.broadcast_to(region_property(mesh,poisson_ratio,"poisson_ratio",lower=-1.,upper=.5),(n,))
-    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-        d = np.broadcast_to(element_constitutive(mesh,young_modulus,poisson_ratio,plane=plane),(n,3,3))
-        coefficient = _thermal_coefficient(e,nu,plane)
-        a = alpha[:,None]*(temperature_snapshot.temperature_k[t]-tref)    # (T,3) nodal per element
-        q = coefficient[:,None]*a
-    if not np.all(np.isfinite(coefficient)) or not np.all(np.isfinite(a)) or not np.all(np.isfinite(q)):
-        raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
-    fixed,values = vector_dirichlet(dirichlet,p,boundary,count,labels)
-    ke = np.einsum("tji,tjk,tkl,t->til",b,d,b,area)
-    if not np.all(np.isfinite(ke)):
-        raise ValueError("element stiffness exceeds finite numeric range")
-    rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
-    k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
-    body = _external_body_load(p,t,area,dofs,body_force)
-    line = traction_load(mesh,p,t,traction)
-    external = body+line
-    qc = q.mean(axis=1)
-    thermal = _thermal_load(area,b,dofs,qc,len(p))
-    load = external+thermal
-    if not all(np.all(np.isfinite(v)) for v in (body,line,external,thermal,load)):
-        raise ValueError("assembled external/thermal load exceeds finite numeric range")
-    free = np.setdiff1d(np.arange(len(load)),fixed)
-    u = np.zeros_like(load)
-    u[fixed] = values
-    if len(free):
-        rhs = load[free]-k[free][:,fixed]@values
-        try:
-            u[free] = splu(k[free][:,free].tocsc()).solve(rhs)
-        except RuntimeError as exc:
-            raise ValueError("singular or ill-conditioned constrained thermoelastic system") from exc
-    residual = k@u-external-thermal
-    if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
-        raise ValueError("nonfinite thermoelastic solution")
-    scale = max(np.linalg.norm(abs(k)@abs(u)+abs(external)+abs(thermal),np.inf),np.finfo(float).tiny)
-    if len(free) and np.linalg.norm(residual[free],np.inf) > 1e-9*scale:
-        raise ValueError("constrained thermoelastic solve failed its residual tolerance")
-    reaction = np.zeros_like(load)
-    reaction[fixed] = residual[fixed]
-    strain = np.einsum("tij,tj->ti",b,u[dofs])
-    ac = a.mean(axis=1)
-    th = ac[:,None]*_M
-    elastic = strain-th
-    stress = np.einsum("tij,tj->ti",d,strain)-qc[:,None]*_M
-    if plane == "strain":
-        lam = e*nu/((1+nu)*(1-2*nu))
-        zz = lam*(strain[:,0]+strain[:,1])-qc
-        ez = np.zeros(n)
-    else:
-        zz = np.zeros(n)
-        ez = ((1+nu)*ac-nu*(strain[:,0]+strain[:,1]))/(1-nu)
-    with np.errstate(over="ignore",invalid="ignore"):
-        energy = _region_energy(strain,a,area,d,e,nu,plane)
-    if not all(np.all(np.isfinite(v)) for v in (strain,th,elastic,stress,zz,ez)):
-        raise ValueError("computed thermoelastic strain/stress exceeds finite numeric range")
-    return ThermoelasticResult(u.reshape(-1,2),strain,th,elastic,stress,zz,ez,
-        external.reshape(-1,2),thermal.reshape(-1,2),reaction.reshape(-1,2),
-        residual.reshape(-1,2),energy,temperature_snapshot,tref,
-        _material_record(thermal_expansion_per_k),_material_record(young_modulus),
-        _material_record(poisson_ratio),plane,body.reshape(-1,2),line.reshape(-1,2))
+    numpy = backend_of(xp) is Backend.NUMPY
+    if is_per_region(value):
+        return {str(k): float(v) if numpy else v for k, v in value.items()}
+    return float(real_array(value, "material")) if numpy else lift(xp, real_value(value, "material"), xp.float64)
 
 
 @dataclass
@@ -346,172 +239,69 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     Tref, alpha, E, nu, Dirichlet displacements, body_force and traction may be
     JAX or PyTorch values, or callbacks returning them; the result is then in
     that library with reverse-mode derivatives
-    (docs/packages/galerkin/differentiation.md). The NumPy solve runs on their
-    numbers first, with all its checks.
+    (docs/packages/galerkin/differentiation.md). Callbacks are called once.
     """
-    body_force, traction = live_inputs.recorded(body_force), live_inputs.recorded(traction)
-    materials = dict(reference_temperature_k=reference_temperature_k,
-                     thermal_expansion_per_k=thermal_expansion_per_k,
-                     young_modulus=young_modulus, poisson_ratio=poisson_ratio)
-    result = _solve_numpy(mesh, temperature_snapshot, plane=plane,
-                          dirichlet=live_inputs.numbers(dirichlet),
-                          body_force=live_inputs.numbers(body_force),
-                          traction=live_inputs.numbers(traction),
-                          **{k: live_inputs.numbers(v) for k, v in materials.items()})
-    inputs = (*materials.values(), dirichlet, body_force, traction)
-    if not any(live_inputs.is_live_input(v) for v in inputs):
-        return result
-    return _live_result(mesh, temperature_snapshot, result, plane, dirichlet, body_force,
-                        traction, **materials)
-
-
-def _record_live(value):
-    """A result record of a live input: the value itself, or a {region name: value} copy."""
-    return {str(k): v for k, v in value.items()} if is_per_region(value) else value
-
-
-def _live_result(mesh, snapshot, result, plane, dirichlet, body_force, traction, *,
-                 reference_temperature_k, thermal_expansion_per_k, young_modulus, poisson_ratio):
-    """``result`` in the inputs' library: the elasticity adjoint correction of the
-    checked NumPy displacement, then every derived field from the same formulas."""
-    xp = live_namespace(*live_inputs.leaves(reference_temperature_k, thermal_expansion_per_k,
-                                             young_modulus, poisson_ratio, dirichlet,
-                                             body_force, traction))
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
-    regional = any(is_per_region(v) for v in
-                   (thermal_expansion_per_k, young_modulus, poisson_ratio))
-    tref = lift(xp, real_value(reference_temperature_k, "reference_temperature_k"), xp.float64)
-    temperature = lift(xp, snapshot.temperature_k)
-    m_vector = lift(xp, _M)
+    _verify_snapshot(temperature_snapshot, p, t)
+    tref = real_value(reference_temperature_k, "reference_temperature_k")
+    if tuple(tref.shape) != () or to_numpy(tref) < 0:
+        raise ValueError("reference_temperature_k must be a finite nonnegative real scalar")
+    regional = any(is_per_region(v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio))
+    alpha = region_property(mesh, thermal_expansion_per_k, "thermal_expansion_per_k", live=True)
+    _check_plane(plane)
+    e, nu = element_materials(mesh, young_modulus, poisson_ratio)
+    body = body_load(p, t, area, dofs, body_force)
+    line = traction_load(mesh, p, t, traction, live=True)
+    xp = live_namespace(tref, alpha, e, nu, body, line, *live_inputs.leaves(dirichlet))
+    tref, alpha, e, nu = (lift(xp, v, xp.float64) for v in (tref, alpha, e, nu))
     if regional:
-        alpha = xp.broadcast_to(lift(xp, region_property(
-            mesh, thermal_expansion_per_k, "thermal_expansion_per_k", live=True), xp.float64), (len(t),))
-        e, nu = (xp.broadcast_to(lift(xp, region_property(mesh, value, name, live=True, **bounds),
-                                      xp.float64), (len(t),))
-                 for value, name, bounds in ((young_modulus, "young_modulus", dict(positive=True)),
-                                             (poisson_ratio, "poisson_ratio", dict(lower=-1., upper=.5))))
-        a = alpha[:, None]*(temperature[t]-tref)
-        q = _thermal_coefficient(e, nu, plane)[:, None]*a
-        a_nodes, qc = a, xp.mean(q, axis=1)
-        ac = xp.mean(a, axis=1)
-    else:
-        alpha = lift(xp, real_value(thermal_expansion_per_k, "thermal_expansion_per_k"), xp.float64)
-        e, nu = live_materials(xp, mesh, len(t), young_modulus, poisson_ratio)
-        a = alpha*(temperature-tref)
-        q = _thermal_coefficient(e, nu, plane)*a
-        a_nodes, qc, ac = a[t], xp.mean(q[t], axis=1), xp.mean(a[t], axis=1)
-    d = constitutive_live(xp, e, nu, plane)
+        alpha, e, nu = (xp.broadcast_to(v, (len(t),)) for v in (alpha, e, nu))
+    temperature = lift(xp, temperature_snapshot.temperature_k)
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        d = constitutive(xp, e, nu, plane)
+        coefficient = _thermal_coefficient(e, nu, plane)
+        if regional:
+            a = alpha[:, None]*(temperature[t]-tref)       # (T,3) nodal values per element
+            q = coefficient[:, None]*a
+        else:
+            a = alpha*(temperature-tref)                   # nodal (N,)
+            q = coefficient*a
+            a, q = a[t], q[t]
+    if not all(np.all(np.isfinite(to_numpy(v))) for v in (coefficient, a, q)):
+        raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
+    _check_finite(d, "constitutive parameters")
     n = 2*len(p)
-    stiffness = live_stiffness(xp, b, dofs, d, area, n)
-    body = live_body_load(xp, p, t, area, dofs, body_force)
-    line = lift(xp, traction_load(mesh, p, t, live_inputs.replayed(traction), live=True))
+    stiffness = vector_stiffness(xp, b, dofs, d, area, n)
+    body, line = lift(xp, body), lift(xp, line)
     external = body+line
-    local = xp.einsum("tji,j,t->ti", lift(xp, b), m_vector, lift(xp, area)*qc)
-    thermal = scatter_add(xp, n, dofs.ravel(), xp.reshape(local, (-1,)))
-    u, fixed = live_displacement(xp, stiffness, external+thermal, result.displacement.reshape(-1),
-                                 dirichlet, p, boundary, count, labels)
+    qc, ac = xp.mean(q, axis=1), xp.mean(a, axis=1)
+    m_vector = lift(xp, _M)
+    thermal = lift(xp, _thermal_load(area, b, dofs, qc, len(p)))
+    load = external+thermal
+    if not all(np.all(np.isfinite(to_numpy(v))) for v in (body, line, external, thermal, load)):
+        raise ValueError("assembled external/thermal load exceeds finite numeric range")
+    u, fixed = displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, "thermoelastic")
     residual = stiffness.matvec(u)-external-thermal
-    reaction = scatter_add(xp, n, fixed, residual[fixed])
     strain = xp.einsum("tij,tj->ti", lift(xp, b), u[dofs])
     th = ac[:, None]*m_vector
-    stress = (xp.einsum("ij,tj->ti", d, strain) if d.ndim == 2
-              else xp.einsum("tij,tj->ti", d, strain))-qc[:, None]*m_vector
+    elastic = strain-th
+    stress = stress_of(xp, d, strain)-qc[:, None]*m_vector
     trace = strain[:, 0]+strain[:, 1]
     if plane == "strain":
-        zz = e*nu/((1+nu)*(1-2*nu))*trace-qc
+        zz = lame(e, nu, "strain")[0]*trace-qc
         ez = xp.zeros_like(qc)
     else:
         zz = xp.zeros_like(qc)
         ez = ((1+nu)*ac-nu*trace)/(1-nu)
-    bary = lift(xp, np.array([[2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3]]))
-    aq = a_nodes@bary.T
-    effective = aq if plane == "stress" else ((1+nu)[:, None] if regional else 1+nu)*aq
-    delta = strain[:, None, :]-effective[..., None]*m_vector
-    density = .5*(xp.einsum("tqi,ij,tqj->tq", delta, d, delta) if d.ndim == 2
-                  else xp.einsum("tqi,tij,tqj->tq", delta, d, delta))
-    if plane == "strain":
-        density = density+.5*(e[:, None] if regional else e)*aq**2
-    energy = xp.sum(lift(xp, area)[:, None]*density)/3
-    return ThermoelasticResult(
-        xp.reshape(u, (-1, 2)), strain, th, strain-th, stress, zz, ez,
-        *(xp.reshape(v, (-1, 2)) for v in (external, thermal, reaction, residual)), energy, snapshot,
-        tref, *(_record_live(v) if is_per_region(v) else lift(xp, real_value(v, "material"), xp.float64)
-                for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)),
-        plane, xp.reshape(body, (-1, 2)), xp.reshape(line, (-1, 2)))
-
-
-def _solve_numpy(mesh, temperature_snapshot, *, reference_temperature_k,
-                 thermal_expansion_per_k, young_modulus, poisson_ratio,
-                 plane, dirichlet, body_force, traction):
-    """The NumPy solve of ``solve_thermoelasticity`` (NumPy inputs only)."""
-    if any(is_per_region(v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)):
-        return _solve_regions(mesh, temperature_snapshot,
-            reference_temperature_k=reference_temperature_k,
-            thermal_expansion_per_k=thermal_expansion_per_k, young_modulus=young_modulus,
-            poisson_ratio=poisson_ratio, plane=plane, dirichlet=dirichlet,
-            body_force=body_force, traction=traction)
-    p,t,area,boundary,count,labels = triangle_geometry(mesh, counterclockwise=False)
-    b,dofs = vector_strain(p,t)
-    _verify_snapshot(temperature_snapshot,p,t)
-    tref = _scalar(reference_temperature_k,"reference_temperature_k",True)
-    alpha = _scalar(thermal_expansion_per_k,"thermal_expansion_per_k")
-    e,nu = _scalar(young_modulus,"young_modulus"), _scalar(poisson_ratio,"poisson_ratio")
-    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-        d = constitutive_matrix(e,nu,plane=plane)
-        coefficient = _thermal_coefficient(e,nu,plane)
-        a = alpha*(temperature_snapshot.temperature_k-tref)
-        q = coefficient*a
-    if not np.isfinite(coefficient) or not np.all(np.isfinite(a)) or not np.all(np.isfinite(q)):
-        raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
-    fixed,values = vector_dirichlet(dirichlet,p,boundary,count,labels)
-    ke = np.einsum("tji,jk,tkl,t->til",b,d,b,area)
-    if not np.all(np.isfinite(ke)):
-        raise ValueError("element stiffness exceeds finite numeric range")
-    rows,cols = np.repeat(dofs,6,axis=1).ravel(), np.tile(dofs,(1,6)).ravel()
-    k = coo_matrix((ke.ravel(),(rows,cols)),shape=(2*len(p),2*len(p))).tocsr()
-    body = _external_body_load(p,t,area,dofs,body_force)
-    line = traction_load(mesh,p,t,traction)
-    external = body+line
-    thermal = _thermal_load(area,b,dofs,q[t].mean(axis=1),len(p))
-    load = external+thermal
-    if not all(np.all(np.isfinite(v)) for v in (body,line,external,thermal,load)):
-        raise ValueError("assembled external/thermal load exceeds finite numeric range")
-    free = np.setdiff1d(np.arange(len(load)),fixed)
-    u = np.zeros_like(load)
-    u[fixed] = values
-    if len(free):
-        rhs = load[free]-k[free][:,fixed]@values
-        try:
-            u[free] = splu(k[free][:,free].tocsc()).solve(rhs)
-        except RuntimeError as exc:
-            raise ValueError("singular or ill-conditioned constrained thermoelastic system") from exc
-    residual = k@u-external-thermal
-    if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
-        raise ValueError("nonfinite thermoelastic solution")
-    scale = max(np.linalg.norm(abs(k)@abs(u)+abs(external)+abs(thermal),np.inf),np.finfo(float).tiny)
-    if len(free) and np.linalg.norm(residual[free],np.inf) > 1e-9*scale:
-        raise ValueError("constrained thermoelastic solve failed its residual tolerance")
-    reaction = np.zeros_like(load)
-    reaction[fixed] = residual[fixed]
-    strain = np.einsum("tij,tj->ti",b,u[dofs])
-    ac = a[t].mean(axis=1)
-    qc = q[t].mean(axis=1)
-    th = ac[:,None]*_M
-    elastic = strain-th
-    stress = strain@d.T-qc[:,None]*_M
-    if plane == "strain":
-        lam = e*nu/((1+nu)*(1-2*nu))
-        zz = lam*(strain[:,0]+strain[:,1])-qc
-        ez = np.zeros(len(t))
-    else:
-        zz = np.zeros(len(t))
-        ez = ((1+nu)*ac-nu*(strain[:,0]+strain[:,1]))/(1-nu)
-    with np.errstate(over="ignore",invalid="ignore"):
-        energy = _physical_energy(strain,a[t],area,d,e,nu,plane)
-    if not all(np.all(np.isfinite(v)) for v in (strain,th,elastic,stress,zz,ez)):
+    with np.errstate(over="ignore", invalid="ignore"):
+        energy = _physical_energy(xp, strain, a, area, d, e, nu, plane)
+    if not all(np.all(np.isfinite(to_numpy(v))) for v in (strain, th, elastic, stress, zz, ez)):
         raise ValueError("computed thermoelastic strain/stress exceeds finite numeric range")
-    return ThermoelasticResult(u.reshape(-1,2),strain,th,elastic,stress,zz,ez,
-        external.reshape(-1,2),thermal.reshape(-1,2),reaction.reshape(-1,2),
-        residual.reshape(-1,2),energy,temperature_snapshot,tref,alpha,e,nu,plane,
-        body.reshape(-1,2),line.reshape(-1,2))
+    numpy = backend_of(xp) is Backend.NUMPY
+    return ThermoelasticResult(
+        xp.reshape(u, (-1, 2)), strain, th, elastic, stress, zz, ez,
+        *(xp.reshape(v, (-1, 2)) for v in (external, thermal, at_fixed(xp, residual, fixed), residual)),
+        energy, temperature_snapshot, float(tref) if numpy else tref,
+        *(_material_record(xp, v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio)),
+        plane, xp.reshape(body, (-1, 2)), xp.reshape(line, (-1, 2)))
