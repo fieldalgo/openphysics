@@ -27,7 +27,7 @@ from .core import forms, kernels
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
 from .core.boundary import scalar_boundary_samples
 from .core.checks import real_value
-from .core.loads import source_load
+from .core.loads import ElementSource, source_load
 from .core import solve as core_solve
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
@@ -118,6 +118,13 @@ class SteadyHeatResult:
     system_rhs: np.ndarray | None = None
 
 
+def _element_source(heat_source, mesh):
+    """An ElementHeatSource as the checked element values core.loads takes; other sources unchanged."""
+    if isinstance(heat_source, ElementHeatSource):
+        return ElementSource(heat_source.on_mesh(mesh))
+    return heat_source
+
+
 def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
                       outward_flux=None, convection=None):
     """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
@@ -166,7 +173,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
         raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
     cells = np.asarray(mesh.triangles)
     stiffness = forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (len(p), len(p)))
-    load = source_load(mesh, p, t, area, heat_source, live=True)
+    load = source_load(mesh, p, t, area, _element_source(heat_source, mesh), live=True)
     # One array library for everything from here on (NumPy objects stay as they are).
     xp = live_namespace(k, load, G, B, shifted_B, None if issparse(H) else H.values,
                         *anchors, *prescribed.values())

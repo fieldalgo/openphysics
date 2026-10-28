@@ -24,7 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
-- 문서: [아키텍처](architecture.md#galerkin-안-core-physics-coupling) 문서가 galerkin의 core·physics·coupling 층, 아직 core로 옮기지 않은 것, 새 물리 추가 절차를 설명합니다. 코드 변경은 없습니다.
+- 문서: [아키텍처](architecture.md#galerkin-안-core-physics-coupling) 문서가 galerkin의 core·physics·coupling 층, 아직 core로 옮기지 않은 것, 새 물리 추가 절차를 설명합니다.
+- `galerkin`: `galerkin.core`가 더는 위쪽 모듈을 import하지 않습니다. 재료 조회는 `galerkin.core.materials`로 옮겼고(`galerkin.materials`는 같은 공개 이름을 유지), `core.loads`는 `ElementHeatSource`를 import하는 대신 검사를 마친 요소 열원 값(`ElementSource`)을 받습니다. import 방향을 검사하는 시험을 더했습니다. 결과는 바뀌지 않습니다.
 
 - `simcase` Studio: 정상·과도 열전도 route가 열전도 영역 문서를 worker thread에서 검증하고 실행합니다. 실행 전에는 도형, 원, 다각형 점, 경계 교차, 루프 꼭짓점 수를, job에서는 절점과 셀 수를 한도와 비교합니다. 영역 결과는 자체 형식 `studio-thermal-steady-regions-v1`과 `studio-thermal-transient-regions-v1`을 쓰고, 직사각형 문서의 응답은 그대로입니다. 페이지는 영역 결과를 영역 색, 경계, 범례, 재료 표, 커서 아래 영역 표시와 함께 보여 줍니다. [문서](packages/simcase/thermal_studio.md#영역-문서).
 
