@@ -33,7 +33,8 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
   python -m pytest -q tests/galerkin/test_crosscheck_skfem.py \
     tests/galerkin/test_crosscheck_skfem_lossy_cavity.py \
     tests/galerkin/test_crosscheck_skfem_multimaterial.py \
-    tests/galerkin/test_crosscheck_symfem_elements.py
+    tests/galerkin/test_crosscheck_symfem_elements.py \
+    tests/galerkin/test_crosscheck_symfem_coefficients.py
 ```
 
 도구가 없으면 로컬에서는 시험을 건너뜁니다. CI는 `OPENPHYSICS_REQUIRE_CROSSCHECK=1`을
@@ -119,6 +120,28 @@ galerkin의 전역 변이 낮은 번호에서 높은 번호로 향하는지, 두
 symfem 2025.12.0, sympy 1.14.0으로 로컬 Linux에서 실행한 값입니다. P1 하중 벡터(galerkin은
 한 점 중심 구적을 씀)와 P1 경계 질량은 비교하지 않습니다. 기호 적분은 코어 하나에서 약 20초
 걸립니다.
+
+### 계수
+
+`test_crosscheck_symfem_coefficients.py`는 같은 메시와 관례로 조립이 계수를 어떻게 적용하는지
+확인합니다. 셀마다 정확한 계수를 하나씩 줍니다. 스칼라, 대칭이 아닌 텐서(각 함수가 텐서의 어느
+쪽에 붙는지 정합니다. `grad phi_i . (C grad phi_j)`, `W_e . (C W_f)`), 복소 스칼라, 복소 텐서입니다.
+symfem이 셀마다 기저 성분을 한 번 정확히 적분하고, 기준값은 이를 정확한 계수와 곱해 더합니다.
+공개 함수가 받는 계수 형태마다 두 번 비교합니다. 공개 함수로 한 번, `galerkin.core.kernels`와
+`core.forms.matrix`로 한 번이라서, 둘 중 어느 쪽이 다른 쪽을 쓰든 이 확인은 영향을 받지 않습니다.
+기준은 위와 같은 `1e-12`이고, 계수는 float64로 한 번 반올림됩니다. 변 x 기울기 결합의 텐서를
+전치하거나 질량 계수의 허수부를 버리면 각각 실패합니다.
+
+| 사례 | 행렬 | 계수 형태 | 최대 차이 | 기준 |
+|---|---|---|---|---|
+| `elements-coefficients-triangles` | P1 강성 | 셀별, 텐서, 복소 셀별, 복소 텐서 | 1.8e-16 | 1e-12 |
+| | P1 질량, Nedelec curl-curl | 셀별, 복소 셀별 | 1.7e-17, 5.3e-16 | 1e-12 |
+| | Nedelec 질량, 변 x P1 기울기 결합 | 셀별, 텐서, 복소 셀별, 복소 텐서 | 2.1e-16, 2.1e-16 | 1e-12 |
+| `elements-coefficients-tetrahedra` | P1 강성 | 셀별, 텐서 | 3.0e-16 | 1e-12 |
+| | P1 질량, Nedelec curl-curl, Nedelec 질량, 변 x P1 기울기 결합 | 셀별 | 6.8e-17, 1.8e-16, 1.1e-16, 2.7e-16 | 1e-12 |
+
+공개 경로와 core 경로의 차이는 같았습니다. 3D 함수는 실수 스칼라 계수만 받으므로(P1 강성은
+텐서도 받음) 3D 복소 계수는 비교하지 않습니다. 같은 로컬 실행이고 약 20초 걸립니다.
 
 ## 사례 추가
 
