@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 어떤 모듈도 다른 모듈이나 클래스의 밑줄 멤버를 읽지 않으며 층 시험이 이를 검사합니다. 클래스 밖에서 쓰던 `EdgeSpace3D._ids`와 `Mesh3D._edge_matrix`는 `galerkin.core.spaces.edge_ids`와 `galerkin.core.tets.edge_matrix`로 바꿨습니다. 결과는 바뀌지 않습니다.
 - `galerkin`: `EdgeSpace`와 `EdgeSpace3D`를 변 커널이 쓰는 국소 변 순서와 함께 `galerkin.core.spaces`로 옮겼습니다. `galerkin`, `galerkin.edge`, `galerkin.edge3d`는 여전히 내보내며, 클래스 모듈(repr과 pickle 경로)은 이제 `galerkin.core.spaces`입니다. 행렬과 필드는 바뀌지 않습니다.
 - `galerkin`: 어떤 모듈도 다른 모듈의 비공개 이름을 import하지 않으며, 층 시험이 이를 검사합니다. 상자 공진기와 탄성이 그렇게 나눠 쓰던 입력 검사는 `galerkin.core.checks`로, 열→역학 workflow의 메시 격리·Dirichlet 검사와 공진기의 광속·수치 기준·상자 메시는 패키지 비공개 모듈로 옮겼습니다. 결과와 오류 메시지는 바뀌지 않습니다.
 - `galerkin`: `solve_elasticity`, `solve_thermoelasticity`, 도파관 모드 연립방정식은 NumPy 본문과 따로 살아 있는 본문을 두는 대신, NumPy와 JAX·PyTorch 입력에 `core.kernels`로 만든 본문 하나를 씁니다. NumPy 결과는 비트 단위로 같습니다.

@@ -6,7 +6,9 @@ See docs/architecture.md ("Inside galerkin"). Read from the source, so a new
 import across a layer fails here rather than in a later import cycle. No module
 imports another module's underscore names: shared code lives in core, coupling,
 a package-private module such as ``_cavity_common`` (imported whole or by
-name) or public names of the module that owns it.
+name) or public names of the module that owns it. Underscore attributes are
+read only on ``self`` and ``cls``: no module reaches into another module's or
+class's private members either.
 """
 import ast
 from pathlib import Path
@@ -94,3 +96,18 @@ def test_no_module_imports_another_modules_private_names():
     assert len(files) > 40
     bad = [(path.relative_to(PACKAGE).as_posix(), *hit) for path in files for hit in _private_names_imported(path)]
     assert not bad, f"private names imported across galerkin modules: {bad}"
+
+
+def _private_members_used(path):
+    """(line, expression) for every underscore attribute read on anything but ``self`` or ``cls``."""
+    return [(node.lineno, ast.unparse(node)) for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.Attribute) and node.attr.startswith("_") and not node.attr.startswith("__")
+            and not (isinstance(node.value, ast.Name) and node.value.id in ("self", "cls"))]
+
+
+def test_no_module_uses_another_modules_private_members():
+    files = sorted(p for p in PACKAGE.rglob("*.py") if "__pycache__" not in p.parts)
+    assert len(files) > 40
+    bad = [(path.relative_to(PACKAGE).as_posix(), *hit) for path in files for hit in _private_members_used(path)]
+    assert not bad, f"private members read outside their own class or module: {bad}"
+

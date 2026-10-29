@@ -91,14 +91,6 @@ class EdgeSpace3D:
     def num_edges(self) -> int:
         return len(self.edges)
 
-    def _ids(self, pairs: np.ndarray) -> np.ndarray:
-        """Global ids of node pairs. self.edges is lexsorted, so a key search works."""
-        n = self.mesh.num_nodes
-        key = self.edges[:, 0].astype(np.int64) * n + self.edges[:, 1]
-        p = np.sort(np.asarray(pairs, dtype=np.int64), axis=1)
-        idx = np.searchsorted(key, p[:, 0] * n + p[:, 1])
-        return idx
-
     def boundary_edge_ids(self, node_set: np.ndarray | None = None) -> np.ndarray:
         """Ids of edges lying in the boundary surface (n x E = 0 constrains these).
 
@@ -110,4 +102,15 @@ class EdgeSpace3D:
             keep = np.isin(faces, np.asarray(node_set, dtype=int)).all(axis=1)
             faces = faces[keep]
         pairs = np.concatenate([faces[:, [0, 1]], faces[:, [0, 2]], faces[:, [1, 2]]])
-        return np.unique(self._ids(np.unique(pairs, axis=0)))
+        return np.unique(edge_ids(self, np.unique(pairs, axis=0)))
+
+
+def edge_ids(space, pairs):
+    """Global ids in ``space`` (an ``EdgeSpace3D``) of the edges joining node ``pairs`` (P, 2).
+
+    ``space.edges`` is lexsorted, so a key search finds them; every pair must be an edge.
+    """
+    n = space.mesh.num_nodes
+    key = space.edges[:, 0].astype(np.int64) * n + space.edges[:, 1]
+    p = np.sort(np.asarray(pairs, dtype=np.int64), axis=1)
+    return np.searchsorted(key, p[:, 0] * n + p[:, 1])
