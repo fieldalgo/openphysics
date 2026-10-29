@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .assembly import assemble_load
 from .materials import region_property, element_values
 from .mesh import Mesh
 from .heat_source import ElementHeatSource
@@ -189,16 +188,12 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
     if is_live(residual):
         reaction = scatter_add(xp, len(p), fixed, residual[fixed])
     electric = -element_gradient(mesh, increment)
-    current = sigma[:, None]*electric
-    heat = xp.einsum("ij,ij->i", current, electric)
+    current, heat, element_load = kernels.p1_joule(mesh, sigma, electric)
+    load = forms.vector(cells, element_load, len(p), order="columns")
+    power = lift(xp, area)@heat
+    supplied = increment@(reaction-outward)
     if backend_of(xp) is Backend.NUMPY:
-        load = assemble_load(mesh, heat)
-        power = float(area@heat)
-        supplied = float(increment@(reaction-outward))
-    else:
-        load = forms.vector(cells, kernels.p1_load(mesh, heat), len(p), order="columns")
-        power = lift(xp, area)@heat
-        supplied = increment@(reaction-outward)
+        power, supplied = float(power), float(supplied)
     power_number, supplied_number = float(to_numpy(power)), float(to_numpy(supplied))
     if not all(np.all(np.isfinite(to_numpy(v))) for v in (electric, current, heat, load, power, supplied)):
         raise ValueError("electric fields or Joule power exceed floating-point range")

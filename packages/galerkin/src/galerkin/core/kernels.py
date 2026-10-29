@@ -4,7 +4,8 @@
 
 Each kernel returns element matrices ``(T, i, j)`` or vectors ``(T, i)`` in the
 array library of its coefficient (NumPy for Python scalars), ready for
-``galerkin.core.forms.matrix`` or ``vector``. Mesh geometry is static and
+``galerkin.core.forms.matrix`` or ``vector``; ``p1_joule`` also takes a field
+and returns the current and the heating with their load. Mesh geometry is static and
 computed with NumPy; only coefficients may be live, so a JAX or PyTorch
 coefficient carries its derivative into the element matrices.
 
@@ -120,8 +121,28 @@ def p1_load(mesh, rho=0.0):
     else:
         xp, rho_e = coefficient(rho)
         rho_e = xp.broadcast_to(_real_coefficient(xp, rho_e), (len(tris),))
-    contrib = rho_e * _lift(xp, area) / 3.0
+    return _centroid_load(xp, rho_e, area)
+
+
+def _centroid_load(xp, values, area):
+    """``int f phi_i`` by the centroid rule for f constant on each triangle: (T, 3)."""
+    contrib = values * _lift(xp, area) / 3.0
     return xp.stack([contrib, contrib, contrib], axis=1)
+
+
+def p1_joule(mesh, sigma, field):
+    """Joule heating of a P1 potential: current sigma E (T, 2), heating sigma E . E (T,) and its load (T, 3).
+
+    ``sigma`` (T,) in S/m and ``field`` E (T, 2) in V/m share one array
+    library; the load is the centroid rule of ``p1_load`` in W/m. No absolute
+    value or conjugate is taken, so the result is analytic in sigma and E: a
+    complex step through it gives exact first derivatives (the Newton step of
+    galerkin.temperature_joule_heating). Used by galerkin.electric.
+    """
+    xp = namespace(sigma, field)
+    current = sigma[:, None] * field
+    heat = _einsum(xp, "ij,ij->i", current, field)
+    return current, heat, _centroid_load(xp, heat, mesh.areas())
 
 
 # -- P1 tetrahedra (galerkin.assembly3d) ---------------------------------------
