@@ -182,6 +182,31 @@ These apply to every input:
   sizes, and checks the queries against a brute force and the corners and
   meshes against the old implementations.
 
+## Tetrahedral mesh contract
+
+meshine does not generate tetrahedra yet. `TetMesh`, `check` and `write_msh`
+fix the output that OpenPhysics's own 3D meshers will return, so that solvers and
+tests can be written against it now:
+
+```python
+from meshine import TetMesh, check, write_msh
+
+mesh = TetMesh(nodes, tetrahedra, regions, region_names, boundary_faces, interfaces=interfaces)
+check(mesh)                    # raises MeshCheckError listing every violation
+write_msh(mesh, "part.msh")    # Gmsh MSH 4.1 ASCII, read back by gmshio.read_msh
+mesh.quality(), mesh.dihedral_angles(), mesh.radius_edge(), mesh.region_volume("die")
+```
+
+`check` decides the sign of every tetrahedron's volume exactly: a floating-point
+filter settles the clear cases and `Fraction` arithmetic the rest. It then checks
+that every face is used once or twice, that the tagged faces are exactly the
+outward-wound exterior faces with one tag each, that `boundary_nodes` match the
+faces, that no node is orphaned or duplicated, that every region is non-empty and
+that `interfaces` hold exactly the faces between two regions, wound from the first
+name to the second. The fields are those `galerkin.from_mesher` reads. The criteria
+the meshers must meet are fixed in the
+[pre-registered 3D validation plan](validation3d.md).
+
 ## Self-checks
 
 ```bash
