@@ -9,10 +9,8 @@ compute exactly as before.
 """
 from collections.abc import Mapping
 from dataclasses import dataclass
-import warnings
 
 import numpy as np
-from scipy.sparse.linalg import MatrixRankWarning
 
 from .assembly import assemble_load
 from .materials import region_property, element_values
@@ -166,12 +164,10 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
         raise ValueError("assembled electric stiffness exceeds floating-point range")
     bc = {(node,): value-offsets[labels[node]]
           for node, value in (prescribed | gauges).items()}
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", MatrixRankWarning)
-        try:
-            increment = core_solve.solve_dirichlet(stiffness, -outward, bc)
-        except (RuntimeError, MatrixRankWarning, ValueError) as exc:
-            raise ValueError("singular or ill-conditioned electric system") from exc
+    try:
+        increment = core_solve.solve_dirichlet(stiffness, -outward, bc)
+    except (RuntimeError, ValueError) as exc:
+        raise ValueError("singular or ill-conditioned electric system") from exc
     potential = increment+offsets[labels]
     residual = stiffness.matvec(increment)+outward
     fixed = np.array(sorted(prescribed), dtype=int)

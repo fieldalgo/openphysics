@@ -300,3 +300,82 @@ def test_torch_solve_keeps_no_factor_on_the_graph():
     assert not any(hasattr(x.grad_fn, name) for name in ("lu", "factor"))
     x.sum().backward()
     assert v.grad is not None
+
+
+def test_a_singular_numpy_block_raises_and_the_public_solve_still_warns():
+    """The physics solvers' NumPy path raises for an exactly singular block; the public
+    galerkin.solve_dirichlet keeps SciPy's spsolve, which warns and returns NaN."""
+    from scipy.sparse.linalg import MatrixRankWarning
+
+    from galerkin.core.solve import solve_dirichlet
+    from galerkin.solver import solve_dirichlet as public_solve_dirichlet
+    K = CooMatrix(np.array([0, 0, 1, 1, 2]), np.array([0, 1, 0, 1, 2]), np.ones(5), (3, 3))
+    bc = {(2,): 0.5}
+    with pytest.raises(ValueError, match="^singular sparse matrix: Factor is exactly singular$"):
+        solve_dirichlet(K, np.ones(3), bc)
+    with pytest.warns(MatrixRankWarning):
+        x = public_solve_dirichlet(K.to_scipy(), np.ones(3), bc)
+    assert np.isnan(x[:2]).all() and x[2] == 0.5
+
+
+@pytest.mark.parametrize("physics", ["heat", "electric", "elasticity"])
+def test_overlapping_numpy_solves_leave_the_warning_filters_alone(monkeypatch, physics):
+    """Two threads inside a NumPy solve at once leave ``warnings.filters`` as they found it.
+
+    ``warnings.catch_warnings`` swaps the process-wide filter list: of two solves that
+    overlap, the one that leaves last would restore a list holding the other's filter.
+    The threads enter and leave in that order here.
+    """
+    import threading
+    import warnings
+
+    import galerkin.core.solve as core_solve
+    from galerkin.elasticity import solve_elasticity
+    from galerkin.electric import solve_steady_electric
+    from galerkin.mesh import rectangle_mesh
+    from galerkin.thermal import solve_steady_heat
+    mesh = rectangle_mesh(1.0, 0.5, 4, 3)
+    left = [int(i) for i in mesh.boundary["left"]]
+    right = [int(i) for i in mesh.boundary["right"]]
+    solves = {
+        "heat": lambda: solve_steady_heat(mesh, conductivity=2.0, dirichlet={i: 300.0 for i in left},
+                                          heat_source=1.0),
+        "electric": lambda: solve_steady_electric(
+            mesh, conductivity=2.0, dirichlet={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
+        "elasticity": lambda: solve_elasticity(
+            mesh, young_modulus=2e3, poisson_ratio=0.3, plane="stress",
+            dirichlet={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),
+    }
+    original = core_solve.scipy_solve_dirichlet
+    first_inside, first_done = threading.Event(), threading.Event()
+    both_inside = threading.Barrier(2, timeout=30)
+
+    def held(*args, **kwargs):
+        if threading.current_thread().name == "first":
+            first_inside.set()
+        both_inside.wait()
+        if threading.current_thread().name == "second":
+            first_done.wait(30)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(core_solve, "scipy_solve_dirichlet", held)
+    before, errors = list(warnings.filters), []
+
+    def run():
+        try:
+            solves[physics]()
+        except Exception as exc:  # reported by the assertion below
+            errors.append(exc)
+        finally:
+            if threading.current_thread().name == "first":
+                first_done.set()
+
+    first = threading.Thread(target=run, name="first")
+    first.start()
+    assert first_inside.wait(30)
+    second = threading.Thread(target=run, name="second")
+    second.start()
+    first.join(60)
+    second.join(60)
+    assert not errors
+    assert warnings.filters == before

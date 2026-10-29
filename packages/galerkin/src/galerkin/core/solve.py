@@ -84,10 +84,13 @@ def solve_dirichlet(terms, b, dirichlet):
     ``terms`` is a CooMatrix or a sequence of them, summed. ``dirichlet`` maps a
     tuple of node indices to a scalar or a matching array, as for
     :func:`galerkin.solver.solve_dirichlet`; a node listed twice takes its last
-    value. On NumPy the terms are converted to SciPy CSR and added left to right
-    and that function solves them, so results round exactly as before. With JAX
-    or PyTorch values the free block is solved with :func:`solve`, and the
-    derivative reaches the matrix entries, ``b`` and the prescribed values.
+    value. On NumPy the terms are converted to SciPy CSR and added left to right,
+    and that function's body solves them with SuperLU's ``splu``: the same
+    numbers as its ``spsolve`` with SuperLU, and an exactly singular block raises
+    ValueError without a warning, so no caller changes the process-wide warning
+    filters to catch one. With JAX or PyTorch values the free block is solved
+    with :func:`solve`, and the derivative reaches the matrix entries, ``b`` and
+    the prescribed values.
     """
     terms = [terms] if isinstance(terms, CooMatrix) else list(terms)
     values = [v for v in dirichlet.values()]
@@ -96,7 +99,7 @@ def solve_dirichlet(terms, b, dirichlet):
         matrix = terms[0].to_scipy()
         for term in terms[1:]:
             matrix = matrix + term.to_scipy()
-        return scipy_solve_dirichlet(matrix, b, dirichlet)
+        return scipy_solve_dirichlet(matrix, b, dirichlet, factor=True)
     A = terms[0]
     for term in terms[1:]:
         A = A + term
@@ -301,11 +304,14 @@ def _build_nan_torch():
     return lambda value, inputs: Through.apply(value, *inputs)
 
 
-def scipy_solve_dirichlet(K, f, dirichlet):
+def scipy_solve_dirichlet(K, f, dirichlet, factor=False):
     """``galerkin.solver.solve_dirichlet`` on SciPy CSR and NumPy data (its body).
 
-    SciPy's SuperLU solves the free block whether or not scikit-umfpack is
-    installed. An exactly singular block warns MatrixRankWarning and gives NaN.
+    By default SciPy's ``spsolve`` solves the free block: an exactly singular
+    block warns MatrixRankWarning and gives NaN. ``factor=True`` (the NumPy path
+    of :func:`solve_dirichlet`) factors it with SuperLU's ``splu`` instead, also
+    when scikit-umfpack is installed, and raises ValueError for an exactly
+    singular block.
     """
     n = K.shape[0]
     # Complex support: solve in complex arithmetic if K, f, or any boundary
@@ -327,6 +333,18 @@ def scipy_solve_dirichlet(K, f, dirichlet):
     K_FD = K[free][:, fixed]
     rhs = f[free] - K_FD @ V[fixed]
 
-    # SuperLU always: with scikit-umfpack installed, spsolve would switch to UMFPACK.
-    V[free] = spla.spsolve(K_FF.tocsc(), rhs, use_umfpack=False)
+    V[free] = _superlu_solve(K_FF, rhs) if factor else spla.spsolve(K_FF.tocsc(), rhs)
     return V
+
+
+def _superlu_solve(A, rhs):
+    """``spsolve(A, rhs)`` with SuperLU, raising ValueError for an exactly singular ``A``.
+
+    The dtype promotion is spsolve's, so the numbers are the same.
+    """
+    dtype = np.promote_types(A.dtype, rhs.dtype)
+    try:
+        lu = splu(A.astype(dtype).tocsc())
+    except RuntimeError as exc:
+        raise ValueError(f"singular sparse matrix: {exc}") from exc
+    return lu.solve(np.asarray(rhs, dtype=dtype))

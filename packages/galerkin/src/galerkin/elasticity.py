@@ -17,10 +17,8 @@ adjoint gives the exact derivatives.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import warnings
 
 import numpy as np
-from scipy.sparse.linalg import MatrixRankWarning
 
 from .materials import is_per_region, region_property
 from .core import forms, kernels
@@ -168,12 +166,10 @@ def displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, wha
     fixed, values = vector_dirichlet(live_inputs.numbers(dirichlet), p, boundary, count, labels)
     if backend_of(xp) is not Backend.NUMPY and len(fixed):
         values = xp.stack([lift(xp, v, xp.float64) for v in dirichlet.values()])
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", MatrixRankWarning)
-        try:
-            u = core_solve.solve_dirichlet(stiffness, load, {tuple(fixed): values} if len(fixed) else {})
-        except (RuntimeError, MatrixRankWarning, ValueError) as exc:
-            raise ValueError(f"singular or ill-conditioned constrained {what} system") from exc
+    try:
+        u = core_solve.solve_dirichlet(stiffness, load, {tuple(fixed): values} if len(fixed) else {})
+    except (RuntimeError, ValueError) as exc:
+        raise ValueError(f"singular or ill-conditioned constrained {what} system") from exc
     check_solution(_numbers(stiffness).to_scipy(), to_numpy(u), to_numpy(load), fixed, what)
     return u, fixed
 
