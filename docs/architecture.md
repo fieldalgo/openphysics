@@ -173,6 +173,9 @@ grid-to-mesh projection waits for a second engine
    do (eigenpairs: `core.eigen`). Until then,
    refuse live values with `core.checks.refuse_live` rather than cut the
    derivative silently ([pattern and limits](packages/galerkin/differentiation.md)).
+   A solver that finds its solution by iteration attaches the implicit
+   derivative of its residual, never the derivative of one more pass of the
+   iteration ([iterative solvers](packages/galerkin/differentiation.md#iterative-solvers)).
 4. **Documents (optional).** Register a `PhysicsKind` in
    [`simcase.registry`](../packages/simcase/src/simcase/registry.py) with its
    contract validation, runner, summary and result types. The runner and schema
