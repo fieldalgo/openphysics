@@ -284,7 +284,8 @@ class CrossSection:
             h = np.minimum(edge_size + grade * d_corner, 3.0 * edge_size + grade * d_trace)
             return np.minimum(h, far_size)
 
-        tm = generate(domain, "outer", min_angle=min_angle, size_fn=size_fn)
+        tm = generate(domain, "outer", min_angle=min_angle, size_fn=size_fn,
+                      candidate_order="stable")
         mesh = from_mesher(tm)
 
         names = mesh.region_names

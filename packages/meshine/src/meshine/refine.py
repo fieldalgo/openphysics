@@ -130,7 +130,8 @@ class _Corner(NamedTuple):
 def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
              size_fn: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
              size_factor: float = 0.6, max_rounds: int = 80, max_points: int = 300_000,
-             smooth: int = 2, verbose: bool = False) -> TriMesh:
+             smooth: int = 2, verbose: bool = False,
+             candidate_order: str = "legacy") -> TriMesh:
     """Mesh a ``Domain``.
 
     Parameters
@@ -146,7 +147,11 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
     max_points : hard cap; MeshSizeLimitError (a RuntimeError) when the input domain as built
                  has more points, or before an insertion would pass it
     smooth : Laplacian smoothing sweeps of interior nodes after refinement
+    candidate_order : "legacy" preserves the existing NumPy quicksort selection;
+                      "stable" retains input order for equal circumradii
     """
+    if not isinstance(candidate_order, str) or candidate_order not in ("legacy", "stable"):
+        raise ValueError('candidate_order must be "legacy" or "stable"')
     if min_angle >= 34:
         raise ValueError("min_angle above ~33 degrees cannot be guaranteed; use <= 33")
     pts, seg_list, regions = domain.build(boundary_names)
@@ -293,7 +298,7 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
                 keep |= points_in_loops(cand, [P[np.array(lp)] for lp in r.loops])
             cand, cand_R = cand[keep], cand_R[keep]
         if len(cand):
-            accepted = _separate(cand, cand_R)
+            accepted = _separate(cand, cand_R, stable=candidate_order == "stable")
             add_points(cand[accepted], False)
         if verbose:
             print(f"round {rnd}: {bad.sum()} bad, inserted {int(len(cand) and accepted.sum())}, "
@@ -649,10 +654,11 @@ def _encroached(cand: np.ndarray, mids: np.ndarray, half: np.ndarray) -> tuple[n
     return encroaches, np.unique(si[hit])
 
 
-def _separate(cand: np.ndarray, R: np.ndarray, factor: float = 0.7) -> np.ndarray:
+def _separate(cand: np.ndarray, R: np.ndarray, factor: float = 0.7, *, stable: bool = False) -> np.ndarray:
     """Greedy filter: accept candidates (largest circumradius first) whose distance to
-    every previously accepted candidate exceeds ``factor`` times their own radius."""
-    order = np.argsort(-R)
+    every previously accepted candidate exceeds ``factor`` times their own radius.
+    With ``stable``, equal radii retain input order independently of quicksort."""
+    order = np.argsort(-R, kind="stable" if stable else "quicksort")
     tree = cKDTree(cand)
     accepted = np.zeros(len(cand), dtype=bool)
     for i in order:
