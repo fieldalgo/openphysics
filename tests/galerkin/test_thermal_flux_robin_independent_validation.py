@@ -245,9 +245,9 @@ def test_thermal_flux_robin_independent_assembled_operator(monkeypatch):
     import galerkin.thermal as production
     # The SciPy solve that eliminates the Dirichlet nodes receives the summed operator.
     observed=[];original=production.core_solve.scipy_solve_dirichlet
-    def observe(matrix,rhs,bc):
+    def observe(matrix,rhs,bc,**options):
         observed.append((matrix.copy(),rhs.copy()))
-        return original(matrix,rhs,bc)
+        return original(matrix,rhs,bc,**options)
     monkeypatch.setattr(production.core_solve,'scipy_solve_dirichlet',observe)
     m=rectangle_mesh(1,1,3,3);bc={int(i):330. for i in m.boundary['left']}
     source=lambda p:6.+2*p[:,0]-3*p[:,1]**2

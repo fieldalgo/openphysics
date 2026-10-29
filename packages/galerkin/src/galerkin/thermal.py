@@ -14,11 +14,9 @@ that library and carry derivatives. NumPy inputs compute exactly as before.
 """
 from dataclasses import dataclass
 from typing import Mapping
-import warnings
 
 import numpy as np
 from scipy.sparse import coo_matrix, issparse
-from scipy.sparse.linalg import MatrixRankWarning
 
 from .mesh import Mesh
 from .heat_source import ElementHeatSource
@@ -189,12 +187,10 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
                 *map(to_numpy, (load, G, B, shifted_B, rhs, shifted_rhs)))):
         raise ValueError("assembled heat system exceeds floating-point range")
     shifted_bc = {(node,): value-offsets[labels[node]] for node, value in prescribed.items()}
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", MatrixRankWarning)
-        try:
-            increment = core_solve.solve_dirichlet([stiffness, H], shifted_rhs, shifted_bc)
-        except (RuntimeError, MatrixRankWarning, ValueError) as exc:
-            raise ValueError("singular or ill-conditioned constrained heat system") from exc
+    try:
+        increment = core_solve.solve_dirichlet([stiffness, H], shifted_rhs, shifted_bc)
+    except (RuntimeError, ValueError) as exc:
+        raise ValueError("singular or ill-conditioned constrained heat system") from exc
     temperature = increment+offsets[labels]
     # K annihilates constants; H does not. shifted_B integrates h*(ambient-offset).
     # Evaluate derivatives and convection before restoring absolute temperature.

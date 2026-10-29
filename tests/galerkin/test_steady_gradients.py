@@ -278,7 +278,8 @@ def test_numpy_containers_and_couplings_refuse_live_values(name):
 
 @pytest.mark.parametrize("name", [None, *BACKENDS])
 def test_a_singular_heat_or_electric_system_is_one_value_error(name):
-    """Conductivity so small that the stiffness underflows to zero: the same message on every library."""
+    """Conductivity so small that the stiffness keeps a few subnormal entries and SuperLU meets
+    an exactly zero pivot: the same message on every library."""
     k = 5e-324 if name is None else _wrap(name, 5e-324)
     with pytest.raises(ValueError, match="^singular or ill-conditioned constrained heat system$"):
         solve_steady_heat(MESH, conductivity=k, dirichlet={i: 300.0 for i in LEFT}, heat_source=1.0)
