@@ -48,6 +48,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `simcase`: `run`이 정상·과도 열전도 영역 문서에 선택적인 `max_input_vertices`, `max_nodes`, `max_triangles`를 받아 풀이 전에 검사하고 `MeshLimitError`로 거절합니다. `check_mesh_limits`는 영역을 만들지 않고 문서의 루프 꼭짓점 수를 반환합니다. 메시 전 작업을 제한하는 것은 `max_input_vertices`뿐입니다. 두 열전도 종류는 물리 등록표(`PhysicsKind.accepts_mesh_limits`)를 통해 상한을 받고, 상한이 없으면 실행은 그대로입니다. [문서](packages/simcase/thermal_regions2d.md#호출자를-위한-메시-상한).
 
+- `meshine`: 세분화 후보의 외접 반지름이 같으면 입력 순서를 유지합니다. 불안정한 NumPy 정렬에 따른 플랫폼별 greedy 선택 차이를 막으며, 동률이 있는 메시는 달라질 수 있습니다. 임의의 수치 라이브러리 버전 사이에서 동일 메시를 보장하지는 않습니다.
 - `meshine`: `generate`는 삽입이 `max_points`를 넘기려 하면 `RuntimeError` 하위 클래스인 `MeshSizeLimitError`를 발생시키고, 만들어진 입력 영역도 세분화 작업 전에 상한과 비교합니다. 그래서 점이 더 많은 입력은 세분화되거나, 삽입이 필요 없을 때 상한을 넘긴 채 반환되지 않고 그 자리에서 거절됩니다. 꼭짓점 수에 대해 O(V²)인 영역 만들기는 여전히 먼저 실행됩니다. [문서](packages/meshine/overview.md#안전장치).
 
 - `galerkin`: 정상·과도 열→역학 workflow가 단계를 연성 층의 `OneWayChain`으로 실행하고, 각 절점 Kelvin 장을 동결하기 전에 같은 메시 `transfer`에 통과시킵니다. 결과·manifest JSON·단계 오류와 메시지는 바뀌지 않습니다. [문서](packages/galerkin/thermal_mechanical_workflow.md).
