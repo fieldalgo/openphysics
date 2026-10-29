@@ -71,6 +71,13 @@ Points are inserted in batches with a separation filter and the point set is
 re-triangulated each round, so the refinement code stays about 430 lines. A
 10k-triangle rib cross-section takes about a second.
 
+The separation filter considers larger circumradii first and retains the input
+candidate order when radii are equal. An unstable tie order can select different
+points on native and WebAssembly NumPy builds. This rule removes that source of
+variation; it does not guarantee identical meshes across all Qhull versions,
+floating-point platforms or geometrically equivalent input orderings. Meshes
+with tied candidates can differ from earlier releases.
+
 ## Small input angles
 
 Ruppert's termination argument needs every angle between two input segments to

@@ -651,8 +651,9 @@ def _encroached(cand: np.ndarray, mids: np.ndarray, half: np.ndarray) -> tuple[n
 
 def _separate(cand: np.ndarray, R: np.ndarray, factor: float = 0.7) -> np.ndarray:
     """Greedy filter: accept candidates (largest circumradius first) whose distance to
-    every previously accepted candidate exceeds ``factor`` times their own radius."""
-    order = np.argsort(-R)
+    every previously accepted candidate exceeds ``factor`` times their own radius.
+    Equal radii retain input order, independent of NumPy's quicksort implementation."""
+    order = np.argsort(-R, kind="stable")
     tree = cKDTree(cand)
     accepted = np.zeros(len(cand), dtype=bool)
     for i in order:
