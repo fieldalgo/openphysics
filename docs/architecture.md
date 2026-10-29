@@ -115,7 +115,7 @@ flowchart TB
     subgraph G["galerkin"]
         Phys["physics modules<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule and heat-to-mechanics workflows"]
         Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
-        Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
+        Core["core<br/>checks · triangles · spaces · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
         Pub["public assembly<br/>assembly · assembly3d · edge · edge3d · solver"]
         Base["mesh types<br/>mesh · mesh3d"]
     end
@@ -130,7 +130,7 @@ flowchart TB
 
 | Layer | Package path | Holds |
 |---|---|---|
-| core | [`galerkin.core`](../packages/galerkin/src/galerkin/core/__init__.py) | Input checks, mesh and element data, boundary sampling, loads, constraints and quadrature. Element kernels (`kernels`), assembly into a sparse matrix (`forms`, `sparse`), and the sparse solve and eigenpair refinement with hand-written adjoints (`solve`, `eigen`). It dispatches on NumPy, JAX and PyTorch in one place (`backend`). |
+| core | [`galerkin.core`](../packages/galerkin/src/galerkin/core/__init__.py) | Input checks, mesh and element data, edge numbering for the Nédélec spaces (`spaces`), boundary sampling, loads, constraints and quadrature. Element kernels (`kernels`), assembly into a sparse matrix (`forms`, `sparse`), and the sparse solve and eigenpair refinement with hand-written adjoints (`solve`, `eigen`). It dispatches on NumPy, JAX and PyTorch in one place (`backend`). |
 | physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity`, … | One formulation each: inputs and units, the checks of its contract, assembly (from core kernels, directly or through the public functions), the solve and the result dataclass. |
 | coupling | [`galerkin.coupling`](../packages/galerkin/src/galerkin/coupling/__init__.py) | Node and element `Field`s on one mesh with an SI unit, same-mesh `transfer` and the `OneWayChain` driver, which runs stages handed to it and imports no physics. The Joule and heat-to-mechanics workflows run on it. The [kernel interface](packages/galerkin/coupling.md) states what a solver must expose for another solver to consume its result. |
 

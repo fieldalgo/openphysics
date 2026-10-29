@@ -78,7 +78,7 @@ src/galerkin/
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
-  edge.py         # Lowest-order Nédélec (Whitney) edge elements: numbering, signs, curl-curl, mass, edge-nodal coupling
+  edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
   mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
@@ -98,14 +98,14 @@ src/galerkin/
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   _thermal_mechanical_common.py   # Input isolation the two heat-to-mechanics workflows share (package-private)
-  core/           # Shared layer: checks, element kernels, assembly, sparse solve and eigen adjoints, array backends
+  core/           # Shared layer: checks, edge numbering and signs, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```
 
-The modules sit in layers: physics modules over coupling, coupling over core,
-core over the base mesh and assembly modules. [Architecture](../../architecture.md#inside-galerkin-core-physics-and-coupling)
+The modules sit in layers: physics modules over coupling and the public assembly
+modules, both over core, and core over the mesh types. [Architecture](../../architecture.md#inside-galerkin-core-physics-and-coupling)
 describes them and the steps for [adding a physics](../../architecture.md#adding-a-physics).
 
 The analytical, convergence and independent-validation tests, the examples

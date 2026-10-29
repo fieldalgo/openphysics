@@ -43,51 +43,12 @@ import scipy.sparse as sp
 
 from .core import forms, kernels
 from .core.checks import refuse_live
+from .core.spaces import EdgeSpace3D  # noqa: F401 (public here)
+from .core.spaces import TET_LOCAL_EDGES as LOCAL_EDGES
 from .core.tets import tet_gradients
-from .mesh3d import Mesh3D
 
-LOCAL_EDGES = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
 _I = np.array([e[0] for e in LOCAL_EDGES])
 _J = np.array([e[1] for e in LOCAL_EDGES])
-
-
-class EdgeSpace3D:
-    """Global edge numbering plus per-tetrahedron orientation signs."""
-
-    def __init__(self, mesh: Mesh3D):
-        self.mesh = mesh
-        loc = np.stack([mesh.tets[:, list(e)] for e in LOCAL_EDGES], axis=1)  # (T,6,2)
-        lo, hi = loc.min(axis=2), loc.max(axis=2)
-        key = np.stack([lo, hi], axis=2).reshape(-1, 2)
-        uniq, inv = np.unique(key, axis=0, return_inverse=True)
-        self.edges = uniq                              # (E, 2) global: low -> high
-        self.tet_edges = inv.reshape(-1, 6)            # (T, 6)
-        self.signs = np.where(loc[:, :, 0] == lo, 1.0, -1.0)
-
-    @property
-    def num_edges(self) -> int:
-        return len(self.edges)
-
-    def _ids(self, pairs: np.ndarray) -> np.ndarray:
-        """Global ids of node pairs. self.edges is lexsorted, so a key search works."""
-        n = self.mesh.num_nodes
-        key = self.edges[:, 0].astype(np.int64) * n + self.edges[:, 1]
-        p = np.sort(np.asarray(pairs, dtype=np.int64), axis=1)
-        idx = np.searchsorted(key, p[:, 0] * n + p[:, 1])
-        return idx
-
-    def boundary_edge_ids(self, node_set: np.ndarray | None = None) -> np.ndarray:
-        """Ids of edges lying in the boundary surface (n x E = 0 constrains these).
-
-        node_set: restrict to boundary faces entirely inside this node set, so a
-                  PEC condition can be applied to some walls only.
-        """
-        faces = self.mesh.boundary_faces()
-        if node_set is not None:
-            keep = np.isin(faces, np.asarray(node_set, dtype=int)).all(axis=1)
-            faces = faces[keep]
-        pairs = np.concatenate([faces[:, [0, 1]], faces[:, [0, 2]], faces[:, [1, 2]]])
-        return np.unique(self._ids(np.unique(pairs, axis=0)))
 
 
 def assemble_curlcurl_3d(space: EdgeSpace3D, coeff=1.0) -> sp.csr_matrix:

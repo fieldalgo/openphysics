@@ -10,21 +10,20 @@ coefficient carries its derivative into the element matrices.
 
 The public assembly functions (galerkin.assembly, assembly3d, edge, edge3d)
 assemble these kernels with ``forms``; each kernel names the function built
-from it. tests/galerkin/test_crosscheck_symfem_coefficients.py checks them
+from it. The edge kernels take an ``EdgeSpace`` or ``EdgeSpace3D`` from
+``core.spaces``. tests/galerkin/test_crosscheck_symfem_coefficients.py checks them
 against exact integrals for every coefficient form those functions accept.
 """
 import numpy as np
 
 from .backend import Backend, backend_of, namespace
+from .spaces import TET_LOCAL_EDGES, TRI_LOCAL_EDGES
 from .tets import tet_gradients
 
-# Local edge e of a triangle is the edge opposite node e: (e+1, e+2) mod 3.
-_TRI_I = (1, 2, 0)
-_TRI_J = (2, 0, 1)
-# Local edges of a tetrahedron, as in galerkin.edge3d.
-_TET_EDGES = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
-_TET_I = np.array([e[0] for e in _TET_EDGES])
-_TET_J = np.array([e[1] for e in _TET_EDGES])
+# Endpoints of the local edges, in the edge order of core.spaces.
+_TRI_I, _TRI_J = zip(*TRI_LOCAL_EDGES)
+_TET_I = np.array([e[0] for e in TET_LOCAL_EDGES])
+_TET_J = np.array([e[1] for e in TET_LOCAL_EDGES])
 
 
 def coefficient(value):
