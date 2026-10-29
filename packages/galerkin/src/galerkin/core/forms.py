@@ -33,7 +33,10 @@ def matrix(row_dofs, col_dofs, element, shape):
     """Global matrix from element matrices ``element[t, i, j]``.
 
     Entry ``(row_dofs[t, i], col_dofs[t, j])`` receives ``element[t, i, j]``;
-    contributions to the same entry add.
+    contributions to the same entry add. Only shapes are checked: the tables
+    must be the ones the kernel was built for (``galerkin.core.kernels``), since
+    a table of the right shape from another space, or with its local order
+    permuted, gives a wrong matrix without an error.
     """
     row_dofs, col_dofs = _dofs(row_dofs), _dofs(col_dofs)
     cells, ni = row_dofs.shape

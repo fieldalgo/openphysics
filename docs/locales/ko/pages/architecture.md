@@ -136,7 +136,9 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
 ## 새 물리 추가하기
 
 1. **galerkin의 정식화.** 모듈 하나를 더합니다. 요소 행렬은 `core.kernels`로 만들거나, 같은 모양의
-   커널(`(T, i, j)` 배열, 셀 루프 없음)을 씁니다. 조립은 `core.forms`, 풀이는 `core.solve`로 합니다.
+   커널(`(T, i, j)` 배열, 셀 루프 없음)을 씁니다. 조립은 `core.forms`로 하되, 모양만 검사하므로 커널마다
+   그 메시나 공간의 DOF 표를 넘깁니다([표](packages/galerkin/differentiation.md#core-커널을-직접-조립하기)).
+   풀이는 `core.solve`로 합니다.
    입력 검사는 `core.checks`로 하고, 다른 물리 모듈의 도우미를 복사하지 않습니다.
    검증 근거는 [기여 안내](contributing.md#변경하기)가 정합니다: 독립 해석 기준과 메시 수렴
    검사입니다. 이를 `docs/packages/galerkin/` 아래 계약 문서와 검증 문서에 기록합니다.
