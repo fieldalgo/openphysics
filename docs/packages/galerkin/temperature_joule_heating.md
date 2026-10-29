@@ -32,8 +32,9 @@ material author's responsibility.
 thermal_conductivity, electric_dirichlet, thermal_dirichlet,
 initial_temperature, outward_current=None, reference_potential=None,
 outward_flux=None, convection=None, relaxation=0.5, temperature_atol=1e-8,
-relative_tolerance=1e-10, max_iterations=100, method="picard")` uses relaxed
-Picard iteration by default; `method="newton"` is described [below](#newton-method).
+relative_tolerance=1e-10, max_iterations=100, method)` requires `method`:
+`"picard"` (relaxed Picard iteration, described here) or `"newton"`
+([below](#newton-method)). There is no default; see *Choosing a method* below.
 The initial value is a finite scalar K or `(N,)` nodal K vector; impose thermal
 Dirichlet values before the first evaluation. Initial values are required:
 there is no implicit choice of a thermal branch. Relaxation is fixed in `(0,1]`.
@@ -54,6 +55,17 @@ must be <= 1e-8. This dimensionless diagnostic is `nonlinear_heat_residual`.
 Picard performs at most `max_iterations` coupled solves, with no hidden retry or
 adaptive relaxation; the [Newton method](#newton-method) states its own bound.
 Tolerances are finite positive, max_iterations is a positive integer. Multiple solutions, uniqueness and convergence are not guaranteed.
+
+**Choosing a method.** `method` has no default, so every call names one. Start
+with `"picard"`: it is the established path, the one JSON documents use, and the
+one the macOS and Windows installation checks run (through the simcase
+`joule_temperature` example). With weak feedback it converges in a few
+iterations, and an iteration costs less than a Newton state. Use `"newton"` when
+Picard is slow or stops at `max_iterations` under strong feedback; for the
+contract thermistor at alpha = 7 or 9 per K Newton needs 4 states (see
+[Validation](#validation)). Pass `derivative` when dsigma/dT is known. Both
+methods return a result only through the same convergence tests. Newton has been
+run on Linux only.
 
 ## Newton method
 
@@ -138,7 +150,7 @@ T=T0+(cos(beta*(x-L/2))/cos(beta*L/2)-1)/alpha,
 beta²=J²*rho0*alpha/k. Refine n=8,16,32; final temperature L2 order >1.8.
 Check current conservation, power/heat balance and strong feedback, relaxation,
 range and maximum-iteration failure. Newton must agree with Picard to 2e-8 K where
-Picard converges, converge where the default Picard does not (alpha = 7 and
+Picard converges, converge where Picard at its default settings does not (alpha = 7 and
 9 per K), handle every boundary kind with region models, and its element and
 assembled Jacobians must match central differences of the residual (1e-7
 relative). Verification results and executable example are exercised by

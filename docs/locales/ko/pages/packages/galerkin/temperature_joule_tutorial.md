@@ -70,7 +70,7 @@ Nonlinear heat residual: 6.216e-12
 | 변경 | 확인할 내용 |
 |---|---|
 | `relaxation=.5` | 허용치 안에서 같은 해; 로컬 실행에서는 8회 대신 33회 반복 |
-| 솔버 호출에 `method='newton'` 추가 | 허용치 안에서 같은 해를 8회 대신 3개 상태로([Newton 방법](temperature_joule_heating.md#newton-방법)) |
+| 솔버 호출의 `method='picard'`를 `method='newton'`으로 변경 | 허용치 안에서 같은 해를 8회 대신 3개 상태로([Newton 방법](temperature_joule_heating.md#newton-방법)) |
 | `.5*(t-300)`를 `0.*(t-300)`로 교체 | 상수 sigma=1 S/m: 최고 300.125 K, 전력 0.25 W/m |
 | 솔버 호출에 `max_iterations=1` 추가 | 예산 부족으로 `JouleConvergenceError`; 완료한 이력 1개 보존 |
 | 모델 범위를 `(300., 300.05)`로 변경 | 시험 온도가 재료 범위를 초과하며 성공한 부분 결과를 반환하지 않음 |

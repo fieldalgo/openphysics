@@ -35,7 +35,7 @@ def test_public_roundtrip_and_direct_api(tmp_path, kind):
             electrical_conductivity=ConductivityModel(lambda t: 2/(1+.01*(t-300)), (290,400)),
             thermal_conductivity=1., electric_dirichlet=bc,
             thermal_dirichlet={int(n):300. for side in ('left','right') for n in mesh.boundary[side]},
-            initial_temperature=300.)
+            initial_temperature=300., method='picard')
         electric, heat = direct.coupled.electrical, direct.coupled.thermal
         assert len(result.summary()['iterations']) == len(direct.history)
         np.testing.assert_allclose(arrays['evaluated_temperature_k'], direct.evaluated_temperature, rtol=1e-12)
