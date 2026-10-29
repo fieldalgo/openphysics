@@ -66,10 +66,10 @@ class Field:
 
     ``values`` is a read-only float64 copy of shape (N,) at nodes or (M,) at
     elements (piecewise constant per triangle). ``unit`` is an SI unit string
-    such as ``"K"`` or ``"W/m^3"``; it is recorded and compared, never
-    converted or inferred. JAX and PyTorch values are refused (TypeError):
-    a field carries NumPy numbers between physics. ``name`` labels the values
-    in error messages.
+    such as ``"K"`` or ``"W/m^3"``; it is recorded and carried by ``transfer``,
+    never compared, converted or inferred. JAX and PyTorch values are refused
+    (TypeError): a field carries NumPy numbers between physics. ``name`` labels
+    the values in error messages.
     """
 
     signature: MeshSignature

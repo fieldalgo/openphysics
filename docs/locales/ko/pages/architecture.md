@@ -149,8 +149,11 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
    합니다(고유쌍은 `core.eigen`). 그때까지는 미분을 조용히 끊지 말고 `core.checks.refuse_live`로 살아 있는
    값을 거부합니다([방식과 한계](packages/galerkin/differentiation.md)).
 4. **문서(선택).** [`simcase.registry`](../../../../packages/simcase/src/simcase/registry.py)에 계약 검증,
-   실행기, 요약, 결과 형식을 담은 `PhysicsKind`를 등록합니다. 실행기·스키마·명령행은 고치지 않습니다.
-   등록하기 전까지 Python 전용 물리는 문서 기능이 되지 않습니다.
+   실행기, 요약, 결과 형식을 담은 `PhysicsKind`를 등록합니다. 실행기와 스키마는 등록표로
+   디스패치하므로 고치지 않습니다. 명령행은 `em.modes2d` subspace sweep의 출력 폴더 검사와 온도
+   의존 Joule workflow의 실패 증거, 두 경우를 이름으로 다룹니다
+   ([`simcase/cli.py`](../../../../packages/simcase/src/simcase/cli.py)). 실패에 구조화된 증거가
+   있는 종류는 그곳에 더합니다. 등록하기 전까지 Python 전용 물리는 문서 기능이 되지 않습니다.
 
 영어와 한국어 문서는 함께 고치고, 수치 기준은 검증한 대로 유지합니다([기여 안내](contributing.md)).
 
