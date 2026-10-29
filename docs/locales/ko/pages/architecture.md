@@ -104,7 +104,7 @@ flowchart TB
     subgraph G["galerkin"]
         Phys["물리 모듈<br/>thermal · electric · transient_heat · elasticity · thermoelasticity<br/>waveguide · cavity · material_cavity<br/>Joule·열→역학 workflow"]
         Coup["coupling<br/>Field · MeshSignature · transfer · OneWayChain"]
-        Core["core<br/>checks · triangles · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
+        Core["core<br/>checks · triangles · spaces · boundary · loads · constraints · quadrature<br/>backend · kernels · forms · sparse · solve · eigen"]
         Pub["공개 조립<br/>assembly · assembly3d · edge · edge3d · solver"]
         Base["메시 형식<br/>mesh · mesh3d"]
     end
@@ -119,7 +119,7 @@ flowchart TB
 
 | 층 | 패키지 경로 | 담는 것 |
 |---|---|---|
-| core | [`galerkin.core`](../../../../packages/galerkin/src/galerkin/core/__init__.py) | 입력 검사, 메시·요소 데이터, 경계 샘플링, 하중, 구속 조건, 적분 규칙. 요소 커널(`kernels`), 희소 행렬로의 조립(`forms`, `sparse`), 손으로 쓴 adjoint를 갖춘 희소 풀이와 고유쌍 보정(`solve`, `eigen`). NumPy·JAX·PyTorch 분기는 한곳(`backend`)에서 합니다. |
+| core | [`galerkin.core`](../../../../packages/galerkin/src/galerkin/core/__init__.py) | 입력 검사, 메시·요소 데이터, Nédélec 공간의 변 번호(`spaces`), 경계 샘플링, 하중, 구속 조건, 적분 규칙. 요소 커널(`kernels`), 희소 행렬로의 조립(`forms`, `sparse`), 손으로 쓴 adjoint를 갖춘 희소 풀이와 고유쌍 보정(`solve`, `eigen`). NumPy·JAX·PyTorch 분기는 한곳(`backend`)에서 합니다. |
 | physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널을 직접 또는 공개 함수를 거쳐), 풀이, 결과 dataclass. |
 | coupling | [`galerkin.coupling`](../../../../packages/galerkin/src/galerkin/coupling/__init__.py) | 한 메시 위의 절점·요소 `Field`(SI 단위), 같은 메시 `transfer`, `OneWayChain` 드라이버. 드라이버는 넘겨받은 단계를 실행할 뿐 물리 모듈을 import하지 않습니다. Joule와 열→역학 workflow가 이 층 위에서 돕니다. [커널 인터페이스](packages/galerkin/coupling.md)는 다른 solver가 결과를 받아 쓰려면 한 solver가 무엇을 내놓아야 하는지 정합니다. |
 

@@ -68,7 +68,7 @@ src/galerkin/
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
-  edge.py         # Lowest-order Nédélec (Whitney) edge elements: numbering, signs, curl-curl, mass, edge-nodal coupling
+  edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
   mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
@@ -88,14 +88,14 @@ src/galerkin/
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   _thermal_mechanical_common.py   # Input isolation the two heat-to-mechanics workflows share (package-private)
-  core/           # Shared layer: checks, element kernels, assembly, sparse solve and eigen adjoints, array backends
+  core/           # Shared layer: checks, edge numbering and signs, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked
   interop.py      # from_mesher: adapt a mesh built elsewhere (meshine, gmshio, ...)
 ```
 
-모듈은 층으로 놓입니다. 물리 모듈 아래 coupling, coupling 아래 core, core 아래 메시·조립
-기반 모듈이 있습니다.
+모듈은 층으로 놓입니다. 물리 모듈 아래 coupling과 공개 조립 모듈, 그 둘 아래 core,
+core 아래 메시 형식이 있습니다.
 [아키텍처](../../architecture.md#galerkin-안-core-physics-coupling)에 층 설명과
 [새 물리 추가하기](../../architecture.md#새-물리-추가하기) 절차가 있습니다.
 

@@ -75,7 +75,7 @@ src/galerkin/
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
-  edge.py         # Lowest-order Nédélec (Whitney) edge elements: numbering, signs, curl-curl, mass, edge-nodal coupling
+  edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling (numbering and signs in core)
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
   mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
