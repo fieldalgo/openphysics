@@ -24,6 +24,7 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: no module reads another module's or class's underscore members; the layer test checks it. `galerkin.core.spaces.edge_ids` and `galerkin.core.tets.edge_matrix` replace the uses of `EdgeSpace3D._ids` and `Mesh3D._edge_matrix` outside their classes. Results are unchanged.
 - `galerkin`: `EdgeSpace` and `EdgeSpace3D` moved to `galerkin.core.spaces`, beside the local edge orders the edge kernels use. `galerkin`, `galerkin.edge` and `galerkin.edge3d` still export them; their module, and so their repr and pickle path, is now `galerkin.core.spaces`. Matrices and fields are unchanged.
 - `galerkin`: no module imports another module's private names, and the layer test checks it. The input checks the box cavities and elasticity shared that way moved to `galerkin.core.checks`; the heat-to-mechanics workflows' mesh isolation and Dirichlet checks, and the cavities' speed of light, numerical gates and box mesh, moved to package-private modules. Results and error messages are unchanged.
 - `galerkin`: `solve_elasticity`, `solve_thermoelasticity` and the waveguide mode system each have one body for NumPy and for JAX or PyTorch inputs, built from `core.kernels`, instead of a NumPy body beside a second, live one. NumPy results are unchanged, bit for bit.

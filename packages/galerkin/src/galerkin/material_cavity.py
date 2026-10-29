@@ -26,6 +26,7 @@ import scipy.sparse.linalg as spla
 from .mesh3d import Mesh3D
 from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
+from .core.spaces import edge_ids
 from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
 from .core.checks import positive_integer, positive_real, triple
 
@@ -192,7 +193,7 @@ def _wall_faces(mesh, lengths):
 
 def _face_edge_ids(space, faces):
     pairs = np.concatenate([faces[:, list(e)] for e in _FACE_EDGES])
-    return np.unique(space._ids(pairs))
+    return np.unique(edge_ids(space, pairs))
 
 
 def _wall_mass(space, faces):
@@ -217,7 +218,7 @@ def _wall_mass(space, faces):
     low, high = faces[:, i.ravel()], faces[:, j.ravel()]
     signs = np.where(low < high, 1.0, -1.0)
     local *= signs[:, :, None] * signs[:, None, :]
-    ids = space._ids(np.stack([low.ravel(), high.ravel()], axis=1)).reshape(-1, 3)
+    ids = edge_ids(space, np.stack([low.ravel(), high.ravel()], axis=1)).reshape(-1, 3)
     return sp.coo_matrix((local.ravel(), (np.repeat(ids, 3, axis=1).ravel(),
                                           np.tile(ids, (1, 3)).ravel())),
                          shape=(space.num_edges,) * 2).tocsc()
