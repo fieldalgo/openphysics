@@ -27,6 +27,7 @@ line.C, line.L, line.G(1e9)           # F/m, H/m, S/m 행렬
 가장자리 결합 차동 쌍의 임피던스를 출력합니다.
 
 [템플릿·JSON 문서·목표 임피던스 설계](design.md).
+SIPI는 `meshine.generate(candidate_order="stable")`를 사용하여 반지름이 같은 세분 후보의 입력 순서를 유지합니다. 이전 버전과 동률 메시가 달라질 수 있습니다. native/WebAssembly 차이의 한 원인을 제거하며 모든 수치 라이브러리 버전에서 동일 메시를 보장하지는 않습니다.
 
 ## 계산하는 양
 

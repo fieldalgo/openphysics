@@ -29,6 +29,7 @@ All lengths are in metres and all results are per metre of line.
 impedance of a 50-ohm-class microstrip and of an edge-coupled differential pair.
 
 [Templates, JSON documents and target-impedance design](design.md).
+SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refinement candidates retain input order. This can change tied meshes from earlier versions; it removes one native/WebAssembly difference, without promising identical meshes across every numerical library version.
 
 ## What is computed
 
