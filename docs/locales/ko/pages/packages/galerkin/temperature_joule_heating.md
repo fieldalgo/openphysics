@@ -15,9 +15,9 @@
 
 `solve_temperature_joule_heat`는 명시적 초기 K 스칼라 또는 `(N,)` 배열을 받으며
 열 Dirichlet 값을 먼저 적용한다. `relaxation=0.5`, `temperature_atol=1e-8 K`,
-`relative_tolerance=1e-10`, `max_iterations=100`이 기본값이다. `method`는 기본값이 없으며
-`"picard"`(완화 Picard, 여기서 설명) 또는 `"newton"`([아래](#newton-방법))을 적어야 한다(아래 *방법 고르기*).
-Picard는 T→σ→전기→열 H(T)를 계산하고 `T += relaxation*(H(T)-T)`로 갱신한다.
+`relative_tolerance=1e-10`, `max_iterations=100`, `method="picard"`가 기본값이다. `method="newton"`은
+[아래](#newton-방법)에 설명하며, 언제 쓰는지는 아래 *방법 고르기*에 적는다.
+기본 Picard는 T→σ→전기→열 H(T)를 계산하고 `T += relaxation*(H(T)-T)`로 갱신한다.
 완화 전 무한노름 결함이 절대+상대 온도 기준을 만족하고,
 σ(H(T))와 σ(T)의 각 요소별 상대 차의 최댓값도 상대 기준을 만족해야 성공한다.
 작은 완화값으로 거짓 수렴할 수 없다. 열 후보·완화 상태 모두 유효 범위를 검사한다.
@@ -27,7 +27,7 @@ H(T)에서 전기를 한 번 더 풀고 `r_heat + load(T) - load(H(T))`의 열 �
 Picard는 결합 해석을 최대 `max_iterations`번 하며 자동 재시도·완화 조절은 없다.
 Newton의 한계는 [아래](#newton-방법)에 적는다. 유일해는 보장하지 않는다.
 
-**방법 고르기.** `method`에는 기본값이 없으므로 호출마다 방법을 적는다. 처음에는 `"picard"`를 쓴다.
+**방법 고르기.** 처음에는 기본값인 `"picard"`를 쓴다.
 오래 써 온 경로이고, JSON 문서가 쓰며, macOS·Windows 설치 검사가 simcase `joule_temperature` 예제로
 돌리는 방법이다. 피드백이 약하면 몇 번 안에 수렴하고, 반복 한 번이 Newton 상태 하나보다 싸다.
 Picard가 느리거나 강한 피드백에서 `max_iterations`에 걸리면 `"newton"`을 쓴다. 계약 서미스터의

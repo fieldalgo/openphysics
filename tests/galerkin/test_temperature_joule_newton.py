@@ -64,8 +64,10 @@ def every_boundary_kind(current=3., **options):
 
 def test_invalid_method_and_derivative():
     mesh, args = thermistor(8)
-    with pytest.raises(TypeError, match="method"):
-        solve_temperature_joule_heat(mesh, **args)    # no default: the caller names the method
+    default = solve_temperature_joule_heat(mesh, **args)    # Picard is the default
+    picard = solve_temperature_joule_heat(mesh, **args, method='picard')
+    assert np.array_equal(default.coupled.thermal.temperature, picard.coupled.thermal.temperature)
+    assert len(default.history) == len(picard.history)
     with pytest.raises(ValueError, match="method must be 'picard' or 'newton'"):
         solve_temperature_joule_heat(mesh, **args, method='secant')
     with pytest.raises(ValueError, match='derivative'):
