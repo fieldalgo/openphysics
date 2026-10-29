@@ -37,6 +37,10 @@ records and plans do not establish a current pass; resource observations are not
 - [Absorbing waveguide modes](../packages/simcase/lossy_modes.md)
 - [PML, leaky and constant-radius modes](../packages/simcase/pml_modes.md)
 
+## Mesh generation plans
+
+- [Pre-registered validation plan: 3D tetrahedral meshing](../packages/meshine/validation3d.md)
+
 ## Historical cavity and milestone records
 
 - [Independent validation plan: vacuum PEC rectangular cavities](../packages/galerkin/cavity3d_validation.md)
