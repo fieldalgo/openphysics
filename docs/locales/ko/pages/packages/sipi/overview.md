@@ -107,6 +107,8 @@ Linux, Python 3.12, 고정 환경 `tools/requirements-py312-linux.txt`에서 했
 2(2), 1954; "Shielded coupled-strip transmission line," *IRE Trans. MTT* 3(5), 1955; E. Hammerstad and
 Ø. Jensen, "Accurate models for microstrip computer-aided design," *IEEE MTT-S Digest*, 1980.
 
+SIPI는 `meshine.generate(candidate_order="stable")`를 사용하여 반지름이 같은 세분 후보의 입력 순서를 유지합니다. 이전 버전과 동률 메시가 달라질 수 있습니다. native/WebAssembly 차이의 한 원인을 제거하며 모든 수치 라이브러리 버전에서 동일 메시를 보장하지는 않습니다.
+
 ## 구현하지 않은 것
 
 - 도체 손실 `R`(표피효과, 표면 거칠기). `R`은 반환하지 않습니다.
