@@ -200,13 +200,16 @@ class CrossSection:
         features = [lay.thickness for lay in self.layers]
         for t in self.traces:
             features.append(t.width)
-            if t.thickness > 0:
-                features.append(t.thickness)
         for i, a in enumerate(self.traces):
             for b in self.traces[i + 1:]:
                 features.append(max(a.x0 - b.x1, b.x0 - a.x1, a.y - b.y1, b.y - a.y1))
         if edge_size is None:
             edge_size = min(features) / 100.0
+            # The conductor interior is excluded from the mesh. Resolve its
+            # side face without imposing thickness / 100 along the entire trace.
+            for t in self.traces:
+                if t.thickness > 0:
+                    edge_size = min(edge_size, t.thickness / 10.0)
         if far_size is None:
             far_size = max(self.width, self.height) / 24.0
         if not (edge_size > 0 and far_size >= edge_size):
@@ -238,9 +241,10 @@ class CrossSection:
         """Mesh the dielectric with refinement toward the trace edges.
 
         edge_size: target edge length at trace corners (default: the smallest
-                   feature / 100). Field singularities sit at these corners.
-                   Features are layer thicknesses, trace widths and thicknesses
-                   and the gaps between traces.
+                   layer thickness, trace width or inter-trace gap / 100,
+                   capped at each positive trace thickness / 10).
+                   Field singularities sit at these corners. Explicit values
+                   override both parts of the default rule.
         far_size:  largest edge length (default: max(width, height) / 24)
         grade:     growth of the edge length per unit distance from the traces
 

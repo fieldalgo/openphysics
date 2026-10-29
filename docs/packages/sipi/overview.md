@@ -74,7 +74,7 @@ the exact `C` from above.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `edge_size` | smallest feature / 100 | Target edge length at trace corners, where the field is singular. Features are layer thicknesses, trace widths and thicknesses, and gaps between traces. |
+| `edge_size` | min(smallest feature / 100, each positive trace thickness / 10) | Target edge length at trace corners, where the field is singular. Features are layer thicknesses, trace widths and gaps between traces. Zero thickness adds no cap. Explicit values override this rule. |
 | `grade` | 0.15 | Growth of the edge length per unit distance from the traces |
 | `far_size` | max(width, height) / 24 | Largest edge length |
 
@@ -84,6 +84,11 @@ the exact `C` from above.
 coaxial mesh built directly with meshine.
 
 ## Accuracy and checks to run
+
+For finite-thickness traces the default resolves the conductor side face at
+`thickness / 10` or finer, without imposing `thickness / 100` along the entire
+trace. This is a meshing heuristic, not an error estimator; check refinement
+for each new geometry. See the [finite-thickness validation](default-mesh.md).
 
 Two errors remain in every result and both are the user's to check:
 
