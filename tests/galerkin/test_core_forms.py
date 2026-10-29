@@ -87,6 +87,40 @@ def test_p1_load_is_assemble_load(name):
         assert np.array_equal(ours, assemble_load(mesh, rho))
 
 
+@pytest.mark.parametrize("name", MESH2D)
+def test_p1_joule_is_the_centroid_joule_load(name):
+    """Current sigma E, heating sigma E . E and its p1_load centroid load, bit for bit."""
+    mesh = MESH2D[name]
+    sigma = RNG.uniform(.5, 2., mesh.num_triangles)
+    field = RNG.normal(size=(mesh.num_triangles, 2))
+    current, heat, load = kernels.p1_joule(mesh, sigma, field)
+    assert np.array_equal(current, sigma[:, None] * field)
+    assert np.array_equal(heat, np.einsum("ij,ij->i", sigma[:, None] * field, field))
+    assert np.array_equal(load, kernels.p1_load(mesh, heat))
+
+
+@pytest.mark.parametrize("name", MESH2D)
+def test_complex_step_through_p1_kernels_matches_central_differences(name):
+    """p1_joule and p1_stiffness are analytic in their coefficient and field: a complex step gives
+    the derivative a central difference measures (the Newton step of temperature_joule_heating)."""
+    mesh = MESH2D[name]
+    sigma = RNG.uniform(.5, 2., mesh.num_triangles)
+    field = RNG.normal(size=(mesh.num_triangles, 2))
+    local = RNG.normal(size=(mesh.num_triangles, 3))
+    dsigma, dfield, dlocal = (RNG.normal(size=a.shape) for a in (sigma, field, local))
+
+    def outputs(s, f, v):
+        _, heat, load = kernels.p1_joule(mesh, s, f)
+        return np.concatenate([heat, load.ravel(), np.einsum("tij,tj->ti", kernels.p1_stiffness(mesh, s), v).ravel()])
+
+    h = 1e-30
+    complex_step = outputs(sigma + 1j * h * dsigma, field + 1j * h * dfield, local + 1j * h * dlocal).imag / h
+    d = 1e-6
+    central = (outputs(sigma + d * dsigma, field + d * dfield, local + d * dlocal)
+               - outputs(sigma - d * dsigma, field - d * dfield, local - d * dlocal)) / (2 * d)
+    np.testing.assert_allclose(complex_step, central, rtol=0, atol=1e-8 * np.max(np.abs(central)))
+
+
 @pytest.mark.parametrize("coeff", ["scalar", "cells", "tensor"])
 def test_tet_kernels_are_assembly3d(coeff):
     mesh, T = MESH3D, MESH3D.num_tets
