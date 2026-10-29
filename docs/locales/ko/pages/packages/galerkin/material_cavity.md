@@ -53,8 +53,8 @@ PEC 벽에서 `curl(mu_r^-1 curl E) = k0^2 eps_r E`의 약형식은 복소 대�
 
 `solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=6,
 target_frequency_hz, wall_conductivity_s_per_m=None)`는 `MaterialCavityResult`를 반환합니다. `lengths_m`,
-`subdivisions`, `num_modes`, `target_frequency_hz`의 의미와 검증은 진공 솔버와 같고
-mesh도 같은 교대 Kuhn mesh입니다.
+`subdivisions`, `num_modes`, `target_frequency_hz`의 의미와 검증은 진공 솔버와 같으나
+JAX·PyTorch 값은 거부하며(아래), mesh도 같은 교대 Kuhn mesh입니다.
 
 `regions`는 `CavityMaterialRegion(bounds_m, relative_permittivity=1,
 relative_permeability=1)`의 시퀀스입니다. `bounds_m`은 상자 원점 기준 m 단위
@@ -120,7 +120,8 @@ S와 M은 서로 다른 재료마다 실수 지시함수 가중 조립에 복소
   `|q_i^T M q_j| <= 1e-7 * sqrt((|q_i|^T |M| |q_i|)(|q_j|^T |M| |q_j|))`;
 - `Im k0^2 < -1e-9 |k0^2|`(이득) 또는 `Re k0^2 <= 0`인 물리 후보가 없을 것.
 
-실패는 부분 결과 없이 `RuntimeError`, 잘못된 인수는 `ValueError`를 냅니다.
+실패는 부분 결과 없이 `RuntimeError`, 잘못된 인수는 `ValueError`, JAX·PyTorch 값은
+`TypeError`를 냅니다(solver가 NumPy로 계산합니다).
 
 ## 검증
 

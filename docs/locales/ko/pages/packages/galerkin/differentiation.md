@@ -148,7 +148,7 @@ shift-invert Arnoldi로 찾으며, 모드마다 분해를 한 번 더 합니다.
 쓰십시오.
 
 `solve_material_cavity_box`와 `solve_modes`, `solve_cavity_box`를 뺀 전자기 solver는 아직
-미분하지 않습니다.
+미분하지 않으며 JAX·PyTorch 값을 거부합니다([거부](#근사하지-않고-거부하는-것)).
 
 ## 상자 공진기: 길이에 대한 미분
 
@@ -182,13 +182,17 @@ curl-curl 행렬과 질량 행렬은 정확히
   `TypeError`로 거부합니다. NumPy 컨테이너인 `ElementHeatSource`, `ElementConductivity`,
   `freeze_temperature`의 `TemperatureSnapshot`, Joule 결합과 열→역학 workflow(열 단계의
   `WorkflowStageError`로 알림), 그리고 살아 있는 열 이력을 받은
-  과도 역학(`TransientThermoelasticError`)이 거부합니다. JSON 문서와 명령행은
+  과도 역학(`TransientThermoelasticError`)이 거부합니다. `solve_material_cavity_box`,
+  모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
+  `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
+  `solve_dirichlet`, `l2_error`, `eval_edge_field_3d`도 거부합니다. JSON 문서와 명령행은
   NumPy로 돕니다.
 
 ## 한계
 
-- 아직 막지 않은 곳: `solve_modes`, `solve_cavity_box`를 뺀 전자기 solver는 입력을 NumPy로
-  바꿉니다. 여기에 넘긴 JAX 값은 미분을 잃으므로, 살아 있는 값을 넘기지 마십시오. 낮은 수준
+- 막지 않았고 미분을 시험하지 않은 곳: `eval_edge_field`와 `radial_pml_coeffs`는 NumPy
+  연산으로 계산합니다. JAX 값인 `dofs`, `k`, `sigma_max`는 미분을 유지한 채 지나가고,
+  PyTorch 값과 JAX 값인 `r0`, `d`는 NumPy 안에서 실패합니다. 낮은 수준
   조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는 값을 `TypeError`로
   거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가

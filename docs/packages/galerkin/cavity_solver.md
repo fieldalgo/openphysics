@@ -86,8 +86,10 @@ vector signs and eigenvectors are not unique physical identifiers.
 Internally, coordinates are divided by `L=max(lengths_m)`. Returned coefficients
 are `q_normalized/sqrt(L)`, eigenvalues `k2_normalized/L**2`, and centroid fields
 `E_normalized/L**1.5`. A uniform physical enlargement by s divides frequency by s.
-Reconstruct each centroid field with
-`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`.
+Reconstruct each centroid field of a NumPy result with
+`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`; it takes
+NumPy coefficients only. A result from JAX or PyTorch lengths already carries
+its centroid fields, with derivatives, in `result.electric_field`.
 
 Serialization belongs to the caller. To preserve the technical field contract,
 store SI coordinates, tetrahedra, edge ordering/orientation, PEC indices and full

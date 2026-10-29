@@ -56,7 +56,8 @@ square root, so `Re f > 0`.
 `solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=6,
 target_frequency_hz, wall_conductivity_s_per_m=None)` returns a `MaterialCavityResult`. `lengths_m`, `subdivisions`,
 `num_modes` and `target_frequency_hz` have the vacuum solver's meaning and validation,
-and the mesh is the same alternating Kuhn mesh.
+except that JAX and PyTorch values are refused (below), and the mesh is the same
+alternating Kuhn mesh.
 
 `regions` is a sequence of `CavityMaterialRegion(bounds_m, relative_permittivity=1,
 relative_permeability=1)`. `bounds_m` is `((x0, x1), (y0, y1), (z0, z1))` in metres
@@ -126,7 +127,8 @@ fundamental divided by `max|eps_r mu_r|`. The requested number nearest the targe
   `|q_i^T M q_j| <= 1e-7 * sqrt((|q_i|^T |M| |q_i|)(|q_j|^T |M| |q_j|))`;
 - no physical candidate with `Im k0^2 < -1e-9 |k0^2|` (gain) or `Re k0^2 <= 0`.
 
-Failures raise `RuntimeError` with no partial result; invalid arguments raise `ValueError`.
+Failures raise `RuntimeError` with no partial result; invalid arguments raise `ValueError`,
+and JAX or PyTorch values raise `TypeError` (the solver computes with NumPy).
 
 ## Validation
 

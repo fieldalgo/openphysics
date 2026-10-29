@@ -111,7 +111,11 @@ def real_scalar(value, name):
 
 
 def positive_real(value, name):
-    """A finite positive Python or NumPy number as float; booleans and arrays are rejected."""
+    """A finite positive Python or NumPy number as float; booleans and arrays are rejected.
+
+    A JAX or PyTorch value raises TypeError (``refuse_live``), anything else ValueError.
+    """
+    refuse_live(value, name)
     if (isinstance(value, (bool, np.bool_))
             or not isinstance(value, (int, float, np.integer, np.floating))):
         raise ValueError(f"{name} must be a finite positive number")
