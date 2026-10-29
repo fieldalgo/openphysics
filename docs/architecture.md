@@ -175,9 +175,13 @@ grid-to-mesh projection waits for a second engine
    derivative silently ([pattern and limits](packages/galerkin/differentiation.md)).
 4. **Documents (optional).** Register a `PhysicsKind` in
    [`simcase.registry`](../packages/simcase/src/simcase/registry.py) with its
-   contract validation, runner, summary and result types. The runner, schema and
-   command line need no change. Python-only physics stays out of documents
-   until it is registered.
+   contract validation, runner, summary and result types. The runner and schema
+   dispatch on the registry and need no change. The command line handles two
+   cases by name, the output check of `em.modes2d` subspace sweeps and the
+   failure evidence of the temperature-dependent Joule workflow
+   ([`simcase/cli.py`](../packages/simcase/src/simcase/cli.py)); a kind whose
+   failures carry structured evidence adds it there. Python-only physics stays
+   out of documents until it is registered.
 
 Keep English and Korean pages together, and keep numerical thresholds as
 validated ([contributing](../CONTRIBUTING.md)).
