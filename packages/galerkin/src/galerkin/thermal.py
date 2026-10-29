@@ -55,7 +55,18 @@ def _coo(xp, matrix):
     return CooMatrix(matrix.rows, matrix.cols, lift(xp, matrix.values), matrix.shape)
 
 
-def _boundary_system(samples, n, labels, anchors, constrained):
+def scalar_boundary_system(samples, n, labels, anchors, constrained):
+    """Robin matrix H, outward-flux load G, ambient load B and shifted ambient load from ``samples``.
+
+    ``samples`` come from ``core.boundary.scalar_boundary_samples``. ``anchors`` and
+    ``constrained`` (one entry per connected component, from ``labels``) are updated
+    in place: a component without Dirichlet support is anchored at the ambient
+    temperature of its first positive h sample. The shifted load integrates
+    h*(ambient - offset of the component). H is SciPy CSR on NumPy and a CooMatrix
+    of the live library otherwise; the loads are arrays of that library. Public so
+    that the Newton step of galerkin.temperature_joule_heating linearizes the
+    operator this heat solve uses.
+    """
     # Pick a useful absolute offset for Robin-only components. Any positive
     # sampled h anchors discretely; no unit-dependent artificial cutoff.
     for kind, edges, shape, weights, values in samples:
@@ -166,7 +177,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
             anchors[component] = value
             constrained[component] = True
     samples = scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, live=True)
-    H, G, B, shifted_B = _boundary_system(samples, len(p), labels, anchors, constrained)
+    H, G, B, shifted_B = scalar_boundary_system(samples, len(p), labels, anchors, constrained)
     missing = np.flatnonzero(~constrained)
     if len(missing):
         raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
