@@ -24,6 +24,7 @@ substrate. Stripline: ground on both sides, the trace between two layers.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Real
 
 import numpy as np
 
@@ -212,6 +213,26 @@ class CrossSection:
             raise ValueError("need 0 < edge_size <= far_size")
         return float(edge_size), float(far_size)
 
+    def mesh_settings(self, *, edge_size=None, far_size=None, grade=0.15, min_angle=28.0):
+        """Resolve and validate mesh options without generating a mesh.
+
+        Return a fresh dictionary suitable for ``mesh(**settings)``. Lengths
+        are metres, grade is dimensionless and min_angle is in degrees.
+        """
+        for key, value in (('edge_size', edge_size), ('far_size', far_size),
+                           ('grade', grade), ('min_angle', min_angle)):
+            if value is None and key in ('edge_size', 'far_size'):
+                continue
+            if isinstance(value, bool) or not isinstance(value, Real) or not np.isfinite(value):
+                raise ValueError(f'{key} must be a finite real number')
+        edge_size, far_size = self._sizes(edge_size, far_size)
+        if grade < 0:
+            raise ValueError('grade must be >= 0')
+        if not 0 < min_angle < 34:
+            raise ValueError('min_angle must be in (0, 34) degrees')
+        return dict(edge_size=edge_size, far_size=far_size,
+                    grade=float(grade), min_angle=float(min_angle))
+
     def mesh(self, *, edge_size: float | None = None, far_size: float | None = None,
              grade: float = 0.15, min_angle: float = 28.0) -> MeshedCrossSection:
         """Mesh the dielectric with refinement toward the trace edges.
@@ -226,7 +247,10 @@ class CrossSection:
         The defaults stayed within 0.5 % in impedance on the validation cases;
         halve edge_size, grade and far_size together to check convergence.
         """
-        edge_size, far_size = self._sizes(edge_size, far_size)
+        settings = self.mesh_settings(edge_size=edge_size, far_size=far_size,
+                                      grade=grade, min_angle=min_angle)
+        edge_size, far_size = settings['edge_size'], settings['far_size']
+        grade, min_angle = settings['grade'], settings['min_angle']
         half = 0.5 * self.width
         xs = {-half, half}
         ys = set(self.interfaces().tolist())

@@ -41,3 +41,5 @@
 
 
 [모델 구성](../modeling/index.md) · [결과와 신뢰성](../results/index.md) · [전체 물리 문제](index.md)
+
+SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/sipi/design.md)도 제공합니다.

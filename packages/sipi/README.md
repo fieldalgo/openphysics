@@ -28,6 +28,9 @@ Cohn stripline solutions and the Hammerstad–Jensen microstrip formulas; the
 [documentation](../../docs/packages/sipi/overview.md) lists the measured errors
 and the checks a user should run (mesh refinement and box truncation).
 
+[Templates, JSON input and target-impedance design](../../docs/packages/sipi/design.md)
+reuse the same engine with input validation and a separate mesh-refinement check.
+
 Not implemented: conductor loss, frequency-dependent dielectrics, S-parameters
 and Touchstone files, 3D structures (vias, planes) and layout import.
 

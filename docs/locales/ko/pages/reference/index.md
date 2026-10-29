@@ -53,3 +53,7 @@
 - [벡터 파장 sweep의 선택형 부분공간 추적](../packages/simcase/vector_subspace_tracking.md)
 
 - [실험적 workspace와 파일 계약](../packages/simcase/workspace.md)
+
+## SIPI 계약
+
+- [단면 템플릿·JSON·목표 임피던스 설계](../packages/sipi/design.md)
