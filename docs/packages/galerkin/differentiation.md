@@ -75,13 +75,13 @@ requires_grad=True)` inputs gives the same gradients through `.backward()`.
 
 ## How the derivative is computed
 
-The steady heat and electric solvers assemble and solve their live systems
-directly. Elasticity and thermoelasticity build their system once, in the
-inputs' library, and solve it on the numbers of the inputs first, with every
-check; one more solve then attaches the derivative to that solution x0:
-x = x0 + A⁻¹(b − A x0), equal to x0 up to rounding. Transient heat runs its NumPy
-solve first and does the same at every step. Callbacks run once. Waveguide modes
-do the same with an eigenpair (next section).
+The steady heat, electric, elasticity and thermoelasticity solvers build their
+system once, in the inputs' library, and solve it once with
+`galerkin.core.solve`, for NumPy and live inputs alike. Transient heat runs each
+step on the numbers first, refined and checked as a NumPy run; one more solve
+then attaches the derivative to that solution x0: x = x0 + A⁻¹(b − A x0), equal
+to x0 up to rounding. Callbacks run once. Waveguide modes do the same with an
+eigenpair (next section).
 
 Assembly runs in the input's library through the closed-form element kernels of
 `galerkin.core.kernels` and `galerkin.core.forms`. The sparse system is still
@@ -209,6 +209,9 @@ no derivative.
   functions (`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`) refuse live
   values with a `TypeError`; assemble `galerkin.core.kernels` with
   `galerkin.core.forms` to keep them live.
+- On JAX, a singular sparse system fails inside the host callback of the solve:
+  JAX logs the callback's traceback (`jax.pure_callback failed`) before the
+  solver raises its `ValueError`. PyTorch prints nothing.
 - With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
   0-d arrays of that library instead of Python floats, and result arrays are not
   made read-only.

@@ -74,11 +74,11 @@ dk, dh = jax.grad(right_temperature, argnums=(0, 1))(2.0, 5.0)
 
 ## 미분을 계산하는 방법
 
-정상 열·전기 solver는 살아 있는 연립방정식을 바로 조립해 풉니다. 탄성과 열탄성은
-연립방정식을 입력의 라이브러리에서 한 번 만들고, 먼저 입력의 숫자로 모든 검사와 함께 풉니다.
-그다음 풀이 한 번으로 그 해 x0에 미분을 붙입니다: x = x0 + A⁻¹(b − A x0). 값은 x0와 반올림
-수준으로 같습니다. 과도 열은 NumPy 풀이를 먼저 돌리고 매 단계 같은 일을 합니다. 콜백은 한
-번만 부릅니다. 도파관 모드는 고유쌍으로 같은 일을 합니다(다음 절).
+정상 열·전기·탄성·열탄성 solver는 연립방정식을 입력의 라이브러리에서 한 번 만들고,
+NumPy 입력이든 살아 있는 입력이든 `galerkin.core.solve`로 한 번 풉니다. 과도 열은 매 단계를
+먼저 숫자로 풀어 NumPy 실행처럼 보정·검사하고, 풀이 한 번으로 그 해 x0에 미분을 붙입니다:
+x = x0 + A⁻¹(b − A x0). 값은 x0와 반올림 수준으로 같습니다. 콜백은 한 번만 부릅니다. 도파관
+모드는 고유쌍으로 같은 일을 합니다(다음 절).
 
 조립은 `galerkin.core.kernels`와 `galerkin.core.forms`의 닫힌 식 요소 커널로,
 입력의 라이브러리에서 이루어집니다. 희소 연립방정식은 여전히 SciPy 희소 LU로
@@ -191,6 +191,9 @@ curl-curl 행렬과 질량 행렬은 정확히
   바꿉니다. 여기에 넘긴 JAX 값은 미분을 잃으므로, 살아 있는 값을 넘기지 마십시오. 낮은 수준
   조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는 값을 `TypeError`로
   거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
+- JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
+  `ValueError`를 내기 전에 JAX가 callback의 traceback(`jax.pure_callback failed`)을
+  기록합니다. PyTorch는 아무것도 출력하지 않습니다.
 - 살아 있는 입력에서는 `joule_power_per_length`와 `supplied_power_per_length`가
   Python float 대신 그 라이브러리의 0차원 배열이며, 결과 배열을 읽기 전용으로
   만들지 않습니다.
