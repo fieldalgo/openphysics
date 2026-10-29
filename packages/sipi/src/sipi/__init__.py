@@ -19,8 +19,13 @@ Conductor loss, S-parameters and 3D structures are not implemented.
 """
 
 from .crosssection import CrossSection, Layer, MeshedCrossSection, Trace
+from .document import CrossSectionDocument
+from .templates import microstrip, stripline, coupled_microstrip, grounded_coplanar
+from .design import DesignEvaluation, ImpedanceDesign, GoalSeekError, seek_impedance
 from .quasistatic import LineParameters, capacitance_matrix, line_parameters
 
 __version__ = "0.1.0"
 __all__ = ["CrossSection", "Layer", "Trace", "MeshedCrossSection", "LineParameters",
-           "capacitance_matrix", "line_parameters", "__version__"]
+           "capacitance_matrix", "line_parameters", "CrossSectionDocument",
+           "microstrip", "stripline", "coupled_microstrip", "grounded_coplanar",
+           "DesignEvaluation", "ImpedanceDesign", "GoalSeekError", "seek_impedance", "__version__"]

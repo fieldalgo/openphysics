@@ -26,6 +26,8 @@ line.C, line.L, line.G(1e9)           # F/m, H/m, S/m 행렬
 [`examples/sipi/pcb_lines.py`](../../../../../../examples/sipi/pcb_lines.py)는 50 Ω급 마이크로스트립과
 가장자리 결합 차동 쌍의 임피던스를 출력합니다.
 
+[템플릿·JSON 문서·목표 임피던스 설계](design.md).
+
 ## 계산하는 양
 
 도체는 z 방향으로 뻗고 단면이 파장보다 작으므로 선로는 준TEM(quasi-TEM) 파를 전달합니다. 신호 도체가
