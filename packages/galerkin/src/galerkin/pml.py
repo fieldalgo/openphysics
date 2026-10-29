@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .core.checks import refuse_live
 from .mesh import Mesh
 
 
@@ -34,7 +35,14 @@ def radial_pml_coeffs(mesh: Mesh, k: float, r0: float, d: float,
                theoretical round-trip reflection e^{-2S}, S = sigma_max d/3,
                of about 1e-6.
     Returns: Lam (T, 2, 2) complex tensors, beta (T,) complex array.
+
+    NumPy only: JAX and PyTorch values of k, r0, d and sigma_max are refused
+    with a TypeError. The coefficients feed assemble_stiffness and
+    assemble_mass, which take NumPy values; no solver differentiates with
+    respect to PML parameters.
     """
+    for name, value in (("k", k), ("r0", r0), ("d", d), ("sigma_max", sigma_max)):
+        refuse_live(value, f"radial_pml_coeffs {name}")
     if sigma_max is None:
         sigma_max = 21.0 / d
 
