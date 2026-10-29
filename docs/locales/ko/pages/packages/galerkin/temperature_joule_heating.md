@@ -143,7 +143,8 @@ python examples/galerkin/temperature_joule_heating.py
 온도·단위 깊이 전력·반복 횟수·결함을 출력한다.
 `galerkin.electric.ElementConductivity(mesh, values)`는 명시적인 양수·유한
 요소별 `(M,)` S/m 사본을 받으며 메시 기하·순서·영역 일치를 검사한다.
-원시 배열은 여전히 거부한다. 열전도도 입력 계약은 변하지 않는다.
+값은 S/m 단위의 요소 [`Field`](coupling.md)에 담기며, 모양·메시 불일치 오류 문구는
+`element conductivity`로 시작한다. 원시 배열은 여전히 거부한다. 열전도도 입력 계약은 변하지 않는다.
 
 전류 구동 양의 저항률 피드백은 정상해 상실에 접근할 수 있다. 반복 실패를 과도
 궤적이나 물리적 불안정성 증거로 단정하지 않는다. 초기값·완화·반복 예산을
