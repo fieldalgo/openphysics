@@ -30,6 +30,10 @@ PML 밖의 물리 종방향 전기장은 `1j*ez/h`입니다.
 단일 계산은 안정성을 검증하지 않습니다. 수동 순방향 극점의 유효굴절률
 허수부는 음수입니다. 총 감쇠에는 흡수와 방사가 포함되며 둘을 분리하지 않습니다.
 
+`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`는 NumPy로
+계산하며 JAX·PyTorch 값을 `TypeError`로 거부합니다. 좌표에 대한 미분은 제공하지
+않습니다([미분](differentiation.md)).
+
 현재 검증은 독립 outgoing TE/TM slab 해석해·정렬 메시 수렴·PML/창 변화
 (`test_pml_modes.py`), 별도 scikit-fem 조립과 dense QZ의 직선/굽힘
 scalar/vector 비교(`test_crosscheck_skfem_pml_modes.py`)입니다. 동일 이산화

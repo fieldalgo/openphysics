@@ -87,7 +87,7 @@ from .core import live as live_inputs
 from .core import solve as core_solve
 from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
-from .core.checks import contains_live
+from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 
 
@@ -99,7 +99,10 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
         or complex.
     coordinate_factors: optional (T, 3) diagonal coordinate Jacobian (sx,sy,h).
     Returns (A, B, space); x = (e_t over edges, e_z over nodes), no BC applied.
+    NumPy only: JAX and PyTorch values raise TypeError (solve_modes differentiates).
     """
+    for name, value in (("eps_r", eps_r), ("k0", k0), ("mu_r", mu_r), ("coordinate_factors", coordinate_factors)):
+        refuse_live(value, f"assemble_mode_system {name}")
     space = space or EdgeSpace(mesh)
     blocks = {name: m.to_scipy() for name, m in _mode_blocks(np, space, eps_r, mu_r, coordinate_factors).items()}
     S, Mt_eps, Mt_mu, G, K, M = (blocks[n] for n in ("S", "Mt_eps", "Mt_mu", "G", "K", "M"))

@@ -19,6 +19,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
+from .core.checks import refuse_live
 from .core.solve import scipy_solve_dirichlet
 
 
@@ -30,5 +31,8 @@ def solve_dirichlet(K: sp.csr_matrix, f: np.ndarray,
                array matching the node set, e.g.
                {tuple(mesh.boundary['inner']): 1.0,
                 tuple(mesh.boundary['outer']): 0.0}
+    NumPy only: JAX and PyTorch values raise TypeError.
     """
+    refuse_live(f, "solve_dirichlet f")
+    refuse_live(list(dirichlet.values()), "solve_dirichlet Dirichlet values")
     return scipy_solve_dirichlet(K, f, dirichlet)

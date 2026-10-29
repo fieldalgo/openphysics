@@ -35,6 +35,11 @@ strength independently is necessary. A single solve does not verify stability.
 Passive forward poles have negative imaginary effective index. Total
 attenuation includes absorption and radiation; it does not separate them.
 
+`mode_coordinates`, `scalar_coordinate_system` and `solve_scalar_coordinates`
+compute with NumPy and refuse JAX and PyTorch values with a `TypeError`;
+derivatives with respect to the coordinates are not provided
+([derivatives](differentiation.md)).
+
 Current validation: independent outgoing TE/TM slab roots with material-aligned
 mesh convergence and PML/window variation (`test_pml_modes.py`), and separate
 scikit-fem assembly plus dense QZ for straight/bent scalar/vector pencils

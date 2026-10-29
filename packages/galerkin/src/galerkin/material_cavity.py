@@ -28,7 +28,7 @@ from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
 from .core.spaces import edge_ids
 from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
-from .core.checks import positive_integer, positive_real, triple
+from .core.checks import positive_integer, positive_real, refuse_live, triple
 
 _INDEPENDENCE_LIMIT = 1e-6
 _BIORTHOGONALITY_LIMIT = 1e-7
@@ -117,6 +117,8 @@ def _regions(regions, lengths, cells):
     for r, region in enumerate(regions):
         if not isinstance(region, CavityMaterialRegion):
             raise ValueError(f"regions[{r}] must be a CavityMaterialRegion")
+        refuse_live([region.bounds_m, region.relative_permittivity, region.relative_permeability],
+                    f"regions[{r}]")
         try:
             bounds = tuple(tuple(pair) for pair in region.bounds_m)
         except TypeError:
@@ -349,10 +351,13 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
 
     Select modes nearest the real target in complex squared wave number,
     ``|k0^2 - (2*pi*f_target/c0)^2|``, then return them in ascending real
-    frequency. Invalid inputs raise ValueError; nonconvergence, insufficient
-    modes or failed quality checks raise RuntimeError without a partial result.
+    frequency. Invalid inputs raise ValueError and JAX or PyTorch values TypeError;
+    nonconvergence, insufficient modes or failed quality checks raise RuntimeError
+    without a partial result.
     See docs/packages/galerkin/material_cavity.md for the conventions and validation.
     """
+    refuse_live(subdivisions, "subdivisions")
+    refuse_live(num_modes, "num_modes")
     lengths = np.asarray(triple(lengths_m, "lengths_m", positive_real))
     cells = triple(subdivisions, "subdivisions", positive_integer)
     count = positive_integer(num_modes, "num_modes")

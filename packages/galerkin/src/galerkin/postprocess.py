@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from .core.backend import is_live, namespace
+from .core.checks import refuse_live
 from .mesh import Mesh
 
 
@@ -46,9 +47,12 @@ def l2_error(mesh: Mesh, V: np.ndarray, exact) -> float:
     """|| V_h - V_exact ||_L2, approximated by a one-point centroid rule.
 
     exact: vectorized callable exact(x, y) returning the analytical solution.
+    NumPy only: JAX and PyTorch values raise TypeError.
     """
+    refuse_live(V, "l2_error V")
     tris = mesh.triangles
     centroid = mesh.nodes[tris].mean(axis=1)
     Vh_c = V[tris].mean(axis=1)              # centroid value of the P1 interpolant
     Ve_c = exact(centroid[:, 0], centroid[:, 1])
+    refuse_live(Ve_c, "l2_error exact values")
     return float(np.sqrt(np.sum(mesh.areas() * np.abs(Vh_c - Ve_c) ** 2)))

@@ -146,7 +146,7 @@ against exact integrals for every coefficient form
 ([element definitions](reference-comparisons.md#element-definitions)).
 
 Not differentiable yet: `material_cavity` and `mode_coordinates` assemble through
-the public functions only (`pml` computes coefficients and assembles nothing). The coupling layer passes fields one way on a
+the public functions only and refuse JAX and PyTorch values (`pml` computes coefficients and assembles nothing). The coupling layer passes fields one way on a
 single mesh. A fixed-point driver waits for a third coupled pair, and
 grid-to-mesh projection waits for a second engine
 ([limits](packages/galerkin/coupling.md#limits)).

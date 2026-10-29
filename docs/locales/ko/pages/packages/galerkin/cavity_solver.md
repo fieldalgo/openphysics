@@ -76,7 +76,7 @@ partner를 보장하지 않습니다. 특히 최소 반환 주파수가 기본 �
 내부 좌표는 `L=max(lengths_m)`로 나눕니다. 반환 계수는 `q_normalized/sqrt(L)`,
 고유값은 `k2_normalized/L**2`, centroid 장은 `E_normalized/L**1.5`입니다.
 물리 크기를 균일하게 s배 하면 주파수는 s로 나눠집니다. 각 centroid 장은
-`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`로 복원합니다.
+`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`로 복원합니다(NumPy 결과만; NumPy 계수만 받습니다). JAX·PyTorch 길이로 얻은 결과는 미분이 붙은 중심 필드를 `result.electric_field`에 이미 담고 있습니다.
 
 직렬화는 호출자 책임입니다. 기술적 장 계약을 보존하려면 SI 좌표, 사면체, 에지
 순서/방향, PEC index, 선언한 정규화 및 검색 metadata와 전체 raw 계수를 저장합니다.

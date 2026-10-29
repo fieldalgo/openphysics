@@ -158,7 +158,8 @@ use contribute nothing, so the other modes keep their derivatives. Break the
 symmetry or use a quantity of the whole degenerate subspace instead.
 
 `solve_material_cavity_box` and the electromagnetic solvers other than
-`solve_modes` and `solve_cavity_box` do not differentiate yet.
+`solve_modes` and `solve_cavity_box` do not differentiate yet; they refuse JAX
+and PyTorch values ([refused](#refused-not-approximated)).
 
 ## Box cavity: derivatives with respect to the lengths
 
@@ -198,14 +199,19 @@ no derivative.
   `ElementHeatSource`, `ElementConductivity` and `freeze_temperature`'s
   `TemperatureSnapshot`, the Joule and heat-to-mechanics workflows (the latter
   reports it as a `WorkflowStageError` of the heat stage), and transient
-  mechanics given a live heat history (a `TransientThermoelasticError`). JSON
-  documents and the command line run on NumPy.
+  mechanics given a live heat history (a `TransientThermoelasticError`). So do
+  `solve_material_cavity_box`, the modal coordinate functions
+  (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
+  `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
+  `l2_error` and `eval_edge_field_3d`. JSON documents and the command line run
+  on NumPy.
 
 ## Limits
 
-- Not yet guarded: the electromagnetic solvers other than `solve_modes` and
-  `solve_cavity_box` convert their inputs with NumPy. A JAX value passed to them
-  loses its derivative; do not pass live values there. The low-level assembly
+- Not guarded and not tested for derivatives: `eval_edge_field` and
+  `radial_pml_coeffs` compute with NumPy operators. JAX values of `dofs`, `k`
+  and `sigma_max` pass through them with their derivative; PyTorch values, and
+  JAX values of `r0` and `d`, fail inside NumPy. The low-level assembly
   functions (`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`) refuse live
   values with a `TypeError`; assemble `galerkin.core.kernels` with
   `galerkin.core.forms` to keep them live.

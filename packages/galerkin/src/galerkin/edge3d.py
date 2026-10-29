@@ -86,8 +86,9 @@ def eval_edge_field_3d(space: EdgeSpace3D, dofs: np.ndarray) -> np.ndarray:
     """Edge dofs -> vector field at tetrahedron centroids, (T, 3).
 
     At the centroid every barycentric coordinate is 1/4, so W_ij reduces to
-    (grad lambda_j - grad lambda_i)/4.
+    (grad lambda_j - grad lambda_i)/4. NumPy only: JAX and PyTorch dofs raise TypeError.
     """
+    refuse_live(dofs, "eval_edge_field_3d dofs")
     g, _ = tet_gradients(space.mesh)
     W = 0.25 * (g[:, _J, :] - g[:, _I, :])                    # (T, 6, 3)
     coef = space.signs * dofs[space.tet_edges]                # (T, 6)

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.sparse.linalg as spla
 from .assembly import assemble_mass, assemble_stiffness
+from .core.checks import refuse_live
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,11 @@ def mode_coordinates(mesh, *, thickness, strength=3.0, order=2,
     bend_origin on the selected outward axis and z=R*theta is reference arc length.
     """
     sides = ("left", "right", "bottom", "top")
+    if isinstance(thickness, dict):
+        refuse_live(list(thickness.values()), "mode_coordinates thickness")
+    for name, value in (("strength", strength), ("order", order), ("bend_radius", bend_radius),
+                        ("bend_origin", bend_origin)):
+        refuse_live(value, f"mode_coordinates {name}")
     if not isinstance(thickness, dict) or set(thickness)-set(sides):
         raise ValueError("PML thickness must map left/right/bottom/top to lengths")
     if any(isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, float, np.number)) for v in thickness.values()):
@@ -87,6 +93,8 @@ def mode_coordinates(mesh, *, thickness, strength=3.0, order=2,
 
 def scalar_coordinate_system(mesh, eps_r, k0, factors):
     """A u=beta^2 B u for the scalar Helmholtz approximation in these coordinates."""
+    for name, value in (("eps_r", eps_r), ("k0", k0), ("factors", factors)):
+        refuse_live(value, f"scalar_coordinate_system {name}")
     factors = np.asarray(factors)
     if factors.shape != (mesh.num_triangles, 3) or not np.isfinite(factors).all() or np.any(factors == 0):
         raise ValueError("coordinate factors must be finite nonzero (triangles, 3)")
@@ -104,6 +112,9 @@ def solve_scalar_coordinates(mesh, eps_r, k0, n_target, factors, *, num_modes=6,
     Returns n_eff and nodal fields. Amplitudes are arbitrary; no candidate is
     silently classified as a physical resonance by this low-level solver.
     """
+    for name, value in (("eps_r", eps_r), ("k0", k0), ("n_target", n_target), ("factors", factors),
+                        ("num_modes", num_modes), ("fixed_nodes", fixed_nodes)):
+        refuse_live(value, f"solve_scalar_coordinates {name}")
     A, B = scalar_coordinate_system(mesh, eps_r, k0, factors)
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed_nodes)
     Af, Bf = A[free][:, free].tocsc(), B[free][:, free].tocsc()
