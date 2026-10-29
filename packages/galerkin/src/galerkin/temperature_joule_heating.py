@@ -18,8 +18,9 @@ from .joule_heating import solve_steady_joule_heat, SteadyJouleHeatResult
 from .materials import region_index, region_property
 from .core import forms, kernels
 from .core import solve as core_solve
+from .core.backend import is_live
 from .core.boundary import scalar_boundary_samples
-from .core.checks import finite_scalar, one_of, readonly_copy, real_array
+from .core.checks import finite_scalar, one_of, readonly_copy, real_array, refuse_live
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 from .thermal import scalar_boundary_system
@@ -94,6 +95,32 @@ class JouleConvergenceError(RuntimeError):
         self.reason = reason
         self.history = tuple(history)
         self.last_temperature = readonly_copy(temperature)
+
+
+def _live_leaves(value):
+    """The JAX and PyTorch arrays in ``value``, searching mapping values, lists and tuples.
+
+    ``core.checks.contains_live`` does not look inside mappings, and boundary
+    data here are tables such as ``{node: volts}`` and ``{tag: (h, ambient)}``.
+    """
+    if isinstance(value, Mapping):
+        return [leaf for v in value.values() for leaf in _live_leaves(v)]
+    if isinstance(value, (list, tuple)):
+        return [leaf for v in value for leaf in _live_leaves(v)]
+    return [value] if is_live(value) else []
+
+
+def _refuse_live_inputs(**inputs):
+    """TypeError for any input holding a JAX or PyTorch value, before anything copies or checks it.
+
+    Both methods find their solution by iteration and return NumPy numbers; a
+    derivative needs the implicit derivative of the coupled residual
+    (docs/packages/galerkin/differentiation.md#iterative-solvers), which this
+    solver does not provide. Values a callback returns (conductivity or
+    boundary condition) are seen only when it runs, inside the iteration.
+    """
+    for name, value in inputs.items():
+        refuse_live(_live_leaves(value), f"solve_temperature_joule_heat {name}")
 
 
 def _models(mesh, value):
@@ -283,7 +310,18 @@ def solve_temperature_joule_heat(
     halving a step whose candidate fails to evaluate, or neither converges nor
     reduces the temperature defect; relaxation applies to Picard only. The same
     tests decide convergence.
+
+    NumPy only: a JAX or PyTorch value in any input raises TypeError before
+    anything is copied or solved; one returned by a callback surfaces as a
+    JouleConvergenceError caused by that TypeError.
     """
+    _refuse_live_inputs(
+        thermal_conductivity=thermal_conductivity, electric_dirichlet=electric_dirichlet,
+        thermal_dirichlet=thermal_dirichlet, initial_temperature=initial_temperature,
+        outward_current=outward_current, reference_potential=reference_potential,
+        outward_flux=outward_flux, convection=convection, relaxation=relaxation,
+        temperature_atol=temperature_atol, relative_tolerance=relative_tolerance,
+        max_iterations=max_iterations)
     one_of(method, METHODS, "method")
     relaxation = finite_scalar(relaxation, "relaxation")
     atol = finite_scalar(temperature_atol, "temperature_atol")

@@ -242,14 +242,24 @@ cannot fail.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
   `TypeError` rather than silently cutting the derivative: the NumPy containers
   `ElementHeatSource`, `ElementConductivity` and `freeze_temperature`'s
-  `TemperatureSnapshot`, the Joule and heat-to-mechanics workflows (the latter
-  reports it as a `WorkflowStageError` of the heat stage), and transient
+  `TemperatureSnapshot`, the one-way Joule transfer (`solve_steady_joule_heat`)
+  and the heat-to-mechanics workflows (the latter reports it as a
+  `WorkflowStageError` of the heat stage), and transient
   mechanics given a live heat history (a `TransientThermoelasticError`). So do
   `solve_material_cavity_box`, the modal coordinate functions
   (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
   `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
   `l2_error` and `eval_edge_field_3d`. JSON documents and the command line run
   on NumPy.
+- `solve_temperature_joule_heat`, with either method, raises a `TypeError` for a
+  JAX or PyTorch value in any input before it copies or solves anything,
+  including values inside region tables and boundary tables such as
+  `{node: volts}` and `{tag: (h, ambient)}`. Callbacks run only inside the
+  iteration, so a live value that one returns surfaces as a
+  `JouleConvergenceError` whose cause is that `TypeError`: the conductivity
+  callbacks `ConductivityModel.evaluate` and `derivative`, and boundary callbacks
+  given for `outward_flux`, `convection` or `outward_current`. See [iterative solvers](#iterative-solvers) for the derivative
+  such a solver would need.
 
 ## Limits
 
