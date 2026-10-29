@@ -27,11 +27,14 @@ from .core import live as live_inputs
 from .core import solve as core_solve
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, namespace, scatter_add, to_numpy
 from .core.boundary import traction_load
-from .core.checks import real_array, real_value
+from .core.checks import one_of, real_array, real_value, require_finite
 from .core.sparse import CooMatrix
 from .core.constraints import vector_dirichlet
 from .core.quadrature import triangle_product_rule
 from .core.triangles import triangle_geometry, vector_strain
+
+
+PLANES = ("stress", "strain")
 
 
 def lame(e, nu, plane):
@@ -54,16 +57,6 @@ def constitutive(xp, e, nu, plane):
     return xp.stack([xp.stack(row, axis=-1) for row in rows], axis=-2)
 
 
-def _check_plane(plane):
-    if plane not in ("stress", "strain"):
-        raise ValueError("plane must be 'stress' or 'strain'")
-
-
-def _check_finite(d, what):
-    if not np.all(np.isfinite(to_numpy(d))):
-        raise ValueError(f"{what} exceed floating-point range")
-
-
 def constitutive_matrix(young_modulus, poisson_ratio, *, plane):
     """Return Pa matrix for [exx, eyy, gamma_xy], gamma_xy=2*exy.
 
@@ -73,9 +66,9 @@ def constitutive_matrix(young_modulus, poisson_ratio, *, plane):
     e, nu = real_array(young_modulus, "young_modulus"), real_array(poisson_ratio, "poisson_ratio")
     if e.shape != () or nu.shape != () or e <= 0 or not -1 < nu < .5:
         raise ValueError("require scalar E > 0 and -1 < nu < 0.5")
-    _check_plane(plane)
+    one_of(plane, PLANES, "plane")
     d = constitutive(np, np.float64(e), np.float64(nu), plane)
-    _check_finite(d, "constitutive parameters")
+    require_finite(d, "constitutive parameters exceed floating-point range")
     return d
 
 
@@ -103,11 +96,11 @@ def element_constitutive(mesh, young_modulus, poisson_ratio, *, plane):
     """
     if not (is_per_region(young_modulus) or is_per_region(poisson_ratio)):
         return constitutive_matrix(young_modulus, poisson_ratio, plane=plane)
-    _check_plane(plane)
+    one_of(plane, PLANES, "plane")
     e, nu = element_materials(mesh, young_modulus, poisson_ratio)
     xp = live_namespace(e, nu)
     d = constitutive(xp, e, nu, plane)
-    _check_finite(d, "constitutive parameters")
+    require_finite(d, "constitutive parameters exceed floating-point range")
     return d
 
 
@@ -253,7 +246,7 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
     """
-    _check_plane(plane)
+    one_of(plane, PLANES, "plane")
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
     e, nu = element_materials(mesh, young_modulus, poisson_ratio)
@@ -261,7 +254,7 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     line = traction_load(mesh, p, t, traction, live=True)
     xp = live_namespace(e, nu, body, line, *live_inputs.leaves(dirichlet))
     d = constitutive(xp, *(lift(xp, v, xp.float64) for v in (e, nu)), plane)
-    _check_finite(d, "constitutive parameters")
+    require_finite(d, "constitutive parameters exceed floating-point range")
     n = 2*len(p)
     stiffness = vector_stiffness(xp, b, dofs, d, area, n)
     body = lift(xp, body)

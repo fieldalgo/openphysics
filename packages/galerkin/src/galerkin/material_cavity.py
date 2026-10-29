@@ -26,8 +26,8 @@ import scipy.sparse.linalg as spla
 from .mesh3d import Mesh3D
 from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
-from .cavity import (_C0, _DENSE_LIMIT, _GRADIENT_LIMIT, _RESIDUAL_LIMIT,
-                     _cavity_mesh, _positive_integer, _positive_real, _triple)
+from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
+from .core.checks import positive_integer, positive_real, triple
 
 _INDEPENDENCE_LIMIT = 1e-6
 _BIORTHOGONALITY_LIMIT = 1e-7
@@ -37,7 +37,7 @@ _GRID_TOLERANCE = 1e-9
 # Symmetric sparsity: minimum degree on A^T+A gives far less fill than COLAMD.
 _ORDERING = "MMD_AT_PLUS_A"
 _MU0 = 1.25663706212e-6           # vacuum permeability (CODATA 2018), H/m
-_ETA0 = _MU0 * _C0
+_ETA0 = _MU0 * C0
 WALLS = ("x0", "x1", "y0", "y1", "z0", "z1")
 _FIXED_POINT_TOLERANCE = 1e-12
 _FIXED_POINT_ITERATIONS = 50
@@ -170,9 +170,9 @@ def _wall_conductivities(value):
         if unknown:
             raise ValueError(f"unknown walls {unknown}; use {WALLS}")
         return {wall: (None if value.get(wall) is None
-                       else _positive_real(value[wall], f"wall_conductivity_s_per_m[{wall}]"))
+                       else positive_real(value[wall], f"wall_conductivity_s_per_m[{wall}]"))
                 for wall in WALLS}
-    sigma = _positive_real(value, "wall_conductivity_s_per_m")
+    sigma = positive_real(value, "wall_conductivity_s_per_m")
     return dict.fromkeys(WALLS, sigma)
 
 
@@ -227,7 +227,7 @@ def _nearest_eigenpairs(stiffness, mass, projector, sigma, count, dense, interio
                         kernel_cutoff, physical_count, start=None):
     """Physical eigenpairs of stiffness q = k^2 mass q nearest a (possibly complex) shift.
 
-    Returned sorted by |k^2 - sigma|. Dense up to _DENSE_LIMIT free edges, with an
+    Returned sorted by |k^2 - sigma|. Dense up to DENSE_LIMIT free edges, with an
     exact gradient-kernel count; otherwise ARPACK on the standard problem
     T = P (A - sigma M)^-1 M P, because ARPACK's generalized mode needs a
     Hermitian positive M and this M is complex symmetric. ``start`` (a previous
@@ -352,17 +352,17 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
     modes or failed quality checks raise RuntimeError without a partial result.
     See docs/packages/galerkin/material_cavity.md for the conventions and validation.
     """
-    lengths = np.asarray(_triple(lengths_m, "lengths_m", _positive_real))
-    cells = _triple(subdivisions, "subdivisions", _positive_integer)
-    count = _positive_integer(num_modes, "num_modes")
-    target = _positive_real(target_frequency_hz, "target_frequency_hz")
+    lengths = np.asarray(triple(lengths_m, "lengths_m", positive_real))
+    cells = triple(subdivisions, "subdivisions", positive_integer)
+    count = positive_integer(num_modes, "num_modes")
+    target = positive_real(target_frequency_hz, "target_frequency_hz")
     materials = _regions(regions, lengths, cells)
     conductivity = _wall_conductivities(wall_conductivity_s_per_m)
     lossy_walls = [wall for wall in WALLS if conductivity[wall] is not None]
     length_scale = float(lengths.max())
     with np.errstate(over="ignore", under="ignore", divide="ignore", invalid="ignore"):
         normalized_lengths = lengths / length_scale
-        target_k = (2 * np.pi / _C0) * target * length_scale
+        target_k = (2 * np.pi / C0) * target * length_scale
         sigma = target_k * target_k
         fundamental = np.pi**2 * np.sort(1 / normalized_lengths**2)[:2].sum()
         eigenvalue_scale = 1 / np.float64(length_scale)**2
@@ -371,7 +371,7 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
             or min(sigma, eigenvalue_scale, field_scale) <= 0):
         raise ValueError("box lengths and target exceed the supported floating-point range")
 
-    normalized_mesh = _cavity_mesh(normalized_lengths, cells)
+    normalized_mesh = cavity_mesh(normalized_lengths, cells)
     centroid_grid = (normalized_mesh.nodes[normalized_mesh.tets].mean(axis=1)
                      / normalized_lengths * np.asarray(cells))
     eps = np.ones(normalized_mesh.num_tets, dtype=complex)
@@ -399,7 +399,7 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
     wall_mass = {w: _wall_mass(space, walls[w])[free][:, free].tocsc() for w in lossy_walls}
     # Physical k0^2 are at least about the vacuum fundamental / max|eps mu|.
     kernel_cutoff = 1e-8 * fundamental / float(np.max(np.abs(eps * mu)))
-    dense = len(free) <= _DENSE_LIMIT
+    dense = len(free) <= DENSE_LIMIT
 
     def wall_coefficient(eigenvalue):
         """Per-wall L*sqrt(j k eta0 sigma) at normalized k^2, with SI k = sqrt(k^2)/L.
@@ -511,8 +511,8 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
             leakage = gradient @ gradient_lu.solve(gradient.T @ mass_vectors)
             leakage_norm = np.sqrt(np.maximum(np.real(
                 np.sum(leakage.conj() * (vacuum_mass @ leakage), axis=0)), 0))
-            if np.max(leakage_norm) > _GRADIENT_LIMIT:
-                raise RuntimeError(f"cavity gradient component exceeds {_GRADIENT_LIMIT:g}")
+            if np.max(leakage_norm) > GRADIENT_LIMIT:
+                raise RuntimeError(f"cavity gradient component exceeds {GRADIENT_LIMIT:g}")
         left = np.column_stack([operators[j] @ vectors[:, j] for j in range(count)])
         right = mass_vectors * values
         residuals = np.linalg.norm(left - right, axis=0) / (
@@ -523,8 +523,8 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
                                      for j in range(count)])
             residuals = np.maximum(residuals, np.linalg.norm(exact - right, axis=0) / (
                 np.linalg.norm(exact, axis=0) + np.linalg.norm(right, axis=0)))
-        if not np.isfinite(residuals).all() or np.max(residuals) > _RESIDUAL_LIMIT:
-            raise RuntimeError(f"cavity Maxwell relative residual exceeds {_RESIDUAL_LIMIT:g}")
+        if not np.isfinite(residuals).all() or np.max(residuals) > RESIDUAL_LIMIT:
+            raise RuntimeError(f"cavity Maxwell relative residual exceeds {RESIDUAL_LIMIT:g}")
     except (RuntimeError, la.LinAlgError, ValueError) as exc:
         raise RuntimeError(f"material cavity solve failed near {target:g} Hz: {exc}") from exc
 
@@ -534,7 +534,7 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
     mesh_si = Mesh3D(normalized_mesh.nodes * length_scale, normalized_mesh.tets.copy(),
                      normalized_mesh.boundary, normalized_mesh.regions, normalized_mesh.region_names)
     eigenvalues = values * eigenvalue_scale
-    frequencies = (_C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
+    frequencies = (C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
     with np.errstate(divide="ignore"):
         quality = np.where(frequencies.imag == 0, np.inf,
                            frequencies.real / (2 * np.where(frequencies.imag == 0, 1,

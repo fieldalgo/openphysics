@@ -28,7 +28,8 @@ import scipy.linalg as la
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from .mesh3d import Mesh3D, box_mesh
+from .mesh3d import Mesh3D
+from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
 from .edge3d import (LOCAL_EDGES, EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
 from .core.tets import tet_gradients
@@ -36,15 +37,11 @@ from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
 from .core.backend import lift, live_namespace, scatter_add
-from .core.checks import contains_live, real_value
+from .core.checks import contains_live, positive_integer, positive_real, real_value, triple
 from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
 from .core.sparse import CooMatrix
 
-_C0 = 299792458.0
-_RESIDUAL_LIMIT = 1e-8
 _ORTHOGONALITY_LIMIT = 1e-7
-_GRADIENT_LIMIT = 1e-9
-_DENSE_LIMIT = 256
 
 
 @dataclass
@@ -73,36 +70,6 @@ class CavityResult:
     mode_count_policy: str = "exact_count_may_split_cluster"
 
 
-def _positive_real(value, name):
-    if (isinstance(value, (bool, np.bool_))
-            or not isinstance(value, (int, float, np.integer, np.floating))):
-        raise ValueError(f"{name} must be a finite positive number")
-    try:
-        value = float(value)
-    except (OverflowError, ValueError):
-        raise ValueError(f"{name} must be a finite positive number") from None
-    if not np.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} must be a finite positive number")
-    return value
-
-
-def _positive_integer(value, name):
-    if (isinstance(value, (bool, np.bool_))
-            or not isinstance(value, (int, np.integer)) or value <= 0):
-        raise ValueError(f"{name} must be a positive integer")
-    return int(value)
-
-
-def _triple(values, name, validate):
-    try:
-        values = tuple(values)
-    except TypeError:
-        raise ValueError(f"{name} must contain three values") from None
-    if len(values) != 3:
-        raise ValueError(f"{name} must contain three values")
-    return tuple(validate(value, f"{name}[{i}]") for i, value in enumerate(values))
-
-
 def _gradient_space(space, free, mass):
     """Interior nodal gradients in the PEC-constrained edge space.
 
@@ -119,25 +86,6 @@ def _gradient_space(space, free, mass):
     mass_gradient = mass @ incidence
     factor = spla.splu((incidence.T @ mass_gradient).tocsc()) if len(interior) else None
     return incidence, mass_gradient, factor
-
-
-def _cavity_mesh(lengths, cells):
-    """Alternate Kuhn diagonals without changing cells, vertices or tet shapes.
-
-    Reflect local coordinates along axis a whenever the cell index on a is odd.
-    Two cells sharing a face have the same tangential parities, hence the same
-    face diagonal: this is a conforming triangulation. Even subdivision counts
-    restore coordinate-reflection symmetry across the box. No refinement or
-    spectral information enters the mesh construction.
-    """
-    base = box_mesh(*lengths, *cells)
-    shape = tuple(n + 1 for n in cells)
-    grid = np.stack(np.unravel_index(base.tets, shape), axis=-1)
-    lower = grid.min(axis=1)[:, None, :]
-    local = grid - lower
-    reflected = lower + np.where(lower % 2, 1 - local, local)
-    tets = (reflected[:, :, 0] * shape[1] + reflected[:, :, 1]) * shape[2] + reflected[:, :, 2]
-    return Mesh3D(base.nodes, tets, base.boundary, base.regions, base.region_names)
 
 
 def solve_cavity_box(lengths_m, subdivisions, *, num_modes=6,
@@ -222,21 +170,21 @@ def _live_result(lengths_m, result):
     signs = lift(xp, space.signs)
     electric = xp.stack([xp.einsum("te,ted->td", signs * coefficients[:, k][space.tet_edges], basis)
                          for k in range(count)]) / scale
-    return CavityResult(result.mesh, space, (_C0 / (2 * np.pi)) * xp.sqrt(eigenvalues), eigenvalues,
+    return CavityResult(result.mesh, space, (C0 / (2 * np.pi)) * xp.sqrt(eigenvalues), eigenvalues,
                         coefficients, electric, lift(xp, result.relative_residuals),
                         result.pec_edge_ids, count, result.target_frequency_hz)
 
 
 def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_frequency_hz):
     """The NumPy solve of ``solve_cavity_box`` (NumPy inputs only)."""
-    lengths = np.asarray(_triple(lengths_m, "lengths_m", _positive_real))
-    cells = _triple(subdivisions, "subdivisions", _positive_integer)
-    count = _positive_integer(num_modes, "num_modes")
-    target = _positive_real(target_frequency_hz, "target_frequency_hz")
+    lengths = np.asarray(triple(lengths_m, "lengths_m", positive_real))
+    cells = triple(subdivisions, "subdivisions", positive_integer)
+    count = positive_integer(num_modes, "num_modes")
+    target = positive_real(target_frequency_hz, "target_frequency_hz")
     length_scale = float(lengths.max())
     with np.errstate(over="ignore", under="ignore", divide="ignore", invalid="ignore"):
         normalized_lengths = lengths / length_scale
-        target_k = (2 * np.pi / _C0) * target * length_scale
+        target_k = (2 * np.pi / C0) * target * length_scale
         sigma = target_k * target_k
         fundamental = np.pi**2 * np.sort(1 / normalized_lengths**2)[:2].sum()
         eigenvalue_scale = 1 / np.float64(length_scale)**2
@@ -247,7 +195,7 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
             or not np.isfinite(reciprocal_lengths).all()):
         raise ValueError("box lengths and target exceed the supported floating-point range")
 
-    normalized_mesh = _cavity_mesh(normalized_lengths, cells)
+    normalized_mesh = cavity_mesh(normalized_lengths, cells)
     space = EdgeSpace3D(normalized_mesh)
     pec = space.boundary_edge_ids()
     free = np.setdiff1d(np.arange(space.num_edges), pec)
@@ -262,7 +210,7 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
 
     try:
         gradient, mass_gradient, gradient_lu = _gradient_space(space, free, mass)
-        if len(free) <= _DENSE_LIMIT:
+        if len(free) <= DENSE_LIMIT:
             values, vectors = la.eigh(stiffness.toarray(), mass.toarray())
             if np.count_nonzero(np.abs(values) <= kernel_cutoff) != interior_count:
                 raise RuntimeError("computed gradient kernel dimension does not match the PEC box")
@@ -311,13 +259,13 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
         if gradient_lu is not None:
             leakage = gradient @ gradient_lu.solve(gradient.T @ mass_vectors)
             leakage_norm = np.sqrt(np.maximum(np.sum(leakage * (mass @ leakage), axis=0), 0))
-            if np.max(leakage_norm) > _GRADIENT_LIMIT:
-                raise RuntimeError(f"cavity gradient component exceeds {_GRADIENT_LIMIT:g}")
+            if np.max(leakage_norm) > GRADIENT_LIMIT:
+                raise RuntimeError(f"cavity gradient component exceeds {GRADIENT_LIMIT:g}")
         left, right = stiffness @ vectors, mass_vectors * values
         residuals = np.linalg.norm(left - right, axis=0) / (
             np.linalg.norm(left, axis=0) + np.linalg.norm(right, axis=0))
-        if not np.isfinite(residuals).all() or np.max(residuals) > _RESIDUAL_LIMIT:
-            raise RuntimeError(f"cavity Maxwell relative residual exceeds {_RESIDUAL_LIMIT:g}")
+        if not np.isfinite(residuals).all() or np.max(residuals) > RESIDUAL_LIMIT:
+            raise RuntimeError(f"cavity Maxwell relative residual exceeds {RESIDUAL_LIMIT:g}")
     except (RuntimeError, la.LinAlgError, ValueError) as exc:
         raise RuntimeError(f"PEC cavity solve failed near {target:g} Hz: {exc}") from exc
 
@@ -327,7 +275,7 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
     mesh_si = Mesh3D(normalized_mesh.nodes * length_scale, normalized_mesh.tets.copy(),
                      normalized_mesh.boundary, normalized_mesh.regions, normalized_mesh.region_names)
     eigenvalues = values * eigenvalue_scale
-    frequencies = (_C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
+    frequencies = (C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
     coefficients /= np.sqrt(length_scale)
     electric *= field_scale
     if not all(np.isfinite(array).all() for array in (eigenvalues, frequencies, coefficients, electric)):

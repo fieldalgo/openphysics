@@ -7,13 +7,13 @@ Import this submodule explicitly; existing component APIs remain unchanged.
 """
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-import copy
 import json
 import numpy as np
 
 from .mesh import Mesh
-from .core.checks import real_array, refuse_live
+from .core.checks import real_array, real_scalar, refuse_live
 from .coupling import Field, OneWayChain, transfer
+from ._thermal_mechanical_common import check_mesh_unchanged, dirichlet_supports, isolated_mesh, mesh_state
 from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
@@ -30,103 +30,12 @@ def _stage_error(stage, exc):
     return WorkflowStageError(stage, str(exc))
 
 
-def _scalar(value, name):
-    a = real_array(value, name)
-    if a.shape != ():
-        raise ValueError(f'{name} must be scalar')
-    return float(a)
-
-
-def _integer(value, name):
-    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
-        raise ValueError(f'{name} must be an integer')
-    return int(value)
-
-
-def _supports(mapping, vector=False):
-    if not isinstance(mapping, Mapping):
-        raise ValueError('Dirichlet data must be a mapping')
-    result = {}
-    for key, value in mapping.items():
-        if vector:
-            if not isinstance(key, tuple) or len(key) != 2:
-                raise ValueError('mechanical Dirichlet keys must be (node, component)')
-            key = tuple(_integer(k, 'mechanical Dirichlet index') for k in key)
-            if key[1] not in (0, 1):
-                raise ValueError('mechanical component must be 0 or 1')
-        else:
-            key = _integer(key, 'thermal Dirichlet node')
-        result[key] = _scalar(value, 'Dirichlet value')
-    return result
-
-
-def _isolated_mesh(mesh):
-    if not isinstance(mesh, Mesh):
-        raise ValueError('mesh must be a galerkin.mesh.Mesh with SI coordinates')
-    p = real_array(mesh.nodes, 'mesh.nodes')
-    t = np.array(mesh.triangles, copy=True)
-    if p.ndim != 2 or p.shape[1] != 2 or len(p) < 3:
-        raise ValueError('mesh.nodes must have shape (N,2), N>=3')
-    if (t.ndim != 2 or t.shape[1] != 3 or not len(t) or t.dtype.kind not in 'iu'
-            or np.any(t < 0) or np.any(t >= len(p))):
-        raise ValueError('mesh.triangles must be integer (M,3) valid indices before construction')
-    q = p[t]
-    with np.errstate(over='ignore', invalid='ignore'):
-        j = q[:, 1:] - q[:, :1]
-        det = j[:, 0, 0]*j[:, 1, 1]-j[:, 0, 1]*j[:, 1, 0]
-    if np.any(~np.isfinite(det)) or np.any(det <= 0):
-        raise ValueError('raw mesh triangles must be finite, CCW and nondegenerate; no orientation repair')
-    def tags(mapping, width):
-        if not isinstance(mapping, Mapping):
-            raise ValueError('mesh boundary data must be mappings')
-        out = {}
-        for name, ids in mapping.items():
-            a = np.array(ids, copy=True)
-            if (not isinstance(name, str) or a.dtype.kind not in 'iu'
-                    or a.ndim != (1 if width == 1 else 2)
-                    or (width == 2 and a.shape[1] != 2)
-                    or np.any(a < 0) or np.any(a >= len(p))):
-                raise ValueError('invalid raw boundary tag/index data')
-            out[name] = a.astype(np.int64, copy=True)
-        return out
-    boundary = tags(mesh.boundary, 1)
-    edges = tags(mesh.boundary_edges, 2)
-    # Geometry/connectivity were checked BEFORE Mesh can cast or flip triangles.
-    regions = None if mesh.regions is None else np.array(mesh.regions, copy=True)
-    if regions is not None and (regions.shape != (len(t),) or regions.dtype.kind not in 'iu'):
-        raise ValueError('mesh.regions must be integer (M,) data when supplied')
-    if regions is not None and np.any(regions > np.iinfo(np.int64).max):
-        raise ValueError('mesh.regions exceeds integer representation')
-    names = copy.deepcopy(mesh.region_names)
-    if names is not None and (not isinstance(names, list) or any(not isinstance(v, str) for v in names)):
-        raise ValueError('mesh.region_names must be a list of strings when supplied')
-    owned = Mesh(p, t.astype(np.int64, copy=True), boundary, edges, regions, names)
-    return owned
-
-
-def _mesh_state(mesh):
-    return (mesh.nodes.copy(), mesh.triangles.copy(),
-            {k: v.copy() for k, v in mesh.boundary.items()},
-            {k: v.copy() for k, v in mesh.boundary_edges.items()},
-            None if mesh.regions is None else mesh.regions.copy(), copy.deepcopy(mesh.region_names))
-
-
-def _check_mesh(mesh, state):
-    if not (np.array_equal(mesh.nodes, state[0]) and np.array_equal(mesh.triangles, state[1])):
-        raise ValueError('isolated reference mesh changed during workflow')
-    if not np.array_equal(mesh.regions, state[4]) or mesh.region_names != state[5]:
-        raise ValueError('isolated reference region metadata changed during workflow')
-    for actual, expected in ((mesh.boundary, state[2]), (mesh.boundary_edges, state[3])):
-        if set(actual) != set(expected) or any(not np.array_equal(actual[k], expected[k]) for k in expected):
-            raise ValueError('isolated reference boundary data changed during workflow')
-
-
 def _material(mesh, value, name, **bounds):
     """Validated scalar float, or a {region name: float} dict (sorted keys)."""
     if is_per_region(value):
         region_property(mesh, value, name, **bounds)
         return {str(k): float(value[k]) for k in sorted(value)}
-    return _scalar(value, name)
+    return real_scalar(value, name)
 
 
 def _input_record(value):
@@ -173,19 +82,19 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
     with chain.stage('input'):
         if not isinstance(units, Mapping) or dict(units) != {'length': 'm', 'temperature': 'K'}:
             raise ValueError("units must be exactly {'length':'m','temperature':'K'}; convert inputs explicitly")
-        owned = _isolated_mesh(mesh)
-        state = _mesh_state(owned)
+        owned = isolated_mesh(mesh)
+        state = mesh_state(owned)
         k = _material(owned, conductivity, 'conductivity', positive=True)
         e = _material(owned, young_modulus, 'young_modulus', positive=True)
         nu = _material(owned, poisson_ratio, 'poisson_ratio', lower=-1., upper=.5)
         alpha = _material(owned, thermal_expansion_per_k, 'thermal_expansion_per_k')
-        tref = _scalar(reference_temperature_k, 'reference_temperature_k')
+        tref = real_scalar(reference_temperature_k, 'reference_temperature_k')
         scalars = [v for v in (k, e) if not isinstance(v, dict)]
         if (any(v <= 0 for v in scalars) or (not isinstance(nu, dict) and not -1 < nu < .5)
                 or tref < 0 or plane not in ('stress', 'strain')):
             raise ValueError('require k>0, E>0, -1<nu<.5, Tref>=0K and plane stress/strain')
-        heat_bc = _supports(thermal_dirichlet)
-        mechanical_bc = _supports(mechanical_dirichlet, vector=True)
+        heat_bc = dirichlet_supports(thermal_dirichlet)
+        mechanical_bc = dirichlet_supports(mechanical_dirichlet, vector=True)
         source = (heat_source if callable(heat_source)
                   else _material(owned, heat_source, 'heat_source'))
         body = body_force if callable(body_force) else real_array(body_force, 'body_force')
@@ -202,7 +111,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         heat = solve_steady_heat(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
         # The mechanical stage computes with NumPy; a live heat input would lose its derivative.
         refuse_live(heat.temperature, "solve_steady_thermoelasticity heat inputs")
-        _check_mesh(owned, state)
+        check_mesh_unchanged(owned, state)
     with chain.stage('transfer'):
         raw = np.asarray(heat.temperature)
         if raw.shape != (len(owned.nodes),):
@@ -221,7 +130,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         minimum_node = int(np.argmin(temperature))
         if temperature[minimum_node] < 0:
             raise ValueError(f'temperature transfer requires nonnegative Kelvin; minimum {temperature[minimum_node]} K at node {minimum_node}')
-        _check_mesh(owned, state)
+        check_mesh_unchanged(owned, state)
         # Same-mesh identity transfer of the nodal Kelvin field; the snapshot
         # below adds its immutable fingerprinted form for mechanics.
         nodal = transfer(Field(owned, temperature, location='node', unit='K',
@@ -233,7 +142,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         mechanics = solve_thermoelasticity(owned, snapshot, reference_temperature_k=tref,
             thermal_expansion_per_k=alpha, young_modulus=e, poisson_ratio=nu, plane=plane,
             dirichlet=mechanical_bc, body_force=body)
-        _check_mesh(owned, state)
+        check_mesh_unchanged(owned, state)
     with chain.stage('manifest'):
         manifest = {'schema': 'galerkin-steady-thermoelasticity-v1',
             'units': {'length': 'm', 'temperature': 'K'}, 'inputs': inputs,

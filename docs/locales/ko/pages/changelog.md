@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 어떤 모듈도 다른 모듈의 비공개 이름을 import하지 않으며, 층 시험이 이를 검사합니다. 상자 공진기와 탄성이 그렇게 나눠 쓰던 입력 검사는 `galerkin.core.checks`로, 열→역학 workflow의 메시 격리·Dirichlet 검사와 공진기의 광속·수치 기준·상자 메시는 패키지 비공개 모듈로 옮겼습니다. 결과와 오류 메시지는 바뀌지 않습니다.
 - `galerkin`: `solve_elasticity`, `solve_thermoelasticity`, 도파관 모드 연립방정식은 NumPy 본문과 따로 살아 있는 본문을 두는 대신, NumPy와 JAX·PyTorch 입력에 `core.kernels`로 만든 본문 하나를 씁니다. NumPy 결과는 비트 단위로 같습니다.
 - `galerkin`: 요소 공식은 이제 `galerkin.core.kernels`에 한 벌만 있습니다. 공개 조립 함수(`assemble_stiffness`, `assemble_mass`, `assemble_boundary_mass`, `assemble_load`, 그 3D 함수와 변 요소 함수)는 이 커널을 조립하며 같은 행렬을 돌려줍니다. 이제 JAX·PyTorch 값을 NumPy로 바꾸는 대신(미분이 끊김) `TypeError`로 거부하고, `assemble_curlcurl_3d`, `assemble_edge_mass_3d`, `assemble_edge_grad_3d`, `assemble_load`는 복소 계수 배열의 허수부를 `ComplexWarning`과 함께 버리는 대신 `TypeError`로 거부합니다. 새 symfem 비교가 셀별·텐서·복소 계수의 커널을 정확한 적분과 비교합니다([요소 정의](reference-comparisons.md#계수)).
 - `galerkin`: `galerkin.core`가 메시 형식만 import합니다. 사면체 기울기는 `galerkin.core.tets`로 옮겼고(`galerkin.tet_gradients`, `galerkin.assembly3d.tet_gradients`는 그대로), SciPy Dirichlet 풀이 본문은 `galerkin.core.solve`로 옮겼으며(`galerkin.solver.solve_dirichlet`의 서명은 그대로), `core.loads`는 중심점 하중을 `core.kernels`로 만듭니다. 공개 조립 모듈은 이제 core 위에 있고, 층 시험이 메시 형식과 이 모듈들도 검사합니다. 결과는 바뀌지 않습니다.
