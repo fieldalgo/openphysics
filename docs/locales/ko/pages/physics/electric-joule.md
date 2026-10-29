@@ -14,7 +14,7 @@ DC 전기 해석, 전기에서 열로의 단방향 전달, 온도 의존 전도�
 
 ## 실행 경로와 한계
 
-Python 전기 API는 영역 전도도와 명시적 Neumann gauge를 지원합니다. JSON/CLI는 균질 직사각형과 문서에 명시된 전도도 모델로 제한되며 shapes·sweep·plot·Studio 실행을 지원하지 않습니다. 온도 의존 JSON은 지정된 선형 비저항 모델을 쓰며 임의 Python callback을 실행하지 않습니다.
+Python 전기 API는 영역 전도도와 명시적 Neumann gauge를 지원합니다. JSON/CLI는 균질 직사각형과 문서에 명시된 전도도 모델로 제한되며 shapes·sweep·plot·Studio 실행을 지원하지 않습니다. 온도 의존 JSON은 지정된 선형 비저항 모델을 쓰며 임의 Python callback을 실행하지 않고, 항상 Picard 반복을 씁니다. Newton 방법(`method="newton"`)은 Python에서만 씁니다.
 
 ## 모델 문서와 사용 흐름
 

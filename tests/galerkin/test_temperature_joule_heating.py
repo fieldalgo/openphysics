@@ -10,7 +10,7 @@ from galerkin.mesh import rectangle_mesh
 from galerkin.electric import ElementConductivity, solve_steady_electric
 from galerkin.joule_heating import solve_steady_joule_heat
 from galerkin.temperature_joule_heating import (
-    ConductivityModel, JouleConvergenceError, solve_temperature_joule_heat)
+    METHODS, ConductivityModel, JouleConvergenceError, solve_temperature_joule_heat)
 
 
 def problem(n=8, alpha=.5, **options):
@@ -26,8 +26,9 @@ def problem(n=8, alpha=.5, **options):
     return mesh, args
 
 
-def test_constant_limit_and_balances():
-    mesh, args = problem(alpha=0.)
+@pytest.mark.parametrize('method', METHODS)
+def test_constant_limit_and_balances(method):
+    mesh, args = problem(alpha=0., method=method)
     actual = solve_temperature_joule_heat(mesh, **args)
     e = solve_steady_electric(mesh, conductivity=1., dirichlet=args['electric_dirichlet'],
                              outward_current=args['outward_current'])
@@ -43,11 +44,12 @@ def test_constant_limit_and_balances():
     assert not actual.evaluated_temperature.flags.writeable
 
 
-def test_analytic_mesh_convergence():
+@pytest.mark.parametrize('method', METHODS)
+def test_analytic_mesh_convergence(method):
     errors = []
     current_errors = []
     for n in (8, 16, 32):
-        mesh, args = problem(n)
+        mesh, args = problem(n, method=method)
         result = solve_temperature_joule_heat(mesh, **args)
         x = mesh.nodes[:, 0]
         exact = 300+(np.cos(np.sqrt(.5)*(x-.5))/np.cos(np.sqrt(.5)/2)-1)/.5
@@ -98,8 +100,9 @@ def test_nonconvergence_and_small_relaxation_preserve_evidence():
     ConductivityModel(lambda t: 1., (0., 400.)),
     ConductivityModel(lambda t: np.ones_like(t, dtype=complex), (0., 400.)),
 ])
-def test_material_failures(model):
-    mesh, args = problem(electrical_conductivity=model)
+@pytest.mark.parametrize('method', METHODS)
+def test_material_failures(model, method):
+    mesh, args = problem(electrical_conductivity=model, method=method)
     with pytest.raises(JouleConvergenceError) as exc:
         solve_temperature_joule_heat(mesh, **args)
     assert exc.value.__cause__ is not None
@@ -129,8 +132,9 @@ def test_element_conductivity_binding():
         solve_steady_electric(mesh, conductivity=field.values, dirichlet=args['electric_dirichlet'])
 
 
-def test_regions_interface_ranges_and_element_mean():
-    mesh, args = problem()
+@pytest.mark.parametrize('method', METHODS)
+def test_regions_interface_ranges_and_element_mean(method):
+    mesh, args = problem(method=method)
     mesh.regions = (mesh.nodes[mesh.triangles].mean(axis=1)[:, 0] > .5).astype(int)
     mesh.region_names = ('a', 'b')
     seen = []
@@ -150,8 +154,9 @@ def test_regions_interface_ranges_and_element_mean():
         solve_temperature_joule_heat(mesh, **args)
 
 
-def test_zero_voltage():
-    mesh, args = problem(outward_current=None)
+@pytest.mark.parametrize('method', METHODS)
+def test_zero_voltage(method):
+    mesh, args = problem(outward_current=None, method=method)
     result = solve_temperature_joule_heat(mesh, **args)
     assert len(result.history) == 1
     assert result.coupled.source_power_per_length == 0
@@ -163,8 +168,9 @@ def test_invalid_ranges(bounds):
         ConductivityModel(lambda t: t, bounds)
 
 
-def test_initial_range_and_callback_exception():
-    mesh, args = problem(initial_temperature=299.)
+@pytest.mark.parametrize('method', METHODS)
+def test_initial_range_and_callback_exception(method):
+    mesh, args = problem(initial_temperature=299., method=method)
     with pytest.raises(JouleConvergenceError, match='outside') as exc:
         solve_temperature_joule_heat(mesh, **args)
     assert exc.value.history == ()
@@ -176,8 +182,9 @@ def test_initial_range_and_callback_exception():
     assert isinstance(exc.value.__cause__, RuntimeError)
 
 
-def test_zero_power_with_nonuniform_thermal_boundary():
-    mesh, args = problem(outward_current=None)
+@pytest.mark.parametrize('method', METHODS)
+def test_zero_power_with_nonuniform_thermal_boundary(method):
+    mesh, args = problem(outward_current=None, method=method)
     for i in mesh.boundary['right']:
         args['thermal_dirichlet'][int(i)] = 301.
     result = solve_temperature_joule_heat(mesh, **args)

@@ -54,7 +54,8 @@ Optional `iteration` in temperature documents has `relaxation` (default .5,
 integer. The existing relaxed Picard loop checks the **unrelaxed** temperature
 and conductivity defects and refreshed nonlinear thermal residual (<=1e-8).
 Electrical/thermal linear residual and conservation gates are unchanged. See the
-linked solver contract for normalization and stopping rules.
+linked solver contract for normalization and stopping rules. Documents always
+use the Picard loop; the Python API's `method="newton"` is not part of this format.
 
 ## Run and save
 

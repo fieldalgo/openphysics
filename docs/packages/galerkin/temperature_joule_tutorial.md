@@ -75,6 +75,7 @@ Copy the script outside `packages/` and change one setting at a time.
 | Change | What to examine |
 |---|---|
 | `relaxation=.5` | Same solution within tolerance; a local run took 33 iterations rather than 8 |
+| Add `method='newton'` to the solver call | Same solution within tolerance in 3 states rather than 8 ([Newton method](temperature_joule_heating.md#newton-method)) |
 | Replace `.5*(t-300)` by `0.*(t-300)` | Constant sigma=1 S/m: maximum 300.125 K, power 0.25 W/m |
 | Add `max_iterations=1` to the solver call | `JouleConvergenceError`: the budget is insufficient; one completed history record is retained |
 | Change the model range to `(300., 300.05)` | A trial exceeds the valid material range; no successful partial result is returned |
@@ -87,8 +88,8 @@ before any history record is completed.
 
 Do not loosen acceptance tolerances or widen a material range just to hide failure.
 Use physically justified inputs and, where appropriate, initial temperature,
-relaxation and iteration budget. Failure of this particular fixed-point solve
-does not establish physical thermal runaway, nor provide a transient trajectory.
+relaxation and iteration budget, or `method='newton'`. Failure of this particular
+solve does not establish physical thermal runaway, nor provide a transient trajectory.
 
 ## 5. Scope and next reading
 
