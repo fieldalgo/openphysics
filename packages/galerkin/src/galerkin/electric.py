@@ -14,7 +14,7 @@ import numpy as np
 
 from .materials import region_property, element_values
 from .mesh import Mesh
-from .heat_source import ElementHeatSource
+from .coupling import Field
 from .postprocess import element_gradient
 from .core import forms, kernels
 from .core import solve as core_solve
@@ -25,13 +25,19 @@ from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 
 
+_MESH_MISMATCH = "element conductivity mesh geometry, ordering or regions do not match"
+
+
 @dataclass(frozen=True, init=False)
 class ElementConductivity:
-    """Positive finite element S/m bound to an exact mesh geometry and order."""
-    _field: ElementHeatSource
+    """Positive finite element S/m bound to an exact mesh geometry and order.
+
+    The values are held in an element ``galerkin.coupling.Field`` in S/m.
+    """
+    _field: Field
 
     def __init__(self, mesh, values):
-        field = ElementHeatSource(mesh, values)
+        field = Field(mesh, values, location="element", unit="S/m", name="element conductivity")
         if np.any(field.values <= 0):
             raise ValueError("element conductivity must be strictly positive")
         object.__setattr__(self, "_field", field)
@@ -41,7 +47,7 @@ class ElementConductivity:
         return self._field.values
 
     def on_mesh(self, mesh):
-        return self._field.on_mesh(mesh)
+        return self._field.on_mesh(mesh, message=_MESH_MISMATCH)
 
 
 def _snapshot(mesh):

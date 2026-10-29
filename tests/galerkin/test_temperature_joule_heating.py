@@ -147,6 +147,21 @@ def test_element_conductivity_binding():
         solve_steady_electric(mesh, conductivity=field.values, dirichlet=args['electric_dirichlet'])
 
 
+def test_element_conductivity_is_labelled_as_conductivity():
+    # The values sit in an element Field in S/m, and errors name a conductivity,
+    # not the heat source whose machinery the class once reused.
+    mesh, _ = problem()
+    field = ElementConductivity(mesh, np.ones(mesh.num_triangles))
+    assert field._field.unit == 'S/m'
+    assert field._field.location == 'element'
+    changed = copy.deepcopy(mesh)
+    changed.nodes[0, 0] += .001
+    with pytest.raises(ValueError, match='^element conductivity .*do not match$'):
+        field.on_mesh(changed)
+    with pytest.raises(ValueError, match=r'^element conductivity must be finite real shape \(M,\)$'):
+        ElementConductivity(mesh, np.ones(mesh.num_triangles + 1))
+
+
 @pytest.mark.parametrize('method', METHODS)
 def test_regions_interface_ranges_and_element_mean(method):
     mesh, args = problem(method=method)

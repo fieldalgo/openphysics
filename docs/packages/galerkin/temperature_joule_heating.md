@@ -215,8 +215,10 @@ at both ends, k=1 W/(m K), sigma=1/(1+0.5*(T-300)) S/m and a [300,400] K
 valid interval. It prints temperature, W/m power, iteration count and defects.
 `ElementConductivity(mesh, values)` in `galerkin.electric` also accepts explicit
 positive finite `(M,)` S/m snapshots with exact geometry/order/region checks.
-It reuses the mesh-binding machinery of element sources; bare arrays remain
-invalid. This does not change thermal conductivity inputs.
+It holds them in an element [`Field`](coupling.md) in S/m, and its shape and
+mesh mismatch errors begin with `element conductivity`; bare arrays remain
+invalid.
+This does not change thermal conductivity inputs.
 
 For prescribed current, positive resistivity feedback can approach a thermal
 runaway or a loss of steady solutions. Failure is not evidence of a transient
