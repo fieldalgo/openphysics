@@ -8,8 +8,9 @@ from galerkin.mesh import layered_rectangle_mesh
 from galerkin.temperature_joule_heating import ConductivityModel, solve_temperature_joule_heat
 
 
+@pytest.mark.parametrize('method', ['picard', 'newton'])
 @pytest.mark.parametrize('case', ['voltage', 'current'])
-def test_temperature_coupling_against_skfem(case):
+def test_temperature_coupling_against_skfem(case, method):
     sk = require_tool('scikit-fem')
     from skfem.helpers import dot, grad
     mesh = layered_rectangle_mesh([.4, 1.], .3, [4, 6], 3, ['a', 'b'])
@@ -26,7 +27,7 @@ def test_temperature_coupling_against_skfem(case):
             thermal_dirichlet={int(i): 300. for i in left}, initial_temperature=300.,
             outward_current={'right': 1.} if case == 'current' else None,
             convection={'right': (2., 300.)}, relaxation=.7,
-            relative_tolerance=1e-12, temperature_atol=1e-11, max_iterations=300)
+            relative_tolerance=1e-12, temperature_atol=1e-11, max_iterations=300, method=method)
     with clock('reference'):
         m = sk.MeshTri(mesh.nodes.T.copy(), mesh.triangles.T.copy())
         basis = sk.Basis(m, sk.ElementTriP1())
@@ -70,7 +71,8 @@ def test_temperature_coupling_against_skfem(case):
         current = sigma[:, None]*E
         power = np.sum(q[:, None]*basis.dx)
     e, h = result.coupled.electrical, result.coupled.thermal
-    emit(make_record(case='temperature-joule-'+case, physics='two-way steady 2D electrothermal',
+    emit(make_record(case='temperature-joule-'+case+('-newton' if method == 'newton' else ''),
+        physics='two-way steady 2D electrothermal',
         api='galerkin.temperature_joule_heating.solve_temperature_joule_heat',
         discretization='P1 cell-mean temperature conductivity', tool='scikit-fem',
         tool_discretization='independent P1 and facet forms; independently relaxed iteration',

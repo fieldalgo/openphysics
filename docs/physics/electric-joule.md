@@ -14,7 +14,7 @@ Distinguish a DC electric solve, one-way electric-to-heat transfer and temperatu
 
 ## Execution routes and limits
 
-The Python electric API supports region conductivity and explicit Neumann gauges. JSON/CLI is restricted to homogeneous rectangles and the documented conductivity models; it has no shapes, sweeps, plots or Studio execution. Temperature-dependent JSON uses the declared linear-resistivity model, not arbitrary Python callbacks.
+The Python electric API supports region conductivity and explicit Neumann gauges. JSON/CLI is restricted to homogeneous rectangles and the documented conductivity models; it has no shapes, sweeps, plots or Studio execution. Temperature-dependent JSON uses the declared linear-resistivity model, not arbitrary Python callbacks, and always the Picard loop; Newton's method (`method="newton"`) is Python only.
 
 ## Model documents and workflows
 
