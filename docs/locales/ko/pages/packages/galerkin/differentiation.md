@@ -29,6 +29,7 @@ NumPy는 미분하지 않습니다.
 | `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
 | `solve_modes` | `eps_r`와 `mu_r`(스칼라 또는 요소별 배열, 실수·복소수)와 `k0`; `n_eff`, `et`, `ez`를 그 라이브러리로 돌려줌. `n_target`은 모드를 고르기만 하므로 미분이 없음; `coordinate_factors`는 NumPy여야 함 |
 | `solve_cavity_box` | `lengths_m`(세 값의 배열, 또는 숫자와 살아 있는 값을 섞은 시퀀스); 주파수, 고유값, 모서리 계수, 중심 필드는 미분과 함께, 잔차(NumPy 풀이의 진단값)는 미분 없이 그 라이브러리로 돌려줌. `target_frequency_hz`는 모드를 고르기만 함 |
+| `eval_edge_field` | `dofs`(실수 또는 복소수, 예: `solve_modes`의 `et[i]`); 중심 필드를 그 라이브러리의 float64 또는 complex128로 돌려줌. `EdgeSpace`는 NumPy 구조이므로 그 기하와 모서리 부호에는 미분이 없음 |
 
 시간 격자 `time_s`는 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
 라이브러리의 값을 돌려줘야 합니다. 첫 시각에 NumPy 숫자를 돌려주고 나중에 살아 있는
@@ -135,7 +136,9 @@ B로 풉니다:
 적용하므로 `et`, `ez`와 그 미분은 이 게이지를 따릅니다. 가장 큰 성분이 여럿이면(대칭
 모드) NumPy 풀이가 위상 0으로 남긴 성분을 씁니다. 겹침의 크기나 |E_z|²/|E_t|² 비율처럼
 게이지에 무관한 양은 미분도 게이지에 무관합니다. 목적함수에는 그런 양을 쓰는 편이
-좋습니다.
+좋습니다. `galerkin.edge.eval_edge_field(space, et[i])`는 살아 있는 모서리 계수를 같은
+라이브러리의 삼각형 중심 횡방향 필드로 바꾸고, 계수에 대한 미분을 함께 나릅니다. 공간의
+기하는 미분을 나르지 않습니다.
 
 축퇴 고유값에는 미분이 없습니다. 고유벡터가 그 쌍의 어떤 결합이든 될 수 있기 때문입니다.
 돌려준 고유값이 이산 문제의 다른 고유값과 상대 1e-8 이내이면
@@ -235,9 +238,9 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
 
 ## 한계
 
-- 막지 않았고 미분을 시험하지 않은 곳: `eval_edge_field`와 `radial_pml_coeffs`는 NumPy
-  연산으로 계산합니다. JAX 값인 `dofs`, `k`, `sigma_max`는 미분을 유지한 채 지나가고,
-  PyTorch 값과 JAX 값인 `r0`, `d`는 NumPy 안에서 실패합니다. 낮은 수준
+- 막지 않았고 미분을 시험하지 않은 곳: `radial_pml_coeffs`는 NumPy 연산으로
+  계산합니다. JAX 값인 `k`, `sigma_max`는 미분을 유지한 채 지나가고, PyTorch 값과
+  JAX 값인 `r0`, `d`는 NumPy 안에서 실패합니다. 낮은 수준
   조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는 값을 `TypeError`로
   거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
@@ -306,6 +309,17 @@ PyTorch 2.14.1 CPU):
   풀이의 중심차분과 맞습니다. 숫자 둘 옆에 살아 있는 길이 하나를 준 경우도 맞습니다.
 - 단면이 정사각형인 상자: 축퇴 쌍은 경고와 NaN을 내고, 단순한 기본 모드는 중심차분과
   맞으며, `num_modes=1`로 잘린 쌍도 경고와 NaN을 냅니다.
+
+`tests/galerkin/test_edge_field_gradients.py`(2026-10-29, Linux, NumPy 2.5, JAX 0.12.0.1,
+PyTorch 2.14.1 CPU):
+
+- JAX·PyTorch dofs로 계산한 `eval_edge_field`가 실수·복소 dofs 모두에서 NumPy 계산과
+  1e-12로 맞고, float32·complex64 dofs는 float64·complex128로 계산합니다.
+- |E|² 가중합의 미분이 dofs의 모든 실수부·허수부에 대해 NumPy 계산의 중심차분과
+  1e-6으로 맞습니다.
+- 살아 있는 코어 유전율로 푼 도파관 모드를 `eval_edge_field(space, et[0])`에 넣어 얻은
+  게이지 무관 비율 Σ w|E_t|² / Σ |E_t|²의 미분이 NumPy 풀이의 중심차분과 1e-6으로 맞습니다.
+- `jax_enable_x64`가 꺼진 JAX와, 길이가 모서리 수와 다른 dofs는 `ValueError`로 거부합니다.
 
 adjoint 풀이 자체는 `tests/galerkin/test_core_solve.py`에서 각 라이브러리가 밀집
 `linalg.solve`를 자동미분한 값과, 중심차분과 비교합니다.

@@ -31,6 +31,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from .core import forms, kernels
+from .core.backend import is_live, lift, live_namespace, require_float64
 from .core.checks import refuse_live
 from .core.spaces import TRI_LOCAL_EDGES, EdgeSpace  # noqa: F401 (EdgeSpace is public here)
 
@@ -76,7 +77,17 @@ def assemble_edge_grad(space: EdgeSpace, coeff=1.0) -> sp.csr_matrix:
 
 
 def eval_edge_field(space: EdgeSpace, dofs: np.ndarray) -> np.ndarray:
-    """Edge dofs -> vector field evaluated at triangle centroids, (T, 2)."""
+    """Edge dofs -> vector field evaluated at triangle centroids, (T, 2).
+
+    ``dofs`` may be a JAX array or a PyTorch tensor, real or complex, for
+    example ``et[i]`` of a ``solve_modes`` call with live inputs. The field is
+    then an array of that library, float64 or complex128, and carries the
+    derivative with respect to ``dofs``; JAX needs ``jax_enable_x64``. The
+    space's geometry and orientation signs are NumPy numbers and carry no
+    derivative.
+    """
+    if is_live(dofs):
+        return _eval_edge_field_live(space, dofs)
     mesh = space.mesh
     g, _ = kernels.triangle_gradients(mesh)
     lam_c = np.full(3, 1.0 / 3.0)                # centroid
@@ -85,4 +96,24 @@ def eval_edge_field(space: EdgeSpace, dofs: np.ndarray) -> np.ndarray:
         We = lam_c[i] * g[:, j, :] - lam_c[j] * g[:, i, :]
         coef = (space.signs[:, e] * dofs[space.tri_edges[:, e]])
         vals += coef[:, None] * We
+    return vals
+
+
+def _eval_edge_field_live(space: EdgeSpace, dofs):
+    """``eval_edge_field`` for JAX or PyTorch ``dofs``: the same sum, in their library."""
+    xp = live_namespace(dofs)
+    require_float64(xp, "eval_edge_field dofs")
+    if tuple(dofs.shape) != (space.num_edges,):
+        raise ValueError(f"eval_edge_field dofs has shape {tuple(dofs.shape)}, "
+                         f"expected ({space.num_edges},), one value per edge")
+    dtype = xp.complex128 if xp.isdtype(dofs.dtype, "complex floating") else xp.float64
+    dofs = xp.astype(dofs, dtype)
+    g, _ = kernels.triangle_gradients(space.mesh)
+    lam_c = np.full(3, 1.0 / 3.0)                # centroid
+    vals = None
+    for e, (i, j) in enumerate(TRI_LOCAL_EDGES):  # local edges, never cells
+        We = lift(xp, lam_c[i] * g[:, j, :] - lam_c[j] * g[:, i, :], dtype)
+        coef = lift(xp, space.signs[:, e], dtype) * dofs[lift(xp, space.tri_edges[:, e])]
+        term = coef[:, None] * We
+        vals = term if vals is None else vals + term
     return vals
