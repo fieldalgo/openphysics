@@ -37,6 +37,10 @@
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
 - [PML·누설·일정 반경 모드](../packages/simcase/pml_modes.md)
 
+## 메시 생성 계획
+
+- [사전 등록 검증 계획: 3D 사면체 메시 생성](../packages/meshine/validation3d.md)
+
 ## 과거 공동·단계별 기록
 
 - [진공 PEC 직육면체 공진기 독립 검증 계획](../packages/galerkin/cavity3d_validation.md)
