@@ -28,8 +28,6 @@ All lengths are in metres and all results are per metre of line.
 [`examples/sipi/pcb_lines.py`](../../../examples/sipi/pcb_lines.py) prints the
 impedance of a 50-ohm-class microstrip and of an edge-coupled differential pair.
 
-SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refinement candidates retain input order. This can change tied meshes from earlier versions; it removes one native/WebAssembly difference, without promising identical meshes across every numerical library version.
-
 ## What is computed
 
 The conductors run along z and the cross-section is small compared with the
@@ -119,6 +117,8 @@ transmission line," *IRE Trans. MTT* 2(2), 1954, and "Shielded coupled-strip
 transmission line," *IRE Trans. MTT* 3(5), 1955; E. Hammerstad and Ø. Jensen,
 "Accurate models for microstrip computer-aided design," *IEEE MTT-S Digest*,
 1980.
+
+SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refinement candidates retain input order. This can change tied meshes from earlier versions; it removes one native/WebAssembly difference, without promising identical meshes across every numerical library version.
 
 ## Not implemented
 
