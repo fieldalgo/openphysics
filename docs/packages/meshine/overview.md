@@ -71,12 +71,15 @@ Points are inserted in batches with a separation filter and the point set is
 re-triangulated each round, so the refinement code stays about 430 lines. A
 10k-triangle rib cross-section takes about a second.
 
-The separation filter considers larger circumradii first and retains the input
-candidate order when radii are equal. An unstable tie order can select different
-points on native and WebAssembly NumPy builds. This rule removes that source of
-variation; it does not guarantee identical meshes across all Qhull versions,
-floating-point platforms or geometrically equivalent input orderings. Meshes
-with tied candidates can differ from earlier releases.
+The separation filter considers larger circumradii first. The default
+`generate(..., candidate_order="legacy")` preserves the existing NumPy quicksort
+selection. Opt into `candidate_order="stable"` to retain the input candidate
+order when radii are equal; SIPI uses this mode for its cross-sections. An
+unstable tie order can select different points on native and WebAssembly NumPy
+builds. Stable ordering removes that source of variation, but does not guarantee
+identical meshes across all Qhull versions, floating-point platforms or
+geometrically equivalent input orderings. Choosing stable ordering can change
+meshes with tied candidates. Other values are rejected with `ValueError`.
 
 ## Small input angles
 

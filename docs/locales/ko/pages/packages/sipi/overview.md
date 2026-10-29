@@ -26,6 +26,8 @@ line.C, line.L, line.G(1e9)           # F/m, H/m, S/m 행렬
 [`examples/sipi/pcb_lines.py`](../../../../../../examples/sipi/pcb_lines.py)는 50 Ω급 마이크로스트립과
 가장자리 결합 차동 쌍의 임피던스를 출력합니다.
 
+SIPI는 `meshine.generate(candidate_order="stable")`를 사용하여 반지름이 같은 세분 후보의 입력 순서를 유지합니다. 이전 버전과 동률 메시가 달라질 수 있습니다. native/WebAssembly 차이의 한 원인을 제거하며 모든 수치 라이브러리 버전에서 동일 메시를 보장하지는 않습니다.
+
 ## 계산하는 양
 
 도체는 z 방향으로 뻗고 단면이 파장보다 작으므로 선로는 준TEM(quasi-TEM) 파를 전달합니다. 신호 도체가

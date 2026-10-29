@@ -6,6 +6,7 @@
 import numpy as np
 import pytest
 
+from meshine import Domain, generate, rectangle
 from meshine.refine import _separate
 
 
@@ -21,10 +22,25 @@ def test_radius_priority_and_input_order_against_pairwise_filter(factor):
             kept.append(i)
     expected = np.zeros(len(radii), dtype=bool)
     expected[kept] = True
-    np.testing.assert_array_equal(_separate(candidates, radii, factor), expected)
+    np.testing.assert_array_equal(_separate(candidates, radii, factor, stable=True), expected)
 
 
 def test_larger_radius_wins_and_ties_keep_first_candidate():
     candidates = np.array([[0.0, 0.0], [0.1, 0.0], [10.0, 0.0], [10.1, 0.0]])
     radii = np.array([1.0, 2.0, 3.0, 3.0])
-    np.testing.assert_array_equal(_separate(candidates, radii), [False, True, True, False])
+    np.testing.assert_array_equal(_separate(candidates, radii, stable=True), [False, True, True, False])
+
+
+@pytest.mark.parametrize("order", ["legacy", "stable"])
+def test_candidate_order_preserves_region_area_and_quality(order):
+    domain = Domain(size=0.15)
+    domain.add_region("square", rectangle(0, 0, 1, 1))
+    mesh = generate(domain, candidate_order=order)
+    assert mesh.region_area("square") == pytest.approx(1.0, abs=1e-12)
+    assert mesh.min_angle() >= 28 - 1e-8
+
+
+@pytest.mark.parametrize("order", [None, True, 0, "", "quick", ["stable"]])
+def test_invalid_candidate_order_is_rejected_before_domain_build(order):
+    with pytest.raises(ValueError, match="candidate_order"):
+        generate(None, candidate_order=order)
