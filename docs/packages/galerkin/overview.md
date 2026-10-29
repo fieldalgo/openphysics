@@ -85,6 +85,7 @@ src/galerkin/
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   material_cavity.py # Box cavity with lossy materials and impedance walls: complex resonances and Q
+  _cavity_common.py  # Box mesh and numerical limits the two cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
   electric.py     # Steady electric conduction
@@ -96,6 +97,7 @@ src/galerkin/
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
+  _thermal_mechanical_common.py   # Input isolation the two heat-to-mechanics workflows share (package-private)
   core/           # Shared layer: checks, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked

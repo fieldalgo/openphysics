@@ -100,3 +100,57 @@ def readonly_copy(value):
     out = np.array(value, copy=True)
     out.flags.writeable = False
     return out
+
+
+def real_scalar(value, name):
+    """``real_array(value, name)`` that must be 0-d, as a float."""
+    a = real_array(value, name)
+    if a.shape != ():
+        raise ValueError(f"{name} must be scalar")
+    return float(a)
+
+
+def positive_real(value, name):
+    """A finite positive Python or NumPy number as float; booleans and arrays are rejected."""
+    if (isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, float, np.integer, np.floating))):
+        raise ValueError(f"{name} must be a finite positive number")
+    try:
+        value = float(value)
+    except (OverflowError, ValueError):
+        raise ValueError(f"{name} must be a finite positive number") from None
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a finite positive number")
+    return value
+
+
+def positive_integer(value, name):
+    """A positive Python or NumPy integer as int; booleans are rejected."""
+    if (isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, np.integer)) or value <= 0):
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
+
+
+def triple(values, name, validate):
+    """Three values, each checked by ``validate(value, f"{name}[i]")``, as a tuple."""
+    try:
+        values = tuple(values)
+    except TypeError:
+        raise ValueError(f"{name} must contain three values") from None
+    if len(values) != 3:
+        raise ValueError(f"{name} must contain three values")
+    return tuple(validate(value, f"{name}[{i}]") for i, value in enumerate(values))
+
+
+def one_of(value, options, name):
+    """``value`` if it is one of ``options``; otherwise ValueError naming them."""
+    if value not in options:
+        raise ValueError(f"{name} must be " + " or ".join(repr(o) for o in options))
+    return value
+
+
+def require_finite(value, message):
+    """Raise ValueError(message) unless every number of ``value`` (any library) is finite."""
+    if not np.all(np.isfinite(to_numpy(value))):
+        raise ValueError(message)

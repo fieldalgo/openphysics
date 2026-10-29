@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .elasticity import (at_fixed, body_load, constitutive, displacement, element_materials,
-                         lame, stress_of, vector_stiffness, _check_finite, _check_plane)
+                         lame, stress_of, vector_stiffness, PLANES)
 from .core import live as live_inputs
 from .core.backend import Backend, backend_of, lift, live_namespace, namespace, scatter_add, to_numpy
 from .core.boundary import traction_load
-from .core.checks import real_array, real_value
+from .core.checks import one_of, real_array, real_value, require_finite
 from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
@@ -249,7 +249,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
         raise ValueError("reference_temperature_k must be a finite nonnegative real scalar")
     regional = any(is_per_region(v) for v in (thermal_expansion_per_k, young_modulus, poisson_ratio))
     alpha = region_property(mesh, thermal_expansion_per_k, "thermal_expansion_per_k", live=True)
-    _check_plane(plane)
+    one_of(plane, PLANES, "plane")
     e, nu = element_materials(mesh, young_modulus, poisson_ratio)
     body = body_load(p, t, area, dofs, body_force)
     line = traction_load(mesh, p, t, traction, live=True)
@@ -270,7 +270,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
             a, q = a[t], q[t]
     if not all(np.all(np.isfinite(to_numpy(v))) for v in (coefficient, a, q)):
         raise ValueError("thermal coefficient/strain/stress exceeds finite numeric range")
-    _check_finite(d, "constitutive parameters")
+    require_finite(d, "constitutive parameters exceed floating-point range")
     n = 2*len(p)
     stiffness = vector_stiffness(xp, b, dofs, d, area, n)
     body, line = lift(xp, body), lift(xp, line)

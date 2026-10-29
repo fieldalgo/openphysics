@@ -11,10 +11,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from .mesh import Mesh
-from .core.checks import real_array
+from .core.checks import real_array, real_scalar
 from .coupling import Field, OneWayChain, transfer
+from ._thermal_mechanical_common import check_mesh_unchanged, dirichlet_supports, isolated_mesh, mesh_state
 from .materials import is_per_region, region_property
-from .thermal_mechanical import _isolated_mesh, _mesh_state, _check_mesh, _supports
 from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
                               freeze_temperature, solve_thermoelasticity)
 from .transient_heat import TransientHeatResult
@@ -33,13 +33,6 @@ class TransientThermoelasticError(ValueError):
 
 def _stage_error(stage, exc, **context):
     return TransientThermoelasticError(stage, **context)
-
-
-def _scalar(value, name):
-    a = real_array(value, name)
-    if a.shape != ():
-        raise ValueError(f"{name} must be scalar")
-    return float(a)
 
 
 def _indices(value, count):
@@ -113,8 +106,8 @@ def solve_transient_thermoelasticity(
             raise ValueError("units must be exactly {'length':'m','time':'s','temperature':'K'}")
         if not isinstance(heat, TransientHeatResult):
             raise ValueError("heat must be a TransientHeatResult")
-        owned = _isolated_mesh(mesh)
-        state = _mesh_state(owned)
+        owned = isolated_mesh(mesh)
+        state = mesh_state(owned)
         nodes = real_array(heat.nodes_m, "heat.nodes_m")
         triangles = np.asarray(heat.triangles)
         if (triangles.dtype.kind not in "iu"
@@ -136,18 +129,18 @@ def solve_transient_thermoelasticity(
             if is_per_region(value):
                 region_property(owned, value, name, **bounds)
                 return {str(k): float(value[k]) for k in sorted(value)}
-            return _scalar(value, name)
+            return real_scalar(value, name)
         e = material(young_modulus, "young_modulus", positive=True)
         nu = material(poisson_ratio, "poisson_ratio", lower=-1., upper=.5)
         alpha = material(thermal_expansion_per_k, "thermal_expansion_per_k")
-        tref = _scalar(reference_temperature_k, "reference_temperature_k")
+        tref = real_scalar(reference_temperature_k, "reference_temperature_k")
         if ((not isinstance(e, dict) and e <= 0) or (not isinstance(nu, dict) and not -1 < nu < .5)
                 or tref < 0 or plane not in ("stress", "strain")):
             raise ValueError("require E>0, -1<nu<.5, Tref>=0K and plane stress/strain")
-        supports = _supports(mechanical_dirichlet, vector=True)
+        supports = dirichlet_supports(mechanical_dirichlet, vector=True)
         # Reject bool values explicitly before the shared support normalizer casts.
         for value in mechanical_dirichlet.values():
-            _scalar(value, "mechanical Dirichlet displacement")
+            real_scalar(value, "mechanical Dirichlet displacement")
         body = real_array(body_force, "body_force")
         if body.shape != (2,):
             raise ValueError("body_force must be a constant Cartesian (2,) vector")
@@ -170,6 +163,6 @@ def solve_transient_thermoelasticity(
                 poisson_ratio=nu, plane=plane, dirichlet=supports,
                 body_force=body,
             )
-            _check_mesh(owned, state)
+            check_mesh_unchanged(owned, state)
         steps.append(TransientThermoelasticStep(int(index), float(times[index]), snapshot, mechanics))
     return TransientThermoelasticResult(owned, tuple(steps))
