@@ -9,7 +9,7 @@ mesh = rectangle_mesh(1., .25, 16, 4)
 left, right = mesh.boundary['left'], mesh.boundary['right']
 model = ConductivityModel(lambda t: 1/(1+.5*(t-300)), (300., 400.))
 result = solve_temperature_joule_heat(
-    mesh, electrical_conductivity=model, thermal_conductivity=1.,
+    mesh, method='picard', electrical_conductivity=model, thermal_conductivity=1.,
     electric_dirichlet={int(i): 0. for i in left}, outward_current={'right': 1.},
     thermal_dirichlet={int(i): 300. for i in np.r_[left, right]},
     initial_temperature=300., relaxation=1.)

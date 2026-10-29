@@ -64,6 +64,8 @@ def every_boundary_kind(current=3., **options):
 
 def test_invalid_method_and_derivative():
     mesh, args = thermistor(8)
+    with pytest.raises(TypeError, match="method"):
+        solve_temperature_joule_heat(mesh, **args)    # no default: the caller names the method
     with pytest.raises(ValueError, match="method must be 'picard' or 'newton'"):
         solve_temperature_joule_heat(mesh, **args, method='secant')
     with pytest.raises(ValueError, match='derivative'):
@@ -73,7 +75,7 @@ def test_invalid_method_and_derivative():
 @pytest.mark.parametrize('alpha', [.5, 7.])
 def test_newton_matches_picard_in_few_states(alpha):
     mesh, args = thermistor(alpha=alpha)
-    picard = solve_temperature_joule_heat(mesh, **args, relaxation=1., max_iterations=300)
+    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
     newton = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(newton.history) <= 5 < len(picard.history)
     assert_allclose(newton.coupled.thermal.temperature, picard.coupled.thermal.temperature, rtol=0., atol=2e-8)
@@ -102,16 +104,16 @@ def test_newton_converges_quadratically_with_an_exact_derivative(alpha):
 def test_newton_converges_where_the_default_picard_does_not(alpha):
     mesh, args = thermistor(alpha=alpha)
     with pytest.raises(JouleConvergenceError, match='maximum iterations'):
-        solve_temperature_joule_heat(mesh, **args)
+        solve_temperature_joule_heat(mesh, **args, method='picard')
     result = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(result.history) <= 6
-    reference = solve_temperature_joule_heat(mesh, **args, relaxation=1., max_iterations=500)
+    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=500)
     assert_allclose(result.coupled.thermal.temperature, reference.coupled.thermal.temperature, rtol=0., atol=2e-8)
 
 
 def test_newton_with_every_boundary_kind_and_region_models():
     mesh, args = every_boundary_kind()
-    picard = solve_temperature_joule_heat(mesh, **args, relaxation=1., max_iterations=300)
+    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
     newton = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(newton.history) <= 5
     assert_allclose(newton.coupled.thermal.temperature, picard.coupled.thermal.temperature, rtol=0., atol=2e-8)
@@ -348,7 +350,7 @@ def test_newton_electric_residual_is_the_electric_solve():
 def test_steps_that_raise_the_defect_are_halved(monkeypatch):
     """With every Newton step made 64 times too long, six halvings restore convergence."""
     mesh, args = thermistor(alpha=7.)
-    reference = solve_temperature_joule_heat(mesh, **args, relaxation=1., max_iterations=300)
+    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
     newton_step = _JointNewton.step
     monkeypatch.setattr(_JointNewton, 'step', lambda self, *a: 64*newton_step(self, *a))
     result = solve_temperature_joule_heat(mesh, **args, method='newton')

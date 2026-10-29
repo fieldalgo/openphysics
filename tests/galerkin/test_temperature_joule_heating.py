@@ -21,7 +21,7 @@ def problem(n=8, alpha=.5, **options):
     args = dict(electrical_conductivity=model, thermal_conductivity=1.,
                 electric_dirichlet={int(i): 0. for i in left},
                 thermal_dirichlet=thermal, initial_temperature=300.,
-                outward_current={'right': 1.}, relaxation=1., max_iterations=200)
+                outward_current={'right': 1.}, relaxation=1., max_iterations=200, method='picard')
     args.update(options)
     return mesh, args
 

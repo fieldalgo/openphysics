@@ -267,12 +267,14 @@ class _JointNewton:
 
 
 def solve_temperature_joule_heat(
-        mesh, *, electrical_conductivity, thermal_conductivity,
+        mesh, *, method, electrical_conductivity, thermal_conductivity,
         electric_dirichlet, thermal_dirichlet, initial_temperature,
         outward_current=None, reference_potential=None, outward_flux=None,
         convection=None, relaxation=0.5, temperature_atol=1e-8,
-        relative_tolerance=1e-10, max_iterations=100, method="picard"):
+        relative_tolerance=1e-10, max_iterations=100):
     """Coupled solve by relaxed Picard or by Newton; see temperature_joule_heating.md for the contract.
+
+    ``method`` has no default: the caller names ``"picard"`` or ``"newton"``.
 
     Temperature defects are unrelaxed. Both temperature and sigma must converge;
     nonlinear heat residual at the returned temperature must be <= 1e-8 relative

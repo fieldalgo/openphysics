@@ -235,7 +235,7 @@ def run_electric_joule(doc, verbose=True):
             thermal_conductivity=heat_args['conductivity'], electric_dirichlet=electric_fixed,
             thermal_dirichlet=heat_args['dirichlet'], initial_temperature=p['initial_temperature_k'],
             outward_current=electric_args['outward_current'], outward_flux=heat_args['outward_flux'],
-            convection=heat_args['convection'], **options)
+            convection=heat_args['convection'], method='picard', **options)
         coupled = nonlinear.coupled
         electric = coupled.electrical
     else:
