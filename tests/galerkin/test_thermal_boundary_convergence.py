@@ -120,7 +120,7 @@ def test_sine_all_robin_or_mixed_mms(mixed):
 
 @pytest.mark.parametrize('mutation',['flux_sign','negative_H','omit_ambient','omit_offset','lumped_mass','separate_means','reversed_normal'])
 def test_actual_runtime_negative_controls(monkeypatch,mutation):
-    original=thermal._boundary_system
+    original=thermal.scalar_boundary_system
     samples_original=thermal.scalar_boundary_samples
     def oracle():
         m=rectangle_mesh(1.,1.,3,3)
@@ -172,6 +172,6 @@ def test_actual_runtime_negative_controls(monkeypatch,mutation):
             wrong={tag:(lambda p,n,fn=fn:fn(p,-n)) for tag,fn in outward_flux.items()}
             return samples_original(mesh,p,t,prescribed,wrong,convection,**options)
         monkeypatch.setattr(thermal,'scalar_boundary_samples',samples_wrong)
-    else:monkeypatch.setattr(thermal,'_boundary_system',mutated)
+    else:monkeypatch.setattr(thermal,'scalar_boundary_system',mutated)
     with pytest.raises((AssertionError,ValueError)):
         oracle()
