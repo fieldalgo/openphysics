@@ -185,6 +185,51 @@ follow the same rule as the waveguide: NaN derivatives and a
 `result.space` hold the numbers of the solved geometry; node coordinates carry
 no derivative.
 
+## Iterative solvers
+
+Some solvers find their solution by iteration instead of one linear solve. The
+temperature-dependent Joule solve (`solve_temperature_joule_heat`) repeats
+"conductivity from temperature, then potential, heat and a new temperature"
+until nothing changes. A derivative attached to such a solution must be the
+implicit derivative of the residual R(x, p) = 0 that the solution satisfies:
+
+    dx/dp = −(∂R/∂x)⁻¹ ∂R/∂p.
+
+Compute it as one Newton step of the complete residual, with the exact Jacobian
+in every unknown and the live inputs, or as the adjoint of that residual (for a
+fixed point x = G(x, p), the adjoint of the converged fixed point). A transient
+problem uses the system of the whole step; an eigenpair uses the bordered system,
+whose λ column is T′(λ) x when the operator T depends on λ.
+
+Never attach the derivative by running the iteration map once more, or a few
+more times, on live inputs from the converged numbers. That excludes an extra
+Picard pass, relaxed or not, a pass with frozen coefficients or a frozen
+factorization, and an extra step of residual inverse iteration.
+
+Such a pass returns the right values and the wrong derivative. From the
+converged x\*, one more pass of x ← G(x, p) changes the values by rounding only,
+but it differentiates only G's direct dependence on p, the first term of
+
+    dx*/dp = (I − G_x)⁻¹ G_p = G_p + G_x G_p + G_x² G_p + …
+
+Its relative error is about μ, the spectral radius of G_x: the feedback
+strength, the fraction of an error that one pass of the iteration leaves. k
+passes leave about μᵏ. A relaxed pass x ← (1 − ω) x + ω G(x, p) is off by about
+1 − ω (1 − λ), with λ the signed dominant eigenvalue of G_x: about one half at
+ω = 0.5 even without feedback. A test that compares only values cannot see this.
+
+Solvers that differentiate already follow the rule. The live step of transient
+heat is one solve of the whole backward Euler system M/Δt + K
+([above](#how-the-derivative-is-computed)), and waveguide modes and the box
+cavity take one Newton step of the bordered eigenproblem
+(`galerkin.core.eigen.refine`). `solve_temperature_joule_heat` does not
+differentiate: both methods refuse live inputs ([refused](#refused-not-approximated)).
+
+A gradient test of an iterative solver needs at least one case whose
+coefficients depend on the state, with feedback μ well above the test tolerance
+(for example μ ≥ 0.05). With μ = 0 an extra pass is exact and such a test
+cannot fail.
+
 ## Refused, not approximated
 
 - `jax.jit` around these solvers: checks need concrete numbers

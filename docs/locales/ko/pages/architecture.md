@@ -148,6 +148,8 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
    연립방정식은 `core.solve`로 한 번 풀어 그 adjoint로 미분을 얻고, 모든 검사는 숫자 사본으로
    합니다(고유쌍은 `core.eigen`). 그때까지는 미분을 조용히 끊지 말고 `core.checks.refuse_live`로 살아 있는
    값을 거부합니다([방식과 한계](packages/galerkin/differentiation.md)).
+   해를 반복으로 찾는 solver는 잔차의 음함수 미분을 붙이며, 반복을 한 번 더 돌린 미분을 붙이지
+   않습니다([반복 solver](packages/galerkin/differentiation.md#반복-solver)).
 4. **문서(선택).** [`simcase.registry`](../../../../packages/simcase/src/simcase/registry.py)에 계약 검증,
    실행기, 요약, 결과 형식을 담은 `PhysicsKind`를 등록합니다. 실행기와 스키마는 등록표로
    디스패치하므로 고치지 않습니다. 명령행은 `em.modes2d` subspace sweep의 출력 폴더 검사와 온도
