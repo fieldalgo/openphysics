@@ -81,8 +81,44 @@ complex step으로 계산한다. σ는 dσ/dT로 1차까지 확장한다. dσ/dT
 기존 해석기의 1e-10 정규화 잔차·성분별 보존·전력/열 수지 기준은 그대로 유지한다.
 온도 사본은 읽기 전용이다. 단위 깊이 W/m에 깊이 m를 곱하면 W다.
 
-잘못된 옵션은 ValueError다. 범위·물성·해석 실패나 최대 반복은 `JouleConvergenceError`이며
-`reason`, 완료된 `history`, `last_temperature`, 원인 예외를 보존한다. 부분 결과를 성공 반환하지 않는다.
+### 오류
+
+어떤 상태도 평가하기 전에 메시와 다음 옵션을 검사해 ValueError를 낸다. 메시는 올바른 삼각형
+메시여야 하고(예: 겹치는 절점이 없어야 한다), `method`는 `"picard"` 또는 `"newton"`,
+`relaxation`은 (0,1], 두 허용오차는 유한한 양수, `max_iterations`는 양의 정수,
+`electrical_conductivity`는 `ConductivityModel` 하나이거나 키가 메시 영역 이름과 정확히 같은 그 표,
+`initial_temperature`는 유한한 실수 스칼라 또는 `(N,)` 벡터(K), `thermal_dirichlet`은 외곽 정수 절점
+번호를 유한한 K에 대응시키는 표여야 한다. 그 밖의 입력에 JAX·PyTorch 값을 직접(또는 그 표 안에)
+넘기면 그보다 먼저 TypeError가 난다([근사하지 않고 거부하는 것](differentiation.md#근사하지-않고-거부하는-것)).
+`method`와 `electrical_conductivity`는 문자열과 `ConductivityModel`만 받으므로, 거기에 넘긴 살아 있는
+값은 위의 ValueError가 된다.
+
+나머지는 상태 T_i를 평가할 때 해석기의 σ 검사나 하위 해석이 검사한다. 열전도도, 전기 Dirichlet·
+기준 전위, 유출 전류·유속·대류 자료, 그리고 전도도 콜백과 경계 콜백이 돌려주는 모든 값이다. 평가 중에
+난 `Exception`의 모든 하위 예외는 `JouleConvergenceError`로 감싸고 원래 예외를 `__cause__`로 잇는다.
+KeyboardInterrupt와 SystemExit은 그대로 지나간다. 음수이거나 유한하지 않은 열전도도, 메시 밖의
+전기 Dirichlet 절점, 모르는 경계 태그, 양수가 아닌 σ 콜백 값의 ValueError, 재료 범위 위반, 콜백이
+낸 모든 `Exception`, 콜백이 돌려준 살아 있는 값의 TypeError가 모두 그렇다. `JouleConvergenceError`는
+RuntimeError이므로 `except ValueError`나 `except TypeError`로는 잡히지 않는다. 원인 예외를 읽으면
+된다. 잘못된 입력은 대개 기록이 하나도 없는 첫 평가에서 실패하므로 `history`가 비어 있을 수 있다.
+Newton은 걸음을 만들 수 없을 때(Jacobian, dσ/dT, 선형 풀이)에도 그 원인을 이어
+`JouleConvergenceError`를 내고, 선 탐색이 어떤 걸음도 받아들이지 못할 때도 낸다(위). `max_iterations`에
+닿으면 원인 없이 낸다. 부분 결과를 성공 반환하지 않는다.
+
+오류는 `reason`(메시지), `history`(완료된 기록, Picard 반복 또는 받아들인 Newton 상태마다 하나),
+`last_temperature`를 담는다. `last_temperature`는 읽기 전용 `(N,)` K 배열이며, 어떻게 끝났는지에 따라
+가리키는 상태가 다르다.
+
+| 끝난 방식 | `last_temperature` |
+|---|---|
+| Picard가 `max_iterations`에 닿음 | 완화한 다음 상태 `T_i + relaxation*(H(T_i)-T_i)`. 평가하지 않았고 `history`에 없다 |
+| Newton이 `max_iterations`에 닿음 | 마지막으로 받아들인 상태 T_i. 그 H(T_i)가 `history`의 마지막 기록이다 |
+| Newton이 걸음을 만들지 못하거나 선 탐색이 어떤 걸음도 받아들이지 못함 | 마지막으로 받아들인 상태 T_i |
+| 열 해가 생기기 전에 평가가 실패함(σ(T_i), 전기 풀이, 열 풀이) | 평가하던 상태 T_i |
+| 열 해가 생긴 뒤에 평가가 실패함(예: H(T_i)가 재료 범위 밖) | 그 시도 열 해 H(T_i) |
+
+마지막 두 줄은 Picard의 모든 반복과 Newton의 첫 상태에 해당한다. Newton 후보의 평가가 실패하면
+대신 걸음을 줄인다(위). 범위 오류는 재료와 벗어난 최솟값·최댓값을 알린다.
 
 ## 검증
 

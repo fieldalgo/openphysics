@@ -109,6 +109,21 @@ def test_material_failures(model, method):
     assert exc.value.last_temperature.shape == (mesh.num_nodes,)
 
 
+@pytest.mark.parametrize('conductivity', [-1., np.nan])
+@pytest.mark.parametrize('method', METHODS)
+def test_invalid_thermal_conductivity_is_wrapped_with_its_cause(conductivity, method):
+    # The contract checks k in the first evaluation, not up front: the caller
+    # gets JouleConvergenceError (not ValueError) with the ValueError chained,
+    # no history, and the state being evaluated, since no heat solution exists.
+    mesh, args = problem(thermal_conductivity=conductivity, method=method)
+    with pytest.raises(JouleConvergenceError, match='conductivity must') as exc:
+        solve_temperature_joule_heat(mesh, **args)
+    assert type(exc.value.__cause__) is ValueError
+    assert exc.value.history == ()
+    expected = np.full(mesh.num_nodes, 300.)
+    assert np.array_equal(exc.value.last_temperature, expected)
+
+
 @pytest.mark.parametrize('option,value', [('relaxation', 0), ('relaxation', 1.1),
     ('relative_tolerance', 0), ('temperature_atol', np.nan),
     ('max_iterations', True), ('max_iterations', 1.5), ('initial_temperature', [300, 301])])
