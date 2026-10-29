@@ -21,7 +21,7 @@ import numpy as np
 import pytest
 
 from galerkin import (EdgeSpace3D, assemble_mode_system, assemble_stiffness, box_mesh, eval_edge_field_3d,
-                      l2_error, rectangle_mesh, solve_dirichlet, solve_material_cavity_box)
+                      l2_error, radial_pml_coeffs, rectangle_mesh, solve_dirichlet, solve_material_cavity_box)
 from galerkin.material_cavity import CavityMaterialRegion
 from galerkin.mesh import Mesh
 from galerkin.mode_coordinates import mode_coordinates, scalar_coordinate_system, solve_scalar_coordinates
@@ -29,6 +29,7 @@ from galerkin.temperature_joule_heating import (ConductivityModel, JouleConverge
                                                 solve_temperature_joule_heat)
 
 MESH = rectangle_mesh(2.0, 1.5, 8, 6)
+PML = {"k": 2 * np.pi, "r0": 1.0, "d": 0.5, "sigma_max": 30.0}
 FACTORS = np.ones((MESH.num_triangles, 3))
 SIZE = [1.0, 0.7, 0.45]
 BOX = {"subdivisions": (2, 2, 2), "num_modes": 2, "target_frequency_hz": 2.2e8}
@@ -90,6 +91,10 @@ CASES = {
     "l2_error values": lambda v: l2_error(MESH, v(MESH.nodes[:, 0]), lambda x, y: x),
     "l2_error exact values": lambda v: l2_error(MESH, MESH.nodes[:, 0], lambda x, y: v(x)),
     "eval_edge_field_3d dofs": lambda v: eval_edge_field_3d(SPACE3D, v(np.ones(SPACE3D.num_edges))),
+    "radial_pml_coeffs k": lambda v: radial_pml_coeffs(MESH, **{**PML, "k": v(PML["k"])}),
+    "radial_pml_coeffs r0": lambda v: radial_pml_coeffs(MESH, **{**PML, "r0": v(PML["r0"])}),
+    "radial_pml_coeffs d": lambda v: radial_pml_coeffs(MESH, **{**PML, "d": v(PML["d"])}),
+    "radial_pml_coeffs sigma_max": lambda v: radial_pml_coeffs(MESH, **{**PML, "sigma_max": v(PML["sigma_max"])}),
 }
 
 

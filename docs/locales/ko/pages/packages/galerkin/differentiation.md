@@ -226,8 +226,9 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
   과도 역학(`TransientThermoelasticError`)이 거부합니다. `solve_material_cavity_box`,
   모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
   `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
-  `solve_dirichlet`, `l2_error`, `eval_edge_field_3d`도 거부합니다. JSON 문서와 명령행은
-  NumPy로 돕니다.
+  `solve_dirichlet`, `l2_error`, `eval_edge_field_3d`, `radial_pml_coeffs`(그 `k`, `r0`,
+  `d`, `sigma_max`; PML 매개변수에 대해 미분하는 solver는 없습니다)도 거부합니다. JSON
+  문서와 명령행은 NumPy로 돕니다.
 - `solve_temperature_joule_heat`는 어느 방법이든 입력에 JAX·PyTorch 값이 있으면 무엇을
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`
   같은 경계 표 안의 값도 마찬가지입니다. 콜백은 반복 안에서만 돌므로, 콜백이 돌려준 살아 있는
@@ -238,11 +239,8 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
 
 ## 한계
 
-- 막지 않았고 미분을 시험하지 않은 곳: `radial_pml_coeffs`는 NumPy 연산으로
-  계산합니다. JAX 값인 `k`, `sigma_max`는 미분을 유지한 채 지나가고, PyTorch 값과
-  JAX 값인 `r0`, `d`는 NumPy 안에서 실패합니다. 낮은 수준
-  조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는 값을 `TypeError`로
-  거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
+- 낮은 수준 조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는
+  값을 `TypeError`로 거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
   `ValueError`를 내기 전에 JAX가 callback의 traceback(`jax.pure_callback failed`)을
   기록합니다. PyTorch는 아무것도 출력하지 않습니다.

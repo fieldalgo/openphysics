@@ -253,8 +253,9 @@ cannot fail.
   `solve_material_cavity_box`, the modal coordinate functions
   (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
   `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
-  `l2_error` and `eval_edge_field_3d`. JSON documents and the command line run
-  on NumPy.
+  `l2_error`, `eval_edge_field_3d` and `radial_pml_coeffs` (its `k`, `r0`, `d`
+  and `sigma_max`; no solver differentiates with respect to PML parameters).
+  JSON documents and the command line run on NumPy.
 - `solve_temperature_joule_heat`, with either method, raises a `TypeError` for a
   JAX or PyTorch value in any input before it copies or solves anything,
   including values inside region tables and boundary tables such as
@@ -267,13 +268,9 @@ cannot fail.
 
 ## Limits
 
-- Not guarded and not tested for derivatives: `radial_pml_coeffs` computes
-  with NumPy operators. JAX values of `k` and `sigma_max` pass through it with
-  their derivative; PyTorch values, and JAX values of `r0` and `d`, fail inside
-  NumPy. The low-level assembly
-  functions (`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`) refuse live
-  values with a `TypeError`; assemble `galerkin.core.kernels` with
-  `galerkin.core.forms` to keep them live.
+- The low-level assembly functions (`galerkin.assembly`, `assembly3d`, `edge`,
+  `edge3d`) refuse live values with a `TypeError`; assemble
+  `galerkin.core.kernels` with `galerkin.core.forms` to keep them live.
 - On JAX, a singular sparse system fails inside the host callback of the solve:
   JAX logs the callback's traceback (`jax.pure_callback failed`) before the
   solver raises its `ValueError`. PyTorch prints nothing.
