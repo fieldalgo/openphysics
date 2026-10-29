@@ -218,13 +218,20 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
 - `jax_enable_x64`가 꺼진 JAX, 그리고 한 호출에 섞인 JAX와 PyTorch 값.
 - 아직 미분하지 않는 solver는 미분을 조용히 끊지 않고 JAX·PyTorch 값을
   `TypeError`로 거부합니다. NumPy 컨테이너인 `ElementHeatSource`, `ElementConductivity`,
-  `freeze_temperature`의 `TemperatureSnapshot`, Joule 결합과 열→역학 workflow(열 단계의
-  `WorkflowStageError`로 알림), 그리고 살아 있는 열 이력을 받은
+  `freeze_temperature`의 `TemperatureSnapshot`, 한 방향 Joule 전달(`solve_steady_joule_heat`)과
+  열→역학 workflow(열 단계의 `WorkflowStageError`로 알림), 그리고 살아 있는 열 이력을 받은
   과도 역학(`TransientThermoelasticError`)이 거부합니다. `solve_material_cavity_box`,
   모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
   `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
   `solve_dirichlet`, `l2_error`, `eval_edge_field_3d`도 거부합니다. JSON 문서와 명령행은
   NumPy로 돕니다.
+- `solve_temperature_joule_heat`는 어느 방법이든 입력에 JAX·PyTorch 값이 있으면 무엇을
+  복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`
+  같은 경계 표 안의 값도 마찬가지입니다. 콜백은 반복 안에서만 돌므로, 콜백이 돌려준 살아 있는
+  값은 그 `TypeError`를 원인으로 가진 `JouleConvergenceError`로 나옵니다. 전도도 콜백
+  `ConductivityModel.evaluate`와 `derivative`, 그리고 `outward_flux`, `convection`,
+  `outward_current`에 준 경계 콜백이 그렇습니다. 이런 solver에 필요한 미분은
+  [반복 solver](#반복-solver)를 보십시오.
 
 ## 한계
 
