@@ -61,8 +61,7 @@ h = 1 mm; t = 35 µm; box width 40h and air height 20h.
 Differences across those ten cases: Z0 −0.194 to +0.123 %, εeff +0.233 to
 +0.652 %. These are report-only comparisons of different discretizations and
 thickness approximations. The analytical acceptance tests are independent of
-these values. No Polar solver was run; no equivalence to a commercial solver
-is claimed.
+these values. These checks do not establish accuracy outside the tested cases.
 
 For new geometries, check mesh refinement and box truncation independently.
 The rule is not an adaptive error estimator and does not cover every clearance,
