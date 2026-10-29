@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `sipi`: reduce over-refinement of finite-thickness traces in the default cross-section mesh; cap corner size at thickness / 10 instead of thickness / 100 while retaining layer/width/gap resolution. Explicit mesh settings are unchanged.
+
 - `galerkin`: `solve_temperature_joule_heat(..., method="newton")` solves the potential and the temperature together by Newton's method: one sparse solve per step with complex-step element Jacobians, a halving line search on the temperature defect, and the convergence tests, results and history of the relaxed Picard iteration (`method="picard"`), which is unchanged. `method` defaults to `"picard"`; the contract page says when to choose `"newton"`, and JSON documents keep the Picard loop. On the contract's current-driven thermistor it converges in 3 or 4 states, also with strong feedback (alpha = 7 and 9 per K) where Picard at its default relaxation 0.5 does not converge within 100 iterations. `ConductivityModel` takes an optional `derivative` (dsigma/dT) for the Newton step. [Documentation](docs/packages/galerkin/temperature_joule_heating.md#newton-method).
 - `galerkin`: the heat solve's boundary system (Robin matrix, flux and ambient loads) is a public name of `galerkin.thermal`, `scalar_boundary_system`, so that the Newton method of `solve_temperature_joule_heat` linearizes the operator the heat solve uses. Heat results are unchanged.
 - `galerkin`: the Joule heating formula moved into `galerkin.core.kernels.p1_joule`, which `solve_steady_electric` uses for NumPy and for JAX or PyTorch inputs alike, with the centroid load rule of `p1_load`. Electric results are unchanged, bit for bit.

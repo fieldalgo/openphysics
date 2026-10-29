@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `sipi`: 유한 두께 트레이스의 기본 단면 메시 과도 세분을 줄였습니다. 층·폭·간격 기준은 유지하면서 모서리 크기의 두께 제한을 두께 / 100에서 두께 / 10으로 바꿨습니다. 명시적 메시 설정은 그대로입니다.
+
 - `galerkin`: `solve_temperature_joule_heat(..., method="newton")`은 전위와 온도를 함께 Newton으로 풉니다. 한 걸음에 희소 풀이 한 번(complex-step 요소 Jacobian), 온도 결함에 대한 반감 선 탐색을 쓰며, 수렴 검사·결과·이력은 그대로인 완화 Picard(`method="picard"`)와 같습니다. `method`의 기본값은 `"picard"`이며, 언제 `"newton"`을 쓸지는 계약 문서에 있습니다. JSON 문서는 계속 Picard 반복을 씁니다. 계약 문서의 전류 구동 서미스터에서 3–4개 상태로 수렴하며, 기본 완화 0.5의 Picard가 100회 안에 수렴하지 않는 강한 피드백(alpha = 7, 9 /K)에서도 수렴합니다. `ConductivityModel`은 Newton 걸음에 쓰는 선택 `derivative`(dσ/dT)를 받습니다. [문서](packages/galerkin/temperature_joule_heating.md#newton-방법).
 - `galerkin`: 열 해석의 경계 연립(Robin 행렬, 유속·주변 하중)을 `galerkin.thermal`의 공개 이름 `scalar_boundary_system`으로 두어, `solve_temperature_joule_heat`의 Newton 방법이 열 해석과 같은 연산자를 선형화합니다. 열 결과는 바뀌지 않습니다.
 - `galerkin`: Joule 발열 공식을 `galerkin.core.kernels.p1_joule`로 옮겨 `solve_steady_electric`가 NumPy와 JAX·PyTorch 입력에 똑같이 쓰며, 하중은 `p1_load`의 중심점 규칙으로 계산합니다. 전기 결과는 비트 단위로 같습니다.
