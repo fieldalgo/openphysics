@@ -274,3 +274,16 @@ def test_numpy_containers_and_couplings_refuse_live_values(name):
             thermal_dirichlet={i: 313.15 for i in LEFT}, heat_source=lambda p: q * _wrap(name, 1.0 + p[:, 0]),
             young_modulus=70e9, poisson_ratio=0.3, plane="strain", thermal_expansion_per_k=12e-6,
             reference_temperature_k=293.15, mechanical_dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
+
+
+@pytest.mark.parametrize("name", [None, *BACKENDS])
+def test_a_singular_heat_or_electric_system_is_one_value_error(name):
+    """Conductivity so small that the stiffness underflows to zero: the same message on every library."""
+    k = 5e-324 if name is None else _wrap(name, 5e-324)
+    with pytest.raises(ValueError, match="^singular or ill-conditioned constrained heat system$"):
+        solve_steady_heat(MESH, conductivity=k, dirichlet={i: 300.0 for i in LEFT}, heat_source=1.0)
+    right = [int(i) for i in MESH.boundary["right"]]
+    with pytest.raises(ValueError, match="^singular or ill-conditioned electric system$"):
+        solve_steady_electric(MESH, conductivity=k,
+                              dirichlet={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in right}})
+

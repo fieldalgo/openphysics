@@ -302,7 +302,11 @@ def _build_nan_torch():
 
 
 def scipy_solve_dirichlet(K, f, dirichlet):
-    """``galerkin.solver.solve_dirichlet`` on SciPy CSR and NumPy data (its body)."""
+    """``galerkin.solver.solve_dirichlet`` on SciPy CSR and NumPy data (its body).
+
+    SciPy's SuperLU solves the free block whether or not scikit-umfpack is
+    installed. An exactly singular block warns MatrixRankWarning and gives NaN.
+    """
     n = K.shape[0]
     # Complex support: solve in complex arithmetic if K, f, or any boundary
     # value is complex.
@@ -323,5 +327,6 @@ def scipy_solve_dirichlet(K, f, dirichlet):
     K_FD = K[free][:, fixed]
     rhs = f[free] - K_FD @ V[fixed]
 
-    V[free] = spla.spsolve(K_FF.tocsc(), rhs)
+    # SuperLU always: with scikit-umfpack installed, spsolve would switch to UMFPACK.
+    V[free] = spla.spsolve(K_FF.tocsc(), rhs, use_umfpack=False)
     return V

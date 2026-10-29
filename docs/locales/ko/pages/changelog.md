@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 정상 열전도, 정상 전기전도, 탄성, 열탄성은 NumPy 입력과 JAX·PyTorch 입력 모두 연립방정식을 `galerkin.core.solve`로 한 번 풉니다. 전에는 NumPy 분기와 살아 있는 분기를 따로 두거나(열·전기), NumPy로 푼 뒤 살아 있는 보정 풀이를 한 번 더 했습니다(탄성·열탄성). NumPy 결과는 비트 단위로 같고, JAX·PyTorch 결과는 반올림 수준으로만 달라집니다(상대 3e-14 이하, 정확한 값이 0인 곳, 예컨대 자유 열팽창의 응력에서는 반올림 수준의 절대 차이). NumPy 풀이는 scikit-umfpack이 설치돼 있어도 SciPy의 SuperLU를 쓰며, 특이한 NumPy 열 연립방정식은 경고 뒤 유한하지 않은 해를 알리는 대신 살아 있는 경로와 같은 `singular or ill-conditioned constrained heat system`을 냅니다.
 - `galerkin`: 어떤 모듈도 다른 모듈이나 클래스의 밑줄 멤버를 읽지 않으며 층 시험이 이를 검사합니다. 클래스 밖에서 쓰던 `EdgeSpace3D._ids`와 `Mesh3D._edge_matrix`는 `galerkin.core.spaces.edge_ids`와 `galerkin.core.tets.edge_matrix`로 바꿨습니다. 결과는 바뀌지 않습니다.
 - `galerkin`: `EdgeSpace`와 `EdgeSpace3D`를 변 커널이 쓰는 국소 변 순서와 함께 `galerkin.core.spaces`로 옮겼습니다. `galerkin`, `galerkin.edge`, `galerkin.edge3d`는 여전히 내보내며, 클래스 모듈(repr과 pickle 경로)은 이제 `galerkin.core.spaces`입니다. 행렬과 필드는 바뀌지 않습니다.
 - `galerkin`: 어떤 모듈도 다른 모듈의 비공개 이름을 import하지 않으며, 층 시험이 이를 검사합니다. 상자 공진기와 탄성이 그렇게 나눠 쓰던 입력 검사는 `galerkin.core.checks`로, 열→역학 workflow의 메시 격리·Dirichlet 검사와 공진기의 광속·수치 기준·상자 메시는 패키지 비공개 모듈로 옮겼습니다. 결과와 오류 메시지는 바뀌지 않습니다.

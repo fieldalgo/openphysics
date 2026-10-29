@@ -11,15 +11,16 @@ E, nu, Dirichlet displacements, body force and traction may be JAX or PyTorch
 values (callbacks may return them); the result arrays are then in that library
 and carry reverse-mode derivatives. One body serves both: the formulas run in
 the inputs' library, the checks read their numbers, and the linear system is
-solved on NumPy numbers first and then once more with the live matrix and load
-(``displacement``), which keeps the values and gives the exact derivatives.
+solved once with ``core.solve`` in that library (``displacement``), whose
+adjoint gives the exact derivatives.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
-from scipy.sparse.linalg import splu
+from scipy.sparse.linalg import MatrixRankWarning
 
 from .materials import is_per_region, region_property
 from .core import forms, kernels
@@ -141,48 +142,40 @@ def body_load(p, t, area, dofs, body_force):
     return scatter_add(xp, 2*len(p), dofs.ravel(), xp.reshape(fe, (-1,)))
 
 
-def constrained_solve(stiffness, load, fixed, values, what):
-    """NumPy u with u[fixed] = values and K u = load on the free DOFs, and its residual K u - load.
+def check_solution(stiffness, u, load, fixed, what):
+    """Raise ValueError for a nonfinite displacement or a free-DOF residual above 1e-9 of the load scale.
 
-    Raises ValueError for a singular or ill-conditioned system, a nonfinite
-    solution or a free-DOF residual above 1e-9 of the load scale.
+    NumPy arguments: ``stiffness`` as SciPy CSR, ``u`` and ``load`` (2N,).
     """
-    k = stiffness.to_scipy()
-    free = np.setdiff1d(np.arange(len(load)), fixed)
-    u = np.zeros_like(load)
-    u[fixed] = values
-    if len(free):
-        rhs = load[free]-k[free][:, fixed] @ values
-        try:
-            u[free] = splu(k[free][:, free].tocsc()).solve(rhs)
-        except RuntimeError as exc:
-            raise ValueError(f"singular or ill-conditioned constrained {what} system") from exc
-    residual = k @ u-load
+    residual = stiffness @ u - load
     if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
         raise ValueError(f"nonfinite {what} solution; check geometry and material scaling")
-    scale = max(np.linalg.norm(abs(k) @ abs(u)+abs(load), np.inf), np.finfo(float).tiny)
+    free = np.setdiff1d(np.arange(len(load)), fixed)
+    scale = max(np.linalg.norm(abs(stiffness) @ abs(u)+abs(load), np.inf), np.finfo(float).tiny)
     if len(free) and np.linalg.norm(residual[free], np.inf) > 1e-9*scale:
         raise ValueError(f"constrained {what} solve failed its residual tolerance")
-    return u
 
 
 def displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, what):
     """Displacement (2N,) in ``xp`` and the fixed DOFs.
 
-    The checked NumPy solve gives u0; with JAX or PyTorch values, one more
-    solve u0 + K^{-1}(f - K u0) with the live K, f and Dirichlet values keeps
-    u0 up to rounding and gives the exact derivatives.
+    One ``core.solve`` solve in the inputs' library: with JAX or PyTorch values
+    the displacement carries exact derivatives to K, the load and the Dirichlet
+    values. The checks read its numbers: a singular or ill-conditioned system,
+    a nonfinite solution or a free-DOF residual above 1e-9 of the load scale
+    raises ValueError.
     """
     fixed, values = vector_dirichlet(live_inputs.numbers(dirichlet), p, boundary, count, labels)
-    u0 = constrained_solve(_numbers(stiffness), to_numpy(load), fixed, values, what)
-    if backend_of(xp) is Backend.NUMPY:
-        return u0, fixed
-    prescribed = (xp.stack([lift(xp, v, xp.float64) for v in dirichlet.values()]) if len(fixed)
-                  else xp.zeros(0, dtype=xp.float64))
-    u0 = lift(xp, u0)
-    delta = core_solve.solve_dirichlet(stiffness, load - stiffness.matvec(u0),
-                                       {tuple(fixed): prescribed - u0[fixed]} if len(fixed) else {})
-    return u0 + delta, fixed
+    if backend_of(xp) is not Backend.NUMPY and len(fixed):
+        values = xp.stack([lift(xp, v, xp.float64) for v in dirichlet.values()])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", MatrixRankWarning)
+        try:
+            u = core_solve.solve_dirichlet(stiffness, load, {tuple(fixed): values} if len(fixed) else {})
+        except (RuntimeError, MatrixRankWarning, ValueError) as exc:
+            raise ValueError(f"singular or ill-conditioned constrained {what} system") from exc
+    check_solution(_numbers(stiffness).to_scipy(), to_numpy(u), to_numpy(load), fixed, what)
+    return u, fixed
 
 
 def _numbers(matrix):

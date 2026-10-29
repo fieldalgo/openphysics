@@ -14,15 +14,16 @@ that library and carry derivatives. NumPy inputs compute exactly as before.
 """
 from dataclasses import dataclass
 from typing import Mapping
+import warnings
 
 import numpy as np
 from scipy.sparse import coo_matrix, issparse
+from scipy.sparse.linalg import MatrixRankWarning
 
 from .mesh import Mesh
 from .heat_source import ElementHeatSource
 from .materials import is_per_region, region_property
 from .postprocess import element_gradient
-from .solver import solve_dirichlet
 from .core import forms, kernels
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
 from .core.boundary import scalar_boundary_samples
@@ -188,13 +189,12 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
                 *map(to_numpy, (load, G, B, shifted_B, rhs, shifted_rhs)))):
         raise ValueError("assembled heat system exceeds floating-point range")
     shifted_bc = {(node,): value-offsets[labels[node]] for node, value in prescribed.items()}
-    try:
-        if backend_of(xp) is Backend.NUMPY:
-            increment = solve_dirichlet(K_numbers+H_numbers, shifted_rhs, shifted_bc)
-        else:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", MatrixRankWarning)
+        try:
             increment = core_solve.solve_dirichlet([stiffness, H], shifted_rhs, shifted_bc)
-    except (RuntimeError, ValueError) as exc:
-        raise ValueError("singular or ill-conditioned constrained heat system") from exc
+        except (RuntimeError, MatrixRankWarning, ValueError) as exc:
+            raise ValueError("singular or ill-conditioned constrained heat system") from exc
     temperature = increment+offsets[labels]
     # K annihilates constants; H does not. shifted_B integrates h*(ambient-offset).
     # Evaluate derivatives and convection before restoring absolute temperature.

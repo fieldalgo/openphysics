@@ -19,7 +19,6 @@ from .materials import region_property, element_values
 from .mesh import Mesh
 from .heat_source import ElementHeatSource
 from .postprocess import element_gradient
-from .solver import solve_dirichlet
 from .core import forms, kernels
 from .core import solve as core_solve
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
@@ -170,10 +169,7 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
     with warnings.catch_warnings():
         warnings.simplefilter("error", MatrixRankWarning)
         try:
-            if backend_of(xp) is Backend.NUMPY:
-                increment = solve_dirichlet(K_numbers, -outward, bc)
-            else:
-                increment = core_solve.solve_dirichlet(stiffness, -outward, bc)
+            increment = core_solve.solve_dirichlet(stiffness, -outward, bc)
         except (RuntimeError, MatrixRankWarning, ValueError) as exc:
             raise ValueError("singular or ill-conditioned electric system") from exc
     potential = increment+offsets[labels]

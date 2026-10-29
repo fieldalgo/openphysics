@@ -210,3 +210,37 @@ def test_temperature_snapshots_stay_numpy(name):
     """The snapshot is an immutable, hashed NumPy record: a live field is refused, not cut."""
     with pytest.raises(TypeError, match="cut the derivative"):
         freeze_temperature(MESH, _wrap(name, np.full(MESH.num_nodes, 300.0)))
+
+
+@pytest.mark.parametrize("name", [None, *BACKENDS])
+def test_a_singular_system_is_one_value_error(name):
+    """E so small that the stiffness underflows to zero: every library reports the singular system."""
+    e = _wrap(name, 5e-324)
+    with pytest.raises(ValueError, match="^singular or ill-conditioned constrained elasticity system$"):
+        _elastic(e, *ELASTIC[1:])
+    snapshot = freeze_temperature(MESH, np.full(MESH.num_nodes, 340.0))
+    with pytest.raises(ValueError, match="^singular or ill-conditioned constrained thermoelastic system$"):
+        solve_thermoelasticity(MESH, snapshot, reference_temperature_k=300.0, thermal_expansion_per_k=1.2e-5,
+                               young_modulus=e, poisson_ratio=0.3, plane="stress",
+                               dirichlet={(i, c): 0.0 for i in LEFT for c in (0, 1)})
+
+
+@pytest.mark.parametrize("name", [None, *BACKENDS])
+@pytest.mark.parametrize("fault,message", [
+    ("perturbed", "^constrained elasticity solve failed its residual tolerance$"),
+    ("nonfinite", "^nonfinite elasticity solution; check geometry and material scaling$")])
+def test_the_checks_read_the_solution(monkeypatch, name, fault, message):
+    """A solve that returns a wrong or nonfinite displacement fails the checks on its numbers."""
+    import galerkin.core.solve as core_solve
+    solve = core_solve.solve_dirichlet
+
+    def faulty(*args, **kwargs):
+        u = solve(*args, **kwargs)
+        if fault == "nonfinite":
+            return u * float("nan")
+        return u * (1 + 1e-6)
+    monkeypatch.setattr(core_solve, "solve_dirichlet", faulty)
+    e = ELASTIC[0] if name is None else _live(name, [ELASTIC[0]])[0]
+    with pytest.raises(ValueError, match=message):
+        _elastic(e, *ELASTIC[1:])
+
