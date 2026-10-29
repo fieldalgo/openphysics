@@ -75,6 +75,27 @@ Ruppert 종료 논증은 두 입력 선분 사이의 모든 각도가 60° 이�
 
   `tests/meshine/test_refine_cost.py`는 이 입력들을 만들고 질의 크기의 상한을 검사하며, 질의는 전수 계산과, 모서리와 메시는 이전 구현과 비교합니다.
 
+## 사면체 메시 계약
+
+meshine은 아직 사면체를 만들지 않습니다. `TetMesh`, `check`, `write_msh`는 OpenPhysics 자체 3D 메셔가
+반환할 출력을 고정하므로, 풀이기와 시험을 지금부터 그 계약에 맞춰 작성할 수 있습니다.
+
+```python
+from meshine import TetMesh, check, write_msh
+
+mesh = TetMesh(nodes, tetrahedra, regions, region_names, boundary_faces, interfaces=interfaces)
+check(mesh)                    # 위반 사항을 모두 나열한 MeshCheckError 발생
+write_msh(mesh, "part.msh")    # Gmsh MSH 4.1 ASCII, gmshio.read_msh로 다시 읽음
+mesh.quality(), mesh.dihedral_angles(), mesh.radius_edge(), mesh.region_volume("die")
+```
+
+`check`는 모든 사면체 부피의 부호를 정확히 판정합니다. 부동소수점 필터가 분명한 경우를 정하고 나머지는
+`Fraction` 산술로 정합니다. 그다음 모든 면이 한 번 또는 두 번 쓰이는지, 태그된 면이 바깥쪽으로 감긴 외부
+면과 정확히 같고 각각 태그가 하나인지, `boundary_nodes`가 면과 맞는지, 고아·중복 노드가 없는지, 모든 영역이
+비어 있지 않은지, `interfaces`가 두 영역 사이의 면을 정확히 담고 첫 이름에서 둘째 이름 방향으로 감겼는지
+확인합니다. 필드는 `galerkin.from_mesher`가 읽는 것입니다. 메셔가 만족해야 할 기준은
+[사전 등록 3D 검증 계획](validation3d.md)에 고정되어 있습니다.
+
 ## 자체 검증
 
 ```bash

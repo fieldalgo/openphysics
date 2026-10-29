@@ -12,13 +12,15 @@
     mesh.nodes, mesh.triangles, mesh.regions, mesh.boundary_edges["left"]
 
 Constrained Delaunay refinement (Ruppert) built on scipy; depends on numpy and scipy only.
+``TetMesh``, ``check`` and ``write_msh`` define the tetrahedral mesh contract for 3D meshers.
 """
 
 from . import shapes
 from .geometry import Circle, Domain, box_sides, rectangle
 from .mesh import TriMesh
+from .mesh3d import MeshCheckError, TetMesh, check, write_msh
 from .refine import MeshSizeLimitError, generate
 
 __version__ = "0.1.0"
-__all__ = ["Domain", "Circle", "TriMesh", "generate", "MeshSizeLimitError", "box_sides", "rectangle", "shapes",
-           "__version__"]
+__all__ = ["Domain", "Circle", "TriMesh", "TetMesh", "MeshCheckError", "check", "write_msh", "generate",
+           "MeshSizeLimitError", "box_sides", "rectangle", "shapes", "__version__"]
