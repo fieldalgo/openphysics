@@ -131,13 +131,57 @@ Existing subsolves retain their normalized 1e-10 residual and per-component
 current/heat and electric-power gates; the one-way transfer retains its 1e-10
 power gates. These checks do not replace the nonlinear fixed-point tests.
 Arrays are owned snapshots. The evaluated-temperature array is read-only.
-
-Invalid static options raise ValueError. A material, range, subsolve or iteration
-failure raises `JouleConvergenceError` with `reason`, completed `history`,
-`last_temperature`, and the chained original cause where applicable. No partial
-successful result is returned. Maximum-iteration failure retains the last
-completed trial's history. Range errors identify material and offending extrema.
 Rates are per unit out-of-plane depth; multiply W/m by depth in m for W.
+
+### Errors
+
+Before anything is evaluated, the solver checks the mesh and these options and
+raises ValueError: the mesh is a valid triangle mesh (no coincident nodes, for
+example); `method` is `"picard"` or `"newton"`; `relaxation` is in (0,1] and
+both tolerances are finite and positive; `max_iterations` is a positive integer;
+`electrical_conductivity` is one `ConductivityModel` or a table of them whose
+keys are exactly the mesh region names; `initial_temperature` is a finite real
+scalar or `(N,)` vector in K; and `thermal_dirichlet` maps exterior integer node
+indices to finite K. A JAX or PyTorch value passed directly in any other input
+(or inside its tables) raises TypeError before that
+([refused, not approximated](differentiation.md#refused-not-approximated));
+`method` and `electrical_conductivity` accept only a string and
+`ConductivityModel`s, so a live value there is the ValueError above.
+
+Everything else is checked when a state T_i is evaluated, by the solver's sigma
+checks or by the subsolves: the thermal conductivity, the electric Dirichlet and
+reference potentials, the outward current, flux and convection data, and every
+value a conductivity or boundary callback returns. Any `Exception` raised during
+an evaluation is wrapped in `JouleConvergenceError` with the original exception
+chained as `__cause__`; KeyboardInterrupt and SystemExit pass through. That
+covers a ValueError for a negative or nonfinite thermal conductivity, an
+electric Dirichlet node outside the mesh or an unknown boundary tag, a sigma
+callback value that is not positive, a material range violation, any
+`Exception` a callback raises, and the TypeError for a live value a callback
+returns. `JouleConvergenceError` is a
+RuntimeError, so `except ValueError` and `except TypeError` do not catch these
+failures; read the cause instead. An invalid input usually fails in the first
+evaluation, before any record exists, so `history` may be empty. Newton also
+raises `JouleConvergenceError` when its step cannot be formed (the Jacobian,
+dsigma/dT or the linear solve), chaining that cause, and when its line search
+accepts no step (above). Reaching `max_iterations` raises it without a cause.
+No partial successful result is returned.
+
+The error carries `reason` (its message), `history` (the completed records, one
+per Picard iteration or accepted Newton state) and `last_temperature`, a
+read-only `(N,)` array in K whose state depends on how the solve ended:
+
+| How the solve ended | `last_temperature` |
+|---|---|
+| Picard reaches `max_iterations` | the relaxed next state `T_i + relaxation*(H(T_i)-T_i)`; it is not evaluated and not in `history` |
+| Newton reaches `max_iterations` | the last accepted state T_i, whose H(T_i) is the last record of `history` |
+| Newton cannot form a step, or its line search accepts none | the last accepted state T_i |
+| An evaluation fails before its heat solution exists (sigma(T_i), the electric solve or the heat solve) | the state being evaluated, T_i |
+| An evaluation fails after its heat solution exists (for example H(T_i) outside a material range) | that trial heat solution H(T_i) |
+
+The last two rows apply to every Picard iteration and to Newton's first state;
+a Newton candidate that fails to evaluate is shortened instead (above). Range
+errors identify the material and the offending extrema.
 
 ## Validation
 
