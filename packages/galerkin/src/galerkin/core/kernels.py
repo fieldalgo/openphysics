@@ -14,6 +14,19 @@ assemble these kernels with ``forms``; each kernel names the function built
 from it. The edge kernels take an ``EdgeSpace`` or ``EdgeSpace3D`` from
 ``core.spaces``. tests/galerkin/test_crosscheck_symfem_coefficients.py checks them
 against exact integrals for every coefficient form those functions accept.
+
+``forms.matrix`` checks only shapes, so each kernel must be placed with the
+cell-to-DOF tables of the mesh or space it was given (a table of the right
+shape from another space gives a wrong matrix without an error):
+
+- P1 triangles (``p1_stiffness``, ``p1_mass``, ``p1_load``): ``mesh.triangles``;
+  ``p1_boundary_mass``: the ``edges`` it was given; P1 tetrahedra: ``mesh.tets``.
+- Edge kernels: ``space.tri_edges`` (2D) or ``space.tet_edges`` (3D) for rows
+  and columns, except ``nedelec_grad`` and ``nedelec3d_grad``, whose columns
+  are ``mesh.triangles`` or ``mesh.tets``.
+- ``vector_p1_stiffness``: the ``dofs`` of ``core.triangles.vector_strain``.
+
+docs/packages/galerkin/differentiation.md tabulates them.
 """
 import numpy as np
 

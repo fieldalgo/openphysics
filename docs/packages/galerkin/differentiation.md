@@ -234,6 +234,42 @@ coefficients depend on the state, with feedback μ well above the test tolerance
 (for example μ ≥ 0.05). With μ = 0 an extra pass is exact and such a test
 cannot fail.
 
+## Assembling core kernels yourself
+
+The public assembly functions take NumPy values. To assemble with JAX or PyTorch
+coefficients, build element matrices with `galerkin.core.kernels`, place them
+with `galerkin.core.forms` and solve with `galerkin.core.solve`, whose adjoint
+gives the derivative. `galerkin.core` follows the same 0.x rule as the rest of the
+Python API ([stability in 0.x](../../../CHANGELOG.md#stability-in-0x)): it may
+change in a minor release (0.1 to 0.2), and patch releases are not meant to change
+it.
+
+`forms.matrix(row_dofs, col_dofs, element, shape)` checks only shapes: that the
+cell-to-DOF tables are 2-D integer arrays and that the element matrices match
+them. It cannot tell which space a table belongs to. A table of the right shape
+from another space, or with its local order permuted (a triangle's vertices
+rotated, displacement components blocked instead of interleaved), is accepted
+without an error and gives a wrong matrix. Pass each kernel the tables of the mesh
+or space it was given:
+
+| Kernel | Element shape | Row table | Column table | Global shape |
+|---|---|---|---|---|
+| `p1_stiffness`, `p1_mass` | (T, 3, 3) | `mesh.triangles` | `mesh.triangles` | (N, N) |
+| `p1_boundary_mass(mesh, edges)` | (E_b, 2, 2) | `edges` | `edges` | (N, N) |
+| `p1_load`, the load of `p1_joule` (with `forms.vector`) | (T, 3) | `mesh.triangles` | — | (N,) |
+| `tet_stiffness`, `tet_mass` | (T, 4, 4) | `mesh.tets` | `mesh.tets` | (N, N) |
+| `nedelec_curlcurl`, `nedelec_mass` | (T, 3, 3) | `space.tri_edges` | `space.tri_edges` | (E, E) |
+| `nedelec_grad` | (T, 3, 3) | `space.tri_edges` | `mesh.triangles` | (E, N) |
+| `nedelec3d_curlcurl`, `nedelec3d_mass`, the components of `nedelec3d_components` | (T, 6, 6) | `space.tet_edges` | `space.tet_edges` | (E, E) |
+| `nedelec3d_grad` | (T, 6, 4) | `space.tet_edges` | `mesh.tets` | (E, N) |
+| `vector_p1_stiffness` | (T, 6, 6) | `dofs` of `galerkin.core.triangles.vector_strain` (DOF 2 × node + component) | the same | (2N, 2N) |
+
+T is the number of cells, N of nodes, E of edges and E_b of the boundary edges
+passed in; for the edge kernels `mesh` is `space.mesh`. The edge kernels apply
+the orientation signs of their `EdgeSpace` or `EdgeSpace3D`, so the edge tables
+must come from that same space. Tables and mesh coordinates are NumPy
+structure; only coefficients may be live.
+
 ## Refused, not approximated
 
 - `jax.jit` around these solvers: checks need concrete numbers
@@ -241,6 +277,11 @@ cannot fail.
   without `jit`.
 - JAX or PyTorch `coordinate_factors` in `solve_modes` (a `TypeError`): derivatives
   with respect to PML stretching or bend coordinates are not provided.
+- `eval_edge_field_3d` with JAX or PyTorch coefficients (a `TypeError`). With
+  live box lengths the cavity field also depends on the lengths through the
+  geometry, which `result.space` holds as numbers, so evaluating it from live
+  coefficients alone would miss that part of the derivative. `solve_cavity_box`
+  returns the field with its full derivative in `result.electric_field`.
 - Forward-mode differentiation (`jax.jvp`, `jax.jacfwd`) and second derivatives.
 - JAX without `jax_enable_x64`, and JAX and PyTorch values in one call.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
@@ -253,8 +294,8 @@ cannot fail.
   `solve_material_cavity_box`, the modal coordinate functions
   (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
   `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
-  `l2_error`, `eval_edge_field_3d` and `radial_pml_coeffs` (its `k`, `r0`, `d`
-  and `sigma_max`; no solver differentiates with respect to PML parameters).
+  `l2_error` and `radial_pml_coeffs` (its `k`, `r0`, `d` and `sigma_max`; no
+  solver differentiates with respect to PML parameters).
   JSON documents and the command line run on NumPy.
 - `solve_temperature_joule_heat`, with either method, raises a `TypeError` for a
   JAX or PyTorch value in any input before it copies or solves anything,
@@ -269,8 +310,10 @@ cannot fail.
 ## Limits
 
 - The low-level assembly functions (`galerkin.assembly`, `assembly3d`, `edge`,
-  `edge3d`) refuse live values with a `TypeError`; assemble
-  `galerkin.core.kernels` with `galerkin.core.forms` to keep them live.
+  `edge3d`) refuse live values with a `TypeError`. The core kernels they are
+  built from keep values live when assembled directly, but `forms.matrix` checks
+  only shapes, so the DOF tables are the caller's responsibility
+  ([assembling core kernels yourself](#assembling-core-kernels-yourself)).
 - On JAX, a singular sparse system fails inside the host callback of the solve:
   JAX logs the callback's traceback (`jax.pure_callback failed`) before the
   solver raises its `ValueError`. PyTorch prints nothing.

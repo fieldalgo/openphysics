@@ -155,7 +155,10 @@ grid-to-mesh projection waits for a second engine
 
 1. **Formulation in galerkin.** Add one module. Build element matrices with
    `core.kernels`, or write a kernel of the same shape (`(T, i, j)` arrays, no
-   loop over cells). Assemble with `core.forms` and solve with `core.solve`.
+   loop over cells). Assemble with `core.forms`, which checks only shapes, with
+   the DOF tables of each kernel's mesh or space
+   ([table](packages/galerkin/differentiation.md#assembling-core-kernels-yourself)),
+   and solve with `core.solve`.
    Validate inputs with `core.checks`, and do not copy helpers from another
    physics module. [Contributing](../CONTRIBUTING.md#making-a-change) sets the
    validation evidence: independent analytical references and mesh-convergence

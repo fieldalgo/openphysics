@@ -210,6 +210,37 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
 사례(예: μ ≥ 0.05)가 하나 이상 있어야 합니다. μ = 0이면 한 번 더 패스가 정확하므로 그런 시험은
 실패할 수 없습니다.
 
+## core 커널을 직접 조립하기
+
+공개 조립 함수는 NumPy 값을 받습니다. JAX·PyTorch 계수로 조립하려면 `galerkin.core.kernels`로
+요소 행렬을 만들고, `galerkin.core.forms`로 배치하고, `galerkin.core.solve`로 푸십시오. 미분은
+그 풀이의 adjoint가 줍니다. `galerkin.core`도 나머지 Python API와 같은 0.x 규칙을 따릅니다
+([0.x의 안정성](../../changelog.md#0x의-안정성)). 마이너 릴리스(0.1에서 0.2)에서 바뀔 수
+있고, 패치 릴리스는 이를 바꾸려는 것이 아닙니다.
+
+`forms.matrix(row_dofs, col_dofs, element, shape)`는 모양만 검사합니다. 셀→DOF 표가 2차원
+정수 배열인지, 요소 행렬이 표와 맞는지만 봅니다. 표가 어느 공간의 것인지는 알 수 없습니다.
+다른 공간에서 온 같은 모양의 표나, 국소 순서를 바꾼 표(삼각형 꼭짓점 순서를 돌린 표, 변위
+성분을 번갈아 놓지 않고 묶어 놓은 표)도 오류 없이 받아들이고 틀린 행렬을 만듭니다. 커널마다
+그 커널에 준 메시나 공간의 표를 넘기십시오.
+
+| 커널 | 요소 모양 | 행 표 | 열 표 | 전체 모양 |
+|---|---|---|---|---|
+| `p1_stiffness`, `p1_mass` | (T, 3, 3) | `mesh.triangles` | `mesh.triangles` | (N, N) |
+| `p1_boundary_mass(mesh, edges)` | (E_b, 2, 2) | `edges` | `edges` | (N, N) |
+| `p1_load`, `p1_joule`의 하중(`forms.vector`로) | (T, 3) | `mesh.triangles` | — | (N,) |
+| `tet_stiffness`, `tet_mass` | (T, 4, 4) | `mesh.tets` | `mesh.tets` | (N, N) |
+| `nedelec_curlcurl`, `nedelec_mass` | (T, 3, 3) | `space.tri_edges` | `space.tri_edges` | (E, E) |
+| `nedelec_grad` | (T, 3, 3) | `space.tri_edges` | `mesh.triangles` | (E, N) |
+| `nedelec3d_curlcurl`, `nedelec3d_mass`, `nedelec3d_components`의 성분 | (T, 6, 6) | `space.tet_edges` | `space.tet_edges` | (E, E) |
+| `nedelec3d_grad` | (T, 6, 4) | `space.tet_edges` | `mesh.tets` | (E, N) |
+| `vector_p1_stiffness` | (T, 6, 6) | `galerkin.core.triangles.vector_strain`의 `dofs`(DOF 2 × 노드 + 성분) | 같은 표 | (2N, 2N) |
+
+T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서리 수입니다. 모서리 커널에서
+`mesh`는 `space.mesh`입니다. 모서리 커널은 자기 `EdgeSpace`나 `EdgeSpace3D`의 방향 부호를
+적용하므로, 모서리 표도 바로 그 공간에서 가져와야 합니다. 표와 메시 좌표는 NumPy 구조이고,
+살아 있는 값이 될 수 있는 것은 계수뿐입니다.
+
 ## 근사하지 않고 거부하는 것
 
 - 이 solver를 감싼 `jax.jit`: 검사에 구체적인 숫자가 필요합니다
@@ -217,6 +248,10 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
   autograd는 동작합니다.
 - `solve_modes`에 JAX·PyTorch `coordinate_factors`(`TypeError`): PML 늘림이나 굽힘
   좌표에 대한 미분은 제공하지 않습니다.
+- JAX·PyTorch 계수를 준 `eval_edge_field_3d`(`TypeError`). 상자 길이가 살아 있으면 공진기
+  필드는 기하를 통해서도 길이에 의존하는데, `result.space`는 그 기하를 숫자로 담습니다. 그래서
+  살아 있는 계수만으로 계산하면 미분의 그 부분을 놓칩니다. `solve_cavity_box`는 미분 전체를
+  담은 필드를 `result.electric_field`로 돌려줍니다.
 - forward 모드 미분(`jax.jvp`, `jax.jacfwd`)과 2차 미분.
 - `jax_enable_x64`가 꺼진 JAX, 그리고 한 호출에 섞인 JAX와 PyTorch 값.
 - 아직 미분하지 않는 solver는 미분을 조용히 끊지 않고 JAX·PyTorch 값을
@@ -226,9 +261,9 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
   과도 역학(`TransientThermoelasticError`)이 거부합니다. `solve_material_cavity_box`,
   모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
   `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
-  `solve_dirichlet`, `l2_error`, `eval_edge_field_3d`, `radial_pml_coeffs`(그 `k`, `r0`,
-  `d`, `sigma_max`; PML 매개변수에 대해 미분하는 solver는 없습니다)도 거부합니다. JSON
-  문서와 명령행은 NumPy로 돕니다.
+  `solve_dirichlet`, `l2_error`, `radial_pml_coeffs`(그 `k`, `r0`, `d`, `sigma_max`; PML
+  매개변수에 대해 미분하는 solver는 없습니다)도 거부합니다. JSON 문서와 명령행은 NumPy로
+  돕니다.
 - `solve_temperature_joule_heat`는 어느 방법이든 입력에 JAX·PyTorch 값이 있으면 무엇을
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`
   같은 경계 표 안의 값도 마찬가지입니다. 콜백은 반복 안에서만 돌므로, 콜백이 돌려준 살아 있는
@@ -240,7 +275,9 @@ M/Δt + K를 한 번 풀고([위](#미분을-계산하는-방법)), 도파관 �
 ## 한계
 
 - 낮은 수준 조립 함수(`galerkin.assembly`, `assembly3d`, `edge`, `edge3d`)는 살아 있는
-  값을 `TypeError`로 거부합니다. 값을 살려 두려면 `galerkin.core.kernels`를 `galerkin.core.forms`로 조립하십시오.
+  값을 `TypeError`로 거부합니다. 이 함수들이 쓰는 core 커널을 직접 조립하면 값이 살아 있지만,
+  `forms.matrix`는 모양만 검사하므로 DOF 표는 호출하는 쪽이 책임집니다
+  ([core 커널을 직접 조립하기](#core-커널을-직접-조립하기)).
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
   `ValueError`를 내기 전에 JAX가 callback의 traceback(`jax.pure_callback failed`)을
   기록합니다. PyTorch는 아무것도 출력하지 않습니다.
