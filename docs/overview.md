@@ -88,13 +88,14 @@ package has its own distribution, version, dependencies and license notices.
 |---|---|
 | [galerkin](../packages/galerkin/README.md) | Finite-element engines and field postprocessing |
 | [galerkin-refsol](../packages/galerkin-refsol/README.md) | Independent analytical references and published benchmarks; import as `refsol` |
-| [meshine](../packages/meshine/README.md) | 2D triangle meshes for material regions |
+| [meshine](../packages/meshine/README.md) | 2D triangle meshes for material regions, and layered tetrahedral meshes |
+| [meshloom](../packages/meshloom/README.md) | Tetrahedral mesher with a compiled exact-arithmetic kernel; packaging skeleton, no mesher yet |
 | [gmshio](../packages/gmshio/README.md) | Optional Gmsh executable integration, MSH reader and mesh adapters |
 | [physmat](../packages/physmat/README.md) | Material properties, optical dispersion and Drude–Lorentz fitting |
 | [simcase](../packages/simcase/README.md) | JSON documents, headless runner and optional local Studio |
 | [sipi](../packages/sipi/README.md) | Signal and power integrity: quasi-static PCB transmission-line cross-sections |
 
-The eighth distribution, [openphysics](../packages/openphysics/README.md)
+The ninth distribution, [openphysics](../packages/openphysics/README.md)
 (`0.0.1`), only reserves the project name: it contains no engine and does not
 install these packages. The repository root is not an installable distribution.
 **Use the checkout installation below; `pip install openphysics` does not install
@@ -111,6 +112,10 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine -e packages/gmshio -e "packages/physmat[rii]" -e "packages/simcase[studio,test]" -e packages/sipi
 ```
+
+`meshloom` builds a compiled Rust kernel: install it with a Rust toolchain on the
+path (`rustup`; the version is pinned in `packages/meshloom/rust-toolchain.toml`)
+and `maturin`, for example `python -m pip install maturin -e packages/meshloom`.
 
 Run commands from the repository root. Running Python inside `packages/` can
 shadow installed modules with the directories of the same name.
@@ -172,12 +177,14 @@ python -m pytest -q
 
 | Scope | Platforms | What it covers |
 |---|---|---|
-| Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all eight distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
-| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all eight wheels, built from sdists and installed with their extras outside the checkout. Each OS: seven implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
+| Full source regression | Linux, Python 3.12 | Full source suite, Studio JavaScript checks, all nine distributions built and installed, numerically sensitive tests under two forced BLAS kernels |
+| Installed-package acceptance | Linux, macOS, Windows, Python 3.12 | Linux: every Python test against all nine wheels, built from sdists and installed with their extras outside the checkout. Each OS: eight implementation sdists built into wheels and tested in a fresh environment for package bytes, bundled assets, public API/CLI/save behavior and heat save/I-O robustness |
 
 Installed acceptance is not a full macOS or Windows regression. Package metadata
 requires Python 3.12 or later, and CI tests only Python 3.12; `OS Independent` classifiers
-and `py3-none-any` wheels describe metadata, not a tested platform matrix. A
+and `py3-none-any` wheels describe metadata, not a tested platform matrix. meshloom's compiled
+wheels are built for manylinux 2.17 x86_64 and aarch64, macOS 11 x86_64 and arm64, and
+Windows x64; CI installs and tests the ones for its own runners only. A
 commit's results are in its required `tests` check on GitHub Actions. The
 [development guide](development.md) lists the checks and commands.
 

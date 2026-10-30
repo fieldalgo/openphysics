@@ -27,6 +27,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
 
+- `meshloom`: OpenPhysics의 첫 컴파일 코드 배포판을, 계획한 정확 산술 사면체 메셔의 패키징 골격으로 새로 추가했습니다. 플랫폼마다(manylinux 2.17 x86_64·aarch64, macOS 11 x86_64·arm64, Windows x64) abi3 wheel 하나에 PyO3와 maturin으로 빌드한 Rust 커널이 들어 있습니다. `kernel_available()`과 `kernel_version()`이 커널을 알려 주고, `generate3d`는 `NotImplementedError`를 냅니다. wheel에는 정적으로 링크된 허용형 Rust crate와 표준 라이브러리의 `THIRD_PARTY_NOTICES`가 들어 있습니다. 릴리스·라이선스·배포 도구가 컴파일 wheel을 빌드하고 확인합니다. [문서](packages/meshloom/overview.md).
 - `sipi`: 동일 기하의 유한 금속·유전체 선로에서 DC/AC RLGC·S를 추출하며 `sipi.volume-line/1` JSON과 명시적 유한 경계를 제공합니다. [계약](packages/sipi/volume_line.md).
 
 - `sipi`: 유한 금속 P1 전류 확산으로 DC부터 해상된 표피·근접 효과까지 계산합니다. DC 극한·전체 인덕턴스·보존 잔차와 CrossSection 부피 메시 adapter를 제공합니다. [계약과 검증](packages/sipi/conductor_diffusion.md).

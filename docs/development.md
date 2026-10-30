@@ -13,12 +13,21 @@ CI pins Python 3.12.14 and Node.js 24.19.0 on Ubuntu 24.04. From the repository
 root, in a Python 3.12 virtual environment:
 
 ```bash
+rustup toolchain install 1.97.0 --profile minimal --component rust-src
 python -m pip install -r tools/requirements-py312-linux.txt
 python -m pip install --no-deps --no-build-isolation \
   -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
+  -e packages/meshloom \
   -e packages/gmshio -e packages/physmat -e packages/simcase -e packages/sipi
 python -m pip check
 ```
+
+`meshloom` is the one package with compiled code. Its editable install builds the
+Rust kernel with maturin (pinned in the requirements) and the toolchain of
+`packages/meshloom/rust-toolchain.toml`, and places the extension next to its
+sources, where the tests import it. Without a build, `tests/meshloom` skips. After
+changing `Cargo.lock` or the toolchain, regenerate the license notices with
+`python tools/build_meshloom_notices.py`; CI checks them with `--check`.
 
 `tools/requirements-py312-linux.txt` pins the validation tools and their transitive
 dependencies, not the packages' runtime requirements. Update pins deliberately
@@ -77,6 +86,7 @@ enter a distribution:
 | `packages/galerkin` | `src/galerkin/` | `tests/galerkin/` | `examples/galerkin/` |
 | `packages/galerkin-refsol` | `src/refsol/` | `tests/refsol/` | `examples/galerkin-refsol/` |
 | `packages/meshine` | `src/meshine/` | `tests/meshine/` | `examples/meshine/` |
+| `packages/meshloom` | `src/meshloom/` (Python), `rust/` (kernel) | `tests/meshloom/` | — |
 | `packages/gmshio` | `src/gmshio/` | `tests/gmshio/`, with its `.geo`/`.msh` fixtures in `tests/gmshio/data/` | `examples/gmshio/` |
 | `packages/physmat` | `src/physmat/` | `tests/physmat/` | `examples/physmat/` |
 | `packages/sipi` | `src/sipi/` | `tests/sipi/` | `examples/sipi/` |
@@ -116,7 +126,7 @@ python tools/check_distributions.py        # build, inspect and install all pack
 python tools/run_installed_tests.py        # every Python test in tests/ against installed wheels
 python tools/check_licenses.py             # installed licenses vs. the reviewed inventory
 python tools/check_markdown_links.py       # relative links and #anchors in all Markdown files
-python tools/check_release_version.py      # one version across the eight distributions
+python tools/check_release_version.py      # one version across the nine distributions
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -145,17 +155,17 @@ not run it. It has four parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all eight distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
-| `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all eight wheels, built from sdists and installed with all their extras outside the checkout |
+| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
+| `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
-| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Seven packages built from sdists into wheels and tested in a fresh environment outside the checkout |
+| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
 The single required check is **`tests`**. It passes only when all four parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
-the eight distributions share one version (see [Publishing](#publishing)), then a
+the nine distributions share one version (see [Publishing](#publishing)), then a
 Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
 are not fetched). Preflight groups (steady boundary, transient documents, steady
@@ -166,7 +176,7 @@ evidence is kept, but the job stays failed. The job usually takes 23 to 45
 minutes; its 90-minute limit only stops hung runs, since hosted runner speed
 varies.
 
-**Distribution checks** (`tools/check_distributions.py`). Builds all eight packages
+**Distribution checks** (`tools/check_distributions.py`). Builds all nine packages
 (including the `openphysics` meta distribution), each wheel from its sdist,
 with pinned build tools, and checks metadata with `twine check --strict`.
 Distributions ship package code only. Each sdist holds exactly its import
@@ -204,7 +214,7 @@ checksums and their exact sdist and wheel contents.
 
 **Installed tests** (`tools/run_installed_tests.py`). Builds every package, each
 wheel from its sdist, and checks the archives with the same rules as the
-distribution check. All eight wheels are installed, each with every extra its
+distribution check. All nine wheels are installed, each with every extra its
 metadata declares, into a fresh environment in a temporary directory outside the
 checkout. Next to it, the script copies the tracked files under `tests/`,
 `examples/` and `docs/` and the root `pyproject.toml`, but nothing under
@@ -302,7 +312,7 @@ same mesher input in nm, um and m); say why in the test.
 
 ## Publishing
 
-The `Release` workflow (`.github/workflows/release.yml`) uploads the eight
+The `Release` workflow (`.github/workflows/release.yml`) uploads the nine
 distributions to PyPI when a GitHub release is published. Pushing a tag alone
 uploads nothing, and validation never starts it. Its jobs run in order:
 
@@ -312,6 +322,11 @@ uploads nothing, and validation never starts it. Its jobs run in order:
 2. **build**: `tools/check_release_version.py --tag <tag>`, then
    `tools/check_distributions.py --build-only` with `OPENPHYSICS_DOCS_REF` set to
    the tag.
+   **kernel** and **assemble**: meshloom's wheels are built from its sdist on each
+   release platform (manylinux 2.17 x86_64 and aarch64, macOS 11 x86_64 and arm64,
+   Windows x64) with the pinned toolchain and maturin; `check_distributions.py
+   --assemble` replaces the local meshloom wheel by them, checks each one and
+   writes `SHA256SUMS`.
 3. **install**: `tools/check_release_install.py --wheels` on Linux, macOS and
    Windows with Python 3.12 and 3.15, third-party requirements resolved from
    PyPI. It is a smoke check of the installed packages, not the test suite.
@@ -331,7 +346,8 @@ release from the tag.
 
 Each package builds from `packages/<name>`; the repository root is not a
 distribution, and `packages/openphysics` is the meta distribution that requires
-six of the other seven and forwards `sipi` as its `sipi` extra. A build-only check for one
+six of the other eight and forwards `sipi` as its `sipi` extra; `meshloom` is not
+part of it yet. A build-only check for one
 package:
 
 ```bash
@@ -339,9 +355,9 @@ python -m build --no-isolation --outdir .validation/simcase packages/simcase
 python -m twine check --strict .validation/simcase/*
 ```
 
-All eight distributions release together under one version. A version change
+All nine distributions release together under one version. A version change
 sets it in every `packages/<name>/pyproject.toml` and in each import package's
-`__version__`, keeps the requirements between our own distributions inside that
+`__version__`, and meshloom's `Cargo.toml`, keeps the requirements between our own distributions inside that
 minor series (`>=0.1.0,<0.2` for 0.1.x) and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
@@ -362,7 +378,9 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 
 A wheel built from an unpacked sdist reuses the sdist's description.
 `tools/tests/test_readme_links.py` checks that the eight `setup.py` files are identical
-and that no relative link is left in any package description.
+and that no relative link is left in any package description. `meshloom` is built by
+maturin, which does not run `setup.py`, so its README uses absolute links only; the
+same test checks that.
 
 ## Stored-value test support
 
