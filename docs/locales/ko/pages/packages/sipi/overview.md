@@ -115,5 +115,5 @@ SIPI는 `meshine.generate(candidate_order="stable")`를 사용하여 반지름�
 - 주파수 의존 유전체(예: Djordjevic–Sarkar). `tan_delta`는 상수입니다.
 - S-파라미터, Touchstone 파일, 시간 영역 응답.
 - 3D 구조: 비아, 평면 공진, 전원 분배망.
-- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 비직사각형 도체, JSON 문서와 Studio 화면.
+- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.

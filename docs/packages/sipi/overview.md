@@ -134,6 +134,6 @@ SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refin
   is constant.
 - S-parameters, Touchstone files, time-domain responses.
 - 3D structures: vias, plane resonances, power-delivery networks.
-- Layout import (Gerber, ODB++, IPC-2581), non-rectangular conductors in
-  `CrossSection`, JSON documents and a Studio view.
+- Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
+  `CrossSection` and a Studio view. [Centred trapezoids, planar coatings and JSON v2](manufacturing_sections.md) are supported.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.

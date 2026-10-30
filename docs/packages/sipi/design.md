@@ -34,6 +34,11 @@ positive. Invalid or overlapping geometry raises before meshing. Names are
 `signal`, or the ordered pair `positive`, `negative`; coplanar reference traces
 are `ground_left`, `ground_right`. Layers are `substrate`, `air`, or `dielectric`.
 
+The four templates additionally accept `top_width`; `sipi.templates.coated_microstrip`
+adds a planar coating. See [manufacturing geometry and JSON v2](manufacturing_sections.md)
+for the exact geometry, clearance and schema changes. In v2 every trace adds required
+`top_width`; the table below lists the unchanged v1 fields.
+
 ## Input document
 
 ```python
@@ -51,7 +56,7 @@ The JSON root has exactly these required fields:
 
 | Field | Contract |
 |---|---|
-| `schema` | `"sipi.cross-section/1"` |
+| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"` |
 | `length_unit` | `"m"`; no implicit conversion |
 | `layers` | Nonempty ordered array of `{name, thickness, eps_r, tan_delta}` |
 | `traces` | Nonempty ordered array of `{name, x, width, y, thickness, ground}` |

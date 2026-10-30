@@ -65,3 +65,5 @@
 - [내 계산의 수렴 확인하기](convergence.md)
 
 - [슬래브 해석해로 도파로 검증하기](slab-tutorial.md)
+
+- [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)

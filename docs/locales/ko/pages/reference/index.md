@@ -57,3 +57,5 @@
 ## SIPI 계약
 
 - [단면 템플릿·JSON·목표 임피던스 설계](../packages/sipi/design.md)
+
+- [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)

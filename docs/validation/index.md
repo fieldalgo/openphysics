@@ -65,3 +65,5 @@ records and plans do not establish a current pass; resource observations are not
 - [Check convergence of your calculation](convergence.md)
 
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
+
+- [Tapered conductors and planar coating: contract and validation](../packages/sipi/manufacturing_sections.md)

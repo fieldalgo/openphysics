@@ -35,3 +35,7 @@ Not implemented: conductor loss, frequency-dependent dielectrics, S-parameters
 and Touchstone files, 3D structures (vias, planes) and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+[Centred trapezoidal conductors and planar coatings](../../docs/packages/sipi/manufacturing_sections.md)
+use actual polygonal geometry. Rectangular inputs retain the original mesh and JSON v1;
+tapered inputs use strict JSON v2. Arbitrary mask profiles are not implemented.
