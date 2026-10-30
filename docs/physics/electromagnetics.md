@@ -45,3 +45,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 [SIPI DC/AC conductor current diffusion](../packages/sipi/conductor_diffusion.md) uses explicit finite metal volumes and magnetic boundaries; dielectric matching is a separate contract.
 
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
+
+[Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).

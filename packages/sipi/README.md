@@ -41,7 +41,7 @@ Conductor resistance is a mandatory modelling input to those network functions.
 [High-frequency surface loss](../../docs/packages/sipi/conductor.md) separately
 extracts signal/return R and internal L with explicit validity checks.
 
-Not implemented: Touchstone import, time-domain response, AC PDN impedance, vias, several layers
+Not implemented: time-domain response, AC PDN impedance, vias, several layers
 and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
@@ -57,7 +57,10 @@ Conductor resistance and internal inductance are not extracted by this API.
 [Frequency-line input JSON](../../docs/packages/sipi/line_model.md) combines geometry,
 material dispersion, explicit metal loss and RLGC/S on one shared mesh.
 
-[DC/AC metal-volume current diffusion](../../docs/packages/sipi/conductor_diffusion.md) extracts R and total L from finite metal regions, with an explicit magnetic boundary and skin-depth resolution gate. Automatic dielectric matching is not provided.
+[DC/AC metal-volume current diffusion](../../docs/packages/sipi/conductor_diffusion.md) extracts R and total L from finite metal regions, with an explicit magnetic boundary and skin-depth resolution gate. The matched line API below supplies the corresponding dielectric extraction.
 
 [Matched finite-metal/dielectric RLGC and versioned JSON](../../docs/packages/sipi/volume_line.md)
 reuse one conforming geometry, with finite material extent and explicit outer boundaries.
+
+[Touchstone input and explicit network comparison](../../docs/packages/sipi/touchstone.md)
+read supported single-ended S samples without guessing port correspondence or extrapolating.

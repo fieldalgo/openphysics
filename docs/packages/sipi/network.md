@@ -87,9 +87,11 @@ order is S11,S21,S12,S22 (`21_12`); N>=3 uses row-major order. Save as `.sNp`
 where N is the number of ports. Port names appear only as ASCII-safe comments.
 The independent reader tests include nonreciprocal data to expose transposition.
 
-Only single-ended export is supported. Mixed-mode export, Touchstone import,
-measurement overlay, time-domain conversion and a general circuit solver are
+Only single-ended export is supported. Mixed-mode export,
+measurement plotting UI, time-domain conversion and a general circuit solver are
 not implemented. The Python APIs do not add a website interface or alter the
 cross-section JSON schema.
 
 For layer-dependent dispersive extraction, see [dielectric models](dielectrics.md).
+
+[Touchstone input and explicit measured-network comparison](touchstone.md) are available through a separate API.
