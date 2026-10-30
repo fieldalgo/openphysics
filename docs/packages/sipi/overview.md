@@ -198,7 +198,7 @@ Python 3.12, pinned environment.
 ## Not implemented
 
 - Measured material fitting and geometric/full-wave dispersion.
-- Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
+- Time-domain responses. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
 - Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
@@ -213,3 +213,5 @@ material and conductor extraction with RLGC/S.
 [DC/AC metal-volume current diffusion and finite reference plates](conductor_diffusion.md).
 
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](volume_line.md).
+
+[Touchstone input and explicit network comparison](touchstone.md).

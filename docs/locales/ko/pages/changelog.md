@@ -29,6 +29,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `sipi`: 유한 금속 P1 전류 확산으로 DC부터 해상된 표피·근접 효과까지 계산합니다. DC 극한·전체 인덕턴스·보존 잔차와 CrossSection 부피 메시 adapter를 제공합니다. [계약과 검증](packages/sipi/conductor_diffusion.md).
 
 - `meshine`: `extrude`가 Gmsh 없이 meshine 바닥 메시로 적층 사면체 메시를 만듭니다. 바닥 영역과 층마다 재료(또는 뺀 칸)를 주고, 하위 층은 `size`나 `divisions`로 나누며, 이웃 프리즘이 항상 맞도록 꼭짓점 순서 규칙으로 프리즘을 자르고, 면에 `z0`, `z1`, 바닥 옆면 이름, `void` 태그와 재료 사이 interface를 붙입니다. Gmsh가 없으면 건너뛰던 3D interop·비정형 공진기 시험에 적층 메시로 같은 단언을 쓰는 Gmsh 없는 쌍둥이 시험이 생겼습니다. [문서](packages/meshine/overview.md#적층-사면체-메시).
+
+- `sipi`: single-ended Touchstone 1/2 S 입력과 명시적 조건의 네트워크 비교를 제공합니다. 복소 보간은 범위 안에서 명시적으로 선택합니다. [계약과 검증](packages/sipi/touchstone.md).
+
 - `simcase`: simcase가 galerkin의 공개 이름만 import하는지 시험이 확인합니다. `galerkin.core`와 밑줄 이름은 쓰지 않습니다. 목록에 적힌 예외는 정상 경계 계약의 사각형 메시 검사 하나이며, galerkin에 공개 메시 검사가 생기면 없앱니다.
 - 문서: 미분 계약 문서가 살아 있는 계수로 `galerkin.core` 커널을 조립하는 법을 적습니다. `galerkin.core`도 나머지 Python API와 같은 0.x 규칙을 따르고, `core.forms.matrix`는 모양만 검사하며(다른 공간에서 온 같은 모양의 표는 오류 없이 틀린 행렬을 만듦), 표 하나가 커널마다 넣을 DOF 표를 밝힙니다. 커널과 `forms.matrix`의 docstring도 같은 내용을 적습니다. `eval_edge_field_3d`가 계속 NumPy 전용인 이유도 적습니다. [문서](packages/galerkin/differentiation.md#core-커널을-직접-조립하기).
 - `galerkin`: `radial_pml_coeffs`는 NumPy로 계산하며 이제 JAX·PyTorch 값인 `k`, `r0`, `d`, `sigma_max`를 `TypeError`로 거부합니다. 이것은 동작하던 경로를 없앱니다. JAX `k`나 `sigma_max`는 계수를 거쳐 `galerkin.core.kernels`, `core.forms`, `core.solve`까지 맞는 미분을 날랐습니다. 이 저장소 안에서는 그 경로를 쓰는 코드가 없었고, 계수를 받는 공개 함수(`assemble_stiffness`, `assemble_mass`)는 살아 있는 값을 거부합니다. 그렇게 미분하던 코드는 이제 NumPy 수를 넘겨야 합니다. 나머지 경우는 미분을 주지 않았습니다. PyTorch 값과 `jax.grad` 아래의 JAX `r0`·`d`는 NumPy 안에서 실패했고, eager JAX `r0`는 NumPy 배열을 돌려줬습니다. NumPy 입력의 결과는 같습니다. [문서](packages/galerkin/differentiation.md#근사하지-않고-거부하는-것).
