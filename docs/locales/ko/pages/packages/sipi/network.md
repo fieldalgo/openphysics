@@ -81,3 +81,5 @@ single-ended 내보내기만 지원합니다. mixed-mode 파일 출력,
 층별 주파수 분산 추출은 [유전체 모델](dielectrics.md)을 사용합니다.
 
 [Touchstone 입력·조건을 명시한 측정 비교](touchstone.md)는 별도 API로 지원합니다.
+
+[종단 네트워크와 주파수 NEXT/FEXT](termination.md)는 소스/부하 임피던스를 명시적으로 받습니다.

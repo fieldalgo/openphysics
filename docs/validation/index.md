@@ -75,3 +75,5 @@ records and plans do not establish a current pass; resource observations are not
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
 
 [Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
+
+- [Terminated networks: independent circuit and modal checks](../packages/sipi/termination.md)

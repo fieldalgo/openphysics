@@ -70,3 +70,5 @@
 [동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).
 
 [Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).
+
+- [종단 네트워크와 주파수 누화](../packages/sipi/termination.md)

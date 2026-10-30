@@ -215,3 +215,5 @@ material and conductor extraction with RLGC/S.
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](volume_line.md).
 
 [Touchstone input and explicit network comparison](touchstone.md).
+
+[Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.

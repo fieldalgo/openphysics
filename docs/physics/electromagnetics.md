@@ -47,3 +47,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
 
 [Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
+
+[Terminated network V/I and frequency crosstalk](../packages/sipi/termination.md) use named Thevenin sources and passive impedances; Python only.

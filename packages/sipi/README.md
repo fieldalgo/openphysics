@@ -64,3 +64,5 @@ reuse one conforming geometry, with finite material extent and explicit outer bo
 
 [Touchstone input and explicit network comparison](../../docs/packages/sipi/touchstone.md)
 read supported single-ended S samples without guessing port correspondence or extrapolating.
+
+[Terminated V/I and frequency crosstalk](../../docs/packages/sipi/termination.md) use explicit passive source/load impedances and named victim ports.
