@@ -197,11 +197,11 @@ Python 3.12, pinned environment.
 
 ## Not implemented
 
-- Interior conductor-current diffusion and DC/low-frequency conductor loss.
-  [High-frequency surface R/internal L and empirical roughness](conductor.md)
-  are available separately; `analyze()` still returns external L and dielectric C/G.
+- Automatic matching of volume-current and dielectric extraction boundaries.
+  The basic quasi-static result still does not return conductor R; use the
+  separate [volume-current contract](conductor_diffusion.md).
+  [Frequency-dependent dielectric extraction](dielectrics.md) is available separately.
 - Measured material fitting and geometric/full-wave dispersion.
-  [Frequency-dependent dielectric models](dielectrics.md) are available separately.
 - Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
@@ -213,3 +213,5 @@ Python 3.12, pinned environment.
 
 [One shared-mesh frequency-line model and input JSON](line_model.md) combines
 material and conductor extraction with RLGC/S.
+
+[DC/AC metal-volume current diffusion and finite reference plates](conductor_diffusion.md).
