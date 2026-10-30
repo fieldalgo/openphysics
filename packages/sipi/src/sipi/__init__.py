@@ -15,12 +15,12 @@
 Signal integrity: quasi-static (quasi-TEM) cross-sections give the
 per-unit-length capacitance, inductance and dielectric conductance matrices,
 single-line impedance and effective permittivity, and coupled-line modes.
+Uniform-line S-parameters accept explicit RLGC.
 
 Power integrity: ``PowerPlane`` solves the DC voltage drop (IR drop) on a
 copper plane fed by voltage sources and loaded by current sinks.
 
-Conductor loss, S-parameters, AC PDN impedance and 3D structures are not
-implemented.
+Conductor-loss extraction, AC PDN impedance and 3D structures are not implemented.
 """
 
 from .crosssection import CrossSection, Layer, MeshedCrossSection, Trace
@@ -31,8 +31,11 @@ from .plane import (COPPER_CONDUCTIVITY, IRDropResult, PowerPlane, Sink, Source,
                     rectangle_outline)
 from .quasistatic import LineParameters, capacitance_matrix, line_parameters
 
+from .network import LineNetwork, rlgc_network, quasistatic_network
+
 __version__ = "0.1.0"
 __all__ = ["CrossSection", "Layer", "Trace", "MeshedCrossSection", "LineParameters",
+           "LineNetwork", "rlgc_network", "quasistatic_network",
            "capacitance_matrix", "line_parameters", "CrossSectionDocument",
            "microstrip", "stripline", "coupled_microstrip", "grounded_coplanar",
            "DesignEvaluation", "ImpedanceDesign", "GoalSeekError", "seek_impedance",

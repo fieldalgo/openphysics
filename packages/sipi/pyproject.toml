@@ -34,7 +34,7 @@ Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/sipi"
 Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "scikit-rf==2.2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

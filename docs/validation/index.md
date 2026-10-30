@@ -65,3 +65,5 @@ records and plans do not establish a current pass; resource observations are not
 - [Check convergence of your calculation](convergence.md)
 
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
+
+- [Line-network analytical and independent-tool checks](../packages/sipi/network_validation.md)

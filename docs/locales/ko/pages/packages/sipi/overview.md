@@ -168,7 +168,7 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 
 - 도체 손실 `R`(표피효과, 표면 거칠기). `R`은 반환하지 않습니다.
 - 주파수 의존 유전체(예: Djordjevic–Sarkar). `tan_delta`는 상수입니다.
-- S-파라미터, Touchstone 파일, 시간 영역 응답.
+- 시간 영역 응답과 Touchstone 불러오기. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
-- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 비직사각형 도체, JSON 문서와 Studio 화면.
+- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 비직사각형 도체와 Studio 화면. [버전 있는 단면 JSON](design.md)은 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.

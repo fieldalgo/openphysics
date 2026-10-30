@@ -138,6 +138,8 @@ CI는 `torch`의 CPU 빌드를 `download.pytorch.org/whl/cpu`에서 설치하고
 | `colorama` | pytest, click(Windows만) | BSD-3-Clause | |
 | `httpx`, `httpcore` | `simcase[test]` | BSD-3-Clause | |
 | `certifi` | httpx, requests | MPL-2.0 | CA 묶음을 수정 없이 사용(certifi의 묶음 자체가 Mozilla 묶음에서 파생된 것). 시험·도구 전용 |
+| `scikit-rf` | `sipi[test]` (`==2.2.0`) | BSD-3-Clause | 네트워크·Touchstone 독립 검증 전용. wheel/sdist에 LICENSE.txt가 없어 정확 v2.2.0 tag 본문 확인. 배포·런타임 의존성 아님 |
+| `pandas` | scikit-rf, CI 3.0.3 | BSD-3-Clause | 시험 전용, 정확 sdist 라이선스 및 vendored 허용형 고지 확인; 배포하지 않음 |
 | `scikit-fem` | `galerkin[crosscheck]`(`>=12,<13`) | BSD-3-Clause | [솔버 비교](reference-comparisons.md)용 레퍼런스 도구. 순수 Python이며 numpy와 scipy만 필요 |
 | `symfem` | `galerkin[crosscheck]`(`==2025.12.0`) | MIT | [요소 비교](reference-comparisons.md#요소-정의)용 정확한 요소 정의. 순수 Python. 휠 메타데이터에 라이선스 필드가 없고 MIT 본문이 라이선스 파일로 들어 있음 |
 | `sympy` | symfem | BSD-3-Clause AND MIT | 순수 Python. 메타데이터는 BSD라고만 적고, 라이선스 파일에 Diofant·multipledispatch·PyDy(BSD-3-Clause)와 latex2sympy(MIT)에서 온 코드가 추가로 적혀 있음 |
@@ -301,6 +303,7 @@ NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. 로더�
 
 | 도구 | Mode | 범위 |
 |---|---|---|
+| `scikit-rf` | live | 주파수별 네트워크 및 Touchstone; 필수 CI, [범위/측정](packages/sipi/network_validation.md) |
 | `scikit-fem` | live | 기존 허용형 비교 시험; 필수 CI |
 | `symfem` | live | 기존 허용형 요소 비교; 필수 CI |
 | `ngsolve` | stored | 별도 생성 환경; 아직 값 기록은 커밋되지 않음 |

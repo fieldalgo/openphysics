@@ -35,7 +35,12 @@ Power integrity: `PowerPlane` solves the DC voltage drop (IR drop) on a copper
 plane fed by regulators and loaded by devices, checked against exact strip,
 annulus and two-pad references.
 
-Not implemented: conductor loss, frequency-dependent dielectrics, S-parameters
-and Touchstone files, AC PDN impedance, vias, several layers and layout import.
+[Uniform-line networks](../../docs/packages/sipi/network.md) convert explicit RLGC
+to 2N-port S, differential/common waves and single-ended Touchstone 2.0 output.
+Conductor resistance is a mandatory modelling input, not extracted from the geometry.
+
+Not implemented: conductor-loss extraction, frequency-dependent dielectrics,
+Touchstone import, time-domain response, AC PDN impedance, vias, several layers
+and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
