@@ -27,6 +27,7 @@ What each package implements, and its limits, is in the
 - SIPI causal Huray conductor roughness updates resistance and internal inductance;
   explicit transmission-line JSON v2 preserves the legacy version-1 contract.
 
+- `meshloom`: a new distribution, OpenPhysics's first with compiled code, as a packaging skeleton for the planned exact-arithmetic tetrahedral mesher. One abi3 wheel per platform (manylinux 2.17 x86_64 and aarch64, macOS 11 x86_64 and arm64, Windows x64) holds a Rust kernel built with PyO3 and maturin; `kernel_available()` and `kernel_version()` report it, and `generate3d` raises `NotImplementedError`. The wheels ship `THIRD_PARTY_NOTICES` for the statically linked, permissively licensed Rust crates and standard library. The release, license and distribution tools build and check the compiled wheels. [Documentation](docs/packages/meshloom/overview.md).
 - `sipi`: a matched finite-metal/dielectric line model extracts DC/AC RLGC and S from one conforming geometry, with strict `sipi.volume-line/1` JSON and explicit finite-domain boundaries. [Contract](docs/packages/sipi/volume_line.md).
 
 - `sipi`: finite-metal P1 current diffusion from DC through resolved skin/proximity effects, with exact DC limits, total inductance, conservation diagnostics and a CrossSection volume-mesh adapter. See the [contract and validation](docs/packages/sipi/conductor_diffusion.md).

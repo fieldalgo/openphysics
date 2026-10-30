@@ -80,13 +80,14 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
 |---|---|
 | [galerkin](packages/galerkin/overview.md) | 유한요소 해석기와 장 후처리 |
 | [galerkin-refsol](packages/galerkin-refsol/overview.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
-| [meshine](packages/meshine/overview.md) | 재료 영역의 2D 삼각형 메시 |
+| [meshine](packages/meshine/overview.md) | 재료 영역의 2D 삼각형 메시와 적층 사면체 메시 |
+| [meshloom](packages/meshloom/overview.md) | 정확 산술 컴파일 커널을 가진 사면체 메셔. 패키징 골격이며 메셔는 아직 없음 |
 | [gmshio](packages/gmshio/overview.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
 | [physmat](packages/physmat/overview.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
 | [simcase](packages/simcase/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
 | [sipi](packages/sipi/overview.md) | 신호·전원 무결성: 준정적 PCB 전송선 단면 |
 
-여덟 번째 배포인 [openphysics](packages/openphysics/overview.md)(`0.0.1`)는
+아홉 번째 배포인 [openphysics](packages/openphysics/overview.md)(`0.0.1`)는
 프로젝트 이름만 예약합니다. 엔진을 포함하지 않고 위 패키지들을 설치하지도 않습니다.
 저장소 루트 자체도 설치 가능한 배포가 아닙니다.
 **아래 소스 설치 방법을 사용하세요. `pip install openphysics`만으로는 시뮬레이션
@@ -104,6 +105,10 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine -e packages/gmshio -e "packages/physmat[rii]" -e "packages/simcase[studio,test]" -e packages/sipi
 ```
+
+`meshloom`은 컴파일되는 Rust 커널을 빌드합니다. Rust 도구 모음(`rustup`, 버전은
+`packages/meshloom/rust-toolchain.toml`에 고정)과 `maturin`이 있는 상태에서 설치하세요.
+예: `python -m pip install maturin -e packages/meshloom`.
 
 명령은 저장소 루트에서 실행하세요. `packages/` 내부에서 Python을 실행하면
 같은 이름의 디렉터리가 설치된 모듈을 가릴 수 있습니다.
@@ -162,12 +167,14 @@ python -m pytest -q
 
 | 범위 | 플랫폼 | 확인하는 것 |
 |---|---|---|
-| 전체 소스 회귀 | Linux, Python 3.12 | 전체 소스 시험, Studio JavaScript 검사, 여덟 배포의 build·설치, 강제한 두 BLAS kernel에서 수치에 민감한 시험 |
-| 설치 패키지 수용 | Linux·macOS·Windows, Python 3.12 | Linux: sdist에서 만든 여덟 wheel을 extra와 함께 checkout 밖에 설치하고 Python 시험 전체를 실행. 각 OS: 일곱 구현 sdist를 wheel로 만들어 새 환경에서 패키지 바이트, 포함 자산, 공개 API·CLI·저장 동작, 열 저장/I-O 견고성 시험 |
+| 전체 소스 회귀 | Linux, Python 3.12 | 전체 소스 시험, Studio JavaScript 검사, 아홉 배포의 build·설치, 강제한 두 BLAS kernel에서 수치에 민감한 시험 |
+| 설치 패키지 수용 | Linux·macOS·Windows, Python 3.12 | Linux: sdist에서 만든 아홉 wheel을 extra와 함께 checkout 밖에 설치하고 Python 시험 전체를 실행. 각 OS: 여덟 구현 sdist를 wheel로 만들어 새 환경에서 패키지 바이트, 포함 자산, 공개 API·CLI·저장 동작, 열 저장/I-O 견고성 시험 |
 
 설치 수용 검사는 macOS나 Windows 전체 회귀 시험이 아닙니다. 패키지 metadata는
 Python 3.12 이상을 요구하고 CI는 Python 3.12만 시험합니다. `OS Independent` 분류와
-`py3-none-any` wheel은 metadata이며 검증된 플랫폼 목록이 아닙니다. 커밋별 결과는
+`py3-none-any` wheel은 metadata이며 검증된 플랫폼 목록이 아닙니다. meshloom의 컴파일
+wheel은 manylinux 2.17 x86_64·aarch64, macOS 11 x86_64·arm64, Windows x64용으로 만들며, CI는 자기
+러너에 맞는 것만 설치해 시험합니다. 커밋별 결과는
 GitHub Actions의 필수 검사 `tests`에서 확인하세요. 검사와 명령은
 [개발 안내](development.md)에 있습니다.
 
