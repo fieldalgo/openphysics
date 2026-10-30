@@ -193,7 +193,7 @@ class VolumeLineDocument:
         if not isinstance(data['materials'],dict):
             raise ValueError('materials must be an object')
         supplied = {name:dielectric_from_dict(value) for name,value in data['materials'].items()}
-        layers = {layer.name:layer for layer in doc.section.layers}
+        layers = {layer.name:layer for layer in doc.section.materials}
         if not set(supplied) <= set(layers):
             raise ValueError('unknown dielectric layer')
         materials = {name:supplied.get(name,ConstantDielectric(layer.eps_r,layer.tan_delta))

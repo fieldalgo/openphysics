@@ -16,6 +16,7 @@ from galerkin import from_mesher
 from meshine import Domain, generate
 
 from .crosssection import CrossSection, Trace
+from .polygons import polygon_domain
 from .conductor_diffusion import conductor_impedance, _indices
 from .network import _scalar
 
@@ -61,7 +62,7 @@ def mesh_conductor_section(section, *, ground_thickness, padding, metal_size,
                            dielectric_interfaces=False):
     """Build a conforming volume mesh including finite trace/reference metal.
 
-    Positive-thickness rectangular and centred tapered traces are supported.
+    Finite rectangular, centred tapered and simple polygon traces are supported.
     Bottom/top plates have the section width and extend out of its dielectric
     box; side grounds extend outward and join horizontal plates without overlap.
     Ground traces and all plates form one common longitudinal reference group.
@@ -136,19 +137,24 @@ def mesh_conductor_section(section, *, ground_thickness, padding, metal_size,
             if np.max(hi-lo) > tolerance:
                 region(name,lo,hi,y0,y1)
 
-    # Slabs preserve all polygon interfaces, including tapered faces and plate
-    # T-junctions. Unlike holes, the metal interiors are themselves regions.
-    for y0,y1 in zip(ys[:-1],ys[1:]):
-        midpoint = (y0+y1)/2
-        active = sorted((trace for trace in solids if trace.y < midpoint < trace.y1),key=lambda t:t.x)
-        left = np.array([xmin,xmin])
-        for trace in active:
-            halfwidth = trace.width_at(np.array([y0,y1]))/2
-            lo,hi = trace.x-halfwidth,trace.x+halfwidth
-            space(left,lo,y0,y1)
-            region('reference' if trace.ground else identifiers[trace.name],lo,hi,y0,y1)
-            left = hi
-        space(left,np.array([xmax,xmax]),y0,y1)
+    if section.polygonal:
+        domain = polygon_domain(section, far_size, solids=solids, metal_size=metal_size,
+                                bounds=(xmin,ymin,xmax,ymax),
+                                dielectric_interfaces=dielectric_interfaces)
+    else:
+        # Slabs preserve all polygon interfaces, including tapered faces and plate
+        # T-junctions. Unlike holes, the metal interiors are themselves regions.
+        for y0,y1 in zip(ys[:-1],ys[1:]):
+            midpoint = (y0+y1)/2
+            active = sorted((trace for trace in solids if trace.y < midpoint < trace.y1),key=lambda t:t.x)
+            left = np.array([xmin,xmin])
+            for trace in active:
+                halfwidth = trace.width_at(np.array([y0,y1]))/2
+                lo,hi = trace.x-halfwidth,trace.x+halfwidth
+                space(left,lo,y0,y1)
+                region('reference' if trace.ground else identifiers[trace.name],lo,hi,y0,y1)
+                left = hi
+            space(left,np.array([xmax,xmax]),y0,y1)
 
     def size_fn(x,y):
         distance = np.min(np.stack([trace.distance(x,y) for trace in solids]),axis=0)
@@ -156,9 +162,17 @@ def mesh_conductor_section(section, *, ground_thickness, padding, metal_size,
 
     mesh = from_mesher(generate(domain,'outer',size_fn=size_fn,min_angle=min_angle,candidate_order='stable'))
     labels = np.asarray(mesh.region_names)[mesh.regions]
-    signals = {name:np.flatnonzero(labels == identifier) for name,identifier in identifiers.items()}
-    ground = np.flatnonzero(labels == 'reference')
-    layers = ({layer.name:np.flatnonzero(labels == f'dielectric-{i}')
-               for i,layer in enumerate(section.layers)} if dielectric_interfaces else None)
+    if section.polygonal:
+        signals = {trace.name:np.flatnonzero(labels == f'__sipi_metal_{i}')
+                   for i,trace in enumerate(solids) if not trace.ground}
+        ground = np.flatnonzero(np.isin(labels,[f'__sipi_metal_{i}'
+                                                for i,t in enumerate(solids) if t.ground]))
+        layers = ({material.name:np.flatnonzero(labels == f'__sipi_dielectric_{i}')
+                   for i,material in enumerate(section.materials)} if dielectric_interfaces else None)
+    else:
+        signals = {name:np.flatnonzero(labels == identifier) for name,identifier in identifiers.items()}
+        ground = np.flatnonzero(labels == 'reference')
+        layers = ({layer.name:np.flatnonzero(labels == f'dielectric-{i}')
+                   for i,layer in enumerate(section.layers)} if dielectric_interfaces else None)
     return MeshedConductors(mesh,signals,ground,mesh.boundary['outer'],
         dict(values,grade=grade,dielectric_interfaces=dielectric_interfaces),layers)

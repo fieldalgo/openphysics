@@ -224,7 +224,8 @@ def surface_conductor_loss(section, frequency, *, conductivity, ground_thickness
     """High-frequency loss for one common metal on all signal/reference surfaces.
 
     Require delta <= every trace's minimum thickness/face-width and reference
-    thickness divided by five. The reference planes are represented by the
+    thickness divided by five. For polygons, use minimum vertex/edge clearance.
+    The reference planes are represented by the
     section boundary; ground_thickness supplies their physical minimum thickness.
     That skin-depth gate is necessary, not a complete curvature/error bound.
     Integrated unit-current disagreement above 5% raises instead of returning
@@ -242,7 +243,7 @@ def _surface_samples(section, frequency, conductivity, ground_thickness,
                                             roughness_rms,roughness)
     ground_thickness = _scalar('ground_thickness',ground_thickness)
     minimum = min([ground_thickness,section.width] +
-                  [min(t.thickness,t.width,t.top_width or t.width) for t in section.traces])
+                  [t.minimum_dimension for t in section.traces])
     if minimum <= 0 or np.max(delta) > minimum/5:
         raise ValueError('surface loss requires finite conductors and skin depth <= minimum conductor dimension / 5')
     return f, delta, correction, zs

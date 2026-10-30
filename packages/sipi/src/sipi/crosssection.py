@@ -1,7 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Layered PCB cross-sections with rectangular or centred trapezoidal traces.
+"""Layered PCB cross-sections with finite polygon conductors and local dielectrics.
 
 A ``CrossSection`` is a stack of dielectric layers between x = -width/2 and
 x = +width/2, starting at y = 0 and growing upward. A trace of zero thickness
@@ -31,9 +31,10 @@ import numpy as np
 from galerkin import Mesh, from_mesher
 from meshine import Domain, generate, rectangle
 
+from .polygons import PolygonTrace, DielectricRegion, trace_shape, check_regions, polygon_domain
 from .quasistatic import LineParameters, line_parameters
 
-__all__ = ["Layer", "Trace", "CrossSection", "MeshedCrossSection"]
+__all__ = ["Layer", "Trace", "CrossSection", "MeshedCrossSection", "PolygonTrace", "DielectricRegion"]
 
 _BOUNDARY = ("ground", "open")
 
@@ -95,6 +96,10 @@ class Trace:
                 raise ValueError(f"trace {self.name!r}: top_width must be finite and > 0")
             if self.thickness == 0 and self.top_width != self.width:
                 raise ValueError('a zero-thickness strip cannot have different top and bottom widths')
+
+    @property
+    def minimum_dimension(self):
+        return min(self.thickness, self.width, self.top_width or self.width)
 
     @property
     def tapered(self) -> bool:
@@ -173,28 +178,31 @@ class MeshedCrossSection:
 
 
 class CrossSection:
-    """Layered cross-section with rectangular/trapezoidal traces (see module docstring)."""
+    """Layered cross-section with Trace/PolygonTrace conductors and optional dielectric_regions."""
 
     def __init__(self, layers, traces, width: float, *, bottom: str = "ground",
-                 top: str = "open", sides: str = "open"):
+                 top: str = "open", sides: str = "open", dielectric_regions=()):
         self.layers = tuple(layers)
         self.traces = tuple(traces)
+        self.dielectric_regions = tuple(dielectric_regions)
         self.width = float(width)
         self.bottom, self.top, self.sides = bottom, top, sides
         if not self.layers:
             raise ValueError("at least one layer is needed")
         if not all(isinstance(lay, Layer) for lay in self.layers):
             raise TypeError("layers must be Layer instances")
-        if not all(isinstance(t, Trace) for t in self.traces):
-            raise TypeError("traces must be Trace instances")
+        if not all(isinstance(t, (Trace, PolygonTrace)) for t in self.traces):
+            raise TypeError("traces must be Trace or PolygonTrace instances")
         for label, value in (("bottom", bottom), ("top", top), ("sides", sides)):
             if value not in _BOUNDARY:
                 raise ValueError(f"{label} must be one of {_BOUNDARY}, not {value!r}")
         if not (np.isfinite(self.width) and self.width > 0):
             raise ValueError("width must be > 0")
-        names = [lay.name for lay in self.layers]
+        if not all(isinstance(r, DielectricRegion) for r in self.dielectric_regions):
+            raise TypeError("dielectric_regions must be DielectricRegion instances")
+        names = [lay.name for lay in self.materials]
         if len(set(names)) != len(names):
-            raise ValueError("layer names must be unique")
+            raise ValueError("layer names must be unique across all dielectric materials")
         names = [t.name for t in self.traces]
         if len(set(names)) != len(names):
             raise ValueError("trace names must be unique")
@@ -204,6 +212,17 @@ class CrossSection:
                 and not any(t.ground for t in self.traces):
             raise ValueError("no reference conductor: ground a boundary or add a ground trace")
         self._check_placement()
+        if self.dielectric_regions:
+            check_regions(self)
+
+    @property
+    def materials(self):
+        """Layer and local-region materials, in input order."""
+        return self.layers + self.dielectric_regions
+
+    @property
+    def polygonal(self):
+        return bool(self.dielectric_regions) or any(isinstance(t, PolygonTrace) for t in self.traces)
 
     @property
     def height(self) -> float:
@@ -225,6 +244,10 @@ class CrossSection:
                                  "is that plane)")
         for i, a in enumerate(self.traces):
             for b in self.traces[i + 1:]:
+                if isinstance(a, PolygonTrace) or isinstance(b, PolygonTrace):
+                    if trace_shape(a).distance(trace_shape(b)) <= tol:
+                        raise ValueError(f"traces {a.name!r} and {b.name!r} touch or overlap")
+                    continue
                 gap_y = max(a.y - b.y1, b.y - a.y1)
                 if a.tapered or b.tapered:
                     # The horizontal gap is affine on the common vertical span;
@@ -246,10 +269,14 @@ class CrossSection:
     def _sizes(self, edge_size, far_size):
         features = [lay.thickness for lay in self.layers]
         for t in self.traces:
-            features.append(min(t.width, t.top_width or t.width))
+            features.append(t.minimum_dimension if isinstance(t, PolygonTrace)
+                            else min(t.width, t.top_width or t.width))
+        features.extend(r.minimum_dimension for r in self.dielectric_regions)
         for i, a in enumerate(self.traces):
             for b in self.traces[i + 1:]:
-                if a.tapered or b.tapered:
+                if isinstance(a, PolygonTrace) or isinstance(b, PolygonTrace):
+                    features.append(trace_shape(a).distance(trace_shape(b)))
+                elif a.tapered or b.tapered:
                     # Conservative bounding-box gap can vanish even for disjoint
                     # shapes. Use their exact polygon/segment distance instead.
                     corners_a, corners_b = a.corners(), b.corners()
@@ -348,12 +375,14 @@ class CrossSection:
         xs = {-half, half}
         ys = set(self.interfaces().tolist())
         for t in self.traces:
-            xs.update((t.x0, t.x1))
+            xs.update((t.xmin, t.xmax))
             ys.update((t.y, t.y1))
         xs, ys = np.array(sorted(xs)), np.array(sorted(ys))
         solids = [t for t in self.traces if t.thickness > 0]
 
-        if any(t.tapered for t in self.traces):
+        if self.polygonal:
+            domain = polygon_domain(self, far_size)
+        elif any(t.tapered for t in self.traces):
             domain = self._tapered_domain(ys, far_size)
         else:
             # Preserve the established rectangular discretization exactly.
@@ -367,7 +396,7 @@ class CrossSection:
                         continue
                     domain.add_region(layer.name, rectangle(xs[i], ys[j], xs[i + 1], ys[j + 1]))
 
-        corners = np.concatenate([t.corners() for t in self.traces])
+        corners = np.concatenate([t.corners() for t in (*self.traces, *self.dielectric_regions)])
 
         def size_fn(x, y):
             x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
@@ -382,7 +411,7 @@ class CrossSection:
         mesh = from_mesher(tm)
 
         names = mesh.region_names
-        by_name = {lay.name: lay for lay in self.layers}
+        by_name = {lay.name: lay for lay in self.materials}
         eps_r = np.array([by_name[names[r]].eps_r for r in mesh.regions])
         tan_delta = np.array([by_name[names[r]].tan_delta for r in mesh.regions])
 
@@ -399,7 +428,7 @@ class CrossSection:
 
         signals = {}
         for t in self.traces:
-            on = (t.distance(p[:, 0], p[:, 1]) <= tol) if t.tapered else (
+            on = (t.distance(p[:, 0], p[:, 1]) <= tol) if isinstance(t, PolygonTrace) or t.tapered else (
                 (p[:, 0] >= t.x0 - tol) & (p[:, 0] <= t.x1 + tol)
                 & (p[:, 1] >= t.y - tol) & (p[:, 1] <= t.y1 + tol))
             if not on.any():

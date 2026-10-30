@@ -21,6 +21,8 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 ## PCB transmission lines (signal and power integrity)
 
+[Polygon and mask cross-sections](../packages/sipi/polygon_sections.md) share actual material boundaries across quasi-static, dispersive and surface/volume conductor extraction.
+
 [Causal roughness](../packages/sipi/roughness.md) adds constitutive resistance and reactance to the surface model.
 
 - [sipi — quasi-static PCB cross-sections: C, L, G, impedance and coupled-line modes](../packages/sipi/overview.md). Python API and [versioned cross-section JSON with impedance design](../packages/sipi/design.md); [uniform-line networks](../packages/sipi/network.md) accept explicit RLGC for S and Touchstone output. [Frequency-line input models](../packages/sipi/line_model.md) share one mesh for dispersive dielectrics, high-frequency conductor surface loss and RLGC/S. [Finite-metal current diffusion](../packages/sipi/conductor_diffusion.md) extracts series R/L with an explicit magnetic boundary. 3D structures remain unsupported.

@@ -9,10 +9,17 @@ import math
 from numbers import Real
 
 from .crosssection import CrossSection, Layer, Trace
+from .polygons import PolygonTrace, DielectricRegion, _vertices
 
 __all__ = ['CrossSectionDocument']
 _SCHEMA = 'sipi.cross-section/1'
 _TAPER_SCHEMA = 'sipi.cross-section/2'
+_POLYGON_SCHEMA = 'sipi.cross-section/3'
+
+
+def _trace(row):
+    values = {k: v for k, v in row.items() if k != 'kind'}
+    return PolygonTrace(**values) if row.get('kind') == 'polygon' else Trace(**values)
 
 
 def _keys(value, required, optional=(), *, where):
@@ -69,12 +76,22 @@ class CrossSectionDocument:
         data = dict(schema=_SCHEMA, length_unit='m',
                     layers=[dict(name=l.name, thickness=l.thickness, eps_r=l.eps_r,
                                  tan_delta=l.tan_delta) for l in section.layers],
-                    traces=[dict(name=t.name, x=t.x, width=t.width, y=t.y,
-                                 thickness=t.thickness, ground=t.ground) for t in section.traces],
+                    traces=[(dict(kind='polygon', name=t.name, vertices=t.vertices, ground=t.ground)
+                             if isinstance(t, PolygonTrace) else
+                             dict(name=t.name, x=t.x, width=t.width, y=t.y,
+                                  thickness=t.thickness, ground=t.ground)) for t in section.traces],
                     box=dict(width=section.width, bottom=section.bottom,
                              top=section.top, sides=section.sides),
                     mesh={} if mesh is None else mesh)
-        if any(t.tapered for t in section.traces):
+        if section.polygonal:
+            data['schema'] = _POLYGON_SCHEMA
+            data['dielectric_regions'] = [dict(name=r.name, vertices=r.vertices, eps_r=r.eps_r,
+                                               tan_delta=r.tan_delta) for r in section.dielectric_regions]
+            for row, trace in zip(data['traces'], section.traces):
+                if isinstance(trace, Trace):
+                    row['kind'] = 'trapezoid'
+                    row['top_width'] = trace.width if trace.top_width is None else trace.top_width
+        elif any(t.tapered for t in section.traces):
             data['schema'] = _TAPER_SCHEMA
             for row, trace in zip(data['traces'], section.traces):
                 row['top_width'] = trace.width if trace.top_width is None else trace.top_width
@@ -83,9 +100,13 @@ class CrossSectionDocument:
 
     @staticmethod
     def _validate(data):
-        _keys(data, ('schema', 'length_unit', 'layers', 'traces', 'box', 'mesh'), where='document')
-        if data['schema'] not in (_SCHEMA, _TAPER_SCHEMA) or data['length_unit'] != 'm':
-            raise ValueError('unsupported schema or length_unit; expected sipi.cross-section/1 or /2 and m')
+        if not isinstance(data, dict):
+            raise ValueError('document must be an object')
+        polygonal = data.get('schema') == _POLYGON_SCHEMA
+        required = ('schema', 'length_unit', 'layers', 'traces', 'box', 'mesh')
+        _keys(data, (*required, 'dielectric_regions') if polygonal else required, where='document')
+        if data['schema'] not in (_SCHEMA, _TAPER_SCHEMA, _POLYGON_SCHEMA) or data['length_unit'] != 'm':
+            raise ValueError('unsupported schema or length_unit; expected sipi.cross-section/1, /2 or /3 and m')
         layers, traces = [], []
         for kind, fields, output in (
                 ('layers', ('name', 'thickness', 'eps_r', 'tan_delta'), layers),
@@ -95,10 +116,20 @@ class CrossSectionDocument:
             if not isinstance(data[kind], list) or not data[kind]:
                 raise ValueError(f'{kind} must be a nonempty array')
             for row in data[kind]:
-                _keys(row, fields, where=kind)
+                row_fields = fields
+                if kind == 'traces' and polygonal:
+                    if not isinstance(row, dict) or row.get('kind') not in ('polygon', 'trapezoid'):
+                        raise ValueError('trace kind must be polygon or trapezoid')
+                    row_fields = (('kind', 'name', 'vertices', 'ground') if row['kind'] == 'polygon'
+                                  else (*fields, 'kind', 'top_width'))
+                _keys(row, row_fields, where=kind)
                 cleaned = {}
-                for key in fields:
-                    if key == 'name':
+                for key in row_fields:
+                    if key == 'kind':
+                        cleaned[key] = row[key]
+                    elif key == 'vertices':
+                        cleaned[key] = [list(point) for point in _vertices(row[key])]
+                    elif key == 'name':
                         cleaned[key] = _name(row[key], kind+'.name')
                     elif key == 'ground':
                         if type(row[key]) is not bool:
@@ -107,6 +138,16 @@ class CrossSectionDocument:
                     else:
                         cleaned[key] = _number(row[key], kind+'.'+key)
                 output.append(cleaned)
+        regions = []
+        if polygonal:
+            if not isinstance(data['dielectric_regions'], list):
+                raise ValueError('dielectric_regions must be an array')
+            for row in data['dielectric_regions']:
+                _keys(row, ('name', 'vertices', 'eps_r', 'tan_delta'), where='dielectric region')
+                regions.append(dict(name=_name(row['name'], 'region.name'),
+                    vertices=[list(point) for point in _vertices(row['vertices'])],
+                    eps_r=_number(row['eps_r'], 'region.eps_r'),
+                    tan_delta=_number(row['tan_delta'], 'region.tan_delta')))
         box = data['box']
         _keys(box, ('width', 'bottom', 'top', 'sides'), where='box')
         cleaned_box = dict(width=_number(box['width'], 'box.width'))
@@ -115,12 +156,15 @@ class CrossSectionDocument:
                 raise ValueError(f'box.{key} must be open or ground')
             cleaned_box[key] = box[key]
         options = _mesh(data['mesh'])
-        section = CrossSection([Layer(**l) for l in layers], [Trace(**t) for t in traces],
-                               **cleaned_box)
+        section = CrossSection([Layer(**l) for l in layers], [_trace(t) for t in traces],
+                               dielectric_regions=[DielectricRegion(**r) for r in regions], **cleaned_box)
         # Resolve defaults too, so inconsistent explicit settings fail before meshing.
         section.mesh_settings(**options)
-        return dict(schema=data['schema'], length_unit='m', layers=layers, traces=traces,
-                    box=cleaned_box, mesh=options)
+        result = dict(schema=data['schema'], length_unit='m', layers=layers, traces=traces,
+                      box=cleaned_box, mesh=options)
+        if polygonal:
+            result['dielectric_regions'] = regions
+        return result
 
     @classmethod
     def from_dict(cls, data):
@@ -150,7 +194,9 @@ class CrossSectionDocument:
         """Rebuild the exact cross-section without meshing it."""
         data = self._data
         return CrossSection([Layer(**l) for l in data['layers']],
-                            [Trace(**t) for t in data['traces']], **data['box'])
+                            [_trace(t) for t in data['traces']],
+                            dielectric_regions=[DielectricRegion(**r)
+                                                for r in data.get('dielectric_regions', [])], **data['box'])
 
     @property
     def mesh_options(self):

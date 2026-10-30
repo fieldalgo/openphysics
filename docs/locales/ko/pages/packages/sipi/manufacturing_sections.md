@@ -89,3 +89,5 @@ OPENPHYSICS_REQUIRE_CROSSCHECK=1 OPENBLAS_NUM_THREADS=1 \
 ```
 
 임의 다각형·중심이 어긋난 윗면·둥근 모서리·도체 손실·주파수 분산·제조 분포·웹 화면은 이 변경에 포함되지 않습니다.
+
+[후속 다각형·국소 마스크·JSONv3](polygon_sections.md)는 별도 계약과 검증을 제공합니다. 위 기존 제조 단면 검증의 범위와 수치는 유지됩니다.
