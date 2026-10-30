@@ -62,6 +62,8 @@ records and plans do not establish a current pass; resource observations are not
 
 ## Apply this to your model
 
+- [Causal roughness: independent spectral quadrature and R/L convergence](../packages/sipi/roughness.md#validation-and-limits)
+
 - [Check convergence of your calculation](convergence.md)
 
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
