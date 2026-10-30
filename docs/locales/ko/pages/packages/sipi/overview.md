@@ -172,3 +172,5 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
 - 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
+
+[주파수 의존 유전체 모델·추출](dielectrics.md).
