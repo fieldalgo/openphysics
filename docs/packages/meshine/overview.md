@@ -192,11 +192,50 @@ These apply to every input:
   sizes, and checks the queries against a brute force and the corners and
   meshes against the old implementations.
 
+## Layered tetrahedral meshes
+
+`extrude` turns a meshine footprint into a tetrahedral mesh of a layer stack,
+without Gmsh. Each footprint region gets a material per layer, or `None` to leave
+that cell out:
+
+```python
+from meshine import Domain, box_sides, check, extrude, generate, rectangle
+
+d = Domain(size=0.8)
+d.add_region("die_zone", rectangle(-2, -2, 2, 2))
+d.add_region("rest", rectangle(-5, -5, 5, 5), holes=[rectangle(-2, -2, 2, 2)])
+mesh = extrude(generate(d, box_sides(-5, 5, -5, 5)), [0.0, 1.0, 1.5, 2.5],
+               {"die_zone": ["substrate", "die", "mold"], "rest": ["substrate", "mold", "mold"]},
+               size=0.4)
+check(mesh)
+mesh.boundary_faces     # "z0", "z1", the footprint's side names, and "void" against left-out cells
+mesh.interfaces         # {("die", "mold"): faces, ...}, wound from the first name to the second
+```
+
+Every footprint triangle becomes a prism per sub-layer, and every prism three
+tetrahedra. The prism's side quads are cut along the diagonal from the lower-index
+bottom vertex to the higher-index top vertex (the vertex-order rule of Dompierre et
+al., 1999), so two prisms that share a quad always cut it the same way and the mesh
+is conforming without any search. `size` sets the fewest equal sub-layers per layer
+that are at most that thick, or `divisions` gives the counts. Layer boundaries are
+kept exactly, and node heights are affine in the layer thicknesses.
+
+Faces are classified per column rather than by a global face sort; on the package
+footprint of the [3D plan](validation3d.md) (C15) the extrusion took 0.66 s per
+million tetrahedra (median of 3 fresh processes, 9.0M tetrahedra, Linux;
+`benchmarks/benchmark_extrude.py`). `examples/meshine/extrude_chip.py` builds the
+chip stack above and solves steady heat on it with galerkin.
+
+Limits of the extruder: only vertical prisms over a planar footprint; its quality
+is the footprint's quality stretched by the layer thickness (the chip example has a
+smallest dihedral angle of 17.6 degrees and mean radius ratio 0.68), and no
+quality improvement runs after extrusion. Node-for-node identity depends on the
+2D mesh, which is reproducible on the same platform only.
+
 ## Tetrahedral mesh contract
 
-meshine does not generate tetrahedra yet. `TetMesh`, `check` and `write_msh`
-fix the output that OpenPhysics's own 3D meshers will return, so that solvers and
-tests can be written against it now:
+`TetMesh`, `check` and `write_msh` fix the output that OpenPhysics's own 3D
+meshers return; `extrude` is the first of them:
 
 ```python
 from meshine import TetMesh, check, write_msh
@@ -273,7 +312,7 @@ grading; meshine's guarantee is the angle bound.
 
 ## Limits
 
-- 2D only. Tetrahedral meshing is a different problem; use Gmsh via `gmshio` for 3D. The criteria for OpenPhysics's own 3D meshers are fixed in advance in the [pre-registered 3D validation plan](validation3d.md).
+- Tetrahedra come only from `extrude`, as layer stacks over a planar footprint. For other 3D shapes use Gmsh via `gmshio`. The criteria for OpenPhysics's own 3D meshers are fixed in advance in the [pre-registered 3D validation plan](validation3d.md).
 - Termination near small input angles is measured, not proved. An input the rules miss stops with the point cap, `max_rounds` or the unresolved-point error instead of running on.
 - Next to a small angle, quality is bounded only by measurement. The triangle in an acute corner keeps the input angle. Rule 2 also leaves skinny triangles outside the corner, in the neighbouring region, when their circumcenter encroaches a first piece, so triangles beside a straight corner can end a little below the input angle: 13.70° and 13.02° beside the 14° corner of a triangle whose other base corner is 20° or 23°, in a box at size 0.05. Where simcase's 128-gon heater touches a side, triangles that do not touch the apex reached at least 5.6°. At a curved cusp, where a meshine `Circle` touches a side or another circle (a true angle of 0°), triangles go below the corner of the 32-gon itself (5.6° at a side, 11.25° at another 32-gon): down to 0.70° at the apex, and 4.1° in triangles that do not touch it.
 - A sharp corner with a side on a meshine `Circle` can be treated although the earlier meshine meshed it: each split of a curved side is projected onto the circle and turns the first piece by up to 180°/n toward the tangent, so a corner that is acute or incompatible on its input chord can widen and finish on its own. Such an input now gets a different mesh; in every one measured, all angles stayed at least `min_angle` (28.05° and up at 28). A triangle inside a 16-gon `Circle`, touching it at a vertex with 33° corners and a side ratio of 1.5, gave 660 nodes before and 661 now; of 121 such triangles (n = 8 to 32, corners of 16° to 42°) that meshed before, the 85 with a treated vertex all changed. simcase never passes a touching `Circle`, so its documents are not affected.

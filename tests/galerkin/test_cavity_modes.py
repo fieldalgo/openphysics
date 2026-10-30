@@ -217,3 +217,60 @@ def test_unstructured_cavity_improves_under_refinement(refsol):
         first.append(abs(vals[:exact[0][1]].mean() - exact[0][0]) / exact[0][0])
     assert first[0] > first[1] > first[2], f"not converging: {first}"
     assert first[-1] < 1e-2, f"finest unstructured mesh still {first[-1]:.2e} off"
+
+
+# --------------------------------------------------------------------------
+# The same assertions on a mesh no external program built: meshine extrudes an
+# unstructured square mesh through the height. These run without Gmsh.
+# --------------------------------------------------------------------------
+meshine = pytest.importorskip("meshine")
+
+
+def _extruded_cavity(size, nev=16, sigma=None):
+    from galerkin import from_mesher
+    from meshine import Domain, box_sides, extrude, generate, rectangle
+
+    d = Domain(size=size)
+    d.add_region("cavity", rectangle(0, 0, 1.0, 1.0))
+    mesh = from_mesher(extrude(generate(d, box_sides(0, 1.0, 0, 1.0)), [0.0, 1.0], size=size))
+    space = EdgeSpace3D(mesh)
+    S = assemble_curlcurl_3d(space)
+    M = assemble_edge_mass_3d(space)
+    free = np.setdiff1d(np.arange(space.num_edges), space.boundary_edge_ids())
+    vals = np.sort(spla.eigsh(S[free][:, free].tocsc(), k=nev,
+                              M=M[free][:, free].tocsc(), sigma=sigma,
+                              which="LM", v0=np.ones(len(free)),
+                              ncv=min(len(free), max(6 * nev, 100)),
+                              maxiter=50000, return_eigenvectors=False))
+    scale = np.abs(vals).max()
+    return mesh, np.sort(vals[np.abs(vals) > 1e-6 * scale])
+
+
+def test_extruded_cavity_matches_the_analytic_spectrum(refsol):
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+                                                             n_max=3))
+    mesh, vals = _extruded_cavity(0.11, sigma=1.3 * exact[0][0])
+    assert abs(mesh.volumes().sum() - 1.0) < 1e-9
+
+    at, errors = 0, []
+    for k2, mult, _ in exact:
+        errors.append(abs(vals[at:at + mult].mean() - k2) / k2)
+        at += mult
+    assert max(errors) < 2e-2, f"cluster-mean errors {errors}"
+
+    flat = [k for k, mult, _ in exact for _ in range(mult)]
+    for value in vals[:len(flat)]:
+        assert min(abs(value - k) / k for k in flat) < 0.06, (
+            f"{value:.4f} falls between the analytic resonances — spurious")
+
+
+@pytest.mark.slow
+def test_extruded_cavity_improves_under_refinement(refsol):
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+                                                             n_max=3))
+    first = []
+    for size in (0.25, 0.16, 0.11):
+        _, vals = _extruded_cavity(size, sigma=1.3 * exact[0][0])
+        first.append(abs(vals[:exact[0][1]].mean() - exact[0][0]) / exact[0][0])
+    assert first[0] > first[1] > first[2], f"not converging: {first}"
+    assert first[-1] < 1e-2, f"finest extruded mesh still {first[-1]:.2e} off"
