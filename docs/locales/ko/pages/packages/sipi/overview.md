@@ -171,7 +171,7 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 - 실측 재료 추정과 형상/전파 분산.
 - 시간 영역 응답. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
-- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
+- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), 곡선/구멍을 가진 도체와 Studio 화면. [단순 다각형·국소 마스크·JSONv3](polygon_sections.md)와 [사다리꼴·평탄 코팅](manufacturing_sections.md)은 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
 
 [주파수 의존 유전체 모델·추출](dielectrics.md).

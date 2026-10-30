@@ -114,3 +114,5 @@ OPENPHYSICS_REQUIRE_CROSSCHECK=1 OPENBLAS_NUM_THREADS=1 \
 
 These models do not add arbitrary polygons, offset top faces, curved corners,
 conductor loss, frequency dispersion, manufacturing distributions or website support.
+
+[Subsequent polygon/local-mask and JSON v3 support](polygon_sections.md) has a separate contract and validation. The historical manufacturing validation above retains its original scope and measurements.

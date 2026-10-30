@@ -8,3 +8,8 @@ use this product except in compliance with the License. A copy of the License
 is distributed with this product in the file LICENSE, and is also available at
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+SIPI uses the separately installed Shapely Python API (BSD-3-Clause).
+Shapely wheels load GEOS (LGPL-2.1) as separate shared libraries.
+This distribution includes no Shapely or GEOS code or binaries. Their notices
+and any redistribution obligations remain with those separate distributions.

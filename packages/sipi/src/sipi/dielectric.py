@@ -251,7 +251,7 @@ class DielectricSweep:
 def dispersive_line(section, frequency, *, materials, **mesh_options):
     """Solve the complex electrostatic problem at each frequency on one mesh.
 
-    materials maps existing layer names to supported dielectric models. Other
+    materials maps existing layer and local-region names to supported dielectric models. Other
     layers retain their constant eps_r/tan_delta. Unknown layers, invalid models
     and table range errors fail before meshing. Existing section/doc APIs and
     constant-material extraction are unchanged. There is no wavelength-dependent
@@ -266,7 +266,7 @@ def _material_samples(section, frequency, materials):
     f = _frequencies(frequency)
     if not isinstance(materials, Mapping):
         raise ValueError('materials must map layer names to dielectric models')
-    layers = {layer.name: layer for layer in section.layers}
+    layers = {layer.name: layer for layer in section.materials}
     if not set(materials) <= set(layers):
         raise ValueError('materials contains an unknown layer name')
     samples = {}

@@ -57,6 +57,8 @@
 
 ## SIPI 계약
 
+- [다각형 도체·국소 유전체·마스크·추가 스트립라인과 JSONv3](../packages/sipi/polygon_sections.md)
+
 - [인과적 Huray 표면 법칙과 선로 JSON v2](../packages/sipi/roughness.md)
 
 - [단면 템플릿·JSON·목표 임피던스 설계](../packages/sipi/design.md)

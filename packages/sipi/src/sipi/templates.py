@@ -9,7 +9,8 @@ from numbers import Real
 
 from .crosssection import CrossSection, Layer, Trace
 
-__all__ = ['microstrip', 'stripline', 'coupled_microstrip', 'grounded_coplanar', 'coated_microstrip']
+__all__ = ['microstrip', 'stripline', 'coupled_microstrip', 'grounded_coplanar', 'coated_microstrip',
+           'offset_stripline', 'coupled_stripline', 'broadside_stripline', 'with_surface_mask']
 
 
 def _positive(name, value, *, zero=False):
@@ -105,3 +106,93 @@ def coated_microstrip(*, width, substrate_height, eps_r, coating_height,
                     _positive('coating_tan_delta', coating_tan_delta, zero=True))
     return CrossSection([layers[0], coating, layers[1]],
                         [Trace('signal', 0.0, w, h, t, top_width=top_width)], box)
+
+
+def offset_stripline(*, width, plane_spacing, trace_height, eps_r, thickness=0.0,
+                     tan_delta=0.0, box_width=None, top_width=None):
+    """One trace between ground planes, with explicit bottom-face height."""
+    base = stripline(width=width, plane_spacing=plane_spacing, eps_r=eps_r,
+                    thickness=thickness, tan_delta=tan_delta, box_width=box_width,
+                    top_width=top_width)
+    y = _positive('trace_height', trace_height)
+    return CrossSection(base.layers, [Trace('signal', 0, width, y, thickness, top_width=top_width)],
+                        base.width, top='ground')
+
+
+def coupled_stripline(*, width, gap, plane_spacing, eps_r, thickness=0.0,
+                     tan_delta=0.0, box_width=None, top_width=None, trace_height=None):
+    """Edge-coupled equal-width pair between two planes; gap is at the bottom face."""
+    gap = _positive('gap', gap)
+    base = stripline(width=width, plane_spacing=plane_spacing, eps_r=eps_r,
+                    thickness=thickness, tan_delta=tan_delta, box_width=box_width,
+                    top_width=top_width)
+    y = base.traces[0].y if trace_height is None else _positive('trace_height', trace_height)
+    offset = (width+gap)/2
+    box_width = max(base.width, 4*(2*width+gap)) if box_width is None else base.width
+    return CrossSection(base.layers,
+        [Trace('positive', -offset, width, y, thickness, top_width=top_width),
+         Trace('negative', offset, width, y, thickness, top_width=top_width)], box_width, top='ground')
+
+
+def broadside_stripline(*, width, gap, plane_spacing, eps_r, thickness,
+                       offset=0.0, tan_delta=0.0, box_width=None):
+    """Vertical pair centred between planes; gap is metal-to-metal, offset is signed.
+
+    The lower/upper traces are named positive/negative. Rectangular conductors
+    have equal positive thickness. The entire box has one homogeneous dielectric.
+    """
+    gap = _positive('gap', gap)
+    t = _positive('thickness', thickness)
+    if isinstance(offset, bool) or not isinstance(offset, Real) or not math.isfinite(offset):
+        raise ValueError('offset must be a finite real number')
+    base = stripline(width=width, plane_spacing=plane_spacing, eps_r=eps_r,
+                    thickness=t, tan_delta=tan_delta, box_width=box_width)
+    box_width = max(base.width, 4*(width+abs(offset))) if box_width is None else base.width
+    return CrossSection(base.layers,
+        [Trace('positive', -offset/2, width, plane_spacing/2-gap/2-t, t),
+         Trace('negative', offset/2, width, plane_spacing/2+gap/2, t)], box_width, top='ground')
+
+
+def with_surface_mask(section, *, thickness, eps_r, tan_delta=0.0, gap_fill_height=0.0):
+    """Add a polygonal mask to coplanar finite rectangular/tapered surface traces.
+
+    Offset top and side faces by thickness, with straight mitred corners (mitre
+    limit 5). Clip only below the common bottom face. Optional gap_fill_height
+    fills the whole box width from that face upwards. No curvature, meniscus or
+    manufacturing prediction is implied. Regions are named mask, or mask_1,...
+    ordered left to right when disconnected. Ground traces are coated too.
+    Existing local regions are preserved and must not overlap the new mask.
+    """
+    from shapely.geometry import box
+    from shapely.ops import unary_union
+    from .polygons import DielectricRegion, trace_shape, _pieces
+    if not isinstance(section, CrossSection):
+        raise TypeError('section must be a CrossSection')
+    t = _positive('thickness', thickness)
+    fill = _positive('gap_fill_height', gap_fill_height, zero=True)
+    if any(not isinstance(trace, Trace) or trace.thickness <= 0 for trace in section.traces):
+        raise ValueError('surface mask requires finite rectangular or tapered traces')
+    y = section.traces[0].y
+    if any(trace.y != y for trace in section.traces):
+        raise ValueError('surface mask traces must share one bottom face height')
+    if y not in section.interfaces():
+        raise ValueError('surface mask requires a layer interface at the trace bottom')
+    half = section.width/2
+    coatings = [trace_shape(trace).buffer(t, join_style='mitre', mitre_limit=5)
+                for trace in section.traces]
+    if fill > 0:
+        coatings.append(box(-half, y, half, y+fill))
+    shape = unary_union(coatings)
+    # Retain the entire lateral/top extent so the section validator rejects
+    # out-of-box coatings instead of silently cutting their physical thickness.
+    xmin, _, xmax, ymax = shape.bounds
+    shape = shape.intersection(box(xmin, y, xmax, ymax))
+    parts = sorted(_pieces(shape), key=lambda p:p.bounds)
+    if any(part.interiors for part in parts):
+        raise ValueError('mask topology contains holes; supply explicit simple regions')
+    regions = [DielectricRegion('mask' if len(parts)==1 else f'mask_{i+1}',
+                                list(part.exterior.coords)[:-1], eps_r, tan_delta)
+               for i,part in enumerate(parts)]
+    return CrossSection(section.layers, section.traces, section.width,
+                        bottom=section.bottom, top=section.top, sides=section.sides,
+                        dielectric_regions=(*section.dielectric_regions, *regions))
