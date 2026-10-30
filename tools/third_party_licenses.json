@@ -222,7 +222,8 @@
         ],
         "imported_by": [
           "tests/sipi/test_crosscheck_skrf_network.py",
-          "tests/sipi/test_dielectric.py"
+          "tests/sipi/test_dielectric.py",
+          "tests/sipi/test_conductor.py"
         ],
         "values": [],
         "generators": "repo",

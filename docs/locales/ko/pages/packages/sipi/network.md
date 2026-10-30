@@ -2,6 +2,8 @@
 
 [English](../../../../../packages/sipi/network.md) | **한국어**
 
+[고주파 도체 표면 손실](conductor.md)은 별도 추출 API이며 외부·내부 L을 합쳐 네트워크에 전달합니다.
+
 [단면 개요](overview.md) · [검증](network_validation.md)
 
 `rlgc_network`는 주어진 단위길이 RLGC를 균일 전송선의 주파수별 S 행렬로 변환합니다.

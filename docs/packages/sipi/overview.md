@@ -197,7 +197,9 @@ Python 3.12, pinned environment.
 
 ## Not implemented
 
-- Conductor loss `R` (skin effect, surface roughness). `R` is not returned.
+- Interior conductor-current diffusion and DC/low-frequency conductor loss.
+  [High-frequency surface R/internal L and empirical roughness](conductor.md)
+  are available separately; `analyze()` still returns external L and dielectric C/G.
 - Frequency-dependent dielectrics (for example Djordjevic–Sarkar); `tan_delta`
   is constant.
 - Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
