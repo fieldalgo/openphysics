@@ -41,3 +41,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 
 [Build a model](../modeling/index.md) · [Results and trust](../results/index.md) · [All physics](index.md)
+
+[Terminated network V/I and frequency crosstalk](../packages/sipi/termination.md) use named Thevenin sources and passive impedances; Python only.

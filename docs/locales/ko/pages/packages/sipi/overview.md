@@ -178,3 +178,5 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 [주파수 의존 유전체 모델·추출](dielectrics.md).
 
 [공유 메시의 주파수 선로 모델·입력 JSON](line_model.md)은 재료·도체 추출을 RLGC/S와 연결합니다.
+
+[종단 네트워크와 주파수 NEXT/FEXT](termination.md)는 소스/부하 임피던스를 명시적으로 받습니다.

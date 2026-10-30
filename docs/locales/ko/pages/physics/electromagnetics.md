@@ -43,3 +43,5 @@
 [모델 구성](../modeling/index.md) · [결과와 신뢰성](../results/index.md) · [전체 물리 문제](index.md)
 
 SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/sipi/design.md)도 제공합니다.
+
+[종단 네트워크 V/I와 주파수 누화](../packages/sipi/termination.md)는 명시 Thevenin 소스·수동 임피던스를 쓰는 Python 전용 API입니다.

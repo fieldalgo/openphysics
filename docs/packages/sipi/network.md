@@ -93,3 +93,5 @@ not implemented. The Python APIs do not add a website interface or alter the
 cross-section JSON schema.
 
 For layer-dependent dispersive extraction, see [dielectric models](dielectrics.md).
+
+[Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.

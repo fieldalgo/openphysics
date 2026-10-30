@@ -69,3 +69,5 @@ records and plans do not establish a current pass; resource observations are not
 - [Line-network analytical and independent-tool checks](../packages/sipi/network_validation.md)
 - [Tapered conductors and planar coating: contract and validation](../packages/sipi/manufacturing_sections.md)
 - [Dispersive dielectrics: analytical, independent-tool and mesh checks](../packages/sipi/dielectrics.md#validation-and-reproduction)
+
+- [Terminated networks: independent circuit and modal checks](../packages/sipi/termination.md)

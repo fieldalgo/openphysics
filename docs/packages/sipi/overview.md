@@ -213,3 +213,5 @@ Python 3.12, pinned environment.
 
 [One shared-mesh frequency-line model and input JSON](line_model.md) combines
 material and conductor extraction with RLGC/S.
+
+[Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.

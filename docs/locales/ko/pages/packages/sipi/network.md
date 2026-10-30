@@ -79,3 +79,5 @@ single-ended 내보내기만 지원합니다. mixed-mode 파일 출력, Touchsto
 단면 JSON 스키마를 변경하지는 않습니다.
 
 층별 주파수 분산 추출은 [유전체 모델](dielectrics.md)을 사용합니다.
+
+[종단 네트워크와 주파수 NEXT/FEXT](termination.md)는 소스/부하 임피던스를 명시적으로 받습니다.

@@ -57,3 +57,5 @@ Conductor resistance and internal inductance are not extracted by this API.
 
 [Frequency-line input JSON](../../docs/packages/sipi/line_model.md) combines geometry,
 material dispersion, explicit metal loss and RLGC/S on one shared mesh.
+
+[Terminated V/I and frequency crosstalk](../../docs/packages/sipi/termination.md) use explicit passive source/load impedances and named victim ports.
