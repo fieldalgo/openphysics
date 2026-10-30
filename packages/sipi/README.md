@@ -66,3 +66,5 @@ reuse one conforming geometry, with finite material extent and explicit outer bo
 read supported single-ended S samples without guessing port correspondence or extrapolating.
 
 [Terminated V/I and frequency crosstalk](../../docs/packages/sipi/termination.md) use explicit passive source/load impedances and named victim ports.
+
+[Saved circuit inputs](../../docs/packages/sipi/circuit_document.md) reproduce network extraction and source/load responses in one versioned JSON document.

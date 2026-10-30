@@ -77,3 +77,5 @@
 [Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).
 
 - [종단 네트워크: 독립 회로·모드 검증](../packages/sipi/termination.md)
+
+- [회로 입력 저장: 형상/네트워크·소스·부하·누화](../packages/sipi/circuit_document.md)

@@ -119,3 +119,5 @@ measurement agreement, a frequency bandwidth, or a new spatial discretization.
 Input network mesh/domain/material limitations still apply. Open loads, coupled
 termination networks, time-domain conversion, nonlinear drivers and vias are not
 implemented here. See the executable [coupled example](../../../examples/sipi/loaded_crosstalk.py).
+
+[Saved circuit inputs: extraction/network, sources, loads and crosstalk](circuit_document.md).

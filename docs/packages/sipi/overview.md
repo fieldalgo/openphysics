@@ -217,3 +217,5 @@ material and conductor extraction with RLGC/S.
 [Touchstone input and explicit network comparison](touchstone.md).
 
 [Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.
+
+[Saved circuit inputs: extraction/network, sources, loads and crosstalk](circuit_document.md).

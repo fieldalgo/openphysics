@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `sipi`: strict `sipi.circuit/1`에 RLGC/Touchstone 또는 형상 선로 문서와 소스/부하를 저장해 단자 응답·명시 누화를 재현합니다. [계약](packages/sipi/circuit_document.md).
+
 - `sipi`: 동일 기하의 유한 금속·유전체 선로에서 DC/AC RLGC·S를 추출하며 `sipi.volume-line/1` JSON과 명시적 유한 경계를 제공합니다. [계약](packages/sipi/volume_line.md).
 
 - `sipi`: 유한 금속 P1 전류 확산으로 DC부터 해상된 표피·근접 효과까지 계산합니다. DC 극한·전체 인덕턴스·보존 잔차와 CrossSection 부피 메시 adapter를 제공합니다. [계약과 검증](packages/sipi/conductor_diffusion.md).

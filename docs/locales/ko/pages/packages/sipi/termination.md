@@ -104,3 +104,5 @@ python examples/sipi/loaded_crosstalk.py
 아닙니다. 입력 네트워크의 메시/외곽/재료 한계를 유지합니다. 개방·결합 종단,
 시간영역 변환, 비선형 드라이버·via는 미구현입니다.
 [실행 가능한 결합선 예제](../../../../../../examples/sipi/loaded_crosstalk.py)를 참고하세요.
+
+[회로 입력 저장: 형상/네트워크·소스·부하·누화](circuit_document.md).

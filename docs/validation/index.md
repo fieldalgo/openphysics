@@ -77,3 +77,5 @@ records and plans do not establish a current pass; resource observations are not
 [Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
 
 - [Terminated networks: independent circuit and modal checks](../packages/sipi/termination.md)
+
+- [Saved circuit inputs: extraction/network, sources, loads and crosstalk](../packages/sipi/circuit_document.md)

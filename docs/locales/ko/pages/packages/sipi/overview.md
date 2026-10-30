@@ -183,3 +183,5 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 [Touchstone 입력과 명시적 네트워크 비교](touchstone.md).
 
 [종단 네트워크와 주파수 NEXT/FEXT](termination.md)는 소스/부하 임피던스를 명시적으로 받습니다.
+
+[회로 입력 저장: 형상/네트워크·소스·부하·누화](circuit_document.md).
