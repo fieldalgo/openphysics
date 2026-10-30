@@ -81,7 +81,7 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
 | [galerkin](packages/galerkin/overview.md) | 유한요소 해석기와 장 후처리 |
 | [galerkin-refsol](packages/galerkin-refsol/overview.md) | 독립 해석해와 출판된 benchmark. Python에서는 `refsol`로 import |
 | [meshine](packages/meshine/overview.md) | 재료 영역의 2D 삼각형 메시와 적층 사면체 메시 |
-| [meshloom](packages/meshloom/overview.md) | 정확 산술 컴파일 커널을 가진 사면체 메셔. 패키징 골격이며 메셔는 아직 없음 |
+| [meshloom](packages/meshloom/overview.md) | 정확 산술 컴파일 커널을 가진 사면체 메셔. 정확 술어와 Delaunay 커널만 있고 메셔는 아직 없음 |
 | [gmshio](packages/gmshio/overview.md) | 선택적 Gmsh 실행파일 연동, MSH reader와 메시 adapter |
 | [physmat](packages/physmat/overview.md) | 재료 물성, 광학 분산과 Drude–Lorentz fitting |
 | [simcase](packages/simcase/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
