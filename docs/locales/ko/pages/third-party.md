@@ -154,6 +154,7 @@ CI는 `torch`의 CPU 빌드를 `download.pytorch.org/whl/cpu`에서 설치하고
 | 배포판 | 용도 | SPDX |
 |---|---|---|
 | `build`, `pyproject-hooks`, `wheel`, `setuptools`, `pip` | 배포판 빌드·설치 | MIT |
+| `maturin` | meshloom 컴파일 커널 빌드, 배포하지 않음 | MIT OR Apache-2.0 |
 | `twine`, `id`, `readme-renderer`, `requests`, `requests-toolbelt`, `rfc3986` | `twine check --strict` | Apache-2.0 |
 | `docutils` | twine의 README 렌더링 | LicenseRef-Public-Domain AND BSD-2-Clause AND 0BSD(GPL 분류자는 휠에 없는 파일을 가리킴) |
 | `nh3`, `rich`, `markdown-it-py`, `mdurl`, `keyring`, `jaraco-classes`, `jaraco-context`, `jaraco-functools`, `more-itertools`, `jeepney`, `urllib3`, `charset-normalizer` | twine 의존성 | MIT |

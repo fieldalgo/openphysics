@@ -38,20 +38,33 @@ def sums(path, files=FILES):
 def test_local_requirements_name_every_wheel_by_url(tmp_path):
     version, requirements = install.local_requirements(wheels(tmp_path / "dist"))
     assert version == "0.1.0"
-    assert len(requirements) == 8
+    assert len(requirements) == len(install.DISTRIBUTIONS) == 9
     assert all(" @ file:" in r for r in requirements)
     assert [r for r in requirements if r.startswith("openphysics[studio,export,rii,sipi] @ ")]
     assert [r for r in requirements if r.startswith("galerkin-refsol @ ")]
 
 
-def test_local_requirements_need_all_seven_at_one_version(tmp_path):
-    with pytest.raises(SystemExit, match="expected one wheel"):
+def test_local_requirements_need_every_distribution_at_one_version(tmp_path):
+    with pytest.raises(SystemExit, match="expected wheels for each"):
         install.local_requirements(wheels(tmp_path / "a", names=install.DISTRIBUTIONS[:-1]))
     directory = wheels(tmp_path / "b")
     (directory / "simcase-0.1.0-py3-none-any.whl").unlink()
     (directory / "simcase-0.1.1-py3-none-any.whl").write_bytes(b"")
     with pytest.raises(SystemExit, match="different versions"):
         install.local_requirements(directory)
+
+
+def test_compiled_distribution_takes_the_wheel_this_interpreter_supports(tmp_path):
+    from packaging.tags import Tag
+    directory = wheels(tmp_path / "dist", names=[n for n in install.DISTRIBUTIONS if n != "meshloom"])
+    for tag in ("manylinux_2_17_x86_64", "macosx_11_0_arm64", "win_amd64"):
+        (directory / f"meshloom-0.1.0-cp312-abi3-{tag}.whl").write_bytes(b"")
+    linux = [Tag("cp312", "abi3", "manylinux_2_17_x86_64"), Tag("py3", "none", "any")]
+    _, requirements = install.local_requirements(directory, supported=linux)
+    assert [r for r in requirements if r.startswith("meshloom @ ") and r.endswith("manylinux_2_17_x86_64.whl")]
+    with pytest.raises(SystemExit, match="exactly one meshloom wheel"):
+        install.local_requirements(directory, supported=[Tag("cp312", "abi3", "musllinux_1_2_x86_64"),
+                                                         Tag("py3", "none", "any")])
 
 
 def fake_pypi(monkeypatch, listed):

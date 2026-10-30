@@ -12,21 +12,22 @@ import subprocess
 import sys
 
 
-for name in ("galerkin", "refsol", "meshine", "gmshio", "physmat", "simcase", "sipi"):
+for name in ("galerkin", "refsol", "meshine", "meshloom", "gmshio", "physmat", "simcase", "sipi"):
     module = importlib.import_module(name)
     path = Path(module.__file__).resolve()
     assert path.is_relative_to(Path(sys.prefix).resolve()), (name, path, sys.prefix)
     print(f"Installed import: {name} -> {path}", flush=True)
 
-for name in ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi",
+for name in ("galerkin", "galerkin-refsol", "meshine", "meshloom", "gmshio", "physmat", "simcase", "sipi",
              "openphysics"):
     dist = metadata.distribution(name)
     direct = json.loads(dist.read_text("direct_url.json") or "{}")
     assert not direct.get("dir_info", {}).get("editable"), name
     assert dist.read_text("LICENSE") or any(str(p).endswith("/LICENSE") for p in dist.files), name
 # The openphysics meta distribution ships no code and requires exactly the six
-# packages, in the same release series, plus the extras it forwards (sipi is one). packaging
-# is installed here as a matplotlib requirement.
+# packages (meshloom is not part of the default install yet), in the same release
+# series, plus the extras it forwards (sipi is one). packaging is installed here as a
+# matplotlib requirement.
 from packaging.requirements import Requirement  # noqa: E402
 
 meta = {}
