@@ -212,13 +212,25 @@ def surface_conductor_loss(section, frequency, *, conductivity, ground_thickness
     Integrated unit-current disagreement above 5% raises instead of returning
     an under-resolved surface-current result. R convergence is a separate check.
     """
+    samples = _surface_samples(section, frequency, conductivity, ground_thickness,
+                               relative_permeability, roughness_rms)
+    return _surface_from_mesh(section.mesh(**mesh_options), *samples)
+
+
+def _surface_samples(section, frequency, conductivity, ground_thickness,
+                     relative_permeability, roughness_rms):
+    """Validate all metal/geometry limits before meshing."""
     f, delta, correction, zs = _metal_samples(frequency,conductivity,relative_permeability,roughness_rms)
     ground_thickness = _scalar('ground_thickness',ground_thickness)
     minimum = min([ground_thickness,section.width] +
                   [min(t.thickness,t.width,t.top_width or t.width) for t in section.traces])
     if minimum <= 0 or np.max(delta) > minimum/5:
         raise ValueError('surface loss requires finite conductors and skin depth <= minimum conductor dimension / 5')
-    meshed = section.mesh(**mesh_options)
+    return f, delta, correction, zs
+
+
+def _surface_from_mesh(meshed, f, delta, correction, zs):
+    """Internal composition on the same mesh as the dielectric solve."""
     factors = surface_current_factors(meshed.mesh,meshed.signals,meshed.ground)
     if factors.current_error > .05:
         raise ValueError(f'surface-current flux error {factors.current_error:.3%} exceeds 5%; refine the mesh')

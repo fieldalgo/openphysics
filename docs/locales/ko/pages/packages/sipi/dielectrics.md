@@ -127,3 +127,5 @@ IEEE Transactions on Advanced Packaging 24(2), 191–196 (2001);
 A. R. Djordjevic 외, *Wideband frequency-domain characterization of FR-4 and
 time-domain causality*, IEEE Transactions on EMC 43(4), 662–667 (2001).
 독립 수식은 [scikit-rf MLine 구현](https://github.com/scikit-rf/scikit-rf/blob/v2.2.0/skrf/media/mline.py)에도 나옵니다.
+
+[공유 메시의 주파수 선로 입력](line_model.md)은 이 추출과 재료/도체 모델을 연결하고 전체 입력을 JSON으로 저장합니다.

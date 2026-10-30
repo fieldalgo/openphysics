@@ -62,3 +62,4 @@
 - [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)
 - [주파수 의존 유전체 모델·추출](../packages/sipi/dielectrics.md)
 - [고주파 도체 표면 손실](../packages/sipi/conductor.md)
+- [공유 메시의 주파수 선로 입력 모델](../packages/sipi/line_model.md)
