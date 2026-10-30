@@ -73,3 +73,5 @@ records and plans do not establish a current pass; resource observations are not
 - [Conductor diffusion: Bessel/DC references, mesh/domain convergence and independent assembly](../packages/sipi/conductor_diffusion.md#validation-and-limits)
 
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
+
+[Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
