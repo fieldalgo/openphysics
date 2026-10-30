@@ -132,8 +132,8 @@ SIPI requests `meshine.generate(candidate_order="stable")` so equal-radius refin
 - Conductor loss `R` (skin effect, surface roughness). `R` is not returned.
 - Frequency-dependent dielectrics (for example Djordjevic–Sarkar); `tan_delta`
   is constant.
-- S-parameters, Touchstone files, time-domain responses.
+- Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures: vias, plane resonances, power-delivery networks.
 - Layout import (Gerber, ODB++, IPC-2581), non-rectangular conductors in
-  `CrossSection`, JSON documents and a Studio view.
+  `CrossSection` and a Studio view. [Versioned cross-section JSON](design.md) is supported.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.

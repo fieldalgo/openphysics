@@ -28,6 +28,9 @@ import pytest
 
 SCHEMA = "openphysics.crosscheck/1"
 TOOLS = {
+    "scikit-rf": {"module": "skrf", "license": "BSD-3-Clause",
+                  "source": "https://github.com/scikit-rf/scikit-rf",
+                  "use": "imported in-process from the sipi[test] test extra"},
     # Exact versions come from the installed metadata at run time.
     "scikit-fem": {"module": "skfem", "license": "BSD-3-Clause",
                    "source": "https://github.com/kinnala/scikit-fem",

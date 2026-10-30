@@ -65,3 +65,5 @@
 - [내 계산의 수렴 확인하기](convergence.md)
 
 - [슬래브 해석해로 도파로 검증하기](slab-tutorial.md)
+
+- [전송선 네트워크 해석식·독립 도구 검증](../packages/sipi/network_validation.md)
