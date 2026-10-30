@@ -27,6 +27,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
 
+- `meshloom`: 커널의 첫 단계를 `meshloom._core`의 내부 구성 요소로 추가했습니다. 정확한 `orient3d`, `insphere`(점 번호 순서의 기호 섭동 포함), 평면 안 `incircle3d` 술어(부동소수점 필터 뒤 정확한 expansion), 점 집합의 Bowyer–Watson Delaunay 사면체 분할, 정확한 검증기입니다. 큰 정수·`Fraction` 행렬식과 비교했고 격자, 한 구 위의 점 껍질, 같은 평면 점 집합에서 확인했습니다. 기준 머신에서 균일한 점 10⁶개에 초당 16만 점입니다. [문서](packages/meshloom/overview.md#커널-구성-요소).
+
 - `meshloom`: OpenPhysics의 첫 컴파일 코드 배포판을, 계획한 정확 산술 사면체 메셔의 패키징 골격으로 새로 추가했습니다. 플랫폼마다(manylinux 2.17 x86_64·aarch64, macOS 11 x86_64·arm64, Windows x64) abi3 wheel 하나에 PyO3와 maturin으로 빌드한 Rust 커널이 들어 있습니다. `kernel_available()`과 `kernel_version()`이 커널을 알려 주고, `generate3d`는 `NotImplementedError`를 냅니다. wheel에는 정적으로 링크된 허용형 Rust crate와 표준 라이브러리의 `THIRD_PARTY_NOTICES`가 들어 있습니다. 릴리스·라이선스·배포 도구가 컴파일 wheel을 빌드하고 확인합니다. [문서](packages/meshloom/overview.md).
 - `sipi`: 동일 기하의 유한 금속·유전체 선로에서 DC/AC RLGC·S를 추출하며 `sipi.volume-line/1` JSON과 명시적 유한 경계를 제공합니다. [계약](packages/sipi/volume_line.md).
 

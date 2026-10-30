@@ -89,7 +89,7 @@ package has its own distribution, version, dependencies and license notices.
 | [galerkin](../packages/galerkin/README.md) | Finite-element engines and field postprocessing |
 | [galerkin-refsol](../packages/galerkin-refsol/README.md) | Independent analytical references and published benchmarks; import as `refsol` |
 | [meshine](../packages/meshine/README.md) | 2D triangle meshes for material regions, and layered tetrahedral meshes |
-| [meshloom](../packages/meshloom/README.md) | Tetrahedral mesher with a compiled exact-arithmetic kernel; packaging skeleton, no mesher yet |
+| [meshloom](../packages/meshloom/README.md) | Tetrahedral mesher with a compiled exact-arithmetic kernel; exact predicates and Delaunay kernel, no mesher yet |
 | [gmshio](../packages/gmshio/README.md) | Optional Gmsh executable integration, MSH reader and mesh adapters |
 | [physmat](../packages/physmat/README.md) | Material properties, optical dispersion and Drude–Lorentz fitting |
 | [simcase](../packages/simcase/README.md) | JSON documents, headless runner and optional local Studio |
