@@ -63,3 +63,5 @@
 - [주파수 의존 유전체 모델·추출](../packages/sipi/dielectrics.md)
 - [고주파 도체 표면 손실](../packages/sipi/conductor.md)
 - [공유 메시의 주파수 선로 입력 모델](../packages/sipi/line_model.md)
+
+[Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).

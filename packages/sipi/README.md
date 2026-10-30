@@ -42,7 +42,7 @@ Conductor resistance is a mandatory modelling input to those network functions.
 extracts signal/return R and internal L with explicit validity checks.
 
 Not implemented: interior conductor-current diffusion,
-Touchstone import, time-domain response, AC PDN impedance, vias, several layers
+time-domain response, AC PDN impedance, vias, several layers
 and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
@@ -57,3 +57,6 @@ Conductor resistance and internal inductance are not extracted by this API.
 
 [Frequency-line input JSON](../../docs/packages/sipi/line_model.md) combines geometry,
 material dispersion, explicit metal loss and RLGC/S on one shared mesh.
+
+[Touchstone input and explicit network comparison](../../docs/packages/sipi/touchstone.md)
+read supported single-ended S samples without guessing port correspondence or extrapolating.

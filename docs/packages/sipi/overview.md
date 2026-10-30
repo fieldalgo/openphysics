@@ -202,7 +202,7 @@ Python 3.12, pinned environment.
   are available separately; `analyze()` still returns external L and dielectric C/G.
 - Measured material fitting and geometric/full-wave dispersion.
   [Frequency-dependent dielectric models](dielectrics.md) are available separately.
-- Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
+- Time-domain responses. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
 - Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
@@ -213,3 +213,5 @@ Python 3.12, pinned environment.
 
 [One shared-mesh frequency-line model and input JSON](line_model.md) combines
 material and conductor extraction with RLGC/S.
+
+[Touchstone input and explicit network comparison](touchstone.md).

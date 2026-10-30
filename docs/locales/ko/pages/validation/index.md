@@ -69,3 +69,5 @@
 - [전송선 네트워크 해석식·독립 도구 검증](../packages/sipi/network_validation.md)
 - [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)
 - [분산 유전체: 해석식·독립 도구·메시 검증](../packages/sipi/dielectrics.md#검증과-재현)
+
+[Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).

@@ -41,3 +41,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 
 [Build a model](../modeling/index.md) · [Results and trust](../results/index.md) · [All physics](index.md)
+
+[Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
