@@ -30,6 +30,8 @@ line.C, line.L, line.G(1e9)           # F/m, H/m, S/m 행렬
 
 [템플릿·JSON 문서·목표 임피던스 설계](design.md).
 
+[상관 공차 분석과 고정 피치 샘플링](study.md).
+
 ## 계산하는 양
 
 도체는 z 방향으로 뻗고 단면이 파장보다 작으므로 선로는 준TEM(quasi-TEM) 파를 전달합니다. 신호 도체가

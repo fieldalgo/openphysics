@@ -27,6 +27,8 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 ## Python contracts and formulations
 
+- [Correlated tolerance studies and fixed-pitch sampling](../packages/sipi/study.md)
+
 - [Vacuum rectangular PEC cavity solver](../packages/galerkin/cavity_solver.md)
 - [Material-loaded rectangular cavity solver](../packages/galerkin/material_cavity.md)
 - [Vector eigenspace reliability](../packages/galerkin/eigenspace_reliability.md)

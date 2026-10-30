@@ -112,3 +112,5 @@ print(result.parameter, result.impedance, result.refined_impedance)
 Linux, Python 3.12.14, NumPy 2.5.4, SciPy 1.18.1에서 47개 시험이 통과했습니다.
 다른 플랫폼과 설치 패키지 수락은 필수 CI에서 별도로 다룹니다. 기존 물리 참조 허용값은 그대로입니다.
 새 외부 의존성은 없으며 템플릿 동등성만으로 공면 구조 물리가 독립 검증됐다고 주장하지 않습니다.
+
+[상관 공차 분석과 고정 피치 샘플링](study.md).
