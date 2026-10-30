@@ -51,6 +51,10 @@ COMPILED = {
     "meshloom": dict(files=("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "THIRD_PARTY_NOTICES"),
                      sources="rust", extension=re.compile(r"meshloom/_kernel\.(abi3\.so|pyd)")),
 }
+# Platform tags of the compiled wheels a release publishes, one wheel each
+# (release.yml builds them from the sdist; --assemble checks the set).
+RELEASE_PLATFORMS = ("manylinux_2_17_x86_64", "manylinux_2_17_aarch64", "macosx_11_0_x86_64",
+                     "macosx_11_0_arm64", "win_amd64")
 
 
 def run(*args, cwd, env=None):
@@ -205,14 +209,56 @@ def check_wheel(wheel):
             for path, relative in sorted(code.items())}
 
 
+def assemble(output, kernels):
+    """Replace the locally built compiled wheels in output by the release's platform wheels.
+
+    Each wheel in ``kernels`` must belong to a COMPILED distribution at the version of its
+    sdist in output, pass check_wheel and twine, and the platforms must be exactly
+    RELEASE_PLATFORMS for every compiled distribution. SHA256SUMS is rewritten.
+    """
+    sdists = {parse_sdist_filename(p.name)[0]: parse_sdist_filename(p.name)[1] for p in output.glob("*.tar.gz")}
+    for name in COMPILED:
+        for local in output.glob(f"{name.replace('-', '_')}-*.whl"):
+            local.unlink()
+    found = {name: set() for name in COMPILED}
+    copied = []
+    for wheel in sorted(Path(kernels).rglob("*.whl")):
+        name, version, _, tags = parse_wheel_filename(wheel.name)
+        if name not in found or sdists.get(name) != version:
+            raise RuntimeError(f"{wheel.name}: not a compiled distribution at its sdist's version")
+        # manylinux2014_<arch> is the legacy alias of manylinux_2_17_<arch> in a compressed tag set.
+        platforms = {t.platform.replace("manylinux2014_", "manylinux_2_17_") for t in tags}
+        if len(platforms) != 1 or not platforms <= set(RELEASE_PLATFORMS) or platforms & found[name]:
+            raise RuntimeError(f"{wheel.name}: platform {sorted(platforms)} is not one new release platform")
+        found[name] |= platforms
+        target = output / wheel.name
+        shutil.copy2(wheel, target)
+        check_wheel(target)
+        copied.append(target)
+    for name, platforms in found.items():
+        if platforms != set(RELEASE_PLATFORMS):
+            raise RuntimeError(f"{name}: missing release wheels for {sorted(set(RELEASE_PLATFORMS) - platforms)}")
+    run(sys.executable, "-m", "twine", "check", "--strict", *copied, cwd=ROOT)
+    artifacts = sorted(output.glob("*.whl")) + sorted(output.glob("*.tar.gz"))
+    (output / "SHA256SUMS").write_text("".join(
+        f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in artifacts))
+    print(f"Assembled {len(artifacts)} release files ({len(copied)} compiled wheels); artifacts: {output}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".validation" / "dist")
     parser.add_argument("--build-only", action="store_true",
                         help="stop after building, twine check and the content checks; "
                              "the release workflow uses this to build what it uploads")
+    parser.add_argument("--assemble", type=Path, metavar="KERNELS",
+                        help="after a --build-only run into --output: replace the compiled wheels by the "
+                             "release platform wheels found under KERNELS and rewrite SHA256SUMS")
     args = parser.parse_args()
     output = args.output.resolve()
+    if args.assemble:
+        assemble(output, args.assemble.resolve())
+        return
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         parser.error("output must be empty to prevent stale distributions from passing validation")
