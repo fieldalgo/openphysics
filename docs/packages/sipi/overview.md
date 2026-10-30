@@ -203,6 +203,6 @@ Python 3.12, pinned environment.
 - Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
-- Layout import (Gerber, ODB++, IPC-2581), non-rectangular conductors in
-  `CrossSection` and a Studio view. [Versioned cross-section JSON](design.md) is supported.
+- Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
+  `CrossSection` and a Studio view. [Centred trapezoids, planar coatings and JSON v2](manufacturing_sections.md) are supported.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.
