@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 정상 열에 `coordinate_system="axisymmetric"` 전체 회전 (r,z) 적분을 추가했습니다. core 조립을 재사용하고 결과 metadata로 W와 Cartesian W/m를 구분합니다. 축 정칙성·해석해·수렴 검사를 포함합니다. [문서](packages/galerkin/thermal_axisymmetric.md).
 - `sipi`: 유한 금속 P1 전류 확산으로 DC부터 해상된 표피·근접 효과까지 계산합니다. DC 극한·전체 인덕턴스·보존 잔차와 CrossSection 부피 메시 adapter를 제공합니다. [계약과 검증](packages/sipi/conductor_diffusion.md).
 
 - `simcase`: simcase가 galerkin의 공개 이름만 import하는지 시험이 확인합니다. `galerkin.core`와 밑줄 이름은 쓰지 않습니다. 목록에 적힌 예외는 정상 경계 계약의 사각형 메시 검사 하나이며, galerkin에 공개 메시 검사가 생기면 없앱니다.
