@@ -166,11 +166,14 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 
 ## 구현하지 않은 것
 
-- 도체 손실 `R`(표피효과, 표면 거칠기). `R`은 반환하지 않습니다.
-- 주파수 의존 유전체(예: Djordjevic–Sarkar). `tan_delta`는 상수입니다.
+- 금속 부피 전류와 유전체 추출 경계의 자동 일치. 기본 준정적 결과는 여전히
+  도체 R을 반환하지 않으며 별도 [부피 전류 계약](conductor_diffusion.md)을 사용합니다.
+  [주파수 의존 유전체 추출](dielectrics.md)은 별도로 제공합니다.
 - 시간 영역 응답과 Touchstone 불러오기. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
 - 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
 
 [주파수 의존 유전체 모델·추출](dielectrics.md).
+
+[DC·AC 금속 내부 전류 확산과 유한 귀환 판](conductor_diffusion.md).

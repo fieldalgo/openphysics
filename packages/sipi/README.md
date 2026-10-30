@@ -37,11 +37,10 @@ annulus and two-pad references.
 
 [Uniform-line networks](../../docs/packages/sipi/network.md) convert explicit RLGC
 to 2N-port S, differential/common waves and single-ended Touchstone 2.0 output.
-Conductor resistance is a mandatory modelling input, not extracted from the geometry.
+Conductor resistance must be supplied explicitly to this network API.
 
-Not implemented: conductor-loss extraction, frequency-dependent dielectrics,
-Touchstone import, time-domain response, AC PDN impedance, vias, several layers
-and layout import.
+Not implemented: Touchstone import, time-domain response, AC PDN impedance,
+vias, several layers and layout import.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
@@ -52,3 +51,5 @@ tapered inputs use strict JSON v2. Arbitrary mask profiles are not implemented.
 Frequency-dependent dielectric models and fixed-mesh extraction are available in
 `sipi.dielectric`; see the [contract and validation](../../docs/packages/sipi/dielectrics.md).
 Conductor resistance and internal inductance are not extracted by this API.
+
+[DC/AC metal-volume current diffusion](../../docs/packages/sipi/conductor_diffusion.md) extracts R and total L from finite metal regions, with an explicit magnetic boundary and skin-depth resolution gate. Automatic dielectric matching is not provided.

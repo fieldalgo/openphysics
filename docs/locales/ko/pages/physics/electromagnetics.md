@@ -21,7 +21,7 @@
 
 ## PCB 전송선(신호·전원 무결성)
 
-- [sipi — 준정적 PCB 단면: C, L, G, 임피던스와 결합선 모드](../packages/sipi/overview.md). Python API와 [균일 전송선 네트워크](../packages/sipi/network.md)가 있으며 명시한 RLGC로 S·Touchstone 출력을 계산합니다. 도체 손실 추출과 3D 구조는 미구현입니다.
+- [sipi — 준정적 PCB 단면: C, L, G, 임피던스와 결합선 모드](../packages/sipi/overview.md). Python API와 [균일 전송선 네트워크](../packages/sipi/network.md)가 있으며 명시한 RLGC로 S·Touchstone 출력을 계산합니다. [유한 금속 전류 확산](../packages/sipi/conductor_diffusion.md)은 자기 경계를 명시하여 직렬 R/L을 추출합니다. 3D 구조는 미구현입니다.
 
 ## Python 계약과 수식
 
@@ -43,3 +43,5 @@
 [모델 구성](../modeling/index.md) · [결과와 신뢰성](../results/index.md) · [전체 물리 문제](index.md)
 
 SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/sipi/design.md)도 제공합니다.
+
+[SIPI DC·AC 도체 내부 전류 확산](../packages/sipi/conductor_diffusion.md)은 유한 금속 부피와 자기 경계를 명시합니다. 유전체 기하 일치는 별도 계약입니다.

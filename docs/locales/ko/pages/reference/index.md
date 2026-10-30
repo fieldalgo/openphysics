@@ -61,3 +61,5 @@
 - [균일 전송선 RLGC·S·Touchstone](../packages/sipi/network.md)
 - [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)
 - [주파수 의존 유전체 모델·추출](../packages/sipi/dielectrics.md)
+
+- [DC·AC 도체 부피 메시, 전류 확산과 잔차](../packages/sipi/conductor_diffusion.md)
