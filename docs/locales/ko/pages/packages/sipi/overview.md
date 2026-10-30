@@ -166,9 +166,6 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 
 ## 구현하지 않은 것
 
-- 금속 부피 전류와 유전체 추출 경계의 자동 일치. 기본 준정적 결과는 여전히
-  도체 R을 반환하지 않으며 별도 [부피 전류 계약](conductor_diffusion.md)을 사용합니다.
-  [주파수 의존 유전체 추출](dielectrics.md)은 별도로 제공합니다.
 - 실측 재료 추정과 형상/전파 분산.
 - 시간 영역 응답과 Touchstone 불러오기. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
@@ -180,3 +177,5 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 [공유 메시의 주파수 선로 모델·입력 JSON](line_model.md)은 재료·도체 추출을 RLGC/S와 연결합니다.
 
 [DC·AC 금속 내부 전류 확산과 유한 귀환 판](conductor_diffusion.md).
+
+[동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](volume_line.md).

@@ -71,3 +71,5 @@ records and plans do not establish a current pass; resource observations are not
 - [Dispersive dielectrics: analytical, independent-tool and mesh checks](../packages/sipi/dielectrics.md#validation-and-reproduction)
 
 - [Conductor diffusion: Bessel/DC references, mesh/domain convergence and independent assembly](../packages/sipi/conductor_diffusion.md#validation-and-limits)
+
+[Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
