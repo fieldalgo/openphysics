@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Rectangular PCB cross-section templates. All lengths are in metres."""
+"""PCB cross-section templates with rectangular or tapered signal conductors. All lengths are in metres."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from numbers import Real
 
 from .crosssection import CrossSection, Layer, Trace
 
-__all__ = ['microstrip', 'stripline', 'coupled_microstrip', 'grounded_coplanar']
+__all__ = ['microstrip', 'stripline', 'coupled_microstrip', 'grounded_coplanar', 'coated_microstrip']
 
 
 def _positive(name, value, *, zero=False):
@@ -32,15 +32,15 @@ def _surface(width, substrate_height, eps_r, thickness, tan_delta, air_height, b
 
 
 def microstrip(*, width, substrate_height, eps_r, thickness=0.0, tan_delta=0.0,
-               air_height=None, box_width=None):
+               air_height=None, box_width=None, top_width=None):
     """One surface trace above a grounded substrate; open top and side walls."""
     w, h, t, box, layers = _surface(width, substrate_height, eps_r, thickness,
                                    tan_delta, air_height, box_width)
-    return CrossSection(layers, [Trace('signal', 0.0, w, h, t)], box)
+    return CrossSection(layers, [Trace('signal', 0.0, w, h, t, top_width=top_width)], box)
 
 
 def stripline(*, width, plane_spacing, eps_r, thickness=0.0, tan_delta=0.0,
-              box_width=None):
+              box_width=None, top_width=None):
     """Trace centred between two ground planes in a homogeneous dielectric.
 
     plane_spacing is the full distance between the planes, including copper.
@@ -51,11 +51,11 @@ def stripline(*, width, plane_spacing, eps_r, thickness=0.0, tan_delta=0.0,
     box = max(12*b, 4*w) if box_width is None else _positive('box_width', box_width)
     return CrossSection([Layer('dielectric', b, _positive('eps_r', eps_r),
                                _positive('tan_delta', tan_delta, zero=True))],
-                        [Trace('signal', 0.0, w, (b-t)/2, t)], box, top='ground')
+                        [Trace('signal', 0.0, w, (b-t)/2, t, top_width=top_width)], box, top='ground')
 
 
 def coupled_microstrip(*, width, gap, substrate_height, eps_r, thickness=0.0,
-                       tan_delta=0.0, air_height=None, box_width=None):
+                       tan_delta=0.0, air_height=None, box_width=None, top_width=None):
     """Equal-width surface pair with edge-to-edge gap and a bottom ground."""
     gap = _positive('gap', gap)
     w, h, t, box, layers = _surface(width, substrate_height, eps_r, thickness,
@@ -63,12 +63,12 @@ def coupled_microstrip(*, width, gap, substrate_height, eps_r, thickness=0.0,
     if box_width is None:
         box = max(box, 4*(2*w+gap))
     offset = (w+gap)/2
-    return CrossSection(layers, [Trace('positive', -offset, w, h, t),
-                                Trace('negative', offset, w, h, t)], box)
+    return CrossSection(layers, [Trace('positive', -offset, w, h, t, top_width=top_width),
+                                Trace('negative', offset, w, h, t, top_width=top_width)], box)
 
 
 def grounded_coplanar(*, width, gap, ground_width, substrate_height, eps_r,
-                     thickness=0.0, tan_delta=0.0, air_height=None, box_width=None):
+                     thickness=0.0, tan_delta=0.0, air_height=None, box_width=None, top_width=None):
     """Surface signal with finite coplanar grounds and a bottom ground plane.
 
     gap is the edge-to-edge signal/ground spacing on each side. ground_width
@@ -81,6 +81,27 @@ def grounded_coplanar(*, width, gap, ground_width, substrate_height, eps_r,
     if box_width is None:
         box = max(box, w+2*gap+2*gw+4*h)
     offset = (w+gw)/2+gap
-    return CrossSection(layers, [Trace('signal', 0.0, w, h, t),
+    return CrossSection(layers, [Trace('signal', 0.0, w, h, t, top_width=top_width),
                                 Trace('ground_left', -offset, gw, h, t, ground=True),
                                 Trace('ground_right', offset, gw, h, t, ground=True)], box)
+
+
+def coated_microstrip(*, width, substrate_height, eps_r, coating_height,
+                      coating_eps_r, thickness=0.0, tan_delta=0.0,
+                      coating_tan_delta=0.0, air_height=None, box_width=None,
+                      top_width=None):
+    """Surface trace in a planar dielectric coating, with air above it.
+
+    coating_height is measured from the substrate surface and must exceed the
+    conductor thickness. Thus the coating fills both sides and the space above
+    the trace up to a flat surface. It is not a conformal or meniscus mask model.
+    """
+    w, h, t, box, layers = _surface(width, substrate_height, eps_r, thickness,
+                                   tan_delta, air_height, box_width)
+    height = _positive('coating_height', coating_height)
+    if height <= t:
+        raise ValueError('coating_height must exceed the conductor thickness')
+    coating = Layer('coating', height, _positive('coating_eps_r', coating_eps_r),
+                    _positive('coating_tan_delta', coating_tan_delta, zero=True))
+    return CrossSection([layers[0], coating, layers[1]],
+                        [Trace('signal', 0.0, w, h, t, top_width=top_width)], box)

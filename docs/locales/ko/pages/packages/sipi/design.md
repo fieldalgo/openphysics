@@ -31,6 +31,10 @@
 `positive`, `negative`, 공면 접지 이름은 `ground_left`, `ground_right`입니다.
 층 이름은 `substrate`, `air` 또는 `dielectric`입니다.
 
+기존4템플릿은 `top_width`도 받으며 `sipi.templates.coated_microstrip`은 평탄 코팅을 더합니다.
+[제조 형상과 JSONv2](manufacturing_sections.md)에 형상·간격·스키마 변경을 정의합니다.
+v2에서는 모든 도체에 필수 `top_width`를 추가하며, 아래 표의 도체 필드는 기존v1 기준입니다.
+
 ## 입력 문서
 
 ```python
@@ -48,7 +52,7 @@ JSON 최상위에는 아래 필드가 모두 필요하며 다른 필드는 허�
 
 | 필드 | 계약 |
 |---|---|
-| `schema` | `"sipi.cross-section/1"` |
+| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"` |
 | `length_unit` | `"m"`; 암묵적 단위 변환 없음 |
 | `layers` | 비어 있지 않은 순서 있는 `{name, thickness, eps_r, tan_delta}` 배열 |
 | `traces` | 비어 있지 않은 순서 있는 `{name, x, width, y, thickness, ground}` 배열 |

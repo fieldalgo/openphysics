@@ -67,3 +67,4 @@
 - [슬래브 해석해로 도파로 검증하기](slab-tutorial.md)
 
 - [전송선 네트워크 해석식·독립 도구 검증](../packages/sipi/network_validation.md)
+- [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)
