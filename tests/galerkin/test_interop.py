@@ -76,6 +76,24 @@ def test_volume_mesh_from_gmshio():
     assert len(mesh.boundary_faces()) == int((count == 1).sum())
 
 
+def test_volume_mesh_from_meshine():
+    """Gmsh-free twin of the gmshio volume test: a box extruded by meshine."""
+    from meshine import Domain, box_sides, extrude, generate, rectangle
+    d = Domain(size=0.25)
+    d.add_region("cavity", rectangle(0, 0, 1.0, 0.8))
+    fem = extrude(generate(d, box_sides(0, 1.0, 0, 0.8)), [0.0, 0.6], size=0.25)
+    mesh = from_mesher(fem)
+    assert mesh.nodes.shape[1] == 3
+    assert mesh.num_tets == len(fem.tetrahedra)
+    assert abs(mesh.volumes().sum() - 1.0 * 0.8 * 0.6) < 1e-9
+    assert (mesh.volumes() > 0).all(), "the adapter must leave orientations valid"
+    assert set(mesh.boundary) == set(fem.boundary_faces)
+
+    # boundary faces really are the surface: every one belongs to a single tet
+    _, count = mesh.faces()
+    assert len(mesh.boundary_faces()) == int((count == 1).sum())
+
+
 def test_adapter_accepts_a_plain_dict_of_arrays():
     """Nothing about the adapter should depend on a particular class."""
     nodes = np.array([[0., 0], [1, 0], [0, 1], [1, 1]])
