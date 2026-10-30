@@ -73,6 +73,7 @@ What each package implements, and its limits, is in the
 
 - `galerkin`: steady heat and steady electric conduction accept JAX or PyTorch values for conductivity, heat source, Dirichlet and reference potentials and boundary data, and return results in that library with derivatives (reverse mode, through an adjoint sparse solve). NumPy results are unchanged. Solvers that do not differentiate yet refuse JAX and PyTorch values instead of silently dropping the derivative. [Documentation](docs/packages/galerkin/differentiation.md).
 
+- `sipi`: add passive dielectric relaxation/table models, strict material JSON and fixed-mesh frequency-dependent complex C/G extraction. [Contract and validation](docs/packages/sipi/dielectrics.md).
 - `sipi`: uniform-line 2N-port S from explicit RLGC, differential/common conversion and single-ended Touchstone 2.0 export. The cross-section bridge reuses C/L/G and requires explicit R; conductor-loss extraction remains unimplemented. [Contract](docs/packages/sipi/network.md).
 - `sipi`: exact centred trapezoidal conductors, planar-coated microstrip and strict JSON v2 while preserving rectangular v1 inputs and meshing. [Contract and validation](docs/packages/sipi/manufacturing_sections.md).
 - `sipi`: add four rectangular cross-section templates, strict `sipi.cross-section/1` JSON input snapshots, resolved mesh settings and bounded impedance design with a separate refinement check. [Contract](docs/packages/sipi/design.md).

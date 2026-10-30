@@ -89,3 +89,5 @@ Only single-ended export is supported. Mixed-mode export, Touchstone import,
 measurement overlay, time-domain conversion and a general circuit solver are
 not implemented. The Python APIs do not add a website interface or alter the
 cross-section JSON schema.
+
+For layer-dependent dispersive extraction, see [dielectric models](dielectrics.md).

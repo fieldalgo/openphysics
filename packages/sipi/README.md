@@ -48,3 +48,7 @@ Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 [Centred trapezoidal conductors and planar coatings](../../docs/packages/sipi/manufacturing_sections.md)
 use actual polygonal geometry. Rectangular inputs retain the original mesh and JSON v1;
 tapered inputs use strict JSON v2. Arbitrary mask profiles are not implemented.
+
+Frequency-dependent dielectric models and fixed-mesh extraction are available in
+`sipi.dielectric`; see the [contract and validation](../../docs/packages/sipi/dielectrics.md).
+Conductor resistance and internal inductance are not extracted by this API.

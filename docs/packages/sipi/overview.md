@@ -206,3 +206,5 @@ Python 3.12, pinned environment.
 - Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
   `CrossSection` and a Studio view. [Centred trapezoids, planar coatings and JSON v2](manufacturing_sections.md) are supported.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.
+
+[Frequency-dependent dielectric models and extraction](dielectrics.md).

@@ -73,6 +73,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `galerkin`: 정상 열전도와 정상 전기 전도가 전도도, 열원, Dirichlet·기준 전위, 경계 데이터에 JAX나 PyTorch 값을 받고, 결과를 그 라이브러리로 미분과 함께 돌려줍니다(adjoint 희소 풀이를 통한 역방향 모드). NumPy 결과는 바뀌지 않습니다. 아직 미분하지 않는 solver는 미분을 조용히 버리지 않고 JAX·PyTorch 값을 거부합니다. [문서](packages/galerkin/differentiation.md).
 
+- `sipi`: 수동 유전체 완화/표 모델, 엄격 재료 JSON, 동일 메시의 주파수별 복소 C/G 추출. [계약·검증](packages/sipi/dielectrics.md).
 - `sipi`: 명시한 RLGC의 균일 전송선 2N포트 S, 차동/공통 변환, single-ended Touchstone 2.0 출력을 추가했습니다. 단면 C/L/G를 재사용하고 R을 필수로 받습니다. 도체 손실 추출은 미구현입니다. [계약](packages/sipi/network.md).
 - `sipi`: 중심정렬 사다리꼴 도체의 실제 메시, 평탄 코팅 microstrip, 기존 v1을 보존하는 엄격 JSONv2를 추가했습니다. [계약·검증](packages/sipi/manufacturing_sections.md).
 - `sipi`: 직사각형 단면 템플릿 4종, 엄격한 `sipi.cross-section/1` JSON 입력, 메시 설정 해석과 별도 세분 검사를 포함한 제한 있는 목표 임피던스 설계를 추가했습니다. [계약](packages/sipi/design.md).
