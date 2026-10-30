@@ -113,3 +113,5 @@ test extra를 설치한 환경에서 관련 검증을 실행합니다:
 ```sh
 OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q tests/sipi/test_conductor.py
 ```
+
+[공유 메시의 주파수 선로 입력](line_model.md)은 이 추출과 재료/도체 모델을 연결하고 전체 입력을 JSON으로 저장합니다.

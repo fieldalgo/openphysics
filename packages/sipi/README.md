@@ -41,7 +41,7 @@ Conductor resistance is a mandatory modelling input to those network functions.
 [High-frequency surface loss](../../docs/packages/sipi/conductor.md) separately
 extracts signal/return R and internal L with explicit validity checks.
 
-Not implemented: interior conductor-current diffusion, frequency-dependent dielectrics,
+Not implemented: interior conductor-current diffusion,
 Touchstone import, time-domain response, AC PDN impedance, vias, several layers
 and layout import.
 
@@ -54,3 +54,6 @@ tapered inputs use strict JSON v2. Arbitrary mask profiles are not implemented.
 Frequency-dependent dielectric models and fixed-mesh extraction are available in
 `sipi.dielectric`; see the [contract and validation](../../docs/packages/sipi/dielectrics.md).
 Conductor resistance and internal inductance are not extracted by this API.
+
+[Frequency-line input JSON](../../docs/packages/sipi/line_model.md) combines geometry,
+material dispersion, explicit metal loss and RLGC/S on one shared mesh.
