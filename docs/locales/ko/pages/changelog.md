@@ -28,6 +28,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `simcase`: `export_fields`가 재료와 손실 벽이 있는 공진기(`cavity3d-edge-complex-v1`)도 씁니다. VTK에는 복소 배열이 없으므로 모드마다 사면체 셀 데이터 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(저장된 정규화와 `exp(+j*omega*t)` 규약)로, 재료는 `tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로 내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 진공 공진기 내보내기와 다른 모든 VTU는 바이트까지 그대로이며, `em.modes2d` 결과만 여전히 거절합니다. [문서](packages/simcase/cavity3d.md).
 - SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
+- `sipi`: strict `sipi.circuit/1`에 RLGC/Touchstone 또는 형상 선로 문서와 소스/부하를 저장해 단자 응답·명시 누화를 재현합니다. [계약](packages/sipi/circuit_document.md).
 
 - `meshloom`: 커널의 첫 단계를 `meshloom._core`의 내부 구성 요소로 추가했습니다. 정확한 `orient3d`, `insphere`(점 번호 순서의 기호 섭동 포함), 평면 안 `incircle3d` 술어(부동소수점 필터 뒤 정확한 expansion), 점 집합의 Bowyer–Watson Delaunay 사면체 분할, 정확한 검증기입니다. 큰 정수·`Fraction` 행렬식과 비교했고 격자, 한 구 위의 점 껍질, 같은 평면 점 집합에서 확인했습니다. 기준 머신에서 균일한 점 10⁶개에 초당 16만 점입니다. [문서](packages/meshloom/overview.md#커널-구성-요소).
 
