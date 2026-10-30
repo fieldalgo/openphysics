@@ -35,11 +35,16 @@
       "test (extras named in test_extras) and tool: permissive, or weak copyleft when the entry sets test_only",
       "GPL: only entries with external_process (a separate process, as a reference tool or an optional backend); never a base runtime requirement, and first-party code must not import them",
       "never_families (AGPL and other network copyleft): any identifier of the family (every version, deprecated ids, '+' forms and LicenseRef- names) in an entry, a bundled_files record or installed metadata is rejected in every environment, also as an external process",
-      "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; a record needs a review unless its expression is satisfied by permissive plus bundled_permissive (reviewed permissive ids accepted only for bundled files) and names no copyleft license; first-party distributions contain no native files",
+      "bundled_files: every shared library a third-party distribution installs, other than its own Python extension modules, must match a glob recorded for the current OS; a record needs a review unless its expression is satisfied by permissive plus bundled_permissive (reviewed permissive ids accepted only for bundled files) and names no copyleft license; first-party distributions contain no native files except the extensions listed under first_party_compiled",
       "bundled_files of entries without external_process load into the OpenPhysics process: a GPL term passes only with a listed runtime exception (runtime_exceptions) or inside an OR with another option"
     ]
   },
-  "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "openphysics", "physmat", "simcase", "sipi"],
+  "first_party": ["galerkin", "galerkin-refsol", "gmshio", "meshine", "meshloom", "openphysics", "physmat", "simcase", "sipi"],
+  "first_party_compiled": {
+    "meshloom": {"extension": ["meshloom/_kernel.abi3.so", "meshloom/_kernel.pyd"], "notices": "THIRD_PARTY_NOTICES",
+                 "linked": "Rust crates pyo3, pyo3-ffi, libc, once_cell and the Rust standard library, statically; every component offers a permissive license. tools/build_meshloom_notices.py generates THIRD_PARTY_NOTICES from Cargo and the toolchain's rust-src and refuses anything else.",
+                 "review": "Compiled code is allowed in meshloom only, with permissive components only and no third-party C/C++ code; redistribution follows the checklist without a separate legal review (project owner, 2026-10-29 and 2026-10-30)."}
+  },
   "external_tools": {
     "ngsolve": {
       "spdx": "LGPL-2.1-only",
@@ -116,6 +121,8 @@
     "kiwisolver": {"spdx": "BSD-3-Clause", "url": "https://github.com/nucleic/kiwi"},
     "markdown-it-py": {"spdx": "MIT", "url": "https://github.com/executablebooks/markdown-it-py"},
     "markupsafe": {"spdx": "BSD-3-Clause", "url": "https://github.com/pallets/markupsafe/", "review": "Required by jinja2 (galerkin[torch])."},
+    "maturin": {"spdx": "MIT OR Apache-2.0", "url": "https://github.com/PyO3/maturin",
+                "bundled": "The maturin build tool, a statically linked Rust executable (its crates under MIT, Apache-2.0 and other permissive terms). Builds meshloom; nothing of it is shipped."},
     "matplotlib": {"spdx": "LicenseRef-Matplotlib", "url": "https://matplotlib.org/stable/project/license.html",
                    "review": "PSF-based permissive license agreement; no SPDX identifier exists for it.",
                    "bundled": "Extension modules statically include FreeType (FTL OR GPL-2.0-or-later, FTL relied on), HarfBuzz (MIT-Modern-Variant), libraqm (MIT), SheenBidi (Apache-2.0) and Qhull (Qhull license); data files include fonts under OFL-1.1 (STIX, Last Resort), the BaKoMa Fonts Licence, Bitstream Vera terms (DejaVu) and Adobe AFM terms. No separate shared libraries."},

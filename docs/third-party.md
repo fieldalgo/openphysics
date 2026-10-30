@@ -174,6 +174,7 @@ which are Apache-2.0 packages of this repository.
 | Distribution | Purpose | SPDX |
 |---|---|---|
 | `build`, `pyproject-hooks`, `wheel`, `setuptools`, `pip` | Build and install distributions | MIT |
+| `maturin` | Build meshloom's compiled kernel; not shipped | MIT OR Apache-2.0 |
 | `twine`, `id`, `readme-renderer`, `requests`, `requests-toolbelt`, `rfc3986` | `twine check --strict` | Apache-2.0 |
 | `docutils` | README rendering in twine | LicenseRef-Public-Domain AND BSD-2-Clause AND 0BSD (its GPL classifier covers files that are not in the wheel) |
 | `nh3`, `rich`, `markdown-it-py`, `mdurl`, `keyring`, `jaraco-classes`, `jaraco-context`, `jaraco-functools`, `more-itertools`, `jeepney`, `urllib3`, `charset-normalizer` | twine dependencies | MIT |

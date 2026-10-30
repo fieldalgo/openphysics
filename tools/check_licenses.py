@@ -35,7 +35,8 @@ is an ``external_process`` tool, a GPL term must offer another option
 (``FTL OR GPL-2.0-or-later``) or carry a runtime exception listed under
 ``runtime_exceptions`` (``WITH GCC-exception-3.1``). Statically linked code is
 not visible this way and is reviewed by hand. First-party distributions must
-contain no native files at all.
+contain no native files, except the extension modules listed under
+``first_party_compiled``, which must also ship their ``THIRD_PARTY_NOTICES``.
 
 Use ``--python`` to inspect another interpreter's environment, e.g. a fresh
 venv holding the installed wheels.
@@ -340,6 +341,7 @@ def check(paths, inventory, check_docs=True, platform=None):
     weak = set(policy["weak_copyleft"])
     never = never_pattern(policy["never_families"])
     first_party = {canonicalize_name(n) for n in inventory["first_party"]}
+    compiled_allowed = {canonicalize_name(k): v for k, v in inventory.get("first_party_compiled", {}).items()}
     entries = {canonicalize_name(k): v for k, v in inventory["distributions"].items()}
     dists = {}
     for dist in metadata.distributions(path=paths):
@@ -359,9 +361,17 @@ def check(paths, inventory, check_docs=True, platform=None):
             declared = expression or short
             if declared != "Apache-2.0":
                 errors.append(f"{name}: first-party metadata must declare Apache-2.0, found {declared!r}")
-            if compiled := native_files(dist, COMPILED):
-                errors.append(f"{name}: first-party distribution contains native files {compiled}; "
+            allowed = compiled_allowed.get(name, {})
+            compiled = native_files(dist, COMPILED)
+            if unlisted := [f for f in compiled if f not in allowed.get("extension", ())]:
+                errors.append(f"{name}: first-party distribution contains native files {unlisted}; "
                               "compiled code needs a license review first")
+            if compiled and not unlisted:
+                notices = [f.as_posix() for f in dist.files or ()
+                           if f.as_posix().endswith(f".dist-info/licenses/{allowed['notices']}")]
+                if len(notices) != 1:
+                    errors.append(f"{name}: a compiled first-party distribution must ship "
+                                  f"dist-info/licenses/{allowed['notices']}")
             report[name] = {**record, "use": "first-party", "spdx": "Apache-2.0"}
             continue
         entry = entries.get(name)
