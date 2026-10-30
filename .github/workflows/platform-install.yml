@@ -20,7 +20,7 @@ jobs:
       # Run one platform at a time to share runner capacity; all three platform checks still run.
       max-parallel: 1
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:

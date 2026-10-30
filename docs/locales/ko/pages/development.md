@@ -149,7 +149,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 | `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
 | `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
-| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
+| `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
 필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.

@@ -158,7 +158,7 @@ not run it. It has four parts, run in parallel:
 | `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
 | `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
-| `installed-platforms` | Ubuntu 24.04, macOS 14, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
+| `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
 The single required check is **`tests`**. It passes only when all four parts
 succeed; a failed, cancelled or skipped part fails it. Every change, including
