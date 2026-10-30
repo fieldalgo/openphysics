@@ -69,6 +69,7 @@ records and plans do not establish a current pass; resource observations are not
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
 
 - [Line-network analytical and independent-tool checks](../packages/sipi/network_validation.md)
+- [Correlated tolerance studies and fixed-pitch sampling](../packages/sipi/study.md)
 - [Tapered conductors and planar coating: contract and validation](../packages/sipi/manufacturing_sections.md)
 - [Dispersive dielectrics: analytical, independent-tool and mesh checks](../packages/sipi/dielectrics.md#validation-and-reproduction)
 

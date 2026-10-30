@@ -128,3 +128,5 @@ The 47 tests passed on Linux, Python 3.12.14, NumPy 2.5.4 and SciPy 1.18.1;
 platform and installed-package acceptance is handled separately by required CI.
 Existing physical reference thresholds are unchanged. No new external dependency
 or independent validation of coplanar physics is claimed by template equivalence.
+
+[Correlated tolerance studies and fixed-pitch sampling](study.md).

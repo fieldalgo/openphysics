@@ -27,6 +27,8 @@
 
 ## Python 계약과 수식
 
+- [상관 공차 분석과 고정 피치 샘플링](../packages/sipi/study.md)
+
 - [진공 직육면체 PEC 공동 솔버](../packages/galerkin/cavity_solver.md)
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
 - [벡터 고유공간 신뢰성](../packages/galerkin/eigenspace_reliability.md)
