@@ -3,8 +3,9 @@
 
 """meshloom — tetrahedral meshing with an exact-arithmetic compiled kernel.
 
-This release is the packaging skeleton: the compiled kernel loads and reports
-its version, and ``generate3d`` is not implemented yet. The acceptance criteria
+There is no mesher yet: the compiled kernel has its first stages, exact
+predicates and the Delaunay tetrahedralization of point sets, as internal building
+blocks in ``meshloom._core``, and ``generate3d`` is not implemented yet. The acceptance criteria
 the mesher will be graded by are fixed in OpenPhysics's pre-registered 3D
 validation plan. Output follows the tetrahedral mesh fields that
 ``galerkin.from_mesher`` reads.
