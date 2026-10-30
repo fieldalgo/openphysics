@@ -145,3 +145,6 @@ A. R. Djordjevic et al., *Wideband frequency-domain characterization of FR-4
 and time-domain causality*, IEEE Transactions on EMC 43(4), 662–667 (2001).
 The independent formula is also documented in
 [scikit-rf's MLine implementation](https://github.com/scikit-rf/scikit-rf/blob/v2.2.0/skrf/media/mline.py).
+
+[Shared-mesh frequency-line input](line_model.md) combines this extraction with
+the other material/conductor components and saves the complete input as JSON.

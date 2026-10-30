@@ -137,3 +137,6 @@ Run the related validation with the test extra installed:
 ```sh
 OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q tests/sipi/test_conductor.py
 ```
+
+[Shared-mesh frequency-line input](line_model.md) combines this extraction with
+the other material/conductor components and saves the complete input as JSON.
