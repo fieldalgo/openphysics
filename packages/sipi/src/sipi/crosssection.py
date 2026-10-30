@@ -1,12 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Layered PCB cross-sections with rectangular traces.
+"""Layered PCB cross-sections with rectangular or centred trapezoidal traces.
 
 A ``CrossSection`` is a stack of dielectric layers between x = -width/2 and
-x = +width/2, starting at y = 0 and growing upward, with rectangular traces
-placed in it. A trace of zero thickness is a strip on a horizontal line; a
-trace with thickness is a solid rectangle that the mesh leaves out. All
+x = +width/2, starting at y = 0 and growing upward. A trace of zero thickness
+is a strip on a horizontal line; a finite trace is a solid rectangle or a
+centred trapezoid that the mesh leaves out. All
 lengths are in metres.
 
 Boundaries of the box:
@@ -60,13 +60,14 @@ class Layer:
 
 @dataclass(frozen=True)
 class Trace:
-    """A rectangular conductor.
+    """A rectangular or centred trapezoidal conductor.
 
     x:         centre of the trace (m)
-    width:     trace width (m)
+    width:     bottom-face width (m)
     y:         bottom face of the trace (m); a zero-thickness trace lies on y
     thickness: 0 for an infinitely thin strip
     ground:    True for a reference conductor held at 0 V (e.g. coplanar ground)
+    top_width: optional top-face width (m); None retains a rectangle
     """
 
     name: str
@@ -75,6 +76,7 @@ class Trace:
     y: float
     thickness: float = 0.0
     ground: bool = False
+    top_width: float | None = None
 
     def __post_init__(self):
         if not self.name:
@@ -86,6 +88,31 @@ class Trace:
             raise ValueError(f"trace {self.name!r}: width must be > 0")
         if self.thickness < 0:
             raise ValueError(f"trace {self.name!r}: thickness must be >= 0")
+
+        if self.top_width is not None:
+            if (isinstance(self.top_width, bool) or not isinstance(self.top_width, Real)
+                    or not np.isfinite(self.top_width) or self.top_width <= 0):
+                raise ValueError(f"trace {self.name!r}: top_width must be finite and > 0")
+            if self.thickness == 0 and self.top_width != self.width:
+                raise ValueError('a zero-thickness strip cannot have different top and bottom widths')
+
+    @property
+    def tapered(self) -> bool:
+        return self.top_width is not None and self.top_width != self.width
+
+    def width_at(self, y):
+        """Linear face width at y; clamp beyond the trace's vertical extent."""
+        if not self.tapered:
+            return np.zeros_like(np.asarray(y, dtype=float)) + self.width
+        return self.width + (self.top_width-self.width)*np.clip((np.asarray(y)-self.y)/self.thickness, 0, 1)
+
+    @property
+    def xmin(self):
+        return self.x - max(self.width, self.top_width or self.width)/2
+
+    @property
+    def xmax(self):
+        return self.x + max(self.width, self.top_width or self.width)/2
 
     @property
     def x0(self) -> float:
@@ -102,11 +129,23 @@ class Trace:
     def corners(self) -> np.ndarray:
         if self.thickness == 0:
             return np.array([[self.x0, self.y], [self.x1, self.y]])
+        top = self.width if self.top_width is None else self.top_width
         return np.array([[self.x0, self.y], [self.x1, self.y],
-                         [self.x1, self.y1], [self.x0, self.y1]])
+                         [self.x+top/2, self.y1], [self.x-top/2, self.y1]])
 
     def distance(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Distance from points to the trace rectangle (0 inside)."""
+        """Euclidean distance to the conductor (0 inside)."""
+        if self.tapered:
+            x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+            points = np.stack((x, y), axis=-1)
+            vertices = self.corners()
+            distances = []
+            for a, b in zip(vertices, np.roll(vertices, -1, axis=0)):
+                edge = b-a
+                u = np.clip(np.sum((points-a)*edge, axis=-1)/np.dot(edge, edge), 0, 1)
+                distances.append(np.linalg.norm(points-a-u[..., None]*edge, axis=-1))
+            inside = (y >= self.y) & (y <= self.y1) & (np.abs(x-self.x) <= self.width_at(y)/2)
+            return np.where(inside, 0, np.min(distances, axis=0))
         dx = np.maximum(np.maximum(self.x0 - x, x - self.x1), 0.0)
         dy = np.maximum(np.maximum(self.y - y, y - self.y1), 0.0)
         return np.hypot(dx, dy)
@@ -134,7 +173,7 @@ class MeshedCrossSection:
 
 
 class CrossSection:
-    """A layered cross-section with rectangular traces (see module docstring)."""
+    """Layered cross-section with rectangular/trapezoidal traces (see module docstring)."""
 
     def __init__(self, layers, traces, width: float, *, bottom: str = "ground",
                  top: str = "open", sides: str = "open"):
@@ -178,7 +217,7 @@ class CrossSection:
         half, H = 0.5 * self.width, self.height
         tol = 1e-12 * max(self.width, H)
         for t in self.traces:
-            if t.x0 <= -half + tol or t.x1 >= half - tol:
+            if t.xmin <= -half + tol or t.xmax >= half - tol:
                 raise ValueError(f"trace {t.name!r} must lie strictly inside the side walls")
             if t.y <= tol or t.y1 >= H - tol:
                 raise ValueError(f"trace {t.name!r} must lie strictly between the bottom "
@@ -186,8 +225,16 @@ class CrossSection:
                                  "is that plane)")
         for i, a in enumerate(self.traces):
             for b in self.traces[i + 1:]:
-                gap_x = max(a.x0 - b.x1, b.x0 - a.x1)
                 gap_y = max(a.y - b.y1, b.y - a.y1)
+                if a.tapered or b.tapered:
+                    # The horizontal gap is affine on the common vertical span;
+                    # its minimum is at an endpoint. Bounding boxes alone can
+                    # falsely reject two disjoint tapered conductors.
+                    low, high = max(a.y, b.y), min(a.y1, b.y1)
+                    gap_x = min(abs(a.x-b.x)-(a.width_at(y)+b.width_at(y))/2
+                                for y in (low, high))
+                else:
+                    gap_x = max(a.x0 - b.x1, b.x0 - a.x1)
                 if gap_x <= tol and gap_y <= tol:
                     raise ValueError(f"traces {a.name!r} and {b.name!r} touch or overlap")
 
@@ -199,10 +246,18 @@ class CrossSection:
     def _sizes(self, edge_size, far_size):
         features = [lay.thickness for lay in self.layers]
         for t in self.traces:
-            features.append(t.width)
+            features.append(min(t.width, t.top_width or t.width))
         for i, a in enumerate(self.traces):
             for b in self.traces[i + 1:]:
-                features.append(max(a.x0 - b.x1, b.x0 - a.x1, a.y - b.y1, b.y - a.y1))
+                if a.tapered or b.tapered:
+                    # Conservative bounding-box gap can vanish even for disjoint
+                    # shapes. Use their exact polygon/segment distance instead.
+                    corners_a, corners_b = a.corners(), b.corners()
+                    gap = min(np.min(a.distance(corners_b[:, 0], corners_b[:, 1])),
+                              np.min(b.distance(corners_a[:, 0], corners_a[:, 1])))
+                    features.append(gap)
+                else:
+                    features.append(max(a.x0 - b.x1, b.x0 - a.x1, a.y - b.y1, b.y - a.y1))
         if edge_size is None:
             edge_size = min(features) / 100.0
             # The conductor interior is excluded from the mesh. Resolve its
@@ -236,6 +291,40 @@ class CrossSection:
         return dict(edge_size=edge_size, far_size=far_size,
                     grade=float(grade), min_angle=float(min_angle))
 
+    def _tapered_domain(self, ys, far_size):
+        """Tile each horizontal slab with exact dielectric quadrilaterals.
+
+        Layer interfaces and every conductor top/bottom split the slabs. The
+        affine trace sides become shared constrained segments, including where
+        they cross a material interface. Thin strips insert collinear vertices
+        into slab boundaries, so their full length is a constrained interface.
+        """
+        domain = Domain(size=far_size)
+        half = self.width/2
+        for y0, y1 in zip(ys[:-1], ys[1:]):
+            ym = (y0+y1)/2
+            solids = sorted((t for t in self.traces if t.thickness > 0 and t.y < ym < t.y1),
+                            key=lambda t: t.x)
+            left = (-half, -half)
+            for trace in [*solids, None]:
+                right = (half, half) if trace is None else (
+                    trace.x-float(trace.width_at(y0))/2, trace.x-float(trace.width_at(y1))/2)
+                bottom_x = [left[0], right[0]]
+                top_x = [left[1], right[1]]
+                for thin in self.traces:
+                    if thin.thickness != 0:
+                        continue
+                    for y, values, lo, hi in ((y0, bottom_x, left[0], right[0]),
+                                              (y1, top_x, left[1], right[1])):
+                        if thin.y == y:
+                            values.extend(x for x in (thin.x0, thin.x1) if lo < x < hi)
+                polygon = [(x, y0) for x in sorted(set(bottom_x))]
+                polygon += [(x, y1) for x in sorted(set(top_x), reverse=True)]
+                domain.add_region(self._layer_at(ym).name, polygon)
+                if trace is not None:
+                    left = (trace.x+float(trace.width_at(y0))/2, trace.x+float(trace.width_at(y1))/2)
+        return domain
+
     def mesh(self, *, edge_size: float | None = None, far_size: float | None = None,
              grade: float = 0.15, min_angle: float = 28.0) -> MeshedCrossSection:
         """Mesh the dielectric with refinement toward the trace edges.
@@ -264,15 +353,19 @@ class CrossSection:
         xs, ys = np.array(sorted(xs)), np.array(sorted(ys))
         solids = [t for t in self.traces if t.thickness > 0]
 
-        domain = Domain(size=far_size)
-        for j in range(len(ys) - 1):
-            ym = 0.5 * (ys[j] + ys[j + 1])
-            layer = self._layer_at(ym)
-            for i in range(len(xs) - 1):
-                xm = 0.5 * (xs[i] + xs[i + 1])
-                if any(t.x0 < xm < t.x1 and t.y < ym < t.y1 for t in solids):
-                    continue
-                domain.add_region(layer.name, rectangle(xs[i], ys[j], xs[i + 1], ys[j + 1]))
+        if any(t.tapered for t in self.traces):
+            domain = self._tapered_domain(ys, far_size)
+        else:
+            # Preserve the established rectangular discretization exactly.
+            domain = Domain(size=far_size)
+            for j in range(len(ys) - 1):
+                ym = 0.5 * (ys[j] + ys[j + 1])
+                layer = self._layer_at(ym)
+                for i in range(len(xs) - 1):
+                    xm = 0.5 * (xs[i] + xs[i + 1])
+                    if any(t.x0 < xm < t.x1 and t.y < ym < t.y1 for t in solids):
+                        continue
+                    domain.add_region(layer.name, rectangle(xs[i], ys[j], xs[i + 1], ys[j + 1]))
 
         corners = np.concatenate([t.corners() for t in self.traces])
 
@@ -306,8 +399,9 @@ class CrossSection:
 
         signals = {}
         for t in self.traces:
-            on = ((p[:, 0] >= t.x0 - tol) & (p[:, 0] <= t.x1 + tol)
-                  & (p[:, 1] >= t.y - tol) & (p[:, 1] <= t.y1 + tol))
+            on = (t.distance(p[:, 0], p[:, 1]) <= tol) if t.tapered else (
+                (p[:, 0] >= t.x0 - tol) & (p[:, 0] <= t.x1 + tol)
+                & (p[:, 1] >= t.y - tol) & (p[:, 1] <= t.y1 + tol))
             if not on.any():
                 raise RuntimeError(f"trace {t.name!r} received no mesh nodes")
             if t.ground:

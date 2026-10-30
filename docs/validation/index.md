@@ -67,3 +67,4 @@ records and plans do not establish a current pass; resource observations are not
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
 
 - [Line-network analytical and independent-tool checks](../packages/sipi/network_validation.md)
+- [Tapered conductors and planar coating: contract and validation](../packages/sipi/manufacturing_sections.md)

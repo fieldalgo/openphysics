@@ -12,6 +12,7 @@ from .crosssection import CrossSection, Layer, Trace
 
 __all__ = ['CrossSectionDocument']
 _SCHEMA = 'sipi.cross-section/1'
+_TAPER_SCHEMA = 'sipi.cross-section/2'
 
 
 def _keys(value, required, optional=(), *, where):
@@ -73,18 +74,24 @@ class CrossSectionDocument:
                     box=dict(width=section.width, bottom=section.bottom,
                              top=section.top, sides=section.sides),
                     mesh={} if mesh is None else mesh)
+        if any(t.tapered for t in section.traces):
+            data['schema'] = _TAPER_SCHEMA
+            for row, trace in zip(data['traces'], section.traces):
+                row['top_width'] = trace.width if trace.top_width is None else trace.top_width
         # Use the same strict path for Python-created and decoded input.
         self._data = self._validate(data)
 
     @staticmethod
     def _validate(data):
         _keys(data, ('schema', 'length_unit', 'layers', 'traces', 'box', 'mesh'), where='document')
-        if data['schema'] != _SCHEMA or data['length_unit'] != 'm':
-            raise ValueError('unsupported schema or length_unit; expected sipi.cross-section/1 and m')
+        if data['schema'] not in (_SCHEMA, _TAPER_SCHEMA) or data['length_unit'] != 'm':
+            raise ValueError('unsupported schema or length_unit; expected sipi.cross-section/1 or /2 and m')
         layers, traces = [], []
         for kind, fields, output in (
                 ('layers', ('name', 'thickness', 'eps_r', 'tan_delta'), layers),
                 ('traces', ('name', 'x', 'width', 'y', 'thickness', 'ground'), traces)):
+            if kind == 'traces' and data['schema'] == _TAPER_SCHEMA:
+                fields = (*fields, 'top_width')
             if not isinstance(data[kind], list) or not data[kind]:
                 raise ValueError(f'{kind} must be a nonempty array')
             for row in data[kind]:
@@ -112,7 +119,7 @@ class CrossSectionDocument:
                                **cleaned_box)
         # Resolve defaults too, so inconsistent explicit settings fail before meshing.
         section.mesh_settings(**options)
-        return dict(schema=_SCHEMA, length_unit='m', layers=layers, traces=traces,
+        return dict(schema=data['schema'], length_unit='m', layers=layers, traces=traces,
                     box=cleaned_box, mesh=options)
 
     @classmethod
