@@ -180,3 +180,86 @@ def test_touchstone_requires_explicit_port_count_and_names(ports, names):
     with pytest.raises(ValueError):
         CircuitDocument(dict(kind='touchstone', text=net.touchstone(), ports=ports, port_names=names),
                            excitation=dict(kind='sources', voltages={'a': 1}), terminations={})
+
+
+@pytest.fixture(scope='module', params=['smooth', 'hammerstad', 'causal-huray'])
+def version_two_line(request):
+    from sipi import coupled_microstrip
+    from sipi.dielectric import WidebandDielectric
+    section = coupled_microstrip(width=.5e-3, gap=.3e-3, substrate_height=1e-3,
+                                 thickness=50e-6, eps_r=4)
+    cross = CrossSectionDocument(section, mesh=dict(edge_size=5e-6, far_size=.2e-3, grade=.1))
+    roughness = {'kind': request.param}
+    if request.param == 'hammerstad':
+        roughness['rms_m'] = 1e-6
+    elif request.param == 'causal-huray':
+        roughness.update(radii_m=[.5e-6, 1.5e-6], surface_ratios=[1.2, .3])
+    nested = TransmissionLineDocument(cross, [1e9, 4e9, 10e9],
+        materials={'substrate': WidebandDielectric(4, .02, 1e9)}, length=.03,
+        conductor=dict(kind='surface', conductivity=58e6, ground_thickness=35e-6,
+                       relative_permeability=1, roughness=roughness),
+        schema='sipi.transmission-line/2')
+    return nested, nested.analyze()
+
+
+@pytest.mark.parametrize('mode', ['sources', 'crosstalk'])
+def test_nested_v2_loss_models_replay_loaded_terminal_response(version_two_line, mode):
+    nested, reference = version_two_line
+    a, near, through, far = reference.network.port_names
+    loads = {a: 40, near: 55, through: 75+5j, far: 100-10j}
+    encoded_loads = {name: {'real': complex(z).real, 'imag': complex(z).imag}
+                     for name, z in loads.items()}
+    if mode == 'sources':
+        excitation = dict(kind=mode, voltages={a: {'real': [1, .8, .6], 'imag': [0, .1, .2]}})
+        direct = terminate_network(reference.network,
+            source_voltages={a: np.array([1, .8+.1j, .6+.2j])}, terminations=loads)
+    else:
+        excitation = dict(kind=mode, aggressor=a, near_victim=near, far_victim=far)
+        comparison = loaded_crosstalk(reference.network, aggressor=a, near_victim=near,
+                                     far_victim=far, terminations=loads)
+        direct = comparison.response
+    doc = CircuitDocument(dict(kind='transmission-line', document=nested.to_dict()),
+                          excitation=excitation, terminations=encoded_loads)
+    text = doc.dumps()
+    restored = CircuitDocument.loads(text)
+    result = restored.analyze()
+    assert restored.dumps() == text == result.input_json
+    assert restored.to_dict()['network']['document'] == nested.to_dict()
+    assert result.extraction.input_json == nested.dumps()
+    np.testing.assert_allclose(result.network.s, reference.network.s, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(result.response.voltage, direct.voltage, rtol=1e-10, atol=0)
+    np.testing.assert_allclose(result.response.current, direct.current, rtol=1e-10, atol=0)
+    if mode == 'crosstalk':
+        np.testing.assert_allclose(result.crosstalk.next_ratio, comparison.next_ratio, rtol=0, atol=1e-12)
+        np.testing.assert_allclose(result.crosstalk.fext_ratio, comparison.fext_ratio, rtol=0, atol=1e-12)
+    # Nested model identity includes dispersion, roughness and resolved mesh.
+    raw = restored.to_dict()
+    raw['network']['document']['conductor']['roughness']['kind'] = 'invalid'
+    assert restored.dumps() == text
+
+
+@pytest.mark.parametrize('change', ['missing', 'mixed-version', 'unknown-model', 'dc'])
+def test_nested_v2_roughness_validity_checked_before_mesh(monkeypatch, change):
+    cross = CrossSectionDocument(microstrip(width=.5e-3, substrate_height=1e-3,
+                                           thickness=50e-6, eps_r=4))
+    nested = TransmissionLineDocument(cross, [1e9], materials={}, length=.03,
+        conductor=dict(kind='surface', conductivity=58e6, ground_thickness=35e-6,
+            relative_permeability=1,
+            roughness=dict(kind='causal-huray', radii_m=[.5e-6], surface_ratios=[1.2])),
+        schema='sipi.transmission-line/2').to_dict()
+    if change == 'missing':
+        nested['conductor']['roughness'].pop('surface_ratios')
+    elif change == 'mixed-version':
+        nested['conductor']['roughness_rms'] = 0
+    elif change == 'unknown-model':
+        nested['conductor']['roughness']['kind'] = 'automatic'
+    else:
+        nested['frequency_hz'] = [0]
+    from sipi import CrossSection
+    def forbidden(*args, **kwargs):
+        pytest.fail('invalid nested roughness reached meshing')
+    monkeypatch.setattr(CrossSection, 'mesh', forbidden)
+    with pytest.raises(ValueError):
+        CircuitDocument(dict(kind='transmission-line', document=nested),
+            excitation=dict(kind='sources', voltages={'near:'+cross.section.traces[0].name: 1}),
+            terminations={})

@@ -50,6 +50,16 @@ and loads are checked against the documented port names and frequency count
 **before meshing**. The result's actual port order and frequency samples must
 match those inputs. Input acceptance does not bypass later extraction failures.
 
+Nested `transmission-line` inputs accept both version 1 and version 2. Version 2
+retains the explicit [smooth, Hammerstad or causal-Huray selection](roughness.md),
+along with the dielectric dispersion, sphere populations and resolved mesh.
+The outer circuit schema remains `sipi.circuit/1`; it does not downgrade the
+inner schema or flatten roughness into frequency-independent resistance.
+[Loaded rough-line example](../../../examples/sipi/loaded_rough_line.py) saves
+and restores a dispersive coupled line with complex mismatched loads, then
+computes NEXT/FEXT against the actual incident voltage. Its limits remain
+frequency-domain ratios, not peak-time crosstalk or measured coupon accuracy.
+
 `excitation` has one of two exact shapes:
 
 - `{"kind":"sources", "voltages":{...}}`: nonempty map of port names to
@@ -102,6 +112,17 @@ against their direct APIs: S absolute difference <=1e-12, terminal V/I relative
 absolute difference <=1e-12 and unequal references. Tests cover complex arrays,
 multiple sources, input isolation, duplicate/unknown fields, invalid ports before
 meshing and propagation of the finite-metal skin-depth rejection.
+
+The version-2 composition checks exercise all three roughness choices with
+both source and crosstalk excitation. Nested inputs, including dispersion and
+mesh settings, survive replay; S uses absolute 1e-12, terminal V/I relative
+1e-10 and NEXT/FEXT absolute 1e-12. Invalid or mixed-version roughness inputs
+and forbidden DC surface inputs must fail before meshing.
+
+On Linux, Python 3.12.14, NumPy 2.5.4 and SciPy 1.18.1 (2026-10-30),
+all 57 circuit-document checks and 648 related SIPI/documentation/reference
+checks passed without skips. The loaded rough-line example also executed.
+This is local engine verification, not a full-repository or deployment check.
 
 Those direct-API checks verify composition and serialization, not independent
 physics accuracy. Use the linked line, material, network and termination contracts
