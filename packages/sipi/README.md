@@ -37,9 +37,11 @@ annulus and two-pad references.
 
 [Uniform-line networks](../../docs/packages/sipi/network.md) convert explicit RLGC
 to 2N-port S, differential/common waves and single-ended Touchstone 2.0 output.
-Conductor resistance is a mandatory modelling input, not extracted from the geometry.
+Conductor resistance is a mandatory modelling input to those network functions.
+[High-frequency surface loss](../../docs/packages/sipi/conductor.md) separately
+extracts signal/return R and internal L with explicit validity checks.
 
-Not implemented: conductor-loss extraction, frequency-dependent dielectrics,
+Not implemented: interior conductor-current diffusion, frequency-dependent dielectrics,
 Touchstone import, time-domain response, AC PDN impedance, vias, several layers
 and layout import.
 
