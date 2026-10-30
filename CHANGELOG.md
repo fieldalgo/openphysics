@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `sipi`: a matched finite-metal/dielectric line model extracts DC/AC RLGC and S from one conforming geometry, with strict `sipi.volume-line/1` JSON and explicit finite-domain boundaries. [Contract](docs/packages/sipi/volume_line.md).
+
 - `sipi`: finite-metal P1 current diffusion from DC through resolved skin/proximity effects, with exact DC limits, total inductance, conservation diagnostics and a CrossSection volume-mesh adapter. See the [contract and validation](docs/packages/sipi/conductor_diffusion.md).
 
 - `simcase`: a test checks that simcase imports only galerkin's public names: no `galerkin.core` and no underscore names. The one listed exception is the rectangle mesh check of the steady boundary contract, until galerkin offers a public mesh check.

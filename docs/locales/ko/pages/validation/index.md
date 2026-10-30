@@ -71,3 +71,5 @@
 - [분산 유전체: 해석식·독립 도구·메시 검증](../packages/sipi/dielectrics.md#검증과-재현)
 
 - [도체 확산: Bessel/DC 해, 메시·영역 수렴, 독립 조립](../packages/sipi/conductor_diffusion.md#검증과-제한)
+
+[동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).

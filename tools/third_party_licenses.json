@@ -243,7 +243,7 @@
     },
     "scikit-fem": {"spdx": "BSD-3-Clause", "url": "https://github.com/kinnala/scikit-fem",
       "reference": {"mode": ["live"], "execution": "in-process", "modules": ["skfem"],
-        "imported_by": ["tests/galerkin/test_crosscheck_skfem*.py", "tests/sipi/test_manufacturing_sections.py", "tests/sipi/test_dielectric.py", "tests/sipi/test_conductor_diffusion.py"], "values": [], "generators": "repo",
+        "imported_by": ["tests/galerkin/test_crosscheck_skfem*.py", "tests/sipi/test_manufacturing_sections.py", "tests/sipi/test_dielectric.py", "tests/sipi/test_conductor_diffusion.py", "tests/sipi/test_volume_line.py"], "values": [], "generators": "repo",
         "light": {"verdict": null, "reason": "Existing permissive CI tool; solve and install timings recorded, isolated import/RSS and repeated CI array bytes not measured. No new tool admission.",
           "date": "2026-10-21", "runner": "GitHub Actions", "python": "3.12.14", "os": "linux",
           "install_s": null, "cases_s": null, "peak_rss_mb": null, "pins_unchanged": null, "pip_check": true}},
