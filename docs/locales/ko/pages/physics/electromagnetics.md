@@ -21,6 +21,8 @@
 
 ## PCB 전송선(신호·전원 무결성)
 
+[인과적 거칠기](../packages/sipi/roughness.md)는 표면 모델의 저항·리액턴스 구성 법칙을 함께 보정합니다.
+
 - [sipi — 준정적 PCB 단면: C, L, G, 임피던스와 결합선 모드](../packages/sipi/overview.md). Python API와 [균일 전송선 네트워크](../packages/sipi/network.md)가 있으며 명시한 RLGC로 S·Touchstone 출력을 계산합니다. [주파수 선로 입력 모델](../packages/sipi/line_model.md)은 메시 하나로 유전체 분산·고주파 도체 표면 손실·RLGC/S를 연결합니다. [유한 금속 전류 확산](../packages/sipi/conductor_diffusion.md)은 명시적 자기 경계에서 R/L을 추출합니다. 3D 구조는 미지원입니다.
 
 ## Python 계약과 수식

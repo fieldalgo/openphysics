@@ -11,6 +11,8 @@ dielectric layers with rectangular traces; `sipi` meshes it with
 problems with the [galerkin](../galerkin/overview.md) engine. It depends on
 numpy, scipy, galerkin and meshine.
 
+[Causal surface roughness and version-2 line input](roughness.md).
+
 ```python
 from sipi import CrossSection, Layer, Trace
 

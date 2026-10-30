@@ -62,6 +62,8 @@
 
 ## 내 모델로 확장하기
 
+- [인과적 거칠기: 독립 스펙트럼 적분·R/L 수렴](../packages/sipi/roughness.md#검증과-한계)
+
 - [내 계산의 수렴 확인하기](convergence.md)
 
 - [슬래브 해석해로 도파로 검증하기](slab-tutorial.md)

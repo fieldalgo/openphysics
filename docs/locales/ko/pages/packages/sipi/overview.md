@@ -9,6 +9,8 @@
 [galerkin](../galerkin/overview.md) 엔진으로 2차원 정전 문제를 풉니다. 의존성은 numpy, scipy,
 galerkin, meshine입니다.
 
+[인과적 표면 거칠기와 버전 2 선로 입력](roughness.md).
+
 ```python
 from sipi import CrossSection, Layer, Trace
 

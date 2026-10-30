@@ -41,12 +41,13 @@ loss.R, loss.L_internal, loss.skin_depth, loss.factors.current_error
 - 기본 `roughness_rms=0`입니다. 양수이면 Hammerstad 경험식
   `1 + (2/pi)*atan(1.4*(Rq/delta)**2)`를 **R에만** 곱하며 매끈한 금속의 리액턴스는 유지합니다.
   인과적 광대역 거칠기 모델, 실측 표면 보정 또는 형상 변경이 아닙니다.
-  Huray·Gradient·Groisse는 미구현입니다.
+  [인과적 Huray](roughness.md)는 명시 구 반지름·면적비를 받아 R과 내부 L을 함께
+  보정합니다. `roughness=CausalHuray(...)`로 선택합니다. Gradient·Groisse는 미구현입니다.
 - 잘못된 재료·표피 깊이 입력은 메시 전에 거부합니다. 적분한 단위 전류 행렬의 최대 차이가
   0.05를 넘으면 세분을 요구하는 `ValueError`를 냅니다. **저항 오차 5% 보장이 아닙니다.**
   R 자체의 세분 변화와 상자 크기 영향은 별도로 확인해야 합니다.
 
-`ConductorLoss`의 주파수·`skin_depth`(m)·`roughness_factor`·`R`(Ω/m)·
+`ConductorLoss`의 주파수·`skin_depth`(m)·`roughness_factor`(실수 저항비)·`R`(Ω/m)·
 `L_internal`(H/m)은 복사한 읽기 전용 배열입니다. R/L은 `(F,N,N)`이며 비대각 성분을 보존합니다.
 `.factors`는 C0, `(N+1,N,N)` 표면 적분, `(N+1,N)` 적분 전류를 제공합니다.
 표면 순서는 `.names`의 신호 순서 다음에 **모든 접지를 합한 그룹**입니다.
@@ -102,7 +103,7 @@ scikit-rf 검사는 **반공간 법칙** 비교로 PCB 장해석이나 거칠기
 실측 손실 정확도나 보편적 오차 한계가 아닙니다.
 
 남은 것: DC/저주파 전이, 도체 내부 표피·근접 확산, 표면별 다른 금속, 유한 접지 전류 재분포,
-인과적 거칠기 리액턴스, 실측 쿠폰 보정, 전파·복사. DC로 외삽하거나 교류 PDN 솔버로 대체하지 마세요.
+실측 쿠폰 보정, 전파·복사. DC로 외삽하거나 교류 PDN 솔버로 대체하지 마세요.
 
 참고: E. Hammerstad and Ø. Jensen, “Accurate models for microstrip computer-aided design,”
 IEEE MTT-S Digest, 1980(거칠기 경험식); 표준 양도체 표면 임피던스와 준TEM 전기·자기 쌍대성은

@@ -24,6 +24,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- SIPI causal Huray conductor roughness updates resistance and internal inductance;
+  explicit transmission-line JSON v2 preserves the legacy version-1 contract.
+
 - `sipi`: a matched finite-metal/dielectric line model extracts DC/AC RLGC and S from one conforming geometry, with strict `sipi.volume-line/1` JSON and explicit finite-domain boundaries. [Contract](docs/packages/sipi/volume_line.md).
 
 - `sipi`: finite-metal P1 current diffusion from DC through resolved skin/proximity effects, with exact DC limits, total inductance, conservation diagnostics and a CrossSection volume-mesh adapter. See the [contract and validation](docs/packages/sipi/conductor_diffusion.md).

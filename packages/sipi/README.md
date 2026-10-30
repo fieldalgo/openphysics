@@ -38,6 +38,9 @@ annulus and two-pad references.
 [Uniform-line networks](../../docs/packages/sipi/network.md) convert explicit RLGC
 to 2N-port S, differential/common waves and single-ended Touchstone 2.0 output.
 Conductor resistance is a mandatory modelling input to those network functions.
+[Causal surface roughness and line JSON v2](../../docs/packages/sipi/roughness.md)
+add explicit sphere populations while preserving the version-1 input contract.
+
 [High-frequency surface loss](../../docs/packages/sipi/conductor.md) separately
 extracts signal/return R and internal L with explicit validity checks.
 
