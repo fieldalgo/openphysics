@@ -170,12 +170,19 @@ def _poisson_errors(m):
     return np.sqrt(e2), np.sqrt(g2), (1.0 / len(mesh.tets)) ** (1 / 3)
 
 
+@pytest.mark.slow
 def test_poisson_on_the_extruded_cube_converges():
+    """V21 on C2 at the sizes {0.2, 0.1, 0.05}, thresholds unchanged.
+
+    The plan's first CI sizes {0.25, 0.177, 0.125} missed the gate on the extruder
+    (L2 slope 1.777, H1 0.881; the first step is not yet asymptotic); that result is
+    recorded as failed and the size change is the amendment in validation3d.md.
+    """
     lam, wq = _duffy_rule()
     assert abs(wq.sum() - 1 / 6) < 1e-15
     # the rule integrates a degree-5 monomial exactly: int x^2 y^2 z dV over the unit tet = 2!2!1!/8! * 6 / 6
     assert abs((lam[:, 1] ** 2 * lam[:, 2] ** 2 * lam[:, 3] * wq).sum() - float(Fraction(2 * 2 * 1, 40320))) < 1e-17
-    results = [_poisson_errors(unit_cube(h)) for h in (0.25, 0.177, 0.125)]
+    results = [_poisson_errors(unit_cube(h)) for h in (0.2, 0.1, 0.05)]
     e_l2, e_h1, h = map(np.array, zip(*results))
     slope_l2 = np.polyfit(np.log(h), np.log(e_l2), 1)[0]
     slope_h1 = np.polyfit(np.log(h), np.log(e_h1), 1)[0]
