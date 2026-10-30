@@ -21,8 +21,9 @@ Power integrity: ``PowerPlane`` solves the DC voltage drop (IR drop) on a
 copper plane fed by voltage sources and loaded by current sinks.
 
 High-frequency conductor loss is available in ``sipi.conductor`` with explicit
-skin-depth and mesh validity checks. Interior current diffusion, AC PDN impedance
-and 3D structures are not implemented.
+skin-depth and mesh validity checks.
+Finite-metal current diffusion is available in ``sipi.conductor_diffusion``.
+AC PDN impedance and 3D structures are not implemented.
 """
 
 from .crosssection import CrossSection, Layer, MeshedCrossSection, Trace
