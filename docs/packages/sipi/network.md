@@ -8,6 +8,8 @@
 frequency-dependent scattering matrix. `quasistatic_network` connects the
 existing cross-section extraction to it. Neither API extracts conductor loss,
 roughness, skin effect, internal inductance or dispersive dielectric properties.
+[Conductor surface loss](conductor.md) is a separate extraction API with a
+high-frequency validity gate and a bridge using external plus internal L.
 
 ```python
 import numpy as np
