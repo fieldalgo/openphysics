@@ -60,3 +60,4 @@
 
 - [균일 전송선 RLGC·S·Touchstone](../packages/sipi/network.md)
 - [사다리꼴 도체·평탄 코팅 계약과 검증](../packages/sipi/manufacturing_sections.md)
+- [고주파 도체 표면 손실](../packages/sipi/conductor.md)
