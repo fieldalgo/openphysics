@@ -71,3 +71,5 @@
 - [분산 유전체: 해석식·독립 도구·메시 검증](../packages/sipi/dielectrics.md#검증과-재현)
 
 - [도체 확산: Bessel/DC 해, 메시·영역 수렴, 독립 조립](../packages/sipi/conductor_diffusion.md#검증과-제한)
+
+- [상관 공차 분석과 고정 피치 샘플링](../packages/sipi/study.md)

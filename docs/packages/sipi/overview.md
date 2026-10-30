@@ -215,3 +215,5 @@ Python 3.12, pinned environment.
 material and conductor extraction with RLGC/S.
 
 [DC/AC metal-volume current diffusion and finite reference plates](conductor_diffusion.md).
+
+[Correlated tolerance studies and fixed-pitch sampling](study.md).

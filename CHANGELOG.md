@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
+
 - `sipi`: finite-metal P1 current diffusion from DC through resolved skin/proximity effects, with exact DC limits, total inductance, conservation diagnostics and a CrossSection volume-mesh adapter. See the [contract and validation](docs/packages/sipi/conductor_diffusion.md).
 
 - `simcase`: a test checks that simcase imports only galerkin's public names: no `galerkin.core` and no underscore names. The one listed exception is the rectangle mesh check of the steady boundary contract, until galerkin offers a public mesh check.

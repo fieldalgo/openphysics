@@ -180,3 +180,5 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 [공유 메시의 주파수 선로 모델·입력 JSON](line_model.md)은 재료·도체 추출을 RLGC/S와 연결합니다.
 
 [DC·AC 금속 내부 전류 확산과 유한 귀환 판](conductor_diffusion.md).
+
+[상관 공차 분석과 고정 피치 샘플링](study.md).

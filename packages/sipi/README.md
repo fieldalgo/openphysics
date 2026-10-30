@@ -58,3 +58,5 @@ Conductor resistance and internal inductance are not extracted by this API.
 material dispersion, explicit metal loss and RLGC/S on one shared mesh.
 
 [DC/AC metal-volume current diffusion](../../docs/packages/sipi/conductor_diffusion.md) extracts R and total L from finite metal regions, with an explicit magnetic boundary and skin-depth resolution gate. Automatic dielectric matching is not provided.
+
+[Impedance tolerance studies](../../docs/packages/sipi/study.md) preserve correlated samples, fixed-pitch geometry, failed rows and descriptive statistics.

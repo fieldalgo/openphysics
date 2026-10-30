@@ -43,3 +43,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 [Build a model](../modeling/index.md) · [Results and trust](../results/index.md) · [All physics](index.md)
 
 [SIPI DC/AC conductor current diffusion](../packages/sipi/conductor_diffusion.md) uses explicit finite metal volumes and magnetic boundaries; dielectric matching is a separate contract.
+
+- [Correlated tolerance studies and fixed-pitch sampling](../packages/sipi/study.md)

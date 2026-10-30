@@ -66,3 +66,5 @@
 
 
 - [DC·AC 도체 부피 메시, 전류 확산과 잔차](../packages/sipi/conductor_diffusion.md)
+
+- [상관 공차 분석과 고정 피치 샘플링](../packages/sipi/study.md)
