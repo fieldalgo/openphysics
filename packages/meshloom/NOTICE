@@ -1,0 +1,14 @@
+meshloom
+Copyright 2026 Yongha Kim (FieldAlgo)
+
+Tetrahedral mesher with an exact-arithmetic compiled kernel.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this product except in compliance with the License. A copy of the License
+is distributed with this product in the file LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The compiled extension statically links the Rust standard library and PyO3,
+both available under the MIT license or the Apache License 2.0. Their notices
+are in THIRD_PARTY_NOTICES in this distribution.
