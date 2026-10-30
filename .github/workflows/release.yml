@@ -202,6 +202,10 @@ jobs:
         with:
           name: release-distributions
           path: dist
+      # The checker picks the meshloom wheel this interpreter supports with packaging's tag
+      # rules; packaging goes into the driver interpreter only, not into the venv it tests.
+      - name: Install the checker's own requirement
+        run: python -m pip install -c tools/requirements-py312-linux.txt packaging
       - name: Install the built wheels with requirements from PyPI and run the smoke check
         run: python -X utf8 tools/check_release_install.py --wheels dist --report release-install/report.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

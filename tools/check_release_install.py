@@ -68,6 +68,7 @@ def local_requirements(directory, supported=None):
 
     A pure distribution has exactly one (py3-none-any) wheel; a compiled one may have one
     per platform, and exactly one of them must match ``supported`` (this interpreter's tags).
+    Needs ``packaging`` in the interpreter that runs this script (release.yml installs it).
     """
     from packaging.tags import sys_tags
     from packaging.utils import parse_wheel_filename
