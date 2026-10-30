@@ -203,6 +203,43 @@
     "requests-toolbelt": {"spdx": "Apache-2.0", "url": "https://github.com/requests/toolbelt"},
     "rfc3986": {"spdx": "Apache-2.0", "url": "https://github.com/python-hyper/rfc3986"},
     "rich": {"spdx": "MIT", "url": "https://github.com/Textualize/rich"},
+    "pandas": {
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/pandas-dev/pandas/blob/v3.0.3/LICENSE",
+      "review": "Test-only transitive requirement of scikit-rf; version 3.0.3 license checked in sdist SHA256 696a4a00a2a2a35d4e5deb3fc946641b96c944f02230e4f76137fe35d806c4fc. Not shipped or a runtime extra. Includes notices for vendored permissive components (dateutil, musl, NumPy, UltraJSON, klib); no package code imports pandas."
+    },
+    "scikit-rf": {
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/scikit-rf/scikit-rf/blob/v2.2.0/LICENSE.txt",
+      "review": "Test-only sipi[test] reference, never runtime or bundled. Version 2.2.0 pure-Python wheel SHA256 95db99c861cc925454d4a427e004b3281f7bf25b27874b9baaec6521058f9804 and sdist 783ec626047c852929ffde032dca067e701afe49b9573ca0c1fa1b2335f16a59 omit LICENSE.txt; BSD-3-Clause text verified at exact upstream v2.2.0 tag. No source copied.",
+      "reference": {
+        "mode": [
+          "live"
+        ],
+        "execution": "in-process",
+        "modules": [
+          "skrf"
+        ],
+        "imported_by": [
+          "tests/sipi/test_crosscheck_skrf_network.py"
+        ],
+        "values": [],
+        "generators": "repo",
+        "light": {
+          "verdict": true,
+          "reason": "Wheel-only isolated install with unchanged NumPy/SciPy pins; timed reference tests include imports and Touchstone reads.",
+          "date": "2026-10-30",
+          "runner": "Linux cloud CPython",
+          "python": "3.12.14",
+          "os": "linux",
+          "install_s": 2.2,
+          "cases_s": 0.662,
+          "peak_rss_mb": 66.26171875,
+          "pins_unchanged": true,
+          "pip_check": true
+        }
+      }
+    },
     "scikit-fem": {"spdx": "BSD-3-Clause", "url": "https://github.com/kinnala/scikit-fem",
       "reference": {"mode": ["live"], "execution": "in-process", "modules": ["skfem"],
         "imported_by": ["tests/galerkin/test_crosscheck_skfem*.py"], "values": [], "generators": "repo",

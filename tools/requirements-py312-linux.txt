@@ -39,6 +39,7 @@ nh3==0.3.7
 numpy==2.5.4
 opentelemetry-api==1.45.1
 packaging==26.3
+pandas==3.0.3
 pillow==12.3.0
 pluggy==1.6.0
 pycparser==3.11
@@ -56,6 +57,7 @@ requests==2.34.2
 rfc3986==2.0.0
 rich==15.0.0
 scikit-fem==12.0.2
+scikit-rf==2.2.0
 scipy==1.18.1
 secretstorage==3.5.0
 setuptools==84.0.0
