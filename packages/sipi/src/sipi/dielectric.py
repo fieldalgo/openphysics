@@ -257,6 +257,12 @@ def dispersive_line(section, frequency, *, materials, **mesh_options):
     constant-material extraction are unchanged. There is no wavelength-dependent
     field correction or conductor-current solve in this quasi-TEM formulation.
     """
+    f, samples = _material_samples(section, frequency, materials)
+    return _dispersive_from_mesh(section.mesh(**mesh_options), f, samples)
+
+
+def _material_samples(section, frequency, materials):
+    """Validate and sample before any geometry work; shared by input documents."""
     f = _frequencies(frequency)
     if not isinstance(materials, Mapping):
         raise ValueError('materials must map layer names to dielectric models')
@@ -270,9 +276,14 @@ def dispersive_line(section, frequency, *, materials, **mesh_options):
         samples[name] = model.permittivity(f)
         if not np.all(np.isfinite(samples[name])):
             raise ValueError('dielectric evaluation produced nonfinite samples')
-    meshed = section.mesh(**mesh_options)
+    return f, samples
+
+
+def _dispersive_from_mesh(meshed, f, samples, *, c0=None):
+    """Internal composition on an already validated, shared dielectric mesh."""
     mesh, signals, ground = meshed.mesh, meshed.signals, meshed.ground
-    c0 = capacitance_matrix(mesh, 1.0, signals, ground)
+    if c0 is None:
+        c0 = capacitance_matrix(mesh, 1.0, signals, ground)
     inductance = mu_0*epsilon_0*np.linalg.inv(c0)
     regions = [mesh.region_names[r] for r in mesh.regions]
     complex_c = []

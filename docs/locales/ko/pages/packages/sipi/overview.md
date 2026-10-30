@@ -169,10 +169,12 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 - 도체 내부 전류 확산과 DC/저주파 도체 손실.
   [고주파 표면 R·내부 L과 경험적 거칠기](conductor.md)는 별도 API로 지원하며,
   `analyze()`는 외부 L과 유전체 C/G를 계속 반환합니다.
-- 주파수 의존 유전체(예: Djordjevic–Sarkar). `tan_delta`는 상수입니다.
+- 실측 재료 추정과 형상/전파 분산. [주파수 의존 유전체 모델](dielectrics.md)은 별도로 지원합니다.
 - 시간 영역 응답과 Touchstone 불러오기. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
 - 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
 
 [주파수 의존 유전체 모델·추출](dielectrics.md).
+
+[공유 메시의 주파수 선로 모델·입력 JSON](line_model.md)은 재료·도체 추출을 RLGC/S와 연결합니다.

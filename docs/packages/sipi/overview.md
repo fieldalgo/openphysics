@@ -200,8 +200,8 @@ Python 3.12, pinned environment.
 - Interior conductor-current diffusion and DC/low-frequency conductor loss.
   [High-frequency surface R/internal L and empirical roughness](conductor.md)
   are available separately; `analyze()` still returns external L and dielectric C/G.
-- Frequency-dependent dielectrics (for example Djordjevic–Sarkar); `tan_delta`
-  is constant.
+- Measured material fitting and geometric/full-wave dispersion.
+  [Frequency-dependent dielectric models](dielectrics.md) are available separately.
 - Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
@@ -210,3 +210,6 @@ Python 3.12, pinned environment.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.
 
 [Frequency-dependent dielectric models and extraction](dielectrics.md).
+
+[One shared-mesh frequency-line model and input JSON](line_model.md) combines
+material and conductor extraction with RLGC/S.
