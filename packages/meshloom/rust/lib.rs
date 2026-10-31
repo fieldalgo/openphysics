@@ -9,6 +9,8 @@
 mod delaunay;
 #[cfg(test)]
 mod exact_ref;
+mod facet;
+mod plc;
 mod predicates;
 
 use predicates::{two_product, P3};
@@ -74,12 +76,13 @@ fn counters<'py>(py: Python<'py>, d: &Bound<'py, PyDict>, n: &predicates::Counte
 /// (k = 4 for orient3d and incircle3d, 5 for insphere and insphere_sos), `ids` the
 /// global indices for insphere_sos (n x 5 int64). Returns n int8 signs.
 #[pyfunction]
-#[pyo3(signature = (kind, coords, ids=None))]
+#[pyo3(signature = (kind, coords, ids=None, axis=2))]
 fn predicate_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes>,
-                        ids: Option<&Bound<'py, PyBytes>>) -> PyResult<Bound<'py, PyBytes>> {
+                        ids: Option<&Bound<'py, PyBytes>>, axis: usize) -> PyResult<Bound<'py, PyBytes>> {
     check_environment()?;
     let k = match kind {
-        "orient3d" | "incircle3d" => 4,
+        "orient2d_proj" => 3,
+        "orient3d" | "incircle3d" | "incircle_plane" | "incircle_plane_sos" => 4,
         "insphere" | "insphere_sos" => 5,
         _ => return Err(PyValueError::new_err(format!("unknown predicate {kind:?}"))),
     };
@@ -90,12 +93,16 @@ fn predicate_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes
     if let Err(e) = delaunay::check_input(&pts) {
         return Err(PyValueError::new_err(e.to_string()));
     }
-    let ids = match (kind, ids) {
-        ("insphere_sos", Some(b)) => u32s(b.as_bytes(), "index")?,
-        ("insphere_sos", None) => return Err(PyValueError::new_err("insphere_sos needs ids")),
+    if axis > 2 {
+        return Err(PyValueError::new_err("axis must be 0, 1 or 2"));
+    }
+    let sos = kind.ends_with("_sos");
+    let ids = match (sos, ids) {
+        (true, Some(b)) => u32s(b.as_bytes(), "index")?,
+        (true, None) => return Err(PyValueError::new_err(format!("{kind} needs ids"))),
         _ => Vec::new(),
     };
-    if kind == "insphere_sos" && ids.len() != pts.len() {
+    if sos && ids.len() != pts.len() {
         return Err(PyValueError::new_err("ids must hold one index per point"));
     }
     let kind = kind.to_owned();
@@ -106,6 +113,12 @@ fn predicate_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes
                 "orient3d" => predicates::orient3d(&q[0], &q[1], &q[2], &q[3], &mut n),
                 "incircle3d" => predicates::incircle3d(&q[0], &q[1], &q[2], &q[3]),
                 "insphere" => predicates::insphere(&q[0], &q[1], &q[2], &q[3], &q[4], &mut n),
+                "orient2d_proj" => predicates::orient2d_proj(axis, &q[0], &q[1], &q[2]),
+                "incircle_plane" => predicates::incircle_plane(axis, &q[0], &q[1], &q[2], &q[3]),
+                "incircle_plane_sos" => {
+                    let i = &ids[4 * g..4 * g + 4];
+                    predicates::incircle_plane_sos(axis, [&q[0], &q[1], &q[2], &q[3]], [i[0], i[1], i[2], i[3]])
+                }
                 _ => {
                     let i = &ids[5 * g..5 * g + 5];
                     predicates::insphere_sos([&q[0], &q[1], &q[2], &q[3], &q[4]], [i[0], i[1], i[2], i[3], i[4]], &mut n)
@@ -175,6 +188,58 @@ fn verify_delaunay<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, tets: &Bo
     Ok(d)
 }
 
+/// Constrained Delaunay triangulation of one planar facet: `coords` n x 3 doubles,
+/// `loops` a list of int64 index arrays (outer loop first, holes after, even-odd).
+/// Returns (triangles as T x 3 int64 bytes wound like the outer loop, dropped axis).
+#[pyfunction]
+fn triangulate_facet<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, loops: Vec<Bound<'py, PyBytes>>)
+                          -> PyResult<(Bound<'py, PyBytes>, usize)> {
+    check_environment()?;
+    let pts = points(coords.as_bytes())?;
+    let loops: Vec<Vec<u32>> = loops.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>()?;
+    let f = py.detach(move || facet::triangulate(&pts, &loops)).map_err(PyValueError::new_err)?;
+    let tris = PyBytes::new_with(py, 24 * f.triangles.len(), |buf| {
+        for (chunk, x) in buf.chunks_exact_mut(8).zip(f.triangles.iter().flatten()) {
+            chunk.copy_from_slice(&(*x as i64).to_le_bytes());
+        }
+        Ok(())
+    })?;
+    Ok((tris, f.axis))
+}
+
+/// Exact validity check of a PLC: `coords` n x 3 doubles, `segments` m x 2 int64 bytes,
+/// `facets` a list of facets, each a list of int64 loop arrays. Raises ValueError naming
+/// the first violation; returns (all segments as int64 bytes, facet triangles as int64
+/// bytes, the facet of each triangle as int64 bytes, number of candidate pairs tested).
+#[pyfunction]
+fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
+                  facets: Vec<Vec<Bound<'py, PyBytes>>>)
+                  -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>, usize)> {
+    check_environment()?;
+    let points = points(coords.as_bytes())?;
+    let seg = u32s(segments.as_bytes(), "segment index")?;
+    if seg.len() % 2 != 0 {
+        return Err(PyValueError::new_err("segments must hold 2 indices each"));
+    }
+    let segments: Vec<[u32; 2]> = seg.chunks_exact(2).map(|c| [c[0], c[1]]).collect();
+    let facets: Vec<Vec<Vec<u32>>> = facets.iter()
+        .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
+        .collect::<PyResult<_>>()?;
+    let plc = plc::Plc { points, segments, facets };
+    let c = py.detach(move || plc::check(&plc)).map_err(PyValueError::new_err)?;
+    let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
+        PyBytes::new_with(py, 8 * xs.len(), |buf| {
+            for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
+                chunk.copy_from_slice(&(*x as i64).to_le_bytes());
+            }
+            Ok(())
+        })
+    };
+    Ok((i64_bytes(c.segments.iter().flatten().copied().collect())?,
+        i64_bytes(c.triangles.iter().flatten().copied().collect())?,
+        i64_bytes(c.triangle_facet)?, c.pairs_tested))
+}
+
 #[pymodule]
 fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -182,6 +247,8 @@ fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(predicate_signs, m)?)?;
     m.add_function(wrap_pyfunction!(tetrahedralize, m)?)?;
     m.add_function(wrap_pyfunction!(verify_delaunay, m)?)?;
+    m.add_function(wrap_pyfunction!(triangulate_facet, m)?)?;
+    m.add_function(wrap_pyfunction!(check_plc, m)?)?;
     Ok(())
 }
 
