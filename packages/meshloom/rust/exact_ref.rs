@@ -245,6 +245,47 @@ pub fn incircle3d(p: &[P3; 4]) -> i8 {
     -t.sign()
 }
 
+/// Component `axis` of (b - a) x (c - a).
+pub fn orient2d_proj(axis: usize, p: &[P3; 3]) -> i8 {
+    let q = integers(p);
+    cross(&sub3(&q[1], &q[0]), &sub3(&q[2], &q[0]))[axis].sign()
+}
+
+fn kept(axis: usize) -> (usize, usize) {
+    match axis {
+        0 => (1, 2),
+        1 => (2, 0),
+        _ => (0, 1),
+    }
+}
+
+/// det4[u, v, |p|^2, 1] over a, b, c, d (projected u, v; 3D squared norm).
+pub fn incircle_plane(axis: usize, p: &[P3; 4]) -> i8 {
+    let q = integers(p);
+    let (i, j) = kept(axis);
+    let rows: Vec<Vec<Big>> = (0..4)
+        .map(|k| vec![q[k][i].clone(), q[k][j].clone(), dot(&q[k], &q[k]), Big::from_u64_shl(1, 0, false)])
+        .collect();
+    det(&rows).sign()
+}
+
+/// The same with the lifted column raised by delta^(rank + 1), rank 0 for the largest id,
+/// for a delta small enough to order the powers.
+pub fn incircle_plane_sos(axis: usize, p: &[P3; 4], ids: [u32; 4]) -> i8 {
+    let q = integers(p);
+    let (i, j) = kept(axis);
+    let coord_bits = q.iter().flatten().map(|x| x.bits()).max().unwrap_or(1);
+    let b = 4 * coord_bits + 32;
+    let rows: Vec<Vec<Big>> = (0..4)
+        .map(|k| {
+            let rank = (0..4).filter(|&m| ids[m] > ids[k]).count() as u32;
+            let l = dot(&q[k], &q[k]).mul(&Big::pow2(4 * b)).add(&Big::pow2((3 - rank) * b));
+            vec![q[k][i].clone(), q[k][j].clone(), l, Big::from_u64_shl(1, 0, false)]
+        })
+        .collect();
+    det(&rows).sign()
+}
+
 // ---------------------------------------------------------------- V16 case generators
 
 pub struct Rng(pub u64);
@@ -447,6 +488,75 @@ mod tests {
         if adversarial > 0 {
             assert!(zeros.iter().all(|&z| z > adversarial / 50), "{zeros:?}");
         }
+    }
+
+    /// Coplanar cases on the conformal integer embedding: the in-plane predicates
+    /// against big integers, and the 2D perturbation against the 3D one (a coplanar
+    /// point is inside the perturbed circle of a, b, c exactly when it is inside the
+    /// perturbed sphere of a, b, c and any point off the plane).
+    fn run_plane(cases: usize, seed: u64) {
+        let mut r = Rng(seed);
+        let mut n = Counters::default();
+        let mut ties = 0;
+        for k in 0..cases {
+            let c = incircle_case(&mut r, k % 2 == 1);
+            let normal = pr::normal_signs(&c[0], &c[1], &c[2]);
+            for axis in 0..3 {
+                assert_eq!(pr::orient2d_proj(axis, &c[0], &c[1], &c[2]), orient2d_proj(axis, &[c[0], c[1], c[2]]));
+                assert_eq!(normal[axis], orient2d_proj(axis, &[c[0], c[1], c[2]]));
+                if normal[axis] == 0 {
+                    continue;
+                }
+                assert_eq!(pr::incircle_plane(axis, &c[0], &c[1], &c[2], &c[3]), incircle_plane(axis, &c), "{c:?}");
+                if !distinct(&c) {
+                    continue;
+                }
+                let ids = [r.int(50) as u32, 50 + r.int(50) as u32, 100 + r.int(50) as u32, 150 + r.int(50) as u32];
+                let mut ids = ids;
+                for i in (1..4).rev() {
+                    let j = r.int(i as u64 + 1) as usize;
+                    ids.swap(i, j);
+                }
+                let s2 = pr::incircle_plane_sos(axis, [&c[0], &c[1], &c[2], &c[3]], ids);
+                // the 1-ulp nudges leave some cases off the plane: the in-plane meaning
+                // (and the 2D-3D agreement) holds for exactly coplanar points only
+                let coplanar = pr::orient3d(&c[0], &c[1], &c[2], &c[3], &mut n) == 0;
+                if coplanar && pr::orient2d_proj(axis, &c[0], &c[1], &c[2]) != 0 {
+                    assert_ne!(s2, 0);
+                    assert_eq!(s2, incircle_plane_sos(axis, &c, ids), "{c:?} {ids:?}");
+                    ties += (pr::incircle_plane(axis, &c[0], &c[1], &c[2], &c[3]) == 0) as usize;
+                    // the same decision from the 3D perturbation, with an off-plane point
+                    let (mut t, mut ti) = ([c[0], c[1], c[2]], [ids[0], ids[1], ids[2]]);
+                    if pr::orient2d_proj(axis, &t[0], &t[1], &t[2]) < 0 {
+                        t.swap(1, 2);
+                        ti.swap(1, 2);
+                    }
+                    let inside2 = pr::incircle_plane_sos(axis, [&t[0], &t[1], &t[2], &c[3]], [ti[0], ti[1], ti[2], ids[3]]) > 0;
+                    for (off, xid) in [(1.0, 1000), (-1.0, 1000), (1.0, 0), (-3.0, 7)] {
+                        let mut x = t[0];
+                        x[(axis + 1) % 3] += off;
+                        x[axis] += 2.0 * off;
+                        let (mut u, mut ui) = (t, ti);
+                        let o = pr::orient3d(&u[0], &u[1], &u[2], &x, &mut n);
+                        if o == 0 {
+                            continue;
+                        }
+                        if o < 0 {
+                            u.swap(1, 2);
+                            ui.swap(1, 2);
+                        }
+                        let inside3 = pr::insphere_sos([&u[0], &u[1], &u[2], &x, &c[3]], [ui[0], ui[1], ui[2], xid, ids[3]], &mut n) > 0;
+                        assert_eq!(inside2, inside3, "{c:?} {ids:?} x={x:?}");
+                    }
+                }
+            }
+        }
+        assert!(ties > cases / 10, "{ties}");
+    }
+
+    #[test]
+    fn in_plane_predicates_agree_with_exact_integers_and_the_3d_perturbation() {
+        run_plane(4_000, 26);
     }
 
     /// V16 in CI: 10^4 random and 10^4 adversarial cases per predicate.

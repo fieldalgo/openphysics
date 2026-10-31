@@ -102,6 +102,11 @@ impl Expansion {
         if y != 0.0 { Expansion(vec![y, x]) } else { Expansion(vec![x]) }
     }
 
+    fn sum(a: f64, b: f64) -> Self {
+        let (x, y) = two_sum(a, b);
+        if y != 0.0 { Expansion(vec![y, x]) } else { Expansion(vec![x]) }
+    }
+
     /// Sign of the value: the sign of the largest component.
     pub fn sign(&self) -> i8 {
         let top = *self.0.last().unwrap();
@@ -431,6 +436,107 @@ pub fn incircle3d(a: &P3, b: &P3, c: &P3, d: &P3) -> i8 {
     let t2 = vv.mul(&dot_exact(&cross_exact(&u, &w), &nrm));
     let t3 = ww.mul(&dot_exact(&nrm, &nrm));
     -t1.sub(&t2).add(&t3).sign()
+}
+
+// ---------------------------------------------------------------- in-plane predicates
+
+/// The two coordinates kept when `axis` is dropped, in cyclic order, so that the 2D
+/// orientation equals component `axis` of the 3D normal (b - a) x (c - a).
+#[inline]
+pub fn kept_axes(axis: usize) -> (usize, usize) {
+    match axis {
+        0 => (1, 2),
+        1 => (2, 0),
+        _ => (0, 1),
+    }
+}
+
+const CCW_ERRBOUND_A: f64 = (3.0 + 16.0 * EPS) * EPS;
+
+/// Sign of component `axis` of (b - a) x (c - a): the orientation of a, b, c projected
+/// along `axis`. Projection is affine and one-to-one on any plane whose normal has a
+/// nonzero `axis` component, so it keeps orientation (up to that component's sign).
+pub fn orient2d_proj(axis: usize, a: &P3, b: &P3, c: &P3) -> i8 {
+    let (i, j) = kept_axes(axis);
+    let detleft = (a[i] - c[i]) * (b[j] - c[j]);
+    let detright = (a[j] - c[j]) * (b[i] - c[i]);
+    let det = detleft - detright;
+    let bound = CCW_ERRBOUND_A * (detleft.abs() + detright.abs());
+    if det > bound {
+        return 1;
+    }
+    if -det > bound {
+        return -1;
+    }
+    let u = [Expansion::diff(b[i], a[i]), Expansion::diff(b[j], a[j])];
+    let v = [Expansion::diff(c[i], a[i]), Expansion::diff(c[j], a[j])];
+    u[0].mul(&v[1]).sub(&u[1].mul(&v[0])).sign()
+}
+
+/// In-plane circle test for coplanar points: with a, b, c counter-clockwise in the
+/// projection along `axis`, positive when d is strictly inside the circle through a, b,
+/// c. It is det[u_k - u_d, v_k - v_d, |p_k|^2 - |p_d|^2] over k = a, b, c with (u, v)
+/// the projected coordinates and |p|^2 the 3D squared norm: for points on one plane
+/// that equals the square of the projection's determinant times the true in-plane
+/// incircle determinant, so the sign is exact without forming a plane basis. Exact,
+/// degree 4.
+pub fn incircle_plane(axis: usize, a: &P3, b: &P3, c: &P3, d: &P3) -> i8 {
+    let (i, j) = kept_axes(axis);
+    let row = |p: &P3| {
+        let mut w = Expansion::diff(p[0], d[0]).mul(&Expansion::sum(p[0], d[0]));
+        for k in 1..3 {
+            w = w.add(&Expansion::diff(p[k], d[k]).mul(&Expansion::sum(p[k], d[k])));
+        }
+        [Expansion::diff(p[i], d[i]), Expansion::diff(p[j], d[j]), w]
+    };
+    det3_exact(&row(a), &row(b), &row(c)).sign()
+}
+
+/// incircle_plane with ties broken by the same index-ordered perturbation as
+/// [`insphere_sos`]: the lifted coordinate of the point with the largest index is
+/// raised most. The perturbed sign is that of the first nonzero cofactor,
+/// (-1)^k orient2d of the other three in order. Restricted to a plane, this is the
+/// 3D perturbation, so facet triangulations agree with the tetrahedralization.
+pub fn incircle_plane_sos(axis: usize, p: [&P3; 4], ids: [u32; 4]) -> i8 {
+    let s = incircle_plane(axis, p[0], p[1], p[2], p[3]);
+    if s != 0 {
+        return s;
+    }
+    let mut order = [0usize, 1, 2, 3];
+    order.sort_unstable_by(|&i, &j| ids[j].cmp(&ids[i]));
+    for &k in &order {
+        let mut q = [p[0]; 3];
+        let mut m = 0;
+        for (r, pr) in p.iter().enumerate() {
+            if r != k {
+                q[m] = pr;
+                m += 1;
+            }
+        }
+        let o = orient2d_proj(axis, q[0], q[1], q[2]);
+        if o != 0 {
+            return if k % 2 == 0 { o } else { -o };
+        }
+    }
+    0
+}
+
+/// Exact sign of the signed area of a closed 2D polygon, sum of x_k y_(k+1) - x_(k+1) y_k.
+pub fn polygon_area_sign(pts: &[[f64; 2]]) -> i8 {
+    let mut acc = Expansion(vec![0.0]);
+    for k in 0..pts.len() {
+        let (a, b) = (pts[k], pts[(k + 1) % pts.len()]);
+        let (p, e) = two_product(a[0], b[1]);
+        let (q, f) = two_product(a[1], b[0]);
+        acc = acc.add(&Expansion(vec![e, p])).sub(&Expansion(vec![f, q]));
+    }
+    acc.sign()
+}
+
+/// Exact signs of the three components of (b - a) x (c - a).
+pub fn normal_signs(a: &P3, b: &P3, c: &P3) -> [i8; 3] {
+    let n = cross_exact(&diff3(b, a), &diff3(c, a));
+    [n[0].sign(), n[1].sign(), n[2].sign()]
 }
 
 /// True when a, b, c are exactly collinear (the cross product of b - a and c - a is 0).

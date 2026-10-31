@@ -14,7 +14,8 @@ import numpy as np
 
 from . import KernelUnavailable, _IMPORT_ERROR, _kernel
 
-_GROUP = {"orient3d": 4, "incircle3d": 4, "insphere": 5, "insphere_sos": 5}
+_GROUP = {"orient2d_proj": 3, "orient3d": 4, "incircle3d": 4, "incircle_plane": 4, "incircle_plane_sos": 4,
+          "insphere": 5, "insphere_sos": 5}
 
 
 def _require():
@@ -30,7 +31,7 @@ def _points(points) -> np.ndarray:
     return p
 
 
-def predicate_signs(kind: str, coords, ids=None) -> np.ndarray:
+def predicate_signs(kind: str, coords, ids=None, axis: int = 2) -> np.ndarray:
     """Exact signs of one predicate over a batch.
 
     ``coords`` has shape (n, k, 3) with k = 4 for ``orient3d`` and ``incircle3d`` and
@@ -39,6 +40,12 @@ def predicate_signs(kind: str, coords, ids=None) -> np.ndarray:
     {-1, 0, 1}. Conventions: orient3d(a, b, c, d) = det[b - a, c - a, d - a];
     insphere > 0 when e is inside the sphere through a positively oriented a, b, c, d;
     incircle3d > 0 when coplanar d is inside the circle through a, b, c.
+
+    In-plane kinds take ``axis``, the coordinate dropped for the projection:
+    ``orient2d_proj`` (k = 3) is component ``axis`` of (b - a) x (c - a);
+    ``incircle_plane`` (k = 4) is positive when coplanar d is inside the circle through
+    a, b, c given counter-clockwise in that projection, and ``incircle_plane_sos``
+    breaks its ties with the same index-ordered perturbation (``ids`` n x 4).
     """
     kernel = _require()
     k = _GROUP.get(kind)
@@ -53,7 +60,7 @@ def predicate_signs(kind: str, coords, ids=None) -> np.ndarray:
         if i.shape != c.shape[:2]:
             raise ValueError(f"ids must have shape {c.shape[:2]}, got {i.shape}")
         i = i.tobytes()
-    out = kernel.predicate_signs(kind, c.tobytes(), i)
+    out = kernel.predicate_signs(kind, c.tobytes(), i, axis)
     return np.frombuffer(out, dtype=np.int8).copy()
 
 
@@ -87,3 +94,41 @@ def verify_delaunay(points, tetrahedra) -> dict:
     if t.ndim != 2 or t.shape[1] != 4:
         raise ValueError(f"tetrahedra must have shape (T, 4), got {t.shape}")
     return kernel.verify_delaunay(p.tobytes(), t.tobytes())
+
+
+def triangulate_facet(points, loops) -> tuple[np.ndarray, int]:
+    """Constrained Delaunay triangulation of one planar facet.
+
+    ``loops`` lists index arrays into ``points``: the outer loop first, then holes,
+    combined by the even-odd rule. The points must be exactly coplanar; loops must be
+    simple and must not touch. Returns triangles (T, 3) wound like the outer loop, and
+    the coordinate axis dropped for the in-plane predicates. Ties of cocircular points
+    are broken by the same index-ordered perturbation as ``delaunay``.
+    """
+    kernel = _require()
+    p = _points(points)
+    lp = [np.ascontiguousarray(x, dtype="<i8").tobytes() for x in loops]
+    tris, axis = kernel.triangulate_facet(p.tobytes(), lp)
+    return np.frombuffer(tris, dtype="<i8").reshape(-1, 3).astype(np.int64), axis
+
+
+def check_plc(points, segments, facets) -> dict:
+    """Exact validity check of a piecewise linear complex.
+
+    ``segments`` (m, 2) and ``facets`` (a list of facets, each a list of loops of point
+    indices, outer loop first) describe the PLC; every loop edge is a segment. Valid
+    means: distinct points, exactly planar facets with simple loops, and no two pieces
+    meeting except in a shared point or along a shared segment (a segment may run along
+    a facet's boundary, never through its inside). Raises ``ValueError`` naming the
+    first violation; returns the segments, the facet triangles, the facet of each
+    triangle and the number of candidate pairs tested.
+    """
+    kernel = _require()
+    p = _points(points)
+    s = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
+    f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
+    seg, tris, owner, pairs = kernel.check_plc(p.tobytes(), s.tobytes(), f)
+    return {"segments": np.frombuffer(seg, dtype="<i8").reshape(-1, 2).astype(np.int64),
+            "triangles": np.frombuffer(tris, dtype="<i8").reshape(-1, 3).astype(np.int64),
+            "triangle_facet": np.frombuffer(owner, dtype="<i8").astype(np.int64),
+            "pairs_tested": pairs}
