@@ -49,6 +49,17 @@ names may change before the mesher's public API.
   locally Delaunay under the perturbation, the hull is locally convex, the Euler
   characteristic is 1 and every distinct point is a vertex.
 
+- **Planar facets and PLC checks.** `triangulate_facet(points, loops)` triangulates
+  one planar facet (outer loop, then holes, combined by the even-odd rule) by
+  constrained Delaunay triangulation. It refuses points off the plane and loops that
+  intersect. Orientation inside the plane is exact after dropping a coordinate.
+  Circle tests use the facet's own metric (`incircle_plane`, exact without projecting
+  circles), with ties broken by the same index-ordered perturbation as in 3D.
+  `check_plc(points, segments, facets)` checks a whole piecewise linear complex
+  exactly: distinct points, planar facets, and no two pieces meeting except at a
+  shared point or along a shared segment. A segment may run along a facet's boundary,
+  never through its inside. The first violation is named in a `ValueError`.
+
 ```python
 import numpy as np
 from meshloom._core import delaunay, verify_delaunay
@@ -98,9 +109,12 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No mesh generation yet: no input facets, boundary recovery, refinement or
-  improvement. Flips and the predicates on points stored on segments and facets
-  come with boundary recovery.
+- No mesh generation yet: input PLCs are checked and their facets triangulated, but
+  there is no boundary recovery, refinement or improvement yet. Flips and the
+  predicates on points stored on segments come with boundary recovery.
+- The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
+  triangulation uses linear scans: both are meant for builder-sized inputs and are
+  not yet tuned for very large surfaces.
 - The kernel refuses fewer than four affinely independent points and
   coordinates outside 0 or [2⁻¹²⁰, 2¹²⁰] in magnitude. It runs on one thread.
 - No musllinux, 32-bit or free-threaded CPython wheels.
