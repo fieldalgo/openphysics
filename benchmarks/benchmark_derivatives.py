@@ -9,6 +9,8 @@ from pathlib import Path
 import sys
 import time
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _harness as harness  # noqa: E402
 
@@ -86,7 +88,7 @@ def heat_problem(n, library):
     layers = len(PARAMETERS["heat"])
     mesh = layered_rectangle_mesh([WIDTH * (i + 1) / layers for i in range(layers)], HEIGHT, n, n)
     left = [int(i) for i in mesh.boundary["left"]]
-    right = [int(i) for i in mesh.boundary["right"]]
+    right = np.asarray(mesh.boundary["right"], dtype=int)  # an int array: JAX refuses list indexing
 
     def objective(*k):
         result = solve_steady_heat(mesh, conductivity={f"layer{i}": v for i, v in enumerate(k)},
@@ -125,7 +127,7 @@ def elasticity_problem(n, library):
 
     mesh = rectangle_mesh(1.0, 0.25, 4 * n, n)
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
-    right = [int(i) for i in mesh.boundary["right"]]
+    right = np.asarray(mesh.boundary["right"], dtype=int)  # an int array: JAX refuses list indexing
 
     def objective(e, nu, tx, ty):
         result = solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu, plane="stress",
