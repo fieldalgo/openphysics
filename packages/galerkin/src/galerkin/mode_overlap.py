@@ -394,16 +394,18 @@ def interpolate_vector_field(space: EdgeSpace, field):
     components = None
     for s in _GAUSS2:
         q = p[:, 0] + s * d
-        values = np.asarray(field(q[:, 0], q[:, 1]))
-        refuse_live(values, "interpolate_vector_field field values")
+        values = field(q[:, 0], q[:, 1])
+        refuse_live(values, "interpolate_vector_field field values")  # before np.asarray hides the library
+        values = np.asarray(values)
         if values.ndim != 2 or values.shape[0] != space.num_edges or values.shape[1] not in (2, 3):
             raise ValueError(f"field must return (N, 2) or (N, 3) values for N points, got {values.shape}")
         components = values.shape[1]
         et += 0.5 * np.einsum("ed,ed->e", values[:, :2], d)
     if components == 2:
         return et, None
-    values = np.asarray(field(mesh.nodes[:, 0], mesh.nodes[:, 1]))
+    values = field(mesh.nodes[:, 0], mesh.nodes[:, 1])
     refuse_live(values, "interpolate_vector_field field values")
+    values = np.asarray(values)
     if values.shape != (mesh.num_nodes, 3):
         raise ValueError(f"field must return (N, 3) values at the {mesh.num_nodes} nodes, got {values.shape}")
     return et, -1j * values[:, 2].astype(complex)
