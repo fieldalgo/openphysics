@@ -6,6 +6,11 @@ Also runs the installed heat API/CLI and save/I-O robustness consumers (partial
 failures, simultaneous writers, existing targets, replacement and ownership)
 on every platform. Until 2026-10-19 these ran only in a separate Windows
 workflow (thermal-windows.yml) with the same selection.
+
+Since 2026-11-02 it also runs the cavity3d, sipi and full-vector/PML waveguide-mode
+wheel consumers (tools/wheel_consumers/) on every platform. The cavity consumer's
+Studio check is deselected here: the portable pins do not install the Studio
+extra; check_distributions.py runs it on Linux.
 """
 import argparse
 from email.parser import BytesParser
@@ -174,6 +179,9 @@ def main():
             ROOT / "tools" / "wheel_consumers" / "test_platform_install.py": tests / "test_platform_install.py",
             ROOT / "tools" / "wheel_consumers" / "test_electric_joule_wheel.py": tests / "test_electric_joule_wheel.py",
             ROOT / "tools" / "wheel_consumers" / "test_thermal_simcase_wheel.py": tests / "test_thermal_simcase_wheel.py",
+            ROOT / "tools" / "wheel_consumers" / "test_cavity_wheel.py": tests / "test_cavity_wheel.py",
+            ROOT / "tools" / "wheel_consumers" / "test_sipi_wheel.py": tests / "test_sipi_wheel.py",
+            ROOT / "tools" / "wheel_consumers" / "test_vector_modes_wheel.py": tests / "test_vector_modes_wheel.py",
             ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
             ROOT / "tests/simcase/test_export_regions.py": tests / "test_export_regions.py",
             ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
@@ -204,9 +212,16 @@ def main():
         run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra",
             "--confcutdir", tests, "--basetemp", output / "consumer-files",
             "--junitxml=" + str(output / "installed-tests.xml"),
+            # The Studio extra (fastapi) is not among the portable pins, so the
+            # cavity consumer's Studio rejection check runs only in check_distributions.py.
+            # A keyword, not a node id: node ids depend on pytest's rootdir choice.
+            "-k", "not test_installed_studio_explicitly_rejects_3d",
             tests / "test_thermal_simcase_wheel.py",
             tests / "test_electric_joule_wheel.py",
             tests / "test_transient_thermomechanical_wheel.py",
+            tests / "test_cavity_wheel.py",
+            tests / "test_sipi_wheel.py",
+            tests / "test_vector_modes_wheel.py",
             tests / "test_msh.py",
             tests / "test_meshloom_kernel.py",
             tests / "test_export_regions.py",

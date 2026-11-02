@@ -242,6 +242,17 @@ installed licenses, package bytes, installed module origins, bundled assets, pub
 smoke tests, the heat save/I-O robustness tests (partial-failure cleanup,
 simultaneous writers, existing targets) and two source target-protection
 fixtures, plus region VTU/PVD export consumers (the export extra is installed).
+The wheel consumers it copies and runs are `test_thermal_simcase_wheel.py`,
+`test_electric_joule_wheel.py`, `test_transient_thermomechanical_wheel.py`,
+`test_cavity_wheel.py` (without its Studio check: the portable pins do not
+install the Studio extra), `test_sipi_wheel.py` (stripline, microstrip, JSON
+document and DC plane against Cohn, Hammerstad–Jensen and exact resistances on
+coarse meshes with stated bounds) and `test_vector_modes_wheel.py` (full-vector
+slab modes against `refsol.slab`, a PML leaky slab against its outgoing-root
+dispersion equation, and the `vector_slab` example with and without PML through
+the `simcase` CLI). The other `test_*_wheel.py` consumers run on Linux only, in
+the distribution check. The three consumers added on 2026-11-02 were verified
+on Linux; their first macOS and Windows runs are the CI jobs themselves.
 This is installed acceptance, not a full macOS or Windows regression.
 
 **Resource observations.** After a green Linux run, the steady and transient
