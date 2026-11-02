@@ -18,6 +18,9 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.thermal` | Kelvin 슬랩 및 정상 사인 제조해, 열유속 W/m^2와 열원 W/m^3 | 직접 해석 미분, 엔진 import 없음 |
 | `refsol.thermal_boundary` | 처방 외향 열유속·Robin 대류를 갖는 정상 슬랩과 사인 장 | 폐형식, 엔진 import 없음 |
 | `refsol.transient_heat` | 균일 단열 가열, 이동 affine 장, 사인 제조해, 소형 dense P1 행렬과 후진 Euler 모드 참조 | 해석식과 dense 고유값 문제, 엔진 import 없음 |
+| `refsol.thermal_multilayer` | 층별 상수 전도도와 균일 열원을 갖는 적층 벽의 정상 전도: 직렬 슬랩과 동심 복합 원통, 경계면에서 온도와 수직 열유속 연속 | 열원 없는 경계값과 직렬 열저항, 경계면 연속성, 유한차분으로 확인한 Fourier 법칙과 에너지 균형, 교과서 단일 층; 엔진 import 없음 |
+| `refsol.transient_heat_multilayer` | 고유함수 급수로 푼 적층 벽의 과도 전도(`LayeredWall`): 정확한 Pruefer 영점 개수에 대한 이분법으로 고유값을 빠뜨리지 않고 구함; 고정 양끝 온도, 주어진 초기 진폭 또는 열원 구동 시작 | 단일 층 사인 급수, 2층 특성 방정식, 독립적인 조밀 유한요소 고유값, c 가중 직교성과 경계면 조건, PDE·경계·초기 잔차, 정상 장시간 극한; 엔진 import 없음 |
+| `refsol.elasticity_multilayer` | 완전 접합된 적층 등방 고체의 평면응력/평면변형률: 자유 면을 갖는 축방향 적층판, 균일 축응력 아래의 직렬 막대(횡방향 변형률이 일치할 때만), 압력과 층별 로그 온도 변화를 받는 동심 복합 원통 | 자유 면의 무표면력과 탄성 법칙, Lamé 단일 셸, Timoshenko 열응력, 균일 가열의 무응력, 경계면·경계 조건을 포함한 평형; 엔진 import 없음 |
 | `refsol.thermoelastic_traction` | 원래 3D 법칙에서 얻은 열변형률·표면하중 결합 장, 다항 제조해, `traction_from_stress` | NumPy/표준 라이브러리만 사용, 엔진 import 없음 |
 | `refsol.elasticity_traction` | 평면응력/평면변형률 단축·전단 장, Cartesian sigma*n과 다항 표면하중 합력 | 폐형식과 직접 미분, FEM import 없음 |
 | `refsol.elasticity` | 균질 등방성 평면응력/평면변형률: 아핀 장, 폐형식 응력, 매끄러운 제조해 | 재료 계수, 공학 전단, 독립적인 힘 미분 |

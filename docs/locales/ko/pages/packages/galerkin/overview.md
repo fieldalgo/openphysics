@@ -20,7 +20,9 @@
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
+| 정상 2D 전기전도: 등방 영역별 전기전도도, 전압·전류·절연 변과 명시적 Neumann 기준 전위, V·E·J와 요소별 Joule 발열 | `galerkin.electric.solve_steady_electric` | [계약과 검증](electric_steady2d.md) | [electric_steady2d.py](../../../../../../examples/galerkin/electric_steady2d.py) |
 | 같은 메시의 정상 전기→열 단방향 연성 | `galerkin.joule_heating.solve_steady_joule_heat` | [API·단위·검증](joule_heating.md) | [joule_heating.py](../../../../../../examples/galerkin/joule_heating.py) |
+| 온도 의존 정상 Joule heating: 유효 범위가 있는 등방 σ(T)를 완화 Picard 또는 Newton으로 | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [계약과 검증](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../../../../examples/galerkin/temperature_joule_heating.py) |
 | 정상 열전도의 처방 외향 열유속과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../../../examples/galerkin/thermal_flux_robin.py) |
 | JAX·PyTorch에서 재료·열원·경계값에 대한 미분: 정상·과도 열, 정상 전기 전도, 탄성, 열탄성, 도파관 고유값과 필드, 길이에 대한 PEC 상자 공진 | JAX·PyTorch 입력을 준 `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes`(필드는 `eval_edge_field`로), `solve_cavity_box` | [계약과 검증](differentiation.md) | — |
 | 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet과 단열 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
@@ -143,6 +145,9 @@ python examples/galerkin/fiber_modes.py             # step-index fibre vector mo
 python examples/galerkin/cavity_modes.py            # 3D PEC cavity
 python examples/galerkin/mesh_io.py                 # Gmsh reader
 python examples/galerkin/thermal_steady2d.py        # steady heat
+python examples/galerkin/electric_steady2d.py       # steady electric conduction
+python examples/galerkin/joule_heating.py           # electric -> heat, one way
+python examples/galerkin/temperature_joule_heating.py # temperature-dependent Joule heating
 python examples/galerkin/elasticity_traction.py     # elasticity with traction
 python examples/galerkin/thermoelastic_traction.py  # prescribed-temperature mechanics
 python examples/galerkin/visualize.py               # figures
