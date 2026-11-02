@@ -41,7 +41,7 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 2D 정전기와 산란 | 지원 | 미지원 | 미지원 |
 | 3D 공동: 진공 PEC, 손실 재료와 도체 벽 | 지원 | `em.cavity3d` | 미지원 |
 | 정상 전기전도 | 지원 | 균질 직사각형 | 미지원 |
-| 정상 열전도 | 지원 | 직사각형 `thermal.steady2d` | 전용 화면 |
+| 정상 열전도 | 지원 | 직사각형 `thermal.steady2d` | 전용 화면; workspace 열 판 |
 | 과도 열전도 | 지원 | 직사각형 `thermal.transient2d` | 전용 화면 |
 | 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 영역 한도 안에서 전용 화면 |
 | 탄성·열팽창·열전도→기계 | 지원 | 미지원 | 미지원 |
