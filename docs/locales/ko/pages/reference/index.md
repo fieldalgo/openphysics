@@ -48,7 +48,7 @@
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
 - [PML·누설·일정 반경 모드](../packages/simcase/pml_modes.md)
 - [재료 영역이 있는 열전도 문서](../packages/simcase/thermal_regions2d.md)
-- [선형탄성 문서](../packages/simcase/mechanics2d.md)
+- [선형탄성·열탄성 문서](../packages/simcase/mechanics2d.md)
 - [직사각형의 headless 정상 열전도](../packages/simcase/thermal_steady2d.md)
 - [정상 외향 열유속·대류 문서](../packages/simcase/thermal_steady_boundary2d.md)
 - [Studio 정상 열전도](../packages/simcase/thermal_studio.md)
