@@ -26,6 +26,14 @@ Supported layouts:
 - 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
   ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
   normalization, unit m^-3/2)
+- 3D cavity with materials and lossy walls (``cavity3d-edge-complex-v1``):
+  VTK has no complex arrays, so each complex mode field becomes the cell data
+  ``electric_field_mode_<k>_real`` and ``electric_field_mode_<k>_imag`` (unit
+  m^-3/2, the saved normalization and ``exp(+j*omega*t)`` convention), and the
+  per-tetrahedron materials become ``tet_relative_permittivity_real``/``_imag``
+  and ``tet_relative_permeability_real``/``_imag`` (dimensionless). Complex
+  frequencies, quality factors and wall conductivities are not per cell and
+  stay in ``fields.npz`` and ``summary.json``
 - electric conduction and Joule heating (``electric-joule2d-p1-v1``, the layout
   of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``):
   point data ``potential_v`` and the nodal electric load, reaction, prescribed
@@ -56,6 +64,7 @@ _STEADY = "thermal2d-p1-node-cell-v1"
 _STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v2"
 _TRANSIENT = "thermal2d-transient-p1-node-cell-v1"
 _CAVITY = "cavity3d-edge-v1"
+_CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
@@ -63,7 +72,7 @@ _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
 _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
-                     _ELECTRIC_JOULE)
+                     _ELECTRIC_JOULE, _CAVITY_COMPLEX)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
@@ -79,6 +88,8 @@ _ELECTRIC_NODAL = ("potential_v", "joule_load_w_per_m", "electric_reaction_a_per
                    "thermal_system_rhs_w_per_m", "evaluated_temperature_k")
 _ELECTRIC_CELL_VECTORS = ("electric_field_v_m", "current_density_a_m2", "heat_flux_w_m2")
 _ELECTRIC_CELL_SCALARS = ("conductivity_s_m", "joule_heating_w_m3")
+# cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
+_CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
 
 
 def _meshio():
@@ -181,6 +192,35 @@ def _cavity(data):
     return points, cells, {}, cell_data
 
 
+def _real_imag(values):
+    """VTK has no complex arrays: one C-ordered float array per part."""
+    values = np.asarray(values)
+    return (np.ascontiguousarray(values.real, dtype=float),
+            np.ascontiguousarray(values.imag, dtype=float))
+
+
+def _cavity_complex(data):
+    points = _points(data["nodes"])
+    tetrahedra = np.asarray(data["tetrahedra"], dtype=np.int64)
+    cells = [("tetra", tetrahedra)]
+    fields = np.asarray(data["electric_field"])
+    if fields.ndim != 3 or fields.shape[1:] != (len(tetrahedra), 3):
+        raise ValueError(f"electric_field: expected shape (modes, tetrahedra, 3), got {fields.shape}")
+    cell_data = {}
+    for k in range(len(fields)):
+        real, imag = _real_imag(fields[k])
+        cell_data[f"electric_field_mode_{k}_real"] = [real]
+        cell_data[f"electric_field_mode_{k}_imag"] = [imag]
+    for name in _CAVITY_COMPLEX_CELL:
+        values = np.asarray(data[name])
+        if values.shape != (len(tetrahedra),):
+            raise ValueError(f"{name}: expected one value per tetrahedron, got shape {values.shape}")
+        real, imag = _real_imag(values)
+        cell_data[f"{name}_real"] = [real]
+        cell_data[f"{name}_imag"] = [imag]
+    return points, cells, {}, cell_data
+
+
 def _load(fields_npz):
     with np.load(fields_npz, allow_pickle=False) as archive:
         return {key: archive[key] for key in archive.files}
@@ -191,7 +231,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
 
     Region layouts also include static cell data ``triangle_regions``. Its IDs
     index ``region_names`` in the saved metadata/summary; no names or material
-    properties are copied to VTU. ``time_index`` applies to transient layouts
+    properties are copied to VTU. Complex cavity fields are written as
+    ``_real``/``_imag`` pairs. ``time_index`` applies to transient layouts
     only. Refuses to overwrite an existing file. Returns the output path.
     """
     output = Path(output)
@@ -207,6 +248,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
         parts = _electric_joule(data)
     elif layout == _CAVITY:
         parts = _cavity(data)
+    elif layout == _CAVITY_COMPLEX:
+        parts = _cavity_complex(data)
     else:
         raise ValueError(f"unsupported field layout {layout!r}; supported: {SUPPORTED_LAYOUTS}")
     points, cells, point_data, cell_data = parts

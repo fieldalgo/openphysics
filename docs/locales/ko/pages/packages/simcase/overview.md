@@ -205,8 +205,13 @@ flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예�
 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`를
 내보냅니다. Joule 결과는 `temperature_k`, 절점 열 배열, 셀 `heat_flux_w_m2`를 더하고,
 `joule.temperature2d`는 `evaluated_temperature_k`를 더합니다. 배열은 저장된 이름과 단위
-접미사를 그대로 쓰며 Dirichlet 절점 목록과 summary는 복사하지 않습니다. 손실 공진기와
-`em.modes2d` 결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 두고
+접미사를 그대로 쓰며 Dirichlet 절점 목록과 summary는 복사하지 않습니다. 재료와 손실 벽이
+있는 공진기(`cavity3d-edge-complex-v1`)는 복소 모드마다 셀 데이터
+`electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와
+`exp(+j*omega*t)` 규약; VTK에는 복소 배열이 없음)를, 재료는
+`tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로
+내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. `em.modes2d`
+결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 두고
 2D 벡터에는 z 성분 0을 붙입니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
