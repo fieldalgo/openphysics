@@ -30,6 +30,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - 도구: 설치 플랫폼 검사(`tools/check_platform_install.py`)가 이제 cavity3d, `sipi`, 완전 벡터/PML 도파로 모드 wheel 소비자를 Linux·macOS·Windows에서 실행합니다. `test_sipi_wheel.py`(거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항 비교)와 `test_vector_modes_wheel.py`(`refsol.slab`, 누설 슬래브 외향 근, PML 유무의 `vector_slab` 예제 CLI 실행)는 새 소비자입니다. cavity 소비자의 Studio 검사는 배포 검사에서 Linux에만 남습니다. Linux에서 확인했고 macOS·Windows는 CI에서 돕니다. [개발 안내](development.md#ci가-돌리는-것).
 - galerkin: 도파관 정식화 문서가 scalar P1·혼합 Nédélec/절점 모드 솔버, 복소 재료와 좌표 늘림 PML, 테두리 고유쌍 미분, 연성 경계, 준정적 sipi 경로를 구현된 대로 읽고 각 수식을 모듈·함수와 함께 인용합니다. [문서](packages/galerkin/waveguide_formulation.md).
 - 저장소 검사: `tools/tests/test_examples_smoke.py`가 `examples/` 아래의 모든 스크립트와 JSON 문서를 임시 디렉터리에서 실행하고 종료 코드 0을 요구합니다. 약 20초를 넘는 예제는 `slow` 마커를 달았습니다. [tools/README.md](../../../../tools/README.md#examples-smoke-test)에 문서화했습니다.
+- 벤치마크: `benchmarks/benchmark_thermal.py`, `benchmark_elasticity.py`, `benchmark_electric.py`, `benchmark_derivatives.py`가 정상·과도 열전도, 탄성과 열탄성 traction workflow, 전기 전도·Joule 가열·온도 의존 Joule 풀이(Picard와 Newton), 그리고 forward 풀이 대 gradient(NumPy 중심 차분, 설치된 경우 JAX·PyTorch adjoint, 없으면 건너뜀)의 시간을 새 프로세스에서 재고 checkout·고정 요구사항·머신·peak RSS를 기록합니다. 전체 열·전기 호출 옆에 공개 assembly 함수의 시간도 잽니다. 사람이 손으로 실행하며 CI는 실행하지 않습니다. 안내: [열전도](benchmark_thermal.md), [탄성](benchmark_elasticity.md), [전기](benchmark_electric.md), [미분](benchmark_derivatives.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
