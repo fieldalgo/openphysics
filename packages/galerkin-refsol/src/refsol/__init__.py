@@ -27,11 +27,12 @@ bent_slab   constant-radius bent slab poles by complex-order Bessel/Hankel match
             optional mpmath package at call time; ImportError names it otherwise)
 joule_slab  steady 1D Joule heating with sigma = sigma0 (1 + alpha (T - T0)): closed form in
             erf/erfi for fixed face potentials and temperatures, current-driven root, fold
+thermal3d   steady heat in three dimensions: sine-product manufactured box and a layered slab along z
 """
 
 from . import (slab, lossy_slab, fiber, metallic, electrostatics, scattering, benchmarks, cavity,
-               material_cavity, wall_loss, joule_slab, bent_slab)
+               material_cavity, wall_loss, joule_slab, bent_slab, thermal3d)
 
 __version__ = "0.1.0"
 __all__ = ["slab", "lossy_slab", "fiber", "metallic", "electrostatics", "scattering", "benchmarks",
-           "cavity", "material_cavity", "wall_loss", "joule_slab", "bent_slab"]
+           "cavity", "material_cavity", "wall_loss", "joule_slab", "bent_slab", "thermal3d"]

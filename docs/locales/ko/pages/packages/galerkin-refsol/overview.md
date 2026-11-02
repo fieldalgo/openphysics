@@ -37,6 +37,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
 | `refsol.joule_slab` | 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정상 1D Joule 가열: erf/erfi 폐형식(`voltage_driven`), 상수 전도도 극한, 금속형 fold 양쪽의 전류 구동 상태(`current_driven`, `fold_current`), 유계 전도도 모델용 온도 범위 | 적분한 보존 법칙(`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), 모듈 자체 도함수의 수치 적분, 유한차분, 상수 sigma 폐형식으로의 O(alpha) 접근, 대칭·반사, 전력 평형, 1매개변수 대칭 방정식 |
 | `refsol.bent_slab` | 복소 차수 Bessel/Hankel 정합(안쪽 `J`, 필름 `J`/`Y`, 외향 `H^(2)`)으로 구한 일정 반경 굽은 슬랩 극점, 안쪽 반경 기준 `n_eff`, `exp(+i omega t)`; 호출 시 선택적 `mpmath` 필요 | 잔차 ≤ 1e-12, 1/R 1차의 직선 슬랩 극한(Richardson), 큰 반경에서 초지수적으로 사라지는 손실, 반경이 줄수록 커지는 손실, TM보다 잘 구속되는 TE, mpmath 없이는 ImportError |
+| `refsol.thermal3d` | 정상 3D 열전도: 상자의 사인 곱 제조해(온도·열유속·열원)와 z 방향 층상 슬랩의 직렬 전도 | 유한차분 대비 열유속·열원, 직렬 저항 공식 대비 슬랩, NumPy만 |
 | `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세 | — |
 
 ## 사용법
