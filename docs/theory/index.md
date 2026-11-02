@@ -14,6 +14,7 @@ for independent evidence. This reading route does not establish additional accur
 - [Material-loaded rectangular cavity solver](../packages/galerkin/material_cavity.md)
 - [Vector eigenspace reliability](../packages/galerkin/eigenspace_reliability.md)
 - [Modal complex coordinates](../packages/galerkin/modal_coordinates.md)
+- [Waveguide formulation: modes, derivatives, coupling and the SI/PI path](../packages/galerkin/waveguide_formulation.md)
 
 ## Heat and electric conduction
 
