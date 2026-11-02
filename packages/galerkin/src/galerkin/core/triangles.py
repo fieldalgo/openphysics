@@ -1,7 +1,15 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Checks and element data for conforming P1 triangle meshes."""
+"""Checks and element data for conforming P1 triangle meshes.
+
+``triangle_geometry`` keeps its validated output in a small cache keyed by the
+mesh content (see ``GEOMETRY_CACHE_ENTRIES``), so the solvers that check the
+same mesh repeatedly validate it once.
+"""
+import hashlib
 import itertools
+import threading
+from collections import OrderedDict
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -9,7 +17,47 @@ from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 
 from ..mesh import Mesh
+from .backend import is_live
 from .checks import real_array
+
+# Validated geometries kept, least recently used first. One entry holds copies
+# of the node and triangle arrays, the areas, the boundary set and the labels: a
+# few MB for a mesh of 30k nodes. Eight entries cover the meshes a coupled
+# workflow or a test module alternates between without holding every mesh of a
+# convergence study.
+GEOMETRY_CACHE_ENTRIES = 8
+_geometry_cache = OrderedDict()
+_geometry_lock = threading.Lock()
+
+
+def clear_geometry_cache():
+    """Forget every cached ``triangle_geometry`` result."""
+    with _geometry_lock:
+        _geometry_cache.clear()
+
+
+def _content_key(nodes, triangles, counterclockwise):
+    """Key of a mesh's content, or None when the arrays must go through the checks first.
+
+    The SHA-256 of each array's dtype, shape and C-order bytes: two meshes share
+    a key exactly when their coordinates and connectivity are byte-identical, so
+    a mesh changed in place (``mesh.nodes += origin``) is validated afresh and a
+    mesh of another dtype never reuses a result. JAX/PyTorch arrays, booleans and
+    non-numeric dtypes are left to the checks, which refuse them.
+    """
+    if is_live(nodes) or is_live(triangles):
+        return None
+    try:
+        nodes, triangles = np.asarray(nodes), np.asarray(triangles)
+    except (TypeError, ValueError):
+        return None
+    if nodes.dtype.kind not in "iuf" or triangles.dtype.kind not in "iu":
+        return None
+    digest = hashlib.sha256()
+    for array in (nodes, triangles):
+        digest.update(repr((array.dtype.str, array.shape)).encode("ascii"))
+        digest.update(np.ascontiguousarray(array).tobytes())
+    return digest.digest(), bool(counterclockwise)
 
 
 def overlap_candidates(centers, radii, block=4096):
@@ -56,10 +104,40 @@ def triangle_geometry(mesh, *, counterclockwise=True):
     ``counterclockwise`` every triangle must be counter-clockwise; otherwise
     either orientation is accepted. ``boundary`` is the set of exterior nodes,
     ``labels`` the connected component of each node.
+
+    A result is cached under the content of ``mesh.nodes`` and ``mesh.triangles``
+    (``GEOMETRY_CACHE_ENTRIES`` meshes, least recently used dropped), so the
+    same mesh is checked once however many solver calls it enters. Every call
+    returns its own copies: changing them never changes a later result.
     """
     if not isinstance(mesh, Mesh):
         raise ValueError("mesh must be a galerkin.mesh.Mesh")
-    p, t = real_array(mesh.nodes, "mesh.nodes"), np.asarray(mesh.triangles)
+    key = _content_key(mesh.nodes, mesh.triangles, counterclockwise)
+    if key is not None:
+        with _geometry_lock:
+            found = _geometry_cache.get(key)
+            if found is not None:
+                _geometry_cache.move_to_end(key)
+        if found is not None:
+            return _copies(found)
+    result = _validated_geometry(mesh, counterclockwise)
+    if key is not None:
+        with _geometry_lock:
+            _geometry_cache[key] = result
+            _geometry_cache.move_to_end(key)
+            while len(_geometry_cache) > GEOMETRY_CACHE_ENTRIES:
+                _geometry_cache.popitem(last=False)
+    return _copies(result)
+
+
+def _copies(result):
+    p, t, area, boundary, count, labels = result
+    return p.copy(), t.copy(), area.copy(), set(boundary), count, labels.copy()
+
+
+def _validated_geometry(mesh, counterclockwise):
+    """The checks behind ``triangle_geometry``, on a mesh not seen before."""
+    p, t = real_array(mesh.nodes, "mesh.nodes"), np.array(mesh.triangles)
     if p.ndim != 2 or p.shape[1] != 2 or len(p) < 3:
         raise ValueError("mesh.nodes must have shape (N, 2), N >= 3")
     if t.ndim != 2 or t.shape[1] != 3 or not len(t) or t.dtype.kind not in "iu":
@@ -138,7 +216,7 @@ def triangle_geometry(mesh, *, counterclockwise=True):
     row, col = np.repeat(t, 3, axis=1).ravel(), np.tile(t, (1, 3)).ravel()
     graph = coo_matrix((np.ones(len(row)), (row, col)), shape=(len(p), len(p)))
     count, labels = connected_components(graph, directed=False)
-    return p, t, abs(det)/2, boundary, count, labels
+    return p, t, abs(det)/2, frozenset(boundary), count, labels
 
 
 def vector_strain(nodes, triangles):

@@ -140,6 +140,19 @@ from the physical curves, unused nodes dropped — and `write_msh` writes those
 back in format 2.2. For a tetrahedral mesh it still returns only the boundary
 node sets; regions and tagged faces on `Mesh3D` are follow-up work.
 
+## Mesh validation cache
+
+Every 2D solver checks its mesh with `galerkin.core.triangles.triangle_geometry`
+(conforming manifold, no overlapping triangles, hanging nodes or hinges). The
+validated result is cached under the content of `mesh.nodes` and
+`mesh.triangles` (a SHA-256 of their dtype, shape and bytes, together with the
+orientation flag), so one mesh is checked once however many solver calls, Joule
+iterations or document stages it enters. The cache keeps at most
+`GEOMETRY_CACHE_ENTRIES` (8) meshes, drops the least recently used one, and
+hands every caller its own copies; a mesh changed in place is a new content and
+is validated again, and a rejected mesh is never cached.
+`clear_geometry_cache()` empties it.
+
 ## Tests
 
 The engine is graded against [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin-refsol/README.md),
