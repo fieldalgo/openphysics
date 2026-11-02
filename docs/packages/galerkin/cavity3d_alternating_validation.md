@@ -1,5 +1,7 @@
 # Independent validation of the alternating Kuhn cavity mesh
 
+[한국어](../../locales/ko/pages/packages/galerkin/cavity3d_alternating_validation.md)
+
 The new cavity implementation passes the **unchanged 27 independent/reference
 tests**, with no failures or skips. The original n=4,8,16 mean-error order
 threshold remains >1.8. The rectangular 111 doublet's independently measured

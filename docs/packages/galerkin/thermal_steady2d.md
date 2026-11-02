@@ -1,5 +1,7 @@
 # Steady two-dimensional heat conduction
 
+[한국어](../../locales/ko/pages/packages/galerkin/thermal_steady2d.md)
+
 Explicit imports are `galerkin.thermal` and `refsol.thermal`. This module solves
 homogeneous isotropic stationary conduction on a conforming P1 triangle mesh:
 

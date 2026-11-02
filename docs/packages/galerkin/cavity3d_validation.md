@@ -1,5 +1,7 @@
 # Independent validation plan: vacuum PEC rectangular cavities
 
+[한국어](../../locales/ko/pages/packages/galerkin/cavity3d_validation.md)
+
 Scope: a vacuum rectangular box with PEC on all six walls, one modal solve,
 lowest-order tetrahedral Nedelec elements. No dielectric loading, losses, open
 boundaries, arbitrary CAD, or renderer validation is covered.

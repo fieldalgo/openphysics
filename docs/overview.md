@@ -45,7 +45,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
 | Steady electric conduction | Yes | Homogeneous rectangle | No |
-| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
+| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view; workspace heat plate |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
 | Elasticity, thermal expansion, heat→mechanics | Yes | No | No |
