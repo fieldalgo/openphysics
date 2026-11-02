@@ -24,6 +24,12 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: `Mesh3D` carries tagged outward boundary faces with `check()` (every exterior face tagged once, outward winding, node sets consistent) and refuses negative region ids; `from_mesher` keeps faces, regions and interfaces and refuses `-1` regions with the count; `read_msh` keeps 3D regions and surface tags. Contract: [tetrahedral mesh format](docs/packages/galerkin/mesh3d_format.md).
+
+- `galerkin`: `solve_cavity` and `solve_material_cavity` run the cavity solvers on external tetrahedral meshes (meshine, gmshio) with PEC or impedance walls per face tag and materials per region; the gradient kernel is counted from the constrained surface; the box solvers are unchanged bit for bit; no derivative path on the mesh variants. [Documentation](docs/packages/galerkin/cavity_solver.md#external-meshes), [material cavity](docs/packages/galerkin/material_cavity.md#external-meshes).
+
+- `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, P1 steady heat on tetrahedral meshes with per-region conductivity and source, Dirichlet faces and insulation and a watt-level balance check; `refsol.thermal3d` references. [Documentation](docs/packages/galerkin/thermal3d.md).
+
 - `galerkin`: `galerkin.electrostatics` — 2D electrostatics with conductors as node sets, free charge and an insulated exterior, and a Maxwell capacitance matrix checked by the energy and charge routes (real or lossy complex permittivity; JAX/PyTorch derivatives for real inputs); `refsol.electrostatics` adds the coax and two-layer plate capacitance references. [Documentation](docs/packages/galerkin/electrostatics.md).
 
 - `galerkin-refsol`: three reference modules. `refsol.lossy_slab` solves the complex-permittivity multilayer slab (bound absorbing and substrate-leaky modes, documented sheet choice, residual ≤ 1e-12, first-order perturbation and tunnelling checks) and grades galerkin's scalar/vector and PML mode solvers at second order; `refsol.joule_slab` gives the exact 1D steady Joule heating slab with `sigma = sigma0 (1 + alpha (T - T0))` between fixed potentials and temperatures (erf/erfi closed form, current-driven fold) and grades `solve_temperature_joule_heat` at second order; `refsol.bent_slab` (optional mpmath) gives constant-radius bent-slab poles by complex-order Bessel matching. [Documentation](docs/packages/galerkin-refsol/overview.md).
