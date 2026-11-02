@@ -25,6 +25,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.elasticity_traction` | 평면응력/평면변형률 단축·전단 장, Cartesian sigma*n과 다항 표면하중 합력 | 폐형식과 직접 미분, FEM import 없음 |
 | `refsol.elasticity` | 균질 등방성 평면응력/평면변형률: 아핀 장, 폐형식 응력, 매끄러운 제조해 | 재료 계수, 공학 전단, 독립적인 힘 미분 |
 | `refsol.slab` | 대칭/비대칭 평면 유전체 도파로 TE/TM 모드, TE 장 분포 | 차단식 대비 모드 수, 짝수 모드 방정식, 경계면 연속성 |
+| `refsol.lossy_slab` | 복소 유전율 다층 슬랩, `exp(+i omega t - i beta z)`: 전달행렬 특성함수, 무손실 `slab` 근에서 연속 추적한 흡수 결합 모드, 외향 sheet의 기판 누설 모드, 장 분포 | 무손실 극한 = `slab`, 정규화 잔차 ≤ 1e-12, 1차 섭동론(TE 구속률, TM 벡터식)과 O(n''^2) 일치, 유한차분 경계면·층 방정식, exp(-2 k0 gamma gap) 터널링률, 경로 무관 연속 추적 |
 | `refsol.fiber` | 계단형 굴절률 광섬유: 스칼라 LP 모드(Gloge), 정확한 벡터 TE/TM/HE/EH 모드, 음함수 미분으로 구한 정확한 벡터 군굴절률(`vector_group_index`, 재료 분산 선택), 정확한 벡터 모드 장(`vector_mode_field`) | Bessel 차단값 대비 LP 개수, 2.4048의 LP11 차단, 약한 도파에서 HE11 ≈ LP01, LP11 군 축퇴, Rudolph–Neumann 근사; Richardson 외삽한 정밀 근 대비 군굴절률, 중심차분 대비 잔차 편미분; 근에서 특이한 장 연속 조건, 경계 조건(E_phi, E_z, n^2 E_r) |
 | `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장 | 폐형식 |
 | `refsol.cavity` | 주파수 상한까지의 모든 진공 PEC 상자 모드, 편광·기하 축퇴 포함, SI | 독립 Cartesian 열거, 솔버·메시 없음 |
@@ -55,7 +56,7 @@ print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 참조 모듈은 sdist와 wheel 모두에 포함되며 FEM 엔진을 import하지 않습니다. 별도의 [엔진 계약](../galerkin/elasticity2d.md)은 경계 구속, 두께당 하중, 잠김 한계를 설명합니다.
 
 ```python
-from refsol import fiber, slab, scattering, benchmarks
+from refsol import fiber, slab, lossy_slab, scattering, benchmarks
 
 # exact HE11 effective index of a step-index fiber
 n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
@@ -63,12 +64,20 @@ n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
 # all guided TE modes of a 220 nm SOI slab
 slab.modes(n_f=3.48, n_s=1.444, n_c=1.444, d=0.22, wavelength=1.55, pol="TE")
 
+# complex TE0 of the same slab with an absorbing film n = 3.48 - 0.01i (Im n_eff < 0)
+lossy_slab.three_layer_modes(3.48 - 0.01j, 1.444, 1.444, d=0.22, wavelength=1.55, pol="TE")[0]
+
+# substrate-leaky TE0: 0.22 um film over a 0.25 um low-index gap on silicon, outgoing sheet
+lossy_slab.substrate_leaky_mode(3.48, 1.444, 3.48, d=0.22, gap=0.25, wavelength=1.55)
+
 # scattered field of a PEC cylinder, radius a, wavenumber k, at points (x, y)
 u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
 
 # published reference: quasi-TE n_eff of the Hadley rib waveguide, slab 0.3 um
 benchmarks.rib_neff(0.3)   # 3.412492
 ```
+
+`refsol.lossy_slab`은 galerkin 모드 솔버의 `exp(+i omega t - i beta z)` 규약으로 복소 유전율 평면 다층 구조를 풉니다. 수동 재료는 `Im eps <= 0`(굴절률 `n' - i n''`), 감쇠하는 모드는 `Im n_eff < 0`입니다. `characteristic`은 영점이 모드인 해석적 전달행렬 함수이고, `solve`는 초기값을 다듬은 뒤(실수부·허수부에 대한 scipy root, 이어서 복소 Newton) 정규화 잔차가 `1e-12`를 넘는 결과를 거부하며, `continued_root`는 구조 경로를 따라 근을 추적합니다. `three_layer_modes`는 흡수 슬랩의 모든 모드를 무손실 `slab` 근에서 감쇠 sheet(`Im Q <= 0`, 외부 장 감쇠)로 출발시키고, `substrate_leaky_mode`는 고립 슬랩의 결합 모드에서 출발해 고굴절률 기판까지 간격을 줄이며 외향 sheet(`Re Q >= 0`; 누설 모드는 `Im Q_sub > 0`로 횡방향으로 커지는 부적절(improper) 기판 장을 가지며, 복소 좌표 PML 솔버가 수렴하는 극점)에서 풉니다. `field`는 `E_y`(TE) 또는 `H_y`(TM)를 반환합니다. 자체 검증은 무손실 극한을 `slab`과, 소손실 극한을 1차 섭동론과(`n'' = 1e-3`에서 `Im n_eff` 상대오차 2.6e-8, `1e-4`에서 100배 감소), 장을 경계면·층 방정식과, 누설률을 터널링 법칙 `exp(-2 k0 gamma gap)`과 비교합니다. `tests/galerkin/test_lossy_slab_modes.py`는 닫힌 띠(흡수 필름)와 복소 좌표 PML(누설 슬랩)에서 galerkin 스칼라·벡터 솔버를 이 근과 대조합니다. 복소 오차는 2차로(가장 미세한 쌍에서 차수 1.97–2.00) 0.01 um 간격에서 3.9e-4–6.8e-4까지 줄고, `Im n_eff`는 상대적으로 3e-4(TE), 4e-3(TM) 이내로 일치합니다.
 
 `refsol.thermal_boundary`는 처방 외향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 외향 열유속은 W/m^2, 대류 h는 W/(m^2 K)입니다.
 
@@ -102,6 +111,7 @@ python -m pip install -e packages/galerkin-refsol
 - 시간 의존성은 `exp(-i omega t)`이며 입사 평면파는 +x로 진행합니다.
 - 길이는 일관된 어떤 단위든 사용할 수 있습니다(파장이 척도를 정함).
 - 유효 굴절률은 `n_eff = beta / k0`입니다.
+- `refsol.lossy_slab`과 `refsol.material_cavity`는 galerkin 솔버처럼 `exp(+i omega t)`를 씁니다: 수동 `Im eps <= 0`, 감쇠 `Im n_eff < 0`, 감쇠 공진 `Im omega > 0`. 변환은 복소 공액입니다.
 
 ## 참고문헌
 
@@ -109,6 +119,10 @@ python -m pip install -e packages/galerkin-refsol
 - A. W. Snyder and J. D. Love, *Optical Waveguide Theory* (Chapman & Hall, 1983).
 - K. Okamoto, *Fundamentals of Optical Waveguides*, 2nd ed. (Academic Press, 2006).
 - G. R. Hadley, "High-accuracy finite-difference equations for dielectric waveguide analysis II: dielectric corners," J. Lightwave Technol. 20, 1210 (2002).
+- D. Marcuse, *Theory of Dielectric Optical Waveguides* (Academic Press, 1974).
+- J. Hu and C. R. Menyuk, "Understanding leaky modes: slab waveguide revisited,"
+  Adv. Opt. Photon. 1, 58 (2009).
+- W. C. Chew, *Waves and Fields in Inhomogeneous Media* (IEEE Press, 1995).
 - 벤치마크 수치는 Hadley의 출판 결과이며 femwell 프로젝트 벤치마크 문서(GPL-3.0)의 같은 표와 교차 확인했습니다. 수치만 재현했으며 NOTICE를 참조하세요.
 
 ## 라이선스
