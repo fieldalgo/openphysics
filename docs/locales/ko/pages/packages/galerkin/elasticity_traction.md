@@ -4,7 +4,7 @@
 
 아래 실행 수치·실패·미검증 서술은 영문 원문의 해당 후보 시점 기록이며 새 수용 결과를 뜻하지 않습니다.
 
-기존 P1 벡터 절점 변위 공간의 `galerkin.elasticity.solve_elasticity`에 선택적 경계 traction을 추가합니다. 서브모듈을 명시적으로 import하며, 최상위 export나 simcase 통합은 추가하지 않습니다. [초기 안내서](../../../../../packages/galerkin/elasticity2d.md)의 정식화, plane 선택, engineering shear, 재료 범위와 locking 한계는 계속 적용됩니다. 0이 아닌 traction을 지원하지 않는다는 초기 안내서의 이전 설명은 이 문서로 대체합니다.
+기존 P1 벡터 절점 변위 공간의 `galerkin.elasticity.solve_elasticity`에 선택적 경계 traction을 추가합니다. 서브모듈을 명시적으로 import하며, 최상위 export는 없습니다. 변마다 상수인 직사각형 부분집합은 [선형탄성 문서](../simcase/mechanics2d.md)를 통해 JSON/CLI에서 쓸 수 있습니다. [초기 안내서](../../../../../packages/galerkin/elasticity2d.md)의 정식화, plane 선택, engineering shear, 재료 범위와 locking 한계는 계속 적용됩니다. 0이 아닌 traction을 지원하지 않는다는 초기 안내서의 이전 설명은 이 문서로 대체합니다.
 
 ## API와 단위
 
@@ -148,4 +148,4 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s tests/galerkin/t
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q
 ```
 
-근접 비압축성 평면변형률 P1 locking, 거친 메시의 굽힘 강성, 소변형 가정과 부동소수점 메시 한계는 그대로입니다. 작은 대수 잔차 통과만으로 nu=0.5 근처의 정확도가 보증되지는 않습니다. 압력 모델, 열팽창, 비선형 재료, 대변형, 접촉, 동적, 3D, simcase나 Studio 기능을 추가하지 않습니다. 의존성을 추가하거나 외부 solver 구현을 복사하지 않습니다. 안내서·예제는 source tree에만 있고 sdist에는 포함되지 않습니다. 설치 검사는 checkout의 예제를 복사해 설치된 wheel로 실행합니다.
+근접 비압축성 평면변형률 P1 locking, 거친 메시의 굽힘 강성, 소변형 가정과 부동소수점 메시 한계는 그대로입니다. 작은 대수 잔차 통과만으로 nu=0.5 근처의 정확도가 보증되지는 않습니다. 압력 모델, 열팽창, 비선형 재료, 대변형, 접촉, 동적, 3D, Studio 기능을 추가하지 않습니다. JSON 문서는 상수 변 traction만 노출합니다. 의존성을 추가하거나 외부 solver 구현을 복사하지 않습니다. 안내서·예제는 source tree에만 있고 sdist에는 포함되지 않습니다. 설치 검사는 checkout의 예제를 복사해 설치된 wheel로 실행합니다.

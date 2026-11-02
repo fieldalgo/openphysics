@@ -28,7 +28,7 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 열전도 | 정상·등방 2D 열전도, Dirichlet·처방 열유속·Robin 경계, 변별 상수 경계 데이터를 받는 직사각형 헤드리스 JSON 경로와 전용 Studio 화면 | [열전도 API](packages/galerkin/thermal_steady2d.md), [열유속·Robin](packages/galerkin/thermal_flux_robin.md), [열전도 JSON](packages/simcase/thermal_steady2d.md), [경계조건 JSON](packages/simcase/thermal_steady_boundary2d.md), [Studio](packages/simcase/thermal_studio.md) |
 | 과도 열전도 | 2D Python 엔진과 직사각형 headless JSON/API/CLI/save, 고정 P1·일관 질량·후진 Euler, 상수 등방 물성·명시 시간·표본 Dirichlet/단열, 전용 Studio 시간·장·이력 화면 | [과도 열전도](packages/galerkin/transient_heat.md), [문서](packages/simcase/thermal_transient2d.md), [검증](packages/galerkin/transient_heat_validation.md), [Studio](packages/simcase/thermal_transient_studio.md) |
 | 재료 영역 | Python에서 정상·과도 열전도, 탄성, 열팽창, 두 열전도→기계 workflow에 쓰는 2D 메시 이름 영역별 상수·등방 재료, 배경 위에 도형을 놓는 정상·과도 열전도 JSON 문서 | [영역 재료](packages/galerkin/multimaterial.md), [영역 문서](packages/simcase/thermal_regions2d.md) |
-| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중 | [탄성](packages/galerkin/elasticity2d.md), [표면하중](packages/galerkin/elasticity_traction.md) |
+| 고체역학 | 정적 2D 선형탄성, 평면응력·평면변형률, 전역 Cartesian 경계 표면하중; 변별 변위 성분·변 표면하중·상수 체적력을 쓰는 headless 직사각형 JSON 문서 | [탄성](packages/galerkin/elasticity2d.md), [표면하중](packages/galerkin/elasticity_traction.md), [JSON 계약](packages/simcase/mechanics2d.md) |
 | 열팽창 | 처방 절점 온도장의 기계해석, 선택적 전체 표면하중, 명시적인 동일 메시 정상 열전도→기계 workflow | [처방 온도](packages/galerkin/prescribed_temperature_thermoelasticity.md), [전체 표면하중](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md) |
 | Joule heating | 온도독립 또는 온도의존 전기전도도, 요소별 발열 전달과 열 에너지 수지를 검증하는 같은 메시의 명시적 정상 전기→열 Python workflow | [Joule workflow](packages/galerkin/joule_heating.md) |
 | 과도 열응력 | 같은 고정 메시에서 저장된 과도 열전도 시간 중 고른 시간마다 준정적 선형 미소변형 기계해석, 명시적인 두 번째 Python 호출 | [과도 열전도→기계](packages/galerkin/transient_thermal_mechanical.md) |
@@ -44,14 +44,16 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 정상 열전도 | 지원 | 직사각형 `thermal.steady2d` | 전용 화면 |
 | 과도 열전도 | 지원 | 직사각형 `thermal.transient2d` | 전용 화면 |
 | 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 영역 한도 안에서 전용 화면 |
-| 탄성·열팽창·열전도→기계 | 지원 | 미지원 | 미지원 |
+| 선형탄성 | 지원 | 균질 직사각형 `mechanics.elasticity2d` | 미지원 |
+| 열팽창·열전도→기계 | 지원 | 미지원 | 미지원 |
 | 정상 Joule heating | 지원 | 균질 직사각형·상수/σ(T) | 미지원 |
 
 Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은 아닙니다.
 
 선택 extra `simcase[export]`를 설치하면 저장된 결과를 ParaView용 VTU 파일로 쓸 수 있습니다.
 대상은 Dirichlet·단열 변만 쓰는 직사각형 정상 열전도, 직사각형 과도 열전도,
-재료 영역이 있는 정상·과도 열전도, 공동(진공 PEC, 또는 재료·손실 벽)입니다. 과도 열전도는
+재료 영역이 있는 정상·과도 열전도, 전기전도·Joule heating, 선형탄성, 공동(진공 PEC, 또는
+재료·손실 벽)입니다. 과도 열전도는
 한 시각 또는 저장된 모든 시각을 `.pvd` 시계열로 내보냅니다.
 [ParaView로 보기](packages/simcase/overview.md#paraview로-보기)를 참고하세요.
 
@@ -61,15 +63,16 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
   열역학적 완전 피드백 연성은 지원하지 않습니다.
 - 과도 열전도는 restart·과도 flux/Robin 입력·자동 연성을 제공하지 않습니다.
 - 정상 열전도→기계 workflow는 별도 Robin·열유속·표면하중 확장을 아직 받지 않습니다.
-- 기계해석(탄성, 열팽창, 열전도→기계)과 2D 정전기·산란은 Python 전용입니다.
+- 열팽창, 열전도→기계, 2D 정전기·산란은 Python 전용입니다. 탄성 문서는 변마다 상수인
+  데이터를 쓰는 균질 직사각형 하나만 다루며 영역이나 열탄성 연계는 없습니다.
 - 2D 열전도와 기계해석은 단위 깊이당 평면 모델입니다. JSON 열전도 문서는 계산 영역(domain)의
   바깥 네 변에만 경계조건을 줍니다.
 - `em.modes2d`는 수동 흡수와 [PML·누설·일정 반경 모드](packages/simcase/pml_modes.md)를
   지원합니다. 후보는 별도 PML/메시 수렴 확인이 필요합니다. 가변 곡률·비선형 역학·형상 sweep은
   지원하지 않습니다.
-- Studio는 3D 모델을 거절하고, 재료 영역이 있는 열전도 문서는 영역 한도 안에서만 받으며, 기계해석 폼이 없습니다.
+- Studio는 3D 모델과 기계해석 문서를 거절하고, 재료 영역이 있는 열전도 문서는 영역 한도 안에서만 받으며, 기계해석 폼이 없습니다.
 - VTU 내보내기는 도파 모드를 거절합니다. 정상 열전도·Joule 문서의 flux/Robin 하중 배열은
-  내보내며, 복소 공동 장은 `_real`/`_imag` 쌍으로 씁니다.
+  내보내며, 복소 공동 장은 `_real`/`_imag` 쌍으로, 탄성 변형률·응력은 이름 붙은 스칼라 성분으로 씁니다.
 
 ## 패키지 구성
 
