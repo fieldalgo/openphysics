@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Docs: the package READMEs and docs overviews list landed features they had omitted: galerkin's steady electric conduction, one-way and temperature-dependent Joule heating, JAX/PyTorch derivatives and the coupling layer; meshine's `extrude` and the tetrahedral mesh contract (the "2D only" limit is gone); refsol's `thermal_multilayer`, `transient_heat_multilayer` and `elasticity_multilayer`. The entry pages describe the workspace's steady heat plate and its optical shapes, and every English page now links its Korean twin and back.
+
 - CI: the pinned GitHub Actions move to their Node 24 releases (`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6) ahead of GitHub's Node 20 retirement; the checks and artifact names are unchanged.
 
 - CI: a daily, non-required `Latest dependencies` canary (`.github/workflows/latest-deps.yml`) installs the packages with the newest dependencies their metadata allows, runs `pip check`, the license inventory check, the preflight groups, the non-slow suite and the forced-kernel tests, and opens, updates or closes one issue with the resolved versions. Pins are still updated deliberately. [Documentation](docs/development.md#latest-dependencies-canary).
