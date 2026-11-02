@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `physmat`: Cu와 Al의 열전도율을 Hust & Lankford(1984, NBSIR 84-3007) 식으로 잔류저항비 RRR을 순도 매개변수로 하는 온도의 함수로 추가했습니다(기본 RRR 100; `physmat.HustLankford`, `physmat.thermal`, 텅스텐은 모델로 포함). 1 K부터 녹는점까지 유효하며 `OutOfRange`/`strict`를 따릅니다. 보고서 표를 1.5 % 이내(Cu, Al), NIST 극저온 OFHC 적합식을 2.3 % 이내, Ho, Powell & Liley 1972를 4.3 % 이내로 재현합니다. 300 K 상수 401/237 W/(m K)는 함수값 397/234가 됩니다. [문서](packages/physmat/overview.md#금속-열전도율의-온도-의존성-hust--lankford-1984).
+
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
