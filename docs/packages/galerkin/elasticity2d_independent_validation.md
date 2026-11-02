@@ -1,5 +1,7 @@
 # Independent acceptance of 2D elasticity
 
+[한국어](../../locales/ko/pages/packages/galerkin/elasticity2d_independent_validation.md)
+
 This validation adds independent polynomial fields and tests without changing
 `galerkin.elasticity`, `refsol.elasticity`, or their existing tests. The inspected
 implementation is commit `52ede82a5e1390c3a14b41be0b7fa70d4f035c08`.

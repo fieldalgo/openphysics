@@ -95,7 +95,7 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))
 경계 성분의 traction은 모두 0입니다. x만 처방하면 경계 하중이 없는 한 y traction은
 0으로 남습니다. 선택적 `traction` 매핑으로 0이 아닌 전역 Cartesian 경계 traction을
 지원합니다. tag·콜백 법선·consistent 적분·처방 DOF의 하중은
-[traction 가이드](../../../../../packages/galerkin/elasticity_traction.md)를 보십시오. 점하중·주기 구속·다점
+[traction 가이드](elasticity_traction.md)를 보십시오. 점하중·주기 구속·다점
 구속은 지원하지 않습니다. 이 첫 API는 내부 처방 변위를 거부합니다.
 
 체적력 콜백은 모든 구적 좌표를 실수 `(Q,2)` 배열로 받고 정확히 같은 shape의 유한
