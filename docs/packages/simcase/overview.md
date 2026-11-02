@@ -181,7 +181,14 @@ axis. They load with `numpy.load(..., allow_pickle=False)`. The scalar `fields`
 key is absent for vector data. `field_representation="vector-edge-nodal-v1"`
 in the archive and summary identifies this layout. Summary metadata includes
 the requested/returned mode counts, normalization and declared coordinate units.
-The model JSON format remains `"openphysics": "0.2"`.
+Every `em.modes2d` result, scalar or vector, also records the saved file layout
+`field_layout="em-modes2d-p1-node-centroid-v1"` (P1 nodal fields; vector results
+add the centroid electric field), `mesh_length_unit` (the declared unit of
+`nodes`) and `length_unit_to_m` (that unit in metres) in both files, and
+`study_parameter` (the swept path, `""` for a single point) in the archive. A
+subspace sweep records `field_layout="em-modes2d-subspace-raw-v1"` instead.
+Existing keys keep their meaning. The model JSON format remains
+`"openphysics": "0.2"`.
 
 Studio receives `vector_fields` with `location="triangle_centroids"`, component
 names and separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point.
