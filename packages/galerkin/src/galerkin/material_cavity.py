@@ -1,7 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""PEC box resonances with box-shaped dielectric/magnetic, possibly lossy, regions.
+"""Cavity resonances with dielectric/magnetic, possibly lossy, regions and impedance walls.
+
+``solve_material_cavity_box`` places axis-aligned material boxes in its own Kuhn
+box; ``solve_material_cavity`` takes any tetrahedral mesh of the format in
+docs/packages/galerkin/mesh3d_format.md with materials per named region and
+walls per face tag. Both share the assembly, search and checks below.
 
 Time convention exp(+j*omega*t): passive materials have eps_r = eps' - j*eps''
 with eps'' >= 0 (likewise mu_r), and decaying resonances have Im(omega) > 0.
@@ -27,7 +32,9 @@ from .mesh3d import Mesh3D
 from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
 from .core.spaces import edge_ids
-from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
+from ._cavity_common import (C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh,
+                             face_edge_ids, gradient_incidence, gradient_potentials,
+                             normalized_mesh, refuse_live_mesh_inputs, search_parameters)
 from .core.checks import positive_integer, positive_real, refuse_live, triple
 
 _INDEPENDENCE_LIMIT = 1e-6
@@ -93,6 +100,7 @@ class MaterialCavityResult:
     search: str = "near_target"
     cluster_completeness: str = "not_certified"
     mode_count_policy: str = "exact_count_may_split_cluster"
+    gradient_kernel_dimension: int = 0
 
 
 def _material(value, name):
@@ -377,25 +385,115 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
             or min(sigma, eigenvalue_scale, field_scale) <= 0):
         raise ValueError("box lengths and target exceed the supported floating-point range")
 
-    normalized_mesh = cavity_mesh(normalized_lengths, cells)
-    centroid_grid = (normalized_mesh.nodes[normalized_mesh.tets].mean(axis=1)
-                     / normalized_lengths * np.asarray(cells))
-    eps = np.ones(normalized_mesh.num_tets, dtype=complex)
-    mu = np.ones(normalized_mesh.num_tets, dtype=complex)
+    mesh = cavity_mesh(normalized_lengths, cells)
+    centroid_grid = (mesh.nodes[mesh.tets].mean(axis=1) / normalized_lengths * np.asarray(cells))
+    eps = np.ones(mesh.num_tets, dtype=complex)
+    mu = np.ones(mesh.num_tets, dtype=complex)
     for planes, eps_value, mu_value in materials:
         inside = np.all((centroid_grid > planes[:, 0]) & (centroid_grid < planes[:, 1]), axis=1)
         eps[inside], mu[inside] = eps_value, mu_value
-    lossless = bool(np.all(eps.imag == 0) and np.all(mu.imag == 0) and not lossy_walls)
 
-    space = EdgeSpace3D(normalized_mesh)
-    walls = _wall_faces(normalized_mesh, normalized_lengths)
+    space = EdgeSpace3D(mesh)
+    walls = _wall_faces(mesh, normalized_lengths)
     pec_faces = [walls[w] for w in WALLS if conductivity[w] is None]
     pec = (_face_edge_ids(space, np.concatenate(pec_faces)) if pec_faces
            else np.array([], dtype=int))
-    free = np.setdiff1d(np.arange(space.num_edges), pec)
     # Gradients of interior nodal potentials are the kernel with any wall mix:
     # their tangential traces vanish on every wall.
+    interior = np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary_nodes())
     interior_count = int(np.prod(np.asarray(cells, dtype=object) - 1))
+    mesh_si = Mesh3D(mesh.nodes * length_scale, mesh.tets.copy(), mesh.boundary, mesh.regions,
+                     mesh.region_names, tagged_faces=mesh.tagged_faces)
+    return _solve_material_cavity_numpy(
+        space, eps, mu, pec, walls, conductivity, lossy_walls, interior, [], interior_count,
+        count, target, sigma, fundamental, length_scale, eigenvalue_scale, field_scale, mesh_si)
+
+
+def _region_materials(mesh, regions):
+    """Per-tetrahedron complex (eps, mu) from {region name: (eps_r, mu_r) or eps_r}."""
+    if mesh.regions is None or mesh.region_names is None:
+        raise ValueError("solve_material_cavity needs mesh.regions and mesh.region_names")
+    if not isinstance(regions, dict):
+        raise ValueError("regions must map every mesh region name to (eps_r, mu_r)")
+    names = list(mesh.region_names)
+    unknown = [k for k in regions if k not in names]
+    missing = [n for n in names if n not in regions]
+    if unknown or missing:
+        raise ValueError(f"regions must match mesh.region_names exactly; missing {missing}, "
+                         f"unknown {unknown}")
+    eps_table, mu_table = [], []
+    for name in names:
+        value = regions[name]
+        refuse_live_mesh_inputs("solve_material_cavity", value)
+        if isinstance(value, (tuple, list)):
+            if len(value) != 2:
+                raise ValueError(f"regions[{name!r}] must be (eps_r, mu_r) or a single eps_r")
+            eps_value, mu_value = value
+        else:
+            eps_value, mu_value = value, 1.0
+        eps_table.append(_material(eps_value, f"regions[{name!r}] relative permittivity"))
+        mu_table.append(_material(mu_value, f"regions[{name!r}] relative permeability"))
+    ids = mesh.regions
+    return np.asarray(eps_table)[ids], np.asarray(mu_table)[ids]
+
+
+def _wall_table(mesh, walls):
+    """{tag: conductivity or None} over every tagged face, PEC where not listed."""
+    tags = list(mesh.tagged_faces)
+    if walls is None:
+        return dict.fromkeys(tags)
+    if not isinstance(walls, dict):
+        raise ValueError("walls must map face tags to a conductivity in S/m or None for PEC")
+    unknown = sorted(set(walls) - set(tags), key=str)
+    if unknown:
+        raise ValueError(f"walls: unknown face tag(s) {unknown}; this mesh carries {sorted(tags)}")
+    return {tag: (None if walls.get(tag) is None
+                  else positive_real(walls[tag], f"walls[{tag!r}]")) for tag in tags}
+
+
+def solve_material_cavity(mesh, *, regions, walls=None, num_modes=6,
+                          target_frequency_hz) -> MaterialCavityResult:
+    """Solve a cavity on an external mesh with materials per region and walls per face tag.
+
+    mesh: ``galerkin.Mesh3D`` in metres with regions and tagged outward faces
+        (docs/packages/galerkin/mesh3d_format.md); checked on entry.
+    regions: ``{region name: (eps_r, mu_r)}`` or ``{name: eps_r}`` (mu_r = 1) for
+        every ``mesh.region_names`` entry; complex under exp(+j*omega*t), passive.
+    walls: None (every tagged face PEC) or ``{face tag: conductivity S/m or None}``;
+        tags not listed are PEC, listed finite conductivities take the Leontovich
+        impedance condition of the box solver.
+    num_modes, target_frequency_hz: as in ``solve_material_cavity_box``.
+
+    Every tagged face is a wall (PEC or impedance), so the gradient kernel is
+    spanned by the potentials constant on each boundary component; its dimension
+    is counted from the mesh and verified on the dense path. NumPy only: JAX or
+    PyTorch values raise TypeError. The returned mesh is the one given.
+    """
+    refuse_live_mesh_inputs("solve_material_cavity", target_frequency_hz, num_modes)
+    scaled, length_scale, lengths = normalized_mesh(mesh, "solve_material_cavity")
+    count, target, sigma, fundamental, eigenvalue_scale, field_scale = search_parameters(
+        lengths, length_scale, target_frequency_hz, num_modes)
+    eps, mu = _region_materials(scaled, regions)
+    conductivity = _wall_table(scaled, walls)
+    tags = list(scaled.tagged_faces)
+    lossy_walls = [tag for tag in tags if conductivity[tag] is not None]
+    space = EdgeSpace3D(scaled)
+    faces = dict(scaled.tagged_faces)
+    pec_faces = [faces[t] for t in tags if conductivity[t] is None]
+    pec = (face_edge_ids(space, np.concatenate(pec_faces)) if pec_faces
+           else np.array([], dtype=int))
+    unit_nodes, components, kernel_count = gradient_potentials(scaled, scaled.faces_tagged(*tags))
+    return _solve_material_cavity_numpy(
+        space, eps, mu, pec, faces, conductivity, lossy_walls, unit_nodes, components, kernel_count,
+        count, target, sigma, fundamental, length_scale, eigenvalue_scale, field_scale, mesh)
+
+
+def _solve_material_cavity_numpy(space, eps, mu, pec, walls, conductivity, lossy_walls, unit_nodes,
+                                 components, interior_count, count, target, sigma, fundamental,
+                                 length_scale, eigenvalue_scale, field_scale, mesh_si):
+    """Assembly, search and checks on a normalized mesh; shared by both entry points."""
+    lossless = bool(np.all(eps.imag == 0) and np.all(mu.imag == 0) and not lossy_walls)
+    free = np.setdiff1d(np.arange(space.num_edges), pec)
     physical_count = len(free) - interior_count
     if count > physical_count:
         raise RuntimeError(f"requested {count} modes but this mesh has only "
@@ -424,16 +522,11 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
         return result.tocsc()
 
     try:
-        mesh = space.mesh
-        interior = np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary_nodes())
-        gradient = sp.coo_matrix(
-            (np.tile([-1.0, 1.0], len(free)),
-             (np.repeat(np.arange(len(free)), 2), space.edges[free].ravel())),
-            shape=(len(free), mesh.num_nodes)).tocsc()[:, interior]
+        gradient = gradient_incidence(space, free, unit_nodes, components)
         # Complex-symmetric projector P = I - C (C^T M C)^-1 C^T M (no conjugation).
         mass_gradient = (mass @ gradient).tocsc()
         gradient_lu = (spla.splu((gradient.T @ mass_gradient).tocsc(), permc_spec=_ORDERING)
-                       if len(interior) else None)
+                       if gradient.shape[1] else None)
         projector = (gradient, mass_gradient, gradient_lu)
         def solve(matrix, shift, wanted, start=None):
             return _nearest_eigenpairs(matrix, mass, projector, shift, wanted, dense,
@@ -537,8 +630,6 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
     coefficients = np.zeros((space.num_edges, count), dtype=complex)
     coefficients[free] = vectors
     electric = np.stack([eval_edge_field_3d(space, coefficients[:, j]) for j in range(count)])
-    mesh_si = Mesh3D(normalized_mesh.nodes * length_scale, normalized_mesh.tets.copy(),
-                     normalized_mesh.boundary, normalized_mesh.regions, normalized_mesh.region_names)
     eigenvalues = values * eigenvalue_scale
     frequencies = (C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
     with np.errstate(divide="ignore"):
@@ -552,4 +643,5 @@ def solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=
         raise RuntimeError("cavity SI output exceeds the supported floating-point range")
     return MaterialCavityResult(mesh_si, EdgeSpace3D(mesh_si), frequencies, frequencies.real.copy(),
                                 quality, eigenvalues, coefficients, electric, residuals, pec,
-                                eps, mu, count, target, lossless, conductivity, iterations)
+                                eps, mu, count, target, lossless, dict(conductivity), iterations,
+                                gradient_kernel_dimension=int(interior_count))

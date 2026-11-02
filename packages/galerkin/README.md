@@ -25,7 +25,10 @@ references and fixed thresholds.
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](../../docs/packages/galerkin/eigenspace_reliability.md), [milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | Mode power (Faraday-route Poynting integral), field overlaps, normalisation, coupling efficiency and confinement factor of vector and scalar modes | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, scalar twins | [Contract and validation](../../docs/packages/galerkin/mode_overlap.md) | — |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](../../docs/packages/galerkin/cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
+| 3D vacuum PEC cavity on an external tetrahedral mesh (meshine, gmshio), PEC on chosen face tags | `solve_cavity` | [Cavity API, external meshes](../../docs/packages/galerkin/cavity_solver.md#external-meshes), [mesh format](../../docs/packages/galerkin/mesh3d_format.md) | — |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](../../docs/packages/galerkin/material_cavity.md) | — |
+| 3D cavity on an external mesh with lossy materials per region and PEC or impedance walls per face tag | `solve_material_cavity` | [Material cavity, external meshes](../../docs/packages/galerkin/material_cavity.md#external-meshes) | — |
+| Steady 3D heat conduction on tetrahedral meshes, isotropic per region, Dirichlet faces and insulation | `galerkin.thermal3d.solve_steady_heat_3d` | [Contract and validation](../../docs/packages/galerkin/thermal3d.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](../../docs/packages/galerkin/thermal_steady2d.md), [validation](../../docs/packages/galerkin/thermal_independent_validation.md) | [thermal_steady2d.py](../../examples/galerkin/thermal_steady2d.py) |
 | Steady 2D electric conduction, isotropic region conductivity, voltage/current/insulation sides and explicit Neumann gauges: V, E, J and elementwise Joule heat | `galerkin.electric.solve_steady_electric` | [Contract and validation](../../docs/packages/galerkin/electric_steady2d.md) | [electric_steady2d.py](../../examples/galerkin/electric_steady2d.py) |
 | Same-mesh steady electric to heat (one-way) | `galerkin.joule_heating.solve_steady_joule_heat` | [API, units and validation](../../docs/packages/galerkin/joule_heating.md) | [joule_heating.py](../../examples/galerkin/joule_heating.py) |
@@ -70,8 +73,9 @@ automatically appear there.
   local-frame or follower-load API.
 - `solve_cavity_box` handles a vacuum rectangular PEC box;
   `solve_material_cavity_box` adds box-shaped lossy regions and
-  finite-conductivity walls. Read their contracts for near-target search
-  limitations.
+  finite-conductivity walls. `solve_cavity` and `solve_material_cavity` take an
+  external tetrahedral mesh ([format](../../docs/packages/galerkin/mesh3d_format.md)) with no derivative path.
+  Read their contracts for near-target search limitations.
 - The 3D sparse direct factorization is comfortable to about 25k edge degrees
   of freedom on four cores; larger problems need iterative solvers.
 
@@ -87,7 +91,7 @@ src/galerkin/
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
   mode_overlap.py # Mode power, overlaps, normalisation, coupling efficiency, confinement (vector and scalar)
-  mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
@@ -95,6 +99,7 @@ src/galerkin/
   _cavity_common.py  # Box mesh and numerical limits the two cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  thermal3d.py    # Steady heat on tetrahedral meshes: P1, Dirichlet faces, insulation
   electric.py     # Steady electric conduction
   materials.py    # Scalar or {region name: value} material lookup
   heat_source.py  # Elementwise volumetric heat sources bound to one mesh
@@ -119,7 +124,8 @@ and the documentation are outside the package, at the repository root:
 `tetrahedra`, `regions`, `region_names` and boundary edges or faces, and
 `Mesh.by_region({"core": ..., "clad": ...})` turns region names into a
 per-element material array. It is verified against meshine and gmshio; neither
-is a dependency of the engine.
+is a dependency of the engine. The 3D shape, its rules and the wall-naming
+schemes are in the [tetrahedral mesh format](../../docs/packages/galerkin/mesh3d_format.md).
 
 Two readers exist for Gmsh `.msh` files, with different roles. `gmshio` is the
 canonical one for new code: it reads MSH 4.1 with the full Gmsh element set and

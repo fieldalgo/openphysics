@@ -17,7 +17,8 @@ print(result.frequencies_hz)
 This API solves a vacuum rectangular box starting at `(0, 0, 0)`, with a perfect
 electric conductor on all six walls. It uses a conforming alternating Kuhn mesh (six
 tetrahedra per Cartesian cell) and the existing lowest-order Nedelec edge elements. It has no
-material, loss, open-boundary, arbitrary-CAD or sweep options.
+material, loss, open-boundary or sweep options. The same solver runs on a mesh built
+elsewhere through `solve_cavity` ([External meshes](#external-meshes)).
 
 The fixed cube and rectangular-box convergence gates below pass with the
 alternating mesh. Algebraic residuals and continuum discretization error are
@@ -155,6 +156,53 @@ eigenvalues, non-finite output, failed factorization, nonconvergence, or failed
 quality checks raise `RuntimeError` with no partial result. A target at a discrete
 eigenvalue can make the shifted factorization singular; choose a nearby target.
 No silent count reduction, zero padding or tolerance relaxation is performed.
+
+## External meshes
+
+`solve_cavity(mesh, *, pec_faces=None, num_modes=6, target_frequency_hz)` runs
+the same assembly, projected search and checks on any tetrahedral mesh of the
+[tetrahedral mesh format](mesh3d_format.md): a `galerkin.Mesh3D` with tagged
+outward faces, from `from_mesher` of a meshine or gmshio mesh or from `box_mesh`,
+coordinates in metres. The mesh is checked on entry (`Mesh3D.check`).
+
+- `pec_faces`: the face tags that carry the perfect conductor; `None` means every
+  tagged face. Faces left out keep the natural condition `n x curl E = 0`
+  (perfect magnetic conductor). Unknown tags raise `ValueError`.
+- `num_modes`, `target_frequency_hz`: as above. JAX or PyTorch values raise
+  `TypeError`: the derivative path exists only for `solve_cavity_box`'s lengths.
+- The mesh is scaled by its longest bounding-box edge; the kernel cutoff
+  `1e-8 * fundamental` uses the lowest TE resonance of that bounding box, so a
+  domain much smaller than its bounding box has a lower (more conservative) cutoff.
+- The result's `mesh` is the one given; `pec_face_tags` records the tags and
+  `gradient_kernel_dimension` the counted kernel.
+
+The gradient kernel is counted from the PEC surface instead of the box formula:
+on the free edges the curl-curl kernel consists of the gradients of nodal
+potentials that are constant on each connected component of the PEC surface
+(nodes joined by PEC edges), modulo constants, so its dimension is
+`(nodes not on PEC) + max(components, 1) - 1`. With all six walls PEC and a
+connected boundary this is the number of interior nodes, the count the box
+solver always used; with PEC on `z0` and `z1` only it is the free nodes plus one.
+The dense path (<= 256 free edges) recounts the kernel from the spectrum and
+refuses a mismatch; the projector uses the same potential basis. On meshes with
+unconstrained holes (harmonic fields that are not gradients) the count is too
+small and the dense check fails: such domains are outside this contract.
+
+`tests/galerkin/test_cavity_mesh.py` grades the mesh route on meshes that
+`meshine.extrude` builds from an unstructured footprint of the 1.0 x 0.8 x 0.6 m
+box (no Gmsh), target the mean of the three lowest resonances:
+
+| Gate | Requirement | Measured (Linux, this change) |
+| --- | --- | --- |
+| M1 TM110, TE101, TE011 against the analytic cavity at sizes 0.2, 0.1, 0.05 m | order >= 1.8 (least-squares slope of the worst relative error), finest <= 2e-3 | worst relative errors 2.34e-2, 6.26e-3, 1.64e-3; order 1.918 |
+| M2 the box solver's own alternating Kuhn mesh (2,2,2 dense and 4,3,3 sparse) through both routes | relative frequency difference <= 1e-10 | 0 (bit-identical on both paths) |
+| M2 extruded mesh against `solve_cavity_box` at matching subdivisions | difference decreases with refinement; orders reported | 1.83e-2, 5.16e-3, 1.38e-3; orders 1.83, 1.91 |
+| Gradient kernel on the 2x2x2 box with PEC on all walls, on `z0`+`z1`, on `z0`, on none | counted kernel 1, 10, 18, 26 confirmed by the dense spectrum | passes |
+| PEC on `z0`+`z1` only, PMC sides, 6x5x4 box | lowest two resonances c/(2a), c/(2b) within 2e-2 | passes |
+
+The extruded mesh is not the alternating Kuhn mesh (the prism split follows the
+vertex order, the Kuhn box reflects per cell parity), so the two routes agree
+only in the limit; on the same mesh they agree to roundoff.
 
 ## Reproducible validation and convergence repair
 

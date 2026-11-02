@@ -39,6 +39,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - galerkin: `galerkin.mode_overlap` — 모드 전력(정확한 edge 질량과 edge-절점 결합 행렬로 계산한 Faraday 경로 복소 Poynting 적분), 교차 전력, 장 중첩과 중첩 행렬, power/mass/peak 정규화, 결합 효율(퇴화 공간 사영 포함), 에너지 구속 계수, 주어진 장의 Nédélec/P1 보간, P1 스칼라 쌍; NumPy 전용. refsol slab·광섬유 장으로 검증했습니다. [계약과 검증](packages/galerkin/mode_overlap.md).
 - `galerkin-refsol`: 참조 모듈 셋 추가. `refsol.lossy_slab`은 복소 유전율 다층 슬랩(흡수 결합 모드와 기판 누설 모드, 명시한 sheet 선택, 잔차 ≤ 1e-12, 1차 섭동·터널링 검증)을 풀고 galerkin 스칼라/벡터·PML 모드 솔버를 2차 수렴으로 평가합니다. `refsol.joule_slab`은 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정확한 1D 정상 Joule 가열 슬랩(erf/erfi 폐형식, 전류 구동 fold)을 제공하고 `solve_temperature_joule_heat`를 2차 수렴으로 평가합니다. `refsol.bent_slab`(선택적 mpmath)은 복소 차수 Bessel 정합으로 일정 반경 굽은 슬랩 극점을 제공합니다. [문서](packages/galerkin-refsol/overview.md).
 - `galerkin`: `galerkin.electrostatics` 추가 — 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기와 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬(실수 또는 손실 복소 유전율; 실수 입력의 JAX/PyTorch 미분); `refsol.electrostatics`에 동축·두 층 평행판 정전용량 레퍼런스 추가. [문서](packages/galerkin/electrostatics.md).
+- `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
+- `galerkin`: `solve_cavity`·`solve_material_cavity`가 외부 사면체 메시(meshine, gmshio)에서 면 태그별 PEC·임피던스 벽과 영역별 재료로 공진기를 풉니다. gradient kernel은 구속 표면에서 셉니다. 상자 솔버는 비트 단위로 동일하고 메시 변형에는 미분 경로가 없습니다. [문서](packages/galerkin/cavity_solver.md#외부-메시), [재료 공진기](packages/galerkin/material_cavity.md#외부-메시).
+- `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, 영역별 열전도율·열원, Dirichlet 면과 단열, W 단위 열수지 검사를 갖는 사면체 메시의 P1 정상 열전도; `refsol.thermal3d` 기준해. [문서](packages/galerkin/thermal3d.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 

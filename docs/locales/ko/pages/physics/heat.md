@@ -29,6 +29,7 @@ Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직
 ## Python 계약과 수식
 
 - [정상 2차원 열전도](../packages/galerkin/thermal_steady2d.md)
+- [사면체 메시의 정상 열전도](../packages/galerkin/thermal3d.md)
 - [정상 2D 외향 열유속과 대류](../packages/galerkin/thermal_flux_robin.md)
 - [고정 P1 메시의 과도 열전도](../packages/galerkin/transient_heat.md)
 - [이름 있는 영역별 구간 상수 재료](../packages/galerkin/multimaterial.md)
