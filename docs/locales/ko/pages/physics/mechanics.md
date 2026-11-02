@@ -12,7 +12,11 @@
 
 ## 실행 경로와 한계
 
-Python 전용이며 역학 JSON/CLI와 Studio 양식은 없습니다. 선형 소변형률 역학이고 열→역학은 열로 되먹임 없는 단방향입니다. 정상 연계 흐름이 별도 flux/Robin/traction 확장을 자동으로 지원하지는 않습니다. 과도 열 snapshot의 역학은 준정적이며 구조 동역학이 아닙니다.
+균질 직사각형 하나의 정적 선형탄성은 JSON/CLI로도 headless 실행합니다([선형탄성 문서](../packages/simcase/mechanics2d.md): 평면응력·평면변형률, 변별 변위 성분, 직교좌표계 변 traction, 상수 체적력). 열팽창과 열→역학은 Python 전용이며 Studio에는 역학 양식이 없습니다. 선형 소변형률 역학이고 열→역학은 열로 되먹임 없는 단방향입니다. 정상 연계 흐름이 별도 flux/Robin/traction 확장을 자동으로 지원하지는 않습니다. 과도 열 snapshot의 역학은 준정적이며 구조 동역학이 아닙니다.
+
+## JSON/CLI 문서
+
+- [선형탄성 문서](../packages/simcase/mechanics2d.md)
 
 ## Python 계약과 수식
 
