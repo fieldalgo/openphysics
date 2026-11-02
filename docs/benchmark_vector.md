@@ -1,5 +1,7 @@
 # Measuring vector mode performance
 
+[한국어](locales/ko/pages/benchmark_vector.md)
+
 From the repository root, use the editable installation and pinned environment
 described in the [development guide](development.md). No additional dependency is needed:
 

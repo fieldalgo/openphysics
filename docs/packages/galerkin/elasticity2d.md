@@ -1,5 +1,7 @@
 # Two-dimensional small-strain elasticity
 
+[한국어](../../locales/ko/pages/packages/galerkin/elasticity2d.md)
+
 Use the explicit submodule imports `galerkin.elasticity` and `refsol.elasticity`.
 This first implementation is a homogeneous, isotropic, linear, static
 displacement formulation on a conforming `galerkin.mesh.Mesh` of P1 triangles.

@@ -1,5 +1,7 @@
 # Rectangular cavity document and results
 
+[한국어](../../locales/ko/pages/packages/simcase/cavity3d.md)
+
 An `em.cavity3d` document holds one rectangular-box study. The case described
 first is a vacuum box with perfect electric conductor (PEC) conditions on all
 six faces; [Materials and conducting walls](#materials-and-conducting-walls)
