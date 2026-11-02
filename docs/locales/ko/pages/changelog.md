@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `galerkin.read_msh`가 평면 MSH 2.2/4.1 파일의 물리 그룹을 보존합니다. 물리 표면은 `regions`/`region_names`가 되고(어느 물리 표면에도 속하지 않는 삼각형은 영역 -1), 물리 곡선은 `boundary_edges`와 `boundary`가 되며, 어떤 삼각형도 쓰지 않는 절점은 버립니다. 결과는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 배열 단위로 같습니다. `write_msh`는 평면 메시의 영역마다 물리 표면 하나를 씁니다. 사면체 메시는 바뀌지 않습니다. [문서](packages/galerkin/overview.md).
+
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
