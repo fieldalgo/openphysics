@@ -24,6 +24,22 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `physmat`: Ciddor 1996의 습한 공기를 `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)`와 벡터화된 `physmat.air.refractive_index`로 추가했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기 분산, BIPM 1981/91 밀도로 0.3–1.69 µm에서 유효하며, NIST Engineering Metrology Toolbox 값을 1e-9 이내, 상온 조건의 Birch & Downs 1994를 6e-9 이내로 재현합니다. `air`는 진공 그대로입니다. 내장 재료 표는 재료별 출처를 밝힙니다. [문서](packages/physmat/overview.md#공기-ciddor-1996).
+
+- `galerkin-refsol`: 참조 모듈 셋 추가. `refsol.lossy_slab`은 복소 유전율 다층 슬랩(흡수 결합 모드와 기판 누설 모드, 명시한 sheet 선택, 잔차 ≤ 1e-12, 1차 섭동·터널링 검증)을 풀고 galerkin 스칼라/벡터·PML 모드 솔버를 2차 수렴으로 평가합니다. `refsol.joule_slab`은 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정확한 1D 정상 Joule 가열 슬랩(erf/erfi 폐형식, 전류 구동 fold)을 제공하고 `solve_temperature_joule_heat`를 2차 수렴으로 평가합니다. `refsol.bent_slab`(선택적 mpmath)은 복소 차수 Bessel 정합으로 일정 반경 굽은 슬랩 극점을 제공합니다. [문서](packages/galerkin-refsol/overview.md).
+
+- galerkin: 도파관 정식화 문서가 scalar P1·혼합 Nédélec/절점 모드 솔버, 복소 재료와 좌표 늘림 PML, 테두리 고유쌍 미분, 연성 경계, 준정적 sipi 경로를 구현된 대로 읽고 각 수식을 모듈·함수와 함께 인용합니다. [문서](packages/galerkin/waveguide_formulation.md).
+
+- 시험: galerkin의 경계 항을 같은 메시에서 scikit-fem과 비교합니다. `thermal.solve_steady_heat`의 외향 열유속·대류(Robin) 변(혼합과 Robin만), 0이 아닌 규정 변위를 둔 `elasticity.solve_elasticity`의 Cartesian traction 변, Helmholtz 조립의 1차 흡수 경계(`assemble_boundary_mass`)입니다. 행렬·하중·반력·장·에너지가 1e-13 이하로 일치합니다. [레퍼런스 도구 비교](reference-comparisons.md#현재-사례).
+
+- 도구: 설치 플랫폼 검사(`tools/check_platform_install.py`)가 이제 cavity3d, `sipi`, 완전 벡터/PML 도파로 모드 wheel 소비자를 Linux·macOS·Windows에서 실행합니다. `test_sipi_wheel.py`(거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항 비교)와 `test_vector_modes_wheel.py`(`refsol.slab`, 누설 슬래브 외향 근, PML 유무의 `vector_slab` 예제 CLI 실행)는 새 소비자입니다. cavity 소비자의 Studio 검사는 배포 검사에서 Linux에만 남습니다. Linux에서 확인했고 macOS·Windows는 CI에서 돕니다. [개발 안내](development.md#ci가-돌리는-것).
+
+- 저장소 검사: `tools/tests/test_examples_smoke.py`가 `examples/` 아래의 모든 스크립트와 JSON 문서를 임시 디렉터리에서 실행하고 종료 코드 0을 요구합니다. 약 20초를 넘는 예제는 `slow` 마커를 달았습니다. [tools/README.md](../../../../tools/README.md#examples-smoke-test)에 문서화했습니다.
+
+- 벤치마크: `benchmarks/benchmark_thermal.py`, `benchmark_elasticity.py`, `benchmark_electric.py`, `benchmark_derivatives.py`가 정상·과도 열전도, 탄성과 열탄성 traction workflow, 전기 전도·Joule 가열·온도 의존 Joule 풀이(Picard와 Newton), 그리고 forward 풀이 대 gradient(NumPy 중심 차분, 설치된 경우 JAX·PyTorch adjoint, 없으면 건너뜀)의 시간을 새 프로세스에서 재고 checkout·고정 요구사항·머신·peak RSS를 기록합니다. 전체 열·전기 호출 옆에 공개 assembly 함수의 시간도 잽니다. 사람이 손으로 실행하며 CI는 실행하지 않습니다. 안내: [열전도](benchmark_thermal.md), [탄성](benchmark_elasticity.md), [전기](benchmark_electric.md), [미분](benchmark_derivatives.md).
+
+- 문서: 패키지 README와 문서 개요에 빠져 있던 기능을 추가했습니다. galerkin의 정상 전기전도, 단방향·온도 의존 Joule heating, JAX/PyTorch 미분과 coupling 계층; meshine의 `extrude`와 사면체 메시 계약("2D 전용" 한계 삭제); refsol의 `thermal_multilayer`, `transient_heat_multilayer`, `elasticity_multilayer`. 진입 문서는 workspace의 정상 열전도 판과 광학 도형을 설명하고, 모든 영문 페이지가 한국어 쌍과 서로 링크합니다.
+
 - SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
 
