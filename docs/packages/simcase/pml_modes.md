@@ -91,6 +91,11 @@ are computational covariant coefficients (physical Et in the unstretched
 window), longitudinal nodal values are physical Ez after division by h, and
 centroid electric components are divided by their Jacobian factors. Fields
 inside PML are artificial. Scalar representation is `pml-scalar-nodal-v1`.
+Both save the file layout `em-modes2d-p1-node-centroid-v1`, so `simcase.export`
+writes them like any mode result: the VTU holds the whole computational mesh,
+and its arrays cover the absorbing layer too, where they are artificial.
+`physical_bounds` in `open_boundary` marks the physical window and is not copied
+to VTU; clip to it in the viewer.
 
 The positive L2 diagnostic uses the transverse computational edge mass and
 nodal interpolation of physical Ez; on the physical window sx=sy=1. The PML

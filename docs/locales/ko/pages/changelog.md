@@ -40,6 +40,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
 - `galerkin`: `solve_cavity`·`solve_material_cavity`가 외부 사면체 메시(meshine, gmshio)에서 면 태그별 PEC·임피던스 벽과 영역별 재료로 공진기를 풉니다. gradient kernel은 구속 표면에서 셉니다. 상자 솔버는 비트 단위로 동일하고 메시 변형에는 미분 경로가 없습니다. [문서](packages/galerkin/cavity_solver.md#외부-메시), [재료 공진기](packages/galerkin/material_cavity.md#외부-메시).
 - `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, 영역별 열전도율·열원, Dirichlet 면과 단열, W 단위 열수지 검사를 갖는 사면체 메시의 P1 정상 열전도; `refsol.thermal3d` 기준해. [문서](packages/galerkin/thermal3d.md).
+- `simcase`: `em.modes2d` 결과가 저장 layout을 기록합니다. `summary.json`과 `fields.npz`에 `field_layout` `em-modes2d-p1-node-centroid-v1`(subspace sweep은 `em-modes2d-subspace-raw-v1`), `mesh_length_unit`, `length_unit_to_m`이 들어가고 archive에는 `study_parameter`도 들어갑니다. 기존 키는 바뀌지 않습니다.
+
+- `simcase`: `simcase.export.export_fields`가 단일 지점 도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`)를 미터 단위 좌표로 씁니다. 스칼라는 점 데이터 `mode_<k>`(복소면 `_real`/`_imag`), 벡터는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`과 점 데이터 `longitudinal_electric_mode_<k>_real`/`_imag`, 그리고 `triangle_regions`입니다. 새 `export_sweep`은 study 지점마다 VTU 하나와 `.pvd`를 쓰며, 단조 파장 sweep이면 timestep이 파장(문서 단위), 아니면 지점 번호입니다. PML 결과는 흡수층을 포함해 내보내고, subspace sweep과 `field_layout` 없이 저장된 결과는 거절합니다. 이전의 모든 VTU/PVD 출력은 바이트까지 같습니다. [문서](packages/simcase/overview.md#paraview로-보기).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
