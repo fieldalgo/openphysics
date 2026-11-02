@@ -14,7 +14,7 @@ Choose steady or transient heat, then rectangular or material-region geometry. B
 
 ## Execution routes and limits
 
-Python and JSON/CLI support rectangular and region models. Studio supports rectangular models, and region models within its [region limits](../packages/simcase/thermal_studio.md#region-documents). Transient heat has no flux/Robin input or restart. For a subsequent mechanical solve, use the explicit coupling route below.
+Python and JSON/CLI support rectangular and region models. Studio supports rectangular models, and region models within its [region limits](../packages/simcase/thermal_studio.md#region-documents). Transient heat takes time-independent flux/Robin sides in Python and JSON/CLI (not in Studio) and has no restart. For a subsequent mechanical solve, use the explicit coupling route below.
 
 ## Model documents and workflows
 

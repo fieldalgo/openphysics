@@ -5,7 +5,7 @@
 **At a glance**
 
 - **What it checks:** the producer-side gates for `solve_transient_heat`: exact controls, a temporal gate on the smallest Dirichlet eigenmode, and spatial gates on a manufactured sine solution.
-- **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%.
+- **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%. With outward flux or convection: slab spatial order ≥ 1.8 and temporal order ≥ 0.9 with finest relative error ≤ 2e-3, long-time agreement with `solve_steady_heat` ≤ 1e-8, per-step heat balance ≤ 1e-10, Dirichlet-only histories unchanged ([details](#outward-flux-and-convection-gates)).
 - **Scope:** the eigenmode gate measures time error only, not PDE refinement. For the result of a specific commit, see its CI run.
 
 ## Evidence
@@ -158,6 +158,41 @@ predetermined pass. It retains all requested history, so the n64 companion
 needs substantial memory. No wall time is a dedicated-host performance baseline.
 
 The distribution helper builds real sdist→wheel artifacts and checks that their package code is byte-identical to the checkout and that they carry no documents, tests or examples; pages, the example and tests are not shipped. It verifies installed origins/source bytes, copies the checkout's tracked independent consumer files and example outside the checkout, and runs the independent `--suite all` consumer and full English convergence example with `python -I` against the installed wheels. The original tests run with the whole `tests/` folder against installed wheels in `tools/run_installed_tests.py`. An implemented gate is distinct from a successful build/install run. Establish packaging, installed and numerical success from the exact current CI exits, logs and artifacts. The narrow Windows save gate is not full transient-physics acceptance; release success is separate.
+
+## Outward flux and convection gates
+
+`tests/galerkin/test_transient_heat_robin.py` and
+`tests/refsol/test_transient_heat_robin_reference.py` fix these gates for the
+`outward_flux`/`convection` keywords. The references are the independent series
+of `refsol.transient_heat_robin` (NumPy and SciPy `brentq` only, no engine
+import): a slab 0<x<L, insulated at x=0, uniform initial T0, with either
+convection h·(T−T_a) at x=L (eigenvalues β_n tan β_n = hL/k, one bracketed root
+per interval (nπ, nπ+π/2)) or a constant outward flux g at x=L; both sum their
+series until a stated tail bound falls below 1e-13 of the temperature scale
+(|T0−T_a| or |g|L/k). The reference tests check the heat equation and both
+face conditions by finite differences, the exact slab mean T0−g·t/(cL), the
+long-time limits and the truncation bound; they do not import the solver.
+
+| Gate | Fixed definition | Threshold |
+|---|---|---|
+| T1 convective slab, spatial | L=1 m, k=2.5, c=4, h=5, T_a=300, T0=350; strips of n=8/16/32 squares, 2000 steps to 0.2 s; relative L2 error of T on the 50 K rise | both orders ≥ 1.8; finest ≤ 2e-3 |
+| T1 convective slab, temporal | n=128, 4/8/16 steps to 0.2 s | both orders ≥ 0.9 |
+| T2 constant-flux slab, spatial | same slab, g=−100 W/m² at x=L (inflow), scale |g|L/k=40 K | both orders ≥ 1.8; finest ≤ 2e-3 |
+| T2 constant-flux slab, temporal | n=128, 4/8/16 steps | both orders ≥ 0.9 |
+| T3 long-time limit | 8×4 rectangle, left 320 K Dirichlet, top g=−20, right (h=5, 300 K), Q=30; 8 steps of 100 s from 320 K vs `solve_steady_heat` with the same data on the same mesh | T, C, reaction and G within 1e-8 of their scales; final storage ≤ 1e-8 |
+| T4 heat balance | the T3 problem and two disconnected Robin-only strips with offsets 350 K and −20 K, callback h and g; storage = f + reaction − G − C per step and per component; C against independently assembled h·ℓ/6·[[2,1],[1,2]] and h·T_a·ℓ/2 | ≤ 1e-10 of the largest term |
+| T5 JAX/PyTorch | histories equal NumPy; d/d(h, T_a, g, k) of a final-temperature functional vs central differences | 1e-12; relative 1e-6 (skips without the libraries) |
+| T6 Dirichlet-only | the frozen text fixture `tests/galerkin/data/transient_heat_dirichlet_48720c9.json` (origin/main solver, two cases) and no boundary sampling call | bit-identical on the recorded platform, 1e-13 elsewhere |
+
+Measured on 2026-11-02 in the development environment (Linux x86_64, NumPy
+2.5.4, SciPy 1.18.1; not a CI result): T1 spatial errors 1.34e-3, 3.29e-4,
+7.24e-5 (orders 2.03, 2.19), temporal 1.08e-2, 5.65e-3, 2.89e-3 (orders 0.94,
+0.97); T2 spatial 1.15e-3, 2.86e-4, 6.69e-5 (orders 2.01, 2.10), temporal
+7.26e-3, 3.80e-3, 1.94e-3 (orders 0.94, 0.97); T3 temperature 6.2e-15,
+convective 2.4e-16, reaction 1.2e-16, G 0; T4 mixed 8.1e-17, two Robin-only
+components 3.5e-16; T6 bit-identical; T5 skipped (JAX and PyTorch not
+installed there). The thresholds above were fixed before these runs and are
+not retuned from them.
 
 ## Bounded spatial-residual refinement
 

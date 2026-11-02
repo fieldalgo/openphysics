@@ -47,7 +47,7 @@ prints a supplied example.
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
-| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation, constant outward flux and convection | `transient_thermal_uniform`, `transient_thermal_boundary` | [Transient heat](thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](thermal_regions2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for steady and
@@ -356,7 +356,10 @@ uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
 JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
 metadata. Initial values are not projected and negative K is not clamped.
-Transient flux/Robin, restart and automatic coupling are not supported.
+Constant outward flux and convection sides (the steady contract's keys) save the
+`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
+pair with two per-step load arrays; time-dependent flux/Robin, restart and
+automatic coupling are not supported.
 
 ### Saved output
 
@@ -376,7 +379,9 @@ copy of saved rectangular steady heat (Dirichlet and insulated sides, or the
 `boundary-v2` layout with flux/convection sides and its nodal
 `prescribed_outward_load`, `ambient_load`, `convective_outward` and `system_rhs`
 arrays), rectangular transient heat (one stored time, `time_index`, default the
-last) and vacuum PEC cavity fields. Steady/transient material-region layouts are
+last; the `transient-p1-node-cell-boundary-v1` layout with flux/convection sides
+adds its per-step `prescribed_outward_load` and `convective_outward` arrays) and
+vacuum PEC cavity fields. Steady/transient material-region layouts are
 also supported, with integer cell data `triangle_regions` and the saved
 steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
 for units, the region-name mapping and an example. Electric conduction and Joule

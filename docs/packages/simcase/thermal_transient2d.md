@@ -4,8 +4,8 @@
 
 **At a glance**
 
-- **What it does:** `thermal.transient2d` connects the transient heat engine to the `simcase` document API, CLI and versioned JSON/NPZ histories: one fixed homogeneous rectangle, P1 triangles, consistent mass and backward Euler, explicit times in seconds, uniform or affine initial Kelvin, side-constant or sampled Dirichlet values and insulation elsewhere, per unit depth.
-- **Limits:** no transient flux, Robin or radiation, variable or region-dependent k/c, adaptive time steps, Crank–Nicolson, automatic coupling or restart. Initial values are not projected and finite negative Kelvin is not clamped.
+- **What it does:** `thermal.transient2d` connects the transient heat engine to the `simcase` document API, CLI and versioned JSON/NPZ histories: one fixed homogeneous rectangle, P1 triangles, consistent mass and backward Euler, explicit times in seconds, uniform or affine initial Kelvin, side-constant or sampled Dirichlet values, constant outward flux or convection sides (the steady boundary contract's keys, time-independent) and insulation elsewhere, per unit depth.
+- **Limits:** no time-dependent flux or convection, no radiation, variable or region-dependent k/c, adaptive time steps, Crank–Nicolson, automatic coupling or restart. Initial values are not projected and finite negative Kelvin is not clamped.
 - **Validation:** the engine's numerical gates are in the galerkin transient heat validation contract (linked below, unchanged); this page lists the document, adapter, installed and save checks separately. For a specific commit, see its CI run.
 
 ## Scope and evidence
@@ -50,6 +50,8 @@ Fixed SI suffixes are not converted by the geometry length unit.
 | heat_source_w_m3 | Finite signed constant Q, W/m³; default 0 |
 | initial_temperature_k | Required finite scalar K or the affine object below |
 | dirichlet_temperature_k | Required side mapping; an empty object means complete insulation |
+| outward_flux_w_m2 | Optional side-to-signed-constant g mapping, W/m²; its presence selects the boundary layout |
+| convection | Optional side-to-object mapping with exactly h_w_m2k (finite h >= 0, W/(m² K)) and ambient_temperature_k (finite K >= 0); its presence selects the boundary layout |
 | study | Only type="transient" and time_s |
 | study.time_s | At least two finite nonnegative real seconds; strictly increasing with finite positive differences; nonzero start allowed |
 | results | Boolean save_fields and plots; defaults true and false; plots=true rejected |
@@ -107,6 +109,32 @@ Consistent mass does not promise positivity or a discrete maximum principle.
 Signed Q permits heating and cooling. The separate heat-to-mechanics
 transfer still rejects negative K; this adapter does not change it.
 
+### Outward flux and convection sides
+
+`outward_flux_w_m2` and `convection` are the keys of the
+[steady boundary contract](thermal_steady_boundary2d.md), read by the same
+code: `{side: g}` with a finite signed constant g in W/m² (positive removes
+heat) and `{side: {"h_w_m2k": h, "ambient_temperature_k": T_a}}` with finite
+h >= 0 and T_a >= 0. Only `left`, `right`, `bottom`, `top` are accepted, each
+condition covers its complete exterior side, one flux plus one convection on
+the same side add, and a side that also appears in `dirichlet_temperature_k`
+is refused (`natural condition overlaps a fully Dirichlet side`). The
+condition is `q.n = g + h*(T - T_a)` as in `galerkin.thermal.solve_steady_heat`
+and `galerkin.transient_heat.solve_transient_heat`.
+
+The values are constants: no `{"values_k": [...]}` samples, callbacks or
+radiation. They are sampled once before stepping, so the transient engine's
+time-independence rule holds by construction. Unlike the steady document, no
+anchor is needed: the mass/time term keeps the system well posed, so a document
+with an empty Dirichlet mapping and h=0 is a valid insulated slab. The
+presence of either key, even as an empty mapping, selects the boundary result
+pair `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
+described below; a document without both keys keeps v1 byte for byte.
+
+The transient Studio route shows the v1 pair only and refuses such documents
+before validation (`unsupported_physics`, no job); run them headless with the
+API or CLI. Region documents do not take these keys.
+
 ## Complete minimal JSON
 
 This is the supplied `transient_thermal_uniform` example:
@@ -142,6 +170,14 @@ For time-dependent side data, an otherwise compatible model can use
 `"left": {"values_k": [300.0, 300.2, 300.6]}`.
 Every sample aligns with the corresponding requested time; selecting a
 second adjacent side requires the same sequence at the shared corner.
+
+The shipped `transient_thermal_boundary` example (`python -m simcase example
+transient_thermal_boundary`) is a 0.05 m x 0.01 m slab at 400 K, insulated
+except for `"convection": {"right": {"h_w_m2k": 500, "ambient_temperature_k": 300}}`
+(k = 50 W/(m K), c = 3.6e6 J/(m³ K), Bi = 0.5), saved at 10, 20, 40 and 80 s.
+Its field is one-dimensional in x and comparable with the convective slab
+series of `refsol.transient_heat_robin`; the
+[gates](#limitations-and-validation-stages) below record the measured agreement.
 
 ## Python API and portable CLI reproduction
 
@@ -229,6 +265,23 @@ There is no initial reaction, residual-step or storage rate; the Nt-1
 arrays align with `rate_time_s=time_s[1:]`. Empty Dirichlet maps give
 D=0 and an (Nt,0) prescribed-temperature history.
 
+With `outward_flux_w_m2` or `convection` the identifiers are
+`result_format="thermal.transient2d-result-v2"` and
+`field_layout="thermal2d-transient-p1-node-cell-boundary-v1"`, and the NPZ
+holds the thirteen arrays above plus two per-step histories:
+
+| Numeric NPZ key | Shape | Location / time axis | Unit |
+|---|---|---|---|
+| prescribed_outward_load_w_per_m | (Nt-1,N) | nodes / time_s[1:] | W/m |
+| convective_outward_w_per_m | (Nt-1,N) | nodes / time_s[1:] | W/m |
+
+They are the engine's G (the integrated prescribed outward flux, the same at
+every step) and C_n = H*T_n - B (the convective outward rate at the step end),
+and the balance becomes `storage_n = source_load_n + reaction_n - G - C_n`; the
+summary's `outward_heat_w_per_m` is then `sum(G + C_n - reaction_n)` and its
+`heat_balance_defect_w_per_m` the defect of that equation. Dirichlet
+thermostat reactions keep their sign.
+
 Positive fixed-node reaction injects heat; free-node reaction is zero.
 Outward heat is the Dirichlet thermostat contribution, not a separately
 reconstructed boundary-flux integral:
@@ -265,6 +318,11 @@ or equate direct element-flux integration with the finite-mesh weak reaction.
 - `dirichlet_nodes`, `save_fields`, `timings_s`, and text definitions
   `reaction_sign`, `balance_equation`, `heat_content_definition`,
   `quadratic_functional_definition`.
+- With the boundary layout also `outward_flux_w_m2`, `convection`,
+  `prescribed_outward_heat_w_per_m`, `convective_outward_heat_w_per_m` and
+  `thermostat_outward_heat_w_per_m` on Nt-1 steps, `outward_sign` and
+  `natural_condition`; `outward_heat_w_per_m`, `heat_balance_defect_w_per_m`,
+  `reaction_sign` and `balance_equation` then describe the three-term total.
 
 Timings distinguish adapter meshing/preparation and solver call; they are not
 a dedicated-host performance baseline or portable timing guarantee.
@@ -332,11 +390,22 @@ exists.
 
 ## Limitations and validation stages
 
-This interface does not add transient flux/Robin/radiation, variable or
-region-dependent k/c, arbitrary mesh/nodal/expression serialization,
-adaptive time steps, Crank–Nicolson, thermal Studio rendering, automatic
-coupling or restart. It does not broaden the separate steady flux/Robin
-or heat-to-mechanics document contracts.
+This interface does not add time-dependent flux or convection, radiation,
+variable or region-dependent k/c, arbitrary mesh/nodal/expression
+serialization, adaptive time steps, Crank–Nicolson, thermal Studio rendering
+of the boundary layout, automatic coupling or restart. It does not broaden the
+heat-to-mechanics document contract.
+
+Pre-registered gates for the boundary keys (`tests/simcase/test_transient_boundary.py`):
+S1 a document run equals the direct `solve_transient_heat` call bit for bit;
+S2 Dirichlet-only documents keep the v1 identifiers, arrays, summary keys and
+values; S3 the convective slab document on 40×2 cells with dt = 1 s to 80 s
+(Fo = 0.44, Bi = 0.5) matches the `refsol.transient_heat_robin` series at 80 s
+with a relative L2 error on the 100 K rise scale <= 2e-3 (2.0e-4 measured on
+2026-11-02, Linux; the shipped [20,2] example with four steps gives 5.6e-3 and
+is an illustration, not a gate); S4 invalid keys are refused with the steady
+contract's messages and no output; S5 the boundary layout exports through
+meshio with its two arrays per step while the earlier layouts are unchanged.
 
 The existing [engine numerical gates](../galerkin/transient_heat_validation.md)
 remain unchanged.
