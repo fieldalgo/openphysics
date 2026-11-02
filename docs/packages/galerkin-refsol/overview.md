@@ -35,6 +35,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
 | `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
 | `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
+| `refsol.joule_slab` | steady 1D Joule heating with `sigma = sigma0 (1 + alpha (T - T0))` between fixed potentials and temperatures: closed form in erf/erfi (`voltage_driven`), the constant-conductivity limit, current-driven states on both sides of the metal-like fold (`current_driven`, `fold_current`), temperature range for bounded conductivity models | integrated conservation laws (`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), quadrature of the module's own derivatives, finite differences, O(alpha) approach to the constant-sigma closed form, symmetry and reflection, power balance, one-parameter symmetric equation |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
@@ -140,6 +141,31 @@ stress/total traction Pa, body force N/m^3, force/reaction N/m and physical
 energy J/m. It supplies prescribed-temperature mechanical references, not a heat
 solve or source authentication.
 
+`refsol.joule_slab` solves the coupled steady equations `(sigma(T) V')' = 0`,
+`k T'' + sigma(T) V'^2 = 0` on a slab `0 <= x <= L` with fixed face potentials and
+temperatures and the linear isotropic model `sigma = sigma0 (1 + alpha (T - T0))`,
+the form a galerkin `ConductivityModel` callback evaluates. Units are SI (m, K,
+V, S/m, W/(m K), A/m^2); `alpha > 0` is a conductivity rising with temperature,
+`alpha < 0` metal-like, `alpha = 0` the parabolic constant-conductivity closed
+form. With `u = sigma/sigma0` the heat equation is `u'' = -c/u`,
+`c = alpha J^2/(k sigma0)`, whose first integral gives `u` and `x` in closed
+form through `erf` (`alpha > 0`) or `erfi` (`alpha < 0`) of the scaled slope; the
+voltage drop fixes both face slopes independently of `J`, so `voltage_driven`
+is explicit, evaluated with `erfcx`/`dawsn` so that nearly linear solutions do
+not overflow. `current_driven` finds the drop carrying a prescribed `J`; for
+`alpha < 0` the current-voltage curve folds at `fold_current` and both branches
+are available. Each `JouleSlab` returns `temperature`, `temperature_gradient`,
+`heat_flux`, `potential`, `electric_field`, `electrical_conductivity`,
+`heat_source`, `current_density`, `joule_power` (per face area,
+`J (V_a - V_b) = k (T'(0) - T'(L))`) and `temperature_range`, the interval a
+bounded model must cover. `tests/galerkin/test_joule_slab_reference.py` grades
+`solve_temperature_joule_heat` on a 1 m x 0.25 m rectangle (Picard, relaxation
+1): the RMS temperature error over the three-point triangle rule falls at second
+order (orders 2.00-2.02) to 3.5e-4 and 4.1e-4 K (`alpha = 0.5` /K, 2 V,
+symmetric and 300/304 K faces) and 2.1e-3 and 2.0e-3 K (`alpha = -0.004` /K,
+5 V) at 32 cells, with the dissipated power within 1.9e-4 relative; the
+`alpha = 0` run matches the constant-conductivity closed form.
+
 All reference modules ship in the sdist and wheel. None of them implements a
 coupled model, and independent acceptance tests derive their own expected values.
 
@@ -186,6 +212,9 @@ graders for another solver.
 - J. Hu and C. R. Menyuk, "Understanding leaky modes: slab waveguide revisited,"
   Adv. Opt. Photon. 1, 58 (2009).
 - W. C. Chew, *Waves and Fields in Inhomogeneous Media* (IEEE Press, 1995).
+- H. S. Carslaw and J. C. Jaeger, *Conduction of Heat in Solids*, 2nd ed. (Oxford, 1959).
+- A. C. Fowler, I. Frigaard and S. D. Howison, "Temperature surges in current-limiting
+  circuit devices," SIAM J. Appl. Math. 52, 998 (1992).
 - Benchmark values are Hadley's published results, cross-checked against the same
   table in the femwell project's benchmark documentation (GPL-3.0). Only the
   numerical values are reproduced; see NOTICE.
