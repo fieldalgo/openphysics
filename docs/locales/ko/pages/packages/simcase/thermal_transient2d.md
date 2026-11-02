@@ -109,8 +109,8 @@ T_a >= 0입니다. `left`, `right`, `bottom`, `top`만 허용하고 각 조건�
 `galerkin.thermal.solve_steady_heat`·`galerkin.transient_heat.solve_transient_heat`와 같은
 `q.n = g + h*(T - T_a)`입니다.
 
-값은 상수입니다. `{"values_k": [...]}` 표본, callback, 복사는 없습니다. 시간 진행 전에 한 번
-표본화하므로 과도 엔진의 시간 불변 규칙이 구조적으로 지켜집니다. 정상 문서와 달리 anchor가
+값은 상수입니다. `{"values_k": [...]}` 표본, callback, 복사는 없습니다. 문서는 상수만 넘기며
+엔진의 시간 의존 callback 형식은 문서로 노출하지 않습니다. 정상 문서와 달리 anchor가
 필요하지 않습니다. 질량/시간 항이 계를 well-posed하게 하므로 빈 Dirichlet 매핑과 h=0인 문서는
 유효한 단열 slab입니다. 두 키 중 하나가 있으면(빈 매핑이어도) 아래의 경계 결과 쌍
 `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`을 선택하고,

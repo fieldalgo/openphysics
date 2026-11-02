@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `solve_transient_heat`의 경계 데이터가 시간에 의존할 수 있습니다. g, h, T_amb는 각각 scalar, callback(points, normals), callback(time_s)->scalar 또는 callback(points, normals, time_s)->(Q,)이며 Dirichlet·source callback처럼 각 단계 끝에서 표본화합니다. H는 h가 변할 때만 다시 조립하고 정적 데이터의 결과는 이전과 비트 단위로 같습니다. JAX/PyTorch 입력은 시간 의존 g·T_amb를 지원하고 시간 의존 h는 거절합니다. 새 `refsol.transient_heat_robin` 주기 주변 온도(해석·후진 Euler 이산 진폭)와 ramp 열유속 Duhamel 기준해. 기준: 주기 진폭·위상 공간 차수 ≥1.8, 시간 ≥0.9, 최세분 ≤ A의 3e-3; ramp 열유속 차수 ≥1.8/0.9, 최세분 ≤ 상승의 2e-3; 단계별 열수지 ≤1e-10. simcase 문서는 상수 변만 유지합니다. [문서](packages/galerkin/transient_heat.md).
+
 - `physmat`: Cu와 Al의 열전도율을 Hust & Lankford(1984, NBSIR 84-3007) 식으로 잔류저항비 RRR을 순도 매개변수로 하는 온도의 함수로 추가했습니다(기본 RRR 100; `physmat.HustLankford`, `physmat.thermal`, 텅스텐은 모델로 포함). 1 K부터 녹는점까지 유효하며 `OutOfRange`/`strict`를 따릅니다. 보고서 표를 1.5 % 이내(Cu, Al), NIST 극저온 OFHC 적합식을 2.3 % 이내, Ho, Powell & Liley 1972를 4.3 % 이내로 재현합니다. 300 K 상수 401/237 W/(m K)는 함수값 397/234가 됩니다. [문서](packages/physmat/overview.md#금속-열전도율의-온도-의존성-hust--lankford-1984).
 
 - `simcase`: PML이 없는 `em.modes2d` 결과가 `mode_power`(지점 × 모드), `confinement`(지점 × 모드 × 영역, `region_names` 순서, 행의 합 1), `field_overlap`(지점 × 모드 × 모드)과, `"results": {"mode_overlap": {"gaussian": {"waist": w0, "center": [x, y]}}}`(문서 단위, 엄격 검증)가 있으면 `coupling_efficiency`(지점 × 모드)를 함께 저장합니다. 모두 문서 길이 단위의 저장 메시 위에서 `galerkin.mode_overlap`으로 계산하며 `summary.json`의 `mode_postprocessing`에 키마다 단위와 설명을 붙여 반복합니다. 벡터 `mode_power`는 저장 상대 장을 문서 길이 단위당 볼트로 읽을 때의 Poynting 전력(W; V/m이면 × `length_unit_to_m`²)이고 손실 모드에서는 복소수이며, 스칼라는 (문서 단위)²의 ∫|φ|² dA입니다. 기존 키·정규화·`field_layout`·VTU 내보내기는 바뀌지 않고, PML 결과와 subspace sweep에는 새 키가 없습니다. [문서](packages/simcase/overview.md#모드-후처리).

@@ -123,8 +123,8 @@ condition is `q.n = g + h*(T - T_a)` as in `galerkin.thermal.solve_steady_heat`
 and `galerkin.transient_heat.solve_transient_heat`.
 
 The values are constants: no `{"values_k": [...]}` samples, callbacks or
-radiation. They are sampled once before stepping, so the transient engine's
-time-independence rule holds by construction. Unlike the steady document, no
+radiation. Documents pass constants only; the engine's time-dependent callback
+forms are not exposed through documents. Unlike the steady document, no
 anchor is needed: the mass/time term keeps the system well posed, so a document
 with an empty Dirichlet mapping and h=0 is a valid insulated slab. The
 presence of either key, even as an empty mapping, selects the boundary result
