@@ -21,10 +21,13 @@ from pathlib import Path
 import numpy as np
 
 from .fields import VectorField
-from .runner import RunResult
+from .runner import RunResult, _length_unit_record
 from .subspace_tracking import columns
 
 FIELD_REPRESENTATION = "vector-subspace-edge-nodal-v1"
+#: Saved layout: raw eigenpair columns per cluster (``raw_*`` arrays), not tracked
+#: modes. Distinct from the per-mode layout so a consumer of that one refuses this.
+FIELD_LAYOUT = "em-modes2d-subspace-raw-v1"
 FRAME_NORMALIZATION = ("electric L2 orthonormal in document length coordinates "
                        "(transverse line integrals and nodal Ez; not V/m and not unit power)")
 MEAN_GROUP_INDEX_MEANING = ("derivative of the cluster mean index: n_bar - lambda d(n_bar)/d(lambda); "
@@ -104,6 +107,8 @@ class SubspaceSweepResult(RunResult):
         return {
             "name": self.doc["name"],
             "units": copy.deepcopy(self.doc["units"]),
+            "field_layout": FIELD_LAYOUT,
+            **_length_unit_record(self.doc),
             "mesh": {"nodes": int(len(self.mesh_nodes)), "triangles": int(len(self.mesh_triangles)),
                      "regions": {n: self.region_materials[n] for n in self.region_names}},
             "study": {"parameter": self.parameter, "values": [float(v) for v in self.values]},
@@ -157,6 +162,8 @@ class SubspaceSweepResult(RunResult):
             arrays = dict(
                 nodes=self.mesh_nodes, triangles=self.mesh_triangles, regions=self.mesh_regions,
                 region_names=np.array(self.region_names), values=np.asarray(self.values, dtype=float),
+                field_layout=np.array(FIELD_LAYOUT), **_length_unit_record(self.doc),
+                study_parameter=np.array(self.parameter),
                 field_representation=np.array(FIELD_REPRESENTATION),
                 cluster_ids=np.array(self.cluster_ids, dtype=np.int64),
                 cluster_offsets=np.asarray(self.cluster_offsets, dtype=np.int64),
