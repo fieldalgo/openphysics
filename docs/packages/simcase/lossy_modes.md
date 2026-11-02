@@ -55,6 +55,13 @@ in the response. Vector components retain their existing complex encoding.
 Saved PNG sweep curves show the real parts of effective and group indices,
 with explicit Re labels; JSON/NPZ retain both complex components.
 
+VTK has no complex arrays either: `simcase.export` writes a complex scalar mode
+as the point data `mode_<k>_real` and `mode_<k>_imag`, and vector modes as
+`electric_field_mode_<k>_real`/`_imag` (centroid cell data) and
+`longitudinal_electric_mode_<k>_real`/`_imag` (nodal point data), with the
+saved values unchanged. `neff` and the attenuation stay in the summary and NPZ.
+See [viewing in ParaView](overview.md#viewing-in-paraview).
+
 ## Selection, normalization and tracking
 
 Without `n_target`, the dielectric vector search uses
