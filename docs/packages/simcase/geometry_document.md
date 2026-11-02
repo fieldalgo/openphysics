@@ -788,23 +788,57 @@ Terms used in the table:
 | meshloom builders (planned) and raw-double inputs | `packages/meshloom/src/meshloom/__init__.py:41-46`; `docs/packages/meshine/validation3d.md:76-95` | Builders become stage 5 features | Raw PLC, fuzz and imported-surface inputs stay meshloom API inputs, out of scope. |
 | Wavebit RCWA and FDTD scenes | Wavebit API | Stage 3 amendment | Not part of this frozen mapping |
 
-## Appendix: walk of current examples (partial)
+## Appendix: walk of current examples
 
-**Checked:**
-- All 25 `examples/simcase/*.json` declare `units.length`.
-- Every numeric value inside their `geometry` blocks (202 values) is an integer
-  number of nm, and therefore of pm. No rounding is needed.
+The walk was made against `main` at `015a6d8`. It checks that every value which
+would become a defining value lies on the 1 pm grid in its declared unit, and
+that every name maps to an `id` without renaming.
+
+**simcase documents.** The 20 built-in examples (`packages/simcase/src/simcase/examples.py`,
+including the thermal and electric examples it registers) and the 25
+`examples/simcase/*.json` files: 45 documents, 364 numbers inside their
+`geometry` blocks.
+- All 45 declare `units.length`.
+- All 364 numbers are integer numbers of pm. No rounding is needed.
+- No shape name needs a generated `id`.
 - One rounding-level corner change is known: `pml_leaky_slab.json` (see the
   [internal grid](#internal-grid-1-pm-frozen)).
 
-**Not yet walked.** This walk is required before acceptance:
-- the built-in examples in `packages/simcase/src/simcase/examples.py` and
-  `thermal_examples.py`;
-- sipi documents in docs and tests;
-- saved Studio projects;
-- `examples/meshine/extrude_chip.py` and `examples/meshine/compare_with_gmsh.py`;
-- `examples/gmshio/hadley_rib_mesh.py`;
-- the galerkin generator examples.
+**sipi.** Every `CrossSection` and `PowerPlane` built while running `tests/sipi`
+was recorded. sipi documents in `docs/packages/sipi` contain no cross-section
+JSON, only dielectric documents.
+- 778 cross-sections, 75 distinct, with 608 length values in metres. 20 values
+  lie off the grid by at most 10⁻⁷ pm. They are floating-point residues of
+  template arithmetic, such as a width of `0.0005499999999999999` m, and would be
+  rounded once with a report.
+- The lower-left `x` of a trace written as `rect` is its centre minus half its
+  width. No recorded trace puts that value off the grid other than through the
+  same residues. An odd number of pm in width would put it half a pm off.
+- No section has a layer and a trace with the same name.
+- 8 power planes with 68 values: all on the grid.
+
+**Studio projects.** The repository holds no saved project files. The shapes in
+the Studio tests (`tests/simcase/studio_workspace_*.cjs`) are integer nm or
+0.5 nm, all on the grid. Names with spaces or markup, such as `Wedge <b>`, take a
+generated `id`, as the [mapping](#mapping-of-current-representations-frozen) says.
+
+**meshine, gmshio and galerkin examples.** `examples/meshine/extrude_chip.py`,
+`examples/meshine/compare_with_gmsh.py`, `examples/gmshio/hadley_rib_mesh.py`
+and the galerkin examples that call `rectangle_mesh`, `annulus_mesh`, `disk_mesh`,
+`layered_rectangle_mesh` and `box_mesh` use short decimal values (for example
+`rectangle(-5, -5, 5, 5)`, z levels `0, 1, 1.5, 2.5`, slab `0.3`, `0.5e-3`). All
+lie on the grid.
+- The `rest` region of `extrude_chip.py`, a rectangle with a hole, becomes a
+  `rect` feature followed by the later `die_zone` feature. The per-layer material
+  lists become `layers` entries with a `map`.
+- The rib's tiled `core`, `box` and `clad` loops become features that do not
+  overlap, so the boolean rule changes nothing.
+- The Threshold field of the gmshio rib becomes one distance-graded
+  `mesh.controls` entry on the `core` selection.
+
+**Finding: inputs without a unit.** meshine `Domain`, gmshio `Geo` and the
+galerkin generators take bare numbers. Their adapters therefore take the length
+unit from the caller and refuse to run without one.
 
 ## Stage 3 preview: Wavebit (not frozen)
 

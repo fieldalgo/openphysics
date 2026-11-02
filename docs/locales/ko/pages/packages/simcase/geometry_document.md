@@ -684,21 +684,43 @@ sipi에서 옮기는 방식:
 | meshloom 빌더(계획)와 원시 double 입력 | `packages/meshloom/src/meshloom/__init__.py:41-46`; `docs/packages/meshine/validation3d.md:76-95` | 빌더는 5단계 피처가 됨 | 원시 PLC, 퍼즈, 가져오기 곡면 입력은 meshloom API 입력으로 남으며 범위 밖 |
 | Wavebit RCWA·FDTD 장면 | Wavebit API | 3단계 보완 | 이 동결 대응표에 들어가지 않음 |
 
-## 부록: 현재 예제 점검(일부)
+## 부록: 현재 예제 점검
 
-**확인한 것:**
-- `examples/simcase/*.json` 25개는 모두 `units.length`를 선언합니다.
-- 그 `geometry` 블록 안의 숫자 값(202개)은 모두 정수 nm이므로 정수 pm입니다. 반올림이 필요 없습니다.
+점검은 `main` `015a6d8` 기준입니다. 정의 값이 될 모든 값이 선언 단위에서 1 pm 격자 위에 있는지,
+모든 이름이 이름 변경 없이 `id`로 옮겨지는지 확인했습니다.
+
+**simcase 문서.** 내장 예제 20개(`packages/simcase/src/simcase/examples.py`, 거기에 등록되는 열·전기
+예제 포함)와 `examples/simcase/*.json` 25개: 문서 45개, `geometry` 블록 안의 숫자 364개.
+- 45개 모두 `units.length`를 선언합니다.
+- 364개 모두 정수 pm입니다. 반올림이 필요 없습니다.
+- 새 `id`가 필요한 도형 이름은 없습니다.
 - 반올림 수준의 꼭짓점 변화가 하나 알려져 있습니다: `pml_leaky_slab.json`([내부 격자](#내부-격자-1-pm동결)
   참고).
 
-**아직 점검하지 않은 것.** 승인 전에 반드시 점검해야 합니다.
-- `packages/simcase/src/simcase/examples.py`와 `thermal_examples.py`의 내장 예제
-- 문서와 시험 안의 sipi 문서
-- 저장된 Studio 프로젝트
-- `examples/meshine/extrude_chip.py`, `examples/meshine/compare_with_gmsh.py`
-- `examples/gmshio/hadley_rib_mesh.py`
-- galerkin 생성기 예제
+**sipi.** `tests/sipi`를 실행하는 동안 만들어지는 모든 `CrossSection`과 `PowerPlane`을 기록했습니다.
+`docs/packages/sipi`의 sipi 문서에는 단면 JSON이 없고 유전체 문서만 있습니다.
+- 단면 778개, 서로 다른 것 75개, 미터 단위 길이 값 608개. 그중 20개가 격자에서 최대 10⁻⁷ pm 벗어납니다.
+  템플릿 계산의 부동소수점 잔차(예: 폭 `0.0005499999999999999` m)이며, 보고와 함께 한 번 반올림됩니다.
+- `rect`로 쓰는 트레이스의 왼쪽 아래 `x`는 중심에서 폭의 절반을 뺀 값입니다. 기록된 트레이스 가운데 같은
+  잔차 말고 이 값이 격자를 벗어나는 경우는 없습니다. 폭이 홀수 pm이면 반 pm 벗어납니다.
+- 층과 트레이스가 같은 이름인 단면은 없습니다.
+- 전원면 8개, 값 68개: 모두 격자 위입니다.
+
+**Studio 프로젝트.** 저장소에는 저장된 프로젝트 파일이 없습니다. Studio 시험
+(`tests/simcase/studio_workspace_*.cjs`)의 도형은 정수 nm 또는 0.5 nm라 모두 격자 위입니다. `Wedge <b>`처럼
+공백이나 마크업이 있는 이름은 [대응표](#현재-표현-대응표동결)대로 생성된 `id`를 받습니다.
+
+**meshine·gmshio·galerkin 예제.** `examples/meshine/extrude_chip.py`, `examples/meshine/compare_with_gmsh.py`,
+`examples/gmshio/hadley_rib_mesh.py`와 `rectangle_mesh`·`annulus_mesh`·`disk_mesh`·`layered_rectangle_mesh`·
+`box_mesh`를 부르는 galerkin 예제는 짧은 십진 값(예: `rectangle(-5, -5, 5, 5)`, z 높이 `0, 1, 1.5, 2.5`,
+슬래브 `0.3`, `0.5e-3`)을 씁니다. 모두 격자 위입니다.
+- `extrude_chip.py`의 `rest` 영역(구멍 있는 사각형)은 `rect` 피처 뒤에 나중 피처 `die_zone`이 오는 형태가
+  됩니다. 층별 재료 목록은 `map`이 있는 `layers` 항목이 됩니다.
+- rib의 서로 맞물린 `core`·`box`·`clad` 루프는 겹치지 않는 피처가 되므로 불리언 규칙이 바꾸는 것이 없습니다.
+- gmshio rib의 Threshold 필드는 `core` 선택에 거는 거리 기반 `mesh.controls` 항목 하나가 됩니다.
+
+**발견: 단위 없는 입력.** meshine `Domain`, gmshio `Geo`, galerkin 생성기는 단위 없는 숫자를 받습니다. 그래서
+이들의 어댑터는 호출자에게서 길이 단위를 받고, 단위가 없으면 실행을 거부합니다.
 
 ## 3단계 미리보기: Wavebit (동결 아님)
 
