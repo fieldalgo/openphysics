@@ -57,6 +57,10 @@
 
 - [벡터 모드 성능 측정](../benchmark_vector.md)
 - [3D PEC 공진기의 시간·메모리 측정](../benchmark_cavity.md)
+- [정상·과도 열전도 시간 측정](../benchmark_thermal.md)
+- [탄성과 열탄성 workflow 시간 측정](../benchmark_elasticity.md)
+- [전기 전도와 Joule 가열 시간 측정](../benchmark_electric.md)
+- [미분 비용 측정](../benchmark_derivatives.md)
 - [Transient Studio 자원 관측기](../transient_resource_probe.md)
 - [영역 Studio 자원 관측](../region_resource_probe.md)
 
