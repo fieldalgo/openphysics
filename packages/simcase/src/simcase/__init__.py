@@ -24,6 +24,7 @@ can mesh without solving and a caching layer can redo only what changed:
 """
 
 from .electric_joule import ElectricJouleRunResult
+from .mechanics import MechanicsRunResult
 from .cavity import CavityRunResult
 from .thermal import ThermalRunResult
 from .transient_thermal import TransientThermalRunResult
@@ -42,5 +43,5 @@ from .units import unit_vocabulary
 __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "ElectricJouleRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
+           "run", "RunResult", "ElectricJouleRunResult", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
            "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity"]

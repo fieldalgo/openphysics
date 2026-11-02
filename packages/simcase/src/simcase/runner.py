@@ -42,6 +42,7 @@ from .subspace_tracking import SUBSPACE_METHOD, SubspaceTracker
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
     from .electric_joule import ElectricJouleRunResult
+    from .mechanics import MechanicsRunResult
     from .subspace_result import SubspaceSweepResult
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
@@ -394,7 +395,8 @@ class RunResult:
 
 def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, max_triangles: int | None = None,
         max_input_vertices: int | None = None
-        ) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult | ElectricJouleRunResult:
+        ) -> (RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult
+              | ElectricJouleRunResult | MechanicsRunResult):
     """Run a document with the runner of its physics kind (``registry``).
 
     ``max_nodes``, ``max_triangles`` and ``max_input_vertices`` are optional mesh limits for
