@@ -33,6 +33,7 @@
 
 - [진공 직육면체 PEC 공동 솔버](../packages/galerkin/cavity_solver.md)
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
+- [3D 솔버가 공유하는 사면체 메시 형식](../packages/galerkin/mesh3d_format.md)
 - [벡터 고유공간 신뢰성](../packages/galerkin/eigenspace_reliability.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
 - [도파관 정식화: 모드, 미분, 연성, SI/PI 경로](../packages/galerkin/waveguide_formulation.md)

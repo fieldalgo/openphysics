@@ -37,6 +37,7 @@
 - [정상 2D 외향 열유속과 대류](../packages/galerkin/thermal_flux_robin.md)
 - [명시적인 정상 열전도 → 열탄성 기계단계](../packages/galerkin/thermal_mechanical_workflow.md)
 - [정상 2차원 열전도](../packages/galerkin/thermal_steady2d.md)
+- [사면체 메시의 정상 열전도](../packages/galerkin/thermal3d.md)
 - [처방 온도 열탄성과 전체 기계 traction](../packages/galerkin/thermoelastic_traction.md)
 - [고정 P1 메시의 과도 열전도](../packages/galerkin/transient_heat.md)
 - [과도 열전도에서 준정적 역학으로](../packages/galerkin/transient_thermal_mechanical.md)
