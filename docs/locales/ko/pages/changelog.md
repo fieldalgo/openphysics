@@ -36,6 +36,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `galerkin`: `galerkin.read_msh`가 평면 MSH 2.2/4.1 파일의 물리 그룹을 보존합니다. 물리 표면은 `regions`/`region_names`가 되고(어느 물리 표면에도 속하지 않는 삼각형은 영역 -1), 물리 곡선은 `boundary_edges`와 `boundary`가 되며, 어떤 삼각형도 쓰지 않는 절점은 버립니다. 결과는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 배열 단위로 같습니다. `write_msh`는 평면 메시의 영역마다 물리 표면 하나를 씁니다. 사면체 메시는 바뀌지 않습니다. [문서](packages/galerkin/overview.md).
 - 문서: 패키지 README와 문서 개요에 빠져 있던 기능을 추가했습니다. galerkin의 정상 전기전도, 단방향·온도 의존 Joule heating, JAX/PyTorch 미분과 coupling 계층; meshine의 `extrude`와 사면체 메시 계약("2D 전용" 한계 삭제); refsol의 `thermal_multilayer`, `transient_heat_multilayer`, `elasticity_multilayer`. 진입 문서는 workspace의 정상 열전도 판과 광학 도형을 설명하고, 모든 영문 페이지가 한국어 쌍과 서로 링크합니다.
 - galerkin: 도파관 정식화 문서가 scalar P1·혼합 Nédélec/절점 모드 솔버, 복소 재료와 좌표 늘림 PML, 테두리 고유쌍 미분, 연성 경계, 준정적 sipi 경로를 구현된 대로 읽고 각 수식을 모듈·함수와 함께 인용합니다. [문서](packages/galerkin/waveguide_formulation.md).
+- galerkin: `galerkin.mode_overlap` — 모드 전력(정확한 edge 질량과 edge-절점 결합 행렬로 계산한 Faraday 경로 복소 Poynting 적분), 교차 전력, 장 중첩과 중첩 행렬, power/mass/peak 정규화, 결합 효율(퇴화 공간 사영 포함), 에너지 구속 계수, 주어진 장의 Nédélec/P1 보간, P1 스칼라 쌍; NumPy 전용. refsol slab·광섬유 장으로 검증했습니다. [계약과 검증](packages/galerkin/mode_overlap.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
