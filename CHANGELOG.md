@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: `triangle_geometry` caches its validated result by mesh content (8-entry LRU, copies returned) and runs the overlap, edge-table, vertex-fan and hanging-node checks vectorised; the boundary samplers look edges up in the cached edge table. Decisions and solver outputs are unchanged byte for byte (checked on 660 result arrays and 15 rejected meshes); on Linux steady heat n=64 goes from 2.0 s to 0.46 s and the thermistor Picard n=16 from 6.2 s to 0.22 s. [Documentation](docs/packages/galerkin/overview.md#mesh-validation-cache).
+
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields` writes two more saved layouts as VTU: rectangular steady heat with flux or convection sides (`thermal2d-p1-node-cell-boundary-v2`), with its nodal boundary load arrays, and electric conduction and Joule heating (`electric-joule2d-p1-v1`, from `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`): point data `potential_v` and the nodal electric and, for Joule, heat arrays; cell data `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3` and, for Joule, `heat_flux_w_m2`. Arrays keep their saved names and values, Dirichlet node lists are not copied, and the saved files are unchanged. Lossy cavities and `em.modes2d` results are still refused. [Documentation](docs/packages/simcase/overview.md#viewing-in-paraview).
