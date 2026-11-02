@@ -16,7 +16,8 @@ print(result.frequencies_hz)
 
 이 API는 `(0, 0, 0)`에서 시작하는 진공 직육면체의 여섯 벽 모두에 완전 전기 도체
 조건을 적용합니다. Cartesian cell당 사면체 6개의 적합 교대 Kuhn mesh와 기존
-최저차 Nedelec 에지 요소를 사용합니다. 재료·손실·개방 경계·임의 CAD·sweep 옵션은 없습니다.
+최저차 Nedelec 에지 요소를 사용합니다. 재료·손실·개방 경계·sweep 옵션은 없습니다. 다른 곳에서
+만든 메시에는 같은 솔버가 `solve_cavity`로 실행됩니다([외부 메시](#외부-메시)).
 
 아래 고정 정육면체/직육면체 수렴 gate는 교대 mesh에서 통과합니다. 대수 잔차와
 연속체 이산화 오차는 별도로 검사하며 작은 잔차만으로 mesh 정확성을 인증하지 않습니다.
@@ -130,6 +131,48 @@ kernel 판정 scale은 정규화 좌표에서 해석 box 기본 k²의 `1e-8`배
 유의한 음의 고유값, nonfinite 출력, 분해 실패, 비수렴, 품질 검사 실패는 부분 결과 없이
 `RuntimeError`입니다. 목표가 이산 고유값이면 shifted 분해가 특이할 수 있으므로
 근처 다른 목표를 택합니다. 조용한 개수 축소·0 padding·허용치 완화는 없습니다.
+
+## 외부 메시
+
+`solve_cavity(mesh, *, pec_faces=None, num_modes=6, target_frequency_hz)`는
+[사면체 메시 형식](mesh3d_format.md)의 어떤 사면체 메시에서든 같은 조립·투영 검색·검사를
+실행합니다. 메시는 바깥 방향 면 태그를 가진 `galerkin.Mesh3D`(meshine·gmshio 메시의
+`from_mesher` 또는 `box_mesh`)이고 좌표는 m입니다. 진입 시 `Mesh3D.check`로 검사합니다.
+
+- `pec_faces`: 완전 도체를 두는 면 태그. `None`이면 모든 태그 면. 빠진 면은 자연
+  조건 `n x curl E = 0`(완전 자기 도체)을 유지합니다. 모르는 태그는 `ValueError`.
+- `num_modes`, `target_frequency_hz`: 위와 같음. JAX·PyTorch 값은 `TypeError`:
+  미분 경로는 `solve_cavity_box`의 길이에만 있습니다.
+- 메시는 경계 상자의 가장 긴 변으로 정규화합니다. kernel 절단값 `1e-8 * fundamental`은
+  그 경계 상자의 최저 TE 공진을 쓰므로 경계 상자보다 훨씬 작은 영역은 더 낮은(보수적인)
+  절단값을 갖습니다.
+- 결과의 `mesh`는 받은 메시 그대로이고 `pec_face_tags`가 태그를, `gradient_kernel_dimension`이
+  셈한 kernel을 기록합니다.
+
+gradient kernel은 상자 공식 대신 PEC 표면에서 셉니다. 자유 변 위의 curl-curl kernel은
+PEC 표면의 각 연결 성분(PEC 변으로 이어진 절점)에서 상수인 절점 전위의 gradient를
+상수를 제외하고 모은 것이므로 차원은 `(PEC 밖 절점 수) + max(성분 수, 1) - 1`입니다.
+여섯 벽이 모두 PEC이고 경계가 연결되어 있으면 내부 절점 수, 즉 상자 솔버가 늘 쓰던
+값이고, `z0`와 `z1`만 PEC이면 자유 절점 수 더하기 1입니다. dense 경로(자유 변 <= 256)는
+spectrum에서 kernel을 다시 세어 불일치를 거부하고, 투영기도 같은 전위 기저를 씁니다.
+구속되지 않은 구멍이 있는 메시(gradient가 아닌 조화 장)는 셈이 너무 작아 dense 검사가
+실패하며 이 계약 밖입니다.
+
+`tests/galerkin/test_cavity_mesh.py`는 1.0 x 0.8 x 0.6 m 상자의 비정형 발자국을
+`meshine.extrude`로 쌓은 메시(Gmsh 없음)에서, 최저 세 공진의 평균을 목표로 메시 경로를
+채점합니다.
+
+| Gate | 요구 | 측정(Linux, 이 변경) |
+| --- | --- | --- |
+| M1 크기 0.2, 0.1, 0.05 m에서 TM110, TE101, TE011 대 해석 공진 | 차수 >= 1.8(최악 상대 오차의 최소제곱 기울기), 최세밀 <= 2e-3 | 최악 상대 오차 2.34e-2, 6.26e-3, 1.64e-3; 차수 1.918 |
+| M2 상자 솔버 자신의 교대 Kuhn 메시(2,2,2 dense, 4,3,3 sparse)를 두 경로로 | 상대 주파수 차 <= 1e-10 | 0(두 경로에서 비트 단위로 동일) |
+| M2 같은 분할의 `solve_cavity_box` 대 쌓은 메시 | 차이가 세밀화와 함께 감소; 차수 보고 | 1.83e-2, 5.16e-3, 1.38e-3; 차수 1.83, 1.91 |
+| 2x2x2 상자에서 PEC를 모든 벽, `z0`+`z1`, `z0`, 없음에 둔 gradient kernel | 셈한 kernel 1, 10, 18, 26을 dense spectrum이 확인 | 통과 |
+| `z0`+`z1`만 PEC, 측면 PMC, 6x5x4 상자 | 최저 두 공진 c/(2a), c/(2b) 2e-2 이내 | 통과 |
+
+쌓은 메시는 교대 Kuhn 메시가 아니므로(프리즘 분할은 정점 순서를, Kuhn 상자는 셀
+패리티 반사를 따름) 두 경로는 극한에서만 일치하고, 같은 메시에서는 roundoff까지
+일치합니다.
 
 ## 재현 가능한 검증과 수렴 수정
 

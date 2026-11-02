@@ -225,7 +225,23 @@ def read_msh(path):
         return groups
 
     if len(tets):
-        return Mesh3D(xyz, lookup[tets], group_nodes(tris, tri_phys, 2))
+        tet_phys = np.array([e[1] for e in elements if e[0] == _TET], dtype=np.int64)
+        volume_tags = [int(t) for t in np.unique(tet_phys) if t != 0]
+        regions = names3 = None
+        if volume_tags and len(volume_tags) == len(np.unique(tet_phys)):
+            # every tetrahedron sits in a physical volume: regions index the names
+            names3 = [names.get((3, t), str(t)) for t in volume_tags]
+            regions = np.searchsorted(np.asarray(volume_tags), tet_phys)
+        faces = {}
+        for tag in np.unique(tri_phys):
+            if tag != 0:
+                faces[names.get((2, int(tag)), str(int(tag)))] = lookup[tris[tri_phys == tag]]
+        mesh = Mesh3D(xyz, lookup[tets], group_nodes(tris, tri_phys, 2),
+                      regions=regions, region_names=names3)
+        # Faces are kept as written; a file that tags only part of the surface, or
+        # winds faces inward, still reads (check() reports it) so that node sets work.
+        mesh.tagged_faces = {k: np.asarray(v, dtype=int).reshape(-1, 3) for k, v in faces.items()}
+        return mesh
     if len(tris):
         return Mesh(xyz[:, :2], lookup[tris], group_nodes(lines, line_phys, 1))
     raise GmshFormatError(f"{path}: no triangles or tetrahedra found")

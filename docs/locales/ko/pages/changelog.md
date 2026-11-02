@@ -37,6 +37,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `galerkin`: `solve_transient_heat`가 정상 솔버와 같은 입력 형식·부호의 `outward_flux`·`convection`을 받습니다(변 태그별 scalar 또는 callback(points, normals), 한 번 표본화하는 시간 무관 데이터; 시간 callback은 거절). 시스템은 M/dt+K+H이며 결과에 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`이 추가됩니다(경계 데이터가 없으면 None; Dirichlet 전용 이력은 비트 단위로 동일). 새 `refsol.transient_heat_robin` 대류·상수 열유속 slab 급수. 기준: slab 공간 차수 ≥1.8, 시간 차수 ≥0.9, `solve_steady_heat`와 장시간 일치 ≤1e-8, 단계별 열수지 ≤1e-10. [문서](packages/galerkin/transient_heat.md).
 - `galerkin`: `galerkin.electrostatics` 추가 — 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기와 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬(실수 또는 손실 복소 유전율; 실수 입력의 JAX/PyTorch 미분); `refsol.electrostatics`에 동축·두 층 평행판 정전용량 레퍼런스 추가. [문서](packages/galerkin/electrostatics.md).
+- `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
+- `galerkin`: `solve_cavity`·`solve_material_cavity`가 외부 사면체 메시(meshine, gmshio)에서 면 태그별 PEC·임피던스 벽과 영역별 재료로 공진기를 풉니다. gradient kernel은 구속 표면에서 셉니다. 상자 솔버는 비트 단위로 동일하고 메시 변형에는 미분 경로가 없습니다. [문서](packages/galerkin/cavity_solver.md#외부-메시), [재료 공진기](packages/galerkin/material_cavity.md#외부-메시).
+- `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, 영역별 열전도율·열원, Dirichlet 면과 단열, W 단위 열수지 검사를 갖는 사면체 메시의 P1 정상 열전도; `refsol.thermal3d` 기준해. [문서](packages/galerkin/thermal3d.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 

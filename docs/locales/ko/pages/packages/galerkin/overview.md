@@ -20,7 +20,10 @@
 | 벡터·스칼라 모드의 전력(Faraday 경로 Poynting 적분), 장 중첩, 정규화, 결합 효율, 구속 계수 | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, 스칼라 쌍 | [계약과 검증](mode_overlap.md) | — |
 | 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기; 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬, 실수 또는 손실 복소 유전율 | `solve_electrostatics`, `capacitance_matrix` | [계약과 기준](electrostatics.md) | — |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
+| 외부 사면체 메시(meshine, gmshio)의 3D 진공 PEC 공진기, 고른 면 태그에 PEC | `solve_cavity` | [공진기 API, 외부 메시](cavity_solver.md#외부-메시), [메시 형식](mesh3d_format.md) | — |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
+| 영역별 손실 재료와 면 태그별 PEC·임피던스 벽을 갖는 외부 메시의 3D 공진기 | `solve_material_cavity` | [재료 공진기, 외부 메시](material_cavity.md#외부-메시) | — |
+| 사면체 메시의 정상 3D 열전도, 영역별 등방성, Dirichlet 면과 단열 | `galerkin.thermal3d.solve_steady_heat_3d` | [계약과 검증](thermal3d.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
 | 정상 2D 전기전도: 등방 영역별 전기전도도, 전압·전류·절연 변과 명시적 Neumann 기준 전위, V·E·J와 요소별 Joule 발열 | `galerkin.electric.solve_steady_electric` | [계약과 검증](electric_steady2d.md) | [electric_steady2d.py](../../../../../../examples/galerkin/electric_steady2d.py) |
 | 같은 메시의 정상 전기→열 단방향 연성 | `galerkin.joule_heating.solve_steady_joule_heat` | [API·단위·검증](joule_heating.md) | [joule_heating.py](../../../../../../examples/galerkin/joule_heating.py) |
@@ -59,7 +62,9 @@
   지원합니다. 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
   Cartesian 하중을 받으며 scalar pressure 전용·로컬 프레임·follower 하중 API는 없습니다.
 - `solve_cavity_box`는 진공 직육면체 PEC 상자를 다루고, `solve_material_cavity_box`는
-  직육면체 손실 영역과 유한 전도도 벽을 더합니다. 목표 근처 탐색 한계는 각 계약을 읽으세요.
+  직육면체 손실 영역과 유한 전도도 벽을 더합니다. `solve_cavity`와 `solve_material_cavity`는
+  외부 사면체 메시([형식](mesh3d_format.md))를 받되 미분 경로가 없습니다. 목표 근처 탐색
+  한계는 각 계약을 읽으세요.
 - 3D 희소 직접 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없습니다. 더 큰 문제에는
   반복 솔버가 필요합니다.
 
@@ -75,7 +80,7 @@ src/galerkin/
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
   mode_overlap.py # Mode power, overlaps, normalisation, coupling efficiency, confinement (vector and scalar)
-  mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
@@ -83,6 +88,7 @@ src/galerkin/
   _cavity_common.py  # Box mesh and numerical limits the two cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  thermal3d.py    # Steady heat on tetrahedral meshes: P1, Dirichlet faces, insulation
   electric.py     # Steady electric conduction
   electrostatics.py # Electrostatics with node-set conductors and the capacitance matrix
   materials.py    # Scalar or {region name: value} material lookup
@@ -112,7 +118,7 @@ core 아래 메시 형식이 있습니다.
 `galerkin.from_mesher`는 `nodes`, `triangles` 또는 `tetrahedra`, `regions`, `region_names`와
 경계 변·면을 제공하는 객체를 변환하고, `Mesh.by_region({"core": ..., "clad": ...})`은 영역
 이름을 요소별 재료 배열로 바꿉니다. meshine과 gmshio로 확인했으며 둘 다 엔진의 의존성이
-아닙니다.
+아닙니다. 3D 형식과 규칙, 벽 이름 체계는 [사면체 메시 형식](mesh3d_format.md)에 있습니다.
 
 ## 시험
 
