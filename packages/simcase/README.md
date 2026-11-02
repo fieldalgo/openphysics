@@ -46,7 +46,7 @@ prints a supplied example.
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](../../docs/packages/simcase/thermal_steady2d.md), [boundaries](../../docs/packages/simcase/thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
-| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation, constant outward flux and convection | `transient_thermal_uniform`, `transient_thermal_boundary` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for steady and
@@ -349,7 +349,10 @@ uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
 JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
 metadata. Initial values are not projected and negative K is not clamped.
-Transient flux/Robin, restart and automatic coupling are not supported.
+Constant outward flux and convection sides (the steady contract's keys) save the
+`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
+pair with two per-step load arrays; time-dependent flux/Robin, restart and
+automatic coupling are not supported.
 
 ### Saved output
 

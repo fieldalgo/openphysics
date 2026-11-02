@@ -19,6 +19,10 @@ Supported layouts:
   one stored time (``time_index``, default the last), or every stored time with
   ``export_time_series``: one VTU per time plus a ParaView collection (``.pvd``)
   that records each ``time_s`` as its timestep
+- transient heat with flux or convection sides
+  (``thermal2d-transient-p1-node-cell-boundary-v1``): the same, plus the nodal
+  per-step ``prescribed_outward_load_w_per_m`` and ``convective_outward_w_per_m``
+  (W/m), present from the second stored time on like the other step rates
 - region heat (``thermal2d-p1-node-cell-regions-v1`` and
   ``thermal2d-transient-p1-node-cell-regions-v1``): the same steady/transient
   arrays plus static integer cell data ``triangle_regions``; steady boundary
@@ -63,16 +67,17 @@ __all__ = ["export_fields", "export_time_series", "SUPPORTED_LAYOUTS"]
 _STEADY = "thermal2d-p1-node-cell-v1"
 _STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v2"
 _TRANSIENT = "thermal2d-transient-p1-node-cell-v1"
+_TRANSIENT_BOUNDARY = "thermal2d-transient-p1-node-cell-boundary-v1"
 _CAVITY = "cavity3d-edge-v1"
 _CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
-_TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
+_TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS, _TRANSIENT_BOUNDARY)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
-_THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS)
+_THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS, _TRANSIENT_BOUNDARY)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
-                     _ELECTRIC_JOULE, _CAVITY_COMPLEX)
+                     _ELECTRIC_JOULE, _CAVITY_COMPLEX, _TRANSIENT_BOUNDARY)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
