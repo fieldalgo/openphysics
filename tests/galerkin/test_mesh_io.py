@@ -14,6 +14,7 @@ import scipy.sparse.linalg as spla
 from galerkin import (read_msh, write_msh, box_mesh, EdgeSpace3D,
                       assemble_curlcurl_3d, assemble_edge_mass_3d)
 from galerkin.gmsh import GmshFormatError
+from galerkin.mesh import Mesh, layered_rectangle_mesh
 
 # One tetrahedron and its four faces, transcribed by hand from the format
 # documentation. Node tags are 10..40 rather than 1..4, so a reader that assumes
@@ -145,6 +146,115 @@ def test_round_trip_preserves_the_physics():
     assert drift < 1e-9, f"connectivity or orientation damaged: drift {drift:.2e}"
 
 
+# A planar mesh in format 2.2: the unit square cut into two triangles, one in
+# the physical surface "a" and one in no physical surface at all, the bottom
+# edge in the physical curve "wall", and a fifth node (tag 50) that no triangle
+# uses. A reader that keeps the dangling node, or that gives the untagged
+# triangle a region of its own, disagrees with gmshio on the same bytes.
+PLANAR_22 = """$MeshFormat
+2.2 0 8
+$EndMeshFormat
+$PhysicalNames
+2
+1 7 "wall"
+2 3 "a"
+$EndPhysicalNames
+$Nodes
+5
+10 0 0 0
+20 1 0 0
+30 1 1 0
+40 0 1 0
+50 5 5 0
+$EndNodes
+$Elements
+3
+1 1 2 7 1 10 20
+2 2 2 3 1 10 20 30
+3 2 2 0 1 10 40 30
+$EndElements
+"""
+
+
+def _edge_set(edges):
+    return {tuple(sorted(e)) for e in np.asarray(edges).tolist()}
+
+
+def _assert_same_planar_mesh(ours, theirs):
+    """The full contract a planar Mesh carries, array for array: nodes, triangles
+    up to orientation (both readers leave them counter-clockwise), regions and
+    their names, and the named boundary edges and nodes."""
+    assert np.array_equal(ours.nodes, theirs.nodes), "node coordinates or order differ"
+    assert np.array_equal(np.sort(ours.triangles, axis=1),
+                          np.sort(theirs.triangles, axis=1)), "connectivity differs"
+    assert (ours.areas() > 0).all() and (theirs.areas() > 0).all()
+    assert ours.region_names == theirs.region_names
+    assert np.array_equal(ours.regions, theirs.regions), "regions differ"
+    assert set(ours.boundary_edges) == set(theirs.boundary_edges)
+    for name in theirs.boundary_edges:
+        assert _edge_set(ours.boundary_edges[name]) == _edge_set(theirs.boundary_edges[name]), \
+            f"boundary edges of '{name}' differ"
+    assert set(ours.boundary) == set(theirs.boundary)
+    for name in theirs.boundary:
+        assert np.array_equal(np.sort(ours.boundary[name]), np.sort(theirs.boundary[name])), \
+            f"boundary nodes of '{name}' differ"
+
+
+def test_planar_fixture_keeps_regions_and_drops_unused_nodes():
+    path = _temp(PLANAR_22)
+    try:
+        mesh = read_msh(path)
+    finally:
+        os.unlink(path)
+    assert mesh.num_nodes == 4 and mesh.num_triangles == 2, "the unused node must go"
+    assert np.allclose(mesh.nodes, [[0, 0], [1, 0], [1, 1], [0, 1]])
+    assert abs(mesh.areas().sum() - 1.0) < 1e-15
+    assert mesh.region_names == ["a"]
+    assert mesh.regions.tolist() == [0, -1], "untagged triangle must be region -1"
+    assert _edge_set(mesh.boundary_edges["wall"]) == {(0, 1)}
+    assert mesh.boundary["wall"].tolist() == [0, 1]
+    assert mesh.by_region({"a": 2.0})[0] == 2.0
+
+
+def test_planar_round_trip_keeps_regions_and_boundary_edges():
+    direct = layered_rectangle_mesh([0.4, 1.0], 0.5, [2, 3], 2,
+                                    region_names=["core", "clad"])
+    path = _temp("")
+    try:
+        write_msh(direct, path)
+        back = read_msh(path)
+    finally:
+        os.unlink(path)
+    _assert_same_planar_mesh(back, direct)
+    assert np.array_equal(back.triangles, direct.triangles)
+
+
+def test_planar_round_trip_keeps_a_triangle_outside_every_region():
+    base = layered_rectangle_mesh([0.5, 1.0], 1.0, 1, 1, region_names=["a", "b"])
+    regions = base.regions.copy()
+    regions[0] = -1
+    direct = Mesh(base.nodes, base.triangles, base.boundary, base.boundary_edges,
+                  regions, base.region_names)
+    path = _temp("")
+    try:
+        write_msh(direct, path)
+        back = read_msh(path)
+    finally:
+        os.unlink(path)
+    _assert_same_planar_mesh(back, direct)
+
+
+def test_planar_mesh_without_physical_surfaces_has_no_regions():
+    text = PLANAR_22.replace('2 2 2 3 1 10 20 30', '2 2 2 0 1 10 20 30')
+    path = _temp(text)
+    try:
+        mesh = read_msh(path)
+    finally:
+        os.unlink(path)
+    assert mesh.regions is None and mesh.region_names is None
+    assert set(mesh.boundary_edges) == {"wall"}
+
+
 # --------------------------------------------------------------------------
 # Until the Gmsh executable was available, this reader was gated only on
 # hand-written fixtures and a round trip through galerkin's own writer. Those
@@ -221,3 +331,50 @@ def test_our_reader_agrees_with_gmshio_on_the_same_file():
         np.unique(np.sort(ours.tets, axis=1), axis=0),
         np.unique(np.sort(theirs.tets, axis=1), axis=0)), \
         "the two readers disagree on connectivity"
+
+
+def _two_region_rectangle_geo():
+    """[0,2]x[0,1] tiled by the regions 'a' (left half) and 'b' (right half),
+    boundary curves named left/right/bottom/top."""
+    from gmshio import geo
+    g = geo.Geo()
+    g.default_lc = 0.3
+    g.add_region("a", [(0, 0), (1, 0), (1, 1), (0, 1)])
+    g.add_region("b", [(1, 0), (2, 0), (2, 1), (1, 1)])
+    return g.render(geo.box_sides(0.0, 2.0, 0.0, 1.0))
+
+
+@pytest.mark.parametrize("fmt", ["msh41", "msh2"])
+def test_planar_reader_agrees_with_gmshio_on_a_file_gmsh_wrote(fmt):
+    """Same bytes, two independent parsers, one contract: galerkin's reader must
+    return exactly what from_mesher(gmshio.to_fem2d(gmshio.read_msh(...)))
+    returns — nodes, triangles, regions, region names and named boundaries.
+    gmshio reads only 4.1, so the 2.2 file is the same mesh re-saved by Gmsh
+    in the old format and is compared against the 4.1 result."""
+    import subprocess
+    from gmshio import generate, read_msh as gmshio_read, to_fem2d
+    from galerkin import from_mesher
+
+    exe = _gmsh_or_skip()
+    with tempfile.TemporaryDirectory() as d:
+        msh41 = os.path.join(d, "two.msh")
+        generate(_two_region_rectangle_geo(), dim=2, out=msh41, verbosity=0)
+        theirs = from_mesher(to_fem2d(gmshio_read(msh41)))
+        if fmt == "msh41":
+            ours = read_msh(msh41)
+        else:
+            msh2 = os.path.join(d, "two_v2.msh")
+            subprocess.run([exe, msh41, "-o", msh2, "-format", "msh2", "-save", "-v", "1"],
+                           capture_output=True, text=True, timeout=300, check=True)
+            with open(msh2) as fh:
+                fh.readline()
+                assert fh.readline().split()[0].startswith("2.2")
+            ours = read_msh(msh2)
+
+    assert ours.num_triangles > 2
+    assert ours.region_names == ["a", "b"]
+    assert set(ours.boundary_edges) == {"left", "right", "bottom", "top"}
+    assert abs(ours.areas()[ours.regions == 0].sum() - 1.0) < 1e-12
+    assert abs(ours.areas()[ours.regions == 1].sum() - 1.0) < 1e-12
+    _assert_same_planar_mesh(ours, theirs)
+    assert np.array_equal(ours.triangles, theirs.triangles)

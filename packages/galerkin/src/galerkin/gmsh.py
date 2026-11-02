@@ -22,6 +22,16 @@ contiguous or start at one; they are remapped. Higher-order elements are not
 read: this engine is lowest-order, and silently dropping the mid-side nodes of a
 second-order mesh would be worse than refusing it.
 
+A planar mesh keeps everything `galerkin.Mesh` can hold: the physical surfaces
+become `regions`/`region_names` (names in physical-tag order, a triangle outside
+every physical surface gets region -1), the physical curves become
+`boundary_edges` and `boundary` node sets, and nodes no triangle uses are
+dropped. That is the same contract `galerkin.from_mesher(gmshio.to_fem2d(...))`
+produces from the same file, so the two readers agree array for array. The
+volumetric path still returns only the boundary node sets of the physical
+surfaces; carrying physical volumes as regions and tagged boundary faces on
+`Mesh3D` is a separate piece of work.
+
 Element type codes used here: 1 = 2-node line, 2 = 3-node triangle,
 4 = 4-node tetrahedron, 15 = 1-node point.
 
@@ -38,7 +48,8 @@ Gating
 Hand-written fixtures transcribed from the format documentation, a round trip
 through the writer below that ends in a physics check, and — since a Gmsh
 executable became available — files that Gmsh itself wrote in both formats,
-cross-checked against gmshio's independent parser for identical connectivity.
+cross-checked against gmshio's independent parser for identical nodes,
+connectivity, regions and named boundary edges.
 """
 
 from __future__ import annotations
@@ -182,11 +193,54 @@ def _parse_elements_41(text, entities):
     return out
 
 
+def _tag_names(tags, names, dim):
+    """Physical tags of one dimension in tag order -> their names.
+
+    Named from $PhysicalNames when the file provides a name, otherwise the tag
+    number as a string, so an unnamed group is still addressable.
+    """
+    return {int(t): names.get((dim, int(t)), str(int(t)))
+            for t in sorted(set(int(t) for t in tags) - {0})}
+
+
+def _planar_mesh(xyz, lookup, tris, tri_phys, lines, line_phys, names):
+    """Triangles plus their physical surfaces and curves -> ``Mesh``.
+
+    Nodes no triangle uses are dropped and the rest renumbered, exactly as
+    ``gmshio.to_fem2d`` does; a dangling node would give a singular system.
+    """
+    tris = lookup[tris]
+    used = np.unique(tris)
+    remap = np.full(len(xyz), -1, dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    nodes = xyz[used, :2]
+    tris = remap[tris]
+
+    surfaces = _tag_names(tri_phys, names, 2)
+    regions = region_names = None
+    if surfaces:
+        region_names = list(surfaces.values())
+        index = {tag: i for i, tag in enumerate(surfaces)}
+        regions = np.array([index.get(int(t), -1) for t in tri_phys], dtype=np.int64)
+
+    boundary_edges = {}
+    for tag, name in _tag_names(line_phys, names, 1).items():
+        edges = remap[lookup[lines[line_phys == tag]]]
+        if (edges < 0).any():
+            raise GmshFormatError(
+                f"boundary curve {name!r} references nodes not in any triangle")
+        boundary_edges[name] = edges
+    boundary = {name: np.unique(e) for name, e in boundary_edges.items()}
+    return Mesh(nodes, tris, boundary, boundary_edges, regions, region_names)
+
+
 def read_msh(path):
     """Read a Gmsh ASCII mesh; returns a Mesh3D if it has tetrahedra, else a Mesh.
 
-    Physical groups on the surface elements become boundary tags, named from
-    $PhysicalNames when the file provides them.
+    Physical groups one dimension below the cells become boundary tags, named
+    from $PhysicalNames when the file provides them. A planar mesh also carries
+    its physical surfaces as ``regions``/``region_names`` and its physical
+    curves as ``boundary_edges`` (see the module docstring).
     """
     sections = _read_sections(path)
     if "MeshFormat" not in sections:
@@ -227,7 +281,8 @@ def read_msh(path):
     if len(tets):
         return Mesh3D(xyz, lookup[tets], group_nodes(tris, tri_phys, 2))
     if len(tris):
-        return Mesh(xyz[:, :2], lookup[tris], group_nodes(lines, line_phys, 1))
+        return _planar_mesh(xyz, lookup, tris, tri_phys,
+                            lines.reshape(-1, 2), line_phys, names)
     raise GmshFormatError(f"{path}: no triangles or tetrahedra found")
 
 
@@ -236,7 +291,12 @@ def write_msh(mesh, path, physical: dict[str, int] | None = None):
 
     Boundary tags are written as physical groups on the surface elements, so a
     read-back mesh carries the same named boundaries — otherwise a round trip
-    would quietly lose every boundary condition.
+    would quietly lose every boundary condition. A planar mesh with regions
+    writes one physical surface per region name (triangles outside every
+    region, index -1, get physical tag 0); without regions every cell goes into
+    one physical group called "domain", which `read_msh` then reports as the
+    single region of the file. ``physical`` fixes the boundary tags by name;
+    region tags follow after the largest boundary tag.
     """
     is3d = hasattr(mesh, "tets")
     cells = mesh.tets if is3d else mesh.triangles
@@ -246,7 +306,18 @@ def write_msh(mesh, path, physical: dict[str, int] | None = None):
         [mesh.nodes, np.zeros(len(mesh.nodes))])
 
     physical = physical or {name: i + 1 for i, name in enumerate(sorted(mesh.boundary))}
-    vol_tag = (max(physical.values()) + 1) if physical else 1
+    first_cell_tag = (max(physical.values()) + 1) if physical else 1
+
+    # one physical group per region when the mesh carries them, else "domain"
+    region_names = None if is3d else getattr(mesh, "region_names", None)
+    regions = None if is3d else getattr(mesh, "regions", None)
+    if regions is not None and region_names is not None:
+        cell_groups = {name: first_cell_tag + i for i, name in enumerate(region_names)}
+        region_tags = np.array([first_cell_tag + i for i in range(len(region_names))] + [0])
+        cell_tags = region_tags[np.where(regions < 0, len(region_names), regions)]
+    else:
+        cell_groups = {"domain": first_cell_tag}
+        cell_tags = np.full(len(cells), first_cell_tag)
 
     # surface elements carrying the boundary tags
     faces, face_tags = [], []
@@ -263,10 +334,11 @@ def write_msh(mesh, path, physical: dict[str, int] | None = None):
 
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("$MeshFormat\n2.2 0 8\n$EndMeshFormat\n")
-        fh.write(f"$PhysicalNames\n{len(physical) + 1}\n")
-        fh.write(f'{dim} {vol_tag} "domain"\n')
+        fh.write(f"$PhysicalNames\n{len(physical) + len(cell_groups)}\n")
         for name, tag in sorted(physical.items(), key=lambda kv: kv[1]):
             fh.write(f'{dim - 1} {tag} "{name}"\n')
+        for name, tag in cell_groups.items():
+            fh.write(f'{dim} {tag} "{name}"\n')
         fh.write("$EndPhysicalNames\n")
 
         fh.write(f"$Nodes\n{len(nodes)}\n")
@@ -280,8 +352,8 @@ def write_msh(mesh, path, physical: dict[str, int] | None = None):
             n += 1
             fh.write(f"{n} {face_type} 2 {tag} 1 "
                      + " ".join(str(int(v) + 1) for v in f) + "\n")
-        for c in cells:
+        for c, tag in zip(cells, cell_tags):
             n += 1
-            fh.write(f"{n} {cell_type} 2 {vol_tag} 1 "
+            fh.write(f"{n} {cell_type} 2 {int(tag)} 1 "
                      + " ".join(str(int(v) + 1) for v in c) + "\n")
         fh.write("$EndElements\n")
