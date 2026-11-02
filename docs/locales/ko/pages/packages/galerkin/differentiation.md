@@ -262,7 +262,9 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
   모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
   `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
   `solve_dirichlet`, `l2_error`, `radial_pml_coeffs`(그 `k`, `r0`, `d`, `sigma_max`; PML
-  매개변수에 대해 미분하는 solver는 없습니다)도 거부합니다. JSON 문서와 명령행은 NumPy로
+  매개변수에 대해 미분하는 solver는 없습니다), 그리고
+  [`galerkin.mode_overlap`](mode_overlap.md)의 모드 후처리(전력, 중첩, 정규화, 결합
+  효율, 구속)도 거부합니다. JSON 문서와 명령행은 NumPy로
   돕니다.
 - `solve_temperature_joule_heat`는 어느 방법이든 입력에 JAX·PyTorch 값이 있으면 무엇을
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`

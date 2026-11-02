@@ -295,7 +295,9 @@ structure; only coefficients may be live.
   (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
   `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
   `l2_error` and `radial_pml_coeffs` (its `k`, `r0`, `d` and `sigma_max`; no
-  solver differentiates with respect to PML parameters).
+  solver differentiates with respect to PML parameters), and the mode
+  post-processing of [`galerkin.mode_overlap`](mode_overlap.md) (power,
+  overlaps, normalisation, coupling efficiency, confinement).
   JSON documents and the command line run on NumPy.
 - `solve_temperature_joule_heat`, with either method, raises a `TypeError` for a
   JAX or PyTorch value in any input before it copies or solves anything,
