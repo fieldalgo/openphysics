@@ -13,7 +13,7 @@
 | Python `Document` + `run` | 지원되는 simcase 모델을 Python으로 자동화할 때 | JSON/CLI와 같은 문서 계약 사용 |
 | JSON/CLI | 재현 가능한 모델 검증·일괄 실행·결과 저장이 필요할 때 | 문서당 지원되는 물리 항목 하나이며, 임의 다중물리 그래프는 아님 |
 | 기존 Studio `/` | 2D 광학 또는 직사각형이거나 재료 영역이 있는 정상/과도 열 모델을 브라우저에서 편집할 때 | 공동·전기/Joule·역학 편집기 없음; 재료 영역이 있는 열 문서는 Studio 영역 한도 안에서만 |
-| 실험적 workspace `/workspace` | 제한된 광학 워크플로와 세션 노트북을 사용할 때 | 고정 광학 어댑터이며 가열 도파로 화면은 설정 미리보기 |
+| 실험적 workspace `/workspace` | 제한된 광학 워크플로와 세션 노트북을 사용할 때, 또는 JSON 없이 정상 열전도 판을 풀 때 | 고정 광학 어댑터; 결과가 탭 안에만 남는 균질 직사각형 열 판 하나; 가열 도파로 화면은 설정 미리보기 |
 
 ## 물리 문제에 맞는 경로 찾기
 
@@ -48,7 +48,7 @@ python -m simcase run examples/simcase/layered_wall.json -o out/wall-cli
 기존 Studio와 실험적 workspace는 `simcase-studio`가 제공하지만 저장 파일의 계약이
 다릅니다. 기존 편집기는 지원되는 simcase 모델 문서를 사용합니다. Workspace의
 입력/세션 JSON은 별도 형식이며, 결과가 담길 수 있는 세션 파일은 headless solver
-문서가 아닙니다. 고정된 형상·파장·재료 선택·내보내기·복원 제한은
+문서가 아닙니다. 고정 창, 파장·재료 범위, 열 판, 내보내기·복원 제한은
 [workspace 가이드](../packages/simcase/workspace.md)를 따릅니다.
 
 가열 도파로 workspace 미리보기는 열–광학 연성 결과를 계산하지 않습니다. 어댑터
