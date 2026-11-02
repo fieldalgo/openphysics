@@ -25,6 +25,7 @@ What each package implements, and its limits, is in the
 ## [Unreleased]
 
 - CI: the pinned GitHub Actions move to their Node 24 releases (`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6) ahead of GitHub's Node 20 retirement; the checks and artifact names are unchanged.
+- CI: a daily, non-required `Latest dependencies` canary (`.github/workflows/latest-deps.yml`) installs the packages with the newest dependencies their metadata allows, runs `pip check`, the license inventory check, the preflight groups, the non-slow suite and the forced-kernel tests, and opens, updates or closes one issue with the resolved versions. Pins are still updated deliberately. [Documentation](docs/development.md#latest-dependencies-canary).
 
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
