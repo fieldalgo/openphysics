@@ -19,6 +19,7 @@ references and fixed thresholds.
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
 | 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 2D electrostatics with conductors as node sets, free charge and insulated exterior; Maxwell capacitance matrix checked by the energy and charge routes, real or lossy complex permittivity | `solve_electrostatics`, `capacitance_matrix` | [Contract and gates](electrostatics.md) | — |
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Waveguide formulation](waveguide_formulation.md), [eigenspace reliability](eigenspace_reliability.md), [milestone validation](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | Mode power (Faraday-route Poynting integral), field overlaps, normalisation, coupling efficiency and confinement factor of vector and scalar modes | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, scalar twins | [Contract and validation](mode_overlap.md) | — |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
@@ -93,6 +94,7 @@ src/galerkin/
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
   electric.py     # Steady electric conduction
+  electrostatics.py # Electrostatics with node-set conductors and the capacitance matrix
   materials.py    # Scalar or {region name: value} material lookup
   heat_source.py  # Elementwise volumetric heat sources bound to one mesh
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
@@ -194,3 +196,5 @@ This project is not affiliated with, endorsed by, or supported by the Gmsh
 project.
 
 [Steady electric conduction: Python API, Joule heat and Neumann gauges](electric_steady2d.md).
+
+[2D electrostatics and the capacitance matrix: conductors as node sets, charges and gates](electrostatics.md).
