@@ -259,6 +259,40 @@ Timing and profiling commands for the solvers are in the
 `queue: max` and are never cancelled by a newer push. Other refs use
 `queue: single`, so a new push supersedes the older run.
 
+### Latest dependencies canary
+
+The `Latest dependencies` workflow (`.github/workflows/latest-deps.yml`) runs
+once a day (21:47 UTC) and on manual dispatch. It is **not** part of the
+required `tests` check and never gates a PR or `main`. It installs the eight
+packages editable with the extras the pinned environment provides
+(`galerkin[test,figures,jax,torch,crosscheck]`, `galerkin-refsol[test]`,
+`meshine[test,plot]`, `meshloom[test]`, `gmshio[test,gmsh,plot]`,
+`physmat[test,rii,plot]`, `simcase[test,studio,export]`, `sipi[test]`) without
+the pinned requirements and without `--no-deps`, so pip resolves the newest
+versions the `pyproject.toml` bounds allow. The PyTorch CPU index is an extra
+index without a version pin, and the step checks that the installed torch is the
+`+cpu` build; meshloom builds with the newest maturin its pyproject allows while
+its Rust crates stay at `Cargo.lock` (`--locked`). It then runs
+`python -m pip check`, the license check (a new transitive distribution without
+a reviewed inventory entry fails it, which is part of the point), the same
+preflight groups as the Linux job, the non-slow suite with the pinned RII
+database and required reference-tool comparisons, and the `blas-kernels` file
+list under both forced OpenBLAS kernels. Once the install has succeeded, each
+check runs even if an earlier one failed, so one failure does not hide the
+others. `pip freeze` goes to the step summary and, with the license report and
+the JUnit files, to the `latest-deps-results` artifact. Left out: the Node
+Studio checks (Node is pinned by the workflow and not resolved by pip, so it
+cannot drift here), the distribution builds, meshloom's Cargo tests and notices,
+and the slow studies.
+
+A failed scheduled or manual run opens the issue **Latest dependencies canary
+failed**, or comments on it when it is already open, with the run URL and the
+resolved versions of the key packages next to their pins; a passing run closes
+it. A cancelled run, including one stopped by the 90-minute limit, is not
+reported. The canary is a heads-up, not a verdict on the commit: the pins in
+`tools/requirements-py312-linux*.txt` are still updated deliberately, in a
+reviewed change that reruns the source and distribution checks.
+
 ## Reading results
 
 Each job uploads its artifacts, even after a failure:
