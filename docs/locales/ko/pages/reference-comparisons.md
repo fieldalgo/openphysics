@@ -81,6 +81,11 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 | `thermoelasticity-p1-plane-strain-three-region-bar` | `thermoelasticity.solve_thermoelasticity`, P1, 영역별 alpha·E·nu | 같음, 열하중 `beta (T_h - Tref) div v` | 절점 변위, 요소 응력 | 4.0e-13, 2.0e-13 | 1e-9 |
 | `thermoelasticity-p1-plane-stress-three-region-bar` | 같음, 평면응력 | 같음 | 절점 변위, 요소 응력 | 4.4e-13, 2.7e-13 | 1e-9 |
 | `transient-heat-p1-three-region-wall` | `transient_heat.solve_transient_heat`, P1, 영역별 k·c·Q | `ElementTriP1` 강성·일관 질량, 시험 안의 backward Euler | 저장된 모든 시각의 절점 온도 | 1.2e-15 | 1e-9 |
+| `heat-p1-flux-robin-mixed-slab` | `thermal.solve_steady_heat`, P1, 왼쪽 변 Dirichlet, 외향 열유속·대류 변(상수와 다항식 자료, 한 변은 공유); `assemble_stiffness`, `assemble_boundary_mass` | `ElementTriP1`, 절점 쌍으로 맞춘 같은 변 위의 `FacetBasis` 7차 | 절점 온도, 요소 열유속, K·H·fQ·G·B·rhs, 대류 외향 열량 C, 반력 | 1.2e-15, 3.8e-14, <= 4.2e-16, 3.2e-14, 3.1e-14 | 1e-9 |
+| `heat-p1-flux-robin-robin-slab` | 같음, Dirichlet 절점 대신 왼쪽 변에 대류(Robin 지지만) | 같음 | 절점 온도, 요소 열유속, K·H·fQ·G·B·rhs, 대류 외향 열량 C | 1.6e-15, 8.7e-14, <= 4.2e-16, 5.4e-14 | 1e-9 |
+| `elasticity-p1-plane-strain-traction-plate` | `elasticity.solve_elasticity`, P1, 체적력, 상수·다항식 traction 변, 0이 아닌 규정 u_y | `ElementVector(ElementTriP1)`, 같은 변 위의 `FacetBasis` 7차 traction 하중 | 절점 변위, 요소 응력, 체적+traction 하중, 반력, 변형 에너지 | 5.8e-15, 6.1e-15, 2.9e-16, 4.8e-15, 2.2e-15 | 1e-9 |
+| `elasticity-p1-plane-stress-traction-plate` | 같음, 평면응력 | 같음 | 같음 | 2.3e-14, 1.0e-14, 2.9e-16, 7.3e-15, 3.4e-16 | 1e-9 |
+| `helmholtz-p1-abc-cylinder` | `assemble_stiffness`, `assemble_mass`, `assemble_boundary_mass`, `solve_dirichlet`, P1, 바깥 변의 흡수 항 `-(ik - 1/(2R)) B` | `ElementTriP1`, 같은 변 위의 `FacetBasis` 경계 질량 | 복소 산란장, 그 허수부, 경계 질량 B, 흡수 경계 위 \|u_s\|^2 적분 | 2.1e-15, 2.1e-15, 8.0e-16, 0 | 1e-9 |
 | `heat-p2-reference-slab` | P1 | `ElementTriP2` | 꼭짓점 온도: P1 대 P2, P1 대 해석해, P2 대 해석해 | 3.7e-5, 3.6e-5, 1.5e-6 | 보고만 |
 | `elasticity-p2-reference-cantilever` | P1, 평면응력 | `ElementVector(ElementTriP2)` | 끝단 처짐, P1 대 P2 | 1.7e-1 | 보고만 |
 
