@@ -70,7 +70,7 @@ After running, follow [results, export and trust](../results/index.md).
 ## Experimental model workspace
 
 [Workspace guidance](../packages/simcase/workspace.md) covers the bounded optical
-runner and input/session saving. The heated-waveguide screen is a setup preview,
+runner, the steady heat plate and input/session saving. The heated-waveguide screen is a setup preview,
 not a coupled solve. Its file formats and capabilities differ from the original
 optical and thermal Studio editors.
 

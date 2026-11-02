@@ -69,8 +69,8 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 
 ## 실험적 모델 workspace
 
-[Workspace 안내](../packages/simcase/workspace.md)는 제한된 광학 실행과 입력·session 저장을
-설명합니다. 가열 도파관 화면은 설정 미리보기이며 연계 물리를 실행하지 않습니다.
+[Workspace 안내](../packages/simcase/workspace.md)는 제한된 광학 실행, 정상 열전도 판과
+입력·session 저장을 설명합니다. 가열 도파관 화면은 설정 미리보기이며 연계 물리를 실행하지 않습니다.
 기존 광학·열 Studio와 파일 형식 및 지원 범위가 다릅니다.
 
 ## 내 모델로 확장하기
