@@ -82,6 +82,7 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | flux/convection 직사각형 정상 열 (`boundary-v2`), 하중 배열 포함 | VTU |
 | flux/Robin 필드를 포함한 정상 재료 영역 열 | VTU |
 | 직사각형·영역 과도 열 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
+| 열유속·대류 변이 있는 직사각형 과도 열(`transient-p1-node-cell-boundary-v1`), step별 하중 배열 두 개 포함 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
 | 진공 PEC 공동 | VTU |
 | 전기 전도·Joule 가열 (`electric-joule2d-p1-v1`) | VTU |
 | 재료·손실 벽이 있는 공동 (`cavity3d-edge-complex-v1`) | VTU, 복소 장은 `_real`/`_imag` 쌍 |

@@ -5,6 +5,9 @@
 Temperatures are finite Kelvin, including negative mathematical values. Initial
 data are never projected. Time-dependent side data are samples at the requested
 times, with no interpolation, extrapolation, or serialized callback language.
+Outward flux and convection sides reuse the steady boundary contract's readers
+(same keys, limits and messages) and are time-independent constants; a document
+that carries either key saves the boundary result/layout pair ``V2``.
 """
 import math
 import sys
@@ -14,10 +17,15 @@ import numpy as np
 
 from . import units
 from .schema import DocumentError
+from .steady_boundary_contract import (
+    has_natural_conditions, natural_conditions, rectangle_exterior_edges, validate_natural_edges,
+)
 
 PHYSICS = "thermal.transient2d"
 RESULT_FORMAT = "thermal.transient2d-result-v1"
 FIELD_LAYOUT = "thermal2d-transient-p1-node-cell-v1"
+V1 = (RESULT_FORMAT, FIELD_LAYOUT)
+V2 = ("thermal.transient2d-result-v2", "thermal2d-transient-p1-node-cell-boundary-v1")
 SIDES = ("left", "right", "bottom", "top")
 
 
@@ -150,7 +158,7 @@ def validate_transient_thermal(doc):
     where = f"physics.{name}"
     keys = {"type", "conductivity_w_mk", "volumetric_heat_capacity_j_m3k",
             "initial_temperature_k", "dirichlet_temperature_k", "heat_source_w_m3"}
-    _object(p, keys, where, keys-{"heat_source_w_m3"})
+    _object(p, keys | {"outward_flux_w_m2", "convection"}, where, keys-{"heat_source_w_m3"})
     if p["type"] != PHYSICS:
         raise DocumentError(f"{where}.type: expected {PHYSICS}")
     for key in ("conductivity_w_mk", "volumetric_heat_capacity_j_m3k"):
@@ -187,6 +195,10 @@ def validate_transient_thermal(doc):
         if any(not _agree(initial[i], values[0]) for i in side_corners[tag]):
             raise DocumentError(f"{where}.dirichlet_temperature_k.{tag}: initial t0 mismatch "
                                 "(32 eps bound); no projection")
+    # Same reader as thermal.steady2d: constant g and (h, ambient) per side, no
+    # time samples. The mass/time term keeps the system well posed, so no anchor
+    # is required and h=0 is only an insulated side.
+    natural_conditions(p, where, sampled)
     _object(d["results"], {"save_fields", "plots"}, "results", {"save_fields", "plots"})
     if any(not isinstance(d["results"][key], bool) for key in ("save_fields", "plots")):
         raise DocumentError("results.save_fields and results.plots must be booleans")
@@ -195,12 +207,26 @@ def validate_transient_thermal(doc):
     doc.notes = []
 
 
+def transient_result_versions(doc):
+    """Return the (result_format, field_layout) pair a validated document saves.
+
+    Presence of ``outward_flux_w_m2`` or ``convection`` selects ``V2``; every
+    other document keeps the legacy ``V1`` identifiers and arrays.
+    """
+    doc.validate()
+    return V2 if has_natural_conditions(doc.sole_physics()[1]) else V1
+
+
 def transient_solver_inputs(doc, mesh):
     """Return copied keyword arguments for solve_transient_heat(mesh, **kwargs).
 
     The caller constructs its SI rectangle mesh. Initial data are evaluated by
     coordinates, never by assumed node ordering. Only requested-time lookup is
     supported for sampled side data. No engine or file operation is performed.
+    With ``outward_flux_w_m2`` or ``convection`` the result also carries the
+    engine's ``outward_flux`` and ``convection`` mappings over complete exterior
+    sides of ``mesh.boundary_edges``, validated as in the steady contract;
+    without them the six legacy keywords are returned unchanged.
     """
     doc.validate()
     name, p = doc.sole_physics()
@@ -264,10 +290,17 @@ def transient_solver_inputs(doc, mesh):
 
     boundary = {node: (values[0] if all(v == values[0] for v in values) else lookup(values))
                 for node, values in sorted(sampled_nodes.items())}
-    return {"conductivity": float(p["conductivity_w_mk"]),
-            "volumetric_heat_capacity": float(p["volumetric_heat_capacity_j_m3k"]),
-            "time_s": times, "initial_temperature_k": initial.copy(),
-            "dirichlet": boundary, "heat_source": float(p.get("heat_source_w_m3", 0.))}
+    inputs = {"conductivity": float(p["conductivity_w_mk"]),
+              "volumetric_heat_capacity": float(p["volumetric_heat_capacity_j_m3k"]),
+              "time_s": times, "initial_temperature_k": initial.copy(),
+              "dirichlet": boundary, "heat_source": float(p.get("heat_source_w_m3", 0.))}
+    if has_natural_conditions(p):
+        flux, convection = natural_conditions(p, f"physics.{name}", p["dirichlet_temperature_k"])
+        lower, upper = np.array([x0, y0]), np.array([x0+lx, y0+ly])
+        exterior = rectangle_exterior_edges(mesh, lower, upper)
+        validate_natural_edges(mesh, *exterior, sampled_nodes, flux, convection)
+        inputs.update(outward_flux=dict(flux), convection=dict(convection))
+    return inputs
 
 
 def transient_thermal_summary(doc):
@@ -276,10 +309,16 @@ def transient_thermal_summary(doc):
         return transient_region_summary(doc)
     name, p = doc.sole_physics()
     times = doc["study"]["time_s"]
+    natural = ''
+    if has_natural_conditions(p):
+        natural = (f'  outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
+                   f'convection {p.get("convection", {})}\n'
+                   '  q.n = g_out + h*(T-T_ambient), sampled once; unselected natural sides insulated\n')
     return (f'{doc["name"]} (openphysics 0.2)\n'
             f'  physics {name}: {PHYSICS}, {len(times)} explicit times in s\n'
             f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
             f'  k={p["conductivity_w_mk"]} W/(m K), '
             f'c={p["volumetric_heat_capacity_j_m3k"]} J/(m^3 K)\n'
+            + natural +
             '  output: SI time/node/cell histories; rates at interval ends only')
 

@@ -56,6 +56,14 @@ def preflight(data, limits):
             and isinstance(next(iter(physics.values())), dict)
             and next(iter(physics.values())).get("type") == KIND,
             "transient route accepts one thermal.transient2d entry", code="unsupported_physics")
+    # The transient view shows the V1 pair only: documents that select the boundary
+    # layout (key presence, as in the headless contract) are refused before any
+    # validation or run, with no job; run them headless instead.
+    entry = next(iter(physics.values()))
+    require(not ("outward_flux_w_m2" in entry or "convection" in entry),
+            "transient Studio shows Dirichlet and insulated sides only; a document with "
+            "outward_flux_w_m2 or convection saves the boundary layout and runs headless "
+            "(python -m simcase run)", code="unsupported_physics")
     mesh, study = data.get("mesh"), data.get("study")
     subdivisions = mesh.get("subdivisions") if isinstance(mesh, dict) else None
     require(isinstance(subdivisions, list) and len(subdivisions) == 2
