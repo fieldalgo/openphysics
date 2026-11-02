@@ -76,15 +76,15 @@ The evaluator reads a geometry block, resolves the booleans and builds the regio
 complex. It lives in simcase and uses pure Python with exact integer and rational
 arithmetic. No compiled code is added outside meshloom.
 
-sipi and its browser calculator will depend on the evaluator, so the evaluator's
-module may import only the standard library and NumPy. It must be importable
-without scipy or shapely.
+The evaluator must work without shapely. Shapely wheels carry GEOS
+(LGPL-2.1), and sipi's browser calculator would ship it to the browser; the
+stage 2 exact 2D engine replaces shapely in any case. The evaluator module itself
+imports only the standard library and NumPy.
 
-That is not true of simcase today. `import simcase` loads the solver chain
-(`packages/simcase/src/simcase/__init__.py:26-40`), and that chain imports scipy
-(`packages/simcase/src/simcase/tracking.py:13`). Removing this dependency is
-stage 1 work: either the package import becomes lazy, or the evaluator is placed
-where it can be imported on its own.
+scipy is not restricted. sipi, galerkin and meshine already depend on it
+(`packages/sipi/pyproject.toml:26`), and it is BSD-3-Clause. `import simcase`
+loads the solver chain (`packages/simcase/src/simcase/__init__.py:26-40`); making
+that import lazy is optional clean-up, not a requirement of this contract.
 
 ## Top-level structure (frozen)
 
@@ -189,7 +189,12 @@ while its micrometre copy counts 0
 **What the grid does not fix.** The meshers' relative tolerances still apply
 after the hand-off: `MERGE_EPS = 1e-9` and `SNAP_EPS = 3e-8` of the bounding-box
 diagonal (`packages/meshine/src/meshine/geometry.py:33,57`). A 1 nm feature in a
-10 cm domain (ratio 10⁻⁸) is below `SNAP_EPS`.
+10 cm domain (ratio 10⁻⁸) is below `SNAP_EPS`. Validation therefore refuses,
+before the hand-off, any feature whose size relative to its component's
+bounding-box diagonal is below the receiving mesher's tolerance, and names the
+feature, its size and the ratio. Nothing disappears silently. Meshing such
+multi-scale geometry correctly is a long-term item and is not scheduled in
+stages 0–6.
 
 **Hand-off to meshine.** meshine receives micrometre doubles. Each coordinate of
 k pm becomes k/10⁶ µm, rounded once. Corners are computed exactly before that
@@ -817,15 +822,24 @@ commit. The amendment must cite the public Wavebit repository at a specific SHA.
 - **Lowering rules:** an extruded circle becomes a cylinder, not a prism.
 - **Out of scope:** raster permittivity layers are material data, not geometry.
 
+## Resolved questions (2026-11-02)
+
+1. Features below the meshers' relative tolerances are refused at validation
+   with their name, size and ratio. Supporting them is a long-term item.
+2. sipi's rectangular-limit identity test stays as it is until the stage 1
+   adapter exists. Replacing node identity by a comparison against analytical
+   or stored references at the existing tolerances then needs a separate
+   decision. Tolerances are not loosened.
+3. The evaluator stays in simcase. It must work without shapely; scipy is not
+   restricted (see [Where the evaluator lives](#where-the-evaluator-lives)).
+4. sipi JSON and Studio projects keep their own formats and are read through
+   the stage 1 adapters. Whether they are retired is decided with the JSON
+   contract decision. New geometry features land in version 1 first.
+5. Wavebit lowering (periodic cells, ellipses, rotation, angles, x/y extrusion)
+   is deferred to a stage 3 amendment. The
+   [stage 3 preview](#stage-3-preview-wavebit-not-frozen) stays non-normative.
+
 ## Open questions
 
-1. Should geometry validation refuse features below the meshers' relative
-   tolerances (`SNAP_EPS`) before the hand-off?
-2. Should sipi's rectangular-limit identity test still require identical nodes
-   once the adapter exists?
-3. Should the evaluator stay in simcase with a lazy package import, or move to a
-   separate pure-Python package if the lazy import proves fragile?
-4. Point selectors (a reference node, a probe) are not defined. Which stage adds
+1. Point selectors (a reference node, a probe) are not defined. Which stage adds
    them?
-5. Does a Studio project keep its own format, or store a version 1 geometry block
-   directly?
