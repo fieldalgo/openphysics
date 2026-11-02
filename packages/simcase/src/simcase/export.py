@@ -42,6 +42,12 @@ Supported layouts:
   centroids. A Joule result adds ``temperature_k``, the nodal heat arrays and
   cell ``heat_flux_w_m2``; a temperature-dependent one adds
   ``evaluated_temperature_k``. Each array keeps its saved name and unit suffix.
+- 2D linear elasticity (``mechanics2d-p1-v1``, the layout of
+  ``mechanics.elasticity2d``): point data ``displacement_m`` and the nodal
+  ``load_n_per_m``, ``reaction_n_per_m`` and ``residual_n_per_m`` arrays as
+  vectors with a zero z component; cell data one named scalar per saved
+  component, ``exx``, ``eyy``, ``gxy`` (engineering shear, dimensionless) from
+  ``strain`` and ``sxx_pa``, ``syy_pa``, ``sxy_pa`` from ``stress_pa``.
 
 Dirichlet node lists, ``metadata_json`` and the summary are not copied: the
 arrays named above are exported when the saved file holds them, nothing else.
@@ -68,11 +74,12 @@ _CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
+_MECHANICS = "mechanics2d-p1-v1"
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
 _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
-                     _ELECTRIC_JOULE, _CAVITY_COMPLEX)
+                     _ELECTRIC_JOULE, _CAVITY_COMPLEX, _MECHANICS)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
@@ -88,6 +95,11 @@ _ELECTRIC_NODAL = ("potential_v", "joule_load_w_per_m", "electric_reaction_a_per
                    "thermal_system_rhs_w_per_m", "evaluated_temperature_k")
 _ELECTRIC_CELL_VECTORS = ("electric_field_v_m", "current_density_a_m2", "heat_flux_w_m2")
 _ELECTRIC_CELL_SCALARS = ("conductivity_s_m", "joule_heating_w_m3")
+# mechanics2d-p1-v1: (N,2) nodal vectors, and (T,3) element arrays split into
+# named scalar cell data in the saved component order. Dirichlet DOF lists stay
+# in fields.npz.
+_MECHANICS_NODAL = ("displacement_m", "load_n_per_m", "reaction_n_per_m", "residual_n_per_m")
+_MECHANICS_CELL = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa")}
 # cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
 _CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
 
@@ -184,6 +196,29 @@ def _electric_joule(data):
     return points, cells, point_data, cell_data
 
 
+def _mechanics(data):
+    points = _points(data["nodes_m"])
+    triangles = np.asarray(data["triangles"], dtype=np.int64)
+    cells = [("triangle", triangles)]
+    point_data, cell_data = {}, {}
+    for name in _MECHANICS_NODAL:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(points), 2):
+                raise ValueError(f"{name}: expected one 2D vector per node, got shape {values.shape}")
+            point_data[name] = _vector3(values)
+    for name, components in _MECHANICS_CELL.items():
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(triangles), 3):
+                raise ValueError(f"{name}: expected three components per triangle, got shape {values.shape}")
+            for k, component in enumerate(components):
+                cell_data[component] = [np.ascontiguousarray(values[:, k])]
+    if "displacement_m" not in point_data:
+        raise ValueError("mechanics2d-p1-v1 export needs the saved displacement_m array")
+    return points, cells, point_data, cell_data
+
+
 def _cavity(data):
     points = _points(data["nodes"])
     cells = [("tetra", np.asarray(data["tetrahedra"], dtype=np.int64))]
@@ -232,7 +267,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
     Region layouts also include static cell data ``triangle_regions``. Its IDs
     index ``region_names`` in the saved metadata/summary; no names or material
     properties are copied to VTU. Complex cavity fields are written as
-    ``_real``/``_imag`` pairs. ``time_index`` applies to transient layouts
+    ``_real``/``_imag`` pairs; elasticity strain and stress components become
+    named scalar cell data. ``time_index`` applies to transient layouts
     only. Refuses to overwrite an existing file. Returns the output path.
     """
     output = Path(output)
@@ -246,6 +282,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
         parts = _thermal(data, layout, time_index)
     elif layout == _ELECTRIC_JOULE:
         parts = _electric_joule(data)
+    elif layout == _MECHANICS:
+        parts = _mechanics(data)
     elif layout == _CAVITY:
         parts = _cavity(data)
     elif layout == _CAVITY_COMPLEX:
