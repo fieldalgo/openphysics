@@ -210,8 +210,20 @@ flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예�
 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와
 `exp(+j*omega*t)` 규약; VTK에는 복소 배열이 없음)를, 재료는
 `tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로
-내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. `em.modes2d`
-결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 두고
+내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 단일 지점
+도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`, `em.modes2d`)는 절점을 미터로 바꿔
+(`nodes * length_unit_to_m`) 내보냅니다. 스칼라 결과는 모드 `k`(0부터)마다 점 데이터
+`mode_<k>`를, 저장된 `fields`가 복소(손실 재료)이면 `mode_<k>_real`/`mode_<k>_imag`를
+씁니다. 벡터 결과는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`(요소중심의 Ex, Ey,
+Ez, 저장된 상대 정규화로 가장 큰 요소중심 |E| = 1)과 점 데이터
+`longitudinal_electric_mode_<k>_real`/`_imag`(절점 Ez)를 씁니다. 모든 모드 VTU에는 정수
+셀 데이터 `triangle_regions`(저장된 `regions`, summary의 `regions` 색인)가 들어갑니다.
+PML 결과도 같은 배치를 쓰며, 메시와 배열은 흡수층까지 덮고 그 안의 장은 인공적입니다.
+`neff`, `edges`, transverse edge 계수, 추적·open boundary 진단은 `fields.npz`에 남습니다.
+study 지점이 여럿인 결과는 여기서 거절하고 `export_sweep`으로 내보냅니다. subspace 배치
+`em-modes2d-subspace-raw-v1`(추적한 모드가 아닌 원시 고유쌍 열)은 둘 다 거절하며,
+`field_layout` 배열이 없는 `fields.npz`(배치를 기록하기 전에 저장한 `em.modes2d` 결과 등)도
+거절합니다(그 `model.json`을 다시 실행). 2D 메시는 z = 0으로 두고
 2D 벡터에는 z 성분 0을 붙입니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
@@ -225,6 +237,13 @@ writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 시각부터 나타납니다. 출력 폴더는 새것이거나 비어 있어야 하며 아무것도 덮어쓰지 않습니다.
 컬렉션은 VTU 파일을 상대 경로로 가리키므로 폴더째 옮겨도 됩니다. `name="heat"`로 파일 이름
 앞부분을 바꿀 수 있습니다. `.pvd`는 일반 XML이라 meshio 외 의존성은 필요 없습니다.
+
+도파관 모드 sweep은 `simcase.export.export_sweep("out/fields.npz", "out/paraview")`가
+study 지점마다 VTU 하나(`fields_00000.vtu`, …, 단일 지점에서 `export_fields`가 쓰는 배열과
+같음)와 컬렉션 `fields.pvd`를 씁니다. timestep은 저장된 `study_parameter`가 파장이고 값이
+엄격히 단조이면(모든 벡터·PML sweep) 문서 길이 단위(`mesh_length_unit`)의 파장이고, 다른
+매개변수의 스칼라 sweep이나 값이 반복·역행하는 sweep이면 지점 색인입니다. 값 자체는
+`fields.npz`에 남습니다. 디렉터리·이름·rollback 규칙은 같습니다.
 
 ## 브라우저 UI
 
