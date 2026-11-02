@@ -34,6 +34,13 @@ NPZ endpoint. A view change never reruns the solver or modifies its document.
 Transient documents with material regions take a separate path on the same
 routes, described in [Region documents](#region-documents).
 
+Headless documents with `outward_flux_w_m2` or `convection` save the boundary
+layout `thermal2d-transient-p1-node-cell-boundary-v1`
+([headless guide](thermal_transient2d.md#outward-flux-and-convection-sides)).
+The transient validate and run routes refuse them by key presence before any
+validation or run (`unsupported_physics`, HTTP 400, no job), and the capability
+keeps the v1 pair only; run such documents headless.
+
 ## User workflow
 
 After installing matching runtime packages and the optional Studio extra, start

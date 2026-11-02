@@ -187,8 +187,15 @@ def test_p1_transient_dispatch_and_temperature_policy_remain_unchanged():
     doc = Document.from_dict(data)
     assert doc.sole_physics()[1]["type"] == "thermal.transient2d"
     assert "explicit times in s" in doc.summary()
+    # The transient contract reads the same boundary keys with its own layout pair;
+    # it keeps finite negative initial K while the shared nonnegative-ambient policy applies.
+    from simcase.transient_thermal_contract import V2, transient_result_versions
     data["physics"]["heat1"]["convection"] = {}
-    with pytest.raises(DocumentError):
+    doc = Document.from_dict(data)
+    assert transient_result_versions(doc) == V2
+    assert doc.sole_physics()[1]["initial_temperature_k"] == -10.
+    data["physics"]["heat1"]["convection"] = {"right": {"h_w_m2k": 1., "ambient_temperature_k": -1.}}
+    with pytest.raises(DocumentError, match="ambient_temperature_k"):
         Document.from_dict(data)
 
 
