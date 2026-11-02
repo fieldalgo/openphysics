@@ -46,6 +46,7 @@ prints a supplied example.
 | `joule.steady2d` | Constant-property steady Joule heating | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
+| `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
@@ -391,7 +392,9 @@ its nodal heat arrays and cell `heat_flux_w_m2`, and `joule.temperature2d` adds
 `mechanics.elasticity2d`) export point data `displacement_m` and the nodal
 `load_n_per_m`, `reaction_n_per_m` and `residual_n_per_m` vectors, and the saved
 strain and stress components as the scalar cell data `exx`, `eyy`, `gxy` and
-`sxx_pa`, `syy_pa`, `sxy_pa`. Arrays keep their saved names and unit suffixes;
+`sxx_pa`, `syy_pa`, `sxy_pa`; thermoelastic results (`thermoelastic2d-p1-v1`) add
+`temperature_k`, the nodal heat arrays, cell `heat_flux_w_m2`, `sigma_zz_pa`,
+`epsilon_zz` and the `total_`, `thermal_` and `elastic_` strain components. Arrays keep their saved names and unit suffixes;
 Dirichlet node lists and the summary are not copied. The cavity with materials
 and lossy walls (`cavity3d-edge-complex-v1`) exports each complex mode as the
 cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`
