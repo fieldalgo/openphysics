@@ -25,6 +25,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 ## [Unreleased]
 
 - 시험: galerkin의 경계 항을 같은 메시에서 scikit-fem과 비교합니다. `thermal.solve_steady_heat`의 외향 열유속·대류(Robin) 변(혼합과 Robin만), 0이 아닌 규정 변위를 둔 `elasticity.solve_elasticity`의 Cartesian traction 변, Helmholtz 조립의 1차 흡수 경계(`assemble_boundary_mass`)입니다. 행렬·하중·반력·장·에너지가 1e-13 이하로 일치합니다. [레퍼런스 도구 비교](reference-comparisons.md#현재-사례).
+- `physmat`: Ciddor 1996의 습한 공기를 `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)`와 벡터화된 `physmat.air.refractive_index`로 추가했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기 분산, BIPM 1981/91 밀도로 0.3–1.69 µm에서 유효하며, NIST Engineering Metrology Toolbox 값을 1e-9 이내, 상온 조건의 Birch & Downs 1994를 6e-9 이내로 재현합니다. `air`는 진공 그대로입니다. 내장 재료 표는 재료별 출처를 밝힙니다. [문서](packages/physmat/overview.md#공기-ciddor-1996).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 

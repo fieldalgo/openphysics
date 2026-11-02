@@ -8,6 +8,7 @@
     si.n(1.55)                             # 3.4757  (wavelength in micrometres)
     si.eps(1.55)                           # complex permittivity (n + i k)^2, exp(-i w t)
     physmat.get("Au").index(0.8)           # 0.15 + 4.9j from Johnson & Christy
+    physmat.standard_air(20, 101325, humidity=0.5).n(0.633)   # moist air, Ciddor 1996
 
     db = physmat.rii.Database("path/to/refractiveindex.info-database")   # CC0 database
     rec = db.load("main/SiO2/Malitson"); rec.dispersion.n(0.5876)
@@ -18,14 +19,15 @@
 Conventions: wavelength in um; n~ = n + i k with k >= 0 for loss; eps = n~^2.
 """
 
-from . import dispersion, fit, library, rii
+from . import air, dispersion, fit, library, rii
+from .air import CiddorAir
 from .dispersion import (Composite, Constant, Dispersion, Drude, DrudeLorentz, OutOfRange, RIIFormula,
                          Sellmeier, Tabulated, ev_to_um, um_to_ev)
 from .fit import FitResult, fit_drude_lorentz
-from .library import constant, get, names
+from .library import constant, get, names, standard_air
 from .material import Material, Property
 
 __version__ = "0.1.0"
-__all__ = ["get", "names", "constant", "Material", "Property", "Dispersion", "Constant", "Sellmeier",
-           "Tabulated", "Composite", "Drude", "DrudeLorentz", "RIIFormula", "OutOfRange", "ev_to_um",
-           "um_to_ev", "fit_drude_lorentz", "FitResult", "dispersion", "fit", "library", "rii", "__version__"]
+__all__ = ["get", "names", "constant", "standard_air", "CiddorAir", "Material", "Property", "Dispersion", "Constant",
+           "Sellmeier", "Tabulated", "Composite", "Drude", "DrudeLorentz", "RIIFormula", "OutOfRange", "ev_to_um",
+           "um_to_ev", "fit_drude_lorentz", "FitResult", "air", "dispersion", "fit", "library", "rii", "__version__"]

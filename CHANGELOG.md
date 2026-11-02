@@ -25,6 +25,7 @@ What each package implements, and its limits, is in the
 ## [Unreleased]
 
 - Tests: scikit-fem comparisons on the same mesh for galerkin's boundary terms: outward-flux and convection (Robin) edges of `thermal.solve_steady_heat` (mixed and Robin-only), Cartesian traction edges of `elasticity.solve_elasticity` with nonzero prescribed displacement, and the first-order absorbing boundary of the Helmholtz assembly (`assemble_boundary_mass`); matrices, loads, reactions, fields and energies agree to 1e-13 or better. [Reference comparisons](docs/reference-comparisons.md#current-cases).
+- `physmat`: moist air after Ciddor 1996 as `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)` and the vectorised `physmat.air.refractive_index`: dispersion of standard dry air with the CO2 correction, water-vapour dispersion and the BIPM 1981/91 density, valid for 0.3–1.69 µm; reproduces the NIST Engineering Metrology Toolbox values within 1e-9 and Birch & Downs 1994 within 6e-9 at ambient conditions. `air` stays vacuum. The built-in materials table now states the source of each material. [Documentation](docs/packages/physmat/overview.md#air-ciddor-1996).
 
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
