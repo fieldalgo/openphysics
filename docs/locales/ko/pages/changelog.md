@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- 문서: 패키지 README와 문서 개요에 빠져 있던 기능을 추가했습니다. galerkin의 정상 전기전도, 단방향·온도 의존 Joule heating, JAX/PyTorch 미분과 coupling 계층; meshine의 `extrude`와 사면체 메시 계약("2D 전용" 한계 삭제); refsol의 `thermal_multilayer`, `transient_heat_multilayer`, `elasticity_multilayer`. 진입 문서는 workspace의 정상 열전도 판과 광학 도형을 설명하고, 모든 영문 페이지가 한국어 쌍과 서로 링크합니다.
+
 - CI: GitHub의 Node 20 런타임 종료에 맞춰 고정한 GitHub Actions를 Node 24 릴리스(`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6)로 올렸습니다. 검사 내용과 아티팩트 이름은 바뀌지 않습니다.
 
 - CI: 필수 검사가 아닌 하루 한 번의 `Latest dependencies` 카나리(`.github/workflows/latest-deps.yml`)가 메타데이터가 허용하는 가장 새 의존성으로 패키지를 설치하고 `pip check`, 라이선스 목록 검사, 사전 검사 묶음, non-slow 시험, 강제 커널 시험을 돌린 뒤 해석된 버전과 함께 이슈 하나를 열거나 갱신하거나 닫습니다. 고정 버전은 여전히 의도적으로 올립니다. [문서](development.md#최신-의존성-카나리).
