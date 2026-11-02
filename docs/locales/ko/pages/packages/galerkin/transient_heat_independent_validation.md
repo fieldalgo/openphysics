@@ -40,7 +40,9 @@ unittest subtest와 후속 pytest/subtest 개수는 실제 관측값으로 따�
 ## 독립 유도와 scale
 
 scalar SI 문제는 c*Tdot-div(k*gradT)=Q이며, 외부 고정 노드의 온도를 처방하고
-나머지 변은 단열이다. 좌표는 m, k는 W/(m K), c는 J/(m^3 K), Q는 W/m^3,
+나머지 변은 단열이다. 뒤에 추가된 `outward_flux`/`convection` keyword는 이 동결
+oracle의 범위 밖이며, 그 생산 측 기준은
+[검증 계약](transient_heat_validation.md#외향-열유속과-대류-기준)에 있다. 좌표는 m, k는 W/(m K), c는 J/(m^3 K), Q는 W/m^3,
 T는 Kelvin이다. 원 barycentric geometry에서 다음을 얻는다.
 
 ```text

@@ -42,7 +42,9 @@ actually observed.
 ## Independent derivation and scales
 
 The scalar SI problem is c*Tdot-div(k*gradT)=Q with prescribed fixed exterior
-nodes, all other edges insulated. Coordinates are metres, k W/(m K),
+nodes, all other edges insulated. The `outward_flux`/`convection` keywords added
+later are outside this frozen oracle; their producer gates are in the
+[validation contract](transient_heat_validation.md#outward-flux-and-convection-gates). Coordinates are metres, k W/(m K),
 c J/(m^3 K), Q W/m^3 and T Kelvin. Original barycentric geometry gives
 
 ```text
