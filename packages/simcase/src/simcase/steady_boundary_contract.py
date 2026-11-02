@@ -106,6 +106,28 @@ def _validated(doc):
         for b in ("bottom", "top"):
             if a in prescribed and b in prescribed and prescribed[a] != prescribed[b]:
                 raise DocumentError(path+".dirichlet_temperature_k: conflicting corner")
+    flux, convection = natural_conditions(p, path, prescribed)
+    if not prescribed and not any(h > 0 for h, _ in convection.values()):
+        raise DocumentError(path+": requires Dirichlet or positive Robin anchor; pure Neumann unsupported")
+    versions = V2 if has_natural_conditions(p) else V1
+    return bounds, prescribed, k, q, flux, convection, versions
+
+
+def has_natural_conditions(p):
+    """Presence, not truth: an empty or null mapping still selects the boundary layout."""
+    return "outward_flux_w_m2" in p or "convection" in p
+
+
+def natural_conditions(p, path, prescribed):
+    """Read the ``outward_flux_w_m2`` and ``convection`` side mappings of one physics entry.
+
+    Shared by the steady and transient rectangle contracts, so both accept the
+    same key names, value forms and limits and raise the same messages: sides are
+    ``left``/``right``/``bottom``/``top``; g is a finite signed W/m²; convection is
+    exactly ``{"h_w_m2k": h >= 0, "ambient_temperature_k": K >= 0}``; a side in
+    ``prescribed`` (a side-to-Dirichlet mapping) cannot also carry a natural
+    condition. Returns ``({side: g}, {side: (h, ambient)})`` as plain floats.
+    """
     flux = p.get("outward_flux_w_m2", {})
     _object(flux, SIDES, path+".outward_flux_w_m2")
     flux = {tag: _number(value, path+".outward_flux_w_m2."+tag) for tag, value in flux.items()}
@@ -119,12 +141,9 @@ def _validated(doc):
         h = _number(value["h_w_m2k"], where+".h_w_m2k", nonnegative=True)
         ambient = _number(value["ambient_temperature_k"], where+".ambient_temperature_k", nonnegative=True)
         convection[tag] = (h, ambient)
-    if not prescribed and not any(h > 0 for h, _ in convection.values()):
-        raise DocumentError(path+": requires Dirichlet or positive Robin anchor; pure Neumann unsupported")
     if set(prescribed) & (set(flux) | set(convection)):
         raise DocumentError(path+": natural condition overlaps a fully Dirichlet side")
-    versions = V2 if "outward_flux_w_m2" in p or "convection" in p else V1
-    return bounds, prescribed, k, q, flux, convection, versions
+    return flux, convection
 
 
 def validate_steady_boundary(doc):
@@ -153,6 +172,39 @@ def steady_boundary_inputs(doc, mesh):
     bounds, side_bc, k, q, flux, convection, _ = _validated(doc)
     lower = np.array([bounds["xmin"], bounds["ymin"]])
     upper = np.array([bounds["xmax"], bounds["ymax"]])
+    p, owners, expected_edges = rectangle_exterior_edges(mesh, lower, upper)
+    node_tags, edge_tags = getattr(mesh, "boundary", None), getattr(mesh, "boundary_edges", None)
+    if not isinstance(node_tags, Mapping) or not isinstance(edge_tags, Mapping):
+        raise DocumentError("mesh: boundary node and edge mappings required")
+    prescribed = {}
+    for tag, value in side_bc.items():
+        ids = np.asarray(node_tags.get(tag, []))
+        # Boundary identity comes from verified exterior edges, not a broad
+        # coordinate mask that could also include nearby interior nodes.
+        expected = np.array(sorted({node for edge in expected_edges[tag] for node in edge}),
+                            dtype=int)
+        if (ids.ndim != 1 or ids.dtype.kind not in "iu" or len(ids) != len(expected)
+                or len(np.unique(ids)) != len(ids) or np.any(ids < 0) or np.any(ids >= len(p))
+                or not np.array_equal(np.sort(ids), expected)):
+            raise DocumentError(f"mesh.boundary.{tag}: expected the complete unique SI side")
+        for node in ids:
+            if int(node) in prescribed and prescribed[int(node)] != value:
+                raise DocumentError("mesh.boundary: conflicting Dirichlet corner")
+            prescribed[int(node)] = value
+    validate_natural_edges(mesh, p, owners, expected_edges, prescribed, flux, convection)
+    return {"conductivity": k, "dirichlet": dict(sorted(prescribed.items())),
+            "heat_source": q, "outward_flux": dict(flux), "convection": dict(convection)}
+
+
+def rectangle_exterior_edges(mesh, lower, upper):
+    """Classify the exterior edges of a connected, hole-free rectangle mesh by side.
+
+    Returns ``(nodes, owners, expected_edges)``: SI node coordinates, the owner
+    count of every sorted edge and, per side tag, the set of exterior edges on it.
+    Raises DocumentError when the coordinate precision cannot separate opposite
+    or adjacent sides, the mesh is disconnected, leaves the rectangle or does not
+    cover it.
+    """
     extent = upper-lower
     tol = 64*np.finfo(float).eps*np.maximum(np.maximum(abs(lower), abs(upper)), extent)
     # Finite endpoints alone do not guarantee distinguishable opposite sides.
@@ -190,24 +242,19 @@ def steady_boundary_inputs(doc, mesh):
             or any(not edges for edges in expected_edges.values())
             or not np.isclose(area.sum(), np.prod(upper-lower), rtol=1e-12, atol=0)):
         raise DocumentError("mesh: must cover the complete rectangle without holes")
-    node_tags, edge_tags = getattr(mesh, "boundary", None), getattr(mesh, "boundary_edges", None)
-    if not isinstance(node_tags, Mapping) or not isinstance(edge_tags, Mapping):
+    return p, owners, expected_edges
+
+
+def validate_natural_edges(mesh, p, owners, expected_edges, prescribed, flux, convection):
+    """Check that each flux/convection tag selects the complete exterior side in mesh.boundary_edges.
+
+    ``prescribed`` maps fixed node indices to their values: an edge whose two
+    nodes are both fixed cannot carry a natural condition. Validation only; the
+    returned conditions are the caller's.
+    """
+    edge_tags = getattr(mesh, "boundary_edges", None)
+    if not isinstance(edge_tags, Mapping):
         raise DocumentError("mesh: boundary node and edge mappings required")
-    prescribed = {}
-    for tag, value in side_bc.items():
-        ids = np.asarray(node_tags.get(tag, []))
-        # Boundary identity comes from verified exterior edges, not a broad
-        # coordinate mask that could also include nearby interior nodes.
-        expected = np.array(sorted({node for edge in expected_edges[tag] for node in edge}),
-                            dtype=int)
-        if (ids.ndim != 1 or ids.dtype.kind not in "iu" or len(ids) != len(expected)
-                or len(np.unique(ids)) != len(ids) or np.any(ids < 0) or np.any(ids >= len(p))
-                or not np.array_equal(np.sort(ids), expected)):
-            raise DocumentError(f"mesh.boundary.{tag}: expected the complete unique SI side")
-        for node in ids:
-            if int(node) in prescribed and prescribed[int(node)] != value:
-                raise DocumentError("mesh.boundary: conflicting Dirichlet corner")
-            prescribed[int(node)] = value
     # Validate each condition kind independently: one flux plus one Robin is additive.
     for label, conditions in (("outward_flux", flux), ("convection", convection)):
         seen = set()
@@ -227,5 +274,3 @@ def steady_boundary_inputs(doc, mesh):
                 found.add(edge)
             if found != expected_edges[tag]:
                 raise DocumentError(f"mesh.boundary_edges.{tag}: selection must cover the complete SI side")
-    return {"conductivity": k, "dirichlet": dict(sorted(prescribed.items())),
-            "heat_source": q, "outward_flux": dict(flux), "convection": dict(convection)}
