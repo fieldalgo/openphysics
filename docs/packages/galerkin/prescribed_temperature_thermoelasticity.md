@@ -1,5 +1,7 @@
 # Prescribed-temperature thermoelasticity (2D mechanical stage)
 
+[한국어](../../locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity.md)
+
 This reusable static mechanical stage accepts an explicitly supplied nodal-P1
 absolute temperature field. It does not call a heat solver, connect a heat result
 automatically, certify temperature provenance, or validate a complete sequential
