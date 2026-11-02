@@ -55,6 +55,13 @@ mesh = read_msh("model.msh")
 mesh.cells("triangle"), mesh.physical_tags("triangle"), mesh.cells_in("pec", "line")
 ```
 
+`gmshio` is the canonical reader for new code: MSH 4.1, the full Gmsh element
+set, and it runs Gmsh for you. `galerkin.read_msh` is the engine's
+dependency-free parser for an ASCII 2.2 or 4.1 file that already exists; for a
+planar mesh it returns the same regions, region names and named boundary edges
+as `galerkin.from_mesher(to_fem2d(read_msh(path)))`, and the two are checked
+against each other on files Gmsh wrote.
+
 A `.geo` script is written in whatever unit its author chose, so `gmshio` holds no
 absolute length constant. Point merging and T-junction splitting in `Geo` are a
 dimensionless fraction of the geometry's own bounding-box diagonal, and `to_fem2d`
