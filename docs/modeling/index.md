@@ -23,6 +23,7 @@ supported. In particular, optical dispersion models do not define thermal or ele
 
 - [meshine — a small quality triangle mesher for multi-material planar domains](../packages/meshine/overview.md)
 - [gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh](../packages/gmshio/overview.md)
+- [Geometry document: stage 0 contract (draft, not implemented)](../packages/simcase/geometry_document.md)
 - [Tutorial: analyse your own waveguide](../packages/simcase/waveguide_tutorial.md)
 
 
