@@ -1,0 +1,302 @@
+# Canary for dependency drift. The required validation (validate.yml) installs
+# only the pinned requirements, so a new release of numpy, scipy, jax, torch,
+# FastAPI or any transitive package is not seen until the pins are updated. This
+# workflow installs the eight packages with their extras WITHOUT the pins, so pip
+# resolves the newest versions the pyproject bounds allow, and runs the checks
+# that depend on the installed libraries: pip's consistency check, the license
+# inventory (a new transitive distribution without a reviewed entry fails it),
+# the preflight groups, the non-slow source suite with the pinned RII database and
+# the reference-tool comparisons, and the numerically sensitive files under two
+# forced OpenBLAS kernels.
+#
+# Not a required check: it never gates a PR or main, and a failure here is a
+# heads-up about a future pin update, not a verdict on the commit. The pins stay
+# updated deliberately in reviewed changes. Left out on purpose: the Node Studio
+# checks (Node and its built-in test runner are pinned by the workflow, not
+# resolved by pip, so they cannot drift here), the distribution builds, meshloom's
+# Cargo tests and notices (its crates are locked), and the slow convergence studies.
+#
+# Reporting (report job): a failed scheduled or manual run opens the issue
+# "Latest dependencies canary failed" or comments on it if it is already open,
+# with the run URL and the resolved versions of the key packages next to the pins;
+# a passing run closes that issue. A cancelled run (including one stopped by the
+# timeout, which GitHub reports as cancelled) is not reported.
+name: Latest dependencies
+
+on:
+  schedule:
+    # Daily at 21:47 UTC: 06:47 KST, 13:47/14:47 Pacific; off the :00/:30 minutes
+    # and outside the 06-09 Pacific peak.
+    - cron: "47 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: latest-deps
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: install the newest dependencies and run the checks
+    runs-on: ubuntu-24.04
+    # The pinned Linux job takes 23-45 min with the slow studies; this one skips
+    # them and adds two forced-kernel passes. The limit only stops hung runs.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.14"
+      - name: Install Gmsh system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxinerama1
+      # meshloom's compiled kernel: the toolchain pinned in packages/meshloom/rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install 1.97.0 --profile minimal --component rust-src --no-self-update
+      - name: Install the packages with the newest dependencies the metadata allows
+        id: install
+        env:
+          # meshloom builds in pip's isolated build environment with the newest
+          # maturin its pyproject allows; the Rust crates stay at Cargo.lock.
+          MATURIN_PEP517_ARGS: --locked
+        run: |
+          # No constraints file and no --no-deps: every extra validate.yml's pinned
+          # environment provides, resolved fresh within the pyproject bounds. The
+          # PyTorch CPU index is an extra index, not the only one: pip takes the
+          # highest version across both, so torch resolves to the +cpu wheel (a
+          # local version outranks the same PyPI version, whose Linux wheel pulls
+          # CUDA packages) while torch's own requirements still come from PyPI
+          # rather than the older copies the CPU index mirrors. The assertion
+          # below catches the day the CPU index lags behind PyPI.
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+            -e "packages/galerkin[test,figures,jax,torch,crosscheck]" \
+            -e "packages/galerkin-refsol[test]" \
+            -e "packages/meshine[test,plot]" \
+            -e "packages/meshloom[test]" \
+            -e "packages/gmshio[test,gmsh,plot]" \
+            -e "packages/physmat[test,rii,plot]" \
+            -e "packages/simcase[test,studio,export]" \
+            -e "packages/sipi[test]"
+          python -c "import torch; assert '+cpu' in torch.__version__, torch.__version__; print(torch.__version__)"
+          python -m pip check
+          gmsh --version
+      - name: Record the resolved versions
+        if: ${{ always() }}
+        run: |
+          mkdir -p .validation
+          python -m pip freeze --all > .validation/latest-deps-freeze.txt
+          # Key packages next to their pins, as a Markdown table for the summary and the issue.
+          python - <<'EOF'
+          import re
+          from pathlib import Path
+          keys = ["numpy", "scipy", "shapely", "matplotlib", "array-api-compat", "jax", "jaxlib",
+                  "torch", "scikit-fem", "symfem", "mpmath", "scikit-rf", "meshio", "fastapi",
+                  "starlette", "uvicorn", "httpx", "pydantic", "pytest", "gmsh", "pyyaml",
+                  "setuptools", "pip"]
+          def table(lines):
+              out = {}
+              for line in lines:
+                  m = re.match(r"^([A-Za-z0-9_.-]+)==(\S+)", line.strip())
+                  if m:
+                      out[m.group(1).lower().replace("_", "-")] = m.group(2)
+              return out
+          pins = {}
+          for name in ("tools/requirements-py312-linux.txt", "tools/requirements-py312-linux-backends.txt"):
+              pins.update(table(Path(name).read_text(encoding="utf-8").splitlines()))
+          got = table(Path(".validation/latest-deps-freeze.txt").read_text(encoding="utf-8").splitlines())
+          rows = ["| Package | Pinned | Resolved |", "|---|---|---|"]
+          for key in keys:
+              pinned, resolved = pins.get(key, "-"), got.get(key, "(not installed)")
+              mark = "" if pinned == resolved or pinned == "-" else " **(new)**"
+              rows.append(f"| `{key}` | {pinned} | {resolved}{mark} |")
+          Path(".validation/latest-deps-key.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
+          EOF
+          {
+            echo "## Latest dependencies"
+            echo
+            cat .validation/latest-deps-key.md
+            echo
+            echo "<details><summary>pip freeze</summary>"
+            echo
+            echo '```'
+            cat .validation/latest-deps-freeze.txt
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+      # From here each check runs independently once the install succeeded, so one
+      # failure (typically a new distribution missing from the license inventory)
+      # does not hide the others.
+      - name: Verify the optional array libraries import
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -c "import array_api_compat, jax, torch; print(jax.__version__, torch.__version__)"
+      - name: Check installed licenses against the reviewed inventory
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python tools/check_licenses.py --report .validation/licenses-latest-deps.json
+      - name: Record CPU model and BLAS kernel
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
+      - name: Fetch pinned RII database
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python tools/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Check steady boundary contract
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m pytest -q -ra --showlocals --junitxml=.validation/steady-boundary-preflight.xml \
+            tests/simcase/test_thermal.py \
+            tests/simcase/test_thermal_simcase_independent_validation.py \
+            tests/simcase/test_steady_boundary_contract.py \
+            tests/simcase/test_steady_boundary_independent_validation.py \
+            tests/simcase/test_steady_boundary_schema.py \
+            tests/simcase/test_steady_boundary_runtime.py \
+            tests/simcase/test_steady_boundary_platform.py \
+            tests/simcase/test_studio_steady_boundary.py
+      - name: Check transient document acceptance
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python tools/diagnose_transient_conditioning.py --report .validation/transient-conditioning.json
+          python -m pytest -q -ra --showlocals --junitxml=.validation/transient-preflight.xml \
+            tests/galerkin/test_transient_heat_tiny_domain.py \
+            tests/galerkin/test_transient_heat_general_state.py \
+            tests/simcase/test_transient_headless_independent_validation.py \
+            tests/simcase/test_transient_thermal_runtime.py \
+            tests/simcase/test_transient_thermal_contract.py \
+            tests/simcase/test_transient_headless_windows.py \
+            tests/simcase/test_studio_transient.py
+      - name: Check steady thermal Studio
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m pytest -q -ra --junitxml=.validation/studio-thermal-preflight.xml \
+            tests/simcase/test_studio_steady_thermal_http.py \
+            tests/simcase/test_studio_thermal_acceptance.py \
+            tests/simcase/test_studio_thermal_lifecycle.py \
+            tests/simcase/test_studio_rectangle_invariants.py \
+            tests/simcase/test_studio_region_http.py
+      - name: Check transient thermomechanical contract and separated convergence
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m pytest -q --capture=tee-sys -o junit_logging=all --junitxml=.validation/transient-thermomechanical.xml \
+            tests/galerkin/test_transient_thermal_mechanical.py \
+            tests/galerkin/test_transient_thermal_mechanical_physics.py
+      - name: Check transient thermal Studio
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m pytest -q -ra -o junit_logging=all -o junit_log_passing_tests=true --junitxml=.validation/studio-transient-preflight.xml \
+            tests/simcase/test_studio_transient_server_http.py \
+            tests/simcase/test_studio_transient_thermal_acceptance.py \
+            tests/simcase/test_studio_transient_lifecycle.py \
+            tests/simcase/test_studio_region_acceptance.py
+      - name: Run the non-slow Python tests with RII and the reference-tool comparisons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
+          OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
+          OPENPHYSICS_CROSSCHECK_DIR: .validation/crosscheck
+        run: python -m pytest -q -ra -m "not slow" --junitxml=.validation/source-tests.xml
+      - name: Numerically sensitive tests under two forced OpenBLAS kernels
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          # Same files as validate.yml's blas-kernels job. OPENBLAS_L2_SIZE works
+          # around OpenMathLib/OpenBLAS#6021 on AVX-512 AMD runners (see #78 and
+          # validate.yml); harmless once the resolved numpy bundles the fix.
+          OPENBLAS_L2_SIZE: "2048"
+        run: |
+          for core in Haswell Sandybridge; do
+            export OPENBLAS_CORETYPE="$core"
+            python tools/report_numeric_runtime.py --expect-core "$core"
+            python -m pytest -q -ra -m "not slow" --junitxml=".validation/blas-kernels-$core.xml" \
+              tests/simcase/test_tracking.py \
+              tests/simcase/test_subspace_tracking.py \
+              tests/simcase/test_subspace_sweep.py \
+              tests/simcase/test_vector_sweep.py \
+              tests/simcase/test_length_canonical.py \
+              tests/simcase/test_thermal_length_canonical.py \
+              tests/galerkin/test_eigenspace_reliability.py \
+              tests/galerkin/test_material_cavity.py \
+              tests/galerkin/test_cavity_wall_loss.py \
+              tests/refsol/test_fiber_group_index.py \
+              tests/refsol/test_fiber_fields.py
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: latest-deps-results
+          path: .validation/
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  report:
+    name: open, update or close the canary issue
+    needs: canary
+    # Failure and success are reported; a cancelled run says nothing about the
+    # dependencies, so it leaves the issue as it is.
+    if: ${{ always() && (needs.canary.result == 'success' || needs.canary.result == 'failure') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        # Absent when the canary failed before recording the versions.
+        continue-on-error: true
+        with:
+          name: latest-deps-results
+          path: results
+      - name: Open or comment on the issue after a failure, close it after a pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RESULT: ${{ needs.canary.result }}
+          EVENT: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: Latest dependencies canary failed
+        run: |
+          # One issue, found by its exact title among the open issues (REST, newest first).
+          number=$(gh api "repos/$REPO/issues?state=open&per_page=100" \
+            --jq "map(select(.pull_request == null and .title == \"$TITLE\")) | .[0].number // empty")
+          {
+            echo "Latest dependencies canary: **$RESULT** ($EVENT run $RUN_URL)."
+            echo
+            if [ -f results/latest-deps-key.md ]; then
+              echo "Resolved versions of the key packages next to the pins in \`tools/requirements-py312-linux*.txt\`:"
+              echo
+              cat results/latest-deps-key.md
+              echo
+              echo "The full \`pip freeze\`, the license report and the JUnit files are in the run's \`latest-deps-results\` artifact."
+            else
+              echo "The run produced no version record (it failed before or during the install); see the run log."
+            fi
+          } > body.md
+          case "$RESULT" in
+            failure)
+              if [ -n "$number" ]; then
+                gh issue comment "$number" --repo "$REPO" --body-file body.md
+                echo "commented on #$number"
+              else
+                {
+                  cat body.md
+                  echo
+                  echo "This workflow (\`.github/workflows/latest-deps.yml\`) is not a required check. It installs the packages without the pinned requirements, so this is a heads-up about the newest releases, not a verdict on the commit. Pins are updated deliberately in a reviewed change; this issue is closed automatically when a run passes."
+                } > create.md
+                gh issue create --repo "$REPO" --title "$TITLE" --body-file create.md
+              fi
+              ;;
+            success)
+              if [ -n "$number" ]; then
+                gh issue close "$number" --repo "$REPO" --reason completed --comment "$(cat body.md)"
+                echo "closed #$number"
+              else
+                echo "passed; no open issue"
+              fi
+              ;;
+          esac
