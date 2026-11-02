@@ -253,7 +253,10 @@ or a stage fails. The observers are in `tools/studio_resources/`; the
 transient ones and the [region resource observation](region_resource_probe.md)
 the region one.
 Timing and profiling commands for the solvers are in the
-[vector](benchmark_vector.md) and [cavity](benchmark_cavity.md) benchmark guides.
+[vector](benchmark_vector.md), [cavity](benchmark_cavity.md),
+[heat](benchmark_thermal.md), [elasticity](benchmark_elasticity.md),
+[electric](benchmark_electric.md) and [derivative](benchmark_derivatives.md)
+benchmark guides.
 
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
