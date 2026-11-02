@@ -7,17 +7,23 @@ capacity and a constant source may be piecewise constant on named mesh regions
 (docs/packages/galerkin/multimaterial.md). Finite Kelvin values are
 mathematical inputs, not a physical material-domain or positivity certificate.
 
-Material, source, Dirichlet and initial values may be JAX or PyTorch values
-(callbacks may return them); the histories are then arrays of that library and
-carry reverse-mode derivatives through every step (all steps are kept). NumPy
-inputs compute exactly as before.
+Exterior edges may carry a prescribed outward flux g and convection h*(T-T_amb)
+with the steady solver's input forms and signs (docs/packages/galerkin/thermal_flux_robin.md),
+sampled once: the boundary data are time-independent in this stage.
+
+Material, source, Dirichlet, boundary and initial values may be JAX or PyTorch
+values (callbacks may return them); the histories are then arrays of that
+library and carry reverse-mode derivatives through every step (all steps are
+kept). NumPy inputs compute exactly as before.
 """
 from dataclasses import dataclass, fields
 import importlib
+import inspect
 import sys
 from typing import Mapping
 
 import numpy as np
+from scipy.sparse import issparse
 from scipy.sparse.linalg import splu
 
 from .mesh import Mesh
@@ -25,12 +31,14 @@ from .materials import is_per_region, region_index, region_property
 from .core import forms, kernels
 from .core import solve as core_solve
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
+from .core.boundary import scalar_boundary_samples
 from .core.checks import real_array, real_value
 from .core.loads import source_load
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 from .assembly import assemble_mass, assemble_stiffness
 from .postprocess import element_gradient
+from .thermal import scalar_boundary_system
 
 
 class TransientHeatStepError(ValueError):
@@ -82,6 +90,52 @@ def _owned(value, dtype):
     return np.frombuffer(a.tobytes(order="C"), dtype=dtype).reshape(a.shape)
 
 
+def _time_independent(data, name):
+    """Refuse a boundary mapping whose callbacks ask for a time argument.
+
+    Boundary callbacks take (points_m, outward_normals), as in steady heat; they
+    are sampled once, so a callback with a third required positional parameter or
+    a parameter named time_s/time is refused here instead of failing when called.
+    """
+    if data is None:
+        return
+    if not isinstance(data, Mapping):
+        raise ValueError(f"{name} must map boundary edge tags to conditions")
+    for tag, condition in data.items():
+        values = condition if isinstance(condition, (tuple, list)) else (condition,)
+        for value in values:
+            if not callable(value):
+                continue
+            try:
+                parameters = inspect.signature(value).parameters.values()
+            except (TypeError, ValueError):
+                continue
+            required = [p for p in parameters
+                        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                        and p.default is p.empty]
+            if len(required) > 2 or any(p.name in ("time_s", "time") for p in parameters):
+                raise ValueError(
+                    f"{name}[{tag!r}] callback must take (points_m, outward_normals) only: "
+                    "outward flux and convection are sampled once and are time-independent "
+                    "in transient heat")
+
+
+def _coo(xp, matrix):
+    """A CooMatrix with values in ``xp`` from a CooMatrix or a SciPy matrix."""
+    if issparse(matrix):
+        matrix = matrix.tocoo()
+        return CooMatrix(matrix.row, matrix.col, lift(xp, matrix.data), matrix.shape)
+    matrix = matrix.coalesce()
+    return CooMatrix(matrix.rows, matrix.cols, lift(xp, matrix.values), matrix.shape)
+
+
+def _scipy(matrix):
+    """SciPy CSR numbers of a CooMatrix or SciPy matrix."""
+    if issparse(matrix):
+        return matrix.tocsr()
+    return CooMatrix(matrix.rows, matrix.cols, to_numpy(matrix.values), matrix.shape).to_scipy()
+
+
 @dataclass(frozen=True, eq=False)
 class TransientHeatResult:
     """Full copied read-only histories, O(Nt*(N+M)) memory, no downsampling.
@@ -91,6 +145,9 @@ class TransientHeatResult:
     Rates/reactions have no entry at t0. nodes_m/triangles capture the mesh.
     conductivity_w_mk and volumetric_heat_capacity_j_m3k are floats, or
     {region name: float} copies for per-region materials.
+    prescribed_outward_load_w_per_m (G) and convective_outward_w_per_m
+    (C_n = H*T_n-B) are (Nt-1,N) step rates when outward_flux or convection was
+    given and None otherwise; then storage_n = f_n+reaction_n-G-C_n.
     Read-only arrays are not a cryptographic tamper/provenance guarantee.
     """
     time_s: np.ndarray
@@ -108,6 +165,8 @@ class TransientHeatResult:
     triangles: np.ndarray
     conductivity_w_mk: float | dict
     volumetric_heat_capacity_j_m3k: float | dict
+    prescribed_outward_load_w_per_m: np.ndarray | None = None
+    convective_outward_w_per_m: np.ndarray | None = None
 
     def __post_init__(self):
         # JAX and PyTorch histories are kept as they are (they carry derivatives).
@@ -120,7 +179,8 @@ class TransientHeatResult:
 
 
 def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixed, labels,
-                  representatives, sample, advance, record, previous, checkpoint_every):
+                  representatives, sample, advance, record, previous, checkpoint_every,
+                  natural=None):
     """Histories of a run with JAX or PyTorch inputs, in that library.
 
     Every step first runs on NumPy numbers (``advance``: refined and checked like
@@ -128,8 +188,11 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
     x = x0 + A^{-1}(b - A x0): equal to x0 up to rounding, with exact derivatives
     with respect to every live input. That second pass has no checks, so it can
     be recomputed during the backward pass (``checkpoint_every``).
+    ``natural`` is None or (H, G, shifted_B): the Robin matrix, prescribed
+    outward load and shifted ambient load, sampled once.
     Returns temperature, flux, load, reaction, residual, storage, content,
-    quadratic and Dirichlet histories.
+    quadratic and Dirichlet histories, then with ``natural`` the prescribed
+    outward load and convective outward histories.
     """
     n, cells = len(labels), np.asarray(mesh.triangles)
     try:
@@ -142,6 +205,9 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
             raise ValueError("mass and stiffness patterns differ")
         k, initial = lift(xp, k), lift(xp, initial)
         offsets = initial[representatives][labels]
+        if natural is not None:
+            robin = _coo(xp, natural[0])
+            outward_load, shifted_ambient = (lift(xp, a) for a in natural[1:])
     except Exception as exc:
         raise TransientHeatStepError(0, times[0]) from exc
 
@@ -157,6 +223,9 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
     def step_live(previous, step, bc, load, x0):
         system = CooMatrix(mass.rows, mass.cols, mass.values/step+stiffness.values, (n, n))
         rhs = load+mass.matvec(previous)/step
+        if natural is not None:
+            system = system+robin
+            rhs = rhs+shifted_ambient-outward_load
         x0 = lift(xp, x0)
         delta = core_solve.solve_dirichlet(
             system, rhs-system.matvec(x0),
@@ -164,8 +233,14 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
         current = x0+delta
         stored = mass.matvec((current-previous)/step)
         residual = stored+stiffness.matvec(centered(current))-load
+        if natural is None:
+            return current, (*recorded(current, load, bc), stored, residual,
+                             scatter_add(xp, n, fixed, residual[fixed]))
+        # H does not annihilate the component offset: C = H*u-shifted_B = H*T-B.
+        convective = robin.matvec(current)-shifted_ambient
+        residual = residual+convective+outward_load
         return current, (*recorded(current, load, bc), stored, residual,
-                         scatter_add(xp, n, fixed, residual[fixed]))
+                         scatter_add(xp, n, fixed, residual[fixed]), outward_load, convective)
 
     def block(previous, sizes, bcs, loads, x0s):
         columns = []
@@ -180,7 +255,7 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
         try:
             bc, load = sample(index)
             bc_n, load_n = to_numpy(bc), to_numpy(load)
-            current, _, _, _ = advance(previous, bc_n, load_n, step)
+            current = advance(previous, bc_n, load_n, step)[0]
             record(index, current, load_n, bc_n)
             previous = current.copy()
             data.append((float(step), lift(xp, bc, xp.float64), lift(xp, load), current))
@@ -199,12 +274,13 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
             state, columns = run(state, list(bcs), list(loads), list(x0s))
             blocks.append(columns)
         nodal = [xp.concat([xp.stack([first[j]]), *(b[j] for b in blocks)]) for j in range(6)]
-        stepped = [xp.concat([b[j] for b in blocks]) for j in range(6, 9)]
+        stepped = [xp.concat([b[j] for b in blocks]) for j in range(6, 9 if natural is None else 11)]
     except Exception as exc:
         raise TransientHeatStepError(len(times)-1, times[-1]) from exc
     temperature, flux, loads, bcs, content, quadratic = nodal
-    storage, residual, reaction = stepped
-    return temperature, flux, loads, reaction, residual, storage, content, quadratic, bcs
+    storage, residual, reaction = stepped[:3]
+    return (temperature, flux, loads, reaction, residual, storage, content, quadratic, bcs,
+            *stepped[3:])
 
 
 def _checkpointed(xp, block, sizes):
@@ -219,7 +295,8 @@ def _checkpointed(xp, block, sizes):
 
 def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                          time_s, initial_temperature_k, dirichlet,
-                         heat_source=0.0, checkpoint_every=None):
+                         heat_source=0.0, outward_flux=None, convection=None,
+                         checkpoint_every=None):
     """Solve c*dT/dt-div(k*grad T)=Q, BE with consistent mass, SI units.
 
     k>0 W/(m K), c>0 J/(m^3 K), explicit increasing nonnegative seconds,
@@ -227,6 +304,11 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     no clamping, maximum principle or physical temperature validity is implied.
     dirichlet: fixed exterior integer node -> scalar K or callback(time_s).
     Q: scalar W/m^3 or callback(points_m,time_s)->exactly(Q,) W/m^3.
+    outward_flux maps mesh.boundary_edges tags to g (W/m^2), convection maps
+    tags to (h, ambient) with h>=0 (W/(m^2 K), K): q.n = g+h*(T-ambient) as in
+    galerkin.thermal.solve_steady_heat, scalars or callbacks(points_m,
+    outward_normals)->exactly (Q,). They are sampled once before stepping and
+    are time-independent; a callback asking for a time argument is refused.
     Other edges are insulated; no anchor is required on a transient component.
     k, c and a constant Q may each be {region name: value} over mesh.region_names.
     Pure callbacks/no concurrent input mutation. Time-local failures are chained
@@ -274,6 +356,9 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             region_property(private_mesh, heat_source, "heat_source", live=True)
     else:
         private_mesh = Mesh(p.copy(), t.copy(), boundary={})
+    # Boundary edge selections are copied as given, so natural-condition
+    # sampling validates the caller's actual arrays, as steady heat does.
+    private_mesh.boundary_edges = {tag: np.array(edges) for tag, edges in mesh.boundary_edges.items()}
     initial = real_value(initial_temperature_k, "initial_temperature_k")
     initial = initial if is_live(initial) else initial.copy()
     if tuple(initial.shape) != (len(p),):
@@ -291,10 +376,17 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     free = np.setdiff1d(np.arange(len(p)), fixed)
     source = (heat_source if callable(heat_source) or regional[2]
               else _value(heat_source, "heat_source"))
+    _time_independent(outward_flux, "outward_flux")
+    _time_independent(convection, "convection")
+    natural = outward_flux is not None or convection is not None
     # NumPy numbers of every live input drive the step and its checks; live values
     # only add derivatives (see _live_history).
     k_live, capacity_live, initial_live = k, capacity, initial
     k, capacity, initial = (_numbers(a) if is_live(a) else a for a in (k, capacity, initial))
+    # One constant offset per component throughout the run, never a per-step
+    # redefinition. K annihilates these constants; the mass derivative is zero.
+    representatives = np.array([np.flatnonzero(labels == c)[0] for c in range(count)])
+    natural_live = None
 
     try:
         mass = assemble_mass(private_mesh, capacity)
@@ -302,13 +394,24 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         _finite(mass.data, stiffness.data)
         if np.any(mass.diagonal() <= 0):
             raise ValueError("consistent mass lost positive diagonal at this numeric scale")
-        # One constant offset per component throughout the run, never a per-step
-        # redefinition. K annihilates these constants; the mass derivative is zero.
-        representatives = np.array([np.flatnonzero(labels == c)[0] for c in range(count)])
         offsets = initial[representatives][labels]
         with np.errstate(over="ignore", invalid="ignore"):
             initial_increment = initial-offsets
         _finite(initial_increment)
+        if natural:
+            # Sampled once (time-independent). H does not annihilate the component
+            # offsets, so the ambient load is shifted by them as in steady heat:
+            # shifted_B integrates h*(ambient-offset of the component).
+            samples = scalar_boundary_samples(private_mesh, p, t, conditions, outward_flux,
+                                              convection, live=True)
+            anchors = [initial_live[r] for r in representatives]
+            natural_live = scalar_boundary_system(samples, len(p), labels, anchors,
+                                                  np.ones(count, dtype=bool))
+            robin_matrix, outward_load, _, shifted_ambient = natural_live
+            natural_live = (robin_matrix, outward_load, shifted_ambient)
+            robin_matrix = _scipy(robin_matrix)
+            outward_load, shifted_ambient = to_numpy(outward_load), to_numpy(shifted_ambient)
+            _finite(robin_matrix.data, outward_load, shifted_ambient)
 
         nt, n, cells = len(times), len(p), len(t)
         temperature = np.empty((nt, n))
@@ -320,6 +423,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         content = np.empty(nt)
         quadratic = np.empty(nt)
         boundary_values = np.empty((nt, len(fixed)))
+        convective_history = np.empty((nt-1, n)) if natural else None
     except Exception as exc:
         raise TransientHeatStepError(0, times[0]) from exc
 
@@ -362,12 +466,25 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         _finite(temperature[index], flux[index], loads[index],
                 content[index], quadratic[index])
 
+    def natural_outward(current):
+        """(convective outward C=H*u-shifted_B, total natural outward C+G) of an increment u."""
+        convective = robin_matrix@current-shifted_ambient
+        return convective, convective+outward_load
+
     def advance(previous, bc, load, step):
-        """One backward-Euler step on NumPy numbers, refined and checked."""
+        """One backward-Euler step on NumPy numbers, refined and checked.
+
+        Returns (increment, storage, residual, reaction, convective outward or None).
+        """
         # Full old M*T includes the old fixed-node contribution. Subtracting
         # full A_FC*d_new includes the new one; neither M_FC term is dropped.
+        # Without natural data the system and loads are exactly the Dirichlet-only ones.
         system = mass/step+stiffness
-        rhs = load+(mass@previous)/step
+        forcing = load
+        if natural:
+            system = system+robin_matrix
+            forcing = load+shifted_ambient-outward_load
+        rhs = forcing+(mass@previous)/step
         current = np.empty(n)
         current[fixed] = bc-offsets[fixed]
         _finite(system.data, rhs, current[fixed])
@@ -387,9 +504,14 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                 trial_storage = mass@trial_rate
                 trial_spatial = stiffness@centered(current)
                 trial_residual = trial_storage+trial_spatial-load
-                _finite(trial_rate, trial_storage, trial_spatial, trial_residual)
                 physical_terms = (abs(mass)@abs(trial_rate)
                                   +abs(stiffness)@abs(centered(current))+abs(load))
+                if natural:
+                    trial_convective, trial_outward = natural_outward(current)
+                    trial_residual = trial_residual+trial_outward
+                    physical_terms = (physical_terms+abs(robin_matrix)@abs(current)
+                                      +abs(shifted_ambient)+abs(outward_load))
+                _finite(trial_rate, trial_storage, trial_spatial, trial_residual)
                 _finite(physical_terms)
                 physical_scale = max(float(np.max(physical_terms)), np.finfo(float).tiny)
                 score = float(np.max(abs(trial_residual[free])))/physical_scale
@@ -401,6 +523,10 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                     balance_scale = max(float(np.sum(
                         (abs(trial_storage)+abs(load)+abs(trial_reaction))[selected])),
                         np.finfo(float).tiny)
+                    if natural:
+                        balance += float(np.sum(trial_outward[selected]))
+                        balance_scale += float(np.sum(
+                            (abs(trial_convective)+abs(outward_load))[selected]))
                     _finite(balance, balance_scale)
                     score = max(score, abs(balance)/balance_scale)
                 _finite(score)
@@ -417,10 +543,15 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         stored = mass@rate
         spatial = stiffness@centered(current)
         residual = stored+spatial-load
+        terms = abs(mass)@abs(rate)+abs(stiffness)@abs(current)+abs(load)
+        convective = None
+        if natural:
+            convective, outward = natural_outward(current)
+            residual = residual+outward
+            terms = terms+abs(robin_matrix)@abs(current)+abs(shifted_ambient)+abs(outward_load)
         reaction = np.zeros(n)
         reaction[fixed] = residual[fixed]
         _finite(current, rate, stored, spatial, residual, reaction)
-        terms = abs(mass)@abs(rate)+abs(stiffness)@abs(current)+abs(load)
         _finite(terms)
         scale = max(float(np.max(terms)), np.finfo(float).tiny)
         if len(free) and np.max(np.abs(residual[free])) > 1e-10*scale:
@@ -431,14 +562,18 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             balance_scale = max(float(np.sum(
                 (abs(stored)+abs(load)+abs(reaction))[selected])),
                 np.finfo(float).tiny)
+            if natural:
+                balance += np.sum(outward[selected])
+                balance_scale += float(np.sum((abs(convective)+abs(outward_load))[selected]))
             _finite(balance, balance_scale)
             if abs(balance) > 1e-10*balance_scale:
                 raise ValueError("transient solve failed component heat balance tolerance")
-        return current, stored, residual, reaction
+        return current, stored, residual, reaction, convective
 
     try:
         bc, load = sample(0)
-        live = any(is_live(a) for a in (k_live, capacity_live, initial_live, bc, load))
+        live = any(is_live(a) for a in (k_live, capacity_live, initial_live, bc, load,
+                                        *(natural_live[1:] if natural else ())))
         if not live:
             bc, load = to_numpy(bc), to_numpy(load)
         bound = 32*np.finfo(float).eps*np.maximum(
@@ -451,12 +586,13 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         raise TransientHeatStepError(0, times[0]) from exc
     if live:
         history = _live_history(
-            live_namespace(k_live, capacity_live, initial_live, bc, load), private_mesh,
+            live_namespace(k_live, capacity_live, initial_live, bc, load,
+                           *(natural_live[1:] if natural else ())), private_mesh,
             k_live, capacity_live, initial_live, bc, load, times, steps, fixed, labels,
-            representatives, sample, advance, record, previous, checkpoint_every)
+            representatives, sample, advance, record, previous, checkpoint_every, natural_live)
         try:
             return TransientHeatResult(times, *history[:8], fixed, history[8], p, t,
-                                       record_k, record_c)
+                                       record_k, record_c, *history[9:])
         except Exception as exc:
             raise TransientHeatStepError(nt-1, times[-1]) from exc
 
@@ -466,18 +602,25 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             if is_live(bc) or is_live(load):
                 raise TypeError("a callback returned a JAX or PyTorch value after NumPy values "
                                 "at time index 0; return one array library throughout")
-            current, stored, residual, reaction = advance(previous, bc, load, step)
+            current, stored, residual, reaction, convective = advance(previous, bc, load, step)
             record(index, current, load, bc)
             storage[index-1] = stored
             residuals[index-1] = residual
             reactions[index-1] = reaction
+            if natural:
+                convective_history[index-1] = convective
             previous = current.copy()
         except Exception as exc:
             raise TransientHeatStepError(index, times[index]) from exc
 
     try:
+        if not natural:
+            return TransientHeatResult(
+                times, temperature, flux, loads, reactions, residuals, storage,
+                content, quadratic, fixed, boundary_values, p, t, record_k, record_c)
         return TransientHeatResult(
             times, temperature, flux, loads, reactions, residuals, storage,
-            content, quadratic, fixed, boundary_values, p, t, record_k, record_c)
+            content, quadratic, fixed, boundary_values, p, t, record_k, record_c,
+            np.broadcast_to(outward_load, (nt-1, n)), convective_history)
     except Exception as exc:
         raise TransientHeatStepError(nt-1, times[-1]) from exc
