@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- galerkin: `galerkin.mode_overlap` — mode power (Faraday-route complex Poynting integral with the exact edge mass and edge-nodal coupling), cross power, field overlaps and overlap matrix, power/mass/peak normalisation, coupling efficiency (including projection onto a degenerate span), energy confinement factor, Nédélec/P1 interpolation of a given field, and P1 scalar twins; NumPy only. Validated against refsol slab and fibre fields. [Contract and validation](docs/packages/galerkin/mode_overlap.md).
+
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields` writes two more saved layouts as VTU: rectangular steady heat with flux or convection sides (`thermal2d-p1-node-cell-boundary-v2`), with its nodal boundary load arrays, and electric conduction and Joule heating (`electric-joule2d-p1-v1`, from `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`): point data `potential_v` and the nodal electric and, for Joule, heat arrays; cell data `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3` and, for Joule, `heat_flux_w_m2`. Arrays keep their saved names and values, Dirichlet node lists are not copied, and the saved files are unchanged. Lossy cavities and `em.modes2d` results are still refused. [Documentation](docs/packages/simcase/overview.md#viewing-in-paraview).
