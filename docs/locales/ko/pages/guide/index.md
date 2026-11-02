@@ -51,6 +51,10 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
 
+## 고체역학 문서
+
+- [선형탄성 문서](../packages/simcase/mechanics2d.md)
+
 ## Studio
 
 - [Studio 정상 열전도](../packages/simcase/thermal_studio.md)
