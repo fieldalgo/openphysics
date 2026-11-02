@@ -33,6 +33,7 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 - [Vacuum rectangular PEC cavity solver](../packages/galerkin/cavity_solver.md)
 - [Material-loaded rectangular cavity solver](../packages/galerkin/material_cavity.md)
+- [Tetrahedral mesh format shared by the 3D solvers](../packages/galerkin/mesh3d_format.md)
 - [Vector eigenspace reliability](../packages/galerkin/eigenspace_reliability.md)
 - [Modal complex coordinates](../packages/galerkin/modal_coordinates.md)
 - [galerkin — the OpenPhysics finite-element engine](../packages/galerkin/overview.md)

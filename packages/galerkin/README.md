@@ -21,7 +21,10 @@ references and fixed thresholds.
 | 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](../../docs/packages/galerkin/eigenspace_reliability.md), [milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](../../docs/packages/galerkin/cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
+| 3D vacuum PEC cavity on an external tetrahedral mesh (meshine, gmshio), PEC on chosen face tags | `solve_cavity` | [Cavity API, external meshes](../../docs/packages/galerkin/cavity_solver.md#external-meshes), [mesh format](../../docs/packages/galerkin/mesh3d_format.md) | — |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](../../docs/packages/galerkin/material_cavity.md) | — |
+| 3D cavity on an external mesh with lossy materials per region and PEC or impedance walls per face tag | `solve_material_cavity` | [Material cavity, external meshes](../../docs/packages/galerkin/material_cavity.md#external-meshes) | — |
+| Steady 3D heat conduction on tetrahedral meshes, isotropic per region, Dirichlet faces and insulation | `galerkin.thermal3d.solve_steady_heat_3d` | [Contract and validation](../../docs/packages/galerkin/thermal3d.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](../../docs/packages/galerkin/thermal_steady2d.md), [validation](../../docs/packages/galerkin/thermal_independent_validation.md) | [thermal_steady2d.py](../../examples/galerkin/thermal_steady2d.py) |
 | Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](../../docs/packages/galerkin/thermal_flux_robin.md), [validation](../../docs/packages/galerkin/thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../examples/galerkin/thermal_flux_robin.py) |
 | Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](../../docs/packages/galerkin/transient_heat.md), [validation](../../docs/packages/galerkin/transient_heat_validation.md), [independent validation](../../docs/packages/galerkin/transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../examples/galerkin/transient_heat_convergence.py) |
@@ -61,8 +64,9 @@ automatically appear there.
   local-frame or follower-load API.
 - `solve_cavity_box` handles a vacuum rectangular PEC box;
   `solve_material_cavity_box` adds box-shaped lossy regions and
-  finite-conductivity walls. Read their contracts for near-target search
-  limitations.
+  finite-conductivity walls. `solve_cavity` and `solve_material_cavity` take an
+  external tetrahedral mesh ([format](../../docs/packages/galerkin/mesh3d_format.md)) with no derivative path.
+  Read their contracts for near-target search limitations.
 - The 3D sparse direct factorization is comfortable to about 25k edge degrees
   of freedom on four cores; larger problems need iterative solvers.
 
@@ -83,6 +87,7 @@ src/galerkin/
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
   material_cavity.py # Box cavity with lossy materials and impedance walls: complex resonances and Q
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  thermal3d.py    # Steady heat on tetrahedral meshes: P1, Dirichlet faces, insulation
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
