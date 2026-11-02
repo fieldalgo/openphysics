@@ -60,8 +60,8 @@ def _content_key(nodes, triangles, counterclockwise):
     return digest.digest(), bool(counterclockwise)
 
 
-def overlap_candidates(centers, radii, block=4096):
-    """Yield (i, ids), ids > i ascending: every pair whose interiors may overlap.
+def overlap_pairs(centers, radii, block=4096):
+    """Arrays (lo, hi), lo < hi, sorted by lo then hi: every pair whose interiors may overlap.
 
     radii are each triangle's largest centroid-to-vertex distance. Interiors can
     overlap only if |c_i - c_k| < r_i + r_k <= 2*max(r_i, r_k), so querying each
@@ -89,11 +89,40 @@ def overlap_candidates(centers, radii, block=4096):
     key = np.concatenate(keys)
     del keys
     key.sort()
-    lo, hi = np.divmod(key[np.diff(key, prepend=-1) != 0], count)
-    del key
-    bounds = np.searchsorted(lo, np.arange(count+1))
+    return np.divmod(key[np.diff(key, prepend=-1) != 0], count)
+
+
+def overlap_candidates(centers, radii, block=4096):
+    """Yield (i, ids), ids > i ascending: the pairs of ``overlap_pairs`` grouped by their lower index."""
+    lo, hi = overlap_pairs(centers, radii, block=block)
+    bounds = np.searchsorted(lo, np.arange(len(centers)+1))
     for i in np.flatnonzero(bounds[1:] > bounds[:-1]):
         yield int(i), hi[bounds[i]:bounds[i+1]]
+
+
+def _interiors_overlap(q, centers, radii, chunk=1 << 16):
+    """Whether any two triangles' interiors overlap: a separating-axis test on every candidate pair.
+
+    A pair (i, k) is kept when the centroid distance is below r_i + r_k, then the
+    six edge normals of both triangles, taken relative to centroid i, are tried
+    as separating axes; the interiors overlap when the projections overlap on
+    every axis by more than 1e-12 of the larger radius. The pairs are processed
+    in chunks so memory stays a few MB whatever the mesh size.
+    """
+    lo, hi = overlap_pairs(centers, radii)
+    keep = np.linalg.norm(centers[hi]-centers[lo], axis=1) < radii[hi]+radii[lo]
+    lo, hi = lo[keep], hi[keep]
+    for start in range(0, len(lo), chunk):
+        i, k = lo[start:start+chunk], hi[start:start+chunk]
+        here, other = q[i]-centers[i][:, None], q[k]-centers[i][:, None]
+        de = np.concatenate([np.roll(here, -1, axis=1)-here, np.roll(other, -1, axis=1)-other], axis=1)
+        axes = np.stack([-de[..., 1], de[..., 0]], axis=-1)
+        axes /= np.linalg.norm(axes, axis=2)[..., None]
+        pa, pb = np.einsum("pvd,pad->pav", here, axes), np.einsum("pvd,pad->pav", other, axes)
+        overlap = np.minimum(pa.max(axis=2), pb.max(axis=2))-np.maximum(pa.min(axis=2), pb.min(axis=2))
+        if np.any(np.all(overlap > 1e-12*np.maximum(radii[i], radii[k])[:, None], axis=1)):
+            return True
+    return False
 
 
 def triangle_geometry(mesh, *, counterclockwise=True):
@@ -188,19 +217,8 @@ def _validated_geometry(mesh, counterclockwise):
             raise ValueError("nonmanifold vertex or triangles joined only at a point")
     centers = q.mean(axis=1)
     radii = np.linalg.norm(q-centers[:, None], axis=2).max(axis=1)
-    for i, ids in overlap_candidates(centers, radii):
-        ids = ids[np.linalg.norm(centers[ids]-centers[i], axis=1) < radii[ids]+radii[i]]
-        if not len(ids):
-            continue
-        other, here = q[ids]-centers[i], q[i]-centers[i]
-        de = np.concatenate([np.broadcast_to(np.roll(here, -1, axis=0)-here, other.shape),
-                             np.roll(other, -1, axis=1)-other], axis=1)
-        axes = np.stack([-de[..., 1], de[..., 0]], axis=-1)
-        axes /= np.linalg.norm(axes, axis=2)[..., None]
-        pa, pb = np.einsum("vd,kad->kav", here, axes), np.einsum("kvd,kad->kav", other, axes)
-        overlap = np.minimum(pa.max(axis=2), pb.max(axis=2))-np.maximum(pa.min(axis=2), pb.min(axis=2))
-        if np.any(np.all(overlap > 1e-12*np.maximum(radii[i], radii[ids])[:, None], axis=1)):
-            raise ValueError("mesh triangles have overlapping interiors")
+    if _interiors_overlap(q, centers, radii):
+        raise ValueError("mesh triangles have overlapping interiors")
     node_tree = cKDTree(p)
     for a, b in edges:
         v = p[b]-p[a]
