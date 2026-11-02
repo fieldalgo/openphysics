@@ -161,6 +161,8 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -
 - 잘못된 값·shape·위상·겹침, 구멍, 분리 성분, 순수 Neumann 호환성과 유일성 구분을
   검사합니다. gate를 낮추려는 의도는 없습니다.
 
-비정상, 복사, 가변·이방성 k, 온도 의존 h, 3D, 새 연성 workflow, simcase/Studio 또는
-export 연결은 추가하지 않습니다. 기존 NumPy/SciPy만 사용하며 새 runtime 의존성이나
+같은 `outward_flux`/`convection` 입력·부호·변 검증을 시간에 무관하게 한 번 표본화하는
+형태로 [`solve_transient_heat`](transient_heat.md)에서도 쓸 수 있습니다. 그 H, G, B는
+M/dt+K+H와 단계별 열수지에 들어갑니다. 복사, 가변·이방성 k, 온도 의존 h, 3D, 새 연성
+workflow, simcase/Studio 또는 export 연결은 추가하지 않습니다. 기존 NumPy/SciPy만 사용하며 새 runtime 의존성이나
 외부 solver 소스는 없습니다. 문서·예제는 배포본에 포함되지 않습니다.
