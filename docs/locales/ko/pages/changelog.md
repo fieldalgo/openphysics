@@ -24,6 +24,10 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: `em.modes2d` 결과가 저장 layout을 기록합니다. `summary.json`과 `fields.npz`에 `field_layout` `em-modes2d-p1-node-centroid-v1`(subspace sweep은 `em-modes2d-subspace-raw-v1`), `mesh_length_unit`, `length_unit_to_m`이 들어가고 archive에는 `study_parameter`도 들어갑니다. 기존 키는 바뀌지 않습니다.
+
+- `simcase`: `simcase.export.export_fields`가 단일 지점 도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`)를 미터 단위 좌표로 씁니다. 스칼라는 점 데이터 `mode_<k>`(복소면 `_real`/`_imag`), 벡터는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`과 점 데이터 `longitudinal_electric_mode_<k>_real`/`_imag`, 그리고 `triangle_regions`입니다. 새 `export_sweep`은 study 지점마다 VTU 하나와 `.pvd`를 쓰며, 단조 파장 sweep이면 timestep이 파장(문서 단위), 아니면 지점 번호입니다. PML 결과는 흡수층을 포함해 내보내고, subspace sweep과 `field_layout` 없이 저장된 결과는 거절합니다. 이전의 모든 VTU/PVD 출력은 바이트까지 같습니다. [문서](packages/simcase/overview.md#paraview로-보기).
+
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
