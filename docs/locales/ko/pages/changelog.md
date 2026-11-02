@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `galerkin.electrostatics` 추가 — 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기와 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬(실수 또는 손실 복소 유전율; 실수 입력의 JAX/PyTorch 미분); `refsol.electrostatics`에 동축·두 층 평행판 정전용량 레퍼런스 추가. [문서](packages/galerkin/electrostatics.md).
+
 - `galerkin-refsol`: 참조 모듈 셋 추가. `refsol.lossy_slab`은 복소 유전율 다층 슬랩(흡수 결합 모드와 기판 누설 모드, 명시한 sheet 선택, 잔차 ≤ 1e-12, 1차 섭동·터널링 검증)을 풀고 galerkin 스칼라/벡터·PML 모드 솔버를 2차 수렴으로 평가합니다. `refsol.joule_slab`은 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정확한 1D 정상 Joule 가열 슬랩(erf/erfi 폐형식, 전류 구동 fold)을 제공하고 `solve_temperature_joule_heat`를 2차 수렴으로 평가합니다. `refsol.bent_slab`(선택적 mpmath)은 복소 차수 Bessel 정합으로 일정 반경 굽은 슬랩 극점을 제공합니다. [문서](packages/galerkin-refsol/overview.md).
 
 - galerkin: `galerkin.mode_overlap` — 모드 전력(정확한 edge 질량과 edge-절점 결합 행렬로 계산한 Faraday 경로 복소 Poynting 적분), 교차 전력, 장 중첩과 중첩 행렬, power/mass/peak 정규화, 결합 효율(퇴화 공간 사영 포함), 에너지 구속 계수, 유효 면적(정확한 질량 분자, `int |E|^4`는 4차 대칭 삼각형 규칙), 주어진 장의 Nédélec/P1 보간, P1 스칼라 쌍; NumPy 전용. refsol slab·광섬유 장으로 검증했습니다. [계약과 검증](packages/galerkin/mode_overlap.md).
