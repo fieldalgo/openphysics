@@ -76,7 +76,8 @@ repository; separate historical package repositories are not needed to use them.
   [material-region heat documents](packages/simcase/thermal_regions2d.md).
   [Electric/Joule documents](packages/simcase/electric_joule.md) add homogeneous
   rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`;
-  [linear elasticity documents](packages/simcase/mechanics2d.md) add `mechanics.elasticity2d`.
+  [mechanics documents](packages/simcase/mechanics2d.md) add `mechanics.elasticity2d` and
+  `mechanics.thermoelastic2d` (steady heat then thermal stress).
   Python-only extensions do not
   automatically become document features. The [steady boundary contract](packages/simcase/thermal_steady_boundary2d.md)
   adds side-constant outward flux/convection and v2 raw fields; documents omitting

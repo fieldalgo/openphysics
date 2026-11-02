@@ -74,7 +74,8 @@ flowchart TB
   [재료 영역 열 문서](packages/simcase/thermal_regions2d.md)를 지원합니다.
   [전기·Joule 문서](packages/simcase/electric_joule.md)는 균질 직사각형의
   `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`를,
-  [선형탄성 문서](packages/simcase/mechanics2d.md)는 `mechanics.elasticity2d`를 제공합니다. Python 전용 확장이 자동으로
+  [기계해석 문서](packages/simcase/mechanics2d.md)는 `mechanics.elasticity2d`와
+  `mechanics.thermoelastic2d`(정상 열전도 후 열응력)를 제공합니다. Python 전용 확장이 자동으로
   문서 입력 기능에 연결되지는 않습니다. [정상 경계조건 계약](packages/simcase/thermal_steady_boundary2d.md)은
   변별 상수 외향 열유속·대류와 v2 raw 필드를 추가하며, 새 키 두 개를 모두
   생략한 기존 문서는 v1을 유지합니다.
