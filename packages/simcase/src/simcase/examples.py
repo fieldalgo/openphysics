@@ -242,3 +242,6 @@ EXAMPLES['thermal_boundary'] = THERMAL_BOUNDARY
 from .electric_examples import ELECTRIC_RECTANGLE, JOULE_RECTANGLE, JOULE_TEMPERATURE
 EXAMPLES.update(electric_rectangle=ELECTRIC_RECTANGLE, joule_rectangle=JOULE_RECTANGLE,
                 joule_temperature=JOULE_TEMPERATURE)
+
+from .mechanics_examples import ELASTIC_PLATE
+EXAMPLES['elastic_plate'] = ELASTIC_PLATE
