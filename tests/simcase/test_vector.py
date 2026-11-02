@@ -121,9 +121,19 @@ def test_vector_units_and_saved_raw_fields_reconstruct_the_physical_field(symbol
     assert summary["units"] == {"length": symbol}
     assert summary["field_representation"] == "vector-edge-nodal-v1"
     assert summary["returned_modes"] == summary["requested_modes"] == 1
+    # The saved layout and the unit of `nodes` are recorded in both files, so a
+    # reader can convert to metres without the document.
+    assert summary["field_layout"] == "em-modes2d-p1-node-centroid-v1"
+    assert summary["mesh_length_unit"] == symbol
+    size = {"nm": 1e-9, "um": 1e-6, "m": 1.0}[symbol]
+    assert summary["length_unit_to_m"] == size
     assert (out / "results.png").stat().st_size > 0
     with np.load(out / "fields.npz", allow_pickle=False) as arrays:
         assert "fields" not in arrays  # a vector must never masquerade as nodal scalar data
+        assert str(arrays["field_layout"]) == "em-modes2d-p1-node-centroid-v1"
+        assert str(arrays["mesh_length_unit"]) == symbol
+        assert float(arrays["length_unit_to_m"]) == size
+        assert str(arrays["study_parameter"]) == ""
         mesh = Mesh(arrays["nodes"], arrays["triangles"], {})
         space = EdgeSpace(mesh)
         np.testing.assert_array_equal(space.edges, arrays["edges"])
