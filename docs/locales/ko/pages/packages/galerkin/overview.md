@@ -16,6 +16,7 @@
 | 문제 | 진입점 | 계약·검증 | 예제 |
 |---|---|---|---|
 | 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기; 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬, 실수 또는 손실 복소 유전율 | `solve_electrostatics`, `capacitance_matrix` | [계약과 기준](electrostatics.md) | — |
 | 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
@@ -79,6 +80,7 @@ src/galerkin/
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
   electric.py     # Steady electric conduction
+  electrostatics.py # Electrostatics with node-set conductors and the capacitance matrix
   materials.py    # Scalar or {region name: value} material lookup
   heat_source.py  # Elementwise volumetric heat sources bound to one mesh
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
@@ -161,3 +163,5 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 이 프로젝트는 Gmsh 프로젝트와 제휴하지 않으며 그 프로젝트의 보증이나 지원을 받지 않습니다.
 
 [정상 전기전도: Python API, Joule 발열과 Neumann 기준 전위](electric_steady2d.md).
+
+[2D 정전기와 정전용량 행렬: 절점 집합 도체, 전하와 기준](electrostatics.md).

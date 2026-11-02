@@ -24,6 +24,7 @@ NumPy는 미분하지 않습니다.
 |---|---|
 | `solve_steady_heat` | `conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `dirichlet` 온도; `outward_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_electrostatics`, `capacitance_matrix` | `permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_potential` 전위(V); `charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
 | `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
 | `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |

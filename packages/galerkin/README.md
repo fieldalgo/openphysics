@@ -19,6 +19,7 @@ references and fixed thresholds.
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
 | 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 2D electrostatics with conductors as node sets, free charge and insulated exterior; Maxwell capacitance matrix checked by the energy and charge routes, real or lossy complex permittivity | `solve_electrostatics`, `capacitance_matrix` | [Contract and gates](../../docs/packages/galerkin/electrostatics.md) | — |
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](../../docs/packages/galerkin/eigenspace_reliability.md), [milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](../../docs/packages/galerkin/cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](../../docs/packages/galerkin/material_cavity.md) | — |
