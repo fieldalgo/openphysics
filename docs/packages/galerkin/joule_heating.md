@@ -1,5 +1,7 @@
 # Steady Joule heating
 
+[한국어](../../locales/ko/pages/packages/galerkin/joule_heating.md)
+
 The explicit one-way workflow is `galerkin.joule_heating.solve_steady_joule_heat`.
 It consumes a `SteadyElectricResult` produced by
 `galerkin.electric.solve_steady_electric` and passes elementwise Joule heat to the

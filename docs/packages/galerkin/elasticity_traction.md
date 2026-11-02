@@ -1,5 +1,7 @@
 # Cartesian boundary traction for 2D elasticity
 
+[한국어](../../locales/ko/pages/packages/galerkin/elasticity_traction.md)
+
 This extends `galerkin.elasticity.solve_elasticity` with optional boundary
 traction in the existing P1 vector nodal displacement space. Import the
 submodule explicitly; no top-level export or simcase integration is added.

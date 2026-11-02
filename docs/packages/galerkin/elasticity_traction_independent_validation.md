@@ -1,5 +1,7 @@
 # Independent acceptance of boundary traction
 
+[한국어](../../locales/ko/pages/packages/galerkin/elasticity_traction_independent_validation.md)
+
 The inspected implementation is `8bb3df93c657c4d8e3a3eb496b805da6bf10b936`.
 This validation changes no production implementation, reference solution,
 existing acceptance test, tolerance, dependency or CI setting. Its oracle uses

@@ -1,5 +1,7 @@
 # Steady 2D electric conduction
 
+[한국어](../../locales/ko/pages/packages/galerkin/electric_steady2d.md)
+
 ## Coupling contract (version 1)
 
 The explicit Python entry point is
