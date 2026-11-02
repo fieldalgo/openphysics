@@ -20,6 +20,7 @@ material_cavity  complex resonances and Q of uniformly or slab-loaded lossy PEC 
 wall_loss   first-order conductor-loss Q of rectangular cavity modes, per wall
 bimetal     Timoshenko (1925) bimetal strip: curvature closed forms and exact plane-stress field
 thermal_convection  NAFEMS T4 convective rectangle: exact series and the published target
+thermal3d   steady heat in three dimensions: sine-product manufactured box and a layered slab along z
 """
 
 from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity, wall_loss
