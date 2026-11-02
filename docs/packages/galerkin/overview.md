@@ -19,7 +19,7 @@ references and fixed thresholds.
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
 | 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
-| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](eigenspace_reliability.md), [milestone validation](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Waveguide formulation](waveguide_formulation.md), [eigenspace reliability](eigenspace_reliability.md), [milestone validation](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](material_cavity.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_steady2d.md), [validation](thermal_independent_validation.md) | [thermal_steady2d.py](../../../examples/galerkin/thermal_steady2d.py) |
