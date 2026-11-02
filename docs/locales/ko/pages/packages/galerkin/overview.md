@@ -70,7 +70,7 @@ src/galerkin/
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
-  mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
@@ -106,7 +106,7 @@ core 아래 메시 형식이 있습니다.
 `galerkin.from_mesher`는 `nodes`, `triangles` 또는 `tetrahedra`, `regions`, `region_names`와
 경계 변·면을 제공하는 객체를 변환하고, `Mesh.by_region({"core": ..., "clad": ...})`은 영역
 이름을 요소별 재료 배열로 바꿉니다. meshine과 gmshio로 확인했으며 둘 다 엔진의 의존성이
-아닙니다.
+아닙니다. 3D 형식과 규칙, 벽 이름 체계는 [사면체 메시 형식](mesh3d_format.md)에 있습니다.
 
 ## 시험
 

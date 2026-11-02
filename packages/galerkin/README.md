@@ -77,7 +77,7 @@ src/galerkin/
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling (numbering and signs in core)
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
-  mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
@@ -100,7 +100,8 @@ and the documentation are outside the package, at the repository root:
 `tetrahedra`, `regions`, `region_names` and boundary edges or faces, and
 `Mesh.by_region({"core": ..., "clad": ...})` turns region names into a
 per-element material array. It is verified against meshine and gmshio; neither
-is a dependency of the engine.
+is a dependency of the engine. The 3D shape, its rules and the wall-naming
+schemes are in the [tetrahedral mesh format](../../docs/packages/galerkin/mesh3d_format.md).
 
 ## Tests
 
