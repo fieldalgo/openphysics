@@ -365,9 +365,10 @@ save and I/O robustness checks on Linux, macOS and Windows; see each contract
 for its save and platform limits.
 
 With the optional `simcase[export]` extra, `simcase.export` writes saved
-rectangular/region heat, electric/Joule and cavity (vacuum PEC, or materials and lossy
-walls) fields as VTU files for ParaView, and a
-transient heat result as a `.pvd` time series; see
+rectangular/region heat, electric/Joule, cavity (vacuum PEC, or materials and lossy
+walls) and single-point waveguide mode fields as VTU files for ParaView, a
+transient heat result as a `.pvd` time series and a mode sweep as one VTU per
+study point with a `.pvd` collection (`export_sweep`); see
 [Viewing in ParaView](../../docs/packages/simcase/overview.md#viewing-in-paraview)
 for the supported layouts.
 

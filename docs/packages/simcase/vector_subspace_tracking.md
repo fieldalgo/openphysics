@@ -116,7 +116,11 @@ layout cannot misread raw member columns as branches.
 (points x vectors x vectors, complex), `cluster_mean_neff`,
 `cluster_mean_group_index` and `mode_tracking_json`. `save_fields=false` omits
 the file. `save` and the CLI refuse an existing output path so new metadata is
-never mixed with fields from an earlier run.
+never mixed with fields from an earlier run. Both files record the layout
+`field_layout="em-modes2d-subspace-raw-v1"` with `mesh_length_unit` and
+`length_unit_to_m`; `simcase.export` refuses this layout, because raw member
+columns are not tracked modes, and their VTU export is deferred. Read the
+`raw_*` arrays and `frame_transform` from `fields.npz` instead.
 
 `simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
 boundary, neff, field)` evaluates each column as an eigenpair of the original
