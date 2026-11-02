@@ -20,12 +20,14 @@ cross-section: effective index, mode fields and group index, with the window,
 mesh and slab-mode checks that tell you whether to trust them.
 
 For an interactive first study, the experimental [Studio workspace](docs/packages/simcase/workspace.md)
-([한국어](docs/locales/ko/pages/packages/simcase/workspace.md)) lets you change a
-rectangular optical core, inspect its mesh, run modes, compare designs and save
-or recover a session. After installing `simcase[studio]` in the configured
-runtime, launch it with `simcase-studio --workspace`. The coupled-physics
-application card is setup only; its electrical, thermal and mechanical studies
-are not connected to this workspace yet.
+([한국어](docs/locales/ko/pages/packages/simcase/workspace.md)) lets you edit an
+optical cross-section from rectangles, circles and polygons of ten lossless
+materials, inspect its mesh, run modes, compare designs and save or recover a
+session; its steady heat application solves one homogeneous rectangular plate
+with a condition per side. After installing `simcase[studio]` in the configured
+runtime, launch it with `simcase-studio --workspace`. The heated-waveguide
+application card is setup only: electrical heating and mechanical deformation
+do not run in this workspace yet.
 
 ## What you can solve
 
@@ -51,7 +53,7 @@ are not connected to this workspace yet.
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
 | Steady electric conduction | Yes | Homogeneous rectangle | No |
-| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
+| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view; workspace heat plate |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
 | Elasticity, thermal expansion, heat→mechanics | Yes | No | No |

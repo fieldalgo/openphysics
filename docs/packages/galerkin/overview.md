@@ -23,7 +23,9 @@ references and fixed thresholds.
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](material_cavity.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_steady2d.md), [validation](thermal_independent_validation.md) | [thermal_steady2d.py](../../../examples/galerkin/thermal_steady2d.py) |
+| Steady 2D electric conduction, isotropic region conductivity, voltage/current/insulation sides and explicit Neumann gauges: V, E, J and elementwise Joule heat | `galerkin.electric.solve_steady_electric` | [Contract and validation](electric_steady2d.md) | [electric_steady2d.py](../../../examples/galerkin/electric_steady2d.py) |
 | Same-mesh steady electric to heat (one-way) | `galerkin.joule_heating.solve_steady_joule_heat` | [API, units and validation](joule_heating.md) | [joule_heating.py](../../../examples/galerkin/joule_heating.py) |
+| Temperature-dependent steady Joule heating, bounded isotropic sigma(T) by relaxed Picard or Newton | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [Contract and validation](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../examples/galerkin/temperature_joule_heating.py) |
 | Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_flux_robin.md), [validation](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../examples/galerkin/thermal_flux_robin.py) |
 | Derivatives with respect to materials, sources and boundary values on JAX or PyTorch: steady and transient heat, steady electric conduction, elasticity, thermoelasticity, and waveguide eigenvalues and fields, PEC box resonances with respect to the lengths | `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes` (its fields through `eval_edge_field`), `solve_cavity_box` with JAX or PyTorch inputs | [Contract and validation](differentiation.md) | — |
 | Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet and insulation | `galerkin.transient_heat.solve_transient_heat` | [Contract](transient_heat.md), [validation](transient_heat_validation.md), [independent validation](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../examples/galerkin/transient_heat_convergence.py) |
@@ -166,6 +168,9 @@ python examples/galerkin/fiber_modes.py             # step-index fibre vector mo
 python examples/galerkin/cavity_modes.py            # 3D PEC cavity
 python examples/galerkin/mesh_io.py                 # Gmsh reader
 python examples/galerkin/thermal_steady2d.py        # steady heat
+python examples/galerkin/electric_steady2d.py       # steady electric conduction
+python examples/galerkin/joule_heating.py           # electric -> heat, one way
+python examples/galerkin/temperature_joule_heating.py # temperature-dependent Joule heating
 python examples/galerkin/elasticity_traction.py     # elasticity with traction
 python examples/galerkin/thermoelastic_traction.py  # prescribed-temperature mechanics
 python examples/galerkin/visualize.py               # figures

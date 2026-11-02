@@ -1,5 +1,7 @@
 # 2D 정상 전기전도
 
+[English](../../../../../packages/galerkin/electric_steady2d.md)
+
 ## 연성 계약 (버전 1)
 
 명시적 Python 진입점은
