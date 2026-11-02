@@ -57,6 +57,10 @@ records and plans do not establish a current pass; resource observations are not
 
 - [Measuring vector mode performance](../benchmark_vector.md)
 - [Measuring 3D PEC cavity time and memory](../benchmark_cavity.md)
+- [Measuring steady and transient heat conduction time](../benchmark_thermal.md)
+- [Measuring elasticity and thermoelastic workflow time](../benchmark_elasticity.md)
+- [Measuring electric conduction and Joule heating time](../benchmark_electric.md)
+- [Measuring the cost of derivatives](../benchmark_derivatives.md)
 - [Transient Studio resource observer](../transient_resource_probe.md)
 - [Region Studio resource observation](../region_resource_probe.md)
 
