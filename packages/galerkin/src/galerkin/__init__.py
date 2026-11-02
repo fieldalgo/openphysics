@@ -32,6 +32,8 @@ from .cavity import CavityResult, solve_cavity_box
 from .material_cavity import (CavityMaterialRegion, MaterialCavityResult,
                               solve_material_cavity_box)
 from .postprocess import element_gradient, l2_error
+from .electrostatics import (ElementPermittivity, ElectrostaticsResult,
+                             solve_electrostatics, capacitance_matrix)
 from .mode_overlap import (vector_power, vector_cross_power, vector_field_overlap,
                            normalize_vector, coupling_efficiency, confinement_factor,
                            overlap_matrix, centroid_field, interpolate_vector_field,
