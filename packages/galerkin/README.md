@@ -127,6 +127,16 @@ per-element material array. It is verified against meshine and gmshio; neither
 is a dependency of the engine. The 3D shape, its rules and the wall-naming
 schemes are in the [tetrahedral mesh format](../../docs/packages/galerkin/mesh3d_format.md).
 
+Two readers exist for Gmsh `.msh` files, with different roles. `gmshio` is the
+canonical one for new code: it reads MSH 4.1 with the full Gmsh element set and
+can run the Gmsh executable itself. `galerkin.read_msh` is the dependency-free
+parser for an ASCII 2.2 or 4.1 file that already exists; for a planar mesh it
+returns the same `Mesh` as `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`
+— regions and their names from the physical surfaces, boundary edges and nodes
+from the physical curves, unused nodes dropped — and `write_msh` writes those
+back in format 2.2. For a tetrahedral mesh it still returns only the boundary
+node sets; regions and tagged faces on `Mesh3D` are follow-up work.
+
 ## Tests
 
 The engine is graded against [galerkin-refsol](https://github.com/fieldalgo/openphysics/blob/main/packages/galerkin-refsol/README.md),
