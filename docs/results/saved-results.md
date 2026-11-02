@@ -86,7 +86,8 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Rectangular or region transient heat | VTU for one time, PVD for all stored times |
 | Vacuum PEC cavity | VTU |
 | Electric conduction and Joule heating (`electric-joule2d-p1-v1`) | VTU |
-| Lossy cavity, waveguide modes | Unsupported by this exporter |
+| Cavity with materials and lossy walls (`cavity3d-edge-complex-v1`) | VTU, complex fields as `_real`/`_imag` pairs |
+| Waveguide modes (`em.modes2d`) | Unsupported by this exporter |
 
 The region path and rectangle boundary-v2 path have different layouts despite
 similar physical conditions. Unsupported export does not mean the solver failed.

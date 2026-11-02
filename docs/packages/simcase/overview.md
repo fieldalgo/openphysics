@@ -387,8 +387,14 @@ arrays, and cell data `electric_field_v_m`, `current_density_a_m2`,
 `conductivity_s_m` and `joule_heating_w_m3`; a Joule result adds `temperature_k`,
 its nodal heat arrays and cell `heat_flux_w_m2`, and `joule.temperature2d` adds
 `evaluated_temperature_k`. Arrays keep their saved names and unit suffixes;
-Dirichlet node lists and the summary are not copied. Lossy cavities and
-`em.modes2d` results are refused as an unsupported field layout. 2D meshes get
+Dirichlet node lists and the summary are not copied. The cavity with materials
+and lossy walls (`cavity3d-edge-complex-v1`) exports each complex mode as the
+cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`
+(m^-3/2, the saved normalization and `exp(+j*omega*t)` convention; VTK has no
+complex arrays) and the materials as `tet_relative_permittivity_real`/`_imag`
+and `tet_relative_permeability_real`/`_imag`; frequencies, quality factors and
+wall conductivities stay in `fields.npz` and `summary.json`. `em.modes2d`
+results are refused as an unsupported field layout. 2D meshes get
 z = 0, and 2D vectors a zero z component. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered

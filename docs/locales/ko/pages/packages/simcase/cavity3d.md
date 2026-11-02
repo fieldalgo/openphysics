@@ -223,7 +223,11 @@ Cavity 출력에는 `neff`나 삼각형·절점 스칼라 배열이 없습니다
 여기서 `pec_edge_ids`는 PEC 벽의 에지만 나열하며, 도체 벽의 에지는 미지수입니다. 정규화는
 `vacuum_mass_hermitian_unit_si`입니다. 진공 에지 질량 `M0`로 `q^H M0 q = 1`이고, 각 모드에서
 크기가 가장 큰 계수는 양의 실수입니다. 진폭은 임의이며 **V/m가 아닙니다**. 배열은
-`numpy.load(path, allow_pickle=False)`로 읽습니다.
+`numpy.load(path, allow_pickle=False)`로 읽습니다. `simcase.export.export_fields`는 이 배치를
+VTU로 쓸 때 복소 모드마다 셀 데이터 `electric_field_mode_<k>_real`과
+`electric_field_mode_<k>_imag`(같은 정규화와 `exp(+j*omega*t)` 규약이므로
+`real*cos(omega*t) - imag*sin(omega*t)`가 순시 장)를, 재료 배열은 `_real`/`_imag` 쌍으로
+씁니다. [ParaView로 보기](overview.md#paraview로-보기)를 참고하세요.
 
 `tests/simcase/test_cavity3d_materials.py`의 시험이 확인하는 것:
 

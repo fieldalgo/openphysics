@@ -84,7 +84,8 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | 직사각형·영역 과도 열 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
 | 진공 PEC 공동 | VTU |
 | 전기 전도·Joule 가열 (`electric-joule2d-p1-v1`) | VTU |
-| 손실 공동·도파관 모드 | 이 exporter에서는 미지원 |
+| 재료·손실 벽이 있는 공동 (`cavity3d-edge-complex-v1`) | VTU, 복소 장은 `_real`/`_imag` 쌍 |
+| 도파관 모드 (`em.modes2d`) | 이 exporter에서는 미지원 |
 
 영역 경로와 직사각형 boundary-v2 경로는 물리 조건이 비슷해도 layout이 다릅니다.
 내보내기 미지원이 해석 실패를 뜻하지는 않습니다. 정확한 범위와 해석은

@@ -6,10 +6,12 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import copy
+
 import numpy as np
 import pytest
 
-from simcase import Document, run
+from simcase import Document, examples, run
 from simcase.export import export_fields, export_time_series
 
 meshio = pytest.importorskip("meshio", reason="install the export extra: pip install 'simcase[export]'")
@@ -280,7 +282,60 @@ def test_electric_export_checks_its_arrays_and_still_refuses_other_layouts(tmp_p
     with pytest.raises(ValueError, match="current_density_a_m2: expected one 2D vector per triangle"):
         export_fields(wrong, tmp_path / "wrong.vtu")
     assert not any(tmp_path.glob("*.vtu"))
-    lossy = tmp_path / "lossy.npz"
-    np.savez(lossy, field_layout="cavity3d-edge-complex-v1")
-    with pytest.raises(ValueError, match="unsupported field layout"):
-        export_fields(lossy, tmp_path / "lossy.vtu")
+    other = tmp_path / "other.npz"
+    np.savez(other, field_layout="cavity3d-edge-complex-v2")
+    with pytest.raises(ValueError, match="unsupported field layout 'cavity3d-edge-complex-v2'"):
+        export_fields(other, tmp_path / "other.vtu")
+
+
+def _saved_lossy_cavity(tmp_path, n=4):
+    data = copy.deepcopy(examples.CAVITY_LOSSY_SLAB)
+    data["mesh"]["subdivisions"] = [n, n, n]
+    data["physics"]["em1"]["num_modes"] = 2
+    data["results"] = {"save_fields": True, "plots": False}
+    out = run(Document.from_dict(data), False).save(tmp_path / "lossy")
+    with np.load(out / "fields.npz", allow_pickle=False) as archive:
+        saved = {key: archive[key] for key in archive.files}
+    return out / "fields.npz", saved
+
+
+def test_complex_cavity_exports_real_and_imaginary_parts(tmp_path):
+    fields, saved = _saved_lossy_cavity(tmp_path)
+    assert str(saved["field_layout"]) == "cavity3d-edge-complex-v1"
+    assert saved["electric_field"].dtype.kind == "c"
+    mesh = meshio.read(export_fields(fields, tmp_path / "lossy.vtu"))
+    np.testing.assert_array_equal(mesh.points, saved["nodes"])
+    np.testing.assert_array_equal(mesh.cells_dict["tetra"], saved["tetrahedra"])
+    modes = len(saved["electric_field"])
+    assert modes == int(saved["returned_modes"]) == 2
+    expected = set()
+    for k in range(modes):
+        for part in ("real", "imag"):
+            expected.add(f"electric_field_mode_{k}_{part}")
+            values = mesh.cell_data[f"electric_field_mode_{k}_{part}"][0]
+            assert values.dtype.kind == "f" and values.shape == (len(saved["tetrahedra"]), 3)
+            np.testing.assert_array_equal(values, getattr(saved["electric_field"][k], part))
+    for name in ("tet_relative_permittivity", "tet_relative_permeability"):
+        for part in ("real", "imag"):
+            expected.add(f"{name}_{part}")
+            np.testing.assert_array_equal(mesh.cell_data[f"{name}_{part}"][0], getattr(saved[name], part))
+    assert set(mesh.cell_data) == expected
+    assert not mesh.point_data
+    # The slab is lossy: the imaginary parts are not all zero.
+    assert any(np.any(mesh.cell_data[f"electric_field_mode_{k}_imag"][0]) for k in range(modes))
+    assert str(saved["electric_field_unit"]) == "m^-3/2"
+    assert str(saved["time_convention"]) == "exp(+j*omega*t)"
+    with pytest.raises(ValueError, match="time series export needs layout"):
+        export_time_series(fields, tmp_path / "series")
+    assert not (tmp_path / "series").exists()
+
+
+def test_complex_cavity_export_checks_its_array_shapes(tmp_path):
+    fields, saved = _saved_lossy_cavity(tmp_path)
+    for name, value in (("electric_field", saved["electric_field"][:, :-1]),
+                        ("tet_relative_permittivity", saved["tet_relative_permittivity"][:-1])):
+        corrupt = tmp_path / f"{name}.npz"
+        np.savez(corrupt, **dict(saved, **{name: value}))
+        with pytest.raises(ValueError, match=f"{name}: expected"):
+            export_fields(corrupt, tmp_path / f"{name}.vtu")
+        assert not (tmp_path / f"{name}.vtu").exists()
