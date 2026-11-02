@@ -13,6 +13,7 @@ EXAMPLE_DOCUMENTS = Path(__file__).resolve().parents[2] / "examples" / "simcase"
 
 BUILTIN = {
     "electric_joule": {"electric.steady2d", "joule.steady2d", "joule.temperature2d"},
+    "mechanics": {"mechanics.elasticity2d", "mechanics.thermoelastic2d"},
     "thermal.transient2d": {"thermal.transient2d"},
     "thermal.steady2d": {"thermal.steady2d"},
     "em.cavity3d": {"em.cavity3d"},
@@ -33,17 +34,20 @@ def test_stage_refusals_keep_their_messages():
     refusals = {k.name: k.stage_refusal for k in registry.kinds()}
     assert refusals == {
         "electric_joule": "{stage} is an EM stage; use run(document) for electric/Joule physics",
+        "mechanics": "{stage} is an EM stage; use run(document) for mechanics physics",
         "thermal.transient2d": "{stage} is an EM 2D stage; use run(document) for thermal.transient2d",
         "thermal.steady2d": "{stage} is an EM 2D stage; use run(document) for thermal.steady2d",
         "em.cavity3d": "{stage} is a 2D stage; use run(document) for em.cavity3d",
         "em.modes2d": None,
     }
     assert [k.name for k in registry.kinds() if k.fresh_output] == [
-        "electric_joule", "thermal.transient2d", "thermal.steady2d"]
+        "electric_joule", "mechanics", "thermal.transient2d", "thermal.steady2d"]
 
 
 @pytest.mark.parametrize("types, kind", [
     (["thermal.steady2d", "joule.steady2d"], "electric_joule"),
+    (["thermal.steady2d", "mechanics.elasticity2d"], "mechanics"),
+    (["mechanics.elasticity2d", "electric.steady2d"], "electric_joule"),
     (["thermal.steady2d", "thermal.transient2d"], "thermal.transient2d"),
     (["em.cavity3d", "thermal.steady2d"], "thermal.steady2d"),
     (["em.modes2d", "em.cavity3d"], "em.cavity3d"),
@@ -78,13 +82,13 @@ def test_unknown_type_error_lists_every_registered_type():
     data = copy.deepcopy(examples.EXAMPLES["soi_strip"])
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
-    assert len(listed) == 7
+    assert len(listed) == 9
     with pytest.raises(DocumentError) as error:
         Document.from_dict(data)
     assert str(error.value) == f"physics.em1.type 'no.such.type' not supported ({listed})"
 
 
-@pytest.mark.parametrize("name", ["thermal_slab", "electric_rectangle"])
+@pytest.mark.parametrize("name", ["thermal_slab", "electric_rectangle", "elastic_plate"])
 def test_run_returns_the_result_types_of_the_kind(name):
     doc = Document.from_dict(copy.deepcopy(examples.EXAMPLES[name]))
     assert isinstance(run(doc, verbose=False), registry.kind_of(doc.data).result_types)

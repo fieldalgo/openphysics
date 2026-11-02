@@ -4,7 +4,9 @@
 
 This extends `galerkin.elasticity.solve_elasticity` with optional boundary
 traction in the existing P1 vector nodal displacement space. Import the
-submodule explicitly; no top-level export or simcase integration is added.
+submodule explicitly; there is no top-level export. The side-constant rectangle
+subset is available from JSON/CLI through the
+[linear elasticity document](../simcase/mechanics2d.md).
 The formulation, plane selection, engineering shear, material range and
 locking limits in [the initial guide](elasticity2d.md) still apply. This
 guide supersedes its earlier statement that nonzero traction is unsupported.
@@ -238,7 +240,8 @@ Near-incompressible plane-strain P1 locking, coarse-mesh bending stiffness,
 small-strain assumptions and floating-point mesh limits are unchanged.
 Passing a small algebraic residual is not an accuracy certificate near
 nu=0.5. This extension adds no pressure model, thermal expansion, nonlinear
-material, large deformation, contact, dynamics, 3D, simcase or Studio feature.
+material, large deformation, contact, dynamics, 3D or Studio feature; the JSON
+document exposes only constant side tractions.
 It introduces no dependency and copies no external solver implementation.
 The guide and example stay in the source tree and are not shipped in the sdist;
 the installed checks copy the example from the checkout and run it against

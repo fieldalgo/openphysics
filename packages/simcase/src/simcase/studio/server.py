@@ -179,12 +179,13 @@ def material_preview(body: MaterialPreview):
 def _headless_thermal_type(doc: Document):
     return next((p.get("type") for p in doc["physics"].values()
                  if p.get("type") in ("thermal.steady2d", "thermal.transient2d",
-                                    "electric.steady2d", "joule.steady2d", "joule.temperature2d")), None)
+                                    "electric.steady2d", "joule.steady2d", "joule.temperature2d",
+                                    "mechanics.elasticity2d", "mechanics.thermoelastic2d")), None)
 
 
 def _require_studio_physics(doc: Document):
     if physics_type := _headless_thermal_type(doc):
-        raise HTTPException(400, f'{physics_type} is headless Python/CLI only; Studio does not support heat input or results')
+        raise HTTPException(400, f'{physics_type} is headless Python/CLI only; Studio does not support its input or results')
     if any(p.get("type") == "em.cavity3d" for p in doc["physics"].values()):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
 
