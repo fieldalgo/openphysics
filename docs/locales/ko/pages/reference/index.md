@@ -28,6 +28,7 @@
 - [2D 정상 전기전도](../packages/galerkin/electric_steady2d.md)
 - [정상 Joule heating](../packages/galerkin/joule_heating.md)
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
+- [3D 솔버가 공유하는 사면체 메시 형식](../packages/galerkin/mesh3d_format.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
 - [모드 전력·중첩·결합](../packages/galerkin/mode_overlap.md)
 - [이름 있는 영역별 구간 상수 재료](../packages/galerkin/multimaterial.md)

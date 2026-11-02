@@ -7,7 +7,7 @@ names so that neither imports the other's private helpers.
 """
 import numpy as np
 
-from .mesh3d import Mesh3D, box_mesh
+from .mesh3d import Mesh3D, box_mesh, tag_faces_by_node_sets
 
 C0 = 299792458.0
 RESIDUAL_LIMIT = 1e-8
@@ -31,4 +31,6 @@ def cavity_mesh(lengths, cells):
     local = grid - lower
     reflected = lower + np.where(lower % 2, 1 - local, local)
     tets = (reflected[:, :, 0] * shape[1] + reflected[:, :, 1]) * shape[2] + reflected[:, :, 2]
-    return Mesh3D(base.nodes, tets, base.boundary, base.regions, base.region_names)
+    mesh = Mesh3D(base.nodes, tets, base.boundary, base.regions, base.region_names)
+    mesh.tagged_faces = tag_faces_by_node_sets(mesh, base.boundary)   # diagonals moved
+    return mesh
