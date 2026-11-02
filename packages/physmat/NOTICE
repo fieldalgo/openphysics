@@ -30,3 +30,18 @@ The original measurement for each record is credited individually in
 
 This data is CC0 1.0, not Apache-2.0. Redistributing it under either set of
 terms is permitted; the Apache-2.0 grant in LICENSE covers the code only.
+
+--------------------------------------------------------------------------------
+The thermal conductivity of copper, aluminium and tungsten versus temperature
+(physmat/thermal.py) evaluates the published equations and fitted parameters of
+
+    J. G. Hust and A. B. Lankford, "Thermal conductivity of aluminum, copper,
+    iron, and tungsten for temperatures from 1 K to the melting point",
+    NBSIR 84-3007, National Bureau of Standards, Boulder (1984).
+    https://doi.org/10.6028/NBS.IR.84-3007
+
+No tables or text of the report are reproduced. The report is a work of the
+United States Government (National Bureau of Standards, now NIST); such works
+are not subject to copyright protection in the United States (17 U.S.C. 105).
+That statute does not settle their status outside the United States; this
+notice records the fact and does not decide it.

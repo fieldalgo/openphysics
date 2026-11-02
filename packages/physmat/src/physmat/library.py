@@ -12,6 +12,9 @@ formulas so they can be compared 1:1 with the database. A handful of thermal and
 mechanical constants (room temperature, order-of-magnitude reference values from
 standard handbooks) are attached to the most common materials as a starting
 point for multiphysics — check them against your own data before relying on them.
+The thermal conductivity of Cu and Al is the Hust and Lankford (1984) equation of
+temperature and residual resistivity ratio (``physmat.thermal``) at RRR 100; the
+same module evaluates tungsten.
 
 Look-up is case-insensitive and accepts aliases: ``get("sio2")``, ``get("silica")``,
 ``get("fused silica")`` all return the same material.
@@ -21,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from . import _tables, air
+from . import _tables, air, thermal
 from .dispersion import Constant, RIIFormula, Tabulated
 from .material import Material, Property
 
@@ -176,11 +179,11 @@ for _key, _name, _aliases in (("Au_Johnson", "Au", ("gold",)), ("Ag_Johnson", "A
                   "electrical_conductivity": Property(4.1e7, "S/m", "handbook value, 300 K")}
     elif _name == "Cu":
         _props = {"density": Property(8960.0, "kg/m^3", "handbook value"),
-                  "thermal_conductivity": Property(401.0, "W/(m K)", "handbook value, 300 K"),
+                  "thermal_conductivity": thermal.conductivity_property("Cu"),    # 397 W/(m K) at 300 K
                   "electrical_conductivity": Property(5.96e7, "S/m", "handbook value, 300 K")}
     elif _name == "Al":
         _props = {"density": Property(2700.0, "kg/m^3", "handbook value"),
-                  "thermal_conductivity": Property(237.0, "W/(m K)", "handbook value, 300 K"),
+                  "thermal_conductivity": thermal.conductivity_property("Al"),    # 234 W/(m K) at 300 K
                   "electrical_conductivity": Property(3.5e7, "S/m", "handbook value, 300 K")}
     elif _name == "Ag":
         _props = {"density": Property(10490.0, "kg/m^3", "handbook value"),
