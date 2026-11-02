@@ -4,16 +4,17 @@
 
 [문서 홈](../../index.md)
 
-상태: **초안 계약입니다. 구현되지 않았고 아직 승인되지 않았습니다.** 이 형식을 읽는 코드는 없으며,
-이 문서는 현재의 어떤 문서·메시 생성기·솔버 동작도 바꾸지 않습니다. 저장소 사실은 `main` `015a6d8`에서
-확인했습니다.
+상태: **초안 계약이며 아직 승인되지 않았습니다.** [1단계 리더](geometry_reader.md)가 문서 안의 버전 1
+형상 블록을 읽고, 실행기에는 여전히 0.2 형식을 넘깁니다. 영역 구성·선택자·출처 이름은 2단계 엔진이
+필요합니다. 저장소 사실은 `main` `015a6d8`에서 확인했습니다.
 
 이 문서의 구성은 다음과 같습니다.
 - **동결** 표시 절은 승인 시 고정됩니다. SHA-256을 기록하며, 그 뒤에는 날짜가 있는 보완으로만
   바뀝니다.
 - **예약** 표시 키워드는 뒤 단계에서 정의합니다. 그때까지 모든 리더가 이름을 밝혀 거부합니다.
-- JSON 문서 계약을 바꾸는 일(봉투 버전 문자열, `"openphysics": "0.2"` 문서 이전)은 따로 결정합니다.
-  그 결정 전까지 0.2 문서는 그대로 동작합니다(`packages/simcase/src/simcase/schema.py:51,100-101`).
+- JSON 계약(2026-11-03 결정): 봉투는 `"openphysics": "0.2"`를 유지하고 `geometry` 블록만 `"version": 1`을
+  가집니다. `version`이 없는 블록은 0.2 형식이며 그대로 동작하고, 이전하는 문서는 없습니다. Studio 프로젝트와
+  sipi JSON은 당분간 자기 형식을 유지합니다.
 
 ## 목적과 범위
 
@@ -76,10 +77,9 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
 자체는 표준 라이브러리와 NumPy만 import합니다.
 
 scipy는 제한하지 않습니다. sipi·galerkin·meshine이 이미 의존하고(`packages/sipi/pyproject.toml:26`),
-BSD-3-Clause입니다. `import simcase`는 솔버 묶음을 불러오고(`packages/simcase/src/simcase/__init__.py:26-40`), 그 묶음이
-shapely를 import합니다(`packages/simcase/src/simcase/geometry.py:18-20`). 그래서 sipi 브라우저 계산기처럼
-shapely 없이 쓰는 곳이 평가기를 쓰기 전에, 패키지 import를 지연시키거나 평가기를 따로 import할 수 있는
-곳으로 옮겨야 합니다.
+BSD-3-Clause입니다. 실행기 묶음은 shapely를 import하므로(`packages/simcase/src/simcase/geometry.py:18-20`),
+`import simcase`는 `simcase.Document` 같은 공개 이름을 처음 쓸 때만 그 묶음을 불러옵니다.
+`simcase.geometry_document`를 import해도 scipy와 shapely는 불러오지 않습니다.
 
 ## 최상위 구조(동결)
 

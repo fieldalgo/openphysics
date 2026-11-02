@@ -4,19 +4,21 @@
 
 [Documentation home](../../README.md)
 
-Status: **DRAFT contract. Not implemented and not yet accepted.** No code reads
-this format. Nothing on this page changes how a current document, mesher or
-solver behaves. Repository facts were checked against `main` at `015a6d8`.
+Status: **DRAFT contract, not yet accepted.** The
+[stage 1 reader](geometry_reader.md) reads version 1 geometry blocks in
+documents and still gives the runners the 0.2 form; the region complex,
+selectors and provenance need the stage 2 engine. Repository facts were checked
+against `main` at `015a6d8`.
 
 How the page is organised:
 - Sections marked **frozen** become fixed when the page is accepted. Their
   SHA-256 is recorded, and after that they change only through a dated amendment.
 - Keywords marked **reserved** are defined by a later stage. Until then, every
   reader refuses them by name.
-- The JSON document contract change needs a decision of its own. That covers the
-  envelope version string and the migration of `"openphysics": "0.2"` documents.
-  Until that decision, 0.2 documents keep working unchanged
-  (`packages/simcase/src/simcase/schema.py:51,100-101`).
+- JSON contract (decided 2026-11-03): the envelope stays `"openphysics": "0.2"`,
+  and only the `geometry` block carries `"version": 1`. A block without `version`
+  is the 0.2 form and keeps working unchanged; no document is migrated. Studio
+  projects and sipi JSON keep their own formats for now.
 
 ## Purpose and scope
 
@@ -82,12 +84,11 @@ stage 2 exact 2D engine replaces shapely in any case. The evaluator module itsel
 imports only the standard library and NumPy.
 
 scipy is not restricted. sipi, galerkin and meshine already depend on it
-(`packages/sipi/pyproject.toml:26`), and it is BSD-3-Clause. `import simcase`
-loads the solver chain (`packages/simcase/src/simcase/__init__.py:26-40`), and
-that chain imports shapely (`packages/simcase/src/simcase/geometry.py:18-20`). So
-the package import must become lazy, or the evaluator must move where it can be
-imported on its own, before a consumer without shapely, such as sipi's browser
-calculator, uses it.
+(`packages/sipi/pyproject.toml:26`), and it is BSD-3-Clause. The runner chain
+imports shapely (`packages/simcase/src/simcase/geometry.py:18-20`), so `import
+simcase` loads that chain only when a public name such as `simcase.Document` is
+first used. Importing `simcase.geometry_document` loads neither scipy nor
+shapely.
 
 ## Top-level structure (frozen)
 
