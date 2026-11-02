@@ -5,7 +5,7 @@
 **At a glance**
 
 - **What it checks:** the producer-side gates for `solve_transient_heat`: exact controls, a temporal gate on the smallest Dirichlet eigenmode, and spatial gates on a manufactured sine solution.
-- **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%. With outward flux or convection: slab spatial order ≥ 1.8 and temporal order ≥ 0.9 with finest relative error ≤ 2e-3, long-time agreement with `solve_steady_heat` ≤ 1e-8, per-step heat balance ≤ 1e-10, Dirichlet-only histories unchanged ([details](#outward-flux-and-convection-gates)).
+- **Fixed gates:** the last two temporal orders are 0.9–1.1 (n=8 mesh, 8/16/32/64 steps); temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on n=8/16/32/64 at 0.25, 0.5 and 1 s; an n=64 companion with half the time step changes each error by ≤ 5%; quadrature orders 8 and 10 agree within 1%. With outward flux or convection: slab spatial order ≥ 1.8 and temporal order ≥ 0.9 with finest relative error ≤ 2e-3, long-time agreement with `solve_steady_heat` ≤ 1e-8, per-step heat balance ≤ 1e-10, Dirichlet-only histories unchanged ([details](#outward-flux-and-convection-gates)). With time-dependent flux or convection: periodic-ambient slab amplitude and phase with spatial order ≥ 1.8, temporal order ≥ 0.9 and finest error ≤ 3e-3 of the amplitude, ramped-flux slab with the same orders and finest error ≤ 2e-3 of the rise, constant callbacks bit-identical to constants, per-step balance ≤ 1e-10 ([details](#time-dependent-flux-and-convection-gates)).
 - **Scope:** the eigenmode gate measures time error only, not PDE refinement. For the result of a specific commit, see its CI run.
 
 ## Evidence
@@ -193,6 +193,57 @@ convective 2.4e-16, reaction 1.2e-16, G 0; T4 mixed 8.1e-17, two Robin-only
 components 3.5e-16; T6 bit-identical; T5 skipped (JAX and PyTorch not
 installed there). The thresholds above were fixed before these runs and are
 not retuned from them.
+
+## Time-dependent flux and convection gates
+
+`tests/galerkin/test_transient_heat_time_boundary.py` and the periodic and
+ramped cases of `tests/refsol/test_transient_heat_robin_reference.py` fix these
+gates for time-dependent boundary values (`callback(time_s)` and
+`callback(points_m, outward_normals, time_s)`). The references are two further
+closed forms in `refsol.transient_heat_robin` (NumPy and SciPy `brentq` only,
+no engine import), derived in its module docstring. `PeriodicAmbientSlab`: slab
+0<x<L, insulated at x=0, convection h·(T−T_a(t)) at x=L with
+T_a(t) = T_m + A sin(ωt); the periodic steady state is T_m + Im[Θ(x) e^{iωt}]
+with Θ(x) = A h cosh(qx)/(h cosh(qL) + k q sinh(qL)), q² = iω/α, and the
+backward-Euler time-discrete problem with the ambient sampled at the end of
+each step has the same form with q_d² = (1 − e^{−iωΔt})/(αΔt), which isolates
+the spatial error. `RampedFluxSlab`: outward flux g(t) = g0·t/τ at x=L,
+insulated at x=0, uniform T0; Duhamel's integral of the constant-flux step
+response with the n⁻⁴ sum in closed form. The reference tests check the heat
+equation and both face conditions by finite differences, periodicity, the
+backward-Euler recurrence of the discrete amplitude and its first-order approach
+to the analytic one, the exact ramp mean T0 − (g0/τ)t²/(2cL) and the Duhamel
+integral by numerical convolution of `FluxSlab`; they do not import the solver.
+
+The periodic gates read the complex amplitude at x=0 and x=L from a
+one-period DFT of the history over the twelfth period (from t = 11 L²/α, well
+after the required 6 L²/α; the transient decays as exp(−β₁²αt/L²)); the error
+is |Θ_fem − Θ_ref|/A, which bounds the amplitude and phase errors together.
+
+| Gate | Fixed definition | Threshold |
+|---|---|---|
+| U1 periodic ambient, spatial | L=1 m, k=2.5, c=4, h=5, T_m=300, A=20, period L²/α=1.6 s, uniform initial T_m; strips of n=8/16/32 squares, 256 steps per period; amplitude at x=0 and x=L vs the time-discrete Θ_d(Δt) | both orders ≥ 1.8 |
+| U1 periodic ambient, temporal | n=128, 16/32/64 steps per period, vs the analytic Θ | both orders ≥ 0.9 |
+| U1 periodic ambient, finest | n=32, 512 steps per period, vs the analytic Θ | ≤ 3e-3 of A |
+| U2 ramped flux, spatial | same slab, g(t) = −100·t/0.2 W/m² at x=L to 0.2 s, 4000 steps; relative L2 error of T on the exact surface rise \|T(L, 0.2 s) − T0\| = 10.64 K | both orders ≥ 1.8; finest ≤ 2e-3 |
+| U2 ramped flux, temporal | n=128, 4/8/16 steps | both orders ≥ 0.9 |
+| U3 constant callbacks | 8×4 rectangle with left Dirichlet ramp, source, top g, right (h, T_a): `lambda t: const` and `lambda p, n, t: full(const)` for g, h and T_a vs the constant values; boundary systems assembled once for static data, once per time for time-dependent data | every result array bit-identical |
+| U4 heat balance and sampling instant | the U3 rectangle and two disconnected Robin-only strips with g(t), h(t), T_a(t) all varying, scalar and field forms; storage = f + reaction − G_n − C_n per step and per component; C_n and G_n vs independently assembled h(t_{n+1})·ℓ/6·[[2,1],[1,2]], h·T_a(t_{n+1})·ℓ/2 and g(t_{n+1})·ℓ/2; G_n of `lambda t: t` sums to t_{n+1} | ≤ 1e-10 of the largest term; 1e-10 and 1e-12 relative |
+| U5 JAX/PyTorch | histories with time-dependent g and T_a (static h) equal NumPy; d/d(h, A, g-rate) of a final-temperature functional vs central differences; time-dependent h refused | 1e-12; relative 1e-6; ValueError (skips without the libraries) |
+| U6 refusals | other signatures (0, 4 or variadic positionals, `(points, time)`), wrong shapes and booleans at index 0, NaN/infinity/negative h at a later step with the step index and time in the message, unchanged result shapes | ValueError / TransientHeatStepError |
+
+Measured on 2026-11-02 in the development environment (Linux x86_64, NumPy
+2.5.4, SciPy 1.18.1; not a CI result): U1 spatial errors vs Θ_d 1.92e-3,
+4.87e-4, 1.23e-4 (orders 1.98, 1.99; vs the analytic Θ 1.07e-3, 2.50e-3,
+2.87e-3, dominated by the first-order time error), temporal 4.43e-2, 2.31e-2,
+1.18e-2 (orders 0.94, 0.97), finest 1.38e-3 (amplitude 8.6e-4 and 1.1e-4 of A,
+phase 6.6e-3 and 1.3e-3 rad at x=0 and x=L); U2 spatial 4.95e-3, 1.28e-3,
+3.37e-4 (orders 1.95, 1.92), temporal 6.27e-2, 3.15e-2, 1.58e-2 (orders 0.99,
+0.99); U3 bit-identical; U4 mixed 2.0e-16, two Robin-only components 2.5e-16;
+U5 skipped (JAX and PyTorch not installed there). Stage-1 constant data
+(Dirichlet-only fixture, mixed, callback and slab cases) were compared bit for
+bit against the previous solver revision in the same environment. The
+thresholds above were fixed before these runs and are not retuned from them.
 
 ## Bounded spatial-residual refinement
 

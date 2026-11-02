@@ -213,11 +213,12 @@ def test_contract_shapes_callbacks_and_refusals():
     assert np.all(constant.prescribed_outward_load_w_per_m[0][top] > 0)
     assert np.allclose(constant.prescribed_outward_load_w_per_m[0].sum(), 3.0*1.0)
     assert np.all(constant.convective_outward_w_per_m[:, np.unique(mesh.boundary_edges["right"])] > 0)
-    # Time callbacks are refused up front, before any sampling.
-    for bad in ({"right": (lambda p, normal, time_s: H, AMBIENT)}, {"right": (H, lambda p, n, t: AMBIENT)}):
-        with pytest.raises(ValueError, match="time-independent"):
+    # Signatures other than the three callback forms are refused up front, before any
+    # sampling (time-dependent forms themselves are covered in test_transient_heat_time_boundary.py).
+    for bad in ({"right": (lambda p, normal, time_s, extra: H, AMBIENT)}, {"right": (H, lambda *a: AMBIENT)}):
+        with pytest.raises(ValueError, match="exactly one of the forms"):
             solve_transient_heat(mesh, convection=bad, **base)
-    with pytest.raises(ValueError, match="time-independent"):
+    with pytest.raises(ValueError, match="never time"):
         solve_transient_heat(mesh, outward_flux={"top": lambda points, time: 3.0}, **base)
     with pytest.raises(ValueError, match="must map"):
         solve_transient_heat(mesh, outward_flux=[("top", 3.0)], **base)
@@ -239,7 +240,8 @@ def test_t6_dirichlet_only_histories_unchanged(monkeypatch):
 
     def forbidden(*args, **kwargs):
         raise AssertionError("boundary sampling ran without outward_flux or convection")
-    monkeypatch.setattr(module, "scalar_boundary_samples", forbidden)
+    monkeypatch.setattr(module, "scalar_boundary_geometry", forbidden)
+    monkeypatch.setattr(module, "evaluate_scalar_boundary", forbidden)
     monkeypatch.setattr(module, "scalar_boundary_system", forbidden)
     for name, case in dirichlet_cases.CASES.items():
         result = solve_transient_heat(**case())
