@@ -1,11 +1,12 @@
-# 선형탄성 문서
+# 선형탄성·열탄성 문서
 
 [English](../../../../../packages/simcase/mechanics2d.md) | **한국어**
 
-`mechanics.elasticity2d`의 JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약의
-한국어 안내다. 수치 풀이와 기존 허용오차는 [2D 탄성](../galerkin/elasticity2d.md)과
-[직교좌표계 경계 traction](../galerkin/elasticity_traction.md) 계약을 따르며, 이 adapter는
-새로운 이산화를 추가하지 않는다.
+`mechanics.elasticity2d`(등온)와 `mechanics.thermoelastic2d`(정상 열전도 후 같은 메시의 열응력)의
+JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약의 한국어 안내다. 수치 풀이와 기존
+허용오차는 [2D 탄성](../galerkin/elasticity2d.md), [직교좌표계 경계 traction](../galerkin/elasticity_traction.md),
+[정상 열전도](../galerkin/thermal_steady2d.md), [열탄성 traction](../galerkin/thermoelastic_traction.md)
+계약을 따르며, 이 adapter는 새로운 이산화를 추가하지 않는다.
 
 ## 범위·입력
 
@@ -18,7 +19,7 @@
 Studio 실행은 지원하지 않는다. 직사각형·단위·메시·study·results 검사는
 [정상 열전도 계약](thermal_steady2d.md)과 같다.
 
-`mechanics.elasticity2d`의 physics 키:
+`mechanics.elasticity2d`의 physics 키(`units`에는 `length`만):
 
 - `plane`: `"stress"` 또는 `"strain"`.
 - `young_modulus_pa`(> 0), `poisson_ratio`(−1 < ν < 0.5, 양 끝 제외). 평면변형률 P1 요소는
@@ -38,6 +39,19 @@ Studio 실행은 지원하지 않는다. 직사각형·단위·메시·study·re
 `right` 양쪽에 `y`를 지정할 때만 막힌다. 수평 변 하나에 `x`, 수직 변 하나에 `y`만 지정하면
 두 변의 모서리를 축으로 하는 hinge가 남으므로 거부한다. 이 규칙은 메시를 만들기 전에 문서만으로
 판정하며, 생성한 메시에 대한 솔버의 rank 검사와 일치한다(테스트에서 모든 조합을 확인).
+
+### 정상 열전도 후 열응력
+
+`mechanics.thermoelastic2d`는 같은 역학 키에 `units.temperature:"K"`(필수),
+`thermal_expansion_per_k`(유한, 부호 있음), `reference_temperature_k`(≥ 0)와
+[정상 열전도](thermal_steady2d.md)·[경계조건](thermal_steady_boundary2d.md) 계약의 변별 상수 열 데이터를
+더한다: `thermal_conductivity_w_mk`(> 0), `dirichlet_temperature_k`(변→K, 음수 아님, 모서리 일치),
+선택적 `heat_source_w_m3`, `outward_flux_w_m2`(변→q·n), `convection`(변→`{h_w_m2k, ambient_temperature_k}`).
+고정 변 하나 이상 또는 양의 h가 필요하고 고정 변에는 자연 경계조건을 줄 수 없다. runner는 메시에서
+`galerkin.thermal.solve_steady_heat`를 풀고 `galerkin.thermoelasticity.freeze_temperature`로 절점 온도를
+고정한 뒤 역학 인자로 `solve_thermoelasticity`를 호출한다. `traction_pa`는 Python 계약과 같이 **전체**
+물리 σ·n이며 열 traction으로 보정하지 않는다. 연계는 단방향이다: 열로 되먹임 없음, 온도 의존 재료 없음,
+교차 메시 전달 없음.
 
 ## 실행·저장
 
@@ -76,6 +90,24 @@ metadata만 있어 `allow_pickle=False`로 읽는다.
 | `load_n_per_m`, `reaction_n_per_m`, `residual_n_per_m` | (N,2) | N/m | 체적력+traction의 consistent 하중; 지정 DOF의 K·u − load(그 외 0); 모든 DOF의 K·u − load |
 | `dirichlet_node_ids`, `dirichlet_components`, `dirichlet_displacement_m` | (K,) | 1, 1, m | 지정 DOF(성분 0 = x, 1 = y)와 값 |
 
+열탄성 결과(ID `mechanics.thermoelastic2d-result-v1`, layout `thermoelastic2d-p1-v1`)는 `strain`과
+`load_n_per_m` 대신 다음을 저장한다:
+
+| 배열 | 모양 | 단위 | 의미 |
+|---|---|---|---|
+| `temperature_k` | (N,) | K | 역학이 사용한 정상 열전도 해 |
+| `heat_flux_w_m2` | (T,2) | W/m² | 요소 열유속 |
+| `thermal_load_w_per_m`, `thermal_reaction_w_per_m`, `thermal_residual_w_per_m`, `prescribed_outward_heat_w_per_m`, `ambient_load_w_per_m`, `convective_outward_heat_w_per_m`, `thermal_system_rhs_w_per_m` | (N,) | W/m | 열 풀이의 절점 배열(flux·대류가 없으면 0) |
+| `thermal_dirichlet_node_ids`, `dirichlet_temperature_k` | (K_T,) | 1, K | 온도 고정 절점과 값 |
+| `total_strain`, `thermal_strain`, `elastic_strain` | (T,3) | 1 | `exx, eyy, gxy`; total = thermal + elastic |
+| `stress_pa` | (T,3) | Pa | 탄성 변형률의 `sxx, syy, sxy` |
+| `sigma_zz_pa`, `epsilon_zz` | (T,) | Pa, 1 | 면외 응력(평면변형률) 또는 변형률(평면응력) |
+| `load_external_n_per_m`, `load_thermal_n_per_m`, `load_body_n_per_m`, `load_traction_n_per_m`, `reaction_n_per_m`, `residual_n_per_m` | (N,2) | N/m | 체적력+traction 하중, 열 등가 하중과 그 두 부분, 지정 DOF의 K·u − load, 모든 DOF의 K·u − load |
+
+열탄성 summary에는 열팽창계수, 기준 온도, 전도도, 고정한 온도의 `temperature_snapshot` 해시(`mesh_hash`,
+`temperature_hash`, `snapshot_hash`), 열 진단값(열원·외향 열과 그 차이 W/m, 자유 열 잔차, 최소·최대 온도),
+외부·열 하중 합(N/m), 물리 탄성 에너지(J/m)가 더해진다. 힘 수지는 외부 하중 + 열 하중 + 반력이다.
+
 변형률·응력은 P1 요소마다 상수다(`field_locations`는 `triangle_centroids`). summary가 성분
 순서를 반복한다. 힘은 면외 깊이 1 m당 값이며 N이 아니다. summary에는 `status:"solved"`,
 plane·재료, `field_units`, `field_locations`, `field_shapes`, 시간, 소프트웨어 버전과 진단값이
@@ -85,7 +117,9 @@ plane·재료, `field_units`, `field_locations`, `field_shapes`, 시간, 소프�
 CLI 종료값: 입력 오류 2(출력 폴더 없음), 풀이·I/O 오류(규칙이 예상하지 못한 특이 행렬,
 비유한 값, 이미 있는 출력) 1, 성공 0. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수
 있다([ParaView로 보기](overview.md#paraview로-보기)): 점 데이터 `displacement_m`과 N/m 절점
-배열 세 개(z = 0 벡터), 셀 데이터 `exx`, `eyy`, `gxy`와 `sxx_pa`, `syy_pa`, `sxy_pa`.
+배열(z = 0 벡터; 열탄성 배치는 `temperature_k`와 W/m 절점 배열을 스칼라로 더함), 셀 데이터 `exx`,
+`eyy`, `gxy`와 `sxx_pa`, `syy_pa`, `sxy_pa`(열탄성: `heat_flux_w_m2`, `sigma_zz_pa`, `epsilon_zz`와
+`total_`, `thermal_`, `elastic_` 변형률 성분).
 내보내기는 저장된 배열을 복사할 뿐 이 계약에 아무것도 더하지 않는다.
 
 ## 검증
@@ -101,15 +135,23 @@ NumPy 2.5.4, SciPy 1.18.1(2026-11-02) 측정값이다.
 | J4 | 잘못된 문서 32개(hinge, 한 성분만, 모서리 상충, 단위 누락·추가, 잘못된 plane, ν = 0.5·−1, 태그 수량, 지정 성분의 traction 등) exit 2, 출력 없음; 강체 규칙이 구속 집합 12개에서 솔버 rank 검사와 일치 | 모두 거부 |
 | J5 | CLI validate/run/save, 기존 출력 거부(기존 summary 불변), 부분 저장 정리, 결과 사본·문서 snapshot 불변 | 통과 |
 | J6 | Studio `/api/validate`·`_require_studio_physics`가 거부; Studio Node 검사 유지 | 통과, Node 247개 |
-| J7 | `tools/wheel_consumers/test_mechanics_wheel.py`(단축 판 CLI, hinge 거부, VTU 내보내기)를 `check_platform_install.py`처럼 임시 폴더에서 `python -I`로 실행 | 통과 |
+| J7 | `tools/wheel_consumers/test_mechanics_wheel.py`(단축 판·열탄성 막대 CLI, hinge 거부, VTU 내보내기)를 `check_platform_install.py`처럼 임시 폴더에서 `python -I`로 실행 | 통과 |
+| K1 | 열탄성 문서 실행 == 같은 메시의 `solve_steady_heat` + `freeze_temperature` + `solve_thermoelasticity`, byte 단위(두 plane, 열원, flux·대류 변, 체적력, traction 둘) | 배열 16개 모두 byte 일치, snapshot 해시 동일 |
+| K2 | 전단 0의 `refsol.thermoelastic_traction.uniform_combined`(법선응력 8·−2 MPa, +20 K), 네 변 Dirichlet의 균일 온도, `m`,`mm`,`um`,`nm`, 두 plane: 온도·변위·면내 및 zz 응력·전체 변형률 상대오차 ≤ 1e-10 | 온도 정확, 변위 ≤ 3.4e-15, 응력 ≤ 3.1e-14, σ_zz ≤ 1.1e-14, 변형률 ≤ 1.1e-14; 물리 에너지 1e-10 |
+| K3 | 두 Dirichlet 변의 선형 온도를 받는 구속 막대, u_x = k α((T₁−T_ref)x + Gx²/2), k = 1+ν 또는 (1+ν)/(1−ν), 응력은 `refsol.thermoelastic_traction.parent_state`: 분할 8,16,32에서 변위 차수 ≥ 1.8 | 차수 1.95, 1.97(평면응력), 1.94, 1.97(평면변형률); 응력 차수 0.97–1.00; 온도 1e-9 K 재현 |
+| K4 | 잘못된 열탄성 문서 16개(온도 단위 누락·비 K, 전도도 누락·0, α 누락·비유한, T_ref 음수·누락, 순수 Neumann 열, 음수·상충 온도, 고정 변의 flux, 음수 h, hinge, Joule 전용 키) exit 2, 출력 없음; `mechanics.elasticity2d`는 열 키를 거부 | 모두 거부 |
 
-`refsol.elasticity_traction.polynomial_manufactured`는 위치에 따라 변하는 체적력과 traction이
-필요해 변마다 상수인 이 문서로 표현할 수 없다. 그래서 J3는 위의 2차 막대 해를 쓰며, 테스트에서
-Navier 방정식으로 솔버와 독립적으로 유도한다.
+`refsol.elasticity_traction.polynomial_manufactured`와
+`refsol.thermoelastic_traction.polynomial_manufactured`는 위치에 따라 변하는 체적력·traction·온도가
+필요하고, 전단이 있는 `uniform_combined`에는 변위 성분이 상수인 변이 없어 변마다 상수인 이 문서로
+표현할 수 없다. 그래서 J3·K3는 위의 2차 막대 해를 쓰며(테스트에서 Navier 방정식으로 솔버와
+독립적으로 유도), K2는 전단 없는 `uniform_combined` 상태를 쓴다.
 
 ## 한계
 
 균질 등방 직사각형 하나, 변마다 상수인 데이터, 정적 소변형률, 단일 study. 영역·도형, 법선/접선
-traction, 분포·점 하중, 열팽창이나 열→역학 연계(Python [열탄성](../galerkin/thermoelastic_traction.md)
-흐름은 Python 전용), 동역학, 3D, Studio 양식은 없다. 구조적으로 유효한 모델도 수치적으로
+traction, 분포·점 하중, 동역학, 3D, Studio 양식은 없다. 열응력은 같은 메시의 정상 열전도에서
+단방향으로만 온다: 역학 되먹임, 온도 의존 물성, 과도 온도, 외부에서 처방한 온도장은 없다(Python
+[과도](../galerkin/transient_thermal_mechanical.md)·[처방 온도](../galerkin/prescribed_temperature_thermoelasticity.md)
+흐름은 Python 전용). 구조적으로 유효한 모델도 수치적으로
 실패할 수 있다(비압축성에 가까운 평면변형률, 극단적 종횡비). 입력 검증 통과는 정확도 보증이 아니다.

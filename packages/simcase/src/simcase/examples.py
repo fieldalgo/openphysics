@@ -262,5 +262,5 @@ from .electric_examples import ELECTRIC_RECTANGLE, JOULE_RECTANGLE, JOULE_TEMPER
 EXAMPLES.update(electric_rectangle=ELECTRIC_RECTANGLE, joule_rectangle=JOULE_RECTANGLE,
                 joule_temperature=JOULE_TEMPERATURE)
 
-from .mechanics_examples import ELASTIC_PLATE
-EXAMPLES['elastic_plate'] = ELASTIC_PLATE
+from .mechanics_examples import ELASTIC_PLATE, THERMOELASTIC_BAR
+EXAMPLES.update(elastic_plate=ELASTIC_PLATE, thermoelastic_bar=THERMOELASTIC_BAR)
