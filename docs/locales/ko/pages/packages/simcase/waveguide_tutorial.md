@@ -102,7 +102,7 @@ print(" ".join(f"{n:.4f}" for n in solve(sloped)))
 
 ## 4. 재료
 
-재료 이름은 먼저 문서 자체의 `materials` 표에서, 그다음 내장 재료 18종에서
+재료 이름은 먼저 문서 자체의 `materials` 표에서, 그다음 내장 재료 19종에서
 찾습니다. 내장 재료에는 `Si`, `SiO2`, `Si3N4`, `LiNbO3`, `vacuum` 등이 있습니다.
 내장 재료는 분산을 담고 있어 sweep의 각 파장이 자기 굴절률을 씁니다. 내 재료는
 상수 굴절률이나 Sellmeier 계수로 줍니다. Sellmeier `C` 값의 단위는 문서 길이
@@ -125,7 +125,7 @@ print(f"{solve(nitride)[0]:.4f}")
 ```
 
 ```text
-18 built-in materials
+19 built-in materials
 1.6658
 ```
 
