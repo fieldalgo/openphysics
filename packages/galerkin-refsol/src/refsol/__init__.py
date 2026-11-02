@@ -22,13 +22,15 @@ material_cavity  complex resonances and Q of uniformly or slab-loaded lossy PEC 
 wall_loss   first-order conductor-loss Q of rectangular cavity modes, per wall
 bimetal     Timoshenko (1925) bimetal strip: curvature closed forms and exact plane-stress field
 thermal_convection  NAFEMS T4 convective rectangle: exact series and the published target
+bent_slab   constant-radius bent slab poles by complex-order Bessel/Hankel matching (needs the
+            optional mpmath package at call time; ImportError names it otherwise)
 joule_slab  steady 1D Joule heating with sigma = sigma0 (1 + alpha (T - T0)): closed form in
             erf/erfi for fixed face potentials and temperatures, current-driven root, fold
 """
 
 from . import (slab, lossy_slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity,
-               wall_loss, joule_slab)
+               wall_loss, joule_slab, bent_slab)
 
 __version__ = "0.1.0"
 __all__ = ["slab", "lossy_slab", "fiber", "metallic", "scattering", "benchmarks", "cavity",
-           "material_cavity", "wall_loss", "joule_slab"]
+           "material_cavity", "wall_loss", "joule_slab", "bent_slab"]
