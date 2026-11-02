@@ -46,6 +46,17 @@ if TYPE_CHECKING:
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
 
+#: Saved layout of ``em.modes2d`` results tracked per mode (``RunResult``): P1 nodal
+#: scalar fields, or vector edge/nodal coefficients with the electric field at
+#: triangle centroids. ``field_representation`` keeps naming the vector/PML
+#: representation; this identifier names the file layout the exporter reads.
+FIELD_LAYOUT = "em-modes2d-p1-node-centroid-v1"
+
+
+def _length_unit_record(doc: Document) -> dict:
+    """The declared length unit and its size in metres, for files that hold nodes in it."""
+    return {"mesh_length_unit": doc.length_unit, "length_unit_to_m": float(doc.scale.size("length"))}
+
 
 @dataclass
 class MeshedModel:
@@ -266,6 +277,8 @@ class RunResult:
         out = {
             "name": self.doc["name"],
             "units": copy.deepcopy(self.doc["units"]),
+            "field_layout": FIELD_LAYOUT,
+            **_length_unit_record(self.doc),
             "mesh": {"nodes": int(len(self.mesh_nodes)), "triangles": int(len(self.mesh_triangles)),
                      "regions": {n: self.region_materials[n] for n in self.region_names}},
             "study": {"parameter": self.parameter, "values": [float(v) for v in self.values]},
@@ -309,9 +322,13 @@ class RunResult:
         (outdir / "log.txt").write_text("\n".join(self.log) + "\n", encoding="utf-8")
         self.doc.save(outdir / "model.json")
         if self.doc["results"].get("save_fields", True):
+            # nodes are in the document length unit; mesh_length_unit names it and
+            # length_unit_to_m converts to metres. study_parameter is the swept path
+            # ("" for a single point) so a reader can tell a wavelength sweep apart.
             arrays = dict(nodes=self.mesh_nodes, triangles=self.mesh_triangles, regions=self.mesh_regions,
                           region_names=np.array(self.region_names), values=np.asarray(self.values, dtype=float),
-                          neff=self.neff)
+                          neff=self.neff, field_layout=FIELD_LAYOUT, **_length_unit_record(self.doc),
+                          study_parameter=self.parameter or "")
             if self.vector_fields is None:
                 arrays["fields"] = np.stack(self.fields)
             else:
