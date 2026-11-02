@@ -15,9 +15,10 @@ import numpy as np
 
 from .schema import DocumentError
 from .thermal import _OwnedOutput, require_fresh_output
+from .steady_boundary_contract import has_natural_conditions
 from .transient_thermal_contract import (
-    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, defaults, transient_solver_inputs, transient_thermal_summary,
-    validate_transient_thermal,
+    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, V1, V2, defaults, transient_solver_inputs,
+    transient_thermal_summary, validate_transient_thermal,
 )
 from .registry import PhysicsKind, register
 
@@ -37,6 +38,12 @@ _FIELD_SPEC = {
     'dirichlet_node_ids': ('1', 'dirichlet_nodes', 'static'),
     'dirichlet_temperatures_k': ('K', 'dirichlet_nodes', 'time_s'),
 }
+# Added by the boundary layout V2 (outward_flux_w_m2 or convection present): the
+# engine's per-step prescribed outward load G and convective outward C_n=H*T_n-B.
+_BOUNDARY_FIELD_SPEC = {
+    'prescribed_outward_load_w_per_m': ('W/m', 'nodes', 'time_s[1:]'),
+    'convective_outward_w_per_m': ('W/m', 'nodes', 'time_s[1:]'),
+}
 
 
 @dataclass(frozen=True)
@@ -49,15 +56,15 @@ class TransientThermalRunResult:
     The copied document is bound to its construction-time JSON snapshot: later
     value edits, including name/results, are refused. Set options before run.
     This detects ordinary document mutation, not hostile object reconstruction.
+    A document with ``outward_flux_w_m2`` or ``convection`` saves the pair
+    ``V2`` with two more per-step arrays; every other document saves ``V1``
+    exactly as before.
     """
     doc: object
     solution: object
     timings: dict
     log: tuple
     _document_json: str = field(init=False, repr=False, compare=False)
-    # Saved identifiers; the region-document result overrides them.
-    result_format = RESULT_FORMAT
-    field_layout = FIELD_LAYOUT
 
     def __post_init__(self):
         # Keep the existing input-lifetime guarantee for direct construction too.
@@ -77,8 +84,25 @@ class TransientThermalRunResult:
         if self._current_document_json() != self._document_json:
             raise ValueError('transient result document changed after run; rerun the model')
 
+    @property
+    def boundary_enabled(self):
+        """True when the document selects the boundary pair ``V2`` (key presence)."""
+        return has_natural_conditions(self.doc.sole_physics()[1])
+
+    # Saved identifiers; the region-document result overrides them with its own.
+    @property
+    def result_format(self):
+        return (V2 if self.boundary_enabled else V1)[0]
+
+    @property
+    def field_layout(self):
+        return (V2 if self.boundary_enabled else V1)[1]
+
+    def _field_spec(self):
+        return {**_FIELD_SPEC, **_BOUNDARY_FIELD_SPEC} if self.boundary_enabled else _FIELD_SPEC
+
     def __getattr__(self, name):
-        if name in _FIELD_SPEC:
+        if name in _FIELD_SPEC or (name in _BOUNDARY_FIELD_SPEC and self.boundary_enabled):
             return getattr(self.solution, name)
         raise AttributeError(name)
 
@@ -92,8 +116,8 @@ class TransientThermalRunResult:
 
     def _raw_arrays(self):
         # Freeze the values used by this save before writing any artifact.
-        arrays = {key: np.array(getattr(self.solution, key), copy=True)
-                  for key in _FIELD_SPEC}
+        spec = self._field_spec()
+        arrays = {key: np.array(getattr(self.solution, key), copy=True) for key in spec}
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'transient raw array {key}: expected finite real numeric values')
@@ -121,6 +145,9 @@ class TransientThermalRunResult:
                   'residual_w_per_m': (nt-1, n), 'storage_rate_w_per_m': (nt-1, n),
                   'heat_content_j_per_m': (nt,), 'quadratic_functional_jk_per_m': (nt,),
                   'dirichlet_temperatures_k': (nt, d)}
+        for key in _BOUNDARY_FIELD_SPEC:
+            if key in spec:
+                shapes[key] = (nt-1, n)
         for key, shape in shapes.items():
             if arrays[key].shape != shape:
                 raise ValueError(f'transient raw array {key}: expected shape {shape}')
@@ -150,13 +177,23 @@ class TransientThermalRunResult:
         source = arrays['source_load_w_per_m'].sum(axis=1)
         storage = arrays['storage_rate_w_per_m'].sum(axis=1)
         reaction = arrays['reaction_w_per_m'].sum(axis=1)
+        spec = self._field_spec()
+        boundary = self.boundary_enabled
+        if boundary:
+            # Returned engine terms: storage_n = f_n + reaction_n - G - C_n.
+            prescribed = arrays['prescribed_outward_load_w_per_m'].sum(axis=1)
+            convective = arrays['convective_outward_w_per_m'].sum(axis=1)
+            outward = prescribed+convective-reaction
+            defect = storage-source[1:]-reaction+prescribed+convective
+        else:
+            outward, defect = -reaction, storage-source[1:]-reaction
         result = {
             'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
             'result_format': self.result_format, 'field_layout': self.field_layout,
             'units': copy.deepcopy(self.doc['units']), 'mesh_length_unit': 'm',
-            'field_units': {key: spec[0] for key, spec in _FIELD_SPEC.items()},
-            'field_locations': {key: spec[1] for key, spec in _FIELD_SPEC.items()},
-            'field_time_axes': {key: spec[2] for key, spec in _FIELD_SPEC.items()},
+            'field_units': {key: s[0] for key, s in spec.items()},
+            'field_locations': {key: s[1] for key, s in spec.items()},
+            'field_time_axes': {key: s[2] for key, s in spec.items()},
             'field_shapes': {key: list(a.shape) for key, a in arrays.items()},
             'mesh': {'nodes': len(arrays['nodes_m']), 'triangles': len(arrays['triangles']),
                      'subdivisions': list(self.doc['mesh']['subdivisions'])},
@@ -169,18 +206,37 @@ class TransientThermalRunResult:
             'temperature_max_k': arrays['temperature_k'].max(axis=1).tolist(),
             'source_heat_w_per_m': source.tolist(),
             'storage_heat_w_per_m': storage.tolist(),
-            'outward_heat_w_per_m': (-reaction).tolist(),
-            'heat_balance_defect_w_per_m': (storage-source[1:]-reaction).tolist(),
+            'outward_heat_w_per_m': outward.tolist(),
+            'heat_balance_defect_w_per_m': defect.tolist(),
             'heat_content_j_per_m': arrays['heat_content_j_per_m'].tolist(),
             'quadratic_functional_jk_per_m': arrays['quadratic_functional_jk_per_m'].tolist(),
             'rate_time_s': times[1:].tolist(),
-            'reaction_sign': 'inward; outward thermostat heat = -sum(reaction)',
-            'balance_equation': 'sum(storage)=sum(source at step end)+sum(reaction)',
+        }
+        if boundary:
+            result.update({
+                'outward_flux_w_m2': copy.deepcopy(p.get('outward_flux_w_m2', {})),
+                'convection': copy.deepcopy(p.get('convection', {})),
+                'prescribed_outward_heat_w_per_m': prescribed.tolist(),
+                'convective_outward_heat_w_per_m': convective.tolist(),
+                'thermostat_outward_heat_w_per_m': (-reaction).tolist(),
+                'reaction_sign': 'inward thermostat contribution; thermostat outward = -sum(reaction)',
+                'outward_sign': 'total outward = sum(prescribed_outward_load + convective_outward - reaction)',
+                'balance_equation': 'sum(storage)=sum(source at step end)+sum(reaction)'
+                                    '-sum(prescribed_outward_load)-sum(convective_outward)',
+                'natural_condition': 'q.n = g_out + h*(T-T_ambient) on selected sides, sampled once; '
+                                     'time-independent',
+            })
+        else:
+            result.update({
+                'reaction_sign': 'inward; outward thermostat heat = -sum(reaction)',
+                'balance_equation': 'sum(storage)=sum(source at step end)+sum(reaction)',
+            })
+        result.update({
             'heat_content_definition': 'H=1^T M T; J/m, chosen zero at 0 K',
             'quadratic_functional_definition': 'V=0.5 T^T M T; J K/m; not stored heat',
             'save_fields': self.doc['results']['save_fields'],
             'timings_s': dict(self.timings),
-        }
+        })
         json.dumps(result, allow_nan=False)
         return result
 
@@ -249,6 +305,9 @@ def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
     solve_seconds = time.perf_counter()-started
     log = (doc.summary(), f'transient heat: {len(solution.time_s)} requested times; full histories retained',
            'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m')
+    if has_natural_conditions(p):
+        log += (f'boundary layout {V2[1]}: per-step prescribed outward load and convective '
+                'outward W/m depth; flux and convection sampled once',)
     result = TransientThermalRunResult(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log)
     result.summary()  # reject malformed/nonfinite results even when no save is requested
     if verbose:

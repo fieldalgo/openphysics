@@ -14,7 +14,7 @@
 
 ## 실행 경로와 한계
 
-Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직사각형 모델과 [영역 한도](../packages/simcase/thermal_studio.md#영역-문서) 안의 영역 모델을 지원합니다. 과도 열전도의 시간에 무관한 flux/Robin 변은 Python에서만 지원하며(JSON/CLI/Studio 제외) restart는 없습니다. 후속 역학 해석은 아래의 명시적 연계 경로를 사용하세요.
+Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직사각형 모델과 [영역 한도](../packages/simcase/thermal_studio.md#영역-문서) 안의 영역 모델을 지원합니다. 과도 열전도의 시간에 무관한 flux/Robin 변은 Python과 JSON/CLI에서 지원하며(Studio 제외) restart는 없습니다. 후속 역학 해석은 아래의 명시적 연계 경로를 사용하세요.
 
 ## 모델 문서와 사용 흐름
 

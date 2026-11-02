@@ -30,6 +30,11 @@ View변경이solver를다시실행하거나문서를바꾸지않습니다.
 재료 영역이 있는 과도 문서는 같은 route에서 별도 경로를 따르며
 [영역 문서](#영역-문서)에서 설명합니다.
 
+`outward_flux_w_m2`나 `convection`이 있는 headless 문서는 경계 layout
+`thermal2d-transient-p1-node-cell-boundary-v1`로 저장합니다([headless 가이드](thermal_transient2d.md#외향-열유속과-대류-변)).
+과도 validate·run route는 키 존재만으로 검증·실행 전에 거절하며(`unsupported_physics`,
+HTTP 400, job 없음) capability는 v1 쌍만 유지합니다. 이런 문서는 headless로 실행하세요.
+
 ## 사용자 흐름
 
 일치하는runtime패키지와선택적Studio extra설치뒤저장소루트에서시작합니다.
