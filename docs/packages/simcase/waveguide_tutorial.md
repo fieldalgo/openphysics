@@ -106,7 +106,7 @@ print(" ".join(f"{n:.4f}" for n in solve(sloped)))
 ## 4. Materials
 
 A material name is looked up first in the document's own `materials` table, then
-in the 18 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and
+in the 19 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and
 `vacuum`. Built-in materials carry their dispersion, so each wavelength of a
 sweep uses its own index. For your own material give a constant index or
 Sellmeier coefficients. Sellmeier `C` values are in the document's length unit
@@ -129,7 +129,7 @@ print(f"{solve(nitride)[0]:.4f}")
 ```
 
 ```text
-18 built-in materials
+19 built-in materials
 1.6658
 ```
 
