@@ -16,7 +16,7 @@
 | 문제 | 진입점 | 계약·검증 | 예제 |
 |---|---|---|---|
 | 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
-| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [도파관 정식화](waveguide_formulation.md), [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
