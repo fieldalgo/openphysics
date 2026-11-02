@@ -1,7 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Vacuum PEC box resonances near a specified frequency, with SI output.
+"""Vacuum PEC resonances near a specified frequency, with SI output.
+
+``solve_cavity_box`` builds its own alternating Kuhn box; ``solve_cavity`` takes
+any tetrahedral mesh of the format in docs/packages/galerkin/mesh3d_format.md
+and applies PEC on the tagged faces named (all of them by default). Both share
+the assembly, the gradient-kernel projection and the search below.
 
 Derivatives
 -----------
@@ -29,7 +34,9 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 from .mesh3d import Mesh3D
-from ._cavity_common import C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh
+from ._cavity_common import (C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, cavity_mesh,
+                             face_edge_ids, face_tags, gradient_incidence, gradient_potentials,
+                             normalized_mesh, refuse_live_mesh_inputs, search_parameters)
 from .edge3d import (LOCAL_EDGES, EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
                      eval_edge_field_3d)
 from .core.tets import tet_gradients
@@ -68,23 +75,21 @@ class CavityResult:
     search: str = "near_target"
     cluster_completeness: str = "not_certified"
     mode_count_policy: str = "exact_count_may_split_cluster"
+    pec_face_tags: tuple = ()
+    gradient_kernel_dimension: int = 0
 
 
-def _gradient_space(space, free, mass):
-    """Interior nodal gradients in the PEC-constrained edge space.
+def _gradient_space(space, free, mass, unit_nodes, components):
+    """Nodal gradients in the PEC-constrained edge space (``_cavity_common`` docstring).
 
-    C maps nodal potentials (zero on the boundary) to edge circulations.
-    The kernel on this simply connected box has exactly one dimension per
-    interior node. C^T M C is positive definite, even though curl-curl is singular.
+    C maps the potential basis (unit potentials on unconstrained nodes plus the
+    indicators of the further PEC components) to edge circulations. On the PEC
+    box that is one dimension per interior node. C^T M C is positive definite,
+    even though curl-curl is singular.
     """
-    mesh = space.mesh
-    interior = np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary_nodes())
-    incidence = sp.coo_matrix(
-        (np.tile([-1.0, 1.0], len(free)),
-         (np.repeat(np.arange(len(free)), 2), space.edges[free].ravel())),
-        shape=(len(free), mesh.num_nodes)).tocsc()[:, interior]
+    incidence = gradient_incidence(space, free, unit_nodes, components)
     mass_gradient = mass @ incidence
-    factor = spla.splu((incidence.T @ mass_gradient).tocsc()) if len(interior) else None
+    factor = spla.splu((incidence.T @ mass_gradient).tocsc()) if incidence.shape[1] else None
     return incidence, mass_gradient, factor
 
 
@@ -195,11 +200,55 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
             or not np.isfinite(reciprocal_lengths).all()):
         raise ValueError("box lengths and target exceed the supported floating-point range")
 
-    normalized_mesh = cavity_mesh(normalized_lengths, cells)
-    space = EdgeSpace3D(normalized_mesh)
+    mesh = cavity_mesh(normalized_lengths, cells)
+    space = EdgeSpace3D(mesh)
     pec = space.boundary_edge_ids()
-    free = np.setdiff1d(np.arange(space.num_edges), pec)
+    interior = np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary_nodes())
     interior_count = int(np.prod(np.asarray(cells, dtype=object) - 1))
+    mesh_si = Mesh3D(mesh.nodes * length_scale, mesh.tets.copy(), mesh.boundary, mesh.regions,
+                     mesh.region_names, tagged_faces=mesh.tagged_faces)
+    return _solve_cavity_numpy(space, pec, interior, [], interior_count, count, target, sigma,
+                               fundamental, length_scale, eigenvalue_scale, field_scale, mesh_si,
+                               tuple(mesh.tagged_faces))
+
+
+def solve_cavity(mesh, *, pec_faces=None, num_modes=6, target_frequency_hz) -> CavityResult:
+    """Solve a vacuum cavity on an external tetrahedral mesh with PEC on tagged faces.
+
+    mesh: a ``galerkin.Mesh3D`` with tagged outward faces (``from_mesher`` of a
+        meshine or gmshio mesh, or ``box_mesh``), coordinates in metres; it is
+        checked against docs/packages/galerkin/mesh3d_format.md.
+    pec_faces: face tag names that carry the perfect conductor; None means every
+        tagged face. Faces left out are natural (perfect magnetic conductor).
+    num_modes, target_frequency_hz: as in ``solve_cavity_box``.
+
+    The mesh is scaled by its longest bounding-box edge, assembled, searched and
+    checked exactly as the box solver does, including the projection onto the
+    complement of the discrete gradient kernel, whose dimension is counted from
+    the PEC surface (``_cavity_common``) and verified by the dense path. The
+    kernel cutoff is relative to the lowest resonance of the bounding box.
+    NumPy only: JAX or PyTorch values raise TypeError; derivatives with respect
+    to the geometry exist only on ``solve_cavity_box``. The returned mesh is the
+    one given.
+    """
+    refuse_live_mesh_inputs("solve_cavity", target_frequency_hz, num_modes)
+    scaled, length_scale, lengths = normalized_mesh(mesh, "solve_cavity")
+    tags = tuple(scaled.tagged_faces) if pec_faces is None else face_tags(scaled, pec_faces, "pec_faces")
+    count, target, sigma, fundamental, eigenvalue_scale, field_scale = search_parameters(
+        lengths, length_scale, target_frequency_hz, num_modes)
+    space = EdgeSpace3D(scaled)
+    faces = scaled.faces_tagged(*tags)
+    pec = face_edge_ids(space, faces)
+    unit_nodes, components, kernel_count = gradient_potentials(scaled, faces)
+    return _solve_cavity_numpy(space, pec, unit_nodes, components, kernel_count, count, target,
+                               sigma, fundamental, length_scale, eigenvalue_scale, field_scale,
+                               mesh, tags)
+
+
+def _solve_cavity_numpy(space, pec, unit_nodes, components, interior_count, count, target, sigma,
+                        fundamental, length_scale, eigenvalue_scale, field_scale, mesh_si, tags):
+    """Assembly, search and checks on a normalized mesh; shared by both entry points."""
+    free = np.setdiff1d(np.arange(space.num_edges), pec)
     physical_count = len(free) - interior_count
     if count > physical_count:
         raise RuntimeError(f"requested {count} modes but this PEC mesh has only "
@@ -209,7 +258,8 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
     kernel_cutoff = 1e-8 * fundamental  # independent of the requested target
 
     try:
-        gradient, mass_gradient, gradient_lu = _gradient_space(space, free, mass)
+        gradient, mass_gradient, gradient_lu = _gradient_space(space, free, mass, unit_nodes,
+                                                               components)
         if len(free) <= DENSE_LIMIT:
             values, vectors = la.eigh(stiffness.toarray(), mass.toarray())
             if np.count_nonzero(np.abs(values) <= kernel_cutoff) != interior_count:
@@ -272,8 +322,6 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
     coefficients = np.zeros((space.num_edges, count))
     coefficients[free] = vectors
     electric = np.stack([eval_edge_field_3d(space, coefficients[:, j]) for j in range(count)])
-    mesh_si = Mesh3D(normalized_mesh.nodes * length_scale, normalized_mesh.tets.copy(),
-                     normalized_mesh.boundary, normalized_mesh.regions, normalized_mesh.region_names)
     eigenvalues = values * eigenvalue_scale
     frequencies = (C0 / (2 * np.pi)) * np.sqrt(eigenvalues)
     coefficients /= np.sqrt(length_scale)
@@ -281,4 +329,5 @@ def _solve_cavity_box_numpy(lengths_m, subdivisions, *, num_modes, target_freque
     if not all(np.isfinite(array).all() for array in (eigenvalues, frequencies, coefficients, electric)):
         raise RuntimeError("cavity SI output exceeds the supported floating-point range")
     return CavityResult(mesh_si, EdgeSpace3D(mesh_si), frequencies, eigenvalues,
-                        coefficients, electric, residuals, pec, count, target)
+                        coefficients, electric, residuals, pec, count, target,
+                        pec_face_tags=tuple(tags), gradient_kernel_dimension=int(interior_count))
