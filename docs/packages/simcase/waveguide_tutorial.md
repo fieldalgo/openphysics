@@ -246,14 +246,28 @@ from step 1:
 
 | File | Contents |
 |---|---|
-| `summary.json` | n_eff per study point and mode, group index, declared units, mesh statistics, timings, mode tracking |
-| `fields.npz` | mesh nodes and triangles, the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids; load with `numpy.load(..., allow_pickle=False)` |
+| `summary.json` | n_eff per study point and mode, group index, declared units, the saved layout `field_layout` with `mesh_length_unit` and `length_unit_to_m`, mesh statistics, timings, mode tracking |
+| `fields.npz` | mesh nodes and triangles (in the document unit), the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids; load with `numpy.load(..., allow_pickle=False)` |
 | `results.png` | mesh, the first mode's \|E\| and the sweep |
 | `log.txt`, `model.json` | the run log and the exact document that was run |
 
 Field amplitudes are relative (the largest centroid \|E\| is 1), not watts or
 volts per metre. The [package overview](overview.md#vector-fields-and-single-point-studies)
 describes the arrays.
+
+To look at the modes in ParaView, install `simcase[export]` and write one VTU
+per wavelength plus a `.pvd` collection into a new directory:
+
+```python
+from simcase.export import export_sweep
+export_sweep("strip_results/fields.npz", "strip_results/paraview")
+```
+
+The collection's timestep is the wavelength in the document unit; the points
+are in metres, and each VTU holds `electric_field_mode_0_real`/`_imag` (cell
+data at centroids), `longitudinal_electric_mode_0_real`/`_imag` (point data)
+and `triangle_regions`. A single-point result goes through `export_fields`
+instead; see [viewing in ParaView](overview.md#viewing-in-paraview).
 
 ## 8. The same model in Studio
 
