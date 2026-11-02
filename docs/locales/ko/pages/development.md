@@ -220,7 +220,9 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 코드가 정해 둔 것과 다르거나 단계가 실패할 때만 실패합니다. 관측 도구는
 `tools/studio_resources/`에 있고, 과도 관측 도구는 [과도 자원 관측 안내](transient_resource_probe.md)가,
 영역 관측은 [영역 자원 관측](region_resource_probe.md)이 설명합니다. 솔버 시간 측정과 프로파일링 명령은
-[벡터](benchmark_vector.md)·[공동](benchmark_cavity.md) 벤치마크 안내에 있습니다.
+[벡터](benchmark_vector.md)·[공동](benchmark_cavity.md)·[열전도](benchmark_thermal.md)·
+[탄성](benchmark_elasticity.md)·[전기](benchmark_electric.md)·[미분](benchmark_derivatives.md)
+벤치마크 안내에 있습니다.
 
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
