@@ -1,5 +1,7 @@
 # Vector eigenspace reliability
 
+[한국어](../../locales/ko/pages/packages/galerkin/eigenspace_reliability.md)
+
 `solve_modes` returns complex `et` and `ez` arrays. The physical fields are
 `E_t = et` (edge line integrals) and `E_z = 1j * ez` (nodal values).
 Reconstruct the original pencil vector as `[beta * et; ez]`, with
