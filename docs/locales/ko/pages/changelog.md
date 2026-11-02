@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `solve_transient_heat`가 정상 솔버와 같은 입력 형식·부호의 `outward_flux`·`convection`을 받습니다(변 태그별 scalar 또는 callback(points, normals), 한 번 표본화하는 시간 무관 데이터; 시간 callback은 거절). 시스템은 M/dt+K+H이며 결과에 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`이 추가됩니다(경계 데이터가 없으면 None; Dirichlet 전용 이력은 비트 단위로 동일). 새 `refsol.transient_heat_robin` 대류·상수 열유속 slab 급수. 기준: slab 공간 차수 ≥1.8, 시간 차수 ≥0.9, `solve_steady_heat`와 장시간 일치 ≤1e-8, 단계별 열수지 ≤1e-10. [문서](packages/galerkin/transient_heat.md).
+
 - `galerkin`: `triangle_geometry`가 검증 결과를 메시 내용 기준으로 캐시하고(8개 LRU, 복사본 반환) 겹침·엣지 표·정점 팬·매달린 노드 검사를 벡터화했으며, 경계 샘플러는 캐시된 엣지 표를 조회합니다. 판정과 솔버 결과는 비트 단위로 그대로이고(결과 배열 660개·거부 메시 15개로 확인), Linux에서 정상 열 n=64가 2.0 s→0.46 s, 열저항 Picard n=16이 6.2 s→0.22 s입니다. [문서](packages/galerkin/overview.md#메시-검증-캐시).
 
 - `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
