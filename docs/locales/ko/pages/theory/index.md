@@ -14,6 +14,7 @@
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
 - [벡터 고유공간 신뢰성](../packages/galerkin/eigenspace_reliability.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
+- [도파관 정식화: 모드, 미분, 연성, SI/PI 경로](../packages/galerkin/waveguide_formulation.md)
 
 ## 열·전기전도
 
