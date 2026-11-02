@@ -42,6 +42,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
 - `galerkin`: `solve_cavity`·`solve_material_cavity`가 외부 사면체 메시(meshine, gmshio)에서 면 태그별 PEC·임피던스 벽과 영역별 재료로 공진기를 풉니다. gradient kernel은 구속 표면에서 셉니다. 상자 솔버는 비트 단위로 동일하고 메시 변형에는 미분 경로가 없습니다. [문서](packages/galerkin/cavity_solver.md#외부-메시), [재료 공진기](packages/galerkin/material_cavity.md#외부-메시).
 - `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, 영역별 열전도율·열원, Dirichlet 면과 단열, W 단위 열수지 검사를 갖는 사면체 메시의 P1 정상 열전도; `refsol.thermal3d` 기준해. [문서](packages/galerkin/thermal3d.md).
+- `galerkin`: `triangle_geometry`가 검증 결과를 메시 내용 기준으로 캐시하고(8개 LRU, 복사본 반환) 겹침·엣지 표·정점 팬·매달린 노드 검사를 벡터화했으며, 경계 샘플러는 캐시된 엣지 표를 조회합니다. 판정과 솔버 결과는 비트 단위로 그대로이고(결과 배열 660개·거부 메시 15개로 확인), Linux에서 정상 열 n=64가 2.0 s→0.46 s, 열저항 Picard n=16이 6.2 s→0.22 s입니다. [문서](packages/galerkin/overview.md#메시-검증-캐시).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
