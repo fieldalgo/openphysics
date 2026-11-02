@@ -41,6 +41,7 @@
 
 ## simcase 계약
 
+- [형상 문서: 0단계 계약(초안, 미구현)](../packages/simcase/geometry_document.md)
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
