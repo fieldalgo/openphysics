@@ -31,7 +31,7 @@ python -m simcase run model.json                          # -> model_results/
 | `joule.temperature2d` | 온도 의존 정상 Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | 영역이 있는 `thermal.steady2d` | 이름 있는 재료 영역의 정상 열전도: 배경 위 도형, 재료 표, 영역 경계를 따르는 메시 | `thermal_regions` | [영역 문서](thermal_regions2d.md) |
-| `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열 | `transient_thermal_uniform` | [과도 열전도](thermal_transient2d.md) |
+| `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `transient_thermal_uniform`, `transient_thermal_boundary` | [과도 열전도](thermal_transient2d.md) |
 | 영역이 있는 `thermal.transient2d` | 이름 있는 재료 영역의 과도 열전도, 재료별 열전도율·열용량 | `transient_thermal_regions` | [영역 문서](thermal_regions2d.md) |
 
 Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료 영역이 있는(Studio 영역 한도 안의) 정상·과도 열전도 문서의 전용 화면을 제공하며, 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
@@ -184,7 +184,7 @@ result = solve_point(model, doc.sole_physics()[1])
 
 [thermal.steady2d 계약](thermal_steady2d.md)은 명시 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 지지 열 반력은 안쪽 방향이며 그 음수가 온도 고정부의 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 외향 열유속·대류, v2 metadata와 raw 배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 v1을 유지합니다. Dirichlet이 비어 있으면 양의 Robin 고정이 필요합니다. 입력 Kelvin은 음이 아니어야 하며, 계산된 유한 음의 온도는 clamp하지 않습니다.
 
-[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1, 일관 질량/후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/표본 Dirichlet 값과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환합니다. 결과는 Nt개 frame, Nt-1개 rate, SI 단위와 버전 metadata를 갖는 JSON/비객체 NPZ 이력으로 저장합니다. 초기값을 projection하지 않고 음의 K를 clamp하지 않습니다. 과도 열유속/Robin, restart, 자동 연성은 지원하지 않습니다.
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1, 일관 질량/후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/표본 Dirichlet 값과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환합니다. 결과는 Nt개 frame, Nt-1개 rate, SI 단위와 버전 metadata를 갖는 JSON/비객체 NPZ 이력으로 저장합니다. 초기값을 projection하지 않고 음의 K를 clamp하지 않습니다. 상수 외향 열유속·대류 변(정상 계약과 같은 키)은 step별 하중 배열 두 개를 더한 `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1` 쌍으로 저장합니다. 시간 의존 열유속/Robin, restart, 자동 연성은 지원하지 않습니다.
 
 ### 저장 출력
 
@@ -196,8 +196,9 @@ result = solve_point(model, doc.sole_physics()[1])
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 직사각형 정상
 열전도(Dirichlet·단열 변, 또는 열유속·대류 변이 있는 `boundary-v2` 배치와 그 절점 배열
 `prescribed_outward_load`, `ambient_load`, `convective_outward`, `system_rhs`), 직사각형 과도
-열전도(저장된 시각 하나, `time_index`, 기본값은 마지막), 진공 PEC 공진기 장을 VTU 사본으로
-씁니다. 정상·과도 재료 영역 배치도 지원하며 정수 셀 데이터 `triangle_regions`와 저장된 정상
+열전도(저장된 시각 하나, `time_index`, 기본값은 마지막; 열유속·대류 변이 있는
+`transient-p1-node-cell-boundary-v1` 배치는 step별 `prescribed_outward_load`·`convective_outward`
+배열을 더함), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 정상·과도 재료 영역 배치도 지원하며 정수 셀 데이터 `triangle_regions`와 저장된 정상
 flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예제는
 [영역 내보내기](thermal_regions2d.md#vtu와-pvd-내보내기)를 참고하세요. 전기 전도·Joule 결과
 (`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`의 배치)는
