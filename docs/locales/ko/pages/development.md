@@ -226,6 +226,33 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
 실행을 대체합니다.
 
+### 최신 의존성 카나리
+
+`Latest dependencies` 워크플로(`.github/workflows/latest-deps.yml`)는 하루 한 번(21:47 UTC)과
+수동 실행에서 돕니다. 필수 검사 `tests`에 **들어가지 않으며** PR이나 `main`을 막지 않습니다.
+고정 환경이 제공하는 extra(`galerkin[test,figures,jax,torch,crosscheck]`, `galerkin-refsol[test]`,
+`meshine[test,plot]`, `meshloom[test]`, `gmshio[test,gmsh,plot]`, `physmat[test,rii,plot]`,
+`simcase[test,studio,export]`, `sipi[test]`)와 함께 패키지 여덟 개를 고정 requirements 없이,
+`--no-deps` 없이 editable로 설치하므로 pip이 `pyproject.toml` 범위 안에서 가장 새 버전을
+고릅니다. PyTorch CPU 인덱스는 버전 고정 없이 추가 인덱스로 쓰며, 설치된 torch가 `+cpu`
+빌드인지 확인합니다. meshloom은 pyproject가 허용하는 가장 새 maturin으로 빌드하되 Rust
+crate는 `Cargo.lock`에 고정합니다(`--locked`). 이어서 `python -m pip check`, 라이선스 검사(검토
+목록에 없는 새 전이 의존성이 있으면 실패하며, 그것이 이 검사의 목적 중 하나입니다), Linux
+job과 같은 사전 검사 묶음, 고정 RII 데이터베이스와 필수 레퍼런스 교차 검사를 포함한
+non-slow 시험, `blas-kernels` 파일 목록을 강제 OpenBLAS 커널 두 개로 돌립니다. 설치가
+성공하면 앞 단계가 실패해도 각 검사는 그대로 돌아서 한 실패가 다른 실패를 가리지
+않습니다. `pip freeze`는 step summary에 적고, 라이선스 보고서·JUnit 파일과 함께
+`latest-deps-results` 아티팩트로 올립니다. 돌리지 않는 것: Studio Node 검사(Node는 워크플로가
+고정하고 pip이 고르지 않으므로 여기서 바뀔 수 없음), 배포물 빌드, meshloom의 Cargo 시험과
+notices, slow 연구.
+
+예약 실행이나 수동 실행이 실패하면 **Latest dependencies canary failed** 이슈를 열고, 이미
+열려 있으면 그 이슈에 댓글을 남깁니다. 본문에는 실행 URL과 주요 패키지의 해석된 버전을
+고정 버전과 나란히 적습니다. 통과한 실행은 그 이슈를 닫습니다. 취소된 실행(90분 제한에
+걸려 멈춘 실행 포함)은 보고하지 않습니다. 카나리는 미리 알리는 신호이지 커밋에 대한
+판정이 아닙니다. `tools/requirements-py312-linux*.txt`의 고정 버전은 여전히 소스·배포 검사를
+다시 돌리는 검토된 변경에서 의도적으로 올립니다.
+
 ## 결과 읽기
 
 각 job은 실패해도 artifact를 올립니다.
