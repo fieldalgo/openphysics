@@ -372,14 +372,24 @@ for its save and platform limits.
 
 With the optional extra `pip install "simcase[export]"` (meshio, MIT),
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
-copy of saved rectangular steady heat with Dirichlet and insulated sides,
-rectangular transient heat (one stored time, `time_index`, default the last)
-and vacuum PEC cavity fields. Steady/transient material-region layouts are
+copy of saved rectangular steady heat (Dirichlet and insulated sides, or the
+`boundary-v2` layout with flux/convection sides and its nodal
+`prescribed_outward_load`, `ambient_load`, `convective_outward` and `system_rhs`
+arrays), rectangular transient heat (one stored time, `time_index`, default the
+last) and vacuum PEC cavity fields. Steady/transient material-region layouts are
 also supported, with integer cell data `triangle_regions` and the saved
 steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
-for units, the region-name mapping and an example. Rectangular steady documents
-with flux/convection sides (`boundary-v2`), lossy cavities and `em.modes2d`
-results are refused as an unsupported field layout. 2D meshes get z = 0. `fields.npz` stays
+for units, the region-name mapping and an example. Electric conduction and Joule
+results (`electric-joule2d-p1-v1`, the layout of `electric.steady2d`,
+`joule.steady2d` and `joule.temperature2d`) export point data `potential_v` with
+the nodal electric load, reaction, prescribed outward current and residual
+arrays, and cell data `electric_field_v_m`, `current_density_a_m2`,
+`conductivity_s_m` and `joule_heating_w_m3`; a Joule result adds `temperature_k`,
+its nodal heat arrays and cell `heat_flux_w_m2`, and `joule.temperature2d` adds
+`evaluated_temperature_k`. Arrays keep their saved names and unit suffixes;
+Dirichlet node lists and the summary are not copied. Lossy cavities and
+`em.modes2d` results are refused as an unsupported field layout. 2D meshes get
+z = 0, and 2D vectors a zero z component. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
 because meshio's XDMF writer needs h5py.

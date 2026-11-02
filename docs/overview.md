@@ -75,9 +75,8 @@ time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#
   mechanics and geometry sweeps are not supported.
 - Studio rejects 3D models, takes heat documents with material regions only
   within its region limits, and has no mechanics forms.
-- The VTU export rejects rectangular steady documents with flux or convection
-  sides (`boundary-v2`), lossy cavities and waveguide modes. Steady region
-  documents include their flux/Robin load arrays.
+- The VTU export rejects lossy cavities and waveguide modes. Steady heat and
+  Joule documents include their flux/Robin load arrays.
 
 ## Packages
 

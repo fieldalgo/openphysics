@@ -79,11 +79,12 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | 저장 layout 계열 | VTU / PVD |
 |---|---|
 | Dirichlet·단열 직사각형 정상 열 | VTU |
-| flux/convection 직사각형 정상 열 (`boundary-v2`) | 미지원 |
+| flux/convection 직사각형 정상 열 (`boundary-v2`), 하중 배열 포함 | VTU |
 | flux/Robin 필드를 포함한 정상 재료 영역 열 | VTU |
 | 직사각형·영역 과도 열 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
 | 진공 PEC 공동 | VTU |
-| 손실 공동·도파관 모드·전기/Joule 결과 | 이 exporter에서는 미지원 |
+| 전기 전도·Joule 가열 (`electric-joule2d-p1-v1`) | VTU |
+| 손실 공동·도파관 모드 | 이 exporter에서는 미지원 |
 
 영역 경로와 직사각형 boundary-v2 경로는 물리 조건이 비슷해도 layout이 다릅니다.
 내보내기 미지원이 해석 실패를 뜻하지는 않습니다. 정확한 범위와 해석은
