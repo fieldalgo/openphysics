@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: `solve_transient_heat`가 정상 솔버와 같은 입력 형식·부호의 `outward_flux`·`convection`을 받습니다(변 태그별 scalar 또는 callback(points, normals), 한 번 표본화하는 시간 무관 데이터; 시간 callback은 거절). 시스템은 M/dt+K+H이며 결과에 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`이 추가됩니다(경계 데이터가 없으면 None; Dirichlet 전용 이력은 비트 단위로 동일). 새 `refsol.transient_heat_robin` 대류·상수 열유속 slab 급수. 기준: slab 공간 차수 ≥1.8, 시간 차수 ≥0.9, `solve_steady_heat`와 장시간 일치 ≤1e-8, 단계별 열수지 ≤1e-10. [문서](packages/galerkin/transient_heat.md).
+
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
