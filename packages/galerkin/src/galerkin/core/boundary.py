@@ -7,6 +7,34 @@ import numpy as np
 
 from .backend import is_live, lift, namespace, scatter_add, to_numpy
 from .checks import real_array, real_value
+from .triangles import edge_table
+
+
+class _EdgeOwners:
+    """Owner lookup of mesh edges from the content-cached edge table: ``owners[(a, b)]``.
+
+    Replaces the dict every call used to build over all triangles. ``slot`` is
+    the flat 3*triangle+local edge index of the lowest triangle containing the
+    edge, so the triangle is ``slot // 3`` and its opposite vertex
+    ``(slot % 3 + 2) % 3``; ``count`` how many triangles contain the edge, 0 for
+    a pair of nodes that is no edge.
+    """
+
+    def __init__(self, triangles, nodes):
+        self.triangles = np.asarray(triangles)
+        self.nodes = nodes
+        edges, counts, slots = edge_table(self.triangles, nodes)
+        self.keys = edges[:, 0]*nodes+edges[:, 1]
+        self.counts = counts
+        self.first = slots[np.concatenate(([0], np.cumsum(counts)[:-1]))]
+
+    def lookup(self, a, b):
+        """(count, slot) of the edge with sorted ends a <= b."""
+        key = a*self.nodes+b
+        index = np.searchsorted(self.keys, key)
+        if index == len(self.keys) or self.keys[index] != key:
+            return 0, -1
+        return int(self.counts[index]), int(self.first[index])
 
 
 def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *, live=False):
@@ -19,10 +47,7 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *,
     or PyTorch constant or callback result stays in its library (otherwise it
     is refused); sampled values are then arrays of that library.
     """
-    owners = {}
-    for cell, tri in enumerate(t):
-        for a, b in ((0, 1), (1, 2), (2, 0)):
-            owners.setdefault(tuple(sorted((int(tri[a]), int(tri[b])))), []).append(cell)
+    owners = _EdgeOwners(t, len(p))
     x, w = np.polynomial.legendre.leggauss(4)
     x, w = (x+1)/2, w/2
     shape = np.column_stack((1-x, x))
@@ -48,8 +73,8 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *,
                 if key in seen:
                     raise ValueError(f"duplicate {kind} edge, including reversed/tag duplicates")
                 seen.add(key)
-                cells = owners.get(key, [])
-                if len(cells) != 1:
+                count, slot = owners.lookup(*key)
+                if count != 1:
                     raise ValueError("selected edge must have exactly one incident triangle")
                 if int(a) in prescribed and int(b) in prescribed:
                     raise ValueError("natural condition overlaps a fully Dirichlet edge")
@@ -58,7 +83,7 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *,
                 if not np.isfinite(length) or length <= 0:
                     raise ValueError("boundary edge must have finite positive length")
                 n = np.array([v[1], -v[0]])/length
-                if n@(p[t[cells[0]]].mean(axis=0)-(p[a]+p[b])/2) > 0:
+                if n@(p[t[slot//3]].mean(axis=0)-(p[a]+p[b])/2) > 0:
                     n = -n
                 normals.append(n)
             points = np.einsum("qa,ead->eqd", shape, p[edges])
@@ -108,11 +133,7 @@ def traction_load(mesh, p, triangles, traction, *, live=False):
         return load.ravel()
     if not isinstance(mesh.boundary_edges, Mapping):
         raise ValueError("traction requires mesh.boundary_edges")
-    owners = {}
-    for tri in triangles:
-        for a, b, c in ((tri[0], tri[1], tri[2]), (tri[1], tri[2], tri[0]),
-                        (tri[2], tri[0], tri[1])):
-            owners.setdefault(tuple(sorted((int(a), int(b)))), []).append(int(c))
+    owners = _EdgeOwners(triangles, len(p))
     selected, seen = [], set()
     # Validate the complete selection before evaluating any user callbacks.
     for tag, field in traction.items():
@@ -129,12 +150,13 @@ def traction_load(mesh, p, triangles, traction, *, live=False):
             key = tuple(sorted((int(a), int(b))))
             if a == b:
                 raise ValueError("traction edge must have nonzero length")
-            if key not in owners or len(owners[key]) != 1:
+            count, slot = owners.lookup(*key)
+            if count != 1:
                 raise ValueError("traction edges must be exterior triangle edges with one owner")
             if key in seen:
                 raise ValueError("duplicate traction edge within or between selected tags")
             seen.add(key)
-            opposite.append(owners[key][0])
+            opposite.append(int(owners.triangles[slot//3, (slot % 3+2) % 3]))
         selected.append((edges, np.asarray(opposite), field))
     z, w = np.polynomial.legendre.leggauss(4)
     s, weights = (z+1)/2, w/2
