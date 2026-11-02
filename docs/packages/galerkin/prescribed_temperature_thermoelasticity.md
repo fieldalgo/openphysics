@@ -182,8 +182,9 @@ material/alpha or piecewise-constant alpha/E/nu on named regions
 nodal-P1 T only. The criteria above describe the homogeneous material.
 Near-incompressible plane strain can lock; nu approaching .5 is not cured by
 validation. No nonlinear/large-strain/contact/dynamics/3D/thermal conduction,
-dedicated scalar-pressure/local-frame/follower APIs, material-temperature dependence, cross-mesh transfer,
-simcase or Studio integration is included. Boundary tags do not certify units
+dedicated scalar-pressure/local-frame/follower APIs, material-temperature dependence, cross-mesh transfer
+or Studio integration is included; the [thermoelastic document](../simcase/mechanics2d.md)
+exposes only the steady-heat-driven rectangle subset. Boundary tags do not certify units
 or provenance. Callable body forces are integrated numerically, so highly
 oscillatory inputs require an independently adequate mesh/quadrature.
 
