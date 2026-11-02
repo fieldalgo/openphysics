@@ -1,0 +1,84 @@
+# Reading version 1 geometry (stage 1)
+
+**English** | [한국어](../../locales/ko/pages/packages/simcase/geometry_reader.md)
+
+[Documentation home](../../README.md)
+
+`simcase.geometry_document` reads the version 1 `geometry` block defined by the
+[geometry document contract](geometry_document.md). It is stage 1 of that
+contract: it parses, validates and quantizes, and it hands geometry to the
+existing builders. No runner reads version 1 documents yet; that waits for the
+JSON contract decision.
+
+```python
+from simcase.geometry_document import parse, to_v02, from_v02, layer_stack
+
+model = parse({"units": {"length": "nm"}, "geometry": {
+    "version": 1,
+    "parameters": {"w": {"value": 500}, "t": {"value": 220}},
+    "components": {"xs": {
+        "dimension": "2d",
+        "domain": {"xmin": -1500, "xmax": 1500, "ymin": -1200, "ymax": 1200},
+        "background": {"material": "SiO2"},
+        "features": [{"name": "core", "type": "rect", "x": "-w/2", "y": 0,
+                      "w": "w", "h": "t", "material": "Si"}]}}}})
+model.components["xs"].features[0].data   # {'x': -250000, 'y': 0, 'w': 500000, 'h': 220000} (pm)
+model.roundings                          # [] : every value was already on the 1 pm grid
+to_v02(model)                            # the 0.2 geometry block, in nm
+```
+
+## What it does
+
+- **Validation.** Names, ids, the reserved ids and keywords, duplicate names,
+  region merges with different materials, simple polygons, positive sizes and
+  selector syntax. Every refusal is a `GeometryError` that names the JSON path.
+- **Expressions.** Parameter values and geometry fields may be expressions with
+  `+ - * /`, parentheses, decimal literals and parameter names. They are evaluated
+  in exact rational arithmetic with the contract's kind rules.
+- **The 1 pm grid.** Every defining value becomes an integer number of pm. A value
+  that is not already on the grid is rounded half to even, once, and listed in
+  `model.roundings` with its path, the written value and the displacement.
+- **Small features.** A feature smaller than the mesher's relative tolerance
+  (3 × 10⁻⁸ of the component's bounding-box diagonal) is refused by name instead
+  of vanishing in the mesh. Meshing such multi-scale geometry is not supported.
+- **0.2 documents.** `from_v02` writes a 0.2 `geometry` block as version 1 and
+  `to_v02` compiles a 2D component, or a box-only 3D component, back. The 0.2
+  builder still resolves the later-wins booleans with shapely; the exact 2D engine
+  of stage 2 replaces it. A trapezoid becomes the polygon of its exact corners.
+- **Layer stacks.** `layer_stack` turns a `layers` feature into the z levels (pm)
+  and the region × layer table that `meshine.extrude` takes. A cell is named by its
+  explicit `region`, otherwise by its material.
+
+```python
+stack = layer_stack(model, "pkg")
+mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
+                       stack.table_for(footprint.region_names), size=0.4)
+```
+
+## What it does not do yet
+
+- Resolve selectors, build the region complex or write provenance names to a mesh
+  (they need the stage 2 engine).
+- Mesh `path` and `segment` features, merged regions, axisymmetric components,
+  cylinders, spheres and `extrude` features. They are parsed and refused by the
+  compilers with their names.
+- Supply design velocities (stage 4).
+
+Importing `simcase.geometry_document` loads neither scipy nor shapely:
+`import simcase` loads its runner chain only when a public name such as
+`simcase.Document` is first used.
+
+## Checks
+
+`tests/simcase/test_geometry_document.py`:
+- All 45 current simcase documents (the built-in examples and
+  `examples/simcase/*.json`) go from 0.2 to version 1 and back unchanged, with no
+  rounding.
+- The 1 pm grid, half-to-even rounding, the range limit and unit declarations.
+- Expression kinds, cycles, division by zero and refused tokens.
+- The layers form of `examples/meshine/extrude_chip.py` gives the same mesh as the
+  direct `extrude` call, node for node.
+- Analytic heat flow: a three-layer series stack between two fixed temperatures,
+  and a circular via in void, match ΔT·A/Σ(tᵢ/kᵢ) and σ·A·ΔT/L to a relative
+  10⁻⁹ (measured about 2 × 10⁻¹⁴). The via's A is the meshed 32-gon, 0.64 % below
+  the circle's area.
