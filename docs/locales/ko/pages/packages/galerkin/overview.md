@@ -30,7 +30,7 @@
 | 온도 의존 정상 Joule heating: 유효 범위가 있는 등방 σ(T)를 완화 Picard 또는 Newton으로 | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [계약과 검증](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../../../../examples/galerkin/temperature_joule_heating.py) |
 | 정상 열전도의 처방 외향 열유속과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../../../examples/galerkin/thermal_flux_robin.py) |
 | JAX·PyTorch에서 재료·열원·경계값에 대한 미분: 정상·과도 열, 정상 전기 전도, 탄성, 열탄성, 도파관 고유값과 필드, 길이에 대한 PEC 상자 공진 | JAX·PyTorch 입력을 준 `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes`(필드는 `eval_edge_field`로), `solve_cavity_box` | [계약과 검증](differentiation.md) | — |
-| 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet과 단열 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
+| 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet, 단열과 시간에 무관한 외향 열유속/대류 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
 | 정적 2D 선형탄성, 평면응력 또는 평면변형률 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity2d.md), [검증](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../../../../examples/galerkin/elasticity2d.py) |
 | 탄성의 전역 Cartesian 경계 표면하중 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity_traction.md), [검증](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../../../../examples/galerkin/elasticity_traction.py) |
 | 같은 메시의 처방 절점 Kelvin 장 아래 기계해석 | `galerkin.thermoelasticity.solve_thermoelasticity` | [계약](prescribed_temperature_thermoelasticity.md), [검증](prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../../../../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
@@ -54,7 +54,7 @@
 
 - 열전도→기계 연성은 열로 되먹임이 없는 명시적 단방향 호출입니다. 정상 workflow는
   Dirichlet·단열 열전도만 받으며 별도 열유속/Robin이나 표면하중 확장을 받지 않습니다.
-- 과도 열전도에는 열유속/Robin 입력, restart, 자동 연성이 없습니다. 선형 API는 유한한 음의
+- 과도 열전도의 열유속/Robin 데이터는 시간에 무관하며(한 번 표본화) restart와 자동 연성은 없습니다. 선형 API는 유한한 음의
   Kelvin을 clamp하지 않습니다.
 - 열·탄성 재료는 등방성이며 이름 있는 메시 영역마다 상수입니다([multimaterial](multimaterial.md)).
   이 열·탄성 계수는 온도에 따라 변하지 않습니다. 별도

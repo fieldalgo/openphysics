@@ -5,7 +5,7 @@
 **한눈에 보기**
 
 - **확인하는 것:** `solve_transient_heat`의 생산 측 기준. 정확 대조, 가장 작은 Dirichlet 고유모드의 시간 기준, 사인 제조해의 공간 기준입니다.
-- **고정 기준:** 마지막 두 시간 차수 0.9–1.1(n=8 메시, 8/16/32/64 스텝), n=8/16/32/64에서 0.25·0.5·1 s의 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9, 시간 간격을 절반으로 줄인 n=64 보조 실행의 오차 변화 ≤ 5%, 8차·10차 구적 일치 1% 이내입니다.
+- **고정 기준:** 마지막 두 시간 차수 0.9–1.1(n=8 메시, 8/16/32/64 스텝), n=8/16/32/64에서 0.25·0.5·1 s의 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9, 시간 간격을 절반으로 줄인 n=64 보조 실행의 오차 변화 ≤ 5%, 8차·10차 구적 일치 1% 이내입니다. 외향 열유속·대류가 있으면 slab 공간 차수 ≥ 1.8, 시간 차수 ≥ 0.9, 최세밀 상대오차 ≤ 2e-3, `solve_steady_heat`와의 장시간 일치 ≤ 1e-8, 단계별 열수지 ≤ 1e-10, Dirichlet만 있는 이력 불변입니다([상세](#외향-열유속과-대류-기준)).
 - **범위:** 고유모드 기준은 시간 오차만 재며 PDE 세분화 결과가 아닙니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
 ## 근거
@@ -152,6 +152,36 @@ subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=root, env=env, check=
 companion에 상당한 메모리가 필요합니다. 실행 시간은 전용 호스트 성능 기준선이 아닙니다.
 
 배포 helper는 실제 sdist→wheel을 만들고, 패키지 코드가 checkout과 byte가 같고 문서·시험·예제가 들어 있지 않은지 확인합니다. 페이지·예제·시험은 배포하지 않습니다. Helper는 설치 출처/source byte를 확인하고, checkout에서 추적되는 독립 consumer 파일·예제를 checkout 밖으로 복사한 뒤, 설치된 wheel을 대상으로 독립 `--suite all` consumer와 전체 영어 수렴 예제를 `python -I`로 실행하도록 구현돼 있습니다. 원 시험은 `tools/run_installed_tests.py`에서 `tests/` 폴더 전체와 함께 설치된 wheel로 실행합니다. 이 gate의 구현은 실제 build/install 성공과 다릅니다. 정확한 현재 CI의 종료값·로그·artifact로 패키징·설치·수치 성공을 확인해야 합니다. Windows의 좁은 저장 gate는 과도 열전도 전체 물리 수용이 아니며, 릴리스 성공도 별도입니다.
+
+## 외향 열유속과 대류 기준
+
+`tests/galerkin/test_transient_heat_robin.py`와
+`tests/refsol/test_transient_heat_robin_reference.py`는 `outward_flux`/`convection`
+keyword의 기준을 고정합니다. 정답은 `refsol.transient_heat_robin`의 독립 급수(NumPy와
+SciPy `brentq`만 사용, 엔진 import 없음)입니다. slab 0<x<L, x=0 단열, 균일 초기 T0에
+x=L의 대류 h·(T−T_a)(고유값 β_n tan β_n = hL/k, 구간 (nπ, nπ+π/2)마다 bracketing한
+근 하나) 또는 x=L의 상수 외향 열유속 g를 둡니다. 두 급수는 명시한 꼬리 한계가 온도
+scale(|T0−T_a| 또는 |g|L/k)의 1e-13 아래로 떨어질 때까지 더합니다. 정답 시험은 열방정식과
+양쪽 면 조건을 유한차분으로, 정확한 slab 평균 T0−g·t/(cL), 장시간 극한, 절단 한계를
+확인하며 솔버를 import하지 않습니다.
+
+| 기준 | 고정 정의 | 허용치 |
+|---|---|---|
+| T1 대류 slab, 공간 | L=1 m, k=2.5, c=4, h=5, T_a=300, T0=350; 정사각형 n=8/16/32개의 띠, 0.2 s까지 2000 스텝; 50 K 상승 기준 T의 상대 L2 오차 | 두 차수 ≥ 1.8; 최세밀 ≤ 2e-3 |
+| T1 대류 slab, 시간 | n=128, 0.2 s까지 4/8/16 스텝 | 두 차수 ≥ 0.9 |
+| T2 상수 열유속 slab, 공간 | 같은 slab, x=L에서 g=−100 W/m²(유입), scale |g|L/k=40 K | 두 차수 ≥ 1.8; 최세밀 ≤ 2e-3 |
+| T2 상수 열유속 slab, 시간 | n=128, 4/8/16 스텝 | 두 차수 ≥ 0.9 |
+| T3 장시간 극한 | 8×4 직사각형, 왼쪽 320 K Dirichlet, 위 g=−20, 오른쪽 (h=5, 300 K), Q=30; 320 K에서 100 s 스텝 8회 vs 같은 메시·같은 데이터의 `solve_steady_heat` | T, C, reaction, G가 각 scale의 1e-8 이내; 최종 storage ≤ 1e-8 |
+| T4 열수지 | T3 문제와 offset 350 K·−20 K인 분리된 Robin-only 띠 둘(callback h와 g); 단계마다·성분마다 storage = f + reaction − G − C; C를 독립 조립한 h·ℓ/6·[[2,1],[1,2]]와 h·T_a·ℓ/2와 비교 | 가장 큰 항의 1e-10 이내 |
+| T5 JAX/PyTorch | 이력이 NumPy와 일치; 최종 온도 functional의 d/d(h, T_a, g, k)를 중심 차분과 비교 | 1e-12; 상대 1e-6(라이브러리가 없으면 skip) |
+| T6 Dirichlet 전용 | 동결 텍스트 fixture `tests/galerkin/data/transient_heat_dirichlet_48720c9.json`(origin/main 솔버, 두 사례)과 경계 표본화 호출 없음 | 기록된 플랫폼에서 비트 동일, 그 외 1e-13 |
+
+2026-11-02 개발 환경(Linux x86_64, NumPy 2.5.4, SciPy 1.18.1; CI 결과 아님) 측정값:
+T1 공간 오차 1.34e-3, 3.29e-4, 7.24e-5(차수 2.03, 2.19), 시간 1.08e-2, 5.65e-3,
+2.89e-3(차수 0.94, 0.97); T2 공간 1.15e-3, 2.86e-4, 6.69e-5(차수 2.01, 2.10), 시간
+7.26e-3, 3.80e-3, 1.94e-3(차수 0.94, 0.97); T3 온도 6.2e-15, 대류 2.4e-16, reaction
+1.2e-16, G 0; T4 혼합 8.1e-17, Robin-only 두 성분 3.5e-16; T6 비트 동일; T5는 skip(그
+환경에 JAX·PyTorch 없음). 위 허용치는 이 실행 전에 고정했으며 결과로 다시 맞추지 않았습니다.
 
 ## 제한된 공간 잔차 보정
 
