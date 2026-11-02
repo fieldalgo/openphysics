@@ -51,6 +51,10 @@ After running, follow [results, export and trust](../results/index.md).
 
 - [Electric and Joule heating documents](../packages/simcase/electric_joule.md)
 
+## Solid mechanics and thermal stress documents
+
+- [Linear elasticity and thermoelastic documents](../packages/simcase/mechanics2d.md)
+
 ## Studio
 
 - [Steady heat in Studio](../packages/simcase/thermal_studio.md)

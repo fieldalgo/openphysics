@@ -43,6 +43,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `simcase`: `em.modes2d` 결과가 저장 layout을 기록합니다. `summary.json`과 `fields.npz`에 `field_layout` `em-modes2d-p1-node-centroid-v1`(subspace sweep은 `em-modes2d-subspace-raw-v1`), `mesh_length_unit`, `length_unit_to_m`이 들어가고 archive에는 `study_parameter`도 들어갑니다. 기존 키는 바뀌지 않습니다.
 
 - `simcase`: `simcase.export.export_fields`가 단일 지점 도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`)를 미터 단위 좌표로 씁니다. 스칼라는 점 데이터 `mode_<k>`(복소면 `_real`/`_imag`), 벡터는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`과 점 데이터 `longitudinal_electric_mode_<k>_real`/`_imag`, 그리고 `triangle_regions`입니다. 새 `export_sweep`은 study 지점마다 VTU 하나와 `.pvd`를 쓰며, 단조 파장 sweep이면 timestep이 파장(문서 단위), 아니면 지점 번호입니다. PML 결과는 흡수층을 포함해 내보내고, subspace sweep과 `field_layout` 없이 저장된 결과는 거절합니다. 이전의 모든 VTU/PVD 출력은 바이트까지 같습니다. [문서](packages/simcase/overview.md#paraview로-보기).
+- `simcase`: 균질 직사각형의 headless 기계해석 문서 두 종. `mechanics.elasticity2d`는 변별 변위 성분·전역 직교좌표계 변 traction·상수 체적력을 쓰는 정적 평면응력/평면변형률 선형탄성을, `mechanics.thermoelastic2d`는 같은 메시에서 변별 상수 경계 데이터의 정상 열전도를 먼저 풀고 전체 traction으로 열응력을 풉니다. 구속이 강체 운동을 남기는 문서는 메시 생성 전에 거부합니다. 결과는 `mechanics.elasticity2d-result-v1`(layout `mechanics2d-p1-v1`)과 `mechanics.thermoelastic2d-result-v1`(`thermoelastic2d-p1-v1`)로 저장되고 `export_fields`가 이름 붙은 변형률·응력 성분으로 VTU를 쓰며 Studio는 둘을 거절합니다. 예제 `elastic_plate`, `thermoelastic_bar`. [문서](packages/simcase/mechanics2d.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 

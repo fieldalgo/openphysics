@@ -29,6 +29,8 @@ python -m simcase run model.json                          # -> model_results/
 | `electric.steady2d` | 직사각형 정상 전기전도 | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.steady2d` | 상수 물성 정상 Joule heating | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | 온도 의존 정상 Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
+| `mechanics.elasticity2d` | 균질 직사각형의 정적 선형탄성: 평면응력·평면변형률, 변별 변위 성분, 직교좌표계 변 traction, 상수 체적력 | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
+| `mechanics.thermoelastic2d` | 변별 상수 경계 데이터의 정상 열전도 후 같은 메시의 열응력, 전체 변 traction | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | 영역이 있는 `thermal.steady2d` | 이름 있는 재료 영역의 정상 열전도: 배경 위 도형, 재료 표, 영역 경계를 따르는 메시 | `thermal_regions` | [영역 문서](thermal_regions2d.md) |
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `transient_thermal_uniform`, `transient_thermal_boundary` | [과도 열전도](thermal_transient2d.md) |
@@ -205,7 +207,12 @@ flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예�
 점 데이터 `potential_v`와 절점 전기 하중·반력·지정 외향 전류·잔차 배열, 셀 데이터
 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`를
 내보냅니다. Joule 결과는 `temperature_k`, 절점 열 배열, 셀 `heat_flux_w_m2`를 더하고,
-`joule.temperature2d`는 `evaluated_temperature_k`를 더합니다. 배열은 저장된 이름과 단위
+`joule.temperature2d`는 `evaluated_temperature_k`를 더합니다. 탄성 결과(`mechanics2d-p1-v1`,
+`mechanics.elasticity2d`의 배치)는 점 데이터 `displacement_m`과 절점 `load_n_per_m`,
+`reaction_n_per_m`, `residual_n_per_m` 벡터, 그리고 저장된 변형률·응력 성분을 스칼라 셀 데이터
+`exx`, `eyy`, `gxy`와 `sxx_pa`, `syy_pa`, `sxy_pa`로 내보냅니다. 열탄성 결과(`thermoelastic2d-p1-v1`)는
+`temperature_k`, 절점 열 배열, 셀 `heat_flux_w_m2`, `sigma_zz_pa`, `epsilon_zz`와 `total_`, `thermal_`,
+`elastic_` 변형률 성분을 더합니다. 배열은 저장된 이름과 단위
 접미사를 그대로 쓰며 Dirichlet 절점 목록과 summary는 복사하지 않습니다. 재료와 손실 벽이
 있는 공진기(`cavity3d-edge-complex-v1`)는 복소 모드마다 셀 데이터
 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와

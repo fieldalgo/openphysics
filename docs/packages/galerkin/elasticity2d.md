@@ -216,8 +216,10 @@ Thin bending-dominated structures can also be too stiff on coarse P1 meshes.
 Large translations with tiny strains may lose floating-point accuracy.
 
 No nonlinear constitutive law, large deformation, contact, dynamics, 3D,
-thermal expansion, multiphysics coupling, simcase or Studio integration is
-included. Small strain and infinitesimal rotation are modeling assumptions,
+thermal expansion, multiphysics coupling or Studio integration is included.
+The headless rectangle subset (side displacement components, Cartesian side
+tractions, constant body force) is exposed to JSON/CLI by the
+[linear elasticity document](../simcase/mechanics2d.md). Small strain and infinitesimal rotation are modeling assumptions,
 not automatically enforced amplitude limits. Rigid rotations in these tests
 are infinitesimal rotation fields, not finite rotations.
 
