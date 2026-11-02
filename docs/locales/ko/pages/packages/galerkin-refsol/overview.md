@@ -30,6 +30,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭 | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한 |
 | `refsol.bimetal` | Timoshenko (1925) 바이메탈 온도계: 힘·모멘트 평형에서 얻은 곡률, 출판된 폐형식(Timoshenko, Villarceau, 단축 Stoney 극한), 끝면 표면하중을 포함한 정확한 평면응력 띠 장 | 무작위 데이터에서 세 폐형식 일치, Stoney 극한, 단면 힘·모멘트 0, 계면 연속, 유한차분 변형률 |
 | `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
+| `refsol.thermal3d` | 정상 3D 열전도: 상자의 사인 곱 제조해(온도·열유속·열원)와 z 방향 층상 슬랩의 직렬 전도 | 유한차분 대비 열유속·열원, 직렬 저항 공식 대비 슬랩, NumPy만 |
 | `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세 | — |
 
 ## 사용법

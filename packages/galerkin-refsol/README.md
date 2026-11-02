@@ -34,6 +34,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
 | `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
 | `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
+| `refsol.thermal3d` | Steady 3D heat: sine-product manufactured field on a box (temperature, flux, source) and series conduction through a layered slab along z | Flux and source against finite differences, slab against the series-resistance formula, NumPy only |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
 ## Usage
