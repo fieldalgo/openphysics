@@ -400,8 +400,24 @@ cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`
 (m^-3/2, the saved normalization and `exp(+j*omega*t)` convention; VTK has no
 complex arrays) and the materials as `tet_relative_permittivity_real`/`_imag`
 and `tet_relative_permeability_real`/`_imag`; frequencies, quality factors and
-wall conductivities stay in `fields.npz` and `summary.json`. `em.modes2d`
-results are refused as an unsupported field layout. 2D meshes get
+wall conductivities stay in `fields.npz` and `summary.json`. A single-point
+waveguide mode result (`em-modes2d-p1-node-centroid-v1`, from `em.modes2d`)
+is exported with its nodes converted to metres (`nodes * length_unit_to_m`):
+a scalar result gives point data `mode_<k>` per mode `k` (zero-based), or
+`mode_<k>_real`/`mode_<k>_imag` when the saved `fields` are complex (lossy
+materials); a vector result gives cell data `electric_field_mode_<k>_real`/
+`_imag` (Ex, Ey, Ez at centroids, the saved relative normalization with the
+largest centroid |E| = 1) and point data `longitudinal_electric_mode_<k>_real`/
+`_imag` (nodal Ez). Every mode VTU adds the integer cell data `triangle_regions`
+(the saved `regions`, indices into the summary's `regions`). PML results use
+the same layout; the mesh and so the arrays cover the absorbing layer, where the
+fields are artificial. `neff`, `edges`, the transverse edge coefficients,
+tracking and open-boundary diagnostics stay in `fields.npz`. A result with
+several study points is refused here and goes through `export_sweep`; the
+subspace layout `em-modes2d-subspace-raw-v1` (raw eigenpair columns, not
+tracked modes) is refused by both, and so is a `fields.npz` without a
+`field_layout` array, such as an `em.modes2d` result saved before the layout
+was recorded (run its `model.json` again). 2D meshes get
 z = 0, and 2D vectors a zero z component. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
@@ -418,6 +434,16 @@ the second time on. The output directory must be new or empty and nothing is
 overwritten; the collection refers to its VTU files by relative paths, so the
 directory can be moved as a whole. `name="heat"` changes the file stem. No
 dependency beyond meshio is needed: the `.pvd` is plain XML.
+
+For a waveguide mode sweep,
+`simcase.export.export_sweep("out/fields.npz", "out/paraview")` writes one VTU
+per study point (`fields_00000.vtu`, …, with the arrays `export_fields` writes
+for a single point) and the collection `fields.pvd`. Its timestep is the swept
+wavelength in the document length unit (`mesh_length_unit`) when the saved
+`study_parameter` is a wavelength and the values are strictly monotone, which
+every vector and PML sweep is; for a scalar sweep of another parameter, or one
+whose values repeat or reverse, it is the point index. The values themselves
+stay in `fields.npz`. The same directory, name and rollback rules apply.
 
 ## The browser UI
 

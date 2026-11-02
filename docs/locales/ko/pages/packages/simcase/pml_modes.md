@@ -80,6 +80,10 @@ scalar는 물리 절점 peak=1, vector는 물리 요소중심의 최대 |E|=1입
 (늘림 없는 물리창에서는 실제 Et), longitudinal은 h로 나눈 실제 Ez 절점값,
 electric은 각 Jacobian 성분으로 나눈 요소중심 장입니다. PML 내부 장은
 인공적입니다. scalar 표현은 `pml-scalar-nodal-v1`입니다.
+둘 다 파일 배치 `em-modes2d-p1-node-centroid-v1`로 저장되므로 `simcase.export`는 다른 모드
+결과처럼 내보냅니다. VTU는 계산 메시 전체를 담으므로 배열은 흡수층까지 덮고 그 안의 값은
+인공적입니다. `open_boundary`의 `physical_bounds`가 물리창을 표시하며 VTU에는 복사되지
+않으므로 뷰어에서 잘라 보세요.
 
 양의 L2 진단은 transverse 계산좌표 edge mass와 실제 Ez의 절점보간을 씁니다.
 물리창에서 sx=sy=1입니다. PML 기여는 이 지표를 확장한 진단값이며 전자기

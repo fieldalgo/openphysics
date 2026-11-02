@@ -236,13 +236,26 @@ n_eff 2.4441  n_g 4.1923
 
 | 파일 | 내용 |
 |---|---|
-| `summary.json` | study 지점·모드별 n_eff, 군굴절률, 선언 단위, 메시 통계, 시간, 모드 추적 |
-| `fields.npz` | 메시 절점·삼각형, 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez). `numpy.load(..., allow_pickle=False)`로 읽음 |
+| `summary.json` | study 지점·모드별 n_eff, 군굴절률, 선언 단위, 저장 배치 `field_layout`과 `mesh_length_unit`·`length_unit_to_m`, 메시 통계, 시간, 모드 추적 |
+| `fields.npz` | 메시 절점·삼각형(문서 단위), 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez). `numpy.load(..., allow_pickle=False)`로 읽음 |
 | `results.png` | 메시, 첫 모드의 \|E\|, sweep |
 | `log.txt`, `model.json` | 실행 로그와 실행한 문서 그대로 |
 
 장 진폭은 상대값(가장 큰 중심 \|E\|가 1)이며 와트나 V/m가 아닙니다. 배열은
 [패키지 개요](overview.md#벡터-장과-단일-지점-study)에 있습니다.
+
+ParaView에서 모드를 보려면 `simcase[export]`를 설치하고 새 디렉터리에 파장마다 VTU 하나와
+`.pvd` 컬렉션을 씁니다.
+
+```python
+from simcase.export import export_sweep
+export_sweep("strip_results/fields.npz", "strip_results/paraview")
+```
+
+컬렉션의 timestep은 문서 단위의 파장이고 점은 미터이며, 각 VTU에는
+`electric_field_mode_0_real`/`_imag`(요소중심 셀 데이터), `longitudinal_electric_mode_0_real`/
+`_imag`(점 데이터), `triangle_regions`가 들어갑니다. 단일 지점 결과는 `export_fields`로
+내보냅니다. [ParaView로 보기](overview.md#paraview로-보기)를 참고하세요.
 
 ## 8. Studio에서 같은 모델
 
