@@ -95,7 +95,7 @@ python -m simcase run vector.json -o vector_results
 
 각 모드는 하나의 공통 척도, 즉 중심점 최대 `|E| = 1`을 사용합니다. 진폭은 상대값이며 V/m 또는 정규화 전력이 아닙니다. 모든 성분은 이 척도를 공유하고 이 무손실 모드의 Ez는 횡방향 장과 직교 위상입니다. 중심값은 요소별로 유지되어 경계면 불연속을 보존합니다. 원시 변/절점 계수는 다른 곳에서 복원할 수 있도록 유한요소 장을 유지합니다.
 
-벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
+벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모든 `em.modes2d` 결과(스칼라·벡터)는 두 파일에 저장 파일 배치 `field_layout="em-modes2d-p1-node-centroid-v1"`(P1 절점 장, 벡터 결과는 요소중심 전기장을 더함), `mesh_length_unit`(`nodes`의 선언 단위), `length_unit_to_m`(그 단위의 미터 크기)을, archive에는 `study_parameter`(sweep 경로, 단일 지점이면 `""`)를 함께 기록합니다. subspace sweep은 대신 `field_layout="em-modes2d-subspace-raw-v1"`을 기록합니다. 기존 키의 의미는 바뀌지 않습니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
 
 Studio는 지점마다 `location="triangle_centroids"`, 성분 이름, `(modes, triangles, 3)` 형상의 별도 `real`/`imag` 배열을 가진 `vector_fields`를 받습니다. 기존 스칼라 HTTP `fields` 구성은 그대로이며 벡터에서는 비어 있습니다. `|E|`, `|Ex|`, `|Ey|`, `|Ez|`를 골라 공통 |E| 색 척도의 크기를 표시합니다. 저장 PNG는 |E|를 표시하고 archive는 복소 성분을 보존합니다. `VectorField.to_dict()`는 같은 JSON 안전 표시 표본을 만듭니다.
 
@@ -211,8 +211,20 @@ flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예�
 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와
 `exp(+j*omega*t)` 규약; VTK에는 복소 배열이 없음)를, 재료는
 `tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로
-내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. `em.modes2d`
-결과는 지원하지 않는 field layout으로 거절합니다. 2D 메시는 z = 0으로 두고
+내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 단일 지점
+도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`, `em.modes2d`)는 절점을 미터로 바꿔
+(`nodes * length_unit_to_m`) 내보냅니다. 스칼라 결과는 모드 `k`(0부터)마다 점 데이터
+`mode_<k>`를, 저장된 `fields`가 복소(손실 재료)이면 `mode_<k>_real`/`mode_<k>_imag`를
+씁니다. 벡터 결과는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`(요소중심의 Ex, Ey,
+Ez, 저장된 상대 정규화로 가장 큰 요소중심 |E| = 1)과 점 데이터
+`longitudinal_electric_mode_<k>_real`/`_imag`(절점 Ez)를 씁니다. 모든 모드 VTU에는 정수
+셀 데이터 `triangle_regions`(저장된 `regions`, summary의 `regions` 색인)가 들어갑니다.
+PML 결과도 같은 배치를 쓰며, 메시와 배열은 흡수층까지 덮고 그 안의 장은 인공적입니다.
+`neff`, `edges`, transverse edge 계수, 추적·open boundary 진단은 `fields.npz`에 남습니다.
+study 지점이 여럿인 결과는 여기서 거절하고 `export_sweep`으로 내보냅니다. subspace 배치
+`em-modes2d-subspace-raw-v1`(추적한 모드가 아닌 원시 고유쌍 열)은 둘 다 거절하며,
+`field_layout` 배열이 없는 `fields.npz`(배치를 기록하기 전에 저장한 `em.modes2d` 결과 등)도
+거절합니다(그 `model.json`을 다시 실행). 2D 메시는 z = 0으로 두고
 2D 벡터에는 z 성분 0을 붙입니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
@@ -226,6 +238,13 @@ writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 시각부터 나타납니다. 출력 폴더는 새것이거나 비어 있어야 하며 아무것도 덮어쓰지 않습니다.
 컬렉션은 VTU 파일을 상대 경로로 가리키므로 폴더째 옮겨도 됩니다. `name="heat"`로 파일 이름
 앞부분을 바꿀 수 있습니다. `.pvd`는 일반 XML이라 meshio 외 의존성은 필요 없습니다.
+
+도파관 모드 sweep은 `simcase.export.export_sweep("out/fields.npz", "out/paraview")`가
+study 지점마다 VTU 하나(`fields_00000.vtu`, …, 단일 지점에서 `export_fields`가 쓰는 배열과
+같음)와 컬렉션 `fields.pvd`를 씁니다. timestep은 저장된 `study_parameter`가 파장이고 값이
+엄격히 단조이면(모든 벡터·PML sweep) 문서 길이 단위(`mesh_length_unit`)의 파장이고, 다른
+매개변수의 스칼라 sweep이나 값이 반복·역행하는 sweep이면 지점 색인입니다. 값 자체는
+`fields.npz`에 남습니다. 디렉터리·이름·rollback 규칙은 같습니다.
 
 ## 브라우저 UI
 
