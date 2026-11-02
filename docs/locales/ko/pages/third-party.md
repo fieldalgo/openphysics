@@ -31,8 +31,13 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    sdist·wheel(패키지 코드, README, LICENSE, NOTICE, 빌드 파일만 담고 시험·문서·예제는
    배포하지 않음), CI 산출물. [데이터와 출판 수치](#데이터와-출판-수치)에 적은 제3자 데이터(physmat에
    넣은 CC0-1.0 굴절률 표, galerkin-refsol의 출판 benchmark 수치)는 자기 조건을 따르고, 그 밖은
-   Apache-2.0인 자체 저작물입니다. 저장소에 복사해 넣은 제3자 소스 코드는 없고, 컴파일된 코드를
-   담은 패키지도 없으며, 배포판은 의존성을 선언만 하고 담지 않습니다.
+   Apache-2.0인 자체 저작물입니다. 저장소에 복사해 넣은 제3자 소스 코드는 없고, 배포판은 의존성을
+   선언만 하고 담지 않습니다. 컴파일된 코드를 담은 패키지는 `meshloom` 하나입니다. 그 wheel에는
+   Rust 확장 모듈 하나가 있고, 여기에 PyO3와 그 작은 의존성, Rust 표준 라이브러리가 정적으로
+   링크됩니다. 모두 허용형 라이선스이며 제3자 C·C++ 코드는 없습니다. 이들의 라이선스 전문은
+   `THIRD_PARTY_NOTICES`에 담겨 배포되고, `tools/build_meshloom_notices.py`가 Cargo와 도구 모음의
+   소스에서 만들고 CI에서 확인합니다. 허용형 라이선스가 없는 구성 요소는 거절합니다. wheel에는
+   crate의 CycloneDX SBOM도 들어 있습니다.
 2. **의존성 하나하나, 그 배포판이 스스로 선언한 라이선스로**: 기본 의존성, extra, 시험·도구
    의존성, 전이 의존성 포함.
    - 허용형 라이선스가 기본입니다.
@@ -154,6 +159,7 @@ CI는 `torch`의 CPU 빌드를 `download.pytorch.org/whl/cpu`에서 설치하고
 | 배포판 | 용도 | SPDX |
 |---|---|---|
 | `build`, `pyproject-hooks`, `wheel`, `setuptools`, `pip` | 배포판 빌드·설치 | MIT |
+| `maturin` | meshloom 컴파일 커널 빌드, 배포하지 않음 | MIT OR Apache-2.0 |
 | `twine`, `id`, `readme-renderer`, `requests`, `requests-toolbelt`, `rfc3986` | `twine check --strict` | Apache-2.0 |
 | `docutils` | twine의 README 렌더링 | LicenseRef-Public-Domain AND BSD-2-Clause AND 0BSD(GPL 분류자는 휠에 없는 파일을 가리킴) |
 | `nh3`, `rich`, `markdown-it-py`, `mdurl`, `keyring`, `jaraco-classes`, `jaraco-context`, `jaraco-functools`, `more-itertools`, `jeepney`, `urllib3`, `charset-normalizer` | twine 의존성 | MIT |

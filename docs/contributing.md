@@ -90,7 +90,7 @@ record or the behavior on `main` before reporting it missing.
 
 ## Releases
 
-All eight distributions share one version. The version change sets it in every
+All nine distributions share one version. The version change sets it in every
 package, keeps the requirements between them inside that minor series and dates
 the [changelog](../CHANGELOG.md)'s `[Unreleased]` section; `tools/check_release_version.py`
 checks it. Land the version change through the same PR process, wait for the required
@@ -106,7 +106,7 @@ tag only when that release needs a patch, and carry reviewed fixes from `main`.
 
 ## Repository structure
 
-The seven implementation packages keep separate distribution names, metadata,
+The eight implementation packages keep separate distribution names, metadata,
 licenses and notices. Third-party integrations belong in a separate package with
 an explicit API and documented external dependencies, following `gmshio`. A GPL
 program can back such an integration only as a separate process, installed through

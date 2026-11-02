@@ -3,7 +3,7 @@
 
 """Make one pytest run test the packages in *this* checkout.
 
-The seven packages are installed editable, and an editable install points at the
+The eight implementation packages are installed editable, and an editable install points at the
 directory it was installed from. In a git worktree that directory is the other
 checkout, so without this the suite imports the main checkout's library while
 collecting this one's tests, and reports on code that is not the code under test:

@@ -3,7 +3,7 @@
 **English** | [한국어](locales/ko/pages/architecture.md)
 
 OpenPhysics is the repository and toolkit. **`galerkin` is its finite-element
-engine**, one of seven implementation packages under `packages/`. The packages
+engine**, one of eight implementation packages under `packages/`. The packages
 have separate distributions and can be used independently where their
 dependencies permit. See the [installation guide](overview.md).
 
@@ -59,11 +59,11 @@ the engine's mesh types. It does not make either mesher a mandatory solver
 runtime dependency. Gmsh is installed separately and retains its own license;
 see [NOTICE](../NOTICE).
 
-The eighth distribution, [`openphysics`](packages/openphysics/overview.md),
+The ninth distribution, [`openphysics`](packages/openphysics/overview.md),
 is a meta distribution with no code that requires six of the implementation
 packages and offers `sipi` as an extra. 0.1.0 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
 name reservation, so **`pip install openphysics` does not install the toolkit
-yet.** The seven implementation packages already live in this public
+yet.** The eight implementation packages already live in this public
 repository; separate historical package repositories are not needed to use them.
 
 ## Entry points and current scope

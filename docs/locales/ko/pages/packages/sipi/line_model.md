@@ -65,6 +65,11 @@ touchstone = result.network.touchstone()
 라이브러리 버전까지 같은 결과를 보장하는 것은 아닙니다. 설치 환경 사이 재현에는 계산 보고서에
 엔진 revision·환경도 함께 보관하세요. 이 스키마는 입력 전용이며 기존 형상 JSON을 바꾸지 않습니다.
 
+버전 2(`sipi.transmission-line/2`)는 위 최상위 필드를 유지하며 surface의
+`roughness_rms`만 명시적 smooth/Hammerstad/causal-Huray 객체로 대체합니다.
+[거칠기 입력 계약](roughness.md#버전-있는-선로-입력)에 정확한 필드를 정의합니다.
+버전 1과 생성자 기본값은 유지하고 저장한 버전도 보존합니다.
+
 ## 결과
 
 `TransmissionLineResult`에는 `.input_json`, 읽기 전용 `.mesh_settings`, `.dielectric`,

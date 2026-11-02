@@ -74,8 +74,10 @@ V를 sqrt(Zref)로 나누고 I에 sqrt(Zref)를 곱해 정규화합니다. 짧�
 N>=3은 행 우선 순서입니다. 포트 수 N에 맞게 `.sNp`로 저장합니다. 이름은 ASCII 안전 주석입니다.
 독립 읽기 시험에 비상호 데이터를 넣어 전치 오류를 검출합니다.
 
-single-ended 내보내기만 지원합니다. mixed-mode 파일 출력, Touchstone 불러오기, 측정 비교,
+single-ended 내보내기만 지원합니다. mixed-mode 파일 출력,
 시간영역 변환, 일반 회로 해석기는 미구현입니다. 이 Python API가 웹 화면을 추가하거나 기존
 단면 JSON 스키마를 변경하지는 않습니다.
 
 층별 주파수 분산 추출은 [유전체 모델](dielectrics.md)을 사용합니다.
+
+[Touchstone 입력·조건을 명시한 측정 비교](touchstone.md)는 별도 API로 지원합니다.

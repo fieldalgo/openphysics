@@ -25,7 +25,19 @@ What each package implements, and its limits, is in the
 ## [Unreleased]
 
 - `galerkin`: steady heat accepts `coordinate_system="axisymmetric"` for full-revolution (r,z) integration, reusing core assembly; result metadata distinguishes W from Cartesian W/m. Axis regularity guards and independent analytical/convergence checks are included. [Documentation](docs/packages/galerkin/thermal_axisymmetric.md).
+- SIPI causal Huray conductor roughness updates resistance and internal inductance;
+  explicit transmission-line JSON v2 preserves the legacy version-1 contract.
+
+- `meshloom`: the kernel's first stages, as internal building blocks in `meshloom._core`: exact `orient3d`, `insphere` (with index-ordered symbolic perturbation) and in-plane `incircle3d` predicates (floating-point filter, then exact expansions), a Bowyer–Watson Delaunay tetrahedralization of point sets and an exact verifier. Checked against big-integer and `Fraction` determinants and on lattices, cospherical shells and coplanar sets; 160k points/s on 10⁶ uniform points on the reference machine. [Documentation](docs/packages/meshloom/overview.md#kernel-building-blocks).
+
+- `meshloom`: a new distribution, OpenPhysics's first with compiled code, as a packaging skeleton for the planned exact-arithmetic tetrahedral mesher. One abi3 wheel per platform (manylinux 2.17 x86_64 and aarch64, macOS 11 x86_64 and arm64, Windows x64) holds a Rust kernel built with PyO3 and maturin; `kernel_available()` and `kernel_version()` report it, and `generate3d` raises `NotImplementedError`. The wheels ship `THIRD_PARTY_NOTICES` for the statically linked, permissively licensed Rust crates and standard library. The release, license and distribution tools build and check the compiled wheels. [Documentation](docs/packages/meshloom/overview.md).
+- `sipi`: a matched finite-metal/dielectric line model extracts DC/AC RLGC and S from one conforming geometry, with strict `sipi.volume-line/1` JSON and explicit finite-domain boundaries. [Contract](docs/packages/sipi/volume_line.md).
+
 - `sipi`: finite-metal P1 current diffusion from DC through resolved skin/proximity effects, with exact DC limits, total inductance, conservation diagnostics and a CrossSection volume-mesh adapter. See the [contract and validation](docs/packages/sipi/conductor_diffusion.md).
+
+- `meshine`: `extrude` builds a layered tetrahedral mesh from a meshine footprint without Gmsh: a material (or a left-out cell) per footprint region and layer, sub-layers by `size` or `divisions`, prisms split by the vertex-order rule so neighbouring prisms always agree, faces tagged `z0`, `z1`, the footprint's side names and `void`, and interfaces between materials. The Gmsh-skipped 3D interop and unstructured-cavity tests have Gmsh-free twins on extruded meshes with the original assertions. [Documentation](docs/packages/meshine/overview.md#layered-tetrahedral-meshes).
+
+- `sipi`: strict single-ended Touchstone 1/2 S input and explicit-condition network comparison, with bounded opt-in complex interpolation. [Contract and verification](docs/packages/sipi/touchstone.md).
 
 - `simcase`: a test checks that simcase imports only galerkin's public names: no `galerkin.core` and no underscore names. The one listed exception is the rectangle mesh check of the steady boundary contract, until galerkin offers a public mesh check.
 - Docs: the derivative contract says how to assemble `galerkin.core` kernels with live coefficients: `galerkin.core` follows the same 0.x rule as the rest of the Python API, `core.forms.matrix` checks only shapes (a table of the right shape from another space gives a wrong matrix without an error), and a table names the DOF tables of each kernel; the kernel and `forms.matrix` docstrings say the same. It also says why `eval_edge_field_3d` stays NumPy-only. [Documentation](docs/packages/galerkin/differentiation.md#assembling-core-kernels-yourself).

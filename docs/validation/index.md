@@ -62,6 +62,8 @@ records and plans do not establish a current pass; resource observations are not
 
 ## Apply this to your model
 
+- [Causal roughness: independent spectral quadrature and R/L convergence](../packages/sipi/roughness.md#validation-and-limits)
+
 - [Check convergence of your calculation](convergence.md)
 
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
@@ -71,3 +73,7 @@ records and plans do not establish a current pass; resource observations are not
 - [Dispersive dielectrics: analytical, independent-tool and mesh checks](../packages/sipi/dielectrics.md#validation-and-reproduction)
 
 - [Conductor diffusion: Bessel/DC references, mesh/domain convergence and independent assembly](../packages/sipi/conductor_diffusion.md#validation-and-limits)
+
+[Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
+
+[Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).

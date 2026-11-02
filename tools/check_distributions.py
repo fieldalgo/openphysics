@@ -4,7 +4,9 @@
 """Build all distributions, check their contents and exercise the wheels in a fresh venv.
 
 Each sdist holds exactly its package code, README, LICENSE, NOTICE and build files,
-and each wheel exactly its package code, all byte-identical to the checkout. Tests,
+and each wheel exactly its package code, all byte-identical to the checkout. The one
+distribution with compiled code (``COMPILED``) also ships its Rust sources in the sdist
+and exactly one extension module, built from them, in each wheel. Tests,
 docs and examples live outside packages/ and are never shipped: the installed checks
 copy the tracked test and example files of this checkout. The package test suites run against installed
 wheels in tools/run_installed_tests.py; this script runs the wheel-specific
@@ -32,7 +34,7 @@ import zipfile
 from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase", "sipi",
+PACKAGES = ("galerkin", "galerkin-refsol", "meshine", "meshloom", "gmshio", "physmat", "simcase", "sipi",
             "openphysics")
 # packages/<name>/ holds what its distribution ships and nothing else: the import
 # package under src/ and the files below. Tests, docs, examples and tools live at
@@ -42,6 +44,17 @@ GENERATED_SDIST_FILES = ("PKG-INFO", "setup.cfg")
 UNSHIPPED_FILES = (".gitignore",)
 EGG_INFO = re.compile(r"(src/)?[^/]+\.egg-info/[^/]+")
 STUDIO_STATIC = "simcase/studio/static/"
+# Distributions allowed to contain compiled code (decision recorded with the project owner,
+# docs/third-party.md): their extra top-level build files, the folder of their Rust
+# sources, and the one extension module each wheel must contain.
+COMPILED = {
+    "meshloom": dict(files=("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "THIRD_PARTY_NOTICES"),
+                     sources="rust", extension=re.compile(r"meshloom/_kernel\.(abi3\.so|pyd)")),
+}
+# Platform tags of the compiled wheels a release publishes, one wheel each
+# (release.yml builds them from the sdist; --assemble checks the set).
+RELEASE_PLATFORMS = ("manylinux_2_17_x86_64", "manylinux_2_17_aarch64", "macosx_11_0_x86_64",
+                     "macosx_11_0_arm64", "win_amd64")
 
 
 def run(*args, cwd, env=None):
@@ -76,11 +89,12 @@ def shipped_code(name):
     classified here instead of shipping or vanishing silently.
     """
     files = tracked(name)
+    compiled = COMPILED.get(name, {})
     code = set()
     for relative in files:
         top, _, rest = relative.partition("/")
         if not rest:
-            if top not in SDIST_FILES + UNSHIPPED_FILES:
+            if top not in SDIST_FILES + UNSHIPPED_FILES + compiled.get("files", ()):
                 raise RuntimeError(f"packages/{name}/{top}: unclassified top-level file; "
                                    "ship it as package code or move it out of packages/")
         elif top == "src":
@@ -88,6 +102,8 @@ def shipped_code(name):
             if not inner or f"src/{package}/__init__.py" not in files:
                 raise RuntimeError(f"packages/{name}/src/{package}: src/ holds only import packages")
             code.add(relative)
+        elif top == compiled.get("sources"):
+            continue                                       # Rust sources: sdist only, see build_sources
         else:
             raise RuntimeError(f"packages/{name}/{top}/: only src/ is allowed; tests, docs, examples "
                                "and tools belong at the repository root")
@@ -95,6 +111,19 @@ def shipped_code(name):
         if required not in files:
             raise RuntimeError(f"packages/{name}/{required} is not tracked")
     return code
+
+
+def build_sources(name):
+    """Tracked build inputs a compiled distribution ships in its sdist but not in its wheel."""
+    compiled = COMPILED.get(name)
+    if not compiled:
+        return set()
+    files = tracked(name)
+    sources = {f for f in files if f.startswith(compiled["sources"] + "/")}
+    for required in compiled["files"]:
+        if required not in files:
+            raise RuntimeError(f"packages/{name}/{required} is not tracked")
+    return sources | set(compiled["files"])
 
 
 def wheel_path(relative):
@@ -126,7 +155,7 @@ def check_sdist(sdist):
     name, _ = parse_sdist_filename(sdist.name)
     source = ROOT / "packages" / name
     files = archive_members(sdist)
-    expected = shipped_code(name) | {f for f in SDIST_FILES if f in tracked(name)}
+    expected = shipped_code(name) | {f for f in SDIST_FILES if f in tracked(name)} | build_sources(name)
     for relative in sorted(expected):
         if relative not in files:
             raise RuntimeError(f"{sdist.name} is missing {relative}")
@@ -142,9 +171,18 @@ def check_sdist(sdist):
 
 
 def check_wheel(wheel):
-    """The wheel holds exactly the package code plus its dist-info, with LICENSE and NOTICE."""
-    name, version, _, _ = parse_wheel_filename(wheel.name)
+    """The wheel holds exactly the package code plus its dist-info, with LICENSE and NOTICE.
+
+    A compiled distribution also holds exactly one extension module and its
+    THIRD_PARTY_NOTICES; every other distribution must be a pure ``py3-none-any`` wheel.
+    """
+    name, version, _, tags = parse_wheel_filename(wheel.name)
     source = ROOT / "packages" / name
+    compiled = COMPILED.get(name)
+    if not compiled and {str(t) for t in tags} != {"py3-none-any"}:
+        raise RuntimeError(f"{wheel.name}: a distribution without compiled code must be py3-none-any")
+    if compiled and any(t.abi != "abi3" for t in tags):
+        raise RuntimeError(f"{wheel.name}: the compiled kernel must be built for the stable ABI (abi3)")
     code = {wheel_path(relative): relative for relative in shipped_code(name)}
     with zipfile.ZipFile(wheel) as archive:
         names = [n for n in archive.namelist() if not n.endswith("/")]
@@ -154,10 +192,14 @@ def check_wheel(wheel):
                 raise RuntimeError(f"{wheel.name} is missing {path}")
             if archive.read(path) != (source / relative).read_bytes():
                 raise RuntimeError(f"{wheel.name}: {path} differs from the checked-out source")
-        if unexpected := sorted(set(names) - set(code) - dist_info):
+        extensions = {n for n in names if compiled and compiled["extension"].fullmatch(n)}
+        if compiled and len(extensions) != 1:
+            raise RuntimeError(f"{wheel.name} must contain exactly one compiled extension, found {sorted(extensions)}")
+        if unexpected := sorted(set(names) - set(code) - dist_info - extensions):
             raise RuntimeError(f"{wheel.name} ships files that are not package code: {unexpected}")
-        # Every wheel must carry the package's own LICENSE and NOTICE unchanged.
-        for notice in ("LICENSE", "NOTICE"):
+        # Every wheel must carry the package's own LICENSE and NOTICE unchanged, and a compiled
+        # one the notices of what its extension links.
+        for notice in ("LICENSE", "NOTICE") + (("THIRD_PARTY_NOTICES",) if compiled else ()):
             found = [p for p in dist_info if p.endswith(f".dist-info/licenses/{notice}")]
             if len(found) != 1:
                 raise RuntimeError(f"{wheel.name} is missing dist-info/licenses/{notice}")
@@ -167,14 +209,56 @@ def check_wheel(wheel):
             for path, relative in sorted(code.items())}
 
 
+def assemble(output, kernels):
+    """Replace the locally built compiled wheels in output by the release's platform wheels.
+
+    Each wheel in ``kernels`` must belong to a COMPILED distribution at the version of its
+    sdist in output, pass check_wheel and twine, and the platforms must be exactly
+    RELEASE_PLATFORMS for every compiled distribution. SHA256SUMS is rewritten.
+    """
+    sdists = {parse_sdist_filename(p.name)[0]: parse_sdist_filename(p.name)[1] for p in output.glob("*.tar.gz")}
+    for name in COMPILED:
+        for local in output.glob(f"{name.replace('-', '_')}-*.whl"):
+            local.unlink()
+    found = {name: set() for name in COMPILED}
+    copied = []
+    for wheel in sorted(Path(kernels).rglob("*.whl")):
+        name, version, _, tags = parse_wheel_filename(wheel.name)
+        if name not in found or sdists.get(name) != version:
+            raise RuntimeError(f"{wheel.name}: not a compiled distribution at its sdist's version")
+        # manylinux2014_<arch> is the legacy alias of manylinux_2_17_<arch> in a compressed tag set.
+        platforms = {t.platform.replace("manylinux2014_", "manylinux_2_17_") for t in tags}
+        if len(platforms) != 1 or not platforms <= set(RELEASE_PLATFORMS) or platforms & found[name]:
+            raise RuntimeError(f"{wheel.name}: platform {sorted(platforms)} is not one new release platform")
+        found[name] |= platforms
+        target = output / wheel.name
+        shutil.copy2(wheel, target)
+        check_wheel(target)
+        copied.append(target)
+    for name, platforms in found.items():
+        if platforms != set(RELEASE_PLATFORMS):
+            raise RuntimeError(f"{name}: missing release wheels for {sorted(set(RELEASE_PLATFORMS) - platforms)}")
+    run(sys.executable, "-m", "twine", "check", "--strict", *copied, cwd=ROOT)
+    artifacts = sorted(output.glob("*.whl")) + sorted(output.glob("*.tar.gz"))
+    (output / "SHA256SUMS").write_text("".join(
+        f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in artifacts))
+    print(f"Assembled {len(artifacts)} release files ({len(copied)} compiled wheels); artifacts: {output}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".validation" / "dist")
     parser.add_argument("--build-only", action="store_true",
                         help="stop after building, twine check and the content checks; "
                              "the release workflow uses this to build what it uploads")
+    parser.add_argument("--assemble", type=Path, metavar="KERNELS",
+                        help="after a --build-only run into --output: replace the compiled wheels by the "
+                             "release platform wheels found under KERNELS and rewrite SHA256SUMS")
     args = parser.parse_args()
     output = args.output.resolve()
+    if args.assemble:
+        assemble(output, args.assemble.resolve())
+        return
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         parser.error("output must be empty to prevent stale distributions from passing validation")
@@ -190,7 +274,7 @@ def main():
     wheel_ids = {parse_wheel_filename(p.name)[:2] for p in wheels}
     sdist_ids = {parse_sdist_filename(p.name) for p in sdists}
     if wheel_ids != sdist_ids or {name for name, _ in wheel_ids} != expected:
-        raise RuntimeError("wheel/sdist package identities and versions must match the eight packages")
+        raise RuntimeError(f"wheel/sdist package identities and versions must match the {len(PACKAGES)} packages")
     run(sys.executable, "-m", "twine", "check", "--strict", *wheels, *sdists, cwd=ROOT)
     for sdist in sdists:
         check_sdist(sdist)

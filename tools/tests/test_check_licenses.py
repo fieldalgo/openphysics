@@ -344,6 +344,27 @@ def test_first_party_distribution_must_not_contain_native_files(tmp_path, native
     assert any("first-party distribution contains native files" in e and native in e for e in errors)
 
 
+@pytest.mark.parametrize("extension", ["meshloom/_kernel.abi3.so", "meshloom/_kernel.pyd"])
+def test_listed_first_party_extension_passes_with_its_notices(tmp_path, extension):
+    files = ["meshloom/__init__.py", extension, "meshloom-1.0.dist-info/licenses/THIRD_PARTY_NOTICES"]
+    errors, report = run(tmp_path, {}, meshloom={"files": files})
+    assert errors == [] and report["meshloom"]["use"] == "first-party"
+
+
+def test_listed_first_party_extension_needs_its_notices(tmp_path):
+    errors, _ = run(tmp_path, {}, meshloom={"files": ["meshloom/__init__.py", "meshloom/_kernel.abi3.so"]})
+    assert any("must ship dist-info/licenses/THIRD_PARTY_NOTICES" in e for e in errors)
+
+
+@pytest.mark.parametrize("native", ["meshloom/_other.abi3.so", "meshloom.libs/libhelper-1234.so.1",
+                                    "meshloom/_kernel.cpython-312-x86_64-linux-gnu.so"])
+def test_compiled_first_party_distribution_carries_only_its_listed_extension(tmp_path, native):
+    files = ["meshloom/__init__.py", "meshloom/_kernel.abi3.so", native,
+             "meshloom-1.0.dist-info/licenses/THIRD_PARTY_NOTICES"]
+    errors, _ = run(tmp_path, {}, meshloom={"files": files})
+    assert any("first-party distribution contains native files" in e and native in e for e in errors)
+
+
 def test_inventory_entries_are_valid_and_documented():
     policy = INVENTORY["policy"]
     known = set(policy["permissive"]) | set(policy["weak_copyleft"]) | {"GPL-2.0-or-later"}

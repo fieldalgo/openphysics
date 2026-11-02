@@ -17,18 +17,25 @@ from scipy.constants import epsilon_0, mu_0
 from galerkin import assemble_stiffness, solve_dirichlet
 from .network import _frequencies, _scalar, rlgc_network
 from .quasistatic import _node_set
+from .roughness import CausalHuray
 
 __all__ = ['SurfaceCurrentFactors', 'ConductorLoss', 'surface_current_factors',
            'surface_impedance', 'surface_conductor_loss']
 
 
-def _metal_samples(frequency, conductivity, relative_permeability, roughness_rms):
+def _metal_samples(frequency, conductivity, relative_permeability, roughness_rms,
+                   roughness=None):
     f = _frequencies(frequency)
     if f[0] <= 0:
         raise ValueError('surface impedance needs strictly positive frequency; DC is unsupported')
     sigma = _scalar('conductivity', conductivity)
     mu_r = _scalar('relative_permeability', relative_permeability)
-    roughness = _scalar('roughness_rms', roughness_rms, zero=True)
+    rms = _scalar('roughness_rms', roughness_rms, zero=True)
+    if roughness is not None:
+        if not isinstance(roughness, CausalHuray):
+            raise TypeError('roughness must be a CausalHuray model or None')
+        if rms != 0:
+            raise ValueError('choose either roughness_rms or a causal roughness model')
     log_f = np.log(f)
     if np.any(np.log(sigma)-np.log(2*np.pi*epsilon_0)-log_f < np.log(1000)):
         raise ValueError('surface approximation requires sigma/(omega*eps0) >= 1000')
@@ -38,24 +45,34 @@ def _metal_samples(frequency, conductivity, relative_permeability, roughness_rms
     if (not np.all(np.isfinite(delta)) or np.any(delta <= 0)
             or not np.all(np.isfinite(resistance)) or np.any(resistance <= 0)):
         raise ValueError('surface impedance cannot be represented for these inputs')
-    scale = np.maximum(roughness, delta)
-    correction = 1+2/np.pi*np.arctan2(1.4*(roughness/scale)**2, (delta/scale)**2)
+    scale = np.maximum(rms, delta)
+    correction = 1+2/np.pi*np.arctan2(1.4*(rms/scale)**2, (delta/scale)**2)
     # Hammerstad is an empirical resistance correction. Do not invent a
     # roughness reactance or imply broadband causality for this correction.
     impedance = resistance*correction + 1j*resistance
+    if roughness is not None:
+        # Re((1+j)*H) and Im((1+j)*H) are different corrections.
+        correction, reactance = roughness._impedance_factors(delta)
+        with np.errstate(over='ignore', invalid='ignore'):
+            impedance = resistance*correction + 1j*(resistance*reactance)
+    if not np.all(np.isfinite(impedance)):
+        raise ValueError('surface impedance cannot be represented for these inputs')
     return f, delta, correction, impedance
 
 
 def surface_impedance(frequency, *, conductivity, relative_permeability=1.0,
-                      roughness_rms=0.0):
+                      roughness_rms=0.0, roughness=None):
     """Ohm/square samples for a uniform good-conductor half-space.
 
     Smooth Zs=(1+j)*sqrt(pi*f*mu/sigma). Optional Hammerstad RMS roughness
     multiplies only its resistance by 1+(2/pi)*atan(1.4*(Rq/delta)^2).
     The correction is empirical, without an added causal reactance model.
+    Alternatively roughness=CausalHuray(...) changes both resistance and
+    reactance; it cannot be combined with nonzero roughness_rms.
     Geometry/skin-depth validity is checked by surface_conductor_loss, not here.
     """
-    return _metal_samples(frequency, conductivity, relative_permeability, roughness_rms)[3]
+    return _metal_samples(frequency, conductivity, relative_permeability, roughness_rms,
+                          roughness)[3]
 
 
 def _readonly(value, dtype=float):
@@ -176,7 +193,7 @@ def surface_current_factors(mesh, signals, ground):
 
 @dataclass(frozen=True)
 class ConductorLoss:
-    """Sampled conductor R and high-frequency internal L with extraction evidence."""
+    """Sampled R/internal L; roughness_factor is Re(Zrough)/Re(Zsmooth)."""
     frequency: np.ndarray
     R: np.ndarray
     L_internal: np.ndarray
@@ -202,7 +219,8 @@ class ConductorLoss:
 
 
 def surface_conductor_loss(section, frequency, *, conductivity, ground_thickness,
-                           relative_permeability=1.0, roughness_rms=0.0, **mesh_options):
+                           relative_permeability=1.0, roughness_rms=0.0,
+                           roughness=None, **mesh_options):
     """High-frequency loss for one common metal on all signal/reference surfaces.
 
     Require delta <= every trace's minimum thickness/face-width and reference
@@ -213,14 +231,15 @@ def surface_conductor_loss(section, frequency, *, conductivity, ground_thickness
     an under-resolved surface-current result. R convergence is a separate check.
     """
     samples = _surface_samples(section, frequency, conductivity, ground_thickness,
-                               relative_permeability, roughness_rms)
+                               relative_permeability, roughness_rms, roughness)
     return _surface_from_mesh(section.mesh(**mesh_options), *samples)
 
 
 def _surface_samples(section, frequency, conductivity, ground_thickness,
-                     relative_permeability, roughness_rms):
+                     relative_permeability, roughness_rms, roughness=None):
     """Validate all metal/geometry limits before meshing."""
-    f, delta, correction, zs = _metal_samples(frequency,conductivity,relative_permeability,roughness_rms)
+    f, delta, correction, zs = _metal_samples(frequency,conductivity,relative_permeability,
+                                            roughness_rms,roughness)
     ground_thickness = _scalar('ground_thickness',ground_thickness)
     minimum = min([ground_thickness,section.width] +
                   [min(t.thickness,t.width,t.top_width or t.width) for t in section.traces])

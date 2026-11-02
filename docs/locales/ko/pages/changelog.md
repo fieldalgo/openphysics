@@ -25,7 +25,19 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 ## [Unreleased]
 
 - `galerkin`: 정상 열에 `coordinate_system="axisymmetric"` 전체 회전 (r,z) 적분을 추가했습니다. core 조립을 재사용하고 결과 metadata로 W와 Cartesian W/m를 구분합니다. 축 정칙성·해석해·수렴 검사를 포함합니다. [문서](packages/galerkin/thermal_axisymmetric.md).
+- SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
+  기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
+
+- `meshloom`: 커널의 첫 단계를 `meshloom._core`의 내부 구성 요소로 추가했습니다. 정확한 `orient3d`, `insphere`(점 번호 순서의 기호 섭동 포함), 평면 안 `incircle3d` 술어(부동소수점 필터 뒤 정확한 expansion), 점 집합의 Bowyer–Watson Delaunay 사면체 분할, 정확한 검증기입니다. 큰 정수·`Fraction` 행렬식과 비교했고 격자, 한 구 위의 점 껍질, 같은 평면 점 집합에서 확인했습니다. 기준 머신에서 균일한 점 10⁶개에 초당 16만 점입니다. [문서](packages/meshloom/overview.md#커널-구성-요소).
+
+- `meshloom`: OpenPhysics의 첫 컴파일 코드 배포판을, 계획한 정확 산술 사면체 메셔의 패키징 골격으로 새로 추가했습니다. 플랫폼마다(manylinux 2.17 x86_64·aarch64, macOS 11 x86_64·arm64, Windows x64) abi3 wheel 하나에 PyO3와 maturin으로 빌드한 Rust 커널이 들어 있습니다. `kernel_available()`과 `kernel_version()`이 커널을 알려 주고, `generate3d`는 `NotImplementedError`를 냅니다. wheel에는 정적으로 링크된 허용형 Rust crate와 표준 라이브러리의 `THIRD_PARTY_NOTICES`가 들어 있습니다. 릴리스·라이선스·배포 도구가 컴파일 wheel을 빌드하고 확인합니다. [문서](packages/meshloom/overview.md).
+- `sipi`: 동일 기하의 유한 금속·유전체 선로에서 DC/AC RLGC·S를 추출하며 `sipi.volume-line/1` JSON과 명시적 유한 경계를 제공합니다. [계약](packages/sipi/volume_line.md).
+
 - `sipi`: 유한 금속 P1 전류 확산으로 DC부터 해상된 표피·근접 효과까지 계산합니다. DC 극한·전체 인덕턴스·보존 잔차와 CrossSection 부피 메시 adapter를 제공합니다. [계약과 검증](packages/sipi/conductor_diffusion.md).
+
+- `meshine`: `extrude`가 Gmsh 없이 meshine 바닥 메시로 적층 사면체 메시를 만듭니다. 바닥 영역과 층마다 재료(또는 뺀 칸)를 주고, 하위 층은 `size`나 `divisions`로 나누며, 이웃 프리즘이 항상 맞도록 꼭짓점 순서 규칙으로 프리즘을 자르고, 면에 `z0`, `z1`, 바닥 옆면 이름, `void` 태그와 재료 사이 interface를 붙입니다. Gmsh가 없으면 건너뛰던 3D interop·비정형 공진기 시험에 적층 메시로 같은 단언을 쓰는 Gmsh 없는 쌍둥이 시험이 생겼습니다. [문서](packages/meshine/overview.md#적층-사면체-메시).
+
+- `sipi`: single-ended Touchstone 1/2 S 입력과 명시적 조건의 네트워크 비교를 제공합니다. 복소 보간은 범위 안에서 명시적으로 선택합니다. [계약과 검증](packages/sipi/touchstone.md).
 
 - `simcase`: simcase가 galerkin의 공개 이름만 import하는지 시험이 확인합니다. `galerkin.core`와 밑줄 이름은 쓰지 않습니다. 목록에 적힌 예외는 정상 경계 계약의 사각형 메시 검사 하나이며, galerkin에 공개 메시 검사가 생기면 없앱니다.
 - 문서: 미분 계약 문서가 살아 있는 계수로 `galerkin.core` 커널을 조립하는 법을 적습니다. `galerkin.core`도 나머지 Python API와 같은 0.x 규칙을 따르고, `core.forms.matrix`는 모양만 검사하며(다른 공간에서 온 같은 모양의 표는 오류 없이 틀린 행렬을 만듦), 표 하나가 커널마다 넣을 DOF 표를 밝힙니다. 커널과 `forms.matrix`의 docstring도 같은 내용을 적습니다. `eval_edge_field_3d`가 계속 NumPy 전용인 이유도 적습니다. [문서](packages/galerkin/differentiation.md#core-커널을-직접-조립하기).

@@ -102,3 +102,11 @@ def test_command_line_exit_status(tmp_path, capsys):
     assert "all distributions at" in capsys.readouterr().out
     assert release.main(["--tag", "v999.0.0"]) == 1
     assert "does not name version" in capsys.readouterr().err
+
+
+def test_compiled_kernel_version_must_match(tmp_path):
+    root = tree(tmp_path)
+    write(root, "packages/core/Cargo.toml", '[package]\nname = "core-kernel"\nversion = "0.1.0"\n')
+    assert release.check(root)[1] == []
+    write(root, "packages/core/Cargo.toml", '[package]\nname = "core-kernel"\nversion = "0.0.9"\n')
+    assert any("Cargo.toml: package version '0.0.9' != '0.1.0'" in e for e in release.check(root)[1])

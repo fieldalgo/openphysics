@@ -33,6 +33,17 @@ def test_every_package_has_the_same_hook():
         assert 'dynamic = ["readme"]' in pyproject and "readme =" not in pyproject, package.name
 
 
+def test_packages_without_the_hook_use_absolute_links():
+    """A package built by another backend (meshloom: maturin) never runs setup.py, so its README
+    is the PyPI description as written and may not use repository-relative links."""
+    for readme in sorted((ROOT / "packages").glob("*/README.md")):
+        if (readme.parent / "setup.py").exists():
+            continue
+        targets = [m.group(3) for m in hook.LINK.finditer(readme.read_text(encoding="utf-8"))]
+        relative = [t for t in targets if not re.match(r"[a-z][a-z0-9+.-]*:", t)]
+        assert targets and not relative, (readme.parent.name, relative)
+
+
 def test_rewrites_links_images_and_anchors():
     text = "\n".join([
         "[guide](docs/guide.md) [part](docs/guide.md#units \"Units\")",

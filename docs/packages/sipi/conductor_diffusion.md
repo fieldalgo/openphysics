@@ -144,3 +144,6 @@ metal, radiation, roughness, temperature-dependent or different conductor
 conductivities, nonuniform/nonlinear magnetic media, and 3D transitions are
 not implemented. Refine both metal and exterior meshes and enlarge the
 magnetic boundary for each new geometry/frequency range.
+
+For matched finite-box dielectric extraction and volume JSON, use the separate
+[volume line model](volume_line.md).

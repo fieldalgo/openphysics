@@ -11,6 +11,8 @@ dielectric layers with rectangular traces; `sipi` meshes it with
 problems with the [galerkin](../galerkin/overview.md) engine. It depends on
 numpy, scipy, galerkin and meshine.
 
+[Causal surface roughness and version-2 line input](roughness.md).
+
 ```python
 from sipi import CrossSection, Layer, Trace
 
@@ -197,12 +199,8 @@ Python 3.12, pinned environment.
 
 ## Not implemented
 
-- Automatic matching of volume-current and dielectric extraction boundaries.
-  The basic quasi-static result still does not return conductor R; use the
-  separate [volume-current contract](conductor_diffusion.md).
-  [Frequency-dependent dielectric extraction](dielectrics.md) is available separately.
 - Measured material fitting and geometric/full-wave dispersion.
-- Time-domain responses and Touchstone import. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
+- Time-domain responses. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
 - Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
@@ -215,3 +213,7 @@ Python 3.12, pinned environment.
 material and conductor extraction with RLGC/S.
 
 [DC/AC metal-volume current diffusion and finite reference plates](conductor_diffusion.md).
+
+[Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](volume_line.md).
+
+[Touchstone input and explicit network comparison](touchstone.md).

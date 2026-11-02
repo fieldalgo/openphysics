@@ -13,6 +13,7 @@
 - [galerkin-refsol — galerkin 검증용 참조해](../packages/galerkin-refsol/overview.md)
 - [gmshio — Gmsh와 링크하지 않고 galerkin에 메시 제공](../packages/gmshio/overview.md)
 - [meshine — 여러 재료로 구성된 평면 영역의 소형 품질 삼각형 메시 생성기](../packages/meshine/overview.md)
+- [meshloom — 정확 산술 컴파일 커널을 가진 사면체 메시 생성](../packages/meshloom/overview.md)
 - [openphysics](../packages/openphysics/overview.md)
 - [physmat — 물리 솔버용 재료 물성](../packages/physmat/overview.md)
 - [simcase — 모델 문서와 헤드리스 실행기](../packages/simcase/overview.md)
@@ -56,6 +57,8 @@
 
 ## SIPI 계약
 
+- [인과적 Huray 표면 법칙과 선로 JSON v2](../packages/sipi/roughness.md)
+
 - [단면 템플릿·JSON·목표 임피던스 설계](../packages/sipi/design.md)
 
 - [균일 전송선 RLGC·S·Touchstone](../packages/sipi/network.md)
@@ -66,3 +69,7 @@
 
 
 - [DC·AC 도체 부피 메시, 전류 확산과 잔차](../packages/sipi/conductor_diffusion.md)
+
+[동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).
+
+[Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).

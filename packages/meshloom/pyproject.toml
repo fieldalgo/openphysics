@@ -1,0 +1,37 @@
+[build-system]
+requires = ["maturin>=1.16,<2"]
+build-backend = "maturin"
+
+[project]
+name = "meshloom"
+version = "0.1.0"
+description = "Tetrahedral mesher with an exact-arithmetic compiled kernel"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES"]
+authors = [{ name = "Yongha Kim" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Rust",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = ["numpy>=1.26"]
+
+[project.urls]
+Homepage = "https://github.com/fieldalgo/openphysics/tree/main/packages/meshloom"
+Repository = "https://github.com/fieldalgo/openphysics/tree/main/packages/meshloom"
+Issues = "https://github.com/fieldalgo/openphysics/issues"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.maturin]
+python-source = "src"
+module-name = "meshloom._kernel"
+features = ["pyo3/extension-module"]
+include = [{ path = "LICENSE", format = "sdist" }, { path = "NOTICE", format = "sdist" }, { path = "THIRD_PARTY_NOTICES", format = "sdist" }]

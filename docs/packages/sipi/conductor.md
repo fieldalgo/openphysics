@@ -48,15 +48,17 @@ All values are SI. A runnable example is
 - `roughness_rms` defaults to zero. When positive, Hammerstad's empirical
   factor `1 + (2/pi)*atan(1.4*(Rq/delta)**2)` multiplies **R only**. Smooth-metal
   reactance is retained. This is not a causal broadband roughness model, a
-  measured surface fit, or a correction to the geometry. Huray, Gradient and
-  Groisse models are not implemented.
+  measured surface fit, or a correction to the geometry. Alternatively,
+  [causal Huray roughness](roughness.md) changes both R and internal L using
+  explicit sphere radii/area ratios; choose `roughness=CausalHuray(...)`.
+  Gradient and Groisse models are not implemented.
 - Invalid material/skin inputs are rejected before meshing. A discrepancy of
   more than 0.05 in the integrated unit-current matrix raises `ValueError`
   requesting refinement. This flux check is **not a 5% resistance guarantee**.
   Check R itself under refinement and separately enlarge the outer box.
 
 `ConductorLoss` contains copied, read-only frequency, `skin_depth` (m),
-`roughness_factor`, `R` (ohm/m) and `L_internal` (H/m). R and L are `(F,N,N)`;
+`roughness_factor` (real resistance ratio), `R` (ohm/m) and `L_internal` (H/m). R and L are `(F,N,N)`;
 off-diagonal terms are retained. `.factors` exposes C0, the `(N+1,N,N)`
 surface integrals and `(N+1,N)` integrated currents: one surface group per
 signal in `.names` order, followed by **all reference conductors together**.
@@ -123,8 +125,8 @@ geometry integrals. The finite-thickness PCB check demonstrates convergence
 for that case, not measured loss accuracy or a universal error bound.
 
 Missing: DC/low-frequency transition, interior skin/proximity diffusion,
-different metals per surface, finite reference-plane redistribution, causal
-roughness reactance, measured-coupon calibration and full-wave radiation.
+different metals per surface, finite reference-plane redistribution,
+measured-coupon calibration and full-wave radiation.
 Do not extrapolate this model to DC or substitute it for an AC PDN solver.
 
 References: E. Hammerstad and Ø. Jensen, “Accurate models for microstrip

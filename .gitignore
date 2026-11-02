@@ -24,3 +24,7 @@ error.log
 *_results/
 # Tutorial result folders such as out/wall-recorded; keeps run records' dirty flag clean.
 /out/
+
+# meshloom Rust build output and in-place extension builds
+packages/meshloom/target/
+packages/meshloom/src/meshloom/_kernel.*

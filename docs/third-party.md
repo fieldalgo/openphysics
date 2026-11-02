@@ -37,8 +37,15 @@ levels.
    [data and published numbers](#data-and-published-numbers) (CC0-1.0
    refractive-index tables embedded in physmat, published benchmark numbers in
    galerkin-refsol), which keeps its own terms. No third-party source code is
-   copied into the repository, no package contains compiled code, and the
-   distributions declare their dependencies without including them.
+   copied into the repository, and the distributions declare their
+   dependencies without including them. Only `meshloom` contains compiled code:
+   its wheels hold one Rust extension module that statically links PyO3, its
+   small dependencies and the Rust standard library, all under permissive
+   licenses, with no third-party C or C++ code. Their license texts ship in
+   `THIRD_PARTY_NOTICES`, which `tools/build_meshloom_notices.py` generates from
+   Cargo and the toolchain's sources and checks in CI; it refuses any component
+   without a permissive license. The wheels also carry a CycloneDX SBOM of the
+   crates.
 2. **Each dependency, by the license its own distribution declares**: base
    requirements, extras, test and tool dependencies, including transitive ones.
    - Permissive licenses are the default.
@@ -174,6 +181,7 @@ which are Apache-2.0 packages of this repository.
 | Distribution | Purpose | SPDX |
 |---|---|---|
 | `build`, `pyproject-hooks`, `wheel`, `setuptools`, `pip` | Build and install distributions | MIT |
+| `maturin` | Build meshloom's compiled kernel; not shipped | MIT OR Apache-2.0 |
 | `twine`, `id`, `readme-renderer`, `requests`, `requests-toolbelt`, `rfc3986` | `twine check --strict` | Apache-2.0 |
 | `docutils` | README rendering in twine | LicenseRef-Public-Domain AND BSD-2-Clause AND 0BSD (its GPL classifier covers files that are not in the wheel) |
 | `nh3`, `rich`, `markdown-it-py`, `mdurl`, `keyring`, `jaraco-classes`, `jaraco-context`, `jaraco-functools`, `more-itertools`, `jeepney`, `urllib3`, `charset-normalizer` | twine dependencies | MIT |

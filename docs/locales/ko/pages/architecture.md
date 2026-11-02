@@ -3,7 +3,7 @@
 [English](../../../architecture.md) | **한국어**
 
 OpenPhysics는 저장소이자 전체 도구 모음입니다. **`galerkin`은 그 안의 유한요소
-해석 엔진**이며, `packages/` 아래 일곱 구현 패키지 중 하나입니다. 각 패키지는
+해석 엔진**이며, `packages/` 아래 여덟 구현 패키지 중 하나입니다. 각 패키지는
 별도의 배포 단위를 가지며 의존성을 충족하면 독립적으로 사용할 수 있습니다.
 [설치 안내](overview.md)를 참고하세요.
 
@@ -59,10 +59,10 @@ flowchart TB
 것은 아닙니다. Gmsh는 별도로 설치하며 자체 라이선스를 유지합니다.
 [NOTICE](../../../../NOTICE)를 참고하세요.
 
-여덟 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
+아홉 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
 코드 없이 구현 패키지 여섯 개를 의존성으로(`sipi`는 extra로) 요구하는 메타 배포판입니다. 0.1.0은 아직 게시되지
 않았습니다. PyPI의 `openphysics`는 빈 0.0.1 이름 예약이므로 **`pip install openphysics`로는
-아직 전체 도구가 설치되지 않습니다.** 일곱 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
+아직 전체 도구가 설치되지 않습니다.** 여덟 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
 사용하기 위해 통합 전의 개별 패키지 저장소가 필요하지 않습니다.
 
 ## 진입점과 현재 지원 범위

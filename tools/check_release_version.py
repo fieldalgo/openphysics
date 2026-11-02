@@ -1,13 +1,14 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Check that the eight distributions agree on one release version.
+"""Check that the distributions agree on one release version.
 
-All eight distributions release in lockstep. This check fails unless
+All distributions under packages/ release in lockstep. This check fails unless
 
 - every packages/<name>/pyproject.toml declares the same version,
 - every import package's ``__version__`` (read from its source, not imported)
   equals that version,
+- every packages/<name>/Cargo.toml (a compiled kernel) declares that version,
 - every requirement between our own distributions, runtime or extra, admits
   that version and stops before the next minor series, and
 - CHANGELOG.md has a ``## [Unreleased]`` section or a section for that version.
@@ -72,6 +73,11 @@ def check(root=ROOT, tag=None):
                 errors.append(f"{relative}: no __version__ string")
             elif found != version:
                 errors.append(f"{relative}: __version__ {found!r} != {version!r}")
+
+    for cargo in sorted((root / "packages").glob("*/Cargo.toml")):
+        found = tomllib.loads(cargo.read_text(encoding="utf-8")).get("package", {}).get("version")
+        if found != version:
+            errors.append(f"{cargo.relative_to(root).as_posix()}: package version {found!r} != {version!r}")
 
     ours = {canonicalize_name(name) for name in projects}
     for name, data in projects.items():

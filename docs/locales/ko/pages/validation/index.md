@@ -62,6 +62,8 @@
 
 ## 내 모델로 확장하기
 
+- [인과적 거칠기: 독립 스펙트럼 적분·R/L 수렴](../packages/sipi/roughness.md#검증과-한계)
+
 - [내 계산의 수렴 확인하기](convergence.md)
 
 - [슬래브 해석해로 도파로 검증하기](slab-tutorial.md)
@@ -71,3 +73,7 @@
 - [분산 유전체: 해석식·독립 도구·메시 검증](../packages/sipi/dielectrics.md#검증과-재현)
 
 - [도체 확산: Bessel/DC 해, 메시·영역 수렴, 독립 조립](../packages/sipi/conductor_diffusion.md#검증과-제한)
+
+[동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).
+
+[Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).

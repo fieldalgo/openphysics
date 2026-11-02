@@ -30,11 +30,15 @@ def audit(source_root, artifacts):
     expected = {checker.canonicalize_name(name) for name in checker.PACKAGES}
     wheel_ids = [checker.parse_wheel_filename(p.name)[:2] for p in wheels]
     sdist_ids = [checker.parse_sdist_filename(p.name) for p in sdists]
-    if (len(wheels) != len(expected) or len(sdists) != len(expected)
-            or len(set(wheel_ids)) != len(expected)
+    # One sdist per package; one wheel per pure package, and one or more platform
+    # wheels for a package with compiled code (checker.COMPILED).
+    compiled = {checker.canonicalize_name(name) for name in checker.COMPILED}
+    pure_wheels = [i for i in wheel_ids if i[0] not in compiled]
+    if (len(sdists) != len(expected) or len(set(sdist_ids)) != len(expected)
+            or len(pure_wheels) != len(set(pure_wheels)) or len(wheel_ids) != len(set(wheels))
             or set(wheel_ids) != set(sdist_ids)
             or {name for name, _ in wheel_ids} != expected):
-        raise RuntimeError("expected matching unique wheel/sdist pairs for all eight packages")
+        raise RuntimeError(f"expected matching wheel/sdist pairs for all {len(expected)} packages")
     actual = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels + sdists}
     recorded = {}
     for line in (artifacts / "SHA256SUMS").read_text(encoding="utf-8").splitlines():

@@ -115,7 +115,7 @@ def test_input_snapshot_and_resolved_mesh_are_isolated():
 
 
 @pytest.mark.parametrize('mutate',[
-    lambda d:d.update(schema='sipi.transmission-line/2'),
+    lambda d:d.update(schema='sipi.transmission-line/999'),
     lambda d:d.update(units='mm'),
     lambda d:d.pop('conductor'),
     lambda d:d.update(conductor={'kind':'perfect','conductivity':58e6}),

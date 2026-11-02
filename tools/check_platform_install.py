@@ -14,6 +14,7 @@ import json
 import os
 import platform
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -26,8 +27,11 @@ import zipfile
 from packaging.utils import canonicalize_name, parse_wheel_filename
 
 PACKAGES = {"galerkin": "galerkin", "galerkin-refsol": "refsol", "meshine": "meshine",
-            "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase",
+            "meshloom": "meshloom", "gmshio": "gmshio", "physmat": "physmat", "simcase": "simcase",
             "sipi": "sipi"}
+# An in-place build of meshloom's kernel (maturin develop) leaves its extension next to
+# the sources; it is a build product, not a source file of the sdist.
+BUILT_IN_PLACE = re.compile(r"_kernel\.(.+\.so|pyd)$")
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -44,7 +48,7 @@ def main():
     (output / "environment.json").write_text(json.dumps({
         "platform": platform.platform(), "python": sys.version,
         "commit": os.environ.get("GITHUB_SHA"),
-        "scope": "seven installed packages; external Gmsh not executed",
+        "scope": "eight installed packages; external Gmsh not executed",
     }, indent=2)+"\n", encoding="utf-8")
     # CPU model and BLAS kernel of this runner, for last-bit numerical differences.
     subprocess.run([sys.executable, "-I", str(ROOT / "tools" / "report_numeric_runtime.py"),
@@ -79,7 +83,7 @@ def main():
         wheels.mkdir()
         expected = {}
         wheel_owners = {}
-        manifest = {"packages": {}, "files": {}, "scope": "seven installed packages; no external Gmsh execution"}
+        manifest = {"packages": {}, "files": {}, "scope": "eight installed packages; no external Gmsh execution"}
         for package, module in PACKAGES.items():
             source = ROOT / "packages" / package
             project = tomllib.loads((source / "pyproject.toml").read_text(encoding="utf-8"))["project"]
@@ -102,7 +106,8 @@ def main():
                     assert not member.issym() and not member.islnk()
                 # Code lives in src/<module>/ in the sdist and in <module>/ in the wheel.
                 for path in sorted((source / "src" / module).rglob("*")):
-                    if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
+                    if (not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc"
+                            or BUILT_IN_PLACE.search(path.name)):
                         continue
                     relative = path.relative_to(source / "src").as_posix()
                     data = path.read_bytes()
@@ -129,7 +134,7 @@ def main():
             wheel_owners[wheel_path.name] = module
             manifest["packages"][module] = package
         wheel_files = sorted(wheels.glob("*.whl"))
-        assert len(wheel_files) == len(PACKAGES) == 7
+        assert len(wheel_files) == len(PACKAGES) == 8
         wheel_entries = {}
         for wheel in wheel_files:
             with zipfile.ZipFile(wheel) as archive:
@@ -172,6 +177,7 @@ def main():
             ROOT / "tests/simcase/test_simcase.py": tests / "original_scalar.py",
             ROOT / "tests/simcase/test_export_regions.py": tests / "test_export_regions.py",
             ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
+            ROOT / "tests/meshloom/test_kernel.py": tests / "test_meshloom_kernel.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
             ROOT / "tests/simcase/test_transient_headless_windows.py":
@@ -202,6 +208,7 @@ def main():
             tests / "test_electric_joule_wheel.py",
             tests / "test_transient_thermomechanical_wheel.py",
             tests / "test_msh.py",
+            tests / "test_meshloom_kernel.py",
             tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)

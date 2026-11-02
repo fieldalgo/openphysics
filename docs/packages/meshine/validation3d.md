@@ -230,6 +230,22 @@ allow it; others are stored values in the
 [stored reference value](../../stored-reference-values.md) format.
 TetGen is not used, even as a stored reference.
 
+## Amendments
+
+Changes after the freeze, each with the old text, the new text and the reason.
+
+**2026-10-30, V21 sizes for the layered extruder.** Old: "CI sizes {0.25, 0.177,
+0.125}". New: for meshes from `meshine.extrude`, V21 on C2 is graded at
+h ∈ {0.2, 0.1, 0.05} (the sizes this plan named for runs outside CI) with the same
+thresholds, L2 slope ≥ 1.8 and H1 slope ≥ 0.9. Reason: at the original sizes the
+extruder **failed** V21: L2 slope 1.777, H1 slope 0.881 (Linux, Python 3.13). The
+first step, 0.25 to 0.177, is not yet in the asymptotic range: the same error code
+gives 1.89 and 0.95 on galerkin's structured cube at n = 4, 8, 16, and size triples
+of extruded meshes from 0.177 down give L2 1.89–1.91 and H1 0.94–0.95. At
+{0.2, 0.1, 0.05} the extruder gives L2 1.932 and H1 0.966. The project owner approved
+this exception; the failure at the original sizes stays recorded here. The
+thresholds are unchanged, and the CDT kernel is graded at the original sizes.
+
 ## Limits
 
 - The baseline constants come from one Linux machine. Time ratios (V14) are always
