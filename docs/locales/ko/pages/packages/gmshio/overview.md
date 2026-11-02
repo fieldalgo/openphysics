@@ -49,6 +49,11 @@ mesh = read_msh("model.msh")
 mesh.cells("triangle"), mesh.physical_tags("triangle"), mesh.cells_in("pec", "line")
 ```
 
+새 코드의 표준 판독기는 `gmshio`입니다. MSH 4.1과 Gmsh의 전체 요소 유형을 읽고 Gmsh를 대신
+실행합니다. `galerkin.read_msh`는 이미 있는 ASCII 2.2 또는 4.1 파일을 의존성 없이 읽는 엔진의
+파서입니다. 평면 메시에 대해 `galerkin.from_mesher(to_fem2d(read_msh(path)))`와 같은 영역,
+영역 이름, 이름 붙은 경계 변을 돌려주며, 두 판독기는 Gmsh가 쓴 파일로 서로 대조 검사합니다.
+
 `.geo` 스크립트는 작성자가 선택한 단위를 사용하므로 `gmshio`에는 절대 길이 상수가 없습니다. `Geo`의 점 병합과 T자 접합 분할은 해당 형상의 경계 상자 대각선에 대한 무차원 비율을 사용합니다. `to_fem2d`도 메시 자체의 평면 내 크기로 평면성을 판단하므로, 같은 형상을 마이크로미터 또는 킬로미터로 적어도 같은 위상을 얻습니다.
 
 `gmshio.geo`의 기본 형상:
