@@ -48,6 +48,14 @@ Supported layouts:
   vectors with a zero z component; cell data one named scalar per saved
   component, ``exx``, ``eyy``, ``gxy`` (engineering shear, dimensionless) from
   ``strain`` and ``sxx_pa``, ``syy_pa``, ``sxy_pa`` from ``stress_pa``.
+- steady heat then thermal stress (``thermoelastic2d-p1-v1``, the layout of
+  ``mechanics.thermoelastic2d``): point data ``temperature_k`` and the nodal
+  heat arrays (W/m) as scalars, ``displacement_m`` and the nodal external,
+  thermal, body, traction, reaction and residual N/m arrays as vectors; cell
+  data ``heat_flux_w_m2`` (vector), ``sigma_zz_pa`` and ``epsilon_zz``
+  (scalars) and the named components ``total_exx``, ``total_eyy``,
+  ``total_gxy``, ``thermal_exx``, …, ``elastic_exx``, …, ``sxx_pa``,
+  ``syy_pa``, ``sxy_pa``.
 
 Dirichlet node lists, ``metadata_json`` and the summary are not copied: the
 arrays named above are exported when the saved file holds them, nothing else.
@@ -75,11 +83,13 @@ _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
 _MECHANICS = "mechanics2d-p1-v1"
+_THERMOELASTIC = "thermoelastic2d-p1-v1"
+_MECHANICS_LAYOUTS = (_MECHANICS, _THERMOELASTIC)
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
 _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
-                     _ELECTRIC_JOULE, _CAVITY_COMPLEX, _MECHANICS)
+                     _ELECTRIC_JOULE, _CAVITY_COMPLEX, *_MECHANICS_LAYOUTS)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
@@ -95,11 +105,22 @@ _ELECTRIC_NODAL = ("potential_v", "joule_load_w_per_m", "electric_reaction_a_per
                    "thermal_system_rhs_w_per_m", "evaluated_temperature_k")
 _ELECTRIC_CELL_VECTORS = ("electric_field_v_m", "current_density_a_m2", "heat_flux_w_m2")
 _ELECTRIC_CELL_SCALARS = ("conductivity_s_m", "joule_heating_w_m3")
-# mechanics2d-p1-v1: (N,2) nodal vectors, and (T,3) element arrays split into
-# named scalar cell data in the saved component order. Dirichlet DOF lists stay
-# in fields.npz.
-_MECHANICS_NODAL = ("displacement_m", "load_n_per_m", "reaction_n_per_m", "residual_n_per_m")
-_MECHANICS_CELL = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa")}
+# mechanics2d-p1-v1 and thermoelastic2d-p1-v1: (N,) nodal scalars, (N,2) nodal
+# vectors, (T,2) cell vectors, (T,) cell scalars and (T,3) element arrays split
+# into named scalar cell data in the saved component order. Dirichlet node and
+# DOF lists stay in fields.npz; absent arrays are skipped.
+_MECHANICS_NODAL_SCALARS = ("temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m",
+                            "thermal_residual_w_per_m", "prescribed_outward_heat_w_per_m",
+                            "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
+                            "thermal_system_rhs_w_per_m")
+_MECHANICS_NODAL = ("displacement_m", "load_n_per_m", "load_external_n_per_m", "load_thermal_n_per_m",
+                    "load_body_n_per_m", "load_traction_n_per_m", "reaction_n_per_m", "residual_n_per_m")
+_MECHANICS_CELL_VECTORS = ("heat_flux_w_m2",)
+_MECHANICS_CELL_SCALARS = ("sigma_zz_pa", "epsilon_zz")
+_MECHANICS_CELL = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa"),
+                   "total_strain": ("total_exx", "total_eyy", "total_gxy"),
+                   "thermal_strain": ("thermal_exx", "thermal_eyy", "thermal_gxy"),
+                   "elastic_strain": ("elastic_exx", "elastic_eyy", "elastic_gxy")}
 # cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
 _CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
 
@@ -196,17 +217,35 @@ def _electric_joule(data):
     return points, cells, point_data, cell_data
 
 
-def _mechanics(data):
+def _mechanics(data, layout):
     points = _points(data["nodes_m"])
     triangles = np.asarray(data["triangles"], dtype=np.int64)
     cells = [("triangle", triangles)]
     point_data, cell_data = {}, {}
+    for name in _MECHANICS_NODAL_SCALARS:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(points),):
+                raise ValueError(f"{name}: expected one value per node, got shape {values.shape}")
+            point_data[name] = values
     for name in _MECHANICS_NODAL:
         if name in data:
             values = np.asarray(data[name], dtype=float)
             if values.shape != (len(points), 2):
                 raise ValueError(f"{name}: expected one 2D vector per node, got shape {values.shape}")
             point_data[name] = _vector3(values)
+    for name in _MECHANICS_CELL_VECTORS:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(triangles), 2):
+                raise ValueError(f"{name}: expected one 2D vector per triangle, got shape {values.shape}")
+            cell_data[name] = [_vector3(values)]
+    for name in _MECHANICS_CELL_SCALARS:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(triangles),):
+                raise ValueError(f"{name}: expected one value per triangle, got shape {values.shape}")
+            cell_data[name] = [values]
     for name, components in _MECHANICS_CELL.items():
         if name in data:
             values = np.asarray(data[name], dtype=float)
@@ -215,7 +254,7 @@ def _mechanics(data):
             for k, component in enumerate(components):
                 cell_data[component] = [np.ascontiguousarray(values[:, k])]
     if "displacement_m" not in point_data:
-        raise ValueError("mechanics2d-p1-v1 export needs the saved displacement_m array")
+        raise ValueError(f"{layout} export needs the saved displacement_m array")
     return points, cells, point_data, cell_data
 
 
@@ -282,8 +321,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
         parts = _thermal(data, layout, time_index)
     elif layout == _ELECTRIC_JOULE:
         parts = _electric_joule(data)
-    elif layout == _MECHANICS:
-        parts = _mechanics(data)
+    elif layout in _MECHANICS_LAYOUTS:
+        parts = _mechanics(data, layout)
     elif layout == _CAVITY:
         parts = _cavity(data)
     elif layout == _CAVITY_COMPLEX:
