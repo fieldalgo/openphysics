@@ -37,5 +37,7 @@ from .mode_overlap import (vector_power, vector_cross_power, vector_field_overla
                            overlap_matrix, centroid_field, interpolate_vector_field,
                            scalar_power, scalar_overlap, normalize_scalar,
                            scalar_coupling_efficiency, scalar_confinement_factor)
+from .electrostatics import (ElementPermittivity, ElectrostaticsResult,
+                             solve_electrostatics, capacitance_matrix)
 
 __version__ = "0.1.0"
