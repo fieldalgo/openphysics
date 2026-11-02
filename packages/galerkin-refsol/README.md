@@ -26,6 +26,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
+| `refsol.lossy_slab` | multilayer slab with complex permittivity, `exp(+i omega t - i beta z)`: transfer-matrix characteristic function, bound absorbing modes continued from the lossless `slab` roots, substrate-leaky modes on the outgoing sheet, field profiles | lossless limit equals `slab`, normalized residual ≤ 1e-12, first-order perturbation theory (TE confinement factor, TM vector formula) to O(n''^2), interface and layer equations by finite differences, exp(-2 k0 gamma gap) tunnelling rate, path-independent continuation |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, optional material dispersion) and exact vector mode fields (`vector_mode_field`) | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots, residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r) |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field | closed forms |
 | `refsol.cavity` | every vacuum PEC box mode up to a frequency ceiling, with polarization and geometric degeneracy, SI | independent Cartesian enumeration, no solver or mesh |
@@ -73,7 +74,7 @@ engine. The separate [engine contract](../../docs/packages/galerkin/elasticity2d
 describes boundary constraints, per-thickness loads and locking limitations.
 
 ```python
-from refsol import fiber, slab, scattering, benchmarks
+from refsol import fiber, slab, lossy_slab, scattering, benchmarks
 
 # exact HE11 effective index of a step-index fiber
 n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
@@ -81,12 +82,42 @@ n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
 # all guided TE modes of a 220 nm SOI slab
 slab.modes(n_f=3.48, n_s=1.444, n_c=1.444, d=0.22, wavelength=1.55, pol="TE")
 
+# complex TE0 of the same slab with an absorbing film n = 3.48 - 0.01i (Im n_eff < 0)
+lossy_slab.three_layer_modes(3.48 - 0.01j, 1.444, 1.444, d=0.22, wavelength=1.55, pol="TE")[0]
+
+# substrate-leaky TE0: 0.22 um film over a 0.25 um low-index gap on silicon, outgoing sheet
+lossy_slab.substrate_leaky_mode(3.48, 1.444, 3.48, d=0.22, gap=0.25, wavelength=1.55)
+
 # scattered field of a PEC cylinder, radius a, wavenumber k, at points (x, y)
 u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
 
 # published reference: quasi-TE n_eff of the Hadley rib waveguide, slab 0.3 um
 benchmarks.rib_neff(0.3)   # 3.412492
 ```
+
+`refsol.lossy_slab` solves the planar multilayer stack with complex permittivity
+in the `exp(+i omega t - i beta z)` convention of the galerkin mode solvers: a
+passive material has `Im eps <= 0` (index `n' - i n''`) and an attenuated mode
+`Im n_eff < 0`. `characteristic` is the analytic transfer-matrix function whose
+zeros are the modes; `solve` refines a guess (scipy root on real and imaginary
+parts, then complex Newton) and rejects a result whose normalized residual
+exceeds `1e-12`; `continued_root` follows a root along a path of structures.
+`three_layer_modes` starts every mode of an absorbing slab from the lossless
+`slab` root on the decaying sheet (`Im Q <= 0`, exterior fields decay);
+`substrate_leaky_mode` starts from the bound mode of the isolated slab and
+shrinks the gap to a high-index substrate on the outgoing sheet (`Re Q >= 0`;
+the leaky mode has `Im Q_sub > 0`, a transversally growing improper substrate
+field, the pole a complex-coordinate PML solver converges to). `field` returns
+`E_y` (TE) or `H_y` (TM). The self-checks compare the lossless limit with `slab`,
+the small-loss limit with first-order perturbation theory (relative error of
+`Im n_eff` 2.6e-8 at `n'' = 1e-3` falling 100-fold at `1e-4`), the fields with
+the interface and layer equations and the leakage rate with the tunnelling law
+`exp(-2 k0 gamma gap)`. `tests/galerkin/test_lossy_slab_modes.py` grades
+galerkin's scalar and vector solvers against these roots in a closed strip
+(absorbing film) and with the complex-coordinate PML (leaky slab): the complex
+error falls at second order (orders 1.97-2.00 on the finest pair) to
+3.9e-4 to 6.8e-4 at a 0.01 um step, where `Im n_eff` agrees to 3e-4 (TE) and
+4e-3 (TM) relative.
 
 `refsol.thermal_boundary` provides independent closed forms for prescribed
 outward flux and Robin boundaries. Coordinates are m, temperature K,
@@ -142,6 +173,7 @@ graders for another solver.
 - Time dependence `exp(-i omega t)`; incident plane waves travel toward +x.
 - Lengths in any consistent unit (the wavelength sets the scale).
 - Effective index `n_eff = beta / k0`.
+- `refsol.lossy_slab` and `refsol.material_cavity` use `exp(+i omega t)` like the galerkin solvers: passive `Im eps <= 0`, attenuated `Im n_eff < 0`, decaying resonance `Im omega > 0`. Conjugate to convert.
 
 ## References
 
@@ -150,6 +182,10 @@ graders for another solver.
 - K. Okamoto, *Fundamentals of Optical Waveguides*, 2nd ed. (Academic Press, 2006).
 - G. R. Hadley, "High-accuracy finite-difference equations for dielectric waveguide
   analysis II: dielectric corners," J. Lightwave Technol. 20, 1210 (2002).
+- D. Marcuse, *Theory of Dielectric Optical Waveguides* (Academic Press, 1974).
+- J. Hu and C. R. Menyuk, "Understanding leaky modes: slab waveguide revisited,"
+  Adv. Opt. Photon. 1, 58 (2009).
+- W. C. Chew, *Waves and Fields in Inhomogeneous Media* (IEEE Press, 1995).
 - Benchmark values are Hadley's published results, cross-checked against the same
   table in the femwell project's benchmark documentation (GPL-3.0). Only the
   numerical values are reproduced; see NOTICE.
