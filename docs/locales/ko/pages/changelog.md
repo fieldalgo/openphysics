@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `physmat`: Cu와 Al의 열전도율을 Hust & Lankford(1984, NBSIR 84-3007) 식으로 잔류저항비 RRR을 순도 매개변수로 하는 온도의 함수로 추가했습니다(기본 RRR 100; `physmat.HustLankford`, `physmat.thermal`, 텅스텐은 모델로 포함). 1 K부터 녹는점까지 유효하며 `OutOfRange`/`strict`를 따릅니다. 보고서 표를 1.5 % 이내(Cu, Al), NIST 극저온 OFHC 적합식을 2.3 % 이내, Ho, Powell & Liley 1972를 4.3 % 이내로 재현합니다. 300 K 상수 401/237 W/(m K)는 함수값 397/234가 됩니다. [문서](packages/physmat/overview.md#금속-열전도율의-온도-의존성-hust--lankford-1984).
+
 - `physmat`: Ciddor 1996의 습한 공기를 `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)`와 벡터화된 `physmat.air.refractive_index`로 추가했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기 분산, BIPM 1981/91 밀도로 0.3–1.69 µm에서 유효하며, NIST Engineering Metrology Toolbox 값을 1e-9 이내, 상온 조건의 Birch & Downs 1994를 6e-9 이내로 재현합니다. `air`는 진공 그대로입니다. 내장 재료 표는 재료별 출처를 밝힙니다. [문서](packages/physmat/overview.md#공기-ciddor-1996).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
