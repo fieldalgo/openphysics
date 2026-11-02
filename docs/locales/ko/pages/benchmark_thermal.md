@@ -48,8 +48,9 @@ k = 2 W/(m K), 균일 열원 10³ W/m³, 왼쪽 변 350 K이며 따로 말하지
   결과 구성을 포함한 전체 `solve_steady_heat` 또는 `solve_transient_heat` 호출.
   과도 사례에서는 `seconds_per_step`이 이를 단계 수로 나눈 값이고 `history_bytes`는
   반환된 온도·열유속 history의 크기입니다.
-- `run_seconds`(`document`): meshine mesh 생성을 포함한 전체 `simcase.run`.
-  `timings`에 runner 자체의 mesh/solve 구분이 남습니다.
+- `run_seconds`(`document`): 직사각형 열전도 문서의 전체 `simcase.run`(mesh는 meshine이
+  아니라 `galerkin.rectangle_mesh`). `timings`에 runner 자체의 mesh/solve 구분이 남으며,
+  두 쪽 모두 단계마다 한 번씩 도는 `triangle_geometry`의 mesh 검증이 대부분입니다.
 - `peak_rss_mib`: solver 호출 직후 읽은 worker 자신의
   `resource.getrusage(RUSAGE_SELF).ru_maxrss`(Linux KiB, macOS bytes를 MiB로 변환).
   import를 포함한 프로세스 lifetime 최고치이며 solver만의 메모리가 아닙니다.
@@ -112,5 +113,6 @@ BLAS thread 하나. 스크립트는 commit `92b6e15`의 것이고, checkout의 d
 약 2 %(node 8385개에서 2.46 s 중 0.054 s)이고, 호출은 node 수에 거의 비례해 node당 약
 0.3 ms씩 늘어납니다. 호출의 대부분은 factorization이 아니라 solver의 경계 시스템, 검사,
 후처리입니다. 50단계의 과도 호출은 같은 mesh의 정상 호출의 약 두 배입니다. `document`의
-실행 시간은 meshine mesh 생성을 포함합니다(`timings`가 mesh와 solve로 거의 반씩 나눕니다).
+실행 시간은 mesh와 solve 단계로 거의 반씩 나뉘고, 프로파일에 따르면 두 쪽 모두 문서 경로가
+두 번(계약 검사, 솔버) 실행하는 `triangle_geometry`의 mesh 검증이 대부분입니다.
 이 환경의 관측이며 scaling 주장이 아닙니다.
