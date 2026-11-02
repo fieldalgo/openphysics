@@ -198,3 +198,89 @@ def test_time_series_keeps_a_collection_it_did_not_create(tmp_path, monkeypatch)
         export_time_series(fields, out)
     assert [p.name for p in out.iterdir()] == ["fields.pvd"]
     assert (out / "fields.pvd").read_text(encoding="utf-8") == "other"
+
+
+_NOT_EXPORTED = ("nodes_m", "triangles", "field_layout", "result_format", "mesh_length_unit",
+                 "metadata_json", "dirichlet_node_ids", "dirichlet_temperature_k",
+                 "electric_dirichlet_node_ids", "dirichlet_potential_v",
+                 "thermal_dirichlet_node_ids")
+
+
+def _assert_every_field_array_exported(fields, mesh):
+    """Each saved array that is not mesh, metadata or a Dirichlet list is in the VTU, unchanged."""
+    with np.load(fields) as saved:
+        exported = set()
+        for name in saved.files:
+            if name in _NOT_EXPORTED:
+                assert name not in mesh.point_data and name not in mesh.cell_data
+                continue
+            array = saved[name]
+            if array.shape == (len(saved["nodes_m"]),):
+                np.testing.assert_array_equal(mesh.point_data[name], array)
+            elif array.shape == (len(saved["triangles"]),):
+                np.testing.assert_array_equal(mesh.cell_data[name][0], array)
+            else:
+                assert array.shape == (len(saved["triangles"]), 2), name
+                vector = mesh.cell_data[name][0]
+                np.testing.assert_array_equal(vector[:, :2], array)
+                np.testing.assert_array_equal(vector[:, 2], 0.0)
+            exported.add(name)
+        assert exported == set(mesh.point_data) | set(mesh.cell_data)
+        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+        np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
+    return exported
+
+
+def test_steady_boundary_heat_exports_its_boundary_loads(tmp_path):
+    fields = _saved(tmp_path, "thermal_boundary.json")
+    with np.load(fields) as saved:
+        assert str(saved["field_layout"]) == "thermal2d-p1-node-cell-boundary-v2"
+    mesh = meshio.read(export_fields(fields, tmp_path / "boundary.vtu"))
+    exported = _assert_every_field_array_exported(fields, mesh)
+    assert {"temperature_k", "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
+            "convective_outward_w_per_m", "system_rhs_w_per_m"} <= set(mesh.point_data)
+    assert set(mesh.cell_data) == {"heat_flux_w_m2"}
+    assert exported == set(mesh.point_data) | {"heat_flux_w_m2"}
+    with pytest.raises(ValueError, match="time series export needs layout"):
+        export_time_series(fields, tmp_path / "series")
+
+
+@pytest.mark.parametrize("example, heat, evaluated", [
+    ("electric_rectangle.json", False, False),
+    ("joule_rectangle.json", True, False),
+    ("joule_temperature.json", True, True)])
+def test_electric_and_joule_results_export_every_field_array(tmp_path, example, heat, evaluated):
+    fields = _saved(tmp_path, example)
+    with np.load(fields) as saved:
+        assert str(saved["field_layout"]) == "electric-joule2d-p1-v1"
+    mesh = meshio.read(export_fields(fields, tmp_path / "electric.vtu"))
+    _assert_every_field_array_exported(fields, mesh)
+    assert {"potential_v", "joule_load_w_per_m", "electric_reaction_a_per_m",
+            "prescribed_outward_current_a_per_m", "electric_residual_a_per_m"} <= set(mesh.point_data)
+    assert {"electric_field_v_m", "current_density_a_m2", "conductivity_s_m",
+            "joule_heating_w_m3"} <= set(mesh.cell_data)
+    assert ("temperature_k" in mesh.point_data) is heat
+    assert ("thermal_system_rhs_w_per_m" in mesh.point_data) is heat
+    assert ("heat_flux_w_m2" in mesh.cell_data) is heat
+    assert ("evaluated_temperature_k" in mesh.point_data) is evaluated
+    with pytest.raises(ValueError, match="time series export needs layout"):
+        export_time_series(fields, tmp_path / "series")
+
+
+def test_electric_export_checks_its_arrays_and_still_refuses_other_layouts(tmp_path):
+    nodes = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    triangles = np.array([[0, 1, 2]])
+    base = dict(field_layout="electric-joule2d-p1-v1", nodes_m=nodes, triangles=triangles)
+    missing = tmp_path / "missing.npz"
+    np.savez(missing, **base, electric_field_v_m=np.zeros((1, 2)))
+    with pytest.raises(ValueError, match="needs the saved potential_v"):
+        export_fields(missing, tmp_path / "missing.vtu")
+    wrong = tmp_path / "wrong.npz"
+    np.savez(wrong, **base, potential_v=np.zeros(3), current_density_a_m2=np.zeros((2, 2)))
+    with pytest.raises(ValueError, match="current_density_a_m2: expected one 2D vector per triangle"):
+        export_fields(wrong, tmp_path / "wrong.vtu")
+    assert not any(tmp_path.glob("*.vtu"))
+    lossy = tmp_path / "lossy.npz"
+    np.savez(lossy, field_layout="cavity3d-edge-complex-v1")
+    with pytest.raises(ValueError, match="unsupported field layout"):
+        export_fields(lossy, tmp_path / "lossy.vtu")

@@ -563,8 +563,9 @@ An existing VTU is refused; a series directory must be new or empty. Series
 failures remove files created by that call. Missing, non-integer, negative or
 incorrectly shaped `triangle_regions` arrays are rejected before output is
 created. This is an exporter for valid `save()` results, not a full validator
-for arbitrary NPZ archives. It does not support restart, XDMF, transient
-flux/Robin input or the separate rectangular steady `boundary-v2` layout.
+for arbitrary NPZ archives. It does not support restart, XDMF or transient
+flux/Robin input. The separate rectangular steady `boundary-v2` layout is
+exported by the same function with its own arrays ([overview](overview.md#viewing-in-paraview)).
 
 `tests/simcase/test_export_regions.py` checks all exported arrays against NPZ,
 all stored timesteps, initial-rate absence, region IDs distinct from material

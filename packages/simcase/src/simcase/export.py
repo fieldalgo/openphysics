@@ -11,6 +11,10 @@ Supported layouts:
 
 - steady heat (``thermal2d-p1-node-cell-v1``): point data ``temperature_k`` and
   the nodal ``load/reaction/residual`` arrays, cell data ``heat_flux_w_m2``
+- steady heat with flux or convection sides
+  (``thermal2d-p1-node-cell-boundary-v2``): the same, plus the nodal
+  ``prescribed_outward_load``, ``ambient_load``, ``convective_outward`` and
+  ``system_rhs`` arrays (W/m)
 - transient heat (``thermal2d-transient-p1-node-cell-v1``): the same arrays at
   one stored time (``time_index``, default the last), or every stored time with
   ``export_time_series``: one VTU per time plus a ParaView collection (``.pvd``)
@@ -22,6 +26,17 @@ Supported layouts:
 - 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
   ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
   normalization, unit m^-3/2)
+- electric conduction and Joule heating (``electric-joule2d-p1-v1``, the layout
+  of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``):
+  point data ``potential_v`` and the nodal electric load, reaction, prescribed
+  outward current and residual arrays; cell data ``electric_field_v_m``,
+  ``current_density_a_m2``, ``conductivity_s_m`` and ``joule_heating_w_m3`` at
+  centroids. A Joule result adds ``temperature_k``, the nodal heat arrays and
+  cell ``heat_flux_w_m2``; a temperature-dependent one adds
+  ``evaluated_temperature_k``. Each array keeps its saved name and unit suffix.
+
+Dirichlet node lists, ``metadata_json`` and the summary are not copied: the
+arrays named above are exported when the saved file holds them, nothing else.
 
 2D coordinates get z = 0, and 2D cell vectors get a zero z component, as VTK
 expects. Times, frequencies and units stay in ``fields.npz`` and
@@ -38,17 +53,32 @@ import numpy as np
 __all__ = ["export_fields", "export_time_series", "SUPPORTED_LAYOUTS"]
 
 _STEADY = "thermal2d-p1-node-cell-v1"
+_STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v2"
 _TRANSIENT = "thermal2d-transient-p1-node-cell-v1"
 _CAVITY = "cavity3d-edge-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
+_ELECTRIC_JOULE = "electric-joule2d-p1-v1"
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
-SUPPORTED_LAYOUTS = (_STEADY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS)
+_THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS)
+SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
+                     _ELECTRIC_JOULE)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
           "convective_outward_w_per_m", "system_rhs_w_per_m")
+# electric-joule2d-p1-v1 arrays by VTK association; absent arrays are skipped
+# (a plain electric result has no heat arrays, only joule.temperature2d has
+# evaluated_temperature_k). Dirichlet node lists are not exported.
+_ELECTRIC_NODAL = ("potential_v", "joule_load_w_per_m", "electric_reaction_a_per_m",
+                   "prescribed_outward_current_a_per_m", "electric_residual_a_per_m",
+                   "temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m",
+                   "thermal_residual_w_per_m", "prescribed_outward_heat_w_per_m",
+                   "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
+                   "thermal_system_rhs_w_per_m", "evaluated_temperature_k")
+_ELECTRIC_CELL_VECTORS = ("electric_field_v_m", "current_density_a_m2", "heat_flux_w_m2")
+_ELECTRIC_CELL_SCALARS = ("conductivity_s_m", "joule_heating_w_m3")
 
 
 def _meshio():
@@ -115,6 +145,34 @@ def _thermal(data, layout, time_index):
     return points, cells, point_data, cell_data
 
 
+def _electric_joule(data):
+    points = _points(data["nodes_m"])
+    triangles = np.asarray(data["triangles"], dtype=np.int64)
+    cells = [("triangle", triangles)]
+    point_data, cell_data = {}, {}
+    for name in _ELECTRIC_NODAL:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(points),):
+                raise ValueError(f"{name}: expected one value per node, got shape {values.shape}")
+            point_data[name] = values
+    for name in _ELECTRIC_CELL_VECTORS:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(triangles), 2):
+                raise ValueError(f"{name}: expected one 2D vector per triangle, got shape {values.shape}")
+            cell_data[name] = [_vector3(values)]
+    for name in _ELECTRIC_CELL_SCALARS:
+        if name in data:
+            values = np.asarray(data[name], dtype=float)
+            if values.shape != (len(triangles),):
+                raise ValueError(f"{name}: expected one value per triangle, got shape {values.shape}")
+            cell_data[name] = [values]
+    if "potential_v" not in point_data:
+        raise ValueError("electric-joule2d-p1-v1 export needs the saved potential_v array")
+    return points, cells, point_data, cell_data
+
+
 def _cavity(data):
     points = _points(data["nodes"])
     cells = [("tetra", np.asarray(data["tetrahedra"], dtype=np.int64))]
@@ -133,8 +191,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
 
     Region layouts also include static cell data ``triangle_regions``. Its IDs
     index ``region_names`` in the saved metadata/summary; no names or material
-    properties are copied to VTU. Refuses to overwrite an existing file.
-    Returns the output path.
+    properties are copied to VTU. ``time_index`` applies to transient layouts
+    only. Refuses to overwrite an existing file. Returns the output path.
     """
     output = Path(output)
     if output.suffix.lower() != ".vtu":
@@ -143,8 +201,10 @@ def export_fields(fields_npz, output, *, time_index=-1):
         raise FileExistsError(f"{output} already exists; choose a new file name")
     data = _load(fields_npz)
     layout = str(data.get("field_layout", ""))
-    if layout in (_STEADY, _TRANSIENT, *_REGION_LAYOUTS):
+    if layout in _THERMAL_LAYOUTS:
         parts = _thermal(data, layout, time_index)
+    elif layout == _ELECTRIC_JOULE:
+        parts = _electric_joule(data)
     elif layout == _CAVITY:
         parts = _cavity(data)
     else:

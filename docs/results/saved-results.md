@@ -81,11 +81,12 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Saved layout family | VTU / PVD |
 |---|---|
 | Rectangular steady heat, Dirichlet/insulated | VTU |
-| Rectangular steady heat with flux/convection (`boundary-v2`) | Unsupported |
+| Rectangular steady heat with flux/convection (`boundary-v2`), including its load arrays | VTU |
 | Steady material-region heat, including its flux/Robin fields | VTU |
 | Rectangular or region transient heat | VTU for one time, PVD for all stored times |
 | Vacuum PEC cavity | VTU |
-| Lossy cavity, waveguide modes, electric/Joule results | Unsupported by this exporter |
+| Electric conduction and Joule heating (`electric-joule2d-p1-v1`) | VTU |
+| Lossy cavity, waveguide modes | Unsupported by this exporter |
 
 The region path and rectangle boundary-v2 path have different layouts despite
 similar physical conditions. Unsupported export does not mean the solver failed.

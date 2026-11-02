@@ -115,6 +115,8 @@ convergence, output conflicts and interrupted writes. Existing solver independen
 reference-tool comparisons remain in force; this adapter adds no discretization.
 
 Only the above rectangle/homogeneous/single-study subset is exposed. Region maps,
-arbitrary sigma callbacks, gauge-only currents, transient physics, 3D, Studio,
-VTU export and release publishing are outside this contract. A model can be
+arbitrary sigma callbacks, gauge-only currents, transient physics, 3D, Studio
+and release publishing are outside this contract. Saved fields can be viewed in
+ParaView through `simcase.export` ([Viewing in ParaView](overview.md#viewing-in-paraview));
+that export copies the saved arrays and adds nothing to this contract. A model can be
 structurally valid yet fail numerically; validation does not certify convergence.
