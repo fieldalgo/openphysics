@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: `triangle_geometry` caches its validated result by mesh content (8-entry LRU, copies returned) and runs the overlap, edge-table, vertex-fan and hanging-node checks vectorised; the boundary samplers look edges up in the cached edge table. Decisions and solver outputs are unchanged byte for byte (checked on 660 result arrays and 15 rejected meshes); on Linux steady heat n=64 goes from 2.0 s to 0.46 s and the thermistor Picard n=16 from 6.2 s to 0.22 s. [Documentation](docs/packages/galerkin/overview.md#mesh-validation-cache).
+
 - `galerkin`: `Mesh3D` carries tagged outward boundary faces with `check()` (every exterior face tagged once, outward winding, node sets consistent) and refuses negative region ids; `from_mesher` keeps faces, regions and interfaces and refuses `-1` regions with the count; `read_msh` keeps 3D regions and surface tags. Contract: [tetrahedral mesh format](docs/packages/galerkin/mesh3d_format.md).
 
 - `galerkin`: `solve_cavity` and `solve_material_cavity` run the cavity solvers on external tetrahedral meshes (meshine, gmshio) with PEC or impedance walls per face tag and materials per region; the gradient kernel is counted from the constrained surface; the box solvers are unchanged bit for bit; no derivative path on the mesh variants. [Documentation](docs/packages/galerkin/cavity_solver.md#external-meshes), [material cavity](docs/packages/galerkin/material_cavity.md#external-meshes).
