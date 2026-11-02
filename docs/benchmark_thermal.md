@@ -55,8 +55,10 @@ be read without profiling:
   input checks, residual and balance checks and result construction. For the
   transient case `seconds_per_step` divides it by the number of steps and
   `history_bytes` is the size of the returned temperature and flux histories.
-- `run_seconds` (`document`): the complete `simcase.run`, including meshine mesh
-  generation; `timings` keeps the runner's own mesh/solve split.
+- `run_seconds` (`document`): the complete `simcase.run` of the rectangle thermal
+  document (meshed by `galerkin.rectangle_mesh`, not meshine); `timings` keeps
+  the runner's own mesh/solve split, in which both halves are dominated by the
+  mesh validation of `triangle_geometry`, run once per stage.
 - `peak_rss_mib`: the worker's own `resource.getrusage(RUSAGE_SELF).ru_maxrss`,
   read right after the solver call (Linux KiB and macOS bytes converted to MiB).
   It is the process lifetime high-water mark including imports, not solver-only
@@ -126,6 +128,8 @@ together take about 2 % of the complete steady solver call (0.054 s of 2.46 s
 at 8385 nodes), and the call grows about linearly with the node count, about
 0.3 ms per node; most of the call is the solver's boundary system, checks and
 postprocessing, not the factorization. The transient call, 50 steps, costs
-about twice the steady call on the same mesh. The `document` run time includes
-meshine mesh generation (`timings` splits it about evenly between mesh and
-solve). These are observations of this environment, not scaling claims.
+about twice the steady call on the same mesh. The `document` run time splits
+about evenly between its mesh and solve stages, and profiling shows both halves
+are mostly the mesh validation of `triangle_geometry`, which the document path
+runs twice (contract check, then solver). These are observations of this
+environment, not scaling claims.
