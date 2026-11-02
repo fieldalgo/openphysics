@@ -18,6 +18,7 @@ si.eps(1.55)                      # (n + i k)^2, exp(-i w t) convention: Im eps 
 si.source                         # 'C. D. Salzberg and J. J. Villa, J. Opt. Soc. Am. 47, 244 (1957) ...'
 si.range_um                       # (1.357, 11.04): evaluating outside raises OutOfRange
 si.get("thermal_conductivity")    # 148.0  (W/(m K)); the multiphysics slot
+physmat.get("Cu").get("thermal_conductivity", 77.0)   # 544: Hust & Lankford 1984 equation, RRR 100
 
 au = physmat.get("Au")            # Johnson & Christy 1972 table
 au.index(0.8)                     # 0.154 + 4.908j
@@ -49,14 +50,73 @@ custom = physmat.Material("doped SiO2", physmat.Sellmeier(B=[...], C=[...], rang
 | Si3N4 (silicon nitride) | Sellmeier 0.31–5.5 µm | Luke et al. 2015, via refractiveindex.info (CC0) |
 | GaAs, InP, Ge | Sellmeier | Skauli 2003, Pettit & Turner 1965, Burnett 2016, via refractiveindex.info (CC0) |
 | Al2O3 (sapphire), MgF2, CaF2, LiNbO3, TiO2 | Sellmeier / formula 4 | Malitson & Dodge 1972, Dodge 1984, Malitson 1963, Zelmon 1997, DeVore 1951, via refractiveindex.info (CC0) |
-| Au, Ag, Cu | n,k table 0.19–1.94 µm | Johnson & Christy 1972, via refractiveindex.info (CC0) |
-| Al | n,k table 0.2–12 µm | Rakić 1995, via refractiveindex.info (CC0) |
+| Au, Ag, Cu | n,k table 0.19–1.94 µm | Johnson & Christy 1972, via refractiveindex.info (CC0); Cu thermal conductivity λ(T): Hust & Lankford 1984, RRR 100 |
+| Al | n,k table 0.2–12 µm | Rakić 1995, via refractiveindex.info (CC0); thermal conductivity λ(T): Hust & Lankford 1984, RRR 100 |
 | H2O (water) | n,k table 0.2–200 µm | Hale & Querry 1973, via refractiveindex.info (CC0) |
 
 Room-temperature density, thermal conductivity, specific heat, Young's
 modulus, Poisson ratio, thermal expansion and thermo-optic coefficient are
 attached to Si, SiO2, Si3N4 and the metals as handbook-level starting values;
-each carries its `source` string. Check them before relying on them.
+each carries its `source` string. Check them before relying on them. The
+exception is the thermal conductivity of Cu and Al, which is a function of
+temperature from a published equation (next section).
+
+## Thermal conductivity of metals versus temperature (Hust & Lankford 1984)
+
+The `thermal_conductivity` of Cu and Al, and `physmat.thermal` for W, evaluate
+the equation of J. G. Hust and A. B. Lankford, *Thermal conductivity of
+aluminum, copper, iron, and tungsten for temperatures from 1 K to the melting
+point*, NBSIR 84-3007, National Bureau of Standards (1984),
+[doi:10.6028/NBS.IR.84-3007](https://doi.org/10.6028/NBS.IR.84-3007). One
+equation per metal, with the residual resistivity ratio RRR = ρ(273 K)/ρ(0 K)
+as the purity parameter (report Eqs. 1.1.3–1.1.6, 1.2.2; T in K, λ in W/(m K)):
+
+```
+λ    = 1 / (W0 + Wi + Wi0)
+W0   = β / T,            β = ρ0 / L0,   ρ0 = ρi,273 / (RRR − 1),   L0 = 2.443e-8 V²/K²
+Wi   = P1 T^P2 / (1 + P1 P3 T^(P2+P4) exp(−(P5/T)^P6)) + Wc(T)
+Wi0  = P7 Wi W0 / (Wi + W0)
+```
+
+with the report's parameters P1–P7, the small correction terms Wc and
+ρi,273 = 15.4, 24.8 and 48.4 nΩ m for Cu, Al and W. No table of the report is
+stored; the equation is evaluated.
+
+```python
+cu = physmat.get("Cu")
+cu.get("thermal_conductivity", np.array([4.0, 20.0, 77.0, 300.0]))   # 628, 2420, 544, 397  (RRR 100)
+physmat.HustLankford("Cu", rrr=300)(20.0)                            # 5073: purer copper
+physmat.HustLankford("Al", rrr=1000).range_k                         # (1.0, 933.47): 1 K to the melting point
+physmat.thermal.thermal_conductivity("W", 300.0)                     # 175.6  (RRR 100)
+physmat.thermal.conductivity_property("W", rrr=50)                   # a Property for your own Material("W", ...)
+```
+
+- **Default RRR 100** for all three metals: a column of the report's own tables,
+  the OFHC-copper grade of the NIST cryogenic fits, and within 2 % of the handbook
+  300 K constants it replaces (Cu 397 vs 401, Al 234 vs 237, W 176 vs 174 W/(m K)).
+  Pass `rrr=` for another purity; below ~100 K the value depends strongly on it.
+- **Validity**: 1 K to the melting point (Cu 1357.77 K, Al 933.47 K, W 3695 K),
+  for annealed bulk specimens; the report represents its primary data within
+  about ±15 % (Cu), random deviations (Al) and ±7 % (W). Temperatures outside
+  raise `OutOfRange` unless `strict=False`. RRR must exceed 1; outside the RRR
+  range of the fitted data (Cu 20–1800, Al 13–16800, W 30–170) the model raises
+  `OutOfRange` unless built with `strict=False`.
+- **Checks** (`tests/physmat/test_conductivity_temperature.py`): the report's
+  Tables 2.4.1 and 3.4.1 are reproduced within 1.5 % (one misprinted Al entry
+  excluded); Cu RRR 100 agrees with the NIST Cryogenic Material Properties OFHC
+  fit within 2.3 % over 4–300 K and with the Ho, Powell & Liley (1972)
+  recommended values within 4.3 % from 100 to 1300 K; Al and W agree with Ho,
+  Powell & Liley within 3.8 % (150–900 K) and 4.0 % (100–3000 K). For tungsten
+  the report's printed parameters reproduce its Table 5.4.1 within 2 % except
+  near the conductivity maximum of the purer columns (table up to 3.5 % above
+  the equation at RRR 100, 7.2 % at RRR 300), an inconsistency of the source
+  that is recorded, not corrected. Aluminium has a shallow minimum near 242 K
+  (+0.5 % to 300 K), as in the report's table and in Ho, Powell & Liley.
+- **Provenance**: the report is a work of the United States Government, not
+  subject to copyright in the United States (17 U.S.C. 105); its status elsewhere
+  is not settled by that statute and is recorded in `NOTICE`, not decided here.
+  Tungsten is not yet a built-in material (it has no optical model); use the
+  `physmat.thermal` functions directly.
 
 ## Air (Ciddor 1996)
 
@@ -106,8 +166,10 @@ The refractiveindex.info database is dedicated to the public domain
 M. N. Polyanskiy, "Refractiveindex.info database of optical constants",
 *Sci. Data* **11**, 94 (2024). Every built-in record also names the original
 measurement. `tools/build_physmat_tables.py` regenerates the embedded tables from a
-local copy of the database. The Ciddor air model holds no database data: it
-evaluates the published equations and their constants.
+local copy of the database. The Ciddor air model and the Hust & Lankford
+conductivity model hold no database data: they evaluate the published
+equations and their constants (see `NOTICE` for the US-government-work note on
+the latter).
 
 ## Self-checks
 
@@ -130,7 +192,8 @@ table's rounding), agrees with an independent Birch & Downs 1994 modified
 Edlén implementation within 1.5e-8 at ambient conditions (measured at most
 5.7e-9), reproduces Ciddor's published Z_a = 0.9995922115 and
 ρ_ws = 0.00985938 kg/m³, and has the right limits (n → 1 as p → 0, monotonic
-in pressure, falling with temperature, normal dispersion).
+in pressure, falling with temperature, normal dispersion). The Hust & Lankford
+conductivity gates are listed in the section above.
 
 ## License
 
