@@ -368,11 +368,38 @@ These timings come from different discretizations and are not a performance comp
 gates. The comparison found no disagreement beyond galerkin's documented mesh error
 and the reference's first-order term.
 
+## External meshes
+
+`solve_material_cavity(mesh, *, regions, walls=None, num_modes=6, target_frequency_hz)`
+runs the same assembly, search, impedance iteration and checks on any mesh of the
+[tetrahedral mesh format](mesh3d_format.md) with regions and tagged outward faces
+(checked on entry), coordinates in metres.
+
+- `regions`: `{region name: (eps_r, mu_r)}`, or `{name: eps_r}` for `mu_r = 1`,
+  with exactly the entries of `mesh.region_names`; the same passivity checks as
+  `CavityMaterialRegion`. A material interface is wherever two regions meet, so
+  a dielectric slab is an extruded layer region, not a grid-plane box.
+- `walls`: `None` (every tagged face PEC) or `{face tag: conductivity S/m or None}`;
+  tags not listed are PEC, unknown tags raise `ValueError`. Listed conductivities
+  take the Leontovich condition above on exactly those faces.
+- JAX or PyTorch values raise `TypeError`; the result's `mesh` is the one given,
+  `wall_conductivity_s_per_m` is keyed by face tag and `gradient_kernel_dimension`
+  records the counted kernel: every tagged face is a wall, so the kernel is spanned
+  by the potentials constant on each boundary component, as for
+  [`solve_cavity`](cavity_solver.md#external-meshes).
+
+| Gate | Requirement | Measured (Linux, this change) |
+| --- | --- | --- |
+| M3 slab `eps_r = 2.2 - 0.02j` in `0 <= z <= 0.3 m` of the 1.0 x 0.8 x 0.6 m box as an extruded layer region, sizes 0.15, 0.1, 0.05 m, against `solve_material_cavity_box` with the same slab as a `CavityMaterialRegion` at matching subdivisions, three modes | finest relative frequency difference <= 5e-3 | 9.72e-3, 2.12e-3, 4.69e-4 |
+| the same slab at 0.15 m with a 5.8e7 S/m floor (`walls={"z0": ...}` and `wall_conductivity_s_per_m={"z0": ...}`) | within 5e-2, finite Q, at least one impedance iteration | passes |
+| the box solver's own 2x2x2 mesh with the slab as regions and `x1` lossy, through both routes | relative difference <= 1e-10, Q to 1e-8 | 2.99e-16 |
+
 ## Limitations
 
 - Finite-conductivity walls are local Leontovich impedances on whole box walls, with
   first-order references; no roughness, coatings, or partial-wall patches.
 - Constant, isotropic, frequency-independent `eps_r`, `mu_r`. Dispersive materials
   would also make the problem nonlinear.
-- Regions are boxes aligned with grid planes. No staircase or curved interfaces.
+- Regions of the box solver are boxes aligned with grid planes, with no staircase or
+  curved interfaces; `solve_material_cavity` takes the regions its mesh carries.
 - Search, cluster and count policies are those of the vacuum solver.

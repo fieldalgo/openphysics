@@ -337,11 +337,35 @@ Arnoldi 벡터 14개로는 `eps = 4 - 0.04j` 경우의 4차 실행에서 여섯�
 **지원 판단:** 바뀌지 않습니다. 이 기능은 해석해 기준을 근거로 지원합니다. 비교에서 galerkin의
 문서화된 메시 오차와 정답의 1차 항을 넘는 불일치는 없었습니다.
 
+## 외부 메시
+
+`solve_material_cavity(mesh, *, regions, walls=None, num_modes=6, target_frequency_hz)`는
+영역과 바깥 방향 면 태그를 가진 [사면체 메시 형식](mesh3d_format.md)의 어떤 메시에서든
+(진입 시 검사, 좌표 m) 같은 조립·검색·임피던스 반복·검사를 실행합니다.
+
+- `regions`: `{영역 이름: (eps_r, mu_r)}` 또는 `mu_r = 1`인 `{이름: eps_r}`,
+  `mesh.region_names`와 정확히 같은 항목. `CavityMaterialRegion`과 같은 수동성 검사.
+  재료 경계면은 두 영역이 만나는 곳이므로 유전체 판은 격자 평면 상자가 아니라 쌓은
+  층 영역입니다.
+- `walls`: `None`(모든 태그 면 PEC) 또는 `{면 태그: 전도도 S/m 또는 None}`. 적지 않은
+  태그는 PEC, 모르는 태그는 `ValueError`. 적은 전도도는 바로 그 면에 위의 Leontovich
+  조건을 둡니다.
+- JAX·PyTorch 값은 `TypeError`. 결과의 `mesh`는 받은 메시, `wall_conductivity_s_per_m`은
+  면 태그가 키이고 `gradient_kernel_dimension`은 셈한 kernel입니다. 모든 태그 면이
+  벽이므로 kernel은 각 경계 성분에서 상수인 전위가 생성합니다([`solve_cavity`](cavity_solver.md) 참조).
+
+| Gate | 요구 | 측정(Linux, 이 변경) |
+| --- | --- | --- |
+| M3 1.0 x 0.8 x 0.6 m 상자의 `0 <= z <= 0.3 m`에 `eps_r = 2.2 - 0.02j` 판을 쌓은 층 영역으로, 크기 0.15, 0.1, 0.05 m, 같은 판을 `CavityMaterialRegion`으로 둔 같은 분할의 `solve_material_cavity_box` 대비, 모드 셋 | 최세밀 상대 주파수 차 <= 5e-3 | 9.72e-3, 2.12e-3, 4.69e-4 |
+| 같은 판, 0.15 m, 5.8e7 S/m 바닥(`walls={"z0": ...}`과 `wall_conductivity_s_per_m={"z0": ...}`) | 5e-2 이내, 유한한 Q, 임피던스 반복 1회 이상 | 통과 |
+| 상자 솔버 자신의 2x2x2 메시에 판을 영역으로, `x1` 손실 벽을 두 경로로 | 상대 차 <= 1e-10, Q는 1e-8 | 2.99e-16 |
+
 ## 한계
 
 - 유한 전도도 벽은 상자 벽 전체에 적용하는 국소 Leontovich 임피던스이며 정답은 1차
   섭동식입니다. 거칠기, 코팅, 벽 일부 패치는 없습니다.
 - 일정하고 등방적이며 주파수 무관한 `eps_r`, `mu_r`만 지원합니다. 분산 재료도 문제를
   비선형으로 만듭니다.
-- 영역은 격자 평면에 맞춘 직육면체입니다. 계단 근사나 곡면 경계는 없습니다.
+- 상자 솔버의 영역은 격자 평면에 맞춘 직육면체이며 계단 근사나 곡면 경계는 없습니다.
+  `solve_material_cavity`는 메시가 가진 영역을 그대로 씁니다.
 - 검색·군집·개수 정책은 진공 솔버와 같습니다.
