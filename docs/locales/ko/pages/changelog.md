@@ -46,6 +46,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `simcase`: 균질 직사각형의 headless 기계해석 문서 두 종. `mechanics.elasticity2d`는 변별 변위 성분·전역 직교좌표계 변 traction·상수 체적력을 쓰는 정적 평면응력/평면변형률 선형탄성을, `mechanics.thermoelastic2d`는 같은 메시에서 변별 상수 경계 데이터의 정상 열전도를 먼저 풀고 전체 traction으로 열응력을 풉니다. 구속이 강체 운동을 남기는 문서는 메시 생성 전에 거부합니다. 결과는 `mechanics.elasticity2d-result-v1`(layout `mechanics2d-p1-v1`)과 `mechanics.thermoelastic2d-result-v1`(`thermoelastic2d-p1-v1`)로 저장되고 `export_fields`가 이름 붙은 변형률·응력 성분으로 VTU를 쓰며 Studio는 둘을 거절합니다. 예제 `elastic_plate`, `thermoelastic_bar`. [문서](packages/simcase/mechanics2d.md).
 - CI: 필수 검사가 아닌 하루 한 번의 `Latest dependencies` 카나리(`.github/workflows/latest-deps.yml`)가 메타데이터가 허용하는 가장 새 의존성으로 패키지를 설치하고 `pip check`, 라이선스 목록 검사, 사전 검사 묶음, non-slow 시험, 강제 커널 시험을 돌린 뒤 해석된 버전과 함께 이슈 하나를 열거나 갱신하거나 닫습니다. 고정 버전은 여전히 의도적으로 올립니다. [문서](development.md#최신-의존성-카나리).
 - `galerkin`: `galerkin.read_msh`가 평면 MSH 2.2/4.1 파일의 물리 그룹을 보존합니다. 물리 표면은 `regions`/`region_names`가 되고(어느 물리 표면에도 속하지 않는 삼각형은 영역 -1), 물리 곡선은 `boundary_edges`와 `boundary`가 되며, 어떤 삼각형도 쓰지 않는 절점은 버립니다. 결과는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 배열 단위로 같습니다. `write_msh`는 평면 메시의 영역마다 물리 표면 하나를 씁니다. 사면체 메시는 바뀌지 않습니다. [문서](packages/galerkin/overview.md).
+- CI: GitHub의 Node 20 런타임 종료에 맞춰 고정한 GitHub Actions를 Node 24 릴리스(`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6)로 올렸습니다. 검사 내용과 아티팩트 이름은 바뀌지 않습니다.
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
