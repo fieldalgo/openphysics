@@ -1,5 +1,7 @@
 # Independent prescribed-temperature mechanical-stage acceptance
 
+[한국어](../../locales/ko/pages/packages/galerkin/prescribed_temperature_thermoelasticity_independent_validation.md)
+
 **At a glance**
 
 - **What it checks:** independent acceptance of `galerkin.thermoelasticity.solve_thermoelasticity` against an original three-dimensional continuum oracle, for an explicitly prescribed nodal-P1 Kelvin field in plane stress and plane strain.

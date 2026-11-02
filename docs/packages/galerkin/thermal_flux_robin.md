@@ -1,5 +1,7 @@
 # Steady 2D outward heat flux and convection
 
+[한국어](../../locales/ko/pages/packages/galerkin/thermal_flux_robin.md)
+
 Import `galerkin.thermal.solve_steady_heat` explicitly. The homogeneous,
 isotropic constant-conductivity P1 triangular model solves
 `-div(k grad T)=Q` in SI coordinates with unit out-of-plane depth.

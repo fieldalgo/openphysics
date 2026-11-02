@@ -1,5 +1,7 @@
 # 정상 Joule heating
 
+[English](../../../../../packages/galerkin/joule_heating.md)
+
 명시적 단방향 workflow `galerkin.joule_heating.solve_steady_joule_heat`는
 `galerkin.electric.solve_steady_electric`의 `SteadyElectricResult`를 받아
 요소별 발열을 기존 정상 열 솔버에 전달합니다. 전기 결과의 기준 계약은

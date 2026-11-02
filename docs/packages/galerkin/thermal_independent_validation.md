@@ -1,5 +1,7 @@
 # Independent acceptance: steady heat conduction
 
+[한국어](../../locales/ko/pages/packages/galerkin/thermal_independent_validation.md)
+
 Candidate implementation: `aaf948ae38aa82907ca16ef7cdeed75dfa7484ba`.
 This independent suite adds a quartic manufactured solution and a mixed-boundary
 quadratic solution, rather than using the implementation's sine answer key.

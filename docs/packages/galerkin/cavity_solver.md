@@ -1,5 +1,7 @@
 # Vacuum rectangular PEC cavity solver
 
+[한국어](../../locales/ko/pages/packages/galerkin/cavity_solver.md)
+
 ```python
 from galerkin import solve_cavity_box
 

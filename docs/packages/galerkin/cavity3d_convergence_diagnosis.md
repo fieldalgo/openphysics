@@ -1,5 +1,7 @@
 # Rectangular PEC 111 doublet: signed-mean convergence diagnosis
 
+[한국어](../../locales/ko/pages/packages/galerkin/cavity3d_convergence_diagnosis.md)
+
 **Historical candidate analysis:** the source SHAs below identify the earlier
 uniform-diagonal core. For the subsequent alternating-mesh candidate, see
 [the independent revalidation](cavity3d_alternating_validation.md). The earlier
