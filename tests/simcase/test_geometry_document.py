@@ -331,3 +331,52 @@ def test_the_reader_imports_without_the_solver_chain():
             "print(sorted(m for m in ('shapely', 'scipy', 'galerkin', 'meshine', 'matplotlib') if m in sys.modules))")
     assert subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                           check=True).stdout.split() == ["[]"]
+
+
+# ----------------------------------------------------------------- 1b: documents with version 1 geometry
+
+def _as_v1(name):
+    doc = copy.deepcopy(DOCS[name])
+    doc["geometry"] = from_v02(doc["geometry"])
+    return doc
+
+
+@pytest.mark.parametrize("name", sorted(DOCS))
+def test_a_document_with_version_1_geometry_runs_the_same_input(name):
+    from simcase import Document
+    v1_doc = _as_v1(name)
+    doc = Document.from_dict(copy.deepcopy(v1_doc))
+    assert doc.data == Document.from_dict(copy.deepcopy(DOCS[name])).data
+    assert doc.geometry_source == v1_doc["geometry"] and doc.geometry_roundings == []
+    assert doc.to_dict()["geometry"] == v1_doc["geometry"]
+    assert doc.copy().to_dict() == doc.to_dict()
+
+
+def test_a_thermal_region_document_gives_identical_results(tmp_path):
+    from simcase import Document, run
+    a = run(Document.from_dict(copy.deepcopy(DOCS["builtin:thermal_regions"])), verbose=False)
+    b = run(Document.from_dict(_as_v1("builtin:thermal_regions")), verbose=False)
+    np.testing.assert_array_equal(a.temperature_k, b.temperature_k)
+    np.testing.assert_array_equal(a.mesh_nodes_m, b.mesh_nodes_m)
+
+
+def test_save_keeps_the_version_1_block_and_roundings_become_notes(tmp_path):
+    from simcase import Document
+    doc_v1 = _as_v1("builtin:soi_strip")
+    feature = doc_v1["geometry"]["components"]["main"]["features"][0]
+    feature["w"] = feature["w"] + 1e-13                     # a residue below 1 pm in micrometres
+    doc = Document.from_dict(copy.deepcopy(doc_v1))
+    assert len(doc.geometry_roundings) == 1
+    assert any("onto the 1 pm grid" in n for n in doc.notes)
+    doc.save(tmp_path / "m.json")
+    saved = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
+    assert saved["geometry"] == doc_v1["geometry"]
+    assert Document.load(tmp_path / "m.json").data == doc.data
+
+
+def test_an_invalid_version_1_block_is_a_document_error():
+    from simcase import Document, DocumentError
+    doc = _as_v1("builtin:soi_strip")
+    doc["geometry"]["components"]["main"]["features"][0]["rotation"] = 0.3
+    with pytest.raises(DocumentError, match="rotation: reserved"):
+        Document.from_dict(doc)

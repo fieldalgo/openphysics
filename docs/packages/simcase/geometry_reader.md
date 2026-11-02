@@ -7,8 +7,22 @@
 `simcase.geometry_document` reads the version 1 `geometry` block defined by the
 [geometry document contract](geometry_document.md). It is stage 1 of that
 contract: it parses, validates and quantizes, and it hands geometry to the
-existing builders. No runner reads version 1 documents yet; that waits for the
-JSON contract decision.
+existing builders.
+
+## In a document
+
+A document keeps `"openphysics": "0.2"`; only its `geometry` block carries
+`"version": 1`. `Document.from_dict` and `Document.load` read such a block with
+`parse`, compile it with `to_v02` and give the runners the 0.2 form, so every
+runner works unchanged and refuses what it cannot take. A block without
+`version` is read as before.
+
+- `doc.data` holds the compiled 0.2 geometry. Results that record the document
+  record this form, which is what was calculated.
+- `doc.geometry_source` holds the version 1 block as written, and `doc.save`,
+  `doc.to_dict` and `doc.copy` keep it.
+- Each value moved onto the 1 pm grid is listed in `doc.geometry_roundings` and
+  reported in `doc.notes`.
 
 ```python
 from simcase.geometry_document import parse, to_v02, from_v02, layer_stack
@@ -73,7 +87,8 @@ Importing `simcase.geometry_document` loads neither scipy nor shapely:
 `tests/simcase/test_geometry_document.py`:
 - All 45 current simcase documents (the built-in examples and
   `examples/simcase/*.json`) go from 0.2 to version 1 and back unchanged, with no
-  rounding.
+  rounding, and each one written with version 1 geometry loads to the same
+  `Document.data`. The region heat example gives identical temperatures.
 - The 1 pm grid, half-to-even rounding, the range limit and unit declarations.
 - Expression kinds, cycles, division by zero and refused tokens.
 - The layers form of `examples/meshine/extrude_chip.py` gives the same mesh as the

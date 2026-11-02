@@ -5,8 +5,17 @@
 [문서 홈](../../index.md)
 
 `simcase.geometry_document`는 [형상 문서 계약](geometry_document.md)이 정한 버전 1 `geometry` 블록을
-읽습니다. 계약의 1단계로, 파싱·검증·양자화를 하고 형상을 기존 생성기에 넘깁니다. 아직 버전 1 문서를
-읽는 실행기는 없으며, JSON 계약 결정 뒤에 연결합니다.
+읽습니다. 계약의 1단계로, 파싱·검증·양자화를 하고 형상을 기존 생성기에 넘깁니다.
+
+## 문서 안에서
+
+문서는 `"openphysics": "0.2"`를 그대로 두고, `geometry` 블록만 `"version": 1`을 가집니다. `Document.from_dict`와
+`Document.load`는 이런 블록을 `parse`로 읽고 `to_v02`로 컴파일해 실행기에 0.2 형식을 넘깁니다. 그래서 모든 실행기가
+바뀌지 않은 채 동작하고, 받을 수 없는 형상은 거부합니다. `version`이 없는 블록은 지금처럼 읽습니다.
+
+- `doc.data`에는 컴파일된 0.2 형상이 들어 있습니다. 문서를 기록하는 결과 파일은 실제로 계산한 이 형식을 기록합니다.
+- `doc.geometry_source`에는 쓴 그대로의 버전 1 블록이 들어 있고, `doc.save`·`doc.to_dict`·`doc.copy`가 이를 유지합니다.
+- 1 pm 격자로 옮긴 값은 `doc.geometry_roundings`에 남고 `doc.notes`로 보고됩니다.
 
 ```python
 from simcase.geometry_document import parse, to_v02, from_v02, layer_stack
@@ -61,7 +70,8 @@ mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
 
 `tests/simcase/test_geometry_document.py`:
 - 현재 simcase 문서 45개(내장 예제와 `examples/simcase/*.json`)가 0.2에서 버전 1로, 다시 0.2로 반올림
-  없이 그대로 돌아옵니다.
+  없이 그대로 돌아오고, 각각을 버전 1 형상으로 쓴 문서가 같은 `Document.data`로 읽힙니다. 영역 열전도 예제는
+  같은 온도를 냅니다.
 - 1 pm 격자, half-to-even 반올림, 범위 한계, 단위 선언.
 - 식의 종류, 순환, 0으로 나누기, 거부되는 토큰.
 - `examples/meshine/extrude_chip.py`를 층 형태로 쓴 메시가 직접 `extrude`를 부른 메시와 노드 하나까지
