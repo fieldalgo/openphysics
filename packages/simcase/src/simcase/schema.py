@@ -190,6 +190,11 @@ class Document:
     scale: Scale = field(default=units.SI, init=False, repr=False)
     #: magnitude warnings from validate(); a scale error is not an invalid document
     notes: list[str] = field(default_factory=list, init=False, repr=False)
+    #: the version 1 geometry block as written, when the document had one; ``data``
+    #: then holds its 0.2 compilation, which is what the runners read and record
+    geometry_source: dict | None = field(default=None, init=False, repr=False)
+    #: values the version 1 reader moved onto the 1 pm grid (simcase.geometry_document.Rounding)
+    geometry_roundings: list = field(default_factory=list, init=False, repr=False)
 
     # -- construction --------------------------------------------------------
 
@@ -197,21 +202,47 @@ class Document:
     def from_dict(cls, d: dict) -> "Document":
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
+        source, roundings = None, []
+        geometry = d.get("geometry")
+        if isinstance(geometry, dict) and "version" in geometry:
+            # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
+            # exactly and compiled to the 0.2 form the runners take; the envelope stays 0.2.
+            from .geometry_document import GeometryError, parse, to_v02
+            try:
+                model = parse(d)
+                compiled = to_v02(model)
+            except GeometryError as exc:
+                raise DocumentError(str(exc)) from None
+            source, roundings = copy.deepcopy(geometry), model.roundings
+            d = {**d, "geometry": compiled}
         kind = kind_of(d)
         defaults = DEFAULTS if kind.defaults is None else kind.defaults()
         doc = cls(_merge(defaults, d))
         doc.validate()
+        doc.geometry_source, doc.geometry_roundings = source, list(roundings)
+        doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
+                         for r in roundings)
         return doc
 
     @classmethod
     def load(cls, path: str | Path) -> "Document":
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
+    def to_dict(self) -> dict:
+        """The document as written: a version 1 geometry block comes back unchanged."""
+        data = copy.deepcopy(self.data)
+        if self.geometry_source is not None:
+            data["geometry"] = copy.deepcopy(self.geometry_source)
+        return data
+
     def save(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps(self.data, indent=2), encoding="utf-8")
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
 
     def copy(self) -> "Document":
-        return Document(copy.deepcopy(self.data))
+        other = Document(copy.deepcopy(self.data))
+        other.geometry_source = copy.deepcopy(self.geometry_source)
+        other.geometry_roundings = list(self.geometry_roundings)
+        return other
 
     # -- access --------------------------------------------------------------
 
