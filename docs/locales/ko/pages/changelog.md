@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: `thermal.transient2d` 문서가 정상 경계조건 계약의 `outward_flux_w_m2`·`convection` 변 키를 받습니다(같은 이름·한계·메시지, 상수만, anchor 불필요). 키가 있으면 새 쌍 `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`을 선택해 step별 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`(W/m)을 단위·위치·시간축과 함께 저장하고, 키가 없는 문서는 v1을 byte 단위로 유지합니다. `export_fields`·`export_time_series`가 새 layout을 쓰고 과도 Studio route는 검증 전에 거절합니다. 새 예제 `transient_thermal_boundary`. 기준: `refsol.transient_heat_robin` 대류 slab 상대 L2 ≤ 2e-3(측정 2.0e-4). [문서](packages/simcase/thermal_transient2d.md).
+
 - `galerkin`: `solve_transient_heat`가 정상 솔버와 같은 입력 형식·부호의 `outward_flux`·`convection`을 받습니다(변 태그별 scalar 또는 callback(points, normals), 한 번 표본화하는 시간 무관 데이터; 시간 callback은 거절). 시스템은 M/dt+K+H이며 결과에 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`이 추가됩니다(경계 데이터가 없으면 None; Dirichlet 전용 이력은 비트 단위로 동일). 새 `refsol.transient_heat_robin` 대류·상수 열유속 slab 급수. 기준: slab 공간 차수 ≥1.8, 시간 차수 ≥0.9, `solve_steady_heat`와 장시간 일치 ≤1e-8, 단계별 열수지 ≤1e-10. [문서](packages/galerkin/transient_heat.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
