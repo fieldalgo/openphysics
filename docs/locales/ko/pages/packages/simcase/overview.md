@@ -95,7 +95,7 @@ python -m simcase run vector.json -o vector_results
 
 각 모드는 하나의 공통 척도, 즉 중심점 최대 `|E| = 1`을 사용합니다. 진폭은 상대값이며 V/m 또는 정규화 전력이 아닙니다. 모든 성분은 이 척도를 공유하고 이 무손실 모드의 Ez는 횡방향 장과 직교 위상입니다. 중심값은 요소별로 유지되어 경계면 불연속을 보존합니다. 원시 변/절점 계수는 다른 곳에서 복원할 수 있도록 유한요소 장을 유지합니다.
 
-벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
+벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모든 `em.modes2d` 결과(스칼라·벡터)는 두 파일에 저장 파일 배치 `field_layout="em-modes2d-p1-node-centroid-v1"`(P1 절점 장, 벡터 결과는 요소중심 전기장을 더함), `mesh_length_unit`(`nodes`의 선언 단위), `length_unit_to_m`(그 단위의 미터 크기)을, archive에는 `study_parameter`(sweep 경로, 단일 지점이면 `""`)를 함께 기록합니다. subspace sweep은 대신 `field_layout="em-modes2d-subspace-raw-v1"`을 기록합니다. 기존 키의 의미는 바뀌지 않습니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
 
 Studio는 지점마다 `location="triangle_centroids"`, 성분 이름, `(modes, triangles, 3)` 형상의 별도 `real`/`imag` 배열을 가진 `vector_fields`를 받습니다. 기존 스칼라 HTTP `fields` 구성은 그대로이며 벡터에서는 비어 있습니다. `|E|`, `|Ex|`, `|Ey|`, `|Ez|`를 골라 공통 |E| 색 척도의 크기를 표시합니다. 저장 PNG는 |E|를 표시하고 archive는 복소 성분을 보존합니다. `VectorField.to_dict()`는 같은 JSON 안전 표시 표본을 만듭니다.
 

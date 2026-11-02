@@ -196,12 +196,16 @@ def test_save_writes_a_fresh_versioned_layout(result, tmp_path):
     output = result.save(tmp_path / "out")
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
     assert summary["field_representation"] == "vector-subspace-edge-nodal-v1"
+    assert summary["field_layout"] == "em-modes2d-subspace-raw-v1"  # not the per-mode layout
+    assert summary["mesh_length_unit"] == "um" and summary["length_unit_to_m"] == 1e-6
     assert summary["clusters"] == [{"id": 1, "rank": 2, "columns": [0, 2]}]
     assert "neff" not in summary and "group_index" not in summary
     assert summary["mode_tracking"] == result.mode_tracking
     np.testing.assert_allclose(summary["cluster_mean_group_index"], result.cluster_mean_group_index())
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
         assert str(arrays["field_representation"]) == "vector-subspace-edge-nodal-v1"
+        assert str(arrays["field_layout"]) == "em-modes2d-subspace-raw-v1"
+        assert str(arrays["study_parameter"]) == "physics.em1.wavelength"
         assert arrays["cluster_offsets"].tolist() == [0, 2]
         np.testing.assert_array_equal(arrays["raw_neff"], result.neff)
         assert arrays["frame_transform"].shape == (5, 2, 2)
