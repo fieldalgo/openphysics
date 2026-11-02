@@ -12,6 +12,9 @@ Third-party material retains its own terms:
   references are retained in the material records.
 - Published benchmark numbers and their references are identified in
   packages/galerkin-refsol/NOTICE.
+- The Hust and Lankford (1984, NBSIR 84-3007) thermal-conductivity equations
+  evaluated in physmat are from a US Government work, as identified in
+  packages/physmat/NOTICE; that notice records the copyright status.
 - Gmsh is an optional, separately installed external executable under its own
   GPL license. It is not bundled with the OpenPhysics distributions. The file
   readers and executable integration are described in packages/gmshio/NOTICE
