@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Docs: the package READMEs and docs overviews list landed features they had omitted: galerkin's steady electric conduction, one-way and temperature-dependent Joule heating, JAX/PyTorch derivatives and the coupling layer; meshine's `extrude` and the tetrahedral mesh contract (the "2D only" limit is gone); refsol's `thermal_multilayer`, `transient_heat_multilayer` and `elasticity_multilayer`. The entry pages describe the workspace's steady heat plate and its optical shapes, and every English page now links its Korean twin and back.
+
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields` writes two more saved layouts as VTU: rectangular steady heat with flux or convection sides (`thermal2d-p1-node-cell-boundary-v2`), with its nodal boundary load arrays, and electric conduction and Joule heating (`electric-joule2d-p1-v1`, from `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`): point data `potential_v` and the nodal electric and, for Joule, heat arrays; cell data `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3` and, for Joule, `heat_flux_w_m2`. Arrays keep their saved names and values, Dirichlet node lists are not copied, and the saved files are unchanged. Lossy cavities and `em.modes2d` results are still refused. [Documentation](docs/packages/simcase/overview.md#viewing-in-paraview).
