@@ -1,11 +1,14 @@
-# Linear elasticity documents
+# Linear elasticity and thermoelastic documents
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/mechanics2d.md)
 
-This is the normative JSON/CLI contract of `mechanics.elasticity2d`. The existing
-[2D elasticity](../galerkin/elasticity2d.md) and [Cartesian traction](../galerkin/elasticity_traction.md)
-contracts define the numerical solve and its unchanged acceptance tolerances; this
-adapter adds no discretization.
+This is the normative JSON/CLI contract of `mechanics.elasticity2d` (isothermal) and
+`mechanics.thermoelastic2d` (steady heat, then thermal stress on the same mesh). The
+existing [2D elasticity](../galerkin/elasticity2d.md), [Cartesian traction](../galerkin/elasticity_traction.md),
+[steady heat](../galerkin/thermal_steady2d.md) and
+[thermoelastic traction](../galerkin/thermoelastic_traction.md) contracts define the
+numerical solves and their unchanged acceptance tolerances; this adapter adds no
+discretization.
 
 ## Scope and input
 
@@ -20,7 +23,7 @@ accepted before allocation. `results` defaults to `save_fields:true, plots:false
 plots and Studio execution are unsupported. The rectangle, unit, mesh, study and
 result checks are the ones of the [steady heat contract](thermal_steady2d.md).
 
-Physics keys of `mechanics.elasticity2d`:
+Physics keys of `mechanics.elasticity2d` (`units` holds exactly `length`):
 
 - `plane`: `"stress"` or `"strain"`.
 - `young_modulus_pa` (> 0) and `poisson_ratio` (−1 < ν < 0.5, both exclusive).
@@ -46,6 +49,23 @@ horizontal side and `y` on one vertical side leaves a hinge about their corner a
 is refused. The rule is decided from the document alone, before meshing; the
 solver's rank test on the generated mesh agrees with it (checked for every
 combination in the test set).
+
+### Steady heat then thermal stress
+
+`mechanics.thermoelastic2d` takes the same mechanical keys plus `units.temperature:
+"K"` (required), `thermal_expansion_per_k` (finite, signed), `reference_temperature_k`
+(≥ 0) and the side-constant heat data of the
+[steady heat](thermal_steady2d.md) and [boundary](thermal_steady_boundary2d.md)
+contracts: `thermal_conductivity_w_mk` (> 0), `dirichlet_temperature_k` (side → K,
+nonnegative, corners agreeing), optional `heat_source_w_m3`, `outward_flux_w_m2`
+(side → q·n) and `convection` (side → `{h_w_m2k, ambient_temperature_k}`); at least
+one fixed side or positive h, and no natural condition on a fixed side. The runner
+solves `galerkin.thermal.solve_steady_heat` on the mesh, freezes the nodal
+temperature with `galerkin.thermoelasticity.freeze_temperature` and calls
+`solve_thermoelasticity` with the mechanical arguments. `traction_pa` is the TOTAL
+physical σ·n, as in the Python contract, never adjusted by a thermal traction. The
+coupling is one-way: no mechanical feedback to heat, no temperature-dependent
+material, no cross-mesh transfer.
 
 ## Run and save
 
@@ -87,6 +107,27 @@ Result ID `mechanics.elasticity2d-result-v1`; layout `mechanics2d-p1-v1`;
 | `load_n_per_m`, `reaction_n_per_m`, `residual_n_per_m` | (N,2) | N/m | consistent body plus traction load; K·u − load at prescribed DOFs (zero elsewhere); K·u − load at all DOFs |
 | `dirichlet_node_ids`, `dirichlet_components`, `dirichlet_displacement_m` | (K,) | 1, 1, m | the prescribed DOFs (component 0 = x, 1 = y) and values |
 
+A thermoelastic result (ID `mechanics.thermoelastic2d-result-v1`, layout
+`thermoelastic2d-p1-v1`) stores instead of `strain` and `load_n_per_m`:
+
+| Array | Shape | Unit | Meaning |
+|---|---|---|---|
+| `temperature_k` | (N,) | K | the steady heat solution the mechanics used |
+| `heat_flux_w_m2` | (T,2) | W/m² | element heat flux |
+| `thermal_load_w_per_m`, `thermal_reaction_w_per_m`, `thermal_residual_w_per_m`, `prescribed_outward_heat_w_per_m`, `ambient_load_w_per_m`, `convective_outward_heat_w_per_m`, `thermal_system_rhs_w_per_m` | (N,) | W/m | the heat solve's nodal arrays (zero when the document has no flux or convection) |
+| `thermal_dirichlet_node_ids`, `dirichlet_temperature_k` | (K_T,) | 1, K | the fixed temperature nodes and values |
+| `total_strain`, `thermal_strain`, `elastic_strain` | (T,3) | 1 | `exx, eyy, gxy`; total = thermal + elastic |
+| `stress_pa` | (T,3) | Pa | `sxx, syy, sxy` from the elastic strain |
+| `sigma_zz_pa`, `epsilon_zz` | (T,) | Pa, 1 | the out-of-plane stress (plane strain) or strain (plane stress) |
+| `load_external_n_per_m`, `load_thermal_n_per_m`, `load_body_n_per_m`, `load_traction_n_per_m`, `reaction_n_per_m`, `residual_n_per_m` | (N,2) | N/m | body plus traction load, the thermal-equivalent load, its two parts, K·u − load at prescribed DOFs, K·u − load everywhere |
+
+The thermoelastic summary adds the thermal expansion, reference temperature,
+conductivity and the `temperature_snapshot` hashes (`mesh_hash`, `temperature_hash`,
+`snapshot_hash`) of the frozen temperature, heat diagnostics (source and outward
+heat and their defect in W/m, free thermal residual, minimum and maximum
+temperature), the external and thermal load sums (N/m) and the physical elastic
+energy (J/m); its force balance is external plus thermal load plus reaction.
+
 Strain and stress are constant per P1 element (`field_locations` says
 `triangle_centroids`); the summary repeats the component orders. Forces are per
 metre of out-of-plane depth, never N. The summary records `status: "solved"`, the
@@ -100,9 +141,11 @@ Invalid input: CLI exit 2 and no output directory. Solve or I/O failure (a singu
 system the rule did not foresee, nonfinite values, an occupied output): exit 1.
 Success: exit 0. Saved fields can be viewed in ParaView through `simcase.export`
 ([Viewing in ParaView](overview.md#viewing-in-paraview)): point data
-`displacement_m` and the three nodal N/m arrays as vectors with z = 0, cell data
-`exx`, `eyy`, `gxy` and `sxx_pa`, `syy_pa`, `sxy_pa`; the export copies the saved
-arrays and adds nothing to this contract.
+`displacement_m` and the nodal N/m arrays as vectors with z = 0 (the thermoelastic
+layout adds `temperature_k` and the nodal W/m arrays as scalars), cell data `exx`,
+`eyy`, `gxy` and `sxx_pa`, `syy_pa`, `sxy_pa` (thermoelastic: `heat_flux_w_m2`,
+`sigma_zz_pa`, `epsilon_zz` and the `total_`, `thermal_` and `elastic_` strain
+components); the export copies the saved arrays and adds nothing to this contract.
 
 ## Validation
 
@@ -117,19 +160,29 @@ are from Linux, Python 3.12, NumPy 2.5.4, SciPy 1.18.1 (2026-11-02).
 | J4 | 32 invalid documents (hinges, one component only, corner conflict, missing or extra units, bad plane, ν = 0.5 and −1, tagged quantities, traction on a prescribed component, …) refused with exit 2 and no output; the rigid-body rule matches the solver's rank test on 12 constraint sets | all refused |
 | J5 | CLI validate/run/save, fresh output refused with the existing summary untouched, partial-save cleanup leaves nothing, result copies and the document snapshot are immutable | passed |
 | J6 | Studio `/api/validate` and `_require_studio_physics` refuse the type; the Studio Node checks stay green | passed, 247 Node tests |
-| J7 | `tools/wheel_consumers/test_mechanics_wheel.py` (uniaxial plate CLI, hinge refusal, VTU export) run with `python -I` from a temporary directory, as `check_platform_install.py` does | passed |
+| J7 | `tools/wheel_consumers/test_mechanics_wheel.py` (uniaxial plate and thermoelastic bar CLI, hinge refusal, VTU export) run with `python -I` from a temporary directory, as `check_platform_install.py` does | passed |
+| K1 | thermoelastic document run equals `solve_steady_heat` + `freeze_temperature` + `solve_thermoelasticity` on the same mesh, byte for byte (both planes, heat source, flux and convection sides, body force, two tractions) | identical bytes for all 16 arrays, same snapshot hash |
+| K2 | `refsol.thermoelastic_traction.uniform_combined` with zero shear (normal stresses 8 and −2 MPa, +20 K), uniform temperature from four Dirichlet sides, for `m`, `mm`, `um`, `nm` and both planes: relative error ≤ 1e-10 on temperature, displacement, in-plane and zz stress and total strain | temperature exact, ≤ 3.4e-15 displacement, ≤ 3.1e-14 stress, ≤ 1.1e-14 σ_zz, ≤ 1.1e-14 strain; physical energy to 1e-10 |
+| K3 | confined bar with the linear temperature of two Dirichlet sides, u_x = k α((T₁−T_ref)x + Gx²/2), k = 1+ν or (1+ν)/(1−ν), stress from `refsol.thermoelastic_traction.parent_state`: displacement order ≥ 1.8 over subdivisions 8, 16, 32 | orders 1.95, 1.97 (plane stress) and 1.94, 1.97 (plane strain); stress orders 0.97–1.00; temperature reproduced to 1e-9 K |
+| K4 | 16 invalid thermoelastic documents (missing or non-Kelvin temperature unit, missing or zero conductivity, missing or nonfinite α, negative or missing T_ref, pure Neumann heat, negative or conflicting temperatures, flux on a fixed side, negative h, hinge, Joule-only keys) refused with exit 2 and no output; heat keys refused on `mechanics.elasticity2d` | all refused |
 
-The `refsol.elasticity_traction.polynomial_manufactured` field needs a position
-dependent body force and traction, which this side-constant document cannot
-express; J3 therefore uses the quadratic bar above, derived in the test from the
-Navier equation, independent of the solver.
+The `refsol.elasticity_traction.polynomial_manufactured` and
+`refsol.thermoelastic_traction.polynomial_manufactured` fields need position
+dependent body forces, tractions and temperatures, and `uniform_combined` with its
+shear term has no side with a constant displacement component; a side-constant
+document cannot express them. J3 and K3 therefore use the quadratic bars above,
+derived in the tests from the Navier equation, independent of the solver, and K2
+uses the shear-free `uniform_combined` state.
 
 ## Limits
 
 One homogeneous isotropic rectangle, side-constant data, static small strain, a
 single study. No regions or shapes, no normal/tangential traction, no distributed
-or point loads, no thermal expansion or heat→mechanics coupling (the Python
-[thermoelastic](../galerkin/thermoelastic_traction.md) workflows stay Python-only),
-no dynamics, 3D or Studio form. A structurally valid model can still fail
+or point loads, no dynamics, 3D or Studio form. Thermal stress is one-way from a
+steady heat solve on the same mesh: no mechanical feedback, no temperature-dependent
+properties, no transient temperatures, no prescribed external temperature field
+(the Python [transient](../galerkin/transient_thermal_mechanical.md) and
+[prescribed-temperature](../galerkin/prescribed_temperature_thermoelasticity.md)
+workflows stay Python-only). A structurally valid model can still fail
 numerically (near-incompressible plane strain, extreme aspect ratios); validation
 does not certify accuracy.

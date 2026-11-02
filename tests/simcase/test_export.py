@@ -312,6 +312,41 @@ def test_mechanics_result_exports_nodal_vectors_and_named_components(tmp_path):
         export_time_series(fields, tmp_path / "series")
 
 
+def test_thermoelastic_result_exports_heat_and_mechanics_arrays(tmp_path):
+    fields = _saved(tmp_path, "thermoelastic_bar.json")
+    mesh = meshio.read(export_fields(fields, tmp_path / "bar.vtu"))
+    with np.load(fields) as saved:
+        assert str(saved["field_layout"]) == "thermoelastic2d-p1-v1"
+        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+        scalars = {"temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m", "thermal_residual_w_per_m",
+                   "prescribed_outward_heat_w_per_m", "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
+                   "thermal_system_rhs_w_per_m"}
+        vectors = {"displacement_m", "load_external_n_per_m", "load_thermal_n_per_m", "load_body_n_per_m",
+                   "load_traction_n_per_m", "reaction_n_per_m", "residual_n_per_m"}
+        assert set(mesh.point_data) == scalars | vectors
+        for name in scalars:
+            np.testing.assert_array_equal(mesh.point_data[name], saved[name])
+        for name in vectors:
+            np.testing.assert_array_equal(mesh.point_data[name][:, :2], saved[name])
+            np.testing.assert_array_equal(mesh.point_data[name][:, 2], 0.0)
+        components = {"total_strain": ("total_exx", "total_eyy", "total_gxy"),
+                      "thermal_strain": ("thermal_exx", "thermal_eyy", "thermal_gxy"),
+                      "elastic_strain": ("elastic_exx", "elastic_eyy", "elastic_gxy"),
+                      "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa")}
+        expected_cells = {c for names in components.values() for c in names} | {"heat_flux_w_m2", "sigma_zz_pa", "epsilon_zz"}
+        assert set(mesh.cell_data) == expected_cells
+        for name, names in components.items():
+            for k, component in enumerate(names):
+                np.testing.assert_array_equal(mesh.cell_data[component][0], saved[name][:, k])
+        np.testing.assert_array_equal(mesh.cell_data["heat_flux_w_m2"][0][:, :2], saved["heat_flux_w_m2"])
+        np.testing.assert_array_equal(mesh.cell_data["sigma_zz_pa"][0], saved["sigma_zz_pa"])
+        np.testing.assert_array_equal(mesh.cell_data["epsilon_zz"][0], saved["epsilon_zz"])
+        for name in ("thermal_dirichlet_node_ids", "dirichlet_temperature_k", "dirichlet_node_ids", "metadata_json"):
+            assert name in saved.files and name not in mesh.point_data and name not in mesh.cell_data
+    with pytest.raises(ValueError, match="time series export needs layout"):
+        export_time_series(fields, tmp_path / "series")
+
+
 def test_mechanics_export_checks_its_arrays(tmp_path):
     nodes = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
     base = dict(field_layout="mechanics2d-p1-v1", nodes_m=nodes, triangles=np.array([[0, 1, 2]]))

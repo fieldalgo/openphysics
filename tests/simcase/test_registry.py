@@ -13,7 +13,7 @@ EXAMPLE_DOCUMENTS = Path(__file__).resolve().parents[2] / "examples" / "simcase"
 
 BUILTIN = {
     "electric_joule": {"electric.steady2d", "joule.steady2d", "joule.temperature2d"},
-    "mechanics": {"mechanics.elasticity2d"},
+    "mechanics": {"mechanics.elasticity2d", "mechanics.thermoelastic2d"},
     "thermal.transient2d": {"thermal.transient2d"},
     "thermal.steady2d": {"thermal.steady2d"},
     "em.cavity3d": {"em.cavity3d"},
@@ -82,7 +82,7 @@ def test_unknown_type_error_lists_every_registered_type():
     data = copy.deepcopy(examples.EXAMPLES["soi_strip"])
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
-    assert len(listed) == 8
+    assert len(listed) == 9
     with pytest.raises(DocumentError) as error:
         Document.from_dict(data)
     assert str(error.value) == f"physics.em1.type 'no.such.type' not supported ({listed})"

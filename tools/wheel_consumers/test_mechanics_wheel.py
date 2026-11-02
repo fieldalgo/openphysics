@@ -67,3 +67,27 @@ def test_installed_export_to_vtu(tmp_path):
     assert set(mesh.point_data) == {'displacement_m', 'load_n_per_m', 'reaction_n_per_m', 'residual_n_per_m'}
     assert set(mesh.cell_data) == {'exx', 'eyy', 'gxy', 'sxx_pa', 'syy_pa', 'sxy_pa'}
     np.testing.assert_allclose(mesh.cell_data['sxx_pa'][0], 1e6, rtol=1e-10)
+
+
+def test_installed_thermoelastic_bar_cli(tmp_path):
+    doc = cli('example', 'thermoelastic_bar')
+    assert doc.returncode == 0, doc.stderr
+    source = tmp_path/'bar.json'
+    source.write_text(doc.stdout, encoding='utf-8')
+    out = tmp_path/'result'
+    solve = cli('run', source, '-o', out, '-q')
+    assert solve.returncode == 0, solve.stderr
+    summary = json.loads((out/'summary.json').read_text(encoding='utf-8'))
+    assert summary['status'] == 'solved'
+    assert summary['result_format'] == 'mechanics.thermoelastic2d-result-v1'
+    assert summary['field_layout'] == 'thermoelastic2d-p1-v1'
+    with np.load(out/'fields.npz', allow_pickle=False) as f:
+        x = f['nodes_m'][:, 0]
+        # The P1 heat solve reproduces the linear temperature 293.15 K + 600 K/m x exactly.
+        np.testing.assert_allclose(f['temperature_k'], 293.15+600.*x, rtol=0, atol=1e-9)
+        # Confined bar: u_x = (1+nu) alpha (G x^2/2) with G = 600 K/m, within P1 discretization error.
+        exact = 1.33*23e-6*300.*x*x
+        assert np.max(abs(f['displacement_m'][:, 0]-exact)) < 5e-3*exact.max()
+        assert f['stress_pa'].shape == (160, 3) and f['sigma_zz_pa'].shape == (160,)
+    assert abs(summary['diagnostics']['heat_power_defect_w_per_m']) < 1e-8
+    assert cli('run', source, '-o', out).returncode == 1
