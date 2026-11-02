@@ -13,6 +13,7 @@ Modules
 slab        planar (slab) dielectric waveguide TE/TM modes, symmetric or asymmetric
 fiber       step-index optical fiber: scalar LP modes and exact vector modes
 metallic    hollow metallic waveguide cutoffs, cavity resonances, coaxial potential
+electrostatics  coaxial and two-layer parallel-plate capacitance per unit length
 scattering  plane-wave scattering off a circular cylinder (PEC and dielectric)
 benchmarks  published reference values with citations (Hadley 2002 rib waveguides, ...)
 cavity      complete finite-frequency Cartesian spectrum of a vacuum PEC box
@@ -22,8 +23,9 @@ bimetal     Timoshenko (1925) bimetal strip: curvature closed forms and exact pl
 thermal_convection  NAFEMS T4 convective rectangle: exact series and the published target
 """
 
-from . import slab, fiber, metallic, scattering, benchmarks, cavity, material_cavity, wall_loss
+from . import (slab, fiber, metallic, electrostatics, scattering, benchmarks, cavity,
+               material_cavity, wall_loss)
 
 __version__ = "0.1.0"
-__all__ = ["slab", "fiber", "metallic", "scattering", "benchmarks", "cavity",
-           "material_cavity", "wall_loss"]
+__all__ = ["slab", "fiber", "metallic", "electrostatics", "scattering", "benchmarks",
+           "cavity", "material_cavity", "wall_loss"]
