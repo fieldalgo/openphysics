@@ -83,8 +83,11 @@ imports only the standard library and NumPy.
 
 scipy is not restricted. sipi, galerkin and meshine already depend on it
 (`packages/sipi/pyproject.toml:26`), and it is BSD-3-Clause. `import simcase`
-loads the solver chain (`packages/simcase/src/simcase/__init__.py:26-40`); making
-that import lazy is optional clean-up, not a requirement of this contract.
+loads the solver chain (`packages/simcase/src/simcase/__init__.py:26-40`), and
+that chain imports shapely (`packages/simcase/src/simcase/geometry.py:18-20`). So
+the package import must become lazy, or the evaluator must move where it can be
+imported on its own, before a consumer without shapely, such as sipi's browser
+calculator, uses it.
 
 ## Top-level structure (frozen)
 
@@ -230,7 +233,11 @@ output doubles.
   - `+` and `-` need operands of the same kind;
   - length × ratio is a length;
   - length ÷ length is a ratio;
-  - length × length is refused.
+  - length × length is refused;
+  - dividing by a length is refused unless the dividend is a length;
+  - a decimal literal has no kind of its own: in `+` and `-` it takes the other
+    operand's kind, and in `×` and `÷` it is a ratio. So `-w/2` and `t + 100` are
+    lengths when `w` and `t` are.
 - **Errors.** A cycle or a division by zero is an error that names the parameter.
 - **Range.** The optional `range` bounds the parameter. Sweeps and derivatives use
   it, and so does a consumer that needs a static bounding box.

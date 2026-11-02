@@ -76,8 +76,10 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
 자체는 표준 라이브러리와 NumPy만 import합니다.
 
 scipy는 제한하지 않습니다. sipi·galerkin·meshine이 이미 의존하고(`packages/sipi/pyproject.toml:26`),
-BSD-3-Clause입니다. `import simcase`가 솔버 묶음을 불러오는 것(`packages/simcase/src/simcase/__init__.py:26-40`)을
-지연 import로 바꾸는 일은 선택적인 정리이며 이 계약의 요구가 아닙니다.
+BSD-3-Clause입니다. `import simcase`는 솔버 묶음을 불러오고(`packages/simcase/src/simcase/__init__.py:26-40`), 그 묶음이
+shapely를 import합니다(`packages/simcase/src/simcase/geometry.py:18-20`). 그래서 sipi 브라우저 계산기처럼
+shapely 없이 쓰는 곳이 평가기를 쓰기 전에, 패키지 import를 지연시키거나 평가기를 따로 import할 수 있는
+곳으로 옮겨야 합니다.
 
 ## 최상위 구조(동결)
 
@@ -202,6 +204,9 @@ double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습�
   - 길이 × 비율은 길이
   - 길이 ÷ 길이는 비율
   - 길이 × 길이는 거부
+  - 나뉘는 값이 길이가 아니면 길이로 나눌 수 없음
+  - 십진 리터럴은 자기 종류가 없습니다. `+`·`-`에서는 상대 항의 종류를 따르고, `×`·`÷`에서는 비율입니다.
+    그래서 `w`와 `t`가 길이면 `-w/2`와 `t + 100`도 길이입니다.
 - **오류.** 순환이나 0으로 나누기는 파라미터 이름을 밝힌 오류입니다.
 - **범위.** 선택 필드 `range`는 파라미터의 범위를 정합니다. 스윕, 미분, 정적 경계 상자가 필요한
   소비자가 씁니다.
