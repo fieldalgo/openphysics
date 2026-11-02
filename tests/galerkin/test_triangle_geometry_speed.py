@@ -21,7 +21,7 @@ import numpy as np
 import pytest
 
 import galerkin.core.triangles as triangles
-from galerkin.core.triangles import GEOMETRY_CACHE_ENTRIES, clear_geometry_cache, triangle_geometry
+from galerkin.core.triangles import GEOMETRY_CACHE_ENTRIES, clear_geometry_cache, edge_table, triangle_geometry
 from galerkin.mesh import Mesh, rectangle_mesh
 
 
@@ -134,6 +134,21 @@ def test_c3_live_or_non_numeric_arrays_are_not_hashed():
     key = triangles._content_key(np.zeros((3, 2)), np.zeros((1, 3), dtype=int), True)
     assert key == triangles._content_key(np.zeros((3, 2), order="F"), np.zeros((1, 3), dtype=int), True)
     assert key != triangles._content_key(np.zeros((3, 2)), np.zeros((1, 3), dtype=int), False)
+
+
+def test_c3_edge_table_is_cached_read_only_and_cleared_with_the_geometry():
+    mesh = rectangle_mesh(1., 1., 2, 2)
+    edges, counts, slots = edge_table(mesh.triangles, mesh.num_nodes)
+    assert edges.shape == (16, 2) and np.all(edges[:, 0] < edges[:, 1])
+    assert np.array_equal(np.lexsort((edges[:, 1], edges[:, 0])), np.arange(16))
+    assert sorted(counts.tolist()) == [1]*8+[2]*8 and len(slots) == 24
+    assert set(np.unique(edges[counts == 1]).tolist()) == triangle_geometry(mesh)[3]
+    again = edge_table(mesh.triangles.copy(), mesh.num_nodes)
+    assert all(a is b for a, b in zip((edges, counts, slots), again))
+    assert not any(a.flags.writeable for a in again)
+    assert edge_table(mesh.triangles.astype(np.int32), mesh.num_nodes)[0] is not edges
+    clear_geometry_cache()
+    assert not triangles._edge_cache and not triangles._geometry_cache
 
 
 def _grid():
