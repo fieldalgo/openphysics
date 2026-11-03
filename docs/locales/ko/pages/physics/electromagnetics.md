@@ -36,6 +36,7 @@
 - [벡터 고유공간 신뢰성](../packages/galerkin/eigenspace_reliability.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
 - [도파관 정식화: 모드, 미분, 연성, SI/PI 경로](../packages/galerkin/waveguide_formulation.md)
+- [모드 전력·중첩·결합](../packages/galerkin/mode_overlap.md)
 - [galerkin — OpenPhysics 유한요소 해석 엔진](../packages/galerkin/overview.md)
 
 

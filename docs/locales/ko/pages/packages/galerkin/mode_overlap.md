@@ -6,8 +6,9 @@
 
 `galerkin.mode_overlap`은 `galerkin.waveguide.solve_modes`의 모드(전체 벡터, edge `et`와
 절점 `ez`)와 `Mesh` 위의 스칼라 P1 모드 함수를 후처리합니다: 도파 전력, 장 중첩,
-정규화, 결합 효율, 구속 계수. 모든 적분은 유한요소 계수의 정확한 질량·결합 행렬
-곱이며, 함수가 그렇게 명시한 곳 외에는 요소 중심에서 표본을 뽑지 않습니다. 이
+정규화, 결합 효율, 구속 계수, 유효 면적. 모든 적분은 유한요소 계수의 정확한 질량·결합
+행렬 곱이며, 유효 면적의 `int |E|^4`만 대칭 삼각형 구적 규칙으로 정확히 적분합니다.
+함수가 그렇게 명시한 곳 외에는 요소 중심에서 표본을 뽑지 않습니다. 이
 페이지는 계약이자 검증 기록입니다. 식은 사전 등록된 것이고, 아래 측정값은 고정된
 Linux 환경에서 `tests/galerkin/test_mode_overlap.py`가 낸 값입니다(2026-11-02).
 
@@ -73,6 +74,20 @@ Linux 환경에서 `tests/galerkin/test_mode_overlap.py`가 낸 값입니다(202
 때만 `eta`에 들어갑니다. `Gamma_R`는 계수를 삼각형 집합 `R`로 제한합니다. 스칼라
 함수는 `M(1)`만 씁니다.
 
+**유효 면적.**
+
+    A_eff = (int |E|^2 dA)^2 / int |E|^4 dA
+
+기본은 `|E|^2 = |E_t|^2`(통상의 횡 정의)이고 `include_longitudinal=True`면
+`|E_t|^2 + |E_z|^2`입니다. 스칼라 모드는 `|E|` 대신 `|phi|`를 씁니다. 분자는 모드 자신과의
+장 중첩(edge·P1 질량 행렬, 정확)입니다. 분모는 질량 행렬 형태가 없으므로 Dunavant의
+6점 4차 대칭 삼각형 규칙(`galerkin.core.quadrature.triangle_symmetric_rule(4)`)으로
+Whitney/P1 보간을 규칙의 점에서 평가해 적분합니다. `E_t`(Whitney)와 `E_z`, `phi`(P1)는
+삼각형마다 선형이므로 `(|E|^2)^2`은 거기서 4차 다항식이고 규칙은 근사가 아니라
+정확합니다. 아래 기준 F3이 12점 6차 규칙과 36점 Gauss–Duffy 곱 규칙에 대해 이를
+확인합니다. `A_eff`는 척도에 무관하고 (메시 단위)^2를 가지며, 높이 `h`의 띠 위 y-불변
+장에서는 `h` 곱하기 유효 폭 `(int |E|^2 dx)^2 / int |E|^4 dx`입니다.
+
 **주어진 장의 보간.** `interpolate_vector_field(space, field)`는 함수
 `field(x, y) -> (N, 2 또는 3)`을 `(et, ez)`로 보냅니다: `et_e`는 edge `e`를 따른 접선
 선적분을 2점 Gauss 구적으로(최저차 Nédélec 보간; edge 방향 3차 변화까지 정확),
@@ -99,11 +114,13 @@ Linux 환경에서 `tests/galerkin/test_mode_overlap.py`가 낸 값입니다(202
 | `confinement_factor(space, et, ez, eps_r, triangles)` | `Gamma_R`; `triangles`는 불 마스크 `(T,)` 또는 인덱스 배열 |
 | `centroid_field(space, et, ez=None)` | 요소 중심의 복소 `E` `(T, 3)`(`eval_edge_field`와 절점 `ez` 평균의 `1j *`) |
 | `interpolate_vector_field(space, field)` | 함수의 `(et, ez)`; 2성분 장이면 `ez`는 None |
+| `effective_area(space, et, ez, include_longitudinal=False)` | (메시 단위)^2의 `A_eff`; 기본은 `E_t`만(`ez`는 None 가능), `True`면 `E_t`와 `E_z` |
 | `scalar_power(mesh, phi)` | `int |phi|^2 dA` |
 | `scalar_overlap(mesh, a, b)` | `int a^* b dA` |
 | `normalize_scalar(mesh, phi, convention="power" \| "peak")` | 단위 `int |phi|^2`(위상 유지) 또는 `|phi|`가 최대인 절점에서 정확히 1(simcase 스칼라 관례, 임의 위상을 제거) |
 | `scalar_coupling_efficiency(mesh, mode, field)` | P1 질량의 `eta`; `mode`는 `(n_n,)` 또는 `(m, n_n)` |
 | `scalar_confinement_factor(mesh, phi, triangles)` | `int_R |phi|^2 / int |phi|^2` |
+| `scalar_effective_area(mesh, phi)` | `(int |phi|^2 dA)^2 / int |phi|^4 dA` |
 
 공개 이름은 `galerkin`에서도 내보냅니다. 벡터 전력 함수는 `beta`가 `H_t`에 들어가므로
 `n_eff`를 명시적으로 받습니다. `solve_modes`가 `(n_eff, space, et, ez)`를 돌려주므로
@@ -180,6 +197,20 @@ TE에 적용되지 않습니다(`H_z != 0`): Faraday 경로와의 측정 차이 
 `eta` 대 두 정확한 편광에 대한 조밀 극좌표 적분): 0.997946 대 0.997924, 차이
 2.15e-5(≤ 5e-3), 통과. scale 1과 3에서 차이는 8.2e-5, 1.3e-5였습니다.
 
+**F. 유효 면적.**
+
+| 기준 | 측정 | 차수 | 결과 |
+|---|---|---|---|
+| F1 x 편광 Gaussian `exp(-r^2/w0^2)`를 `interpolate_vector_field`로 반경 4 w0의 원판 메시(`disk_mesh`, 반경 방향 16, 32, 64 × 방위각 24, 48, 96 분할)에 보간: `effective_area` 대 `pi w0^2`, 상대 오차, 차수 ≥ 1.8, 최세밀 ≤ 1e-3 | 1.33e-2, 3.31e-3, 8.26e-4 | 2.00, 2.00 | 통과 |
+| F2 A의 스칼라 slab TE0: `scalar_effective_area / height` 대 `field_te`를 `quad`로 적분한 유효 폭 `(int E^2 dx)^2 / int E^4 dx`(0.299304 µm), 상대 오차, 차수 ≥ 1.8, 최세밀 ≤ 1e-3 | 1.20e-2, 3.07e-3, 7.72e-4 | 1.97, 1.99 | 통과 |
+| F3 4차 규칙의 `int |E|^4` 대 6차 규칙, 상대, 한 메시에서 ≤ 1e-12(scale 1 TM slab 모드, `E_t`만과 `E_z` 포함; A의 h = 0.044 µm P1 TE0 장) | 4.3e-15, 6.9e-15, 2.7e-15; 36점 곱 규칙 대비 6.7e-16, 4.7e-15, 4.0e-15 | — | 통과(정확) |
+| F4 JAX·PyTorch 값 거부(`TypeError`), 모양 오류, 비유한·영 장(`ValueError`); 척도 불변; 상수 스칼라 장의 `A_eff`는 영역 면적 | 명시대로 | — | 통과 |
+
+보간한 Gaussian의 F1 오차는 Whitney 보간 자체가 `L2`에서 1차인데도 2차로 수렴합니다.
+매끄러운 장의 주 보간 오차는 각 삼각형에서 평균이 0이어서 `A_eff`의 두 적분이 모두
+`O(h^2)`로만 보기 때문입니다. F3은 두 규칙이 단위 삼각형에서 각자의 차수까지의 모든
+단항식을 1e-13 안에서 적분하는지도 확인합니다.
+
 단위 테스트는 세 벡터·두 스칼라 정규화 관례(왕복, 위상 유지), 생성 공간 사영(구성원은
 1, 쌍의 선형 결합, 종속 모드 거부), 구속 영역의 마스크·인덱스 형태, 보간이 Whitney
 함수와 모자 함수를 정확히 재현함, 모양 오류, JAX·PyTorch 값 거부(라이브러리가 없으면
@@ -195,7 +226,8 @@ TE에 적용되지 않습니다(`H_z != 0`): Faraday 경로와의 측정 차이 
   ([모드 복소 좌표](modal_coordinates.md)).
 - 좌표 인자(PML, 굽힘)를 가진 모드는 계산 좌표의 공변 성분이며, 여기 적분은 늘림을
   되돌리지 않습니다.
-- 유효 면적, 군속도·에너지 속도 전력, 가져온 측정 장과의 중첩, 중심→edge 사영은
-  없습니다.
+- 군속도·에너지 속도 전력, 가져온 측정 장과의 중첩, 중심→edge 사영은 없습니다. 유효
+  면적은 위의 `|E|^2`/`|E|^4` 정의이며 비선형 계수 가중(영역별 `n_2`, `chi^(3)`)은
+  제공하지 않습니다.
 - simcase 문서나 Studio에는 노출되지 않습니다. simcase 정규화(`"peak"`)는 비교를 위해
   재현했을 뿐입니다.

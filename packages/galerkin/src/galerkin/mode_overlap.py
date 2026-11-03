@@ -40,6 +40,12 @@ of triangles R is Gamma = int_R eps_r |E|^2 / int eps_r |E|^2 with the same two
 mass matrices carrying the coefficient Re(eps_r) restricted to R. The scalar
 functions use the P1 mass alone.
 
+The effective area A_eff = (int |E|^2 dA)^2 / int |E|^4 dA takes its numerator
+from the same mass matrices and its denominator from a fixed symmetric
+triangle rule (Dunavant's 6-point degree-4 rule, ``triangle_symmetric_rule``)
+applied to the Whitney/P1 interpolant: both E_t and E_z are linear on each
+triangle, so |E|^4 is a polynomial of degree 4 there and the rule is exact.
+
 Units
 -----
 With the mesh in metres and E in V/m, ``vector_power`` is in watts. With the mesh
@@ -54,8 +60,7 @@ NumPy only: JAX and PyTorch values raise TypeError (``refuse_live``), since thes
 integrals would otherwise cut the derivative silently. The power definition is
 the lossless-waveguide one (Re of the complex Poynting integral); for lossy or
 leaky modes it is still the +z power of the given field, but modes are then not
-power-orthogonal and the imaginary part is reactive. No effective area; no
-simcase or Studio exposure.
+power-orthogonal and the imaginary part is reactive. No simcase or Studio exposure.
 """
 
 from __future__ import annotations
@@ -64,14 +69,18 @@ import numpy as np
 from scipy.constants import c as _C_LIGHT, mu_0 as _MU_0
 
 from .assembly import assemble_mass
+from .core import kernels
 from .core.checks import one_of, positive_real, refuse_live
+from .core.quadrature import triangle_symmetric_rule
+from .core.spaces import TRI_LOCAL_EDGES
 from .edge import EdgeSpace, assemble_edge_grad, assemble_edge_mass, eval_edge_field
 from .mesh import Mesh
 
 __all__ = ["vector_power", "vector_cross_power", "vector_field_overlap", "normalize_vector",
            "coupling_efficiency", "confinement_factor", "overlap_matrix", "centroid_field",
-           "interpolate_vector_field", "scalar_power", "scalar_overlap", "normalize_scalar",
-           "scalar_coupling_efficiency", "scalar_confinement_factor"]
+           "interpolate_vector_field", "effective_area", "scalar_power", "scalar_overlap",
+           "normalize_scalar", "scalar_coupling_efficiency", "scalar_confinement_factor",
+           "scalar_effective_area"]
 
 _GAUSS2 = (0.5 - 0.5 / np.sqrt(3.0), 0.5 + 0.5 / np.sqrt(3.0))
 
@@ -411,6 +420,70 @@ def interpolate_vector_field(space: EdgeSpace, field):
     return et, -1j * values[:, 2].astype(complex)
 
 
+# -- effective area --------------------------------------------------------------
+
+_QUARTIC_RULE = 4   # degree of the symmetric triangle rule for int |E|^4; exact for the linear interpolants
+
+
+def _quartic_integral(mesh, density_at, degree):
+    """int (|E|^2)^2 dA by the symmetric rule of ``degree``; ``density_at(bary) -> (T, Q)`` gives |E|^2."""
+    bary, weights = triangle_symmetric_rule(degree)
+    density = density_at(bary)
+    return float(np.einsum("t,tq,q->", mesh.areas(), density ** 2, weights))
+
+
+def _vector_density(space, et, ez):
+    """|E|^2 of the Whitney (and P1) interpolant at barycentric points, as a function of ``bary`` (Q, 3)."""
+    mesh = space.mesh
+    g, _ = kernels.triangle_gradients(mesh)                     # (T, 3, 2)
+    coefficients = space.signs * et[space.tri_edges]            # (T, 3)
+
+    def density(bary):
+        e_t = np.zeros((mesh.num_triangles, len(bary), 2), dtype=complex)
+        for e, (i, j) in enumerate(TRI_LOCAL_EDGES):
+            w = bary[None, :, i, None] * g[:, None, j, :] - bary[None, :, j, None] * g[:, None, i, :]
+            e_t += coefficients[:, e, None, None] * w
+        out = np.sum(np.abs(e_t) ** 2, axis=-1)
+        if ez is not None:
+            out = out + np.abs(np.einsum("qk,tk->tq", bary, ez[mesh.triangles])) ** 2
+        return out
+    return density
+
+
+def _scalar_density(mesh, phi):
+    def density(bary):
+        return np.abs(np.einsum("qk,tk->tq", bary, phi[mesh.triangles])) ** 2
+    return density
+
+
+def _effective_area(mesh, power, quartic):
+    if not quartic > 0:
+        raise ValueError("the field is zero; cannot form an effective area")
+    return float(power ** 2 / quartic)
+
+
+def effective_area(space: EdgeSpace, et, ez, include_longitudinal=False) -> float:
+    """A_eff = (int |E|^2 dA)^2 / int |E|^4 dA of one vector mode, in (mesh unit)^2.
+
+    The numerator is the exact field overlap of the mode with itself
+    (``vector_field_overlap``); the denominator integrates (|E|^2)^2 of the
+    Whitney/P1 interpolant with Dunavant's 6-point degree-4 symmetric triangle
+    rule, which is exact because E_t and E_z are linear on each triangle. By
+    default |E|^2 = |E_t|^2, the usual transverse definition; with
+    include_longitudinal=True it is |E_t|^2 + |E_z|^2 (``ez`` may be None
+    otherwise). Scale free. NumPy only.
+    """
+    et = _edge_dofs(space, et, "et")
+    if include_longitudinal:
+        ez = _nodal(space.mesh, ez, "ez")
+    else:
+        ez = None
+    power = _field_overlap(assemble_edge_mass(space, 1.0), None if ez is None else assemble_mass(space.mesh, 1.0),
+                           et, ez, et, ez).real
+    return _effective_area(space.mesh, power, _quartic_integral(space.mesh, _vector_density(space, et, ez),
+                                                                _QUARTIC_RULE))
+
+
 # -- scalar modes --------------------------------------------------------------
 
 def scalar_power(mesh: Mesh, phi) -> float:
@@ -473,3 +546,15 @@ def scalar_confinement_factor(mesh: Mesh, phi, triangles) -> float:
         raise ValueError("the field is zero; cannot form a confinement factor")
     inside = (np.conj(phi) @ (assemble_mass(mesh, mask.astype(float)) @ phi)).real
     return float(inside / total)
+
+
+def scalar_effective_area(mesh: Mesh, phi) -> float:
+    """A_eff = (int |phi|^2 dA)^2 / int |phi|^4 dA of a nodal P1 field, in (mesh unit)^2.
+
+    The numerator is ``scalar_power`` (exact P1 mass); the denominator uses the
+    degree-4 symmetric triangle rule on the P1 interpolant, exact since |phi|^4
+    is a quartic on each triangle. Scale free. NumPy only.
+    """
+    phi = _nodal(mesh, phi, "phi")
+    return _effective_area(mesh, scalar_power(mesh, phi),
+                           _quartic_integral(mesh, _scalar_density(mesh, phi), _QUARTIC_RULE))

@@ -6,10 +6,11 @@
 
 `galerkin.mode_overlap` post-processes the modes of `galerkin.waveguide.solve_modes`
 (full-vector, edge `et` and nodal `ez`) and scalar P1 mode functions on a `Mesh`:
-guided power, field overlaps, normalisation, coupling efficiency and confinement
-factor. Every integral is an exact mass- or coupling-matrix product of the finite
-element coefficients; nothing is sampled at centroids except where a function says
-so. This page is the contract and the validation record; the formulation is
+guided power, field overlaps, normalisation, coupling efficiency, confinement
+factor and effective area. Every integral is an exact mass- or coupling-matrix
+product of the finite element coefficients, except `int |E|^4` of the effective
+area, which a symmetric triangle rule integrates exactly; nothing is sampled at
+centroids except where a function says so. This page is the contract and the validation record; the formulation is
 pre-registered and the measured values below are those of
 `tests/galerkin/test_mode_overlap.py` on the pinned Linux environment
 (2026-11-02).
@@ -84,6 +85,23 @@ overlap, computed from the Gram matrix of the modes. A transverse input
 component enters `eta` only when the input has one. `Gamma_R` restricts the
 coefficient to the triangles `R`. The scalar functions use `M(1)` alone.
 
+**Effective area.**
+
+    A_eff = (int |E|^2 dA)^2 / int |E|^4 dA
+
+with `|E|^2 = |E_t|^2` by default (the usual transverse definition) or
+`|E_t|^2 + |E_z|^2` with `include_longitudinal=True`; for a scalar mode `|phi|`
+replaces `|E|`. The numerator is the field overlap of the mode with itself (edge
+and P1 mass matrices, exact). The denominator has no mass-matrix form, so it is
+integrated with Dunavant's 6-point degree-4 symmetric triangle rule
+(`galerkin.core.quadrature.triangle_symmetric_rule(4)`), evaluating the
+Whitney/P1 interpolant at the rule's points: `E_t` (Whitney) and `E_z`, `phi` (P1)
+are linear on each triangle, so `(|E|^2)^2` is a polynomial of degree 4 there
+and the rule is exact, not approximate; gate F3 below checks this against the
+12-point degree-6 rule and the 36-point Gauss–Duffy product rule. `A_eff` is
+scale free and carries (mesh unit)^2; for a y-invariant field on a strip of
+height `h` it equals `h` times the effective width `(int |E|^2 dx)^2 / int |E|^4 dx`.
+
 **Interpolating a given field.** `interpolate_vector_field(space, field)` maps a
 function `field(x, y) -> (N, 2 or 3)` to `(et, ez)`: `et_e` is the tangential
 line integral along edge `e` by two-point Gauss quadrature (the lowest-order
@@ -112,11 +130,13 @@ All functions are NumPy only; JAX and PyTorch values raise `TypeError`
 | `confinement_factor(space, et, ez, eps_r, triangles)` | `Gamma_R`; `triangles` a boolean mask `(T,)` or an index array |
 | `centroid_field(space, et, ez=None)` | `(T, 3)` complex `E` at centroids (`eval_edge_field` and `1j *` mean nodal `ez`) |
 | `interpolate_vector_field(space, field)` | `(et, ez)` of a function, `ez` None for a two-component field |
+| `effective_area(space, et, ez, include_longitudinal=False)` | `A_eff` in (mesh unit)^2; `E_t` only by default (`ez` may then be None), `E_t` and `E_z` with `True` |
 | `scalar_power(mesh, phi)` | `int |phi|^2 dA` |
 | `scalar_overlap(mesh, a, b)` | `int a^* b dA` |
 | `normalize_scalar(mesh, phi, convention="power" \| "peak")` | unit `int |phi|^2` (phase unchanged) or peak exactly 1 at the node of largest `|phi|` (the simcase scalar convention, which removes the arbitrary phase) |
 | `scalar_coupling_efficiency(mesh, mode, field)` | `eta` with the P1 mass; `mode` `(n_n,)` or `(m, n_n)` |
 | `scalar_confinement_factor(mesh, phi, triangles)` | `int_R |phi|^2 / int |phi|^2` |
+| `scalar_effective_area(mesh, phi)` | `(int |phi|^2 dA)^2 / int |phi|^4 dA` |
 
 The public names are also exported from `galerkin`. The vector power functions
 take `n_eff` explicitly because `beta` enters `H_t`; `solve_modes` returns
@@ -202,6 +222,21 @@ edge dofs; `eta` into the pair vs a dense polar integral over both exact
 polarisations): 0.997946 vs 0.997924, difference 2.15e-5 (≤ 5e-3), pass. At
 scales 1 and 3 the difference was 8.2e-5 and 1.3e-5.
 
+**F. Effective area.**
+
+| Gate | Measured | Order | Result |
+|---|---|---|---|
+| F1 x-polarised Gaussian `exp(-r^2/w0^2)` interpolated with `interpolate_vector_field` onto a disk mesh of radius 4 w0 (`disk_mesh`, 16, 32, 64 radial by 24, 48, 96 azimuthal divisions): `effective_area` vs `pi w0^2`, relative error, order ≥ 1.8, finest ≤ 1e-3 | 1.33e-2, 3.31e-3, 8.26e-4 | 2.00, 2.00 | pass |
+| F2 scalar slab TE0 of A: `scalar_effective_area / height` vs the effective width `(int E^2 dx)^2 / int E^4 dx` of `field_te` by `quad` (0.299304 µm), relative error, order ≥ 1.8, finest ≤ 1e-3 | 1.20e-2, 3.07e-3, 7.72e-4 | 1.97, 1.99 | pass |
+| F3 `int |E|^4` by the degree-4 rule vs the degree-6 rule, relative, ≤ 1e-12 on one mesh (scale-1 TM slab mode, `E_t` alone and with `E_z`; the P1 TE0 field of A at h = 0.044 µm) | 4.3e-15, 6.9e-15, 2.7e-15; vs the 36-point product rule 6.7e-16, 4.7e-15, 4.0e-15 | — | pass (exact) |
+| F4 refusal of JAX and PyTorch values (`TypeError`), shape errors, nonfinite and zero fields (`ValueError`); scale invariance; `A_eff` of a constant scalar field equals the domain area | as stated | — | pass |
+
+The F1 error of the interpolated Gaussian converges at second order although the
+Whitney interpolant itself is first order in `L2`: the leading interpolation
+error of a smooth field has zero mean on each triangle, so both integrals of
+`A_eff` see it at `O(h^2)`. F3 also checks the two rules integrate every
+monomial up to their degree on the unit triangle to 1e-13.
+
 Unit tests cover the three vector and two scalar normalisation conventions
 (round trip, phase preserved), the projection onto a span (one for a member, a
 linear combination of the pair, refusal of dependent modes), mask and index
@@ -221,7 +256,9 @@ values (skipped where the libraries are absent; the backend CI job runs them).
   PML candidate ([modal coordinates](modal_coordinates.md)).
 - Modes with coordinate factors (PML, bends) are covariant computational
   components; the integrals here do not undo the stretch.
-- No effective area, no group-velocity or energy-velocity power, no
-  overlap with an imported measured field, no centroid-to-edge projection.
+- No group-velocity or energy-velocity power, no overlap with an imported
+  measured field, no centroid-to-edge projection. The effective area is the
+  `|E|^2`/`|E|^4` definition above; no nonlinear-coefficient weighting
+  (`n_2`, `chi^(3)` per region) is offered.
 - Not exposed in simcase documents or Studio; the simcase normalisations
   (`"peak"`) are reproduced here for comparison only.
