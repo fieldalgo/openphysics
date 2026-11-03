@@ -56,17 +56,50 @@ mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
                        stack.table_for(footprint.region_names), size=0.4)
 ```
 
+## sipi와 meshine 어댑터
+
+두 패키지는 자기 형상을 버전 1 블록으로 씁니다. 결과는 단순한 사전이며 simcase에 의존하지 않고, `parse`가
+그 결과를 검사합니다.
+
+```python
+from sipi import geometry_v1 as sipi_v1
+out = sipi_v1.to_geometry_v1(section)          # sipi CrossSection, 미터 단위
+model = parse({"units": out["units"], "geometry": out["geometry"]})
+out["materials"], out["conductors"], out["boundaries"], out["renamed"]
+
+from meshine import geometry_v1 as meshine_v1
+out = meshine_v1.to_geometry_v1(domain, length_unit="um")   # build() 전의 Domain
+out["mesh_size"], out["mesh_controls"]         # 기본 크기, Circle 꼭짓점 수
+```
+
+- **sipi:** 층을 아래부터, 그다음 국소 유전체 영역, 그다음 트레이스를 트레이스 순서로 둡니다. 그래서 나중
+  피처 우선 규칙이 sipi 자체의 자르기와 같아집니다. 사각형 트레이스는 `rect`, 사다리꼴은 `trapezoid`, 두께 0은
+  `segment`, `PolygonTrace`는 `polygon`입니다. 층이나 영역과 이름이 같은 트레이스는 `<name>-trace`로 바꾸고
+  `renamed`에 남깁니다. 유도 좌표(트레이스 왼쪽 아래 꼭짓점, 층 경계)는 정확하게 씁니다.
+- **meshine:** 영역을 포함 순서로 둡니다. 어떤 영역으로도 정확히 채워지지 않는 구멍은 빈 공간 피처가 되고,
+  그 안의 영역은 여전히 뒤에 와서 이깁니다. 같은 이름의 루프는 `region`으로 합칩니다. `Domain`에는 단위와 재료가
+  없으므로 `length_unit`이 필수이고, `materials`로 정하지 않으면 영역 재료는 영역 이름입니다. 경계 이름 함수는
+  옮길 수 없습니다.
+
+`examples/simcase/geometry_v1_soi_strip.json`은 SOI 스트립 예제를 버전 1 형상과 파라미터로 쓴 것입니다.
+
 ## 아직 하지 않는 일
 
 - 선택자 해석, 영역 구성 만들기, 메시에 출처 이름 쓰기(2단계 엔진이 필요합니다).
-- `path`·`segment` 피처, 병합 영역, 축대칭 컴포넌트, 원통, 구, `extrude` 피처, `finalize: "imprint"`의
-  메시. 파싱은 하고, 컴파일러가 이름을 밝혀 거부합니다.
+- `path`·`segment` 피처, 병합 영역, 축대칭 컴포넌트, 원통, 구, `extrude` 피처, `finalize: "imprint"`,
+  빈 공간(`material: null`)의 메시. 파싱은 하고, 컴파일러가 이름을 밝혀 거부합니다.
 - 설계 속도 제공(4단계).
 
 `simcase.geometry_document`를 import해도 scipy와 shapely는 불러오지 않습니다. `import simcase`는
 `simcase.Document` 같은 공개 이름을 처음 쓸 때 실행기 묶음을 불러옵니다.
 
 ## 검증
+
+`tests/simcase/test_geometry_adapters.py`: sipi 단면 8가지(마이크로스트립, 스트립라인, 결합, 코플래너, 표면 마스크,
+사다리꼴, 두께 0, 국소 영역이 있는 다각형 도체)가 영역마다 sipi 자체 형상의 넓이와 상대 10⁻¹² 이내로 맞고(측정
+4 × 10⁻¹⁶), 반올림은 입력 잔차(최대 2 × 10⁻⁷ pm)에서만 일어납니다. meshine 리브·발자국·구멍 도메인은 루프 넓이와
+맞고, 광섬유는 정확한 원을 유지합니다. 버전 1 SOI 스트립 예제는 `soi_strip.json`과 같은 `Document.data`로 읽힙니다.
+
 
 `tests/simcase/test_geometry_document.py`:
 - 현재 simcase 문서 45개(내장 예제와 `examples/simcase/*.json`)가 0.2에서 버전 1로, 다시 0.2로 반올림

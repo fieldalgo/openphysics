@@ -677,6 +677,7 @@ sipi에서 옮기는 방식:
 | Studio 작업공간 프로젝트·세션 v1–v5; 기능 엔드포인트 | `packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`; `packages/simcase/src/simcase/studio/static/workspace-notebook.mjs:9-23`; `packages/simcase/src/simcase/studio/server.py:80-135` | 형상 v1로 컴파일되는 응용 형식이며 자체 형상 의미는 없음. 도형은 피처가 됨: `name`은 표시 이름, 이름에 공백이 있으면 `id`를 생성. 창은 `domain`, 열판은 사각형 문서 | 초안에 한한 손실: 재료가 없는(`''`) 도형. 반올림: Studio는 값을 10⁻⁶ nm까지 유지(`packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:15-16`)하고 이동은 그 정리를 거치지 않음(`packages/simcase/src/simcase/studio/static/workspace-shape-editor.mjs:9-16`). 1 pm 아래는 반올림. 이 형식은 당분간 유지하며, 폐기 여부는 실제 사용자 파일을 본 뒤 따로 정함 |
 | Studio 광학 솔버 문서(`s1..sN`, 사각형을 다각형으로 씀) | `packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:91-98` | 첫 행과 같은 0.2 문서 | 그 문서는 프로젝트보다 이미 손실이 있음. 계약은 그 문서가 아니라 프로젝트에서 받음 |
 | sipi `CrossSection`: 층, 트레이스(직사각형, 사다리꼴, 두께 0), 상자 변 플래그, 접지 플래그 | `packages/sipi/src/sipi/crosssection.py:42-206` | `2d` 구성 요소: 전폭 층 `rect`를 아래부터, 그 뒤 트레이스를 트레이스 순서로 `rect`·`trapezoid`·`segment`. `eps_r`·`tan_delta`는 층 이름의 `materials` 항목. 물리는 `conductors`(순서 있는 `signals`, 접지 트레이스와 접지 변을 담은 `reference` 선택)를 가짐. 변 플래그는 변 태그 위의 물리. `outer`는 `boundary_tags`에서 | 형상 손실 없음. 이름 변경: 층과 트레이스의 이름이 같으면(지금은 목록을 따로 검사하므로 허용, `packages/sipi/src/sipi/crosssection.py:195-200`) 영역으로 합쳐지므로 하나의 이름을 바꿈. 반올림: `(w+gap)/2`(`packages/sipi/src/sipi/templates.py:65`) 같은 템플릿 산술은 0.00015000000000000001 m 같은 값을 내며 격자에서 약 10⁻⁸ pm 벗어남. 동작: 사각형 경로의 정확한 부동소수점 일치(`packages/sipi/src/sipi/crosssection.py:319,348-353`)가 바뀔 수 있고, 동일성 시험 `tests/sipi/test_manufacturing_sections.py:19`가 이를 감지함(열린 질문). 겹침·맞닿음 거부(`packages/sipi/src/sipi/crosssection.py:216-239`)는 어댑터에 남으므로 나중 피처 우선 규칙이 sipi 겹침을 풀지 않음. 허용오차 기반 도체 노드 고르기(`packages/sipi/src/sipi/crosssection.py:389-410`)는 선택으로 바뀜 |
+| sipi 국소 유전체 영역과 다각형 도체(`DielectricRegion`, `PolygonTrace`, 단면 v3) | `packages/sipi/src/sipi/polygons.py` | `polygon` 피처. 영역은 층 뒤·트레이스 앞에 두므로 영역은 자기가 놓인 층을, 도체는 둘 다를 자름. `sipi.geometry_v1.to_geometry_v1`이 씀 | 없음. 반올림: 오프셋 마스크 꼭짓점의 부동소수점 잔차(최대 10⁻⁶ pm) |
 | sipi JSON `sipi.cross-section/1,/2`과 선로·부피 감싸개 | `packages/sipi/src/sipi/document.py:13-161`; `packages/sipi/src/sipi/line_model.py`; `packages/sipi/src/sipi/volume_line.py` | 형상 v1로 컴파일되는 응용 형식. 스키마 버전(/1, /2)은 sipi 형식의 속성 | 없음. 템플릿 파라미터는 지금도 저장하지 않음 |
 | sipi 도체 단면 메시(`signal-<i>`, `reference`, `_bottom`/`_top`/`_side`, `ground_thickness`) | `packages/sipi/src/sipi/conductor_mesh.py:59-164` | 그 소비자가 같은 형상과 자기 메시 옵션으로 만듦 | 없음. 합성 이름은 그 소비자의 메시 세부 사항이 됨 |
 | sipi `PowerPlane`: 외곽선, 구멍, 세 종류의 단자 | `packages/sipi/src/sipi/plane.py:42-71,181-286` | 외곽선은 영역 `copper`인 `polygon` 또는 `circle`. 구멍은 `material: null`인 나중 피처. 루프 전체 단자는 `{"boundary": {"feature": <id>}}`, 변 단자는 이름 붙인 다각형 `edges`의 `any`. `boundary_tags`가 단자 이름, `outline`, `cutout`을 재현. 두께는 물리로, 원 `n`은 `circle_segments`로 | 없음. 어댑터는 겹치는 구멍과 외곽선 밖 구멍을 거부함(지금은 `packages/sipi/src/sipi/plane.py:282-285`에서 실패) |
@@ -727,6 +728,9 @@ sipi에서 옮기는 방식:
 **발견: 단위 없는 입력.** meshine `Domain`, gmshio `Geo`, galerkin 생성기는 단위 없는 숫자를 받습니다. 그래서
 이들의 어댑터는 호출자에게서 길이 단위를 받고, 단위가 없으면 실행을 거부합니다.
 
+**어댑터.** `sipi.geometry_v1.to_geometry_v1`은 `CrossSection`을, `meshine.geometry_v1.to_geometry_v1`은 직접 만든
+`Domain`을(`length_unit` 필수) 버전 1 블록으로 씁니다. [1단계 리더](geometry_reader.md)를 참고하세요.
+
 ## 3단계 미리보기: Wavebit (동결 아님)
 
 이 절은 규범이 아닙니다. 3단계 보완이 더해야 할 것을 적습니다. 그 바탕의 Wavebit 사실은 이름 있는
@@ -767,3 +771,4 @@ sipi에서 옮기는 방식:
 - 2026-11-03: 아직 미정으로 적혀 있던 곳에 JSON 결정을 반영(봉투는 `"0.2"` 유지, 0.2 사각형 문서는 기존
   분기 유지). Studio·sipi 형식은 사용자 파일을 본 뒤 정할 때까지 유지한다고 명시. `imprint`를 2단계 엔진으로
   옮기고 1단계 컴파일러가 이름을 밝혀 거부하도록 함.
+- 2026-11-03: 대응표에 sipi v3 행(국소 유전체 영역·다각형 도체)을 더하고 sipi·meshine 어댑터를 밝힘.
