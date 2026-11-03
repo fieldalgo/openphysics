@@ -24,7 +24,7 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- galerkin: `galerkin.mode_overlap` — mode power (Faraday-route complex Poynting integral with the exact edge mass and edge-nodal coupling), cross power, field overlaps and overlap matrix, power/mass/peak normalisation, coupling efficiency (including projection onto a degenerate span), energy confinement factor, Nédélec/P1 interpolation of a given field, and P1 scalar twins; NumPy only. Validated against refsol slab and fibre fields. [Contract and validation](docs/packages/galerkin/mode_overlap.md).
+- galerkin: `galerkin.mode_overlap` — mode power (Faraday-route complex Poynting integral with the exact edge mass and edge-nodal coupling), cross power, field overlaps and overlap matrix, power/mass/peak normalisation, coupling efficiency (including projection onto a degenerate span), energy confinement factor, effective area (exact mass numerator, degree-4 symmetric triangle rule for `int |E|^4`), Nédélec/P1 interpolation of a given field, and P1 scalar twins; NumPy only. Validated against refsol slab and fibre fields. [Contract and validation](docs/packages/galerkin/mode_overlap.md).
 
 - galerkin: a waveguide formulation page reads the scalar P1 and mixed Nédélec/nodal mode solvers, complex materials and the coordinate-stretch PML, the bordered eigenpair derivative, the coupling boundary and the quasi-static sipi path as implemented, each formula cited to its module and function. [Documentation](docs/packages/galerkin/waveguide_formulation.md).
 
