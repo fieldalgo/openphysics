@@ -18,6 +18,10 @@ B  vector slab (the strip of test_slab_modes.py): the Faraday-route power
 C  fibre HE11 (the mesh of test_fiber_modes.py): coupling of the exact field
    into the degenerate numerical pair and the core confinement.
 D  Gaussian to HE11 coupling against a dense polar-grid integral.
+F  effective area: an analytic Gaussian interpolated onto a disk mesh (A_eff ->
+   pi w0^2), the scalar slab TE0 against scipy.quad of field_te, exactness of
+   the degree-4 rule against the degree-6 and the 36-point product rules, and
+   refusals.
 
 Mesh note for A. A strip one cell high with unit height (aspect ratio ~100)
 gives the discrete eigenfunction an O(h) variation across y: on the
@@ -35,10 +39,13 @@ from scipy.integrate import quad
 
 from galerkin import (assemble_edge_mass, assemble_mass, assemble_stiffness, disk_mesh, rectangle_mesh,
                       solve_modes)
-from galerkin.mode_overlap import (centroid_field, confinement_factor, coupling_efficiency, interpolate_vector_field,
+from galerkin.core.quadrature import triangle_product_rule, triangle_symmetric_rule
+from galerkin.edge import EdgeSpace
+from galerkin.mode_overlap import (_quartic_integral, _scalar_density, _vector_density, centroid_field,
+                                   confinement_factor, coupling_efficiency, effective_area, interpolate_vector_field,
                                    normalize_scalar, normalize_vector, overlap_matrix, scalar_confinement_factor,
-                                   scalar_coupling_efficiency, scalar_overlap, scalar_power, vector_cross_power,
-                                   vector_field_overlap, vector_power)
+                                   scalar_coupling_efficiency, scalar_effective_area, scalar_overlap, scalar_power,
+                                   vector_cross_power, vector_field_overlap, vector_power)
 from conftest import rate
 
 # -- A: scalar TE slab ----------------------------------------------------------------
@@ -77,6 +84,7 @@ def slab_reference(refsol):
     pieces = [(-20.0, -THICKNESS / 2), (-THICKNESS / 2, THICKNESS / 2), (THICKNESS / 2, 20.0)]
     norm2 = sum(quad(lambda x: profile(x) ** 2, a, b)[0] for a, b in pieces)   # whole line, per unit y
     gamma_film = quad(lambda x: profile(x) ** 2, -THICKNESS / 2, THICKNESS / 2)[0] / norm2
+    norm4 = sum(quad(lambda x: profile(x) ** 4, a, b)[0] for a, b in pieces)
     w0 = THICKNESS
 
     def gaussian(x):
@@ -85,7 +93,7 @@ def slab_reference(refsol):
                    limit=200)[0]
     eta_gaussian = overlap ** 2 / (norm2 * quad(lambda x: gaussian(x) ** 2, -PAD, PAD)[0])
     return {"n_eff": n_eff, "profile": profile, "norm2": norm2, "gamma_film": gamma_film,
-            "gaussian": gaussian, "eta_gaussian": eta_gaussian}
+            "gaussian": gaussian, "eta_gaussian": eta_gaussian, "width_eff": norm2 ** 2 / norm4}
 
 
 @pytest.fixture(scope="module")
@@ -108,7 +116,8 @@ def scalar_study(slab_reference):
             "eta_01": scalar_coupling_efficiency(mesh, phi[0], phi[1]),
             "gamma_err": abs(scalar_confinement_factor(mesh, mode, film) - ref["gamma_film"]),
             "eta_gauss_err": abs(scalar_coupling_efficiency(mesh, mode, ref["gaussian"](mesh.nodes[:, 0]))
-                                 - ref["eta_gaussian"])})
+                                 - ref["eta_gaussian"]),
+            "area_rel": abs(scalar_effective_area(mesh, phi[0]) / height - ref["width_eff"]) / ref["width_eff"]})
     for row in rows:
         print("A scalar slab: " + ", ".join(f"{k}={v:.3e}" for k, v in row.items()))
     return rows
@@ -379,6 +388,105 @@ def test_d_gaussian_to_he11_coupling_matches_a_dense_integral(fiber):
     assert abs(eta - reference) <= 5e-3
 
 
+# -- F: effective area ----------------------------------------------------------------
+
+def test_f1_gaussian_effective_area_converges_to_pi_w0_squared():
+    """x-polarised exp(-r^2/w0^2) through interpolate_vector_field on a disk of radius 4 w0.
+
+    A_eff = (int e^-2r^2/w0^2)^2 / int e^-4r^2/w0^2 = pi w0^2 (truncation e^-32).
+    Gate: order >= 1.8 over three meshes, finest relative error <= 1e-3.
+    """
+    w0 = 1.0
+
+    def gaussian(x, y):
+        return np.stack([np.exp(-(x ** 2 + y ** 2) / w0 ** 2), np.zeros_like(x)], axis=-1)
+    errors = []
+    for scale in (1, 2, 4):
+        mesh = disk_mesh((4 * w0,), 16 * scale, 24 * scale)
+        space = EdgeSpace(mesh)
+        et, ez = interpolate_vector_field(space, gaussian)
+        assert ez is None
+        area = effective_area(space, et, ez)
+        errors.append(abs(area - np.pi * w0 ** 2) / (np.pi * w0 ** 2))
+        print(f"F1 scale {scale}: A_eff = {area:.8f}, relative error {errors[-1]:.3e}")
+    orders = rate(errors)
+    print(f"F1 orders {orders}")   # measured 1.33e-2, 3.31e-3, 8.26e-4; 2.00, 2.00
+    assert orders[-1] >= 1.8, (errors, orders)
+    assert errors[-1] <= 1e-3, errors
+
+
+def test_f2_scalar_slab_effective_area_matches_quad(scalar_study, slab_reference):
+    """A_eff / height of the P1 TE0 field against (int E^2 dx)^2 / int E^4 dx by quad.
+
+    The field is y-invariant on the strip of height h, so A_eff = height * w_eff
+    with the effective width w_eff on the line (the scaling of A1). Gate: order
+    >= 1.8, finest <= 1e-3.
+    """
+    errors = [r["area_rel"] for r in scalar_study]
+    orders = _orders(scalar_study, "area_rel")
+    print(f"F2 w_eff reference {slab_reference['width_eff']:.6f} um; relative errors {errors}, orders {orders}")
+    assert orders[-1] >= 1.8, (errors, orders)   # measured 1.20e-2, 3.07e-3, 7.73e-4; 1.97, 1.99
+    assert errors[-1] <= 1e-3, errors
+
+
+def test_f3_degree_4_rule_is_exact_for_the_quartic_density(small):
+    """int |E|^4 by the degree-4 rule against the degree-6 and the 36-point product rules, 1e-12.
+
+    E_t (Whitney) and E_z (P1) are linear per triangle, so (|E|^2)^2 is a quartic
+    and the three rules must agree to roundoff; the scalar P1 case likewise.
+    """
+    space, _, et, ez = small
+    mesh = space.mesh
+    mesh_s, _, phi, _ = _scalar_slab(55)
+    bary_p, w_p = triangle_product_rule()
+    cases = {"vector E_t": (mesh, _vector_density(space, et[0], None)),
+             "vector E_t + E_z": (mesh, _vector_density(space, et[0], ez[0])),
+             "scalar": (mesh_s, _scalar_density(mesh_s, phi[0]))}
+    for name, (m, density) in cases.items():
+        q4, q6 = _quartic_integral(m, density, 4), _quartic_integral(m, density, 6)
+        qp = float(np.einsum("t,tq,q->", m.areas(), density(bary_p) ** 2, w_p))
+        print(f"F3 {name}: degree 4 {q4:.15e}, |4 - 6| / 6 = {abs(q4 - q6) / q6:.2e}, "
+              f"|4 - product| / product = {abs(q4 - qp) / qp:.2e}")
+        assert abs(q4 - q6) / q6 <= 1e-12
+        assert abs(q4 - qp) / qp <= 1e-12
+    for degree in (4, 6):   # the rules themselves: every monomial up to their degree on the unit triangle
+        bary, w = triangle_symmetric_rule(degree)
+        assert w.sum() == pytest.approx(1.0, abs=1e-14)
+        from math import factorial
+        for a in range(degree + 1):
+            for b in range(degree + 1 - a):
+                c = degree - a - b
+                exact = factorial(a) * factorial(b) * factorial(c) / factorial(a + b + c + 2)
+                assert 0.5 * np.sum(w * bary[:, 0] ** a * bary[:, 1] ** b * bary[:, 2] ** c) == \
+                    pytest.approx(exact, rel=1e-13)
+    with pytest.raises(ValueError, match="degree"):
+        triangle_symmetric_rule(5)
+
+
+def test_f4_effective_area_scale_free_longitudinal_and_errors(small):
+    space, _, et, ez = small
+    mesh = space.mesh
+    a = effective_area(space, et[0], ez[0])
+    assert a > 0
+    assert effective_area(space, 3.3j * et[0], None) == pytest.approx(a, rel=1e-12)
+    assert effective_area(space, et[0], ez[0], include_longitudinal=True) != pytest.approx(a, rel=1e-6)
+    constant = np.ones(mesh.num_nodes)   # |phi| = 1 everywhere: A_eff is the domain area
+    assert scalar_effective_area(mesh, constant) == pytest.approx(mesh.areas().sum(), rel=1e-12)
+    assert scalar_effective_area(mesh, 2j * constant) == pytest.approx(mesh.areas().sum(), rel=1e-12)
+    with pytest.raises(ValueError, match="et has shape"):
+        effective_area(space, et[0][:-1], ez[0])
+    with pytest.raises(ValueError, match="ez has shape"):
+        effective_area(space, et[0], ez[0][:-1], include_longitudinal=True)
+    with pytest.raises(ValueError, match="phi has shape"):
+        scalar_effective_area(mesh, constant[:-1])
+    with pytest.raises(ValueError, match="zero"):
+        effective_area(space, np.zeros(space.num_edges), None)
+    with pytest.raises(ValueError, match="zero"):
+        scalar_effective_area(mesh, np.zeros(mesh.num_nodes))
+    with pytest.raises(ValueError, match="finite"):
+        scalar_effective_area(mesh, np.full(mesh.num_nodes, np.inf))
+
+
 # -- unit tests -----------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -559,6 +667,9 @@ def test_live_inputs_are_refused(small, name):
                  lambda: scalar_power(mesh, live_phi),
                  lambda: scalar_coupling_efficiency(mesh, live_phi, ez[0].real),
                  lambda: scalar_confinement_factor(mesh, live_phi, np.ones(mesh.num_triangles, bool)),
+                 lambda: effective_area(space, live_et, ez[0]),
+                 lambda: effective_area(space, et[0], live_ez, include_longitudinal=True),
+                 lambda: scalar_effective_area(mesh, live_phi),
                  lambda: interpolate_vector_field(space, lambda x, y: _live_values(name, [np.zeros((len(x), 2))])[0])):
         with pytest.raises(TypeError, match="NumPy"):
             call()
