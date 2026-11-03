@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: PML이 없는 `em.modes2d` 결과가 `mode_power`(지점 × 모드), `confinement`(지점 × 모드 × 영역, `region_names` 순서, 행의 합 1), `field_overlap`(지점 × 모드 × 모드)과, `"results": {"mode_overlap": {"gaussian": {"waist": w0, "center": [x, y]}}}`(문서 단위, 엄격 검증)가 있으면 `coupling_efficiency`(지점 × 모드)를 함께 저장합니다. 모두 문서 길이 단위의 저장 메시 위에서 `galerkin.mode_overlap`으로 계산하며 `summary.json`의 `mode_postprocessing`에 키마다 단위와 설명을 붙여 반복합니다. 벡터 `mode_power`는 저장 상대 장을 문서 길이 단위당 볼트로 읽을 때의 Poynting 전력(W; V/m이면 × `length_unit_to_m`²)이고 손실 모드에서는 복소수이며, 스칼라는 (문서 단위)²의 ∫|φ|² dA입니다. 기존 키·정규화·`field_layout`·VTU 내보내기는 바뀌지 않고, PML 결과와 subspace sweep에는 새 키가 없습니다. [문서](packages/simcase/overview.md#모드-후처리).
+
 - `simcase`: 균질 직사각형의 headless 기계해석 문서 두 종. `mechanics.elasticity2d`는 변별 변위 성분·전역 직교좌표계 변 traction·상수 체적력을 쓰는 정적 평면응력/평면변형률 선형탄성을, `mechanics.thermoelastic2d`는 같은 메시에서 변별 상수 경계 데이터의 정상 열전도를 먼저 풀고 전체 traction으로 열응력을 풉니다. 구속이 강체 운동을 남기는 문서는 메시 생성 전에 거부합니다. 결과는 `mechanics.elasticity2d-result-v1`(layout `mechanics2d-p1-v1`)과 `mechanics.thermoelastic2d-result-v1`(`thermoelastic2d-p1-v1`)로 저장되고 `export_fields`가 이름 붙은 변형률·응력 성분으로 VTU를 쓰며 Studio는 둘을 거절합니다. 예제 `elastic_plate`, `thermoelastic_bar`. [문서](packages/simcase/mechanics2d.md).
 
 - `simcase`: `em.modes2d` 결과가 저장 layout을 기록합니다. `summary.json`과 `fields.npz`에 `field_layout` `em-modes2d-p1-node-centroid-v1`(subspace sweep은 `em-modes2d-subspace-raw-v1`), `mesh_length_unit`, `length_unit_to_m`이 들어가고 archive에는 `study_parameter`도 들어갑니다. 기존 키는 바뀌지 않습니다.
