@@ -6,13 +6,19 @@
 array of these cases as IEEE hexadecimal floats, computed by the solver at
 origin/main 48720c9 before outward-flux and convection support was added. The
 regression test in ``test_transient_heat_robin.py`` requires the same bits from
-the current solver on the recorded platform and library versions, and agreement
-to roundoff elsewhere. Regenerate only with the recorded solver revision:
+the current solver on the recorded platform, library versions and OpenBLAS
+kernel, and agreement to roundoff elsewhere: numpy's bundled OpenBLAS picks its
+kernel from the CPU at import time, and two kernels can differ in the last bit
+(a hosted runner's CPU model changes between runs). Regenerate only with the
+recorded solver revision:
 
     PYTHONPATH=tests/galerkin python -c "from transient_heat_dirichlet_cases import write; write()"
 """
+import ctypes
 import dataclasses
+import glob
 import json
+import os
 from pathlib import Path
 import platform
 
@@ -53,9 +59,35 @@ def affine_case():
 CASES = {"ramp": ramp_case, "affine": affine_case}
 
 
+def openblas_core():
+    """Kernel name of numpy's bundled OpenBLAS, or None (another BLAS, or not found).
+
+    The same lookup as ``tools/report_numeric_runtime.py``; copied because the
+    installed-wheel run has no ``tools/`` directory.
+    """
+    base = Path(np.__file__).resolve().parent
+    patterns = [base.parent/"numpy.libs"/"*openblas*", base/".dylibs"/"*openblas*"]
+    for pattern in patterns:
+        for path in sorted(glob.glob(str(pattern))):
+            try:
+                if hasattr(os, "add_dll_directory"):
+                    os.add_dll_directory(str(Path(path).parent))
+                library = ctypes.CDLL(path)
+            except OSError:
+                continue
+            for symbol in ("scipy_openblas_get_corename64_", "scipy_openblas_get_corename",
+                           "openblas_get_corename64_", "openblas_get_corename"):
+                function = getattr(library, symbol, None)
+                if function is not None:
+                    function.restype = ctypes.c_char_p
+                    return function().decode()
+    return None
+
+
 def environment():
+    """What has to match for bit-identical histories: OS, architecture, numpy, scipy and the BLAS kernel."""
     return {"system": platform.system(), "machine": platform.machine(),
-            "numpy": np.__version__, "scipy": scipy.__version__}
+            "numpy": np.__version__, "scipy": scipy.__version__, "blas": openblas_core()}
 
 
 def arrays(case):
