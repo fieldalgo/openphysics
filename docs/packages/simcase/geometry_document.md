@@ -1,18 +1,19 @@
-# Geometry document: stage 0 contract (draft)
+# Geometry document: stage 0 contract
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/geometry_document.md)
 
 [Documentation home](../../README.md)
 
-Status: **DRAFT contract, not yet accepted.** The
+Status: **Accepted on 2026-11-03.** The
 [stage 1 reader](geometry_reader.md) reads version 1 geometry blocks in
 documents and still gives the runners the 0.2 form; the region complex,
 selectors and provenance need the stage 2 engine. Repository facts were checked
 against `main` at `015a6d8`.
 
 How the page is organised:
-- Sections marked **frozen** become fixed when the page is accepted. Their
-  SHA-256 is recorded, and after that they change only through a dated amendment.
+- Sections marked **frozen** are fixed since the page was accepted. The SHA-256 of
+  the accepted page is recorded, and frozen sections now change only through a
+  dated amendment listed in [Changes to this page](#changes-to-this-page).
 - Keywords marked **reserved** are defined by a later stage. Until then, every
   reader refuses them by name.
 - JSON contract (decided 2026-11-03): the envelope stays `"openphysics": "0.2"`,
@@ -39,7 +40,7 @@ is written in several separate ways:
 
 This page defines the one geometry block that all of them compile to.
 
-**Frozen on acceptance:**
+**Frozen since acceptance:**
 - the top-level structure;
 - units and the fixed 1 pm internal grid;
 - length and ratio parameters;
@@ -894,9 +895,10 @@ commit. The amendment must cite the public Wavebit repository at a specific SHA.
 
 ## Changes to this page
 
-While the page is a draft, it changes through ordinary pull requests as the stages
-are built. After acceptance, frozen sections change only through dated amendments
-listed here.
+Frozen sections change only through dated amendments listed here. Other sections
+(the stage 3 preview, the open questions and anything marked "not frozen") are
+updated through ordinary pull requests as the stages are built, and the change is
+listed here too.
 
 - 2026-11-03: Stated the JSON decision where the page still called it open (the
   envelope stays `"0.2"`; 0.2 rectangle documents keep their dispatch); said that
@@ -904,3 +906,4 @@ listed here.
   stage 2 engine, the stage 1 compiler refusing it by name.
 - 2026-11-03: Added the sipi v3 row (local dielectric regions and polygon
   conductors) to the mapping and named the sipi and meshine adapters.
+- 2026-11-03: Accepted. Frozen sections are fixed from this version on.
