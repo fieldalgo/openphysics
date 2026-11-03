@@ -63,7 +63,6 @@ in FEM (stage 2); `cylinder` and `sphere` (stage 5).
 - any persisted form of the region complex.
 
 **Not decided here:**
-- the JSON contract change itself;
 - the stage 2 exact 2D engine, or any code;
 - mesh deformation and adjoints, which belong to galerkin;
 - 3D arrangements beyond the box rule;
@@ -119,8 +118,8 @@ block without `version` is the 0.2 form, and an adapter reads it (see the
 ### Version
 
 `version` is an integer. It belongs to the geometry block and does not replace
-the envelope's `openphysics` string. Whether the envelope moves to `"0.3"` is left
-to the JSON contract decision.
+the envelope's `openphysics` string. The envelope stays `"0.2"` and moves only
+when a change breaks compatibility.
 
 ### Units
 
@@ -333,10 +332,12 @@ and footprint parts.
 `imprint` is the optional mode that preserves interfaces. It is not a union: it
 never merges regions and never changes a material.
 
-**Stage 1 realization.** Stage 1 splits a region into pieces that share its
-region name. meshine merges such pieces and keeps the shared segment as a
-constraint, but it does not report it as an interface
-(`packages/meshine/src/meshine/refine.py:690-707`). Stage 1 therefore lists these
+**Realization.** `imprint` needs the region complex, so it arrives with the stage 2
+engine. The stage 1 reader parses the keyword, and its compiler to the 0.2 builder
+refuses it by name, since that builder removes covered boundaries. The engine will split a region into
+pieces that share its region name. meshine merges such pieces and keeps the shared
+segment as a constraint, but it does not report it as an interface
+(`packages/meshine/src/meshine/refine.py:690-707`), so the engine lists these
 curves in the new `provenance_edges` field (see [Mesh tags](#mesh-tags-frozen)).
 
 3D `imprint` is reserved.
@@ -776,12 +777,12 @@ Terms used in the table:
 | Isolated exact circle; hole heuristic | `packages/simcase/src/simcase/geometry.py:71-104,216-229` | `circle` kind in the complex, with one shared curve identity | None. The heuristic is removed. |
 | Occluded circle (128-gon) | `packages/simcase/src/simcase/geometry.py:46` | `circle`; after booleans, the arcs come with stage 2 | None in the document. Until stage 2 the mesh still uses the polygon. |
 | MultiPolygon region; sliver rules | `packages/simcase/src/simcase/geometry.py:27-38,213-216` | One region with several faces; the same `AREA_EPS` rule | None |
-| Rectangle documents (thermal, electric, Joule, uniform transient) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | A `2d` component with a domain, no features and a background without a `material` key. `mesh.subdivisions` stays in `mesh`. | None. Dispatch by key presence (`packages/simcase/src/simcase/thermal_regions.py:30-36`) is replaced by an explicit field in the JSON decision. |
+| Rectangle documents (thermal, electric, Joule, uniform transient) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | A `2d` component with a domain, no features and a background without a `material` key. `mesh.subdivisions` stays in `mesh`. | None. A 0.2 document keeps today's dispatch by key presence (`packages/simcase/src/simcase/thermal_regions.py:30-36`); in version 1 the background without a `material` key marks the homogeneous body. |
 | `em.cavity3d` boxes and wall keys | `packages/simcase/src/simcase/cavity.py:46,104-145` | A `3d` component with `box` features and later-wins. Default tags are `x0`–`z1`, with the `xmin`–`zmax` aliases. The grid-plane and centroid rules stay mesh checks. | Rename: a box named `background` (legal today, `packages/simcase/src/simcase/cavity.py:121-124`) is renamed. Gain: box names now reach the region complex (today only bounds and material reach the solver, `packages/simcase/src/simcase/cavity.py:400-406`). |
 | PML thickness, bend, grading centre | `packages/simcase/src/simcase/pml_contract.py:18-41`; `packages/simcase/src/simcase/schema.py:351-355` | Unchanged physics and mesh fields | None |
 | Region complexity guard; Studio limits | `packages/simcase/src/simcase/complexity.py:46-93`; `packages/simcase/src/simcase/studio/thermal_regions_api.py:47-60` | Unchanged, counted on features | None |
 | Classic Studio | `packages/simcase/src/simcase/studio/static/index.html:750` | Edits the document, as now | None |
-| Studio workspace project and session v1–v5; capability endpoints | `packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`; `packages/simcase/src/simcase/studio/static/workspace-notebook.mjs:9-23`; `packages/simcase/src/simcase/studio/server.py:80-135` | Application formats that compile to geometry v1, with no geometry semantics of their own. Shapes become features: `name` is the display name, and `id` is generated when the name has spaces. The window becomes `domain`. The heat plate becomes a rectangle document. | LOSS for drafts only: shapes with no material (`''`). Rounding: Studio keeps values to 10⁻⁶ nm (`packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:15-16`), and moves skip that tidy step (`packages/simcase/src/simcase/studio/static/workspace-shape-editor.mjs:9-16`). Anything below 1 pm is rounded. Whether these formats retire is left to the JSON decision. |
+| Studio workspace project and session v1–v5; capability endpoints | `packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`; `packages/simcase/src/simcase/studio/static/workspace-notebook.mjs:9-23`; `packages/simcase/src/simcase/studio/server.py:80-135` | Application formats that compile to geometry v1, with no geometry semantics of their own. Shapes become features: `name` is the display name, and `id` is generated when the name has spaces. The window becomes `domain`. The heat plate becomes a rectangle document. | LOSS for drafts only: shapes with no material (`''`). Rounding: Studio keeps values to 10⁻⁶ nm (`packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:15-16`), and moves skip that tidy step (`packages/simcase/src/simcase/studio/static/workspace-shape-editor.mjs:9-16`). Anything below 1 pm is rounded. These formats stay for now; whether they retire is decided separately, after looking at real user files. |
 | Studio optical solver document (`s1..sN`, rects written as polygons) | `packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:91-98` | A 0.2 document, as in row 1 | That document is already lossy compared with the project. The contract is fed from the project, not from it. |
 | sipi `CrossSection`: layers, traces (rect, trapezoid, zero thickness), box side flags, ground flag | `packages/sipi/src/sipi/crosssection.py:42-206` | A `2d` component: full-width layer `rect`s bottom-up, then the traces in trace order as `rect`, `trapezoid` or `segment`. `eps_r` and `tan_delta` become `materials` entries named after the layer. Physics gets `conductors` (ordered `signals`, plus a `reference` selection that holds the ground traces and grounded sides). The side flags become physics on side tags. `outer` comes from `boundary_tags`. | No LOSS of geometry. Rename: a layer and a trace with the same name (allowed today, because the lists are checked separately, `packages/sipi/src/sipi/crosssection.py:195-200`) would merge as regions, so one of them is renamed. Rounding: template arithmetic such as `(w+gap)/2` (`packages/sipi/src/sipi/templates.py:65`) gives values like 0.00015000000000000001 m, about 10⁻⁸ pm off the grid. Behaviour: the rectangular path's exact float coincidences (`packages/sipi/src/sipi/crosssection.py:319,348-353`) can change, which the identity test `tests/sipi/test_manufacturing_sections.py:19` would see (open question). Overlap and touch refusals (`packages/sipi/src/sipi/crosssection.py:216-239`) stay in the adapter, so later-wins never resolves a sipi overlap. Selections replace the tolerance-based conductor node pick (`packages/sipi/src/sipi/crosssection.py:389-410`). |
 | sipi JSON `sipi.cross-section/1,/2` and the line and volume wrappers | `packages/sipi/src/sipi/document.py:13-161`; `packages/sipi/src/sipi/line_model.py`; `packages/sipi/src/sipi/volume_line.py` | Application formats that compile to geometry v1. The schema version (/1 or /2) is a property of the sipi format. | None. Template parameters are not stored today. |
@@ -875,8 +876,8 @@ commit. The amendment must cite the public Wavebit repository at a specific SHA.
 3. The evaluator stays in simcase. It must work without shapely; scipy is not
    restricted (see [Where the evaluator lives](#where-the-evaluator-lives)).
 4. sipi JSON and Studio projects keep their own formats and are read through
-   the stage 1 adapters. Whether they are retired is decided with the JSON
-   contract decision. New geometry features land in version 1 first.
+   the stage 1 adapters. Whether they retire is decided separately, after looking
+   at real user files. New geometry features land in version 1 first.
 5. Wavebit lowering (periodic cells, ellipses, rotation, angles, x/y extrusion)
    is deferred to a stage 3 amendment. The
    [stage 3 preview](#stage-3-preview-wavebit-not-frozen) stays non-normative.
@@ -885,3 +886,14 @@ commit. The amendment must cite the public Wavebit repository at a specific SHA.
 
 1. Point selectors (a reference node, a probe) are not defined. Which stage adds
    them?
+
+## Changes to this page
+
+While the page is a draft, it changes through ordinary pull requests as the stages
+are built. After acceptance, frozen sections change only through dated amendments
+listed here.
+
+- 2026-11-03: Stated the JSON decision where the page still called it open (the
+  envelope stays `"0.2"`; 0.2 rectangle documents keep their dispatch); said that
+  Studio and sipi formats stay until user files are reviewed; moved `imprint` to the
+  stage 2 engine, the stage 1 compiler refusing it by name.
