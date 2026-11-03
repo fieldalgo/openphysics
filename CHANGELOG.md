@@ -24,7 +24,7 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- galerkin: `galerkin.mode_overlap` — mode power (Faraday-route complex Poynting integral with the exact edge mass and edge-nodal coupling), cross power, field overlaps and overlap matrix, power/mass/peak normalisation, coupling efficiency (including projection onto a degenerate span), energy confinement factor, Nédélec/P1 interpolation of a given field, and P1 scalar twins; NumPy only. Validated against refsol slab and fibre fields. [Contract and validation](docs/packages/galerkin/mode_overlap.md).
+- galerkin: `galerkin.mode_overlap` — mode power (Faraday-route complex Poynting integral with the exact edge mass and edge-nodal coupling), cross power, field overlaps and overlap matrix, power/mass/peak normalisation, coupling efficiency (including projection onto a degenerate span), energy confinement factor, effective area (exact mass numerator, degree-4 symmetric triangle rule for `int |E|^4`), Nédélec/P1 interpolation of a given field, and P1 scalar twins; NumPy only. Validated against refsol slab and fibre fields. [Contract and validation](docs/packages/galerkin/mode_overlap.md).
 
 - `sipi`: versioned impedance studies add explicit sweeps/corners, independent uniform and correlated normal sampling, fixed-pitch coupled geometry and failure-preserving evaluation. [Contract and validation](docs/packages/sipi/study.md).
 
