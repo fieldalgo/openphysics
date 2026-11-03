@@ -28,7 +28,9 @@ A document is a JSON object with these sections (lengths use its declared unit):
     mesh       global size, optional per-shape sizes (on the shape), optional
                radial grading {center, near, far, distance}, min_angle.
     study      {"type": "single"} or {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [...]}
-    results    {"save_fields": true, "plots": true}
+    results    {"save_fields": true, "plots": true}; optional "mode_overlap":
+               {"gaussian": {"waist": w0, "center": [x, y]}} (document length unit)
+               adds a Gaussian coupling efficiency to em.modes2d results
 
 The same file drives a script, a command line run, and the optional studio: the GUI
 is an editor for this document, nothing more.
@@ -45,6 +47,7 @@ from typing import Any
 
 from . import units
 from .units import Scale, UnitError
+from .mode_postprocessing import validate_mode_overlap
 from .tracking import tracking_settings
 from .registry import kind_of, physics_types
 
@@ -301,6 +304,7 @@ class Document:
             raise DocumentError("geometry.domain needs xmin, xmax, ymin, ymax")
         if not (dom["xmin"] < dom["xmax"] and dom["ymin"] < dom["ymax"]):
             raise DocumentError("geometry.domain is empty")
+        validate_mode_overlap(d["results"], dom, DocumentError)
         names = set()
         for i, s in enumerate(g["shapes"]):
             t = s.get("type")

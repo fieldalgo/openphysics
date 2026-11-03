@@ -56,7 +56,11 @@ result.save("results")
 진단 경계 좌표는 문서 단위입니다. JSON은 `openphysics.modes2d/2`, 실수부
 `neff`, `neff_imag`를 유지하고 `open_boundary`, 선택적 `bend_loss_db_90deg`를
 추가합니다. NPZ는 pickle 없이 복소 배열과 `open_boundary_json`을 저장합니다.
-기능 브랜치 구현이 릴리스를 뜻하지는 않습니다.
+기능 브랜치 구현이 릴리스를 뜻하지는 않습니다. PML 결과는 [닫힌 창
+결과](overview.md#모드-후처리)의 `mode_power`/`confinement`/`field_overlap`/
+`coupling_efficiency` 배열을 저장하지 않습니다. 횡 계수가 늘린 좌표의 공변
+적분이어서 창 전체의 무손실 Poynting 식은 물리 전력이 아니며, 물리 창 변형은
+제공하지 않습니다. `results.mode_overlap` 블록은 검증만 하고 무시합니다.
 
 각 `openphysics.pml-candidates/1` 점은 전체 후보의 1부터 시작하는 번호,
 복소 지수, 원래 pencil 상대잔차, 양의 물리/PML L2 비율, 선택 번호와 이유를

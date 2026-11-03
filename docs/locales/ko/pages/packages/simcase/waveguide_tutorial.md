@@ -236,13 +236,23 @@ n_eff 2.4441  n_g 4.1923
 
 | 파일 | 내용 |
 |---|---|
-| `summary.json` | study 지점·모드별 n_eff, 군굴절률, 선언 단위, 저장 배치 `field_layout`과 `mesh_length_unit`·`length_unit_to_m`, 메시 통계, 시간, 모드 추적 |
-| `fields.npz` | 메시 절점·삼각형(문서 단위), 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez). `numpy.load(..., allow_pickle=False)`로 읽음 |
+| `summary.json` | study 지점·모드별 n_eff, 군굴절률, 선언 단위, 저장 배치 `field_layout`과 `mesh_length_unit`·`length_unit_to_m`, 메시 통계, 시간, 모드 추적, `mode_postprocessing`(전력·구속·중첩과 단위) |
+| `fields.npz` | 메시 절점·삼각형(문서 단위), 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez), 그리고 `mode_power`·`confinement`·`field_overlap`. `numpy.load(..., allow_pickle=False)`로 읽음 |
 | `results.png` | 메시, 첫 모드의 \|E\|, sweep |
 | `log.txt`, `model.json` | 실행 로그와 실행한 문서 그대로 |
 
 장 진폭은 상대값(가장 큰 중심 \|E\|가 1)이며 와트나 V/m가 아닙니다. 배열은
 [패키지 개요](overview.md#벡터-장과-단일-지점-study)에 있습니다.
+
+### 모드 후처리
+
+`fields.npz`의 `confinement[p, m]`은 `region_names`의 영역마다 모드 에너지(`Re eps_r |E|^2`)의
+비율을 담으므로 스트립의 코어 구속률은 `core` 항목이며 행의 합은 1입니다. `mode_power[p, m]`은
+저장 진폭을 문서 단위당 볼트로 읽을 때 장이 전달하는 전력이고(장을 `sqrt(Re mode_power)`로 나누면
+1 W 모드), `field_overlap`은 행렬 `int conj(E_a) . E_b dA`입니다. JSON에
+`"results": {"mode_overlap": {"gaussian": {"waist": 0.3, "center": [0.0, 0.11]}}}`(문서 단위)를
+추가하면 그 1/e 반지름의 x 편광 Gaussian 빔이 각 모드에 결합하는 비율 `coupling_efficiency`도
+저장됩니다. 정확한 절차와 단위는 [패키지 개요](overview.md#모드-후처리)에 있습니다.
 
 ParaView에서 모드를 보려면 `simcase[export]`를 설치하고 새 디렉터리에 파장마다 VTU 하나와
 `.pvd` 컬렉션을 씁니다.

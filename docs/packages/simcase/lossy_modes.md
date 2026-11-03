@@ -60,6 +60,12 @@ as the point data `mode_<k>_real` and `mode_<k>_imag`, and vector modes as
 `electric_field_mode_<k>_real`/`_imag` (centroid cell data) and
 `longitudinal_electric_mode_<k>_real`/`_imag` (nodal point data), with the
 saved values unchanged. `neff` and the attenuation stay in the summary and NPZ.
+
+The saved post-processing ([overview](overview.md#mode-post-processing)) is
+complex where the field is: a lossy vector mode has a nonzero imaginary
+`mode_power` (reactive part; `Re` is the +z power) and lossy modes are not
+power-orthogonal; a lossy scalar result keeps a real `mode_power`
+(`int |phi|^2 dA`) and a complex Hermitian `field_overlap`.
 See [viewing in ParaView](overview.md#viewing-in-paraview).
 
 ## Selection, normalization and tracking

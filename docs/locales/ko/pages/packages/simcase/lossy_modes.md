@@ -57,6 +57,11 @@ VTK에도 복소 배열이 없으므로 `simcase.export`는 복소 스칼라 모
 `mode_<k>_real`·`mode_<k>_imag`로, 벡터 모드를 `electric_field_mode_<k>_real`/`_imag`
 (요소중심 셀 데이터)와 `longitudinal_electric_mode_<k>_real`/`_imag`(절점 점 데이터)로
 저장값 그대로 씁니다. `neff`와 감쇠는 summary와 NPZ에 남습니다.
+
+저장되는 후처리([개요](overview.md#모드-후처리))는 장이 복소이면 복소입니다. 손실
+벡터 모드의 `mode_power`는 허수부(무효 전력)가 0이 아니고 `Re`가 +z 전력이며, 손실
+모드들은 전력 직교하지 않습니다. 손실 스칼라 결과의 `mode_power`는 실수
+(`int |phi|^2 dA`)이고 `field_overlap`은 복소 Hermitian입니다.
 [ParaView로 보기](overview.md#paraview로-보기)를 참고하세요.
 
 ## 선택·정규화·추적
