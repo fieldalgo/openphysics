@@ -502,14 +502,17 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     def boundary_at(index):
         """(H as NumPy CSR, G, shifted_B) for the step ending at ``times[index]``.
 
-        Static data return the arrays sampled at times[0]; time-dependent data
+        Static data return the values sampled at times[0]; time-dependent data
         are sampled at times[index]. H is reassembled only when h varies. The
-        loads are live if an input is.
+        loads are live if an input is: the static case hands back the sampled
+        G and shifted_B themselves (``natural_live``), not their NumPy copies in
+        ``boundary0``, so the live history keeps its derivatives with respect to
+        h, the ambient temperature and the prescribed flux.
         """
         if not natural:
             return None
         if not timed or index == 0:
-            return boundary0
+            return (boundary0[0], natural_live[1], natural_live[2])
         robin, outward, shifted = natural_system(float(times[index]))
         robin = _scipy(robin) if timed_h else boundary0[0]
         _finite(robin.data, to_numpy(outward), to_numpy(shifted))
