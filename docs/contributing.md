@@ -39,10 +39,15 @@ optional skips; a passing subset does not replace the required CI check.
   portable. A passing subset or a documentation change does not establish new
   platform support, and a pass on one OS or a universal wheel says nothing about
   another OS.
-- **Scope.** One topic per PR. Changes on the same topic go in one PR, each as its
-  own self-contained commit; unrelated changes go in separate PRs. The test is
-  whether a later reader -- a person or an agent -- can follow what changed and
-  why from the PR and its commits, not how many CI runs it takes. Do not commit
+- **Scope.** The unit of tracking is the commit: one self-contained commit per
+  change, whose message says what changed and why, with its measurements and the
+  checks that were run. Independent topics that have each been verified on their
+  own branch may land together in one PR; Rebase and merge keeps every commit on
+  `main`, so history and reverts stay per commit. If a PR's CI fails because of
+  one commit, that commit is dropped from the PR and the rest is pushed again. A
+  change that needs its own review, or is risky to land, gets its own PR. The test
+  is whether a later reader -- a person or an agent -- can follow what changed and
+  why from the commits. Do not commit
   credentials, generated build directories, local environment files or private
   research material.
 - **Licensing.** Preserve upstream notices and verify the terms and provenance of
