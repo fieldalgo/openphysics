@@ -36,6 +36,7 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 - [Vector eigenspace reliability](../packages/galerkin/eigenspace_reliability.md)
 - [Modal complex coordinates](../packages/galerkin/modal_coordinates.md)
 - [Waveguide formulation: modes, derivatives, coupling and the SI/PI path](../packages/galerkin/waveguide_formulation.md)
+- [Mode power, overlap and coupling](../packages/galerkin/mode_overlap.md)
 - [galerkin — the OpenPhysics finite-element engine](../packages/galerkin/overview.md)
 
 
