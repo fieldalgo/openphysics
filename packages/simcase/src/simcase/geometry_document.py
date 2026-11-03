@@ -865,6 +865,9 @@ def to_v02(model: GeometryModel, component: str | None = None) -> dict:
     if comp.dimension == "axisymmetric":
         raise GeometryError(f"component {comp.name!r}: no 0.2 runner takes an axisymmetric component")
     out: dict = {"domain": {k: u(v) for k, v in comp.domain.items()}}
+    if comp.background.get("material", "") is None or any(f.material is None for f in comp.features):
+        raise GeometryError(f"component {comp.name!r}: void (material null) needs the stage 2 engine; the 0.2 "
+                            "builder meshes every region")
     if "material" in comp.background:
         out["background"] = {"material": comp.background["material"]}
         if "mesh_size" in comp.background:

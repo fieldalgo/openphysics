@@ -1,0 +1,89 @@
+{
+  "openphysics": "0.2",
+  "name": "SOI strip waveguide 500 x 220 nm, version 1 geometry",
+  "units": {
+    "length": "um"
+  },
+  "geometry": {
+    "version": 1,
+    "parameters": {
+      "w": {
+        "value": 0.5,
+        "range": [
+          0.3,
+          0.9
+        ]
+      },
+      "t": {
+        "value": 0.22
+      }
+    },
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": -1.5,
+          "xmax": 1.5,
+          "ymin": -1.2,
+          "ymax": 1.2
+        },
+        "background": {
+          "material": "SiO2"
+        },
+        "features": [
+          {
+            "name": "core",
+            "type": "rect",
+            "x": "-w/2",
+            "y": 0.0,
+            "w": "w",
+            "h": "t",
+            "material": "Si",
+            "mesh_size": 0.02
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "wavelength": 1.55,
+      "num_modes": 2,
+      "n_cladding": 1.45,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.25,
+    "grading": {
+      "center": [
+        0.0,
+        0.11
+      ],
+      "near": 0.02,
+      "far": 0.16,
+      "distance": 1.0
+    }
+  },
+  "study": {
+    "type": "sweep",
+    "parameter": "physics.em1.wavelength",
+    "values": [
+      1.4,
+      1.45,
+      1.5,
+      1.55,
+      1.6,
+      1.65,
+      1.7
+    ]
+  }
+}
