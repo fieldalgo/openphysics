@@ -69,13 +69,44 @@ mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
                        stack.table_for(footprint.region_names), size=0.4)
 ```
 
+## Adapters from sipi and meshine
+
+Two packages write their own geometry as version 1 blocks. They emit plain
+dictionaries and do not depend on simcase; `parse` checks what they write.
+
+```python
+from sipi import geometry_v1 as sipi_v1
+out = sipi_v1.to_geometry_v1(section)          # a sipi CrossSection, in metres
+model = parse({"units": out["units"], "geometry": out["geometry"]})
+out["materials"], out["conductors"], out["boundaries"], out["renamed"]
+
+from meshine import geometry_v1 as meshine_v1
+out = meshine_v1.to_geometry_v1(domain, length_unit="um")   # a Domain before build()
+out["mesh_size"], out["mesh_controls"]         # default size, Circle vertex counts
+```
+
+- **sipi:** layers bottom-up, then local dielectric regions, then traces in trace
+  order, so later features win as sipi's own cuts do. A rectangle trace is a
+  `rect`, a tapered one a `trapezoid`, a zero-thickness one a `segment` and a
+  `PolygonTrace` a `polygon`. A trace whose name a layer or region already uses is
+  renamed `<name>-trace` and listed in `renamed`. Derived coordinates (a trace's
+  lower-left corner, layer interfaces) are written exactly.
+- **meshine:** regions in containment order; a hole that no region fills exactly
+  becomes a void feature, and regions inside it still come later. Same-name loops
+  merge through `region`. A `Domain` has no unit and no materials, so
+  `length_unit` is required and each region's material is its name unless
+  `materials` maps it. A boundary-name callback cannot be carried over.
+
+`examples/simcase/geometry_v1_soi_strip.json` is the SOI strip example written
+with version 1 geometry and parameters.
+
 ## What it does not do yet
 
 - Resolve selectors, build the region complex or write provenance names to a mesh
   (they need the stage 2 engine).
 - Mesh `path` and `segment` features, merged regions, axisymmetric components,
-  cylinders, spheres, `extrude` features and `finalize: "imprint"`. They are parsed
-  and refused by the compilers with their names.
+  cylinders, spheres, `extrude` features, `finalize: "imprint"` and void
+  (`material: null`). They are parsed and refused by the compilers with their names.
 - Supply design velocities (stage 4).
 
 Importing `simcase.geometry_document` loads neither scipy nor shapely:
@@ -83,6 +114,15 @@ Importing `simcase.geometry_document` loads neither scipy nor shapely:
 `simcase.Document` is first used.
 
 ## Checks
+
+`tests/simcase/test_geometry_adapters.py`: eight sipi sections (microstrip,
+stripline, coupled, coplanar, surface-masked, tapered, zero-thickness, polygon
+conductor with a local region) give each region the area sipi's own shapes define
+to a relative 10⁻¹² (measured 4 × 10⁻¹⁶), with roundings only on input residues
+(at most 2 × 10⁻⁷ pm); the meshine rib, footprint and hole domains match their loop
+areas, and the fiber keeps exact circles. The version 1 SOI strip example loads to
+the same `Document.data` as `soi_strip.json`.
+
 
 `tests/simcase/test_geometry_document.py`:
 - All 45 current simcase documents (the built-in examples and
