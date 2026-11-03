@@ -48,7 +48,7 @@ def plate(features, **extra):
 # ----------------------------------------------------------------- S1-1: 0.2 round trip
 
 def test_all_current_documents_are_walked():
-    assert len(DOCS) == 45
+    assert len(DOCS) == 51
 
 
 @pytest.mark.parametrize("name", sorted(DOCS))
