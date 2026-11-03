@@ -24,6 +24,22 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- CI: GitHub의 Node 20 런타임 종료에 맞춰 고정한 GitHub Actions를 Node 24 릴리스(`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6)로 올렸습니다. 검사 내용과 아티팩트 이름은 바뀌지 않습니다.
+
+- CI: 필수 검사가 아닌 하루 한 번의 `Latest dependencies` 카나리(`.github/workflows/latest-deps.yml`)가 메타데이터가 허용하는 가장 새 의존성으로 패키지를 설치하고 `pip check`, 라이선스 목록 검사, 사전 검사 묶음, non-slow 시험, 강제 커널 시험을 돌린 뒤 해석된 버전과 함께 이슈 하나를 열거나 갱신하거나 닫습니다. 고정 버전은 여전히 의도적으로 올립니다. [문서](development.md#최신-의존성-카나리).
+
+- 시험: galerkin의 경계 항을 같은 메시에서 scikit-fem과 비교합니다. `thermal.solve_steady_heat`의 외향 열유속·대류(Robin) 변(혼합과 Robin만), 0이 아닌 규정 변위를 둔 `elasticity.solve_elasticity`의 Cartesian traction 변, Helmholtz 조립의 1차 흡수 경계(`assemble_boundary_mass`)입니다. 행렬·하중·반력·장·에너지가 1e-13 이하로 일치합니다. [레퍼런스 도구 비교](reference-comparisons.md#현재-사례).
+
+- `physmat`: Ciddor 1996의 습한 공기를 `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)`와 벡터화된 `physmat.air.refractive_index`로 추가했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기 분산, BIPM 1981/91 밀도로 0.3–1.69 µm에서 유효하며, NIST Engineering Metrology Toolbox 값을 1e-9 이내, 상온 조건의 Birch & Downs 1994를 6e-9 이내로 재현합니다. `air`는 진공 그대로입니다. 내장 재료 표는 재료별 출처를 밝힙니다. [문서](packages/physmat/overview.md#공기-ciddor-1996).
+
+- 저장소 검사: `tools/tests/test_examples_smoke.py`가 `examples/` 아래의 모든 스크립트와 JSON 문서를 임시 디렉터리에서 실행하고 종료 코드 0을 요구합니다. 약 20초를 넘는 예제는 `slow` 마커를 달았습니다. [tools/README.md](../../../../tools/README.md#examples-smoke-test)에 문서화했습니다.
+
+- 벤치마크: `benchmarks/benchmark_thermal.py`, `benchmark_elasticity.py`, `benchmark_electric.py`, `benchmark_derivatives.py`가 정상·과도 열전도, 탄성과 열탄성 traction workflow, 전기 전도·Joule 가열·온도 의존 Joule 풀이(Picard와 Newton), 그리고 forward 풀이 대 gradient(NumPy 중심 차분, 설치된 경우 JAX·PyTorch adjoint, 없으면 건너뜀)의 시간을 새 프로세스에서 재고 checkout·고정 요구사항·머신·peak RSS를 기록합니다. 전체 열·전기 호출 옆에 공개 assembly 함수의 시간도 잽니다. 사람이 손으로 실행하며 CI는 실행하지 않습니다. 안내: [열전도](benchmark_thermal.md), [탄성](benchmark_elasticity.md), [전기](benchmark_electric.md), [미분](benchmark_derivatives.md).
+
+- 도구: 설치 플랫폼 검사(`tools/check_platform_install.py`)가 이제 cavity3d, `sipi`, 완전 벡터/PML 도파로 모드 wheel 소비자를 Linux·macOS·Windows에서 실행합니다. `test_sipi_wheel.py`(거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항 비교)와 `test_vector_modes_wheel.py`(`refsol.slab`, 누설 슬래브 외향 근, PML 유무의 `vector_slab` 예제 CLI 실행)는 새 소비자입니다. cavity 소비자의 Studio 검사는 배포 검사에서 Linux에만 남습니다. Linux에서 확인했고 macOS·Windows는 CI에서 돕니다. [개발 안내](development.md#ci가-돌리는-것).
+
+- `galerkin`: `galerkin.read_msh`가 평면 MSH 2.2/4.1 파일의 물리 그룹을 보존합니다. 물리 표면은 `regions`/`region_names`가 되고(어느 물리 표면에도 속하지 않는 삼각형은 영역 -1), 물리 곡선은 `boundary_edges`와 `boundary`가 되며, 어떤 삼각형도 쓰지 않는 절점은 버립니다. 결과는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 배열 단위로 같습니다. `write_msh`는 평면 메시의 영역마다 물리 표면 하나를 씁니다. 사면체 메시는 바뀌지 않습니다. [문서](packages/galerkin/overview.md).
+
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
 
 - `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
