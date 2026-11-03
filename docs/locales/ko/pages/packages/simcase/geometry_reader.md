@@ -59,8 +59,8 @@ mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
 ## 아직 하지 않는 일
 
 - 선택자 해석, 영역 구성 만들기, 메시에 출처 이름 쓰기(2단계 엔진이 필요합니다).
-- `path`·`segment` 피처, 병합 영역, 축대칭 컴포넌트, 원통, 구, `extrude` 피처의 메시. 파싱은 하고,
-  컴파일러가 이름을 밝혀 거부합니다.
+- `path`·`segment` 피처, 병합 영역, 축대칭 컴포넌트, 원통, 구, `extrude` 피처, `finalize: "imprint"`의
+  메시. 파싱은 하고, 컴파일러가 이름을 밝혀 거부합니다.
 - 설계 속도 제공(4단계).
 
 `simcase.geometry_document`를 import해도 scipy와 shapely는 불러오지 않습니다. `import simcase`는

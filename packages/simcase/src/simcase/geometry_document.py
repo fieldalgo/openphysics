@@ -859,6 +859,9 @@ def to_v02(model: GeometryModel, component: str | None = None) -> dict:
     """
     comp = _pick(model, component)
     u = model.to_unit
+    if comp.finalize == "imprint":
+        raise GeometryError(f"component {comp.name!r}: finalize 'imprint' needs the stage 2 engine; the 0.2 "
+                            "builder would remove the covered boundaries")
     if comp.dimension == "axisymmetric":
         raise GeometryError(f"component {comp.name!r}: no 0.2 runner takes an axisymmetric component")
     out: dict = {"domain": {k: u(v) for k, v in comp.domain.items()}}
