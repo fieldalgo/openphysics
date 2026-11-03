@@ -4,7 +4,8 @@
 "system": "Linux",
 "machine": "x86_64",
 "numpy": "2.5.4",
-"scipy": "1.18.1"
+"scipy": "1.18.1",
+"blas": "SkylakeX"
 },
 "cases": {
 "ramp": {
