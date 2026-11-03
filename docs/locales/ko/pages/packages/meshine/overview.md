@@ -153,6 +153,12 @@ python -m pytest -q tests/meshine
 
 `examples/meshine/compare_with_gmsh.py`는 같은 리브 도파로를 여기서 생성한 메시와 Gmsh(`gmshio` 경유) 메시로 나란히 그립니다. Gmsh Frontal-Delaunay가 여전히 더 높은 평균 품질(반지름비 0.98 대 0.93)과 매끄러운 크기 변화를 제공합니다. meshine이 보장하는 것은 각도 하한입니다.
 
+## 형상 문서로 쓰기
+
+`meshine.geometry_v1.to_geometry_v1(domain, length_unit=...)`은 `build` 전의 `Domain`을
+[simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상 블록으로 씁니다. `Domain`에는 단위가 없으므로
+`length_unit`이 필수입니다. [어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
+
 ## 한계
 
 - 사면체는 `extrude`로 평면 바닥 위의 층 적층만 만듭니다. 다른 3D 형상에는 `gmshio`를 통한 Gmsh를 사용하세요. OpenPhysics 자체 3D 메셔의 기준은 [사전 등록 3D 검증 계획](validation3d.md)에 미리 고정했습니다.

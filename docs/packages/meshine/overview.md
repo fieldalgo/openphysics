@@ -310,6 +310,14 @@ by Gmsh (through the `gmshio` package) side by side. Gmsh's Frontal-Delaunay
 still produces higher mean quality (0.98 vs 0.93 radius ratio) and smoother
 grading; meshine's guarantee is the angle bound.
 
+## As a geometry document
+
+`meshine.geometry_v1.to_geometry_v1(domain, length_unit=...)` writes a `Domain`,
+before `build`, as a version 1 geometry block of the
+[simcase geometry document](../simcase/geometry_document.md). A `Domain` carries no
+unit, so `length_unit` is required. See
+[the adapters](../simcase/geometry_reader.md#adapters-from-sipi-and-meshine).
+
 ## Limits
 
 - Tetrahedra come only from `extrude`, as layer stacks over a planar footprint. For other 3D shapes use Gmsh via `gmshio`. The criteria for OpenPhysics's own 3D meshers are fixed in advance in the [pre-registered 3D validation plan](validation3d.md).

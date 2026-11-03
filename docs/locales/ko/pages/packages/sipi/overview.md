@@ -168,6 +168,12 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 | D3 두 패드 a = 0.5 mm, d = 10 mm, 정사각 판 100·200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ(무한 시트의 등전위 원판) | 각각 1 % 이내, 판을 두 배로 할 때 R 변화 ≤ 0.5 % | +0.27 %, −0.19 %, 변화 −0.46 % |
 | D4 부하 둘과 절개 | Joule 손실 = Σ 단자 전압 × 전류 | 1e-9 | 통과 |
 
+## 형상 문서로 쓰기
+
+`sipi.geometry_v1.to_geometry_v1(section)`은 단면을 [simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상
+블록으로 쓰고, 재료·도체·상자 플래그를 함께 돌려줍니다. 결과는 단순한 사전이며 의존성을 더하지 않습니다.
+[어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
+
 ## 구현하지 않은 것
 
 - 실측 재료 추정과 형상/전파 분산.
