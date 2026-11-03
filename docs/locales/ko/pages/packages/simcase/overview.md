@@ -97,6 +97,27 @@ python -m simcase run vector.json -o vector_results
 
 벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모든 `em.modes2d` 결과(스칼라·벡터)는 두 파일에 저장 파일 배치 `field_layout="em-modes2d-p1-node-centroid-v1"`(P1 절점 장, 벡터 결과는 요소중심 전기장을 더함), `mesh_length_unit`(`nodes`의 선언 단위), `length_unit_to_m`(그 단위의 미터 크기)을, archive에는 `study_parameter`(sweep 경로, 단일 지점이면 `""`)를 함께 기록합니다. subspace sweep은 대신 `field_layout="em-modes2d-subspace-raw-v1"`을 기록합니다. 기존 키의 의미는 바뀌지 않습니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
 
+### 모드 후처리
+
+PML이 없는 모든 스칼라·벡터 `em.modes2d` 결과는 study 지점 `p`와 모드 `m`마다 세 개의 배열을 추가로 저장합니다. 값은 문서 길이 단위의 저장 메시 위에서 [`galerkin.mode_overlap`](../galerkin/mode_overlap.md)을 직접 호출한 것이며(`simcase.mode_postprocessing`이 정확한 절차를 적고, `tests/simcase/test_modes_postprocessing.py`가 저장값이 그 호출과 바이트 단위로 같음을 확인합니다):
+
+| 키 | 모양 | 의미 |
+|---|---|---|
+| `mode_power` | `(points, modes)` | 벡터: 저장 장의 복소 Poynting 적분 `P = 1/2 int (E x H*) . z dA`(`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); 스칼라: `int |phi|^2 dA`(`scalar_power`, 실수) |
+| `confinement` | `(points, modes, regions)` | `region_names` 순서의 영역별 에너지 비율 `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2`(`confinement_factor`); 스칼라: `int_R |phi|^2 / int |phi|^2`. 행의 합은 1 |
+| `field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA`(`overlap_matrix(..., "field")`, Hermitian; 스칼라: `scalar_overlap`); 대각은 `int |E|^2 dA`이며 스칼라 결과에서는 `mode_power`와 같음 |
+| `coupling_efficiency` | `(points, modes)` | `results.mode_overlap.gaussian`이 있을 때만: Gaussian 입력의 `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)`(`interpolate_vector_field` 뒤 `coupling_efficiency`; 스칼라: 절점에서 `scalar_coupling_efficiency`) |
+
+저장 진폭은 상대값이므로 `mode_power` 자체에는 절대 단위가 없습니다. 정확한 뜻은 다음과 같습니다. 벡터 진폭을 문서 길이 단위당 볼트(마이크로미터 문서면 V/um)로 읽으면 `mode_power`는 그 장의 전력(와트)이고 `Re`는 +z로 전달되는 시간 평균 전력입니다. V/m로 읽으면 와트 전력은 `mode_power * length_unit_to_m**2`입니다. 저장 모드를 `sqrt(Re mode_power)`로 나누면 1 W를 전달하는 장(문서 단위당 V 진폭)이 됩니다. 무손실 모드에서는 허수부가 반올림 오차이고, 손실 모드(복소 `neff`)에서는 무효 전력이며 모드들은 전력 직교하지 않습니다. 스칼라 `mode_power`와 `field_overlap`은 (문서 단위)^2이고 `confinement`·`coupling_efficiency`는 무차원입니다. `summary.json`은 `mode_postprocessing` 아래에 키마다 `unit`과 `description`을 붙여 같은 값을 반복합니다(`field_overlap`은 `real`/`imag`, 벡터 `mode_power`는 `imag` 목록, `confinement`는 영역 이름 포함).
+
+선택적 문서 블록
+
+```json
+"results": {"mode_overlap": {"gaussian": {"waist": 0.22, "center": [0.0, 0.11]}}}
+```
+
+은 입력 장 `exp(-((x - cx)^2 + (y - cy)^2) / waist^2)`(`waist`는 1/e 장 반지름, `center`는 문서 길이 단위)에 대한 `coupling_efficiency`를 추가합니다. 벡터 결과에서는 x 편광 입력을 모드의 횡 장과만 비교하고, 스칼라 결과에서는 스칼라 진폭입니다. waist는 양수, 중심은 기하 창 안이어야 하며 `mode_overlap`과 `gaussian` 아래의 다른 키는 거절됩니다. PML 결과와 subspace sweep에는 이 키들이 없습니다. PML 계수는 늘린 좌표의 공변 적분이어서 창 전체의 무손실 Poynting 식이 물리 전력이 아니고, subspace 프레임은 모드가 아니기 때문입니다([PML 모드](pml_modes.md), [subspace 추적](vector_subspace_tracking.md)). VTU 내보내기는 바뀌지 않고 장만 쓰므로 후처리 값은 `fields.npz`나 `summary.json`에서 읽습니다.
+
 Studio는 지점마다 `location="triangle_centroids"`, 성분 이름, `(modes, triangles, 3)` 형상의 별도 `real`/`imag` 배열을 가진 `vector_fields`를 받습니다. 기존 스칼라 HTTP `fields` 구성은 그대로이며 벡터에서는 비어 있습니다. `|E|`, `|Ex|`, `|Ey|`, `|Ez|`를 골라 공통 |E| 색 척도의 크기를 표시합니다. 저장 PNG는 |E|를 표시하고 archive는 복소 성분을 보존합니다. `VectorField.to_dict()`는 같은 JSON 안전 표시 표본을 만듭니다.
 
 ### 추적 벡터 파장 sweep

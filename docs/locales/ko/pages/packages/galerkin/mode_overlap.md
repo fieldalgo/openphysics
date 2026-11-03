@@ -229,5 +229,7 @@ TE에 적용되지 않습니다(`H_z != 0`): Faraday 경로와의 측정 차이 
 - 군속도·에너지 속도 전력, 가져온 측정 장과의 중첩, 중심→edge 사영은 없습니다. 유효
   면적은 위의 `|E|^2`/`|E|^4` 정의이며 비선형 계수 가중(영역별 `n_2`, `chi^(3)`)은
   제공하지 않습니다.
-- simcase 문서나 Studio에는 노출되지 않습니다. simcase 정규화(`"peak"`)는 비교를 위해
-  재현했을 뿐입니다.
+- simcase는 닫힌 창 `em.modes2d` 결과마다 `vector_power`/`scalar_power`,
+  `confinement_factor`, `overlap_matrix`와 선택적 Gaussian `coupling_efficiency`를
+  저장합니다([모드 후처리](../simcase/overview.md#모드-후처리)). Studio에는 노출되지
+  않습니다. simcase 정규화(`"peak"`)는 비교를 위해 재현했을 뿐입니다.

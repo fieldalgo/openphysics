@@ -61,7 +61,13 @@ units. `solve_point` diagnostics and `run` diagnostics use document units.
 The JSON summary retains `openphysics.modes2d/2`, real `neff` plus `neff_imag`,
 and adds `open_boundary` and optional `bend_loss_db_90deg`. NPZ retains complex
 arrays and `open_boundary_json` without pickles. No releases are implied by a
-feature-branch implementation.
+feature-branch implementation. PML results save none of the
+`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` arrays of
+[closed-window results](overview.md#mode-post-processing): the transverse
+coefficients are covariant integrals in the stretched coordinates, so the
+lossless Poynting formula over the whole window is not the physical power and
+a physical-window variant is not offered. A `results.mode_overlap` block is
+validated but ignored for them.
 
 Each `openphysics.pml-candidates/1` point records all searched candidates,
 one-based candidate numbers, complex index, original-pencil relative residual,
