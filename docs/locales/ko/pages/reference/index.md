@@ -44,7 +44,7 @@
 
 ## simcase 계약
 
-- [형상 문서: 0단계 계약(초안)](../packages/simcase/geometry_document.md)
+- [형상 문서: 0단계 계약](../packages/simcase/geometry_document.md)
 - [버전 1 형상 읽기(1단계)](../packages/simcase/geometry_reader.md)
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
