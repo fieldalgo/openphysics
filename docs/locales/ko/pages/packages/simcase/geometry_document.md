@@ -58,7 +58,6 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
 - 영역 구성을 저장하는 형식
 
 **여기서 정하지 않는 것:**
-- JSON 계약 변경 자체
 - 2단계 정확 2D 엔진이나 그 밖의 코드
 - 메시 변형과 adjoint(galerkin 소관)
 - 상자 규칙을 넘는 3D 배열
@@ -109,7 +108,7 @@ BSD-3-Clause입니다. 실행기 묶음은 shapely를 import하므로(`packages/
 ### 버전
 
 `version`은 정수입니다. 형상 블록에 속하며 봉투의 `openphysics` 문자열을 대신하지 않습니다.
-봉투를 `"0.3"`으로 올릴지는 JSON 계약 결정에 맡깁니다.
+봉투는 `"0.2"`를 유지하며, 호환이 깨지는 변경이 생길 때만 올립니다.
 
 ### 단위
 
@@ -285,10 +284,11 @@ double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습�
 
 `imprint`는 경계면을 남기는 선택 방식입니다. 합집합이 아니어서 영역을 합치지 않고 재료도 바꾸지 않습니다.
 
-**1단계 구현.** 1단계는 영역을 영역 이름이 같은 조각으로 나눕니다. meshine은 이런 조각을 합치고 공유
-구간을 제약으로 유지하지만 경계면으로 보고하지는 않습니다
-(`packages/meshine/src/meshine/refine.py:690-707`). 그래서 1단계는 이 곡선을 새 필드
-`provenance_edges`에 적습니다([메시 태그](#메시-태그동결) 참고).
+**구현.** `imprint`는 영역 구성이 필요하므로 2단계 엔진과 함께 들어옵니다. 1단계 리더는 이 키워드를
+읽지만, 0.2 생성기는 덮인 경계를 지우므로 0.2로 넘기는 컴파일러가 이름을 밝혀 거부합니다. 엔진은 영역을 영역 이름이 같은
+조각으로 나눕니다. meshine은 이런 조각을 합치고 공유 구간을 제약으로 유지하지만 경계면으로 보고하지는
+않으므로(`packages/meshine/src/meshine/refine.py:690-707`), 엔진이 이 곡선을 새 필드 `provenance_edges`에
+적습니다([메시 태그](#메시-태그동결) 참고).
 
 3D `imprint`는 예약입니다.
 
@@ -669,12 +669,12 @@ sipi에서 옮기는 방식:
 | 단독 정확 원; 구멍 어림 규칙 | `packages/simcase/src/simcase/geometry.py:71-104,216-229` | 구성 안의 `circle` 종류, 곡선 정체성 하나를 공유 | 없음. 어림 규칙은 사라짐 |
 | 가려진 원(128각형) | `packages/simcase/src/simcase/geometry.py:46` | `circle`. 불리언 뒤의 원호는 2단계에서 | 문서에서는 없음. 2단계 전까지 메시는 여전히 다각형을 씀 |
 | MultiPolygon 영역; 슬리버 규칙 | `packages/simcase/src/simcase/geometry.py:27-38,213-216` | 면이 여럿인 영역 하나; 같은 `AREA_EPS` 규칙 | 없음 |
-| 사각형 문서(열, 전기, 줄, 균일 과도) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | 도메인만 있고 피처가 없으며 배경에 `material` 키가 없는 `2d` 구성 요소. `mesh.subdivisions`는 `mesh`에 남음 | 없음. 키 유무로 가르던 것(`packages/simcase/src/simcase/thermal_regions.py:30-36`)은 JSON 결정에서 명시 필드로 바뀜 |
+| 사각형 문서(열, 전기, 줄, 균일 과도) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | 도메인만 있고 피처가 없으며 배경에 `material` 키가 없는 `2d` 구성 요소. `mesh.subdivisions`는 `mesh`에 남음 | 없음. 0.2 문서는 지금처럼 키 유무로 가름(`packages/simcase/src/simcase/thermal_regions.py:30-36`). 버전 1에서는 `material` 키가 없는 배경이 균질체 표시 |
 | `em.cavity3d` 상자와 벽 키 | `packages/simcase/src/simcase/cavity.py:46,104-145` | `box` 피처와 나중 피처 우선 규칙을 쓰는 `3d` 구성 요소. 기본 태그 `x0`–`z1`, 별칭 `xmin`–`zmax`. 격자면·중심점 규칙은 메시 검사로 남음 | 이름 변경: `background`라는 상자(지금은 허용, `packages/simcase/src/simcase/cavity.py:121-124`)는 이름이 바뀜. 이득: 상자 이름이 이제 영역 구성까지 감(지금은 경계와 재료만 솔버에 전달, `packages/simcase/src/simcase/cavity.py:400-406`) |
 | PML 두께, 굽힘, 등급 중심 | `packages/simcase/src/simcase/pml_contract.py:18-41`; `packages/simcase/src/simcase/schema.py:351-355` | 그대로인 물리·메시 필드 | 없음 |
 | 영역 복잡도 검사; Studio 한도 | `packages/simcase/src/simcase/complexity.py:46-93`; `packages/simcase/src/simcase/studio/thermal_regions_api.py:47-60` | 그대로, 피처 기준으로 셈 | 없음 |
 | 기존 Studio | `packages/simcase/src/simcase/studio/static/index.html:750` | 지금처럼 문서를 편집 | 없음 |
-| Studio 작업공간 프로젝트·세션 v1–v5; 기능 엔드포인트 | `packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`; `packages/simcase/src/simcase/studio/static/workspace-notebook.mjs:9-23`; `packages/simcase/src/simcase/studio/server.py:80-135` | 형상 v1로 컴파일되는 응용 형식이며 자체 형상 의미는 없음. 도형은 피처가 됨: `name`은 표시 이름, 이름에 공백이 있으면 `id`를 생성. 창은 `domain`, 열판은 사각형 문서 | 초안에 한한 손실: 재료가 없는(`''`) 도형. 반올림: Studio는 값을 10⁻⁶ nm까지 유지(`packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:15-16`)하고 이동은 그 정리를 거치지 않음(`packages/simcase/src/simcase/studio/static/workspace-shape-editor.mjs:9-16`). 1 pm 아래는 반올림. 이 형식의 폐기 여부는 JSON 결정에 맡김 |
+| Studio 작업공간 프로젝트·세션 v1–v5; 기능 엔드포인트 | `packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`; `packages/simcase/src/simcase/studio/static/workspace-notebook.mjs:9-23`; `packages/simcase/src/simcase/studio/server.py:80-135` | 형상 v1로 컴파일되는 응용 형식이며 자체 형상 의미는 없음. 도형은 피처가 됨: `name`은 표시 이름, 이름에 공백이 있으면 `id`를 생성. 창은 `domain`, 열판은 사각형 문서 | 초안에 한한 손실: 재료가 없는(`''`) 도형. 반올림: Studio는 값을 10⁻⁶ nm까지 유지(`packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:15-16`)하고 이동은 그 정리를 거치지 않음(`packages/simcase/src/simcase/studio/static/workspace-shape-editor.mjs:9-16`). 1 pm 아래는 반올림. 이 형식은 당분간 유지하며, 폐기 여부는 실제 사용자 파일을 본 뒤 따로 정함 |
 | Studio 광학 솔버 문서(`s1..sN`, 사각형을 다각형으로 씀) | `packages/simcase/src/simcase/studio/static/workspace-shapes.mjs:91-98` | 첫 행과 같은 0.2 문서 | 그 문서는 프로젝트보다 이미 손실이 있음. 계약은 그 문서가 아니라 프로젝트에서 받음 |
 | sipi `CrossSection`: 층, 트레이스(직사각형, 사다리꼴, 두께 0), 상자 변 플래그, 접지 플래그 | `packages/sipi/src/sipi/crosssection.py:42-206` | `2d` 구성 요소: 전폭 층 `rect`를 아래부터, 그 뒤 트레이스를 트레이스 순서로 `rect`·`trapezoid`·`segment`. `eps_r`·`tan_delta`는 층 이름의 `materials` 항목. 물리는 `conductors`(순서 있는 `signals`, 접지 트레이스와 접지 변을 담은 `reference` 선택)를 가짐. 변 플래그는 변 태그 위의 물리. `outer`는 `boundary_tags`에서 | 형상 손실 없음. 이름 변경: 층과 트레이스의 이름이 같으면(지금은 목록을 따로 검사하므로 허용, `packages/sipi/src/sipi/crosssection.py:195-200`) 영역으로 합쳐지므로 하나의 이름을 바꿈. 반올림: `(w+gap)/2`(`packages/sipi/src/sipi/templates.py:65`) 같은 템플릿 산술은 0.00015000000000000001 m 같은 값을 내며 격자에서 약 10⁻⁸ pm 벗어남. 동작: 사각형 경로의 정확한 부동소수점 일치(`packages/sipi/src/sipi/crosssection.py:319,348-353`)가 바뀔 수 있고, 동일성 시험 `tests/sipi/test_manufacturing_sections.py:19`가 이를 감지함(열린 질문). 겹침·맞닿음 거부(`packages/sipi/src/sipi/crosssection.py:216-239`)는 어댑터에 남으므로 나중 피처 우선 규칙이 sipi 겹침을 풀지 않음. 허용오차 기반 도체 노드 고르기(`packages/sipi/src/sipi/crosssection.py:389-410`)는 선택으로 바뀜 |
 | sipi JSON `sipi.cross-section/1,/2`과 선로·부피 감싸개 | `packages/sipi/src/sipi/document.py:13-161`; `packages/sipi/src/sipi/line_model.py`; `packages/sipi/src/sipi/volume_line.py` | 형상 v1로 컴파일되는 응용 형식. 스키마 버전(/1, /2)은 sipi 형식의 속성 | 없음. 템플릿 파라미터는 지금도 저장하지 않음 |
@@ -750,11 +750,20 @@ sipi에서 옮기는 방식:
    완화하지 않습니다.
 3. 평가기는 simcase 안에 둡니다. shapely 없이 동작해야 하고, scipy는 제한하지 않습니다
    ([평가기의 위치](#평가기의-위치) 참고).
-4. sipi JSON과 Studio 프로젝트는 자기 형식을 유지하고 1단계 어댑터로 읽습니다. 폐기 여부는 JSON 계약
-   결정에서 정합니다. 새 형상 기능은 버전 1에 먼저 넣습니다.
+4. sipi JSON과 Studio 프로젝트는 자기 형식을 유지하고 1단계 어댑터로 읽습니다. 폐기 여부는 실제 사용자
+   파일을 본 뒤 따로 정합니다. 새 형상 기능은 버전 1에 먼저 넣습니다.
 5. Wavebit 변환(주기 셀, 타원, 회전, 각도, x·y 방향 압출)은 3단계 보완으로 미룹니다.
    [3단계 미리보기](#3단계-미리보기-wavebit-동결-아님)는 계속 비규범입니다.
 
 ## 열린 질문
 
 1. 점 선택자(기준 노드, 탐침)는 정의하지 않았습니다. 어느 단계에서 더할까요?
+
+## 이 문서의 변경 기록
+
+초안인 동안에는 단계가 진행되면서 일반 풀 리퀘스트로 고칩니다. 승인 뒤에는 동결 절을 여기 적는 날짜 있는
+보완으로만 바꿉니다.
+
+- 2026-11-03: 아직 미정으로 적혀 있던 곳에 JSON 결정을 반영(봉투는 `"0.2"` 유지, 0.2 사각형 문서는 기존
+  분기 유지). Studio·sipi 형식은 사용자 파일을 본 뒤 정할 때까지 유지한다고 명시. `imprint`를 2단계 엔진으로
+  옮기고 1단계 컴파일러가 이름을 밝혀 거부하도록 함.
