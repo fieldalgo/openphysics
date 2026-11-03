@@ -220,3 +220,15 @@ def test_same_name_loops_merge_through_region_and_a_unit_is_required():
         meshine_v1.to_geometry_v1(d, length_unit=None)
     with pytest.raises(TypeError):
         meshine_v1.to_geometry_v1(box_sides(0, 1, 0, 1), length_unit="um")
+
+
+def test_the_domain_order_does_not_depend_on_the_unit():
+    def build(s):
+        d = Domain(size=0.5 * s)
+        d.add_region("ring", rectangle(0, 0, 10 * s, 10 * s), holes=[rectangle(2 * s, 2 * s, 8 * s, 8 * s)])
+        d.add_region("island", rectangle(4 * s, 4 * s, 6 * s, 6 * s))
+        d.add_region("cap", rectangle(0, 10 * s, 10 * s, 11 * s))
+        return meshine_v1.to_geometry_v1(d, length_unit="um" if s == 1 else "m")
+    small, large = build(1e-6), build(1.0)
+    names = lambda out: [(f["name"], f["material"]) for f in out["geometry"]["components"]["domain"]["features"]]
+    assert names(small) == names(large)

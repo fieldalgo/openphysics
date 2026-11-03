@@ -45,16 +45,21 @@ def _area(v: np.ndarray) -> float:
 
 
 def _inside(p, poly: np.ndarray) -> bool:
-    """Point in polygon, counting the boundary as inside (input data, not exact)."""
+    """Point in polygon, counting the boundary as inside (input data, not exact).
+
+    "On the boundary" is a distance below 1e-12 of the polygon's own diagonal, so the
+    answer does not depend on the unit the numbers are written in.
+    """
     x, y = p
+    tol = 1e-12 * float(np.hypot(*(poly.max(axis=0) - poly.min(axis=0))))
     n, hit = len(poly), False
     for i in range(n):
         (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % n]
-        cross = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
-        if abs(cross) <= 1e-12 * max(1.0, abs(x2 - x1) + abs(y2 - y1)) and \
-                min(x1, x2) - 1e-15 <= x <= max(x1, x2) + 1e-15 and min(y1, y2) - 1e-15 <= y <= max(y1, y2) + 1e-15:
+        dx, dy = x2 - x1, y2 - y1
+        t = min(1.0, max(0.0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
+        if np.hypot(x - (x1 + t * dx), y - (y1 + t * dy)) <= tol:
             return True
-        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * dx / dy:
             hit = not hit
     return hit
 
