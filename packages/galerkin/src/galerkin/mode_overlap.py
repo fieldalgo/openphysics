@@ -60,7 +60,9 @@ NumPy only: JAX and PyTorch values raise TypeError (``refuse_live``), since thes
 integrals would otherwise cut the derivative silently. The power definition is
 the lossless-waveguide one (Re of the complex Poynting integral); for lossy or
 leaky modes it is still the +z power of the given field, but modes are then not
-power-orthogonal and the imaginary part is reactive. No simcase or Studio exposure.
+power-orthogonal and the imaginary part is reactive. No Studio exposure (simcase
+saves power, confinement, overlaps and Gaussian coupling with closed-window
+``em.modes2d`` results: ``simcase.mode_postprocessing``).
 """
 
 from __future__ import annotations

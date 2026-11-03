@@ -120,7 +120,11 @@ never mixed with fields from an earlier run. Both files record the layout
 `field_layout="em-modes2d-subspace-raw-v1"` with `mesh_length_unit` and
 `length_unit_to_m`; `simcase.export` refuses this layout, because raw member
 columns are not tracked modes, and their VTU export is deferred. Read the
-`raw_*` arrays and `frame_transform` from `fields.npz` instead.
+`raw_*` arrays and `frame_transform` from `fields.npz` instead. For the same
+reason a subspace sweep saves none of the per-mode
+`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` arrays of
+[tracked results](overview.md#mode-post-processing): frame columns are
+arbitrary unitary mixtures within a cluster.
 
 `simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
 boundary, neff, field)` evaluates each column as an eigenpair of the original

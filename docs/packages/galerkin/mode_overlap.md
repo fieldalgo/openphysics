@@ -260,5 +260,9 @@ values (skipped where the libraries are absent; the backend CI job runs them).
   measured field, no centroid-to-edge projection. The effective area is the
   `|E|^2`/`|E|^4` definition above; no nonlinear-coefficient weighting
   (`n_2`, `chi^(3)` per region) is offered.
-- Not exposed in simcase documents or Studio; the simcase normalisations
-  (`"peak"`) are reproduced here for comparison only.
+- simcase saves `vector_power`/`scalar_power`, `confinement_factor`,
+  `overlap_matrix` and an optional Gaussian `coupling_efficiency` with every
+  closed-window `em.modes2d` result
+  ([mode post-processing](../simcase/overview.md#mode-post-processing)); not
+  exposed in Studio. The simcase normalisations (`"peak"`) are reproduced here
+  for comparison only.

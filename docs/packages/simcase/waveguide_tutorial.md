@@ -246,14 +246,28 @@ from step 1:
 
 | File | Contents |
 |---|---|
-| `summary.json` | n_eff per study point and mode, group index, declared units, the saved layout `field_layout` with `mesh_length_unit` and `length_unit_to_m`, mesh statistics, timings, mode tracking |
-| `fields.npz` | mesh nodes and triangles (in the document unit), the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids; load with `numpy.load(..., allow_pickle=False)` |
+| `summary.json` | n_eff per study point and mode, group index, declared units, the saved layout `field_layout` with `mesh_length_unit` and `length_unit_to_m`, mesh statistics, timings, mode tracking, and `mode_postprocessing` (power, confinement, overlaps with units) |
+| `fields.npz` | mesh nodes and triangles (in the document unit), the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids, plus `mode_power`, `confinement` and `field_overlap`; load with `numpy.load(..., allow_pickle=False)` |
 | `results.png` | mesh, the first mode's \|E\| and the sweep |
 | `log.txt`, `model.json` | the run log and the exact document that was run |
 
 Field amplitudes are relative (the largest centroid \|E\| is 1), not watts or
 volts per metre. The [package overview](overview.md#vector-fields-and-single-point-studies)
 describes the arrays.
+
+### Mode post-processing
+
+`confinement[p, m]` in `fields.npz` holds the share of the mode's energy
+(`Re eps_r |E|^2`) in each region of `region_names`, so the strip's core
+confinement is the `core` entry; its rows sum to 1. `mode_power[p, m]` is the
+power the saved field carries when its amplitudes are read as volts per
+document unit (divide the field by `sqrt(Re mode_power)` for a 1 W mode), and
+`field_overlap` the matrix `int conj(E_a) . E_b dA`. Add
+`"results": {"mode_overlap": {"gaussian": {"waist": 0.3, "center": [0.0, 0.11]}}}`
+(document units) to the JSON to also save `coupling_efficiency`, the fraction
+of an x-polarised Gaussian beam of that 1/e radius that couples into each mode.
+The [package overview](overview.md#mode-post-processing) states the exact
+recipe and units.
 
 To look at the modes in ParaView, install `simcase[export]` and write one VTU
 per wavelength plus a `.pvd` collection into a new directory:

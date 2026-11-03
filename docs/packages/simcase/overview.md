@@ -192,6 +192,57 @@ subspace sweep records `field_layout="em-modes2d-subspace-raw-v1"` instead.
 Existing keys keep their meaning. The model JSON format remains
 `"openphysics": "0.2"`.
 
+### Mode post-processing
+
+Every scalar or vector `em.modes2d` result without PML also saves, per study
+point `p` and mode `m`, three additional arrays computed with
+[`galerkin.mode_overlap`](../galerkin/mode_overlap.md) on the saved mesh in the
+document length unit (`simcase.mode_postprocessing` states the exact recipe,
+and `tests/simcase/test_modes_postprocessing.py` checks that the saved values
+are byte-identical to those calls):
+
+| Key | Shape | Meaning |
+|---|---|---|
+| `mode_power` | `(points, modes)` | vector: the complex Poynting integral `P = 1/2 int (E x H*) . z dA` of the saved field (`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); scalar: `int |phi|^2 dA` (`scalar_power`, real) |
+| `confinement` | `(points, modes, regions)` | energy fraction per region in `region_names` order: `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2` (`confinement_factor`); scalar: `int_R |phi|^2 / int |phi|^2`. Rows sum to 1 |
+| `field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA` (`overlap_matrix(..., "field")`, Hermitian; scalar: `scalar_overlap`); the diagonal is `int |E|^2 dA`, which for scalar results equals `mode_power` |
+| `coupling_efficiency` | `(points, modes)` | only with `results.mode_overlap.gaussian`: `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)` of a Gaussian input (`coupling_efficiency` after `interpolate_vector_field`; scalar: `scalar_coupling_efficiency` at the nodes) |
+
+The saved amplitudes are relative, so `mode_power` carries no absolute unit by
+itself. Its exact meaning: read the vector amplitudes as volts per document
+length unit (V/um for a micrometre document); `mode_power` is then the power
+of that field in watts, `Re` the time-averaged power carried in +z. Read them as
+V/m instead and the power in watts is `mode_power * length_unit_to_m**2`.
+Dividing a saved mode by `sqrt(Re mode_power)` gives a field that carries 1 W
+(amplitudes in V per document unit). For a lossless mode the imaginary part is
+roundoff; for a lossy mode (complex `neff`) it is the reactive part and the
+modes are not power-orthogonal. The scalar `mode_power` and `field_overlap`
+are in (document unit)^2; `confinement` and `coupling_efficiency` are
+dimensionless. `summary.json` repeats the values under `mode_postprocessing`
+with a `unit` and `description` per key (`field_overlap` as `real`/`imag`,
+the vector `mode_power` with an `imag` list, `confinement` with its region
+names).
+
+The optional document block
+
+```json
+"results": {"mode_overlap": {"gaussian": {"waist": 0.22, "center": [0.0, 0.11]}}}
+```
+
+adds `coupling_efficiency` for the input field
+`exp(-((x - cx)^2 + (y - cy)^2) / waist^2)`, with `waist` the 1/e field radius
+and `center` in the document length unit. For vector results the input is
+x-polarised and compared with the transverse mode field alone; for scalar
+results it is a scalar amplitude. The waist must be positive, the centre must
+lie inside the geometry window and no other key is accepted under
+`mode_overlap` or `gaussian`. PML results and subspace sweeps gain none of
+these keys: PML coefficients are covariant integrals in stretched coordinates,
+so the lossless Poynting formula over the window is not the physical power, and
+subspace frames are not modes ([PML modes](pml_modes.md),
+[subspace tracking](vector_subspace_tracking.md)). The VTU export is unchanged
+and writes the fields only; read the post-processing from `fields.npz` or
+`summary.json`.
+
 Studio receives `vector_fields` with `location="triangle_centroids"`, component
 names and separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point.
 The existing scalar HTTP `fields` layout is unchanged; for vectors it is empty.
