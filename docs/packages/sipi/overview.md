@@ -199,6 +199,13 @@ Python 3.12, pinned environment.
 | D3 two pads, a = 0.5 mm, d = 10 mm, square plane 100 and 200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ (equipotential discs, infinite sheet) | each within 1 %; doubling the plane changes R by ≤ 0.5 % | +0.27 %, −0.19 %; change −0.46 % |
 | D4 two loads and a cutout | Joule loss = Σ terminal voltage × current | 1e-9 | passed |
 
+## As a geometry document
+
+`sipi.geometry_v1.to_geometry_v1(section)` writes a cross-section as a version 1
+geometry block of the [simcase geometry document](../simcase/geometry_document.md),
+with its materials, conductors and box flags alongside. It is a plain dictionary and
+adds no dependency. See [the adapters](../simcase/geometry_reader.md#adapters-from-sipi-and-meshine).
+
 ## Not implemented
 
 - Measured material fitting and geometric/full-wave dispersion.
