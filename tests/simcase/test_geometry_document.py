@@ -24,7 +24,8 @@ def _docs():
     docs = {f"builtin:{k}": v for k, v in EXAMPLES.items()}
     docs.update({p.name: json.loads(p.read_text(encoding="utf-8"))
                  for p in sorted((ROOT / "examples" / "simcase").glob("*.json"))})
-    return docs
+    # The walk covers the 0.2 documents; version 1 examples are checked below.
+    return {k: v for k, v in docs.items() if "version" not in v.get("geometry", {})}
 
 
 DOCS = _docs()
@@ -203,6 +204,13 @@ def test_imprint_is_parsed_but_refused_by_the_02_compiler():
                                                 "material": "Si"}], finalize="imprint")))
     assert model.components["xs"].finalize == "imprint"
     with pytest.raises(GeometryError, match="imprint' needs the stage 2 engine"):
+        to_v02(model)
+
+
+def test_void_is_parsed_but_refused_by_the_02_compiler():
+    model = parse(v1({"length": "um"}, plate([{"name": "hole", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
+                                                "material": None}])))
+    with pytest.raises(GeometryError, match="void .material null. needs the stage 2 engine"):
         to_v02(model)
 
 
@@ -388,3 +396,13 @@ def test_an_invalid_version_1_block_is_a_document_error():
     doc["geometry"]["components"]["main"]["features"][0]["rotation"] = 0.3
     with pytest.raises(DocumentError, match="rotation: reserved"):
         Document.from_dict(doc)
+
+
+def test_the_version_1_example_reads_as_the_soi_strip_example():
+    from simcase import Document
+    path = ROOT / "examples" / "simcase" / "geometry_v1_soi_strip.json"
+    doc = Document.load(path)
+    reference = Document.load(ROOT / "examples" / "simcase" / "soi_strip.json")
+    assert {k: v for k, v in doc.data.items() if k != "name"} == \
+        {k: v for k, v in reference.data.items() if k != "name"}
+    assert doc.geometry_roundings == [] and doc.to_dict()["geometry"]["version"] == 1
