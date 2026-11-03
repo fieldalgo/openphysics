@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: PML이 없는 `em.modes2d` 결과가 `mode_power`(지점 × 모드), `confinement`(지점 × 모드 × 영역, `region_names` 순서, 행의 합 1), `field_overlap`(지점 × 모드 × 모드)과, `"results": {"mode_overlap": {"gaussian": {"waist": w0, "center": [x, y]}}}`(문서 단위, 엄격 검증)가 있으면 `coupling_efficiency`(지점 × 모드)를 함께 저장합니다. 모두 문서 길이 단위의 저장 메시 위에서 `galerkin.mode_overlap`으로 계산하며 `summary.json`의 `mode_postprocessing`에 키마다 단위와 설명을 붙여 반복합니다. 벡터 `mode_power`는 저장 상대 장을 문서 길이 단위당 볼트로 읽을 때의 Poynting 전력(W; V/m이면 × `length_unit_to_m`²)이고 손실 모드에서는 복소수이며, 스칼라는 (문서 단위)²의 ∫|φ|² dA입니다. 기존 키·정규화·`field_layout`·VTU 내보내기는 바뀌지 않고, PML 결과와 subspace sweep에는 새 키가 없습니다. [문서](packages/simcase/overview.md#모드-후처리).
+
 - galerkin: `galerkin.mode_overlap` — 모드 전력(정확한 edge 질량과 edge-절점 결합 행렬로 계산한 Faraday 경로 복소 Poynting 적분), 교차 전력, 장 중첩과 중첩 행렬, power/mass/peak 정규화, 결합 효율(퇴화 공간 사영 포함), 에너지 구속 계수, 유효 면적(정확한 질량 분자, `int |E|^4`는 4차 대칭 삼각형 규칙), 주어진 장의 Nédélec/P1 보간, P1 스칼라 쌍; NumPy 전용. refsol slab·광섬유 장으로 검증했습니다. [계약과 검증](packages/galerkin/mode_overlap.md).
 
 - `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
