@@ -74,8 +74,8 @@ mesh = meshine.extrude(footprint, [model.to_unit(z) for z in stack.levels],
 - Resolve selectors, build the region complex or write provenance names to a mesh
   (they need the stage 2 engine).
 - Mesh `path` and `segment` features, merged regions, axisymmetric components,
-  cylinders, spheres and `extrude` features. They are parsed and refused by the
-  compilers with their names.
+  cylinders, spheres, `extrude` features and `finalize: "imprint"`. They are parsed
+  and refused by the compilers with their names.
 - Supply design velocities (stage 4).
 
 Importing `simcase.geometry_document` loads neither scipy nor shapely:

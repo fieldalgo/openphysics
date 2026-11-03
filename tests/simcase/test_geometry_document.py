@@ -198,6 +198,14 @@ def test_selections_and_tags_are_accepted():
     assert model.components["xs"].region_names == ["core", "pad"]
 
 
+def test_imprint_is_parsed_but_refused_by_the_02_compiler():
+    model = parse(v1({"length": "um"}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
+                                                "material": "Si"}], finalize="imprint")))
+    assert model.components["xs"].finalize == "imprint"
+    with pytest.raises(GeometryError, match="imprint' needs the stage 2 engine"):
+        to_v02(model)
+
+
 def test_trapezoid_compiles_to_its_exact_corners():
     model = parse(v1({"length": "m"}, plate([{"name": "t", "type": "trapezoid", "cx": 5, "y": 1, "w": 3,
                                                "w_top": "2.8", "h": 0.035, "material": "Cu"}])))
