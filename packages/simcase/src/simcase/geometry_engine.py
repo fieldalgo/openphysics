@@ -1483,14 +1483,16 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
     check_handoff(rc)
     poly: dict[int, list | None] = {}
     circle_objs: dict[tuple, object] = {}
-    counts: dict[tuple, int] = {}
     for k in rc.curves:
         if k.kind == "line":
             poly[k.index] = [pt(k.a), pt(k.b)]
+    counts = _circle_vertex_counts(rc, poly, pt, unit_pm, size)
+    for k in rc.curves:
+        if k.kind == "line":
             continue
         key = (k.params["center"], k.params["r2"])
         r = math.sqrt(k.params["r2"]) / unit_pm
-        n = counts.setdefault(key, max(16, int(2 * math.pi * r / (size / 2))))
+        n = counts[key]
         if k.kind == "circle":
             if key not in circle_objs:
                 circle_objs[key] = Circle((float(key[0][0] / unit_pm), float(key[0][1] / unit_pm)), r, n=n)
@@ -1541,6 +1543,66 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
         return best
 
     return d, namer, materials
+
+
+#: A circle's polygon may not need more vertices than this to keep clear of its neighbours.
+MAX_CIRCLE_VERTICES = 20000
+
+
+def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, size: float) -> dict:
+    """The vertex count of every circle's polygon: the 0.2 rule max(16, 2 pi r / (size / 2)),
+    raised for a whole circle so that the sagitta of its polygon's chords stays below the
+    distance from the circle line to the nearest other curve. A chord that cut across a
+    neighbouring feature's corner would give the mesher crossing loops; meshine projects
+    inserted nodes back onto a whole circle, so the count only sets where the chords start.
+    A whole circle that would need more than MAX_CIRCLE_VERTICES is refused by name."""
+    circles: dict[tuple, float] = {}
+    whole: set = set()
+    for k in rc.curves:
+        if k.kind != "line":
+            circles.setdefault((k.params["center"], k.params["r2"]), math.sqrt(k.params["r2"]) / unit_pm)
+            if k.kind == "circle":
+                whole.add((k.params["center"], k.params["r2"]))
+    segments = [(poly[k.index][0], poly[k.index][1]) for k in rc.curves if k.kind == "line"]
+    arc_ends = [(k.params["center"], k.params["r2"], pt(k.a), pt(k.b)) for k in rc.curves if k.kind == "arc"]
+    counts = {}
+    for key, r in circles.items():
+        c = (float(key[0][0] / unit_pm), float(key[0][1] / unit_pm))
+        n = max(16, int(2 * math.pi * r / (size / 2)))
+        if key not in whole:
+            # a cut circle's arcs meet other curves at vertices; a chord of theirs that crosses a
+            # neighbour is caught by the crossing check of the rounded polylines
+            counts[key] = n
+            continue
+        gap = math.inf
+        for p, q in segments:
+            near = _point_segment_distance(c, p, q)
+            far = max(math.hypot(p[0] - c[0], p[1] - c[1]), math.hypot(q[0] - c[0], q[1] - c[1]))
+            if near <= r <= far:
+                gap = 0.0
+            else:
+                gap = min(gap, abs(near - r) if near > r else r - far)
+        for centre, r2, pa, pb in arc_ends:
+            if (centre, r2) == key:
+                continue
+            for q in (pa, pb):
+                gap = min(gap, abs(math.hypot(q[0] - c[0], q[1] - c[1]) - r))
+        for other, r2 in circles.items():
+            if other == key:
+                continue
+            o = (float(other[0][0] / unit_pm), float(other[0][1] / unit_pm))
+            dist = math.hypot(o[0] - c[0], o[1] - c[1])
+            gap = min(gap, max(dist - r - r2, r - dist - r2, r2 - dist - r, 0.0))
+        if gap < math.inf and gap > 0:
+            n = max(n, math.ceil(math.pi * math.sqrt(r / (2 * gap))) + 1)
+        if n > MAX_CIRCLE_VERTICES or gap == 0.0:
+            names = sorted(p for k in rc.curves if k.kind != "line" and (k.params["center"], k.params["r2"]) == key
+                           for p in k.provenance)
+            raise GeometryError(f"hand-off: the circle of {names} passes within {gap:g} mesher units of another "
+                                f"curve; its polygon would need more than {MAX_CIRCLE_VERTICES} vertices to keep "
+                                "its chords clear of that curve")
+        counts[key] = n
+    return counts
 
 
 def _add_cell(d, rc: RegionComplex, cell: Cell, poly: dict, circle_objs: dict, unit_pm: Fraction,

@@ -119,7 +119,10 @@ Every refusal names the feature.
   (size / 2)))`, the 0.2 rule;
 - a `circle` curve becomes one `meshine.Circle` object that the inside cell and
   the surrounding cell's hole share, so mesh nodes on it are projected onto the
-  exact circle;
+  exact circle; its vertex count is raised above the 0.2 rule when needed so
+  that the sagitta of its chords stays below the distance to the nearest other
+  curve (a chord may not cut across a feature inside the circle), and a circle
+  that would need more than 20000 vertices is refused by name;
 - cells of one region are added under that name as separate loops, and
   meshine merges them and keeps the shared segment as a constraint (that is
   how `imprint` pieces travel);

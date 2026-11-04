@@ -1149,3 +1149,27 @@ def test_a_selection_may_not_share_a_tag_name_and_a_dangling_segment_is_refused_
     raw["geometry"]["components"]["main"]["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 0]]})
     with pytest.raises(DocumentError, match="segment feature inside a region"):
         Document.from_dict(raw)
+
+
+# ----------------------------------------------------------------- circle polygons keep clear of neighbouring features
+
+def test_a_circle_polygon_gets_enough_vertices_to_clear_an_inner_corner():
+    # size 5 nm gives the 0.2 rule n = 25 with a chord sagitta of 0.079 nm; the rect corner sits
+    # 0.03 nm inside the circle line, so the chords would cut across it
+    rc, d, mesh, _materials = _mesh(v1([circle("c", 50, 50, 10, "Si"), rect("r", 42.95, 42.95, 14.1, 14.1, "Ge")]))
+    circles = [cv for r in d.regions for cv in r.curves if isinstance(cv, Circle)]
+    assert circles and circles[0].n > 25
+    areas = {name: 0.0 for name in mesh.region_names}
+    tri = mesh.nodes[mesh.triangles]
+    a = 0.5 * np.abs((tri[:, 1, 0] - tri[:, 0, 0]) * (tri[:, 2, 1] - tri[:, 0, 1]) - (tri[:, 2, 0] - tri[:, 0, 0]) * (tri[:, 1, 1] - tri[:, 0, 1]))
+    for i, name in enumerate(mesh.region_names):
+        areas[name] = float(a[mesh.regions == i].sum()) * 1e6          # um^2 -> nm^2
+    assert abs(areas["r"] - 14.1 ** 2) < 1e-6 and abs(areas["c"] - (math.pi * 100 - 14.1 ** 2)) < 0.01 * math.pi * 100
+
+
+def test_a_whole_circle_that_cannot_clear_a_neighbour_is_refused(monkeypatch):
+    from simcase import geometry_engine
+    monkeypatch.setattr(geometry_engine, "MAX_CIRCLE_VERTICES", 30)
+    with pytest.raises(GeometryError, match="keep its chords clear"):
+        _mesh(v1([circle("c", 50, 50, 10, "Si"), rect("r", 42.95, 42.95, 14.1, 14.1, "Ge")]))
+    _mesh(v1([circle("c", 50, 50, 10, "Si"), rect("r", 45, 45, 10, 10, "Ge")]))              # corner 2.9 nm inside
