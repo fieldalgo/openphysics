@@ -28,7 +28,7 @@ from galerkin import Mesh
 from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
-from .geometry import build_domain
+from .geometry import build_domain, provenance_edges_of
 from .mesh_limits import _is_region_document, _mesh_limits
 from . import units
 from .materials import material_table
@@ -116,13 +116,14 @@ def build_mesh(doc: Document) -> MeshedModel:
             f"reaches it first. The usual cause is a mesh.size or a feature far from the scale of the "
             f"units this document declares.")
     tri = dataclasses.replace(tri_um, nodes=units.lengths_from_micrometres(tri_um.nodes, doc.scale))
-    return MeshedModel(doc, tri, _solver_mesh(tri), region_materials, material_table(doc, region_materials),
-                       solver_mesh=_solver_mesh(tri_um))
+    provenance = provenance_edges_of(canonical, tri_um)         # node pairs: the same in both units
+    return MeshedModel(doc, tri, _solver_mesh(tri, provenance), region_materials,
+                       material_table(doc, region_materials), solver_mesh=_solver_mesh(tri_um, provenance))
 
 
-def _solver_mesh(tri: TriMesh) -> Mesh:
+def _solver_mesh(tri: TriMesh, provenance_edges: dict | None = None) -> Mesh:
     return Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
-                boundary_edges=dict(tri.boundary_edges))
+                boundary_edges=dict(tri.boundary_edges), provenance_edges=provenance_edges)
 
 
 def micrometre_document(doc: Document) -> Document:

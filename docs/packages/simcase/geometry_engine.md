@@ -134,17 +134,21 @@ on its circle, within `1e-9` of the mesh diagonal (meshine's merge tolerance)
 and are consecutive there; nothing is read back from the mesher, so the
 internal constraints of `imprint` pieces, which meshine keeps but does not
 report as interfaces, are found too. This is the contract's `provenance_edges`
-field computed on the simcase side; the shared mesh type does not carry it yet.
+field. For a version 1 document, `build_mesh` and the region heat mesh builder
+put it on the galerkin `Mesh` they return (`mesh.provenance_edges`, node pairs,
+the same in every unit); a 0.2 document's mesh carries `None`. Nothing in
+galerkin reads the field yet.
 
 A document with a version 1 geometry block is meshed through this route:
 `Document.from_dict` keeps the parsed model (`doc.geometry_model`, integer
 picometres, unit-free), the canonical micrometre copy carries it, and
 `build_domain` evaluates it and hands the complex to meshine as above, with the
 0.2 sliver rule (a piece under `1e-12` of the domain area is left out and
-noted). The 0.2 compilation that `to_v02` makes stays what the validators read
-and the results record, so a block it refuses (`imprint`, void, merged regions,
-`path`, `segment`) is still refused at load, by name; letting the runners read
-the complex for those is separate work. A 0.2 block is meshed by the shapely
+noted). The 0.2 compilation that `to_v02` makes (with `validation=True`) stays what
+the validators read and the results record: `imprint` documents load with
+their shapes and `segment` features are left out of that form, both being
+meshed by the engine; void, merged regions and `path` have no 0.2 form and are
+still refused at load, by name, until the runners read the complex. A 0.2 block is meshed by the shapely
 route as before. The loops reach meshine in a different vertex order from the
 shapely route, so a version 1 copy of a 0.2 document gives a different refined
 mesh and results that agree at discretization level, as the contract's internal
