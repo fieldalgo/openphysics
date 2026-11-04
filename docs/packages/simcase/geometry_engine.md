@@ -49,7 +49,11 @@ as a diagnostic; it is not a persisted format.
 - A `Cell` is one face. A region that later features cut into pieces, or that
   `region` merges from several features, has several cells with the same
   `region`; `loops` lists its outer loop and its holes as `(curve index,
-  forward)` pairs. A void cell (`material: null`) has `void == True`.
+  forward)` pairs. A void cell (`material: null`) has `void == True`. A cell
+  that `region` merged from several features lists them all in
+  `feature_indices`, names the earliest in `feature`, and takes the smallest
+  of their `mesh_size` values; `{"feature": id}` selects every cell the
+  feature owns a piece of.
 - A `Curve` is a maximal piece of one supporting line or circle between two
   vertices. An `arc` runs counter-clockwise from vertex `a` to `b` around
   `params["center"]` with `params["r2"]` the radius squared; a `circle` is a
@@ -75,8 +79,10 @@ as a diagnostic; it is not a persisted format.
   **`imprint`** keeps every edge inside the domain, so a covered boundary
   survives as a curve between two cells of one region.
 - **`segment`** features are zero-area curves imprinted into the region that
-  contains them. A later area feature removes the part it covers. A segment
-  that crosses a region splits it into two cells.
+  contains them. A later area feature removes the part it covers (the part
+  that later features own on both sides, under `imprint` too; a segment on
+  the boundary of such a feature stays). A segment that crosses a region
+  splits it into two cells.
 - **Provenance** is geometric: a curve carries the part name of every feature,
   and the domain side, whose source curve contains it, whether or not that
   feature owns a neighbouring cell.

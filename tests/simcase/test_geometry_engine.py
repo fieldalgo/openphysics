@@ -1000,3 +1000,64 @@ def test_a_line_tangent_to_a_circle_meets_it_at_the_exact_rational_point():
     assert len(tangent) == 1
     assert len(rc.curves) == 10 and len(rc.curves_with("t.e1")) == 2
     assert close(areas_nm2(rc)["c"] * 1e6, math.pi) and areas_nm2(rc)["t"] * 1e6 == pytest.approx(40 - math.pi, rel=1e-12)
+
+
+# ----------------------------------------------------------------- review findings of 2026-11-04 (regressions)
+
+@pytest.mark.parametrize("order", [0, 1])
+def test_a_hole_pinched_at_its_leftmost_vertex_is_a_hole_in_either_feature_order(order):
+    a = polygon("a", [(10, 50), (30, 30), (30, 45)], "A")
+    b = polygon("b", [(10, 50), (30, 55), (30, 70)], "B")
+    rc = check_euler(run(v1([a, b] if order == 0 else [b, a])))
+    assert areas_nm2(rc) == {"a": 150.0, "b": 150.0, "background": 9700.0} and len(rc.curves) == 10
+    bg = rc.cells[rc.cells_of_region("background")[0]]
+    assert len(bg.loops) == 2 and len(bg.loops[1]) == 6                     # one pinched hole of both triangles
+    rc = check_euler(run(v1([rect("a", 10, 10, 20, 20, "A"), polygon("b", [(10, 10), (30, 5), (30, 8)], "B")])))
+    assert areas_nm2(rc) == {"a": 400.0, "b": 30.0, "background": 9570.0}
+    seg = {"name": "s", "type": "segment", "points": [[10, 10], [30, 5]]}
+    for feats in ([rect("a", 10, 10, 20, 20, "A"), seg], [seg, rect("a", 10, 10, 20, 20, "A")]):
+        rc = check_euler(run(v1(feats)))
+        assert areas_nm2(rc) == {"a": 400.0, "background": 9600.0} and len(rc.curves) == 9
+
+
+def test_a_segment_on_the_shared_edge_of_one_region_is_kept_symmetrically():
+    seg = {"name": "s", "type": "segment", "points": [[40, 10], [40, 30]]}
+    left = [rect("a", 10, 10, 30, 20, "Si", region="core"), seg, rect("b", 40, 10, 30, 20, "Si", region="core")]
+    right = [rect("a", 40, 10, 30, 20, "Si", region="core"), seg, rect("b", 10, 10, 30, 20, "Si", region="core")]
+    for feats in (left, right):
+        rc = check_euler(run(v1(feats)))
+        assert len(rc.curves_with("s.line")) == 1 and len(rc.cells_of_region("core")) == 2
+    covered = [seg, rect("a", 10, 10, 30, 20, "Si", region="core"), rect("b", 40, 10, 30, 20, "Si", region="core")]
+    rc = check_euler(run(v1(covered)))
+    assert not rc.curves_with("s.line") and len(rc.cells_of_region("core")) == 1    # later features cover it
+    rc = check_euler(run(v1([{"name": "s", "type": "segment", "points": [[20, 20], [30, 35]]},
+                             rect("a", 10, 10, 40, 40, "Si")], finalize="imprint")))
+    assert not rc.curves_with("s.line")                                           # covered under imprint too
+    rc.to_domain(0.005)
+
+
+def test_merged_regions_list_every_owning_feature():
+    doc = v1([rect("a", 10, 10, 30, 20, "Si", region="core", mesh_size=1), rect("b", 40, 10, 30, 20, "Si", region="core", mesh_size=7)],
+             selections={"fa": {"region": {"feature": "a"}}, "fb": {"region": "b"}})
+    rc = check_euler(run(doc))
+    (cell,) = [rc.cells[i] for i in rc.cells_of_region("core")]
+    assert cell.feature == "a" and cell.feature_indices == frozenset({0, 1}) and cell.mesh_size == 1000
+    assert rc.selections["fa"][1] == rc.selections["fb"][1] == frozenset({cell.index})
+    rc2 = check_euler(run(v1([rect("b", 40, 10, 30, 20, "Si", region="core", mesh_size=7),
+                              rect("a", 10, 10, 30, 20, "Si", region="core", mesh_size=1)])))
+    (cell2,) = [rc2.cells[i] for i in rc2.cells_of_region("core")]
+    assert cell2.feature == "b" and cell2.feature_indices == frozenset({0, 1}) and cell2.mesh_size == 1000
+    assert rc.region_names() == rc2.region_names() == ["core", "background"]
+
+
+@pytest.mark.parametrize("size_nm", [5.0, 4.0, 3.0, 2.5])
+def test_whole_circle_edges_are_read_back_at_any_vertex_count(size_nm):
+    rc, d, mesh, _materials = _mesh(v1([circle("c", 50, 50, 10, "Si")]), size_nm=size_nm)
+    by_curve = rc.curve_edges(mesh)
+    circle_edges = _edge_set([by_curve[k.index] for k in rc.curves if k.kind == "circle"])
+    assert circle_edges == _edge_set([mesh.interfaces[("background", "c")]])
+    assert all(len(by_curve[k.index]) >= 1 for k in rc.curves if k.kind == "circle")
+    rc, d, mesh, _materials = _mesh(v1([rect("a", 10, 10, 40, 40, "Si", region="core"), rect("b", 50, 10, 40, 40, "Si", region="core"),
+                                        circle("c", 50, 30, 12, "Ge")]), size_nm=size_nm)
+    prov = rc.provenance_edges(mesh)
+    assert _edge_set([prov["c.boundary"]]) == _edge_set([mesh.interfaces[("c", "core")]])
