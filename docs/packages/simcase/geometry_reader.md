@@ -103,7 +103,9 @@ out["mesh_size"], out["mesh_controls"]         # default size, Circle vertex cou
   `materials` maps it. A boundary-name callback cannot be carried over.
 
 `examples/simcase/geometry_v1_soi_strip.json` is the SOI strip example written
-with version 1 geometry and parameters.
+with version 1 geometry and parameters; `geometry_v1_imprint_rib.json` is a rib
+waveguide whose slab and rib are one silicon, with `finalize: "imprint"`
+keeping the etch line and selections naming it and the rib walls.
 
 ## What it does not do yet
 

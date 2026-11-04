@@ -794,3 +794,79 @@ def test_meshed_models_of_version_1_documents_carry_provenance_edges():
     mesh, _materials, _tri = build_region_mesh(Document.from_dict(raw))
     assert set(mesh.provenance_edges) >= {"plate.top", "heater.boundary", "domain.left"}
     assert len(mesh.provenance_edges["heater.boundary"]) >= 16
+
+
+# ----------------------------------------------------------------- selector coverage
+
+def _three_regions(**extra):
+    return v1([rect("sub", 0, 0, 100, 40, "glass"), rect("core", 30, 40, 40, 20, "Si"),
+               circle("via", 50, 80, 8, "Cu")], **extra)
+
+
+def test_boundary_selector_keys():
+    doc = _three_regions(selections={
+        "core_edge": {"boundary": {"of": "core"}},
+        "cu_edge": {"boundary": {"material": "Cu"}},
+        "core_sub": {"boundary": {"between": ["core", "sub"]}},
+        "sub_out": {"boundary": {"between": ["sub", "exterior"]}},
+        "top_named": {"boundary": {"provenance": "core.top"}},
+        "via_feat": {"boundary": {"feature": "via"}},
+        "both": {"boundary": {"any": ["core_edge", "cu_edge"]}},
+        "alias": {"boundary": "core_edge"}})
+    rc = check_euler(run(doc))
+    sel = {k: v[1] for k, v in rc.selections.items()}
+    assert len(sel["core_edge"]) == 4 and len(sel["core_sub"]) == 1 and sel["core_sub"] < sel["core_edge"]
+    assert len(sel["cu_edge"]) == 2 and sel["cu_edge"] == sel["via_feat"]
+    assert len(sel["sub_out"]) == 3                                     # bottom and the two sides below y = 40
+    assert all(rc.curves[i].tag in ("left", "right", "bottom") for i in sel["sub_out"])
+    assert sel["top_named"] == frozenset(rc.curves_with("core.top")) and len(sel["top_named"]) == 1
+    assert sel["both"] == sel["core_edge"] | sel["cu_edge"] and sel["alias"] == sel["core_edge"]
+
+
+def test_region_selector_keys_and_errors():
+    doc = _three_regions(selections={"metal": {"region": {"material": "Cu"}}, "pair": {"region": {"any": ["core", "metal"]}},
+                                     "f": {"region": {"feature": "sub"}}})
+    rc = run(doc)
+    sel = {k: v[1] for k, v in rc.selections.items()}
+    assert sel["metal"] == frozenset(rc.cells_of_region("via")) and sel["f"] == frozenset(rc.cells_of_region("sub"))
+    assert sel["pair"] == frozenset(rc.cells_of_region("core")) | sel["metal"]
+    with pytest.raises(GeometryError, match="refers to itself"):
+        run(_three_regions(selections={"loop": {"boundary": {"any": ["loop"]}}}))
+    with pytest.raises(GeometryError, match="not a selection, a region or a feature id"):
+        run(_three_regions(selections={"x": {"region": "nothing"}}))
+    with pytest.raises(GeometryError, match="selects boundaries, not regions"):
+        run(_three_regions(selections={"x": {"region": {"provenance": "core.top"}}}))
+    with pytest.raises(GeometryError, match="no feature"):
+        run(_three_regions(selections={"x": {"boundary": {"feature": "ghost"}}}))
+
+
+def test_boundary_tags_first_match_wins_and_only_exterior_curves_take_tags():
+    doc = _three_regions(boundary_tags=[{"tag": "floor", "select": {"boundary": {"between": ["sub", "exterior"]}}},
+                                        {"tag": "walls", "select": {"boundary": "left"}},
+                                        {"tag": "inner", "select": {"boundary": {"of": "core"}}}])
+    rc = run(doc)
+    tags = {k.tag for k in rc.curves if k.tag}
+    assert tags == {"floor", "walls", "right", "top"}                  # the sub's left piece is floor, the rest walls
+    assert "inner" not in tags
+    assert {rc.curves[i].tag for i in rc.exterior_curves() if "domain.left" in rc.curves[i].provenance} == {"floor", "walls"}
+
+
+# ----------------------------------------------------------------- the imprint rib example
+
+def test_the_imprint_rib_example_keeps_the_etch_line_and_runs():
+    from simcase import Document, build_mesh
+    raw = json.loads((ROOT / "examples" / "simcase" / "geometry_v1_imprint_rib.json").read_text(encoding="utf-8"))
+    doc = Document.from_dict(raw)
+    from simcase.geometry_engine import evaluate
+    rc = evaluate(doc.geometry_model)
+    assert rc.region_names() == ["slab", "rib", "background"]
+    assert len(rc.cells_of_region("rib")) == 2 and len(rc.cells_of_region("slab")) == 2
+    assert len(rc.curves_with("slab.top")) == 3                       # left slab top, the imprinted line, right slab top
+    inner = [k for k in rc.curves if "slab.top" in k.provenance and k.left is not None and k.right is not None
+             and rc.cells[k.left].region == rc.cells[k.right].region == "rib"]
+    assert len(inner) == 1
+    assert rc.selections["etch_line"][1] == frozenset(rc.curves_with("slab.top"))
+    assert len(rc.selections["rib_walls"][1]) == 4                      # bottom, top, and the left and right walls above the slab
+    model = build_mesh(doc)
+    assert set(model.tri.region_names) == {"slab", "rib", "background"}
+    assert len(model.mesh.provenance_edges["slab.top"]) >= 3

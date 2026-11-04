@@ -84,7 +84,8 @@ out["mesh_size"], out["mesh_controls"]         # 기본 크기, Circle 꼭짓점
   없으므로 `length_unit`이 필수이고, `materials`로 정하지 않으면 영역 재료는 영역 이름입니다. 경계 이름 함수는
   옮길 수 없습니다.
 
-`examples/simcase/geometry_v1_soi_strip.json`은 SOI 스트립 예제를 버전 1 형상과 파라미터로 쓴 것입니다.
+`examples/simcase/geometry_v1_imprint_rib.json`은 슬랩과 리브가 같은 실리콘인 리브 도파관으로, `finalize: "imprint"`가 식각선을 남기고
+선택이 그 선과 리브 벽을 이름 짓습니다. `examples/simcase/geometry_v1_soi_strip.json`은 SOI 스트립 예제를 버전 1 형상과 파라미터로 쓴 것입니다.
 
 ## 아직 하지 않는 일
 
