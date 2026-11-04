@@ -39,7 +39,9 @@ domain, namer, materials = rc.to_domain(size)   # meshine 넘기기, size는 µm
 
 - `Cell`은 면 하나입니다. 나중 피처가 조각낸 영역이나 `region`으로 여러 피처를 합친 영역은 같은 `region`을 가진
   셀 여러 개로 나옵니다. `loops`는 바깥 루프와 구멍들을 `(곡선 번호, 정방향)` 쌍의 목록으로 둡니다.
-  빈 공간 셀(`material: null`)은 `void == True`입니다.
+  빈 공간 셀(`material: null`)은 `void == True`입니다. `region`으로 여러 피처를 합친 셀은 `feature_indices`에 그 피처를
+  모두 적고, `feature`에는 가장 앞선 것을, `mesh_size`에는 가장 작은 값을 둡니다. `{"feature": id}`는 그 피처가 조각을
+  소유하는 모든 셀을 고릅니다.
 - `Curve`는 지지 직선이나 원 하나의 두 꼭짓점 사이 최대 조각입니다. `arc`는 `params["center"]`를 중심으로
   꼭짓점 `a`에서 `b`로 반시계 방향으로 가고 `params["r2"]`는 반지름 제곱입니다. `circle`은 아무것도 닿지 않는
   온전한 원을 두 꼭짓점에서 나눈 것입니다. `left`·`right`는 셀 번호이고 도메인 바깥은 `None`입니다.
@@ -58,8 +60,9 @@ domain, namer, materials = rc.to_domain(size)   # meshine 넘기기, size는 µm
 - **`later_wins`**는 같은 영역의 두 면 사이 변을 지웁니다. 다만 나중 면적 피처가 덮지 않은 `segment`가 그 위에
   있으면 남깁니다. **`imprint`**는 도메인 안의 모든 변을 남기므로, 덮인 경계가 같은 영역의 두 셀 사이 곡선으로
   살아남습니다.
-- **`segment`**는 면적 없는 곡선으로, 자기를 포함하는 영역에 새겨집니다. 나중 면적 피처는 자기가 덮는 부분을
-  지웁니다. 영역을 가로지르는 segment는 영역을 두 셀로 나눕니다.
+- **`segment`**는 면적 없는 곡선으로, 자기를 포함하는 영역에 새겨집니다. 나중 면적 피처는 자기가 덮는 부분(양쪽을
+  나중 피처가 소유하는 부분, `imprint`에서도)을 지우고, 그런 피처의 경계 위 segment는 남습니다. 영역을 가로지르는
+  segment는 영역을 두 셀로 나눕니다.
 - **출처**는 기하적입니다. 곡선은 자기를 포함하는 원래 곡선을 가진 모든 피처 부분과 도메인 변의 이름을 가지며,
   그 피처가 이웃 셀을 소유하는지와 무관합니다.
 - **선택과 `boundary_tags`**는 계약의 [선택자 규칙](geometry_document.md#선택자-규칙동결)대로 해석합니다.

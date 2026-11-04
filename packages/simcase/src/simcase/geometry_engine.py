@@ -522,38 +522,58 @@ class _Dcel:
         return best, best_h, best_arc
 
     def _orientation(self, cyc: list[int]) -> bool:
-        """True for a counter-clockwise cycle (a bounded face's outer boundary)."""
-        _best, h, inside_arc = self.extreme(cyc)
+        """True for a counter-clockwise cycle (a bounded face's outer boundary).
+
+        At the lexicographically smallest point of the cycle nothing of the cycle lies to the
+        left, so the face is bounded exactly when none of the cycle's passages through that
+        point has the direction (-1, 0) inside its sector (the wedge from the outgoing germ
+        counter-clockwise to the reversed incoming germ). A cycle pinched at that point passes
+        it more than once, and every passage is tested.
+        """
+        best, h, inside_arc = self.extreme(cyc)
         if inside_arc:
-            return self.he_fwd[h]           # counter-clockwise around the centre moves down at the left
-        h_in = cyc[cyc.index(h) - 1]
-        t_in, t_out = self.dir_to(h_in), self.dir_from[h]
-        s = cross_sign(t_in[0], t_in[1], t_out[0], t_out[1])
-        if s:
-            return s > 0                    # a left turn at the leftmost vertex: the face is convex there
-        if (t_in[0] * t_out[0] + t_in[1] * t_out[1]).sign() > 0:
-            # a straight passage through the leftmost point is vertical; the face lies to the
-            # left of the travel direction, so moving down puts it to the east
-            if t_out[1].sign() == 0:
-                raise GeometryError("internal: a horizontal passage through the leftmost point of a cycle")
-            return t_out[1].sign() < 0
-        # a cusp: both germs leave the vertex in one direction; the face between them is the thin
-        # wedge when the reversed incoming germ bends further left than the outgoing one
-        (s_in, r_in), (s_out, r_out) = self.kappa[h_in], self.kappa[h]
-        s_rev = -s_in                       # the incoming edge as a germ leaving the vertex
-        if s_rev == 0 and s_out == 0:
-            return False                    # the free end of a dangling segment: the cycle wraps around it
-        # the thin wedge lies between the germs when the reversed incoming germ is the more
-        # counter-clockwise one: sign(kappa_rev - kappa_out) > 0 with kappa = s / sqrt(r2)
-        if s_rev == 0:
-            diff = -s_out
-        elif s_out == 0 or s_rev != s_out:
-            diff = s_rev
-        else:
-            diff = s_rev if r_in < r_out else (-s_rev if r_in > r_out else 0)
-        if diff == 0:
-            raise GeometryError("internal: a cusp between two germs of one circle")
-        return diff > 0
+            e = self.he_edge[h]
+            # moving down at the leftmost point of the circle (counter-clockwise around the
+            # centre) keeps the face to the east; a backward passage puts it to the west
+            return all(self.he_fwd[k] for k in cyc if self.he_edge[k] is e)
+        v = self.src(h)
+        for i, k in enumerate(cyc):
+            if self.src(k) != v:
+                continue
+            h_in = cyc[i - 1]
+            t_in = self.dir_to(h_in)
+            a, b = self.dir_from[k], (-t_in[0], -t_in[1])
+            s_in, r_in = self.kappa[h_in]
+            if self._sector_has_left(a, self.kappa[k], b, (-s_in, r_in)):
+                return False
+        return True
+
+    @staticmethod
+    def _sector_has_left(a, ka, b, kb) -> bool:
+        """Whether the sector from germ a counter-clockwise to germ b holds the direction (-1, 0).
+
+        Neither germ points left (the vertex is the leftmost point). Germs of one direction
+        form a cusp: the sector is the thin wedge when b bends further left than a
+        (larger signed curvature), else the whole turn minus that wedge.
+        """
+        c = _dir_cmp(a, b)
+        if c == 0:
+            (sa, ra), (sb, rb) = ka, kb
+            if sa == sb == 0:
+                return True                     # a dangling edge's free end: the face wraps around it
+            if sa == 0:
+                thin = sb > 0
+            elif sb == 0 or sa != sb:
+                thin = sb > sa
+            else:
+                thin = (rb < ra) if sb > 0 else (rb > ra)    # kappa = s / sqrt(r2)
+                if rb == ra:
+                    raise GeometryError("internal: a cusp between two germs of one circle")
+            return not thin
+        left = (Q2(-1), Q2(0))
+        if c < 0:                               # angle(a) < angle(b): inside when a < left < b
+            return _dir_cmp(a, left) < 0 and _dir_cmp(left, b) < 0
+        return _dir_cmp(a, left) < 0 or _dir_cmp(left, b) < 0
 
     def bbox(self, cyc: list[int]):
         xs = [self.V.x[self.src(h)] for h in cyc]
@@ -593,7 +613,10 @@ class _Dcel:
             elif cands and not self.contains(self.cycles[cands[0]], v):
                 cands = []
             if len(cands) > 1:
-                cands.sort(key=cmp_to_key(lambda p, q: _box_cmp(bbox[p], bbox[q])))
+                inner = [c for c in cands if all(_box_inside(bbox[c], bbox[o]) for o in cands)]
+                if len(inner) != 1:
+                    raise GeometryError("internal: containing faces whose bounding boxes do not nest")
+                cands = inner
             holes[cands[0] if cands else None].append(hk)
         self.faces = [(None, holes[None])] + [(o, holes[o]) for o in outers]
         for i, (outer, hs) in enumerate(self.faces):
@@ -671,6 +694,7 @@ class Cell:
     loops: list                     # [outer, hole, ...], each a list of (curve index, forward)
     area: float                     # pm^2
     membership: frozenset           # the feature indices containing the cell (-1: the domain)
+    feature_indices: frozenset = frozenset()    # every feature that owns a piece of the cell (-1: background)
 
     @property
     def void(self) -> bool:
@@ -1127,38 +1151,61 @@ class _Engine:
                 return False
             if ra is None or rb is None or ra != rb:
                 return True
-            if comp.finalize == "imprint":
-                return True
-            o = owner[fa]
-            covered = all(o >= 0 and o > s for s in e.segment_features)
-            return bool(e.segment_features) and not covered
+            if not e.segment_features:
+                return comp.finalize == "imprint"            # a covered feature boundary
+            # a segment survives unless a later area feature covers it from both sides
+            covered = all(o >= 0 and o > s for o in (owner[fa], owner[fb]) for s in e.segment_features)
+            return not covered or (comp.finalize == "imprint" and bool(e.toggles))
 
         kept = [e for e in edges if survives(e)]
         cell_edges = [_Edge(e.curve, e.a, e.b, e.provenance, e.toggles, e.segment_features, i)
                       for i, e in enumerate(kept)]
         d2 = _Dcel(self.V, cell_edges)
+        # pass-1 faces joined across dropped edges form one cell; the cell lists every feature
+        # that owns one of them, and its representative is the earliest of those
+        parent = list(range(len(dcel.faces)))
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        kept_ids = {e.index for e in kept}
+        for e in edges:
+            if e.index not in kept_ids:
+                h = 2 * e.index
+                parent[find(dcel.face_left_of(h))] = find(dcel.face_left_of(h ^ 1))
+        group_owners: dict[int, set] = {}
+        for fi in range(len(dcel.faces)):
+            if owner[fi] is not None:
+                group_owners.setdefault(find(fi), set()).add(fi)
         cells: list[Cell] = []
         cell_of_face: dict[int, int] = {}
         for fi, (outer, holes) in enumerate(d2.faces):
             if outer is None:
                 continue
-            # the owner of a pass-2 face is the owner of the pass-1 face left of any of its half-edges
             h = d2.cycles[outer][0]
             h_old = 2 * kept[d2.he_edge[h].index].index + (0 if d2.he_fwd[h] else 1)
-            old_face = dcel.face_left_of(h_old)
-            o = owner[old_face]
-            if o is None:
+            group = find(dcel.face_left_of(h_old))
+            faces1 = group_owners.get(group)
+            if not faces1:
                 continue
+            owners = sorted({owner[f1] for f1 in faces1})
+            o = owners[0]
+            rep_face = min(faces1, key=lambda f1: (owner[f1], f1))
             idx = len(cells)
             cell_of_face[fi] = idx
             loops = [[(d2.he_edge[k].index, d2.he_fwd[k]) for k in d2.cycles[cy]] for cy in (outer, *holes)]
             area = sum(self._cycle_area(d2, d2.cycles[cy]) for cy in (outer, *holes))
             if o < 0:
                 cells.append(Cell(idx, "background", comp.background.get("material", _MISSING), "background", -1,
-                                  comp.background.get("mesh_size"), loops, area, membership[old_face]))
+                                  comp.background.get("mesh_size"), loops, area, membership[rep_face], frozenset({-1})))
             else:
-                f = comp.features[o]
-                cells.append(Cell(idx, f.region, f.material, f.id, o, f.mesh_size, loops, area, membership[old_face]))
+                feats = [comp.features[i] for i in owners]
+                sizes = [f.mesh_size for f in feats if f.mesh_size is not None]
+                cells.append(Cell(idx, feats[0].region, feats[0].material, feats[0].id, o,
+                                  min(sizes) if sizes else None, loops, area, membership[rep_face], frozenset(owners)))
         whole = {key: _whole_circle(cell_edges, c) for key, c in self.circles.items()}
         curves = []
         for e in cell_edges:
@@ -1341,7 +1388,7 @@ def _resolve_region(rc: RegionComplex, comp: Component, expr, where: str, stack:
         if expr in regions:
             hits.append(("region", {c.index for c in rc.cells if c.region == expr}))
         if f is not None and not (expr in regions and f.region == expr):
-            hits.append(("feature", {c.index for c in rc.cells if c.feature_index == i}))
+            hits.append(("feature", {c.index for c in rc.cells if i in c.feature_indices}))
         if len(hits) > 1:
             raise GeometryError(f"{where}: {expr!r} is both a {hits[0][0]} and a {hits[1][0]}")
         if not hits:
@@ -1352,7 +1399,7 @@ def _resolve_region(rc: RegionComplex, comp: Component, expr, where: str, stack:
         i, f = _feature_by_id(comp, v)
         if f is None:
             raise GeometryError(f"{where}: no feature {v!r}")
-        return {c.index for c in rc.cells if c.feature_index == i}
+        return {c.index for c in rc.cells if i in c.feature_indices}
     if k == "material":
         return {c.index for c in rc.cells if c.material == v}
     if k == "any":
@@ -1539,19 +1586,23 @@ def _curve_edges(rc: RegionComplex, mesh) -> dict:
     for k in rc.curves:
         found = []
         pts = poly[k.index]
-        if pts is None:                                        # a whole circle: nodes on it, by angle
+        if pts is None:                                        # a whole circle: nodes on it, chained by angle
             c = circles[(k.params["center"], k.params["r2"])]
             d = nodes - c.center
             on = np.nonzero(np.abs(np.hypot(d[:, 0], d[:, 1]) - c.radius) <= tol)[0]
-            if len(on):
+            if len(on) >= 2:
                 ang = np.arctan2(d[on, 1], d[on, 0])
-                ta = math.atan2(*reversed(tuple(nodes[_nearest(nodes, _vertex_um(rc, k.a), tol)] - c.center)))
-                span = [(float((a - ta) % (2 * math.pi)), int(i)) for a, i in zip(ang, on)]
-                tb = (math.atan2(*reversed(tuple(nodes[_nearest(nodes, _vertex_um(rc, k.b), tol)] - c.center))) - ta) % (2 * math.pi)
-                tb = 2 * math.pi if tb <= 1e-12 else tb
-                ordered = [i for a, i in sorted(span) if a <= tb + 1e-12]
-                found = chain(ordered)
-            out[k.index] = np.array(found, dtype=int).reshape(-1, 2)
+                order = [int(i) for _a, i in sorted(zip(ang, on))]
+                ring = chain(order + order[:1])
+                # the edge belongs to the arc (a -> b counter-clockwise) that holds its midpoint angle
+                pa, pb = _vertex_um(rc, k.a), _vertex_um(rc, k.b)
+                ta = math.atan2(pa[1] - c.center[1], pa[0] - c.center[0])
+                span = (math.atan2(pb[1] - c.center[1], pb[0] - c.center[0]) - ta) % (2 * math.pi)
+                for e in ring:
+                    m = 0.5 * (nodes[e[0]] + nodes[e[1]]) - c.center
+                    if (math.atan2(m[1], m[0]) - ta) % (2 * math.pi) < span:
+                        found.append(e)
+            out[k.index] = np.array(sorted(set(found)), dtype=int).reshape(-1, 2)
             continue
         for p, q in zip(pts[:-1], pts[1:]):
             p, q = np.asarray(p), np.asarray(q)
@@ -1571,15 +1622,6 @@ def _vertex_um(rc: RegionComplex, v: int):
     unit_pm = rc._handoff["unit_pm"]
     x, y = rc.vertices[v]
     return (float(x.approx() / unit_pm), float(y.approx() / unit_pm))
-
-
-def _nearest(nodes, p, tol) -> int:
-    import numpy as np
-    d = np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])
-    i = int(np.argmin(d))
-    if d[i] > tol:
-        raise GeometryError(f"no mesh node at the vertex {p}")
-    return i
 
 
 def _point_segment_distance(m, p, q) -> float:
