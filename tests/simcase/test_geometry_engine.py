@@ -721,3 +721,76 @@ def test_random_circles_rects_and_polygons_never_break_the_arrangement():
             a = rc.area_of_region(f["name"]) / 1e6 if cells else 0.0
             assert abs(a - a_ref) <= 1e-3 * max(a_ref, 1.0), (feats, f["name"], a, a_ref)
             assert len(cells) == len(parts), (feats, f["name"])
+
+
+# ----------------------------------------------------------------- imprint and segment documents run
+
+def _soi_v1(**component_extra):
+    raw = copy.deepcopy(EXAMPLES["soi_strip"])
+    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"]["components"]["main"].update(component_extra)
+    return raw
+
+
+def _run_v1(raw):
+    from simcase import Document, run
+    return run(Document.from_dict(raw), verbose=False)
+
+
+def test_an_imprint_document_loads_runs_and_keeps_the_covered_boundary():
+    from simcase import Document, build_domain
+    from simcase.runner import micrometre_document
+    plain = _soi_v1()
+    core = plain["geometry"]["components"]["main"]["features"][0]
+    cover = dict(core, name="wide", id="wide", x=core["x"] - 0.1, w=core["w"] + 0.2)        # the same silicon, wider
+    raw = _soi_v1(finalize="imprint")
+    raw["geometry"]["components"]["main"]["features"] = [core, cover]
+    doc = Document.from_dict(raw)
+    assert doc.data["geometry"]["shapes"][1]["name"] == "wide" and "finalize" not in doc.data["geometry"]
+    assert doc.to_dict()["geometry"]["components"]["main"]["finalize"] == "imprint"
+    rc_domain, namer, materials = build_domain(micrometre_document(doc))
+    mesh = generate(rc_domain, namer)
+    assert set(mesh.region_names) == {"wide", "background"}                   # core is covered, as a region
+    from simcase.geometry_engine import evaluate
+    rc = evaluate(doc.geometry_model)
+    assert [c.region for c in rc.cells].count("wide") == 3                    # left strip, the core footprint, right strip
+    rc.to_domain(micrometre_document(doc)["mesh"]["size"])
+    rc_domain2, namer2, _m = rc.to_domain(micrometre_document(doc)["mesh"]["size"])
+    mesh2 = generate(rc_domain2, namer2)
+    assert len(rc.provenance_edges(mesh2)["core.left"]) >= 1                    # the covered boundary is meshed
+    merged = _soi_v1()
+    merged["geometry"]["components"]["main"]["features"] = [cover]
+    a, b = _run_v1(raw), _run_v1(merged)
+    assert abs(float(np.asarray(a.neff)[0, 0]) - float(np.asarray(b.neff)[0, 0])) < 2e-3   # same silicon, same mode
+
+
+def test_a_segment_document_loads_and_runs():
+    from simcase import Document
+    raw = _soi_v1()
+    comp = raw["geometry"]["components"]["main"]
+    comp["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 1.2]]})
+    doc = Document.from_dict(raw)
+    assert [s["name"] for s in doc.data["geometry"]["shapes"]] == ["core"]
+    a, b = _run_v1(raw), _run_v1(_soi_v1())
+    assert abs(float(np.asarray(a.neff)[0, 0]) - float(np.asarray(b.neff)[0, 0])) < 2e-3
+    from simcase.geometry_engine import evaluate
+    rc = evaluate(doc.geometry_model)
+    assert [c.region for c in rc.cells].count("core") == 2 and len(rc.curves_with("cut.line")) == 3
+
+
+# ----------------------------------------------------------------- provenance_edges on the shared mesh
+
+def test_meshed_models_of_version_1_documents_carry_provenance_edges():
+    from simcase import Document, build_mesh
+    from simcase.thermal_regions import build_region_mesh
+    model = build_mesh(Document.from_dict(_soi_v1()))
+    prov = model.mesh.provenance_edges
+    assert prov is not None and set(prov) >= {"core.top", "core.left", "domain.bottom"}
+    assert _edge_set([prov["domain.left"]]) == _edge_set([model.tri.boundary_edges["left"]])
+    assert set(model.solver_mesh.provenance_edges) == set(prov)
+    assert build_mesh(Document.from_dict(copy.deepcopy(EXAMPLES["soi_strip"]))).mesh.provenance_edges is None
+    raw = copy.deepcopy(EXAMPLES["thermal_regions"])
+    raw["geometry"] = from_v02(raw["geometry"])
+    mesh, _materials, _tri = build_region_mesh(Document.from_dict(raw))
+    assert set(mesh.provenance_edges) >= {"plate.top", "heater.boundary", "domain.left"}
+    assert len(mesh.provenance_edges["heater.boundary"]) >= 16

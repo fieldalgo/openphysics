@@ -107,11 +107,14 @@ with version 1 geometry and parameters.
 
 ## What it does not do yet
 
-- Resolve selectors, build the region complex or write provenance names to a mesh
-  (they need the stage 2 engine).
-- Mesh `path` and `segment` features, merged regions, axisymmetric components,
-  cylinders, spheres, `extrude` features, `finalize: "imprint"` and void
-  (`material: null`). They are parsed and refused by the compilers with their names.
+- Resolve selectors or build the region complex: the
+  [stage 2 engine](geometry_engine.md) does that, and it meshes the document.
+- Load `path` features, merged regions, axisymmetric components, cylinders,
+  spheres, `extrude` features and void (`material: null`) into a `Document`:
+  the validators and the results still read the 0.2 compilation, which has no
+  form for them, so `to_v02` refuses them by name. `finalize: "imprint"` and
+  `segment` features do load (`to_v02(..., validation=True)` keeps the shapes
+  and leaves the segments out), because the engine meshes them.
 - Supply design velocities (stage 4).
 
 Importing `simcase.geometry_document` loads neither scipy nor shapely:

@@ -201,6 +201,9 @@ class Document:
     #: the parsed version 1 block (simcase.geometry_document.GeometryModel, integer pm); the
     #: mesh of such a document comes from the exact engine, not from the 0.2 compilation
     geometry_model: object = field(default=None, init=False, repr=False)
+    #: the region complex the engine built when this document was meshed
+    #: (simcase.geometry_engine.RegionComplex); set by geometry.build_domain
+    geometry_complex: object = field(default=None, init=False, repr=False)
 
     # -- construction --------------------------------------------------------
 
@@ -217,7 +220,7 @@ class Document:
             from .geometry_document import GeometryError, parse, to_v02
             try:
                 model = parse(d)
-                compiled = to_v02(model)
+                compiled = to_v02(model, validation=True)
             except GeometryError as exc:
                 raise DocumentError(str(exc)) from None
             source, roundings = copy.deepcopy(geometry), model.roundings

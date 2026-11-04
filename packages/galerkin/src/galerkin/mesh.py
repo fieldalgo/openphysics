@@ -27,7 +27,8 @@ class Mesh:
                  boundary: dict[str, np.ndarray],
                  boundary_edges: dict[str, np.ndarray] | None = None,
                  regions: np.ndarray | None = None,
-                 region_names: list[str] | None = None):
+                 region_names: list[str] | None = None,
+                 provenance_edges: dict[str, np.ndarray] | None = None):
         self.nodes = np.asarray(nodes, dtype=float)
         self.triangles = np.asarray(triangles, dtype=int)
         self.boundary = {k: np.asarray(v, dtype=int) for k, v in boundary.items()}
@@ -36,6 +37,12 @@ class Mesh:
         self.regions = (None if regions is None
                         else np.asarray(regions, dtype=int))
         self.region_names = list(region_names) if region_names is not None else None
+        #: optional, from a geometry document (simcase geometry contract, "Mesh tags"):
+        #: provenance name -> (E, 2) node pairs of the mesh edges that carry it; an edge
+        #: with several names appears under each, internal imprint curves included.
+        #: Nothing in galerkin reads it yet.
+        self.provenance_edges = (None if provenance_edges is None else
+                                 {k: np.asarray(v, dtype=int).reshape(-1, 2) for k, v in provenance_edges.items()})
         self._fix_orientation()   # reorders vertices only, so regions stays aligned
 
     @property

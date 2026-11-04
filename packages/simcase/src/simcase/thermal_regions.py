@@ -293,10 +293,12 @@ def build_region_mesh(doc, limits=None):
         if limits.max_triangles is not None and tri.num_triangles > limits.max_triangles:
             raise MeshLimitError('triangles', limits.max_triangles, int(tri.num_triangles))
     # Convert the canonical mesh directly to SI, never through document units.
+    from .geometry import provenance_edges_of
     mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
                 boundary={k: np.asarray(v) for k, v in tri.boundary_nodes.items()},
                 boundary_edges={k: np.asarray(v) for k, v in tri.boundary_edges.items()},
-                regions=np.asarray(tri.regions), region_names=list(tri.region_names))
+                regions=np.asarray(tri.regions), region_names=list(tri.region_names),
+                provenance_edges=provenance_edges_of(canonical, tri) if limits is None else None)
     region_materials = {r: region_materials[r] for r in mesh.region_names}
     # Keep the diagnostic triangulation in document units, as before.
     tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))

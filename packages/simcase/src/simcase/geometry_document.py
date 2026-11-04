@@ -849,17 +849,24 @@ def from_v02(geometry: dict) -> dict:
     return {"version": 1, "components": {"main": comp}}
 
 
-def to_v02(model: GeometryModel, component: str | None = None) -> dict:
+def to_v02(model: GeometryModel, component: str | None = None, *, validation: bool = False) -> dict:
     """Compile a 2D component, or a box-only 3D component, to the 0.2 ``geometry`` form.
 
     Values come back in the document unit, each rounded once from its pm count; a
     trapezoid becomes the polygon of its exact corners. Features the 0.2 builder
     cannot express (merged regions, segments, paths, 2.5D and curved 3D features)
     are refused with their names.
+
+    With ``validation`` the result is the form the document validators read and the
+    results record while the exact engine (stage 2) does the meshing: ``finalize:
+    "imprint"`` is accepted (the shapes are the same, the engine keeps the covered
+    boundaries) and ``segment`` features are left out (they have no area and no
+    material; the engine imprints them). Without it the result is what the 0.2 builder
+    meshes, which would drop both silently, so both are refused by name.
     """
     comp = _pick(model, component)
     u = model.to_unit
-    if comp.finalize == "imprint":
+    if comp.finalize == "imprint" and not validation:
         raise GeometryError(f"component {comp.name!r}: finalize 'imprint' needs the stage 2 engine; the 0.2 "
                             "builder would remove the covered boundaries")
     if comp.dimension == "axisymmetric":
@@ -876,6 +883,8 @@ def to_v02(model: GeometryModel, component: str | None = None) -> dict:
         return out
     shapes = []
     for f in comp.features:
+        if f.type == "segment" and validation:
+            continue
         if f.region != f.name:
             raise GeometryError(f"feature {f.name!r}: merged regions need the stage 2 hand-off")
         allowed = ("box",) if comp.dimension == "3d" else ("rect", "circle", "polygon", "trapezoid")

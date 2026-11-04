@@ -173,7 +173,15 @@ def _domain_from_model(doc: Document) -> tuple[Domain, callable, dict[str, str]]
     except GeometryError as exc:
         raise DocumentError(str(exc)) from None
     doc.notes.extend(rc.notes)
+    doc.geometry_complex = rc
     return domain, namer, materials
+
+
+def provenance_edges_of(doc: Document, tri) -> dict | None:
+    """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
+    or None for a 0.2 document (no complex, no provenance)."""
+    rc = getattr(doc, "geometry_complex", None)
+    return None if rc is None else rc.provenance_edges(tri)
 
 
 def _circle_vertex_count(r: float, size: float) -> float:

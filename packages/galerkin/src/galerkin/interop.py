@@ -125,5 +125,7 @@ def from_mesher(source) -> Mesh | Mesh3D:
 
     edges = _get(source, "boundary_edges") or {}
     boundary_edges = {k: np.asarray(v, dtype=int) for k, v in edges.items()}
+    provenance = _get(source, "provenance_edges")
     return Mesh(nodes[:, :2], tris, _boundary(boundary_edges), boundary_edges,
-                regions=regions, region_names=names)
+                regions=regions, region_names=names,
+                provenance_edges=provenance if isinstance(provenance, dict) else None)
