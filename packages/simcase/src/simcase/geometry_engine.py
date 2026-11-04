@@ -1481,6 +1481,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
         return coords[v]
 
     check_handoff(rc)
+    rc.notes = [n for n in rc.notes if not n.startswith("geometry.features: a piece of")]
     poly: dict[int, list | None] = {}
     circle_objs: dict[tuple, object] = {}
     for k in rc.curves:
@@ -1564,7 +1565,7 @@ def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, 
             if k.kind == "circle":
                 whole.add((k.params["center"], k.params["r2"]))
     segments = [(poly[k.index][0], poly[k.index][1]) for k in rc.curves if k.kind == "line"]
-    arc_ends = [(k.params["center"], k.params["r2"], pt(k.a), pt(k.b)) for k in rc.curves if k.kind == "arc"]
+    arcs = [(k.params["center"], k.params["r2"], pt(k.a), pt(k.b)) for k in rc.curves if k.kind == "arc"]
     counts = {}
     for key, r in circles.items():
         c = (float(key[0][0] / unit_pm), float(key[0][1] / unit_pm))
@@ -1582,13 +1583,28 @@ def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, 
                 gap = 0.0
             else:
                 gap = min(gap, abs(near - r) if near > r else r - far)
-        for centre, r2, pa, pb in arc_ends:
+        for centre, r2, pa, pb in arcs:
+            # a kept arc of another circle: its ends, and the point of its circle nearest to
+            # this circle's line when that point lies on the arc
             if (centre, r2) == key:
                 continue
+            o = (float(centre[0] / unit_pm), float(centre[1] / unit_pm))
+            ro = math.sqrt(r2) / unit_pm
             for q in (pa, pb):
                 gap = min(gap, abs(math.hypot(q[0] - c[0], q[1] - c[1]) - r))
+            dist = math.hypot(o[0] - c[0], o[1] - c[1])
+            if dist == 0:
+                gap = min(gap, abs(ro - r))
+                continue
+            ux, uy = (c[0] - o[0]) / dist, (c[1] - o[1]) / dist
+            t0 = math.atan2(pa[1] - o[1], pa[0] - o[0])
+            span = (math.atan2(pb[1] - o[1], pb[0] - o[0]) - t0) % (2 * math.pi)
+            for sgn in (1, -1):
+                px, py = o[0] + sgn * ro * ux, o[1] + sgn * ro * uy
+                if (math.atan2(py - o[1], px - o[0]) - t0) % (2 * math.pi) <= span:
+                    gap = min(gap, abs(math.hypot(px - c[0], py - c[1]) - r))
         for other, r2 in circles.items():
-            if other == key:
+            if other == key or other not in whole:
                 continue
             o = (float(other[0][0] / unit_pm), float(other[0][1] / unit_pm))
             dist = math.hypot(o[0] - c[0], o[1] - c[1])
@@ -1631,11 +1647,17 @@ def _curve_edges(rc: RegionComplex, mesh) -> dict:
     lo, hi = nodes.min(axis=0), nodes.max(axis=0)
     tol = 1e-9 * float(np.hypot(*(hi - lo)))
     poly, circles = rc._handoff["poly"], rc._handoff["circles"]
-    for pts in poly.values():
-        for p in pts or ():
-            if np.min(np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])) > tol:
-                raise GeometryError("curve_edges: the mesh has no node at a hand-off vertex; it does not come from "
-                                    "the last to_domain of this complex (another size or unit?)")
+    # every hand-off point has a node, except one that meshine may have snapped away: an end of
+    # an input edge shorter than SNAP_EPS of the diagonal (meshine.geometry.SNAP_EPS = 3e-8)
+    points = [p for pts in poly.values() for p in (pts or ())]
+    snap = 3e-8 * float(np.hypot(*(hi - lo)))
+    for p in points:
+        if np.min(np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])) <= tol:
+            continue
+        if any(q is not p and 0 < math.hypot(q[0] - p[0], q[1] - p[1]) <= 2 * snap for q in points):
+            continue
+        raise GeometryError("curve_edges: the mesh has no node at a hand-off vertex; it does not come from "
+                            "the last to_domain of this complex (another size or unit?)")
     out = {}
 
     def chain(order_nodes):

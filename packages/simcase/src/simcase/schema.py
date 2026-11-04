@@ -211,7 +211,7 @@ class Document:
     def from_dict(cls, d: dict) -> "Document":
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
-        source, roundings, model = None, [], None
+        source, roundings, model, complex_ = None, [], None, None
         geometry = d.get("geometry")
         if isinstance(geometry, dict) and "version" in geometry:
             # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
@@ -223,7 +223,8 @@ class Document:
                 compiled = to_v02(model, validation=True)
                 if any(f.type == "segment" for c in model.components.values() for f in c.features):
                     from .geometry_engine import check_handoff, evaluate
-                    check_handoff(evaluate(model))
+                    complex_ = evaluate(model)
+                    check_handoff(complex_)
             except GeometryError as exc:
                 raise DocumentError(str(exc)) from None
             source, roundings = copy.deepcopy(geometry), model.roundings
@@ -233,6 +234,7 @@ class Document:
         doc = cls(_merge(defaults, d))
         doc.validate()
         doc.geometry_source, doc.geometry_roundings, doc.geometry_model = source, list(roundings), model
+        doc.geometry_complex = complex_
         doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
                          for r in roundings)
         return doc
@@ -256,6 +258,7 @@ class Document:
         other.geometry_source = copy.deepcopy(self.geometry_source)
         other.geometry_roundings = list(self.geometry_roundings)
         other.geometry_model = self.geometry_model
+        other.geometry_complex = self.geometry_complex
         return other
 
     # -- access --------------------------------------------------------------

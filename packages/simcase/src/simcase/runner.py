@@ -185,6 +185,7 @@ def micrometre_document(doc: Document) -> Document:
     out = Document.from_dict(d)
     # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
     out.geometry_model = doc.geometry_model
+    out.geometry_complex = doc.geometry_complex
     return out
 
 
