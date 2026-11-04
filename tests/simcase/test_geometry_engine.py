@@ -986,3 +986,17 @@ def test_the_geometry_command_prints_the_complex(capsys, tmp_path):
     old.write_text(json.dumps(EXAMPLES["soi_strip"]), encoding="utf-8")
     assert main(["geometry", str(old)]) == 2
     assert "version 1 block" in capsys.readouterr().err
+
+
+# ----------------------------------------------------------------- a tangent point off the grid stays exact
+
+def test_a_line_tangent_to_a_circle_meets_it_at_the_exact_rational_point():
+    # the edge (1, 3) -> (-5, -5) is tangent to the unit circle at (-4/5, 3/5): the parameter
+    # -3/5 is not a dyadic rational, so a floating-point division would miss the point
+    rc = check_euler(run(v1([polygon("t", [(1, 3), (-5, -5), (5, -5)], "A"), circle("c", 0, 0, 1, "B")],
+                              dom=(-10, 10, -10, 10), units="pm")))
+    tangent = [v for v in rc.vertices if v[0].D == 0 and v[1].D == 0
+               and v[0].a == Fraction(-4, 5) and v[1].a == Fraction(3, 5)]
+    assert len(tangent) == 1
+    assert len(rc.curves) == 10 and len(rc.curves_with("t.e1")) == 2
+    assert close(areas_nm2(rc)["c"] * 1e6, math.pi) and areas_nm2(rc)["t"] * 1e6 == pytest.approx(40 - math.pi, rel=1e-12)
