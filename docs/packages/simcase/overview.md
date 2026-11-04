@@ -17,6 +17,7 @@ python -m pip install -e packages/meshine -e packages/physmat -e packages/galerk
 python -m simcase example soi_strip > model.json
 python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
+python -m simcase geometry model.json                     # the region complex of a version 1 geometry block
 ```
 
 The package and CLI are named `simcase`. The JSON version field remains

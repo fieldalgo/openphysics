@@ -42,6 +42,10 @@ rc.euler()                                # (V, E, F, C): V - E + F == 1 + C alw
 domain, namer, materials = rc.to_domain(size)   # the meshine hand-off, size in micrometres
 ```
 
+`python -m simcase geometry model.json [-c component]` prints the same complex
+of a version 1 document (cells, curves with provenance and tags, selections)
+as a diagnostic; it is not a persisted format.
+
 - A `Cell` is one face. A region that later features cut into pieces, or that
   `region` merges from several features, has several cells with the same
   `region`; `loops` lists its outer loop and its holes as `(curve index,

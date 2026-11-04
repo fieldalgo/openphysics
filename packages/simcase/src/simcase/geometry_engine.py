@@ -747,6 +747,31 @@ class RegionComplex:
         comps = len({find(v) for v in used})
         return len(used), len(self.curves), len(self.cells) + 1, comps
 
+    def summary(self, model: GeometryModel | None = None) -> str:
+        """A diagnostic listing of the cells, curves, tags and selections (not a persisted format).
+
+        With the ``model`` the lengths and areas are given in its document unit; without it
+        in picometres."""
+        u = (lambda k: float(Fraction(k) / model.pm_per_unit)) if model is not None else (lambda k: float(k))
+        unit = str(model.units_length) if model is not None else "pm"
+        dom = self.domain
+        lines = [f"component {self.component!r} ({self.dimension}): domain x {u(dom['xmin']):g}..{u(dom['xmax']):g}, "
+                 f"y {u(dom['ymin']):g}..{u(dom['ymax']):g} {unit}",
+                 f"{len(self.cells)} cells, {len(self.curves)} curves, {len({k.a for k in self.curves} | {k.b for k in self.curves})} vertices"]
+        for c in self.cells:
+            mat = "void" if c.void else ("(homogeneous)" if c.material is _MISSING else c.material)
+            holes = f", {len(c.loops) - 1} hole(s)" if len(c.loops) > 1 else ""
+            lines.append(f"  cell {c.index}: region {c.region!r}, material {mat}, feature {c.feature}, "
+                         f"area {u(1) ** 2 * c.area:.6g} {unit}^2, {len(c.loops[0])} boundary curves{holes}")
+        names = lambda cell: "exterior" if cell is None else repr(self.cells[cell].region)   # noqa: E731
+        for k in self.curves:
+            where = f"{names(k.left)} | {names(k.right)}"
+            tag = f", tag {k.tag}" if k.tag else ""
+            lines.append(f"  curve {k.index}: {k.kind} {' '.join(sorted(k.provenance))} ({where}{tag})")
+        for name, (kind, chosen) in self.selections.items():
+            lines.append(f"  selection {name!r}: {len(chosen)} {kind} entries {sorted(chosen)}")
+        return "\n".join(lines)
+
     def to_domain(self, size: float, *, unit_pm=10 ** 6, mesh_sizes: bool = True, min_area: float = 0.0):
         """The meshine ``Domain``, boundary namer and {region: material} of this complex.
 

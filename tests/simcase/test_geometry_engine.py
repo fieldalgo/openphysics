@@ -970,3 +970,19 @@ def test_random_arc_paths_never_break_the_arrangement():
             assert len(cells) == len(parts), (feats, f["name"])
         done += 1
     print(f"arc-path fuzz: {done} cases agree, {skipped} exact-touch cases skipped")
+
+
+# ----------------------------------------------------------------- the geometry command
+
+def test_the_geometry_command_prints_the_complex(capsys, tmp_path):
+    from simcase.cli import main
+    path = ROOT / "examples" / "simcase" / "geometry_v1_imprint_rib.json"
+    assert main(["geometry", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert "component 'xs' (2d)" in out and "um" in out
+    assert out.count("region 'rib'") == 2 and "slab.top" in out and "selection 'etch_line': 3 boundary entries" in out
+    assert "tag left" in out and "material Si" in out
+    old = tmp_path / "old.json"
+    old.write_text(json.dumps(EXAMPLES["soi_strip"]), encoding="utf-8")
+    assert main(["geometry", str(old)]) == 2
+    assert "version 1 block" in capsys.readouterr().err
