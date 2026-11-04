@@ -16,6 +16,8 @@ import time
 from fractions import Fraction
 from pathlib import Path
 
+import numpy as np
+
 import pytest
 from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
@@ -615,3 +617,107 @@ def test_hand_off_rounds_each_coordinate_once():
     for x, y in intersections:
         p = (float(x.approx() / 10 ** 6), float(y.approx() / 10 ** 6))
         assert min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in pts) < 1e-12
+
+
+# ----------------------------------------------------------------- the runner route of version 1 documents
+
+def test_a_version_1_document_is_meshed_by_the_engine():
+    from simcase import Document, build_domain
+    from simcase.runner import micrometre_document
+    raw = copy.deepcopy(EXAMPLES["soi_strip"])
+    raw["geometry"] = from_v02(raw["geometry"])
+    comp = raw["geometry"]["components"]["main"]
+    comp["boundary_tags"] = [{"tag": "port", "select": {"boundary": {"between": ["background", "exterior"]}}}]
+    doc = Document.from_dict(raw)
+    assert doc.geometry_model is not None and doc.copy().geometry_model is doc.geometry_model
+    canonical = micrometre_document(doc)
+    assert canonical.geometry_model is doc.geometry_model
+    domain, namer, materials = build_domain(canonical)
+    mesh = generate(domain, namer)
+    assert materials == {"core": "Si", "background": "SiO2"}
+    assert set(mesh.boundary_edges) == {"port"}                   # boundary_tags reach the mesh
+    assert set(mesh.region_names) == {"core", "background"}
+    del comp["boundary_tags"]
+    domain, namer, _materials = build_domain(micrometre_document(Document.from_dict(raw)))
+    assert set(generate(domain, namer).boundary_edges) == {"left", "right", "bottom", "top"}
+
+
+def test_the_0_2_route_is_untouched_for_0_2_documents():
+    from simcase import Document, build_domain
+    from simcase.runner import micrometre_document
+    doc = Document.from_dict(copy.deepcopy(EXAMPLES["soi_strip"]))
+    assert doc.geometry_model is None
+    domain, namer, materials = build_domain(micrometre_document(doc))
+    assert materials == {"core": "Si", "background": "SiO2"} and callable(namer)
+
+
+# ----------------------------------------------------------------- mesh edges by curve, provenance and selection
+
+def _edge_set(arrays):
+    return {tuple(sorted(e)) for a in arrays for e in a}
+
+
+def test_curve_edges_cover_every_boundary_and_interface_edge():
+    rc, d, mesh, _materials = _mesh(v1([rect("core", 10, 10, 40, 30, "Si"), circle("c", 70, 60, 12, "Ge")],
+                                       selections={"wall": {"boundary": {"between": ["core", "background"]}},
+                                                   "rim": {"boundary": {"between": ["background", "exterior"]}}}))
+    by_curve = rc.curve_edges(mesh)
+    reported = _edge_set(mesh.boundary_edges.values()) | _edge_set(mesh.interfaces.values())
+    assert _edge_set(by_curve.values()) == reported
+    assert all(len(e) for e in by_curve.values())
+    prov = rc.provenance_edges(mesh)
+    assert _edge_set([prov["domain.left"]]) == _edge_set([mesh.boundary_edges["left"]])
+    assert _edge_set([rc.selection_edges(mesh, "wall")]) == _edge_set([mesh.interfaces[("background", "core")]])
+    assert _edge_set([rc.selection_edges(mesh, "rim")]) == _edge_set(mesh.boundary_edges.values())
+    assert _edge_set([prov["c.boundary"]]) == _edge_set([mesh.interfaces[("background", "c")]])
+    top = prov["core.top"]
+    assert len(top) >= 2 and set(np.unique(top)) <= set(mesh.boundary_nodes.get("outer", [])) | set(np.unique(mesh.interfaces[("background", "core")]))
+
+
+def test_internal_imprint_curves_have_mesh_edges_the_mesher_does_not_report():
+    rc, d, mesh, _materials = _mesh(v1([rect("a", 10, 10, 10, 10, "Si"), rect("b", 0, 0, 50, 50, "Ge")], finalize="imprint"))
+    assert ("b", "b") not in mesh.interfaces
+    prov = rc.provenance_edges(mesh)
+    assert len(prov["a.top"]) >= 1 and len(prov["a.left"]) >= 1
+    inner = _edge_set([prov["a.top"], prov["a.bottom"], prov["a.left"], prov["a.right"]])
+    assert not inner & (_edge_set(mesh.boundary_edges.values()) | _edge_set(mesh.interfaces.values()))
+
+
+# ----------------------------------------------------------------- robustness fuzz with circles (not a pre-registered gate)
+
+def _shapely_feature(f, clip):
+    if f["type"] == "rect":
+        g = box(f["x"], f["y"], f["x"] + f["w"], f["y"] + f["h"])
+    elif f["type"] == "circle":
+        g = Point(f["cx"], f["cy"]).buffer(f["r"], quad_segs=256)
+    else:
+        g = Polygon(f["points"])
+    return g.intersection(clip)
+
+
+def test_random_circles_rects_and_polygons_never_break_the_arrangement():
+    """Circles make every predicate exercise the quadratic fields. shapely's 256-gon is only
+    an approximation here, so the areas are compared within 1e-3 and the point of the check
+    is that the engine never raises an internal error, Euler holds and the face counts agree
+    (tangencies are improbable with random integer input)."""
+    rng = random.Random(42)
+    clip = box(0, 0, 100, 100)
+    for _case in range(300):
+        feats = []
+        for i in range(rng.randint(1, 6)):
+            if rng.random() < 0.5:
+                feats.append(circle(f"f{i}", rng.randint(0, 100), rng.randint(0, 100), rng.randint(5, 40)))
+            else:
+                f = _random_feature(rng, i)
+                if f is not None:
+                    feats.append(f)
+        rc = check_euler(run(v1(feats)))
+        polys = [_shapely_feature(f, clip) for f in feats]
+        for i, f in enumerate(feats):
+            g = polys[i].difference(unary_union(polys[i + 1:])) if i + 1 < len(polys) else polys[i]
+            parts = _parts(g)
+            a_ref = sum(p.area for p in parts)
+            cells = rc.cells_of_region(f["name"])
+            a = rc.area_of_region(f["name"]) / 1e6 if cells else 0.0
+            assert abs(a - a_ref) <= 1e-3 * max(a_ref, 1.0), (feats, f["name"], a, a_ref)
+            assert len(cells) == len(parts), (feats, f["name"])

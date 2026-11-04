@@ -175,7 +175,10 @@ def micrometre_document(doc: Document) -> Document:
         gaussian["waist"] = um(gaussian["waist"])
         gaussian["center"] = [um(c) for c in gaussian["center"]]
     d["units"] = dict(d["units"], length="um")
-    return Document.from_dict(d)
+    out = Document.from_dict(d)
+    # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
+    out.geometry_model = doc.geometry_model
+    return out
 
 
 def study_points(doc: Document) -> tuple[str | None, list]:

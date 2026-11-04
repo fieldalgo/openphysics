@@ -198,6 +198,9 @@ class Document:
     geometry_source: dict | None = field(default=None, init=False, repr=False)
     #: values the version 1 reader moved onto the 1 pm grid (simcase.geometry_document.Rounding)
     geometry_roundings: list = field(default_factory=list, init=False, repr=False)
+    #: the parsed version 1 block (simcase.geometry_document.GeometryModel, integer pm); the
+    #: mesh of such a document comes from the exact engine, not from the 0.2 compilation
+    geometry_model: object = field(default=None, init=False, repr=False)
 
     # -- construction --------------------------------------------------------
 
@@ -205,11 +208,12 @@ class Document:
     def from_dict(cls, d: dict) -> "Document":
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
-        source, roundings = None, []
+        source, roundings, model = None, [], None
         geometry = d.get("geometry")
         if isinstance(geometry, dict) and "version" in geometry:
             # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
-            # exactly and compiled to the 0.2 form the runners take; the envelope stays 0.2.
+            # exactly and compiled to the 0.2 form the validators read and the results record;
+            # the envelope stays 0.2, and the mesh comes from the exact engine (geometry.build_domain).
             from .geometry_document import GeometryError, parse, to_v02
             try:
                 model = parse(d)
@@ -222,7 +226,7 @@ class Document:
         defaults = DEFAULTS if kind.defaults is None else kind.defaults()
         doc = cls(_merge(defaults, d))
         doc.validate()
-        doc.geometry_source, doc.geometry_roundings = source, list(roundings)
+        doc.geometry_source, doc.geometry_roundings, doc.geometry_model = source, list(roundings), model
         doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
                          for r in roundings)
         return doc
@@ -245,6 +249,7 @@ class Document:
         other = Document(copy.deepcopy(self.data))
         other.geometry_source = copy.deepcopy(self.geometry_source)
         other.geometry_roundings = list(self.geometry_roundings)
+        other.geometry_model = self.geometry_model
         return other
 
     # -- access --------------------------------------------------------------

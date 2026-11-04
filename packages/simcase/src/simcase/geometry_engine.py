@@ -705,6 +705,7 @@ class RegionComplex:
     selections: dict                # name -> ("region" | "boundary", frozenset of indices)
     notes: list = field(default_factory=list)
     _dcel: object = field(default=None, repr=False)
+    _handoff: object = field(default=None, repr=False)      # the polylines of the last to_domain
 
     def region_names(self) -> list[str]:
         """The surviving regions in feature order, the background last (the 0.2 route's order)."""
@@ -746,18 +747,54 @@ class RegionComplex:
         comps = len({find(v) for v in used})
         return len(used), len(self.curves), len(self.cells) + 1, comps
 
-    def to_domain(self, size: float, *, unit_pm: int = 10 ** 6, mesh_sizes: bool = True):
+    def to_domain(self, size: float, *, unit_pm=10 ** 6, mesh_sizes: bool = True, min_area: float = 0.0):
         """The meshine ``Domain``, boundary namer and {region: material} of this complex.
 
         Coordinates are rounded once from pm to ``unit_pm`` picometres per mesher unit
-        (micrometres by default). Arcs become polylines whose vertices both sides share;
-        a circle that nothing touches becomes one shared ``meshine.Circle``. Void cells
-        are not added, so their border is exterior. ``size`` is the mesher's default
+        (micrometres by default; an exact ``Fraction`` is accepted). Arcs become polylines
+        whose vertices both sides share; a circle that nothing touches becomes one shared
+        ``meshine.Circle``. Void cells are not added, so their border is exterior, and so
+        is a cell below ``min_area`` (pm²), which is noted. ``size`` is the mesher's default
         edge length in its own unit and fixes the circle vertex counts; ``mesh_sizes``
-        passes each cell's own size on.
+        passes each cell's own size on. Regions are added in feature order, the
+        background last, each region's cells in index order.
         """
         from meshine import Circle, Domain
-        return _to_domain(self, size, unit_pm, Circle, Domain, mesh_sizes)
+        return _to_domain(self, size, Fraction(unit_pm), Circle, Domain, mesh_sizes, min_area)
+
+    def curve_edges(self, mesh) -> dict:
+        """{curve index: (E, 2) node pairs} of the mesh edges that lie on each curve.
+
+        ``mesh`` is the meshine ``TriMesh`` generated from the last ``to_domain`` hand-off
+        (its nodes in the mesher's unit). An edge belongs to a curve when both its nodes
+        lie on one piece of the curve's polyline, or on the circle, within 1e-9 of the
+        mesh's diagonal (meshine's own merge tolerance) and are consecutive there. Every
+        mesh edge on a region boundary, an interface or an internal (imprint or segment)
+        constraint is found this way; nothing is read back from the mesher.
+        """
+        if self._handoff is None:
+            raise GeometryError("curve_edges needs the mesh of a to_domain hand-off of this complex")
+        return _curve_edges(self, mesh)
+
+    def provenance_edges(self, mesh) -> dict:
+        """{provenance name: (E, 2)} over the curves that carry the name (contract, mesh tags)."""
+        import numpy as np
+        by_curve = self.curve_edges(mesh)
+        out: dict[str, list] = {}
+        for k in self.curves:
+            for name in k.provenance:
+                out.setdefault(name, []).extend(map(tuple, by_curve[k.index]))
+        return {name: np.array(sorted(set(v)), dtype=int).reshape(-1, 2) for name, v in out.items()}
+
+    def selection_edges(self, mesh, name: str):
+        """The (E, 2) mesh edges of a boundary selection, resolved through the curves it holds."""
+        import numpy as np
+        kind, chosen = self.selections[name]
+        if kind != "boundary":
+            raise GeometryError(f"selection {name!r} selects regions, not boundaries")
+        by_curve = self.curve_edges(mesh)
+        pairs = sorted({tuple(e) for i in chosen for e in by_curve[i]})
+        return np.array(pairs, dtype=int).reshape(-1, 2)
 
 
 # ----------------------------------------------------------------------- evaluation
@@ -1360,9 +1397,10 @@ def _boundary_of(rc: RegionComplex, cells: set[int]) -> set[int]:
 
 # ----------------------------------------------------------------------- meshine hand-off
 
-def _to_domain(rc: RegionComplex, size: float, unit_pm: int, Circle, Domain, mesh_sizes: bool):
+def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain, mesh_sizes: bool,
+               min_area: float):
     V = rc._dcel.V
-    scale = Fraction(1, unit_pm)
+    scale = 1 / unit_pm
     coords: dict[int, tuple[float, float]] = {}
 
     def pt(v: int):
@@ -1387,11 +1425,11 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: int, Circle, Domain, mes
         n = counts.setdefault(key, max(16, int(2 * math.pi * r / (size / 2))))
         if k.kind == "circle":
             if key not in circle_objs:
-                circle_objs[key] = Circle((key[0][0] / unit_pm, key[0][1] / unit_pm), r, n=n)
+                circle_objs[key] = Circle((float(key[0][0] / unit_pm), float(key[0][1] / unit_pm)), r, n=n)
             poly[k.index] = None
             continue
         pa, pb = pt(k.a), pt(k.b)
-        cx, cy = key[0][0] / unit_pm, key[0][1] / unit_pm
+        cx, cy = float(key[0][0] / unit_pm), float(key[0][1] / unit_pm)
         t0 = math.atan2(pa[1] - cy, pa[0] - cx)
         th = (math.atan2(pb[1] - cy, pb[0] - cx) - t0) % (2 * math.pi)
         m = max(2, math.ceil(n * th / (2 * math.pi)))
@@ -1399,33 +1437,32 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: int, Circle, Domain, mes
         pts.append(pb)
         poly[k.index] = pts
     _check_rounded_topology(rc, poly, coords)
+    rc._handoff = {"poly": poly, "circles": circle_objs, "unit_pm": unit_pm}
     d = Domain(size=size)
     materials: dict[str, object] = {}
-    for cell in rc.cells:
-        if cell.void:
-            continue
-        materials[cell.region] = cell.material
-        loops = []
-        for loop in cell.loops:
-            if all(rc.curves[i].kind == "circle" for i, _f in loop):
-                loops.append(circle_objs[(rc.curves[loop[0][0]].params["center"], rc.curves[loop[0][0]].params["r2"])])
+    skipped: set[int] = set()
+    for region in rc.region_names():
+        for ci in rc.cells_of_region(region):
+            cell = rc.cells[ci]
+            if cell.void:
                 continue
-            verts = []
-            for i, fwd in loop:
-                pts = poly[i] if fwd else poly[i][::-1]
-                verts.extend(pts[:-1])
-            loops.append(verts)
-        d.add_region(cell.region, loops[0], holes=loops[1:],
-                     size=(cell.mesh_size / unit_pm if cell.mesh_size is not None and mesh_sizes else None))
+            if cell.area < min_area:
+                skipped.add(ci)
+                rc.notes.append(f"geometry: a piece of {cell.region!r} covers {cell.area / float(unit_pm) ** 2:g} "
+                                f"square mesher units, under the sliver limit, so it is left out of the mesh")
+                continue
+            _add_cell(d, rc, cell, poly, circle_objs, unit_pm, mesh_sizes)
+            materials[cell.region] = cell.material
     exterior_segments = []
-    for i in rc.exterior_curves():
-        k = rc.curves[i]
+    for k in rc.curves:
+        if not (rc.is_exterior(k.left) or rc.is_exterior(k.right) or k.left in skipped or k.right in skipped):
+            continue
         pts = poly[k.index]
         if pts is None:
             vs = circle_objs[(k.params["center"], k.params["r2"])].vertices()
             pts = [tuple(v) for v in vs] + [tuple(vs[0])]
         for p, q in zip(pts[:-1], pts[1:]):
-            exterior_segments.append((p, q, k.tag))
+            exterior_segments.append((p, q, k.tag or "outer"))
 
     def namer(mid):
         best, best_d = "outer", math.inf
@@ -1436,6 +1473,88 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: int, Circle, Domain, mes
         return best
 
     return d, namer, materials
+
+
+def _add_cell(d, rc: RegionComplex, cell: Cell, poly: dict, circle_objs: dict, unit_pm: Fraction,
+              mesh_sizes: bool) -> None:
+    loops = []
+    for loop in cell.loops:
+        if all(rc.curves[i].kind == "circle" for i, _f in loop):
+            loops.append(circle_objs[(rc.curves[loop[0][0]].params["center"], rc.curves[loop[0][0]].params["r2"])])
+            continue
+        verts = []
+        for i, fwd in loop:
+            pts = poly[i] if fwd else poly[i][::-1]
+            verts.extend(pts[:-1])
+        loops.append(verts)
+    d.add_region(cell.region, loops[0], holes=loops[1:],
+                 size=(float(cell.mesh_size / unit_pm) if cell.mesh_size is not None and mesh_sizes else None))
+
+
+def _curve_edges(rc: RegionComplex, mesh) -> dict:
+    import numpy as np
+    nodes = np.asarray(mesh.nodes, dtype=float)
+    tris = np.asarray(mesh.triangles, dtype=int)
+    pairs = np.concatenate([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+    pairs.sort(axis=1)
+    mesh_edges = {tuple(e) for e in np.unique(pairs, axis=0)}
+    lo, hi = nodes.min(axis=0), nodes.max(axis=0)
+    tol = 1e-9 * float(np.hypot(*(hi - lo)))
+    poly, circles = rc._handoff["poly"], rc._handoff["circles"]
+    out = {}
+
+    def chain(order_nodes):
+        found = []
+        for a, b in zip(order_nodes[:-1], order_nodes[1:]):
+            e = (min(a, b), max(a, b))
+            if e in mesh_edges:
+                found.append(e)
+        return found
+
+    for k in rc.curves:
+        found = []
+        pts = poly[k.index]
+        if pts is None:                                        # a whole circle: nodes on it, by angle
+            c = circles[(k.params["center"], k.params["r2"])]
+            d = nodes - c.center
+            on = np.nonzero(np.abs(np.hypot(d[:, 0], d[:, 1]) - c.radius) <= tol)[0]
+            if len(on):
+                ang = np.arctan2(d[on, 1], d[on, 0])
+                ta = math.atan2(*reversed(tuple(nodes[_nearest(nodes, _vertex_um(rc, k.a), tol)] - c.center)))
+                span = [(float((a - ta) % (2 * math.pi)), int(i)) for a, i in zip(ang, on)]
+                tb = (math.atan2(*reversed(tuple(nodes[_nearest(nodes, _vertex_um(rc, k.b), tol)] - c.center))) - ta) % (2 * math.pi)
+                tb = 2 * math.pi if tb <= 1e-12 else tb
+                ordered = [i for a, i in sorted(span) if a <= tb + 1e-12]
+                found = chain(ordered)
+            out[k.index] = np.array(found, dtype=int).reshape(-1, 2)
+            continue
+        for p, q in zip(pts[:-1], pts[1:]):
+            p, q = np.asarray(p), np.asarray(q)
+            dvec = q - p
+            L = float(np.hypot(*dvec))
+            w = nodes - p
+            t = (w @ dvec) / L
+            perp = np.abs(dvec[0] * w[:, 1] - dvec[1] * w[:, 0]) / L
+            on = np.nonzero((perp <= tol) & (t >= -tol) & (t <= L + tol))[0]
+            ordered = [int(i) for _t, i in sorted(zip(t[on], on))]
+            found.extend(chain(ordered))
+        out[k.index] = np.array(sorted(set(found)), dtype=int).reshape(-1, 2)
+    return out
+
+
+def _vertex_um(rc: RegionComplex, v: int):
+    unit_pm = rc._handoff["unit_pm"]
+    x, y = rc.vertices[v]
+    return (float(x.approx() / unit_pm), float(y.approx() / unit_pm))
+
+
+def _nearest(nodes, p, tol) -> int:
+    import numpy as np
+    d = np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])
+    i = int(np.argmin(d))
+    if d[i] > tol:
+        raise GeometryError(f"no mesh node at the vertex {p}")
+    return i
 
 
 def _point_segment_distance(m, p, q) -> float:

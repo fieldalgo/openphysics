@@ -149,8 +149,31 @@ def _rings(poly: Polygon):
 
 
 def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
-    """meshine Domain, boundary namer, and {region name: material name}."""
+    """meshine Domain, boundary namer, and {region name: material name}.
+
+    A document written with a version 1 geometry block is resolved by the exact
+    engine (``simcase.geometry_engine``) from its parsed model, so touches and
+    booleans are decided exactly and each coordinate is rounded once at the
+    hand-off; a 0.2 block goes through the shapely route as before.
+    """
+    if getattr(doc, "geometry_model", None) is not None:
+        return _domain_from_model(doc)
     return _domain_from_regions(doc)[:3]
+
+
+def _domain_from_model(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
+    from .geometry_document import GeometryError, pm_per_unit
+    from .geometry_engine import evaluate
+    try:
+        rc = evaluate(doc.geometry_model)
+        unit_pm = pm_per_unit(doc["units"])
+        dom = doc.domain
+        min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
+        domain, namer, materials = rc.to_domain(doc["mesh"]["size"], unit_pm=unit_pm, min_area=min_area_pm2)
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
+    doc.notes.extend(rc.notes)
+    return domain, namer, materials
 
 
 def _circle_vertex_count(r: float, size: float) -> float:

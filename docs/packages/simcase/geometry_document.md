@@ -6,10 +6,10 @@
 
 Status: **Accepted on 2026-11-03.** The
 [stage 1 reader](geometry_reader.md) reads version 1 geometry blocks in
-documents and still gives the runners the 0.2 form; the
+documents and gives the runners the 0.2 form for validation and recording; the
 [stage 2 engine](geometry_engine.md) builds the region complex, selectors and
-provenance of 2D and axisymmetric components (2026-11-04), and the runners do
-not read it yet. Repository facts were checked against `main` at `015a6d8`.
+provenance of 2D and axisymmetric components and meshes version 1 documents
+(2026-11-04); the runners do not read the complex itself yet. Repository facts were checked against `main` at `015a6d8`.
 
 How the page is organised:
 - Sections marked **frozen** are fixed since the page was accepted. The SHA-256 of
@@ -909,6 +909,6 @@ listed here too.
 - 2026-11-03: Added the sipi v3 row (local dielectric regions and polygon
   conductors) to the mapping and named the sipi and meshine adapters.
 - 2026-11-03: Accepted. Frozen sections are fixed from this version on.
-- 2026-11-04: Status and the consumers table name the stage 2 engine and what
-  it refuses (not frozen sections). Frozen text is unchanged: the engine's
+- 2026-11-04: Status and the consumers table name the stage 2 engine, which
+  meshes version 1 documents, and what it refuses (not frozen sections). Frozen text is unchanged: the engine's
   grid-point rule for arc end points is a consumer refusal the contract allows.
