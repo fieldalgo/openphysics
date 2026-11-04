@@ -15,11 +15,15 @@ complex from what this reader parses.
 A document keeps `"openphysics": "0.2"`; only its `geometry` block carries
 `"version": 1`. `Document.from_dict` and `Document.load` read such a block with
 `parse`, compile it with `to_v02` and give the runners the 0.2 form, so every
-runner works unchanged and refuses what it cannot take. A block without
-`version` is read as before.
+runner works unchanged and refuses what it cannot take. The mesh of such a
+document comes from the [stage 2 engine](geometry_engine.md), which keeps the
+parsed model (`doc.geometry_model`). A block without `version` is read as
+before.
 
 - `doc.data` holds the compiled 0.2 geometry. Results that record the document
-  record this form, which is what was calculated.
+  record this form; the mesh itself comes from the exact model that
+  `doc.geometry_model` keeps, which the compilation describes up to the
+  single rounding of derived corners.
 - `doc.geometry_source` holds the version 1 block as written, and `doc.save`,
   `doc.to_dict` and `doc.copy` keep it.
 - Each value moved onto the 1 pm grid is listed in `doc.geometry_roundings` and

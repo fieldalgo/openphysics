@@ -120,11 +120,37 @@ Every refusal names the feature.
 The namer it returns maps a boundary segment's midpoint to the tag of the
 nearest exterior polyline piece.
 
-The runners still take the 0.2 form that `to_v02` compiles, so a version 1
-document that reaches a solver is meshed through the 0.2 builder today; the
-engine is the route for the features the 0.2 builder refuses (`imprint`, void,
-merged regions, `path`, `segment`) once the runners read the complex. That
-wiring is separate work.
+After `meshine.generate`, the mesh edges can be read back by curve:
+
+```python
+mesh = generate(domain, namer)
+rc.curve_edges(mesh)                 # {curve index: (E, 2) node pairs on that curve}
+rc.provenance_edges(mesh)            # {"core.top": (E, 2), "domain.left": ..., ...}
+rc.selection_edges(mesh, "wall")     # the edges of a boundary selection
+```
+
+An edge belongs to a curve when both nodes lie on one piece of its polyline, or
+on its circle, within `1e-9` of the mesh diagonal (meshine's merge tolerance)
+and are consecutive there; nothing is read back from the mesher, so the
+internal constraints of `imprint` pieces, which meshine keeps but does not
+report as interfaces, are found too. This is the contract's `provenance_edges`
+field computed on the simcase side; the shared mesh type does not carry it yet.
+
+A document with a version 1 geometry block is meshed through this route:
+`Document.from_dict` keeps the parsed model (`doc.geometry_model`, integer
+picometres, unit-free), the canonical micrometre copy carries it, and
+`build_domain` evaluates it and hands the complex to meshine as above, with the
+0.2 sliver rule (a piece under `1e-12` of the domain area is left out and
+noted). The 0.2 compilation that `to_v02` makes stays what the validators read
+and the results record, so a block it refuses (`imprint`, void, merged regions,
+`path`, `segment`) is still refused at load, by name; letting the runners read
+the complex for those is separate work. A 0.2 block is meshed by the shapely
+route as before. The loops reach meshine in a different vertex order from the
+shapely route, so a version 1 copy of a 0.2 document gives a different refined
+mesh and results that agree at discretization level, as the contract's internal
+grid section says (region heat example: 595 against 597 nodes, maximum and mean
+temperature within 6e-4 and 4e-4 of the temperature rise; waveguide examples:
+effective indices within 2e-6 to 1.6e-4).
 
 ## Validation
 

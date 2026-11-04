@@ -12,9 +12,11 @@
 
 문서는 `"openphysics": "0.2"`를 그대로 두고, `geometry` 블록만 `"version": 1`을 가집니다. `Document.from_dict`와
 `Document.load`는 이런 블록을 `parse`로 읽고 `to_v02`로 컴파일해 실행기에 0.2 형식을 넘깁니다. 그래서 모든 실행기가
-바뀌지 않은 채 동작하고, 받을 수 없는 형상은 거부합니다. `version`이 없는 블록은 지금처럼 읽습니다.
+바뀌지 않은 채 동작하고, 받을 수 없는 형상은 거부합니다. 이런 문서의 메시는 파싱한 모델(`doc.geometry_model`)을 들고 있는
+[2단계 엔진](geometry_engine.md)이 만듭니다. `version`이 없는 블록은 지금처럼 읽습니다.
 
-- `doc.data`에는 컴파일된 0.2 형상이 들어 있습니다. 문서를 기록하는 결과 파일은 실제로 계산한 이 형식을 기록합니다.
+- `doc.data`에는 컴파일된 0.2 형상이 들어 있습니다. 문서를 기록하는 결과 파일은 이 형식을 기록하고, 메시 자체는
+  `doc.geometry_model`이 들고 있는 정확한 모델에서 나옵니다. 컴파일은 유도 모서리의 한 번 반올림까지 그 모델을 기술합니다.
 - `doc.geometry_source`에는 쓴 그대로의 버전 1 블록이 들어 있고, `doc.save`·`doc.to_dict`·`doc.copy`가 이를 유지합니다.
 - 1 pm 격자로 옮긴 값은 `doc.geometry_roundings`에 남고 `doc.notes`로 보고됩니다.
 
