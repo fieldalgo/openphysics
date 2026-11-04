@@ -870,3 +870,103 @@ def test_the_imprint_rib_example_keeps_the_etch_line_and_runs():
     model = build_mesh(doc)
     assert set(model.tri.region_names) == {"slab", "rib", "background"}
     assert len(model.mesh.provenance_edges["slab.top"]) >= 3
+
+
+# ----------------------------------------------------------------- robustness fuzz with arc paths (not a pre-registered gate)
+
+_ON_CIRCLE = {5: [(5, 0), (3, 4), (0, 5), (-3, 4), (-5, 0), (-3, -4), (0, -5), (3, -4), (4, 3), (-4, 3), (-4, -3), (4, -3)],
+              10: [(10, 0), (6, 8), (0, 10), (-6, 8), (-10, 0), (-6, -8), (0, -10), (6, -8), (8, 6), (-8, 6), (-8, -6), (8, -6)],
+              13: [(13, 0), (5, 12), (12, 5), (0, 13), (-5, 12), (-12, 5), (-13, 0), (-5, -12), (-12, -5), (0, -13), (5, -12), (12, -5)]}
+
+
+def _random_path(rng, name):
+    """A simple closed path on integer points of one circle: chords and counter-clockwise arcs."""
+    r = rng.choice(list(_ON_CIRCLE))
+    cx, cy = rng.randint(20, 80), rng.randint(20, 80)
+    offs = sorted(_ON_CIRCLE[r], key=lambda o: math.atan2(o[1], o[0]))
+    idx = sorted(rng.sample(range(len(offs)), rng.randint(3, 6)))
+    pts = [(cx + offs[i][0], cy + offs[i][1]) for i in idx]
+    segs = []
+    for j in range(len(pts)):
+        q = pts[(j + 1) % len(pts)]
+        segs.append({"arc": {"center": [cx, cy], "to": list(q), "ccw": True}} if rng.random() < 0.5 else {"line": list(q)})
+    return {"name": name, "type": "path", "start": list(pts[0]), "segments": segs, "material": "m"}, (cx, cy, r)
+
+
+def _shapely_path(f, n=720):
+    cur = tuple(f["start"])
+    coords = [cur]
+    for s in f["segments"]:
+        if "line" in s:
+            cur = tuple(s["line"])
+            coords.append(cur)
+            continue
+        (cx, cy), to = s["arc"]["center"], tuple(s["arc"]["to"])
+        r = math.hypot(cur[0] - cx, cur[1] - cy)
+        a0, a1 = math.atan2(cur[1] - cy, cur[0] - cx), math.atan2(to[1] - cy, to[0] - cx)
+        d = (a1 - a0) % (2 * math.pi)
+        m = max(2, int(n * d / (2 * math.pi)))
+        coords.extend((cx + r * math.cos(a0 + d * i / m), cy + r * math.sin(a0 + d * i / m)) for i in range(1, m))
+        coords.append(to)
+        cur = to
+    return Polygon(coords)
+
+
+def _circle_extreme_touch(circles, feats, dom):
+    """True when an axis-extreme point of a circle lies exactly on another feature's edge, the domain
+    or another circle: there the exact engine keeps a touch that a polygon approximation misses."""
+    edges = [e for f in feats if f["type"] in ("rect", "polygon") for e in _feature_edges(f, dom)]
+    d = [((dom[0], dom[2]), (dom[1], dom[2])), ((dom[1], dom[2]), (dom[1], dom[3])),
+         ((dom[1], dom[3]), (dom[0], dom[3])), ((dom[0], dom[3]), (dom[0], dom[2]))]
+    for cx, cy, r in circles:
+        for v in ((cx + r, cy), (cx - r, cy), (cx, cy + r), (cx, cy - r)):
+            for p, q in edges + d:
+                if (q[0] - p[0]) * (v[1] - p[1]) - (q[1] - p[1]) * (v[0] - p[0]) == 0 and \
+                        min(p[0], q[0]) <= v[0] <= max(p[0], q[0]) and min(p[1], q[1]) <= v[1] <= max(p[1], q[1]):
+                    return True
+            for ox, oy, orad in circles:
+                if (ox, oy, orad) != (cx, cy, r) and (v[0] - ox) ** 2 + (v[1] - oy) ** 2 == orad * orad:
+                    return True
+    return False
+
+
+def test_random_arc_paths_never_break_the_arrangement():
+    """Arc paths exercise arc-arc and arc-line intersections and the cusp and tangent rules.
+    shapely's 720-gon is an approximation, so areas are compared within 2e-3; cases where a
+    circle's extreme point touches another edge exactly are skipped, since there the exact
+    engine rightly keeps a touch the polygon misses (a face pinched at a point)."""
+    rng = random.Random(7)
+    clip = box(0, 0, 100, 100)
+    done = skipped = 0
+    while done < 200:
+        feats, circles = [], []
+        for i in range(rng.randint(1, 4)):
+            u = rng.random()
+            if u < 0.6:
+                f, c = _random_path(rng, f"p{i}")
+                feats.append(f)
+                circles.append(c)
+            elif u < 0.8:
+                f = circle(f"c{i}", rng.randint(10, 90), rng.randint(10, 90), rng.randint(5, 30))
+                feats.append(f)
+                circles.append((f["cx"], f["cy"], f["r"]))
+            else:
+                f = _random_feature(rng, i)
+                if f is not None:
+                    feats.append(f)
+        if _circle_extreme_touch(circles, feats, (0, 100, 0, 100)) or len(set(circles)) < len(circles):
+            skipped += 1                   # two features on one circle: their polygon approximations overlap in slivers
+            continue
+        rc = check_euler(run(v1(feats)))
+        polys = [(_shapely_path(f) if f["type"] == "path" else _shapely_feature(f, clip)).intersection(clip)
+                 for f in feats]
+        for i, f in enumerate(feats):
+            g = polys[i].difference(unary_union(polys[i + 1:])) if i + 1 < len(polys) else polys[i]
+            parts = [q for q in _parts(g) if q.area > 1e-9]
+            a_ref = sum(p.area for p in parts)
+            cells = rc.cells_of_region(f["name"])
+            a = rc.area_of_region(f["name"]) / 1e6 if cells else 0.0
+            assert abs(a - a_ref) <= 2e-3 * max(a_ref, 1.0), (feats, f["name"], a, a_ref)
+            assert len(cells) == len(parts), (feats, f["name"])
+        done += 1
+    print(f"arc-path fuzz: {done} cases agree, {skipped} exact-touch cases skipped")
