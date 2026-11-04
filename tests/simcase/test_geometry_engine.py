@@ -290,7 +290,7 @@ def _fuzz_cases(seed, count):
     return accepted, touching
 
 
-def _compare_with_shapely(doc, rc, holes=True):
+def _compare_with_shapely(doc, rc, holes=True, faces=True):
     ref = _shapely_regions(doc)
     problems = []
     for name, g in ref.items():
@@ -300,7 +300,7 @@ def _compare_with_shapely(doc, rc, holes=True):
         a = rc.area_of_region(name) / 1e6 if cells else 0.0
         if not close(a, a_ref):
             problems.append(f"{name}: area {a!r} vs shapely {a_ref!r}")
-        if len(cells) != len(ps):
+        if faces and len(cells) != len(ps):
             problems.append(f"{name}: {len(cells)} faces vs shapely {len(ps)} parts")
         if holes and sum(len(rc.cells[c].loops) - 1 for c in cells) != sum(len(p.interiors) for p in ps):
             problems.append(f"{name}: hole count differs from shapely")
@@ -316,16 +316,17 @@ def test_g2_1_general_position_fuzz_agrees_with_shapely():
         for p in _compare_with_shapely(doc, rc):
             problems.append((feats, p))
     assert not problems, problems[:5]
-    # touching cases are outside G2-1: areas and face counts still agree; only shapely's
-    # hole-touching-shell representation differs from the engine's pinched loop
-    hole_differences = 0
+    # touching cases are outside G2-1: the areas still agree; a piece pinched at a vertex is one
+    # ring with a repeated vertex for shapely and two faces, or an outer loop plus a hole, for
+    # the engine, so face and hole counts are compared only for the record
+    representation = 0
     for feats in touching[:300]:
         doc = v1(feats)
         rc = check_euler(run(doc))
-        assert not _compare_with_shapely(doc, rc, holes=False), feats
-        hole_differences += bool(_compare_with_shapely(doc, rc))
+        assert not _compare_with_shapely(doc, rc, holes=False, faces=False), feats
+        representation += bool(_compare_with_shapely(doc, rc))
     print(f"G2-1: {len(accepted)} general-position cases agree; {min(len(touching), 300)} touching cases agree "
-          f"in area and face count, {hole_differences} differ only in hole representation")
+          f"in area, {representation} differ in how a pinched piece is represented")
 
 
 # ----------------------------------------------------------------- G2-2: circles and arcs against analytic areas
