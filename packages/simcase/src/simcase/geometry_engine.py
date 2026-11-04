@@ -1254,7 +1254,7 @@ def _line_circle_points(p0, d, c: _Circle):
     if disc < 0:
         return []
     if disc == 0:
-        t = Q2(-B / (2 * A))
+        t = Q2(Fraction(-B) / (2 * A))
         return [(Q2(p0[0]) + t * dx, Q2(p0[1]) + t * dy)]
     disc = Fraction(disc)
     root = Q2(0, Fraction(1, disc.denominator), disc.numerator * disc.denominator)      # sqrt(disc)
