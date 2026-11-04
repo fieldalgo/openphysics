@@ -1173,3 +1173,32 @@ def test_a_whole_circle_that_cannot_clear_a_neighbour_is_refused(monkeypatch):
     with pytest.raises(GeometryError, match="keep its chords clear"):
         _mesh(v1([circle("c", 50, 50, 10, "Si"), rect("r", 42.95, 42.95, 14.1, 14.1, "Ge")]))
     _mesh(v1([circle("c", 50, 50, 10, "Si"), rect("r", 45, 45, 10, 10, "Ge")]))              # corner 2.9 nm inside
+
+
+# ----------------------------------------------------------------- third review (2026-11-04)
+
+def test_read_back_tolerates_a_vertex_the_mesher_snapped_away():
+    feats = [polygon("p", [(500, 500), (500.1, 500), (500.1, 500.1), (500, 500.1), (500, 500.00002)], "Si")]
+    rc = run(v1(feats, dom=(0, 1000, 0, 1000), units="um"))
+    d, namer, _m = rc.to_domain(50.0)
+    mesh = generate(d, namer)
+    prov = rc.provenance_edges(mesh)                                  # the 20 pm edge was snapped by meshine
+    assert len(prov["p.e2"]) >= 1 and len(prov["p.e1"]) >= 1
+
+
+def test_a_whole_circle_ignores_the_dropped_arcs_of_a_cut_circle():
+    rc, d, mesh, _m = _mesh(v1([circle("D", 75, 50, 10, "Y"), rect("E", 20, 20, 60, 60, "Y"), circle("C", 50, 50, 20, "X")]))
+    assert {cv.n for r in d.regions for cv in r.curves if isinstance(cv, Circle)}       # C is still a Circle
+    assert set(mesh.region_names) == {"background", "D", "E", "C"}
+
+
+def test_a_segment_document_evaluates_once_and_reuses_the_complex():
+    from simcase import Document, build_mesh
+    raw = _soi_v1()
+    raw["geometry"]["components"]["main"]["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 1.2]]})
+    doc = Document.from_dict(raw)
+    assert doc.geometry_complex is not None and doc.copy().geometry_complex is doc.geometry_complex
+    model = build_mesh(doc)
+    from simcase.runner import micrometre_document
+    assert micrometre_document(doc).geometry_complex is doc.geometry_complex
+    assert "cut.line" in model.mesh.provenance_edges

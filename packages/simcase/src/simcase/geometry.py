@@ -167,7 +167,7 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
     from .geometry_document import GeometryError, pm_per_unit
     from .geometry_engine import evaluate
     try:
-        rc = evaluate(doc.geometry_model)
+        rc = doc.geometry_complex if getattr(doc, "geometry_complex", None) is not None else evaluate(doc.geometry_model)
         unit_pm = pm_per_unit(doc["units"])
         dom = doc.domain
         min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
@@ -185,8 +185,14 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
 def provenance_edges_of(doc: Document, tri) -> dict | None:
     """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
     or None for a 0.2 document (no complex, no provenance)."""
+    from .geometry_document import GeometryError
     rc = getattr(doc, "geometry_complex", None)
-    return None if rc is None else rc.provenance_edges(tri)
+    if rc is None:
+        return None
+    try:
+        return rc.provenance_edges(tri)
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
 
 
 def _circle_vertex_count(r: float, size: float) -> float:
