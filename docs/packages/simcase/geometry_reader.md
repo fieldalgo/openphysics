@@ -7,7 +7,8 @@
 `simcase.geometry_document` reads the version 1 `geometry` block defined by the
 [geometry document contract](geometry_document.md). It is stage 1 of that
 contract: it parses, validates and quantizes, and it hands geometry to the
-existing builders.
+existing builders. The [stage 2 engine](geometry_engine.md) builds the region
+complex from what this reader parses.
 
 ## In a document
 
