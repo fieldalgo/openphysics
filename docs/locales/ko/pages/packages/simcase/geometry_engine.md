@@ -34,6 +34,9 @@ rc.euler()                                # (V, E, F, C): 항상 V - E + F == 1 
 domain, namer, materials = rc.to_domain(size)   # meshine 넘기기, size는 µm
 ```
 
+`python -m simcase geometry model.json [-c component]`는 버전 1 문서의 같은 복합체(셀, 출처·태그가 붙은 곡선, 선택)를
+진단용으로 출력합니다. 저장 형식이 아닙니다.
+
 - `Cell`은 면 하나입니다. 나중 피처가 조각낸 영역이나 `region`으로 여러 피처를 합친 영역은 같은 `region`을 가진
   셀 여러 개로 나옵니다. `loops`는 바깥 루프와 구멍들을 `(곡선 번호, 정방향)` 쌍의 목록으로 둡니다.
   빈 공간 셀(`material: null`)은 `void == True`입니다.

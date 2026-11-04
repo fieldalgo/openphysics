@@ -27,6 +27,9 @@ def main(argv=None) -> int:
     v.add_argument("model")
     e = sub.add_parser("example", help="print an example document")
     e.add_argument("name", choices=sorted(examples.EXAMPLES))
+    g = sub.add_parser("geometry", help="print the region complex of a version 1 geometry document (a diagnostic)")
+    g.add_argument("model")
+    g.add_argument("-c", "--component", default=None, help="component name (default: the only one)")
     args = ap.parse_args(argv)
 
     if args.cmd == "example":
@@ -39,6 +42,20 @@ def main(argv=None) -> int:
         return 2
     if args.cmd == "validate":
         print(doc.summary())
+        return 0
+    if args.cmd == "geometry":
+        if doc.geometry_model is None:
+            print("error: the document has a 0.2 geometry block; the region complex needs a version 1 block "
+                  "(see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
+            return 2
+        from .geometry_document import GeometryError
+        from .geometry_engine import evaluate
+        try:
+            rc = evaluate(doc.geometry_model, args.component)
+        except GeometryError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        print(rc.summary(doc.geometry_model))
         return 0
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
     from .registry import kind_of
