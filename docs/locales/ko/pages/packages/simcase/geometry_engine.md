@@ -35,7 +35,8 @@ domain, namer, materials = rc.to_domain(size)   # meshine 넘기기, size는 µm
 ```
 
 `python -m simcase geometry model.json [-c component]`는 버전 1 문서의 같은 복합체(셀, 출처·태그가 붙은 곡선, 선택)를
-진단용으로 출력합니다. 저장 형식이 아닙니다.
+진단용으로 출력합니다. `Document.load`의 물리 검증 없이 형상 블록만 읽으므로 빈 공간·병합·`path`·다중 구성 요소
+문서도 보여 줍니다. 저장 형식이 아닙니다.
 
 - `Cell`은 면 하나입니다. 나중 피처가 조각낸 영역이나 `region`으로 여러 피처를 합친 영역은 같은 `region`을 가진
   셀 여러 개로 나옵니다. `loops`는 바깥 루프와 구멍들을 `(곡선 번호, 정방향)` 쌍의 목록으로 둡니다.
@@ -108,14 +109,19 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
 ```
 
 변의 두 노드가 곡선 다각선의 한 조각 위(또는 원 위)에 메시 대각선의 `1e-9`(meshine의 병합 허용오차) 안으로
-놓이고 그 위에서 연속이면 그 곡선의 변입니다. 메셔에서 되읽는 것은 없으므로, meshine이 유지하되 경계면으로
+놓이고 그 위에서 연속이면 그 곡선의 변입니다. 복합체의 마지막 `to_domain`에서 나오지 않은 메시(넘기기 꼭짓점에
+노드가 없음)는 거부합니다. 메셔에서 되읽는 것은 없으므로, meshine이 유지하되 경계면으로
 보고하지 않는 `imprint` 조각의 내부 제약도 찾습니다. 이것이 계약의 `provenance_edges` 필드입니다. 버전 1 문서라면
 `build_mesh`와 영역 열 메시 생성기가 돌려주는 galerkin `Mesh`에 실립니다(`mesh.provenance_edges`, 노드 쌍이라
 단위와 무관). 0.2 문서의 메시는 `None`을 가집니다. galerkin은 아직 이 필드를 읽지 않습니다.
 
 버전 1 형상 블록을 가진 문서는 이 경로로 메시됩니다. `Document.from_dict`가 파싱한 모델(`doc.geometry_model`,
 정수 pm, 단위 없음)을 들고, 정규 µm 사본이 그것을 그대로 옮기며, `build_domain`이 평가해 위처럼 복합체를
-meshine에 넘깁니다(0.2 sliver 규칙: 도메인 넓이의 `1e-12` 미만 조각은 빼고 기록). `to_v02`가(`validation=True`로) 만드는 0.2
+meshine에 넘깁니다(0.2 sliver 규칙: 도메인 넓이의 `1e-12` 미만 조각은 빼고 `doc.notes`에 기록). 메시 한도 경로
+(`check_mesh_limits`, `max_input_vertices`를 준 실행)도 같은 엔진 경로로 같은 루프 꼭짓점을 셉니다. 도파관 러너는
+도메인 네 변의 바깥 변만 받으므로 변 이름을 바꾸는 `boundary_tags`, 빈 공간 영역, sliver 틈은 솔버 전에 이름을
+밝혀 거부되고, 영역 열은 전처럼 다른 태그를 거부합니다. 셀 안에서 끝나는 `segment`는 읽을 때 거부됩니다(meshine은
+영역 루프만 받음). `to_v02`가(`validation=True`로) 만드는 0.2
 컴파일은 여전히 검증기가 읽고 결과가 기록하는 형식입니다. `imprint` 문서는 도형 그대로 읽히고 `segment` 피처는
 그 형식에서 빠지며 둘 다 엔진이 메시합니다. 빈 공간·병합 영역·`path`는 0.2 형식이 없어 러너가 복합체를 읽을 때까지
 읽을 때 이름을 밝혀 거부됩니다.

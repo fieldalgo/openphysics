@@ -1062,3 +1062,90 @@ def test_whole_circle_edges_are_read_back_at_any_vertex_count(size_nm):
                                         circle("c", 50, 30, 12, "Ge")]), size_nm=size_nm)
     prov = rc.provenance_edges(mesh)
     assert _edge_set([prov["c.boundary"]]) == _edge_set([mesh.interfaces[("c", "core")]])
+
+
+# ----------------------------------------------------------------- integration review findings of 2026-11-04
+
+def _imprint_regions_doc():
+    raw = copy.deepcopy(EXAMPLES["thermal_regions"])
+    raw["geometry"] = from_v02(raw["geometry"])
+    comp = raw["geometry"]["components"]["main"]
+    comp["finalize"] = "imprint"
+    comp["features"].append({"name": "cut", "type": "segment", "points": [[0, 10], [40, 10]]})
+    return raw
+
+
+def test_mesh_limits_take_the_engine_route_for_version_1_documents():
+    from simcase import Document, check_mesh_limits, run
+    from simcase.mesh_limits import _MeshLimits
+    from simcase.thermal_regions import build_region_mesh
+    doc = Document.from_dict(_imprint_regions_doc())
+    free, _m, _t = build_region_mesh(doc)
+    limited, _m, _t = build_region_mesh(doc, _MeshLimits(max_input_vertices=10 ** 6))
+    assert free.num_nodes == limited.num_nodes and limited.provenance_edges is not None
+    assert len(limited.provenance_edges["cut.line"]) >= 1
+    count = check_mesh_limits(doc, max_input_vertices=10 ** 6)
+    from simcase.geometry import _domain_from_model
+    from simcase.runner import micrometre_document
+    assert count == _domain_from_model(micrometre_document(doc))[3]
+    with pytest.raises(Exception, match="input_vertices"):
+        check_mesh_limits(doc, max_input_vertices=3)
+    result = run(doc, verbose=False, max_input_vertices=10 ** 6)
+    assert len(result.temperature_k) == free.num_nodes
+
+
+def test_an_em_document_whose_tags_are_not_the_four_sides_is_refused_before_the_solver():
+    from simcase import Document, DocumentError, run
+    tagged = _soi_v1(boundary_tags=[{"tag": "port", "select": {"boundary": {"between": ["background", "exterior"]}}}])
+    with pytest.raises(DocumentError, match="four domain sides"):
+        run(Document.from_dict(tagged), verbose=False)
+
+
+def test_the_engine_sliver_note_reaches_the_document():
+    from simcase import Document, build_mesh
+    raw = _soi_v1()
+    comp = raw["geometry"]["components"]["main"]
+    comp["domain"] = {"xmin": -500, "xmax": 500, "ymin": -500, "ymax": 500}
+    core = comp["features"][0]
+    core.update({"x": 100, "y": 100, "w": 0.5, "h": 0.005})
+    comp["features"].append(dict(core, name="cover", id="cover", x=100.0001, w=0.4999))
+    raw["mesh"] = {"size": 100}
+    doc = Document.from_dict(raw)
+    from simcase import DocumentError
+    with pytest.raises(DocumentError, match="four domain sides"):      # the gap the sliver leaves is 'outer'
+        build_mesh(doc)
+    assert any(n.startswith("geometry.features: a piece of 'core'") for n in doc.notes)
+
+
+def test_the_geometry_command_shows_what_the_document_route_refuses(capsys, tmp_path):
+    from simcase.cli import main
+    raw = _soi_v1()
+    raw["geometry"]["components"]["main"]["features"].append(circle("hole", 0, 0.9, 0.1, None))
+    raw["geometry"]["components"]["plan"] = {"dimension": "2d", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1},
+                                             "background": {"material": "SiO2"}, "features": []}
+    path = tmp_path / "void.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    assert main(["geometry", str(path), "-c", "main"]) == 0
+    out = capsys.readouterr().out
+    assert "material void" in out and "tag outer" in out
+    assert main(["geometry", str(path)]) == 2 and "name a component" in capsys.readouterr().err
+
+
+def test_curve_edges_refuse_a_mesh_from_another_hand_off():
+    rc = run(v1([rect("r", 10, 10, 40, 40, "Si"), circle("c", 50, 30, 15, "Ge")]))
+    domain, namer, _m = rc.to_domain(0.005)
+    mesh = generate(domain, namer)
+    rc.to_domain(0.002)
+    with pytest.raises(GeometryError, match="last to_domain"):
+        rc.curve_edges(mesh)
+
+
+def test_a_selection_may_not_share_a_tag_name_and_a_dangling_segment_is_refused_at_load():
+    from simcase import Document, DocumentError
+    with pytest.raises(GeometryError, match="share a mesh tag"):
+        run(v1([rect("a", 10, 10, 30, 20, "Si")], boundary_tags=[{"tag": "wall", "select": {"boundary": "left"}}],
+               selections={"wall": {"boundary": "right"}}))
+    raw = _soi_v1()
+    raw["geometry"]["components"]["main"]["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 0]]})
+    with pytest.raises(DocumentError, match="segment feature inside a region"):
+        Document.from_dict(raw)

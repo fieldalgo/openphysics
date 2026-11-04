@@ -298,7 +298,7 @@ def build_region_mesh(doc, limits=None):
                 boundary={k: np.asarray(v) for k, v in tri.boundary_nodes.items()},
                 boundary_edges={k: np.asarray(v) for k, v in tri.boundary_edges.items()},
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
-                provenance_edges=provenance_edges_of(canonical, tri) if limits is None else None)
+                provenance_edges=provenance_edges_of(canonical, tri))
     region_materials = {r: region_materials[r] for r in mesh.region_names}
     # Keep the diagnostic triangulation in document units, as before.
     tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))
