@@ -6,9 +6,10 @@
 
 Status: **Accepted on 2026-11-03.** The
 [stage 1 reader](geometry_reader.md) reads version 1 geometry blocks in
-documents and still gives the runners the 0.2 form; the region complex,
-selectors and provenance need the stage 2 engine. Repository facts were checked
-against `main` at `015a6d8`.
+documents and still gives the runners the 0.2 form; the
+[stage 2 engine](geometry_engine.md) builds the region complex, selectors and
+provenance of 2D and axisymmetric components (2026-11-04), and the runners do
+not read it yet. Repository facts were checked against `main` at `015a6d8`.
 
 How the page is organised:
 - Sections marked **frozen** are fixed since the page was accepted. The SHA-256 of
@@ -670,6 +671,7 @@ keyword.
 | Consumer | Takes | Refuses |
 |---|---|---|
 | FEM 2D (meshine) | `2d` components (and `axisymmetric` once a runner exists); `rect`, `circle`, `polygon`, `trapezoid` | `path` and `segment` until stage 2; reserved keywords |
+| [stage 2 engine](geometry_engine.md) (`simcase.geometry_engine`) | `2d` and `axisymmetric` components with every 2D feature, both finalize modes, void and merged regions; its hand-off gives meshine the complex as loops | `3d`; a `path` whose boundary meets itself; an arc whose `to` is not on its circle (the end point must be a grid point); at the hand-off, a `segment` curve inside one cell |
 | FEM 2.5D (`meshine.extrude`) | `layers`, and `extrude` along z | sloped or curved sidewalls: the extruder makes vertical prisms only (`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | `box` with the grid-plane rule | other 3D features |
 | FEM 3D (meshloom, stage 5) | the stage 5 combinations | everything else, until a gmshio route exists |
@@ -907,3 +909,6 @@ listed here too.
 - 2026-11-03: Added the sipi v3 row (local dielectric regions and polygon
   conductors) to the mapping and named the sipi and meshine adapters.
 - 2026-11-03: Accepted. Frozen sections are fixed from this version on.
+- 2026-11-04: Status and the consumers table name the stage 2 engine and what
+  it refuses (not frozen sections). Frozen text is unchanged: the engine's
+  grid-point rule for arc end points is a consumer refusal the contract allows.
