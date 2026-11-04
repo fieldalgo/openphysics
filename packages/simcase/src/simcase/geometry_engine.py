@@ -1480,11 +1480,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
             coords[v] = (float(V.x[v].approx() * scale), float(V.y[v].approx() * scale))
         return coords[v]
 
-    for k in rc.curves:
-        if k.left is not None and k.left == k.right:
-            raise GeometryError(f"hand-off: curve {sorted(k.provenance)} lies inside region "
-                                f"{rc.cells[k.left].region!r} with that region on both sides; meshine takes region "
-                                "loops only, so a segment feature inside a region cannot be handed over")
+    check_handoff(rc)
     poly: dict[int, list | None] = {}
     circle_objs: dict[tuple, object] = {}
     counts: dict[tuple, int] = {}
@@ -1520,7 +1516,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
                 continue
             if cell.area < min_area:
                 skipped.add(ci)
-                rc.notes.append(f"geometry: a piece of {cell.region!r} covers {cell.area / float(unit_pm) ** 2:g} "
+                rc.notes.append(f"geometry.features: a piece of {cell.region!r} covers {cell.area / float(unit_pm) ** 2:g} "
                                 f"square mesher units, under the sliver limit, so it is left out of the mesh")
                 continue
             _add_cell(d, rc, cell, poly, circle_objs, unit_pm, mesh_sizes)
@@ -1573,6 +1569,11 @@ def _curve_edges(rc: RegionComplex, mesh) -> dict:
     lo, hi = nodes.min(axis=0), nodes.max(axis=0)
     tol = 1e-9 * float(np.hypot(*(hi - lo)))
     poly, circles = rc._handoff["poly"], rc._handoff["circles"]
+    for pts in poly.values():
+        for p in pts or ():
+            if np.min(np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])) > tol:
+                raise GeometryError("curve_edges: the mesh has no node at a hand-off vertex; it does not come from "
+                                    "the last to_domain of this complex (another size or unit?)")
     out = {}
 
     def chain(order_nodes):
@@ -1622,6 +1623,15 @@ def _vertex_um(rc: RegionComplex, v: int):
     unit_pm = rc._handoff["unit_pm"]
     x, y = rc.vertices[v]
     return (float(x.approx() / unit_pm), float(y.approx() / unit_pm))
+
+
+def check_handoff(rc: RegionComplex) -> None:
+    """Refuse what the mesher cannot take: a curve with one cell on both sides (a segment inside a cell)."""
+    for k in rc.curves:
+        if k.left is not None and k.left == k.right:
+            raise GeometryError(f"hand-off: curve {sorted(k.provenance)} lies inside region "
+                                f"{rc.cells[k.left].region!r} with that region on both sides; meshine takes region "
+                                "loops only, so a segment feature inside a region cannot be handed over")
 
 
 def _point_segment_distance(m, p, q) -> float:

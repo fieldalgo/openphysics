@@ -445,6 +445,8 @@ def _component(r: _Reader, cname: str, c: dict) -> Component:
     comp = Component(cname, dim, domain, background, features, finalize, {}, [])
     comp.selections = _selections(c.get("selections", {}), comp, f"{path}.selections")
     comp.boundary_tags = _boundary_tags(c.get("boundary_tags", []), comp, f"{path}.boundary_tags")
+    for name in set(comp.selections) & {e["tag"] for e in comp.boundary_tags}:
+        raise GeometryError(f"{path}.selections.{name}: a selection may not share a mesh tag's name")
     _check_small_features(comp, path)
     return comp
 

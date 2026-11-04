@@ -115,6 +115,12 @@ def build_mesh(doc: Document) -> MeshedModel:
             f"never a usable intermediate result, so it is refused here rather than in whatever reduction "
             f"reaches it first. The usual cause is a mesh.size or a feature far from the scale of the "
             f"units this document declares.")
+    tags = set(tri_um.boundary_edges)
+    sides = {"left", "right", "bottom", "top"}
+    if not sides <= tags or (tags != sides and canonical.geometry_model is not None):
+        raise DocumentError(f"mesh: this runner takes exterior edges on the four domain sides only; found tags "
+                            f"{sorted(tags)}. A boundary_tags entry that renames a side, a void region and a sliver "
+                            "gap give other tags, which no physics here accepts yet")
     tri = dataclasses.replace(tri_um, nodes=units.lengths_from_micrometres(tri_um.nodes, doc.scale))
     provenance = provenance_edges_of(canonical, tri_um)         # node pairs: the same in both units
     return MeshedModel(doc, tri, _solver_mesh(tri, provenance), region_materials,

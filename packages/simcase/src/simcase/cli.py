@@ -35,6 +35,8 @@ def main(argv=None) -> int:
     if args.cmd == "example":
         print(json.dumps(examples.EXAMPLES[args.name], indent=2))
         return 0
+    if args.cmd == "geometry":
+        return _geometry(args.model, args.component)
     try:
         doc = Document.load(args.model)
     except (DocumentError, json.JSONDecodeError, FileNotFoundError) as exc:
@@ -42,20 +44,6 @@ def main(argv=None) -> int:
         return 2
     if args.cmd == "validate":
         print(doc.summary())
-        return 0
-    if args.cmd == "geometry":
-        if doc.geometry_model is None:
-            print("error: the document has a 0.2 geometry block; the region complex needs a version 1 block "
-                  "(see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
-            return 2
-        from .geometry_document import GeometryError
-        from .geometry_engine import evaluate
-        try:
-            rc = evaluate(doc.geometry_model, args.component)
-        except GeometryError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 2
-        print(rc.summary(doc.geometry_model))
         return 0
     out = Path(args.out) if args.out else Path(args.model).with_suffix("").with_name(Path(args.model).stem + "_results")
     from .registry import kind_of
@@ -93,6 +81,31 @@ def main(argv=None) -> int:
     if doc["results"].get("plots", True):
         files.append("results.png")
     print(f"results written to {out}/  ({', '.join(files)})")
+    return 0
+
+
+def _geometry(path: str, component: str | None) -> int:
+    """The region complex of a version 1 geometry block, read from the file without the
+    physics validation of ``Document.load`` so that every component the engine takes is shown."""
+    from .geometry_document import GeometryError, parse
+    from .geometry_engine import evaluate
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    geometry = data.get("geometry") if isinstance(data, dict) else None
+    if not isinstance(geometry, dict) or "version" not in geometry:
+        print("error: the document has a 0.2 geometry block; the region complex needs a version 1 block "
+              "(see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
+        return 2
+    try:
+        model = parse(data)
+        rc = evaluate(model, component)
+    except GeometryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(rc.summary(model))
     return 0
 
 

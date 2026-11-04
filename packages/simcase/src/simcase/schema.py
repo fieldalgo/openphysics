@@ -221,6 +221,9 @@ class Document:
             try:
                 model = parse(d)
                 compiled = to_v02(model, validation=True)
+                if any(f.type == "segment" for c in model.components.values() for f in c.features):
+                    from .geometry_engine import check_handoff, evaluate
+                    check_handoff(evaluate(model))
             except GeometryError as exc:
                 raise DocumentError(str(exc)) from None
             source, roundings = copy.deepcopy(geometry), model.roundings

@@ -157,11 +157,13 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
     hand-off; a 0.2 block goes through the shapely route as before.
     """
     if getattr(doc, "geometry_model", None) is not None:
-        return _domain_from_model(doc)
+        return _domain_from_model(doc)[:3]
     return _domain_from_regions(doc)[:3]
 
 
-def _domain_from_model(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
+def _domain_from_model(doc: Document, max_input_vertices: int | None = None
+                       ) -> tuple[Domain, callable, dict[str, str], int]:
+    """The engine route of ``build_domain``, with the loop vertex count meshine receives."""
     from .geometry_document import GeometryError, pm_per_unit
     from .geometry_engine import evaluate
     try:
@@ -174,7 +176,10 @@ def _domain_from_model(doc: Document) -> tuple[Domain, callable, dict[str, str]]
         raise DocumentError(str(exc)) from None
     doc.notes.extend(rc.notes)
     doc.geometry_complex = rc
-    return domain, namer, materials
+    count = sum(lp.n if isinstance(lp, Circle) else len(lp) for _name, loops, _size in domain._pending for lp in loops)
+    if max_input_vertices is not None and count > max_input_vertices:
+        raise MeshLimitError("input_vertices", max_input_vertices, count)
+    return domain, namer, materials, count
 
 
 def provenance_edges_of(doc: Document, tri) -> dict | None:
@@ -206,7 +211,10 @@ def _domain_from_regions(doc: Document, regions=None, max_input_vertices: int | 
     MeshLimitError, and so does an exact circle whose own count alone is over it, before
     the Circle is made (a tiny global mesh.size would make it as large as memory allows,
     or overflow). With None nothing is checked and the build is exactly build_domain's.
+    A version 1 document takes the engine route with the same count and limit.
     """
+    if regions is None and getattr(doc, "geometry_model", None) is not None:
+        return _domain_from_model(doc, max_input_vertices)
     mesh_cfg = doc["mesh"]
     d = Domain(size=mesh_cfg["size"])
     dom = doc.domain

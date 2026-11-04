@@ -44,7 +44,9 @@ domain, namer, materials = rc.to_domain(size)   # the meshine hand-off, size in 
 
 `python -m simcase geometry model.json [-c component]` prints the same complex
 of a version 1 document (cells, curves with provenance and tags, selections)
-as a diagnostic; it is not a persisted format.
+as a diagnostic; it reads the geometry block without the physics validation of
+`Document.load`, so void, merged, `path` and multi-component documents are
+shown too. It is not a persisted format.
 
 - A `Cell` is one face. A region that later features cut into pieces, or that
   `region` merges from several features, has several cells with the same
@@ -141,7 +143,8 @@ rc.selection_edges(mesh, "wall")     # the edges of a boundary selection
 
 An edge belongs to a curve when both nodes lie on one piece of its polyline, or
 on its circle, within `1e-9` of the mesh diagonal (meshine's merge tolerance)
-and are consecutive there; nothing is read back from the mesher, so the
+and are consecutive there; a mesh that does not come from the complex's last
+`to_domain` (a hand-off vertex without a node) is refused; nothing is read back from the mesher, so the
 internal constraints of `imprint` pieces, which meshine keeps but does not
 report as interfaces, are found too. This is the contract's `provenance_edges`
 field. For a version 1 document, `build_mesh` and the region heat mesh builder
@@ -154,7 +157,13 @@ A document with a version 1 geometry block is meshed through this route:
 picometres, unit-free), the canonical micrometre copy carries it, and
 `build_domain` evaluates it and hands the complex to meshine as above, with the
 0.2 sliver rule (a piece under `1e-12` of the domain area is left out and
-noted). The 0.2 compilation that `to_v02` makes (with `validation=True`) stays what
+noted in `doc.notes`); the mesh-limit routes (`check_mesh_limits`, a run with
+`max_input_vertices`) take the same engine route and count the same loop
+vertices. The waveguide runner takes exterior edges on the four domain sides
+only, so a `boundary_tags` entry that renames a side, a void region or a sliver
+gap is refused by name before the solver; region heat refuses other tags as
+before. A `segment` that ends inside a cell is refused when the document loads,
+since meshine takes region loops only. The 0.2 compilation that `to_v02` makes (with `validation=True`) stays what
 the validators read and the results record: `imprint` documents load with
 their shapes and `segment` features are left out of that form, both being
 meshed by the engine; void, merged regions and `path` have no 0.2 form and are
