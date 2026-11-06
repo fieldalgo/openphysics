@@ -239,6 +239,28 @@ THERMAL_BOUNDARY = {
 }
 EXAMPLES['thermal_boundary'] = THERMAL_BOUNDARY
 
+# Convective cooling of a slab: insulated at x=0, convection at x=L, insulated top and
+# bottom, so the field is one-dimensional in x and comparable with the
+# refsol.transient_heat_robin.ConvectiveSlab series. Headless runner only (boundary layout).
+TRANSIENT_THERMAL_BOUNDARY = {
+    'openphysics': '0.2', 'name': 'Convective cooling of a slab',
+    'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
+    'geometry': {'domain': {'xmin': 0, 'xmax': 0.05, 'ymin': 0, 'ymax': 0.01}},
+    'materials': {},
+    'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 50.,
+                         'volumetric_heat_capacity_j_m3k': 3.6e6,
+                         'initial_temperature_k': 400., 'dirichlet_temperature_k': {},
+                         'heat_source_w_m3': 0.,
+                         'convection': {'right': {'h_w_m2k': 500., 'ambient_temperature_k': 300.}}}},
+    'mesh': {'subdivisions': [20, 2]},
+    'study': {'type': 'transient', 'time_s': [0., 10., 20., 40., 80.]},
+    'results': {'save_fields': True, 'plots': False},
+}
+EXAMPLES['transient_thermal_boundary'] = TRANSIENT_THERMAL_BOUNDARY
+
 from .electric_examples import ELECTRIC_RECTANGLE, JOULE_RECTANGLE, JOULE_TEMPERATURE
 EXAMPLES.update(electric_rectangle=ELECTRIC_RECTANGLE, joule_rectangle=JOULE_RECTANGLE,
                 joule_temperature=JOULE_TEMPERATURE)
+
+from .mechanics_examples import ELASTIC_PLATE, THERMOELASTIC_BAR
+EXAMPLES.update(elastic_plate=ELASTIC_PLATE, thermoelastic_bar=THERMOELASTIC_BAR)

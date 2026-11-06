@@ -39,6 +39,10 @@ adds a planar coating. See [manufacturing geometry and JSON v2](manufacturing_se
 for the exact geometry, clearance and schema changes. In v2 every trace adds required
 `top_width`; the table below lists the unchanged v1 fields.
 
+See [polygons, local masks and JSON v3](polygon_sections.md) for additional sections:
+`offset_stripline`, `coupled_stripline`, `broadside_stripline` and `with_surface_mask`
+are available from `sipi.templates`.
+
 ## Input document
 
 ```python
@@ -56,7 +60,7 @@ The JSON root has exactly these required fields:
 
 | Field | Contract |
 |---|---|
-| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"` |
+| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"`; [v3](polygon_sections.md) |
 | `length_unit` | `"m"`; no implicit conversion |
 | `layers` | Nonempty ordered array of `{name, thickness, eps_r, tan_delta}` |
 | `traces` | Nonempty ordered array of `{name, x, width, y, thickness, ground}` |
@@ -128,3 +132,5 @@ The 47 tests passed on Linux, Python 3.12.14, NumPy 2.5.4 and SciPy 1.18.1;
 platform and installed-package acceptance is handled separately by required CI.
 Existing physical reference thresholds are unchanged. No new external dependency
 or independent validation of coplanar physics is claimed by template equivalence.
+
+[Correlated tolerance studies and fixed-pitch sampling](study.md).

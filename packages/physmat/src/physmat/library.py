@@ -5,11 +5,16 @@
 
 Optical models are taken from the refractiveindex.info database (CC0 1.0), which
 cites the original measurements; the citation of each record is kept in
-``Material.source``. Sellmeier-type coefficients are stored as refractiveindex.info
+``Material.source``. The one exception is ``standard_air``, computed from the
+published Ciddor (1996) equations (``physmat.air``) rather than from stored
+data. Sellmeier-type coefficients are stored as refractiveindex.info
 formulas so they can be compared 1:1 with the database. A handful of thermal and
 mechanical constants (room temperature, order-of-magnitude reference values from
 standard handbooks) are attached to the most common materials as a starting
 point for multiphysics — check them against your own data before relying on them.
+The thermal conductivity of Cu and Al is the Hust and Lankford (1984) equation of
+temperature and residual resistivity ratio (``physmat.thermal``) at RRR 100; the
+same module evaluates tungsten.
 
 Look-up is case-insensitive and accepts aliases: ``get("sio2")``, ``get("silica")``,
 ``get("fused silica")`` all return the same material.
@@ -19,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from . import _tables
+from . import _tables, air, thermal
 from .dispersion import Constant, RIIFormula, Tabulated
 from .material import Material, Property
 
@@ -45,6 +50,33 @@ def _add(m: Material):
 
 # ---- vacuum / air ---------------------------------------------------------
 _add(Material("vacuum", Constant(1.0, 0.0, "vacuum"), "definition", aliases=("air",)))
+
+
+def standard_air(temperature_c: float = air.STANDARD_TEMPERATURE_C, pressure_pa: float = air.STANDARD_PRESSURE_PA,
+                 humidity: float = 0.0, co2_ppm: float = air.STANDARD_CO2_PPM,
+                 vapour_pressure_pa: float | None = None, strict: bool = True, name: str | None = None) -> Material:
+    """Moist air after Ciddor (1996) at the given conditions: n(wavelength) for 0.3-1.69 um.
+
+    Defaults are Ciddor's standard dry air (15 C, 101325 Pa, 0 % RH, 450 ppm CO2).
+    ``humidity`` is the relative humidity as a fraction (0.5 = 50 %); alternatively
+    give the water-vapour partial pressure ``vapour_pressure_pa``. ``strict=False``
+    accepts conditions outside the stated validity ranges. The ``density`` property
+    (kg/m^3, temperature in kelvin like every ``Property``) is the BIPM 1981/91
+    moist-air density at the same pressure, humidity and CO2.
+    """
+    model = air.CiddorAir(temperature_c, pressure_pa, humidity, co2_ppm, vapour_pressure_pa, strict)
+    cond = f"{temperature_c:g} C, {pressure_pa:g} Pa, "
+    cond += (f"pv = {vapour_pressure_pa:g} Pa" if vapour_pressure_pa is not None else f"RH {100 * humidity:g} %")
+    cond += f", {co2_ppm:g} ppm CO2"
+    props = {"density": Property(lambda T: model.density(np.asarray(T, dtype=float) - 273.15), "kg/m^3",
+                                 "BIPM 1981/91 moist-air density equation (R. S. Davis, Metrologia 29, 67 (1992)) "
+                                 f"at {cond.split(', ', 1)[1]}")}
+    return Material(name or f"standard_air ({cond})", model, f"{air.CITATION} [{cond}]", properties=props)
+
+
+_add(Material("standard_air", air.CiddorAir(), air.CITATION + " [15 C, 101325 Pa, RH 0 %, 450 ppm CO2]",
+              properties=standard_air().properties,
+              aliases=("standard air", "Ciddor air", "air (Ciddor)", "moist air")))
 
 # ---- dielectrics: Sellmeier-type formulas ----------------------------------
 _add(Material(
@@ -147,11 +179,11 @@ for _key, _name, _aliases in (("Au_Johnson", "Au", ("gold",)), ("Ag_Johnson", "A
                   "electrical_conductivity": Property(4.1e7, "S/m", "handbook value, 300 K")}
     elif _name == "Cu":
         _props = {"density": Property(8960.0, "kg/m^3", "handbook value"),
-                  "thermal_conductivity": Property(401.0, "W/(m K)", "handbook value, 300 K"),
+                  "thermal_conductivity": thermal.conductivity_property("Cu"),    # 397 W/(m K) at 300 K
                   "electrical_conductivity": Property(5.96e7, "S/m", "handbook value, 300 K")}
     elif _name == "Al":
         _props = {"density": Property(2700.0, "kg/m^3", "handbook value"),
-                  "thermal_conductivity": Property(237.0, "W/(m K)", "handbook value, 300 K"),
+                  "thermal_conductivity": thermal.conductivity_property("Al"),    # 234 W/(m K) at 300 K
                   "electrical_conductivity": Property(3.5e7, "S/m", "handbook value, 300 K")}
     elif _name == "Ag":
         _props = {"density": Property(10490.0, "kg/m^3", "handbook value"),

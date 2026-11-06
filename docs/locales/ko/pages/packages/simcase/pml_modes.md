@@ -56,7 +56,11 @@ result.save("results")
 진단 경계 좌표는 문서 단위입니다. JSON은 `openphysics.modes2d/2`, 실수부
 `neff`, `neff_imag`를 유지하고 `open_boundary`, 선택적 `bend_loss_db_90deg`를
 추가합니다. NPZ는 pickle 없이 복소 배열과 `open_boundary_json`을 저장합니다.
-기능 브랜치 구현이 릴리스를 뜻하지는 않습니다.
+기능 브랜치 구현이 릴리스를 뜻하지는 않습니다. PML 결과는 [닫힌 창
+결과](overview.md#모드-후처리)의 `mode_power`/`confinement`/`field_overlap`/
+`coupling_efficiency` 배열을 저장하지 않습니다. 횡 계수가 늘린 좌표의 공변
+적분이어서 창 전체의 무손실 Poynting 식은 물리 전력이 아니며, 물리 창 변형은
+제공하지 않습니다. `results.mode_overlap` 블록은 검증만 하고 무시합니다.
 
 각 `openphysics.pml-candidates/1` 점은 전체 후보의 1부터 시작하는 번호,
 복소 지수, 원래 pencil 상대잔차, 양의 물리/PML L2 비율, 선택 번호와 이유를
@@ -80,6 +84,10 @@ scalar는 물리 절점 peak=1, vector는 물리 요소중심의 최대 |E|=1입
 (늘림 없는 물리창에서는 실제 Et), longitudinal은 h로 나눈 실제 Ez 절점값,
 electric은 각 Jacobian 성분으로 나눈 요소중심 장입니다. PML 내부 장은
 인공적입니다. scalar 표현은 `pml-scalar-nodal-v1`입니다.
+둘 다 파일 배치 `em-modes2d-p1-node-centroid-v1`로 저장되므로 `simcase.export`는 다른 모드
+결과처럼 내보냅니다. VTU는 계산 메시 전체를 담으므로 배열은 흡수층까지 덮고 그 안의 값은
+인공적입니다. `open_boundary`의 `physical_bounds`가 물리창을 표시하며 VTU에는 복사되지
+않으므로 뷰어에서 잘라 보세요.
 
 양의 L2 진단은 transverse 계산좌표 edge mass와 실제 Ez의 절점보간을 씁니다.
 물리창에서 sx=sy=1입니다. PML 기여는 이 지표를 확장한 진단값이며 전자기

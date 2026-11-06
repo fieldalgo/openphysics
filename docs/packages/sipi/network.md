@@ -95,3 +95,5 @@ cross-section JSON schema.
 For layer-dependent dispersive extraction, see [dielectric models](dielectrics.md).
 
 [Touchstone input and explicit measured-network comparison](touchstone.md) are available through a separate API.
+
+[Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.

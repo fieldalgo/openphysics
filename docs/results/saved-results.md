@@ -73,7 +73,8 @@ For a saved supported transient heat layout, `export_time_series` writes a VTU
 per stored time and a PVD collection. It does not interpolate or rerun the solver.
 Open the PVD in ParaView and use its time controls. Move the collection and its
 VTU files together. Time is in seconds, not the frame number. The initial frame
-has temperature/flux but no completed-step reaction, residual or storage-rate arrays.
+has temperature/flux but no completed-step reaction, residual or storage-rate arrays,
+nor the boundary layout's per-step load arrays.
 See the complete [transient export commands](../packages/simcase/overview.md#viewing-in-paraview).
 
 ## Check export support before choosing the viewer
@@ -81,11 +82,14 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Saved layout family | VTU / PVD |
 |---|---|
 | Rectangular steady heat, Dirichlet/insulated | VTU |
-| Rectangular steady heat with flux/convection (`boundary-v2`) | Unsupported |
+| Rectangular steady heat with flux/convection (`boundary-v2`), including its load arrays | VTU |
 | Steady material-region heat, including its flux/Robin fields | VTU |
 | Rectangular or region transient heat | VTU for one time, PVD for all stored times |
+| Rectangular transient heat with flux/convection (`transient-p1-node-cell-boundary-v1`), including its two per-step load arrays | VTU for one time, PVD for all stored times |
 | Vacuum PEC cavity | VTU |
-| Lossy cavity, waveguide modes, electric/Joule results | Unsupported by this exporter |
+| Electric conduction and Joule heating (`electric-joule2d-p1-v1`) | VTU |
+| Cavity with materials and lossy walls (`cavity3d-edge-complex-v1`) | VTU, complex fields as `_real`/`_imag` pairs |
+| Waveguide modes (`em.modes2d`, `em-modes2d-p1-node-centroid-v1`) | VTU for a single point, PVD for a sweep (`export_sweep`); nodes converted to metres, complex modes as `_real`/`_imag` pairs; subspace sweeps (`em-modes2d-subspace-raw-v1`) and results saved without `field_layout` refused |
 
 The region path and rectangle boundary-v2 path have different layouts despite
 similar physical conditions. Unsupported export does not mean the solver failed.

@@ -30,6 +30,8 @@ line.C, line.L, line.G(1e9)           # F/m, H/m, S/m 행렬
 
 [템플릿·JSON 문서·목표 임피던스 설계](design.md).
 
+[상관 공차 분석과 고정 피치 샘플링](study.md).
+
 ## 계산하는 양
 
 도체는 z 방향으로 뻗고 단면이 파장보다 작으므로 선로는 준TEM(quasi-TEM) 파를 전달합니다. 신호 도체가
@@ -166,12 +168,18 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 | D3 두 패드 a = 0.5 mm, d = 10 mm, 정사각 판 100·200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ(무한 시트의 등전위 원판) | 각각 1 % 이내, 판을 두 배로 할 때 R 변화 ≤ 0.5 % | +0.27 %, −0.19 %, 변화 −0.46 % |
 | D4 부하 둘과 절개 | Joule 손실 = Σ 단자 전압 × 전류 | 1e-9 | 통과 |
 
+## 형상 문서로 쓰기
+
+`sipi.geometry_v1.to_geometry_v1(section)`은 단면을 [simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상
+블록으로 쓰고, 재료·도체·상자 플래그를 함께 돌려줍니다. 결과는 단순한 사전이며 의존성을 더하지 않습니다.
+[어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
+
 ## 구현하지 않은 것
 
 - 실측 재료 추정과 형상/전파 분산.
 - 시간 영역 응답. [균일 전송선 S·Touchstone 출력](network.md)은 명시한 RLGC를 받습니다.
 - DC 전원면을 넘는 3D 구조와 전원 분배망: 비아, 여러 층, 평면 공진, 교류 PDN 임피던스, 디커플링.
-- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), `CrossSection`의 임의 다각형 도체와 Studio 화면. [사다리꼴·평탄 코팅과 JSONv2](manufacturing_sections.md)는 지원합니다.
+- 레이아웃 가져오기(Gerber, ODB++, IPC-2581), 곡선/구멍을 가진 도체와 Studio 화면. [단순 다각형·국소 마스크·JSONv3](polygon_sections.md)와 [사다리꼴·평탄 코팅](manufacturing_sections.md)은 지원합니다.
 - 자성 기판: `L`은 모든 곳에서 `mu = mu0`를 가정합니다.
 
 [주파수 의존 유전체 모델·추출](dielectrics.md).
@@ -183,3 +191,7 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 [동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](volume_line.md).
 
 [Touchstone 입력과 명시적 네트워크 비교](touchstone.md).
+
+[종단 네트워크와 주파수 NEXT/FEXT](termination.md)는 소스/부하 임피던스를 명시적으로 받습니다.
+
+[회로 입력 저장: 형상/네트워크·소스·부하·누화](circuit_document.md).

@@ -10,8 +10,13 @@ External meshers hand back the same five things, whatever built them:
     regions         (T,)  index into        | region_names        the names
     boundary_edges  {name: (E, 2)}          | boundary_faces {name: (F, 3)}
     boundary_nodes  {name: (n,)}            | the same, when the mesher supplies it
+                                            | interfaces {(a, b): (F, 3)}, optional
 
-so one duck-typed adapter takes any of them. Verified against
+so one duck-typed adapter takes any of them. The 3D shape is the format of
+docs/packages/galerkin/mesh3d_format.md (``gmshio.FemMesh3D``, ``meshine.TetMesh``):
+the faces are kept on ``Mesh3D.tagged_faces`` and checked (every exterior face
+tagged once, outward winding), and region ids must be valid: gmshio marks
+tetrahedra outside every physical volume with -1, and those are refused here. Verified against
 `meshine` (pure numpy/scipy, planar) and `gmshio` (drives the Gmsh executable
 as a separate process, planar and volumetric); neither is imported here, and
 neither is a dependency of the engine — the adapter only reads attributes.
@@ -58,6 +63,8 @@ def from_mesher(source) -> Mesh | Mesh3D:
     Dimensionality is decided by the cells, not by the node array, because a
     planar mesh is sometimes carried with a zero z column.
     """
+    if isinstance(source, (Mesh, Mesh3D)):
+        return source
     nodes = np.asarray(_get(source, "nodes"), dtype=float)
     if nodes is None or nodes.ndim != 2:
         raise TypeError("source has no (N, d) 'nodes' array")
@@ -78,6 +85,12 @@ def from_mesher(source) -> Mesh | Mesh3D:
                 f"regions has {len(regions)} entries for {len(cells)} cells")
         if names is not None and regions.max(initial=-1) >= len(names):
             raise ValueError("a region index points past the end of region_names")
+        negative = int(np.count_nonzero(regions < 0))
+        if negative:
+            raise ValueError(
+                f"{negative} of {len(cells)} cells carry region id -1: they lie outside every "
+                "named region (gmshio gives -1 to tetrahedra outside every physical volume). "
+                "Tag every volume in the mesher, or drop those cells, before from_mesher")
 
     # Prefer the mesher's own node sets when it supplies them; otherwise derive
     # them from the tagged facets, which is the same set for a watertight mesh.
@@ -102,10 +115,17 @@ def from_mesher(source) -> Mesh | Mesh3D:
         if nodes.shape[1] != 3:
             raise ValueError("a tetrahedral mesh needs (N, 3) nodes")
         faces = _get(source, "boundary_faces") or {}
-        return Mesh3D(nodes, tets, _boundary(faces),
-                      regions=regions, region_names=names)
+        faces = {str(k): np.asarray(v, dtype=int).reshape(-1, 3) for k, v in faces.items()}
+        interfaces = _get(source, "interfaces") or {}
+        mesh = Mesh3D(nodes, tets, _boundary(faces), regions=regions, region_names=names,
+                      tagged_faces=faces or None, interfaces=interfaces)
+        if faces:
+            mesh.check()
+        return mesh
 
     edges = _get(source, "boundary_edges") or {}
     boundary_edges = {k: np.asarray(v, dtype=int) for k, v in edges.items()}
+    provenance = _get(source, "provenance_edges")
     return Mesh(nodes[:, :2], tris, _boundary(boundary_edges), boundary_edges,
-                regions=regions, region_names=names)
+                regions=regions, region_names=names,
+                provenance_edges=provenance if isinstance(provenance, dict) else None)

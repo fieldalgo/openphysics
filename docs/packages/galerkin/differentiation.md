@@ -25,6 +25,7 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 |---|---|
 | `solve_steady_heat` | `conductivity` (scalar or `{region name: value}`); `heat_source` (scalar, region table or a callback returning live values); `dirichlet` temperatures; `outward_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
 | `solve_steady_electric` | `conductivity` (scalar or region table); `dirichlet` and `reference_potential` volts; `outward_current` (scalar or callback returning live values) |
+| `solve_electrostatics`, `capacitance_matrix` | `permittivity` (real scalar or region table; complex permittivity is NumPy only); conductor and `reference_potential` volts; `charge_density` (scalar, region table or a callback returning live values). The capacitance matrix is returned in that library ([contract](electrostatics.md)) |
 | `solve_transient_heat` | `conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source` (scalar, region table or a callback `(points, time)` returning live values); `dirichlet` temperatures (scalars or callbacks `(time)` returning live values); `initial_temperature_k` |
 | `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
 | `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
@@ -295,7 +296,9 @@ structure; only coefficients may be live.
   (`mode_coordinates`, `scalar_coordinate_system`, `solve_scalar_coordinates`),
   `assemble_mode_system` (`solve_modes` differentiates), `solve_dirichlet`,
   `l2_error` and `radial_pml_coeffs` (its `k`, `r0`, `d` and `sigma_max`; no
-  solver differentiates with respect to PML parameters).
+  solver differentiates with respect to PML parameters), and the mode
+  post-processing of [`galerkin.mode_overlap`](mode_overlap.md) (power,
+  overlaps, normalisation, coupling efficiency, confinement).
   JSON documents and the command line run on NumPy.
 - `solve_temperature_joule_heat`, with either method, raises a `TypeError` for a
   JAX or PyTorch value in any input before it copies or solves anything,

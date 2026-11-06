@@ -31,6 +31,8 @@ and the checks a user should run (mesh refinement and box truncation).
 [Templates, JSON input and target-impedance design](../../docs/packages/sipi/design.md)
 reuse the same engine with input validation and a separate mesh-refinement check.
 
+[Impedance tolerance studies](../../docs/packages/sipi/study.md) preserve correlated samples, fixed-pitch geometry, failed rows and descriptive statistics.
+
 Power integrity: `PowerPlane` solves the DC voltage drop (IR drop) on a copper
 plane fed by regulators and loaded by devices, checked against exact strip,
 annulus and two-pad references.
@@ -67,3 +69,7 @@ reuse one conforming geometry, with finite material extent and explicit outer bo
 
 [Touchstone input and explicit network comparison](../../docs/packages/sipi/touchstone.md)
 read supported single-ended S samples without guessing port correspondence or extrapolating.
+
+[Terminated V/I and frequency crosstalk](../../docs/packages/sipi/termination.md) use explicit passive source/load impedances and named victim ports.
+
+[Saved circuit inputs](../../docs/packages/sipi/circuit_document.md) reproduce network extraction and source/load responses in one versioned JSON document.

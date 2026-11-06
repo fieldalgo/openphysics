@@ -16,14 +16,21 @@
 | 문제 | 진입점 | 계약·검증 | 예제 |
 |---|---|---|---|
 | 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
-| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기; 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬, 실수 또는 손실 복소 유전율 | `solve_electrostatics`, `capacitance_matrix` | [계약과 기준](electrostatics.md) | — |
+| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [도파관 정식화](waveguide_formulation.md), [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| 벡터·스칼라 모드의 전력(Faraday 경로 Poynting 적분), 장 중첩, 정규화, 결합 효율, 구속 계수, 유효 면적 | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, 스칼라 쌍 | [계약과 검증](mode_overlap.md) | — |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
+| 외부 사면체 메시(meshine, gmshio)의 3D 진공 PEC 공진기, 고른 면 태그에 PEC | `solve_cavity` | [공진기 API, 외부 메시](cavity_solver.md#외부-메시), [메시 형식](mesh3d_format.md) | — |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
+| 영역별 손실 재료와 면 태그별 PEC·임피던스 벽을 갖는 외부 메시의 3D 공진기 | `solve_material_cavity` | [재료 공진기, 외부 메시](material_cavity.md#외부-메시) | — |
+| 사면체 메시의 정상 3D 열전도, 영역별 등방성, Dirichlet 면과 단열 | `galerkin.thermal3d.solve_steady_heat_3d` | [계약과 검증](thermal3d.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
+| 정상 2D 전기전도: 등방 영역별 전기전도도, 전압·전류·절연 변과 명시적 Neumann 기준 전위, V·E·J와 요소별 Joule 발열 | `galerkin.electric.solve_steady_electric` | [계약과 검증](electric_steady2d.md) | [electric_steady2d.py](../../../../../../examples/galerkin/electric_steady2d.py) |
 | 같은 메시의 정상 전기→열 단방향 연성 | `galerkin.joule_heating.solve_steady_joule_heat` | [API·단위·검증](joule_heating.md) | [joule_heating.py](../../../../../../examples/galerkin/joule_heating.py) |
+| 온도 의존 정상 Joule heating: 유효 범위가 있는 등방 σ(T)를 완화 Picard 또는 Newton으로 | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [계약과 검증](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../../../../examples/galerkin/temperature_joule_heating.py) |
 | 정상 열전도의 처방 외향 열유속과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../../../examples/galerkin/thermal_flux_robin.py) |
 | JAX·PyTorch에서 재료·열원·경계값에 대한 미분: 정상·과도 열, 정상 전기 전도, 탄성, 열탄성, 도파관 고유값과 필드, 길이에 대한 PEC 상자 공진 | JAX·PyTorch 입력을 준 `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes`(필드는 `eval_edge_field`로), `solve_cavity_box` | [계약과 검증](differentiation.md) | — |
-| 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet과 단열 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
+| 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet, 단열과 시간에 무관한 외향 열유속/대류 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
 | 정적 2D 선형탄성, 평면응력 또는 평면변형률 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity2d.md), [검증](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../../../../examples/galerkin/elasticity2d.py) |
 | 탄성의 전역 Cartesian 경계 표면하중 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity_traction.md), [검증](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../../../../examples/galerkin/elasticity_traction.py) |
 | 같은 메시의 처방 절점 Kelvin 장 아래 기계해석 | `galerkin.thermoelasticity.solve_thermoelasticity` | [계약](prescribed_temperature_thermoelasticity.md), [검증](prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../../../../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
@@ -47,7 +54,7 @@
 
 - 열전도→기계 연성은 열로 되먹임이 없는 명시적 단방향 호출입니다. 정상 workflow는
   Dirichlet·단열 열전도만 받으며 별도 열유속/Robin이나 표면하중 확장을 받지 않습니다.
-- 과도 열전도에는 열유속/Robin 입력, restart, 자동 연성이 없습니다. 선형 API는 유한한 음의
+- 과도 열전도의 열유속/Robin 데이터는 시간에 무관하며(한 번 표본화) restart와 자동 연성은 없습니다. 선형 API는 유한한 음의
   Kelvin을 clamp하지 않습니다.
 - 열·탄성 재료는 등방성이며 이름 있는 메시 영역마다 상수입니다([multimaterial](multimaterial.md)).
   이 열·탄성 계수는 온도에 따라 변하지 않습니다. 별도
@@ -55,7 +62,9 @@
   지원합니다. 기계해석은 선형 미소변형입니다. 표면하중 API는 전역
   Cartesian 하중을 받으며 scalar pressure 전용·로컬 프레임·follower 하중 API는 없습니다.
 - `solve_cavity_box`는 진공 직육면체 PEC 상자를 다루고, `solve_material_cavity_box`는
-  직육면체 손실 영역과 유한 전도도 벽을 더합니다. 목표 근처 탐색 한계는 각 계약을 읽으세요.
+  직육면체 손실 영역과 유한 전도도 벽을 더합니다. `solve_cavity`와 `solve_material_cavity`는
+  외부 사면체 메시([형식](mesh3d_format.md))를 받되 미분 경로가 없습니다. 목표 근처 탐색
+  한계는 각 계약을 읽으세요.
 - 3D 희소 직접 분해는 네 코어에서 약 25k개 변 자유도까지 무리가 없습니다. 더 큰 문제에는
   반복 솔버가 필요합니다.
 
@@ -70,7 +79,8 @@ src/galerkin/
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
   waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
-  mesh3d.py       # Mesh3D + box_mesh (Kuhn subdivision, six tets per cube)
+  mode_overlap.py # Mode power, overlaps, normalisation, coupling efficiency, confinement (vector and scalar)
+  mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
   cavity.py       # Public vacuum PEC box solver, SI output and projected gradient kernel
@@ -78,7 +88,9 @@ src/galerkin/
   _cavity_common.py  # Box mesh and numerical limits the two cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
+  thermal3d.py    # Steady heat on tetrahedral meshes: P1, Dirichlet faces, insulation
   electric.py     # Steady electric conduction
+  electrostatics.py # Electrostatics with node-set conductors and the capacitance matrix
   materials.py    # Scalar or {region name: value} material lookup
   heat_source.py  # Elementwise volumetric heat sources bound to one mesh
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
@@ -106,7 +118,25 @@ core 아래 메시 형식이 있습니다.
 `galerkin.from_mesher`는 `nodes`, `triangles` 또는 `tetrahedra`, `regions`, `region_names`와
 경계 변·면을 제공하는 객체를 변환하고, `Mesh.by_region({"core": ..., "clad": ...})`은 영역
 이름을 요소별 재료 배열로 바꿉니다. meshine과 gmshio로 확인했으며 둘 다 엔진의 의존성이
-아닙니다.
+아닙니다. 3D 형식과 규칙, 벽 이름 체계는 [사면체 메시 형식](mesh3d_format.md)에 있습니다.
+
+Gmsh `.msh` 파일 판독기는 역할이 다른 두 가지가 있습니다. 새 코드의 표준은 `gmshio`입니다.
+MSH 4.1을 Gmsh의 전체 요소 유형으로 읽고 Gmsh 실행 파일을 직접 실행할 수 있습니다.
+`galerkin.read_msh`는 이미 있는 ASCII 2.2 또는 4.1 파일을 의존성 없이 읽는 파서입니다.
+평면 메시에 대해서는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 같은 `Mesh`를
+돌려줍니다. 물리 표면이 영역과 영역 이름이 되고, 물리 곡선이 경계 변과 절점이 되며, 쓰이지
+않는 절점은 버립니다. `write_msh`는 이를 2.2 형식으로 다시 씁니다. 사면체 메시는 아직 경계
+절점 집합만 돌려주며, `Mesh3D`의 영역과 태그된 면은 후속 작업입니다.
+
+## 메시 검증 캐시
+
+모든 2D 솔버는 `galerkin.core.triangles.triangle_geometry`로 메시를 검사합니다(정합
+매니폴드, 겹치는 삼각형·매달린 노드·힌지 없음). 검증된 결과는 `mesh.nodes`와
+`mesh.triangles`의 내용(dtype·shape·바이트의 SHA-256과 방향 플래그)을 키로 캐시되므로,
+한 메시는 솔버 호출·Joule 반복·문서 단계가 몇 번이든 한 번만 검사됩니다. 캐시는 최대
+`GEOMETRY_CACHE_ENTRIES`(8)개의 메시를 보관하고 가장 오래 쓰지 않은 항목을 버리며, 호출자마다
+자기 복사본을 돌려줍니다. 제자리에서 바뀐 메시는 새 내용이므로 다시 검증되고, 거절된 메시는
+캐시되지 않습니다. `clear_geometry_cache()`로 비울 수 있습니다.
 
 ## 시험
 
@@ -143,6 +173,9 @@ python examples/galerkin/fiber_modes.py             # step-index fibre vector mo
 python examples/galerkin/cavity_modes.py            # 3D PEC cavity
 python examples/galerkin/mesh_io.py                 # Gmsh reader
 python examples/galerkin/thermal_steady2d.py        # steady heat
+python examples/galerkin/electric_steady2d.py       # steady electric conduction
+python examples/galerkin/joule_heating.py           # electric -> heat, one way
+python examples/galerkin/temperature_joule_heating.py # temperature-dependent Joule heating
 python examples/galerkin/elasticity_traction.py     # elasticity with traction
 python examples/galerkin/thermoelastic_traction.py  # prescribed-temperature mechanics
 python examples/galerkin/visualize.py               # figures
@@ -161,3 +194,5 @@ Gmsh는 GPL-2.0-or-later의 별도 프로그램입니다. 이 엔진에 배포�
 이 프로젝트는 Gmsh 프로젝트와 제휴하지 않으며 그 프로젝트의 보증이나 지원을 받지 않습니다.
 
 [정상 전기전도: Python API, Joule 발열과 Neumann 기준 전위](electric_steady2d.md).
+
+[2D 정전기와 정전용량 행렬: 절점 집합 도체, 전하와 기준](electrostatics.md).

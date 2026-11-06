@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 #: Modules that register the built-in kinds when imported. Imported on first
 #: lookup, not here: they import ``schema``, which uses this module.
-BUILTIN_MODULES = ("electric_joule", "transient_thermal", "thermal", "cavity", "runner")
+BUILTIN_MODULES = ("electric_joule", "mechanics", "transient_thermal", "thermal", "cavity", "runner")
 
 
 @dataclass(frozen=True)

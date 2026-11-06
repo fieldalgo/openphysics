@@ -1,5 +1,7 @@
 # Steady 2D outward heat flux and convection
 
+[한국어](../../locales/ko/pages/packages/galerkin/thermal_flux_robin.md)
+
 Import `galerkin.thermal.solve_steady_heat` explicitly. The homogeneous,
 isotropic constant-conductivity P1 triangular model solves
 `-div(k grad T)=Q` in SI coordinates with unit out-of-plane depth.
@@ -170,7 +172,11 @@ Frozen gates retain all original Dirichlet tests and add:
 - Invalid values/shapes/topology/overlaps, holes, disconnected components and
   pure Neumann compatibility versus uniqueness. No gate reduction is intended.
 
-No transient, radiation, variable/anisotropic k, temperature-dependent h,
-3D, new coupling workflow, simcase/Studio or export integration is added here.
+The same `outward_flux`/`convection` inputs, signs and edge validation are
+available, time-independent and sampled once, in
+[`solve_transient_heat`](transient_heat.md); its H, G and B enter M/dt+K+H and
+the per-step heat balance. No radiation, variable/anisotropic k,
+temperature-dependent h, 3D, new coupling workflow, simcase/Studio or export
+integration is added here.
 Existing NumPy/SciPy only; no new runtime dependency or third-party solver source.
 Documents and examples are not shipped in the distributions.

@@ -1,5 +1,7 @@
 # Independent headless thermal document validation
 
+[한국어](../../locales/ko/pages/packages/simcase/thermal_simcase_independent_validation.md)
+
 **At a glance**
 
 - **What it checks:** independent acceptance of the headless `thermal.steady2d` document path (document, run, saved arrays) on a translated rectangle with a closed-form quadratic-source solution. The oracle reconstructs stiffness, load, flux and residuals from the saved raw arrays; metadata never generates the expected answer.

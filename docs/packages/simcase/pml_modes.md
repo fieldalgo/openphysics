@@ -61,7 +61,13 @@ units. `solve_point` diagnostics and `run` diagnostics use document units.
 The JSON summary retains `openphysics.modes2d/2`, real `neff` plus `neff_imag`,
 and adds `open_boundary` and optional `bend_loss_db_90deg`. NPZ retains complex
 arrays and `open_boundary_json` without pickles. No releases are implied by a
-feature-branch implementation.
+feature-branch implementation. PML results save none of the
+`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` arrays of
+[closed-window results](overview.md#mode-post-processing): the transverse
+coefficients are covariant integrals in the stretched coordinates, so the
+lossless Poynting formula over the whole window is not the physical power and
+a physical-window variant is not offered. A `results.mode_overlap` block is
+validated but ignored for them.
 
 Each `openphysics.pml-candidates/1` point records all searched candidates,
 one-based candidate numbers, complex index, original-pencil relative residual,
@@ -91,6 +97,11 @@ are computational covariant coefficients (physical Et in the unstretched
 window), longitudinal nodal values are physical Ez after division by h, and
 centroid electric components are divided by their Jacobian factors. Fields
 inside PML are artificial. Scalar representation is `pml-scalar-nodal-v1`.
+Both save the file layout `em-modes2d-p1-node-centroid-v1`, so `simcase.export`
+writes them like any mode result: the VTU holds the whole computational mesh,
+and its arrays cover the absorbing layer too, where they are artificial.
+`physical_bounds` in `open_boundary` marks the physical window and is not copied
+to VTU; clip to it in the viewer.
 
 The positive L2 diagnostic uses the transverse computational edge mass and
 nodal interpolation of physical Ez; on the physical window sx=sy=1. The PML

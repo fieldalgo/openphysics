@@ -44,9 +44,11 @@ prints a supplied example.
 | `electric.steady2d` | Homogeneous rectangle steady conduction | `electric_rectangle` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
 | `joule.steady2d` | Constant-property steady Joule heating | `joule_rectangle` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](../../docs/packages/simcase/electric_joule.md) |
+| `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](../../docs/packages/simcase/mechanics2d.md) |
+| `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](../../docs/packages/simcase/mechanics2d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](../../docs/packages/simcase/thermal_steady2d.md), [boundaries](../../docs/packages/simcase/thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
-| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation, constant outward flux and convection | `transient_thermal_uniform`, `transient_thermal_boundary` | [Transient heat](../../docs/packages/simcase/thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](../../docs/packages/simcase/thermal_regions2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for steady and
@@ -349,7 +351,10 @@ uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
 JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
 metadata. Initial values are not projected and negative K is not clamped.
-Transient flux/Robin, restart and automatic coupling are not supported.
+Constant outward flux and convection sides (the steady contract's keys) save the
+`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
+pair with two per-step load arrays; time-dependent flux/Robin, restart and
+automatic coupling are not supported.
 
 ### Saved output
 
@@ -362,8 +367,10 @@ save and I/O robustness checks on Linux, macOS and Windows; see each contract
 for its save and platform limits.
 
 With the optional `simcase[export]` extra, `simcase.export` writes saved
-rectangular/region heat and vacuum PEC cavity fields as VTU files for ParaView, and a
-transient heat result as a `.pvd` time series; see
+rectangular/region heat, electric/Joule, cavity (vacuum PEC, or materials and lossy
+walls) and single-point waveguide mode fields as VTU files for ParaView, a
+transient heat result as a `.pvd` time series and a mode sweep as one VTU per
+study point with a `.pvd` collection (`export_sweep`); see
 [Viewing in ParaView](../../docs/packages/simcase/overview.md#viewing-in-paraview)
 for the supported layouts.
 
@@ -491,6 +498,7 @@ script / CLI  ->  runs the document      simcase.run
 | Waveguide tutorial | [Analyse your own waveguide](../../docs/packages/simcase/waveguide_tutorial.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/waveguide_tutorial.md) |
 | Vector subspace tracking | [Guide](../../docs/packages/simcase/vector_subspace_tracking.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
 | Cavity documents | [Contract](../../docs/packages/simcase/cavity3d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/cavity3d.md) |
+| Elasticity and thermoelastic documents | [Contract](../../docs/packages/simcase/mechanics2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/mechanics2d.md) |
 | Steady heat documents | [Contract](../../docs/packages/simcase/thermal_steady2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_steady2d.md) |
 | Steady heat validation | [Report](../../docs/packages/simcase/thermal_simcase_independent_validation.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_simcase_independent_validation.md) |
 | Steady boundaries | [Contract](../../docs/packages/simcase/thermal_steady_boundary2d.md) | [한국어](../../docs/locales/ko/pages/packages/simcase/thermal_steady_boundary2d.md) |

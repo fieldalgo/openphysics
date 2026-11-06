@@ -97,7 +97,13 @@ Hermitian 양의 준정부호입니다. 시작 지점의 방향은 임의입니�
 `raw_neff`, `edges`, `raw_transverse`, `raw_longitudinal`, `raw_electric`, `frame_transform`
 (지점 x 벡터 x 벡터, 복소), `cluster_mean_neff`, `cluster_mean_group_index`,
 `mode_tracking_json`을 담습니다. `save_fields=false`이면 이 파일을 쓰지 않습니다. `save`와 CLI는
-이미 있는 출력 경로를 거절하므로 새 metadata가 이전 실행의 장과 섞이지 않습니다.
+이미 있는 출력 경로를 거절하므로 새 metadata가 이전 실행의 장과 섞이지 않습니다. 두 파일은
+배치 `field_layout="em-modes2d-subspace-raw-v1"`과 `mesh_length_unit`, `length_unit_to_m`을
+기록합니다. 원시 구성원 열은 추적한 모드가 아니므로 `simcase.export`는 이 배치를 거절하며 VTU
+내보내기는 보류 중입니다. 대신 `fields.npz`의 `raw_*` 배열과 `frame_transform`을 읽으세요.
+같은 이유로 subspace sweep은 [추적 결과](overview.md#모드-후처리)의 모드별
+`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` 배열을 저장하지
+않습니다. 프레임 열은 군 안의 임의 유니터리 혼합입니다.
 
 `simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
 boundary, neff, field)`는 풀이와 같은 파장 축척·PEC 구속으로 각 열을 원래 벡터 pencil의

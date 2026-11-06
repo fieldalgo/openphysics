@@ -27,11 +27,16 @@ def main(argv=None) -> int:
     v.add_argument("model")
     e = sub.add_parser("example", help="print an example document")
     e.add_argument("name", choices=sorted(examples.EXAMPLES))
+    g = sub.add_parser("geometry", help="print the region complex of a version 1 geometry document (a diagnostic)")
+    g.add_argument("model")
+    g.add_argument("-c", "--component", default=None, help="component name (default: the only one)")
     args = ap.parse_args(argv)
 
     if args.cmd == "example":
         print(json.dumps(examples.EXAMPLES[args.name], indent=2))
         return 0
+    if args.cmd == "geometry":
+        return _geometry(args.model, args.component)
     try:
         doc = Document.load(args.model)
     except (DocumentError, json.JSONDecodeError, FileNotFoundError) as exc:
@@ -76,6 +81,31 @@ def main(argv=None) -> int:
     if doc["results"].get("plots", True):
         files.append("results.png")
     print(f"results written to {out}/  ({', '.join(files)})")
+    return 0
+
+
+def _geometry(path: str, component: str | None) -> int:
+    """The region complex of a version 1 geometry block, read from the file without the
+    physics validation of ``Document.load`` so that every component the engine takes is shown."""
+    from .geometry_document import GeometryError, parse
+    from .geometry_engine import evaluate
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    geometry = data.get("geometry") if isinstance(data, dict) else None
+    if not isinstance(geometry, dict) or "version" not in geometry:
+        print("error: the document has a 0.2 geometry block; the region complex needs a version 1 block "
+              "(see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
+        return 2
+    try:
+        model = parse(data)
+        rc = evaluate(model, component)
+    except GeometryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(rc.summary(model))
     return 0
 
 

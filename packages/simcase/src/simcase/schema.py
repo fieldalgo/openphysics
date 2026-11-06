@@ -28,7 +28,9 @@ A document is a JSON object with these sections (lengths use its declared unit):
     mesh       global size, optional per-shape sizes (on the shape), optional
                radial grading {center, near, far, distance}, min_angle.
     study      {"type": "single"} or {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [...]}
-    results    {"save_fields": true, "plots": true}
+    results    {"save_fields": true, "plots": true}; optional "mode_overlap":
+               {"gaussian": {"waist": w0, "center": [x, y]}} (document length unit)
+               adds a Gaussian coupling efficiency to em.modes2d results
 
 The same file drives a script, a command line run, and the optional studio: the GUI
 is an editor for this document, nothing more.
@@ -45,6 +47,7 @@ from typing import Any
 
 from . import units
 from .units import Scale, UnitError
+from .mode_postprocessing import validate_mode_overlap
 from .tracking import tracking_settings
 from .registry import kind_of, physics_types
 
@@ -190,6 +193,17 @@ class Document:
     scale: Scale = field(default=units.SI, init=False, repr=False)
     #: magnitude warnings from validate(); a scale error is not an invalid document
     notes: list[str] = field(default_factory=list, init=False, repr=False)
+    #: the version 1 geometry block as written, when the document had one; ``data``
+    #: then holds its 0.2 compilation, which is what the runners read and record
+    geometry_source: dict | None = field(default=None, init=False, repr=False)
+    #: values the version 1 reader moved onto the 1 pm grid (simcase.geometry_document.Rounding)
+    geometry_roundings: list = field(default_factory=list, init=False, repr=False)
+    #: the parsed version 1 block (simcase.geometry_document.GeometryModel, integer pm); the
+    #: mesh of such a document comes from the exact engine, not from the 0.2 compilation
+    geometry_model: object = field(default=None, init=False, repr=False)
+    #: the region complex the engine built when this document was meshed
+    #: (simcase.geometry_engine.RegionComplex); set by geometry.build_domain
+    geometry_complex: object = field(default=None, init=False, repr=False)
 
     # -- construction --------------------------------------------------------
 
@@ -197,21 +211,55 @@ class Document:
     def from_dict(cls, d: dict) -> "Document":
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
+        source, roundings, model, complex_ = None, [], None, None
+        geometry = d.get("geometry")
+        if isinstance(geometry, dict) and "version" in geometry:
+            # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
+            # exactly and compiled to the 0.2 form the validators read and the results record;
+            # the envelope stays 0.2, and the mesh comes from the exact engine (geometry.build_domain).
+            from .geometry_document import GeometryError, parse, to_v02
+            try:
+                model = parse(d)
+                compiled = to_v02(model, validation=True)
+                if any(f.type == "segment" for c in model.components.values() for f in c.features):
+                    from .geometry_engine import check_handoff, evaluate
+                    complex_ = evaluate(model)
+                    check_handoff(complex_)
+            except GeometryError as exc:
+                raise DocumentError(str(exc)) from None
+            source, roundings = copy.deepcopy(geometry), model.roundings
+            d = {**d, "geometry": compiled}
         kind = kind_of(d)
         defaults = DEFAULTS if kind.defaults is None else kind.defaults()
         doc = cls(_merge(defaults, d))
         doc.validate()
+        doc.geometry_source, doc.geometry_roundings, doc.geometry_model = source, list(roundings), model
+        doc.geometry_complex = complex_
+        doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
+                         for r in roundings)
         return doc
 
     @classmethod
     def load(cls, path: str | Path) -> "Document":
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
+    def to_dict(self) -> dict:
+        """The document as written: a version 1 geometry block comes back unchanged."""
+        data = copy.deepcopy(self.data)
+        if self.geometry_source is not None:
+            data["geometry"] = copy.deepcopy(self.geometry_source)
+        return data
+
     def save(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps(self.data, indent=2), encoding="utf-8")
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
 
     def copy(self) -> "Document":
-        return Document(copy.deepcopy(self.data))
+        other = Document(copy.deepcopy(self.data))
+        other.geometry_source = copy.deepcopy(self.geometry_source)
+        other.geometry_roundings = list(self.geometry_roundings)
+        other.geometry_model = self.geometry_model
+        other.geometry_complex = self.geometry_complex
+        return other
 
     # -- access --------------------------------------------------------------
 
@@ -270,6 +318,7 @@ class Document:
             raise DocumentError("geometry.domain needs xmin, xmax, ymin, ymax")
         if not (dom["xmin"] < dom["xmax"] and dom["ymin"] < dom["ymax"]):
             raise DocumentError("geometry.domain is empty")
+        validate_mode_overlap(d["results"], dom, DocumentError)
         names = set()
         for i, s in enumerate(g["shapes"]):
             t = s.get("type")

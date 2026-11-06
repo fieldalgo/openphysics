@@ -122,7 +122,7 @@ class TransmissionLineResult:
 class TransmissionLineDocument:
     """Strict sipi.transmission-line/1 or /2; no file I/O or implicit metal.
 
-    cross_section is a CrossSectionDocument. materials maps existing layer
+    cross_section is a CrossSectionDocument. materials maps existing layer and local-region
     names to supported dielectric model objects; other layers stay constant.
     conductor is an explicit {'kind':'perfect'} or a complete surface record.
     Geometry mesh defaults are resolved and saved at construction. Accessors

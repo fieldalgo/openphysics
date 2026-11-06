@@ -28,11 +28,12 @@ from galerkin import Mesh
 from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
-from .geometry import build_domain
+from .geometry import build_domain, provenance_edges_of
 from .mesh_limits import _is_region_document, _mesh_limits
 from . import units
 from .materials import material_table
 from .fields import VectorField
+from . import mode_postprocessing
 from .registry import PhysicsKind, kind_of, kind_of_type, register
 from .schema import Document, DocumentError
 from .tracking import ModeTracker, ModeTrackingError, tracking_settings
@@ -42,9 +43,21 @@ from .subspace_tracking import SUBSPACE_METHOD, SubspaceTracker
 if TYPE_CHECKING:
     from .cavity import CavityRunResult
     from .electric_joule import ElectricJouleRunResult
+    from .mechanics import MechanicsRunResult
     from .subspace_result import SubspaceSweepResult
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
+
+#: Saved layout of ``em.modes2d`` results tracked per mode (``RunResult``): P1 nodal
+#: scalar fields, or vector edge/nodal coefficients with the electric field at
+#: triangle centroids. ``field_representation`` keeps naming the vector/PML
+#: representation; this identifier names the file layout the exporter reads.
+FIELD_LAYOUT = "em-modes2d-p1-node-centroid-v1"
+
+
+def _length_unit_record(doc: Document) -> dict:
+    """The declared length unit and its size in metres, for files that hold nodes in it."""
+    return {"mesh_length_unit": doc.length_unit, "length_unit_to_m": float(doc.scale.size("length"))}
 
 
 @dataclass
@@ -102,14 +115,21 @@ def build_mesh(doc: Document) -> MeshedModel:
             f"never a usable intermediate result, so it is refused here rather than in whatever reduction "
             f"reaches it first. The usual cause is a mesh.size or a feature far from the scale of the "
             f"units this document declares.")
+    tags = set(tri_um.boundary_edges)
+    sides = {"left", "right", "bottom", "top"}
+    if not sides <= tags or (tags != sides and canonical.geometry_model is not None):
+        raise DocumentError(f"mesh: this runner takes exterior edges on the four domain sides only; found tags "
+                            f"{sorted(tags)}. A boundary_tags entry that renames a side, a void region and a sliver "
+                            "gap give other tags, which no physics here accepts yet")
     tri = dataclasses.replace(tri_um, nodes=units.lengths_from_micrometres(tri_um.nodes, doc.scale))
-    return MeshedModel(doc, tri, _solver_mesh(tri), region_materials, material_table(doc, region_materials),
-                       solver_mesh=_solver_mesh(tri_um))
+    provenance = provenance_edges_of(canonical, tri_um)         # node pairs: the same in both units
+    return MeshedModel(doc, tri, _solver_mesh(tri, provenance), region_materials,
+                       material_table(doc, region_materials), solver_mesh=_solver_mesh(tri_um, provenance))
 
 
-def _solver_mesh(tri: TriMesh) -> Mesh:
+def _solver_mesh(tri: TriMesh, provenance_edges: dict | None = None) -> Mesh:
     return Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
-                boundary_edges=dict(tri.boundary_edges))
+                boundary_edges=dict(tri.boundary_edges), provenance_edges=provenance_edges)
 
 
 def micrometre_document(doc: Document) -> Document:
@@ -157,8 +177,16 @@ def micrometre_document(doc: Document) -> Document:
             sm["C"] = [um(c, 2) for c in sm["C"]]
             if "range" in sm:
                 sm["range"] = [um(r) for r in sm["range"]]
+    gaussian = d.get("results", {}).get("mode_overlap", {}).get("gaussian")
+    if gaussian is not None:
+        gaussian["waist"] = um(gaussian["waist"])
+        gaussian["center"] = [um(c) for c in gaussian["center"]]
     d["units"] = dict(d["units"], length="um")
-    return Document.from_dict(d)
+    out = Document.from_dict(d)
+    # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
+    out.geometry_model = doc.geometry_model
+    out.geometry_complex = doc.geometry_complex
+    return out
 
 
 def study_points(doc: Document) -> tuple[str | None, list]:
@@ -234,6 +262,10 @@ class RunResult:
     vector_fields: list[VectorField] | None = None
     mode_tracking: dict | None = None
     open_boundary: list[dict] | None = None
+    #: ``mode_power`` (P, M), ``confinement`` (P, M, R), ``field_overlap`` (P, M, M) and, with
+    #: ``results.mode_overlap.gaussian``, ``coupling_efficiency`` (P, M); None for PML results
+    #: (``simcase.mode_postprocessing``).
+    postprocessing: dict | None = None
 
     # -- derived -----------------------------------------------------------
 
@@ -266,6 +298,8 @@ class RunResult:
         out = {
             "name": self.doc["name"],
             "units": copy.deepcopy(self.doc["units"]),
+            "field_layout": FIELD_LAYOUT,
+            **_length_unit_record(self.doc),
             "mesh": {"nodes": int(len(self.mesh_nodes)), "triangles": int(len(self.mesh_triangles)),
                      "regions": {n: self.region_materials[n] for n in self.region_names}},
             "study": {"parameter": self.parameter, "values": [float(v) for v in self.values]},
@@ -298,6 +332,10 @@ class RunResult:
             if loss is not None: out["bend_loss_db_90deg"] = loss.tolist()
         if self.mode_tracking is not None:
             out["mode_tracking"] = copy.deepcopy(self.mode_tracking)
+        if self.postprocessing is not None:
+            out["mode_postprocessing"] = mode_postprocessing.summary_block(
+                self.postprocessing, vector=self.vector_fields is not None, length_unit=self.doc.length_unit,
+                region_names=self.region_names, gaussian=mode_postprocessing.gaussian_settings(self.doc["results"]))
         return out
 
     # -- output ------------------------------------------------------------
@@ -309,9 +347,13 @@ class RunResult:
         (outdir / "log.txt").write_text("\n".join(self.log) + "\n", encoding="utf-8")
         self.doc.save(outdir / "model.json")
         if self.doc["results"].get("save_fields", True):
+            # nodes are in the document length unit; mesh_length_unit names it and
+            # length_unit_to_m converts to metres. study_parameter is the swept path
+            # ("" for a single point) so a reader can tell a wavelength sweep apart.
             arrays = dict(nodes=self.mesh_nodes, triangles=self.mesh_triangles, regions=self.mesh_regions,
                           region_names=np.array(self.region_names), values=np.asarray(self.values, dtype=float),
-                          neff=self.neff)
+                          neff=self.neff, field_layout=FIELD_LAYOUT, **_length_unit_record(self.doc),
+                          study_parameter=self.parameter or "")
             if self.vector_fields is None:
                 arrays["fields"] = np.stack(self.fields)
             else:
@@ -321,6 +363,8 @@ class RunResult:
                               vector_electric=np.stack([f.electric for f in self.vector_fields]))
             if self.mode_tracking is not None:
                 arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
+            if self.postprocessing is not None:
+                arrays.update(self.postprocessing)
             if self.open_boundary is not None:
                 arrays["open_boundary_json"] = json.dumps(self.open_boundary)
                 arrays["field_representation"] = "pml-vector-edge-nodal-v1" if self.vector_fields is not None else "pml-scalar-nodal-v1"
@@ -394,7 +438,8 @@ class RunResult:
 
 def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, max_triangles: int | None = None,
         max_input_vertices: int | None = None
-        ) -> RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult | ElectricJouleRunResult:
+        ) -> (RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult
+              | ElectricJouleRunResult | MechanicsRunResult):
     """Run a document with the runner of its physics kind (``registry``).
 
     ``max_nodes``, ``max_triangles`` and ``max_input_vertices`` are optional mesh limits for
@@ -450,6 +495,11 @@ def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | Subspace
     parameter, values = study_points(doc)
     neffs, fields = [], []
     open_diagnostics = [] if "pml" in doc.sole_physics()[1] else None
+    # Power, confinement, overlaps and Gaussian coupling of every saved mode, in document
+    # units (simcase.mode_postprocessing). PML results are skipped: their coefficients are
+    # covariant integrals in stretched coordinates and the window is not the physical one.
+    postprocessing = [] if open_diagnostics is None else None
+    gaussian = mode_postprocessing.gaussian_settings(doc["results"])
     vector_fields = [] if doc.sole_physics()[1]["formulation"] == "vector" else None
     tracker, tracking = None, None
     scalar_tracking = (vector_fields is None and parameter is not None and parameter.endswith(".wavelength")
@@ -507,6 +557,17 @@ def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | Subspace
             diagnostic = res["open_boundary"]
             open_diagnostics.append(diagnostic)
         neffs.append(res["neff"])
+        if postprocessing is not None:
+            if vector_fields is None:
+                point = mode_postprocessing.scalar_postprocessing(tm.nodes, tm.triangles, res["fields"], tm.regions,
+                                                                  len(tm.region_names), gaussian)
+            else:
+                vf = res["vector_field"]
+                point = mode_postprocessing.vector_postprocessing(
+                    tm.nodes, tm.triangles, vf.edges, vf.transverse, vf.longitudinal, res["neff"],
+                    physics["wavelength"], model.eps_per_triangle(physics["wavelength"]), tm.regions,
+                    len(tm.region_names), gaussian)
+            postprocessing.append(point)
         if vector_fields is None:
             fields.append(res["fields"])
         else:
@@ -523,7 +584,8 @@ def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | Subspace
 
     return RunResult(doc, tm.nodes, tm.triangles, tm.regions, tm.region_names, model.region_materials,
                      parameter, values if parameter else [doc.sole_physics()[1]["wavelength"]],
-                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking, open_diagnostics)
+                     np.array(neffs), fields, {"mesh": t_mesh, "solve": t_solve}, log, vector_fields, tracking, open_diagnostics,
+                     None if postprocessing is None else mode_postprocessing.stack_points(postprocessing))
 
 
 

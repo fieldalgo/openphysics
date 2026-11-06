@@ -212,19 +212,57 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 **설치 플랫폼** (`tools/check_platform_install.py`). OS마다 설치된 라이선스, 패키지 바이트, 설치된
 모듈 위치, 포함 자산, 공개 API·CLI·저장 간단 시험, 열 저장/I-O 견고성 시험(부분 실패
 정리, 동시 저장, 기존 대상 보호), source 대상 보호 fixture 두 개와 export extra를 설치한
-영역 VTU/PVD 소비자 시험(`tests/simcase/test_export_regions.py`)을 확인합니다. 설치
-수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
+영역 VTU/PVD 소비자 시험(`tests/simcase/test_export_regions.py`)을 확인합니다.
+복사해 실행하는 wheel 소비자는 `test_thermal_simcase_wheel.py`,
+`test_electric_joule_wheel.py`, `test_transient_thermomechanical_wheel.py`,
+`test_cavity_wheel.py`(Studio 검사는 제외: 이식 가능한 고정 버전 목록은 Studio extra를
+설치하지 않습니다), `test_sipi_wheel.py`(스트립라인·마이크로스트립·JSON 문서·DC 평면을
+거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항과 명시한 허용치로 비교)와
+`test_vector_modes_wheel.py`(완전 벡터 슬래브 모드를 `refsol.slab`과, PML 누설 슬래브를
+외향 근 분산식과 비교하고, `vector_slab` 예제를 PML 유무로 `simcase` CLI에서 실행)입니다.
+나머지 `test_*_wheel.py` 소비자는 배포 검사에서 Linux에서만 돕니다. 2026-11-02에 추가한
+소비자 세 개는 Linux에서 확인했으며, macOS와 Windows의 첫 실행은 CI 작업 자체입니다.
+설치 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
 코드가 정해 둔 것과 다르거나 단계가 실패할 때만 실패합니다. 관측 도구는
 `tools/studio_resources/`에 있고, 과도 관측 도구는 [과도 자원 관측 안내](transient_resource_probe.md)가,
 영역 관측은 [영역 자원 관측](region_resource_probe.md)이 설명합니다. 솔버 시간 측정과 프로파일링 명령은
-[벡터](benchmark_vector.md)·[공동](benchmark_cavity.md) 벤치마크 안내에 있습니다.
+[벡터](benchmark_vector.md)·[공동](benchmark_cavity.md)·[열전도](benchmark_thermal.md)·
+[탄성](benchmark_elasticity.md)·[전기](benchmark_electric.md)·[미분](benchmark_derivatives.md)
+벤치마크 안내에 있습니다.
 
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
 실행을 대체합니다.
+
+### 최신 의존성 카나리
+
+`Latest dependencies` 워크플로(`.github/workflows/latest-deps.yml`)는 하루 한 번(21:47 UTC)과
+수동 실행에서 돕니다. 필수 검사 `tests`에 **들어가지 않으며** PR이나 `main`을 막지 않습니다.
+고정 환경이 제공하는 extra(`galerkin[test,figures,jax,torch,crosscheck]`, `galerkin-refsol[test]`,
+`meshine[test,plot]`, `meshloom[test]`, `gmshio[test,gmsh,plot]`, `physmat[test,rii,plot]`,
+`simcase[test,studio,export]`, `sipi[test]`)와 함께 패키지 여덟 개를 고정 requirements 없이,
+`--no-deps` 없이 editable로 설치하므로 pip이 `pyproject.toml` 범위 안에서 가장 새 버전을
+고릅니다. PyTorch CPU 인덱스는 버전 고정 없이 추가 인덱스로 쓰며, 설치된 torch가 `+cpu`
+빌드인지 확인합니다. meshloom은 pyproject가 허용하는 가장 새 maturin으로 빌드하되 Rust
+crate는 `Cargo.lock`에 고정합니다(`--locked`). 이어서 `python -m pip check`, 라이선스 검사(검토
+목록에 없는 새 전이 의존성이 있으면 실패하며, 그것이 이 검사의 목적 중 하나입니다), Linux
+job과 같은 사전 검사 묶음, 고정 RII 데이터베이스와 필수 레퍼런스 교차 검사를 포함한
+non-slow 시험, `blas-kernels` 파일 목록을 강제 OpenBLAS 커널 두 개로 돌립니다. 설치가
+성공하면 앞 단계가 실패해도 각 검사는 그대로 돌아서 한 실패가 다른 실패를 가리지
+않습니다. `pip freeze`는 step summary에 적고, 라이선스 보고서·JUnit 파일과 함께
+`latest-deps-results` 아티팩트로 올립니다. 돌리지 않는 것: Studio Node 검사(Node는 워크플로가
+고정하고 pip이 고르지 않으므로 여기서 바뀔 수 없음), 배포물 빌드, meshloom의 Cargo 시험과
+notices, slow 연구.
+
+예약 실행이나 수동 실행이 실패하면 **Latest dependencies canary failed** 이슈를 열고, 이미
+열려 있으면 그 이슈에 댓글을 남깁니다. 본문에는 실행 URL과 주요 패키지의 해석된 버전을
+고정 버전과 나란히 적습니다. 통과한 실행은 그 이슈를 닫습니다. 취소된 실행(90분 제한에
+걸려 멈춘 실행 포함)은 보고하지 않습니다. 카나리는 미리 알리는 신호이지 커밋에 대한
+판정이 아닙니다. `tools/requirements-py312-linux*.txt`의 고정 버전은 여전히 소스·배포 검사를
+다시 돌리는 검토된 변경에서 의도적으로 올립니다.
 
 ## 결과 읽기
 

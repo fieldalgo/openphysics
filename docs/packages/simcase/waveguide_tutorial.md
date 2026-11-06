@@ -106,7 +106,7 @@ print(" ".join(f"{n:.4f}" for n in solve(sloped)))
 ## 4. Materials
 
 A material name is looked up first in the document's own `materials` table, then
-in the 18 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and
+in the 19 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and
 `vacuum`. Built-in materials carry their dispersion, so each wavelength of a
 sweep uses its own index. For your own material give a constant index or
 Sellmeier coefficients. Sellmeier `C` values are in the document's length unit
@@ -129,7 +129,7 @@ print(f"{solve(nitride)[0]:.4f}")
 ```
 
 ```text
-18 built-in materials
+19 built-in materials
 1.6658
 ```
 
@@ -246,14 +246,42 @@ from step 1:
 
 | File | Contents |
 |---|---|
-| `summary.json` | n_eff per study point and mode, group index, declared units, mesh statistics, timings, mode tracking |
-| `fields.npz` | mesh nodes and triangles, the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids; load with `numpy.load(..., allow_pickle=False)` |
+| `summary.json` | n_eff per study point and mode, group index, declared units, the saved layout `field_layout` with `mesh_length_unit` and `length_unit_to_m`, mesh statistics, timings, mode tracking, and `mode_postprocessing` (power, confinement, overlaps with units) |
+| `fields.npz` | mesh nodes and triangles (in the document unit), the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids, plus `mode_power`, `confinement` and `field_overlap`; load with `numpy.load(..., allow_pickle=False)` |
 | `results.png` | mesh, the first mode's \|E\| and the sweep |
 | `log.txt`, `model.json` | the run log and the exact document that was run |
 
 Field amplitudes are relative (the largest centroid \|E\| is 1), not watts or
 volts per metre. The [package overview](overview.md#vector-fields-and-single-point-studies)
 describes the arrays.
+
+### Mode post-processing
+
+`confinement[p, m]` in `fields.npz` holds the share of the mode's energy
+(`Re eps_r |E|^2`) in each region of `region_names`, so the strip's core
+confinement is the `core` entry; its rows sum to 1. `mode_power[p, m]` is the
+power the saved field carries when its amplitudes are read as volts per
+document unit (divide the field by `sqrt(Re mode_power)` for a 1 W mode), and
+`field_overlap` the matrix `int conj(E_a) . E_b dA`. Add
+`"results": {"mode_overlap": {"gaussian": {"waist": 0.3, "center": [0.0, 0.11]}}}`
+(document units) to the JSON to also save `coupling_efficiency`, the fraction
+of an x-polarised Gaussian beam of that 1/e radius that couples into each mode.
+The [package overview](overview.md#mode-post-processing) states the exact
+recipe and units.
+
+To look at the modes in ParaView, install `simcase[export]` and write one VTU
+per wavelength plus a `.pvd` collection into a new directory:
+
+```python
+from simcase.export import export_sweep
+export_sweep("strip_results/fields.npz", "strip_results/paraview")
+```
+
+The collection's timestep is the wavelength in the document unit; the points
+are in metres, and each VTU holds `electric_field_mode_0_real`/`_imag` (cell
+data at centroids), `longitudinal_electric_mode_0_real`/`_imag` (point data)
+and `triangle_regions`. A single-point result goes through `export_fields`
+instead; see [viewing in ParaView](overview.md#viewing-in-paraview).
 
 ## 8. The same model in Studio
 

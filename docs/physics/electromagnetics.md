@@ -21,16 +21,23 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 ## PCB transmission lines (signal and power integrity)
 
+[Polygon and mask cross-sections](../packages/sipi/polygon_sections.md) share actual material boundaries across quasi-static, dispersive and surface/volume conductor extraction.
+
 [Causal roughness](../packages/sipi/roughness.md) adds constitutive resistance and reactance to the surface model.
 
 - [sipi — quasi-static PCB cross-sections: C, L, G, impedance and coupled-line modes](../packages/sipi/overview.md). Python API and [versioned cross-section JSON with impedance design](../packages/sipi/design.md); [uniform-line networks](../packages/sipi/network.md) accept explicit RLGC for S and Touchstone output. [Frequency-line input models](../packages/sipi/line_model.md) share one mesh for dispersive dielectrics, high-frequency conductor surface loss and RLGC/S. [Finite-metal current diffusion](../packages/sipi/conductor_diffusion.md) extracts series R/L with an explicit magnetic boundary. 3D structures remain unsupported.
 
 ## Python contracts and formulations
 
+- [Correlated tolerance studies and fixed-pitch sampling](../packages/sipi/study.md)
+
 - [Vacuum rectangular PEC cavity solver](../packages/galerkin/cavity_solver.md)
 - [Material-loaded rectangular cavity solver](../packages/galerkin/material_cavity.md)
+- [Tetrahedral mesh format shared by the 3D solvers](../packages/galerkin/mesh3d_format.md)
 - [Vector eigenspace reliability](../packages/galerkin/eigenspace_reliability.md)
 - [Modal complex coordinates](../packages/galerkin/modal_coordinates.md)
+- [Waveguide formulation: modes, derivatives, coupling and the SI/PI path](../packages/galerkin/waveguide_formulation.md)
+- [Mode power, overlap and coupling](../packages/galerkin/mode_overlap.md)
 - [galerkin — the OpenPhysics finite-element engine](../packages/galerkin/overview.md)
 
 
@@ -49,3 +56,7 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
 
 [Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
+
+[Terminated network V/I and frequency crosstalk](../packages/sipi/termination.md) use named Thevenin sources and passive impedances; Python only.
+
+- [Saved circuit inputs: extraction/network, sources, loads and crosstalk](../packages/sipi/circuit_document.md)

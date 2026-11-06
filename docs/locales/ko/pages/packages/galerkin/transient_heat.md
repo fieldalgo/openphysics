@@ -4,9 +4,9 @@
 
 **한눈에 보기**
 
-- **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점이며 나머지 경계는 단열입니다.
-- **한계:** 처방 열유속·Robin 경계, restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
-- **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
+- **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점, 그리고 태그가 붙은 외곽 변의 처방 외향 열유속 g[W/m²] 또는 대류 h·(T − T_amb)(정상 솔버와 같은 입력 형식; 각각 상수, 공간 변화 또는 시간 의존)이며 나머지 경계는 단열입니다.
+- **한계:** 복사나 온도 의존 h는 없습니다. 시간 의존 경계 데이터는 엔진 기능이며(simcase 문서 adapter는 상수만 받음), JAX·PyTorch 입력에서는 시간 의존 h를 거절합니다. restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
+- **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. [열유속·대류 기준](transient_heat_validation.md#외향-열유속과-대류-기준)은 대류 slab과 상수 열유속 slab을 독립 급수·정상 솔버·단계별 열수지와 비교하고, [시간 의존 기준](transient_heat_validation.md#시간-의존-열유속과-대류-기준)은 정현파 주변 온도와 ramp 열유속을 닫힌 형식과 비교합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
 ## 근거
 
@@ -38,7 +38,8 @@ reaction은 0입니다. 이는 정확한 기준 기대값이며 **관측한 실�
 ```text
 solve_transient_heat(
     mesh, *, conductivity, volumetric_heat_capacity,
-    time_s, initial_temperature_k, dirichlet, heat_source=0.0)
+    time_s, initial_temperature_k, dirichlet, heat_source=0.0,
+    outward_flux=None, convection=None, checkpoint_every=None)
 ```
 
 하위 모듈을 명시적으로 import합니다. 자동 최상위 export는 추가하지 않습니다.
@@ -60,8 +61,27 @@ anchor 규칙을 가져오면 안 됩니다.
 | initial_temperature_k | time_s[0]의 유한 실수 정확히 (N,) K |
 | dirichlet | 고정 외곽 정수 절점 -> scalar K 또는 callback(time_s)->scalar K |
 | heat_source | 유한 scalar W/m³, `{영역 이름: Q}`, 또는 callback(points_m,time_s)->정확히 (Q,) W/m³ |
+| outward_flux | `None` 또는 `{boundary_edges 태그: g}`, g는 W/m²(양수면 열 제거); scalar, callback(points_m, outward_normals)->정확히 (Q,), callback(time_s)->scalar 또는 callback(points_m, outward_normals, time_s)->정확히 (Q,) |
+| convection | `None` 또는 `{boundary_edges 태그: (h, T_amb)}`, h ≥ 0은 W/(m² K), T_amb는 K; 각각 scalar 또는 같은 callback 형식 중 하나 |
 
-Source callback은 (Q,2) m 좌표와 한 scalar 초 값을 받습니다. Callback 출력의
+Source callback은 (Q,2) m 좌표와 한 scalar 초 값을 받습니다.
+열유속과 대류는 [정상 외향 열유속·대류](thermal_flux_robin.md)와 정확히 같습니다.
+선택한 변에서 q·n = g + h·(T − T_amb)이며, 같은 4점 변 구적, 같은 변 검증(비어 있지
+않은 태그의 외곽 변, 인접 삼각형 하나, 중복이나 양끝 Dirichlet 변 없음, h ≥ 0),
+같은 단위 길이 외향 법선을 사용합니다. g, h, T_amb는 각각 네 형식 중 하나이며 callback의
+필수 위치 인자 수로 구분합니다. scalar 또는 `callback(points_m, outward_normals)`는
+**정적** 데이터로 이전과 똑같이 시간 진행 전에 한 번 표본화합니다. scalar를 돌려주는
+`callback(time_s)`와 정확히 (Q,)를 돌려주는 `callback(points_m, outward_normals, time_s)`는
+**시간 의존** 데이터입니다. 시간 의존 값은 검증을 위해 `time_s[0]`에서 표본화한 뒤
+**각 단계의 끝 t_{n+1}**에서 표본화합니다. Dirichlet·source callback을 평가하는 것과 같은
+시점이며 후진 Euler는 오른쪽 끝 데이터를 사용합니다. 그 밖의 서명(인자 없음, 넷 이상,
+가변 위치 인자, 인자 이름이 `time_s`/`time`인 두 인자 callback)은 표본화 전에
+ValueError로 거절합니다. 변 형상과 검증은 한 번 수행하며 `time_s[0]`의 표본화·조립 실패는
+time index 0으로, 이후 실패는 해당 단계로 chaining합니다. Robin 행렬 H는 h 자체가 시간
+의존일 때만 단계마다 다시 조립하고 그 외에는 한 번 조립합니다. G와 B는 어떤 값이든 시간
+의존이면 단계마다 다시 평가합니다(변 국소 비용으로 단계별 factorization에 비해 작음).
+자연 경계 변은 Dirichlet 절점처럼 무언가를 고정하지 않습니다. Robin만 있는 성분도
+M/dt + K + H_n이 양의 정부호이므로 잘 정의됩니다. Callback 출력의
 scalar broadcasting은 없습니다. bool·complex·비유한 값, 잘못된 shape와
 bool/비정수/내부/범위 밖 Dirichlet ID를 거절합니다. 혼합 Python sequence는 dtype
 변환 전에 bool을 검사합니다. 이미 변환된 float 배열에서는 생성 이력을 알 수 없습니다.
@@ -73,7 +93,7 @@ Consistent mass 진화가 음이 아닌 절점 값을 보존하지 않을 수 �
 lumping 또는 discrete maximum principle을 약속하지 않습니다. 별도 열→기계
 snapshot 정책은 계속 음의 K를 거절하며 이 모듈은 전달 API를 바꾸지 않습니다.
 
-Robin/outward-flux/복사 입력, 온도 의존 또는 연속적으로 변하는 재료, 변경 메시, adaptive time step,
+복사, 온도 의존 h, 온도 의존 또는 연속적으로 변하는 재료, 변경 메시, adaptive time step,
 Crank–Nicolson, mechanics, schema/CLI/Studio, 저장 또는 restart API는 없습니다.
 예상하지 않은 keyword를 조용히 무시하지 않습니다.
 
@@ -91,7 +111,8 @@ mass 항은 실제 초기 장을 사용합니다. 0이 아닌 시작 시간도 �
 
 Source와 경계 callback은 순수하고 결정적이어야 합니다. Source는 t0에서 검증하고
 f0 진단용으로 보존합니다. 이후 각 요청 시간마다 한 번 표본화하며 BE는 **오른쪽 끝**
-하중을 사용합니다. 각 지정 경계 callback도 시간마다 한 번 표본화합니다. 점 batch나
+하중을 사용합니다. 각 지정 경계 callback도 시간마다 한 번 표본화하며, 시간 의존 열유속·대류
+callback도 그렇습니다(정적 데이터는 시간 진행 전에 한 번). 점 batch나
 절점 평가 순서는 보장하지 않습니다. 초기 rate 또는 reaction을 만들지 않습니다.
 
 형상/연결, 시간, 초기 데이터, scalar 입력과 고정 Dirichlet 선택은 callback 전에
@@ -110,21 +131,29 @@ TransientHeatStepError로 chaining합니다. __cause__는 원래 예외를 보�
 ```text
 M_e = c*A/12 * [[2,1,1],[1,2,1],[1,1,2]]
 K_ij = integral k*grad(N_i).grad(N_j)
+H_n,ij = integral_Gamma h(t_n)*N_i*N_j ds        (대류 변)
+G_n,i  = integral_Gamma g(t_n)*N_i ds            (outward_flux 변)
+B_n,i  = integral_Gamma h(t_n)*T_amb(t_n)*N_i ds
 f_i(t) = integral N_i*Q(x,t)
-r_n = M*(T_n-T_n-1)/h_n + K*T_n - f_n
+A_n = M/h_n + K + H_n
+r_n = M*(T_n-T_n-1)/h_n + K*T_n + H_n*T_n - B_n + G_n - f_n
 
-(M_FF/h_n+K_FF)*T_F,n =
-    f_F,n + M_FF*T_F,n-1/h_n
-    - K_FC*d_n - M_FC*(d_n-d_n-1)/h_n
+(A_FF)*T_F,n =
+    f_F,n + B_n,F - G_n,F + M_FF*T_F,n-1/h_n
+    - A_FC*d_n + M_FC*d_n-1/h_n
 ```
 
 Old와 new M_FC 항이 모두 필요합니다. 구현은 전체 old M*T를 포함하고 전체 new
-A_FC*d를 뺍니다. 정상 문제의 반복 해석이 아닙니다. 정상 열전도의 4점 경계/Robin
-구적을 여기서 사용하지 않습니다. 공간 source 적분은 기존 6x6 Duffy 규칙입니다.
+A_FC*d를 뺍니다. 정상 문제의 반복 해석이 아닙니다. H_n, G_n, B_n은 한 번 계산한 변 형상 위의
+정상 솔버 4점 변 적분입니다. 정적 데이터는 한 번 조립하고(H, G, B), 시간 의존 데이터는
+G_n·B_n을 단계마다 다시 평가하며 H_n은 h가 변할 때만 다시 조립합니다. 열유속·대류
+데이터가 없으면 이 항이 없고 시스템과 하중은 Dirichlet만 있는 경우와 정확히 같습니다. 공간 source 적분은 기존 6x6 Duffy 규칙입니다.
 
 각 형상 성분은 전체 실행에서 하나의 **시간에 무관한** 초기 offset을 사용해
-차분/미분합니다. Stiffness image는 수학적으로 0이고 mass 미분도 0입니다. 시간마다
-offset을 재설정하지 않습니다. 각 요청 dt마다 sparse factorization을 다시 계산하며
+차분/미분합니다. Stiffness image는 수학적으로 0이고 mass 미분도 0입니다. H는 offset을
+소거하지 않습니다. 정상 열전도처럼 증분 u = T − offset으로 풀고 h·(T_amb − 성분
+offset)을 적분한 shifted 주변 하중을 사용하며, 대류 열률은 C_n = H_n·u_n − shifted B_n =
+H_n·T_n − B_n입니다. 시간마다 offset을 재설정하지 않습니다. 각 요청 dt마다 sparse factorization을 다시 계산하며
 dt와 무관한 재사용이나 성능을 주장하지 않습니다. 파생 부동소수점 overflow나
 residual/balance 검사 실패는 잘못된 성공 history 대신 예외를 발생시킵니다.
 
@@ -147,6 +176,12 @@ N은 절점, M은 삼각형, Nt는 요청 시간, D는 정렬된 고유 지정 �
 | dirichlet_node_ids | (D,) | 정렬된 고유 고정 절점 인덱스 |
 | dirichlet_temperatures_k | (Nt,D) | 표본화한 지정 K |
 | nodes_m / triangles | (N,2) / (M,3) | 복사한 SI 형상/연결/순서 |
+| prescribed_outward_load_w_per_m | (Nt-1,N) 또는 None | 단계별 G_n, W/m; outward_flux/convection이 없으면 None |
+| convective_outward_w_per_m | (Nt-1,N) 또는 None | C_n = H_n*T_n-B_n, W/m; outward_flux/convection이 없으면 None |
+
+두 경계 열률은 외향이 양수입니다. `outward_flux`와 `convection`을 모두 주지 않으면 0 배열이
+아니라 `None`이므로 Dirichlet만 있는 결과의 필드와 메모리는 그대로입니다.
+`residual_w_per_m`과 `reaction_w_per_m`은 H, G, B 항이 있으면 이를 포함합니다.
 
 두 metadata 필드 conductivity_w_mk와 volumetric_heat_capacity_j_m3k는
 제공한 상수를 기록합니다(float, 또는 영역별 입력이면 `{영역 이름: float}` 사본). 단위·provenance·hash·source 출처 인증을 주장하지 않습니다.
@@ -159,7 +194,8 @@ streaming, restart는 없습니다. 큰 요청은 할당에 실패할 수 있으
 
 JAX·PyTorch 입력이면 history가 그 라이브러리 배열(읽기 전용 아님)로 나오고 역방향
 미분을 지닙니다. 그 메모리와 `checkpoint_every` 옵션은
-[JAX·PyTorch로 미분하기](differentiation.md)에 있습니다.
+[JAX·PyTorch로 미분하기](differentiation.md)에 있습니다. 이런 입력에서 시간 의존 g·T_amb는
+지원하고, 시간 의존 h는 ValueError로 거절합니다(미분하는 단계 안에서 H를 다시 조립해야 함).
 
 ## 열량 회계와 이차 functional
 
@@ -172,10 +208,14 @@ V_n = .5*T_n^T*M*T_n                   [J K/m]
 storage_n = M*(T_n-T_n-1)/h_n           [W/m]
 reaction_n = residual_n on fixed DOFs  [W/m]
 outward_D,n = -sum(reaction_n)
-(H_n-H_n-1)/h_n = sum(f_n)+sum(reaction_n)
-outward_D,n = sum(f_n)-sum(storage_n)
+(H_n-H_n-1)/h_n = sum(f_n)+sum(reaction_n)-sum(G_n)-sum(C_n)
+outward_D,n = sum(f_n)-sum(storage_n)-sum(G_n)-sum(C_n)
 ```
 
+열유속·대류 데이터가 있으면 G와 C_n은 두 경계 결과 필드이며 항등식은 연결 성분마다
+따로 성립합니다. 없으면 G와 C 항이 없습니다. 자유 잔차는 절대 항 scale(이제 |H|·|u|,
+|shifted B|, |G| 포함)의 1e-10 이내, 각 성분의 불균형은 그 성분의 절대 storage·열원·
+reaction·처방·대류 열률 합의 1e-10 이내여야 하며 아니면 그 단계에서 예외를 냅니다.
 양의 reaction은 열을 주입합니다. H는 0K를 선택한 기준으로 삼는 선형 상수 열용량의
 현열량이며 보편적 절대 enthalpy 모델이 아닙니다. V는 이차 functional이지 **저장 열량이
 아닙니다**. 균질한 0 Dirichlet 또는 완전 단열 무강제 진화에서는 BE 이차 항등식이
@@ -189,7 +229,7 @@ maximum principle을 주장하면 안 됩니다. 복원한 셀 flux는 H(div)-co
 
 ## 별도의 headless 문서 adapter
 
-직사각형 `thermal.transient2d` JSON/API/CLI와 저장 이력은 별도 simcase adapter가 제공합니다. [입력·결과·저장 계약](../simcase/thermal_transient2d.md)은 simcase 문서에 있습니다. 이 engine 함수의 임의 callback/메시 범위가 문서 직렬화 범위인 것은 아닙니다. 문서는 균일/affine 초기장과 변 상수/요청 시간별 표본을 사용하며 초기 일치·무projection·finite K/no clamp를 유지합니다. Studio·restart·과도 flux/Robin·자동 연성은 추가하지 않습니다. 엔진 수용과 headless source/설치/저장/CI 수용은 구분합니다.
+직사각형 `thermal.transient2d` JSON/API/CLI와 저장 이력은 별도 simcase adapter가 제공합니다. [입력·결과·저장 계약](../simcase/thermal_transient2d.md)은 simcase 문서에 있습니다. 이 engine 함수의 임의 callback/메시 범위가 문서 직렬화 범위인 것은 아닙니다. 문서는 균일/affine 초기장과 변 상수/요청 시간별 표본을 사용하며 초기 일치·무projection·finite K/no clamp를 유지합니다. 문서 adapter는 상수 외향 열유속·대류 변만 노출하며, 엔진의 시간 의존 경계 callback은 문서 범위가 아닙니다. Studio·restart·자동 연성은 추가하지 않습니다. 엔진 수용과 headless source/설치/저장/CI 수용은 구분합니다.
 ## 제한된 공간 잔차 보정
 
 초기 성분 상태 offset은 전체 해석에서 고정합니다. 강성과 기울기를 평가할 때만

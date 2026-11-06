@@ -242,6 +242,17 @@ installed licenses, package bytes, installed module origins, bundled assets, pub
 smoke tests, the heat save/I-O robustness tests (partial-failure cleanup,
 simultaneous writers, existing targets) and two source target-protection
 fixtures, plus region VTU/PVD export consumers (the export extra is installed).
+The wheel consumers it copies and runs are `test_thermal_simcase_wheel.py`,
+`test_electric_joule_wheel.py`, `test_transient_thermomechanical_wheel.py`,
+`test_cavity_wheel.py` (without its Studio check: the portable pins do not
+install the Studio extra), `test_sipi_wheel.py` (stripline, microstrip, JSON
+document and DC plane against Cohn, Hammerstad–Jensen and exact resistances on
+coarse meshes with stated bounds) and `test_vector_modes_wheel.py` (full-vector
+slab modes against `refsol.slab`, a PML leaky slab against its outgoing-root
+dispersion equation, and the `vector_slab` example with and without PML through
+the `simcase` CLI). The other `test_*_wheel.py` consumers run on Linux only, in
+the distribution check. The three consumers added on 2026-11-02 were verified
+on Linux; their first macOS and Windows runs are the CI jobs themselves.
 This is installed acceptance, not a full macOS or Windows regression.
 
 **Resource observations.** After a green Linux run, the steady and transient
@@ -253,11 +264,48 @@ or a stage fails. The observers are in `tools/studio_resources/`; the
 transient ones and the [region resource observation](region_resource_probe.md)
 the region one.
 Timing and profiling commands for the solvers are in the
-[vector](benchmark_vector.md) and [cavity](benchmark_cavity.md) benchmark guides.
+[vector](benchmark_vector.md), [cavity](benchmark_cavity.md),
+[heat](benchmark_thermal.md), [elasticity](benchmark_elasticity.md),
+[electric](benchmark_electric.md) and [derivative](benchmark_derivatives.md)
+benchmark guides.
 
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
 `queue: single`, so a new push supersedes the older run.
+
+### Latest dependencies canary
+
+The `Latest dependencies` workflow (`.github/workflows/latest-deps.yml`) runs
+once a day (21:47 UTC) and on manual dispatch. It is **not** part of the
+required `tests` check and never gates a PR or `main`. It installs the eight
+packages editable with the extras the pinned environment provides
+(`galerkin[test,figures,jax,torch,crosscheck]`, `galerkin-refsol[test]`,
+`meshine[test,plot]`, `meshloom[test]`, `gmshio[test,gmsh,plot]`,
+`physmat[test,rii,plot]`, `simcase[test,studio,export]`, `sipi[test]`) without
+the pinned requirements and without `--no-deps`, so pip resolves the newest
+versions the `pyproject.toml` bounds allow. The PyTorch CPU index is an extra
+index without a version pin, and the step checks that the installed torch is the
+`+cpu` build; meshloom builds with the newest maturin its pyproject allows while
+its Rust crates stay at `Cargo.lock` (`--locked`). It then runs
+`python -m pip check`, the license check (a new transitive distribution without
+a reviewed inventory entry fails it, which is part of the point), the same
+preflight groups as the Linux job, the non-slow suite with the pinned RII
+database and required reference-tool comparisons, and the `blas-kernels` file
+list under both forced OpenBLAS kernels. Once the install has succeeded, each
+check runs even if an earlier one failed, so one failure does not hide the
+others. `pip freeze` goes to the step summary and, with the license report and
+the JUnit files, to the `latest-deps-results` artifact. Left out: the Node
+Studio checks (Node is pinned by the workflow and not resolved by pip, so it
+cannot drift here), the distribution builds, meshloom's Cargo tests and notices,
+and the slow studies.
+
+A failed scheduled or manual run opens the issue **Latest dependencies canary
+failed**, or comments on it when it is already open, with the run URL and the
+resolved versions of the key packages next to their pins; a passing run closes
+it. A cancelled run, including one stopped by the 90-minute limit, is not
+reported. The canary is a heads-up, not a verdict on the commit: the pins in
+`tools/requirements-py312-linux*.txt` are still updated deliberately, in a
+reviewed change that reruns the source and distribution checks.
 
 ## Reading results
 

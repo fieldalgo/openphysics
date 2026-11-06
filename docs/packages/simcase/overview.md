@@ -17,6 +17,7 @@ python -m pip install -e packages/meshine -e packages/physmat -e packages/galerk
 python -m simcase example soi_strip > model.json
 python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
+python -m simcase geometry model.json                     # the region complex of a version 1 geometry block
 ```
 
 The package and CLI are named `simcase`. The JSON version field remains
@@ -45,9 +46,11 @@ prints a supplied example.
 | `electric.steady2d` | Homogeneous rectangle steady conduction | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.steady2d` | Constant-property steady Joule heating | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
+| `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
+| `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
-| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation | `transient_thermal_uniform` | [Transient heat](thermal_transient2d.md) |
+| `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation, constant outward flux and convection | `transient_thermal_uniform`, `transient_thermal_boundary` | [Transient heat](thermal_transient2d.md) |
 | `thermal.transient2d` with regions | Transient heat with named material regions, per-material conductivity and heat capacity | `transient_thermal_regions` | [Region documents](thermal_regions2d.md) |
 
 Studio edits and runs 2D optical models and has dedicated views for steady and
@@ -181,7 +184,65 @@ axis. They load with `numpy.load(..., allow_pickle=False)`. The scalar `fields`
 key is absent for vector data. `field_representation="vector-edge-nodal-v1"`
 in the archive and summary identifies this layout. Summary metadata includes
 the requested/returned mode counts, normalization and declared coordinate units.
-The model JSON format remains `"openphysics": "0.2"`.
+Every `em.modes2d` result, scalar or vector, also records the saved file layout
+`field_layout="em-modes2d-p1-node-centroid-v1"` (P1 nodal fields; vector results
+add the centroid electric field), `mesh_length_unit` (the declared unit of
+`nodes`) and `length_unit_to_m` (that unit in metres) in both files, and
+`study_parameter` (the swept path, `""` for a single point) in the archive. A
+subspace sweep records `field_layout="em-modes2d-subspace-raw-v1"` instead.
+Existing keys keep their meaning. The model JSON format remains
+`"openphysics": "0.2"`.
+
+### Mode post-processing
+
+Every scalar or vector `em.modes2d` result without PML also saves, per study
+point `p` and mode `m`, three additional arrays computed with
+[`galerkin.mode_overlap`](../galerkin/mode_overlap.md) on the saved mesh in the
+document length unit (`simcase.mode_postprocessing` states the exact recipe,
+and `tests/simcase/test_modes_postprocessing.py` checks that the saved values
+are byte-identical to those calls):
+
+| Key | Shape | Meaning |
+|---|---|---|
+| `mode_power` | `(points, modes)` | vector: the complex Poynting integral `P = 1/2 int (E x H*) . z dA` of the saved field (`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); scalar: `int |phi|^2 dA` (`scalar_power`, real) |
+| `confinement` | `(points, modes, regions)` | energy fraction per region in `region_names` order: `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2` (`confinement_factor`); scalar: `int_R |phi|^2 / int |phi|^2`. Rows sum to 1 |
+| `field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA` (`overlap_matrix(..., "field")`, Hermitian; scalar: `scalar_overlap`); the diagonal is `int |E|^2 dA`, which for scalar results equals `mode_power` |
+| `coupling_efficiency` | `(points, modes)` | only with `results.mode_overlap.gaussian`: `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)` of a Gaussian input (`coupling_efficiency` after `interpolate_vector_field`; scalar: `scalar_coupling_efficiency` at the nodes) |
+
+The saved amplitudes are relative, so `mode_power` carries no absolute unit by
+itself. Its exact meaning: read the vector amplitudes as volts per document
+length unit (V/um for a micrometre document); `mode_power` is then the power
+of that field in watts, `Re` the time-averaged power carried in +z. Read them as
+V/m instead and the power in watts is `mode_power * length_unit_to_m**2`.
+Dividing a saved mode by `sqrt(Re mode_power)` gives a field that carries 1 W
+(amplitudes in V per document unit). For a lossless mode the imaginary part is
+roundoff; for a lossy mode (complex `neff`) it is the reactive part and the
+modes are not power-orthogonal. The scalar `mode_power` and `field_overlap`
+are in (document unit)^2; `confinement` and `coupling_efficiency` are
+dimensionless. `summary.json` repeats the values under `mode_postprocessing`
+with a `unit` and `description` per key (`field_overlap` as `real`/`imag`,
+the vector `mode_power` with an `imag` list, `confinement` with its region
+names).
+
+The optional document block
+
+```json
+"results": {"mode_overlap": {"gaussian": {"waist": 0.22, "center": [0.0, 0.11]}}}
+```
+
+adds `coupling_efficiency` for the input field
+`exp(-((x - cx)^2 + (y - cy)^2) / waist^2)`, with `waist` the 1/e field radius
+and `center` in the document length unit. For vector results the input is
+x-polarised and compared with the transverse mode field alone; for scalar
+results it is a scalar amplitude. The waist must be positive, the centre must
+lie inside the geometry window and no other key is accepted under
+`mode_overlap` or `gaussian`. PML results and subspace sweeps gain none of
+these keys: PML coefficients are covariant integrals in stretched coordinates,
+so the lossless Poynting formula over the window is not the physical power, and
+subspace frames are not modes ([PML modes](pml_modes.md),
+[subspace tracking](vector_subspace_tracking.md)). The VTU export is unchanged
+and writes the fields only; read the post-processing from `fields.npz` or
+`summary.json`.
 
 Studio receives `vector_fields` with `location="triangle_centroids"`, component
 names and separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point.
@@ -356,7 +417,10 @@ uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
 JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
 metadata. Initial values are not projected and negative K is not clamped.
-Transient flux/Robin, restart and automatic coupling are not supported.
+Constant outward flux and convection sides (the steady contract's keys) save the
+`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
+pair with two per-step load arrays; time-dependent flux/Robin, restart and
+automatic coupling are not supported.
 
 ### Saved output
 
@@ -372,14 +436,54 @@ for its save and platform limits.
 
 With the optional extra `pip install "simcase[export]"` (meshio, MIT),
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
-copy of saved rectangular steady heat with Dirichlet and insulated sides,
-rectangular transient heat (one stored time, `time_index`, default the last)
-and vacuum PEC cavity fields. Steady/transient material-region layouts are
+copy of saved rectangular steady heat (Dirichlet and insulated sides, or the
+`boundary-v2` layout with flux/convection sides and its nodal
+`prescribed_outward_load`, `ambient_load`, `convective_outward` and `system_rhs`
+arrays), rectangular transient heat (one stored time, `time_index`, default the
+last; the `transient-p1-node-cell-boundary-v1` layout with flux/convection sides
+adds its per-step `prescribed_outward_load` and `convective_outward` arrays) and
+vacuum PEC cavity fields. Steady/transient material-region layouts are
 also supported, with integer cell data `triangle_regions` and the saved
 steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
-for units, the region-name mapping and an example. Rectangular steady documents
-with flux/convection sides (`boundary-v2`), lossy cavities and `em.modes2d`
-results are refused as an unsupported field layout. 2D meshes get z = 0. `fields.npz` stays
+for units, the region-name mapping and an example. Electric conduction and Joule
+results (`electric-joule2d-p1-v1`, the layout of `electric.steady2d`,
+`joule.steady2d` and `joule.temperature2d`) export point data `potential_v` with
+the nodal electric load, reaction, prescribed outward current and residual
+arrays, and cell data `electric_field_v_m`, `current_density_a_m2`,
+`conductivity_s_m` and `joule_heating_w_m3`; a Joule result adds `temperature_k`,
+its nodal heat arrays and cell `heat_flux_w_m2`, and `joule.temperature2d` adds
+`evaluated_temperature_k`. Elasticity results (`mechanics2d-p1-v1`, the layout of
+`mechanics.elasticity2d`) export point data `displacement_m` and the nodal
+`load_n_per_m`, `reaction_n_per_m` and `residual_n_per_m` vectors, and the saved
+strain and stress components as the scalar cell data `exx`, `eyy`, `gxy` and
+`sxx_pa`, `syy_pa`, `sxy_pa`; thermoelastic results (`thermoelastic2d-p1-v1`) add
+`temperature_k`, the nodal heat arrays, cell `heat_flux_w_m2`, `sigma_zz_pa`,
+`epsilon_zz` and the `total_`, `thermal_` and `elastic_` strain components. Arrays keep their saved names and unit suffixes;
+Dirichlet node lists and the summary are not copied. The cavity with materials
+and lossy walls (`cavity3d-edge-complex-v1`) exports each complex mode as the
+cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`
+(m^-3/2, the saved normalization and `exp(+j*omega*t)` convention; VTK has no
+complex arrays) and the materials as `tet_relative_permittivity_real`/`_imag`
+and `tet_relative_permeability_real`/`_imag`; frequencies, quality factors and
+wall conductivities stay in `fields.npz` and `summary.json`. A single-point
+waveguide mode result (`em-modes2d-p1-node-centroid-v1`, from `em.modes2d`)
+is exported with its nodes converted to metres (`nodes * length_unit_to_m`):
+a scalar result gives point data `mode_<k>` per mode `k` (zero-based), or
+`mode_<k>_real`/`mode_<k>_imag` when the saved `fields` are complex (lossy
+materials); a vector result gives cell data `electric_field_mode_<k>_real`/
+`_imag` (Ex, Ey, Ez at centroids, the saved relative normalization with the
+largest centroid |E| = 1) and point data `longitudinal_electric_mode_<k>_real`/
+`_imag` (nodal Ez). Every mode VTU adds the integer cell data `triangle_regions`
+(the saved `regions`, indices into the summary's `regions`). PML results use
+the same layout; the mesh and so the arrays cover the absorbing layer, where the
+fields are artificial. `neff`, `edges`, the transverse edge coefficients,
+tracking and open-boundary diagnostics stay in `fields.npz`. A result with
+several study points is refused here and goes through `export_sweep`; the
+subspace layout `em-modes2d-subspace-raw-v1` (raw eigenpair columns, not
+tracked modes) is refused by both, and so is a `fields.npz` without a
+`field_layout` array, such as an `em.modes2d` result saved before the layout
+was recorded (run its `model.json` again). 2D meshes get
+z = 0, and 2D vectors a zero z component. `fields.npz` stays
 the reference result; times, frequencies and units remain in it and in
 `summary.json`. An existing VTU is never overwritten. XDMF is not offered
 because meshio's XDMF writer needs h5py.
@@ -395,6 +499,16 @@ the second time on. The output directory must be new or empty and nothing is
 overwritten; the collection refers to its VTU files by relative paths, so the
 directory can be moved as a whole. `name="heat"` changes the file stem. No
 dependency beyond meshio is needed: the `.pvd` is plain XML.
+
+For a waveguide mode sweep,
+`simcase.export.export_sweep("out/fields.npz", "out/paraview")` writes one VTU
+per study point (`fields_00000.vtu`, …, with the arrays `export_fields` writes
+for a single point) and the collection `fields.pvd`. Its timestep is the swept
+wavelength in the document length unit (`mesh_length_unit`) when the saved
+`study_parameter` is a wavelength and the values are strictly monotone, which
+every vector and PML sweep is; for a scalar sweep of another parameter, or one
+whose values repeat or reverse, it is the point index. The values themselves
+stay in `fields.npz`. The same directory, name and rollback rules apply.
 
 ## The browser UI
 

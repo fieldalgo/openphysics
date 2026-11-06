@@ -458,8 +458,8 @@ ParaView에서 `view.vtu` 또는 `paraview/fields.pvd`를 엽니다. **셀** 배
 기존 VTU는 거부하고 시계열 폴더는 새것이거나 비어 있어야 합니다. 시계열 쓰기에 실패하면
 이번 호출이 만든 파일을 정리합니다. `triangle_regions`가 없거나 정수가 아니거나 음수이거나
 크기가 맞지 않으면 출력 생성 전에 거부합니다. 유효한 `save()` 결과를 위한 내보내기이며
-임의 NPZ의 전체 검증기는 아닙니다. restart·XDMF·과도 flux/Robin 입력 및 별도 직사각형
-정상 `boundary-v2` 배치는 지원하지 않습니다.
+임의 NPZ의 전체 검증기는 아닙니다. restart·XDMF·과도 flux/Robin 입력은 지원하지 않습니다.
+별도 직사각형 정상 `boundary-v2` 배치는 같은 함수가 자체 배열로 내보냅니다([개요](overview.md#paraview로-보기)).
 
 `tests/simcase/test_export_regions.py`는 내보낸 모든 배열과 NPZ, 모든 저장 시각, 초기율
 부재, 재료 ID와 구별되는 영역 ID, 기존 출력 보호와 실패 정리를 검증합니다. 같은 수치 환경에서

@@ -21,16 +21,23 @@
 
 ## PCB 전송선(신호·전원 무결성)
 
+[다각형/마스크 단면](../packages/sipi/polygon_sections.md)은 실제 재료 경계를 준정적·분산·표면/체적 도체 해석에 공유합니다.
+
 [인과적 거칠기](../packages/sipi/roughness.md)는 표면 모델의 저항·리액턴스 구성 법칙을 함께 보정합니다.
 
 - [sipi — 준정적 PCB 단면: C, L, G, 임피던스와 결합선 모드](../packages/sipi/overview.md). Python API와 [균일 전송선 네트워크](../packages/sipi/network.md)가 있으며 명시한 RLGC로 S·Touchstone 출력을 계산합니다. [주파수 선로 입력 모델](../packages/sipi/line_model.md)은 메시 하나로 유전체 분산·고주파 도체 표면 손실·RLGC/S를 연결합니다. [유한 금속 전류 확산](../packages/sipi/conductor_diffusion.md)은 명시적 자기 경계에서 R/L을 추출합니다. 3D 구조는 미지원입니다.
 
 ## Python 계약과 수식
 
+- [상관 공차 분석과 고정 피치 샘플링](../packages/sipi/study.md)
+
 - [진공 직육면체 PEC 공동 솔버](../packages/galerkin/cavity_solver.md)
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
+- [3D 솔버가 공유하는 사면체 메시 형식](../packages/galerkin/mesh3d_format.md)
 - [벡터 고유공간 신뢰성](../packages/galerkin/eigenspace_reliability.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
+- [도파관 정식화: 모드, 미분, 연성, SI/PI 경로](../packages/galerkin/waveguide_formulation.md)
+- [모드 전력·중첩·결합](../packages/galerkin/mode_overlap.md)
 - [galerkin — OpenPhysics 유한요소 해석 엔진](../packages/galerkin/overview.md)
 
 
@@ -51,3 +58,7 @@ SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/
 [동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).
 
 [Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).
+
+[종단 네트워크 V/I와 주파수 누화](../packages/sipi/termination.md)는 명시 Thevenin 소스·수동 임피던스를 쓰는 Python 전용 API입니다.
+
+- [회로 입력 저장: 형상/네트워크·소스·부하·누화](../packages/sipi/circuit_document.md)

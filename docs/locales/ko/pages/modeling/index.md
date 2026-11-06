@@ -22,6 +22,8 @@ JSON 문서로 묶고, Python 경로에서는 각 패키지 API를 직접 조합
 
 - [meshine — 여러 재료로 구성된 평면 영역의 소형 품질 삼각형 메시 생성기](../packages/meshine/overview.md)
 - [gmshio — Gmsh와 링크하지 않고 galerkin에 메시 제공](../packages/gmshio/overview.md)
+- [형상 문서: 0단계 계약](../packages/simcase/geometry_document.md)
+- [버전 1 형상 읽기(1단계)](../packages/simcase/geometry_reader.md)
 - [튜토리얼: 내 도파관 해석하기](../packages/simcase/waveguide_tutorial.md)
 
 

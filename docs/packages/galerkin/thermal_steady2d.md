@@ -4,6 +4,7 @@ For full-revolution (r,z) conduction, use the optional
 [axisymmetric measure](thermal_axisymmetric.md). The per-thickness equations and
 units below describe the default Cartesian case.
 
+[한국어](../../locales/ko/pages/packages/galerkin/thermal_steady2d.md)
 
 Explicit imports are `galerkin.thermal` and `refsol.thermal`. This module solves
 homogeneous isotropic stationary conduction on a conforming P1 triangle mesh:

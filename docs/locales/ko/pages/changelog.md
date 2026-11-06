@@ -25,8 +25,65 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 ## [Unreleased]
 
 - `galerkin`: 정상 열에 `coordinate_system="axisymmetric"` 전체 회전 (r,z) 적분을 추가했습니다. core 조립을 재사용하고 결과 metadata로 W와 Cartesian W/m를 구분합니다. 축 정칙성·해석해·수렴 검사를 포함합니다. [문서](packages/galerkin/thermal_axisymmetric.md).
+- `simcase`: 형상 문서 계약의 2단계 정확 2D 엔진 `simcase.geometry_engine`. `evaluate(model, component)`는 파싱한 버전 1 `2d`·`axisymmetric` 구성 요소를 영역 복합체로 만듭니다: 영역·재료·소유 피처를 가진 셀, 정확한 매개변수·출처 이름·양쪽 셀을 가진 `line`/`arc`/`circle` 곡선, 해석된 선택과 경계 태그, 나중 피처 우선과 `imprint`, `segment`, 빈 공간, 병합 영역(병합 셀은 소유 피처 전부를 `feature_indices`에 적음). 모든 산술이 정확(정수 pm, 유리수, 2차 무리수)해서 접함과 위상이 단위와 무관합니다. `RegionComplex.to_domain`은 원호를 양쪽이 공유하는 다각선으로, 닿지 않는 원은 공유 `Circle` 하나로, 좌표는 한 번만 반올림해 meshine에 넘기고, 반올림으로 점이 겹치거나 교차하면 거부합니다. `3d`, 자기와 만나는 path, `to`가 원 위에 없는 path 원호는 거부합니다. 버전 1 형상 블록을 가진 문서는 이제 엔진으로 메시되어(`Document.geometry_model`, `build_domain`) `boundary_tags`가 메시에 닿고(도파관 러너는 네 변 외 태그를 이름 밝혀 거부) 불리언이 정확하며 메시 한도 경로도 같습니다. 세밀화 메시는 shapely 경로와 이산화 수준에서 다르며(영역 열 예제: 온도가 상승의 6e-4 안), 0.2 문서는 전처럼 메시됩니다. `RegionComplex.curve_edges`·`provenance_edges`·`selection_edges`는 생성된 메시의 변을 곡선·출처 이름·경계 선택별로 되읽습니다(imprint 내부 제약 포함). `finalize: "imprint"`나 `segment` 피처를 가진 문서는 이제 읽히고 실행됩니다(`to_v02(..., validation=True)`가 도형은 두고 segment는 기록용 0.2 형식에서 뺌, 메시는 엔진이). `path`·빈 공간·병합 영역은 여전히 읽을 때 거부됩니다. 예제 `examples/simcase/geometry_v1_imprint_rib.json`. `python -m simcase geometry model.json`은 버전 1 문서의 영역 복합체를 진단용으로 출력합니다. `galerkin.Mesh`가 선택 필드 `provenance_edges`를 받고(`from_mesher`로도), `build_mesh`와 영역 열 메시 생성기가 버전 1 문서에 대해 채우며, galerkin은 아직 읽지 않습니다. 사전 등록 검사 G2-1..7(shapely 대비 일반 위치 2000건, 원 해석 넓이, Euler, 불변성, 퇴화 입력, 현재 문서 51개, 시간)은 `tests/simcase/test_geometry_engine.py`에 있습니다. [문서](packages/simcase/geometry_engine.md).
+
+- `galerkin`: `solve_transient_heat`의 경계 데이터가 시간에 의존할 수 있습니다. g, h, T_amb는 각각 scalar, callback(points, normals), callback(time_s)->scalar 또는 callback(points, normals, time_s)->(Q,)이며 Dirichlet·source callback처럼 각 단계 끝에서 표본화합니다. H는 h가 변할 때만 다시 조립하고 정적 데이터의 결과는 이전과 비트 단위로 같습니다. JAX/PyTorch 입력은 시간 의존 g·T_amb를 지원하고 시간 의존 h는 거절합니다. 새 `refsol.transient_heat_robin` 주기 주변 온도(해석·후진 Euler 이산 진폭)와 ramp 열유속 Duhamel 기준해. 기준: 주기 진폭·위상 공간 차수 ≥1.8, 시간 ≥0.9, 최세분 ≤ A의 3e-3; ramp 열유속 차수 ≥1.8/0.9, 최세분 ≤ 상승의 2e-3; 단계별 열수지 ≤1e-10. simcase 문서는 상수 변만 유지합니다. [문서](packages/galerkin/transient_heat.md).
+
+- `physmat`: Cu와 Al의 열전도율을 Hust & Lankford(1984, NBSIR 84-3007) 식으로 잔류저항비 RRR을 순도 매개변수로 하는 온도의 함수로 추가했습니다(기본 RRR 100; `physmat.HustLankford`, `physmat.thermal`, 텅스텐은 모델로 포함). 1 K부터 녹는점까지 유효하며 `OutOfRange`/`strict`를 따릅니다. 보고서 표를 1.5 % 이내(Cu, Al), NIST 극저온 OFHC 적합식을 2.3 % 이내, Ho, Powell & Liley 1972를 4.3 % 이내로 재현합니다. 300 K 상수 401/237 W/(m K)는 함수값 397/234가 됩니다. [문서](packages/physmat/overview.md#금속-열전도율의-온도-의존성-hust--lankford-1984).
+
+- `simcase`: PML이 없는 `em.modes2d` 결과가 `mode_power`(지점 × 모드), `confinement`(지점 × 모드 × 영역, `region_names` 순서, 행의 합 1), `field_overlap`(지점 × 모드 × 모드)과, `"results": {"mode_overlap": {"gaussian": {"waist": w0, "center": [x, y]}}}`(문서 단위, 엄격 검증)가 있으면 `coupling_efficiency`(지점 × 모드)를 함께 저장합니다. 모두 문서 길이 단위의 저장 메시 위에서 `galerkin.mode_overlap`으로 계산하며 `summary.json`의 `mode_postprocessing`에 키마다 단위와 설명을 붙여 반복합니다. 벡터 `mode_power`는 저장 상대 장을 문서 길이 단위당 볼트로 읽을 때의 Poynting 전력(W; V/m이면 × `length_unit_to_m`²)이고 손실 모드에서는 복소수이며, 스칼라는 (문서 단위)²의 ∫|φ|² dA입니다. 기존 키·정규화·`field_layout`·VTU 내보내기는 바뀌지 않고, PML 결과와 subspace sweep에는 새 키가 없습니다. [문서](packages/simcase/overview.md#모드-후처리).
+
+- `simcase`: 균질 직사각형의 headless 기계해석 문서 두 종. `mechanics.elasticity2d`는 변별 변위 성분·전역 직교좌표계 변 traction·상수 체적력을 쓰는 정적 평면응력/평면변형률 선형탄성을, `mechanics.thermoelastic2d`는 같은 메시에서 변별 상수 경계 데이터의 정상 열전도를 먼저 풀고 전체 traction으로 열응력을 풉니다. 구속이 강체 운동을 남기는 문서는 메시 생성 전에 거부합니다. 결과는 `mechanics.elasticity2d-result-v1`(layout `mechanics2d-p1-v1`)과 `mechanics.thermoelastic2d-result-v1`(`thermoelastic2d-p1-v1`)로 저장되고 `export_fields`가 이름 붙은 변형률·응력 성분으로 VTU를 쓰며 Studio는 둘을 거절합니다. 예제 `elastic_plate`, `thermoelastic_bar`. [문서](packages/simcase/mechanics2d.md).
+
+- `simcase`: `em.modes2d` 결과가 저장 layout을 기록합니다. `summary.json`과 `fields.npz`에 `field_layout` `em-modes2d-p1-node-centroid-v1`(subspace sweep은 `em-modes2d-subspace-raw-v1`), `mesh_length_unit`, `length_unit_to_m`이 들어가고 archive에는 `study_parameter`도 들어갑니다. 기존 키는 바뀌지 않습니다.
+
+- `simcase`: `simcase.export.export_fields`가 단일 지점 도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`)를 미터 단위 좌표로 씁니다. 스칼라는 점 데이터 `mode_<k>`(복소면 `_real`/`_imag`), 벡터는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`과 점 데이터 `longitudinal_electric_mode_<k>_real`/`_imag`, 그리고 `triangle_regions`입니다. 새 `export_sweep`은 study 지점마다 VTU 하나와 `.pvd`를 쓰며, 단조 파장 sweep이면 timestep이 파장(문서 단위), 아니면 지점 번호입니다. PML 결과는 흡수층을 포함해 내보내고, subspace sweep과 `field_layout` 없이 저장된 결과는 거절합니다. 이전의 모든 VTU/PVD 출력은 바이트까지 같습니다. [문서](packages/simcase/overview.md#paraview로-보기).
+
+- `simcase`: `thermal.transient2d` 문서가 정상 경계조건 계약의 `outward_flux_w_m2`·`convection` 변 키를 받습니다(같은 이름·한계·메시지, 상수만, anchor 불필요). 키가 있으면 새 쌍 `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`을 선택해 step별 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`(W/m)을 단위·위치·시간축과 함께 저장하고, 키가 없는 문서는 v1을 byte 단위로 유지합니다. `export_fields`·`export_time_series`가 새 layout을 쓰고 과도 Studio route는 검증 전에 거절합니다. 새 예제 `transient_thermal_boundary`. 기준: `refsol.transient_heat_robin` 대류 slab 상대 L2 ≤ 2e-3(측정 2.0e-4). [문서](packages/simcase/thermal_transient2d.md).
+
+- `galerkin`: `solve_transient_heat`가 정상 솔버와 같은 입력 형식·부호의 `outward_flux`·`convection`을 받습니다(변 태그별 scalar 또는 callback(points, normals), 한 번 표본화하는 시간 무관 데이터; 시간 callback은 거절). 시스템은 M/dt+K+H이며 결과에 `prescribed_outward_load_w_per_m`·`convective_outward_w_per_m`이 추가됩니다(경계 데이터가 없으면 None; Dirichlet 전용 이력은 비트 단위로 동일). 새 `refsol.transient_heat_robin` 대류·상수 열유속 slab 급수. 기준: slab 공간 차수 ≥1.8, 시간 차수 ≥0.9, `solve_steady_heat`와 장시간 일치 ≤1e-8, 단계별 열수지 ≤1e-10. [문서](packages/galerkin/transient_heat.md).
+
+- `galerkin`: `triangle_geometry`가 검증 결과를 메시 내용 기준으로 캐시하고(8개 LRU, 복사본 반환) 겹침·엣지 표·정점 팬·매달린 노드 검사를 벡터화했으며, 경계 샘플러는 캐시된 엣지 표를 조회합니다. 판정과 솔버 결과는 비트 단위로 그대로이고(결과 배열 660개·거부 메시 15개로 확인), Linux에서 정상 열 n=64가 2.0 s→0.46 s, 열저항 Picard n=16이 6.2 s→0.22 s입니다. [문서](packages/galerkin/overview.md#메시-검증-캐시).
+
+- `galerkin`: `Mesh3D`가 바깥 방향 태그 면과 `check()`(모든 외부 면 한 번 태그, 바깥 감김, 절점 집합 일치)를 갖고 음수 영역 id를 거부합니다. `from_mesher`는 면·영역·계면을 유지하고 `-1` 영역을 개수와 함께 거부하며 `read_msh`는 3D 영역과 표면 태그를 유지합니다. 계약: [사면체 메시 형식](packages/galerkin/mesh3d_format.md).
+
+- `galerkin`: `solve_cavity`·`solve_material_cavity`가 외부 사면체 메시(meshine, gmshio)에서 면 태그별 PEC·임피던스 벽과 영역별 재료로 공진기를 풉니다. gradient kernel은 구속 표면에서 셉니다. 상자 솔버는 비트 단위로 동일하고 메시 변형에는 미분 경로가 없습니다. [문서](packages/galerkin/cavity_solver.md#외부-메시), [재료 공진기](packages/galerkin/material_cavity.md#외부-메시).
+
+- `galerkin`: `galerkin.thermal3d.solve_steady_heat_3d`, 영역별 열전도율·열원, Dirichlet 면과 단열, W 단위 열수지 검사를 갖는 사면체 메시의 P1 정상 열전도; `refsol.thermal3d` 기준해. [문서](packages/galerkin/thermal3d.md).
+
+- `galerkin`: `galerkin.electrostatics` 추가 — 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기와 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬(실수 또는 손실 복소 유전율; 실수 입력의 JAX/PyTorch 미분); `refsol.electrostatics`에 동축·두 층 평행판 정전용량 레퍼런스 추가. [문서](packages/galerkin/electrostatics.md).
+
+- `galerkin-refsol`: 참조 모듈 셋 추가. `refsol.lossy_slab`은 복소 유전율 다층 슬랩(흡수 결합 모드와 기판 누설 모드, 명시한 sheet 선택, 잔차 ≤ 1e-12, 1차 섭동·터널링 검증)을 풀고 galerkin 스칼라/벡터·PML 모드 솔버를 2차 수렴으로 평가합니다. `refsol.joule_slab`은 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정확한 1D 정상 Joule 가열 슬랩(erf/erfi 폐형식, 전류 구동 fold)을 제공하고 `solve_temperature_joule_heat`를 2차 수렴으로 평가합니다. `refsol.bent_slab`(선택적 mpmath)은 복소 차수 Bessel 정합으로 일정 반경 굽은 슬랩 극점을 제공합니다. [문서](packages/galerkin-refsol/overview.md).
+
+- galerkin: `galerkin.mode_overlap` — 모드 전력(정확한 edge 질량과 edge-절점 결합 행렬로 계산한 Faraday 경로 복소 Poynting 적분), 교차 전력, 장 중첩과 중첩 행렬, power/mass/peak 정규화, 결합 효율(퇴화 공간 사영 포함), 에너지 구속 계수, 유효 면적(정확한 질량 분자, `int |E|^4`는 4차 대칭 삼각형 규칙), 주어진 장의 Nédélec/P1 보간, P1 스칼라 쌍; NumPy 전용. refsol slab·광섬유 장으로 검증했습니다. [계약과 검증](packages/galerkin/mode_overlap.md).
+
+- galerkin: 도파관 정식화 문서가 scalar P1·혼합 Nédélec/절점 모드 솔버, 복소 재료와 좌표 늘림 PML, 테두리 고유쌍 미분, 연성 경계, 준정적 sipi 경로를 구현된 대로 읽고 각 수식을 모듈·함수와 함께 인용합니다. [문서](packages/galerkin/waveguide_formulation.md).
+
+- 문서: 패키지 README와 문서 개요에 빠져 있던 기능을 추가했습니다. galerkin의 정상 전기전도, 단방향·온도 의존 Joule heating, JAX/PyTorch 미분과 coupling 계층; meshine의 `extrude`와 사면체 메시 계약("2D 전용" 한계 삭제); refsol의 `thermal_multilayer`, `transient_heat_multilayer`, `elasticity_multilayer`. 진입 문서는 workspace의 정상 열전도 판과 광학 도형을 설명하고, 모든 영문 페이지가 한국어 쌍과 서로 링크합니다.
+
+- CI: GitHub의 Node 20 런타임 종료에 맞춰 고정한 GitHub Actions를 Node 24 릴리스(`actions/checkout` v5, `actions/setup-python` v6, `actions/setup-node` v5, `actions/upload-artifact` v6)로 올렸습니다. 검사 내용과 아티팩트 이름은 바뀌지 않습니다.
+
+- CI: 필수 검사가 아닌 하루 한 번의 `Latest dependencies` 카나리(`.github/workflows/latest-deps.yml`)가 메타데이터가 허용하는 가장 새 의존성으로 패키지를 설치하고 `pip check`, 라이선스 목록 검사, 사전 검사 묶음, non-slow 시험, 강제 커널 시험을 돌린 뒤 해석된 버전과 함께 이슈 하나를 열거나 갱신하거나 닫습니다. 고정 버전은 여전히 의도적으로 올립니다. [문서](development.md#최신-의존성-카나리).
+
+- 시험: galerkin의 경계 항을 같은 메시에서 scikit-fem과 비교합니다. `thermal.solve_steady_heat`의 외향 열유속·대류(Robin) 변(혼합과 Robin만), 0이 아닌 규정 변위를 둔 `elasticity.solve_elasticity`의 Cartesian traction 변, Helmholtz 조립의 1차 흡수 경계(`assemble_boundary_mass`)입니다. 행렬·하중·반력·장·에너지가 1e-13 이하로 일치합니다. [레퍼런스 도구 비교](reference-comparisons.md#현재-사례).
+
+- `physmat`: Ciddor 1996의 습한 공기를 `standard_air` / `physmat.standard_air(temperature_c, pressure_pa, humidity, co2_ppm)`와 벡터화된 `physmat.air.refractive_index`로 추가했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기 분산, BIPM 1981/91 밀도로 0.3–1.69 µm에서 유효하며, NIST Engineering Metrology Toolbox 값을 1e-9 이내, 상온 조건의 Birch & Downs 1994를 6e-9 이내로 재현합니다. `air`는 진공 그대로입니다. 내장 재료 표는 재료별 출처를 밝힙니다. [문서](packages/physmat/overview.md#공기-ciddor-1996).
+
+- 저장소 검사: `tools/tests/test_examples_smoke.py`가 `examples/` 아래의 모든 스크립트와 JSON 문서를 임시 디렉터리에서 실행하고 종료 코드 0을 요구합니다. 약 20초를 넘는 예제는 `slow` 마커를 달았습니다. [tools/README.md](../../../../tools/README.md#examples-smoke-test)에 문서화했습니다.
+
+- 벤치마크: `benchmarks/benchmark_thermal.py`, `benchmark_elasticity.py`, `benchmark_electric.py`, `benchmark_derivatives.py`가 정상·과도 열전도, 탄성과 열탄성 traction workflow, 전기 전도·Joule 가열·온도 의존 Joule 풀이(Picard와 Newton), 그리고 forward 풀이 대 gradient(NumPy 중심 차분, 설치된 경우 JAX·PyTorch adjoint, 없으면 건너뜀)의 시간을 새 프로세스에서 재고 checkout·고정 요구사항·머신·peak RSS를 기록합니다. 전체 열·전기 호출 옆에 공개 assembly 함수의 시간도 잽니다. 사람이 손으로 실행하며 CI는 실행하지 않습니다. 안내: [열전도](benchmark_thermal.md), [탄성](benchmark_elasticity.md), [전기](benchmark_electric.md), [미분](benchmark_derivatives.md).
+
+- 도구: 설치 플랫폼 검사(`tools/check_platform_install.py`)가 이제 cavity3d, `sipi`, 완전 벡터/PML 도파로 모드 wheel 소비자를 Linux·macOS·Windows에서 실행합니다. `test_sipi_wheel.py`(거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항 비교)와 `test_vector_modes_wheel.py`(`refsol.slab`, 누설 슬래브 외향 근, PML 유무의 `vector_slab` 예제 CLI 실행)는 새 소비자입니다. cavity 소비자의 Studio 검사는 배포 검사에서 Linux에만 남습니다. Linux에서 확인했고 macOS·Windows는 CI에서 돕니다. [개발 안내](development.md#ci가-돌리는-것).
+
+- `galerkin`: `galerkin.read_msh`가 평면 MSH 2.2/4.1 파일의 물리 그룹을 보존합니다. 물리 표면은 `regions`/`region_names`가 되고(어느 물리 표면에도 속하지 않는 삼각형은 영역 -1), 물리 곡선은 `boundary_edges`와 `boundary`가 되며, 어떤 삼각형도 쓰지 않는 절점은 버립니다. 결과는 `from_mesher(gmshio.to_fem2d(gmshio.read_msh(path)))`와 배열 단위로 같습니다. `write_msh`는 평면 메시의 영역마다 물리 표면 하나를 씁니다. 사면체 메시는 바뀌지 않습니다. [문서](packages/galerkin/overview.md).
+
+- `sipi`: 버전 공차 입력으로 sweep/corners·독립 uniform·상관 normal, 고정 피치 차동 형상과 실패 행 보존을 지원합니다. [계약·검증](packages/sipi/study.md).
+
+- `simcase`: `simcase.export.export_fields`가 저장 배치 두 가지를 더 VTU로 씁니다. 열유속·대류 변이 있는 직사각형 정상 열전도(`thermal2d-p1-node-cell-boundary-v2`)는 절점 경계 하중 배열과 함께, 전기 전도·Joule 가열(`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`)은 점 데이터 `potential_v`와 절점 전기 배열(Joule이면 열 배열도), 셀 데이터 `electric_field_v_m`, `current_density_a_m2`, `conductivity_s_m`, `joule_heating_w_m3`(Joule이면 `heat_flux_w_m2`도)로 내보냅니다. 배열은 저장된 이름과 값을 그대로 쓰고 Dirichlet 절점 목록은 복사하지 않으며 저장 파일은 바뀌지 않습니다. 손실 공진기와 `em.modes2d` 결과는 여전히 거절합니다. [문서](packages/simcase/overview.md#paraview로-보기).
+- `simcase`: `export_fields`가 재료와 손실 벽이 있는 공진기(`cavity3d-edge-complex-v1`)도 씁니다. VTK에는 복소 배열이 없으므로 모드마다 사면체 셀 데이터 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(저장된 정규화와 `exp(+j*omega*t)` 규약)로, 재료는 `tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로 내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 진공 공진기 내보내기와 다른 모든 VTU는 바이트까지 그대로이며, `em.modes2d` 결과만 여전히 거절합니다. [문서](packages/simcase/cavity3d.md).
 - SIPI 인과적 Huray 도체 거칠기로 저항·내부 인덕턴스를 함께 보정하고,
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
+- `sipi`: strict `sipi.circuit/1`에 RLGC/Touchstone 또는 형상 선로 문서와 소스/부하를 저장해 단자 응답·명시 누화를 재현합니다. [계약](packages/sipi/circuit_document.md).
 
 - `meshloom`: 커널의 첫 단계를 `meshloom._core`의 내부 구성 요소로 추가했습니다. 정확한 `orient3d`, `insphere`(점 번호 순서의 기호 섭동 포함), 평면 안 `incircle3d` 술어(부동소수점 필터 뒤 정확한 expansion), 점 집합의 Bowyer–Watson Delaunay 사면체 분할, 정확한 검증기입니다. 큰 정수·`Fraction` 행렬식과 비교했고 격자, 한 구 위의 점 껍질, 같은 평면 점 집합에서 확인했습니다. 기준 머신에서 균일한 점 10⁶개에 초당 16만 점입니다. [문서](packages/meshloom/overview.md#커널-구성-요소).
 
@@ -38,6 +95,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `meshine`: `extrude`가 Gmsh 없이 meshine 바닥 메시로 적층 사면체 메시를 만듭니다. 바닥 영역과 층마다 재료(또는 뺀 칸)를 주고, 하위 층은 `size`나 `divisions`로 나누며, 이웃 프리즘이 항상 맞도록 꼭짓점 순서 규칙으로 프리즘을 자르고, 면에 `z0`, `z1`, 바닥 옆면 이름, `void` 태그와 재료 사이 interface를 붙입니다. Gmsh가 없으면 건너뛰던 3D interop·비정형 공진기 시험에 적층 메시로 같은 단언을 쓰는 Gmsh 없는 쌍둥이 시험이 생겼습니다. [문서](packages/meshine/overview.md#적층-사면체-메시).
 
 - `sipi`: single-ended Touchstone 1/2 S 입력과 명시적 조건의 네트워크 비교를 제공합니다. 복소 보간은 범위 안에서 명시적으로 선택합니다. [계약과 검증](packages/sipi/touchstone.md).
+
+- `sipi`: `LineNetwork`의 명시 Thevenin 소스/부하를 연결해 단자 V/I·잔차·전력과 기준 전압이 명시된 주파수 NEXT/FEXT를 계산합니다. [계약·검증](packages/sipi/termination.md).
 
 - `simcase`: simcase가 galerkin의 공개 이름만 import하는지 시험이 확인합니다. `galerkin.core`와 밑줄 이름은 쓰지 않습니다. 목록에 적힌 예외는 정상 경계 계약의 사각형 메시 검사 하나이며, galerkin에 공개 메시 검사가 생기면 없앱니다.
 - 문서: 미분 계약 문서가 살아 있는 계수로 `galerkin.core` 커널을 조립하는 법을 적습니다. `galerkin.core`도 나머지 Python API와 같은 0.x 규칙을 따르고, `core.forms.matrix`는 모양만 검사하며(다른 공간에서 온 같은 모양의 표는 오류 없이 틀린 행렬을 만듦), 표 하나가 커널마다 넣을 DOF 표를 밝힙니다. 커널과 `forms.matrix`의 docstring도 같은 내용을 적습니다. `eval_edge_field_3d`가 계속 NumPy 전용인 이유도 적습니다. [문서](packages/galerkin/differentiation.md#core-커널을-직접-조립하기).

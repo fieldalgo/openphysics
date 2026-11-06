@@ -32,8 +32,8 @@ mesh and slab-mode checks that tell you whether to trust them.
 | Heat conduction | Steady isotropic 2D conduction; Dirichlet, prescribed-flux and Robin boundaries; rectangular headless JSON with side-constant boundary data and a dedicated Studio view | [Heat API](packages/galerkin/thermal_steady2d.md), [flux/Robin](packages/galerkin/thermal_flux_robin.md), [thermal JSON](packages/simcase/thermal_steady2d.md), [boundary JSON](packages/simcase/thermal_steady_boundary2d.md), [Studio](packages/simcase/thermal_studio.md) |
 | Transient heat | 2D Python engine and rectangular headless JSON/API/CLI/save; fixed P1, consistent mass/backward Euler, constant isotropic properties, explicit times and sampled Dirichlet/insulation; dedicated Studio time/field/history views | [Transient heat](packages/galerkin/transient_heat.md), [document](packages/simcase/thermal_transient2d.md), [validation](packages/galerkin/transient_heat_validation.md), [Studio](packages/simcase/thermal_transient_studio.md) |
 | Material regions | Piecewise-constant isotropic materials on named 2D mesh regions for steady and transient heat, elasticity, thermal expansion and both heat→mechanics workflows in Python; steady and transient heat JSON documents with shapes over a background | [Region materials](packages/galerkin/multimaterial.md), [region documents](packages/simcase/thermal_regions2d.md) |
-| Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction | [Elasticity](packages/galerkin/elasticity2d.md), [traction](packages/galerkin/elasticity_traction.md) |
-| Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow | [Prescribed temperature](packages/galerkin/prescribed_temperature_thermoelasticity.md), [total traction](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md) |
+| Solid mechanics | Static 2D linear elasticity, plane stress/strain and global Cartesian boundary traction; a headless rectangular JSON document with side displacement components, side tractions and a constant body force | [Elasticity](packages/galerkin/elasticity2d.md), [traction](packages/galerkin/elasticity_traction.md), [JSON contract](packages/simcase/mechanics2d.md) |
+| Thermal expansion | Prescribed nodal-temperature mechanics, optional total traction, and an explicit same-mesh steady heat→mechanics workflow; a headless rectangular JSON document that solves steady heat and then thermal stress | [Prescribed temperature](packages/galerkin/prescribed_temperature_thermoelasticity.md), [total traction](packages/galerkin/thermoelastic_traction.md), [workflow](packages/galerkin/thermal_mechanical_workflow.md), [JSON contract](packages/simcase/mechanics2d.md) |
 | Joule heating | Same-mesh steady electric/heat Python workflows; constant or temperature-dependent conductivity, elementwise power transfer and thermal energy balance | [Joule workflow](packages/galerkin/joule_heating.md) |
 | Transient thermal stress | Quasistatic linear small-strain mechanics at selected stored transient-heat times on the same fixed mesh, through an explicit second Python call | [Transient heat→mechanics](packages/galerkin/transient_thermal_mechanical.md) |
 
@@ -45,10 +45,12 @@ mesh and slab-mode checks that tell you whether to trust them.
 | 2D electrostatics and scattering | Yes | No | No |
 | 3D cavity: vacuum PEC, lossy materials and walls | Yes | `em.cavity3d` | No |
 | Steady electric conduction | Yes | Homogeneous rectangle | No |
-| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view |
+| Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view; workspace heat plate |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
-| Elasticity, thermal expansion, heat→mechanics | Yes | No | No |
+| Linear elasticity | Yes | Homogeneous rectangle `mechanics.elasticity2d` | No |
+| Steady heat→thermal stress | Yes | Homogeneous rectangle `mechanics.thermoelastic2d` | No |
+| Prescribed-temperature and transient heat→mechanics | Yes | No | No |
 | Steady Joule heating | Yes | Homogeneous rectangle, constant or σ(T) | No |
 
 Python-only capabilities do not automatically appear in JSON or Studio.
@@ -56,8 +58,9 @@ Python-only capabilities do not automatically appear in JSON or Studio.
 With the optional `simcase[export]` extra, saved results can be written as VTU
 files for ParaView: rectangular steady heat with Dirichlet and insulated sides,
 rectangular transient heat, steady/transient heat with material regions,
-and the vacuum PEC cavity. Transient heat supports one time or every stored
-time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#viewing-in-paraview).
+electric conduction and Joule heating, linear elasticity and thermal stress, and the
+cavities (vacuum PEC, or materials and lossy walls). Transient heat
+supports one time or every stored time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#viewing-in-paraview).
 
 ### Current limits
 
@@ -66,18 +69,21 @@ time as a `.pvd` series. See [Viewing in ParaView](packages/simcase/overview.md#
 - Transient heat has no restart, transient flux/Robin input or automatic coupling.
 - The steady heat→mechanics workflow does not yet accept the separate
   Robin/flux/traction extensions.
-- Mechanics (elasticity, thermal expansion, heat→mechanics) and 2D
-  electrostatics and scattering are Python-only.
+- Prescribed-temperature and transient heat→mechanics and 2D electrostatics and
+  scattering are Python-only; the mechanics documents cover one homogeneous
+  rectangle with side-constant data (isothermal elasticity, or steady heat then
+  thermal stress), with no regions.
 - 2D heat and mechanics are plane models per unit depth. JSON heat documents
   set boundary conditions only on the four outer sides of the domain.
 - `em.modes2d` supports passive absorption and [PML/leaky/constant-radius modes](packages/simcase/pml_modes.md);
   candidates require independent PML/mesh convergence checks. Variable curvature, nonlinear
   mechanics and geometry sweeps are not supported.
-- Studio rejects 3D models, takes heat documents with material regions only
-  within its region limits, and has no mechanics forms.
-- The VTU export rejects rectangular steady documents with flux or convection
-  sides (`boundary-v2`), lossy cavities and waveguide modes. Steady region
-  documents include their flux/Robin load arrays.
+- Studio rejects 3D models and mechanics documents, takes heat documents with
+  material regions only within its region limits, and has no mechanics forms.
+- The VTU export rejects waveguide modes. Steady heat and Joule documents
+  include their flux/Robin load arrays; complex cavity fields are written as
+  `_real`/`_imag` pairs; elasticity and thermoelastic strain and stress become
+  named scalar components.
 
 ## Packages
 

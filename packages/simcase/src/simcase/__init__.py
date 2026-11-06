@@ -23,24 +23,59 @@ can mesh without solving and a caching layer can redo only what changed:
     result = solve_point(model, doc.sole_physics()[1])
 """
 
-from .electric_joule import ElectricJouleRunResult
-from .cavity import CavityRunResult
-from .thermal import ThermalRunResult
-from .transient_thermal import TransientThermalRunResult
-from . import examples
-from .geometry import build_domain
-from .mesh_limits import MeshLimitError, check_mesh_limits
-from .complexity import RegionComplexity, region_complexity
-from .fields import VectorField
-from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
-from .schema import FORMAT, Document, DocumentError
-from .subspace_result import SubspaceSweepResult
-from .tracking import ModeTrackingError
-from .physics_pml_modes import ModeSelectionError
-from .units import unit_vocabulary
-
 __version__ = "0.1.0"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "ElectricJouleRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
+           "run", "RunResult", "ElectricJouleRunResult", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
            "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity"]
+
+
+_loading = False
+
+
+def _load_runner() -> None:
+    """Import the runner chain, in the order the package always imported it.
+
+    ``import simcase`` alone stays light, so a consumer of a light submodule such as
+    ``simcase.geometry_document`` does not pull in scipy, shapely or the solvers.
+    The first access to any public name below loads all of them, with the same
+    import side effects as before.
+    """
+    global _loading
+    _loading = True
+    try:
+        _import_runner()
+    finally:
+        _loading = False
+
+
+def _import_runner() -> None:
+    from .electric_joule import ElectricJouleRunResult
+    from .mechanics import MechanicsRunResult
+    from .cavity import CavityRunResult
+    from .thermal import ThermalRunResult
+    from .transient_thermal import TransientThermalRunResult
+    from . import examples
+    from .geometry import build_domain
+    from .mesh_limits import MeshLimitError, check_mesh_limits
+    from .complexity import RegionComplexity, region_complexity
+    from .fields import VectorField
+    from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
+    from .schema import FORMAT, Document, DocumentError
+    from .subspace_result import SubspaceSweepResult
+    from .tracking import ModeTrackingError
+    from .physics_pml_modes import ModeSelectionError
+    from .units import unit_vocabulary
+    names = dict(locals())
+    globals().update({k: names[k] for k in __all__ if k != "__version__"})
+
+
+def __getattr__(name: str):
+    if name in __all__ and not _loading:
+        _load_runner()
+        return globals()[name]
+    raise AttributeError(f"module 'simcase' has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))

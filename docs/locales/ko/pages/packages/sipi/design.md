@@ -35,6 +35,10 @@
 [제조 형상과 JSONv2](manufacturing_sections.md)에 형상·간격·스키마 변경을 정의합니다.
 v2에서는 모든 도체에 필수 `top_width`를 추가하며, 아래 표의 도체 필드는 기존v1 기준입니다.
 
+추가 단면은 [다각형·국소 마스크·JSONv3](polygon_sections.md)를 참고하십시오.
+`offset_stripline`, `coupled_stripline`, `broadside_stripline`, `with_surface_mask`는
+`sipi.templates`에서 제공합니다.
+
 ## 입력 문서
 
 ```python
@@ -52,7 +56,7 @@ JSON 최상위에는 아래 필드가 모두 필요하며 다른 필드는 허�
 
 | 필드 | 계약 |
 |---|---|
-| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"` |
+| `schema` | `"sipi.cross-section/1"` or `"sipi.cross-section/2"`; [v3](polygon_sections.md) |
 | `length_unit` | `"m"`; 암묵적 단위 변환 없음 |
 | `layers` | 비어 있지 않은 순서 있는 `{name, thickness, eps_r, tan_delta}` 배열 |
 | `traces` | 비어 있지 않은 순서 있는 `{name, x, width, y, thickness, ground}` 배열 |
@@ -112,3 +116,5 @@ print(result.parameter, result.impedance, result.refined_impedance)
 Linux, Python 3.12.14, NumPy 2.5.4, SciPy 1.18.1에서 47개 시험이 통과했습니다.
 다른 플랫폼과 설치 패키지 수락은 필수 CI에서 별도로 다룹니다. 기존 물리 참조 허용값은 그대로입니다.
 새 외부 의존성은 없으며 템플릿 동등성만으로 공면 구조 물리가 독립 검증됐다고 주장하지 않습니다.
+
+[상관 공차 분석과 고정 피치 샘플링](study.md).

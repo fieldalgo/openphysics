@@ -79,11 +79,14 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | 저장 layout 계열 | VTU / PVD |
 |---|---|
 | Dirichlet·단열 직사각형 정상 열 | VTU |
-| flux/convection 직사각형 정상 열 (`boundary-v2`) | 미지원 |
+| flux/convection 직사각형 정상 열 (`boundary-v2`), 하중 배열 포함 | VTU |
 | flux/Robin 필드를 포함한 정상 재료 영역 열 | VTU |
 | 직사각형·영역 과도 열 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
+| 열유속·대류 변이 있는 직사각형 과도 열(`transient-p1-node-cell-boundary-v1`), step별 하중 배열 두 개 포함 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
 | 진공 PEC 공동 | VTU |
-| 손실 공동·도파관 모드·전기/Joule 결과 | 이 exporter에서는 미지원 |
+| 전기 전도·Joule 가열 (`electric-joule2d-p1-v1`) | VTU |
+| 재료·손실 벽이 있는 공동 (`cavity3d-edge-complex-v1`) | VTU, 복소 장은 `_real`/`_imag` 쌍 |
+| 도파관 모드 (`em.modes2d`, `em-modes2d-p1-node-centroid-v1`) | 단일 지점은 VTU, sweep은 PVD(`export_sweep`); 절점은 미터로 변환, 복소 모드는 `_real`/`_imag` 쌍; subspace sweep(`em-modes2d-subspace-raw-v1`)과 `field_layout` 없이 저장된 결과는 거절 |
 
 영역 경로와 직사각형 boundary-v2 경로는 물리 조건이 비슷해도 layout이 다릅니다.
 내보내기 미지원이 해석 실패를 뜻하지는 않습니다. 정확한 범위와 해석은

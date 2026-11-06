@@ -14,7 +14,7 @@
 
 ## 실행 경로와 한계
 
-Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직사각형 모델과 [영역 한도](../packages/simcase/thermal_studio.md#영역-문서) 안의 영역 모델을 지원합니다. 과도 열전도는 flux/Robin 입력과 restart를 제공하지 않습니다. 후속 역학 해석은 아래의 명시적 연계 경로를 사용하세요.
+Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직사각형 모델과 [영역 한도](../packages/simcase/thermal_studio.md#영역-문서) 안의 영역 모델을 지원합니다. 과도 열전도의 flux/Robin 변은 Python에서 상수·공간 변화·시간 의존 값으로, JSON/CLI에서는 상수로 지원하며(Studio 제외) restart는 없습니다. 후속 역학 해석은 아래의 명시적 연계 경로를 사용하세요.
 
 ## 모델 문서와 사용 흐름
 
@@ -29,6 +29,7 @@ Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직
 ## Python 계약과 수식
 
 - [정상 2차원 열전도](../packages/galerkin/thermal_steady2d.md)
+- [사면체 메시의 정상 열전도](../packages/galerkin/thermal3d.md)
 - [정상 2D 외향 열유속과 대류](../packages/galerkin/thermal_flux_robin.md)
 - [고정 P1 메시의 과도 열전도](../packages/galerkin/transient_heat.md)
 - [이름 있는 영역별 구간 상수 재료](../packages/galerkin/multimaterial.md)

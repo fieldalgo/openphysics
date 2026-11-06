@@ -1,5 +1,7 @@
 # Rectangular cavity document and results
 
+[한국어](../../locales/ko/pages/packages/simcase/cavity3d.md)
+
 An `em.cavity3d` document holds one rectangular-box study. The case described
 first is a vacuum box with perfect electric conductor (PEC) conditions on all
 six faces; [Materials and conducting walls](#materials-and-conducting-walls)
@@ -238,7 +240,12 @@ Here `pec_edge_ids` lists only the edges of PEC walls; edges of conducting walls
 are unknowns. The normalization is `vacuum_mass_hermitian_unit_si`: `q^H M0 q = 1`
 with the vacuum edge mass `M0`, and the largest-magnitude coefficient of each mode
 is real and positive. The amplitude is arbitrary and is **not V/m**. Arrays load with
-`numpy.load(path, allow_pickle=False)`.
+`numpy.load(path, allow_pickle=False)`. `simcase.export.export_fields` writes this
+layout to VTU with each complex mode as the cell data `electric_field_mode_<k>_real`
+and `electric_field_mode_<k>_imag` (same normalization and `exp(+j*omega*t)`
+convention, so `real*cos(omega*t) - imag*sin(omega*t)` is the instantaneous field) and
+the material arrays as `_real`/`_imag` pairs; see
+[Viewing in ParaView](overview.md#viewing-in-paraview).
 
 Tests in `tests/simcase/test_cavity3d_materials.py` check:
 

@@ -94,7 +94,7 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 |---|---|---|---|
 | `numpy` | openphysics 외 전부(`>=1.26`) | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | 휠에 OpenBLAS와 GCC 런타임 라이브러리가 들어 있고, 그 가운데 libquadmath는 LGPL-2.1-or-later(GCC 예외 대상 아님). Linux와 macOS 14 미만에서는 별도 공유 라이브러리, macOS 14 이상에서는 없음(Apple Accelerate 사용), Windows에서는 GCC 런타임이 정적으로 링크된 OpenBLAS DLL과 `msvcp140.dll`. [묶인 구성 요소](#묶인-구성-요소) 참고 |
 | `scipy` | galerkin, galerkin-refsol, meshine, physmat, simcase(`>=1.11.2`) | BSD-3-Clause | 휠에 libquadmath(LGPL-2.1-or-later)를 포함한 GCC 런타임 라이브러리가 Linux와 모든 macOS에서 공유 라이브러리로 들어 있고, macOS 14 이상을 빼면 OpenBLAS도 들어 있음. Windows에서는 GCC 런타임이 OpenBLAS DLL과 확장 모듈 하나에 정적으로 들어 있음. Qhull은 정적 링크. [묶인 구성 요소](#묶인-구성-요소) 참고 |
-| `shapely` | simcase(`>=2.0.2`) | BSD-3-Clause | 휠에 GEOS(LGPL-2.1)가 Linux·macOS·Windows 모두 별도 공유 라이브러리로 들어 있고 shapely 자신의 확장 모듈이 동적으로 로드함. Windows 휠에는 `msvcp140.dll`도 있음. OpenPhysics는 shapely의 Python API만 부르고 어느 것도 재배포하지 않음. [묶인 구성 요소](#묶인-구성-요소) 참고 |
+| `shapely` | simcase, sipi(`>=2.0.2`) | BSD-3-Clause | 휠에 GEOS(LGPL-2.1)가 Linux·macOS·Windows 모두 별도 공유 라이브러리로 들어 있고 shapely 자신의 확장 모듈이 동적으로 로드함. Windows 휠에는 `msvcp140.dll`도 있음. OpenPhysics는 shapely의 Python API만 부르고 어느 것도 재배포하지 않음. [묶인 구성 요소](#묶인-구성-요소) 참고 |
 | `matplotlib` | simcase와 그림 extra(`>=3.8`) | LicenseRef-Matplotlib | PSF 기반 허용형 라이선스. 확장 모듈에 FreeType(FTL OR GPL-2.0-or-later, FTL로 사용), HarfBuzz, libraqm, SheenBidi, Qhull이 정적으로 들어 있고, 데이터 파일에 OFL-1.1·BaKoMa·Bitstream Vera 조건의 글꼴이 있음 |
 | `contourpy`, `cycler`, `kiwisolver` | matplotlib | BSD-3-Clause | |
 | `fonttools`, `pyparsing`, `six` | matplotlib | MIT | |
@@ -247,6 +247,7 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 | G. R. Hadley, J. Lightwave Technol. 20(7), 1210 (2002) | 출판된 사실 | `galerkin-refsol`의 benchmark 값. femwell(GPL-3.0)과 함께 공개된 표와 대조했고 숫자만 옮겼으며 코드·글은 옮기지 않음. [galerkin-refsol NOTICE](../../../../packages/galerkin-refsol/NOTICE) 참고 |
 | NAFEMS T4 벤치마크 목표값((0.6, 0.2) m에서 18.3 °C), DIANA FEA 튜토리얼(NAFEMS, *The Standard NAFEMS Benchmarks*, 1990 인용)과 FEATool `ex_heattransfer4.m`(Cameron, Casey, Simpson, *Benchmark Tests for Thermal Analysis*, NAFEMS, 1986 인용)에서 옮김 | 출판된 사실 | `refsol.thermal_convection`의 문제 설정과 목표값. 숫자만 옮겼으며 두 문서의 글·코드는 옮기지 않음. [galerkin-refsol NOTICE](../../../../packages/galerkin-refsol/NOTICE) 참고 |
 | handbook 유형의 열·기계 상수 | 근사 예제 입력 | 인증된 측정값이 아님. [자산 출처](assets.md) 참고 |
+| J. G. Hust, A. B. Lankford, *Thermal conductivity of aluminum, copper, iron, and tungsten for temperatures from 1 K to the melting point*, NBSIR 84-3007, National Bureau of Standards (1984), [doi:10.6028/NBS.IR.84-3007](https://doi.org/10.6028/NBS.IR.84-3007) | 미국 정부 저작물: 미국 안에서는 저작권 대상이 아님(17 U.S.C. 105). 미국 밖에서의 지위는 그 법률이 정하지 않으므로 여기에는 사실만 적고 판단하지 않음 | `physmat/thermal.py`가 Cu, Al, W의 출판된 식과 적합 매개변수를 계산함. 표나 글은 옮기지 않음. NIST Cryogenic Material Properties의 OFHC 구리 적합식과 Ho, Powell, Liley 1972 권장값(출판 수치, 시험에 인용)과 대조함. [physmat NOTICE](../../../../packages/physmat/NOTICE) 참고 |
 
 ## 비교용 레퍼런스 도구
 

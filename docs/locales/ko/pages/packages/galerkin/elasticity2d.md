@@ -95,7 +95,7 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))
 경계 성분의 traction은 모두 0입니다. x만 처방하면 경계 하중이 없는 한 y traction은
 0으로 남습니다. 선택적 `traction` 매핑으로 0이 아닌 전역 Cartesian 경계 traction을
 지원합니다. tag·콜백 법선·consistent 적분·처방 DOF의 하중은
-[traction 가이드](../../../../../packages/galerkin/elasticity_traction.md)를 보십시오. 점하중·주기 구속·다점
+[traction 가이드](elasticity_traction.md)를 보십시오. 점하중·주기 구속·다점
 구속은 지원하지 않습니다. 이 첫 API는 내부 처방 변위를 거부합니다.
 
 체적력 콜백은 모든 구적 좌표를 실수 `(Q,2)` 배열로 받고 정확히 같은 shape의 유한
@@ -190,8 +190,9 @@ nu=0.5는 거부하며 엄격한 nu<0.5 입력 검사를 통과해도 정확도�
 과도하게 뻣뻣할 수 있습니다. 매우 작은 변형률과 큰 병진을 함께 쓰면 부동소수점 정확도를
 잃을 수 있습니다.
 
-비선형 구성 법칙, 대변형, 접촉, 동역학, 3D, 열팽창, 다중물리 연성, simcase·Studio
-연결은 포함하지 않습니다. 소변형률·미소 회전은 모델 가정이지 자동으로 강제하는 진폭
+비선형 구성 법칙, 대변형, 접촉, 동역학, 3D, 열팽창, 다중물리 연성, Studio 연결은
+포함하지 않습니다. headless 직사각형 부분집합(변별 변위 성분, 직교좌표계 변 traction,
+상수 체적력)은 [선형탄성 문서](../simcase/mechanics2d.md)가 JSON/CLI로 제공합니다. 소변형률·미소 회전은 모델 가정이지 자동으로 강제하는 진폭
 한계가 아닙니다. 시험의 강체 회전은 유한 회전이 아닌 미소 회전장입니다.
 
 기존 NumPy/SciPy 의존성과 직접 유도한 식만 사용하며 외부 solver 구현을 복사하지

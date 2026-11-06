@@ -28,9 +28,17 @@ from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d,
 from .gmsh import read_msh, write_msh
 from .interop import from_mesher
 from .waveguide import assemble_mode_system, solve_modes
-from .cavity import CavityResult, solve_cavity_box
+from .cavity import CavityResult, solve_cavity, solve_cavity_box
 from .material_cavity import (CavityMaterialRegion, MaterialCavityResult,
-                              solve_material_cavity_box)
+                              solve_material_cavity, solve_material_cavity_box)
 from .postprocess import element_gradient, l2_error
+from .electrostatics import (ElementPermittivity, ElectrostaticsResult,
+                             solve_electrostatics, capacitance_matrix)
+from .mode_overlap import (vector_power, vector_cross_power, vector_field_overlap,
+                           normalize_vector, coupling_efficiency, confinement_factor,
+                           overlap_matrix, centroid_field, interpolate_vector_field,
+                           effective_area, scalar_power, scalar_overlap, normalize_scalar,
+                           scalar_coupling_efficiency, scalar_confinement_factor,
+                           scalar_effective_area)
 
 __version__ = "0.1.0"

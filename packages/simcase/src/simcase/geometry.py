@@ -149,8 +149,50 @@ def _rings(poly: Polygon):
 
 
 def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
-    """meshine Domain, boundary namer, and {region name: material name}."""
+    """meshine Domain, boundary namer, and {region name: material name}.
+
+    A document written with a version 1 geometry block is resolved by the exact
+    engine (``simcase.geometry_engine``) from its parsed model, so touches and
+    booleans are decided exactly and each coordinate is rounded once at the
+    hand-off; a 0.2 block goes through the shapely route as before.
+    """
+    if getattr(doc, "geometry_model", None) is not None:
+        return _domain_from_model(doc)[:3]
     return _domain_from_regions(doc)[:3]
+
+
+def _domain_from_model(doc: Document, max_input_vertices: int | None = None
+                       ) -> tuple[Domain, callable, dict[str, str], int]:
+    """The engine route of ``build_domain``, with the loop vertex count meshine receives."""
+    from .geometry_document import GeometryError, pm_per_unit
+    from .geometry_engine import evaluate
+    try:
+        rc = doc.geometry_complex if getattr(doc, "geometry_complex", None) is not None else evaluate(doc.geometry_model)
+        unit_pm = pm_per_unit(doc["units"])
+        dom = doc.domain
+        min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
+        domain, namer, materials = rc.to_domain(doc["mesh"]["size"], unit_pm=unit_pm, min_area=min_area_pm2)
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
+    doc.notes.extend(rc.notes)
+    doc.geometry_complex = rc
+    count = sum(lp.n if isinstance(lp, Circle) else len(lp) for _name, loops, _size in domain._pending for lp in loops)
+    if max_input_vertices is not None and count > max_input_vertices:
+        raise MeshLimitError("input_vertices", max_input_vertices, count)
+    return domain, namer, materials, count
+
+
+def provenance_edges_of(doc: Document, tri) -> dict | None:
+    """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
+    or None for a 0.2 document (no complex, no provenance)."""
+    from .geometry_document import GeometryError
+    rc = getattr(doc, "geometry_complex", None)
+    if rc is None:
+        return None
+    try:
+        return rc.provenance_edges(tri)
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
 
 
 def _circle_vertex_count(r: float, size: float) -> float:
@@ -175,7 +217,10 @@ def _domain_from_regions(doc: Document, regions=None, max_input_vertices: int | 
     MeshLimitError, and so does an exact circle whose own count alone is over it, before
     the Circle is made (a tiny global mesh.size would make it as large as memory allows,
     or overflow). With None nothing is checked and the build is exactly build_domain's.
+    A version 1 document takes the engine route with the same count and limit.
     """
+    if regions is None and getattr(doc, "geometry_model", None) is not None:
+        return _domain_from_model(doc, max_input_vertices)
     mesh_cfg = doc["mesh"]
     d = Domain(size=mesh_cfg["size"])
     dom = doc.domain

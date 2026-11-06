@@ -28,24 +28,31 @@
 - [2D 정상 전기전도](../packages/galerkin/electric_steady2d.md)
 - [정상 Joule heating](../packages/galerkin/joule_heating.md)
 - [재료 충전 직육면체 공동 솔버](../packages/galerkin/material_cavity.md)
+- [3D 솔버가 공유하는 사면체 메시 형식](../packages/galerkin/mesh3d_format.md)
 - [모드 복소 좌표](../packages/galerkin/modal_coordinates.md)
+- [모드 전력·중첩·결합](../packages/galerkin/mode_overlap.md)
 - [이름 있는 영역별 구간 상수 재료](../packages/galerkin/multimaterial.md)
 - [처방 온도장 열탄성: 2D 기계 단계](../packages/galerkin/prescribed_temperature_thermoelasticity.md)
 - [온도 의존 정상 Joule heating](../packages/galerkin/temperature_joule_heating.md)
 - [정상 2D 외향 열유속과 대류](../packages/galerkin/thermal_flux_robin.md)
 - [명시적인 정상 열전도 → 열탄성 기계단계](../packages/galerkin/thermal_mechanical_workflow.md)
 - [정상 2차원 열전도](../packages/galerkin/thermal_steady2d.md)
+- [사면체 메시의 정상 열전도](../packages/galerkin/thermal3d.md)
 - [처방 온도 열탄성과 전체 기계 traction](../packages/galerkin/thermoelastic_traction.md)
 - [고정 P1 메시의 과도 열전도](../packages/galerkin/transient_heat.md)
 - [과도 열전도에서 준정적 역학으로](../packages/galerkin/transient_thermal_mechanical.md)
 
 ## simcase 계약
 
+- [형상 문서: 0단계 계약](../packages/simcase/geometry_document.md)
+- [버전 1 형상 읽기(1단계)](../packages/simcase/geometry_reader.md)
+- [정확 2D 형상 엔진(2단계)](../packages/simcase/geometry_engine.md)
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
 - [PML·누설·일정 반경 모드](../packages/simcase/pml_modes.md)
 - [재료 영역이 있는 열전도 문서](../packages/simcase/thermal_regions2d.md)
+- [선형탄성·열탄성 문서](../packages/simcase/mechanics2d.md)
 - [직사각형의 headless 정상 열전도](../packages/simcase/thermal_steady2d.md)
 - [정상 외향 열유속·대류 문서](../packages/simcase/thermal_steady_boundary2d.md)
 - [Studio 정상 열전도](../packages/simcase/thermal_studio.md)
@@ -57,6 +64,8 @@
 
 ## SIPI 계약
 
+- [다각형 도체·국소 유전체·마스크·추가 스트립라인과 JSONv3](../packages/sipi/polygon_sections.md)
+
 - [인과적 Huray 표면 법칙과 선로 JSON v2](../packages/sipi/roughness.md)
 
 - [단면 템플릿·JSON·목표 임피던스 설계](../packages/sipi/design.md)
@@ -67,9 +76,15 @@
 - [고주파 도체 표면 손실](../packages/sipi/conductor.md)
 - [공유 메시의 주파수 선로 입력 모델](../packages/sipi/line_model.md)
 
+- [상관 공차 분석과 고정 피치 샘플링](../packages/sipi/study.md)
+
 
 - [DC·AC 도체 부피 메시, 전류 확산과 잔차](../packages/sipi/conductor_diffusion.md)
 
 [동일 기하 유한 금속·유전체 DC/AC RLGC와 버전 JSON](../packages/sipi/volume_line.md).
 
 [Touchstone 입력과 명시적 네트워크 비교](../packages/sipi/touchstone.md).
+
+- [종단 네트워크와 주파수 누화](../packages/sipi/termination.md)
+
+- [회로 입력 저장: 형상/네트워크·소스·부하·누화](../packages/sipi/circuit_document.md)

@@ -14,7 +14,7 @@ Choose steady or transient heat, then rectangular or material-region geometry. B
 
 ## Execution routes and limits
 
-Python and JSON/CLI support rectangular and region models. Studio supports rectangular models, and region models within its [region limits](../packages/simcase/thermal_studio.md#region-documents). Transient heat has no flux/Robin input or restart. For a subsequent mechanical solve, use the explicit coupling route below.
+Python and JSON/CLI support rectangular and region models. Studio supports rectangular models, and region models within its [region limits](../packages/simcase/thermal_studio.md#region-documents). Transient heat takes flux/Robin sides in Python (constant, spatially varying or time-dependent) and as constants in JSON/CLI (not in Studio), and has no restart. For a subsequent mechanical solve, use the explicit coupling route below.
 
 ## Model documents and workflows
 
@@ -29,6 +29,7 @@ Python and JSON/CLI support rectangular and region models. Studio supports recta
 ## Python contracts and formulations
 
 - [Steady two-dimensional heat conduction](../packages/galerkin/thermal_steady2d.md)
+- [Steady heat conduction on tetrahedral meshes](../packages/galerkin/thermal3d.md)
 - [Steady 2D outward heat flux and convection](../packages/galerkin/thermal_flux_robin.md)
 - [Transient heat on a fixed P1 mesh](../packages/galerkin/transient_heat.md)
 - [Piecewise-constant materials on named regions](../packages/galerkin/multimaterial.md)

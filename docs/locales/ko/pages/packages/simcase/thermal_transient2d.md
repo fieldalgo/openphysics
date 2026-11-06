@@ -4,8 +4,8 @@
 
 **한눈에 보기**
 
-- **하는 일:** `thermal.transient2d`는 과도 열전도 엔진을 `simcase` 문서 API·CLI·버전 JSON/NPZ 이력에 연결합니다. 고정된 균질 직사각형 하나, P1 삼각형, 일관 질량과 후진 Euler, 초 단위 명시 시간, 균일 또는 affine 초기 Kelvin, 변 상수 또는 표본 Dirichlet 값과 나머지 단열이며, 깊이당 계산입니다.
-- **한계:** 과도 열유속·Robin·복사, 가변 또는 영역별 k/c, 적응 시간 간격, Crank–Nicolson, 자동 연성, restart가 없습니다. 초기값을 projection하지 않고 유한한 음의 Kelvin을 clamp하지 않습니다.
+- **하는 일:** `thermal.transient2d`는 과도 열전도 엔진을 `simcase` 문서 API·CLI·버전 JSON/NPZ 이력에 연결합니다. 고정된 균질 직사각형 하나, P1 삼각형, 일관 질량과 후진 Euler, 초 단위 명시 시간, 균일 또는 affine 초기 Kelvin, 변 상수 또는 표본 Dirichlet 값, 상수 외향 열유속 또는 대류 변(정상 경계조건 계약과 같은 키, 시간에 무관)과 나머지 단열이며, 깊이당 계산입니다.
+- **한계:** 시간 의존 열유속·대류, 복사, 가변 또는 영역별 k/c, 적응 시간 간격, Crank–Nicolson, 자동 연성, restart가 없습니다. 초기값을 projection하지 않고 유한한 음의 Kelvin을 clamp하지 않습니다.
 - **검증:** 엔진 수치 기준은 galerkin 과도 열전도 검증 계약(아래 링크, 변경 없음)에 있고, 이 페이지는 문서·adapter·설치·저장 검사를 따로 나열합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
 ## 범위와 근거
@@ -46,6 +46,8 @@
 | heat_source_w_m3 | 유한 부호 있는 상수 Q, W/m³; 기본값 0 |
 | initial_temperature_k | 필수 유한 scalar K 또는 아래 affine object |
 | dirichlet_temperature_k | 필수 변 매핑; 빈 object는 완전 단열 |
+| outward_flux_w_m2 | 선택적 side→부호 있는 상수 g 매핑, W/m²; 존재하면 경계 layout 선택 |
+| convection | 선택적 side→객체 매핑; 정확히 h_w_m2k(유한 h >= 0, W/(m² K))와 ambient_temperature_k(유한 K >= 0); 존재하면 경계 layout 선택 |
 | study | type="transient"와 time_s만 |
 | study.time_s | 유한한 음이 아닌 실수 초 최소 두 개; 유한 양의 차이로 엄격히 증가; 0이 아닌 시작 허용 |
 | results | Boolean save_fields·plots; 기본값 true·false; plots=true 거절 |
@@ -96,6 +98,27 @@ abs(initial_i - d_i(t0)) <= 32*eps*max(1 K, abs(initial_i), abs(d_i(t0)))
 discrete maximum principle을 약속하지 않습니다. 부호 있는 Q는 가열·냉각을 허용합니다.
 별도 열→기계 전달은 계속 음의 K를 거절하며 이 adapter는 이를 바꾸지 않습니다.
 
+### 외향 열유속과 대류 변
+
+`outward_flux_w_m2`와 `convection`은 [정상 경계조건 계약](thermal_steady_boundary2d.md)의
+키이며 같은 코드가 읽습니다. `{side: g}`는 W/m² 단위의 유한한 부호 있는 상수 g(양수는
+열을 제거), `{side: {"h_w_m2k": h, "ambient_temperature_k": T_a}}`는 유한한 h >= 0과
+T_a >= 0입니다. `left`, `right`, `bottom`, `top`만 허용하고 각 조건은 외곽 변 전체를 덮으며,
+같은 변의 열유속 하나와 대류 하나는 더해지고, `dirichlet_temperature_k`에도 있는 변은
+거절합니다(`natural condition overlaps a fully Dirichlet side`). 조건은
+`galerkin.thermal.solve_steady_heat`·`galerkin.transient_heat.solve_transient_heat`와 같은
+`q.n = g + h*(T - T_a)`입니다.
+
+값은 상수입니다. `{"values_k": [...]}` 표본, callback, 복사는 없습니다. 문서는 상수만 넘기며
+엔진의 시간 의존 callback 형식은 문서로 노출하지 않습니다. 정상 문서와 달리 anchor가
+필요하지 않습니다. 질량/시간 항이 계를 well-posed하게 하므로 빈 Dirichlet 매핑과 h=0인 문서는
+유효한 단열 slab입니다. 두 키 중 하나가 있으면(빈 매핑이어도) 아래의 경계 결과 쌍
+`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`을 선택하고,
+두 키가 모두 없는 문서는 v1을 byte 단위로 유지합니다.
+
+과도 Studio route는 v1 쌍만 표시하며 이런 문서를 검증 전에 거절합니다(`unsupported_physics`,
+job 없음). API나 CLI로 headless 실행하세요. 영역 문서는 이 키를 받지 않습니다.
+
 ## 완전한 최소 JSON
 
 제공하는 `transient_thermal_uniform` 예제입니다.
@@ -130,6 +153,12 @@ discrete maximum principle을 약속하지 않습니다. 부호 있는 Q는 가�
 `"left": {"values_k": [300.0, 300.2, 300.6]}`으로 지정할 수 있습니다.
 각 표본은 해당 요청 시간에 대응하며 두 번째 인접 변을 선택하려면 공유 꼭짓점에서
 같은 수열이 필요합니다.
+
+제공하는 `transient_thermal_boundary` 예제(`python -m simcase example transient_thermal_boundary`)는
+400 K의 0.05 m × 0.01 m slab이며 `"convection": {"right": {"h_w_m2k": 500, "ambient_temperature_k": 300}}`
+외에는 단열입니다(k = 50 W/(m K), c = 3.6e6 J/(m³ K), Bi = 0.5). 10, 20, 40, 80 s에 저장합니다.
+온도장은 x 방향 1차원이며 `refsol.transient_heat_robin`의 대류 slab 급수와 비교할 수 있습니다.
+아래 [기준](#한계와-검증-단계)에 측정한 일치를 기록합니다.
 
 ## Python API와 이식 가능한 CLI 재현
 
@@ -215,6 +244,21 @@ D는 정렬된 고유 Dirichlet 절점 수입니다.
 `rate_time_s=time_s[1:]`에 대응합니다. 빈 Dirichlet 매핑에서는 D=0이며
 처방 온도 이력은 (Nt,0)입니다.
 
+`outward_flux_w_m2`나 `convection`이 있으면 식별자는
+`result_format="thermal.transient2d-result-v2"`,
+`field_layout="thermal2d-transient-p1-node-cell-boundary-v1"`이고 NPZ는 위 열세 배열에
+step별 이력 두 개를 더합니다.
+
+| 수치 NPZ 키 | Shape | 위치 / 시간축 | 단위 |
+|---|---|---|---|
+| prescribed_outward_load_w_per_m | (Nt-1,N) | nodes / time_s[1:] | W/m |
+| convective_outward_w_per_m | (Nt-1,N) | nodes / time_s[1:] | W/m |
+
+엔진의 G(적분한 처방 외향 열유속, 모든 step에서 같음)와 C_n = H*T_n - B(step 끝의 대류
+외향 rate)이며 수지는 `storage_n = source_load_n + reaction_n - G - C_n`이 됩니다. Summary의
+`outward_heat_w_per_m`은 `sum(G + C_n - reaction_n)`, `heat_balance_defect_w_per_m`은 이 식의
+defect입니다. Dirichlet thermostat 반력의 부호는 그대로입니다.
+
 양의 고정 절점 반력은 열을 주입하고 자유 절점 반력은 0입니다.
 외향 열은 Dirichlet thermostat 기여이며 별도로 복원한 경계 flux 적분이 아닙니다.
 
@@ -249,6 +293,11 @@ Rate와 H는 면외 깊이당 값이며 실제 두께 m를 곱하면 W와 J입�
 - `dirichlet_nodes`, `save_fields`, `timings_s`, 정의 문자열
   `reaction_sign`, `balance_equation`, `heat_content_definition`,
   `quadratic_functional_definition`.
+- 경계 layout에서는 `outward_flux_w_m2`, `convection`, Nt-1 step의
+  `prescribed_outward_heat_w_per_m`, `convective_outward_heat_w_per_m`,
+  `thermostat_outward_heat_w_per_m`, `outward_sign`, `natural_condition`을 더하고
+  `outward_heat_w_per_m`, `heat_balance_defect_w_per_m`, `reaction_sign`, `balance_equation`은
+  세 항의 합계를 설명합니다.
 
 시간 측정은 adapter 메시/준비와 solver 호출을 구분하며 전용 호스트 성능 기준선이나
 이식 가능한 시간 보장이 아닙니다. Summary 생성은 배열 유한성·차원/인덱스/CCW 형상·
@@ -309,9 +358,17 @@ Save·summary에는 추가 검증 복사본·압축 buffer가 필요합니다. �
 
 ## 한계와 검증 단계
 
-과도 flux/Robin/복사·가변/영역별 k/c·임의 메시/절점/수식 직렬화·adaptive time step·
-Crank–Nicolson·열 Studio 렌더링·자동 연성·restart는 추가하지 않습니다.
-별도 정상 flux/Robin이나 열→기계 문서 계약의 범위를 넓히지 않습니다.
+시간 의존 열유속·대류, 복사, 가변/영역별 k/c, 임의 메시/절점/수식 직렬화, adaptive time step,
+Crank–Nicolson, 경계 layout의 열 Studio 렌더링, 자동 연성, restart는 추가하지 않습니다.
+열→기계 문서 계약의 범위를 넓히지 않습니다.
+
+경계 키의 사전 등록 기준(`tests/simcase/test_transient_boundary.py`): S1 문서 실행은 직접
+`solve_transient_heat` 호출과 bit 단위로 같다. S2 Dirichlet만 있는 문서는 v1 식별자·배열·summary
+키·값을 유지한다. S3 40×2 셀, dt = 1 s, 80 s까지의 대류 slab 문서(Fo = 0.44, Bi = 0.5)는 80 s에서
+`refsol.transient_heat_robin` 급수와 100 K 상승 척도의 상대 L2 오차 <= 2e-3로 일치한다(2026-11-02
+Linux 측정 2.0e-4; 제공 예제 [20,2]·4 step은 5.6e-3이며 예시일 뿐 기준이 아님). S4 잘못된 키는 정상
+계약의 메시지로 거절되고 출력이 없다. S5 경계 layout은 step별 두 배열과 함께 meshio로 내보내지고
+이전 layout은 변하지 않는다.
 
 기존 [엔진 수치 gate](../galerkin/transient_heat_validation.md)는
 불변입니다.

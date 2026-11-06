@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
   "numpy>=1.26",
   "scipy>=1.11.2",
+  "shapely>=2.0.2",
   "galerkin>=0.1.0,<0.2",
   "meshine>=0.1.0,<0.2",
 ]

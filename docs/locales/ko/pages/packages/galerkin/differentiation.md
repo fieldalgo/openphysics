@@ -24,6 +24,7 @@ NumPy는 미분하지 않습니다.
 |---|---|
 | `solve_steady_heat` | `conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `dirichlet` 온도; `outward_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_electrostatics`, `capacitance_matrix` | `permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_potential` 전위(V); `charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
 | `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
 | `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
@@ -262,7 +263,9 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
   모드 좌표 함수(`mode_coordinates`, `scalar_coordinate_system`,
   `solve_scalar_coordinates`), `assemble_mode_system`(`solve_modes`는 미분합니다),
   `solve_dirichlet`, `l2_error`, `radial_pml_coeffs`(그 `k`, `r0`, `d`, `sigma_max`; PML
-  매개변수에 대해 미분하는 solver는 없습니다)도 거부합니다. JSON 문서와 명령행은 NumPy로
+  매개변수에 대해 미분하는 solver는 없습니다), 그리고
+  [`galerkin.mode_overlap`](mode_overlap.md)의 모드 후처리(전력, 중첩, 정규화, 결합
+  효율, 구속)도 거부합니다. JSON 문서와 명령행은 NumPy로
   돕니다.
 - `solve_temperature_joule_heat`는 어느 방법이든 입력에 JAX·PyTorch 값이 있으면 무엇을
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`

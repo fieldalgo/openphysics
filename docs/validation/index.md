@@ -57,6 +57,10 @@ records and plans do not establish a current pass; resource observations are not
 
 - [Measuring vector mode performance](../benchmark_vector.md)
 - [Measuring 3D PEC cavity time and memory](../benchmark_cavity.md)
+- [Measuring steady and transient heat conduction time](../benchmark_thermal.md)
+- [Measuring elasticity and thermoelastic workflow time](../benchmark_elasticity.md)
+- [Measuring electric conduction and Joule heating time](../benchmark_electric.md)
+- [Measuring the cost of derivatives](../benchmark_derivatives.md)
 - [Transient Studio resource observer](../transient_resource_probe.md)
 - [Region Studio resource observation](../region_resource_probe.md)
 
@@ -69,6 +73,7 @@ records and plans do not establish a current pass; resource observations are not
 - [Verify a waveguide against the slab solution](slab-tutorial.md)
 
 - [Line-network analytical and independent-tool checks](../packages/sipi/network_validation.md)
+- [Correlated tolerance studies and fixed-pitch sampling](../packages/sipi/study.md)
 - [Tapered conductors and planar coating: contract and validation](../packages/sipi/manufacturing_sections.md)
 - [Dispersive dielectrics: analytical, independent-tool and mesh checks](../packages/sipi/dielectrics.md#validation-and-reproduction)
 
@@ -77,3 +82,7 @@ records and plans do not establish a current pass; resource observations are not
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](../packages/sipi/volume_line.md).
 
 [Touchstone input and explicit network comparison](../packages/sipi/touchstone.md).
+
+- [Terminated networks: independent circuit and modal checks](../packages/sipi/termination.md)
+
+- [Saved circuit inputs: extraction/network, sources, loads and crosstalk](../packages/sipi/circuit_document.md)

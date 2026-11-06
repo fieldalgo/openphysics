@@ -32,6 +32,8 @@ impedance of a 50-ohm-class microstrip and of an edge-coupled differential pair.
 
 [Templates, JSON documents and target-impedance design](design.md).
 
+[Correlated tolerance studies and fixed-pitch sampling](study.md).
+
 ## What is computed
 
 The conductors run along z and the cross-section is small compared with the
@@ -197,14 +199,22 @@ Python 3.12, pinned environment.
 | D3 two pads, a = 0.5 mm, d = 10 mm, square plane 100 and 200 mm | `R = acosh(d/2a) / (pi sigma t)` = 0.4693 mΩ (equipotential discs, infinite sheet) | each within 1 %; doubling the plane changes R by ≤ 0.5 % | +0.27 %, −0.19 %; change −0.46 % |
 | D4 two loads and a cutout | Joule loss = Σ terminal voltage × current | 1e-9 | passed |
 
+## As a geometry document
+
+`sipi.geometry_v1.to_geometry_v1(section)` writes a cross-section as a version 1
+geometry block of the [simcase geometry document](../simcase/geometry_document.md),
+with its materials, conductors and box flags alongside. It is a plain dictionary and
+adds no dependency. See [the adapters](../simcase/geometry_reader.md#adapters-from-sipi-and-meshine).
+
 ## Not implemented
 
 - Measured material fitting and geometric/full-wave dispersion.
 - Time-domain responses. [Uniform-line S and Touchstone export](network.md) accept explicit RLGC.
 - 3D structures and power-delivery networks beyond DC planes: vias, several layers,
   plane resonances, AC PDN impedance, decoupling.
-- Layout import (Gerber, ODB++, IPC-2581), arbitrary polygonal conductors in
-  `CrossSection` and a Studio view. [Centred trapezoids, planar coatings and JSON v2](manufacturing_sections.md) are supported.
+- Layout import (Gerber, ODB++, IPC-2581), curved or holed conductors and a Studio view.
+  [Simple polygons, local masks and JSON v3](polygon_sections.md) and
+  [centred trapezoids and planar coatings](manufacturing_sections.md) are supported.
 - Magnetic substrates: `L` assumes `mu = mu0` everywhere.
 
 [Frequency-dependent dielectric models and extraction](dielectrics.md).
@@ -217,3 +227,7 @@ material and conductor extraction with RLGC/S.
 [Matched finite-metal/dielectric DC/AC RLGC and versioned JSON](volume_line.md).
 
 [Touchstone input and explicit network comparison](touchstone.md).
+
+[Terminated networks and frequency NEXT/FEXT](termination.md) accept explicit source/load impedances.
+
+[Saved circuit inputs: extraction/network, sources, loads and crosstalk](circuit_document.md).

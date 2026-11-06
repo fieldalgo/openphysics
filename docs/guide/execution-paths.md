@@ -13,7 +13,7 @@ across interfaces, but the interfaces do not expose identical capabilities.
 | Python `Document` + `run` | You want to automate supported simcase models in Python | Uses the same document contract as JSON/CLI |
 | JSON/CLI | You need repeatable model validation, batch execution and saved results | One supported physics entry per document; a document is not an arbitrary multiphysics graph |
 | Original Studio at `/` | You want browser editing of 2D optical or steady/transient heat models, rectangular or with material regions | No cavity, electric/Joule or mechanics editor; heat documents with material regions only within Studio's region limits |
-| Experimental workspace at `/workspace` | You want the bounded optical workflow and its session notebook | Fixed optical adapter; heated-waveguide screen is a setup preview |
+| Experimental workspace at `/workspace` | You want the bounded optical workflow with its session notebook, or a steady heat plate without JSON | Fixed optical adapter; one homogeneous rectangular heat plate whose results stay in the tab; heated-waveguide screen is a setup preview |
 
 ## Find the route for a physical problem
 
@@ -51,8 +51,8 @@ The original Studio and experimental workspace are served by `simcase-studio`,
 but their saved files have different contracts. Original editors use supported
 simcase model documents. Workspace input/session JSON is its own format; a
 session may contain results, and is not a headless solver document. Follow the
-[workspace guide](../packages/simcase/workspace.md) for its fixed geometry,
-wavelength, material choices, exports and restoration limits.
+[workspace guide](../packages/simcase/workspace.md) for its fixed window, wavelength
+and material ranges, heat plate, exports and restoration limits.
 
 The heated-waveguide workspace preview does not calculate coupled thermal–optical
 results. Switch to a supported document or Python workflow when you need controls
