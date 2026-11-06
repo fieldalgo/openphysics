@@ -147,13 +147,18 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
   아닌 이름은 읽을 때 거부됩니다.
 - `circle_segments: n`(정수, 8 이상)은 선택된 곡선이 놓인 원, 또는 선택된 셀을 둘러싸는 원마다 0.2 규칙 대신 꼭짓점
   수를 정합니다. 잘린 원의 원호는 `n`의 제 몫을 가집니다. `n`에서 현이 이웃 곡선을 가로지르는 온전한 원은 여유에
-  필요한 수로 올리고 그 사실을 `doc.notes`에 적습니다.
+  필요한 수로 올리고 그 사실을 러너에 준 문서의 `notes`에 적습니다(`build_mesh`, 영역 열·과도 영역 실행). 결과의
+  문서는 읽을 때마다 재검증되어 notes가 비워지므로 실행한 문서에서 읽습니다.
 - `size: h`(`units.length` 단위의 양의 길이, 문서와 함께 변환)는 선택된 셀의 메시 크기를 피처의 `mesh_size`보다
   우선해 정합니다. 경계 선택의 size는 아직 구현되지 않아 이름 밝혀 거부되고, 계약의 `z_divisions`와 거리 등급도
   그렇습니다.
 
-`rc.to_domain(size, controls=[...])`는 같은 항목을 `size`가 pm인 채로 받고(`Document.controls_pm()`),
-`rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
+`rc.to_domain(size, controls=[...])`는 같은 항목을 `size`가 pm인 채로 받고(`Document.controls_pm()`, 항목을 먼저
+검사), `rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
+
+러너의 µm 사본(`runner.micrometre_document`)은 버전 1 블록을 문서 자신의 단위로 둔 채 `units.length`만 µm라고
+말합니다(엔진은 단위와 무관해 블록을 다시 읽지 않음). 사본은 그 단위를 `geometry_block_unit`에 적고 `to_dict()`·
+`save()`를 거부합니다. 결과는 원본 문서를 기록합니다.
 
 ## 검증
 

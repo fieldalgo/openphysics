@@ -564,9 +564,12 @@ def s11_fixtures(kind):
     two_physics['physics']['second'] = copy.deepcopy(next(iter(region['physics'].values())))
     version_1 = copy.deepcopy(region)
     version_1['geometry'] = from_v02(region['geometry'])
+    version_1_rectangle = copy.deepcopy(rectangle)
+    version_1_rectangle['geometry'] = from_v02(rectangle['geometry'])
     return {'rectangle': rectangle, 'region': region, 'shapes_only': shapes_only,
             'background_only': background_only, 'geometry_list': geometry_list, 'no_geometry': no_geometry,
-            'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1}
+            'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1,
+            'version_1_rectangle': version_1_rectangle}
 
 
 @pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
@@ -576,7 +579,15 @@ def test_s11_applies_agrees_with_the_engine_rule(kind):
     assert decided == {name: has_region_geometry(doc, kind) for name, doc in s11_fixtures(kind).items()}
     assert decided == {'rectangle': False, 'region': True, 'shapes_only': True, 'background_only': True,
                        'geometry_list': False, 'no_geometry': False, 'physics_not_dict': False,
-                       'two_physics': True, 'version_1': True}
+                       'two_physics': True, 'version_1': True, 'version_1_rectangle': False}
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s11_a_homogeneous_version_1_rectangle_validates_on_the_rectangle_path(client, kind):
+    doc = s11_fixtures(kind)['version_1_rectangle']
+    response = post(client, doc, 'validate')
+    assert response.status_code == 200 and response.json()['ok'] is True, response.text
+    assert 'version' in response.json()['doc']['geometry'] or 'shapes' not in response.json()['doc']['geometry']
 
 
 # ---- S15: version 1 geometry documents take the region path as written -------------------

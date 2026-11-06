@@ -62,17 +62,14 @@ class RegionLimits:
 def applies(raw, kind):
     """A raw document of physics ``kind`` that declares region geometry.
 
-    The same rule as simcase's own choice of the region path: a physics entry of that type
-    and a ``geometry`` object with ``shapes`` or ``background``, or a version 1 block
-    (``version``; a homogeneous rectangle written so is compiled to the 0.2 form with a
-    ``background`` at load, so it stays on this path). Thermal defaults add only
-    ``geometry.domain``, so the raw and the merged document agree."""
-    if not isinstance(raw, dict) or not isinstance(raw.get("physics"), dict):
-        return False
-    typed = any(isinstance(p, dict) and p.get("type") == kind for p in raw["physics"].values())
-    geometry = raw.get("geometry")
-    return typed and isinstance(geometry, dict) and ("shapes" in geometry or "background" in geometry
-                                                    or "version" in geometry)
+    simcase's own choice of the region path (``simcase.thermal_regions.has_region_geometry``):
+    a physics entry of that type and a ``geometry`` object with ``shapes`` or ``background``,
+    or a version 1 block whose component has features or a background material (a
+    homogeneous rectangle written as version 1 is compiled to the 0.2 rectangle form at load
+    and takes the rectangle path). Thermal defaults add only ``geometry.domain``, so the raw
+    and the merged document agree."""
+    from simcase.thermal_regions import has_region_geometry
+    return has_region_geometry(raw, kind)
 
 
 def raw_preflight(raw, kind, limits):

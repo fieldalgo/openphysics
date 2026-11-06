@@ -198,9 +198,12 @@ class Document:
     scale: Scale = field(default=units.SI, init=False, repr=False)
     #: magnitude warnings from validate(); a scale error is not an invalid document
     notes: list[str] = field(default_factory=list, init=False, repr=False)
-    #: the version 1 geometry block as written, when the document had one; ``data``
-    #: then holds its 0.2 compilation, which is what the runners read and record
+    #: the version 1 geometry block as written, when the document had one; ``data`` holds
+    #: the same block for a 2D region component and its 0.2 compilation otherwise
     geometry_source: dict | None = field(default=None, init=False, repr=False)
+    #: the length unit the version 1 block in ``data`` is written in when it differs from
+    #: ``units.length``: set on the runner's micrometre copy, which then refuses to_dict()
+    geometry_block_unit: str | None = field(default=None, init=False, repr=False)
     #: values the version 1 reader moved onto the 1 pm grid (simcase.geometry_document.Rounding)
     geometry_roundings: list = field(default_factory=list, init=False, repr=False)
     #: the parsed version 1 block (simcase.geometry_document.GeometryModel, integer pm); the
@@ -260,7 +263,15 @@ class Document:
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def to_dict(self) -> dict:
-        """The document as written: a version 1 geometry block comes back unchanged."""
+        """The document as written: a version 1 geometry block comes back unchanged.
+
+        The micrometre copy a runner meshes (``runner.micrometre_document``) keeps a version
+        1 block in the original unit while its ``units.length`` says micrometres, so it
+        refuses; serialise the original document, as the results do."""
+        unit = self.geometry_block_unit
+        if unit is not None and unit != self.data.get("units", {}).get("length"):
+            raise DocumentError(f"this is the runner's micrometre copy: its geometry block is written in {unit!r} "
+                                "while units.length is micrometres; serialise the original document")
         data = copy.deepcopy(self.data)
         if self.geometry_source is not None:
             data["geometry"] = copy.deepcopy(self.geometry_source)
@@ -271,6 +282,7 @@ class Document:
 
     def copy(self) -> "Document":
         other = Document(copy.deepcopy(self.data))
+        other.geometry_block_unit = self.geometry_block_unit
         other.geometry_source = copy.deepcopy(self.geometry_source)
         other.geometry_roundings = list(self.geometry_roundings)
         other.geometry_model = self.geometry_model
@@ -445,8 +457,12 @@ class Document:
                                     "boundary is not implemented yet (give the size to a region)")
 
     def controls_pm(self) -> list[dict]:
-        """``mesh_controls()`` with each ``size`` as an integer pm count, for the engine hand-off."""
+        """``mesh_controls()`` with each ``size`` as an integer pm count, for the engine hand-off.
+
+        The entries are checked first (``check_mesh_controls``), so a document built without
+        ``from_dict`` is refused by name here rather than failing inside the engine."""
         from fractions import Fraction
+        self.check_mesh_controls()
         unit_pm = self._pm_per_unit()
         out = []
         for entry in self.mesh_controls():

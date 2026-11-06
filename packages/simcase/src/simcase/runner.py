@@ -102,7 +102,7 @@ def build_mesh(doc: Document) -> MeshedModel:
     # so the same mesh. Coordinates go back to the document unit afterwards.
     canonical = micrometre_document(doc)
     domain, namer, region_materials = build_domain(canonical)
-    doc.notes.extend(note for note in canonical.notes if note.startswith("geometry."))
+    doc.notes.extend(note for note in canonical.notes if note.startswith(("geometry.", "mesh.controls:")))
     mcfg = canonical["mesh"]
     size_fn = None
     if mcfg.get("grading"):
@@ -191,8 +191,11 @@ def micrometre_document(doc: Document) -> Document:
         gaussian["center"] = [um(c) for c in gaussian["center"]]
     d["units"] = dict(d["units"], length="um")
     if doc.is_version_1:
-        # the block is not re-read in micrometres: the model travels with the copy
+        # the block is not re-read in micrometres: the model travels with the copy, and the
+        # block in the copy's data stays in the document's unit (geometry_block_unit), so the
+        # copy refuses to be serialised; results record the original document
         out = Document(d)
+        out.geometry_block_unit = doc.geometry_block_unit or doc["units"]["length"]
         out.geometry_model = doc.geometry_model
         out.geometry_complex = doc.geometry_complex
         out.geometry_source, out.geometry_roundings = doc.geometry_source, list(doc.geometry_roundings)

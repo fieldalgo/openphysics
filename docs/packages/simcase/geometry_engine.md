@@ -204,15 +204,24 @@ it). Each entry is `{"select": <target>, <one control>}`; later entries win.
   circle that the selected curves lie on, or that bounds a selected cell, in
   place of the 0.2 rule. A cut circle's arcs take their share of `n`. A whole
   circle whose chords at `n` would cut across a neighbouring curve is raised to
-  the count the clearance needs and the raise is noted in `doc.notes`.
+  the count the clearance needs and the raise is noted in the `notes` of the
+  document given to the runner (`build_mesh`, the region heat and transient
+  region runs); a result's own document is re-validated on every read, which
+  resets its notes, so read the note on the document you ran.
 - `size: h` (a positive length in `units.length`, converted with the document)
   sets the mesh size of the selected cells, over the feature's own `mesh_size`.
   A size on a boundary selection is not implemented yet and is refused by name,
   as are the contract's `z_divisions` and distance grading.
 
 `rc.to_domain(size, controls=[...])` takes the same entries with `size` in
-picometres (`Document.controls_pm()`); `rc.select(expr)` resolves a target to
-`("region", cells)` or `("boundary", curves)`.
+picometres (`Document.controls_pm()`, which checks the entries first); `rc.select(expr)`
+resolves a target to `("region", cells)` or `("boundary", curves)`.
+
+The runner's micrometre copy (`runner.micrometre_document`) keeps a version 1
+block in the document's own unit while its `units.length` says micrometres (the
+engine is unit-free, so nothing re-reads the block); the copy records that unit
+in `geometry_block_unit` and refuses `to_dict()` and `save()`. Results record
+the original document.
 
 ## Validation
 
