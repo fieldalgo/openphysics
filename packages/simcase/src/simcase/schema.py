@@ -106,7 +106,12 @@ def check_format_units_and_tags(doc: "Document") -> None:
         doc.scale = units.resolve(d.get("units"))
     except UnitError as exc:
         raise DocumentError(str(exc)) from None
-    reject_tagged_values(d)
+    geometry = d.get("geometry")
+    if isinstance(geometry, dict) and "version" in geometry:
+        # a version 1 block writes points as [x, y] with expressions; the reader checks it
+        reject_tagged_values({k: v for k, v in d.items() if k != "geometry"})
+    else:
+        reject_tagged_values(d)
 
 
 def reject_tagged_values(node, path: str = "") -> None:
@@ -215,26 +220,36 @@ class Document:
         geometry = d.get("geometry")
         if isinstance(geometry, dict) and "version" in geometry:
             # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
-            # exactly and compiled to the 0.2 form the validators read and the results record;
-            # the envelope stays 0.2, and the mesh comes from the exact engine (geometry.build_domain).
-            from .geometry_document import GeometryError, parse, to_v02
+            # exactly. A 2D region component stays in ``data`` as written: the validators
+            # read it through the accessors (domain, background, regions) and the exact
+            # engine meshes it (geometry.build_domain). A homogeneous rectangle or a box-only
+            # 3D component is compiled to the 0.2 form its kind reads. The envelope stays 0.2.
+            from .geometry_document import GeometryError, _pick, parse, to_v02
             try:
                 model = parse(d)
-                compiled = to_v02(model, validation=True)
-                if any(f.type == "segment" for c in model.components.values() for f in c.features):
-                    from .geometry_engine import check_handoff, evaluate
-                    complex_ = evaluate(model)
-                    check_handoff(complex_)
+                comp = _pick(model, None)
+                homogeneous = not comp.features and "material" not in comp.background
+                if comp.dimension == "3d" or homogeneous:
+                    d = {**d, "geometry": to_v02(model, validation=True)}
+                else:
+                    d = {**d, "geometry": copy.deepcopy(geometry)}
             except GeometryError as exc:
                 raise DocumentError(str(exc)) from None
             source, roundings = copy.deepcopy(geometry), model.roundings
-            d = {**d, "geometry": compiled}
         kind = kind_of(d)
         defaults = DEFAULTS if kind.defaults is None else kind.defaults()
         doc = cls(_merge(defaults, d))
+        if model is not None and "version" in d["geometry"]:
+            doc.data["geometry"] = d["geometry"]            # the kind's 0.2 geometry defaults do not apply
+        doc.geometry_model = model
         doc.validate()
-        doc.geometry_source, doc.geometry_roundings, doc.geometry_model = source, list(roundings), model
-        doc.geometry_complex = complex_
+        doc.geometry_source, doc.geometry_roundings = source, list(roundings)
+        if doc.is_version_1 and any(f.type == "segment" for f in doc.component.features):
+            from .geometry_engine import check_handoff
+            try:
+                check_handoff(doc.complex())
+            except GeometryError as exc:
+                raise DocumentError(str(exc)) from None
         doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
                          for r in roundings)
         return doc
@@ -280,12 +295,81 @@ class Document:
         node[parts[-1]] = value
 
     @property
+    def is_version_1(self) -> bool:
+        """``data['geometry']`` is a version 1 block (a 2D region component kept as written)."""
+        return self.geometry_model is not None and "version" in self.data["geometry"]
+
+    @property
+    def component(self):
+        """The one component of a version 1 geometry block (``geometry_document.Component``)."""
+        from .geometry_document import _pick
+        return _pick(self.geometry_model, None)
+
+    def complex(self):
+        """The region complex of a version 1 document, evaluated once and kept."""
+        if self.geometry_complex is None:
+            from .geometry_engine import evaluate
+            self.geometry_complex = evaluate(self.geometry_model)
+        return self.geometry_complex
+
+    def _pm_per_unit(self):
+        from .geometry_document import pm_per_unit
+        return pm_per_unit(self.data.get("units"))
+
+    def _length(self, k) -> float:
+        """An integer pm count of the model in this document's length unit, rounded once."""
+        from fractions import Fraction
+        return float(Fraction(k) / self._pm_per_unit())
+
+    @property
     def shapes(self) -> list[dict]:
+        if self.is_version_1:
+            raise DocumentError("a version 1 geometry block has features, not shapes; read regions()")
         return self.data["geometry"]["shapes"]
 
     @property
     def domain(self) -> dict:
+        """The domain bounds in the document's length unit, whatever block form it holds."""
+        if self.is_version_1:
+            return {k: self._length(v) for k, v in self.component.domain.items()}
         return self.data["geometry"]["domain"]
+
+    @property
+    def background(self) -> dict:
+        """``{"material": ..., "mesh_size": ...}`` of the background; keys only when given."""
+        if self.is_version_1:
+            bg = self.component.background
+            out = {}
+            if "material" in bg:
+                out["material"] = bg["material"]
+            if "mesh_size" in bg:
+                out["mesh_size"] = self._length(bg["mesh_size"])
+            return out
+        return self.data["geometry"]["background"]
+
+    def regions(self) -> list[dict]:
+        """One entry per declared region, in order: ``{"name", "material", "mesh_size", "type"}``.
+
+        A 0.2 block gives its shapes. A version 1 block gives its area features grouped by
+        ``region`` (merged features share one entry with the smallest mesh_size); ``type``
+        is the feature type, or ``"region"`` for a merge; ``material`` is None for void.
+        """
+        if not self.is_version_1:
+            return [{"name": s["name"], "material": s["material"], "mesh_size": s.get("mesh_size"), "type": s["type"]}
+                    for s in self.data["geometry"]["shapes"]]
+        out: dict[str, dict] = {}
+        for f in self.component.features:
+            if f.type in ("segment", "layers"):
+                continue
+            size = None if f.mesh_size is None else self._length(f.mesh_size)
+            entry = out.get(f.region)
+            if entry is None:
+                out[f.region] = {"name": f.region, "material": f.material, "mesh_size": size, "type": f.type}
+            else:
+                entry["type"] = "region"
+                if size is not None and (entry["mesh_size"] is None or size < entry["mesh_size"]):
+                    entry["mesh_size"] = size
+        return list(out.values())
 
     @property
     def length_unit(self) -> str:
@@ -313,14 +397,14 @@ class Document:
         d = self.data
         check_format_units_and_tags(self)
         g = d["geometry"]
-        dom = g.get("domain")
+        dom = g.get("domain") if not self.is_version_1 else self.domain
         if not dom or any(k not in dom for k in ("xmin", "xmax", "ymin", "ymax")):
             raise DocumentError("geometry.domain needs xmin, xmax, ymin, ymax")
         if not (dom["xmin"] < dom["xmax"] and dom["ymin"] < dom["ymax"]):
             raise DocumentError("geometry.domain is empty")
         validate_mode_overlap(d["results"], dom, DocumentError)
         names = set()
-        for i, s in enumerate(g["shapes"]):
+        for i, s in enumerate([] if self.is_version_1 else g["shapes"]):
             t = s.get("type")
             if t not in SHAPE_TYPES:
                 raise DocumentError(f"shape {i}: unknown type {t!r} (rect, circle, polygon)")
@@ -338,7 +422,7 @@ class Document:
                 raise DocumentError(f"shape {s['name']}: r must be positive")
             if t == "polygon" and len(s["points"]) < 3:
                 raise DocumentError(f"shape {s['name']}: polygon needs >= 3 points")
-        if "material" not in g["background"]:
+        if "material" not in self.background:
             raise DocumentError("geometry.background needs a material")
         if not isinstance(d["materials"], dict):
             raise DocumentError("materials must be an object mapping names to material definitions")
@@ -368,7 +452,7 @@ class Document:
             if not (isinstance(p["wavelength"], (int, float)) and p["wavelength"] > 0):
                 raise DocumentError(f"{where}.wavelength must be a positive number (use study.sweep for several)")
             from .pml_contract import validate as validate_pml
-            validate_pml(p, d["geometry"]["domain"], where, DocumentError)
+            validate_pml(p, dom, where, DocumentError)
             if p["formulation"] == "vector":
                 for key in ("wavelength", "n_cladding", "num_modes"):
                     value = p.get(key)
@@ -452,14 +536,15 @@ class Document:
         return kind_of(self.data).summary(self)
 
     def em_modes2d_summary(self) -> str:
-        g, p, m, st = self.data["geometry"], self.data["physics"], self.data["mesh"], self.data["study"]
+        p, m, st = self.data["physics"], self.data["mesh"], self.data["study"]
+        dom, bg = self.domain, self.background
         length = self.length_unit
         lines = [f"{self.data['name']}  (openphysics {FORMAT})",
-                 f"  domain x [{g['domain']['xmin']}, {g['domain']['xmax']}]  y [{g['domain']['ymin']}, {g['domain']['ymax']}] {length}",
-                 f"  background: {g['background']['material']}"]
-        for s in g["shapes"]:
+                 f"  domain x [{dom['xmin']}, {dom['xmax']}]  y [{dom['ymin']}, {dom['ymax']}] {length}",
+                 f"  background: {bg.get('material')}"]
+        for s in self.regions():
             lines.append(f"  shape {s['name']}: {s['type']} of {s['material']}" +
-                         (f", mesh {s['mesh_size']} {length}" if "mesh_size" in s else ""))
+                         (f", mesh {s['mesh_size']} {length}" if s["mesh_size"] is not None else ""))
         for pname, ph in p.items():
             lines.append(f"  physics {pname}: {ph['type']} {ph['formulation']}, lambda {ph['wavelength']} {length}, "
                          f"{ph['num_modes']} mode(s), boundary {ph['boundary']}")

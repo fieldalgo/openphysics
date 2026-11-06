@@ -95,8 +95,42 @@ def region_complexity(data, *, max_shapes: int | None = None, max_circles: int |
 
 def _shape_list(data) -> list:
     geometry = data.get('geometry') if isinstance(data, dict) else None
+    if isinstance(geometry, dict) and 'version' in geometry:
+        return _version_1_shapes(geometry)
     shapes = geometry.get('shapes') if isinstance(geometry, dict) else None
     return shapes if isinstance(shapes, list) else []
+
+
+def _version_1_shapes(geometry) -> list:
+    """The area features of a raw version 1 block as 0.2-shaped dicts for counting: a
+    trapezoid and a path count as polygons of their corner points, a segment not at all.
+    A field written as an expression is not a number and contributes no segment."""
+    comps = geometry.get('components')
+    if not isinstance(comps, dict) or len(comps) != 1:
+        return []
+    (comp,) = comps.values()
+    feats = comp.get('features') if isinstance(comp, dict) else None
+    out = []
+    for f in feats if isinstance(feats, list) else []:
+        if not isinstance(f, dict):
+            out.append(f)
+            continue
+        t = f.get('type')
+        if t in ('rect', 'circle', 'polygon'):
+            out.append(f)
+        elif t == 'trapezoid':
+            cx, y, w, h = (f.get(k) for k in ('cx', 'y', 'w', 'h'))
+            wt = f.get('w_top', w)
+            nums = all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (cx, y, w, h, wt))
+            pts = [[cx - w / 2, y], [cx + w / 2, y], [cx + wt / 2, y + h], [cx - wt / 2, y + h]] if nums else []
+            out.append({**f, 'type': 'polygon', 'points': pts})
+        elif t == 'path':
+            pts = [f.get('start')]
+            for s in f.get('segments') if isinstance(f.get('segments'), list) else []:
+                if isinstance(s, dict):
+                    pts.append(s.get('line') if 'line' in s else (s.get('arc') or {}).get('to'))
+            out.append({**f, 'type': 'polygon', 'points': pts})
+    return out
 
 
 def _number(value) -> float | None:

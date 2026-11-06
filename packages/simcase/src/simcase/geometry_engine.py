@@ -850,7 +850,11 @@ class RegionComplex:
 
 def evaluate(model: GeometryModel, component: str | None = None) -> RegionComplex:
     """The region complex of one 2D or axisymmetric component."""
-    comp = _pick(model, component)
+    return evaluate_component(_pick(model, component))
+
+
+def evaluate_component(comp: Component) -> RegionComplex:
+    """The region complex of a parsed component (``geometry_document.Component``)."""
     if comp.dimension == "3d":
         raise GeometryError(f"component {comp.name!r}: the 2D engine takes 2d and axisymmetric components")
     return _Engine(comp).run()

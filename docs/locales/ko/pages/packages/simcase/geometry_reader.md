@@ -11,12 +11,13 @@
 ## 문서 안에서
 
 문서는 `"openphysics": "0.2"`를 그대로 두고, `geometry` 블록만 `"version": 1`을 가집니다. `Document.from_dict`와
-`Document.load`는 이런 블록을 `parse`로 읽고 `to_v02`로 컴파일해 실행기에 0.2 형식을 넘깁니다. 그래서 모든 실행기가
-바뀌지 않은 채 동작하고, 받을 수 없는 형상은 거부합니다. 이런 문서의 메시는 파싱한 모델(`doc.geometry_model`)을 들고 있는
+`Document.load`는 이런 블록을 `parse`로 읽습니다. 2D 영역 구성 요소는 쓴 그대로 `doc.data`에 남고 실행기는 접근자
+`doc.domain`·`doc.background`·`doc.regions()`로 읽습니다. 균질 사각형이나 상자만 있는 3D 구성 요소는 `to_v02`로 그
+종류가 읽는 0.2 형식으로 컴파일됩니다. 메시는 파싱한 모델(`doc.geometry_model`)을 들고 있는
 [2단계 엔진](geometry_engine.md)이 만듭니다. `version`이 없는 블록은 지금처럼 읽습니다.
 
-- `doc.data`에는 컴파일된 0.2 형상이 들어 있습니다. 문서를 기록하는 결과 파일은 이 형식을 기록하고, 메시 자체는
-  `doc.geometry_model`이 들고 있는 정확한 모델에서 나옵니다. 컴파일은 유도 모서리의 한 번 반올림까지 그 모델을 기술합니다.
+- `doc.data`에는 2D 영역 구성 요소라면 버전 1 블록이(결과 파일도 쓴 그대로 기록), 균질 사각형이나 3D 구성 요소라면
+  컴파일된 0.2 형상이 들어 있습니다.
 - `doc.geometry_source`에는 쓴 그대로의 버전 1 블록이 들어 있고, `doc.save`·`doc.to_dict`·`doc.copy`가 이를 유지합니다.
 - 1 pm 격자로 옮긴 값은 `doc.geometry_roundings`에 남고 `doc.notes`로 보고됩니다.
 
@@ -90,10 +91,10 @@ out["mesh_size"], out["mesh_controls"]         # 기본 크기, Circle 꼭짓점
 ## 아직 하지 않는 일
 
 - 선택자 해석과 영역 구성 만들기. [2단계 엔진](geometry_engine.md)이 그 일을 하고 문서를 메시합니다.
-- `path` 피처, 병합 영역, 축대칭 컴포넌트, 원통, 구, `extrude` 피처, 빈 공간(`material: null`)을 `Document`로
-  읽는 것. 검증기와 결과는 여전히 0.2 컴파일을 읽는데 거기에는 이들의 형식이 없으므로 `to_v02`가 이름을 밝혀
-  거부합니다. `finalize: "imprint"`와 `segment` 피처는 읽힙니다(`to_v02(..., validation=True)`가 도형은 그대로
-  두고 segment는 뺍니다). 엔진이 그것들을 메시하기 때문입니다.
+- 원통·구·`extrude` 피처를 `Document`로 읽는 것. 그 종류들은 0.2 컴파일을 읽는데 거기에는 이들의 형식이 없으므로
+  `to_v02`가 이름을 밝혀 거부합니다. 2D 영역 구성 요소(`path`·병합 영역·빈 공간·`imprint`·`segment` 포함)는 쓴
+  그대로 문서에 남아 `doc.domain`·`doc.background`·`doc.regions()`로 읽힙니다. 축대칭 구성 요소는 읽히지만 아직
+  받는 러너가 없습니다. 균질 사각형과 상자만 있는 3D 구성 요소는 0.2 형식으로 컴파일됩니다.
 - 설계 속도 제공(4단계).
 
 `simcase.geometry_document`를 import해도 scipy와 shapely는 불러오지 않습니다. `import simcase`는

@@ -155,22 +155,33 @@ put it on the galerkin `Mesh` they return (`mesh.provenance_edges`, node pairs,
 the same in every unit); a 0.2 document's mesh carries `None`. Nothing in
 galerkin reads the field yet.
 
-A document with a version 1 geometry block is meshed through this route:
+A document with a version 1 geometry block is meshed through this route.
 `Document.from_dict` keeps the parsed model (`doc.geometry_model`, integer
-picometres, unit-free), the canonical micrometre copy carries it, and
-`build_domain` evaluates it and hands the complex to meshine as above, with the
-0.2 sliver rule (a piece under `1e-12` of the domain area is left out and
-noted in `doc.notes`); the mesh-limit routes (`check_mesh_limits`, a run with
+picometres, unit-free) and, for a 2D region component, **keeps the block
+itself in `doc.data`**: the validators, summaries and result files read it
+through the accessors `doc.domain`, `doc.background` and `doc.regions()` (one
+entry per declared region, merged features as one entry with the smallest
+`mesh_size`, `material` None for void), the canonical micrometre copy carries
+the model without re-reading the block, and `build_domain` evaluates the
+complex once (`doc.complex()`) and hands it to meshine as above, with the 0.2
+sliver rule (a piece under `1e-12` of the domain area is left out and noted in
+`doc.notes`). The mesh-limit routes (`check_mesh_limits`, a run with
 `max_input_vertices`) take the same engine route and count the same loop
-vertices. The waveguide runner takes exterior edges on the four domain sides
-only, so a `boundary_tags` entry that renames a side, a void region or a sliver
-gap is refused by name before the solver; region heat refuses other tags as
-before. A `segment` that ends inside a cell is refused when the document loads,
-since meshine takes region loops only. The 0.2 compilation that `to_v02` makes (with `validation=True`) stays what
-the validators read and the results record: `imprint` documents load with
-their shapes and `segment` features are left out of that form, both being
-meshed by the engine; void, merged regions and `path` have no 0.2 form and are
-still refused at load, by name, until the runners read the complex. A 0.2 block is meshed by the shapely
+vertices. So `imprint`, `segment`, void, merged regions and `path` documents
+load and run. A homogeneous rectangle component and a box-only 3D component are
+still compiled to the 0.2 form their kinds read (`to_v02`), losslessly.
+
+What the runners refuse, by name: the waveguide runner takes exterior edges on
+the four domain sides only, so a `boundary_tags` entry that renames a side, a
+void region or a sliver gap is refused before the solver; region heat takes no
+void feature or background and refuses other tags as before; a `segment` that
+ends inside a cell is refused at load (meshine takes region loops only); an
+axisymmetric component loads but no runner takes it yet; region heat refuses a
+feature that the domain cuts away or that is a sliver (a feature later
+features cover is allowed, as a covered 0.2 shape is). Arcs reach the mesher
+with the 0.2 circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle
+from the global mesh size, so a coarse `mesh.size` gives coarse arcs; the
+contract's `mesh.controls` `circle_segments` is not implemented yet. A 0.2 block is meshed by the shapely
 route as before. The loops reach meshine in a different vertex order from the
 shapely route, so a version 1 copy of a 0.2 document gives a different refined
 mesh and results that agree at discretization level, as the contract's internal
