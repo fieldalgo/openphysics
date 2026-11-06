@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 import region_studio_fixtures as fx
 from simcase import (Document, MeshLimitError, ThermalRunResult, TransientThermalRunResult, check_mesh_limits,
                      examples, region_complexity, run)
+from simcase.geometry_document import from_v02
 from simcase.studio import server
 from simcase.studio import thermal_api as thermal
 from simcase.studio import thermal_regions_api as regions
@@ -561,9 +562,11 @@ def s11_fixtures(kind):
     physics_not_dict['physics'] = ['heat1']
     two_physics = copy.deepcopy(region)
     two_physics['physics']['second'] = copy.deepcopy(next(iter(region['physics'].values())))
+    version_1 = copy.deepcopy(region)
+    version_1['geometry'] = from_v02(region['geometry'])
     return {'rectangle': rectangle, 'region': region, 'shapes_only': shapes_only,
             'background_only': background_only, 'geometry_list': geometry_list, 'no_geometry': no_geometry,
-            'physics_not_dict': physics_not_dict, 'two_physics': two_physics}
+            'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1}
 
 
 @pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
@@ -573,7 +576,72 @@ def test_s11_applies_agrees_with_the_engine_rule(kind):
     assert decided == {name: has_region_geometry(doc, kind) for name, doc in s11_fixtures(kind).items()}
     assert decided == {'rectangle': False, 'region': True, 'shapes_only': True, 'background_only': True,
                        'geometry_list': False, 'no_geometry': False, 'physics_not_dict': False,
-                       'two_physics': True}
+                       'two_physics': True, 'version_1': True}
+
+
+# ---- S15: version 1 geometry documents take the region path as written -------------------
+
+def version_1_copy(doc, merge=None):
+    """``doc`` with its geometry rewritten as a version 1 block; with ``merge`` = (a, b, name),
+    the two named rectangles become one region ``name`` (same material)."""
+    out = copy.deepcopy(doc)
+    out['geometry'] = from_v02(doc['geometry'])
+    if merge:
+        a, b, name = merge
+        comp = out['geometry']['components']['main']
+        for f in comp['features']:
+            if f['name'] in (a, b):
+                f['region'] = name
+        physics = next(iter(out['physics'].values()))
+        source = physics.get('heat_source_w_m3')
+        if isinstance(source, dict) and (a in source or b in source):
+            value = source.pop(a, source.pop(b, 0.0))
+            source.pop(b, None)
+            source[name] = value
+    return out
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s15_a_version_1_document_is_accepted_as_written_and_its_result_is_checked(client, kind):
+    base = fx.steady_example() if kind == thermal.KIND else fx.transient_example()
+    doc = version_1_copy(base)
+    validated = post(client, doc, 'validate')
+    assert validated.status_code == 200, validated.text
+    # the accepted document keeps the block as written, so the validation echo records it so
+    assert validated.json()['doc']['geometry'] == doc['geometry']
+    identity, status = finished(client, doc)
+    assert status['status'] == 'done', status
+    result = client.get('/api/jobs/'+identity['job']+'/result')
+    assert result.status_code == 200, result.text
+    summary = result.json()['summary']
+    expected = Document.from_dict(doc)
+    assert summary['region_names'] == [entry['name'] for entry in expected.regions()] + ['background']
+    assert summary['regions'][summary['region_names'][0]]['material'] == expected.regions()[0]['material']
+    assert_idle(server._thermal_jobs)
+
+
+def test_s15_a_merged_region_document_runs_on_the_steady_route(client):
+    base = fx.with_shapes([fx.rect('left', 5.0, 5.0, 10.0, 10.0, 'copper'), fx.rect('right', 15.0, 5.0, 10.0, 10.0, 'copper')],
+                          heat={'left': 1e6, 'right': 1e6})
+    doc = version_1_copy(base, merge=('left', 'right', 'heater'))
+    identity, status = finished(client, doc)
+    assert status['status'] == 'done', status
+    summary = client.get('/api/jobs/'+identity['job']+'/result').json()['summary']
+    assert summary['region_names'] == ['heater', 'background']
+    assert summary['regions']['heater']['material'] == 'copper'
+    assert abs(summary['regions']['heater']['area_m2'] - 200e-6) <= 1e-9 * 200e-6
+    assert_idle(server._thermal_jobs)
+
+
+def test_s15_version_1_limits_name_the_features(client, monkeypatch):
+    monkeypatch.setattr(server, '_region_limits', regions.RegionLimits(max_shapes=1))
+    doc = version_1_copy(fx.with_shapes([fx.rect('a', 1.0, 1.0, 5.0, 5.0), fx.rect('b', 10.0, 1.0, 5.0, 5.0)]))
+    response = post(client, doc, 'validate')
+    assert response.status_code == 413, response.text
+    error = response.json()['error']
+    assert error['code'] == 'geometry_limit_exceeded' and error['path'] == 'geometry.components'
+    assert error['message'].startswith('geometry.components has 2 shapes')
+    assert_idle(server._thermal_jobs)
 
 
 # ---- S12: capture fault matrices ------------------------------------------------------

@@ -20,8 +20,9 @@ selection; see the separate [transient Studio guide](thermal_transient_studio.md
 Pre-solve mesh preview, arbitrary geometry beyond the region documents below,
 automatic coupling and new result-saving endpoints are outside this interface.
 Steady documents with
-material regions (`geometry.shapes` or `geometry.background`) take a separate
-path on the same routes, described in [Region documents](#region-documents).
+material regions (`geometry.shapes` or `geometry.background`, or a
+[version 1 geometry block](geometry_document.md)) take a separate path on the
+same routes, described in [Region documents](#region-documents).
 
 Implementation is separate from validation and release status. Inspect the
 exact checkout's CI results and artifacts for source, installed-platform,
@@ -196,9 +197,15 @@ There is no new save/upload/path/overwrite API or automatic retry queue.
 
 ## Region documents
 
-A `thermal.steady2d` document whose `geometry` has `shapes` or `background`
-(the engine's own rule, see [heat documents with material regions](thermal_regions2d.md))
+A `thermal.steady2d` document whose `geometry` has `shapes` or `background`,
+or is a version 1 geometry block (`version`; the engine's own rule, see
+[heat documents with material regions](thermal_regions2d.md))
 takes Studio's region path on `/api/thermal/validate` and `/api/thermal/run`.
+A version 1 document is accepted as written (the validation echo and the
+result record its block, not a compilation), its features count as shapes in
+the raw geometry caps (path `geometry.components`), and its mesh comes from the
+[stage 2 engine](geometry_engine.md); what region heat refuses in such a
+document (a void feature, a tag off the four sides) is an `invalid_document`.
 Every other document follows the rectangle path, whose code, bytes and errors
 are unchanged; `tests/simcase/test_studio_rectangle_invariants.py` pins them.
 A region document with `mesh.subdivisions` is refused (`invalid_document`,
@@ -240,7 +247,7 @@ nothing is published.
 | Event loop, cost linear in the JSON | One `thermal.steady2d` entry; no `mesh.subdivisions` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
 | Event loop | The steady boundary (v2) result runtime is installed, since region results always carry the boundary arrays | `unsupported_result_format` (400) |
 | Event loop, run only | The public result API for region runs is available (the block's `run_enabled`) | `unsupported_public_api` (400) |
-| Worker thread, before `Document.from_dict` | At most 64 shapes, 16 circles and 512 polygon points in total, then at most 1024 boundary crossings (`simcase.region_complexity`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
+| Worker thread, before `Document.from_dict` | At most 64 shapes, 16 circles and 512 polygon points in total, then at most 1024 boundary crossings (`simcase.region_complexity`) | `geometry_limit_exceeded` (413), path `geometry.shapes` (`geometry.components` for a version 1 block) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | At most 2048 loop vertices after the shapes' booleans (`simcase.check_mesh_limits`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
 | Worker thread | The document's name, units, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |

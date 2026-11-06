@@ -18,7 +18,8 @@ generic-route 열 guard는 유지합니다. 이 정상열 인터페이스는 과
 선택을 제외하며 별도 [과도 Studio 가이드](thermal_transient_studio.md)를 참조하세요.
 해석 전 메시 preview·아래 영역 문서를 넘는 임의 형상·자동 연성·새 결과저장 endpoint는
 범위 밖입니다.
-재료 영역이 있는 정상 문서(`geometry.shapes` 또는 `geometry.background`)는 같은
+재료 영역이 있는 정상 문서(`geometry.shapes` 또는 `geometry.background`, 또는
+[버전 1 형상 블록](geometry_document.md))는 같은
 route에서 별도 경로를 따르며 [영역 문서](#영역-문서)에서 설명합니다.
 
 구현과 검증·release상태는 별개입니다. Source·설치 플랫폼·browser·자원 근거는
@@ -181,9 +182,14 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 
 ## 영역 문서
 
-`geometry`에 `shapes`나 `background`가 있는 `thermal.steady2d` 문서는(엔진과 같은
+`geometry`에 `shapes`나 `background`가 있거나 버전 1 형상 블록(`version`)인
+`thermal.steady2d` 문서는(엔진과 같은
 규칙, [재료 영역이 있는 열전도 문서](thermal_regions2d.md) 참고)
 `/api/thermal/validate`와 `/api/thermal/run`에서 Studio의 영역 경로를 따릅니다.
+버전 1 문서는 쓴 그대로 받습니다(검증 응답과 결과는 컴파일이 아니라 그 블록을 기록). raw 형상
+한도에서는 피처를 도형으로 셉니다(경로 `geometry.components`). 메시는
+[2단계 엔진](geometry_engine.md)이 만들고, 영역 열이 그런 문서에서 거부하는 것(빈 공간 피처,
+네 변 밖 태그)은 `invalid_document`입니다.
 그 밖의 문서는 직사각형 경로를 따르며 그 코드·byte·오류는 바뀌지 않습니다.
 `tests/simcase/test_studio_rectangle_invariants.py`가 이를 고정합니다.
 `mesh.subdivisions`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
@@ -222,7 +228,7 @@ job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
 | Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; `mesh.subdivisions` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
 | Event loop | 정상 경계(v2) 결과 runtime이 설치되어 있음(영역 결과는 항상 경계 배열을 담으므로) | `unsupported_result_format`(400) |
 | Event loop, run만 | 영역 실행용 공개 결과 API를 쓸 수 있음(블록의 `run_enabled`) | `unsupported_public_api`(400) |
-| Worker thread, `Document.from_dict` 전 | 도형 64개, 원 16개, 다각형 점 합계 512개 이하, 다음으로 경계 교차 1024개 이하(`simcase.region_complexity`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
+| Worker thread, `Document.from_dict` 전 | 도형 64개, 원 16개, 다각형 점 합계 512개 이하, 다음으로 경계 교차 1024개 이하(`simcase.region_complexity`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes`(버전 1 블록은 `geometry.components`) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | 도형 boolean 뒤 루프 꼭짓점 2048개 이하(`simcase.check_mesh_limits`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
 | Worker thread | 문서의 이름·단위·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
