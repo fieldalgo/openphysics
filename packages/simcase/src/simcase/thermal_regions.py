@@ -235,7 +235,7 @@ def region_source(p, names, path):
 
 def region_mesh_settings(doc):
     mesh = doc.data['mesh']
-    _object(mesh, {'size', 'min_angle'}, 'mesh')
+    _object(mesh, {'size', 'min_angle', 'controls'}, 'mesh')   # controls: Document.check_mesh_controls
     if 'size' not in mesh:
         raise DocumentError('mesh.size: required by a region document (document length units)')
     _number(mesh['size'], 'mesh.size', positive=True)

@@ -1320,3 +1320,90 @@ def test_a_feature_outside_the_domain_is_refused_for_region_heat_but_a_covered_o
     covered = _regions_doc([dict(heater, name="under"), plate, heater])     # 'under' lies under the plate
     doc = Document.from_dict(covered)
     assert [r["name"] for r in doc.regions()] == ["under", "plate", "heater"]
+
+
+# ----------------------------------------------------------------- mesh.controls (G3-7)
+
+def _circle_counts(d):
+    """The vertex counts of the Circle loops a pending domain holds (before its build)."""
+    return [lp.n for _name, loops, _size in d._pending for lp in loops if isinstance(lp, Circle)]
+
+
+def test_g3_7_circle_segments_sets_the_vertex_count_of_a_whole_circle_and_of_an_arc():
+    rc = run(v1([circle("c", 50, 50, 10, "Si")]))
+    d, namer, _materials = rc.to_domain(0.005, controls=[{"select": "c", "circle_segments": 40}])
+    assert _circle_counts(d) == [40, 40]
+    mesh = generate(d, boundary_names=namer)
+    edges = rc.curve_edges(mesh)
+    assert sum(len(edges[k.index]) for k in rc.curves if k.kind == "circle") >= 40
+    # the 0.2 rule gives this circle 25 vertices at this size; a region selection, a feature id and a
+    # boundary expression all reach the circle
+    d, _n, _m = rc.to_domain(0.005)
+    assert _circle_counts(d) == [25, 25]
+    for expr in ("c", {"feature": "c"}, "c.boundary", {"of": "c"}, {"material": "Si"}):
+        d, _n, _m = rc.to_domain(0.005, controls=[{"select": expr, "circle_segments": 40}])
+        assert _circle_counts(d) == [40, 40], expr
+    # a cut circle: the arc polylines follow the count (a semicircle of 64 is 32 pieces)
+    rc = run(v1([rect("r", 0, 0, 50, 100, "Ge"), circle("c", 50, 50, 10, "Si")]))
+    rc.to_domain(0.005, controls=[{"select": "c", "circle_segments": 64}])
+    arcs = [k for k in rc.curves if k.kind == "arc"]
+    assert len(arcs) == 2 and all(len(rc._handoff["poly"][k.index]) - 1 == 32 for k in arcs)
+    rc.to_domain(0.005)
+    assert all(len(rc._handoff["poly"][k.index]) - 1 == 13 for k in arcs)
+
+
+def test_g3_7_circle_segments_below_the_clearance_need_is_raised_and_noted():
+    rc = run(v1([circle("c", 50, 50, 10, "Si"), rect("r", 60.1, 40, 20, 20, "Ge")]))
+    d, _n, _m = rc.to_domain(0.005, controls=[{"select": "c", "circle_segments": 8}])
+    assert set(_circle_counts(d)) == {24} and any(note.startswith("mesh.controls: circle_segments 8 of the circle of ['c.boundary'] "
+                                             "raised to 24") for note in rc.notes)
+    rc.to_domain(0.005)
+    assert not any(note.startswith("mesh.controls") for note in rc.notes)
+
+
+def test_g3_7_size_on_a_region_selection_refines_its_cells_and_a_boundary_is_refused():
+    rc = run(v1([rect("r", 20, 20, 40, 40, "Si")], selections={"core": {"region": "r"}}))
+    d0, n0, _m = rc.to_domain(0.01)
+    coarse = generate(d0, boundary_names=n0)
+    d1, n1, _m = rc.to_domain(0.01, controls=[{"select": "core", "size": 2 * 10 ** 3}])      # 2 nm in pm
+    fine = generate(d1, boundary_names=n1)
+    assert len(fine.nodes) > 2 * len(coarse.nodes)
+    assert [s for _name, _loops, s in d1._pending] == [0.002, None]
+    with pytest.raises(GeometryError, match="boundary selection; a size on a boundary is not implemented"):
+        rc.to_domain(0.01, controls=[{"select": "left", "size": 2 * 10 ** 3}])
+    with pytest.raises(GeometryError, match="is not a selection, a region or a feature id"):
+        rc.to_domain(0.01, controls=[{"select": "nothing", "circle_segments": 16}])
+
+
+def test_g3_7_document_mesh_controls_are_checked_at_load_and_converted_with_the_units():
+    from simcase import Document, DocumentError
+    from simcase.runner import micrometre_document
+    from simcase.thermal_regions import build_region_mesh
+    raw = _regions_doc([{"name": "heater", "type": "circle", "cx": 20, "cy": 10, "r": 3, "material": "copper"}],
+                       physics_source={"heater": 1e6})
+    raw["mesh"]["controls"] = [{"select": "heater", "circle_segments": 48}, {"select": "heater", "size": 0.5}]
+    doc = Document.from_dict(raw)                                     # units mm
+    assert doc.controls_pm() == [{"select": "heater", "circle_segments": 48}, {"select": "heater", "size": 500_000_000}]
+    um = micrometre_document(doc)
+    assert um.mesh_controls()[1]["size"] == 500.0 and um.controls_pm() == doc.controls_pm()
+    mesh = build_region_mesh(doc)[0]
+    assert len(mesh.provenance_edges["heater.boundary"]) >= 48
+    plain = copy.deepcopy(raw)
+    del plain["mesh"]["controls"]
+    assert len(mesh.nodes) > len(build_region_mesh(Document.from_dict(plain))[0].nodes)
+    for controls, message in [
+            ([{"select": "heater", "z_divisions": 3}], "not implemented yet"),
+            ([{"select": "heater", "circle_segments": 4}], "at least 8"),
+            ([{"select": "heater", "size": -1}], "positive length"),
+            ([{"select": "heater", "circle_segments": 16, "size": 1}], "exactly one of"),
+            ([{"select": "nowhere", "circle_segments": 16}], "not a selection, a region or a feature id"),
+            ([{"select": "left", "size": 1}], "boundary selection"),
+            ({"select": "heater"}, "expected a list")]:
+        bad = copy.deepcopy(raw)
+        bad["mesh"]["controls"] = controls
+        with pytest.raises(DocumentError, match=message):
+            Document.from_dict(bad)
+    v02 = copy.deepcopy(EXAMPLES["thermal_regions"])
+    v02["mesh"]["controls"] = [{"select": "heater", "circle_segments": 16}]
+    with pytest.raises(DocumentError, match="needs a version 1 geometry block"):
+        Document.from_dict(v02)
