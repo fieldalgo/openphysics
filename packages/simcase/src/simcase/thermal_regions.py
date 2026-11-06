@@ -28,7 +28,8 @@ BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
 
 
 def has_region_geometry(data, physics_type):
-    """A document of physics_type that declares region geometry."""
+    """A document of physics_type that declares region geometry (exported by ``simcase``; Studio
+    decides the region path with it)."""
     if not isinstance(data, dict) or not isinstance(data.get('physics'), dict):
         return False
     typed = any(isinstance(p, dict) and p.get('type') == physics_type for p in data['physics'].values())
