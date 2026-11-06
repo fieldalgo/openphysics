@@ -29,7 +29,7 @@ import anyio
 import numpy as np
 from fastapi.concurrency import run_in_threadpool
 from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult,
-                     TransientThermalRunResult, check_mesh_limits, region_complexity)
+                     TransientThermalRunResult, check_mesh_limits, has_region_geometry, region_complexity)
 
 from . import thermal_api as common
 from . import transient_thermal_api as transient
@@ -62,13 +62,12 @@ class RegionLimits:
 def applies(raw, kind):
     """A raw document of physics ``kind`` that declares region geometry.
 
-    simcase's own choice of the region path (``simcase.thermal_regions.has_region_geometry``):
+    simcase's own choice of the region path (``simcase.has_region_geometry``):
     a physics entry of that type and a ``geometry`` object with ``shapes`` or ``background``,
     or a version 1 block whose component has features or a background material (a
     homogeneous rectangle written as version 1 is compiled to the 0.2 rectangle form at load
     and takes the rectangle path). Thermal defaults add only ``geometry.domain``, so the raw
     and the merged document agree."""
-    from simcase.thermal_regions import has_region_geometry
     return has_region_geometry(raw, kind)
 
 

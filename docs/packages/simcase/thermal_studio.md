@@ -199,7 +199,7 @@ There is no new save/upload/path/overwrite API or automatic retry queue.
 
 A `thermal.steady2d` document whose `geometry` has `shapes` or `background`,
 or is a version 1 geometry block whose component has features or a background
-material (the engine's own rule, `simcase.thermal_regions.has_region_geometry`,
+material (the engine's own rule, `simcase.has_region_geometry`,
 see [heat documents with material regions](thermal_regions2d.md)) takes
 Studio's region path on `/api/thermal/validate` and `/api/thermal/run`. A
 homogeneous rectangle written as version 1 (no features, no background

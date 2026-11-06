@@ -183,7 +183,7 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 ## 영역 문서
 
 `geometry`에 `shapes`나 `background`가 있거나, 구성 요소에 피처나 배경 재료가 있는 버전 1 형상 블록인
-`thermal.steady2d` 문서는(엔진과 같은 규칙 `simcase.thermal_regions.has_region_geometry`,
+`thermal.steady2d` 문서는(엔진과 같은 규칙 `simcase.has_region_geometry`,
 [재료 영역이 있는 열전도 문서](thermal_regions2d.md) 참고)
 `/api/thermal/validate`와 `/api/thermal/run`에서 Studio의 영역 경로를 따릅니다. 피처도 배경 재료도 없는 균질
 사각형을 버전 1로 쓴 문서는 읽을 때 0.2 사각형 형식으로 컴파일되어 0.2 사각형처럼 직사각형 경로를 따릅니다.
