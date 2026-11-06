@@ -144,15 +144,20 @@ def micrometre_document(doc: Document) -> Document:
     d = copy.deepcopy(doc.data)
     um = lambda v, power=1: units.length_to_micrometres(v, doc.scale, power)   # noqa: E731
     g = d["geometry"]
-    g["domain"] = {k: um(v) for k, v in g["domain"].items()}
-    if "mesh_size" in g["background"]:
-        g["background"]["mesh_size"] = um(g["background"]["mesh_size"])
-    for s in g["shapes"]:
-        for k in ("x", "y", "w", "h", "cx", "cy", "r", "mesh_size"):
-            if s.get(k) is not None:
-                s[k] = um(s[k])
-        if "points" in s:
-            s["points"] = [[um(c) for c in p] for p in s["points"]]
+    if doc.is_version_1:
+        # the exact model is unit-free (integer pm); the block stays as written and the
+        # accessors read the model in the copy's micrometres
+        pass
+    else:
+        g["domain"] = {k: um(v) for k, v in g["domain"].items()}
+        if "mesh_size" in g["background"]:
+            g["background"]["mesh_size"] = um(g["background"]["mesh_size"])
+        for s in g["shapes"]:
+            for k in ("x", "y", "w", "h", "cx", "cy", "r", "mesh_size"):
+                if s.get(k) is not None:
+                    s[k] = um(s[k])
+            if "points" in s:
+                s["points"] = [[um(c) for c in p] for p in s["points"]]
     m = d["mesh"]
     m["size"] = um(m["size"])
     if m.get("grading"):
@@ -182,6 +187,14 @@ def micrometre_document(doc: Document) -> Document:
         gaussian["waist"] = um(gaussian["waist"])
         gaussian["center"] = [um(c) for c in gaussian["center"]]
     d["units"] = dict(d["units"], length="um")
+    if doc.is_version_1:
+        # the block is not re-read in micrometres: the model travels with the copy
+        out = Document(d)
+        out.geometry_model = doc.geometry_model
+        out.geometry_complex = doc.geometry_complex
+        out.geometry_source, out.geometry_roundings = doc.geometry_source, list(doc.geometry_roundings)
+        out.validate()
+        return out
     out = Document.from_dict(d)
     # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
     out.geometry_model = doc.geometry_model

@@ -165,9 +165,10 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
                        ) -> tuple[Domain, callable, dict[str, str], int]:
     """The engine route of ``build_domain``, with the loop vertex count meshine receives."""
     from .geometry_document import GeometryError, pm_per_unit
-    from .geometry_engine import evaluate
     try:
-        rc = doc.geometry_complex if getattr(doc, "geometry_complex", None) is not None else evaluate(doc.geometry_model)
+        if doc.component.dimension == "axisymmetric":
+            raise DocumentError(f"component {doc.component.name!r}: no runner takes an axisymmetric component yet")
+        rc = doc.complex()
         unit_pm = pm_per_unit(doc["units"])
         dom = doc.domain
         min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
@@ -180,6 +181,37 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
     if max_input_vertices is not None and count > max_input_vertices:
         raise MeshLimitError("input_vertices", max_input_vertices, count)
     return domain, namer, materials, count
+
+
+def dropped_features(doc: Document) -> list[str]:
+    """Version 1 area features that contribute no material: cut away by the domain or a sliver.
+
+    A feature with no surviving piece in the complex is evaluated once more with only the
+    features up to itself: if it has no piece even then (outside the domain, or under the
+    sliver limit ``AREA_EPS`` of the domain area), it is listed with the 0.2 wording; if it
+    has one, later features cover it, which is allowed ("later wins")."""
+    import dataclasses
+    from .geometry_engine import evaluate_component
+    comp = doc.component
+    rc = doc.complex()
+    dom = comp.domain
+    min_area = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"])
+    ppu = float(doc._pm_per_unit())
+    out = []
+    for i, f in enumerate(comp.features):
+        if f.type in ("segment", "layers"):
+            continue
+        if any(i in c.feature_indices and c.area >= min_area for c in rc.cells):
+            continue
+        alone = evaluate_component(dataclasses.replace(comp, features=comp.features[:i + 1], selections={},
+                                                       boundary_tags=[]))
+        own = sum(c.area for c in alone.cells if i in c.feature_indices)
+        if own >= min_area:
+            continue
+        out.append(f"geometry.features: {f.name!r} covers {own / ppu ** 2:g} square {doc.length_unit} inside the "
+                   f"domain, under {AREA_EPS:g} of the domain, so it would be dropped and contribute no material. "
+                   "Check its size and position against the domain.")
+    return out
 
 
 def provenance_edges_of(doc: Document, tri) -> dict | None:

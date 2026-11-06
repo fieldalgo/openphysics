@@ -14,16 +14,16 @@ complex from what this reader parses.
 
 A document keeps `"openphysics": "0.2"`; only its `geometry` block carries
 `"version": 1`. `Document.from_dict` and `Document.load` read such a block with
-`parse`, compile it with `to_v02` and give the runners the 0.2 form, so every
-runner works unchanged and refuses what it cannot take. The mesh of such a
-document comes from the [stage 2 engine](geometry_engine.md), which keeps the
-parsed model (`doc.geometry_model`). A block without `version` is read as
-before.
+`parse`. A 2D region component stays in `doc.data` as written and the runners
+read it through the accessors `doc.domain`, `doc.background` and
+`doc.regions()`; a homogeneous rectangle or a box-only 3D component is compiled
+with `to_v02` to the 0.2 form its kind reads. The mesh comes from the
+[stage 2 engine](geometry_engine.md), which keeps the parsed model
+(`doc.geometry_model`). A block without `version` is read as before.
 
-- `doc.data` holds the compiled 0.2 geometry. Results that record the document
-  record this form; the mesh itself comes from the exact model that
-  `doc.geometry_model` keeps, which the compilation describes up to the
-  single rounding of derived corners.
+- `doc.data` holds the version 1 block for a 2D region component (so results
+  record it as written), and the compiled 0.2 geometry for a homogeneous
+  rectangle or a 3D component.
 - `doc.geometry_source` holds the version 1 block as written, and `doc.save`,
   `doc.to_dict` and `doc.copy` keep it.
 - Each value moved onto the 1 pm grid is listed in `doc.geometry_roundings` and
@@ -111,12 +111,13 @@ keeping the etch line and selections naming it and the rib walls.
 
 - Resolve selectors or build the region complex: the
   [stage 2 engine](geometry_engine.md) does that, and it meshes the document.
-- Load `path` features, merged regions, axisymmetric components, cylinders,
-  spheres, `extrude` features and void (`material: null`) into a `Document`:
-  the validators and the results still read the 0.2 compilation, which has no
-  form for them, so `to_v02` refuses them by name. `finalize: "imprint"` and
-  `segment` features do load (`to_v02(..., validation=True)` keeps the shapes
-  and leaves the segments out), because the engine meshes them.
+- Load cylinders, spheres and `extrude` features into a `Document`: their
+  kinds read the 0.2 compilation, which has no form for them, so `to_v02`
+  refuses them by name. A 2D region component (`path`, merged regions, void,
+  `imprint`, `segment` included) stays in the document as written and is read
+  through `doc.domain`, `doc.background` and `doc.regions()`; an axisymmetric
+  component loads but no runner takes it yet. A homogeneous rectangle and a
+  box-only 3D component are compiled to the 0.2 form.
 - Supply design velocities (stage 4).
 
 Importing `simcase.geometry_document` loads neither scipy nor shapely:

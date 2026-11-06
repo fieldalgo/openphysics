@@ -362,7 +362,17 @@ def test_a_document_with_version_1_geometry_runs_the_same_input(name):
     from simcase import Document
     v1_doc = _as_v1(name)
     doc = Document.from_dict(copy.deepcopy(v1_doc))
-    assert doc.data == Document.from_dict(copy.deepcopy(DOCS[name])).data
+    expected = Document.from_dict(copy.deepcopy(DOCS[name])).data
+    if doc.is_version_1:
+        # a 2D region component stays as written; the accessors give the 0.2 reading
+        assert {k: v for k, v in doc.data.items() if k != "geometry"} == {k: v for k, v in expected.items() if k != "geometry"}
+        assert doc.data["geometry"] == v1_doc["geometry"]
+        assert doc.domain == expected["geometry"]["domain"]
+        assert doc.background == expected["geometry"]["background"]
+        assert [(r["name"], r["material"], r["mesh_size"]) for r in doc.regions()] == \
+            [(s["name"], s["material"], s.get("mesh_size")) for s in expected["geometry"]["shapes"]]
+    else:
+        assert doc.data == expected
     assert doc.geometry_source == v1_doc["geometry"] and doc.geometry_roundings == []
     assert doc.to_dict()["geometry"] == v1_doc["geometry"]
     assert doc.copy().to_dict() == doc.to_dict()
@@ -412,6 +422,9 @@ def test_the_version_1_example_reads_as_the_soi_strip_example():
     path = ROOT / "examples" / "simcase" / "geometry_v1_soi_strip.json"
     doc = Document.load(path)
     reference = Document.load(ROOT / "examples" / "simcase" / "soi_strip.json")
-    assert {k: v for k, v in doc.data.items() if k != "name"} == \
-        {k: v for k, v in reference.data.items() if k != "name"}
+    assert {k: v for k, v in doc.data.items() if k not in ("name", "geometry")} == \
+        {k: v for k, v in reference.data.items() if k not in ("name", "geometry")}
+    assert doc.is_version_1 and doc.domain == reference.domain and doc.background == reference.background
+    assert [(r["name"], r["material"], r["mesh_size"]) for r in doc.regions()] == \
+        [(s["name"], s["material"], s.get("mesh_size")) for s in reference.shapes]
     assert doc.geometry_roundings == [] and doc.to_dict()["geometry"]["version"] == 1

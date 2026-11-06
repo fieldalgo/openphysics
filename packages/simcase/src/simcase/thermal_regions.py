@@ -33,7 +33,13 @@ def has_region_geometry(data, physics_type):
         return False
     typed = any(isinstance(p, dict) and p.get('type') == physics_type for p in data['physics'].values())
     geometry = data.get('geometry')
-    return typed and isinstance(geometry, dict) and ('shapes' in geometry or 'background' in geometry)
+    if not typed or not isinstance(geometry, dict):
+        return False
+    if 'version' in geometry:
+        # a version 1 block kept in the document is a region component; a homogeneous
+        # rectangle was compiled to the 0.2 form at load, so it never reaches here
+        return True
+    return 'shapes' in geometry or 'background' in geometry
 
 
 def is_region_thermal(data):
@@ -110,6 +116,8 @@ def region_geometry(doc):
     """Validate geometry.domain/background/shapes; return the shape names."""
     d = doc.data
     g = d['geometry']
+    if doc.is_version_1:
+        return _version_1_region_geometry(doc)
     _object(g, {'domain', 'background', 'shapes'}, 'geometry')
     dom = g.get('domain')
     _object(dom, {'xmin', 'xmax', 'ymin', 'ymax'}, 'geometry.domain')
@@ -136,6 +144,30 @@ def region_geometry(doc):
     return names
 
 
+def _version_1_region_geometry(doc):
+    """The region checks of a version 1 block: the reader has checked the geometry itself;
+    here the domain must be finite in metres, the background and every region need a material
+    (region heat takes no void), and a feature that the domain cuts away or that is a sliver is
+    refused by name, as a dropped 0.2 shape is. A feature that later features cover is not."""
+    dom = doc.domain
+    for key, value in dom.items():
+        _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
+    if not isinstance(doc.background.get('material'), str) or not doc.background['material']:
+        raise DocumentError('geometry.background.material: expected a material name (region heat takes no void '
+                            'background)')
+    names = set()
+    for r in doc.regions():
+        if r['material'] is None:
+            raise DocumentError(f'feature {r["name"]!r}: material null (void) is not accepted by region heat')
+        names.add(r['name'])
+    from .geometry import dropped_features
+    dropped = dropped_features(doc)
+    if dropped:
+        raise DocumentError(' '.join(dropped) + ' A heat region document refuses a feature that contributes no '
+                            'material.')
+    return names
+
+
 def refuse_dropped_shapes(doc):
     """Refuse a named shape that lies outside the domain or below the sliver limit.
 
@@ -159,7 +191,7 @@ def refuse_dropped_shapes(doc):
 
 def covered_shapes(doc, mesh):
     """Shapes with no triangles in the mesh: fully covered by later shapes."""
-    return [s['name'] for s in doc['geometry']['shapes'] if s['name'] not in mesh.region_names]
+    return [s['name'] for s in doc.regions() if s['name'] not in mesh.region_names]
 
 
 def region_materials_table(doc, required, label):
@@ -177,9 +209,9 @@ def region_materials_table(doc, required, label):
             _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
         if 'source' in spec and not isinstance(spec['source'], str):
             raise DocumentError(where+'.source: expected a string')
-    g = d['geometry']
-    for where, mname in [('geometry.background.material', g['background']['material'])] + [
-            (f'geometry.shapes[{i}].material', s['material']) for i, s in enumerate(g['shapes'])]:
+    for where, mname in [('geometry.background.material', doc.background['material'])] + [
+            (f'geometry.shapes[{i}].material' if not doc.is_version_1 else f'region {s["name"]!r}', s['material'])
+            for i, s in enumerate(doc.regions())]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
                                 '(thermal properties are never taken from built-in optical materials)')
@@ -246,12 +278,11 @@ def validate_region_thermal(doc):
 
 def region_summary(doc):
     name, p = doc.sole_physics()
-    g = doc['geometry']
     lines = [f'{doc["name"]} (openphysics 0.2)',
              f'  physics {name}: {PHYSICS}, single steady heat, named material regions',
              f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
-             f'  background: {g["background"]["material"]}']
-    for s in g['shapes']:
+             f'  background: {doc.background["material"]}']
+    for s in doc.regions():
         lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"]}')
     for mname, spec in doc['materials'].items():
         lines.append(f'  material {mname}: k={spec.get("conductivity_w_mk")} W/(m K)')

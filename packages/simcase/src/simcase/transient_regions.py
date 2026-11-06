@@ -81,7 +81,7 @@ def validate_transient_region_thermal(doc):
         _array(spec['gradient_k_per_m'], initial_path+'.gradient_k_per_m', 2)
     else:
         _number(spec, initial_path)
-    dom = d['geometry']['domain']
+    dom = doc.domain
     to_si = lambda v: units.length_to_micrometres(v, doc.scale)*units.UM_IN_SI
     x0, y0, x1, y1 = (to_si(dom[k]) for k in ('xmin', 'ymin', 'xmax', 'ymax'))
     corners = ((x0, y0), (x0, y1), (x1, y0), (x1, y1))
@@ -111,13 +111,12 @@ def validate_transient_region_thermal(doc):
 
 def transient_region_summary(doc):
     name, p = doc.sole_physics()
-    g = doc['geometry']
     lines = [f'{doc["name"]} (openphysics 0.2)',
              f'  physics {name}: {PHYSICS}, {len(doc["study"]["time_s"])} explicit times in s, '
              'named material regions',
              f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
-             f'  background: {g["background"]["material"]}']
-    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"]}' for s in g['shapes']]
+             f'  background: {doc.background["material"]}']
+    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"]}' for s in doc.regions()]
     lines += [f'  material {m}: k={v.get("conductivity_w_mk")} W/(m K), '
               f'c={v.get("volumetric_heat_capacity_j_m3k")} J/(m^3 K)' for m, v in doc['materials'].items()]
     lines.append('  output: SI time/node/cell histories, triangle regions; rates at interval ends only')
@@ -130,7 +129,7 @@ def transient_region_inputs(doc, mesh, region_materials):
     materials = doc['materials']
     times = np.array(doc['study']['time_s'], dtype=float, copy=True)
     nodes = np.asarray(mesh.nodes, dtype=float)
-    dom = doc['geometry']['domain']
+    dom = doc.domain
     origin = units.length_to_micrometres([dom['xmin'], dom['ymin']], doc.scale)*units.UM_IN_SI
     spec = p['initial_temperature_k']
     with np.errstate(over='ignore', invalid='ignore'):

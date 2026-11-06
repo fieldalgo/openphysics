@@ -747,7 +747,7 @@ def test_an_imprint_document_loads_runs_and_keeps_the_covered_boundary():
     raw = _soi_v1(finalize="imprint")
     raw["geometry"]["components"]["main"]["features"] = [core, cover]
     doc = Document.from_dict(raw)
-    assert doc.data["geometry"]["shapes"][1]["name"] == "wide" and "finalize" not in doc.data["geometry"]
+    assert doc.is_version_1 and [r["name"] for r in doc.regions()] == ["core", "wide"]
     assert doc.to_dict()["geometry"]["components"]["main"]["finalize"] == "imprint"
     rc_domain, namer, materials = build_domain(micrometre_document(doc))
     mesh = generate(rc_domain, namer)
@@ -771,7 +771,7 @@ def test_a_segment_document_loads_and_runs():
     comp = raw["geometry"]["components"]["main"]
     comp["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 1.2]]})
     doc = Document.from_dict(raw)
-    assert [s["name"] for s in doc.data["geometry"]["shapes"]] == ["core"]
+    assert [r["name"] for r in doc.regions()] == ["core"] and doc.is_version_1
     a, b = _run_v1(raw), _run_v1(_soi_v1())
     assert abs(float(np.asarray(a.neff)[0, 0]) - float(np.asarray(b.neff)[0, 0])) < 2e-3
     from simcase.geometry_engine import evaluate
@@ -1202,3 +1202,121 @@ def test_a_segment_document_evaluates_once_and_reuses_the_complex():
     from simcase.runner import micrometre_document
     assert micrometre_document(doc).geometry_complex is doc.geometry_complex
     assert "cut.line" in model.mesh.provenance_edges
+
+
+# ----------------------------------------------------------------- stage 2b: runners read the complex (G3)
+
+def _regions_doc(features, physics_source=None, material_extra=None):
+    """A region heat document on the 0..40 x 0..20 mm plate, written as version 1."""
+    raw = copy.deepcopy(EXAMPLES["thermal_regions"])
+    raw["geometry"] = from_v02(raw["geometry"])
+    comp = raw["geometry"]["components"]["main"]
+    comp["features"] = features
+    (name, p), = raw["physics"].items()
+    if physics_source is not None:
+        p["heat_source_w_m3"] = physics_source
+    if material_extra:
+        raw["materials"].update(material_extra)
+    return raw
+
+
+def test_g3_3_a_merged_region_takes_its_heat_source_over_both_pieces():
+    from simcase import Document, run
+    base = EXAMPLES["thermal_regions"]["geometry"]["shapes"]
+    plate = dict(base[0])                                            # the plate rect (document units)
+    heater = dict(base[1])                                           # the heater circle
+    (name, p), = EXAMPLES["thermal_regions"]["physics"].items()
+    q = p["heat_source_w_m3"]
+    left = dict(heater, type="rect", name="h1", x=12.0, y=6.0, w=6.0, h=4.0)
+    right = dict(left, name="h2", x=18.0)
+    for k in ("cx", "cy", "r"):
+        left.pop(k, None), right.pop(k, None)
+    merged = _regions_doc([plate, dict(left, region="heater"), dict(right, region="heater")], {"heater": q["heater"]} if "heater" in q else q)
+    split = _regions_doc([plate, left, right], {"h1": q["heater"], "h2": q["heater"]} if "heater" in q else q)
+    a, b = run(Document.from_dict(merged), verbose=False), run(Document.from_dict(split), verbose=False)
+    assert set(a.region_names) == {"background", "plate", "heater"}
+    rise = a.temperature_k.max() - a.temperature_k.min()
+    # the two meshes differ (one region of two pieces against two regions), so node-averaged
+    # quantities are not comparable; the extremes and the energy balance are
+    assert abs(a.temperature_k.max() - b.temperature_k.max()) <= 2e-3 * rise
+    assert abs(a.temperature_k.min() - b.temperature_k.min()) <= 2e-3 * rise
+    assert set(a.region_names) == (set(b.region_names) | {"heater"}) - {"h1", "h2"}
+    doc = Document.from_dict(merged)
+    assert [r["name"] for r in doc.regions()] == ["plate", "heater"] and doc.regions()[1]["type"] == "region"
+    assert "shape heater: region" in doc.summary()
+
+
+def test_g3_4_void_documents_are_refused_by_name():
+    from simcase import Document, DocumentError, run
+    raw = _soi_v1()
+    raw["geometry"]["components"]["main"]["features"].append(circle("hole", 0, 0.9, 0.1, None))
+    doc = Document.from_dict(raw)                                     # loads: the block stays as written
+    assert doc.is_version_1 and doc.regions()[1]["material"] is None
+    with pytest.raises(DocumentError, match="four domain sides"):
+        run(doc, verbose=False)
+    base = EXAMPLES["thermal_regions"]["geometry"]["shapes"]
+    with pytest.raises(DocumentError, match="void"):
+        Document.from_dict(_regions_doc([dict(base[0]), dict(base[1], material=None)]))
+
+
+def test_g3_5_a_stadium_path_core_agrees_with_its_polygon_approximation():
+    from simcase import Document, run
+    raw = _soi_v1()
+    comp = raw["geometry"]["components"]["main"]
+    core = comp["features"][0]
+    stadium = {"name": "core", "type": "path", "material": core["material"], "mesh_size": core["mesh_size"],
+               "start": [-0.15, 0.0],
+               "segments": [{"line": [0.15, 0.0]}, {"arc": {"center": [0.15, 0.11], "to": [0.15, 0.22], "ccw": True}},
+                            {"line": [-0.15, 0.22]}, {"arc": {"center": [-0.15, 0.11], "to": [-0.15, 0.0], "ccw": True}}]}
+    comp["features"] = [stadium]
+    # the hand-off samples an arc with the 0.2 circle rule, max(16, 2 pi r / (mesh.size / 2)) vertices
+    # per circle: 16 here, so 8 per semicircle; the polygon twin uses the same 8
+    n = 8
+    pts = [[0.15 + 0.11 * math.cos(-math.pi / 2 + math.pi * i / n), 0.11 + 0.11 * math.sin(-math.pi / 2 + math.pi * i / n)]
+           for i in range(n + 1)]
+    pts += [[-0.15 + 0.11 * math.cos(math.pi / 2 + math.pi * i / n), 0.11 + 0.11 * math.sin(math.pi / 2 + math.pi * i / n)]
+            for i in range(n + 1)]
+    pts = [[round(x, 6), round(y, 6)] for x, y in pts]
+    poly_doc = copy.deepcopy(raw)
+    poly_doc["geometry"]["components"]["main"]["features"] = [{"name": "core", "type": "polygon", "points": pts,
+                                                               "material": core["material"], "mesh_size": core["mesh_size"]}]
+    a, b = run(Document.from_dict(raw), verbose=False), run(Document.from_dict(poly_doc), verbose=False)
+    na, nb = float(np.asarray(a.neff)[0, 0]), float(np.asarray(b.neff)[0, 0])
+    assert abs(na - nb) <= 2e-3, (na, nb)
+    doc = Document.from_dict(raw)
+    assert doc.regions()[0]["type"] == "path" and "shape core: path" in doc.summary()
+
+
+def test_g3_6_region_complexity_counts_version_1_features():
+    from simcase import region_complexity
+    raw = _soi_v1()
+    comp = raw["geometry"]["components"]["main"]
+    comp["features"] += [circle("c", 0.5, 0.5, 0.1, "Si"), {"name": "t", "type": "trapezoid", "cx": 0, "y": -0.5, "w": 0.4,
+                                                              "w_top": 0.3, "h": 0.1, "material": "Si"},
+                         {"name": "s", "type": "segment", "points": [[0, 0], [1, 1]]}]
+    rc = region_complexity(raw)
+    assert rc.shapes == 3 and rc.circles == 1 and rc.polygon_points == 4
+
+
+def test_an_axisymmetric_document_loads_but_no_runner_takes_it():
+    from simcase import Document, DocumentError, build_mesh
+    raw = _soi_v1()
+    comp = raw["geometry"]["components"]["main"]
+    comp["dimension"] = "axisymmetric"
+    comp["domain"] = {"xmin": 0, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2}
+    comp["features"][0]["x"] = 0
+    doc = Document.from_dict(raw)
+    with pytest.raises(DocumentError, match="axisymmetric"):
+        build_mesh(doc)
+
+
+def test_a_feature_outside_the_domain_is_refused_for_region_heat_but_a_covered_one_is_not():
+    from simcase import Document, DocumentError
+    base = EXAMPLES["thermal_regions"]["geometry"]["shapes"]
+    plate, heater = dict(base[0]), dict(base[1])
+    far = dict(heater, name="far", cx=1000.0)
+    with pytest.raises(DocumentError, match="'far' covers 0 square"):
+        Document.from_dict(_regions_doc([plate, heater, far]))
+    covered = _regions_doc([dict(heater, name="under"), plate, heater])     # 'under' lies under the plate
+    doc = Document.from_dict(covered)
+    assert [r["name"] for r in doc.regions()] == ["under", "plate", "heater"]
