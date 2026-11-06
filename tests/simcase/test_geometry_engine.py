@@ -1460,6 +1460,10 @@ def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere()
     assert run(doc, verbose=False).summary()["physics_type"] == kind
     regions = _regions_doc([], physics_source=0.0)    # no features, but a background material
     assert has_region_geometry(regions, kind) and Document.from_dict(regions).is_version_1
+    for features in ({"a": 1}, "x", 0):               # not a feature list: the reader refuses it, never a region
+        odd = copy.deepcopy(slab)
+        odd["geometry"]["components"]["main"]["features"] = features
+        assert not has_region_geometry(odd, kind)
 
 
 def test_the_micrometre_copy_of_a_version_1_document_refuses_to_serialise():
@@ -1526,6 +1530,8 @@ def test_g3_8_distance_grading_from_a_boundary_and_from_a_region_selection():
     assert rc.size_function([{"select": "core", "circle_segments": 16}]) is None
     with pytest.raises(GeometryError, match="to_domain first"):
         run(doc).size_function(grading)
+    with pytest.raises(GeometryError, match="1000000 pm per mesher unit, not 1000000000"):
+        rc.size_function(grading, unit_pm=10 ** 9)                       # the hand-off was in micrometres
 
 
 def test_g3_8_a_whole_circle_and_a_hole_are_graded_from_their_true_outline():
@@ -1541,7 +1547,7 @@ def test_g3_8_a_whole_circle_and_a_hole_are_graded_from_their_true_outline():
 
 def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runners():
     import numpy as np
-    from simcase import Document, DocumentError, build_mesh, check_mesh_limits
+    from simcase import Document, DocumentError, build_domain, build_mesh, check_mesh_limits
     from simcase.runner import micrometre_document
     from simcase.thermal_regions import build_region_mesh
     raw = _regions_doc([{"name": "heater", "type": "rect", "x": 15, "y": 7, "w": 10, "h": 6, "material": "copper"}],
@@ -1561,6 +1567,13 @@ def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runner
     far_away = lengths[centres[:, 0] > 0.035]
     assert len(mesh.nodes) > 2 * len(coarse.nodes) and on_rim.mean() < 0.4 * far_away.mean()
     assert check_mesh_limits(doc, max_input_vertices=10 ** 6) == check_mesh_limits(plain, max_input_vertices=10 ** 6)
+    # the shared complex was last handed off in micrometres by the mesh-limit check: the public
+    # helper refuses the millimetre document rather than mixing units, and agrees after a build
+    from simcase.geometry import size_function
+    with pytest.raises(DocumentError, match="pm per mesher unit"):
+        size_function(doc)
+    build_domain(doc)
+    assert size_function(doc)(15.0, 10.0) == pytest.approx(0.2) and size_function(doc)(40.0, 10.0) == pytest.approx(2.0)
     em = _soi_v1(selections={"edge": {"boundary": {"of": "core"}}})
     em["mesh"]["controls"] = [{"select": "edge", "near": 0.005, "far": 0.2, "distance": 0.3}]       # um
     graded = build_mesh(Document.from_dict(em)).mesh                           # document units (um)

@@ -56,7 +56,8 @@ def _version_1_has_regions(geometry):
     if component.get('dimension') == '3d':
         return False
     background = component.get('background')
-    return bool(component.get('features')) or (isinstance(background, dict) and 'material' in background)
+    features = component.get('features')
+    return (isinstance(features, list) and bool(features)) or (isinstance(background, dict) and 'material' in background)
 
 
 def is_region_thermal(data):

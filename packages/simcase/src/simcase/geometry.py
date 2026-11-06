@@ -217,7 +217,11 @@ def dropped_features(doc: Document) -> list[str]:
 
 def size_function(doc: Document):
     """The mesh size function of a version 1 document's ``mesh.controls`` distance gradings, in
-    the mesher's units, after ``build_domain(doc)``; None for a 0.2 document or without one."""
+    the mesher's units, after ``build_domain(doc)``; None for a 0.2 document or without one.
+
+    The complex is shared with the document's micrometre copy, so after a run or a mesh-limit
+    check its last hand-off is in micrometres: this then refuses a document in another unit
+    rather than mixing units (call ``build_domain(doc)`` again first)."""
     from .geometry_document import GeometryError, pm_per_unit
     rc = getattr(doc, "geometry_complex", None)
     if rc is None or getattr(doc, "geometry_model", None) is None:
