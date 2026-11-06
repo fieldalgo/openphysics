@@ -172,7 +172,8 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
         unit_pm = pm_per_unit(doc["units"])
         dom = doc.domain
         min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
-        domain, namer, materials = rc.to_domain(doc["mesh"]["size"], unit_pm=unit_pm, min_area=min_area_pm2)
+        domain, namer, materials = rc.to_domain(doc["mesh"]["size"], unit_pm=unit_pm, min_area=min_area_pm2,
+                                                controls=doc.controls_pm())
     except GeometryError as exc:
         raise DocumentError(str(exc)) from None
     doc.notes.extend(rc.notes)

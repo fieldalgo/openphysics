@@ -244,6 +244,7 @@ class Document:
         doc.geometry_model = model
         doc.validate()
         doc.geometry_source, doc.geometry_roundings = source, list(roundings)
+        doc.check_mesh_controls()
         if doc.is_version_1 and any(f.type == "segment" for f in doc.component.features):
             from .geometry_engine import check_handoff
             try:
@@ -391,6 +392,68 @@ class Document:
     def validate(self) -> None:
         """The contract of the document's physics kind (``registry``)."""
         kind_of(self.data).validate(self)
+
+    def mesh_controls(self) -> list[dict]:
+        """The contract's ``mesh.controls`` entries, as written (``[]`` when absent)."""
+        controls = self.data.get("mesh", {}).get("controls")
+        return [] if controls is None else controls
+
+    def check_mesh_controls(self) -> None:
+        """Refuse a malformed ``mesh.controls`` list, or one whose targets the component lacks.
+
+        An entry is ``{"select": <name or selector>, <one control>}`` with the control
+        ``circle_segments`` (an integer, at least 8: meshine's floor) or ``size`` (a positive
+        length in the document's unit, on a region selection). The contract's ``z_divisions``
+        and distance grading (``near``, ``far``, ``distance``) are not implemented yet and are
+        refused by name, as is any list on a 0.2 geometry block, which has no selections.
+        """
+        controls = self.mesh_controls()
+        if not controls:
+            return
+        if not isinstance(controls, list):
+            raise DocumentError("mesh.controls: expected a list of objects")
+        if not self.is_version_1:
+            raise DocumentError("mesh.controls needs a version 1 geometry block with a 2D region component; "
+                                "a 0.2 geometry block has no selections to control")
+        from .geometry_document import GeometryError
+        for i, entry in enumerate(controls):
+            where = f"mesh.controls[{i}]"
+            if not isinstance(entry, dict) or "select" not in entry:
+                raise DocumentError(f"{where}: expected an object with 'select' and one control")
+            known = {"circle_segments", "size"}
+            later = {"z_divisions", "near", "far", "distance"}
+            keys = set(entry) - {"select"}
+            if keys & later:
+                raise DocumentError(f"{where}: {sorted(keys & later)} are not implemented yet; "
+                                    "circle_segments and size are")
+            if len(keys) != 1 or not keys <= known:
+                raise DocumentError(f"{where}: expected exactly one of circle_segments or size, got {sorted(keys)}")
+            if "circle_segments" in entry:
+                n = entry["circle_segments"]
+                if type(n) is not int or n < 8:
+                    raise DocumentError(f"{where}.circle_segments: expected an integer of at least 8")
+            else:
+                h = entry["size"]
+                if type(h) not in (int, float) or not math.isfinite(h) or h <= 0:
+                    raise DocumentError(f"{where}.size: expected a positive length in units.length")
+            try:
+                kind, _chosen = self.complex().select(entry["select"])
+            except GeometryError as exc:
+                raise DocumentError(f"{where}: {exc}") from None
+            if "size" in entry and kind != "region":
+                raise DocumentError(f"{where}: select {entry['select']!r} is a boundary selection; a size on a "
+                                    "boundary is not implemented yet (give the size to a region)")
+
+    def controls_pm(self) -> list[dict]:
+        """``mesh_controls()`` with each ``size`` as an integer pm count, for the engine hand-off."""
+        from fractions import Fraction
+        unit_pm = self._pm_per_unit()
+        out = []
+        for entry in self.mesh_controls():
+            if "size" in entry:
+                entry = {**entry, "size": int(round(Fraction(entry["size"]) * unit_pm))}
+            out.append(entry)
+        return out
 
     def validate_em_modes2d(self) -> None:
         """The ``em.modes2d`` contract; also reports a document no kind claims."""

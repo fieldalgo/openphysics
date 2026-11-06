@@ -730,6 +730,7 @@ class RegionComplex:
     notes: list = field(default_factory=list)
     _dcel: object = field(default=None, repr=False)
     _handoff: object = field(default=None, repr=False)      # the polylines of the last to_domain
+    _component: object = field(default=None, repr=False)    # the parsed Component, for select()
 
     def region_names(self) -> list[str]:
         """The surviving regions in feature order, the background last (the 0.2 route's order)."""
@@ -747,6 +748,25 @@ class RegionComplex:
 
     def curves_with(self, provenance: str) -> list[int]:
         return [k.index for k in self.curves if provenance in k.provenance]
+
+    def select(self, expr) -> tuple[str, frozenset]:
+        """What a ``mesh.controls`` ``select`` names: ``("region", cells)`` or ``("boundary", curves)``.
+
+        A named selection gives its own kind. Otherwise the contract's region selectors are
+        tried first (a region name, a feature id, ``{"feature": ..}``, ``{"material": ..}``),
+        then the boundary ones (a tag, a provenance name, ``{"provenance": ..}``, ``{"of": ..}``,
+        ``{"between": ..}``). A name that is neither is refused."""
+        if isinstance(expr, str) and expr in self.selections:
+            return self.selections[expr]
+        comp = self._component
+        where = f"mesh.controls: select {expr!r}"
+        try:
+            return "region", frozenset(_resolve_region(self, comp, expr, where, ()))
+        except GeometryError as region_error:
+            try:
+                return "boundary", frozenset(_resolve_boundary(self, comp, expr, where, ()))
+            except GeometryError:
+                raise region_error from None
 
     def is_exterior(self, cell: int | None) -> bool:
         """The exterior for the mesh: outside the domain, or a void cell."""
@@ -796,7 +816,8 @@ class RegionComplex:
             lines.append(f"  selection {name!r}: {len(chosen)} {kind} entries {sorted(chosen)}")
         return "\n".join(lines)
 
-    def to_domain(self, size: float, *, unit_pm=10 ** 6, mesh_sizes: bool = True, min_area: float = 0.0):
+    def to_domain(self, size: float, *, unit_pm=10 ** 6, mesh_sizes: bool = True, min_area: float = 0.0,
+                  controls: list | None = None):
         """The meshine ``Domain``, boundary namer and {region: material} of this complex.
 
         Coordinates are rounded once from pm to ``unit_pm`` picometres per mesher unit
@@ -807,9 +828,16 @@ class RegionComplex:
         edge length in its own unit and fixes the circle vertex counts; ``mesh_sizes``
         passes each cell's own size on. Regions are added in feature order, the
         background last, each region's cells in index order.
+
+        ``controls`` are the contract's ``mesh.controls`` entries, already checked for form:
+        ``{"select": expr, "circle_segments": n}`` sets the vertex count of every circle
+        that the selection's curves lie on or that bounds one of its cells (raised, and
+        noted, where a whole circle's chords would otherwise cut across a neighbouring
+        curve); ``{"select": expr, "size": h}`` (``h`` in pm) sets the mesh size of the
+        selection's cells, a boundary selection being refused. Later entries win.
         """
         from meshine import Circle, Domain
-        return _to_domain(self, size, Fraction(unit_pm), Circle, Domain, mesh_sizes, min_area)
+        return _to_domain(self, size, Fraction(unit_pm), Circle, Domain, mesh_sizes, min_area, controls or [])
 
     def curve_edges(self, mesh) -> dict:
         """{curve index: (E, 2) node pairs} of the mesh edges that lie on each curve.
@@ -1224,7 +1252,7 @@ class _Engine:
                 curves.append(Curve(e.index, kind, e.a, e.b, {"center": (c.cx, c.cy), "r2": c.r2}, e.provenance,
                                     left, right))
         rc = RegionComplex(comp.name, comp.dimension, dict(comp.domain), list(zip(self.V.x, self.V.y)), cells,
-                           curves, {}, self.notes, d2)
+                           curves, {}, self.notes, d2, _component=comp)
         _default_tags(rc)
         _apply_boundary_tags(rc, comp)
         rc.selections = _resolve_selections(rc, comp)
@@ -1473,8 +1501,33 @@ def _boundary_of(rc: RegionComplex, cells: set[int]) -> set[int]:
 
 # ----------------------------------------------------------------------- meshine hand-off
 
+def _resolve_controls(rc: RegionComplex, controls: list) -> tuple[dict, dict]:
+    """({circle key: requested vertex count}, {cell index: size in pm}) of ``mesh.controls``."""
+    counts: dict[tuple, int] = {}
+    sizes: dict[int, int] = {}
+    for entry in controls:
+        kind, chosen = rc.select(entry["select"])
+        if "circle_segments" in entry:
+            if kind == "region":
+                curves = _boundary_of(rc, set(chosen)) | {k.index for k in rc.curves
+                                                          if k.left in chosen and k.right in chosen}
+            else:
+                curves = set(chosen)
+            for i in curves:
+                k = rc.curves[i]
+                if k.kind != "line":
+                    counts[(k.params["center"], k.params["r2"])] = int(entry["circle_segments"])
+        if "size" in entry:
+            if kind != "region":
+                raise GeometryError(f"mesh.controls: select {entry['select']!r} is a boundary selection; a size "
+                                    "on a boundary is not implemented yet (give the size to a region)")
+            for ci in chosen:
+                sizes[ci] = entry["size"]
+    return counts, sizes
+
+
 def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain, mesh_sizes: bool,
-               min_area: float):
+               min_area: float, controls: list):
     V = rc._dcel.V
     scale = 1 / unit_pm
     coords: dict[int, tuple[float, float]] = {}
@@ -1485,13 +1538,14 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
         return coords[v]
 
     check_handoff(rc)
-    rc.notes = [n for n in rc.notes if not n.startswith("geometry.features: a piece of")]
+    rc.notes = [n for n in rc.notes if not n.startswith(("geometry.features: a piece of", "mesh.controls:"))]
     poly: dict[int, list | None] = {}
     circle_objs: dict[tuple, object] = {}
     for k in rc.curves:
         if k.kind == "line":
             poly[k.index] = [pt(k.a), pt(k.b)]
-    counts = _circle_vertex_counts(rc, poly, pt, unit_pm, size)
+    requested, cell_sizes = _resolve_controls(rc, controls)
+    counts = _circle_vertex_counts(rc, poly, pt, unit_pm, size, requested)
     for k in rc.curves:
         if k.kind == "line":
             continue
@@ -1526,7 +1580,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
                 rc.notes.append(f"geometry.features: a piece of {cell.region!r} covers {cell.area / float(unit_pm) ** 2:g} "
                                 f"square mesher units, under the sliver limit, so it is left out of the mesh")
                 continue
-            _add_cell(d, rc, cell, poly, circle_objs, unit_pm, mesh_sizes)
+            _add_cell(d, rc, cell, poly, circle_objs, unit_pm, mesh_sizes, cell_sizes.get(ci))
             materials[cell.region] = cell.material
     exterior_segments = []
     for k in rc.curves:
@@ -1554,13 +1608,16 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
 MAX_CIRCLE_VERTICES = 20000
 
 
-def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, size: float) -> dict:
+def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, size: float,
+                          requested: dict | None = None) -> dict:
     """The vertex count of every circle's polygon: the 0.2 rule max(16, 2 pi r / (size / 2)),
+    or the count a ``circle_segments`` control asked for (``requested``, by circle key),
     raised for a whole circle so that the sagitta of its polygon's chords stays below the
     distance from the circle line to the nearest other curve. A chord that cut across a
     neighbouring feature's corner would give the mesher crossing loops; meshine projects
     inserted nodes back onto a whole circle, so the count only sets where the chords start.
     A whole circle that would need more than MAX_CIRCLE_VERTICES is refused by name."""
+    requested = requested or {}
     circles: dict[tuple, float] = {}
     whole: set = set()
     for k in rc.curves:
@@ -1573,7 +1630,7 @@ def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, 
     counts = {}
     for key, r in circles.items():
         c = (float(key[0][0] / unit_pm), float(key[0][1] / unit_pm))
-        n = max(16, int(2 * math.pi * r / (size / 2)))
+        n = requested.get(key, max(16, int(2 * math.pi * r / (size / 2))))
         if key not in whole:
             # a cut circle's arcs meet other curves at vertices; a chord of theirs that crosses a
             # neighbour is caught by the crossing check of the rounded polylines
@@ -1614,10 +1671,16 @@ def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, 
             dist = math.hypot(o[0] - c[0], o[1] - c[1])
             gap = min(gap, max(dist - r - r2, r - dist - r2, r2 - dist - r, 0.0))
         if gap < math.inf and gap > 0:
-            n = max(n, math.ceil(math.pi * math.sqrt(r / (2 * gap))) + 1)
+            needed = math.ceil(math.pi * math.sqrt(r / (2 * gap))) + 1
+            if key in requested and needed > n:
+                names = sorted({p for k in rc.curves if k.kind != "line"
+                                and (k.params["center"], k.params["r2"]) == key for p in k.provenance})
+                rc.notes.append(f"mesh.controls: circle_segments {n} of the circle of {names} raised to {needed} "
+                                "to keep its chords clear of the nearest other curve")
+            n = max(n, needed)
         if n > MAX_CIRCLE_VERTICES or gap == 0.0:
-            names = sorted(p for k in rc.curves if k.kind != "line" and (k.params["center"], k.params["r2"]) == key
-                           for p in k.provenance)
+            names = sorted({p for k in rc.curves if k.kind != "line" and (k.params["center"], k.params["r2"]) == key
+                            for p in k.provenance})
             raise GeometryError(f"hand-off: the circle of {names} passes within {gap:g} mesher units of another "
                                 f"curve; its polygon would need more than {MAX_CIRCLE_VERTICES} vertices to keep "
                                 "its chords clear of that curve")
@@ -1626,7 +1689,7 @@ def _circle_vertex_counts(rc: RegionComplex, poly: dict, pt, unit_pm: Fraction, 
 
 
 def _add_cell(d, rc: RegionComplex, cell: Cell, poly: dict, circle_objs: dict, unit_pm: Fraction,
-              mesh_sizes: bool) -> None:
+              mesh_sizes: bool, size_pm=None) -> None:
     loops = []
     for loop in cell.loops:
         if all(rc.curves[i].kind == "circle" for i, _f in loop):
@@ -1637,8 +1700,9 @@ def _add_cell(d, rc: RegionComplex, cell: Cell, poly: dict, circle_objs: dict, u
             pts = poly[i] if fwd else poly[i][::-1]
             verts.extend(pts[:-1])
         loops.append(verts)
+    size_pm = cell.mesh_size if size_pm is None else size_pm
     d.add_region(cell.region, loops[0], holes=loops[1:],
-                 size=(float(cell.mesh_size / unit_pm) if cell.mesh_size is not None and mesh_sizes else None))
+                 size=(float(size_pm / unit_pm) if size_pm is not None and mesh_sizes else None))
 
 
 def _curve_edges(rc: RegionComplex, mesh) -> dict:

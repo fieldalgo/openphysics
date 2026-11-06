@@ -160,6 +160,9 @@ def micrometre_document(doc: Document) -> Document:
                 s["points"] = [[um(c) for c in p] for p in s["points"]]
     m = d["mesh"]
     m["size"] = um(m["size"])
+    for entry in m.get("controls") or []:
+        if "size" in entry:
+            entry["size"] = um(entry["size"])
     if m.get("grading"):
         gr = m["grading"]
         gr["center"] = [um(c) for c in gr["center"]]

@@ -180,14 +180,39 @@ axisymmetric component loads but no runner takes it yet; region heat refuses a
 feature that the domain cuts away or that is a sliver (a feature later
 features cover is allowed, as a covered 0.2 shape is). Arcs reach the mesher
 with the 0.2 circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle
-from the global mesh size, so a coarse `mesh.size` gives coarse arcs; the
-contract's `mesh.controls` `circle_segments` is not implemented yet. A 0.2 block is meshed by the shapely
-route as before. The loops reach meshine in a different vertex order from the
+from the global mesh size, so a coarse `mesh.size` gives coarse arcs unless a
+`mesh.controls` entry says otherwise (below). A 0.2 block is meshed by the
+shapely route as before. The loops reach meshine in a different vertex order from the
 shapely route, so a version 1 copy of a 0.2 document gives a different refined
 mesh and results that agree at discretization level, as the contract's internal
 grid section says (region heat example: 595 against 597 nodes, maximum and mean
 temperature within 6e-4 and 4e-4 of the temperature rise; waveguide examples:
 effective indices within 2e-6 to 1.6e-4).
+
+### `mesh.controls`
+
+The contract's optional `mesh.controls` list is read for a version 1 document
+with a 2D region component (a 0.2 block has no selections and is refused with
+it). Each entry is `{"select": <target>, <one control>}`; later entries win.
+
+- `select` names a declared selection, or is a region selector (a region name,
+  a feature id, `{"feature": ..}`, `{"material": ..}`) or, failing that, a
+  boundary selector (a tag, a provenance name such as `core.boundary`,
+  `{"of": ..}`, `{"between": ..}`). A name that is none of these is refused at
+  load.
+- `circle_segments: n` (an integer, at least 8) sets the vertex count of every
+  circle that the selected curves lie on, or that bounds a selected cell, in
+  place of the 0.2 rule. A cut circle's arcs take their share of `n`. A whole
+  circle whose chords at `n` would cut across a neighbouring curve is raised to
+  the count the clearance needs and the raise is noted in `doc.notes`.
+- `size: h` (a positive length in `units.length`, converted with the document)
+  sets the mesh size of the selected cells, over the feature's own `mesh_size`.
+  A size on a boundary selection is not implemented yet and is refused by name,
+  as are the contract's `z_divisions` and distance grading.
+
+`rc.to_domain(size, controls=[...])` takes the same entries with `size` in
+picometres (`Document.controls_pm()`); `rc.select(expr)` resolves a target to
+`("region", cells)` or `("boundary", curves)`.
 
 ## Validation
 
