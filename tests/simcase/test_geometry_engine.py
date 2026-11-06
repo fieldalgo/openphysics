@@ -1407,3 +1407,82 @@ def test_g3_7_document_mesh_controls_are_checked_at_load_and_converted_with_the_
     v02["mesh"]["controls"] = [{"select": "heater", "circle_segments": 16}]
     with pytest.raises(DocumentError, match="needs a version 1 geometry block"):
         Document.from_dict(v02)
+
+
+# ----------------------------------------------------------------- review findings of 2026-11-07 (stage 2b)
+
+def test_a_circle_segments_raise_is_noted_on_the_document_by_both_runners():
+    from simcase import Document, run, build_mesh
+    raw = _regions_doc([{"name": "heater", "type": "circle", "cx": 20, "cy": 10, "r": 3, "material": "copper"},
+                        {"name": "bar", "type": "rect", "x": 23.03, "y": 5, "w": 5, "h": 10, "material": "steel"}],
+                       physics_source={"heater": 1e6})
+    raw["mesh"]["controls"] = [{"select": "heater", "circle_segments": 8}]
+    doc = Document.from_dict(raw)
+    run(doc, verbose=False)      # region heat meshes its own copy; the given document carries the note
+    # (a result's document is re-validated on every read, which resets its notes, so it never holds one)
+    notes = [n for n in doc.notes
+             if n.startswith("mesh.controls: circle_segments 8 of the circle of ['heater.boundary'] raised to 24")]
+    assert len(notes) == 1, doc.notes
+    run(doc, verbose=False)
+    assert doc.notes.count(notes[0]) == 1                                   # a second run adds no duplicate
+    transient = copy.deepcopy(EXAMPLES["transient_thermal_regions"])
+    transient["geometry"] = from_v02(transient["geometry"])
+    comp = transient["geometry"]["components"]["main"]
+    comp["features"] = [{"name": "heater", "type": "circle", "cx": 15, "cy": 2.5, "r": 2, "material": "steel"},
+                        {"name": "bar", "type": "rect", "x": 17.02, "y": 1, "w": 5, "h": 3, "material": "steel"}]
+    (_name, p), = transient["physics"].items()
+    p["heat_source_w_m3"] = {"heater": 200000.0, "background": 50000.0}
+    transient["mesh"]["controls"] = [{"select": "heater", "circle_segments": 8}]
+    tdoc = Document.from_dict(transient)
+    run(tdoc, verbose=False)
+    assert any(n.startswith("mesh.controls: circle_segments 8 of the circle of ['heater.boundary'] raised to")
+               for n in tdoc.notes), tdoc.notes
+    em = _soi_v1()
+    em["geometry"]["components"]["main"]["features"].append(
+        {"name": "ring", "type": "circle", "cx": 0.0, "cy": 0.6, "r": 0.2, "material": "silicon"})
+    em["geometry"]["components"]["main"]["features"].append(
+        {"name": "post", "type": "rect", "x": 0.2005, "y": 0.5, "w": 0.1, "h": 0.2, "material": "silicon"})
+    em["mesh"]["controls"] = [{"select": "ring", "circle_segments": 8}]
+    doc = Document.from_dict(em)
+    build_mesh(doc)
+    assert any(n.startswith("mesh.controls: circle_segments 8 of the circle of ['ring.boundary'] raised to") for n in doc.notes)
+
+
+def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere():
+    from simcase import Document, run
+    from simcase.thermal_regions import has_region_geometry
+    slab = copy.deepcopy(EXAMPLES["thermal_slab"])
+    slab["geometry"] = from_v02(slab["geometry"])
+    kind = next(iter(slab["physics"].values()))["type"]
+    assert not has_region_geometry(slab, kind)
+    doc = Document.from_dict(slab)
+    assert not doc.is_version_1 and not has_region_geometry(doc.data, kind)
+    assert run(doc, verbose=False).summary()["physics_type"] == kind
+    regions = _regions_doc([], physics_source=0.0)    # no features, but a background material
+    assert has_region_geometry(regions, kind) and Document.from_dict(regions).is_version_1
+
+
+def test_the_micrometre_copy_of_a_version_1_document_refuses_to_serialise():
+    from simcase import Document, DocumentError
+    from simcase.runner import micrometre_document
+    doc = Document.from_dict(_regions_doc([{"name": "heater", "type": "rect", "x": 5, "y": 5, "w": 10, "h": 10,
+                                            "material": "copper"}]))
+    um = micrometre_document(doc)
+    assert um["units"]["length"] == "um" and um.domain["xmax"] == 40000.0 and um.geometry_block_unit == "mm"
+    with pytest.raises(DocumentError, match="micrometre copy"):
+        um.to_dict()
+    with pytest.raises(DocumentError, match="micrometre copy"):
+        um.copy().to_dict()
+    assert micrometre_document(um).geometry_block_unit == "mm"
+    assert doc.geometry_block_unit is None and doc.to_dict()["geometry"] == doc.data["geometry"]
+
+
+def test_mesh_controls_of_an_unvalidated_document_are_refused_by_name_at_the_hand_off():
+    from simcase import Document, DocumentError, check_mesh_limits
+    raw = _regions_doc([{"name": "heater", "type": "circle", "cx": 20, "cy": 10, "r": 3, "material": "copper"}])
+    raw["mesh"]["controls"] = [{"select": "heater", "circle_segments": "x"}]
+    doc = Document.from_dict(_regions_doc([{"name": "heater", "type": "circle", "cx": 20, "cy": 10, "r": 3,
+                                            "material": "copper"}]))
+    doc.data["mesh"]["controls"] = raw["mesh"]["controls"]       # bypassing from_dict
+    with pytest.raises(DocumentError, match="circle_segments: expected an integer"):
+        check_mesh_limits(doc, max_input_vertices=10 ** 6)

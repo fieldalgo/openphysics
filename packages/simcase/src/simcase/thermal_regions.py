@@ -36,10 +36,26 @@ def has_region_geometry(data, physics_type):
     if not typed or not isinstance(geometry, dict):
         return False
     if 'version' in geometry:
-        # a version 1 block kept in the document is a region component; a homogeneous
-        # rectangle was compiled to the 0.2 form at load, so it never reaches here
-        return True
+        return _version_1_has_regions(geometry)
     return 'shapes' in geometry or 'background' in geometry
+
+
+def _version_1_has_regions(geometry):
+    """A raw version 1 block that Document.from_dict keeps as a 2D region component: its one
+    component has features or a background material. A homogeneous rectangle (neither) is
+    compiled to the 0.2 rectangle form at load and takes the rectangle path, as does a 3D
+    component (cavity form). A block of another shape is left to the reader to refuse and
+    counted as a region block, so the refusal names it."""
+    components = geometry.get('components')
+    if not isinstance(components, dict) or len(components) != 1:
+        return True
+    (component,) = components.values()
+    if not isinstance(component, dict):
+        return True
+    if component.get('dimension') == '3d':
+        return False
+    background = component.get('background')
+    return bool(component.get('features')) or (isinstance(background, dict) and 'material' in background)
 
 
 def is_region_thermal(data):
@@ -311,6 +327,8 @@ def build_region_mesh(doc, limits=None):
         tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']))
     else:
         tri, region_materials = _limited_mesh(canonical, limits, generate)
+    doc.notes.extend(note for note in canonical.notes
+                     if note.startswith(('geometry.', 'mesh.controls:')) and note not in doc.notes)
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
     unknown = set(tri.boundary_edges)-set(SIDES)
@@ -469,11 +487,13 @@ class RegionThermalRunResult(ThermalRunResult):
 def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     from galerkin.thermal import solve_steady_heat
     doc.validate()
-    doc = doc.copy()
+    given, doc = doc, doc.copy()
     doc.validate()
     name, _ = doc.sole_physics()
     t0 = time.perf_counter()
     mesh, region_materials, tri = build_region_mesh(doc, mesh_limits)
+    # the hand-off's notes (slivers left out, raised circle counts) reach the caller's document
+    given.notes.extend(n for n in doc.notes if n.startswith(('geometry.', 'mesh.controls:')) and n not in given.notes)
     kwargs = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
     calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
