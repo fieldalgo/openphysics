@@ -41,9 +41,23 @@
     return values.length === 1 && object(values[0]) ? values[0].type : null;
   }
   function route(s) { return typeof s === 'string' && /^\/api\/[a-zA-Z0-9_/-]+$/.test(s) && !s.includes('..'); }
+  // The server's rule (simcase.has_region_geometry): shapes or background, or a version 1
+  // geometry block whose one component has features or a background material (a homogeneous
+  // rectangle written as version 1 is compiled to the rectangle form at load; a 3D component is
+  // not a region document; any other block shape is left to the server to refuse as a region one).
+  function versionOneHasRegions(geometry) {
+    const components=geometry.components;
+    if (!object(components) || Object.keys(components).length!==1) return true;
+    const component=Object.values(components)[0];
+    if (!object(component)) return true;
+    if (component.dimension==='3d') return false;
+    const features=component.features, background=component.background;
+    return (Array.isArray(features) && features.length>0) || (object(background) && Object.hasOwn(background,'material'));
+  }
   function hasRegionGeometry(doc, type=TYPE) {
     return soleType(doc)===type && object(doc.geometry)
-      && (Object.hasOwn(doc.geometry,'shapes') || Object.hasOwn(doc.geometry,'background'));
+      && (Object.hasOwn(doc.geometry,'shapes') || Object.hasOwn(doc.geometry,'background')
+          || (Object.hasOwn(doc.geometry,'version') && versionOneHasRegions(doc.geometry)));
   }
   function freeze(x) {
     if (x!==null && typeof x==='object') { Object.values(x).forEach(freeze); Object.freeze(x); }

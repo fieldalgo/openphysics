@@ -578,8 +578,18 @@ test('J10 hasRegionGeometry on the server rule fixtures (two physics entries: fa
   const noGeometry=copy(region);delete noGeometry.geometry;
   const physicsNotDict=copy(region);physicsNotDict.physics=['heat1'];
   const twoPhysics=copy(region);twoPhysics.physics.second={type:T.TYPE};
+  // version 1 blocks, as the server's from_v02 writes them (the numbers do not matter to the rule)
+  const component=(extra)=>({dimension:'2d',domain:{xmin:0,xmax:40,ymin:0,ymax:20},finalize:'later_wins',...extra});
+  const versionOne=copy(region);versionOne.geometry={version:1,components:{main:component({background:{material:'steel'},
+    features:[{name:'heater',type:'rect',x:1,y:1,w:2,h:2,material:'copper'}]})}};
+  const versionOneBackground=copy(region);versionOneBackground.geometry={version:1,components:{main:component({background:{material:'steel'}})}};
+  const versionOneRectangle=copy(region);versionOneRectangle.geometry={version:1,components:{main:component({})}};
+  const versionOneBox=copy(region);versionOneBox.geometry={version:1,components:{main:{dimension:'3d',domain:{},features:[{name:'b',type:'box'}]}}};
+  const versionOneTwoComponents=copy(region);versionOneTwoComponents.geometry={version:1,components:{a:component({}),b:component({})}};
   const decided=Object.fromEntries(Object.entries({rectangle,region,shapesOnly,backgroundOnly,geometryList,noGeometry,
-    physicsNotDict,twoPhysics}).map(([k,v])=>[k,T.hasRegionGeometry(v)]));
+    physicsNotDict,twoPhysics,versionOne,versionOneBackground,versionOneRectangle,versionOneBox,versionOneTwoComponents})
+    .map(([k,v])=>[k,T.hasRegionGeometry(v)]));
   assert.deepEqual(decided,{rectangle:false,region:true,shapesOnly:true,backgroundOnly:true,geometryList:false,
-    noGeometry:false,physicsNotDict:false,twoPhysics:false});
+    noGeometry:false,physicsNotDict:false,twoPhysics:false,versionOne:true,versionOneBackground:true,
+    versionOneRectangle:false,versionOneBox:false,versionOneTwoComponents:true});
 });
