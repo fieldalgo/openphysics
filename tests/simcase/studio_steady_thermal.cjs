@@ -586,10 +586,11 @@ test('J10 hasRegionGeometry on the server rule fixtures (two physics entries: fa
   const versionOneRectangle=copy(region);versionOneRectangle.geometry={version:1,components:{main:component({})}};
   const versionOneBox=copy(region);versionOneBox.geometry={version:1,components:{main:{dimension:'3d',domain:{},features:[{name:'b',type:'box'}]}}};
   const versionOneTwoComponents=copy(region);versionOneTwoComponents.geometry={version:1,components:{a:component({}),b:component({})}};
+  const versionOneOddFeatures=copy(region);versionOneOddFeatures.geometry={version:1,components:{main:component({features:{a:1}})}};
   const decided=Object.fromEntries(Object.entries({rectangle,region,shapesOnly,backgroundOnly,geometryList,noGeometry,
-    physicsNotDict,twoPhysics,versionOne,versionOneBackground,versionOneRectangle,versionOneBox,versionOneTwoComponents})
-    .map(([k,v])=>[k,T.hasRegionGeometry(v)]));
+    physicsNotDict,twoPhysics,versionOne,versionOneBackground,versionOneRectangle,versionOneBox,versionOneTwoComponents,
+    versionOneOddFeatures}).map(([k,v])=>[k,T.hasRegionGeometry(v)]));
   assert.deepEqual(decided,{rectangle:false,region:true,shapesOnly:true,backgroundOnly:true,geometryList:false,
     noGeometry:false,physicsNotDict:false,twoPhysics:false,versionOne:true,versionOneBackground:true,
-    versionOneRectangle:false,versionOneBox:false,versionOneTwoComponents:true});
+    versionOneRectangle:false,versionOneBox:false,versionOneTwoComponents:true,versionOneOddFeatures:false});
 });

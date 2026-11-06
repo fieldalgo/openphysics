@@ -870,15 +870,19 @@ class RegionComplex:
         gives ``h0`` on the selection, growing linearly with the distance from it to ``h1``
         at ``d`` and beyond: the distance to a boundary selection's curves, and to a region
         selection's cells (zero inside them). Several entries combine by minimum. The
-        function takes mesher-unit coordinates (``unit_pm`` picometres per unit) as meshine's
-        ``size_fn`` does, and reads the polylines of the last ``to_domain``."""
+        function takes mesher-unit coordinates as meshine's ``size_fn`` does and reads the
+        polylines of the last ``to_domain``, whose unit it keeps: ``unit_pm`` (picometres per
+        mesher unit) must be that hand-off's, so lengths and distances agree."""
         entries = [e for e in controls if "distance" in e]
         if not entries:
             return None
         if self._handoff is None:
             raise GeometryError("size_function: call to_domain first; the grading reads its polylines")
+        if Fraction(unit_pm) != self._handoff["unit_pm"]:
+            raise GeometryError(f"size_function: the last to_domain used {self._handoff['unit_pm']} pm per mesher "
+                                f"unit, not {Fraction(unit_pm)}; the grading measures its polylines in that unit")
         import numpy as np
-        scale = 1 / Fraction(unit_pm)
+        scale = 1 / self._handoff["unit_pm"]
         parts = []
         for e in entries:
             kind, chosen = self.select(e["select"])
