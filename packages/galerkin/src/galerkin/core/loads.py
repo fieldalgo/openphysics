@@ -29,7 +29,7 @@ def _centroid_load(mesh, t, size, values):
     return forms.vector(t, kernels.p1_load(mesh, values), size, order="columns")
 
 
-def source_load(mesh, p, t, area, source, *, live=False):
+def source_load(mesh, p, t, area, source, *, live=False, measure=None):
     """Consistent P1 nodal load of a volumetric source (named heat_source in messages).
 
     ``source`` is an ElementSource, a {region name: value} mapping, a scalar,
@@ -37,6 +37,8 @@ def source_load(mesh, p, t, area, source, *, live=False):
     live=True a JAX or PyTorch value or callback result stays in its library
     (otherwise it is refused) and so does the load; ElementSource is NumPy.
     """
+    if measure is not None and measure.axisymmetric:
+        return _weighted_source_load(mesh, p, t, area, source, live, measure)
     if isinstance(source, ElementSource):
         return _centroid_load(mesh, t, len(p), source.values)
     if is_per_region(source):
@@ -64,3 +66,28 @@ def source_load(mesh, p, t, area, source, *, live=False):
     load = np.zeros(len(p))
     np.add.at(load, t.ravel(), local.ravel())
     return load
+
+
+def _weighted_source_load(mesh, p, t, area, source, live, measure):
+    """Consistent weighted load; static quadrature, array-API values and scatter."""
+    bary, weights = triangle_product_rule()
+    points = np.einsum("qa,tad->tqd", bary, p[t])
+    check = real_value if live else real_array
+    if isinstance(source, ElementSource):
+        values = source.values[:, None]
+    elif is_per_region(source):
+        values = region_property(mesh, source, "heat_source", live=live)[:, None]
+    elif callable(source):
+        values = check(source(points.reshape(-1, 2)), "heat_source callback")
+        if tuple(values.shape) != (points.shape[0]*points.shape[1],):
+            raise ValueError("heat_source callback must return exactly shape (Q,)")
+        values = values.reshape(points.shape[:2])
+    else:
+        values = check(source, "heat_source")
+        if tuple(values.shape) != ():
+            raise ValueError("constant heat_source must be scalar")
+    xp = namespace(values)
+    basis = xp.broadcast_to(xp.asarray(bary)[None, :, :], (len(t), *bary.shape))
+    local = forms.integrate_linear(basis, weights, area,
+                                   values*xp.asarray(measure.density(points)))
+    return forms.vector(t, local, len(p))

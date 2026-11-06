@@ -27,6 +27,7 @@ from .core.backend import Backend, backend_of, is_live, lift, live_namespace, sc
 from .core.boundary import scalar_boundary_samples
 from .core.checks import real_value
 from .core.loads import ElementSource, source_load
+from .core.measure import ScalarMeasure
 from .core import solve as core_solve
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
@@ -115,7 +116,8 @@ class SteadyHeatResult:
     reaction is residual=(K+H)*T-system_rhs on fixed nodes, zero on free nodes.
     Positive reaction injects heat; the Dirichlet thermostat outward contribution
     is -reaction. Total outward heat also includes prescribed and convective terms.
-    All nodal heat rates are per unit out-of-plane thickness, not watts.
+    Cartesian nodal heat rates are per unit out-of-plane thickness (W/m).
+    Axisymmetric rates integrate a full revolution (W); see nodal_heat_rate_unit.
     """
     temperature: np.ndarray
     heat_flux: np.ndarray
@@ -126,6 +128,8 @@ class SteadyHeatResult:
     ambient_load: np.ndarray | None = None
     convective_outward: np.ndarray | None = None
     system_rhs: np.ndarray | None = None
+    coordinate_system: str = "cartesian"
+    nodal_heat_rate_unit: str = "W/m"
 
 
 def _element_source(heat_source, mesh):
@@ -136,7 +140,7 @@ def _element_source(heat_source, mesh):
 
 
 def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
-                      outward_flux=None, convection=None):
+                      outward_flux=None, convection=None, coordinate_system="cartesian"):
     """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
 
     conductivity is finite scalar k>0 in W/(m K), or {region name: k} with
@@ -149,6 +153,9 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     q.n = g+h*(T-ambient), h>=0. Boundary scalars or callbacks
     (points_m, outward_normals)->(Q,) use W/m^2, W/(m^2 K), K respectively.
     Untagged natural edges are insulated. See docs/packages/galerkin/thermal_flux_robin.md.
+    coordinate_system="axisymmetric" interprets coordinates as (r,z), r>=0,
+    and uses the full 2*pi*r volume and surface measure. Nodal heat rates then
+    have units W, recorded on the result, instead of the Cartesian W/m.
     """
     if not is_per_region(conductivity):
         k = real_value(conductivity, "conductivity")
@@ -156,6 +163,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
             raise ValueError("conductivity must be a finite scalar > 0")
         k = k if is_live(k) else float(k)
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
+    measure = ScalarMeasure(mesh, coordinate_system)
     if is_per_region(conductivity):
         k = region_property(mesh, conductivity, "conductivity", positive=True, live=True)
     if not isinstance(dirichlet, Mapping):
@@ -176,14 +184,20 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
         if not constrained[component]:
             anchors[component] = value
             constrained[component] = True
-    samples = scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, live=True)
+    measure.check_axis_dirichlet(prescribed)
+    samples = measure.boundary_samples(
+        scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, live=True))
     H, G, B, shifted_B = scalar_boundary_system(samples, len(p), labels, anchors, constrained)
     missing = np.flatnonzero(~constrained)
     if len(missing):
         raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
     cells = np.asarray(mesh.triangles)
-    stiffness = forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (len(p), len(p)))
-    load = source_load(mesh, p, t, area, _element_source(heat_source, mesh), live=True)
+    element = kernels.p1_stiffness(mesh, k)
+    if measure.axisymmetric:
+        xp = live_namespace(element)
+        element = element*xp.asarray(measure.cell_factor())[:, None, None]
+    stiffness = forms.matrix(cells, cells, element, (len(p), len(p)))
+    load = source_load(mesh, p, t, area, _element_source(heat_source, mesh), live=True, measure=measure)
     # One array library for everything from here on (NumPy objects stay as they are).
     xp = live_namespace(k, load, G, B, shifted_B, None if issparse(H) else H.values,
                         *anchors, *prescribed.values())
@@ -232,4 +246,4 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     if is_live(residual):
         reaction = scatter_add(xp, len(p), fixed, residual[fixed])
     return SteadyHeatResult(temperature, flux, load, reaction, residual,
-                            G, B, convective, rhs)
+                            G, B, convective, rhs, coordinate_system, measure.nodal_rate_unit)
