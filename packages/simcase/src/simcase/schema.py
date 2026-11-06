@@ -414,10 +414,12 @@ class Document:
         """Refuse a malformed ``mesh.controls`` list, or one whose targets the component lacks.
 
         An entry is ``{"select": <name or selector>, <one control>}`` with the control
-        ``circle_segments`` (an integer, at least 8: meshine's floor) or ``size`` (a positive
-        length in the document's unit, on a region selection). The contract's ``z_divisions``
-        and distance grading (``near``, ``far``, ``distance``) are not implemented yet and are
-        refused by name, as is any list on a 0.2 geometry block, which has no selections.
+        ``circle_segments`` (an integer, at least 8: meshine's floor), ``size`` (a positive
+        length in the document's unit, on a region selection) or the distance grading
+        ``near``, ``far``, ``distance`` (three positive lengths: ``near`` on the selection,
+        growing linearly to ``far`` at ``distance`` from it). The contract's ``z_divisions``
+        is not implemented yet and is refused by name, as is any list on a 0.2 geometry
+        block, which has no selections.
         """
         controls = self.mesh_controls()
         if not controls:
@@ -432,19 +434,27 @@ class Document:
             where = f"mesh.controls[{i}]"
             if not isinstance(entry, dict) or "select" not in entry:
                 raise DocumentError(f"{where}: expected an object with 'select' and one control")
-            known = {"circle_segments", "size"}
-            later = {"z_divisions", "near", "far", "distance"}
+            grading = {"near", "far", "distance"}
             keys = set(entry) - {"select"}
-            if keys & later:
-                raise DocumentError(f"{where}: {sorted(keys & later)} are not implemented yet; "
-                                    "circle_segments and size are")
-            if len(keys) != 1 or not keys <= known:
-                raise DocumentError(f"{where}: expected exactly one of circle_segments or size, got {sorted(keys)}")
+            if "z_divisions" in keys:
+                raise DocumentError(f"{where}: z_divisions is not implemented yet; circle_segments, size and the "
+                                    "distance grading (near, far, distance) are")
+            if keys & grading:
+                if keys != grading:
+                    raise DocumentError(f"{where}: a distance grading needs near, far and distance together, "
+                                        f"got {sorted(keys)}")
+                for k in sorted(grading):
+                    v = entry[k]
+                    if type(v) not in (int, float) or not math.isfinite(v) or v <= 0:
+                        raise DocumentError(f"{where}.{k}: expected a positive length in units.length")
+            elif len(keys) != 1 or not keys <= {"circle_segments", "size"}:
+                raise DocumentError(f"{where}: expected circle_segments, size, or near+far+distance, "
+                                    f"got {sorted(keys)}")
             if "circle_segments" in entry:
                 n = entry["circle_segments"]
                 if type(n) is not int or n < 8:
                     raise DocumentError(f"{where}.circle_segments: expected an integer of at least 8")
-            else:
+            elif "size" in entry:
                 h = entry["size"]
                 if type(h) not in (int, float) or not math.isfinite(h) or h <= 0:
                     raise DocumentError(f"{where}.size: expected a positive length in units.length")
@@ -466,8 +476,8 @@ class Document:
         unit_pm = self._pm_per_unit()
         out = []
         for entry in self.mesh_controls():
-            if "size" in entry:
-                entry = {**entry, "size": int(round(Fraction(entry["size"]) * unit_pm))}
+            entry = {**entry, **{k: int(round(Fraction(entry[k]) * unit_pm))
+                                 for k in ("size", "near", "far", "distance") if k in entry}}
             out.append(entry)
         return out
 

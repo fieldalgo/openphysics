@@ -319,13 +319,13 @@ def build_region_mesh(doc, limits=None):
     before."""
     from galerkin.mesh import Mesh
     from meshine import generate
-    from .geometry import build_domain
+    from .geometry import build_domain, size_function
     from .runner import micrometre_document
     from . import units
     canonical = micrometre_document(doc)
     if limits is None:
         domain, namer, region_materials = build_domain(canonical)
-        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']))
+        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), **_grading(canonical))
     else:
         tri, region_materials = _limited_mesh(canonical, limits, generate)
     doc.notes.extend(note for note in canonical.notes
@@ -355,19 +355,29 @@ def build_region_mesh(doc, limits=None):
     return mesh, region_materials, tri
 
 
+def _grading(canonical):
+    """meshine's ``size_fn`` keyword for a version 1 document's distance gradings, after its
+    domain is built; empty otherwise, so a 0.2 document's call is exactly as before."""
+    from .geometry import size_function
+    size_fn = size_function(canonical)
+    return {} if size_fn is None else {'size_fn': size_fn}
+
+
 def _limited_mesh(doc, limits, generate):
     """(meshine mesh, region materials) of the micrometre document ``doc`` under ``limits``:
     the loop vertices are counted before Domain.build, and max_points is passed only when
     max_nodes is set, so meshine otherwise keeps its own default cap."""
-    from .geometry import _domain_from_regions
+    from .geometry import _domain_from_regions, size_function
     from .mesh_limits import MeshLimitError
     domain, namer, region_materials, _count = _domain_from_regions(
         doc, max_input_vertices=limits.max_input_vertices)
+    grading = _grading(doc)
     if limits.max_nodes is None:
-        return generate(domain, namer, min_angle=float(doc['mesh']['min_angle'])), region_materials
+        return generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), **grading), region_materials
     from meshine import MeshSizeLimitError     # here: an older meshine fails only limited runs
     try:
-        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), max_points=limits.max_nodes)
+        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), max_points=limits.max_nodes,
+                       **grading)
     except MeshSizeLimitError as exc:
         raise MeshLimitError('nodes', limits.max_nodes) from exc
     return tri, region_materials

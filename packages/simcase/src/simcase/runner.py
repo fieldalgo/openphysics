@@ -28,7 +28,7 @@ from galerkin import Mesh
 from meshine import TriMesh, generate, shapes as mshapes
 
 from . import physics_em_modes2d
-from .geometry import build_domain, provenance_edges_of
+from .geometry import build_domain, provenance_edges_of, size_function
 from .mesh_limits import _is_region_document, _mesh_limits
 from . import units
 from .materials import material_table
@@ -108,6 +108,7 @@ def build_mesh(doc: Document) -> MeshedModel:
     if mcfg.get("grading"):
         g = mcfg["grading"]
         size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
+    size_fn = _combined_size(size_fn, size_function(canonical))
     tri_um = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
     if tri_um.num_triangles == 0 or tri_um.num_nodes == 0:
         raise DocumentError(
@@ -125,6 +126,22 @@ def build_mesh(doc: Document) -> MeshedModel:
     provenance = provenance_edges_of(canonical, tri_um)         # node pairs: the same in both units
     return MeshedModel(doc, tri, _solver_mesh(tri, provenance), region_materials,
                        material_table(doc, region_materials), solver_mesh=_solver_mesh(tri_um, provenance))
+
+
+def _combined_size(*functions):
+    """The point-wise minimum of the given size functions, None when there is none."""
+    functions = [f for f in functions if f is not None]
+    if not functions:
+        return None
+    if len(functions) == 1:
+        return functions[0]
+
+    def h(x, y):
+        out = functions[0](x, y)
+        for f in functions[1:]:
+            out = np.minimum(out, f(x, y))
+        return out
+    return h
 
 
 def _solver_mesh(tri: TriMesh, provenance_edges: dict | None = None) -> Mesh:
@@ -161,8 +178,9 @@ def micrometre_document(doc: Document) -> Document:
     m = d["mesh"]
     m["size"] = um(m["size"])
     for entry in m.get("controls") or []:
-        if "size" in entry:
-            entry["size"] = um(entry["size"])
+        for k in ("size", "near", "far", "distance"):
+            if k in entry:
+                entry[k] = um(entry[k])
     if m.get("grading"):
         gr = m["grading"]
         gr["center"] = [um(c) for c in gr["center"]]

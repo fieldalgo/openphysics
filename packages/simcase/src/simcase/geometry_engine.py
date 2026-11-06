@@ -863,6 +863,62 @@ class RegionComplex:
                 out.setdefault(name, []).extend(map(tuple, by_curve[k.index]))
         return {name: np.array(sorted(set(v)), dtype=int).reshape(-1, 2) for name, v in out.items()}
 
+    def size_function(self, controls: list, unit_pm=10 ** 6):
+        """The mesh size function of the ``mesh.controls`` distance-grading entries, or None.
+
+        An entry ``{"select": expr, "near": h0, "far": h1, "distance": d}`` (lengths in pm)
+        gives ``h0`` on the selection, growing linearly with the distance from it to ``h1``
+        at ``d`` and beyond: the distance to a boundary selection's curves, and to a region
+        selection's cells (zero inside them). Several entries combine by minimum. The
+        function takes mesher-unit coordinates (``unit_pm`` picometres per unit) as meshine's
+        ``size_fn`` does, and reads the polylines of the last ``to_domain``."""
+        entries = [e for e in controls if "distance" in e]
+        if not entries:
+            return None
+        if self._handoff is None:
+            raise GeometryError("size_function: call to_domain first; the grading reads its polylines")
+        import numpy as np
+        scale = 1 / Fraction(unit_pm)
+        parts = []
+        for e in entries:
+            kind, chosen = self.select(e["select"])
+            curves = set(chosen) if kind == "boundary" else _boundary_of(self, set(chosen))
+            segments, circles = _selection_pieces(self, curves)
+            cells = [self._cell_polygons(ci) for ci in chosen] if kind == "region" else []
+            parts.append((float(e["near"] * scale), float(e["far"] * scale), float(e["distance"] * scale),
+                          segments, circles, cells))
+
+        def h(x, y):
+            x = np.asarray(x, dtype=float); y = np.asarray(y, dtype=float)
+            out = np.full(np.broadcast(x, y).shape, np.inf)
+            for near, far, dist, segments, circles, cells in parts:
+                d = _distance_to_pieces(x, y, segments, circles)
+                for outer, holes in cells:
+                    inside = _inside_polygon(x, y, outer)
+                    for hole in holes:
+                        inside &= ~_inside_polygon(x, y, hole)
+                    d = np.where(inside, 0.0, d)
+                out = np.minimum(out, near + (far - near) * np.clip(d / dist, 0.0, 1.0))
+            return out
+        return h
+
+    def _cell_polygons(self, ci: int) -> tuple:
+        """(outer, holes) vertex arrays of a cell from the last hand-off's polylines."""
+        import numpy as np
+        poly, circles = self._handoff["poly"], self._handoff["circles"]
+        loops = []
+        for loop in self.cells[ci].loops:
+            if all(self.curves[i].kind == "circle" for i, _f in loop):
+                k = self.curves[loop[0][0]]
+                loops.append(np.asarray(circles[(k.params["center"], k.params["r2"])].vertices(), dtype=float))
+                continue
+            verts = []
+            for i, fwd in loop:
+                pts = poly[i] if fwd else poly[i][::-1]
+                verts.extend(pts[:-1])
+            loops.append(np.asarray(verts, dtype=float))
+        return loops[0], loops[1:]
+
     def selection_edges(self, mesh, name: str):
         """The (E, 2) mesh edges of a boundary selection, resolved through the curves it holds."""
         import numpy as np
@@ -1482,6 +1538,49 @@ def _resolve_boundary(rc: RegionComplex, comp: Component, expr, where: str, stac
             out |= _resolve_boundary(rc, comp, e, where, stack)
         return out
     raise GeometryError(f"{where}: unknown selector key {k!r}")
+
+
+def _selection_pieces(rc: RegionComplex, curves: set) -> tuple[list, list]:
+    """(line pieces [(p, q)], whole circles [(cx, cy, r)]) of these curves in the last hand-off's units."""
+    poly, circles, unit_pm = rc._handoff["poly"], rc._handoff["circles"], rc._handoff["unit_pm"]
+    segments, rounds = [], []
+    for i in curves:
+        k = rc.curves[i]
+        pts = poly[k.index]
+        if pts is None:
+            c = circles[(k.params["center"], k.params["r2"])]
+            rounds.append((float(c.center[0]), float(c.center[1]), float(c.radius)))
+            continue
+        segments.extend(zip(pts[:-1], pts[1:]))
+    return segments, rounds
+
+
+def _distance_to_pieces(x, y, segments: list, circles: list):
+    """Point-wise distance from (x, y) arrays to line pieces and circle lines (inf with none)."""
+    import numpy as np
+    d = np.full(np.broadcast(x, y).shape, np.inf)
+    for (px, py), (qx, qy) in segments:
+        ux, uy = qx - px, qy - py
+        L2 = ux * ux + uy * uy
+        t = 0.0 if L2 == 0 else np.clip(((x - px) * ux + (y - py) * uy) / L2, 0.0, 1.0)
+        d = np.minimum(d, np.hypot(x - (px + t * ux), y - (py + t * uy)))
+    for cx, cy, r in circles:
+        d = np.minimum(d, np.abs(np.hypot(x - cx, y - cy) - r))
+    return d
+
+
+def _inside_polygon(x, y, verts):
+    """Even-odd test of (x, y) arrays against a closed polygon given by its vertices."""
+    import numpy as np
+    inside = np.zeros(np.broadcast(x, y).shape, dtype=bool)
+    n = len(verts)
+    for i in range(n):
+        (x0, y0), (x1, y1) = verts[i], verts[(i + 1) % n]
+        if y0 == y1:
+            continue
+        crosses = ((y0 > y) != (y1 > y)) & (x < x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+        inside ^= crosses
+    return inside
 
 
 def _side_in(cell, selection) -> bool:
