@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Steady and transient heat region documents in Studio; an ordinary public simcase consumer.
 
-A region document (a heat document whose ``geometry`` has ``shapes`` or ``background``)
-takes this path on the same routes as rectangle documents, which keep their own code
+A region document (a heat document whose ``geometry`` has ``shapes`` or ``background``,
+or is a version 1 geometry block) takes this path on the same routes as rectangle documents, which keep their own code
 unchanged. Each stage bounds the cost of the next:
 
 1. on the event loop, O(JSON size): the physics entry, a stray ``mesh.subdivisions`` and,
@@ -63,13 +63,16 @@ def applies(raw, kind):
     """A raw document of physics ``kind`` that declares region geometry.
 
     The same rule as simcase's own choice of the region path: a physics entry of that type
-    and a ``geometry`` object with ``shapes`` or ``background``. Thermal defaults add only
+    and a ``geometry`` object with ``shapes`` or ``background``, or a version 1 block
+    (``version``; a homogeneous rectangle written so is compiled to the 0.2 form with a
+    ``background`` at load, so it stays on this path). Thermal defaults add only
     ``geometry.domain``, so the raw and the merged document agree."""
     if not isinstance(raw, dict) or not isinstance(raw.get("physics"), dict):
         return False
     typed = any(isinstance(p, dict) and p.get("type") == kind for p in raw["physics"].values())
     geometry = raw.get("geometry")
-    return typed and isinstance(geometry, dict) and ("shapes" in geometry or "background" in geometry)
+    return typed and isinstance(geometry, dict) and ("shapes" in geometry or "background" in geometry
+                                                    or "version" in geometry)
 
 
 def raw_preflight(raw, kind, limits):
@@ -163,24 +166,31 @@ def capability(kind, limits, rlimits):
             "limits": asdict(rlimits)}
 
 
-def _geometry_limit(message):
-    return common.ThermalAPIError("geometry_limit_exceeded", message, 413, path="geometry.shapes")
+def _geometry_limit(message, path="geometry.shapes"):
+    return common.ThermalAPIError("geometry_limit_exceeded", message, 413, path=path)
+
+
+def _shapes_path(raw):
+    """Where the shapes of a raw region document are: a version 1 block's features count as shapes."""
+    geometry = raw.get("geometry") if isinstance(raw, dict) else None
+    return "geometry.components" if isinstance(geometry, dict) and "version" in geometry else "geometry.shapes"
 
 
 def _check_complexity(raw, rlimits):
     counts = region_complexity(raw, max_shapes=rlimits.max_shapes, max_circles=rlimits.max_circles,
                                max_polygon_points=rlimits.max_polygon_points)
+    path = _shapes_path(raw)
     for what, count, name in (("shapes", counts.shapes, "max_shapes"),
                               ("circles", counts.circles, "max_circles"),
                               ("polygon points", counts.polygon_points, "max_polygon_points")):
         limit = getattr(rlimits, name)
         if count > limit:
-            raise _geometry_limit(f"geometry.shapes has {count} {what}, more than Studio's region limit "
-                                  f"{name}={limit}")
+            raise _geometry_limit(f"{path} has {count} {what}, more than Studio's region limit "
+                                  f"{name}={limit}", path)
     if counts.boundary_crossings > rlimits.max_boundary_crossings:
         raise _geometry_limit(f"the shapes' boundaries cross {counts.boundary_crossings} times (segment pairs "
                               f"of different shapes), more than Studio's region limit max_boundary_crossings="
-                              f"{rlimits.max_boundary_crossings}")
+                              f"{rlimits.max_boundary_crossings}", path)
 
 
 def _summary_floor(doc, limits):
@@ -308,9 +318,9 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
     count = len(names)
     _require(ids.ndim == 1 and len(ids) == len(triangles) and ids.dtype.kind in "iu"
              and not np.any(ids < 0) and not np.any(ids >= count), "triangle region ids outside the regions")
-    geometry = doc["geometry"]
-    assigned = {s["name"]: s["material"] for s in geometry["shapes"]}
-    assigned["background"] = geometry["background"]["material"]
+    # doc.regions() and doc.background read a 0.2 block's shapes or a version 1 block's features
+    assigned = {entry["name"]: entry["material"] for entry in doc.regions()}
+    assigned["background"] = doc.background["material"]
     regions = summary.get("regions")
     _require(isinstance(regions, dict) and set(regions) == set(names), "summary regions disagree with the names")
     cells = np.bincount(ids, minlength=count)
@@ -326,7 +336,7 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
         _require(type(area) is float and math.isfinite(area) and area >= 0
                  and area == float(areas[ids == i].sum()), name+": region area disagrees")
         total += area
-    domain = geometry["domain"]
+    domain = doc.domain
     scale = doc.scale.to_si(1., {"length": 1})
     expected = (domain["xmax"]-domain["xmin"])*(domain["ymax"]-domain["ymin"])*scale*scale
     _require(math.isfinite(expected) and expected > 0 and abs(total-expected) <= 1e-9*expected,
