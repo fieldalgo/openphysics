@@ -1395,7 +1395,7 @@ def test_g3_7_document_mesh_controls_are_checked_at_load_and_converted_with_the_
             ([{"select": "heater", "z_divisions": 3}], "not implemented yet"),
             ([{"select": "heater", "circle_segments": 4}], "at least 8"),
             ([{"select": "heater", "size": -1}], "positive length"),
-            ([{"select": "heater", "circle_segments": 16, "size": 1}], "exactly one of"),
+            ([{"select": "heater", "circle_segments": 16, "size": 1}], "expected circle_segments, size, or"),
             ([{"select": "nowhere", "circle_segments": 16}], "not a selection, a region or a feature id"),
             ([{"select": "left", "size": 1}], "boundary selection"),
             ({"select": "heater"}, "expected a list")]:
@@ -1486,3 +1486,94 @@ def test_mesh_controls_of_an_unvalidated_document_are_refused_by_name_at_the_han
     doc.data["mesh"]["controls"] = raw["mesh"]["controls"]       # bypassing from_dict
     with pytest.raises(DocumentError, match="circle_segments: expected an integer"):
         check_mesh_limits(doc, max_input_vertices=10 ** 6)
+
+
+# ----------------------------------------------------------------- mesh.controls distance grading (G3-8)
+
+def _edge_lengths(mesh):
+    import numpy as np
+    nodes, tris = np.asarray(mesh.nodes, dtype=float), np.asarray(mesh.triangles, dtype=int)
+    p = nodes[tris]
+    centres = p.mean(axis=1)
+    lengths = np.linalg.norm(p - np.roll(p, 1, axis=1), axis=2).mean(axis=1)
+    return centres, lengths
+
+
+def test_g3_8_distance_grading_from_a_boundary_and_from_a_region_selection():
+    import numpy as np
+    doc = v1([rect("r", 40, 40, 20, 20, "Si")], selections={"wall": {"boundary": {"of": "r"}}, "core": {"region": "r"}})
+    rc = run(doc)
+    d, namer, _m = rc.to_domain(0.02)                                   # 20 nm everywhere
+    plain = generate(d, boundary_names=namer)
+    grading = [{"select": "wall", "near": 2 * 10 ** 3, "far": 20 * 10 ** 3, "distance": 20 * 10 ** 3}]   # pm
+    h = rc.size_function(grading)
+    # the function itself: near on the wall, far at the distance and beyond, linear between
+    assert h(0.040, 0.050) == pytest.approx(0.002) and h(0.050, 0.050) == pytest.approx(0.002 + 0.018 * 0.5)
+    assert h(0.0, 0.0) == pytest.approx(0.020) and h(0.050, 0.030) == pytest.approx(0.002 + 0.018 * 0.5)
+    graded = generate(d, boundary_names=namer, size_fn=h)
+    centres, lengths = _edge_lengths(graded)
+    near = lengths[np.abs(np.hypot(centres[:, 0] - 0.050, centres[:, 1] - 0.050) - 0.0) < 0.012]   # inside the rect
+    far_away = lengths[(centres[:, 0] < 0.015) & (centres[:, 1] < 0.015)]
+    assert len(graded.nodes) > 3 * len(plain.nodes) and near.mean() < 0.3 * far_away.mean()
+    # a region selection: zero distance inside the cell, so near throughout it
+    h = rc.size_function([{"select": "core", "near": 2 * 10 ** 3, "far": 20 * 10 ** 3, "distance": 20 * 10 ** 3}])
+    assert h(0.050, 0.050) == pytest.approx(0.002) and h(0.041, 0.059) == pytest.approx(0.002)
+    assert h(0.030, 0.050) == pytest.approx(0.002 + 0.018 * 0.5)
+    # two entries combine by minimum, with the global grading of the runner (runner.build_mesh)
+    h2 = rc.size_function([{"select": "core", "near": 5 * 10 ** 3, "far": 20 * 10 ** 3, "distance": 20 * 10 ** 3},
+                           {"select": "left", "near": 1 * 10 ** 3, "far": 20 * 10 ** 3, "distance": 10 * 10 ** 3}])
+    assert h2(0.0, 0.050) == pytest.approx(0.001) and h2(0.050, 0.050) == pytest.approx(0.005)
+    assert rc.size_function([{"select": "core", "circle_segments": 16}]) is None
+    with pytest.raises(GeometryError, match="to_domain first"):
+        run(doc).size_function(grading)
+
+
+def test_g3_8_a_whole_circle_and_a_hole_are_graded_from_their_true_outline():
+    rc = run(v1([circle("c", 50, 50, 10, "Si"), rect("box", 10, 10, 30, 30, "Ge"), circle("hole", 25, 25, 5, None)]))
+    rc.to_domain(0.02)
+    h = rc.size_function([{"select": "c", "near": 1 * 10 ** 3, "far": 10 * 10 ** 3, "distance": 10 * 10 ** 3}])
+    assert h(0.050, 0.050) == pytest.approx(0.001)                      # inside the circle cell
+    assert h(0.065, 0.050) == pytest.approx(0.001 + 0.009 * 0.5)        # 5 nm outside its line
+    h = rc.size_function([{"select": "box", "near": 1 * 10 ** 3, "far": 10 * 10 ** 3, "distance": 10 * 10 ** 3}])
+    assert h(0.025, 0.025) == pytest.approx(0.001 + 0.009 * 0.5)        # the hole's centre: 5 nm from its rim
+    assert h(0.015, 0.015) == pytest.approx(0.001)                      # in the box, outside the hole
+
+
+def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runners():
+    import numpy as np
+    from simcase import Document, DocumentError, build_mesh, check_mesh_limits
+    from simcase.runner import micrometre_document
+    from simcase.thermal_regions import build_region_mesh
+    raw = _regions_doc([{"name": "heater", "type": "rect", "x": 15, "y": 7, "w": 10, "h": 6, "material": "copper"}],
+                       physics_source={"heater": 1e6})
+    raw["geometry"]["components"]["main"]["selections"] = {"rim": {"boundary": {"of": "heater"}}}
+    plain = Document.from_dict(raw)
+    raw["mesh"]["controls"] = [{"select": "rim", "near": 0.2, "far": 2.0, "distance": 5.0}]     # mm
+    doc = Document.from_dict(raw)
+    assert doc.controls_pm() == [{"select": "rim", "near": 200_000_000, "far": 2_000_000_000, "distance": 5_000_000_000}]
+    um = micrometre_document(doc)
+    assert um.mesh_controls() == [{"select": "rim", "near": 200.0, "far": 2000.0, "distance": 5000.0}]
+    assert um.controls_pm() == doc.controls_pm()
+    mesh = build_region_mesh(doc)[0]
+    coarse = build_region_mesh(plain)[0]
+    centres, lengths = _edge_lengths(mesh)                       # metres
+    on_rim = lengths[(np.abs(centres[:, 0] - 0.015) < 0.5e-3) & (np.abs(centres[:, 1] - 0.010) < 2e-3)]
+    far_away = lengths[centres[:, 0] > 0.035]
+    assert len(mesh.nodes) > 2 * len(coarse.nodes) and on_rim.mean() < 0.4 * far_away.mean()
+    assert check_mesh_limits(doc, max_input_vertices=10 ** 6) == check_mesh_limits(plain, max_input_vertices=10 ** 6)
+    em = _soi_v1(selections={"edge": {"boundary": {"of": "core"}}})
+    em["mesh"]["controls"] = [{"select": "edge", "near": 0.005, "far": 0.2, "distance": 0.3}]       # um
+    graded = build_mesh(Document.from_dict(em)).mesh                           # document units (um)
+    centres, lengths = _edge_lengths(graded)
+    at_edge = lengths[(np.abs(np.abs(centres[:, 0]) - 0.25) < 0.01) & (centres[:, 1] > 0.02) & (centres[:, 1] < 0.2)]
+    far_up = lengths[centres[:, 1] > 0.8]
+    assert len(graded.nodes) > len(build_mesh(Document.from_dict(_soi_v1())).mesh.nodes)
+    assert len(at_edge) > 10 and at_edge.mean() < 0.3 * far_up.mean()
+    for controls, message in [([{"select": "rim", "near": 0.2, "far": 2.0}], "near, far and distance together"),
+                              ([{"select": "rim", "near": 0.2, "far": -2.0, "distance": 5.0}], "far: expected a positive"),
+                              ([{"select": "rim", "near": 0.2, "far": 2.0, "distance": 5.0, "size": 1}], "together"),
+                              ([{"select": "rim", "z_divisions": 2}], "z_divisions is not implemented")]:
+        bad = copy.deepcopy(raw)
+        bad["mesh"]["controls"] = controls
+        with pytest.raises(DocumentError, match=message):
+            Document.from_dict(bad)

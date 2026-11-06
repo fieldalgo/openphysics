@@ -150,11 +150,15 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
   필요한 수로 올리고 그 사실을 러너에 준 문서의 `notes`에 적습니다(`build_mesh`, 영역 열·과도 영역 실행). 결과의
   문서는 읽을 때마다 재검증되어 notes가 비워지므로 실행한 문서에서 읽습니다.
 - `size: h`(`units.length` 단위의 양의 길이, 문서와 함께 변환)는 선택된 셀의 메시 크기를 피처의 `mesh_size`보다
-  우선해 정합니다. 경계 선택의 size는 아직 구현되지 않아 이름 밝혀 거부되고, 계약의 `z_divisions`와 거리 등급도
-  그렇습니다.
+  우선해 정합니다. 경계 선택의 size는 아직 구현되지 않아 이름 밝혀 거부되고, 계약의 `z_divisions`도 그렇습니다.
+- `near: h0, far: h1, distance: d`(양의 길이 셋, 함께)는 계약의 거리 등급입니다. 메시 크기는 선택 위에서 `h0`이고
+  선택에서의 거리에 따라 선형으로 커져 `d`부터는 `h1`입니다. 거리는 경계 선택이면 그 곡선(폴리라인과 참 원)까지,
+  영역 선택이면 그 셀까지이며 셀 안은 0입니다. 여러 등급과 0.2 `mesh.grading`은 최솟값으로 합쳐지고 meshine은
+  셀의 크기와도 최솟값을 씁니다. 두 러너 모두 적용합니다(`runner.build_mesh`, 영역 열 메시 빌더, 메시 한도 경로).
 
-`rc.to_domain(size, controls=[...])`는 같은 항목을 `size`가 pm인 채로 받고(`Document.controls_pm()`, 항목을 먼저
-검사), `rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
+`rc.to_domain(size, controls=[...])`는 같은 항목을 길이가 pm인 채로 받고(`Document.controls_pm()`, 항목을 먼저
+검사), `rc.size_function(controls, unit_pm)`은 넘기기 뒤 메셔 단위의 등급 크기 함수(문서는
+`geometry.size_function(doc)`), `rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
 
 러너의 µm 사본(`runner.micrometre_document`)은 버전 1 블록을 문서 자신의 단위로 둔 채 `units.length`만 µm라고
 말합니다(엔진은 단위와 무관해 블록을 다시 읽지 않음). 사본은 그 단위를 `geometry_block_unit`에 적고 `to_dict()`·

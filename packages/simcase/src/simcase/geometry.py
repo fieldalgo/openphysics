@@ -215,6 +215,19 @@ def dropped_features(doc: Document) -> list[str]:
     return out
 
 
+def size_function(doc: Document):
+    """The mesh size function of a version 1 document's ``mesh.controls`` distance gradings, in
+    the mesher's units, after ``build_domain(doc)``; None for a 0.2 document or without one."""
+    from .geometry_document import GeometryError, pm_per_unit
+    rc = getattr(doc, "geometry_complex", None)
+    if rc is None or getattr(doc, "geometry_model", None) is None:
+        return None
+    try:
+        return rc.size_function(doc.controls_pm(), unit_pm=pm_per_unit(doc["units"]))
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
+
+
 def provenance_edges_of(doc: Document, tri) -> dict | None:
     """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
     or None for a 0.2 document (no complex, no provenance)."""
