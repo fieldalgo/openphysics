@@ -1,5 +1,9 @@
 # 정상 2차원 열전도
 
+전체 회전 (r,z) 열전도는 [축대칭 옵션](thermal_axisymmetric.md)을 사용합니다.
+아래의 단위 두께당 식과 단위는 기본 Cartesian 모드를 설명합니다.
+
+
 [English original](../../../../../packages/galerkin/thermal_steady2d.md)
 
 명시적 import는 `galerkin.thermal`과 `refsol.thermal`입니다. 이 모듈은 적합 P1
