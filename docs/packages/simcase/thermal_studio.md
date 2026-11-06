@@ -206,7 +206,8 @@ homogeneous rectangle written as version 1 (no features, no background
 material) is compiled to the 0.2 rectangle form at load and takes the rectangle
 path, as the 0.2 rectangle does.
 A version 1 document is accepted as written (the validation echo and the
-result record its block, not a compilation), its features count as shapes in
+result record its block, not a compilation; the page applies the same rule
+to pin the document family before it validates), its features count as shapes in
 the raw geometry caps (path `geometry.components`), and its mesh comes from the
 [stage 2 engine](geometry_engine.md); what region heat refuses in such a
 document (a void feature, a tag off the four sides) is an `invalid_document`.
