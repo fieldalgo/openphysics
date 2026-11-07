@@ -48,6 +48,10 @@ def validate_transient_region_thermal(doc):
     except (units.UnitError, OverflowError, TypeError, ValueError) as exc:
         raise DocumentError(f'units: {exc}') from exc
     names = region_geometry(doc)
+    from .thermal_regions import is_axisymmetric
+    if is_axisymmetric(doc):
+        raise DocumentError(f'component {doc.component.name!r}: transient heat takes 2d components only; the '
+                            'transient solver is Cartesian (per metre of depth)')
     region_materials_table(doc, ('conductivity_w_mk', 'volumetric_heat_capacity_j_m3k'), 'transient heat')
     region_mesh_settings(doc)
     _object(d['study'], {'type', 'time_s'}, 'study', {'type', 'time_s'})

@@ -166,8 +166,8 @@ def _domain_from_model(doc: Document, max_input_vertices: int | None = None
     """The engine route of ``build_domain``, with the loop vertex count meshine receives."""
     from .geometry_document import GeometryError, pm_per_unit
     try:
-        if doc.component.dimension == "axisymmetric":
-            raise DocumentError(f"component {doc.component.name!r}: no runner takes an axisymmetric component yet")
+        # an axisymmetric component is meshed as (r, z) in the same units; its r = 0 side is
+        # tagged "axis" (geometry_engine), and each runner decides what it takes
         rc = doc.complex()
         unit_pm = pm_per_unit(doc["units"])
         dom = doc.domain

@@ -185,6 +185,48 @@ thermostat heat, total outward heat is
 `sum(prescribed_outward_load + convective_outward - reaction)`, all nodal
 rates are W/m of depth.
 
+## Axisymmetric documents
+
+A `thermal.steady2d` region document whose [version 1 geometry
+block](geometry_document.md) has an `axisymmetric` component is a body of
+revolution: the component's (x, y) are (r, z), `domain.xmin` is the inner
+radius (`0` for a solid) and the same features, materials and sources apply.
+The mesh is built in (r, z) by the [stage 2 engine](geometry_engine.md) and
+solved with galerkin's [axisymmetric measure](../galerkin/thermal_axisymmetric.md)
+(`coordinate_system="axisymmetric"`, volume measure `2πr dr dz`).
+
+- **Sides.** With `xmin == 0` the r = 0 side is the mesh tag `axis`, which is
+  the symmetry axis: it carries natural regularity and takes no
+  `dirichlet_temperature_k`, `outward_flux_w_m2` or `convection` entry
+  (refused by name, as is `left`, which such a domain does not have). The
+  physical sides are `right` (the outer radius), `bottom` and `top`. An annulus
+  (`xmin > 0`) keeps `left` as its inner radius.
+- **Result.** The run returns an `AxisymmetricRegionThermalRunResult`, whose
+  identifiers are `thermal.axisymmetric-regions-result-v1` and
+  `thermal-axisymmetric-p1-node-cell-regions-v1`. Its nodal rates are
+  **full-revolution powers in W**, under the field names `load_w`,
+  `reaction_w`, `residual_w`, `prescribed_outward_load_w`, `ambient_load_w`,
+  `convective_outward_w` and `system_rhs_w`; the summary's diagnostics end in
+  `_w` (`source_heat_w`, `outward_heat_w`, ...) and it records
+  `coordinate_system: "axisymmetric"` and `nodal_heat_rate_unit: "W"`.
+  Temperature (K), heat flux (W/m²), triangle regions and areas (`area_m2`,
+  the meridional section) are as in a Cartesian run. The Cartesian
+  identifiers and `_w_per_m` names are never used for such a result.
+- **Not taken.** The waveguide runner (its physics needs the four sides), the
+  transient region runner (the transient solver is Cartesian) and Studio (no
+  axisymmetric payload) refuse an axisymmetric component by name.
+
+Checks G4-1 to G4-5 (`tests/simcase/test_thermal_axisymmetric_regions.py`,
+pre-registered in the HQ work record on 2026-11-07, measured the same day on
+Linux, Python 3.12, pinned environment): a uniformly heated solid cylinder
+(mesh size 0.1 mm on a 3 mm radius) matches the exact parabola
+`Q (R² − r²) / (4k)` at every node within 2e-3 of the axis rise, absorbs
+`Q π R² L` within 1e-9 and balances its heat within 1e-10; a heated core in a
+conducting shell matches the analytic axis and interface rises within 2e-3; a
+source-free annulus conducts logarithmically within 1e-3 of the temperature
+difference at the mid radius; the axis and left-side refusals, the other
+runners' and Studio's refusals, and the result identifiers and field names.
+
 ## Validation
 
 `tests/simcase/test_thermal_regions.py`, gates fixed before the

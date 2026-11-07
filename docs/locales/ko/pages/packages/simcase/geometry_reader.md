@@ -93,8 +93,8 @@ out["mesh_size"], out["mesh_controls"]         # 기본 크기, Circle 꼭짓점
 - 선택자 해석과 영역 구성 만들기. [2단계 엔진](geometry_engine.md)이 그 일을 하고 문서를 메시합니다.
 - 원통·구·`extrude` 피처를 `Document`로 읽는 것. 그 종류들은 0.2 컴파일을 읽는데 거기에는 이들의 형식이 없으므로
   `to_v02`가 이름을 밝혀 거부합니다. 2D 영역 구성 요소(`path`·병합 영역·빈 공간·`imprint`·`segment` 포함)는 쓴
-  그대로 문서에 남아 `doc.domain`·`doc.background`·`doc.regions()`로 읽힙니다. 축대칭 구성 요소는 읽히지만 아직
-  받는 러너가 없습니다. 균질 사각형과 상자만 있는 3D 구성 요소는 0.2 형식으로 컴파일됩니다.
+  그대로 문서에 남아 `doc.domain`·`doc.background`·`doc.regions()`로 읽힙니다. 축대칭 구성 요소는 정상 영역 열에서만
+  실행됩니다. 균질 사각형과 상자만 있는 3D 구성 요소는 0.2 형식으로 컴파일됩니다.
 - 설계 속도 제공(4단계).
 
 `simcase.geometry_document`를 import해도 scipy와 shapely는 불러오지 않습니다. `import simcase`는

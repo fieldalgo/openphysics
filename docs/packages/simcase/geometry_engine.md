@@ -176,7 +176,9 @@ the four domain sides only, so a `boundary_tags` entry that renames a side, a
 void region or a sliver gap is refused before the solver; region heat takes no
 void feature or background and refuses other tags as before; a `segment` that
 ends inside a cell is refused at load (meshine takes region loops only); an
-axisymmetric component loads but no runner takes it yet; region heat refuses a
+axisymmetric component is taken by steady region heat only ([axisymmetric
+documents](thermal_regions2d.md#axisymmetric-documents)); the waveguide and
+transient runners and Studio refuse it by name; region heat refuses a
 feature that the domain cuts away or that is a sliver (a feature later
 features cover is allowed, as a covered 0.2 shape is). Arcs reach the mesher
 with the 0.2 circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle
