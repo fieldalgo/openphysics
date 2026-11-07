@@ -126,7 +126,8 @@ def transient_region_summary(doc):
              'named material regions',
              f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
              f'  background: {doc.background["material"]}']
-    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"]}' for s in doc.regions()]
+    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"] if s["material"] is not None else "void (hole)"}'
+              for s in doc.regions()]
     lines += [f'  material {m}: k={v.get("conductivity_w_mk")} W/(m K), '
               f'c={v.get("volumetric_heat_capacity_j_m3k")} J/(m^3 K)' for m, v in doc['materials'].items()]
     lines.append('  output: SI time/node/cell histories, triangle regions; rates at interval ends only')
