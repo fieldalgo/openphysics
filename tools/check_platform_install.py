@@ -187,6 +187,9 @@ def main():
             ROOT / "tests/simcase/test_export_regions.py": tests / "test_export_regions.py",
             ROOT / "tests/gmshio/test_msh.py": tests / "test_msh.py",
             ROOT / "tests/meshloom/test_kernel.py": tests / "test_meshloom_kernel.py",
+            # the exact facet triangulation and PLC checks, on every platform's wheel
+            ROOT / "tests/meshloom/test_facet.py": tests / "test_meshloom_facet.py",
+            ROOT / "tests/meshloom/test_plc.py": tests / "test_meshloom_plc.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
             ROOT / "tests/simcase/test_transient_headless_windows.py":
@@ -226,6 +229,8 @@ def main():
             tests / "test_vector_modes_wheel.py",
             tests / "test_msh.py",
             tests / "test_meshloom_kernel.py",
+            tests / "test_meshloom_facet.py",
+            tests / "test_meshloom_plc.py",
             tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
