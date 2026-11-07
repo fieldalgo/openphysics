@@ -21,6 +21,56 @@
 
 use crate::predicates::{self as pr, Counters, P3};
 
+/// The geometry the kernel needs, by point index: orientation, the perturbed
+/// insphere, exact equality and collinearity. Input points use the expansion
+/// predicates directly ([`Plain`]); a mix with points on segments uses
+/// [`crate::mixed`].
+pub trait Geom {
+    fn len(&self) -> usize;
+    fn orient3d(&mut self, v: [u32; 4]) -> i8;
+    fn insphere_sos(&mut self, v: [u32; 5]) -> i8;
+    fn same(&self, a: u32, b: u32) -> bool;
+    fn collinear(&self, a: u32, b: u32, c: u32) -> bool;
+    fn counters(&self) -> Counters;
+}
+
+/// Input points only.
+pub struct Plain<'a> {
+    pub pts: &'a [P3],
+    pub n: Counters,
+}
+
+impl Geom for Plain<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.pts.len()
+    }
+
+    #[inline(always)]
+    fn orient3d(&mut self, v: [u32; 4]) -> i8 {
+        let p = |i: u32| &self.pts[i as usize];
+        pr::orient3d(p(v[0]), p(v[1]), p(v[2]), p(v[3]), &mut self.n)
+    }
+
+    #[inline(always)]
+    fn insphere_sos(&mut self, v: [u32; 5]) -> i8 {
+        let p = |i: u32| &self.pts[i as usize];
+        pr::insphere_sos([p(v[0]), p(v[1]), p(v[2]), p(v[3]), p(v[4])], v, &mut self.n)
+    }
+
+    fn same(&self, a: u32, b: u32) -> bool {
+        pr::same_point(&self.pts[a as usize], &self.pts[b as usize])
+    }
+
+    fn collinear(&self, a: u32, b: u32, c: u32) -> bool {
+        pr::collinear(&self.pts[a as usize], &self.pts[b as usize], &self.pts[c as usize])
+    }
+
+    fn counters(&self) -> Counters {
+        self.n
+    }
+}
+
 pub const GHOST: u32 = u32::MAX;
 const FREE: u32 = u32::MAX - 1;
 
@@ -40,6 +90,8 @@ pub enum Error {
     Domain(usize),
     TooMany,
     Order(&'static str),
+    /// Input that the caller must fix (named by index).
+    Input(String),
     Internal(String),
 }
 
@@ -51,6 +103,7 @@ impl std::fmt::Display for Error {
                                              0 or [2^-120, 2^120] in magnitude"),
             Error::TooMany => write!(f, "too many points for 32-bit vertex indices"),
             Error::Order(s) => write!(f, "invalid insertion order: {s}"),
+            Error::Input(s) => f.write_str(s),
             Error::Internal(s) => write!(f, "internal error: {s}"),
         }
     }
@@ -64,8 +117,12 @@ pub struct Output {
     pub stats: Stats,
 }
 
-struct Mesh<'a> {
-    pts: &'a [P3],
+pub(crate) struct Mesh<G: Geom> {
+    pub(crate) g: G,
+    // a tetrahedron (finite or ghost) holding each vertex, for edge queries; kept only
+    // when `track` is set (boundary recovery), as it costs time in plain insertion
+    vt: Vec<u32>,
+    track: bool,
     // per tetrahedron: 4 vertices, then 4 links (interleaved, so one cache line holds both)
     data: Vec<u32>,
     mark: Vec<u32>,
@@ -130,33 +187,90 @@ pub fn tetrahedralize(pts: &[P3], order: Option<&[u32]>) -> Result<Output, Error
         }
     }
     let order: Vec<u32> = order.into_iter().filter(|&i| vertex_of[i as usize] == i).collect();
-    let mut m = Mesh::new(pts);
+    let mut m = Mesh::build(Plain { pts, n: Counters::default() }, &order, false)?;
     m.stats.duplicates = (pts.len() - order.len()) as u64;
-    let first = m.start(&order)?;
-    for &i in &order {
-        if first.contains(&i) {
-            continue;
-        }
-        if let Some(v) = m.insert(i)? {
-            return Err(Error::Internal(format!("point {i} equals vertex {v} after deduplication")));
-        }
-    }
-    m.stats.inserted += 4;
-    let mut tets = Vec::with_capacity(m.data.len() / 8);
-    for t in 0..m.data.len() / 8 {
-        let v = &m.data[8 * t..8 * t + 4];
-        if v[0] != FREE && v[3] != GHOST {
-            tets.push([v[0], v[1], v[2], v[3]]);
-        }
-    }
-    Ok(Output { tets, vertex_of, stats: m.stats })
+    let tets = m.tets();
+    let mut stats = m.stats;
+    stats.predicates = m.g.counters();
+    Ok(Output { tets, vertex_of, stats })
 }
 
-impl<'a> Mesh<'a> {
-    fn new(pts: &'a [P3]) -> Self {
-        let cap = 7 * pts.len() + 16;
+impl<G: Geom> Mesh<G> {
+    /// The tetrahedralization of the points of `order` (distinct, at least four
+    /// affinely independent), inserted in that order.
+    /// `track` keeps a vertex-to-tetrahedron map for [`Mesh::has_edge`].
+    pub(crate) fn build(g: G, order: &[u32], track: bool) -> Result<Self, Error> {
+        let mut m = Mesh::new(g);
+        m.track = track;
+        let first = m.start(order)?;
+        for &i in order {
+            if first.contains(&i) {
+                continue;
+            }
+            if let Some(v) = m.insert(i)? {
+                return Err(Error::Internal(format!("point {i} equals vertex {v} after deduplication")));
+            }
+        }
+        m.stats.inserted += 4;
+        Ok(m)
+    }
+
+    /// The finite tetrahedra, positively oriented.
+    pub(crate) fn tets(&self) -> Vec<[u32; 4]> {
+        let mut tets = Vec::with_capacity(self.data.len() / 8);
+        for t in 0..self.data.len() / 8 {
+            let v = &self.data[8 * t..8 * t + 4];
+            if v[0] != FREE && v[3] != GHOST {
+                tets.push([v[0], v[1], v[2], v[3]]);
+            }
+        }
+        tets
+    }
+
+    pub(crate) fn stats(&self) -> Stats {
+        let mut s = self.stats;
+        s.predicates = self.g.counters();
+        s
+    }
+
+    /// True when a and b (vertices of the mesh) are joined by an edge: a walk over
+    /// the tetrahedra around a.
+    pub(crate) fn has_edge(&mut self, a: u32, b: u32) -> bool {
+        debug_assert!(self.track, "has_edge needs a mesh built with track");
+        let Some(&t0) = self.vt.get(a as usize) else { return false };
+        if t0 == u32::MAX || !self.verts(t0).contains(&a) {
+            return false;
+        }
+        self.epoch += 1;
+        let seen = 2 * self.epoch;
+        self.stack.clear();
+        self.stack.push(t0);
+        self.mark[t0 as usize] = seen;
+        while let Some(t) = self.stack.pop() {
+            let v = self.verts(t);
+            if v.contains(&b) {
+                return true;
+            }
+            for i in 0..4 {
+                if v[i] == a {
+                    continue; // the face opposite a does not hold a
+                }
+                let nb = self.adj(4 * t + i as u32) >> 2;
+                if self.mark[nb as usize] != seen {
+                    self.mark[nb as usize] = seen;
+                    self.stack.push(nb);
+                }
+            }
+        }
+        false
+    }
+
+    fn new(g: G) -> Self {
+        let cap = 7 * g.len() + 16;
         Mesh {
-            pts,
+            vt: Vec::new(),
+            track: false,
+            g,
             data: Vec::with_capacity(8 * cap),
             mark: Vec::with_capacity(cap),
             free: Vec::new(),
@@ -172,13 +286,8 @@ impl<'a> Mesh<'a> {
         }
     }
 
-    #[inline]
-    fn p(&self, v: u32) -> &'a P3 {
-        &self.pts[v as usize]
-    }
-
     fn alloc(&mut self, v: [u32; 4]) -> u32 {
-        if let Some(t) = self.free.pop() {
+        let t = if let Some(t) = self.free.pop() {
             self.data[8 * t as usize..8 * t as usize + 4].copy_from_slice(&v);
             t
         } else {
@@ -187,7 +296,21 @@ impl<'a> Mesh<'a> {
             self.data.extend_from_slice(&[u32::MAX; 4]);
             self.mark.push(0);
             t
+        };
+        // every vertex of a cavity lies on its boundary, so each one is in a new
+        // tetrahedron: the map stays valid after every insertion
+        if !self.track {
+            return t;
         }
+        for &x in &v {
+            if x != GHOST {
+                if x as usize >= self.vt.len() {
+                    self.vt.resize(x as usize + 1, u32::MAX);
+                }
+                self.vt[x as usize] = t;
+            }
+        }
+        t
     }
 
     #[inline(always)]
@@ -217,20 +340,14 @@ impl<'a> Mesh<'a> {
 
     /// First tetrahedron from the first affinely independent points of `order`.
     fn start(&mut self, order: &[u32]) -> Result<[u32; 4], Error> {
-        let n = &mut Counters::default();
         let a = *order.first().ok_or(Error::Degenerate("fewer than 4 points"))?;
-        let pa = self.p(a);
-        let b = *order.iter().find(|&&i| !pr::same_point(self.p(i), pa))
+        let b = *order.iter().find(|&&i| !self.g.same(i, a))
             .ok_or(Error::Degenerate("all points coincide"))?;
-        let pb = self.p(b);
-        let c = *order.iter().find(|&&i| !pr::collinear(pa, pb, self.p(i)))
+        let c = *order.iter().find(|&&i| !self.g.collinear(a, b, i))
             .ok_or(Error::Degenerate("all points are collinear"))?;
-        let pc = self.p(c);
-        let d = *order.iter().find(|&&i| pr::orient3d(pa, pb, pc, self.p(i), n) != 0)
+        let d = *order.iter().find(|&&i| self.g.orient3d([a, b, c, i]) != 0)
             .ok_or(Error::Degenerate("all points are coplanar"))?;
-        let (c, d) = if pr::orient3d(pa, pb, pc, self.p(d), n) > 0 { (c, d) } else { (d, c) };
-        self.stats.predicates.orient3d += n.orient3d;
-        self.stats.predicates.orient3d_exact += n.orient3d_exact;
+        let (c, d) = if self.g.orient3d([a, b, c, d]) > 0 { (c, d) } else { (d, c) };
 
         let v = [a, b, c, d];
         let t0 = self.alloc(v);
@@ -281,9 +398,8 @@ impl<'a> Mesh<'a> {
     #[inline]
     fn conflict(&mut self, t: u32, q: u32) -> bool {
         let v = self.verts(t);
-        let pq = self.p(q);
         if v[3] == GHOST {
-            let o = pr::orient3d(self.p(v[0]), self.p(v[1]), self.p(v[2]), pq, &mut self.stats.predicates);
+            let o = self.g.orient3d([v[0], v[1], v[2], q]);
             if o != 0 {
                 return o > 0;
             }
@@ -292,12 +408,10 @@ impl<'a> Mesh<'a> {
             let nb = self.adj(4 * t + 3) >> 2;
             return self.conflict(nb, q);
         }
-        let p = [self.p(v[0]), self.p(v[1]), self.p(v[2]), self.p(v[3]), pq];
-        pr::insphere_sos(p, [v[0], v[1], v[2], v[3], q], &mut self.stats.predicates) > 0
+        self.g.insphere_sos([v[0], v[1], v[2], v[3], q]) > 0
     }
 
     fn locate(&mut self, q: u32) -> Result<Located, Error> {
-        let pq = self.p(q);
         let mut t = self.last;
         let limit = self.data.len() / 8 + 16;
         let mut steps = 0usize;
@@ -309,9 +423,9 @@ impl<'a> Mesh<'a> {
             let r = (self.next_rand() & 3) as usize;
             for k in 0..4 {
                 let i = (r + k) & 3;
-                let mut w = [self.p(v[0]), self.p(v[1]), self.p(v[2]), self.p(v[3])];
-                w[i] = pq;
-                if pr::orient3d(w[0], w[1], w[2], w[3], &mut self.stats.predicates) < 0 {
+                let mut w = v;
+                w[i] = q;
+                if self.g.orient3d(w) < 0 {
                     t = self.adj(4 * t + i as u32) >> 2;
                     steps += 1;
                     self.stats.walk_steps += 1;
@@ -332,20 +446,18 @@ impl<'a> Mesh<'a> {
                 continue;
             }
             if v[3] == GHOST {
-                if outside.is_none()
-                    && pr::orient3d(self.p(v[0]), self.p(v[1]), self.p(v[2]), pq, &mut self.stats.predicates) > 0
-                {
+                if outside.is_none() && self.g.orient3d([v[0], v[1], v[2], q]) > 0 {
                     outside = Some(t);
                 }
                 continue;
             }
-            if let Some(&x) = v.iter().find(|&&x| pr::same_point(self.p(x), pq)) {
+            if let Some(&x) = v.iter().find(|&&x| self.g.same(x, q)) {
                 return Ok(Located::Duplicate(x));
             }
             let inside = (0..4).all(|i| {
-                let mut w = [self.p(v[0]), self.p(v[1]), self.p(v[2]), self.p(v[3])];
-                w[i] = pq;
-                pr::orient3d(w[0], w[1], w[2], w[3], &mut self.stats.predicates) >= 0
+                let mut w = v;
+                w[i] = q;
+                self.g.orient3d(w) >= 0
             });
             if inside {
                 return Ok(Located::Tet(t));
@@ -355,7 +467,7 @@ impl<'a> Mesh<'a> {
     }
 
     /// Inserts point q; returns the vertex it duplicates, if any.
-    fn insert(&mut self, q: u32) -> Result<Option<u32>, Error> {
+    pub(crate) fn insert(&mut self, q: u32) -> Result<Option<u32>, Error> {
         let t0 = match self.locate(q)? {
             Located::Duplicate(v) => return Ok(Some(v)),
             Located::Tet(t) => t,
@@ -563,13 +675,20 @@ pub struct Report {
 /// characteristic 1; every distinct point a vertex.
 pub fn verify(pts: &[P3], tets: &[[u32; 4]]) -> Result<Report, String> {
     check_input(pts).map_err(|e| e.to_string())?;
-    let mut n = Counters::default();
-    let p = |v: u32| &pts[v as usize];
+    let mut distinct: Vec<&P3> = pts.iter().collect();
+    distinct.sort_unstable_by(|a, b| pr::lex_cmp(a, b));
+    distinct.dedup_by(|a, b| pr::same_point(a, b));
+    verify_with(&mut Plain { pts, n: Counters::default() }, distinct.len(), tets)
+}
+
+/// [`verify`] for any geometry: `vertices` is the number of distinct points, all of
+/// which must be vertices.
+pub fn verify_with<G: Geom>(g: &mut G, vertices: usize, tets: &[[u32; 4]]) -> Result<Report, String> {
     for (t, v) in tets.iter().enumerate() {
-        if v.iter().any(|&x| x as usize >= pts.len()) {
+        if v.iter().any(|&x| x as usize >= g.len()) {
             return Err(format!("tetrahedron {t} has a vertex index out of range"));
         }
-        if pr::orient3d(p(v[0]), p(v[1]), p(v[2]), p(v[3]), &mut n) <= 0 {
+        if g.orient3d(*v) <= 0 {
             return Err(format!("tetrahedron {t} is not positively oriented"));
         }
     }
@@ -619,12 +738,12 @@ pub fn verify(pts: &[P3], tets: &[[u32; 4]]) -> Result<Report, String> {
                 let (_, t2, i2) = faces[k + 1];
                 let v1 = tets[t1 as usize];
                 let e = tets[t2 as usize][i2 as usize];
-                let mut w = [p(v1[0]), p(v1[1]), p(v1[2]), p(v1[3])];
-                w[i1 as usize] = p(e);
-                if pr::orient3d(w[0], w[1], w[2], w[3], &mut n) >= 0 {
+                let mut w = v1;
+                w[i1 as usize] = e;
+                if g.orient3d(w) >= 0 {
                     return Err(format!("tetrahedra {t1} and {t2} overlap across a shared face"));
                 }
-                let s = pr::insphere_sos([p(v1[0]), p(v1[1]), p(v1[2]), p(v1[3]), p(e)], [v1[0], v1[1], v1[2], v1[3], e], &mut n);
+                let s = g.insphere_sos([v1[0], v1[1], v1[2], v1[3], e]);
                 if s >= 0 {
                     return Err(format!("face between tetrahedra {t1} and {t2} is not locally Delaunay"));
                 }
@@ -653,14 +772,14 @@ pub fn verify(pts: &[P3], tets: &[[u32; 4]]) -> Result<Report, String> {
             Err(_) => return Err(format!("hull edge ({a}, {b}) has no opposite hull face")),
         };
         let (f, t) = hull[h as usize];
-        let g = hull[other as usize].0;
-        let e = *g.iter().find(|&&x| x != a && x != b).unwrap();
-        let o = pr::orient3d(p(f[0]), p(f[1]), p(f[2]), p(e), &mut n);
+        let opposite = hull[other as usize].0;
+        let e = *opposite.iter().find(|&&x| x != a && x != b).unwrap();
+        let o = g.orient3d([f[0], f[1], f[2], e]);
         let convex = if o != 0 {
             o < 0
         } else {
             let v = tets[t as usize];
-            pr::insphere_sos([p(v[0]), p(v[1]), p(v[2]), p(v[3]), p(e)], [v[0], v[1], v[2], v[3], e], &mut n) < 0
+            g.insphere_sos([v[0], v[1], v[2], v[3], e]) < 0
         };
         if !convex {
             return Err(format!("hull edge ({a}, {b}) is not locally convex"));
@@ -685,13 +804,10 @@ pub fn verify(pts: &[P3], tets: &[[u32; 4]]) -> Result<Report, String> {
     if euler != 1 {
         return Err(format!("Euler characteristic {euler}, expected 1"));
     }
-    let mut distinct: Vec<&P3> = pts.iter().collect();
-    distinct.sort_unstable_by(|a, b| pr::lex_cmp(a, b));
-    distinct.dedup_by(|a, b| pr::same_point(a, b));
-    if distinct.len() != report.vertices {
-        return Err(format!("{} distinct points but {} vertices", distinct.len(), report.vertices));
+    if vertices != report.vertices {
+        return Err(format!("{vertices} distinct points but {} vertices", report.vertices));
     }
-    report.predicates = n;
+    report.predicates = g.counters();
     Ok(report)
 }
 

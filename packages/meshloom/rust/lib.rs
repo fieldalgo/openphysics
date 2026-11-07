@@ -14,6 +14,7 @@ mod facet;
 mod mixed;
 mod plc;
 mod predicates;
+mod recovery;
 
 use predicates::{two_product, P3};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -217,6 +218,58 @@ fn spoint_coords<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, seg: &Bound
     Ok(PyBytes::new(py, &out.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>()))
 }
 
+/// Segment recovery: `coords` n x 3 doubles, `segments` m x 2 int64 (elementary,
+/// non-crossing), `max_depth` the halving limit per piece. Returns (tetrahedra T x 4,
+/// S points' segments k x 2 and parameters k, chain lengths m and the concatenated
+/// chains as int64 bytes, statistics).
+#[pyfunction]
+#[pyo3(signature = (coords, segments, max_depth=60))]
+#[allow(clippy::type_complexity)]
+fn recover_segments<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>, max_depth: u32)
+    -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>,
+                 Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
+    check_environment()?;
+    let pts = points(coords.as_bytes())?;
+    let seg = u32s(segments.as_bytes(), "segment index")?;
+    if seg.len() % 2 != 0 {
+        return Err(PyValueError::new_err("segments must hold 2 indices each"));
+    }
+    let segs: Vec<[u32; 2]> = seg.chunks_exact(2).map(|c| [c[0], c[1]]).collect();
+    let r = py.detach(move || recovery::recover(&pts, &segs, max_depth)).map_err(|e| match e {
+        delaunay::Error::Internal(_) => PyRuntimeError::new_err(e.to_string()),
+        _ => PyValueError::new_err(e.to_string()),
+    })?;
+    let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
+        PyBytes::new_with(py, 8 * xs.len(), |buf| {
+            for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
+                chunk.copy_from_slice(&(*x as i64).to_le_bytes());
+            }
+            Ok(())
+        })
+    };
+    let tets = i64_bytes(r.tets.iter().flatten().copied().collect())?;
+    let sseg = i64_bytes(r.s.iter().flat_map(|s| [s.a, s.b]).collect())?;
+    let st: Vec<u8> = r.s.iter().flat_map(|s| s.t.to_le_bytes()).collect();
+    let lens = i64_bytes(r.chains.iter().map(|c| c.len() as u32).collect())?;
+    let chains = i64_bytes(r.chains.iter().flatten().copied().collect())?;
+    let d = PyDict::new(py);
+    d.set_item("rounds", r.stats.rounds)?;
+    d.set_item("protected_vertices", r.stats.protected_vertices)?;
+    d.set_item("protection_points", r.stats.protection_points)?;
+    d.set_item("bisection_points", r.stats.bisection_points)?;
+    d.set_item("max_depth", r.stats.max_depth)?;
+    d.set_item("exact_points", r.stats.exact_points)?;
+    d.set_item("mixed_calls", r.mixed.calls)?;
+    d.set_item("mixed_interval", r.mixed.interval)?;
+    d.set_item("mixed_exact", r.mixed.exact)?;
+    d.set_item("mixed_sos", r.mixed.sos)?;
+    d.set_item("input_exact", r.kernel.predicates.orient3d_exact + r.kernel.predicates.insphere_exact)?;
+    d.set_item("walk_steps", r.kernel.walk_steps)?;
+    d.set_item("cavity_tets", r.kernel.cavity_tets)?;
+    d.set_item("inserted", r.kernel.inserted)?;
+    Ok((tets, sseg, PyBytes::new(py, &st), lens, chains, d))
+}
+
 /// Delaunay tetrahedralization: `coords` n x 3 doubles, `order` an optional
 /// insertion order (n int64). Returns (tetrahedra as T x 4 int64 bytes, for each
 /// point the vertex it duplicates or itself as n int64 bytes, statistics).
@@ -362,6 +415,7 @@ fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(predicate_signs, m)?)?;
     m.add_function(wrap_pyfunction!(mixed_signs, m)?)?;
     m.add_function(wrap_pyfunction!(spoint_coords, m)?)?;
+    m.add_function(wrap_pyfunction!(recover_segments, m)?)?;
     m.add_function(wrap_pyfunction!(tetrahedralize, m)?)?;
     m.add_function(wrap_pyfunction!(verify_delaunay, m)?)?;
     m.add_function(wrap_pyfunction!(triangulate_facet, m)?)?;

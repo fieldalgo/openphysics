@@ -44,6 +44,8 @@ pub enum Pt {
 /// `exact` those the interval filter could not decide; `sos` perturbed ties.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct MixedCounters {
+    /// the input-point predicates' own counters (calls with input points only)
+    pub input: Counters,
     pub calls: u64,
     pub interval: u64,
     pub exact: u64,
@@ -129,6 +131,27 @@ impl<'a> Mixed<'a> {
         }
     }
 
+    /// True when the two points are exactly equal.
+    pub fn same(&self, a: Pt, b: Pt) -> bool {
+        if let (Pt::In(i), Pt::In(j)) = (a, b) {
+            return pr::same_point(&self.input[i as usize], &self.input[j as usize]);
+        }
+        let (x, y) = (self.exact(a), self.exact(b));
+        (0..3).all(|k| x[k].sub(&y[k]).exact_sign() == 0)
+    }
+
+    /// True when the point's exact coordinates are doubles (so rounding it for output
+    /// moves it nowhere).
+    pub fn is_exact(&self, p: Pt) -> bool {
+        match p {
+            Pt::In(_) => true,
+            Pt::S(_) => self.exact(p).iter().all(|c| {
+                let x = c.to_f64();
+                x.is_finite() && Dy::from_f64(x).sub(c).exact_sign() == 0
+            }),
+        }
+    }
+
     fn input_only<const N: usize>(&self, p: &[Pt; N]) -> Option<[&P3; N]> {
         let mut out = [&self.input[0]; N];
         for (o, q) in out.iter_mut().zip(p) {
@@ -144,7 +167,7 @@ impl<'a> Mixed<'a> {
     pub fn orient3d(&self, p: [Pt; 4], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
         if let Some(q) = self.input_only(&p) {
-            return pr::orient3d(q[0], q[1], q[2], q[3], &mut Counters::default());
+            return pr::orient3d(q[0], q[1], q[2], q[3], &mut n.input);
         }
         n.interval += 1;
         let iv = p.map(|q| self.interval(q));
@@ -160,7 +183,7 @@ impl<'a> Mixed<'a> {
     pub fn insphere(&self, p: [Pt; 5], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
         if let Some(q) = self.input_only(&p) {
-            return pr::insphere(q[0], q[1], q[2], q[3], q[4], &mut Counters::default());
+            return pr::insphere(q[0], q[1], q[2], q[3], q[4], &mut n.input);
         }
         n.interval += 1;
         let iv = p.map(|q| self.interval(q));
@@ -405,5 +428,62 @@ impl Num for Dy {
 
     fn mul(&self, o: &Dy) -> Dy {
         Dy { m: self.m.mul(&o.m), e: self.e + o.e }
+    }
+}
+
+/// Input points and a growing table of S points, owned: the geometry of a mesh into
+/// which boundary recovery inserts points on segments. Global indices put the S points
+/// after the input points.
+pub struct MixedPoints {
+    pub input: Vec<P3>,
+    pub s: Vec<SPoint>,
+    pub n: MixedCounters,
+}
+
+impl MixedPoints {
+    pub fn new(input: Vec<P3>) -> MixedPoints {
+        MixedPoints { input, s: Vec::new(), n: MixedCounters::default() }
+    }
+
+    pub fn view(&self) -> Mixed<'_> {
+        Mixed { input: &self.input, s: &self.s }
+    }
+
+    /// Adds an S point; returns its global index.
+    pub fn push(&mut self, sp: SPoint) -> u32 {
+        self.s.push(sp);
+        (self.input.len() + self.s.len() - 1) as u32
+    }
+}
+
+impl crate::delaunay::Geom for MixedPoints {
+    fn len(&self) -> usize {
+        self.input.len() + self.s.len()
+    }
+
+    fn orient3d(&mut self, v: [u32; 4]) -> i8 {
+        let m = Mixed { input: &self.input, s: &self.s };
+        m.orient3d(v.map(|i| m.from_id(i)), &mut self.n)
+    }
+
+    fn insphere_sos(&mut self, v: [u32; 5]) -> i8 {
+        let m = Mixed { input: &self.input, s: &self.s };
+        m.insphere_sos(v.map(|i| m.from_id(i)), &mut self.n)
+    }
+
+    fn same(&self, a: u32, b: u32) -> bool {
+        let m = self.view();
+        m.same(m.from_id(a), m.from_id(b))
+    }
+
+    fn collinear(&self, a: u32, b: u32, c: u32) -> bool {
+        let m = self.view();
+        let p = [a, b, c].map(|i| m.from_id(i));
+        let mut n = MixedCounters::default();
+        (0..3).all(|axis| m.orient2d_proj(axis, p, &mut n) == 0)
+    }
+
+    fn counters(&self) -> Counters {
+        self.n.input
     }
 }
