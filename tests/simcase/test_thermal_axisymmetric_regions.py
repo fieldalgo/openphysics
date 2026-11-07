@@ -113,14 +113,18 @@ def test_g4_4_other_runners_refuse_an_axisymmetric_component_by_name():
     transient["geometry"]["components"]["main"]["dimension"] = "axisymmetric"
     with pytest.raises(DocumentError, match="transient heat takes 2d components only"):
         Document.from_dict(transient)
-    em = copy.deepcopy(EXAMPLES["soi_strip"])
-    em["geometry"] = from_v02(em["geometry"])
-    comp = em["geometry"]["components"]["main"]
-    comp["dimension"] = "axisymmetric"
-    comp["domain"]["xmin"] = 0.0
-    from simcase import build_mesh
-    with pytest.raises(DocumentError, match="axisymmetric component's axis"):
-        build_mesh(Document.from_dict(em))
+    for xmin in (0.0, 1.0):                           # at r = 0 (an axis tag) and as an annulus (four plain tags)
+        em = copy.deepcopy(EXAMPLES["soi_strip"])
+        em["geometry"] = from_v02(em["geometry"])
+        comp = em["geometry"]["components"]["main"]
+        comp["dimension"] = "axisymmetric"
+        shift = xmin - comp["domain"]["xmin"]
+        comp["domain"]["xmin"] += shift
+        comp["domain"]["xmax"] += shift
+        for f in comp["features"]:
+            f["x"] += shift
+        with pytest.raises(DocumentError, match="em.modes2d takes 2d components only"):
+            Document.from_dict(em)
 
 
 def test_g4_4_studio_refuses_an_axisymmetric_document_at_validation():
@@ -151,3 +155,11 @@ def test_g4_5_the_result_keeps_its_own_identifiers_and_full_revolution_field_nam
     # a Cartesian region document keeps its identifiers and names
     plain = run(Document.from_dict(EXAMPLES["thermal_regions"]), verbose=False)
     assert plain.result_format == "thermal.steady2d-regions-result-v1" and "load_w_per_m" in plain._raw_arrays()
+    # the saved result exports to VTU with (r, z) points, the _w rates and the region ids
+    meshio = pytest.importorskip("meshio")
+    from simcase.export import export_fields
+    vtu = export_fields(tmp_path / "out" / "fields.npz", tmp_path / "out" / "view.vtu")
+    mesh = meshio.read(vtu)
+    np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+    np.testing.assert_array_equal(mesh.point_data["load_w"], saved["load_w"])
+    assert "load_w_per_m" not in mesh.point_data and "triangle_regions" in mesh.cell_data

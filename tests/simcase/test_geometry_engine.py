@@ -1298,16 +1298,17 @@ def test_g3_6_region_complexity_counts_version_1_features():
     assert rc.shapes == 3 and rc.circles == 1 and rc.polygon_points == 4
 
 
-def test_an_axisymmetric_document_loads_but_no_runner_takes_it():
-    from simcase import Document, DocumentError, build_mesh
+def test_an_axisymmetric_waveguide_document_is_refused_at_load():
+    # stage 2c: steady region heat takes an axisymmetric component (test_thermal_axisymmetric_regions.py);
+    # the waveguide physics refuses it at validation, whatever xmin is
+    from simcase import Document, DocumentError
     raw = _soi_v1()
     comp = raw["geometry"]["components"]["main"]
     comp["dimension"] = "axisymmetric"
     comp["domain"] = {"xmin": 0, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2}
     comp["features"][0]["x"] = 0
-    doc = Document.from_dict(raw)
-    with pytest.raises(DocumentError, match="axisymmetric"):
-        build_mesh(doc)
+    with pytest.raises(DocumentError, match="em.modes2d takes 2d components only"):
+        Document.from_dict(raw)
 
 
 def test_a_feature_outside_the_domain_is_refused_for_region_heat_but_a_covered_one_is_not():
