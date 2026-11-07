@@ -77,6 +77,15 @@ names may change before the mesher's public API.
   and exact big integers the rest. Queries use global indices, input points first and
   then S points, which also order the tie-breaking perturbation. `spoint_coords` gives
   the output coordinates, each rounded once to the nearest double.
+- **Segment recovery.** `recover_segments(points, segments, max_depth=60)` turns every
+  elementary segment (the `subsegments` of `check_plc`) into a union of edges of the
+  Delaunay tetrahedralization, adding S points only on the segments. Where a missing
+  piece ends at a vertex whose segments meet at less than 90 degrees, every segment at
+  that vertex is first split at one common distance from it (a protecting sphere);
+  every other missing piece is halved until it is an edge. The result is the Delaunay
+  tetrahedralization of the input and S points under the index-ordered perturbation,
+  with each segment as a chain of edges through its own S points. A piece that would
+  need more than `max_depth` halvings raises `RuntimeError` instead of looping.
 
 ```python
 import numpy as np
@@ -92,7 +101,9 @@ These stages are graded by V16 and V17 of the
 big-integer determinants on 10⁴ random and 10⁴ adversarial cases each, and
 `tests/meshloom` cross-checks them with Python `Fraction` and runs the verifier and
 three insertion orders on the C12 point sets. `benchmarks/benchmark_delaunay.py`
-measures throughput on 10⁶ uniform points, with the V15 counters per vertex.
+measures throughput on 10⁶ uniform points, with the V15 counters per vertex, and
+`benchmarks/benchmark_recovery.py` the segment recovery counters (Steiner points per
+segment) on the chip package and a geodesic sphere.
 
 ## Platforms and build
 
@@ -128,9 +139,8 @@ See [third-party software](../../third-party.md).
 ## Limits
 
 - No mesh generation yet: input PLCs are checked and their facets triangulated, but
-  there is no boundary recovery, refinement or improvement yet. The predicates on
-  points stored on segments are in place; inserting those points and flips come with
-  boundary recovery.
+  there is no facet recovery, refinement or improvement yet. Segments are recovered;
+  facets, flips and region labels come with the rest of boundary recovery.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.

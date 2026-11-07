@@ -102,6 +102,34 @@ def spoint_coords(points, segments, t) -> np.ndarray:
     return np.frombuffer(out, dtype="<f8").reshape(-1, 3).astype(np.float64)
 
 
+def recover_segments(points, segments, max_depth: int = 60) -> dict:
+    """Segment recovery (boundary recovery, first part): the Delaunay
+    tetrahedralization of ``points`` (n, 3) with points added on the ``segments``
+    (m, 2) until every segment is a union of edges.
+
+    The segments must be elementary and must not cross: the ``subsegments`` of
+    ``check_plc``. New points are S points on input segments (see
+    ``mixed_predicate_signs``): first at acute vertices (where two segments meet at less
+    than 90 degrees), then by halving every piece that is not an edge, at most
+    ``max_depth`` times per piece. Returns a dict with ``tetrahedra`` (T, 4) over global
+    indices (input points, then S points), ``s_segments`` (k, 2) and ``s_t`` (k,) of the
+    S points, ``chains`` (one index array per segment, from its first point to its
+    second through its S points) and counters. Too deep a recovery raises
+    ``RuntimeError``; bad input raises ``ValueError``.
+    """
+    kernel = _require()
+    p = _points(points)
+    s = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
+    tets, sseg, st, lens, chains, stats = kernel.recover_segments(p.tobytes(), s.tobytes(), max_depth)
+    flat = np.frombuffer(chains, dtype="<i8").astype(np.int64)
+    cuts = np.cumsum(np.frombuffer(lens, dtype="<i8"))[:-1]
+    return {"tetrahedra": np.frombuffer(tets, dtype="<i8").reshape(-1, 4).astype(np.int64),
+            "s_segments": np.frombuffer(sseg, dtype="<i8").reshape(-1, 2).astype(np.int64),
+            "s_t": np.frombuffer(st, dtype="<f8").astype(np.float64),
+            "chains": np.split(flat, cuts) if len(lens) else [],
+            "stats": stats}
+
+
 def delaunay(points, order=None) -> tuple[np.ndarray, np.ndarray, dict]:
     """Delaunay tetrahedralization of ``points`` (n, 3).
 

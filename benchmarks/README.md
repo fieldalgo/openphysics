@@ -15,6 +15,7 @@ result can be compared with another run.
 | `benchmark_derivatives.py` | [Cost of derivatives](../docs/benchmark_derivatives.md): forward solve, adjoint gradient (JAX, PyTorch) and central differences |
 | `benchmark_extrude.py` | [Layered tetrahedral meshes](../docs/packages/meshine/overview.md#layered-tetrahedral-meshes) (V33 of the [3D plan](../docs/packages/meshine/validation3d.md)) |
 | `benchmark_delaunay.py` | [meshloom kernel building blocks](../docs/packages/meshloom/overview.md#kernel-building-blocks) (V17 throughput and V15 counters of the [3D plan](../docs/packages/meshine/validation3d.md)) |
+| `benchmark_recovery.py` | [meshloom kernel building blocks](../docs/packages/meshloom/overview.md#kernel-building-blocks) (segment recovery V15 counters of the [3D plan](../docs/packages/meshine/validation3d.md) on C3 and a C1 stand-in) |
 
 Run them from the repository root in the pinned environment of the
 [development guide](../docs/development.md), and write results outside the
