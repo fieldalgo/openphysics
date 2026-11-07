@@ -270,6 +270,60 @@ fn recover_segments<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
     Ok((tets, sseg, PyBytes::new(py, &st), lens, chains, d))
 }
 
+/// Boundary recovery so far: the PLC check, segment recovery, then every facet's
+/// subfacets with the points added on its sub-segments. Returns (tetrahedra T x 4, S
+/// points' segments k x 2 and parameters k, subfacets F x 3 with their facet F, missing
+/// subfacets as indices into those, statistics).
+#[pyfunction]
+#[pyo3(signature = (coords, segments, facets, max_depth=60))]
+#[allow(clippy::type_complexity)]
+fn recover_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
+                    facets: Vec<Vec<Bound<'py, PyBytes>>>, max_depth: u32)
+    -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>,
+                 Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
+    check_environment()?;
+    let points = points(coords.as_bytes())?;
+    let seg = u32s(segments.as_bytes(), "segment index")?;
+    if seg.len() % 2 != 0 {
+        return Err(PyValueError::new_err("segments must hold 2 indices each"));
+    }
+    let segments: Vec<[u32; 2]> = seg.chunks_exact(2).map(|c| [c[0], c[1]]).collect();
+    let facets: Vec<Vec<Vec<u32>>> = facets.iter()
+        .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
+        .collect::<PyResult<_>>()?;
+    let plc = plc::Plc { points, segments, facets };
+    let r = py.detach(move || recovery::recover_plc(&plc, max_depth)).map_err(PyValueError::new_err)?;
+    let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
+        PyBytes::new_with(py, 8 * xs.len(), |buf| {
+            for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
+                chunk.copy_from_slice(&(*x as i64).to_le_bytes());
+            }
+            Ok(())
+        })
+    };
+    let mut sub = Vec::new();
+    let mut owner = Vec::new();
+    let mut index = std::collections::HashMap::new();
+    for (f, tris) in r.subfacets.iter().enumerate() {
+        for t in tris {
+            index.insert((f as u32, *t), owner.len() as u32);
+            sub.extend(t);
+            owner.push(f as u32);
+        }
+    }
+    let missing: Vec<u32> = r.missing.iter().map(|k| index[k]).collect();
+    let d = PyDict::new(py);
+    d.set_item("protection_points", r.rec.stats.protection_points)?;
+    d.set_item("bisection_points", r.rec.stats.bisection_points)?;
+    d.set_item("subfacets", owner.len())?;
+    d.set_item("missing", missing.len())?;
+    d.set_item("plane_exact", r.plane.exact)?;
+    Ok((i64_bytes(r.rec.tets.iter().flatten().copied().collect())?,
+        i64_bytes(r.rec.s.iter().flat_map(|s| [s.a, s.b]).collect())?,
+        PyBytes::new(py, &r.rec.s.iter().flat_map(|s| s.t.to_le_bytes()).collect::<Vec<u8>>()),
+        i64_bytes(sub)?, i64_bytes(owner)?, i64_bytes(missing)?, d))
+}
+
 /// Delaunay tetrahedralization: `coords` n x 3 doubles, `order` an optional
 /// insertion order (n int64). Returns (tetrahedra as T x 4 int64 bytes, for each
 /// point the vertex it duplicates or itself as n int64 bytes, statistics).
@@ -416,6 +470,7 @@ fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(mixed_signs, m)?)?;
     m.add_function(wrap_pyfunction!(spoint_coords, m)?)?;
     m.add_function(wrap_pyfunction!(recover_segments, m)?)?;
+    m.add_function(wrap_pyfunction!(recover_plc, m)?)?;
     m.add_function(wrap_pyfunction!(tetrahedralize, m)?)?;
     m.add_function(wrap_pyfunction!(verify_delaunay, m)?)?;
     m.add_function(wrap_pyfunction!(triangulate_facet, m)?)?;

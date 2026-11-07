@@ -217,3 +217,68 @@ def test_bad_input_and_too_deep_recovery_are_refused():
     cloud = np.array([[rng.random() for _ in range(3)] for _ in range(300)] + [[-0.1] * 3, [1.1] * 3])
     with pytest.raises(RuntimeError, match="halvings"):
         recover_segments(cloud, [[300, 301]], max_depth=1)
+
+
+def exact_points(points, sseg, st):
+    """Exact coordinates (Fraction) of the input points followed by the S points."""
+    from fractions import Fraction as F
+    out = [[F(c) for c in p] for p in points.tolist()]
+    for (a, b), t in zip(sseg.tolist(), st.tolist()):
+        out.append([F(x) + F(t) * (F(y) - F(x)) for x, y in zip(points[a].tolist(), points[b].tolist())])
+    return out
+
+
+def projected_area(q, idx, axis):
+    i, j = [(1, 2), (2, 0), (0, 1)][axis]
+    pts = [q[k] for k in idx]
+    return sum(pts[m][i] * pts[(m + 1) % len(pts)][j] - pts[(m + 1) % len(pts)][i] * pts[m][j]
+               for m in range(len(pts))) / 2
+
+
+@pytest.mark.parametrize("case", ["chip", "fichera-tilted", "prism", "interface"])
+def test_subfacets_tile_their_facets_with_the_segment_points(case):
+    from meshloom._core import recover_plc
+    if case == "chip":
+        pts, facets = voxel_plc(chip())
+    elif case == "fichera-tilted":
+        pts, facets = voxel_plc(fichera(), TILT)
+    elif case == "prism":
+        pts, facets = twisted_prism()
+    else:
+        # two stacked cells and their interface, crowded by points on both sides
+        pts, facets = voxel_plc({(0, 0, 0): "a", (0, 0, 1): "b"})
+        rng = random.Random(9)
+        extra = [[0.02 + 0.21 * rng.random(), 0.02 + 0.21 * rng.random(),
+                  0.25 + (1 if k % 2 else -1) * (0.0005 + 0.01 * rng.random())] for k in range(40)]
+        pts = np.vstack([pts, extra])
+    r = recover_plc(pts, np.zeros((0, 2)), facets)
+    q = exact_points(pts, r["s_segments"], r["s_t"])
+    n = len(pts)
+    plc = check_plc(pts, np.zeros((0, 2)), facets)
+    subs = {tuple(sorted(s)) for s in plc["subsegments"].tolist()}
+    for f, loops in enumerate(facets):
+        tris = r["subfacets"][r["subfacet_facet"] == f].tolist()
+        assert tris
+        # the facet's points: its own, and S points on its sub-segments (in its plane)
+        a, b, c = (q[v] for v in loops[0][:3])
+        normal = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+                  (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+                  (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])]
+        for t in tris:
+            for v in t:
+                assert sum(x * (y - z) for x, y, z in zip(normal, q[v], a)) == 0, "subfacet vertex off the plane"
+                if v >= n:
+                    s = tuple(sorted(r["s_segments"][v - n].tolist()))
+                    assert s in subs
+        axis = max(range(3), key=lambda k: abs(normal[k]))
+        want = abs(sum(projected_area(q, lp, axis) for lp in loops[:1])) - \
+            sum(abs(projected_area(q, lp, axis)) for lp in loops[1:])
+        got = [projected_area(q, t, axis) for t in tris]
+        assert all(g != 0 for g in got) and len({g > 0 for g in got}) == 1, "consistently wound, no slivers"
+        assert abs(sum(got)) == want, f"facet {f}: the subfacets do not tile it"
+    # missing = subfacets that are not faces of the tetrahedralization
+    faces = {tuple(sorted(v[:i] + v[i + 1:])) for v in r["tetrahedra"].tolist() for i in range(4)}
+    absent = [k for k, t in enumerate(r["subfacets"].tolist()) if tuple(sorted(t)) not in faces]
+    assert absent == r["missing"].tolist()
+    if case == "interface":
+        assert len(absent) > 0  # the work left to facet recovery

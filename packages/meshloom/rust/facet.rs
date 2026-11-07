@@ -28,29 +28,77 @@ pub struct Facet {
     pub triangles: Vec<[u32; 3]>,
     /// The axis dropped for the in-plane predicates.
     pub axis: usize,
+    /// True when the outer loop runs clockwise in that projection (the triangles are
+    /// then wound clockwise too).
+    pub flip: bool,
 }
 
-struct Tri<'a> {
-    pts: &'a [P3],
+/// The in-plane predicates a facet triangulation needs, by point index: orientation
+/// and the perturbed circle test in the projection along `axis`, and the order of
+/// collinear points. Input points use [`Plain2`]; points on segments use
+/// [`crate::mixed::Mixed`].
+pub(crate) trait PlanePred {
+    fn orient(&self, axis: usize, a: u32, b: u32, c: u32) -> i8;
+    /// incircle_plane with the index-ordered perturbation.
+    fn incircle_sos(&self, axis: usize, a: u32, b: u32, c: u32, d: u32) -> i8;
+    /// For c collinear with a and b: c strictly between them.
+    fn between(&self, axis: usize, a: u32, b: u32, c: u32) -> bool;
+    /// For collinear v, x, y: x and y on the same side of v.
+    fn same_direction(&self, axis: usize, v: u32, x: u32, y: u32) -> bool;
+}
+
+/// Input points: the expansion predicates and coordinate comparisons.
+pub(crate) struct Plain2<'a> {
+    pub pts: &'a [P3],
+}
+
+impl Plain2<'_> {
+    fn xy(&self, axis: usize, v: u32) -> [f64; 2] {
+        let (i, j) = pr::kept_axes(axis);
+        [self.pts[v as usize][i], self.pts[v as usize][j]]
+    }
+}
+
+impl PlanePred for Plain2<'_> {
+    fn orient(&self, axis: usize, a: u32, b: u32, c: u32) -> i8 {
+        let p = |v: u32| &self.pts[v as usize];
+        pr::orient2d_proj(axis, p(a), p(b), p(c))
+    }
+
+    fn incircle_sos(&self, axis: usize, a: u32, b: u32, c: u32, d: u32) -> i8 {
+        let p = |v: u32| &self.pts[v as usize];
+        pr::incircle_plane_sos(axis, [p(a), p(b), p(c), p(d)], [a, b, c, d])
+    }
+
+    fn between(&self, axis: usize, a: u32, b: u32, c: u32) -> bool {
+        let (pa, pb, pc) = (self.xy(axis, a), self.xy(axis, b), self.xy(axis, c));
+        let k = if pa[0] != pb[0] { 0 } else { 1 };
+        pc[k] > pa[k].min(pb[k]) && pc[k] < pa[k].max(pb[k])
+    }
+
+    fn same_direction(&self, axis: usize, v: u32, x: u32, y: u32) -> bool {
+        let (pv, px, py) = (self.xy(axis, v), self.xy(axis, x), self.xy(axis, y));
+        (0..2).any(|k| (px[k] - pv[k]).signum() * (py[k] - pv[k]).signum() > 0.0 && px[k] != pv[k] && py[k] != pv[k])
+    }
+}
+
+struct Tri<'a, P: PlanePred> {
+    pred: &'a P,
     axis: usize,
     tris: Vec<[u32; 3]>, // counter-clockwise in the projection; ghosts as (a, b, GHOST)
     points: Vec<u32>,
     constraints: HashSet<(u32, u32)>,
 }
 
-impl<'a> Tri<'a> {
-    fn p(&self, v: u32) -> &'a P3 {
-        &self.pts[v as usize]
-    }
-
+impl<P: PlanePred> Tri<'_, P> {
     fn orient(&self, a: u32, b: u32, c: u32) -> i8 {
-        pr::orient2d_proj(self.axis, self.p(a), self.p(b), self.p(c))
+        self.pred.orient(self.axis, a, b, c)
     }
 
     /// True when c is strictly inside the circle of the counter-clockwise a, b, x under
     /// the perturbation.
     fn in_circle(&self, a: u32, b: u32, x: u32, c: u32) -> bool {
-        pr::incircle_plane_sos(self.axis, [self.p(a), self.p(b), self.p(x), self.p(c)], [a, b, x, c]) > 0
+        self.pred.incircle_sos(self.axis, a, b, x, c) > 0
     }
 
     fn conflict(&self, t: usize, q: u32) -> bool {
@@ -350,7 +398,8 @@ pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], ex
         .max_by(|&x, &y| approx[x].total_cmp(&approx[y]))
         .ok_or_else(|| bad(3, "the facet's normal is zero".into()))?;
 
-    let mut t = Tri { pts, axis, tris: Vec::new(), points: Vec::new(), constraints: HashSet::new() };
+    let plain = Plain2 { pts };
+    let t = Tri { pred: &plain, axis, tris: Vec::new(), points: Vec::new(), constraints: HashSet::new() };
     let cons: Vec<(u32, u32)> = loops.iter()
         .flat_map(|lp| (0..lp.len()).map(move |k| (lp[k], lp[(k + 1) % lp.len()])))
         .collect();
@@ -407,22 +456,39 @@ pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], ex
         }
     }
 
-    // Delaunay triangulation of all the facet's points
+    // Delaunay triangulation of all the facet's points, then the constraints
     let order: Vec<u32> = loops.iter().flatten().copied().chain(extras.iter().copied()).collect();
-    t.points = order.clone();
-    let (x, y, z) = (a, b, c);
+    let flip = loop_orientation(pts, axis, outer) < 0;
+    let triangles = cdt(&plain, axis, &order, &boundary, extra_edges, flip).map_err(|(w, m)| bad(w, m))?;
+    if triangles.is_empty() {
+        return Err(bad(3, "the facet has no area".into()));
+    }
+    Ok(Facet { triangles, axis, flip })
+}
+
+/// Constrained Delaunay triangulation of `points` in the plane (projected along
+/// `axis`), with the `boundary` pieces and the `inner` edges as constraints, labelled
+/// even-odd from the outside by the boundary pieces only. Returns the inside triangles,
+/// counter-clockwise in the projection (clockwise when `flip`). Errors carry the witness
+/// type: 3 for the facet itself, 5 when an inner edge cannot be inserted.
+pub(crate) fn cdt<P: PlanePred>(pred: &P, axis: usize, points: &[u32], boundary: &[(u32, u32)],
+                                inner: &[(u32, u32)], flip: bool) -> Result<Vec<[u32; 3]>, (u8, String)> {
+    let mut t = Tri { pred, axis, tris: Vec::new(), points: points.to_vec(), constraints: HashSet::new() };
+    let x = *points.first().ok_or((3, "the facet has no points".to_string()))?;
+    let y = *points.iter().find(|&&v| v != x).ok_or((3, "the facet has one point".to_string()))?;
+    let z = *points.iter().find(|&&v| t.orient(x, y, v) != 0).ok_or((3, "the facet's points are collinear".to_string()))?;
     let (y, z) = if t.orient(x, y, z) > 0 { (y, z) } else { (z, y) };
     t.tris = vec![[x, y, z], [y, x, GHOST], [z, y, GHOST], [x, z, GHOST]];
-    for &v in &order {
+    for &v in points {
         if v != x && v != y && v != z {
-            t.insert(v).map_err(|m| bad(3, m))?;
+            t.insert(v).map_err(|m| (3, m))?;
         }
     }
-    for &(p, q) in &boundary {
-        t.insert_edge(p, q).map_err(|m| bad(3, m))?;
+    for &(p, q) in boundary {
+        t.insert_edge(p, q).map_err(|m| (3, m))?;
     }
-    for &(p, q) in extra_edges {
-        t.insert_edge(p, q).map_err(|m| bad(5, m))?;
+    for &(p, q) in inner {
+        t.insert_edge(p, q).map_err(|m| (5, m))?;
     }
     // even-odd labelling from the outside: only the boundary pieces count
     let constraint: HashSet<(u32, u32)> = boundary.iter().map(|&(p, q)| (p.min(q), p.max(q))).collect();
@@ -445,25 +511,20 @@ pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], ex
                     parity[n] = p;
                     stack.push(n);
                 } else if parity[n] != p {
-                    return Err(bad(3, "the loops do not bound a consistent region (even-odd labelling conflict)".into()));
+                    return Err((3, "the loops do not bound a consistent region (even-odd labelling conflict)".into()));
                 }
             }
         }
     }
-    let flip = loop_orientation(pts, axis, outer) < 0;
-    let triangles: Vec<[u32; 3]> = t.tris.iter().zip(&parity)
+    Ok(t.tris.iter().zip(&parity)
         .filter(|(tri, &p)| tri[2] != GHOST && p == 1)
         .map(|(tri, _)| if flip { [tri[0], tri[2], tri[1]] } else { *tri })
-        .collect();
-    if triangles.is_empty() {
-        return Err(bad(3, "the facet has no area".into()));
-    }
-    Ok(Facet { triangles, axis })
+        .collect())
 }
 
 /// True when closed segments p-q and r-s share any point other than one common end at
 /// which they do not overlap.
-fn segments_meet(t: &Tri, p: u32, q: u32, r: u32, s: u32) -> bool {
+fn segments_meet<P: PlanePred>(t: &Tri<P>, p: u32, q: u32, r: u32, s: u32) -> bool {
     let shared = [p, q].iter().filter(|v| **v == r || **v == s).count();
     if shared == 2 {
         return true; // the same edge twice
@@ -487,27 +548,19 @@ fn segments_meet(t: &Tri, p: u32, q: u32, r: u32, s: u32) -> bool {
 }
 
 /// For c collinear with a-b: true when c lies strictly between a and b.
-fn strictly_between(t: &Tri, a: u32, b: u32, c: u32) -> bool {
-    let (pa, pb, pc) = (axis_coords(t, a), axis_coords(t, b), axis_coords(t, c));
-    let k = if pa[0] != pb[0] { 0 } else { 1 };
-    pc[k] > pa[k].min(pb[k]) && pc[k] < pa[k].max(pb[k])
-}
-
-fn axis_coords(t: &Tri, v: u32) -> [f64; 2] {
-    let (i, j) = pr::kept_axes(t.axis);
-    [t.p(v)[i], t.p(v)[j]]
+fn strictly_between<P: PlanePred>(t: &Tri<P>, a: u32, b: u32, c: u32) -> bool {
+    t.pred.between(t.axis, a, b, c)
 }
 
 /// For collinear v, x, y: true when x and y lie on the same side of v.
-fn same_direction(t: &Tri, v: u32, x: u32, y: u32) -> bool {
-    let (pv, px, py) = (axis_coords(t, v), axis_coords(t, x), axis_coords(t, y));
-    (0..2).any(|k| (px[k] - pv[k]).signum() * (py[k] - pv[k]).signum() > 0.0 && px[k] != pv[k] && py[k] != pv[k])
+fn same_direction<P: PlanePred>(t: &Tri<P>, v: u32, x: u32, y: u32) -> bool {
+    t.pred.same_direction(t.axis, v, x, y)
 }
 
-/// For collinear points: true when c lies on the closed segment a-b.
-fn on_segment(t: &Tri, a: u32, b: u32, c: u32) -> bool {
-    let (pa, pb, pc) = (axis_coords(t, a), axis_coords(t, b), axis_coords(t, c));
-    (0..2).all(|k| pc[k] >= pa[k].min(pb[k]) && pc[k] <= pa[k].max(pb[k]))
+/// For collinear points: true when c lies on the closed segment a-b (distinct indices
+/// are distinct points).
+fn on_segment<P: PlanePred>(t: &Tri<P>, a: u32, b: u32, c: u32) -> bool {
+    c == a || c == b || t.pred.between(t.axis, a, b, c)
 }
 
 #[cfg(test)]

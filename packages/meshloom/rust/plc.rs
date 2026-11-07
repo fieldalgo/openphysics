@@ -34,10 +34,25 @@ pub struct Checked {
     /// inside the other, is listed once per facet.
     pub triangles: Vec<[u32; 3]>,
     pub triangle_facet: Vec<u32>,
+    /// What each facet's triangulation was built from, to rebuild it with points added
+    /// on its sub-segments (boundary recovery).
+    pub facets: Vec<FacetInfo>,
     /// Elementary sub-segments on the boundary of an odd number of facets (witnesses of
     /// type 6): empty when the PLC is closed.
     pub open_subsegments: Vec<[u32; 2]>,
     pub pairs_tested: usize,
+}
+
+/// A facet's points (its own and the coplanar points inside it), its boundary pieces
+/// (the sub-segments of its loops), its inner constraints (the other sub-segments on
+/// it), the projection axis and whether its outer loop is clockwise there.
+#[derive(Debug, Clone, Default)]
+pub struct FacetInfo {
+    pub points: Vec<u32>,
+    pub boundary: Vec<(u32, u32)>,
+    pub inner: Vec<(u32, u32)>,
+    pub axis: usize,
+    pub flip: bool,
 }
 
 /// A cell of the PLC: an edge (index into `Checked::segments`) or a facet.
@@ -220,6 +235,7 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
     let mut facet_edges: Vec<HashSet<(u32, u32)>> = Vec::with_capacity(plc.facets.len());
     let mut by_x: Vec<u32> = (0..pts.len() as u32).collect();
     by_x.sort_unstable_by(|&i, &j| pts[i as usize][0].total_cmp(&pts[j as usize][0]));
+    let edge_index: HashMap<(u32, u32), usize> = edges.iter().enumerate().map(|(e, &[a, b])| ((a, b), e)).collect();
     for (f, loops) in plc.facets.iter().enumerate() {
         let own: HashSet<u32> = loops.iter().flatten().copied().collect();
         let (lo, hi) = bbox(pts, &own.iter().copied().collect::<Vec<_>>());
@@ -260,6 +276,15 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
                 eds.insert((u, v));
             }
         }
+        let mut boundary: Vec<(u32, u32)> = loops.iter()
+            .flat_map(|lp| (0..lp.len()).map(move |k| (lp[k], lp[(k + 1) % lp.len()])))
+            .flat_map(|(a, b)| edge_subs[edge_index[&(a.min(b), a.max(b))]].iter().copied())
+            .collect();
+        boundary.sort_unstable();
+        boundary.dedup();
+        let mut points: Vec<u32> = loops.iter().flatten().copied().chain(extra.iter().copied()).collect();
+        points.dedup();
+        out.facets.push(FacetInfo { points, boundary, inner: inner.clone(), axis: t.axis, flip: t.flip });
         out.triangle_facet.extend(std::iter::repeat_n(f as u32, t.triangles.len()));
         out.triangles.extend(t.triangles);
         facet_tris.push(tris);
