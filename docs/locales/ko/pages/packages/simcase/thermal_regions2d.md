@@ -74,6 +74,7 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   적지 않은 영역은 0), 사각형 문서와 같은 변 규칙의 `dirichlet_temperature_k`,
   `outward_flux_w_m2`, `convection`(모서리 충돌 거부, Dirichlet 변이나 양의 Robin 고정 필요,
   Dirichlet 변에 자연 조건 금지). 여기의 `conductivity_w_mk`는 거부합니다(`materials`에서 옴).
+  [버전 1 형상 블록](geometry_document.md)은 더 많은 경계에 이름을 붙일 수 있습니다([이름 붙은 경계](#이름-붙은-경계)).
 - `mesh`: `size` > 0(길이 단위, 필수), `min_angle`(도, 기본 28, 최대 33).
   `subdivisions`와 `grading`은 거부합니다.
 - `study` `{"type": "single"}`; `results.plots`는 false여야 합니다.
@@ -152,6 +153,29 @@ meshine이 여전히 처리하지 못하는 입력은 계속 돌지 않고 오�
 달성한 최소각이 더해집니다. 부호와 단위는 경계 계약과 같습니다: 반력은 안쪽으로 들어오는
 thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_outward - reaction)`,
 절점 열량은 모두 깊이당 W/m입니다.
+
+## 이름 붙은 경계
+
+[버전 1 형상 블록](geometry_document.md)을 가진 문서는 `dirichlet_temperature_k`·`outward_flux_w_m2`·`convection`
+항목(과도 러너는 `dirichlet_temperature_k`)을 도메인 네 변 밖의 경계에도 줄 수 있습니다.
+
+- [2단계 엔진](geometry_engine.md)이 선언하는 외부 태그: `boundary_tags` 이름, 빈 공간 피처(`material: null`)나
+  sliver 틈의 경계에 붙는 `outer`.
+- 곡선이 모두 외부(도메인이나 빈 공간)에 놓인 구성 요소의 경계 선택(`selections`). 메시는 같은 변이 가진 변 태그나
+  `outer` 태그 옆에 선택 이름으로 절점을 이름 짓고 변에 태그를 붙입니다(`mesh.boundary[이름]`,
+  `mesh.boundary_edges[이름]`). 두 영역 사이 경계면의 선택은 이름 밝혀 거부합니다(galerkin은 외부 절점만 고정·부하).
+
+빈 공간 피처는 구멍입니다. 메시하지 않으며 그 경계는 외부 경계이고 **이름을 짓지 않으면 단열**입니다(HQ 결정
+2026-11-08). 빈 공간만 접하는 변은 메시 변이 없어 데이터를 주면 이름 밝혀 거부됩니다. 메시 변 하나는 flux 항목 하나·
+convection 항목 하나를 받습니다. 같은 변에 변 태그와 선택이 둘 다 데이터를 주면 거부합니다. 모든 경계 선택의 변은
+(내부 것도) galerkin 메시의 `mesh.selection_edges`에 있습니다(계약 `provenance_edges`의 선택 읽기). 아직 다른 곳은
+읽지 않습니다.
+
+검사 G5-1~G5-5(`tests/simcase/test_thermal_named_boundaries.py`, 2026-11-08 HQ 작업 기록에 사전 등록, 같은 날 Linux·
+Python 3.12 고정 환경에서 측정): 빈 판 속 빈 구멍이 있는 강철 원판에 `boundary_tags`와 선택으로 두 원에 Dirichlet을
+주면 중간 반지름에서 대수 분포와 온도 차의 1e-3 이내; 구멍 벽의 flux는 정확히 `g`×벽 다각형 길이, convection은 직렬
+저항 열량과 2e-3 이내, 둘 다 열 균형 1e-10 이내; 이름 없는 구멍은 단열(균형 1e-10); 거부(경계면 선택·모르는 이름·영역
+선택·겹친 변); 과도 러너의 선택 Dirichlet과 거부; 0.2 문서는 네 변만.
 
 ## 축대칭 문서
 
