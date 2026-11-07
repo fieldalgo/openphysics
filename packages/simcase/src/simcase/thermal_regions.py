@@ -136,13 +136,24 @@ def boundary_names(doc):
         return set(), set(), set()
     rc = doc.complex()
     exterior = set(rc.exterior_curves())
-    tags = {rc.curves[i].tag for i in exterior} - set(SIDES) - {'axis'}
+    # "outer" is always declared: a sliver gap, left out of the mesh at the hand-off, gets it
+    # too; a name without mesh edges is refused by name at mesh time
+    tags = ({rc.curves[i].tag for i in exterior} | {'outer'}) - set(SIDES) - {'axis'}
     outside, inside = set(), set()
     for name, (kind, chosen) in rc.selections.items():
         if kind != 'boundary':
             continue
         (outside if set(chosen) <= exterior else inside).add(name)
     return tags, outside, inside
+
+
+def void_area_m2(doc):
+    """The area of a version 1 document's void cells in square metres (holes in the mesh)."""
+    if not getattr(doc, 'is_version_1', False):
+        return 0.0
+    rc = doc.complex()
+    pm_per_m = float(doc._pm_per_unit()) / float(doc.scale.to_si(1.0, {'length': 1}))   # pm per unit / m per unit
+    return sum(c.area for c in rc.cells if c.void) / pm_per_m ** 2
 
 
 def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
@@ -366,7 +377,7 @@ def region_summary(doc):
              f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
              f'  background: {doc.background["material"]}']
     for s in doc.regions():
-        lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"]}')
+        lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"] if s["material"] is not None else "void (hole)"}')
     for mname, spec in doc['materials'].items():
         lines.append(f'  material {mname}: k={spec.get("conductivity_w_mk")} W/(m K)')
     rate = 'W (full revolution; axisymmetric (r, z))' if is_axisymmetric(doc) else 'W/m of depth'
@@ -423,8 +434,8 @@ def build_region_mesh(doc, limits=None):
         # edges for flux and convection, beside the side or outer tag the same edges carry
         _tags, outside, _inside = boundary_names(doc)
         for name, edges in selections.items():
-            if name not in outside:
-                continue                                  # an interior selection carries no data
+            if name not in outside or len(edges) == 0:
+                continue                                  # interior, or without a mesh edge: no data
             if name in boundary or name in boundary_edges:
                 raise DocumentError(f'selection {name!r} shares its name with a mesh tag')
             boundary[name] = np.unique(np.asarray(edges, dtype=int))
@@ -496,7 +507,7 @@ def region_inputs(doc, mesh, region_materials):
     flux = {tag: float(v) for tag, v in p.get('outward_flux_w_m2', {}).items()}
     convection = {tag: (float(v['h_w_m2k']), float(v['ambient_temperature_k']))
                   for tag, v in p.get('convection', {}).items()}
-    _refuse_doubled_edges(mesh, path, flux, convection)
+    _refuse_doubled_edges(mesh, path, flux, convection, p.get('dirichlet_temperature_k', {}))
     return dict(conductivity=conductivity, dirichlet=dict(sorted(prescribed.items())),
                 heat_source=source, outward_flux=flux, convection=convection)
 
@@ -509,18 +520,29 @@ def _axisymmetric_name(key):
     return key[:-len('_per_m')] if key.endswith('_w_per_m') else key
 
 
-def _refuse_doubled_edges(mesh, path, flux, convection):
+def _refuse_doubled_edges(mesh, path, flux, convection, dirichlet):
     """A mesh edge may carry one flux and one convection entry: a side tag and an exterior
     selection on the same edges, both given data, would apply it twice."""
+    def edge_sets(tags):
+        return {tag: {tuple(sorted(map(int, e))) for e in np.asarray(mesh.boundary_edges[tag]).reshape(-1, 2)}
+                for tag in tags}
     for label, table in (('outward_flux_w_m2', flux), ('convection', convection)):
-        edges = {tag: {tuple(sorted(map(int, e))) for e in np.asarray(mesh.boundary_edges[tag]).reshape(-1, 2)}
-                 for tag in table}
+        edges = edge_sets(table)
         names = sorted(edges)
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 if edges[a] & edges[b]:
                     raise DocumentError(f'{path}.{label}: {a!r} and {b!r} share mesh edges; give that boundary '
                                         'one entry')
+    # a natural condition on a fully Dirichlet edge is refused by the solver; here by name,
+    # for a side tag and a selection that carry the same edges (names alone are checked at load)
+    fixed = edge_sets(dirichlet)
+    for label, table in (('outward_flux_w_m2', flux), ('convection', convection)):
+        for a, e in edge_sets(table).items():
+            for b, f in fixed.items():
+                if a != b and e & f:
+                    raise DocumentError(f'{path}.{label}.{a}: {a!r} shares mesh edges with the Dirichlet boundary '
+                                        f'{b!r}; a natural condition does not apply on a Dirichlet edge')
 
 
 class RegionThermalRunResult(ThermalRunResult):

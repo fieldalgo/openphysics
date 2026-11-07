@@ -339,8 +339,19 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
     domain = doc.domain
     scale = doc.scale.to_si(1., {"length": 1})
     expected = (domain["xmax"]-domain["xmin"])*(domain["ymax"]-domain["ymin"])*scale*scale
-    _require(math.isfinite(expected) and expected > 0 and abs(total-expected) <= 1e-9*expected,
-             "region areas do not add up to the domain")
+    void = 0.0
+    if getattr(doc, "is_version_1", False):
+        # a void feature is a hole: its cells are not meshed, so the regions tile the domain
+        # minus the void area (simcase.thermal_regions.void_area_m2, exact). A round border
+        # between material and void is meshed as an inscribed polygon, which moves area from
+        # one side to the other: within 1e-2 of the void area either way (a 16-gon leaves
+        # 2.5e-2 of a disc; the mesher's circles have at least 16 vertices and the hand-off's
+        # count grows with the mesh size).
+        from simcase.thermal_regions import void_area_m2
+        void = void_area_m2(doc)
+    low = expected - void
+    _require(math.isfinite(expected) and low > 0 and abs(total-low) <= 1e-2*void + 1e-9*expected,
+             "region areas do not add up to the domain minus its void features")
     _, physics = doc.sole_physics()
     _require(_exact_json(summary.get("materials")) == _exact_json(doc["materials"]),
              "summary materials disagree with the document")

@@ -162,3 +162,55 @@ def test_g5_5_the_transient_runner_fixes_a_selection_and_refuses_an_unknown_name
     plain["physics"]["heat1"]["dirichlet_temperature_k"]["outer"] = 300.0
     with pytest.raises(DocumentError, match="unsupported thermal keys \\['outer'\\]"):
         Document.from_dict(plain)
+
+
+# ----------------------------------------------------------------- review findings of 2026-11-08
+
+def test_studio_runs_a_void_document_on_both_region_routes():
+    from simcase.thermal_regions import void_area_m2
+    hole_doc = Document.from_dict(plate([HOLE], physics={"dirichlet_temperature_k": {"left": 300.0}}))
+    assert abs(void_area_m2(hole_doc) - math.pi * 9e-6) <= 1e-9 * math.pi * 9e-6
+    assert void_area_m2(Document.from_dict(EXAMPLES["thermal_regions"])) == 0.0
+    from fastapi.testclient import TestClient
+    from simcase.studio import server, thermal_api
+    from simcase.studio import thermal_regions_api as regions
+    hole = plate([HOLE], physics={"dirichlet_temperature_k": {"left": 300.0, "right": 350.0}}, size=1.0)
+    annulus = _annulus(dirichlet_temperature_k={"inner": 400.0, "rim": 300.0})
+    moving = plate([HOLE], kind="transient", size=1.0, selections={"wall": {"boundary": {"of": "hole"}}},
+                   physics={"initial_temperature_k": 300.0, "dirichlet_temperature_k": {"left": 300.0, "wall": 300.0}})
+    moving["study"]["time_s"] = [0.0, 5.0, 10.0]
+    server._thermal_jobs = thermal_api.ThermalJobs()
+    server._region_limits = regions.RegionLimits()
+    server._start_thermal_thread = lambda target, args: target(*args)
+    with TestClient(server.app) as client:
+        for doc, route in ((hole, "/api/thermal/"), (annulus, "/api/thermal/"), (moving, "/api/thermal/transient/")):
+            response = client.post(route + "run", json={"doc": doc, "client_revision": 1, "request_seq": 1})
+            assert response.status_code == 200, response.text
+            status = client.get("/api/jobs/" + response.json()["job"]).json()
+            assert status["status"] == "done", status
+
+
+def test_an_exterior_selection_without_mesh_edges_is_refused_by_name():
+    v1 = {"name": "v1", "type": "rect", "x": 10.0, "y": 5.0, "w": 5.0, "h": 10.0, "material": None}
+    v2 = {"name": "v2", "type": "rect", "x": 15.0, "y": 5.0, "w": 5.0, "h": 10.0, "material": None}
+    raw = plate([v1, v2], physics={"dirichlet_temperature_k": {"left": 300.0, "seam": 350.0}},
+                selections={"seam": {"boundary": {"between": ["v1", "v2"]}}})
+    with pytest.raises(DocumentError, match="no mesh edge lies on 'seam'"):
+        run(Document.from_dict(raw), verbose=False)
+    raw["physics"]["heat1"]["dirichlet_temperature_k"] = {"left": 300.0}
+    raw["physics"]["heat1"]["outward_flux_w_m2"] = {"seam": 5.0}
+    with pytest.raises(DocumentError, match="no mesh edge lies on 'seam'"):
+        run(Document.from_dict(raw), verbose=False)
+    moving = plate([v1, v2], kind="transient", size=1.0, selections={"seam": {"boundary": {"between": ["v1", "v2"]}}},
+                   physics={"initial_temperature_k": 300.0, "dirichlet_temperature_k": {"left": 300.0, "seam": 300.0}})
+    moving["study"]["time_s"] = [0.0, 5.0]
+    with pytest.raises(DocumentError, match="no mesh edge lies on 'seam'"):
+        run(Document.from_dict(moving), verbose=False)
+
+
+def test_a_natural_condition_on_a_dirichlet_boundary_under_another_name_is_refused():
+    for physics in ({"outward_flux_w_m2": {"hole_wall": 2000.0}},
+                    {"convection": {"hole_wall": {"h_w_m2k": 5.0, "ambient_temperature_k": 300.0}}}):
+        raw = _annulus(dirichlet_temperature_k={"inner": 400.0, "rim": 300.0}, **physics)
+        with pytest.raises(DocumentError, match="shares mesh edges with the Dirichlet boundary 'inner'"):
+            run(Document.from_dict(raw), verbose=False)
