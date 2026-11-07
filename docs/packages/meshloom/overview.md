@@ -86,6 +86,19 @@ names may change before the mesher's public API.
   tetrahedralization of the input and S points under the index-ordered perturbation,
   with each segment as a chain of edges through its own S points. A piece that would
   need more than `max_depth` halvings raises `RuntimeError` instead of looping.
+- **Facet recovery.** `recover_plc(points, segments, facets)` runs the PLC check and
+  segment recovery, then triangulates every facet again with the S points on its
+  segments (its subfacets, with the same exact predicates and tie-breaking) and lists
+  the subfacets that are not yet faces. `recover_boundary(points, segments, facets)`
+  goes on and makes every subfacet a face: around each connected region of missing
+  subfacets of a facet it removes the tetrahedra whose interiors cross the region and
+  refills each side of the facet plane by gift-wrapping (every new tetrahedron the
+  exact Delaunay choice among the cavity vertices that see its face). It then verifies
+  the result from the arrays: positive tetrahedra, the hull unchanged, every point a
+  vertex, every subfacet a face, every segment piece an edge, and every other interior
+  face locally Delaunay, which makes the result a constrained Delaunay
+  tetrahedralization. A cavity it cannot fill raises `ValueError`; the tetrahedra
+  still fill the convex hull (no region labels yet).
 
 ```python
 import numpy as np
@@ -138,9 +151,12 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No mesh generation yet: input PLCs are checked and their facets triangulated, but
-  there is no facet recovery, refinement or improvement yet. Segments are recovered;
-  facets, flips and region labels come with the rest of boundary recovery.
+- No mesh generation yet: input PLCs are checked and their segments and facets
+  recovered, but there are no region labels, rounding to doubles, refinement or
+  improvement yet. Facet recovery fills cavities by gift-wrapping only: a cavity
+  without a constrained Delaunay filling (none so far in the tests) is an error, not
+  yet repaired with extra points, and the fill takes time quadratic in the cavity
+  size (the faster cavity path comes with the rest of boundary recovery).
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.
