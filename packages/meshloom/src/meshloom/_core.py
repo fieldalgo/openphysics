@@ -66,6 +66,42 @@ def predicate_signs(kind: str, coords, ids=None, axis: int = 2) -> np.ndarray:
     return np.frombuffer(out, dtype=np.int8).copy()
 
 
+def mixed_predicate_signs(kind: str, points, segments, t, query, axis: int = 2) -> tuple[np.ndarray, dict]:
+    """Exact signs of one predicate over points stored on segments (S points) and input
+    points.
+
+    ``points`` (n, 3) are the input points; S point ``j`` lies on the segment
+    ``segments[j]`` = (a, b) at ``points[a] + t[j] * (points[b] - points[a])``, with
+    ``0 < t[j] < 1``. ``query`` (g, k) gives each group's points by global index: input
+    points ``0..n``, S points ``n..n+m``, the same indices that order the perturbation
+    of the ``_sos`` kinds. Kinds and conventions are those of ``predicate_signs``
+    (``orient3d``, ``insphere``, ``insphere_sos``; in-plane ``orient2d_proj``,
+    ``incircle_plane``, ``incircle_plane_sos`` with ``axis``). The coordinates of S
+    points are never rounded: an interval filter decides most signs and exact dyadic
+    big integers the rest. Returns the signs (int8) and call counters.
+    """
+    kernel = _require()
+    p = _points(points)
+    seg = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
+    tt = np.ascontiguousarray(np.asarray(t, dtype="<f8").reshape(-1))
+    q = np.ascontiguousarray(np.asarray(query, dtype="<i8"))
+    out, counts = kernel.mixed_signs(kind, p.tobytes(), seg.tobytes(), tt.tobytes(), q.tobytes(), axis)
+    return np.frombuffer(out, dtype=np.int8).copy(), counts
+
+
+def spoint_coords(points, segments, t) -> np.ndarray:
+    """Output coordinates of S points (see ``mixed_predicate_signs``): each coordinate of
+    ``points[a] + t * (points[b] - points[a])`` rounded once to the nearest double
+    (ties to even). The predicates never use these; they are for output. Returns (m, 3).
+    """
+    kernel = _require()
+    p = _points(points)
+    seg = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
+    tt = np.ascontiguousarray(np.asarray(t, dtype="<f8").reshape(-1))
+    out = kernel.spoint_coords(p.tobytes(), seg.tobytes(), tt.tobytes())
+    return np.frombuffer(out, dtype="<f8").reshape(-1, 3).astype(np.float64)
+
+
 def delaunay(points, order=None) -> tuple[np.ndarray, np.ndarray, dict]:
     """Delaunay tetrahedralization of ``points`` (n, 3).
 

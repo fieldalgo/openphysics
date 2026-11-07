@@ -64,8 +64,19 @@ names may change before the mesher's public API.
   named in an `InvalidPLC` (a `ValueError`) with the witness type of the import
   validity rule and a witness that can be checked independently: the vertex, the
   facet or facets, and for crossings an exact rational point in both cells that lies
-  in no cell contained in both. It also returns the edges split at the points on them and the pieces
-  on the boundary of an odd number of facets (none when the surface is closed).
+  in no cell contained in both. It also returns the edges split at the points on them
+  and the pieces on the boundary of an odd number of facets (none when the surface is
+  closed).
+- **Points on segments.** Boundary recovery adds points on input segments: an S point
+  is `points[a] + t (points[b] - points[a])` with `0 < t < 1`, stored as (a, b, t) and
+  never rounded inside the mesher. Its coordinates are exact dyadic rationals, so
+  `mixed_predicate_signs(kind, points, segments, t, query, axis=2)` evaluates
+  `orient3d`, `insphere`, `insphere_sos` and the in-plane `orient2d_proj`,
+  `incircle_plane`, `incircle_plane_sos` exactly on any mix of input and S points:
+  an interval filter (every operation rounded outward by one ulp) decides most signs,
+  and exact big integers the rest. Queries use global indices, input points first and
+  then S points, which also order the tie-breaking perturbation. `spoint_coords` gives
+  the output coordinates, each rounded once to the nearest double.
 
 ```python
 import numpy as np
@@ -117,8 +128,9 @@ See [third-party software](../../third-party.md).
 ## Limits
 
 - No mesh generation yet: input PLCs are checked and their facets triangulated, but
-  there is no boundary recovery, refinement or improvement yet. Flips and the
-  predicates on points stored on segments come with boundary recovery.
+  there is no boundary recovery, refinement or improvement yet. The predicates on
+  points stored on segments are in place; inserting those points and flips come with
+  boundary recovery.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.

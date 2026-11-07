@@ -8,141 +8,8 @@
 //! through the full 5 x 5 lifted determinant with an explicit, small enough
 //! perturbation, not through the cofactor rule the kernel uses.
 
+use crate::bigint::{decompose, Big};
 use crate::predicates::{self as pr, Counters, P3};
-use std::cmp::Ordering;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Big {
-    neg: bool,
-    mag: Vec<u32>, // little-endian, no trailing zeros; empty = 0
-}
-
-fn trim(v: &mut Vec<u32>) {
-    while v.last() == Some(&0) {
-        v.pop();
-    }
-}
-
-fn cmp_mag(a: &[u32], b: &[u32]) -> Ordering {
-    a.len().cmp(&b.len()).then_with(|| a.iter().rev().cmp(b.iter().rev()))
-}
-
-fn add_mag(a: &[u32], b: &[u32]) -> Vec<u32> {
-    let mut r = Vec::with_capacity(a.len().max(b.len()) + 1);
-    let mut carry = 0u64;
-    for i in 0..a.len().max(b.len()) {
-        let s = *a.get(i).unwrap_or(&0) as u64 + *b.get(i).unwrap_or(&0) as u64 + carry;
-        r.push(s as u32);
-        carry = s >> 32;
-    }
-    r.push(carry as u32);
-    trim(&mut r);
-    r
-}
-
-fn sub_mag(a: &[u32], b: &[u32]) -> Vec<u32> {
-    // |a| >= |b|
-    let mut r = Vec::with_capacity(a.len());
-    let mut borrow = 0i64;
-    for i in 0..a.len() {
-        let mut s = a[i] as i64 - *b.get(i).unwrap_or(&0) as i64 - borrow;
-        borrow = 0;
-        if s < 0 {
-            s += 1 << 32;
-            borrow = 1;
-        }
-        r.push(s as u32);
-    }
-    trim(&mut r);
-    r
-}
-
-impl Big {
-    fn zero() -> Big {
-        Big { neg: false, mag: Vec::new() }
-    }
-
-    fn sign(&self) -> i8 {
-        if self.mag.is_empty() { 0 } else if self.neg { -1 } else { 1 }
-    }
-
-    fn from_u64_shl(m: u64, shift: u32, neg: bool) -> Big {
-        let mut mag = vec![0u32; (shift / 32) as usize];
-        let s = shift % 32;
-        let wide = (m as u128) << s;
-        for k in 0..4 {
-            mag.push((wide >> (32 * k)) as u32);
-        }
-        trim(&mut mag);
-        Big { neg: neg && !mag.is_empty(), mag }
-    }
-
-    fn add(&self, o: &Big) -> Big {
-        if self.neg == o.neg {
-            let mag = add_mag(&self.mag, &o.mag);
-            return Big { neg: self.neg && !mag.is_empty(), mag };
-        }
-        match cmp_mag(&self.mag, &o.mag) {
-            Ordering::Equal => Big::zero(),
-            Ordering::Greater => Big { neg: self.neg, mag: sub_mag(&self.mag, &o.mag) },
-            Ordering::Less => Big { neg: o.neg, mag: sub_mag(&o.mag, &self.mag) },
-        }
-    }
-
-    fn neg(&self) -> Big {
-        Big { neg: !self.neg && !self.mag.is_empty(), mag: self.mag.clone() }
-    }
-
-    fn sub(&self, o: &Big) -> Big {
-        self.add(&o.neg())
-    }
-
-    fn mul(&self, o: &Big) -> Big {
-        if self.mag.is_empty() || o.mag.is_empty() {
-            return Big::zero();
-        }
-        let mut r = vec![0u32; self.mag.len() + o.mag.len()];
-        for (i, &a) in self.mag.iter().enumerate() {
-            let mut carry = 0u64;
-            for (j, &b) in o.mag.iter().enumerate() {
-                let t = r[i + j] as u64 + a as u64 * b as u64 + carry;
-                r[i + j] = t as u32;
-                carry = t >> 32;
-            }
-            let mut k = i + o.mag.len();
-            while carry != 0 {
-                let t = r[k] as u64 + carry;
-                r[k] = t as u32;
-                carry = t >> 32;
-                k += 1;
-            }
-        }
-        trim(&mut r);
-        Big { neg: self.neg != o.neg, mag: r }
-    }
-
-    fn bits(&self) -> u32 {
-        match self.mag.last() {
-            None => 0,
-            Some(&top) => 32 * (self.mag.len() as u32 - 1) + (32 - top.leading_zeros()),
-        }
-    }
-
-    fn pow2(k: u32) -> Big {
-        Big::from_u64_shl(1, k, false)
-    }
-}
-
-/// (odd integer mantissa, exponent of its unit, sign) with |x| = m * 2^e, for x != 0.
-fn decompose(x: f64) -> (u64, i32, bool) {
-    let bits = x.to_bits();
-    let neg = bits >> 63 == 1;
-    let exp = ((bits >> 52) & 0x7ff) as i32;
-    let frac = bits & ((1u64 << 52) - 1);
-    let (m, e) = if exp == 0 { (frac, -1074) } else { (frac | (1u64 << 52), exp - 1075) };
-    let tz = m.trailing_zeros();
-    (m >> tz, e + tz as i32, neg)
-}
 
 /// The points of one case as integers on a common scale 2^e0.
 fn integers(pts: &[P3]) -> Vec<[Big; 3]> {
@@ -198,13 +65,19 @@ fn det(m: &[Vec<Big>]) -> Big {
 }
 
 pub fn orient3d(p: &[P3; 4]) -> i8 {
-    let q = integers(p);
+    orient3d_q(&integers(p))
+}
+
+fn orient3d_q(q: &[[Big; 3]]) -> i8 {
     let rows = vec![sub3(&q[1], &q[0]).to_vec(), sub3(&q[2], &q[0]).to_vec(), sub3(&q[3], &q[0]).to_vec()];
     det(&rows).sign()
 }
 
 pub fn insphere(p: &[P3; 5]) -> i8 {
-    let q = integers(p);
+    insphere_q(&integers(p))
+}
+
+fn insphere_q(q: &[[Big; 3]]) -> i8 {
     let rows: Vec<Vec<Big>> = (0..4).map(|i| {
         let d = sub3(&q[i], &q[4]);
         let l = dot(&d, &d);
@@ -216,7 +89,10 @@ pub fn insphere(p: &[P3; 5]) -> i8 {
 /// -det5[p, |p|^2 + delta^(rank + 1), 1] with rank 0 for the largest id, for a delta
 /// small enough that the perturbation terms are ordered by their power.
 pub fn insphere_sos(p: &[P3; 5], ids: [u32; 5]) -> i8 {
-    let q = integers(p);
+    insphere_sos_q(&integers(p), ids)
+}
+
+fn insphere_sos_q(q: &[[Big; 3]], ids: [u32; 5]) -> i8 {
     let coord_bits = q.iter().flatten().map(|x| x.bits()).max().unwrap_or(1);
     // every 4 x 4 cofactor is below 2^(3 coord_bits + 2 coord_bits + 8); one power of delta
     // more must dwarf the sum of all of them
@@ -247,7 +123,10 @@ pub fn incircle3d(p: &[P3; 4]) -> i8 {
 
 /// Component `axis` of (b - a) x (c - a).
 pub fn orient2d_proj(axis: usize, p: &[P3; 3]) -> i8 {
-    let q = integers(p);
+    orient2d_proj_q(axis, &integers(p))
+}
+
+fn orient2d_proj_q(axis: usize, q: &[[Big; 3]]) -> i8 {
     cross(&sub3(&q[1], &q[0]), &sub3(&q[2], &q[0]))[axis].sign()
 }
 
@@ -261,7 +140,10 @@ fn kept(axis: usize) -> (usize, usize) {
 
 /// det4[u, v, |p|^2, 1] over a, b, c, d (projected u, v; 3D squared norm).
 pub fn incircle_plane(axis: usize, p: &[P3; 4]) -> i8 {
-    let q = integers(p);
+    incircle_plane_q(axis, &integers(p))
+}
+
+fn incircle_plane_q(axis: usize, q: &[[Big; 3]]) -> i8 {
     let (i, j) = kept(axis);
     let rows: Vec<Vec<Big>> = (0..4)
         .map(|k| vec![q[k][i].clone(), q[k][j].clone(), dot(&q[k], &q[k]), Big::from_u64_shl(1, 0, false)])
@@ -272,7 +154,10 @@ pub fn incircle_plane(axis: usize, p: &[P3; 4]) -> i8 {
 /// The same with the lifted column raised by delta^(rank + 1), rank 0 for the largest id,
 /// for a delta small enough to order the powers.
 pub fn incircle_plane_sos(axis: usize, p: &[P3; 4], ids: [u32; 4]) -> i8 {
-    let q = integers(p);
+    incircle_plane_sos_q(axis, &integers(p), ids)
+}
+
+fn incircle_plane_sos_q(axis: usize, q: &[[Big; 3]], ids: [u32; 4]) -> i8 {
     let (i, j) = kept(axis);
     let coord_bits = q.iter().flatten().map(|x| x.bits()).max().unwrap_or(1);
     let b = 4 * coord_bits + 32;
@@ -572,5 +457,375 @@ mod tests {
     #[ignore]
     fn v16_predicates_agree_with_exact_integers_large() {
         run(1_000_000, 100_000, 1016);
+    }
+}
+
+// ---------------------------------------------------------------- mixed points (M4)
+
+/// A point of a mixed case for the reference: an input point, or the S point
+/// a + t (b - a) of a segment, given by its doubles.
+#[derive(Clone, Copy, Debug)]
+pub enum RefPt {
+    In(P3),
+    S(P3, P3, f64),
+}
+
+/// A term of a coordinate as (mantissa, exponent, negative): a double, or the product
+/// of two doubles. None for zero.
+fn term(x: f64, y: Option<f64>) -> Option<(u128, i32, bool)> {
+    if x == 0.0 || y == Some(0.0) {
+        return None;
+    }
+    let (mx, ex, nx) = decompose(x);
+    Some(match y {
+        None => (mx as u128, ex, nx),
+        Some(y) => {
+            let (my, ey, ny) = decompose(y);
+            (mx as u128 * my as u128, ex + ey, nx != ny)
+        }
+    })
+}
+
+fn big_u128(m: u128, shift: u32, neg: bool) -> Big {
+    Big::from_u64_shl(m as u64, shift, neg).add(&Big::from_u64_shl((m >> 64) as u64, shift + 64, neg))
+}
+
+/// The coordinates of a mixed case as integers on one common scale 2^e0: an S
+/// coordinate is a_k + t b_k - t a_k, three terms whose smallest exponent sets e0.
+fn mixed_integers(pts: &[RefPt]) -> Vec<[Big; 3]> {
+    let terms: Vec<[Vec<(u128, i32, bool)>; 3]> = pts.iter().map(|p| std::array::from_fn(|k| match p {
+        RefPt::In(x) => term(x[k], None).into_iter().collect(),
+        RefPt::S(a, b, t) => [term(a[k], None), term(*t, Some(b[k])), term(*t, Some(a[k])).map(|(m, e, n)| (m, e, !n))]
+            .into_iter().flatten().collect(),
+    })).collect();
+    let e0 = terms.iter().flatten().flatten().map(|t| t.1).min().unwrap_or(0);
+    terms.iter().map(|c| std::array::from_fn(|k| {
+        c[k].iter().fold(Big::zero(), |acc, &(m, e, neg)| acc.add(&big_u128(m, (e - e0) as u32, neg)))
+    })).collect()
+}
+
+pub fn orient3d_mixed(p: &[RefPt; 4]) -> i8 {
+    orient3d_q(&mixed_integers(p))
+}
+
+pub fn insphere_mixed(p: &[RefPt; 5]) -> i8 {
+    insphere_q(&mixed_integers(p))
+}
+
+pub fn insphere_sos_mixed(p: &[RefPt; 5], ids: [u32; 5]) -> i8 {
+    insphere_sos_q(&mixed_integers(p), ids)
+}
+
+pub fn orient2d_proj_mixed(axis: usize, p: &[RefPt; 3]) -> i8 {
+    orient2d_proj_q(axis, &mixed_integers(p))
+}
+
+pub fn incircle_plane_mixed(axis: usize, p: &[RefPt; 4]) -> i8 {
+    incircle_plane_q(axis, &mixed_integers(p))
+}
+
+pub fn incircle_plane_sos_mixed(axis: usize, p: &[RefPt; 4], ids: [u32; 4]) -> i8 {
+    incircle_plane_sos_q(axis, &mixed_integers(p), ids)
+}
+
+/// Exactly equal points of a mixed case (by their integers on the common scale).
+pub fn mixed_distinct(p: &[RefPt]) -> bool {
+    let q = mixed_integers(p);
+    (0..q.len()).all(|i| (i + 1..q.len()).all(|j| q[i] != q[j]))
+}
+
+#[cfg(test)]
+mod mixed_tests {
+    use super::*;
+    use crate::mixed::{Mixed, MixedCounters, Pt, SPoint};
+
+    /// A mixed case: the input points, the S table and the query, plus the same query
+    /// for the reference.
+    struct Case {
+        input: Vec<P3>,
+        s: Vec<SPoint>,
+        query: Vec<Pt>,
+        refs: Vec<RefPt>,
+    }
+
+    impl Case {
+        fn new() -> Case {
+            Case { input: Vec::new(), s: Vec::new(), query: Vec::new(), refs: Vec::new() }
+        }
+
+        fn input(&mut self, x: P3) -> u32 {
+            self.input.push(x);
+            self.input.len() as u32 - 1
+        }
+
+        fn push_in(&mut self, x: P3) {
+            let i = self.input(x);
+            self.query.push(Pt::In(i));
+            self.refs.push(RefPt::In(x));
+        }
+
+        fn push_s(&mut self, a: P3, b: P3, t: f64) {
+            let (ia, ib) = (self.input(a), self.input(b));
+            self.s.push(SPoint { a: ia, b: ib, t });
+            self.query.push(Pt::S(self.s.len() as u32 - 1));
+            self.refs.push(RefPt::S(a, b, t));
+        }
+
+        fn mixed(&self) -> Mixed<'_> {
+            Mixed { input: &self.input, s: &self.s }
+        }
+
+        fn ids<const N: usize>(&self) -> [u32; N] {
+            let m = self.mixed();
+            std::array::from_fn(|k| m.id(self.query[k]))
+        }
+
+        fn q<const N: usize>(&self) -> [Pt; N] {
+            std::array::from_fn(|k| self.query[k])
+        }
+
+        fn r<const N: usize>(&self) -> [RefPt; N] {
+            std::array::from_fn(|k| self.refs[k])
+        }
+    }
+
+    fn t_of(r: &mut Rng) -> f64 {
+        match r.int(5) {
+            0 => 2f64.powi(-(1 + r.int(50) as i32)),                     // close to a
+            1 => 1.0 - 2f64.powi(-(1 + r.int(52) as i32)),               // close to b
+            2 => (1 + r.int(15)) as f64 / 16.0,                          // dyadic
+            _ => r.unit().clamp(f64::MIN_POSITIVE, 1.0 - f64::EPSILON),  // any double
+        }
+    }
+
+    /// Positions for a predicate on N points (`kind`: 0 orient3d, 1 insphere, 2 plane),
+    /// each turned into an input point or an S point near or exactly at it.
+    fn case(r: &mut Rng, adversarial: bool, n: usize, kind: usize, sphere: &[P3]) -> Case {
+        let s = domain_scale(r);
+        let mut c = Case::new();
+        if !adversarial {
+            for _ in 0..n {
+                if r.int(2) == 0 {
+                    c.push_in(r.point());
+                } else {
+                    let (a, b) = (r.point(), r.point());
+                    c.push_s(a, b, t_of(r));
+                }
+            }
+            return c;
+        }
+        // the exact position of each point, and how an S point reaches it exactly:
+        // integer offsets d with a = x - d, b = x + 3d and t = 1/4, or x -+ d and 1/2
+        let embed = |x: f64, y: f64| [x + 2.0 * y, 2.0 * x + y, 2.0 * x - 2.0 * y];
+        let pos: Vec<P3> = match kind {
+            0 => match r.int(3) {
+                // exactly coplanar lattice points on the tilted plane x + 2y - z = 0
+                0 | 1 => (0..n).map(|_| {
+                    let (x, y) = (r.int(64) as f64, r.int(64) as f64);
+                    [x, y, x + 2.0 * y]
+                }).collect(),
+                // a tiny tetrahedron far from the origin
+                _ => {
+                    let o = [1.0e3, -2.0e3, 0.5e3];
+                    vec![o, [nudge(o[0], 1), o[1], o[2]], [o[0], nudge(o[1], 1), o[2]],
+                         [o[0], o[1], nudge(o[2], r.int(3) - 1)]][..n].to_vec()
+                }
+            },
+            1 => {
+                let pick = |r: &mut Rng| sphere[r.int(sphere.len() as u64) as usize];
+                (0..n).map(|_| pick(r)).collect()
+            }
+            _ => {
+                let circle = [[5.0, 0.0], [-5.0, 0.0], [0.0, 5.0], [0.0, -5.0], [3.0, 4.0], [-3.0, 4.0],
+                              [3.0, -4.0], [-3.0, -4.0], [4.0, 3.0], [-4.0, 3.0], [4.0, -3.0], [-4.0, -3.0]];
+                (0..n).map(|_| {
+                    let q = circle[r.int(12) as usize];
+                    embed(q[0], q[1])
+                }).collect()
+            }
+        };
+        let far = pos.iter().flatten().any(|x| x.abs() >= 1.0e3);
+        for (k, x) in pos.iter().enumerate() {
+            if r.int(3) == 0 {
+                c.push_in(scale(*x, s));
+                continue;
+            }
+            // a direction that keeps the S point's segment in the case's plane, if any
+            let d = match kind {
+                0 if !far => {
+                    let (u, v) = (r.int(5) as f64 - 2.0, r.int(5) as f64 - 2.0 + 0.5);
+                    [u, v, u + 2.0 * v]
+                }
+                2 => {
+                    let (u, v) = (r.int(5) as f64 - 2.0, r.int(5) as f64 - 2.0 + 0.5);
+                    embed(u, v)
+                }
+                _ => [1.0 + r.int(3) as f64, -2.0, 3.0],
+            };
+            let (mut a, mut b, t) = if far {
+                // segment through a far point: exact when the ends are, near-degenerate
+                ([x[0] - 1.0, x[1], x[2]], [x[0] + 1.0, x[1], x[2]], 0.5)
+            } else if r.int(2) == 0 {
+                ([x[0] - d[0], x[1] - d[1], x[2] - d[2]], [x[0] + d[0], x[1] + d[1], x[2] + d[2]], 0.5)
+            } else {
+                ([x[0] - d[0], x[1] - d[1], x[2] - d[2]], [x[0] + 3.0 * d[0], x[1] + 3.0 * d[1], x[2] + 3.0 * d[2]], 0.25)
+            };
+            if r.int(4) == 0 {
+                // one end a few ulps off: the S point leaves the plane or sphere by a tiny amount
+                let j = r.int(3) as usize;
+                if r.int(2) == 0 {
+                    a[j] = nudge(a[j], r.int(5) - 2);
+                } else {
+                    b[j] = nudge(b[j], r.int(5) - 2);
+                }
+            }
+            let t = if r.int(5) == 0 && k % 2 == 0 { t_of(r) } else { t };
+            c.push_s(scale(a, s), scale(b, s), t);
+        }
+        c
+    }
+
+    #[derive(Default, Debug)]
+    struct Tally {
+        zeros: [usize; 4],
+        sos: usize,
+        exact_double_checks: usize,
+        n: MixedCounters,
+    }
+
+    fn run_mixed(random: usize, adversarial: usize, seed: u64) -> Tally {
+        let mut r = Rng(seed);
+        let sphere = sphere_points();
+        let mut t = Tally::default();
+        for k in 0..random + adversarial {
+            let adv = k >= random;
+
+            // orient3d
+            let c = case(&mut r, adv, 4, 0, &sphere);
+            let m = c.mixed();
+            crate::mixed::check_spoints(&c.input, &c.s).unwrap();
+            let s = m.orient3d(c.q(), &mut t.n);
+            assert_eq!(s, orient3d_mixed(&c.r()), "orient3d {:?} {:?}", c.refs, c.s);
+            t.zeros[0] += (s == 0) as usize;
+
+            // insphere, and the perturbed one on distinct points with a proper tetrahedron
+            let c = case(&mut r, adv, 5, 1, &sphere);
+            let m = c.mixed();
+            let s = m.insphere(c.q(), &mut t.n);
+            assert_eq!(s, insphere_mixed(&c.r()), "insphere {:?}", c.refs);
+            t.zeros[1] += (s == 0) as usize;
+            let r4: [RefPt; 4] = std::array::from_fn(|i| c.refs[i]);
+            if mixed_distinct(&c.refs) && orient3d_mixed(&r4) != 0 {
+                let so = m.insphere_sos(c.q(), &mut t.n);
+                assert_ne!(so, 0);
+                assert_eq!(so, insphere_sos_mixed(&c.r(), c.ids()), "insphere_sos {:?}", c.refs);
+                t.sos += (s == 0) as usize;
+            }
+
+            // in-plane predicates on every axis whose normal component is nonzero
+            let c = case(&mut r, adv, 4, 2, &sphere);
+            let m = c.mixed();
+            let r3: [RefPt; 3] = std::array::from_fn(|i| c.refs[i]);
+            let coplanar = orient3d_mixed(&c.r()) == 0;
+            for axis in 0..3 {
+                let o = m.orient2d_proj(axis, std::array::from_fn(|i| c.query[i]), &mut t.n);
+                assert_eq!(o, orient2d_proj_mixed(axis, &r3), "orient2d_proj {:?}", c.refs);
+                t.zeros[2] += (o == 0) as usize;
+                if o == 0 {
+                    continue;
+                }
+                let s = m.incircle_plane(axis, c.q(), &mut t.n);
+                assert_eq!(s, incircle_plane_mixed(axis, &c.r()), "incircle_plane {:?}", c.refs);
+                t.zeros[3] += (s == 0) as usize;
+                if coplanar && mixed_distinct(&c.refs) {
+                    let so = m.incircle_plane_sos(axis, c.q(), &mut t.n);
+                    assert_ne!(so, 0);
+                    assert_eq!(so, incircle_plane_sos_mixed(axis, &c.r(), c.ids()), "incircle_plane_sos {:?}", c.refs);
+                }
+            }
+
+            // S points whose exact coordinates are doubles agree with the input-point
+            // predicates on those doubles (an independent check: expansions, M3)
+            if adv {
+                let c = case(&mut r, true, 5, 1, &sphere);
+                let m = c.mixed();
+                // a rounded point is exact when it equals the S point on a common scale
+                let exact: Vec<Option<P3>> = c.query.iter().zip(&c.refs).map(|(&p, rp)| {
+                    let x = m.rounded(p);
+                    let both = mixed_integers(&[RefPt::In(x), *rp]);
+                    (both[0] == both[1]).then_some(x)
+                }).collect();
+                if exact.iter().all(|x| x.is_some()) {
+                    let x: Vec<P3> = exact.into_iter().map(|x| x.unwrap()).collect();
+                    let mut n = Counters::default();
+                    assert_eq!(m.orient3d([c.query[0], c.query[1], c.query[2], c.query[3]], &mut t.n),
+                               pr::orient3d(&x[0], &x[1], &x[2], &x[3], &mut n));
+                    assert_eq!(m.insphere(c.q(), &mut t.n), pr::insphere(&x[0], &x[1], &x[2], &x[3], &x[4], &mut n));
+                    let distinct = (0..5).all(|i| (i + 1..5).all(|j| !pr::same_point(&x[i], &x[j])));
+                    if distinct && pr::orient3d(&x[0], &x[1], &x[2], &x[3], &mut n) != 0 {
+                        assert_eq!(m.insphere_sos(c.q(), &mut t.n),
+                                   pr::insphere_sos([&x[0], &x[1], &x[2], &x[3], &x[4]], c.ids(), &mut n));
+                    }
+                    t.exact_double_checks += 1;
+                }
+            }
+        }
+        t
+    }
+
+    /// V16 for mixed points in CI: 10^4 random and 10^4 adversarial cases per predicate.
+    #[test]
+    fn v16_mixed_predicates_agree_with_exact_integers() {
+        let n = std::env::var("V16_N").ok().and_then(|s| s.parse().ok()).unwrap_or(10_000);
+        let t = run_mixed(n, n, 216);
+        eprintln!("{t:?}");
+        // the adversarial half reaches the degenerate cases and the exact path
+        assert!(t.zeros.iter().all(|&z| z > n / 50), "{t:?}");
+        assert!(t.sos > n / 50 && t.exact_double_checks > n / 10, "{t:?}");
+        assert!(t.n.exact > (n / 20) as u64, "{t:?}");
+    }
+
+    /// V16 for mixed points outside CI: 10^6 random and 10^5 adversarial cases.
+    #[test]
+    #[ignore]
+    fn v16_mixed_predicates_agree_with_exact_integers_large() {
+        let t = run_mixed(1_000_000, 100_000, 1216);
+        eprintln!("{t:?}");
+    }
+
+    #[test]
+    fn rounded_s_points_are_the_nearest_doubles_and_bad_tables_are_refused() {
+        let input = [[0.0, 0.0, 0.0], [1.0, 3.0, 0.1]];
+        let s = [SPoint { a: 0, b: 1, t: 1.0 / 3.0 }];
+        let m = Mixed { input: &input, s: &s };
+        let x = m.rounded(Pt::S(0));
+        // a is the origin, so the exact point is t * b: one correctly rounded product
+        // per coordinate is the nearest double
+        let want: Vec<f64> = (0..3).map(|k| (1.0 / 3.0) * input[1][k]).collect();
+        assert_eq!(x.to_vec(), want);
+        // a sum that rounds: the nearest double of a + t (b - a), against the reference
+        let input2 = [[1.0, -0.1, 7.0], [3.0, 0.3, -2.0]];
+        let s2 = [SPoint { a: 0, b: 1, t: 0.1 }];
+        let m2 = Mixed { input: &input2, s: &s2 };
+        let y = m2.rounded(Pt::S(0));
+        for k in 0..3 {
+            // |exact - y| <= half an ulp of y: compare against the neighbours
+            for nb in [y[k].next_up(), y[k].next_down()] {
+                let mut z = y;
+                z[k] = nb;
+                let qz = mixed_integers(&[RefPt::S(input2[0], input2[1], 0.1), RefPt::In(y), RefPt::In(z)]);
+                let d_y = qz[0][k].sub(&qz[1][k]);
+                let d_z = qz[0][k].sub(&qz[2][k]);
+                let mag = |b: &Big| if b.sign() < 0 { b.neg() } else { b.clone() };
+                assert!(mag(&d_y).sub(&mag(&d_z)).sign() <= 0, "coordinate {k} is not the nearest double");
+            }
+        }
+
+        assert_eq!(m.id(Pt::S(0)), 2);
+        assert_eq!(m.from_id(2), Pt::S(0));
+        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 0, t: 0.5 }]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 1, t: 1.0 }]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 2, t: 0.5 }]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 1, t: f64::NAN }]).is_err());
     }
 }
