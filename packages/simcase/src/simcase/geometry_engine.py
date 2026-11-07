@@ -1669,7 +1669,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
         pts.append(pb)
         poly[k.index] = pts
     _check_rounded_topology(rc, poly, coords)
-    rc._handoff = {"poly": poly, "circles": circle_objs, "unit_pm": unit_pm}
+    rc._handoff = {"poly": poly, "circles": circle_objs, "unit_pm": unit_pm, "meshed": set()}
     d = Domain(size=size)
     materials: dict[str, object] = {}
     skipped: set[int] = set()
@@ -1684,6 +1684,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
                                 f"square mesher units, under the sliver limit, so it is left out of the mesh")
                 continue
             _add_cell(d, rc, cell, poly, circle_objs, unit_pm, mesh_sizes, cell_sizes.get(ci))
+            rc._handoff["meshed"].add(ci)
             materials[cell.region] = cell.material
     exterior_segments = []
     for k in rc.curves:
@@ -1818,9 +1819,13 @@ def _curve_edges(rc: RegionComplex, mesh) -> dict:
     lo, hi = nodes.min(axis=0), nodes.max(axis=0)
     tol = 1e-9 * float(np.hypot(*(hi - lo)))
     poly, circles = rc._handoff["poly"], rc._handoff["circles"]
-    # every hand-off point has a node, except one that meshine may have snapped away: an end of
-    # an input edge shorter than SNAP_EPS of the diagonal (meshine.geometry.SNAP_EPS = 3e-8)
-    points = [p for pts in poly.values() for p in (pts or ())]
+    # a curve reaches the mesh only through a cell that was added (void, sliver and exterior
+    # cells are not): the other curves have no edges and their vertices need no node
+    meshed = rc._handoff["meshed"]
+    live = {k.index for k in rc.curves if k.left in meshed or k.right in meshed}
+    # every live hand-off point has a node, except one that meshine may have snapped away: an
+    # end of an input edge shorter than SNAP_EPS of the diagonal (meshine.geometry.SNAP_EPS = 3e-8)
+    points = [p for i, pts in poly.items() if i in live for p in (pts or ())]
     snap = 3e-8 * float(np.hypot(*(hi - lo)))
     for p in points:
         if np.min(np.hypot(nodes[:, 0] - p[0], nodes[:, 1] - p[1])) <= tol:
@@ -1842,6 +1847,9 @@ def _curve_edges(rc: RegionComplex, mesh) -> dict:
     for k in rc.curves:
         found = []
         pts = poly[k.index]
+        if k.index not in live:
+            out[k.index] = np.zeros((0, 2), dtype=int)
+            continue
         if pts is None:                                        # a whole circle: nodes on it, chained by angle
             c = circles[(k.params["center"], k.params["r2"])]
             d = nodes - c.center

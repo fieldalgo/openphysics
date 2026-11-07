@@ -83,7 +83,9 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   `outward_flux_w_m2` and `convection` with the side rules of the rectangle
   documents (corner conflicts refused, a Dirichlet side or positive Robin anchor
   required, no natural condition on a Dirichlet side). `conductivity_w_mk` here
-  is refused: it comes from `materials`.
+  is refused: it comes from `materials`. A [version 1 geometry
+  block](geometry_document.md) may name more boundaries, see
+  [Named boundaries](#named-boundaries).
 - `mesh`: `size` > 0 (length unit, required) and `min_angle` (degrees, default
   28, at most 33). `subdivisions` and `grading` are refused.
 - `study` `{"type": "single"}`; `results.plots` must be false.
@@ -184,6 +186,44 @@ Signs and units are those of the boundary contract: reaction is inward
 thermostat heat, total outward heat is
 `sum(prescribed_outward_load + convective_outward - reaction)`, all nodal
 rates are W/m of depth.
+
+## Named boundaries
+
+A document with a [version 1 geometry block](geometry_document.md) may give
+`dirichlet_temperature_k`, `outward_flux_w_m2` and `convection` entries (and
+the transient runner its `dirichlet_temperature_k`) to boundaries beyond the
+four domain sides:
+
+- the exterior tags the [stage 2 engine](geometry_engine.md) declares: a
+  `boundary_tags` name, and `outer` on the border of a void feature
+  (`material: null`) or of a sliver gap;
+- a boundary selection of the component (`selections`) whose curves all lie on
+  the exterior (the domain or a void); the mesh names its nodes and tags its
+  edges under the selection's name (`mesh.boundary[name]`,
+  `mesh.boundary_edges[name]`), beside the side or `outer` tag the same edges
+  carry. A selection on an interface between two regions is refused by name:
+  galerkin fixes and loads exterior nodes only.
+
+A void feature is a hole: it is not meshed and its border is an exterior
+boundary that is **insulated unless named** (HQ decision 2026-11-08). A side
+that borders a void feature only has no mesh edge and is refused by name when
+data is given to it. One mesh edge takes one flux and one convection entry: a
+side tag and a selection on the same edges, both given data, are refused.
+Every boundary selection's edges, interior ones included, are on the galerkin
+mesh as `mesh.selection_edges` (the contract's `provenance_edges` read for
+selections); nothing else reads them yet.
+
+Checks G5-1 to G5-5 (`tests/simcase/test_thermal_named_boundaries.py`,
+pre-registered in the HQ work record on 2026-11-08, measured the same day on
+Linux, Python 3.12, pinned environment): a steel disc with a void hole in a
+void plate, Dirichlet on both circles through `boundary_tags` and through a
+selection, matches the logarithmic profile within 1e-3 of the temperature
+difference at the mid radius; a flux on the hole wall gives exactly `g` times
+the wall's polygon length and a convection on it the series-resistance rate
+within 2e-3, both with heat balance within 1e-10; an unnamed hole is insulated
+with the balance within 1e-10; the refusals (interface selections, unknown
+names, a region selection, doubled edges); the transient runner's Dirichlet on
+a selection and its refusals; a 0.2 document keeps its four sides.
 
 ## Axisymmetric documents
 

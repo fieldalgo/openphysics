@@ -28,7 +28,8 @@ class Mesh:
                  boundary_edges: dict[str, np.ndarray] | None = None,
                  regions: np.ndarray | None = None,
                  region_names: list[str] | None = None,
-                 provenance_edges: dict[str, np.ndarray] | None = None):
+                 provenance_edges: dict[str, np.ndarray] | None = None,
+                 selection_edges: dict[str, np.ndarray] | None = None):
         self.nodes = np.asarray(nodes, dtype=float)
         self.triangles = np.asarray(triangles, dtype=int)
         self.boundary = {k: np.asarray(v, dtype=int) for k, v in boundary.items()}
@@ -43,6 +44,12 @@ class Mesh:
         #: Nothing in galerkin reads it yet.
         self.provenance_edges = (None if provenance_edges is None else
                                  {k: np.asarray(v, dtype=int).reshape(-1, 2) for k, v in provenance_edges.items()})
+        #: optional, from a geometry document: boundary selection name -> (E, 2) node pairs of
+        #: the mesh edges the selection holds, exterior or internal. simcase's region heat
+        #: runners resolve Dirichlet nodes from it, and give an exterior selection's edges a
+        #: ``boundary_edges`` tag of the same name for flux and convection data.
+        self.selection_edges = (None if selection_edges is None else
+                                {k: np.asarray(v, dtype=int).reshape(-1, 2) for k, v in selection_edges.items()})
         self._fix_orientation()   # reorders vertices only, so regions stays aligned
 
     @property

@@ -1246,7 +1246,9 @@ def test_g3_3_a_merged_region_takes_its_heat_source_over_both_pieces():
     assert "shape heater: region" in doc.summary()
 
 
-def test_g3_4_void_documents_are_refused_by_name():
+def test_g3_4_void_documents_are_refused_by_the_waveguide_runner_and_are_holes_for_region_heat():
+    # stage 2d (2026-11-08): region heat takes a void feature as an insulated-unless-named hole
+    # (test_thermal_named_boundaries.py); the waveguide runner still refuses its outer tag
     from simcase import Document, DocumentError, run
     raw = _soi_v1()
     raw["geometry"]["components"]["main"]["features"].append(circle("hole", 0, 0.9, 0.1, None))
@@ -1255,8 +1257,10 @@ def test_g3_4_void_documents_are_refused_by_name():
     with pytest.raises(DocumentError, match="four domain sides"):
         run(doc, verbose=False)
     base = EXAMPLES["thermal_regions"]["geometry"]["shapes"]
-    with pytest.raises(DocumentError, match="void"):
-        Document.from_dict(_regions_doc([dict(base[0]), dict(base[1], material=None)]))
+    hole = Document.from_dict(_regions_doc([dict(base[0]), dict(base[1], material=None)], physics_source=0.0))
+    result = run(hole, verbose=False)
+    assert result.region_names == ["plate", "background"] and "outer" in result.mesh.boundary_edges
+    assert result.summary()["normalized_heat_balance_defect"] <= 1e-10
 
 
 def test_g3_5_a_stadium_path_core_agrees_with_its_polygon_approximation():

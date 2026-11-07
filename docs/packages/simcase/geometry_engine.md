@@ -173,8 +173,10 @@ still compiled to the 0.2 form their kinds read (`to_v02`), losslessly.
 
 What the runners refuse, by name: the waveguide runner takes exterior edges on
 the four domain sides only, so a `boundary_tags` entry that renames a side, a
-void region or a sliver gap is refused before the solver; region heat takes no
-void feature or background and refuses other tags as before; a `segment` that
+void region or a sliver gap is refused before the solver; region heat takes a
+void feature as a hole whose border is insulated unless named, and names its
+`boundary_tags`, `outer` and exterior selections for boundary data ([named
+boundaries](thermal_regions2d.md#named-boundaries)); a `segment` that
 ends inside a cell is refused at load (meshine takes region loops only); an
 axisymmetric component is taken by steady region heat only ([axisymmetric
 documents](thermal_regions2d.md#axisymmetric-documents)); the waveguide and

@@ -93,7 +93,13 @@ def validate_transient_region_thermal(doc):
                for x, y in corners]
     side_corners = {'left': (0, 1), 'right': (2, 3), 'bottom': (0, 2), 'top': (1, 3)}
     boundary = p['dirichlet_temperature_k']
-    _object(boundary, SIDES, where+'.dirichlet_temperature_k')
+    from .thermal_regions import boundary_names
+    tags, outside, inside = boundary_names(doc)
+    for key in boundary if isinstance(boundary, dict) else ():
+        if key in inside:
+            raise DocumentError(f"{where}.dirichlet_temperature_k.{key}: selection {key!r} lies on an interface "
+                                "between two regions; boundary data applies to exterior boundaries only")
+    _object(boundary, set(SIDES) | tags | outside, where+'.dirichlet_temperature_k')
     sampled = {tag: _samples(value, times, where+'.dirichlet_temperature_k.'+tag)
                for tag, value in boundary.items()}
     for horizontal in ('left', 'right'):
@@ -102,7 +108,7 @@ def validate_transient_region_thermal(doc):
                 raise DocumentError(f'{where}.dirichlet_temperature_k: conflicting corner '
                                     f'temperatures on {horizontal}/{vertical}')
     for tag, values in sampled.items():
-        if any(not _agree(initial[i], values[0]) for i in side_corners[tag]):
+        if tag in side_corners and any(not _agree(initial[i], values[0]) for i in side_corners[tag]):
             raise DocumentError(f'{where}.dirichlet_temperature_k.{tag}: initial t0 mismatch '
                                 '(32 eps bound); no projection')
     _object(d['results'], {'save_fields', 'plots'}, 'results', {'save_fields', 'plots'})
@@ -120,7 +126,8 @@ def transient_region_summary(doc):
              'named material regions',
              f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
              f'  background: {doc.background["material"]}']
-    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"]}' for s in doc.regions()]
+    lines += [f'  shape {s["name"]}: {s["type"]}, {s["material"] if s["material"] is not None else "void (hole)"}'
+              for s in doc.regions()]
     lines += [f'  material {m}: k={v.get("conductivity_w_mk")} W/(m K), '
               f'c={v.get("volumetric_heat_capacity_j_m3k")} J/(m^3 K)' for m, v in doc['materials'].items()]
     lines.append('  output: SI time/node/cell histories, triangle regions; rates at interval ends only')
@@ -144,6 +151,9 @@ def transient_region_inputs(doc, mesh, region_materials):
     sampled_nodes = {}
     for tag, value in p['dirichlet_temperature_k'].items():
         values = tuple(_samples(value, times, f'{where}.dirichlet_temperature_k.{tag}'))
+        if tag not in mesh.boundary:
+            raise DocumentError(f'{where}.dirichlet_temperature_k.{tag}: no mesh edge lies on {tag!r} (a side that '
+                                'borders a void feature only)')
         for node in mesh.boundary[tag]:
             node = int(node)
             if node in sampled_nodes and sampled_nodes[node] != values:
