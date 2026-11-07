@@ -197,7 +197,7 @@ fn triangulate_facet<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, loops: 
     check_environment()?;
     let pts = points(coords.as_bytes())?;
     let loops: Vec<Vec<u32>> = loops.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>()?;
-    let f = py.detach(move || facet::triangulate(&pts, &loops)).map_err(PyValueError::new_err)?;
+    let f = py.detach(move || facet::triangulate(&pts, &loops)).map_err(|e| PyValueError::new_err(e.msg))?;
     let tris = PyBytes::new_with(py, 24 * f.triangles.len(), |buf| {
         for (chunk, x) in buf.chunks_exact_mut(8).zip(f.triangles.iter().flatten()) {
             chunk.copy_from_slice(&(*x as i64).to_le_bytes());
@@ -214,7 +214,8 @@ fn triangulate_facet<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, loops: 
 #[pyfunction]
 fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
                   facets: Vec<Vec<Bound<'py, PyBytes>>>)
-                  -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>, usize)> {
+                  -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>, Bound<'py, PyBytes>,
+                               Bound<'py, PyBytes>, Bound<'py, PyBytes>, usize)> {
     check_environment()?;
     let points = points(coords.as_bytes())?;
     let seg = u32s(segments.as_bytes(), "segment index")?;
@@ -226,7 +227,8 @@ fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Boun
         .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
         .collect::<PyResult<_>>()?;
     let plc = plc::Plc { points, segments, facets };
-    let c = py.detach(move || plc::check(&plc)).map_err(PyValueError::new_err)?;
+    // a refusal carries (message, witness type or None)
+    let c = py.detach(move || plc::check(&plc)).map_err(|e| PyValueError::new_err((e.msg, e.witness)))?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
             for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
@@ -236,8 +238,10 @@ fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Boun
         })
     };
     Ok((i64_bytes(c.segments.iter().flatten().copied().collect())?,
+        i64_bytes(c.subsegments.iter().flatten().copied().collect())?,
         i64_bytes(c.triangles.iter().flatten().copied().collect())?,
-        i64_bytes(c.triangle_facet)?, c.pairs_tested))
+        i64_bytes(c.triangle_facet)?,
+        i64_bytes(c.open_subsegments.iter().flatten().copied().collect())?, c.pairs_tested))
 }
 
 #[pymodule]

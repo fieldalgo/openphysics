@@ -34,6 +34,8 @@ struct Tri<'a> {
     pts: &'a [P3],
     axis: usize,
     tris: Vec<[u32; 3]>, // counter-clockwise in the projection; ghosts as (a, b, GHOST)
+    points: Vec<u32>,
+    constraints: HashSet<(u32, u32)>,
 }
 
 impl<'a> Tri<'a> {
@@ -96,9 +98,15 @@ impl<'a> Tri<'a> {
         self.tris.iter().any(|t| has_edge(t, a, b) || has_edge(t, b, a))
     }
 
-    /// Inserts the constraint a-b, which crosses no point (checked beforehand).
+    /// Inserts the constraint a-b. It may not pass through a point or cross another
+    /// constraint: callers split edges at the points on them, and crossings are input
+    /// errors found before triangulating.
     fn insert_edge(&mut self, a: u32, b: u32) -> Result<(), String> {
+        if let Some(&v) = self.points.iter().find(|&&v| v != a && v != b && self.orient(a, b, v) == 0 && strictly_between(self, a, b, v)) {
+            return Err(format!("constraint {a}-{b} passes through point {v}"));
+        }
         if self.has_edge(a, b) {
+            self.constraints.insert((a.min(b), a.max(b)));
             return Ok(());
         }
         // triangles whose interior the open segment a-b crosses: those with an edge it
@@ -116,6 +124,16 @@ impl<'a> Tri<'a> {
             .collect();
         if crossed.is_empty() {
             return Err(format!("constraint {a}-{b} crosses no triangle and is not an edge"));
+        }
+        for &t in &crossed {
+            for (u, v) in edges(&self.tris[t]) {
+                if self.constraints.contains(&(u.min(v), u.max(v)))
+                    && self.orient(a, b, u) * self.orient(a, b, v) < 0
+                    && self.orient(u, v, a) * self.orient(u, v, b) < 0
+                {
+                    return Err(format!("constraints {a}-{b} and {u}-{v} cross"));
+                }
+            }
         }
         // boundary of the removed region, as directed edges in counter-clockwise order
         let mut count: HashMap<(u32, u32), i32> = HashMap::new();
@@ -153,6 +171,7 @@ impl<'a> Tri<'a> {
         self.fill(a, b, &above, &mut fill);
         tris.extend(fill);
         self.tris = tris;
+        self.constraints.insert((a.min(b), a.max(b)));
         Ok(())
     }
 
@@ -199,23 +218,68 @@ fn loop_orientation(pts: &[P3], axis: usize, lp: &[u32]) -> i8 {
     pr::polygon_area_sign(&coords)
 }
 
-/// Constrained Delaunay triangulation of the facet bounded by `loops`.
-pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
-    if loops.is_empty() {
-        return Err("a facet needs at least one loop".into());
+/// Why an input is refused: the message, and the witness type of the import validity
+/// rule (lab protocol section 4) when the refusal is one: 1 a coordinate outside the
+/// kernel's range, 2 a repeated vertex in a facet, 3 a degenerate, non-planar or
+/// non-simple facet, 4 two facets with the same vertices, 5 two cells whose intersection
+/// is not a union of cells, 0 no facets. `None` for malformed arrays (an index that
+/// does not exist, coincident points).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputError {
+    pub witness: Option<u8>,
+    pub msg: String,
+}
+
+impl InputError {
+    pub fn new(witness: Option<u8>, msg: impl Into<String>) -> Self {
+        InputError { witness, msg: msg.into() }
     }
-    crate::delaunay::check_input(pts).map_err(|e| e.to_string())?;
+}
+
+impl std::fmt::Display for InputError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.msg)
+    }
+}
+
+/// The kernel's range check, as witness type 1 (too many points is not a witness).
+pub(crate) fn check_points(pts: &[P3]) -> Result<(), InputError> {
+    crate::delaunay::check_input(pts).map_err(|e| {
+        let w = matches!(e, crate::delaunay::Error::Domain(_)).then_some(1);
+        InputError::new(w, e.to_string())
+    })
+}
+
+/// Constrained Delaunay triangulation of the facet bounded by `loops`.
+pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, InputError> {
+    triangulate_with(pts, loops, &[], &[])
+}
+
+/// Constrained Delaunay triangulation of the facet bounded by `loops`, with more points
+/// of its plane (`extra_points`) and more constraint edges between them
+/// (`extra_edges`), as a PLC needs for the vertices and edges that lie on a facet. Loop
+/// edges are split at the extra points on them; only loop edges bound the facet (even-odd),
+/// so extra points and edges outside it change nothing inside. Extra edges may not pass
+/// through a point or cross each other or a loop edge.
+pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], extra_edges: &[(u32, u32)])
+                        -> Result<Facet, InputError> {
+    let malformed = |m: String| InputError::new(None, m);
+    let bad = |w: u8, m: String| InputError::new(Some(w), m);
+    if loops.is_empty() {
+        return Err(malformed("a facet needs at least one loop".into()));
+    }
+    check_points(pts)?;
     let mut seen = HashSet::new();
     for (l, lp) in loops.iter().enumerate() {
         if lp.len() < 3 {
-            return Err(format!("loop {l} has fewer than 3 points"));
+            return Err(bad(3, format!("loop {l} has fewer than 3 points")));
         }
         for &v in lp {
             if v as usize >= pts.len() {
-                return Err(format!("loop {l} refers to point {v}, which does not exist"));
+                return Err(malformed(format!("loop {l} refers to point {v}, which does not exist")));
             }
             if !seen.insert(v) {
-                return Err(format!("point {v} appears twice in the facet's loops"));
+                return Err(bad(2, format!("point {v} appears twice in the facet's loops")));
             }
         }
     }
@@ -225,13 +289,13 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
     let pa = &pts[a as usize];
     let pb = &pts[b as usize];
     let c = *outer.iter().find(|&&v| !pr::collinear(pa, pb, &pts[v as usize]))
-        .ok_or("the facet's outer loop is collinear")?;
+        .ok_or_else(|| bad(3, "the facet's outer loop is collinear".into()))?;
     let pc = &pts[c as usize];
     let mut cnt = pr::Counters::default();
     for lp in loops {
         for &v in lp {
             if pr::orient3d(pa, pb, pc, &pts[v as usize], &mut cnt) != 0 {
-                return Err(format!("point {v} is not in the facet's plane"));
+                return Err(bad(3, format!("point {v} is not in the facet's plane")));
             }
         }
     }
@@ -244,9 +308,9 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
     };
     let axis = (0..3).filter(|&k| signs[k] != 0)
         .max_by(|&x, &y| approx[x].total_cmp(&approx[y]))
-        .ok_or("the facet's normal is zero")?;
+        .ok_or_else(|| bad(3, "the facet's normal is zero".into()))?;
 
-    let mut t = Tri { pts, axis, tris: Vec::new() };
+    let mut t = Tri { pts, axis, tris: Vec::new(), points: Vec::new(), constraints: HashSet::new() };
     let cons: Vec<(u32, u32)> = loops.iter()
         .flat_map(|lp| (0..lp.len()).map(move |k| (lp[k], lp[(k + 1) % lp.len()])))
         .collect();
@@ -257,26 +321,71 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
             let (p, q) = cons[x];
             let (r, s) = cons[y];
             if segments_meet(&t, p, q, r, s) {
-                return Err(format!("loop edges {p}-{q} and {r}-{s} intersect"));
+                return Err(bad(3, format!("loop edges {p}-{q} and {r}-{s} intersect")));
             }
         }
     }
 
-    // Delaunay triangulation of the loop points
-    let order: Vec<u32> = loops.iter().flatten().copied().collect();
+    // the extra points must lie on the plane too
+    let mut extras: Vec<u32> = Vec::new();
+    for &v in extra_points {
+        if v as usize >= pts.len() {
+            return Err(malformed(format!("extra point {v} does not exist")));
+        }
+        if seen.contains(&v) || extras.contains(&v) {
+            continue;
+        }
+        if pr::orient3d(pa, pb, pc, &pts[v as usize], &mut cnt) != 0 {
+            return Err(malformed(format!("extra point {v} is not in the facet's plane")));
+        }
+        extras.push(v);
+    }
+    // loop edges split at the extra points on them: the boundary pieces
+    let mut boundary: Vec<(u32, u32)> = Vec::new();
+    let (i, j) = pr::kept_axes(axis);
+    for &(p, q) in &cons {
+        let mut on: Vec<u32> = extras.iter().copied()
+            .filter(|&v| t.orient(p, q, v) == 0 && strictly_between(&t, p, q, v)).collect();
+        let k = if pts[p as usize][i] != pts[q as usize][i] { i } else { j };
+        let up = pts[q as usize][k] > pts[p as usize][k];
+        on.sort_by(|&x, &y| {
+            let o = pts[x as usize][k].total_cmp(&pts[y as usize][k]);
+            if up { o } else { o.reverse() }
+        });
+        let mut prev = p;
+        for v in on {
+            boundary.push((prev, v));
+            prev = v;
+        }
+        boundary.push((prev, q));
+    }
+    for &(p, q) in extra_edges {
+        for v in [p, q] {
+            if !seen.contains(&v) && !extras.contains(&v) {
+                return Err(malformed(format!("extra edge {p}-{q} ends at point {v}, which is not a facet point")));
+            }
+        }
+    }
+
+    // Delaunay triangulation of all the facet's points
+    let order: Vec<u32> = loops.iter().flatten().copied().chain(extras.iter().copied()).collect();
+    t.points = order.clone();
     let (x, y, z) = (a, b, c);
     let (y, z) = if t.orient(x, y, z) > 0 { (y, z) } else { (z, y) };
     t.tris = vec![[x, y, z], [y, x, GHOST], [z, y, GHOST], [x, z, GHOST]];
     for &v in &order {
         if v != x && v != y && v != z {
-            t.insert(v)?;
+            t.insert(v).map_err(|m| bad(3, m))?;
         }
     }
-    for &(p, q) in &cons {
-        t.insert_edge(p, q)?;
+    for &(p, q) in &boundary {
+        t.insert_edge(p, q).map_err(|m| bad(3, m))?;
     }
-    // even-odd labelling from the outside
-    let constraint: HashSet<(u32, u32)> = cons.iter().map(|&(p, q)| (p.min(q), p.max(q))).collect();
+    for &(p, q) in extra_edges {
+        t.insert_edge(p, q).map_err(|m| bad(5, m))?;
+    }
+    // even-odd labelling from the outside: only the boundary pieces count
+    let constraint: HashSet<(u32, u32)> = boundary.iter().map(|&(p, q)| (p.min(q), p.max(q))).collect();
     let mut by_edge: HashMap<(u32, u32), usize> = HashMap::new();
     for (k, tri) in t.tris.iter().enumerate() {
         for (u, v) in edges(tri) {
@@ -296,7 +405,7 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
                     parity[n] = p;
                     stack.push(n);
                 } else if parity[n] != p {
-                    return Err("the loops do not bound a consistent region (even-odd labelling conflict)".into());
+                    return Err(bad(3, "the loops do not bound a consistent region (even-odd labelling conflict)".into()));
                 }
             }
         }
@@ -307,7 +416,7 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, String> {
         .map(|(tri, _)| if flip { [tri[0], tri[2], tri[1]] } else { *tri })
         .collect();
     if triangles.is_empty() {
-        return Err("the facet has no area".into());
+        return Err(bad(3, "the facet has no area".into()));
     }
     Ok(Facet { triangles, axis })
 }
@@ -335,6 +444,13 @@ fn segments_meet(t: &Tri, p: u32, q: u32, r: u32, s: u32) -> bool {
         return on_segment(t, p, q, r) || on_segment(t, p, q, s) || on_segment(t, r, s, p) || on_segment(t, r, s, q);
     }
     o1 * o2 <= 0 && o3 * o4 <= 0
+}
+
+/// For c collinear with a-b: true when c lies strictly between a and b.
+fn strictly_between(t: &Tri, a: u32, b: u32, c: u32) -> bool {
+    let (pa, pb, pc) = (axis_coords(t, a), axis_coords(t, b), axis_coords(t, c));
+    let k = if pa[0] != pb[0] { 0 } else { 1 };
+    pc[k] > pa[k].min(pb[k]) && pc[k] < pa[k].max(pb[k])
 }
 
 fn axis_coords(t: &Tri, v: u32) -> [f64; 2] {
@@ -376,8 +492,8 @@ mod tests {
     #[test]
     fn non_planar_and_crossing_loops_are_refused() {
         let pts = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 1e-3]];
-        assert!(triangulate(&pts, &[vec![0, 1, 2, 3]]).unwrap_err().contains("plane"));
+        assert!(triangulate(&pts, &[vec![0, 1, 2, 3]]).unwrap_err().msg.contains("plane"));
         let bow = vec![[0.0, 0.0, 0.0], [1.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
-        assert!(triangulate(&bow, &[vec![0, 1, 2, 3]]).unwrap_err().contains("intersect"));
+        assert!(triangulate(&bow, &[vec![0, 1, 2, 3]]).unwrap_err().msg.contains("intersect"));
     }
 }

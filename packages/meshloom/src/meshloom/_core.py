@@ -112,23 +112,51 @@ def triangulate_facet(points, loops) -> tuple[np.ndarray, int]:
     return np.frombuffer(tris, dtype="<i8").reshape(-1, 3).astype(np.int64), axis
 
 
+class InvalidPLC(ValueError):
+    """A refused PLC. ``witness_type`` is the type of the import validity rule the
+    refusal is a witness of (0 no facets, 1 a coordinate outside the kernel's range,
+    2 a repeated vertex in a facet, 3 a degenerate, non-planar or non-simple facet,
+    4 two facets with the same vertices, 5 two cells whose intersection is not a union
+    of cells), or ``None`` for malformed arrays (an index that does not exist,
+    coincident points)."""
+
+    def __init__(self, message: str, witness_type: int | None):
+        super().__init__(message)
+        self.witness_type = witness_type
+
+
 def check_plc(points, segments, facets) -> dict:
     """Exact validity check of a piecewise linear complex.
 
     ``segments`` (m, 2) and ``facets`` (a list of facets, each a list of loops of point
-    indices, outer loop first) describe the PLC; every loop edge is a segment. Valid
-    means: distinct points, exactly planar facets with simple loops, and no two pieces
-    meeting except in a shared point or along a shared segment (a segment may run along
-    a facet's boundary, never through its inside). Raises ``ValueError`` naming the
-    first violation; returns the segments, the facet triangles, the facet of each
-    triangle and the number of candidate pairs tested.
+    indices, outer loop first) describe the PLC; every loop edge is an edge too. Valid
+    means: distinct points in the kernel's range, exactly planar facets with simple
+    loops, and every two cells (points, edges, facets) meeting in a union of cells. So
+    a point may lie inside an edge or a facet (a T-junction), an edge inside a facet,
+    and a facet inside a coplanar facet; crossings, piercings, partial collinear
+    overlaps and coplanar overlaps that no cell of both covers are refused.
+
+    Raises ``InvalidPLC`` naming the first violation. Returns the edges, the elementary
+    sub-segments (edges split at the points on them), the facet triangles (each facet
+    triangulated with the points and sub-segments on it) with the facet of each, the
+    sub-segments on the boundary of an odd number of facets (empty when the PLC is
+    closed) and the number of candidate pairs tested.
     """
     kernel = _require()
     p = _points(points)
     s = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
-    seg, tris, owner, pairs = kernel.check_plc(p.tobytes(), s.tobytes(), f)
-    return {"segments": np.frombuffer(seg, dtype="<i8").reshape(-1, 2).astype(np.int64),
+    try:
+        seg, sub, tris, owner, opened, pairs = kernel.check_plc(p.tobytes(), s.tobytes(), f)
+    except ValueError as e:
+        if len(e.args) == 2:
+            raise InvalidPLC(*e.args) from None
+        raise
+
+    def pairs_of(b):
+        return np.frombuffer(b, dtype="<i8").reshape(-1, 2).astype(np.int64)
+
+    return {"segments": pairs_of(seg), "subsegments": pairs_of(sub),
             "triangles": np.frombuffer(tris, dtype="<i8").reshape(-1, 3).astype(np.int64),
             "triangle_facet": np.frombuffer(owner, dtype="<i8").astype(np.int64),
-            "pairs_tested": pairs}
+            "open_subsegments": pairs_of(opened), "pairs_tested": pairs}
