@@ -62,7 +62,9 @@ names may change before the mesher's public API.
   inside a coplanar facet; crossings, piercings, partial collinear overlaps and
   coplanar overlaps that no common cell covers are refused. The first violation is
   named in an `InvalidPLC` (a `ValueError`) with the witness type of the import
-  validity rule. It also returns the edges split at the points on them and the pieces
+  validity rule and a witness that can be checked independently: the vertex, the
+  facet or facets, and for crossings an exact rational point in both cells that lies
+  in no cell contained in both. It also returns the edges split at the points on them and the pieces
   on the boundary of an odd number of facets (none when the surface is closed).
 
 ```python

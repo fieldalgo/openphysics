@@ -227,8 +227,32 @@ fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Boun
         .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
         .collect::<PyResult<_>>()?;
     let plc = plc::Plc { points, segments, facets };
-    // a refusal carries (message, witness type or None)
-    let c = py.detach(move || plc::check(&plc)).map_err(|e| PyValueError::new_err((e.msg, e.witness)))?;
+    // a refusal carries (message, witness type or None, detail kind, detail indices)
+    let c = py.detach(move || plc::check(&plc)).map_err(|e| {
+        use facet::{At, Detail};
+        let (kind, ids): (&str, Vec<i64>) = match &e.detail {
+            Detail::None => ("", vec![]),
+            Detail::NoFacets => ("no facets", vec![]),
+            Detail::Vertex(i) => ("vertex", vec![*i as i64]),
+            Detail::Facet(f) => ("facet", vec![*f as i64]),
+            Detail::Facets(f, g) => ("facets", vec![*f as i64, *g as i64]),
+            Detail::Point { cells: (f, g), at } => {
+                let (kind, pieces): (&str, Vec<u32>) = match at {
+                    At::Centroid(v) => ("centroid", v.clone()),
+                    At::SegSeg(a, b) => ("segseg", a.iter().chain(b).copied().collect()),
+                    At::SegTri(a, b) => ("segtri", a.iter().chain(b).copied().collect()),
+                    At::TriTri(a, b) => ("tritri", a.iter().chain(b).copied().collect()),
+                };
+                // each cell as two numbers: (-1, facet) or a free segment's ends
+                let cell = |c: &facet::CellRef| match c {
+                    facet::CellRef::Facet(f) => [-1, *f as i64],
+                    facet::CellRef::Segment([u, v]) => [*u as i64, *v as i64],
+                };
+                (kind, cell(f).into_iter().chain(cell(g)).chain(pieces.iter().map(|&x| x as i64)).collect())
+            }
+        };
+        PyValueError::new_err((e.msg, e.witness, kind, ids))
+    })?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
             for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {

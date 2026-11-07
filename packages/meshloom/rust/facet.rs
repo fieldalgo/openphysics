@@ -228,11 +228,51 @@ fn loop_orientation(pts: &[P3], axis: usize, lp: &[u32]) -> i8 {
 pub struct InputError {
     pub witness: Option<u8>,
     pub msg: String,
+    /// What the witness names, for a checker to confirm it.
+    pub detail: Detail,
+}
+
+/// The cells a refusal names. Points of type 5 are given by the pieces whose exact
+/// intersection holds them, so that they stay exact rationals.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Detail {
+    #[default]
+    None,
+    NoFacets,
+    Vertex(u32),
+    Facet(u32),
+    /// Two facets (type 4, or type 5 with `at`).
+    Facets(u32, u32),
+    /// Type 5: two cells (facets when the cells lie in facets) and the pieces in whose
+    /// intersection the witness point lies.
+    Point { cells: (CellRef, CellRef), at: At },
+}
+
+/// A cell named by a witness: a facet, or a free segment by its end points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellRef {
+    Facet(u32),
+    Segment([u32; 2]),
+}
+
+/// Where a type-5 witness point lies: the centroid of a piece shared by the two facets
+/// without a cell of both covering it, or in the intersection of two crossing pieces.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum At {
+    Centroid(Vec<u32>),
+    SegSeg([u32; 2], [u32; 2]),
+    SegTri([u32; 2], [u32; 3]),
+    TriTri([u32; 3], [u32; 3]),
 }
 
 impl InputError {
     pub fn new(witness: Option<u8>, msg: impl Into<String>) -> Self {
-        InputError { witness, msg: msg.into() }
+        InputError { witness, msg: msg.into(), detail: Detail::None }
+    }
+
+    pub fn with(mut self, detail: Detail) -> Self {
+        self.detail = detail;
+        self
     }
 }
 
@@ -244,9 +284,9 @@ impl std::fmt::Display for InputError {
 
 /// The kernel's range check, as witness type 1 (too many points is not a witness).
 pub(crate) fn check_points(pts: &[P3]) -> Result<(), InputError> {
-    crate::delaunay::check_input(pts).map_err(|e| {
-        let w = matches!(e, crate::delaunay::Error::Domain(_)).then_some(1);
-        InputError::new(w, e.to_string())
+    crate::delaunay::check_input(pts).map_err(|e| match e {
+        crate::delaunay::Error::Domain(i) => InputError::new(Some(1), e.to_string()).with(Detail::Vertex(i as u32)),
+        _ => InputError::new(None, e.to_string()),
     })
 }
 
