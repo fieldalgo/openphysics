@@ -29,7 +29,8 @@ import anyio
 import numpy as np
 from fastapi.concurrency import run_in_threadpool
 from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult,
-                     TransientThermalRunResult, check_mesh_limits, has_region_geometry, region_complexity)
+                     TransientThermalRunResult, check_mesh_limits, has_region_geometry, region_complexity,
+                     void_area_m2)
 
 from . import thermal_api as common
 from . import transient_thermal_api as transient
@@ -347,7 +348,6 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
         # one side to the other: within 1e-2 of the void area either way (a 16-gon leaves
         # 2.5e-2 of a disc; the mesher's circles have at least 16 vertices and the hand-off's
         # count grows with the mesh size).
-        from simcase.thermal_regions import void_area_m2
         void = void_area_m2(doc)
     low = expected - void
     _require(math.isfinite(expected) and low > 0 and abs(total-low) <= 1e-2*void + 1e-9*expected,
