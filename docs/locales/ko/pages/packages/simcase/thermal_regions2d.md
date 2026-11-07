@@ -153,6 +153,32 @@ meshine이 여전히 처리하지 못하는 입력은 계속 돌지 않고 오�
 thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_outward - reaction)`,
 절점 열량은 모두 깊이당 W/m입니다.
 
+## 축대칭 문서
+
+[버전 1 형상 블록](geometry_document.md)에 `axisymmetric` 구성 요소가 있는 `thermal.steady2d` 영역 문서는 회전체입니다.
+구성 요소의 (x, y)는 (r, z), `domain.xmin`은 안쪽 반지름(속이 찬 물체는 `0`)이고 피처·재료·열원은 같은 방식으로
+적용됩니다. 메시는 [2단계 엔진](geometry_engine.md)이 (r, z)로 만들고, galerkin의
+[축대칭 측도](../galerkin/thermal_axisymmetric.md)(`coordinate_system="axisymmetric"`, 부피 측도 `2πr dr dz`)로 풉니다.
+
+- **변.** `xmin == 0`이면 r = 0 변은 메시 태그 `axis`이며 대칭축입니다. 자연 정칙성을 가지므로
+  `dirichlet_temperature_k`·`outward_flux_w_m2`·`convection` 항목을 받지 않습니다(이름 밝혀 거부; 그런 도메인에 없는
+  `left`도 거부). 물리적 변은 `right`(바깥 반지름)·`bottom`·`top`입니다. 환형(`xmin > 0`)은 `left`를 안쪽 반지름으로
+  유지합니다.
+- **결과.** 실행은 `AxisymmetricRegionThermalRunResult`를 돌려주며 식별자는 `thermal.axisymmetric-regions-result-v1`과
+  `thermal-axisymmetric-p1-node-cell-regions-v1`입니다. 절점 열량은 **전체 회전의 전력 W**이고 필드 이름은 `load_w`·
+  `reaction_w`·`residual_w`·`prescribed_outward_load_w`·`ambient_load_w`·`convective_outward_w`·`system_rhs_w`입니다.
+  요약의 진단은 `_w`로 끝나고(`source_heat_w`·`outward_heat_w` 등) `coordinate_system: "axisymmetric"`·
+  `nodal_heat_rate_unit: "W"`를 기록합니다. 온도(K)·열유속(W/m²)·삼각형 영역·넓이(`area_m2`, 자오면 단면)는 Cartesian
+  실행과 같습니다. Cartesian 식별자와 `_w_per_m` 이름은 이런 결과에 쓰지 않습니다.
+- **받지 않는 곳.** 도파관 러너(물리가 네 변을 요구), 과도 영역 러너(과도 솔버는 Cartesian), Studio(축대칭 payload 없음)는
+  축대칭 구성 요소를 이름 밝혀 거부합니다.
+
+검사 G4-1~G4-5(`tests/simcase/test_thermal_axisymmetric_regions.py`, 2026-11-07 HQ 작업 기록에 사전 등록, 같은 날 Linux·
+Python 3.12 고정 환경에서 측정): 균일 가열 속찬 원통(반지름 3 mm, 메시 0.1 mm)이 모든 절점에서 정확한 포물선
+`Q (R² − r²) / (4k)`와 축 상승의 2e-3 이내로 일치하고 `Q π R² L`을 1e-9 이내로 흡수하며 열 균형 결함 1e-10 이내; 전도 껍질
+속 가열 코어가 해석적 축·경계면 상승과 2e-3 이내; 열원 없는 환형이 중간 반지름에서 온도 차의 1e-3 이내로 대수 전도;
+축·left 거부, 다른 러너·Studio 거부, 결과 식별자·필드 이름.
+
 ## 검증
 
 `tests/simcase/test_thermal_regions.py`, 비교 전에 고정한 기준:

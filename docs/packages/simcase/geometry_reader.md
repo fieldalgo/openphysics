@@ -116,7 +116,7 @@ keeping the etch line and selections naming it and the rib walls.
   refuses them by name. A 2D region component (`path`, merged regions, void,
   `imprint`, `segment` included) stays in the document as written and is read
   through `doc.domain`, `doc.background` and `doc.regions()`; an axisymmetric
-  component loads but no runner takes it yet. A homogeneous rectangle and a
+  component runs in steady region heat only. A homogeneous rectangle and a
   box-only 3D component are compiled to the 0.2 form.
 - Supply design velocities (stage 4).
 

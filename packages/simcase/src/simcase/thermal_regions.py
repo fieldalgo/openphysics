@@ -22,6 +22,10 @@ from .thermal import PHYSICS, ThermalRunResult, _number, _object
 RESULT_FORMAT = 'thermal.steady2d-regions-result-v1'
 FIELD_LAYOUT = 'thermal2d-p1-node-cell-regions-v1'
 SIDES = ('left', 'right', 'bottom', 'top')
+#: the result identifiers of an axisymmetric run: full-revolution rates in W, never the
+#: Cartesian per-metre identifiers (galerkin docs/packages/galerkin/thermal_axisymmetric.md)
+AXISYMMETRIC_RESULT_FORMAT = 'thermal.axisymmetric-regions-result-v1'
+AXISYMMETRIC_FIELD_LAYOUT = 'thermal-axisymmetric-p1-node-cell-regions-v1'
 MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'source'}
 BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
                    'convective_outward_w_per_m', 'system_rhs_w_per_m')
@@ -99,10 +103,28 @@ def _shape(s, i, names):
             _number(s[key], f'{where}.{key}', positive=key in ('w', 'h', 'r'))
 
 
-def _sides(p, name):
+def is_axisymmetric(doc):
+    """A version 1 document whose component is axisymmetric: its mesh is (r, z)."""
+    return bool(getattr(doc, 'is_version_1', False)) and doc.component.dimension == 'axisymmetric'
+
+
+def exterior_sides(doc):
+    """The mesh tags of the domain sides of this document, and those that may carry data.
+
+    A 2D document has the four sides. An axisymmetric document whose domain starts at
+    r = 0 has ``axis`` in place of ``left``; the axis is the symmetry axis, which carries
+    natural regularity and no Dirichlet, flux or convection data (galerkin rejects them),
+    so it is a side of the mesh but not a side a document may name. An annulus (xmin > 0)
+    keeps ``left`` as a physical side."""
+    if is_axisymmetric(doc) and doc.domain['xmin'] == 0:
+        return ('axis', 'right', 'bottom', 'top'), ('right', 'bottom', 'top')
+    return SIDES, SIDES
+
+
+def _sides(p, name, allowed=SIDES):
     path = f'physics.{name}'
     bc = p.get('dirichlet_temperature_k', {})
-    _object(bc, set(SIDES), path+'.dirichlet_temperature_k')
+    _named_sides(bc, set(allowed), path+'.dirichlet_temperature_k')
     for tag, value in bc.items():
         _number(value, f'{path}.dirichlet_temperature_k.{tag}', nonnegative=True)
     for a in ('left', 'right'):
@@ -110,11 +132,11 @@ def _sides(p, name):
             if a in bc and b in bc and bc[a] != bc[b]:
                 raise DocumentError(f'{path}.dirichlet_temperature_k: conflicting corner temperatures on {a}/{b}')
     flux = p.get('outward_flux_w_m2', {})
-    _object(flux, set(SIDES), path+'.outward_flux_w_m2')
+    _named_sides(flux, set(allowed), path+'.outward_flux_w_m2')
     for tag, value in flux.items():
         _number(value, f'{path}.outward_flux_w_m2.{tag}')
     robin = p.get('convection', {})
-    _object(robin, set(SIDES), path+'.convection')
+    _named_sides(robin, set(allowed), path+'.convection')
     anchored = False
     for tag, value in robin.items():
         where = f'{path}.convection.{tag}'
@@ -251,6 +273,17 @@ def region_source(p, names, path):
         _number(source, f'{path}.heat_source_w_m3')
 
 
+def _named_sides(value, allowed, path):
+    """``_object`` over the sides a document may name; the axis is refused by name."""
+    if isinstance(value, dict) and 'axis' in value and 'axis' not in allowed:
+        raise DocumentError(f"{path}.axis: 'axis' is the symmetry axis of an axisymmetric component; it carries "
+                            "natural regularity and takes no Dirichlet, flux or convection data")
+    if isinstance(value, dict) and 'left' in value and 'left' not in allowed:
+        raise DocumentError(f"{path}.left: an axisymmetric component whose domain starts at r = 0 has no left "
+                            "side; its r = 0 side is the axis")
+    _object(value, allowed, path)
+
+
 def region_mesh_settings(doc):
     mesh = doc.data['mesh']
     _object(mesh, {'size', 'min_angle', 'controls'}, 'mesh')   # controls: Document.check_mesh_controls
@@ -282,7 +315,7 @@ def validate_region_thermal(doc):
     names = region_geometry(doc)
     region_materials_table(doc, ('conductivity_w_mk',), 'steady heat')
     region_source(p, names, path)
-    _sides(p, name)
+    _sides(p, name, exterior_sides(doc)[1])
     region_mesh_settings(doc)
     if d['study'] != {'type': 'single'}:
         raise DocumentError('thermal.steady2d supports only study {"type":"single"}')
@@ -304,9 +337,10 @@ def region_summary(doc):
         lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"]}')
     for mname, spec in doc['materials'].items():
         lines.append(f'  material {mname}: k={spec.get("conductivity_w_mk")} W/(m K)')
+    rate = 'W (full revolution; axisymmetric (r, z))' if is_axisymmetric(doc) else 'W/m of depth'
     lines += [f'  Q={p["heat_source_w_m3"]} W/m^3',
               f'  Dirichlet {p.get("dirichlet_temperature_k", {})} K; other exterior insulated unless flux/convection given',
-              '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth, triangle regions']
+              f'  output: coordinates m, temperature K, flux W/m^2, nodal heat {rate}, triangle regions']
     return '\n'.join(lines)
 
 
@@ -333,9 +367,9 @@ def build_region_mesh(doc, limits=None):
                      if note.startswith(('geometry.', 'mesh.controls:')) and note not in doc.notes)
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
-    unknown = set(tri.boundary_edges)-set(SIDES)
-    if unknown or set(tri.boundary_edges) != set(SIDES):
-        raise DocumentError(f'mesh: exterior edges must all lie on the four domain sides; found tags '
+    sides = set(exterior_sides(doc)[0])
+    if set(tri.boundary_edges) != sides:
+        raise DocumentError(f'mesh: exterior edges must all lie on the domain sides {sorted(sides)}; found tags '
                             f'{sorted(tri.boundary_edges)}')
     if limits is not None:
         from .mesh_limits import MeshLimitError
@@ -410,6 +444,14 @@ def region_inputs(doc, mesh, region_materials):
                   for tag, v in p.get('convection', {}).items()}
     return dict(conductivity=conductivity, dirichlet=dict(sorted(prescribed.items())),
                 heat_source=source, outward_flux=flux, convection=convection)
+
+
+RATE_FIELDS = ('load_w_per_m', 'reaction_w_per_m', 'residual_w_per_m') + BOUNDARY_FIELDS
+
+
+def _axisymmetric_name(key):
+    """The field name of a full-revolution rate: ``load_w_per_m`` becomes ``load_w``."""
+    return key[:-len('_per_m')] if key.endswith('_w_per_m') else key
 
 
 class RegionThermalRunResult(ThermalRunResult):
@@ -496,6 +538,53 @@ class RegionThermalRunResult(ThermalRunResult):
         return result
 
 
+class AxisymmetricRegionThermalRunResult(RegionThermalRunResult):
+    """The result of an axisymmetric run: the same arrays with the nodal rates in W over the
+    full revolution, under their own result identifiers and ``_w`` field names. The inherited
+    ``_w_per_m`` properties return the same arrays (the public read path of ThermalRunResult);
+    the saved fields and the summary carry the ``_w`` names and the unit W only."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._result_format, self._field_layout = AXISYMMETRIC_RESULT_FORMAT, AXISYMMETRIC_FIELD_LAYOUT
+
+    @property
+    def load_w(self): return self.solution.load
+
+    @property
+    def reaction_w(self): return self.solution.reaction
+
+    @property
+    def residual_w(self): return self.solution.residual
+
+    @property
+    def prescribed_outward_load_w(self): return self.solution.prescribed_outward_load
+
+    @property
+    def ambient_load_w(self): return self.solution.ambient_load
+
+    @property
+    def convective_outward_w(self): return self.solution.convective_outward
+
+    @property
+    def system_rhs_w(self): return self.solution.system_rhs
+
+    def _raw_arrays(self):
+        arrays = super()._raw_arrays()
+        return {_axisymmetric_name(key): a for key, a in arrays.items()}
+
+    def summary(self):
+        result = super().summary()
+        for table in ('field_units', 'field_locations'):
+            result[table] = {_axisymmetric_name(key): ('W' if key in RATE_FIELDS and table == 'field_units' else v)
+                             for key, v in result[table].items()}
+        result['coordinate_system'] = 'axisymmetric'
+        result['nodal_heat_rate_unit'] = 'W'
+        result['coordinates'] = '(r, z) in metres; volume measure 2*pi*r dr dz, full revolution'
+        json.dumps(result, allow_nan=False)
+        return result
+
+
 def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     from galerkin.thermal import solve_steady_heat
     doc.validate()
@@ -509,9 +598,10 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     kwargs = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
     calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    axisymmetric = is_axisymmetric(doc)
     t0 = time.perf_counter()
     try:
-        solution = solve_steady_heat(mesh, **kwargs)
+        solution = solve_steady_heat(mesh, **kwargs, coordinate_system='axisymmetric' if axisymmetric else 'cartesian')
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
@@ -524,26 +614,28 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     scale = max(float(sum(np.sum(abs(a)) for a in (solution.load, solution.reaction, G, C))),
                 np.finfo(float).tiny)
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
-    diagnostics = {'source_heat_w_per_m': source_heat,
-                   'prescribed_outward_heat_w_per_m': float(G.sum()),
-                   'convective_outward_heat_w_per_m': float(C.sum()),
-                   'thermostat_outward_heat_w_per_m': -float(solution.reaction.sum()),
-                   'outward_heat_w_per_m': outward,
-                   'heat_balance_defect_w_per_m': outward-source_heat,
+    rate = 'w' if axisymmetric else 'w_per_m'
+    diagnostics = {f'source_heat_{rate}': source_heat,
+                   f'prescribed_outward_heat_{rate}': float(G.sum()),
+                   f'convective_outward_heat_{rate}': float(C.sum()),
+                   f'thermostat_outward_heat_{rate}': -float(solution.reaction.sum()),
+                   f'outward_heat_{rate}': outward,
+                   f'heat_balance_defect_{rate}': outward-source_heat,
                    'normalized_heat_balance_defect': abs(outward-source_heat)/scale,
-                   'free_residual_max_w_per_m': float(np.max(abs(solution.residual[free]))) if len(free) else 0.,
+                   f'free_residual_max_{rate}': float(np.max(abs(solution.residual[free]))) if len(free) else 0.,
                    'mesh_min_angle_deg': float(tri.min_angle())}
     log = [region_summary(doc),
            f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
            *([f'shapes fully covered by later shapes (no triangles): {covered_shapes(doc, mesh)}']
              if covered_shapes(doc, mesh) else []),
            f'temperature K: {solution.temperature.min():.12g} to {solution.temperature.max():.12g}',
-           f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
+           (f'source {source_heat:.12g} W; signed outward {outward:.12g} W (full revolution)' if axisymmetric
+            else f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth')]
     if verbose:
         print('\n'.join(log))
-    result = RegionThermalRunResult(doc, mesh, solution, fixed,
-                                    np.array([kwargs['dirichlet'][int(i)] for i in fixed], dtype=float),
-                                    diagnostics, {'mesh': t_mesh, 'solve': t_solve}, log)
+    cls = AxisymmetricRegionThermalRunResult if axisymmetric else RegionThermalRunResult
+    result = cls(doc, mesh, solution, fixed, np.array([kwargs['dirichlet'][int(i)] for i in fixed], dtype=float),
+                 diagnostics, {'mesh': t_mesh, 'solve': t_solve}, log)
     result.region_materials = region_materials
     result.summary()
     return result

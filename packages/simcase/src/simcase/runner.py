@@ -120,8 +120,9 @@ def build_mesh(doc: Document) -> MeshedModel:
     sides = {"left", "right", "bottom", "top"}
     if not sides <= tags or (tags != sides and canonical.geometry_model is not None):
         raise DocumentError(f"mesh: this runner takes exterior edges on the four domain sides only; found tags "
-                            f"{sorted(tags)}. A boundary_tags entry that renames a side, a void region and a sliver "
-                            "gap give other tags, which no physics here accepts yet")
+                            f"{sorted(tags)}. A boundary_tags entry that renames a side, a void region, a sliver "
+                            "gap and an axisymmetric component's axis give other tags, which no physics here "
+                            "accepts yet")
     tri = dataclasses.replace(tri_um, nodes=units.lengths_from_micrometres(tri_um.nodes, doc.scale))
     provenance = provenance_edges_of(canonical, tri_um)         # node pairs: the same in both units
     return MeshedModel(doc, tri, _solver_mesh(tri, provenance), region_materials,

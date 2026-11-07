@@ -211,6 +211,10 @@ def _accept(raw, kind, limits, rlimits, nt, tags, for_run):
             doc = Document.from_dict(raw)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
             raise common.ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
+        if getattr(doc, "is_version_1", False) and doc.component.dimension == "axisymmetric":
+            raise common.ThermalAPIError("invalid_document", "Studio shows Cartesian region results only; an "
+                                         "axisymmetric component has no Studio payload yet (run it with simcase)",
+                                         400 if for_run else 200)
         count = check_mesh_limits(doc, max_input_vertices=rlimits.max_input_vertices)
         _summary_floor(doc, limits)
         run_doc = None
