@@ -13,7 +13,7 @@
 //! there is no tolerance. Candidate pairs come from a sweep over bounding boxes. Any
 //! violation is an error naming the cells, with its witness type.
 
-use crate::facet::{self, InputError};
+use crate::facet::{self, At, CellRef, Detail, InputError};
 use crate::predicates::{self as pr, Counters, P3};
 use std::collections::{HashMap, HashSet};
 
@@ -71,16 +71,21 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
         }
     }
     if plc.facets.is_empty() {
-        return Err(bad(0, "the PLC has no facets".into()));
+        return Err(bad(0, "the PLC has no facets".into()).with(Detail::NoFacets));
     }
     let mut out = Checked::default();
     let mut seen = HashSet::new();
-    let mut add_segment = |a: u32, b: u32, what: &str| -> Result<(), InputError> {
+    let mut add_segment = |a: u32, b: u32, facet: Option<usize>| -> Result<(), InputError> {
+        let what = facet.map_or("segment".to_string(), |f| format!("facet {f} edge"));
         if a as usize >= pts.len() || b as usize >= pts.len() {
             return Err(malformed(format!("{what} {a}-{b} refers to a point that does not exist")));
         }
         if a == b {
-            return Err(bad(3, format!("{what} {a}-{b} has equal ends")));
+            // a loop that repeats a vertex (type 2); a free segment with equal ends is degenerate
+            return Err(match facet {
+                Some(f) => bad(2, format!("{what} {a}-{b} repeats a vertex")).with(Detail::Facet(f as u32)),
+                None => bad(3, format!("{what} {a}-{b} has equal ends")),
+            });
         }
         if seen.insert((a.min(b), a.max(b))) {
             out.segments.push([a.min(b), a.max(b)]);
@@ -88,20 +93,20 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
         Ok(())
     };
     for s in &plc.segments {
-        add_segment(s[0], s[1], "segment")?;
+        add_segment(s[0], s[1], None)?;
     }
     let mut vertex_sets: HashMap<Vec<u32>, usize> = HashMap::new();
     for (f, loops) in plc.facets.iter().enumerate() {
         for lp in loops {
             for k in 0..lp.len() {
-                add_segment(lp[k], lp[(k + 1) % lp.len()], &format!("facet {f} edge"))?;
+                add_segment(lp[k], lp[(k + 1) % lp.len()], Some(f))?;
             }
         }
         let mut vs: Vec<u32> = loops.iter().flatten().copied().collect();
         vs.sort_unstable();
         vs.dedup();
         if let Some(g) = vertex_sets.insert(vs, f) {
-            return Err(bad(4, format!("facets {g} and {f} have the same vertices")));
+            return Err(bad(4, format!("facets {g} and {f} have the same vertices")).with(Detail::Facets(g as u32, f as u32)));
         }
     }
     let mut n = Counters::default();
@@ -158,6 +163,35 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
     subs.sort_unstable();
     out.subsegments = subs.iter().map(|&(a, b)| [a, b]).collect();
     let edge_name = |e: u32| format!("segment {:?}", edges[e as usize]);
+    // the facets with each edge in a loop, to name type-5 witnesses by two facets
+    let mut edge_facets: Vec<Vec<u32>> = vec![Vec::new(); edges.len()];
+    {
+        let index: HashMap<(u32, u32), usize> = edges.iter().enumerate().map(|(e, &[a, b])| ((a, b), e)).collect();
+        for (f, loops) in plc.facets.iter().enumerate() {
+            for lp in loops {
+                for k in 0..lp.len() {
+                    let (a, b) = (lp[k], lp[(k + 1) % lp.len()]);
+                    let e = index[&(a.min(b), a.max(b))];
+                    if !edge_facets[e].contains(&(f as u32)) {
+                        edge_facets[e].push(f as u32);
+                    }
+                }
+            }
+        }
+    }
+    let sub_facets = |s: (u32, u32)| -> Vec<u32> {
+        let mut v: Vec<u32> = sub_edges[&s].iter().flat_map(|&e| edge_facets[e as usize].iter().copied()).collect();
+        v.sort_unstable();
+        v.dedup();
+        v
+    };
+    // two different facets, one from each list; else the cells themselves (a free
+    // segment by its ends)
+    let pick = |a: &[u32], b: &[u32], ca: CellRef, cb: CellRef| -> (CellRef, CellRef) {
+        a.iter().flat_map(|&f| b.iter().map(move |&g| (f, g))).find(|(f, g)| f != g)
+            .map_or((ca, cb), |(f, g)| (CellRef::Facet(f), CellRef::Facet(g)))
+    };
+    let cell_ref = |e: u32| CellRef::Segment(edges[e as usize]);
 
     // 2. two sub-segments meet only at a shared end (an identical piece is one key)
     {
@@ -174,7 +208,10 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
             }
         });
         if let Some((s, t)) = found {
-            return Err(bad(5, format!("{} and {} intersect", edge_name(sub_edges[&s][0]), edge_name(sub_edges[&t][0]))));
+            let e = bad(5, format!("{} and {} intersect", edge_name(sub_edges[&s][0]), edge_name(sub_edges[&t][0])));
+            let at = At::SegSeg([s.0, s.1], [t.0, t.1]);
+            let cells = pick(&sub_facets(s), &sub_facets(t), cell_ref(sub_edges[&s][0]), cell_ref(sub_edges[&t][0]));
+            return Err(e.with(Detail::Point { cells, at }));
         }
     }
 
@@ -206,7 +243,13 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
         let members: HashSet<u32> = own.iter().copied().chain(extra.iter().copied()).collect();
         let inner: Vec<(u32, u32)> = subs.iter().copied()
             .filter(|&(a, b)| members.contains(&a) && members.contains(&b)).collect();
-        let t = facet::triangulate_with(pts, loops, &extra, &inner).map_err(|e| InputError::new(e.witness, format!("facet {f}: {}", e.msg)))?;
+        let t = facet::triangulate_with(pts, loops, &extra, &inner).map_err(|e| {
+            let named = InputError::new(e.witness, format!("facet {f}: {}", e.msg));
+            match e.witness {
+                Some(2 | 3) => named.with(Detail::Facet(f as u32)),
+                _ => named,
+            }
+        })?;
         let mut tris = HashSet::new();
         let mut eds = HashSet::new();
         for tri in &t.triangles {
@@ -256,16 +299,41 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
         Cell::Edge(e) => edge_name(e),
         Cell::Facet(f) => format!("facet {f}"),
     };
-    let covered = |cells: &[Cell]| -> Result<(), InputError> {
+    let as_ref = |c: Cell| match c {
+        Cell::Facet(f) => CellRef::Facet(f),
+        Cell::Edge(e) => cell_ref(e),
+    };
+    let facets_of = |c: Cell| -> Vec<u32> {
+        match c {
+            Cell::Facet(f) => vec![f],
+            Cell::Edge(e) => edge_facets[e as usize].clone(),
+        }
+    };
+    // the piece `piece` lies in every cell of `cells`; it is a witness when two of them
+    // contain no common cell that contains it. Two facets are preferred, as the
+    // witness names facets; otherwise the facets of the two cells.
+    let covered = |cells: &[Cell], piece: Vec<u32>| -> Result<(), InputError> {
+        let bad_pair = |s: Cell, t: Cell| !cells.iter().any(|&h| contained(h, s) && contained(h, t));
+        let mut first = None;
         for x in 0..cells.len() {
             for y in x + 1..cells.len() {
                 let (s, t) = (cells[x], cells[y]);
-                if !cells.iter().any(|&h| contained(h, s) && contained(h, t)) {
-                    return Err(bad(5, format!("{} and {} intersect in a part that no cell of both covers", name(s), name(t))));
+                if bad_pair(s, t) {
+                    if matches!((s, t), (Cell::Facet(_), Cell::Facet(_))) {
+                        first = Some((s, t));
+                        break;
+                    }
+                    first.get_or_insert((s, t));
                 }
             }
+            if matches!(first, Some((Cell::Facet(_), Cell::Facet(_)))) {
+                break;
+            }
         }
-        Ok(())
+        let Some((s, t)) = first else { return Ok(()) };
+        let e = bad(5, format!("{} and {} intersect in a part that no cell of both covers", name(s), name(t)));
+        let cells = pick(&facets_of(s), &facets_of(t), as_ref(s), as_ref(t));
+        Err(e.with(Detail::Point { cells, at: At::Centroid(piece) }))
     };
     let mut sub_cells: HashMap<(u32, u32), Vec<Cell>> = HashMap::new();
     for (k, es) in &sub_edges {
@@ -283,12 +351,12 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
     let mut sub_keys: Vec<_> = sub_cells.keys().copied().collect();
     sub_keys.sort_unstable();
     for k in &sub_keys {
-        covered(&sub_cells[k])?;
+        covered(&sub_cells[k], vec![k.0, k.1])?;
     }
     let mut tri_keys: Vec<[u32; 3]> = tri_cells.keys().copied().collect();
     tri_keys.sort_unstable();
     for k in &tri_keys {
-        covered(&tri_cells[k])?;
+        covered(&tri_cells[k], k.to_vec())?;
     }
 
     // 5. sub-segments against facet triangles, and triangles of different facets, meet
@@ -298,7 +366,7 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
     let boxes: Vec<_> = items.iter().map(|&(is_seg, i)| {
         if is_seg { bbox(pts, &[subs[i].0, subs[i].1]) } else { bbox(pts, &tri_keys[i]) }
     }).collect();
-    let mut found: Option<(String, String)> = None;
+    let mut found: Option<((bool, usize), (bool, usize))> = None;
     for_overlapping(&boxes, |x, y| {
         if found.is_some() {
             return;
@@ -320,18 +388,27 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
             }
         };
         if !ok {
-            let piece = |(is_seg, i): (bool, usize)| {
-                if is_seg {
-                    sub_cells[&subs[i]].first().map(|&c| name(c)).unwrap_or_default()
-                } else {
-                    tri_cells[&tri_keys[i]].first().map(|&c| name(c)).unwrap_or_default()
-                }
-            };
-            found = Some((piece(a), piece(b)));
+            found = Some((a, b));
         }
     });
-    if let Some((x, y)) = found {
-        return Err(bad(5, format!("{x} and {y} intersect")));
+    if let Some((a, b)) = found {
+        let cells = |(is_seg, i): (bool, usize)| -> &Vec<Cell> {
+            if is_seg { &sub_cells[&subs[i]] } else { &tri_cells[&tri_keys[i]] }
+        };
+        let facets = |p: (bool, usize)| -> Vec<u32> {
+            let mut v: Vec<u32> = cells(p).iter().flat_map(|&c| facets_of(c)).collect();
+            v.dedup();
+            v
+        };
+        let (a, b) = if a.0 || !b.0 { (a, b) } else { (b, a) }; // a segment first
+        let e = bad(5, format!("{} and {} intersect", name(cells(a)[0]), name(cells(b)[0])));
+        let at = match (a, b) {
+            ((true, i), (false, j)) => At::SegTri([subs[i].0, subs[i].1], tri_keys[j]),
+            ((false, i), (false, j)) => At::TriTri(tri_keys[i], tri_keys[j]),
+            _ => unreachable!("segment pairs are checked in step 2"),
+        };
+        let cells = pick(&facets(a), &facets(b), as_ref(cells(a)[0]), as_ref(cells(b)[0]));
+        return Err(e.with(Detail::Point { cells, at }));
     }
     out.pairs_tested = tested;
     Ok(out)

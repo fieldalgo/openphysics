@@ -10,6 +10,8 @@ benchmark; the public mesher API comes with a later release and may change them.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import numpy as np
 
 from . import KernelUnavailable, _IMPORT_ERROR, _kernel
@@ -118,11 +120,114 @@ class InvalidPLC(ValueError):
     2 a repeated vertex in a facet, 3 a degenerate, non-planar or non-simple facet,
     4 two facets with the same vertices, 5 two cells whose intersection is not a union
     of cells), or ``None`` for malformed arrays (an index that does not exist,
-    coincident points)."""
+    coincident points).
 
-    def __init__(self, message: str, witness_type: int | None):
+    ``witness`` names what can be checked, or is ``None``: ``{"type": 0, "reason":
+    "no facets"}``, ``{"type": 1, "vertex": i}``, ``{"type": 2 or 3, "facet": f}``,
+    ``{"type": 4, "facets": (f, g)}`` or ``{"type": 5, "cells": (c, d), "point": p}``,
+    where ``p`` is an exact point (three ``Fraction``) in both cells that lies in no
+    cell contained in both. A cell is ``("facet", f)``, or ``("segment", (u, v))`` for
+    a free segment that lies in no facet; when both are facets, ``"facets": (f, g)``
+    repeats them."""
+
+    def __init__(self, message: str, witness_type: int | None, witness: dict | None = None):
         super().__init__(message)
         self.witness_type = witness_type
+        self.witness = witness
+
+
+def _sub(a, b):
+    return [x - y for x, y in zip(a, b)]
+
+
+def _cross(a, b):
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+
+def _dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _seg_tri_points(a, b, t):
+    """Endpoints of the exact intersection of segment a-b with the closed triangle t
+    (Fraction coordinates); empty when they do not meet."""
+    nrm = _cross(_sub(t[1], t[0]), _sub(t[2], t[0]))
+    oa, ob = _dot(nrm, _sub(a, t[0])), _dot(nrm, _sub(b, t[0]))
+    k = max(range(3), key=lambda i: abs(nrm[i]))  # dropped axis
+    i, j = [(1, 2), (2, 0), (0, 1)][k]
+
+    def o2(p, q, r):
+        return (q[i] - p[i]) * (r[j] - p[j]) - (q[j] - p[j]) * (r[i] - p[i])
+
+    sigma = 1 if o2(*t) > 0 else -1
+
+    def at(s):
+        return [x + s * (y - x) for x, y in zip(a, b)]
+
+    if oa == 0 and ob == 0:  # coplanar: clip the parameter interval by the three edges
+        lo, hi = Fraction(0), Fraction(1)
+        for p, q in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            f0, f1 = sigma * o2(p, q, a), sigma * o2(p, q, b)
+            if f0 < 0 and f1 < 0:
+                return []
+            if f0 < 0:
+                lo = max(lo, f0 / (f0 - f1))
+            elif f1 < 0:
+                hi = min(hi, f0 / (f0 - f1))
+        return [] if lo > hi else [at(lo), at(hi)]
+    if (oa > 0 and ob > 0) or (oa < 0 and ob < 0):
+        return []
+    p = at(oa / (oa - ob))
+    inside = all(sigma * o2(u, v, p) >= 0 for u, v in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])))
+    return [p] if inside else []
+
+
+def _witness_point(kind, ids, pts):
+    """The exact witness point of a type-5 refusal from the pieces the kernel names."""
+    q = [[Fraction(float(c)) for c in pts[v]] for v in ids]
+
+    def mean(ps):
+        return [sum(c) / len(ps) for c in zip(*ps)] if ps else None
+
+    if kind == "centroid":
+        return mean(q)
+    if kind == "segseg":
+        a, b, c, d = q
+        d1, d2 = _sub(b, a), _sub(d, c)
+        n = _cross(d1, d2)
+        s = _dot(_cross(_sub(c, a), d2), n) / _dot(n, n)
+        return [x + s * y for x, y in zip(a, d1)]
+    if kind == "segtri":
+        return mean(_seg_tri_points(q[0], q[1], q[2:]))
+    if kind == "tritri":
+        t, u = q[:3], q[3:]
+        ps = []
+        for x, y in ((t, u), (u, t)):
+            for m in range(3):
+                ps += _seg_tri_points(x[m], x[(m + 1) % 3], y)
+        return mean(ps)
+    return None
+
+
+def _witness(wtype, kind, ids, pts):
+    if wtype is None or not kind:
+        return None
+    if kind == "no facets":
+        return {"type": 0, "reason": "no facets"}
+    if kind == "vertex":
+        return {"type": wtype, "vertex": ids[0]}
+    if kind == "facet":
+        return {"type": wtype, "facet": ids[0]}
+    if kind == "facets":
+        return {"type": wtype, "facets": (ids[0], ids[1])}
+    point = _witness_point(kind, ids[4:], pts)
+    if point is None:
+        return None
+    cells = [("facet", b) if a == -1 else ("segment", (a, b)) for a, b in (ids[0:2], ids[2:4])]
+    w = {"type": wtype, "cells": tuple(cells), "point": tuple(point)}
+    if all(kind == "facet" for kind, _ in cells):
+        w["facets"] = (cells[0][1], cells[1][1])
+    return w
 
 
 def check_plc(points, segments, facets) -> dict:
@@ -136,7 +241,8 @@ def check_plc(points, segments, facets) -> dict:
     and a facet inside a coplanar facet; crossings, piercings, partial collinear
     overlaps and coplanar overlaps that no cell of both covers are refused.
 
-    Raises ``InvalidPLC`` naming the first violation. Returns the edges, the elementary
+    Raises ``InvalidPLC`` naming the first violation, with a witness that can be
+    checked independently. Returns the edges, the elementary
     sub-segments (edges split at the points on them), the facet triangles (each facet
     triangulated with the points and sub-segments on it) with the facet of each, the
     sub-segments on the boundary of an odd number of facets (empty when the PLC is
@@ -149,8 +255,9 @@ def check_plc(points, segments, facets) -> dict:
     try:
         seg, sub, tris, owner, opened, pairs = kernel.check_plc(p.tobytes(), s.tobytes(), f)
     except ValueError as e:
-        if len(e.args) == 2:
-            raise InvalidPLC(*e.args) from None
+        if len(e.args) == 4:
+            msg, wtype, kind, ids = e.args
+            raise InvalidPLC(msg, wtype, _witness(wtype, kind, list(ids), p)) from None
         raise
 
     def pairs_of(b):

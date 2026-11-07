@@ -130,10 +130,62 @@ def merge(*parts):
     return np.array(points, float), facets
 
 
+def in_facet(p, pts, loops):
+    """Exact test: p lies in the closed facet (coplanar, and inside by even-odd with the
+    boundary included)."""
+    q = [[Fraction(float(c)) for c in pts[v]] for v in loops[0]]
+    a = q[0]
+    n = next(n for b, c in itertools.combinations(q[1:], 2)
+             if any(n := [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+                          (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+                          (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])]))
+    if sum(x * (y - z) for x, y, z in zip(n, p, a)) != 0:
+        return False
+    k = max(range(3), key=lambda i: abs(n[i]))
+    i, j = [(1, 2), (2, 0), (0, 1)][k]
+    inside = False
+    for lp in loops:
+        r = [[Fraction(float(c)) for c in pts[v]] for v in lp]
+        for u, w in zip(r, r[1:] + r[:1]):
+            cr = (w[i] - u[i]) * (p[j] - u[j]) - (w[j] - u[j]) * (p[i] - u[i])
+            if cr == 0 and min(u[i], w[i]) <= p[i] <= max(u[i], w[i]) and min(u[j], w[j]) <= p[j] <= max(u[j], w[j]):
+                return True  # on the boundary
+            if (u[j] > p[j]) != (w[j] > p[j]) and p[i] < u[i] + (p[j] - u[j]) * (w[i] - u[i]) / (w[j] - u[j]):
+                inside = not inside
+    return inside
+
+
+def in_segment(p, pts, seg):
+    a, b = ([Fraction(float(c)) for c in pts[v]] for v in seg)
+    d = [y - x for x, y in zip(a, b)]
+    k = max(range(3), key=lambda i: abs(d[i]))
+    t = (p[k] - a[k]) / d[k]
+    return 0 <= t <= 1 and all(a[i] + t * d[i] == p[i] for i in range(3))
+
+
 def refused(witness, pts, segments, facets, match=None):
     with pytest.raises(InvalidPLC, match=match) as e:
         check_plc(pts, np.asarray(segments).reshape(-1, 2), facets)
     assert e.value.witness_type == witness, str(e.value)
+    w = e.value.witness
+    if witness is None:
+        assert w is None
+        return None
+    assert w is not None and w["type"] == witness, (str(e.value), w)
+    if witness == 1:
+        assert not all(np.isfinite(pts[w["vertex"]])) or any(
+            x != 0 and not 2.0 ** -120 <= abs(x) <= 2.0 ** 120 for x in pts[w["vertex"]])
+    if witness == 4:
+        f, g = w["facets"]
+        assert f != g and set(sum(facets[f], [])) == set(sum(facets[g], []))
+    if witness == 5:
+        assert w["cells"][0] != w["cells"][1]
+        for kind, c in w["cells"]:
+            if kind == "facet":
+                assert in_facet(w["point"], pts, facets[c])
+            else:
+                assert in_segment(w["point"], pts, c)
+    return w
 
 
 def test_cells_inside_cells_are_valid():
@@ -202,7 +254,8 @@ def test_invalid_plcs_are_refused():
     # a facet given twice (type 4), a repeated vertex (type 2), a non-planar facet and a
     # collinear triangle (type 3)
     refused(4, np.array(sub, float), [], sub_f + [[[0, 1, 3, 2]]], match="same vertices")
-    refused(2, np.array(sub, float), [], sub_f[:-1] + [[[1, 3, 7, 3, 5]]], match="twice")
+    assert refused(2, np.array(sub, float), [], sub_f[:-1] + [[[1, 3, 7, 3, 5]]], match="twice")["facet"] == 5
+    assert refused(2, np.array(sub, float), [], sub_f + [[[0, 0, 7]]])["facet"] == 6
     bent = np.array(sub, float)
     bent[7, 2] = np.nextafter(1.0, 2.0)
     refused(3, bent, [], sub_f, match="plane")
@@ -211,8 +264,8 @@ def test_invalid_plcs_are_refused():
     # a coordinate outside the kernel's range (type 1), named by its point
     tiny = np.array(sub, float)
     tiny[5, 1] = 1e-200
-    refused(1, tiny, [], sub_f, match="5")
+    assert refused(1, tiny, [], sub_f, match="5")["vertex"] == 5
     # no facets (type 0); coincident points are malformed arrays, not a witness
-    refused(0, np.array(sub, float), [], [], match="no facets")
+    assert refused(0, np.array(sub, float), [], [], match="no facets") == {"type": 0, "reason": "no facets"}
     twice = np.array(sub + [sub[3]], float)
     refused(None, twice, [], sub_f, match="coincide")
