@@ -32,6 +32,7 @@
 use crate::delaunay::{self, Error, Mesh};
 use crate::mixed::{MixedCounters, MixedPoints, Pt, SPoint};
 use crate::predicates::P3;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RecoveryStats {
@@ -227,6 +228,75 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     let tets = mesh.tets();
     let kernel = mesh.stats();
     Ok(Recovered { tets, s: mesh.g.s.clone(), chains, stats, kernel, mixed: mesh.g.n })
+}
+
+/// A PLC after segment recovery: the recovered tetrahedralization, every facet's
+/// subfacets (its constrained Delaunay triangulation with the S points on its
+/// sub-segments, as global indices) and the subfacets that are not yet faces of the
+/// tetrahedralization (facet recovery's work).
+pub struct PlcRecovered {
+    pub rec: Recovered,
+    pub subfacets: Vec<Vec<[u32; 3]>>,
+    pub missing: Vec<(u32, [u32; 3])>,
+    pub plane: MixedCounters,
+}
+
+/// The PLC check, segment recovery on its elementary sub-segments, then the subfacets.
+pub fn recover_plc(plc: &crate::plc::Plc, max_depth: u32) -> Result<PlcRecovered, String> {
+    let checked = crate::plc::check(plc).map_err(|e| e.msg)?;
+    let segs = checked.subsegments.clone();
+    let rec = recover(&plc.points, &segs, max_depth).map_err(|e| e.to_string())?;
+    let (subfacets, missing, plane_n) = {
+    let chain_of: HashMap<(u32, u32), &Vec<u32>> = segs.iter().zip(&rec.chains)
+        .map(|(s, c)| ((s[0].min(s[1]), s[0].max(s[1])), c)).collect();
+    let plane = crate::mixed::MixedPlane {
+        m: crate::mixed::Mixed { input: &plc.points, s: &rec.s },
+        n: std::cell::Cell::new(MixedCounters::default()),
+    };
+    let chain = |e: &(u32, u32)| -> Result<&Vec<u32>, String> {
+        chain_of.get(&(e.0.min(e.1), e.0.max(e.1))).copied()
+            .ok_or_else(|| format!("sub-segment {}-{} has no recovered chain", e.0, e.1))
+    };
+    let mut subfacets = Vec::with_capacity(checked.facets.len());
+    for (f, info) in checked.facets.iter().enumerate() {
+        let mut points = info.points.clone();
+        let mut boundary = Vec::new();
+        let on_boundary: std::collections::HashSet<(u32, u32)> = info.boundary.iter().copied().collect();
+        for e in &info.boundary {
+            let c = chain(e)?;
+            points.extend(&c[1..c.len() - 1]);
+            boundary.extend(c.windows(2).map(|w| (w[0], w[1])));
+        }
+        let mut inner = Vec::new();
+        for e in info.inner.iter().filter(|e| !on_boundary.contains(&(e.0.min(e.1), e.0.max(e.1)))) {
+            let c = chain(e)?;
+            points.extend(&c[1..c.len() - 1]);
+            inner.extend(c.windows(2).map(|w| (w[0], w[1])));
+        }
+        let tris = crate::facet::cdt(&plane, info.axis, &points, &boundary, &inner, info.flip)
+            .map_err(|(_, m)| format!("facet {f} with its segment points: {m}"))?;
+        subfacets.push(tris);
+    }
+    let faces: std::collections::HashSet<[u32; 3]> = rec.tets.iter()
+        .flat_map(|v| (0..4).map(move |i| {
+            let mut k = [v[(i + 1) % 4], v[(i + 2) % 4], v[(i + 3) % 4]];
+            k.sort_unstable();
+            k
+        }))
+        .collect();
+    let mut missing = Vec::new();
+    for (f, tris) in subfacets.iter().enumerate() {
+        for t in tris {
+            let mut k = *t;
+            k.sort_unstable();
+            if !faces.contains(&k) {
+                missing.push((f as u32, *t));
+            }
+        }
+    }
+    (subfacets, missing, plane.n.get())
+    };
+    Ok(PlcRecovered { rec, subfacets, missing, plane: plane_n })
 }
 
 /// True when two of the segments `inc` at vertex v meet at less than 90 degrees.
@@ -425,5 +495,84 @@ mod tests {
         let mut twice = pts.clone();
         twice.push(pts[7]);
         assert!(matches!(recover(&twice, &[[0, 1]], 60), Err(Error::Input(m)) if m.contains("coincide")));
+    }
+
+    fn plc_of(points: Vec<P3>, facets: Vec<Vec<Vec<u32>>>) -> crate::plc::Plc {
+        crate::plc::Plc { points, segments: Vec::new(), facets }
+    }
+
+    fn voxel(cells: &[[i32; 3]], tilt: bool) -> crate::plc::Plc {
+        let set: HashSet<[i32; 3]> = cells.iter().copied().collect();
+        let mut index: HashMap<[i32; 3], u32> = HashMap::new();
+        let mut points = Vec::new();
+        let mut facets = Vec::new();
+        let mut pid = |c: [i32; 3], points: &mut Vec<P3>| *index.entry(c).or_insert_with(|| {
+            let p = [c[0] as f64 * 0.25, c[1] as f64 * 0.25, c[2] as f64 * 0.25];
+            points.push(if tilt {
+                [2.0 * p[0] + p[1], -p[0] + 2.0 * p[1] + p[2], p[1] + 3.0 * p[2]]
+            } else { p });
+            points.len() as u32 - 1
+        });
+        for &c in cells {
+            for axis in 0..3 {
+                for side in [0, 1] {
+                    let mut nb = c;
+                    nb[axis] += if side == 1 { 1 } else { -1 };
+                    if set.contains(&nb) {
+                        continue;
+                    }
+                    let mut base = c;
+                    base[axis] += side;
+                    let (u, v) = [(1, 2), (2, 0), (0, 1)][axis];
+                    let corners: Vec<u32> = [(0, 0), (1, 0), (1, 1), (0, 1)].iter().map(|&(du, dv)| {
+                        let mut q = base;
+                        q[u] += du;
+                        q[v] += dv;
+                        pid(q, &mut points)
+                    }).collect();
+                    facets.push(vec![corners]);
+                }
+            }
+        }
+        plc_of(points, facets)
+    }
+
+    #[test]
+    fn subfacets_after_segment_recovery() {
+        let fichera: Vec<[i32; 3]> = (0..8).map(|k| [k & 1, (k >> 1) & 1, (k >> 2) & 1]).filter(|c| *c != [1, 1, 1]).collect();
+        let slab: Vec<[i32; 3]> = (0..12).map(|k| [k % 4, k / 4, 0]).collect();
+        let mut prism_pts = Vec::new();
+        for (h, rot) in [(0.0f64, 0.0f64), (1.0, 30.0)] {
+            for k in 0..3 {
+                let a = (120.0 * k as f64 + rot).to_radians();
+                prism_pts.push([a.cos(), a.sin(), h]);
+            }
+        }
+        let prism = plc_of(prism_pts, [[0, 2, 1], [3, 4, 5], [0, 1, 4], [0, 4, 3], [1, 2, 5], [1, 5, 4], [2, 0, 3], [2, 3, 5]]
+            .iter().map(|t| vec![t.to_vec()]).collect());
+        // two stacked cells with their interface as a facet, and free points just above and
+        // below it: the interface triangles stop being Delaunay (hull faces never do)
+        let mut cube = voxel(&[[0, 0, 0], [0, 0, 1]], false);
+        let corner = |p: P3, pts: &[P3]| pts.iter().position(|q| *q == p).unwrap() as u32;
+        let iface = vec![vec![corner([0.0, 0.0, 0.25], &cube.points), corner([0.25, 0.0, 0.25], &cube.points),
+                              corner([0.25, 0.25, 0.25], &cube.points), corner([0.0, 0.25, 0.25], &cube.points)]];
+        cube.facets.push(iface);
+        let mut seed = 21u64;
+        for k in 0..40 {
+            let (u, v) = (0.02 + 0.21 * lcg(&mut seed), 0.02 + 0.21 * lcg(&mut seed));
+            let d = 0.0005 + 0.01 * lcg(&mut seed);
+            cube.points.push([u, v, if k % 2 == 0 { 0.25 + d } else { 0.25 - d }]);
+        }
+        let near = recover_plc(&cube, 60).unwrap();
+        eprintln!("interface with near points: {} subfacets, {} missing", near.subfacets.iter().map(|t| t.len()).sum::<usize>(), near.missing.len());
+        assert!(!near.missing.is_empty(), "facet recovery has work to do");
+        for (name, plc) in [("fichera", voxel(&fichera, false)), ("fichera tilted", voxel(&fichera, true)),
+                            ("slab", voxel(&slab, false)), ("slab tilted", voxel(&slab, true)), ("prism", prism)] {
+            let r = recover_plc(&plc, 60).unwrap();
+            // every subfacet set covers its facet: as many triangles as the facet needs
+            assert!(r.subfacets.iter().all(|t| !t.is_empty()), "{name}");
+            eprintln!("{name}: {} points, {} S points, {} subfacets, {} missing", plc.points.len(), r.rec.s.len(),
+                      r.subfacets.iter().map(|t| t.len()).sum::<usize>(), r.missing.len());
+        }
     }
 }

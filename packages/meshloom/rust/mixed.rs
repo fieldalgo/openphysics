@@ -487,3 +487,45 @@ impl crate::delaunay::Geom for MixedPoints {
         self.n.input
     }
 }
+
+impl Mixed<'_> {
+    /// Sign of (a - o) . (b - o), exactly.
+    pub fn dot_sign(&self, o: Pt, a: Pt, b: Pt) -> i8 {
+        let (eo, ea, eb) = (self.exact(o), self.exact(a), self.exact(b));
+        let d = (0..3).map(|k| ea[k].sub(&eo[k]).mul(&eb[k].sub(&eo[k]))).reduce(|x, y| x.add(&y)).unwrap();
+        d.exact_sign()
+    }
+}
+
+/// The in-plane predicates of a facet triangulation over input and S points, by global
+/// index. Counters are kept in a cell: the triangulation asks through `&self`.
+pub struct MixedPlane<'a> {
+    pub m: Mixed<'a>,
+    pub n: std::cell::Cell<MixedCounters>,
+}
+
+impl crate::facet::PlanePred for MixedPlane<'_> {
+    fn orient(&self, axis: usize, a: u32, b: u32, c: u32) -> i8 {
+        let mut n = self.n.get();
+        let s = self.m.orient2d_proj(axis, [a, b, c].map(|i| self.m.from_id(i)), &mut n);
+        self.n.set(n);
+        s
+    }
+
+    fn incircle_sos(&self, axis: usize, a: u32, b: u32, c: u32, d: u32) -> i8 {
+        let mut n = self.n.get();
+        let s = self.m.incircle_plane_sos(axis, [a, b, c, d].map(|i| self.m.from_id(i)), &mut n);
+        self.n.set(n);
+        s
+    }
+
+    fn between(&self, _axis: usize, a: u32, b: u32, c: u32) -> bool {
+        let p = |i: u32| self.m.from_id(i);
+        self.m.dot_sign(p(c), p(a), p(b)) < 0
+    }
+
+    fn same_direction(&self, _axis: usize, v: u32, x: u32, y: u32) -> bool {
+        let p = |i: u32| self.m.from_id(i);
+        self.m.dot_sign(p(v), p(x), p(y)) > 0
+    }
+}
