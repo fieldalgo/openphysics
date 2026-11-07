@@ -569,7 +569,7 @@ part       := [A-Za-z0-9_-]+
 | 소비자 | 받는 것 | 거부하는 것 |
 |---|---|---|
 | FEM 2D(meshine) | `2d` 구성 요소(러너가 생기면 `axisymmetric`도); `rect`, `circle`, `polygon`, `trapezoid` | 2단계 전 `path`·`segment`; 예약 키워드 |
-| [2단계 엔진](geometry_engine.md)(`simcase.geometry_engine`) | 모든 2D 피처·두 finalize 모드·빈 공간·병합 영역을 가진 `2d`·`axisymmetric` 구성 요소. 넘기기는 복합체를 루프로 meshine에 줌. 러너는 그런 문서를 `doc.regions()`로 읽고 `mesh.controls`의 `circle_segments`·`size`·거리 등급이 넘기기에 닿음(2026-11-06/07) | `3d`; 경계가 자기와 만나는 `path`; `to`가 자기 원 위에 없는 원호(끝점은 격자점이어야 함); 넘기기에서 셀 하나 안의 `segment` 곡선; 정상 영역 열 밖의 축대칭(도파관·과도 러너와 Studio는 거부; 영역 열은 전체 회전 열량으로 받음, 2026-11-07), 러너에서 빈 공간(그 경계의 물리 미정) |
+| [2단계 엔진](geometry_engine.md)(`simcase.geometry_engine`) | 모든 2D 피처·두 finalize 모드·빈 공간·병합 영역을 가진 `2d`·`axisymmetric` 구성 요소. 넘기기는 복합체를 루프로 meshine에 줌. 러너는 그런 문서를 `doc.regions()`로 읽고 `mesh.controls`의 `circle_segments`·`size`·거리 등급이 넘기기에 닿음(2026-11-06/07) | `3d`; 경계가 자기와 만나는 `path`; `to`가 자기 원 위에 없는 원호(끝점은 격자점이어야 함); 넘기기에서 셀 하나 안의 `segment` 곡선; 정상 영역 열 밖의 축대칭(도파관·과도 러너와 Studio는 거부; 영역 열은 전체 회전 열량으로 받음, 2026-11-07), 도파관 러너에서 빈 공간(영역 열은 이름 없으면 단열인 구멍으로 받음, 2026-11-08) |
 | FEM 2.5D(`meshine.extrude`) | `layers`, z 방향 `extrude` | 기울거나 휜 옆면. 압출기는 수직 프리즘만 만듦(`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | 격자면 규칙을 지키는 `box` | 다른 3D 피처 |
 | FEM 3D(meshloom, 5단계) | 5단계 조합 | 그 밖의 모든 것(gmshio 경로가 생길 때까지) |

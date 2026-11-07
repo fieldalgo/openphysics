@@ -232,6 +232,20 @@ def size_function(doc: Document):
         raise DocumentError(str(exc)) from None
 
 
+def selection_edges_of(doc: Document, tri) -> dict | None:
+    """The contract's boundary selections of a version 1 document as mesh edges: {name: (E, 2)
+    node pairs} over the mesh generated from ``build_domain(doc)``; None for a 0.2 document."""
+    from .geometry_document import GeometryError
+    rc = getattr(doc, "geometry_complex", None)
+    if rc is None or getattr(doc, "geometry_model", None) is None:
+        return None
+    try:
+        return {name: rc.selection_edges(tri, name) for name, (kind, _chosen) in rc.selections.items()
+                if kind == "boundary"}
+    except GeometryError as exc:
+        raise DocumentError(str(exc)) from None
+
+
 def provenance_edges_of(doc: Document, tri) -> dict | None:
     """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
     or None for a 0.2 document (no complex, no provenance)."""

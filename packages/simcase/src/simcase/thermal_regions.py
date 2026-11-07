@@ -121,10 +121,36 @@ def exterior_sides(doc):
     return SIDES, SIDES
 
 
-def _sides(p, name, allowed=SIDES):
+def boundary_names(doc):
+    """The boundary names a region heat document may give data to, beyond its domain sides.
+
+    A version 1 document adds the exterior mesh tags its complex declares (a ``boundary_tags``
+    name, ``outer`` on the border of a void feature or a sliver gap) and its boundary
+    selections. Returns ``(tags, exterior_selections, interior_selections)``; a selection is
+    exterior when every curve it holds borders the exterior (the domain or a void), interior
+    otherwise. Data may name the tags and the exterior selections; an interior selection is
+    refused by name (galerkin fixes and loads exterior nodes only). A 0.2 document has none. An
+    unnamed exterior boundary is insulated (HQ decision 2026-11-08: a void border is insulated
+    unless named)."""
+    if not getattr(doc, 'is_version_1', False):
+        return set(), set(), set()
+    rc = doc.complex()
+    exterior = set(rc.exterior_curves())
+    tags = {rc.curves[i].tag for i in exterior} - set(SIDES) - {'axis'}
+    outside, inside = set(), set()
+    for name, (kind, chosen) in rc.selections.items():
+        if kind != 'boundary':
+            continue
+        (outside if set(chosen) <= exterior else inside).add(name)
+    return tags, outside, inside
+
+
+def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
     path = f'physics.{name}'
+    tags, outside, inside = names
+    dirichlet_ok = flux_ok = set(allowed) | tags | outside
     bc = p.get('dirichlet_temperature_k', {})
-    _named_sides(bc, set(allowed), path+'.dirichlet_temperature_k')
+    _named_sides(bc, dirichlet_ok, path+'.dirichlet_temperature_k', inside)
     for tag, value in bc.items():
         _number(value, f'{path}.dirichlet_temperature_k.{tag}', nonnegative=True)
     for a in ('left', 'right'):
@@ -132,11 +158,11 @@ def _sides(p, name, allowed=SIDES):
             if a in bc and b in bc and bc[a] != bc[b]:
                 raise DocumentError(f'{path}.dirichlet_temperature_k: conflicting corner temperatures on {a}/{b}')
     flux = p.get('outward_flux_w_m2', {})
-    _named_sides(flux, set(allowed), path+'.outward_flux_w_m2')
+    _named_sides(flux, flux_ok, path+'.outward_flux_w_m2', inside)
     for tag, value in flux.items():
         _number(value, f'{path}.outward_flux_w_m2.{tag}')
     robin = p.get('convection', {})
-    _named_sides(robin, set(allowed), path+'.convection')
+    _named_sides(robin, flux_ok, path+'.convection', inside)
     anchored = False
     for tag, value in robin.items():
         where = f'{path}.convection.{tag}'
@@ -186,20 +212,18 @@ def region_geometry(doc):
 
 def _version_1_region_geometry(doc):
     """The region checks of a version 1 block: the reader has checked the geometry itself;
-    here the domain must be finite in metres, the background and every region need a material
-    (region heat takes no void), and a feature that the domain cuts away or that is a sliver is
-    refused by name, as a dropped 0.2 shape is. A feature that later features cover is not."""
+    here the domain must be finite in metres, the background needs a material, a void feature
+    (``material: null``) is a hole whose border is an exterior boundary (insulated unless named,
+    HQ decision 2026-11-08), and a feature that the domain cuts away or that is a sliver is
+    refused by name, as a dropped 0.2 shape is. A feature that later features cover is not.
+    Returns the names of the material regions."""
     dom = doc.domain
     for key, value in dom.items():
         _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
     if not isinstance(doc.background.get('material'), str) or not doc.background['material']:
         raise DocumentError('geometry.background.material: expected a material name (region heat takes no void '
                             'background)')
-    names = set()
-    for r in doc.regions():
-        if r['material'] is None:
-            raise DocumentError(f'feature {r["name"]!r}: material null (void) is not accepted by region heat')
-        names.add(r['name'])
+    names = {r['name'] for r in doc.regions() if r['material'] is not None}
     from .geometry import dropped_features
     dropped = dropped_features(doc)
     if dropped:
@@ -230,8 +254,9 @@ def refuse_dropped_shapes(doc):
 
 
 def covered_shapes(doc, mesh):
-    """Shapes with no triangles in the mesh: fully covered by later shapes."""
-    return [s['name'] for s in doc.regions() if s['name'] not in mesh.region_names]
+    """Shapes with no triangles in the mesh: fully covered by later shapes (a void region is
+    never meshed and is not listed)."""
+    return [s['name'] for s in doc.regions() if s['material'] is not None and s['name'] not in mesh.region_names]
 
 
 def region_materials_table(doc, required, label):
@@ -251,7 +276,7 @@ def region_materials_table(doc, required, label):
             raise DocumentError(where+'.source: expected a string')
     for where, mname in [('geometry.background.material', doc.background['material'])] + [
             (f'geometry.shapes[{i}].material' if not doc.is_version_1 else f'region {s["name"]!r}', s['material'])
-            for i, s in enumerate(doc.regions())]:
+            for i, s in enumerate(doc.regions()) if s['material'] is not None]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
                                 '(thermal properties are never taken from built-in optical materials)')
@@ -273,14 +298,21 @@ def region_source(p, names, path):
         _number(source, f'{path}.heat_source_w_m3')
 
 
-def _named_sides(value, allowed, path):
-    """``_object`` over the sides a document may name; the axis is refused by name."""
+def _named_sides(value, allowed, path, interior=()):
+    """``_object`` over the boundary names a document may give this data to; the axis, a left
+    side at r = 0 and an interior selection given flux or convection are refused by name."""
     if isinstance(value, dict) and 'axis' in value and 'axis' not in allowed:
         raise DocumentError(f"{path}.axis: 'axis' is the symmetry axis of an axisymmetric component; it carries "
                             "natural regularity and takes no Dirichlet, flux or convection data")
     if isinstance(value, dict) and 'left' in value and 'left' not in allowed:
         raise DocumentError(f"{path}.left: an axisymmetric component whose domain starts at r = 0 has no left "
                             "side; its r = 0 side is the axis")
+    if isinstance(value, dict):
+        for key in value:
+            if key in interior and key not in allowed:
+                raise DocumentError(f"{path}.{key}: selection {key!r} lies on an interface between two regions; "
+                                    "boundary data applies to exterior boundaries only (galerkin fixes and loads "
+                                    "exterior nodes)")
     _object(value, allowed, path)
 
 
@@ -315,7 +347,7 @@ def validate_region_thermal(doc):
     names = region_geometry(doc)
     region_materials_table(doc, ('conductivity_w_mk',), 'steady heat')
     region_source(p, names, path)
-    _sides(p, name, exterior_sides(doc)[1])
+    _sides(p, name, exterior_sides(doc)[1], boundary_names(doc))
     region_mesh_settings(doc)
     if d['study'] != {'type': 'single'}:
         raise DocumentError('thermal.steady2d supports only study {"type":"single"}')
@@ -368,9 +400,13 @@ def build_region_mesh(doc, limits=None):
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
     sides = set(exterior_sides(doc)[0])
-    if set(tri.boundary_edges) != sides:
-        raise DocumentError(f'mesh: exterior edges must all lie on the domain sides {sorted(sides)}; found tags '
-                            f'{sorted(tri.boundary_edges)}')
+    declared = sides | boundary_names(doc)[0]
+    tags = set(tri.boundary_edges)
+    # a side that borders a void feature only has no mesh edge and is absent; a tag the
+    # geometry does not declare is a defect of the hand-off
+    if not tags <= declared or (not doc.is_version_1 and tags != sides):
+        raise DocumentError(f'mesh: exterior edges must lie on the domain sides {sorted(sides)} and the boundaries '
+                            f'the geometry declares {sorted(declared - sides)}; found tags {sorted(tags)}')
     if limits is not None:
         from .mesh_limits import MeshLimitError
         if limits.max_nodes is not None and tri.num_nodes > limits.max_nodes:
@@ -378,12 +414,25 @@ def build_region_mesh(doc, limits=None):
         if limits.max_triangles is not None and tri.num_triangles > limits.max_triangles:
             raise MeshLimitError('triangles', limits.max_triangles, int(tri.num_triangles))
     # Convert the canonical mesh directly to SI, never through document units.
-    from .geometry import provenance_edges_of
+    from .geometry import provenance_edges_of, selection_edges_of
+    boundary = {k: np.asarray(v) for k, v in tri.boundary_nodes.items()}
+    boundary_edges = {k: np.asarray(v) for k, v in tri.boundary_edges.items()}
+    selections = selection_edges_of(canonical, tri)
+    if selections:
+        # a boundary selection names its nodes for Dirichlet data; an exterior one also tags its
+        # edges for flux and convection, beside the side or outer tag the same edges carry
+        _tags, outside, _inside = boundary_names(doc)
+        for name, edges in selections.items():
+            if name not in outside:
+                continue                                  # an interior selection carries no data
+            if name in boundary or name in boundary_edges:
+                raise DocumentError(f'selection {name!r} shares its name with a mesh tag')
+            boundary[name] = np.unique(np.asarray(edges, dtype=int))
+            boundary_edges[name] = np.asarray(edges, dtype=int).reshape(-1, 2)
     mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
-                boundary={k: np.asarray(v) for k, v in tri.boundary_nodes.items()},
-                boundary_edges={k: np.asarray(v) for k, v in tri.boundary_edges.items()},
+                boundary=boundary, boundary_edges=boundary_edges,
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
-                provenance_edges=provenance_edges_of(canonical, tri))
+                provenance_edges=provenance_edges_of(canonical, tri), selection_edges=selections)
     region_materials = {r: region_materials[r] for r in mesh.region_names}
     # Keep the diagnostic triangulation in document units, as before.
     tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))
@@ -434,6 +483,11 @@ def region_inputs(doc, mesh, region_materials):
     else:
         source = float(source)
     prescribed = {}
+    for label in ('dirichlet_temperature_k', 'outward_flux_w_m2', 'convection'):
+        for tag in p.get(label, {}):
+            if tag not in mesh.boundary_edges:
+                raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
+                                    'borders a void feature only, or a selection whose curves are inside the mesh)')
     for tag, value in p.get('dirichlet_temperature_k', {}).items():
         for node in mesh.boundary[tag]:
             if int(node) in prescribed and prescribed[int(node)] != value:
@@ -442,6 +496,7 @@ def region_inputs(doc, mesh, region_materials):
     flux = {tag: float(v) for tag, v in p.get('outward_flux_w_m2', {}).items()}
     convection = {tag: (float(v['h_w_m2k']), float(v['ambient_temperature_k']))
                   for tag, v in p.get('convection', {}).items()}
+    _refuse_doubled_edges(mesh, path, flux, convection)
     return dict(conductivity=conductivity, dirichlet=dict(sorted(prescribed.items())),
                 heat_source=source, outward_flux=flux, convection=convection)
 
@@ -452,6 +507,20 @@ RATE_FIELDS = ('load_w_per_m', 'reaction_w_per_m', 'residual_w_per_m') + BOUNDAR
 def _axisymmetric_name(key):
     """The field name of a full-revolution rate: ``load_w_per_m`` becomes ``load_w``."""
     return key[:-len('_per_m')] if key.endswith('_w_per_m') else key
+
+
+def _refuse_doubled_edges(mesh, path, flux, convection):
+    """A mesh edge may carry one flux and one convection entry: a side tag and an exterior
+    selection on the same edges, both given data, would apply it twice."""
+    for label, table in (('outward_flux_w_m2', flux), ('convection', convection)):
+        edges = {tag: {tuple(sorted(map(int, e))) for e in np.asarray(mesh.boundary_edges[tag]).reshape(-1, 2)}
+                 for tag in table}
+        names = sorted(edges)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                if edges[a] & edges[b]:
+                    raise DocumentError(f'{path}.{label}: {a!r} and {b!r} share mesh edges; give that boundary '
+                                        'one entry')
 
 
 class RegionThermalRunResult(ThermalRunResult):
