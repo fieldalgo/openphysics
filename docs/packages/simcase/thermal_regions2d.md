@@ -212,9 +212,11 @@ solved with galerkin's [axisymmetric measure](../galerkin/thermal_axisymmetric.m
   Temperature (K), heat flux (W/m²), triangle regions and areas (`area_m2`,
   the meridional section) are as in a Cartesian run. The Cartesian
   identifiers and `_w_per_m` names are never used for such a result.
-- **Not taken.** The waveguide runner (its physics needs the four sides), the
-  transient region runner (the transient solver is Cartesian) and Studio (no
-  axisymmetric payload) refuse an axisymmetric component by name.
+- **Not taken.** The waveguide runner (a body of revolution is not its
+  physics; refused at validation whatever `xmin` is), the transient region
+  runner (the transient solver is Cartesian) and Studio (no axisymmetric
+  payload) refuse an axisymmetric component by name. `export_fields` writes
+  the saved result as a VTU with (r, z) points.
 
 Checks G4-1 to G4-5 (`tests/simcase/test_thermal_axisymmetric_regions.py`,
 pre-registered in the HQ work record on 2026-11-07, measured the same day on
@@ -557,8 +559,10 @@ analytical convergence tests remain required.
 ## VTU and PVD export
 
 Install `simcase[export]` (meshio, MIT) to view saved region results in ParaView.
-`export_fields(fields_npz, output, *, time_index=-1)` accepts both
-`thermal2d-p1-node-cell-regions-v1` and
+`export_fields(fields_npz, output, *, time_index=-1)` accepts
+`thermal2d-p1-node-cell-regions-v1`,
+`thermal-axisymmetric-p1-node-cell-regions-v1` (points are (r, z), the
+rates are the `_w` full-revolution powers) and
 `thermal2d-transient-p1-node-cell-regions-v1`. `export_time_series(fields_npz,
 output_dir, *, name="fields")` accepts the transient layout and writes one VTU
 per stored time plus a PVD collection with exact `time_s` values in seconds.

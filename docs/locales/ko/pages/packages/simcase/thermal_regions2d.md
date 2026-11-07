@@ -170,8 +170,9 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
   요약의 진단은 `_w`로 끝나고(`source_heat_w`·`outward_heat_w` 등) `coordinate_system: "axisymmetric"`·
   `nodal_heat_rate_unit: "W"`를 기록합니다. 온도(K)·열유속(W/m²)·삼각형 영역·넓이(`area_m2`, 자오면 단면)는 Cartesian
   실행과 같습니다. Cartesian 식별자와 `_w_per_m` 이름은 이런 결과에 쓰지 않습니다.
-- **받지 않는 곳.** 도파관 러너(물리가 네 변을 요구), 과도 영역 러너(과도 솔버는 Cartesian), Studio(축대칭 payload 없음)는
-  축대칭 구성 요소를 이름 밝혀 거부합니다.
+- **받지 않는 곳.** 도파관 러너(회전체는 그 물리가 아님; `xmin`과 무관하게 검증에서 거부), 과도 영역 러너(과도 솔버는
+  Cartesian), Studio(축대칭 payload 없음)는 축대칭 구성 요소를 이름 밝혀 거부합니다. `export_fields`는 저장한 결과를 (r, z)
+  점의 VTU로 씁니다.
 
 검사 G4-1~G4-5(`tests/simcase/test_thermal_axisymmetric_regions.py`, 2026-11-07 HQ 작업 기록에 사전 등록, 같은 날 Linux·
 Python 3.12 고정 환경에서 측정): 균일 가열 속찬 원통(반지름 3 mm, 메시 0.1 mm)이 모든 절점에서 정확한 포물선
@@ -440,8 +441,8 @@ meshine에 넘기는 영역의 수와 같은지, 검증하지 않은 문서가 �
 
 `simcase[export]`(meshio, MIT)를 설치하면 저장한 영역 결과를 ParaView에서 볼 수 있습니다.
 `export_fields(fields_npz, output, *, time_index=-1)`는
-`thermal2d-p1-node-cell-regions-v1` 및
-`thermal2d-transient-p1-node-cell-regions-v1`을 받습니다.
+`thermal2d-p1-node-cell-regions-v1`, `thermal-axisymmetric-p1-node-cell-regions-v1`(점은 (r, z), 열량은 `_w`
+전체 회전 전력) 및 `thermal2d-transient-p1-node-cell-regions-v1`을 받습니다.
 `export_time_series(fields_npz, output_dir, *, name="fields")`는 과도 배치를 받아
 저장된 시각마다 VTU를 만들고 정확한 `time_s`(초)를 기록한 PVD 컬렉션으로 연결합니다.
 두 함수 모두 솔버를 다시 실행하거나 저장 결과를 바꾸지 않습니다.

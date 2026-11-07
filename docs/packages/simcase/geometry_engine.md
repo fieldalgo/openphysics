@@ -178,7 +178,7 @@ void feature or background and refuses other tags as before; a `segment` that
 ends inside a cell is refused at load (meshine takes region loops only); an
 axisymmetric component is taken by steady region heat only ([axisymmetric
 documents](thermal_regions2d.md#axisymmetric-documents)); the waveguide and
-transient runners and Studio refuse it by name; region heat refuses a
+transient runners and Studio refuse it by name (the waveguide runner at validation, whatever `xmin` is); region heat refuses a
 feature that the domain cuts away or that is a sliver (a feature later
 features cover is allowed, as a covered 0.2 shape is). Arcs reach the mesher
 with the 0.2 circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle

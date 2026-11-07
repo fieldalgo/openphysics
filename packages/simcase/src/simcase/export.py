@@ -23,7 +23,9 @@ Supported layouts:
   (``thermal2d-transient-p1-node-cell-boundary-v1``): the same, plus the nodal
   per-step ``prescribed_outward_load_w_per_m`` and ``convective_outward_w_per_m``
   (W/m), present from the second stored time on like the other step rates
-- region heat (``thermal2d-p1-node-cell-regions-v1`` and
+- region heat (``thermal2d-p1-node-cell-regions-v1``,
+  ``thermal-axisymmetric-p1-node-cell-regions-v1`` with (r, z) points and its
+  ``_w`` full-revolution rates, and
   ``thermal2d-transient-p1-node-cell-regions-v1``): the same steady/transient
   arrays plus static integer cell data ``triangle_regions``; steady boundary
   loads are point data when present
@@ -107,6 +109,7 @@ _TRANSIENT_BOUNDARY = "thermal2d-transient-p1-node-cell-boundary-v1"
 _CAVITY = "cavity3d-edge-v1"
 _CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
+_AXISYMMETRIC_REGIONS = "thermal-axisymmetric-p1-node-cell-regions-v1"   # (r, z) points; rates in W
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
 _MODES = "em-modes2d-p1-node-centroid-v1"
@@ -115,14 +118,17 @@ _MECHANICS = "mechanics2d-p1-v1"
 _THERMOELASTIC = "thermoelastic2d-p1-v1"
 _MECHANICS_LAYOUTS = (_MECHANICS, _THERMOELASTIC)
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS, _TRANSIENT_BOUNDARY)
-_REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS)
+_REGION_LAYOUTS = (_STEADY_REGIONS, _AXISYMMETRIC_REGIONS, _TRANSIENT_REGIONS)
 _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, *_REGION_LAYOUTS, _TRANSIENT_BOUNDARY)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, *_REGION_LAYOUTS,
                      _ELECTRIC_JOULE, _CAVITY_COMPLEX, _TRANSIENT_BOUNDARY, _MODES, *_MECHANICS_LAYOUTS)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
-          "convective_outward_w_per_m", "system_rhs_w_per_m")
+          "convective_outward_w_per_m", "system_rhs_w_per_m",
+          # the axisymmetric region layout: full-revolution rates in W
+          "load_w", "reaction_w", "residual_w", "prescribed_outward_load_w", "ambient_load_w",
+          "convective_outward_w", "system_rhs_w")
 # electric-joule2d-p1-v1 arrays by VTK association; absent arrays are skipped
 # (a plain electric result has no heat arrays, only joule.temperature2d has
 # evaluated_temperature_k). Dirichlet node lists are not exported.

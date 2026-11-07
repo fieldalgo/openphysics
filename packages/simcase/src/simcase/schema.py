@@ -486,6 +486,10 @@ class Document:
         d = self.data
         check_format_units_and_tags(self)
         g = d["geometry"]
+        if self.is_version_1 and self.component.dimension == "axisymmetric":
+            raise DocumentError(f"component {self.component.name!r}: em.modes2d takes 2d components only; an "
+                                "axisymmetric component is a body of revolution, which this waveguide physics "
+                                "does not describe (steady region heat takes it)")
         dom = g.get("domain") if not self.is_version_1 else self.domain
         if not dom or any(k not in dom for k in ("xmin", "xmax", "ymin", "ymax")):
             raise DocumentError("geometry.domain needs xmin, xmax, ymin, ymax")
