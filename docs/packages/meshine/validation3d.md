@@ -85,11 +85,11 @@ and θ (bins of 5°); counts of tetrahedra with any θ below 10° and below 30°
 | C7 | prism of length 1 over an isosceles triangle with legs 1 and a 15° apex |
 | C8 | thin-layer stack, aspect ratio 1:50 |
 | C9 | box cavity with a dielectric block |
-| C10 | adversarial inputs: Schönhardt prism; Chazelle polyhedron; cospherical prism with an interior vertex; near-coplanar quadrilaterals; stacked layers; a 4³ cospherical box lattice; 5° and 30° wedges; a 1:100 slab |
+| C10 | adversarial inputs: Schönhardt prism; Chazelle polyhedron; cospherical prism with an interior vertex; near-coplanar quadrilaterals; stacked layers; a 4³ cospherical box lattice; 5° and 30° wedges; a 1:100 slab; closed surfaces, meshed as their parity domain (see "C14 protocol"), with each configuration the C14 validity rule makes valid: a vertex inside an edge, a vertex inside a facet, an edge inside a facet, a T-junction, nested shells, two shells touching at a vertex, an edge with four facets, two closed shells where a facet of one lies inside a coplanar facet of the other (a box standing on a larger box) |
 | C11 | concentric-sphere capacitor: a = 0.5, b = 0.75, c = 1 |
 | C12 | Delaunay point sets: uniform 10³–10⁶ points, a 50³ lattice, cospherical shells, coplanar sets |
 | C13 | fuzz: dyadic box and cylinder assemblies with 1-ulp jitter; random closed piecewise-linear complexes |
-| C14 | permissively licensed subset of Thingi10K (CC0, CC BY, public domain); the subset is fixed by file hash before the first boundary-recovery pull request |
+| C14 | Thingi10K population, version 1: every file of the Thingi10K dataset (HuggingFace `Thingi10K/Thingi10K`, revision `2d5d3b2f3cd3711028ad75b12788c13b25559ec6`) licensed CC BY, CC0 or public domain, except 12 whose identical bytes also appear under another license, with 14 byte duplicates merged: 3,106 files, fixed by SHA-256 before the first boundary-recovery pull request. Each file is in class A, B or X, or is unclassified (see "C14 protocol") |
 | C15 | package footprint 10×10 with 36 vias, r = 0.15 |
 
 Sizes for C1–C7: C1 h ∈ {0.2, 0.1, 0.05}; C2 {0.12, 0.06, 0.03}; C3 {0.8, 0.4, 0.2};
@@ -137,7 +137,7 @@ counts can be compared.
 | V17 | C12 | (a) every interior face locally Delaunay under symbolic perturbation, checked exactly; (b) 3 insertion orders give the same tetrahedra; throughput on 10⁶ uniform points | (a), (b) 100%; ≥ 150k points/s target, < 50k points/s stops the kernel plan | yes |
 | V18 | C10 at 3 sizes | V1–V4 | 100%; Steiner counts reported | yes |
 | V19 | C13 | panics, invalid outputs (V1–V3), hangs (60 s child-process limit), untyped errors | all 0; 200 cases per CI run, 10⁵ outside CI | yes |
-| V20 | C14 | share giving a valid (V1–V3) mesh | ≥ 98.0% within 60 s and ≥ 99.5% within 600 s | yes |
+| V20 | C14 class A, boundary-recovery mode | share giving a valid mesh: mesh sanity (see "C14 protocol") and V1–V3 as written, with V3 applied to every input facet and V2's Euler clause applied when the referee records the surface as ball-like (one connected, edge- and vertex-manifold surface of Euler characteristic 2), plus: every input facet is tiled by the boundary faces mapped to it (each node within (√3/2)·ε·max\|x\| of the closed facet, x the node's coordinates; projected areas positive, non-overlapping and summing to the facet area within relative 1e-12); every boundary face is wound toward the outside recorded by the referee; the total volume equals the exact parity-domain volume within relative 1e-12. Time in reference seconds; counting as in "C14 protocol" | ≥ 98.0% within 60 s and ≥ 99.5% within 600 s | yes |
 | V21 | C2: u = sin πx sin πy sin πz, −Δu = 3π²u, u = 0 on the boundary. C1: u = x² − y² + z with Dirichlet data | P1 errors with a degree-5 rule: e_L2, e_H1 (C2 only); h_eff = (\|Ω\|/T)^{1/3}; least-squares slopes over 3 meshes | L2 slope ≥ 1.8; H1 slope ≥ 0.9 | yes |
 | V22 | C3 with conductivities 1, 0.01, 1 per layer; T = 0 at the bottom, T = 1 at the top, insulated sides | max over nodes of \|T_h − T_exact\|, T_exact piecewise linear in z | ≤ 1e-10 | yes |
 | V23 | C2 PEC cube cavity through `from_mesher` and the 3D edge-element eigensolver | the existing assertions of the unstructured-cavity tests in `tests/galerkin/test_cavity_modes.py`, unchanged | unchanged | yes |
@@ -151,6 +151,10 @@ counts can be compared.
 | V31 | C2, C3 | `write_msh` → `gmshio.read_msh` → `gmshio.to_fem3d`: region names, regions and per-tag face sets equal the original mesh | identical, no Gmsh binary needed | yes |
 | V32 | the 3D meshing and interop tests that are skipped without Gmsh today (gmshio generation, galerkin interop, unstructured cavity) | the same assertions on a mesh from OpenPhysics's own mesher | unchanged | yes |
 | V33 | C15 | 2D footprint mesh time at size 0.1 (median of 3); extrusion and tagging time | ≤ 30 s; ≤ 2 s per 1M tetrahedra | benchmark |
+| V34 | C14: all 3,106 files in boundary-recovery mode, every class-X and class-B file through the public meshing API with the V36 defaults, and every V36 and V37 run; a file without canonical arrays runs only as "C14 protocol" says; other runs on C14 files (other modes or modified input) count for crashes and mesh sanity only | safety: crashes (a panic, caught or not; an untyped error; any other abnormal end that the harness does not classify as a time stop, a memory stop or a harness error); invalid outputs (a mesh that fails mesh sanity, or fails the validity rule of its row other than by a bound-only failure, see "C14 protocol"); rejections whose witness is missing or not confirmed by the witness verifier; meshes returned for a file with a stored, confirmed class-X or class-B witness; if the product ships an STL/OBJ reader, canonical arrays that differ from the C14 loader's | 0 of each | yes |
+| V35 | C14 class X, boundary-recovery mode | share rejected with a typed invalid-input or not-closed error whose witness the witness verifier confirms, within 60 s × max(1, F_in/10⁶); not evaluated until the referee's exact test for 5 is stored | ≥ 99.5% | yes |
+| V36 | C14 class A, through the public meshing API with the defaults recorded on this page before the first V36 run | share giving a mesh valid under V20's rule within 600 s × max(1, F_in/10⁵) | ≥ 98.5%, and ≥ the V20 share within 600 s on the same commit minus 1.0 percentage point; 0 invalid outputs; not evaluated when V20 is not evaluated on that commit | yes |
+| V37 | C14 class A, each model inside an air box (see "C14 protocol"), through the public meshing API as in V36 | share giving a mesh valid under V20's rule over the whole box, with box nodes exactly on the box planes, every model facet tiled by model–air interface faces and each region volume within relative 1e-12 of its exact volume, within 600 s × max(1, F_in/10⁵) | ≥ 98.5%, and ≥ the V20 share within 600 s on the same commit minus 1.0 percentage point; 0 invalid outputs; not evaluated when V20 is not evaluated on that commit | yes |
 
 ### Frozen baseline constants
 
@@ -222,6 +226,141 @@ tetrahedron count (V9, V10) and the draft V8 would have been contradictory, so V
 now stated against the baseline's own size distribution. This revision was made
 before the freeze and before any implementation.
 
+### C14 protocol
+
+**Population.** The population file (3,132 rows: 3,106 members, 14 merged duplicates, 12 excluded files; SHA-256
+`8a3e66e43fe8ccc1a7459ea5848326e7204430e79a98994dc454b912406b3b49`) is kept in the project's lab records. The
+member-set digest, the SHA-256 of the members' file SHA-256 values in lowercase hex, sorted, each followed by a line
+feed, is `4c76cd96d50382a0502bdda6c039f5a534f7a8ac44b8e55a5436a025d126623e`. Members are never added, removed or
+swapped; any other population is a new C14 version. Provisional class counts from the dataset's metadata are A 1,595,
+B 44 and X 1,467. The referee's counts replace them before the first gated run, and failure budgets follow from the
+same percentages.
+
+**Symbols.** F_in is a file's canonical facet count (for V37, the model's alone; 0 for a file without canonical
+arrays). E_max is the model's largest bounding-box extent, and lo and hi are its bounding-box minimum and maximum
+corners. κ = t_cal / t_cal,ref (see "Timing"), and τ is a time limit of a row. The class letters A, B and X are
+unrelated to the baseline B and to V7's B.
+
+**Input arrays.** Every rule here applies to canonical arrays: binary STL float32 widened exactly to float64; ASCII STL
+and OBJ decimals parsed to the correctly rounded float64; vertices merged only when their coordinates are bitwise equal
+(+0.0 equals −0.0); OBJ polygons kept; unreferenced vertices dropped. If the product ships an STL/OBJ reader, V34 runs
+through it and its canonical arrays must equal these. Otherwise C14 covers meshing canonical arrays only. A file that
+the C14 loader cannot read under these rules has no canonical arrays (0 under "Validity rule"). It is outside every
+share and runs in no mode that takes canonical arrays, boundary-recovery mode included. If the product ships an STL/OBJ
+reader, V34 runs the file through that reader, which must reject it with a typed error. That error is the expected
+rejection and needs no witness of its own; arrays returned for it differ from the C14 loader's. Otherwise the file is
+only reported.
+
+**Validity rule.** This is the input contract for imported closed surfaces; the product's own input check must
+implement the same rule. Cells are the vertices, edges and facets of the canonical input. An elementary sub-segment
+is the part of an edge between consecutive vertices that lie on it. A file is invalid if (0) the C14 loader cannot
+read it, or it has no facets after loading. It is also invalid if it has:
+
+1. a coordinate that is not finite, or that is nonzero with magnitude outside [2⁻¹²⁰, 2¹²⁰];
+2. a facet that repeats a vertex;
+3. an exactly collinear triangle, or a non-planar or non-simple polygon;
+4. two facets with the same vertex set; or
+5. two cells whose exact intersection is not a union of cells (crossings, piercings, partial collinear overlaps of
+   edges, and a coplanar overlap with a part that no cell contained in both covers).
+
+A vertex inside an edge or facet, an edge inside a facet, and T-junctions are valid. So are a facet inside a coplanar
+facet and a coplanar overlap that is exactly the union of the facets contained in both. The product's input check
+must read 5 in the same way: a rejection that names such a pair has a witness that the witness verifier does not
+confirm. A valid file is closed unless (6) an elementary sub-segment lies on the boundary of an odd number of facets.
+Several components, nested shells and non-manifold edges with an even number of facets are allowed. The domain of a
+valid closed file is its parity domain: the points off the surface from which a generic ray crosses the surface an odd
+number of times. Facet orientation is not used.
+
+**Classes and witnesses.** The project's exact referee gives each file at most one class. It is lab code in exact
+rational arithmetic, written from this rule alone by people who never see mesher results on C14, and frozen, with its
+output hashed, before the first gated C14 run. Its exact test for 5 may be frozen and stored later, as stated below.
+
+- X: a witness of 0–5.
+- B: valid, with a witness of 6.
+- A: valid and closed.
+
+A file whose dataset metadata reports a self-intersection, a degenerate face or a duplicate face (a flagged file) is
+never in class A in this version. A class-A file is expected to be meshed. A class-X or class-B file is expected to be
+rejected with a typed error that names a witness: the cells involved and, for 5, an exact rational point of the
+intersection that lies in no cell contained in both; for 0 on a file without facets, "no facets". A file without
+canonical arrays is expected to be rejected as "Input arrays" says. The project's witness verifier checks the witness on
+the canonical input. The referee's witness of 0 gives the C14 loader's reason category or "no facets", and the witness
+verifier checks it by re-running the C14 loader on the file's bytes.
+
+Until the referee's exact test for 5 is stored, the dataset's self-intersection count stands in for it, and every
+flagged file is in class X. Flagged files without a stored witness are then outside every share, V34's no-mesh clause
+does not apply to them, and a mesh returned for one is checked for mesh sanity only.
+
+When the referee's exact test for 5 is first stored, every file is reclassified by it before the next run starts,
+without mesher results, and failure budgets follow from the same percentages; a run uses the classes stored when it
+starts. A flagged file that then has no witness of 0–6 is in no class in this version: it is outside every share, V34's
+no-mesh clause does not apply to it, a mesh returned for it is checked for mesh sanity only, and it is reported.
+
+**Mesh sanity.** Finite coordinates; every input vertex kept bit-identical; no duplicate or unreferenced nodes; exact
+orient3d > 0 (V1); every face in one or two tetrahedra, with opposite orientations when in two; no duplicate
+tetrahedra.
+
+**Rounding bounds.** A bound-only failure is a mesh that passes mesh sanity and its row's validity rule, with every
+boundary node within (√3/2)·ε·max|x| of its facet, except for one or more of: V3(a)'s area bound, V3(b)'s 4ε·L bound,
+and the relative 1e-12 area and volume sums of V20's rule. Correct rounding can exceed these bounds (see "Limits"). Such
+a mesh is a failure in its share and is listed, but it is not an invalid output under V34.
+
+**Modes and air box.** Boundary-recovery mode is the exact input check, the constrained Delaunay tetrahedralization,
+inside/outside labelling and one rounding to float64 with certification and repair, without refinement. The
+public-API defaults used by V36 and V37 are recorded on this page before the first V36 run. A later change of them is
+entered in the Amendments section with the old values, the new values and a reason that cites no C14 result; from then
+on V36 and V37 use the new defaults and also report the old ones. The air box is [lo − m, hi + m] per axis, with
+m = 2^⌈log₂(E_max/4)⌉, computed in float64 round-to-nearest. Each box face is split into two triangles through its
+lexicographically smallest corner. The regions are "model" (the parity domain) and "air".
+
+**Counting.** In V20, V36 and V37 only a valid mesh within the limit counts. Timeouts, memory stops, typed internal
+errors and bound-only failures are failures. In V35 only a confirmed rejection within the limit counts. A share is the
+exact fraction of successes over the row's files and is compared with its threshold without rounding: 8 failures in
+1,595 files (99.498%) is below 99.5%. A kill that the harness did not send and that has no out-of-memory event is a
+harness error: the file is re-run once, and if the error repeats, the file counts as a failure in its share, not as a
+crash. A file leaves a share in three ways only:
+
+- (a) before the run, checks independent of the mesher find that no source delivers bytes with the file's SHA-256, on
+  three attempts spread over at least 24 hours. Such files are listed, and if more than 1% of a row's files are
+  unavailable, the row is not evaluated.
+- (b) while the exact test for 5 is not stored, the witness verifier confirms a witness of 5 that the mesher reported
+  for a class-A or class-B file. The file moves to X, one way; it is listed and never replaced. If more than 1% of
+  class A moves in this way after the referee is frozen, that run is not evaluated, and its share is published with
+  and without the moves.
+- (c) in the reclassification when the exact test for 5 is first stored (see "Classes and witnesses"), a class-A or
+  class-B file for which that test finds a witness of 5 that the witness verifier confirms moves to X, one way. Such
+  files are listed, and failure budgets follow from the same percentages.
+
+A confirmed witness is a referee defect if it is of 0–4 on a class-A or class-B file, of 6 on a class-A file, or,
+once the exact test is stored, of 5 on a class-A or class-B file. The referee is then corrected and every file is
+rescored. Size, difficulty or other tools' results never remove a file. A result is one complete run of the row on one
+tagged commit; re-running only the failures does not count. Every complete run is recorded. If two runs of a row on one
+tagged commit disagree, the row is recorded as failed for that commit. This page sets no milestones: a run below a
+threshold is recorded as failed for that commit, whatever stage the project is in. A run that is not evaluated is
+recorded as such and never counts as passed.
+
+**Timing.** One dedicated Linux x86-64 reference machine with at least 32 GiB of RAM; one thread; one process per
+file; at most 16 GiB of memory per run, without swap. Time runs from the API call, with canonical arrays in memory, to
+the certified mesh or typed error. Reading, merging and validation are not timed. Times are reference seconds: wall
+seconds divided by κ = t_cal / t_cal,ref. Here t_cal is the time of a hash-pinned calibration benchmark (fixed-seed 3D
+Delaunay), and t_cal,ref is its time on the reference machine when the benchmark was frozen, measured once as the
+median of 5 runs and never re-measured. Files run in batches of 100 in ascending SHA-256 order. κ is measured at the
+start and the end of each batch; a batch counts only if both values lie within [0.8, 1.25], and its times are wall
+seconds divided by the smaller one. A batch that does not count stays in the record and is re-run whole. A run that
+ends within [0.8 τ, 1.25 τ] of a time limit τ of its row, taken for the file where the row scales it, is run twice
+more, and the median decides. Runs are stopped at 1.5 times the row's largest time limit for the file (900 s for V20),
+converted to wall time with κ at the batch start. A file in no share runs with V35's limit. The harness classifies
+memory stops, which are not crashes. A replacement reference machine counts only if its κ lies within [0.8, 1.25];
+otherwise C14 rows are not evaluated. C14 rows are judged on this machine only and claim Linux x86-64 only. They run
+outside CI, and CI never fetches Thingi10K.
+
+**Reference tools and corrections.** No other tool decides a C14 class, membership, denominator or result, and no file
+is excused because other tools fail it too. Figures published in papers may be shown beside C14 results. A defect in a
+C14 tool is corrected only when a minimal synthetic case shows that the tool contradicts this page. The case contains
+no mesher output and no C14 geometry; when it corrects a referee defect proven by a confirmed witness under
+"Counting", it may be modelled on that witness. Every recorded run is then rescored mechanically, and both scorings are
+published. Any other change to C14 is a new C14 version and needs its own amendment of this page.
+
 ## Reference comparisons
 
 Comparisons with Gmsh, Gmsh HXT, Netgen and pytetwild are reported, never gated.
@@ -246,6 +385,22 @@ of extruded meshes from 0.177 down give L2 1.89–1.91 and H1 0.94–0.95. At
 this exception; the failure at the original sizes stays recorded here. The
 thresholds are unchanged, and the CDT kernel is graded at the original sizes.
 
+**2026-11-06 (landed 2026-11-07), C14 population and V20 protocol.** Old: C14 "permissively licensed subset of
+Thingi10K (CC0, CC BY, public domain); the subset is fixed by file hash before the first boundary-recovery pull
+request"; V20 "C14 | share giving a valid (V1–V3) mesh". New: C14 is the fixed 3,106-file Thingi10K population, in
+which every file is in class A, B or X or is unclassified. V20 counts class A in boundary-recovery mode, with mesh
+sanity, V1–V3, facet coverage, inside/outside labelling and exact volume, timed in reference seconds and counted as in
+"C14 protocol". Rows V34–V37, the subsection "C14 protocol", cases in C10 and a bullet in "Limits" are added. V20's
+thresholds are unchanged. Reason: the old text did not fix the files, their expected outcomes, the denominator, the
+run mode or the time measurement. A share over all permissively licensed files would include about 1,467 invalid
+inputs, so it could not mean "valid mesh". V20's file set is now derived by the referee without mesher results; the
+only exit from it that depends on a mesher result is limited to files with a confirmed witness of invalid input and
+capped at 1% of class A. The population was fixed by SHA-256 on 2026-11-04, before any boundary-recovery pull request
+was opened. These rules were adopted on 2026-11-06 and 2026-11-07, before any mesher result on a C14 file existed.
+**The C14 freeze condition was missed:** this text was to land before the first boundary-recovery pull request, but
+that pull request (segment recovery, #205) was opened and merged on 2026-11-07, before this text landed. It touches no
+C14 file, and no mesher has been run on one; V20 has not been run. The project owner approved this change.
+
 ## Limits
 
 - The baseline constants come from one Linux machine. Time ratios (V14) are always
@@ -253,3 +408,4 @@ thresholds are unchanged, and the CDT kernel is graded at the original sizes.
 - No dihedral-angle bound is promised next to small input angles (C7, C10); those
   cases are reported or exempted as stated.
 - This page does not certify any code. Each acceptance record names the exact commit it grades.
+- On C14, V3's frozen bounds can be stricter than correct rounding allows: V3(b)'s 4ε·L on a file whose largest absolute coordinate exceeds about 4.6 L, and V3(a)'s 1e-12 on a needle facet with a Steiner node on a long edge. Such files stay in every share, and the bounds are not loosened; a mesh that fails only such a bound is a failure in its share, not an invalid output under V34.
