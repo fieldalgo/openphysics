@@ -56,9 +56,14 @@ names may change before the mesher's public API.
   Circle tests use the facet's own metric (`incircle_plane`, exact without projecting
   circles), with ties broken by the same index-ordered perturbation as in 3D.
   `check_plc(points, segments, facets)` checks a whole piecewise linear complex
-  exactly: distinct points, planar facets, and no two pieces meeting except at a
-  shared point or along a shared segment. A segment may run along a facet's boundary,
-  never through its inside. The first violation is named in a `ValueError`.
+  exactly: distinct points in the kernel's range, planar facets with simple loops, and
+  every two cells (points, edges, facets) meeting in a union of cells. So a point may
+  lie inside an edge or a facet (a T-junction), an edge inside a facet, and a facet
+  inside a coplanar facet; crossings, piercings, partial collinear overlaps and
+  coplanar overlaps that no common cell covers are refused. The first violation is
+  named in an `InvalidPLC` (a `ValueError`) with the witness type of the import
+  validity rule. It also returns the edges split at the points on them and the pieces
+  on the boundary of an odd number of facets (none when the surface is closed).
 
 ```python
 import numpy as np

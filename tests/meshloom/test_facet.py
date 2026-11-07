@@ -10,7 +10,6 @@ index-ordered perturbation. Facets lie on tilted planes (conformal and non-confo
 integer embeddings), axis-aligned planes and cocircular configurations.
 """
 
-import itertools
 import random
 from fractions import Fraction
 
