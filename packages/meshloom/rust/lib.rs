@@ -6,10 +6,12 @@
 //! Arrays cross the boundary as little-endian bytes, so the extension needs no
 //! array crate; the Python side wraps them in numpy arrays.
 
+mod bigint;
 mod delaunay;
 #[cfg(test)]
 mod exact_ref;
 mod facet;
+mod mixed;
 mod plc;
 mod predicates;
 
@@ -128,6 +130,91 @@ fn predicate_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes
         }).collect()
     });
     Ok(PyBytes::new(py, &out))
+}
+
+/// Exact signs of one predicate over a batch of mixed points: `coords` the input
+/// points (n x 3 doubles), `seg` the S points' segment ends (m x 2 int64) and `t` their
+/// parameters (m doubles), `query` the global indices of each group (input points
+/// 0..n, S points n..n+m). Returns (signs as int8 bytes, counters).
+#[pyfunction]
+#[pyo3(signature = (kind, coords, seg, t, query, axis=2))]
+fn mixed_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes>, seg: &Bound<'py, PyBytes>,
+                    t: &Bound<'py, PyBytes>, query: &Bound<'py, PyBytes>, axis: usize)
+                    -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
+    check_environment()?;
+    let k = match kind {
+        "orient2d_proj" => 3,
+        "orient3d" | "incircle_plane" | "incircle_plane_sos" => 4,
+        "insphere" | "insphere_sos" => 5,
+        _ => return Err(PyValueError::new_err(format!("unknown predicate {kind:?}"))),
+    };
+    if axis > 2 {
+        return Err(PyValueError::new_err("axis must be 0, 1 or 2"));
+    }
+    let input = points(coords.as_bytes())?;
+    if let Err(e) = delaunay::check_input(&input) {
+        return Err(PyValueError::new_err(e.to_string()));
+    }
+    let ends = u32s(seg.as_bytes(), "segment end")?;
+    let ts = f64s(t.as_bytes());
+    if ends.len() != 2 * ts.len() {
+        return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
+    }
+    let s: Vec<mixed::SPoint> = ts.iter().enumerate()
+        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+    mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
+    let q = u32s(query.as_bytes(), "query index")?;
+    if q.len() % k != 0 {
+        return Err(PyValueError::new_err(format!("{kind} takes groups of {k} points")));
+    }
+    let total = (input.len() + s.len()) as u32;
+    if let Some(bad) = q.iter().find(|&&i| i >= total) {
+        return Err(PyValueError::new_err(format!("query index {bad} refers to no point")));
+    }
+    let kind = kind.to_owned();
+    let (out, n) = py.detach(move || {
+        let m = mixed::Mixed { input: &input, s: &s };
+        let mut n = mixed::MixedCounters::default();
+        let out: Vec<u8> = q.chunks_exact(k).map(|g| {
+            let p: Vec<mixed::Pt> = g.iter().map(|&i| m.from_id(i)).collect();
+            let s = match kind.as_str() {
+                "orient3d" => m.orient3d([p[0], p[1], p[2], p[3]], &mut n),
+                "insphere" => m.insphere([p[0], p[1], p[2], p[3], p[4]], &mut n),
+                "insphere_sos" => m.insphere_sos([p[0], p[1], p[2], p[3], p[4]], &mut n),
+                "orient2d_proj" => m.orient2d_proj(axis, [p[0], p[1], p[2]], &mut n),
+                "incircle_plane" => m.incircle_plane(axis, [p[0], p[1], p[2], p[3]], &mut n),
+                _ => m.incircle_plane_sos(axis, [p[0], p[1], p[2], p[3]], &mut n),
+            };
+            s as u8
+        }).collect();
+        (out, n)
+    });
+    let d = PyDict::new(py);
+    d.set_item("calls", n.calls)?;
+    d.set_item("interval", n.interval)?;
+    d.set_item("exact", n.exact)?;
+    d.set_item("sos", n.sos)?;
+    Ok((PyBytes::new(py, &out), d))
+}
+
+/// The output coordinates of S points: each coordinate of points[a] + t (points[b] -
+/// points[a]) rounded once to the nearest double. Returns m x 3 doubles.
+#[pyfunction]
+fn spoint_coords<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, seg: &Bound<'py, PyBytes>,
+                      t: &Bound<'py, PyBytes>) -> PyResult<Bound<'py, PyBytes>> {
+    check_environment()?;
+    let input = points(coords.as_bytes())?;
+    let ends = u32s(seg.as_bytes(), "segment end")?;
+    let ts = f64s(t.as_bytes());
+    if ends.len() != 2 * ts.len() {
+        return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
+    }
+    let s: Vec<mixed::SPoint> = ts.iter().enumerate()
+        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+    mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
+    let m = mixed::Mixed { input: &input, s: &s };
+    let out: Vec<f64> = (0..s.len() as u32).flat_map(|j| m.rounded(mixed::Pt::S(j))).collect();
+    Ok(PyBytes::new(py, &out.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>()))
 }
 
 /// Delaunay tetrahedralization: `coords` n x 3 doubles, `order` an optional
@@ -273,6 +360,8 @@ fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(two_product_probe, m)?)?;
     m.add_function(wrap_pyfunction!(predicate_signs, m)?)?;
+    m.add_function(wrap_pyfunction!(mixed_signs, m)?)?;
+    m.add_function(wrap_pyfunction!(spoint_coords, m)?)?;
     m.add_function(wrap_pyfunction!(tetrahedralize, m)?)?;
     m.add_function(wrap_pyfunction!(verify_delaunay, m)?)?;
     m.add_function(wrap_pyfunction!(triangulate_facet, m)?)?;
