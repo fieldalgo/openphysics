@@ -154,6 +154,29 @@ def recover_plc(points, segments, facets, max_depth: int = 60) -> dict:
             "subfacet_facet": i64(owner, -1), "missing": i64(missing, -1), "stats": stats}
 
 
+def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
+    """Boundary recovery of a PLC: ``recover_plc``, then facet recovery (every
+    subfacet becomes a face: cavities around missing subfacets refilled by exact
+    gift-wrapping on each side of the facet plane) and the constrained Delaunay
+    verifier (every interior face that is not a subfacet is locally Delaunay). Returns
+    ``tetrahedra`` over the input points and S points, ``s_segments``, ``s_t``,
+    ``subfacets``, ``subfacet_facet`` and counters. Not yet region-labelled: the
+    tetrahedra fill the convex hull. A PLC it cannot recover raises ``ValueError``.
+    """
+    kernel = _require()
+    p = _points(points)
+    s = np.ascontiguousarray(np.asarray(segments, dtype="<i8").reshape(-1, 2))
+    f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
+    tets, sseg, st, sub, owner, stats = kernel.recover_boundary(p.tobytes(), s.tobytes(), f, max_depth)
+
+    def i64(b, *shape):
+        return np.frombuffer(b, dtype="<i8").reshape(*shape).astype(np.int64)
+
+    return {"tetrahedra": i64(tets, -1, 4), "s_segments": i64(sseg, -1, 2),
+            "s_t": np.frombuffer(st, dtype="<f8").astype(np.float64), "subfacets": i64(sub, -1, 3),
+            "subfacet_facet": i64(owner, -1), "stats": stats}
+
+
 def delaunay(points, order=None) -> tuple[np.ndarray, np.ndarray, dict]:
     """Delaunay tetrahedralization of ``points`` (n, 3).
 

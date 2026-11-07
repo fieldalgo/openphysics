@@ -282,3 +282,82 @@ def test_subfacets_tile_their_facets_with_the_segment_points(case):
     assert absent == r["missing"].tolist()
     if case == "interface":
         assert len(absent) > 0  # the work left to facet recovery
+
+
+# ---------------------------------------------------------------- facet recovery
+
+def check_boundary(points, r):
+    """Independent checks of recover_boundary's result: every point a vertex, every
+    tetrahedron positive, every face in at most two, every subfacet a face, every
+    interior face that is not a subfacet locally Delaunay (constrained Delaunay), and
+    the volume equal to the convex hull's."""
+    n = len(points)
+    tets, sseg, st = r["tetrahedra"], r["s_segments"], r["s_t"]
+    k = len(st)
+    assert sorted(np.unique(tets).tolist()) == list(range(n + k)), "every point is a vertex"
+    signs, _ = mixed_predicate_signs("orient3d", points, sseg, st, tets)
+    assert (signs == 1).all(), "every tetrahedron is positive"
+    faces = {}
+    for ti, v in enumerate(tets.tolist()):
+        for i in range(4):
+            faces.setdefault(tuple(sorted(v[:i] + v[i + 1:])), []).append((ti, i))
+    subs = {tuple(sorted(t)) for t in r["subfacets"].tolist()}
+    assert subs <= set(faces), "every subfacet is a face"
+    pairs = []
+    for f, owners in faces.items():
+        assert len(owners) <= 2
+        if len(owners) == 2 and f not in subs:
+            (t1, _), (t2, i2) = owners
+            pairs.append(tets[t1].tolist() + [int(tets[t2][i2])])
+    s, _ = mixed_predicate_signs("insphere_sos", points, sseg, st, np.array(pairs))
+    assert (s < 0).all(), "every other interior face is locally Delaunay"
+    xyz = np.vstack([points, points[sseg[:, 0]] + st[:, None] * (points[sseg[:, 1]] - points[sseg[:, 0]])]) \
+        if k else points
+    a, b, c, d = (xyz[tets[:, i]] for i in range(4))
+    vol = np.einsum("ij,ij->i", b - a, np.cross(c - a, d - a)).sum() / 6
+    hull = pytest.importorskip("scipy.spatial").ConvexHull(points).volume
+    assert abs(vol - hull) <= 1e-9 * max(1.0, abs(hull)), (vol, hull)
+
+
+def crowded(case, seed):
+    """A voxel PLC with free points at 1e-6 to 0.03 from its interior interfaces, in
+    general position (optionally tilted): segment recovery leaves subfacets missing."""
+    rng = random.Random(seed)
+    cells, planes = {
+        "chip": (chip(), [(2, 0.25), (2, 0.5), (0, 0.5), (1, 0.5)]),
+        "stack": ({(0, 0, 0): "a", (0, 0, 1): "b", (0, 0, 2): "c"}, [(2, 0.25), (2, 0.5)]),
+        "fichera": (fichera(), [(0, 0.25), (1, 0.25), (2, 0.25)]),
+    }[case]
+    pts, facets = voxel_plc(cells)
+    lo, hi = pts.min(0), pts.max(0)
+    extra = []
+    while len(extra) < 60:
+        ax, c = rng.choice(planes)
+        q = [lo[i] + (hi[i] - lo[i]) * rng.random() for i in range(3)]
+        q[ax] = c + rng.choice([-1, 1]) * 10 ** rng.uniform(-6, -1.5)
+        if all(lo[i] < q[i] < hi[i] for i in range(3)):
+            extra.append(q)
+    pts = np.vstack([pts, extra])
+    return (pts @ TILT.T if seed % 2 else pts), facets
+
+
+@pytest.mark.parametrize("case", ["chip", "stack", "fichera"])
+@pytest.mark.parametrize("seed", [1, 2])
+def test_missing_subfacets_are_recovered(case, seed):
+    from meshloom._core import recover_boundary, recover_plc
+    pts, facets = crowded(case, seed)
+    missing = len(recover_plc(pts, np.zeros((0, 2)), facets)["missing"])
+    r = recover_boundary(pts, np.zeros((0, 2)), facets)
+    assert r["stats"]["missing_after_segments"] == missing > 0
+    assert r["stats"]["regions"] > 0
+    check_boundary(pts, r)
+
+
+@pytest.mark.parametrize("case", ["chip", "fichera-tilted", "prism", "sphere"])
+def test_boundary_recovery_without_missing_subfacets(case):
+    from meshloom._core import recover_boundary
+    pts, facets = {"chip": lambda: voxel_plc(chip()), "fichera-tilted": lambda: voxel_plc(fichera(), TILT),
+                   "prism": twisted_prism, "sphere": lambda: geodesic_sphere(4)}[case]()
+    r = recover_boundary(pts, np.zeros((0, 2)), facets)
+    assert r["stats"]["regions"] == 0
+    check_boundary(pts, r)
