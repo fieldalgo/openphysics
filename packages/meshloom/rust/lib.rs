@@ -12,6 +12,7 @@ mod delaunay;
 mod exact_ref;
 mod facet;
 mod facetrec;
+mod mesh;
 mod mixed;
 mod plc;
 mod predicates;
@@ -384,6 +385,62 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
         i64_bytes(sub)?, i64_bytes(owner)?, d))
 }
 
+/// Boundary recovery, regions, rounding and certification of a PLC. `domain` is
+/// "regions" (every bounded component a region) or "parity" (the even-odd domain of
+/// closed surfaces). Returns (nodes N x 3 doubles, tetrahedra, regions, boundary
+/// facet per face, boundary faces, interface region pairs, interface faces, node
+/// sources, region count) as bytes, and counters.
+#[pyfunction]
+#[pyo3(signature = (coords, segments, facets, domain, max_depth))]
+fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
+                 facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32)
+    -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
+    check_environment()?;
+    let domain = match domain {
+        "regions" => mesh::Domain::Regions,
+        "parity" => mesh::Domain::Parity,
+        _ => return Err(PyValueError::new_err("domain must be 'regions' or 'parity'")),
+    };
+    let points = points(coords.as_bytes())?;
+    let seg = u32s(segments.as_bytes(), "segment index")?;
+    if seg.len() % 2 != 0 {
+        return Err(PyValueError::new_err("segments must hold 2 indices each"));
+    }
+    let segments: Vec<[u32; 2]> = seg.chunks_exact(2).map(|c| [c[0], c[1]]).collect();
+    let facets: Vec<Vec<Vec<u32>>> = facets.iter()
+        .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
+        .collect::<PyResult<_>>()?;
+    let plc = plc::Plc { points, segments, facets };
+    let (m, b) = py.detach(move || -> Result<_, String> {
+        let b = facetrec::recover_boundary(&plc, max_depth)?;
+        let m = mesh::build(&plc.points, &b, domain)?;
+        Ok((m, b.stats))
+    }).map_err(PyValueError::new_err)?;
+    let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
+        PyBytes::new_with(py, 8 * xs.len(), |buf| {
+            for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
+                chunk.copy_from_slice(&(*x as i64).to_le_bytes());
+            }
+            Ok(())
+        })
+    };
+    let out = vec![
+        PyBytes::new(py, &m.nodes.iter().flatten().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>()),
+        i64_bytes(m.tets.iter().flatten().copied().collect())?,
+        i64_bytes(m.regions.clone())?,
+        i64_bytes(m.boundary.iter().map(|b| b.0).collect())?,
+        i64_bytes(m.boundary.iter().flat_map(|b| b.1).collect())?,
+        i64_bytes(m.interfaces.iter().flat_map(|i| [i.0, i.1]).collect())?,
+        i64_bytes(m.interfaces.iter().flat_map(|i| i.2).collect())?,
+        i64_bytes(m.source.clone())?,
+    ];
+    let d = PyDict::new(py);
+    d.set_item("region_count", m.region_count)?;
+    d.set_item("regions_filled", b.regions)?;
+    d.set_item("cavity_tetrahedra", b.removed)?;
+    Ok((out, d))
+}
+
 /// Delaunay tetrahedralization: `coords` n x 3 doubles, `order` an optional
 /// insertion order (n int64). Returns (tetrahedra as T x 4 int64 bytes, for each
 /// point the vertex it duplicates or itself as n int64 bytes, statistics).
@@ -532,6 +589,7 @@ fn _kernel(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(recover_segments, m)?)?;
     m.add_function(wrap_pyfunction!(recover_plc, m)?)?;
     m.add_function(wrap_pyfunction!(recover_boundary, m)?)?;
+    m.add_function(wrap_pyfunction!(mesh_plc, m)?)?;
     m.add_function(wrap_pyfunction!(tetrahedralize, m)?)?;
     m.add_function(wrap_pyfunction!(verify_delaunay, m)?)?;
     m.add_function(wrap_pyfunction!(triangulate_facet, m)?)?;

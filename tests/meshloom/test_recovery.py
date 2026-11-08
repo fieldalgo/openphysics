@@ -361,3 +361,134 @@ def test_boundary_recovery_without_missing_subfacets(case):
     r = recover_boundary(pts, np.zeros((0, 2)), facets)
     assert r["stats"]["regions"] == 0
     check_boundary(pts, r)
+
+
+# ---------------------------------------------------------------- regions and output
+
+def check_mesh(m, want_volumes=None):
+    """The plan's output contract, checked exactly (Fraction) from the arrays."""
+    from fractions import Fraction as F
+    nodes, tets, regions = m["nodes"], m["tetrahedra"], m["regions"]
+    q = [[F(x) for x in p] for p in nodes.tolist()]
+
+    def orient(a, b, c, d):
+        u = [q[b][i] - q[a][i] for i in range(3)]
+        v = [q[c][i] - q[a][i] for i in range(3)]
+        w = [q[d][i] - q[a][i] for i in range(3)]
+        return u[0] * (v[1] * w[2] - v[2] * w[1]) - u[1] * (v[0] * w[2] - v[2] * w[0]) + \
+            u[2] * (v[0] * w[1] - v[1] * w[0])
+
+    vol = [orient(*t) for t in tets.tolist()]
+    assert all(v > 0 for v in vol), "exact orient3d > 0 on the output doubles"
+    assert sorted(np.unique(tets).tolist()) == list(range(len(nodes))), "no orphan nodes"
+    assert len({tuple(p) for p in nodes.tolist()}) == len(nodes), "no duplicate nodes"
+    k = len(m["region_names"])
+    assert set(regions.tolist()) == set(range(k)), "regions in range, none empty"
+    # faces: exterior faces are exactly the boundary faces, wound outward, each in one tag
+    owners = {}
+    for ti, v in enumerate(tets.tolist()):
+        for i in range(4):
+            owners.setdefault(tuple(sorted(v[:i] + v[i + 1:])), []).append((ti, v[i]))
+    exterior = {f for f, o in owners.items() if len(o) == 1}
+    tagged = [tuple(f) for faces in m["boundary_faces"].values() for f in faces.tolist()]
+    assert len(tagged) == len(set(map(lambda f: tuple(sorted(f)), tagged))) == len(exterior)
+    assert {tuple(sorted(f)) for f in tagged} == exterior
+    for f in tagged:
+        (_, apex), = owners[tuple(sorted(f))]
+        assert orient(*f, apex) < 0, "boundary face wound outward"
+    for tag, faces in m["boundary_faces"].items():
+        assert np.array_equal(m["boundary_nodes"][tag], np.unique(faces))
+    # interfaces: between regions a < b, wound from a to b; every region change is one
+    changes = set()
+    for f, o in owners.items():
+        if len(o) == 2 and regions[o[0][0]] != regions[o[1][0]]:
+            changes.add(f)
+    listed = set()
+    for (a, b), faces in m["interfaces"].items():
+        assert a < b
+        for f in faces.tolist():
+            o = {regions[t]: apex for t, apex in owners[tuple(sorted(f))]}
+            assert set(o) == {a, b} and orient(*f, o[a]) < 0 and orient(*f, o[b]) > 0
+            listed.add(tuple(sorted(f)))
+    assert listed == changes
+    vols = sorted(sum(v for v, r in zip(vol, regions.tolist()) if r == i) / 6 for i in range(k))
+    if want_volumes is not None:
+        assert vols == sorted(F(x) for x in want_volumes), vols
+    return vols
+
+
+def test_chip_package_regions():
+    from meshloom._core import mesh_plc
+    pts, facets = voxel_plc(chip())
+    m = mesh_plc(pts, facets)
+    # cells of 0.25: substrate 10x10x1 cells... volumes in cell units of the voxel builder
+    vols = check_mesh(m)
+    assert len(m["region_names"]) == len(set(chip().values()))
+    assert sum(vols) == sum(1 for _ in chip()) * F_cell()
+
+
+def F_cell():
+    from fractions import Fraction as F
+    return F(1, 64)  # voxel_plc cells have h = 0.25
+
+
+@pytest.mark.parametrize("case", ["fichera", "fichera-tilted", "crowded-stack"])
+def test_one_or_more_regions_with_exact_volume(case):
+    from meshloom._core import mesh_plc
+    if case == "fichera":
+        pts, facets = voxel_plc(fichera())
+        cells = fichera()
+    elif case == "fichera-tilted":
+        pts, facets = voxel_plc(fichera(), TILT)
+        cells = fichera()
+    else:
+        pts, facets = crowded("stack", 3)
+        cells = {(0, 0, 0): "a", (0, 0, 1): "b", (0, 0, 2): "c"}
+    m = mesh_plc(pts, facets)
+    vols = check_mesh(m)
+    scale = abs(round(np.linalg.det(TILT))) if case != "fichera" else 1  # crowded(…, 3) is tilted too
+    assert sum(vols) == len(cells) * F_cell() * scale
+
+
+def test_nested_shells_parity_and_regions():
+    from meshloom._core import mesh_plc
+    pts, facets = voxel_plc({(x, y, z): "a" for x in range(3) for y in range(3) for z in range(3)})
+    # a separate inner cube inside the middle cell, as its own closed shell
+    lo, hi = 0.3, 0.45
+    base = len(pts)
+    corners = [[x, y, z] for z in (lo, hi) for x, y in ((lo, lo), (hi, lo), (hi, hi), (lo, hi))]
+    pts = np.vstack([pts, corners])
+    inner = [[[base, base + 1, base + 2, base + 3]], [[base + 4, base + 5, base + 6, base + 7]]]
+    inner += [[[base + k, base + (k + 1) % 4, base + 4 + (k + 1) % 4, base + 4 + k]] for k in range(4)]
+    regions = mesh_plc(pts, facets + inner)
+    parity = mesh_plc(pts, facets + inner, domain="parity")
+    vr = check_mesh(regions)
+    vp = check_mesh(parity)
+    from fractions import Fraction as F
+    cube = (F(hi) - F(lo)) ** 3
+    assert cube in vr
+    assert len(parity["region_names"]) == 1 and vp[0] == sum(vr) - cube  # the shell around the cube
+
+
+def test_twisted_prism_with_segment_points_is_rounded_and_certified():
+    from meshloom._core import mesh_plc
+    pts, facets = twisted_prism()
+    m = mesh_plc(pts, facets)
+    assert len(m["nodes"]) > len(pts)  # S points, rounded once to doubles
+    assert set(range(len(pts))) <= set(m["node_source"].tolist())
+    check_mesh(m)
+    src = m["node_source"].tolist()
+    for i, s in enumerate(src):
+        if s < len(pts):
+            assert m["nodes"][i].tolist() == pts[s].tolist(), "input points are kept bit for bit"
+
+
+def test_parity_refuses_surfaces_that_are_not_closed():
+    from meshloom._core import mesh_plc
+    # three stacked cells of different materials: interface edges have three facets
+    pts, facets = voxel_plc({(0, 0, 0): "a", (0, 0, 1): "b", (0, 0, 2): "c"})
+    assert len(mesh_plc(pts, facets)["region_names"]) == 3
+    with pytest.raises(ValueError, match="parity"):
+        mesh_plc(pts, facets, domain="parity")
+    with pytest.raises(ValueError, match="domain"):
+        mesh_plc(pts, facets, domain="inside")

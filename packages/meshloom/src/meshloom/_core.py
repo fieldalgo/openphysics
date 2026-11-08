@@ -177,6 +177,44 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
             "subfacet_facet": i64(owner, -1), "stats": stats}
 
 
+def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60) -> dict:
+    """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
+    regions, rounding and certification. ``domain="regions"`` makes every bounded
+    component (tetrahedra joined across faces that are not facets) a region;
+    ``domain="parity"`` makes the even-odd domain of closed surfaces one region. S points
+    are rounded once to the nearest double and every tetrahedron is certified with
+    exact ``orient3d > 0`` on the output doubles (no flip repair yet: a tetrahedron
+    that rounding inverts raises ``ValueError``). Returns the fields of the plan's
+    output contract: ``nodes``, ``tetrahedra``, ``regions``, ``region_names``,
+    ``boundary_faces`` and ``boundary_nodes`` by facet index (faces wound outward),
+    ``interfaces`` keyed by region pairs (a < b, wound from a to b), and ``node_source``
+    (each node's global point index: input points first, then S points).
+    """
+    kernel = _require()
+    p = _points(points)
+    s = np.ascontiguousarray(np.asarray(np.zeros((0, 2)) if segments is None else segments,
+                                        dtype="<i8").reshape(-1, 2))
+    f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
+    out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+
+    def i64(b, *shape):
+        return np.frombuffer(b, dtype="<i8").reshape(*shape).astype(np.int64)
+
+    nodes = np.frombuffer(out[0], dtype="<f8").reshape(-1, 3).astype(np.float64)
+    tets, regions = i64(out[1], -1, 4), i64(out[2], -1)
+    bfacet, bfaces = i64(out[3], -1), i64(out[4], -1, 3)
+    ipair, ifaces = i64(out[5], -1, 2), i64(out[6], -1, 3)
+    boundary = {int(k): bfaces[bfacet == k] for k in np.unique(bfacet)}
+    interfaces = {}
+    for (a, b), face in zip(ipair.tolist(), ifaces):
+        interfaces.setdefault((a, b), []).append(face)
+    return {"nodes": nodes, "tetrahedra": tets, "regions": regions,
+            "region_names": [f"region {i}" for i in range(stats["region_count"])],
+            "boundary_faces": boundary, "boundary_nodes": {k: np.unique(v) for k, v in boundary.items()},
+            "interfaces": {k: np.array(v, dtype=np.int64).reshape(-1, 3) for k, v in interfaces.items()},
+            "node_source": i64(out[7], -1), "stats": stats}
+
+
 def delaunay(points, order=None) -> tuple[np.ndarray, np.ndarray, dict]:
     """Delaunay tetrahedralization of ``points`` (n, 3).
 
