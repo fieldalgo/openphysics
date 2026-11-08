@@ -256,3 +256,33 @@ def test_g6_3_the_transient_runner_fixes_an_interface_and_reaches_the_steady_sol
     final = np.asarray(b.temperature_k)[-1]
     assert final.shape == a.temperature_k.shape
     assert np.max(np.abs(final - a.temperature_k)) <= 1e-6 * 40.0
+
+
+# ----------------------------------------------------------------- review findings of 2026-11-08 (stage 2e)
+
+def test_a_fixed_selection_touching_a_side_is_refused_by_name_under_that_side_s_flux():
+    core = {"name": "core", "type": "rect", "x": 0.0, "y": 5.0, "w": 10.0, "h": 10.0, "material": "steel"}
+    for physics in ({"outward_flux_w_m2": {"left": 1000.0}},
+                    {"convection": {"left": {"h_w_m2k": 5.0, "ambient_temperature_k": 300.0}}}):
+        raw = plate([core], physics={"dirichlet_temperature_k": {"seam": 340.0, "right": 300.0}, **physics},
+                    selections={"seam": {"boundary": {"of": "core"}}}, size=1.0)
+        with pytest.raises(DocumentError, match="shares mesh edges with the Dirichlet boundary 'seam'"):
+            run(Document.from_dict(raw), verbose=False)
+    # the same selection at a value other than the side's names both boundaries
+    raw = plate([core], physics={"dirichlet_temperature_k": {"left": 300.0, "seam": 340.0}},
+                selections={"seam": {"boundary": {"of": "core"}}}, size=1.0)
+    with pytest.raises(DocumentError, match="'left' and 'seam' share node"):
+        run(Document.from_dict(raw), verbose=False)
+
+
+def test_an_axisymmetric_selection_touching_the_axis_fixes_its_off_axis_nodes_only():
+    from test_thermal_axisymmetric_regions import cylinder, TB
+    core = {"name": "core", "type": "rect", "x": 0.0, "y": 0.2, "w": 1.0, "h": 0.5, "material": "pla"}
+    raw = cylinder(features=[core], source=0.0, size_mm=0.2, dirichlet={"right": TB, "seam": 350.0})
+    raw["geometry"]["components"]["rod"]["selections"] = {"seam": {"boundary": {"of": "core"}}}
+    result = run(Document.from_dict(raw), verbose=False)
+    fixed = result.mesh_nodes_m[result.dirichlet_node_ids]
+    seam = result.mesh.boundary["seam"]
+    assert len(seam) >= 10 and np.all(result.mesh_nodes_m[seam, 0] > 0)          # no axis node in the selection
+    assert np.all(result.temperature_k[seam] == 350.0)
+    assert result.summary()["normalized_heat_balance_defect"] <= 1e-10
