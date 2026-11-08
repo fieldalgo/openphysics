@@ -16,10 +16,10 @@ requires the six OpenPhysics packages, which release together with it.
 | `physmat` | materials and optical dispersion |
 | `simcase` | model document, headless runner and the optional browser studio |
 
-**0.1.0 is not on PyPI yet.** PyPI holds only the empty `0.0.1` name reservations,
+**0.0.2 is not on PyPI yet.** PyPI holds only the empty `0.0.1` name reservations,
 so these commands install nothing useful today, and pip may still report success.
 Until the release, [install from a source checkout](../../overview.md#install-from-source) or from wheels built
-from it, and pin the version (`"openphysics[studio]==0.1.0"`) so that pip refuses
+from it, and pin the version (`"openphysics[studio]==0.0.2"`) so that pip refuses
 instead of picking `0.0.1`. The commands below are for the release.
 
 ```bash
@@ -38,8 +38,8 @@ pip install "openphysics[studio,export,rii]"
 No extra installs Gmsh. `gmshio` runs Gmsh as a separate program; install it on its
 own (for example `pip install gmsh`) if you need it, under Gmsh's own license.
 
-Every package can also be installed on its own. Versions before 0.1.0 (`0.0.1`) were
-empty name reservations and install nothing.
+Every package can also be installed on its own. Version `0.0.1` of every name was an
+empty name reservation and installs nothing.
 
 Version 0.x is an alpha: the Python API may change between minor versions. The
 [changelog](../../../CHANGELOG.md) records each release and what stays stable.

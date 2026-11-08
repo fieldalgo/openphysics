@@ -61,7 +61,7 @@ see [NOTICE](../NOTICE).
 
 The ninth distribution, [`openphysics`](packages/openphysics/overview.md),
 is a meta distribution with no code that requires six of the implementation
-packages and offers `sipi` as an extra. 0.1.0 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
+packages and offers `sipi` as an extra. 0.0.2 is not published yet: the `openphysics` on PyPI is the empty 0.0.1
 name reservation, so **`pip install openphysics` does not install the toolkit
 yet.** The eight implementation packages already live in this public
 repository; separate historical package repositories are not needed to use them.

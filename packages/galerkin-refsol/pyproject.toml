@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "galerkin-refsol"
-version = "0.1.0"
+version = "0.0.2"
 description = "Reference solutions and published benchmarks for validating the galerkin finite-element engine"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"

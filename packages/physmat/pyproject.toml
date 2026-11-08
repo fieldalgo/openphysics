@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "physmat"
-version = "0.1.0"
+version = "0.0.2"
 description = "Material properties for physics solvers: optical dispersion models, built-in materials with sources, refractiveindex.info reader, Drude-Lorentz fitting"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"

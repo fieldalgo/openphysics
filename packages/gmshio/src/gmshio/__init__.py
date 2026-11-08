@@ -14,7 +14,7 @@ from .mesh import ELEMENT_TYPES, CellBlock, Mesh
 from .msh import MshFormatError, read_msh
 from .run import GmshNotFound, find_gmsh, generate, gmsh_version
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 __all__ = ["geo", "fem", "generate", "read_msh", "to_fem2d", "to_fem3d", "Mesh", "CellBlock",
            "FemMesh2D", "FemMesh3D", "ELEMENT_TYPES", "MshFormatError", "GmshNotFound",
            "find_gmsh", "gmsh_version", "__version__"]

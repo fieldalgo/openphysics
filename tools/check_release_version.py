@@ -114,7 +114,7 @@ def check(root=ROOT, tag=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tag", help="release tag, for example v0.1.0")
+    parser.add_argument("--tag", help="release tag, for example v0.0.2")
     args = parser.parse_args(argv)
     version, errors = check(ROOT, args.tag)
     for error in errors:

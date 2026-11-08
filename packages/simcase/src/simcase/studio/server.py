@@ -33,7 +33,7 @@ from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="simcase studio", version="0.1.0")
+app = FastAPI(title="simcase studio", version=__version__)
 
 _workspace_instance = uuid.uuid4().hex
 _jobs: dict[str, dict] = {}

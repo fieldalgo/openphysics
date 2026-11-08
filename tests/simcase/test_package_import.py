@@ -29,7 +29,7 @@ def test_the_first_public_name_loads_the_runner_chain():
 def test_public_names_and_star_import_still_work():
     import simcase
     from simcase import Document, examples, run
-    assert simcase.__version__ == "0.1.0"
+    assert simcase.__version__ == "0.0.2"
     assert Document.__name__ == "Document" and callable(run) and "soi_strip" in examples.EXAMPLES
     namespace: dict = {}
     exec("from simcase import *", namespace)

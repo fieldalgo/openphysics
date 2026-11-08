@@ -11,7 +11,7 @@ validation plan. Output follows the tetrahedral mesh fields that
 ``galerkin.from_mesher`` reads.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 
 try:
     from . import _kernel

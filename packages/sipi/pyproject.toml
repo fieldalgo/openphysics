@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sipi"
-version = "0.1.0"
+version = "0.0.2"
 description = "Signal- and power-integrity analysis for PCB interconnects: quasi-static transmission-line cross-sections on the galerkin engine"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"
@@ -25,8 +25,8 @@ dependencies = [
   "numpy>=1.26",
   "scipy>=1.11.2",
   "shapely>=2.0.2",
-  "galerkin>=0.1.0,<0.2",
-  "meshine>=0.1.0,<0.2",
+  "galerkin>=0.0.2,<0.1",
+  "meshine>=0.0.2,<0.1",
 ]
 
 [project.urls]

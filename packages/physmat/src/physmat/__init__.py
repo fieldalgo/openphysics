@@ -30,7 +30,7 @@ from .library import constant, get, names, standard_air
 from .material import Material, Property
 from .thermal import HustLankford
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 __all__ = ["get", "names", "constant", "standard_air", "CiddorAir", "Material", "Property", "Dispersion", "Constant",
            "Sellmeier", "Tabulated", "Composite", "Drude", "DrudeLorentz", "RIIFormula", "OutOfRange", "ev_to_um",
            "um_to_ev", "fit_drude_lorentz", "FitResult", "HustLankford", "air", "dispersion", "fit", "library", "rii",

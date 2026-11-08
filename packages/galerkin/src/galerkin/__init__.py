@@ -41,4 +41,4 @@ from .mode_overlap import (vector_power, vector_cross_power, vector_field_overla
                            scalar_coupling_efficiency, scalar_confinement_factor,
                            scalar_effective_area)
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
