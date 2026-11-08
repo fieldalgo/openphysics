@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: Studio 작업 공간에서 **Save session**을 첫 번째 기본 저장 버튼으로 두고, 입력만 저장하는 버튼 이름을 **Save inputs only**(여는 버튼은 **Open inputs file**)로 바꿨습니다. 저장 버튼마다 고정 설명이 붙고, 완료한 실행이 세션 파일에 없으면 입력만 저장한 뒤에도 헤더가 저장된 것처럼 보이지 않고 *Results not saved*를 표시합니다.
 - `simcase`: Studio 작업 공간 시작 화면이 이 브라우저에 복구 세션이 있으면 **Continue where you left off**를 보여 줍니다. 마지막 세션이나 이전 세션을 복구하거나, 세션 파일을 열거나, 새로 시작할 수 있습니다. 재시작 후 새로고침하면 빈 화면처럼 보이고 복구 버튼이 닫힌 도움말 안에 있던 문제를 고쳤습니다.
 - `simcase`: Studio 작업 공간이 새로 연 페이지가 복구하지 않은 브라우저 복구 세션을 보관합니다. 첫 자동 저장이 그 세션을 최대 세 개의 이전 세션으로 옮기고, **Recover earlier session**으로 실행과 비교째 되살립니다. 전에는 복구 안내를 놓치고 새 작업을 시작하면 경고 없이 덮어썼습니다.
 - `simcase`: Studio 작업 공간이 서버 재시작 뒤 스스로 다시 연결합니다. 재시작된 서버에 Run하면 다시 연결하고 다시 실행하라고 안내합니다(서버가 거부한 요청에 "work may continue"라고 하지 않습니다). 서버에 연결할 수 없으면 그 이유와 함께 Run이 꺼지고, 같은 주소로 Studio가 돌아올 때까지 3초마다 확인합니다.

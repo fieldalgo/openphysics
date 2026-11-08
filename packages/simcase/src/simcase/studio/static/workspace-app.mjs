@@ -323,7 +323,10 @@ const signature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
 function refreshPersistence(){
   const clean=!edits.dirty;
-  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
+  // Results not in a session file outrank a clean input snapshot: saving inputs only
+  // must not read as saved while completed runs would be lost.
+  const runsUnsaved=runs.length>0&&savedNotebookState!==notebookStamp();
+  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):runsUnsaved?'Results not saved · use Save session':(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
   refreshNotebook();refreshWorkflow();
 }
 function refreshWorkflow(){
@@ -377,7 +380,7 @@ $('confirm-load').onclick=()=>{
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  edits.record(doc);edits.markSaved();refreshPersistence();notice('Project file download requested. Inputs only; no computed results.');
+  edits.record(doc);edits.markSaved();refreshPersistence();notice('Inputs file download requested. It has no computed results'+(runs.length?'; use Save session to keep the runs.':'.'));
 }catch(e){notice(e.message);}};
 $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click();}catch(e){notice(e.message);}};
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
@@ -531,7 +534,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
-  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Run provenance</h2>'+pair('Computation','Optical modes only')+pair('Input',same?'Current snapshot':'Earlier snapshot')+'<p>Selected completed run. Save session includes fields; Save file includes inputs only.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';
+  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Run provenance</h2>'+pair('Computation','Optical modes only')+pair('Input',same?'Current snapshot':'Earlier snapshot')+'<p>Selected completed run. Save session includes fields; Save inputs only does not.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';
   const desc=document.createElement('p');desc.textContent=`Job ${solverRun.job}${solverRun.serverVersion?' · simcase '+solverRun.serverVersion:''}${Number.isInteger(solverRun.inputRevision)?' · input revision '+solverRun.inputRevision:''} · ${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
   renderField();solverRun.neff.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Browser recovery result — not recomputed or authenticated. ':'Imported file result — not recomputed or authenticated. ')+' Ranked candidates are not mode-matched between designs. Save session to keep results. No thermal or mechanical solve was performed.';$('canvas').append(note);

@@ -25,7 +25,9 @@
    입력을 유지합니다. Stop waiting은 상태 조회만 중단합니다.
 5. 기준 실행에 이름을 붙이고 **Pin selected run**으로 고정합니다. 모델을 변경해
    다시 실행한 뒤 **Compare**에서 A/B, 후보, 성분, probe와 단면을 선택합니다.
-6. **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다. 로컬 복구를
+6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
+   **Save inputs only**는 결과 없이 모델만 저장합니다. 완료한 실행이 세션 파일에 없으면
+   헤더에 *Results not saved*가 표시됩니다. 로컬 복구를
    사용하려면 **Browser recovery saved**를 확인합니다. 새로고침하거나 Studio를 다시
    켜면 시작 화면에 **Continue where you left off** 카드가 마지막 브라우저 세션과 이전
    세션을 보여 줍니다. 하나를 골라 복구하거나, 세션 파일을 열거나, 새로 시작합니다.
