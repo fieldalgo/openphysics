@@ -279,3 +279,29 @@ def test_pml_studio_returns_candidate_diagnostics_and_bend_loss(client):
     assert summary['open_boundary'][0]['stability'] == 'not_checked'
     assert summary['bend_loss_db_90deg'][0][0] > 0
     assert summary['field_representation'] == 'pml-vector-edge-nodal-v1'
+
+
+def test_the_openphysics_command_opens_the_workspace_and_simcase_studio_the_classic_page():
+    from simcase.studio.server import _arguments
+    assert _arguments([], product=True).path == "/workspace"
+    assert _arguments(["--classic"], product=True).path == "/"
+    assert _arguments([], product=False).path == "/"
+    assert _arguments(["--workspace"], product=False).path == "/workspace"
+    with pytest.raises(SystemExit):
+        _arguments(["--workspace"], product=True)          # the product command has no such flag
+
+
+@pytest.mark.parametrize("product, argv, line", [
+    (True, [], "OpenPhysics Studio at http://127.0.0.1:8765/workspace (stop with Ctrl+C)"),
+    (False, [], "simcase studio at http://127.0.0.1:8765/"),          # unchanged for simcase-studio
+    (False, ["--workspace"], "simcase studio at http://127.0.0.1:8765/workspace"),
+])
+def test_each_command_prints_its_address(monkeypatch, capsys, product, argv, line):
+    import uvicorn
+
+    from simcase.studio import server
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: served.append(kwargs))
+    server.main([*argv, "--no-browser"], product=product)
+    assert capsys.readouterr().out.strip() == line
+    assert served == [{"host": "127.0.0.1", "port": 8765, "log_level": "warning"}]

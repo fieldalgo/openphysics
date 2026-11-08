@@ -659,32 +659,47 @@ async def transient_history(job_id: str, request: Request):
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
-def main(argv=None):
+def _arguments(argv, *, product):
     import argparse
+    ap = argparse.ArgumentParser(prog="openphysics" if product else "simcase-studio",
+                                 description="OpenPhysics Studio: the model workspace in your browser" if product
+                                 else "browser UI for simcase models")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--no-browser", action="store_true")
+    if product:
+        ap.add_argument("--classic", action="store_true", help="open the classic optical and thermal editor")
+    else:
+        ap.add_argument("--workspace", action="store_true",
+                        help="open the experimental model workspace instead of the classic editor")
+    args = ap.parse_args(argv)
+    args.path = ("/" if args.classic else "/workspace") if product else ("/workspace" if args.workspace else "/")
+    return args
+
+
+def product_main(argv=None):
+    """The ``openphysics`` command: Studio opened on its model workspace."""
+    main(argv, product=True)
+
+
+def main(argv=None, *, product=False):
     import webbrowser
 
     import uvicorn
 
-    ap = argparse.ArgumentParser(prog="simcase-studio", description="browser UI for simcase models")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--no-browser", action="store_true")
-    ap.add_argument("--workspace", action="store_true",
-                    help="open the experimental model workspace instead of the classic editor")
-    args = ap.parse_args(argv)
+    args = _arguments(argv, product=product)
     host = args.host.strip("[]")
     if not security.is_loopback(host):
         print(f"warning: --host {args.host} makes Studio reachable from other machines. Studio has no "
               "accounts or encryption; use it only on a network you trust.", file=sys.stderr)
     if host not in ("0.0.0.0", "::"):
         _extra_hosts.add(host.lower())
-    path = "/workspace" if args.workspace else "/"
     # A wildcard bind is opened through loopback of the same family (``::`` may be IPv6-only).
     url_host = {"0.0.0.0": "127.0.0.1", "::": "[::1]"}.get(host, f"[{host}]" if ":" in host else host)
-    url = f"http://{url_host}:{args.port}{path}"
+    url = f"http://{url_host}:{args.port}{args.path}"
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    print(f"simcase studio at {url}")
+    print(f"OpenPhysics Studio at {url} (stop with Ctrl+C)" if product else f"simcase studio at {url}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

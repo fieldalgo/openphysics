@@ -24,10 +24,10 @@ for name in ("galerkin", "galerkin-refsol", "meshine", "meshloom", "gmshio", "ph
     direct = json.loads(dist.read_text("direct_url.json") or "{}")
     assert not direct.get("dir_info", {}).get("editable"), name
     assert dist.read_text("LICENSE") or any(str(p).endswith("/LICENSE") for p in dist.files), name
-# The openphysics meta distribution ships no code and requires exactly the six
-# packages (meshloom is not part of the default install yet), in the same release
-# series, plus the extras it forwards (sipi is one). packaging is installed here as a
-# matplotlib requirement.
+# The openphysics meta distribution ships no code and requires the complete product
+# (HQ decision 2026-11-08): the six packages with simcase[studio,export] and physmat[rii],
+# and sipi (meshloom is not part of the default install yet), in the same release series.
+# The earlier extras stay as aliases. packaging is installed here as a matplotlib requirement.
 from packaging.requirements import Requirement  # noqa: E402
 
 meta = {}
@@ -36,8 +36,9 @@ for requirement in map(Requirement, metadata.requires("openphysics")):
     assert str(requirement.specifier) == "<0.1,>=0.0.2", requirement
     meta.setdefault(extra, set()).add((requirement.name, frozenset(requirement.extras)))
 assert meta == {
-    "": {(name, frozenset()) for name in
-         ("galerkin", "galerkin-refsol", "meshine", "gmshio", "physmat", "simcase")},
+    "": {("galerkin", frozenset()), ("galerkin-refsol", frozenset()), ("meshine", frozenset()),
+         ("gmshio", frozenset()), ("physmat", frozenset({"rii"})), ("simcase", frozenset({"studio", "export"})),
+         ("sipi", frozenset())},
     "studio": {("simcase", frozenset({"studio"}))},
     "export": {("simcase", frozenset({"export"}))},
     "rii": {("physmat", frozenset({"rii"}))},
@@ -46,7 +47,7 @@ assert meta == {
 assert importlib.util.find_spec("openphysics") is None
 assert not [f for f in metadata.distribution("openphysics").files if str(f).endswith(".py")]
 
-for command in ("simcase", "simcase-run", "simcase-studio"):
+for command in ("simcase", "simcase-run", "simcase-studio", "openphysics"):
     executable = shutil.which(command)
     assert executable and Path(executable).resolve().is_relative_to(Path(sys.prefix).resolve())
     subprocess.run([executable, "--help"], check=True)
