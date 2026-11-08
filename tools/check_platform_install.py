@@ -195,6 +195,7 @@ def main():
             ROOT / "tests/meshloom/test_recovery.py": tests / "test_meshloom_recovery.py",
             # the C10 adversarial inputs meshed and checked (V1-V4) on every platform
             ROOT / "tests/meshloom/test_adversarial.py": tests / "test_meshloom_adversarial.py",
+            ROOT / "tests/meshloom/test_fuzz.py": tests / "test_meshloom_fuzz.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
             ROOT / "tests/simcase/test_transient_headless_windows.py":
@@ -239,6 +240,7 @@ def main():
             tests / "test_meshloom_mixed.py",
             tests / "test_meshloom_recovery.py",
             tests / "test_meshloom_adversarial.py",
+            tests / "test_meshloom_fuzz.py",
             tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
