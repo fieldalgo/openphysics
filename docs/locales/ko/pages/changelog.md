@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: Studio 작업 공간이 새로 연 페이지가 복구하지 않은 브라우저 복구 세션을 보관합니다. 첫 자동 저장이 그 세션을 최대 세 개의 이전 세션으로 옮기고, **Recover earlier session**으로 실행과 비교째 되살립니다. 전에는 복구 안내를 놓치고 새 작업을 시작하면 경고 없이 덮어썼습니다.
 - `simcase`: Studio 작업 공간이 서버 재시작 뒤 스스로 다시 연결합니다. 재시작된 서버에 Run하면 다시 연결하고 다시 실행하라고 안내합니다(서버가 거부한 요청에 "work may continue"라고 하지 않습니다). 서버에 연결할 수 없으면 그 이유와 함께 Run이 꺼지고, 같은 주소로 Studio가 돌아올 때까지 3초마다 확인합니다.
 - `simcase`: `SubspaceSweepResult.field_representation`이 저장·전송하는 벡터 부분공간 필드의 layout 이름(`"vector-subspace-edge-nodal-v1"`, 그대로)을 알려 줍니다. Studio는 이 값을 여기서 읽고 `simcase.__all__`에 있는 이름만 가져옵니다. Studio 가드 시험은 Studio 패키지 밖으로 나가는 상대 import도 거부합니다.
 - `simcase`: 과도 영역 열이 정상 영역 열처럼 버전 1 `axisymmetric` 구성 요소를 회전체로 풉니다. 결과는 자체 식별자(`thermal.axisymmetric-transient-regions-result-v1`, `thermal-axisymmetric-transient-p1-node-cell-regions-v1`)와 전체 회전 열량 W(`source_load_w`·`reaction_w`·`residual_w`·`storage_rate_w`), `heat_content_j`, `quadratic_functional_jk`를 가지며 `export_fields`·`export_time_series`가 그 layout을 받습니다. Studio는 축대칭 문서를 계속 거부합니다. 검사 G7-5는 `tests/simcase/test_thermal_axisymmetric_regions.py`. [문서](packages/simcase/thermal_regions2d.md#축대칭-문서).

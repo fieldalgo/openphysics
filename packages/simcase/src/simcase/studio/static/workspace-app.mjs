@@ -428,7 +428,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  if(state.phase==='pending')message.textContent='Browser recovery pending';
  if(state.phase==='saving')message.textContent='Saving browser recovery…';
  if(state.phase==='current')message.textContent='Current notebook already in browser recovery';
- if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
+ if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;renderEarlierSessions();message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
  if(state.phase==='error'){message.textContent=state.code==='recovery-conflict'?'Browser recovery changed in another tab':'Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
 }});
 async function loadNotebookRecovery(){
@@ -436,7 +436,30 @@ async function loadNotebookRecovery(){
  try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
   if(recovered){$('autosave-status').textContent='Previous browser session available · '+recovered.session.runs.length+' runs';$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
   else $('autosave-status').textContent='Completed sessions will be saved for browser recovery';
+  await renderEarlierSessions();
  }catch(error){if(version!==notebookLoadVersion)return;$('autosave-status').textContent='Browser recovery unavailable · save a session file';$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
+}
+// Earlier sessions: what browser recovery held when an earlier page started new work.
+let earlierSessions=[];
+async function renderEarlierSessions(){
+ const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];
+ let list=[];try{list=await notebookStore.loadEarlier();}catch{return;}
+ list.forEach((record,index)=>{let recovered;try{recovered=readNotebookRecovery(record);}catch{return;}
+  earlierSessions.push(recovered);
+  const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
+  button.textContent='Recover earlier session · '+recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();
+  button.onclick=()=>recoverEarlier(index,button);box.append(button);});
+}
+async function recoverEarlier(index,opener){
+ if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
+ try{
+  rejectInvalidInput();
+  const loaded=await workspaceLoads.read(async()=>{const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();return {latest,recovered:readNotebookRecovery(list[index]??null)};});
+  if(!loaded)return;const {latest,recovered}=loaded.value;if(!recovered)throw new Error('That earlier session is no longer stored.');
+  if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
+  // Adopt the latest record: the next save keeps it as an earlier session in turn.
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
+ }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
 $('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNotebookRecovery();
 $('recover-notebook').onclick=async()=>{
