@@ -177,7 +177,8 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
             "subfacet_facet": i64(owner, -1), "stats": stats}
 
 
-def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60) -> dict:
+def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60, h: float | None = None,
+             ratio: float | None = None, alpha: float = 1.0, max_points: int = 0) -> dict:
     """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
     regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
@@ -203,7 +204,8 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
     try:
-        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, float(h or 0.0),
+                                     float(ratio or 0.0), float(alpha), int(max_points))
     except ValueError as e:
         if len(e.args) != 3:
             raise
@@ -211,7 +213,8 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         if kind == "NotClosed":
             raise NotClosed(msg, {"type": 6, "segment": (int(ids[0]), int(ids[1])),
                                   "facets": tuple(int(x) for x in ids[2:])}) from None
-        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError}.get(kind, MeshError)
+        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError,
+               "RefineFail": RefineError}.get(kind, MeshError)
         raise cls(msg) from None
 
     def i64(b, *shape):
@@ -326,6 +329,12 @@ class RecoveryError(MeshError):
     """Boundary recovery failed (a cavity without a filling, the depth limit)."""
 
     kind = "RecoveryFail"
+
+
+class RefineError(MeshError):
+    """Refinement failed: the point cap was reached, or an insertion failed."""
+
+    kind = "RefineFail"
 
 
 class RoundingError(MeshError):
