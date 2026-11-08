@@ -17,6 +17,7 @@ mod mixed;
 mod plc;
 mod predicates;
 mod recovery;
+mod refine;
 
 use predicates::{two_product, P3};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -394,11 +395,13 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// sources, region count) as bytes, and counters. `seed_coords` (k x 3 doubles) and
 /// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
-#[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None))]
+#[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None, h=0.0, ratio=0.0,
+                    alpha=1.0, max_points=0))]
 #[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
                  facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
-                 seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>)
+                 seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>, h: f64,
+                 ratio: f64, alpha: f64, max_points: usize)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
@@ -431,9 +434,14 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     }
     let seeds: Vec<mesh::Seed> = sp.into_iter().zip(sl).map(|(p, label)| mesh::Seed { p, label }).collect();
     let plc = plc::Plc { points, segments, facets };
-    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "Internal", message, ids)
-    let (m, b) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
-        let b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
+    let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
+        let mut b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+        let mut rs = refine::RefineStats::default();
+        if h > 0.0 || ratio > 0.0 {
+            let opt = refine::RefineOptions { h, alpha, ratio, max_points: if max_points > 0 { max_points } else { 5_000_000 } };
+            rs = refine::refine(&plc, &mut b, opt).map_err(|e| ("RefineFail", e, vec![]))?;
+        }
         let m = mesh::build(&plc.points, &b, domain, &seeds).map_err(|e| match &e {
             mesh::MeshError::NotClosed { segment, facets } => {
                 ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
@@ -442,7 +450,7 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
             mesh::MeshError::Seed(_) => ("RegionSeed", e.to_string(), vec![]),
             mesh::MeshError::Internal(_) => ("Internal", e.to_string(), vec![]),
         })?;
-        Ok((m, b.stats))
+        Ok((m, b.stats, rs))
     }).map_err(|(kind, msg, ids)| PyValueError::new_err((kind, msg, ids)))?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
@@ -466,6 +474,10 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     ];
     let d = PyDict::new(py);
     d.set_item("region_count", m.region_count)?;
+    d.set_item("segment_points", rs.segment_points)?;
+    d.set_item("facet_points", rs.facet_points)?;
+    d.set_item("volume_points", rs.volume_points)?;
+    d.set_item("rejected_points", rs.rejected)?;
     d.set_item("inverted_after_rounding", m.repair.inverted)?;
     d.set_item("flips23", m.repair.flips23)?;
     d.set_item("flips32", m.repair.flips32)?;
