@@ -9,7 +9,10 @@ Status: **Accepted on 2026-11-03.** The
 documents and gives the runners the 0.2 form for validation and recording; the
 [stage 2 engine](geometry_engine.md) builds the region complex, selectors and
 provenance of 2D and axisymmetric components and meshes version 1 documents
-(2026-11-04); the runners do not read the complex itself yet. Repository facts were checked against `main` at `015a6d8`.
+(2026-11-04); the runners do not read the complex itself yet. The stage 4 amendment
+(2026-11-08) defines the design velocity and the topology probe, which
+[`simcase.geometry_velocity`](geometry_engine.md#design-velocity-stage-4)
+implements. Repository facts were checked against `main` at `015a6d8`.
 
 How the page is organised:
 - Sections marked **frozen** are fixed since the page was accepted. The SHA-256 of
@@ -663,6 +666,48 @@ the mesh once keep refusing this
   topology change. The exact probe (step size and degeneracy test) is defined by
   the stage 4 amendment.
 
+**Stage 4 amendment (2026-11-08).** It defines the last sentence above and the
+interface of the design velocity:
+
+- **Parameter.** p is one independent length parameter: `kind: "length"`, and a
+  `value` that is a number or an expression without parameter names. Parameters
+  derived from p follow it through their expressions.
+- **What is supplied.** For one component of dimension `2d` or `axisymmetric`,
+  `simcase.geometry_velocity.design_velocity` supplies V = ∂x/∂p:
+  - of every length field, by JSON path (a forward-mode derivative of the exact
+    expression);
+  - of every vertex of the region complex, defining or derived, solved exactly
+    from the curves and defining points through it;
+  - of every curve: the end velocities of a line; the centre velocity and dr/dp
+    of an arc or circle.
+
+  V is dimensionless, so it does not depend on the unit. It is exact. It is taken
+  at the rounded geometry, from the unrounded expressions.
+- **Mesh nodes.** A mesh node on a curve receives V:
+  - on a line: the end velocities interpolated linearly;
+  - on an arc: the centre velocity plus dr/dp along the normal, with the
+    tangential part of the ends interpolated in angle.
+
+  The node also receives the curve and the vertex it lies on (node provenance).
+  Interior nodes, remeshing, element inversion and adjoints belong to galerkin.
+- **Topology probe.** The derivative is refused, naming the features, unless
+  both tests pass:
+  - (a) at every vertex, the constraints of its curves and defining points have
+    one common solution that fixes both components;
+  - (b) the exact evaluations at p ± δ have the combinatorial signature of p.
+    δ = 2⁻²⁰ pm / 2^⌈log₂ max |V|⌉ of parameter change. Each length field takes
+    its base pm count plus the exact change of its expression, on a grid fine
+    enough that nothing is rounded a second time. The signature covers cells,
+    curves with provenance, sides and end-vertex incidence, and selections.
+
+  A topology event closer than δ is also refused, which is conservative. The
+  parameter's `range` does not limit the probe.
+- **Refused by name:**
+  - ratio and derived parameters;
+  - `3d` components;
+  - `path` arcs whose start, centre or end moves;
+  - tangent contacts, even when the motion keeps the tangency.
+
 ## Consumers
 
 Every consumer refuses what it cannot take, and the refusal names the feature or
@@ -672,6 +717,7 @@ keyword.
 |---|---|---|
 | FEM 2D (meshine) | `2d` components (and `axisymmetric` once a runner exists); `rect`, `circle`, `polygon`, `trapezoid` | `path` and `segment` until stage 2; reserved keywords |
 | [stage 2 engine](geometry_engine.md) (`simcase.geometry_engine`) | `2d` and `axisymmetric` components with every 2D feature, both finalize modes, void and merged regions; its hand-off gives meshine the complex as loops; the runners read such a document through `doc.regions()`, and `mesh.controls` `circle_segments`, `size` and the distance grading reach its hand-off (2026-11-06/07) | `3d`; a `path` whose boundary meets itself; an arc whose `to` is not on its circle (the end point must be a grid point); at the hand-off, a `segment` curve inside one cell; axisymmetric outside region heat (the waveguide runner and Studio refuse it; steady and transient region heat take it with full-revolution rates, 2026-11-07/08), void in the waveguide runner (region heat takes it as an insulated-unless-named hole, 2026-11-08) |
+| [design velocity](geometry_engine.md#design-velocity-stage-4) (`simcase.geometry_velocity`, stage 4) | one independent length parameter of a `2d` or `axisymmetric` component; static `path` arcs; the meshine mesh of the complex's last hand-off for node velocities | ratio and derived parameters; `3d`; moving `path` arcs; tangent contacts; any topology change at p (both tests of the probe) |
 | FEM 2.5D (`meshine.extrude`) | `layers`, and `extrude` along z | sloped or curved sidewalls: the extruder makes vertical prisms only (`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | `box` with the grid-plane rule | other 3D features |
 | FEM 3D (meshloom, stage 5) | the stage 5 combinations | everything else, until a gmshio route exists |
@@ -912,3 +958,8 @@ listed here too.
 - 2026-11-04: Status and the consumers table name the stage 2 engine, which
   meshes version 1 documents, and what it refuses (not frozen sections). Frozen text is unchanged: the engine's
   grid-point rule for arc end points is a consumer refusal the contract allows.
+- 2026-11-08: Stage 4 amendment, approved by the founder on 2026-11-08: the
+  design velocity (parameter, what is supplied, mesh nodes), the topology probe
+  (first-order vertex test and exact probe at p ± δ) and what is refused, under
+  "Parameters, sweeps and derivatives". The earlier frozen text is unchanged.
+  Also: a consumers row and a status sentence (not frozen sections).
