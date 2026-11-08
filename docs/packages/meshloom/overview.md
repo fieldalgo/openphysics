@@ -119,7 +119,10 @@ names may change before the mesher's public API.
   boundary recovery needed. The plan's C10 adversarial inputs are meshed this way
   and checked against V1–V4 on every platform's installed wheel (twisted prism,
   near-coplanar quadrilaterals, stacked layers, a 4³ box lattice, 5° and 30°
-  wedges, a 1:100 slab, and touching, nested and stacked shells).
+  wedges, a 1:100 slab, and touching, nested and stacked shells). C13 fuzzing runs
+  200 seeded assemblies of dyadic boxes and n-gon prisms, some with 1-ulp jitter, in a
+  child process with a 60 s progress limit: each must give a valid mesh or a typed
+  error.
 
 ```python
 import numpy as np
