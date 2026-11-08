@@ -13,6 +13,9 @@ All distributions under packages/ release in lockstep. This check fails unless
   that version and stops before the next minor series, and
 - CHANGELOG.md has a ``## [Unreleased]`` section or a section for that version.
 
+With ``--tag`` it also refuses Markdown under packages/ and docs/ that still says the
+release is not on PyPI yet (a package README becomes the PyPI description).
+
 With ``--tag vX.Y.Z`` (a release), the tag must name that version and
 CHANGELOG.md must have a dated ``## [X.Y.Z] - YYYY-MM-DD`` section. Run it from
 the repository root as a file: ``python tools/check_release_version.py``.
@@ -30,6 +33,8 @@ from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
+# Pre-release wording that must be gone before a tag (English and Korean pages).
+NOT_PUBLISHED = re.compile(r"not on PyPI yet|아직 PyPI에 없")
 SECTION = re.compile(r"^## \[(?P<name>[^\]]+)\](?: - (?P<date>\d{4}-\d{2}-\d{2}))?\s*$", re.M)
 
 
@@ -106,6 +111,11 @@ def check(root=ROOT, tag=None):
             errors.append(f"tag {tag!r} does not name version {version!r}; expected v{version}")
         if not sections.get(version):
             errors.append(f"CHANGELOG.md has no dated '## [{version}] - YYYY-MM-DD' section")
+        for page in sorted([*(root / "packages").glob("**/*.md"), *(root / "docs").glob("**/*.md")]):
+            # a changelog records history, which may quote the wording
+            if page.name != "changelog.md" and NOT_PUBLISHED.search(page.read_text(encoding="utf-8")):
+                errors.append(f"{page.relative_to(root).as_posix()} still says the release is not on PyPI; "
+                              "update it before tagging")
     elif "Unreleased" not in sections and version not in sections:
         errors.append(f"CHANGELOG.md has neither '## [Unreleased]' nor '## [{version}]'")
     return version, errors

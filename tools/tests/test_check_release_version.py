@@ -110,3 +110,16 @@ def test_compiled_kernel_version_must_match(tmp_path):
     assert release.check(root)[1] == []
     write(root, "packages/core/Cargo.toml", '[package]\nname = "core-kernel"\nversion = "0.0.9"\n')
     assert any("Cargo.toml: package version '0.0.9' != '0.1.0'" in e for e in release.check(root)[1])
+
+
+def test_release_refuses_pages_that_say_the_release_is_not_on_pypi(tmp_path):
+    tree(tmp_path, changelog="## [0.1.0] - 2026-10-21\n")
+    write(tmp_path, "packages/suite/README.md", "**0.1.0 is not on PyPI yet.** Install from source.\n")
+    write(tmp_path, "docs/locales/ko/pages/packages/suite/overview.md", "0.1.0은 아직 PyPI에 없습니다.\n")
+    write(tmp_path, "docs/locales/ko/pages/changelog.md", "- 문서: 0.1.0이 아직 PyPI에 없다는 것을 밝힙니다.\n")
+    # before a release the wording is expected
+    assert release.check(tmp_path)[1] == []
+    _, errors = release.check(tmp_path, "v0.1.0")
+    assert errors == [
+        "docs/locales/ko/pages/packages/suite/overview.md still says the release is not on PyPI; update it before tagging",
+        "packages/suite/README.md still says the release is not on PyPI; update it before tagging"]
