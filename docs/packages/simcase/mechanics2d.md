@@ -219,9 +219,12 @@ the left end):
 **Materials.** Every used material gives `young_modulus_pa` (> 0) and
 `poisson_ratio` (−1 < ν < 0.5); a thermoelastic document also needs
 `thermal_expansion_per_k` (finite, signed) and the region heat key
-`conductivity_w_mk` (> 0). These are the names of the galerkin arguments
-(`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`) with the document's SI
-suffix, the same as the rectangle physics keys. The `materials` table is shared with
+`conductivity_w_mk` (> 0). α is the linear thermal expansion coefficient. These are the names of the galerkin
+arguments (`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`) with the
+document's SI suffix, the same as the rectangle physics keys for E, ν and α. The
+conductivity key is region heat's `conductivity_w_mk`, not the rectangle
+thermoelastic physics key `thermal_conductivity_w_mk`; in the table that name is
+refused with a pointer to `conductivity_w_mk`. The `materials` table is shared with
 the other region physics; each reads the keys it needs and validates every key it
 finds. Properties are never taken from built-in optical materials. In `physics`,
 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`,
@@ -270,8 +273,9 @@ with exit 1, as for region heat. Mesh limits (`max_input_vertices`, `max_nodes`,
 `max_triangles`, see [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers))
 apply to region documents; the rectangle documents refuse them.
 
-**Run and results.** The runner meshes the regions once (meshine, in metres, as
-region heat), maps E, ν and α by region name and calls `solve_elasticity`, or
+**Run and results.** The runner meshes the regions once, as region heat does: a
+micrometre copy of the document is meshed by meshine and the nodes are converted to
+metres once, maps E, ν and α by region name and calls `solve_elasticity`, or
 `solve_steady_heat` with conductivity by region, `freeze_temperature` and
 `solve_thermoelasticity`. The result IDs are `mechanics.elasticity2d-regions-result-v1`
 (layout `mechanics2d-p1-regions-v1`) and `mechanics.thermoelastic2d-regions-result-v1`
@@ -282,7 +286,15 @@ the scalar material entries, the summary holds `region_names` (the index order o
 region), the `materials` table, the boundary data (`displacement_m`, `traction_pa`,
 `pressure_pa` and its sign, and for thermoelasticity the heat data) and the mesh
 (nodes, triangles, size, requested and achieved minimum angle). Diagnostics,
-units, saving and export are those of the rectangle results.
+units and saving are those of the rectangle results. `simcase.export` does not yet
+take the two region layouts (it refuses them as an unsupported field layout).
+
+Only lengths follow `units.length` (geometry, `mesh.size`); every SI-suffixed value
+is SI whatever the length unit. The same document written in m, mm, µm or nm gives
+bit-identical saved arrays (a regression test in the same file, measured by the
+independent units review of 2026-11-08, not pre-registered). Saved coordinates come
+from the micrometre mesh times 1e-6 and can differ from a round number in the last
+digit (0.1 m may read 0.09999999999999999): select nodes with a tolerance.
 
 **Validation** (`tests/simcase/test_mechanics_regions.py`; checks R0 to R7
 pre-registered in the HQ work record on 2026-11-08 before the code; measured the

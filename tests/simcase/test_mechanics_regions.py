@@ -343,7 +343,17 @@ def test_r6_material_and_geometry_refusals():
     _refuse(raw, 'mechanics.elasticity2d takes 2d components only')
     raw = layered(displacement_m=SUPPORT)
     raw['mesh'] = {'subdivisions': [10, 2]}
-    _refuse(raw, "mesh: unsupported thermal keys \\['subdivisions'\\]")
+    _refuse(raw, "mesh: unsupported mechanics keys \\['subdivisions'\\]")
+    raw = layered(displacement_m=SUPPORT)
+    raw['materials']['steel']['thermal_conductivity_w_mk'] = 45.0
+    _refuse(raw, 'materials.steel.thermal_conductivity_w_mk: the materials table names thermal conductivity '
+                 'conductivity_w_mk')
+    raw = layered(displacement_m=SUPPORT)
+    raw['materials']['steel']['youngs_modulus_pa'] = 1e9
+    _refuse(raw, "materials.steel: unsupported mechanics keys \\['youngs_modulus_pa'\\]")
+    raw = layered(displacement_m=SUPPORT, v1=False)
+    del raw['units']
+    _refuse(raw, 'units: expected an object')
     raw = layered(displacement_m=SUPPORT)
     raw['units'] = {'length': 'mm', 'temperature': 'K'}
     _refuse(raw, "units: unsupported mechanics keys \\['temperature'\\]")
@@ -464,3 +474,47 @@ def test_region_examples_run_and_save(name, tmp_path):
         assert z['triangle_regions'].shape == (summary['mesh']['triangles'],)
     assert max(abs(v) for v in summary['diagnostics']['force_balance_n_per_m']) <= 1e-6 * max(
         1.0, *map(abs, summary['diagnostics']['support_reaction_n_per_m']))
+
+
+# -- length units: only lengths follow units.length; SI-suffixed values are never converted ------
+
+SCALE = {'m': 1e-3, 'mm': 1.0, 'um': 1e3, 'nm': 1e6}
+LENGTH_KEYS = ('xmin', 'xmax', 'ymin', 'ymax', 'x', 'y', 'w', 'h', 'cx', 'cy', 'r')
+
+
+def _in_unit(raw, unit):
+    """The millimetre document ``raw`` with every length written in ``unit``; SI values untouched."""
+    out = copy.deepcopy(raw)
+    k = SCALE[unit]
+    comp = out['geometry']['components']['main']
+    comp['domain'] = {key: v * k for key, v in comp['domain'].items()}
+    for f in comp['features']:
+        for key in LENGTH_KEYS:
+            if key in f:
+                f[key] = f[key] * k
+    out['mesh']['size'] = out['mesh']['size'] * k
+    out['units']['length'] = unit
+    return out
+
+
+@pytest.mark.parametrize('name, physics', [
+    ('elastic_regions', {'displacement_m': {'left': {'x': 1e-7}, 'bottom': {'y': 0.0}},
+                         'body_force_n_m3': [1e5, -2e6]}),
+    ('thermoelastic_regions', {'displacement_m': {'left': {'x': 1e-7, 'y': 0.0}}, 'body_force_n_m3': [0.0, -1e5],
+                               'pressure_pa': {'right': 2e6}}),
+])
+def test_region_results_do_not_depend_on_the_length_unit(name, physics):
+    """Not pre-registered (the units review of 2026-11-08 measured it; added as a regression)."""
+    raw = copy.deepcopy(examples.EXAMPLES[name])
+    raw['physics'][next(iter(raw['physics']))].update(physics)
+    ref = solve(raw)
+    for unit in ('m', 'um', 'nm'):
+        other = solve(_in_unit(raw, unit))
+        for key, array in ref.fields.items():
+            np.testing.assert_array_equal(other.fields[key], array, err_msg=f'{unit}: {key}')
+        assert abs(other.summary()['mesh']['achieved_min_angle_deg'] - ref.summary()['mesh']['achieved_min_angle_deg']) \
+            <= 1e-12 * ref.summary()['mesh']['achieved_min_angle_deg']
+    # the comparison sees a wrong unit: millimetre numbers declared as metres
+    wrong = copy.deepcopy(raw)
+    wrong['units']['length'] = 'm'
+    assert not np.array_equal(solve(wrong).fields['displacement_m'], ref.fields['displacement_m'])
