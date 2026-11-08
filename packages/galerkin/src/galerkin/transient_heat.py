@@ -37,9 +37,9 @@ from .core.backend import Backend, backend_of, is_live, lift, live_namespace, sc
 from .core.boundary import evaluate_scalar_boundary, scalar_boundary_geometry
 from .core.checks import real_array, real_value
 from .core.loads import source_load
+from .core.measure import ScalarMeasure
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
-from .assembly import assemble_mass, assemble_stiffness
 from .postprocess import element_gradient
 from .thermal import scalar_boundary_system
 
@@ -181,8 +181,11 @@ def _scipy(matrix):
 class TransientHeatResult:
     """Full copied read-only histories, O(Nt*(N+M)) memory, no downsampling.
 
-    Node temperatures: K; element flux: W/m^2. All nodal rates: W/m depth.
-    H is J/m, whereas quadratic V is J K/m and is NOT stored heat.
+    Node temperatures: K; element flux: W/m^2. All nodal rates: W/m depth
+    (coordinate_system "cartesian") or W over the full revolution
+    ("axisymmetric", nodal_rate_unit "W"; the field names keep their Cartesian
+    ``_w_per_m`` spelling). H is J/m (J), whereas quadratic V is J K/m (J K) and
+    is NOT stored heat.
     Rates/reactions have no entry at t0. nodes_m/triangles capture the mesh.
     conductivity_w_mk and volumetric_heat_capacity_j_m3k are floats, or
     {region name: float} copies for per-region materials.
@@ -208,6 +211,8 @@ class TransientHeatResult:
     volumetric_heat_capacity_j_m3k: float | dict
     prescribed_outward_load_w_per_m: np.ndarray | None = None
     convective_outward_w_per_m: np.ndarray | None = None
+    coordinate_system: str = "cartesian"
+    nodal_rate_unit: str = "W/m"
 
     def __post_init__(self):
         # JAX and PyTorch histories are kept as they are (they carry derivatives).
@@ -219,9 +224,25 @@ class TransientHeatResult:
                 object.__setattr__(self, f.name, _owned(value, dtype))
 
 
+def _element_matrices(mesh, k, capacity, measure):
+    """Element (mass, stiffness) of ``measure``, in the coefficients' array libraries.
+
+    Cartesian: the kernels of assemble_mass and assemble_stiffness, unchanged.
+    Axisymmetric: the stiffness carries the exact cell factor 2*pi*r_centroid of
+    its constant integrand (as steady heat), the mass the exact cubic moments
+    of the linear radius (kernels.p1_mass_axisymmetric).
+    """
+    stiffness = kernels.p1_stiffness(mesh, k)
+    if not measure.axisymmetric:
+        return kernels.p1_mass(mesh, capacity), stiffness
+    xp = live_namespace(stiffness)
+    stiffness = stiffness*xp.asarray(measure.cell_factor())[:, None, None]
+    return kernels.p1_mass_axisymmetric(mesh, capacity), stiffness
+
+
 def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixed, labels,
                   representatives, sample, advance, record, previous, checkpoint_every,
-                  natural=None):
+                  natural=None, measure=None):
     """Histories of a run with JAX or PyTorch inputs, in that library.
 
     Every step first runs on NumPy numbers (``advance``: refined and checked like
@@ -241,8 +262,9 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
         def lifted(matrix):
             matrix = matrix.coalesce()
             return CooMatrix(matrix.rows, matrix.cols, lift(xp, matrix.values), matrix.shape)
-        mass = lifted(forms.matrix(cells, cells, kernels.p1_mass(mesh, capacity), (n, n)))
-        stiffness = lifted(forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (n, n)))
+        element_mass, element_stiffness = _element_matrices(mesh, k, capacity, measure)
+        mass = lifted(forms.matrix(cells, cells, element_mass, (n, n)))
+        stiffness = lifted(forms.matrix(cells, cells, element_stiffness, (n, n)))
         if not (np.array_equal(mass.rows, stiffness.rows) and np.array_equal(mass.cols, stiffness.cols)):
             raise ValueError("mass and stiffness patterns differ")
         k, initial = lift(xp, k), lift(xp, initial)
@@ -343,7 +365,7 @@ def _checkpointed(xp, block, sizes):
 def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                          time_s, initial_temperature_k, dirichlet,
                          heat_source=0.0, outward_flux=None, convection=None,
-                         checkpoint_every=None):
+                         checkpoint_every=None, coordinate_system="cartesian"):
     """Solve c*dT/dt-div(k*grad T)=Q, BE with consistent mass, SI units.
 
     k>0 W/(m K), c>0 J/(m^3 K), explicit increasing nonnegative seconds,
@@ -372,6 +394,16 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     checkpoint_every=m (int >= 1) keeps only every m-th state and recomputes the
     steps between during the backward pass: less memory, more time. It does not
     change values and has no effect on NumPy inputs.
+
+    coordinate_system="axisymmetric" interprets coordinates as (r,z), r>=0,
+    and integrates the full revolution with the measure 2*pi*r as
+    galerkin.thermal.solve_steady_heat: mass, stiffness, source and boundary
+    samples are weighted (the consistent mass is the exact cubic moment of the
+    linear radius), nodal rates and the heat content are then W and J over the
+    revolution (result.nodal_rate_unit "W"; the field names keep their
+    Cartesian spelling), the element flux stays W/m^2, Dirichlet data on the
+    axis alone and nonzero flux or h on the axis are refused, and the axis
+    needs no condition. The default is bit-for-bit the Cartesian solve.
     """
     if checkpoint_every is not None and (
             isinstance(checkpoint_every, (bool, np.bool_))
@@ -390,6 +422,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         raise ValueError("time_s differences must be finite and strictly positive")
 
     p, t, area, exterior, count, labels = triangle_geometry(mesh)
+    measure = ScalarMeasure(mesh, coordinate_system)
     p, t = p.copy(), t.copy()
     # Geometry is validated before Mesh can cast indices or repair orientation.
     record_k, record_c = k, capacity
@@ -426,6 +459,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                 or not 0 <= node < len(p)):
             raise ValueError(f"Dirichlet nodes must be integer node indices inside the mesh's {len(p)} nodes")
         conditions[int(node)] = value if callable(value) else _value(value, "Dirichlet temperature")
+    measure.check_axis_dirichlet(conditions)
     fixed = np.array(sorted(conditions), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)
     source = (heat_source if callable(heat_source) or regional[2]
@@ -457,15 +491,18 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         flux_now = None if outward_flux is None else _bound(outward_flux, flux_forms, "outward_flux", now)
         convection_now = (None if convection is None
                           else _bound(convection, convection_forms, "convection", now))
-        samples = evaluate_scalar_boundary(geometry, flux_now, convection_now, live=True)
+        samples = measure.boundary_samples(
+            evaluate_scalar_boundary(geometry, flux_now, convection_now, live=True))
         anchors = [initial_live[r] for r in representatives]
         robin, outward, _, shifted = scalar_boundary_system(samples, len(p), labels, anchors,
                                                             np.ones(count, dtype=bool))
         return robin, outward, shifted
 
     try:
-        mass = assemble_mass(private_mesh, capacity)
-        stiffness = assemble_stiffness(private_mesh, k)
+        element_mass, element_stiffness = _element_matrices(private_mesh, k, capacity, measure)
+        cells = private_mesh.triangles
+        mass = forms.matrix(cells, cells, element_mass, (len(p), len(p))).to_scipy()
+        stiffness = forms.matrix(cells, cells, element_stiffness, (len(p), len(p))).to_scipy()
         _finite(mass.data, stiffness.data)
         if np.any(mass.diagonal() <= 0):
             raise ValueError("consistent mass lost positive diagonal at this numeric scale")
@@ -532,7 +569,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         load = source_load(
             private_mesh, p, t, area,
             (lambda points: real_value(source(points.copy(), now), "heat_source callback"))
-            if callable(source) else source, live=True)
+            if callable(source) else source, live=True, measure=measure)
         _finite(to_numpy(bc), to_numpy(load))
         return bc, load, boundary_at(index)
 
@@ -690,10 +727,12 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                            *(natural_live[1:] if natural else ())), private_mesh,
             k_live, capacity_live, initial_live, bc, load, times, steps, fixed, labels,
             representatives, sample, advance, record, previous, checkpoint_every,
-            natural_live[0] if natural else None)
+            natural_live[0] if natural else None, measure)
         try:
             return TransientHeatResult(times, *history[:8], fixed, history[8], p, t,
-                                       record_k, record_c, *history[9:])
+                                       record_k, record_c, *history[9:],
+                                       coordinate_system=coordinate_system,
+                                       nodal_rate_unit=measure.nodal_rate_unit)
         except Exception as exc:
             raise TransientHeatStepError(nt-1, times[-1]) from exc
 
@@ -718,13 +757,14 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             raise TransientHeatStepError(index, times[index]) from exc
 
     try:
+        metadata = dict(coordinate_system=coordinate_system, nodal_rate_unit=measure.nodal_rate_unit)
         if not natural:
             return TransientHeatResult(
                 times, temperature, flux, loads, reactions, residuals, storage,
-                content, quadratic, fixed, boundary_values, p, t, record_k, record_c)
+                content, quadratic, fixed, boundary_values, p, t, record_k, record_c, **metadata)
         return TransientHeatResult(
             times, temperature, flux, loads, reactions, residuals, storage,
             content, quadratic, fixed, boundary_values, p, t, record_k, record_c,
-            prescribed_history, convective_history)
+            prescribed_history, convective_history, **metadata)
     except Exception as exc:
         raise TransientHeatStepError(nt-1, times[-1]) from exc

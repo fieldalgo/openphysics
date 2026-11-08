@@ -5,6 +5,7 @@
 **한눈에 보기**
 
 - **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점, 그리고 태그가 붙은 외곽 변의 처방 외향 열유속 g[W/m²] 또는 대류 h·(T − T_amb)(정상 솔버와 같은 입력 형식; 각각 상수, 공간 변화 또는 시간 의존)이며 나머지 경계는 단열입니다.
+- **축대칭:** `coordinate_system="axisymmetric"`은 메시를 (r, z)로 읽고 [축대칭 정상 열전도](thermal_axisymmetric.md)의 측도로 전체 회전을 적분합니다. [축대칭 과도 열](#축대칭-과도-열) 참조.
 - **한계:** 복사나 온도 의존 h는 없습니다. 시간 의존 경계 데이터는 엔진 기능이며(simcase 문서 adapter는 상수만 받음), JAX·PyTorch 입력에서는 시간 의존 h를 거절합니다. restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
 - **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. [열유속·대류 기준](transient_heat_validation.md#외향-열유속과-대류-기준)은 대류 slab과 상수 열유속 slab을 독립 급수·정상 솔버·단계별 열수지와 비교하고, [시간 의존 기준](transient_heat_validation.md#시간-의존-열유속과-대류-기준)은 정현파 주변 온도와 ramp 열유속을 닫힌 형식과 비교합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
 
@@ -39,7 +40,8 @@ reaction은 0입니다. 이는 정확한 기준 기대값이며 **관측한 실�
 solve_transient_heat(
     mesh, *, conductivity, volumetric_heat_capacity,
     time_s, initial_temperature_k, dirichlet, heat_source=0.0,
-    outward_flux=None, convection=None, checkpoint_every=None)
+    outward_flux=None, convection=None, checkpoint_every=None,
+    coordinate_system="cartesian")
 ```
 
 하위 모듈을 명시적으로 import합니다. 자동 최상위 export는 추가하지 않습니다.
@@ -226,6 +228,36 @@ maximum principle을 주장하면 안 됩니다. 복원한 셀 flux는 H(div)-co
 
 고정 gate, 독립 대수/reference 경계와 재현은
 [검증 가이드](transient_heat_validation.md)를 보세요.
+
+## 축대칭 과도 열
+
+`coordinate_system="axisymmetric"`은 같은 후진 Euler 계를 회전체에서 풉니다. 메시 좌표는
+m 단위 (r, z)이고 r ≥ 0이며, 모든 적분은 [축대칭 정상 열전도](thermal_axisymmetric.md)의
+측도 `2πr`(`core.measure.ScalarMeasure`)을 씁니다. 강성은 상수 피적분함수의 정확한 셀
+인자 `2π r_centroid`를, 일관 질량은 **선형 반지름의 정확한 3차 모멘트**
+`∫ c N_i N_j 2πr = 2π|T| c Σ_m r_m ∫ N_i N_j N_m`(`core.kernels.p1_mass_axisymmetric`,
+구적 없음; 꼭짓점 중복도에 대해 `∫ N_i N_j N_m = |T| a!b!c!/60`)를 쓰고, 열원과
+열유속·대류 표본은 기존 Gauss 점에서 가중하며, 요소 열유속은 W/m²의 `(q_r, q_z)`
+그대로입니다. 절점 열량(`source_load`·`reaction`·`residual`·`storage_rate`·경계 하중)은
+**전체 회전의 W**, `heat_content`는 J, 이차 functional은 J K이고, 결과는
+`coordinate_system`과 `nodal_rate_unit`(`"W"`)을 기록합니다(필드 이름은 Cartesian
+`_w_per_m` 철자를 유지하고 [simcase 영역 adapter](../simcase/thermal_regions2d.md#축대칭-문서)가
+바꿔 적습니다). 정상 페이지의 축 규칙이 그대로 적용됩니다. 축에만 놓인 절점의 Dirichlet
+데이터와 축 변의 비영 열유속·h는 거부하며(경계 거부는 데이터를 처음 표본화하는 시각
+index 0에 연결됨), 축 자체에는 조건이 필요 없습니다. 기본값은 Cartesian 풀이와 bit 단위로
+같습니다. JAX·PyTorch 입력은 Cartesian과 같이 지원하며 측도는 정적 기하입니다.
+
+검사 G7-1~G7-4(`tests/galerkin/test_transient_heat_axisymmetric.py`, 2026-11-08 HQ 작업
+기록에 사전 등록, 같은 날 Linux·Python 3.12 고정 환경에서 측정): 표면을 293.15 K로 고정한
+균일 원통(R 3 mm)이 350 K에서 식는 과정을 Bessel 급수와 비교, 반지름 분할 8/16/32에 단계
+수를 분할의 제곱으로 늘리고 초기 낙차 대비 절점 최대 노름 오차: 구간마다 차수 ≥ 0.9, 최세
+메시에서 ≤ 2e-2(관측 1.4e-2, 2.7e-3, 8.6e-4); 열유속·대류 유무 모두 매 단계
+`storage = source + reaction − prescribed − convective`가 합산 열량의 1e-10 이내이고 끝면의
+처방 열유속은 `g πR²`로 적분; 단열 균일 원통은 `H = c T0 πR²L`로 시작(1e-12)하고 초당 `Q/c`씩
+데워짐(1e-10 K); 기하급수로 커지는 단계가 열원·Dirichlet·대류·열유속을 가진 축대칭 정상
+풀이에 상승의 1e-8 이내(열량 1e-6)로 도달; Cartesian 기본값은 명시적 `"cartesian"` 호출과
+배열마다 동일; 가중 질량 커널은 36점 구적과 1e-13 이내; JAX·PyTorch에서 열량의 열용량·열원
+미분이 `T0 πR²L`·`t πR²L`(해당 라이브러리가 설치된 곳에서 실행).
 
 ## 별도의 headless 문서 adapter
 
