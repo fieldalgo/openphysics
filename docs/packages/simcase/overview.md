@@ -599,6 +599,8 @@ needs something the engine does not export, the engine exports it on purpose.
 
 The [experimental model workspace](workspace.md) is available at `/workspace` on the same server. It uses native JavaScript modules and a separate capability contract; the original optical and heat editors remain available.
 
+The experimental [geometry lab](geometry_lab.md) at `/geometry-lab` edits the parameters of a version 1 geometry document and draws the exact engine's region complex; it is a separate page and runs no physics.
+
 ## Self-checks
 
 ```bash

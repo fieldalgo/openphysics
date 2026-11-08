@@ -33,6 +33,7 @@ from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
 from . import security
+from . import geometry_api
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version=__version__)
@@ -656,6 +657,7 @@ async def transient_history(job_id: str, request: Request):
     return _transient_view(job_id, request, history=True)
 
 
+geometry_api.install(app)    # the experimental geometry lab, /geometry-lab
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

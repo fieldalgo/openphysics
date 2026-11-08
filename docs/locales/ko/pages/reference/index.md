@@ -47,6 +47,7 @@
 - [형상 문서: 0단계 계약](../packages/simcase/geometry_document.md)
 - [버전 1 형상 읽기(1단계)](../packages/simcase/geometry_reader.md)
 - [정확 2D 형상 엔진(2단계)](../packages/simcase/geometry_engine.md)
+- [Studio 형상 실험실(실험적)](../packages/simcase/geometry_lab.md)
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
