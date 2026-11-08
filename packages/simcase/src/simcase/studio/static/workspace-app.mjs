@@ -816,18 +816,31 @@ async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
  try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v5'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v5';}
- catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;$('workspace-tools').open=true;}
+ catch(error){
+  // no answer at all: say so and keep checking; any other failure is shown and checking stops
+  if(connectionFailure(error)==='unreachable'){connection.message=UNREACHABLE_MESSAGE;scheduleReconnect();}
+  else{connection.message='Studio connection unavailable or incompatible: '+error.message;$('workspace-tools').open=true;}
+ }
  finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;refreshJobControls();render();refreshJobControls();}
 }
 // While the server cannot be reached, check every 3 s and reconnect when it is back.
-let reconnectTimer=null;
+let reconnectTimer=null,reconnecting=false;
 function connectionLost(){
  connection.ready=false;connection.message=UNREACHABLE_MESSAGE;$('connection-status').textContent=connection.message;notice(UNREACHABLE_MESSAGE);render();refreshJobControls();
- if(reconnectTimer)return;
- reconnectTimer=setInterval(async()=>{
-  try{await solverApi('/api/workspace/capabilities/v5');}catch{return;}
-  clearInterval(reconnectTimer);reconnectTimer=null;await connectWorkspace();
+ scheduleReconnect();
+}
+// One check at a time: the next is scheduled only after the previous one ends. A quiet probe
+// runs first, so the page does not flicker through "Checking" while the server is down.
+function scheduleReconnect(){
+ if(reconnectTimer||reconnecting)return;
+ reconnectTimer=setTimeout(async()=>{
+  reconnectTimer=null;reconnecting=true;let reachable=true;
+  try{
+   try{await solverApi('/api/workspace/capabilities/v5');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
+   if(reachable)await connectWorkspace();
+  }finally{reconnecting=false;}
   if(connection.ready){notice(RECONNECTED_MESSAGE);if($('job-message').textContent===UNREACHABLE_MESSAGE)$('job-message').textContent=RECONNECTED_MESSAGE;}
+  else if(!reachable||connection.message===UNREACHABLE_MESSAGE)scheduleReconnect();
  },3000);
 }
 $('connect-workspace').onclick=connectWorkspace;
