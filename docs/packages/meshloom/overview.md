@@ -116,7 +116,10 @@ names may change before the mesher's public API.
   `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
   outward), and `interfaces` by region pair (wound from the lower region to the
   higher). There is no refinement: the mesh has the input points and the points
-  boundary recovery needed.
+  boundary recovery needed. The plan's C10 adversarial inputs are meshed this way
+  and checked against V1–V4 on every platform's installed wheel (twisted prism,
+  near-coplanar quadrilaterals, stacked layers, a 4³ box lattice, 5° and 30°
+  wedges, a 1:100 slab, and touching, nested and stacked shells).
 
 ```python
 import numpy as np

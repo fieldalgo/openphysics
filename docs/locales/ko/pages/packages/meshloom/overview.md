@@ -86,6 +86,8 @@ meshloom이 메시를 만들기 전까지 적층 형상에는 [`meshine.extrude`
   모두 양이고 모든 면이 사면체 두 개 이하에 속할 때만 적용합니다. `nodes`, `tetrahedra`, `regions`, `region_names`, 면 번호별
   `boundary_faces`와 `boundary_nodes`(바깥쪽으로 감김), 영역 쌍별 `interfaces`(작은 번호 영역에서 큰 번호
   영역 쪽으로 감김)를 돌려줍니다. 세분화는 없어서, 메시에는 입력 점과 경계 복원에 필요한 점만 있습니다.
+  계획의 C10 적대적 입력을 이렇게 메시로 만들어 모든 플랫폼의 설치 휠에서 V1–V4로 검사합니다(꼬인 프리즘,
+  거의 같은 평면인 사각형, 적층, 4³ 상자 격자, 5°·30° 쐐기, 1:100 슬래브, 맞닿거나 겹치거나 쌓인 껍질).
 
 ```python
 import numpy as np
