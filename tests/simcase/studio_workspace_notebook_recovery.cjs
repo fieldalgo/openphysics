@@ -39,22 +39,45 @@ test('queued recovery keeps the scheduled notebook when the UI replaces or edits
  assert.equal(recovered.input.model.width,500);assert.equal(recovered.runs.length,1);assert.equal(recovered.runs[0].label,'Reference');assert.equal(recovered.runs[0].pinned,true);assert.equal(recovered.runs[0].input.model.width,500);assert.deepEqual(recovered.runs[0].neff,[2.4,1.7]);assert.deepEqual(recovered.comparison,['12345678','12345678']);assert.equal(recovered.view.probe.x,0);
 });
 
-// Minimal asynchronous IDB transaction model: reads and writes are ordered;
-// abort discards the pending write. The browser check exercises real IndexedDB.
+// Minimal asynchronous IDB transaction model: keyed values; requests in one
+// transaction are ordered and the transaction completes after the last request's
+// handler has run; abort discards its writes. The browser check exercises real
+// IndexedDB.
 function database(initial){
- let value=initial,tail=Promise.resolve();
- return {open(){const opening={};queueMicrotask(()=>{
+ const data=new Map([['latest',initial]]);let tail=Promise.resolve();
+ return {data,open(){const opening={};queueMicrotask(()=>{
   opening.result={close(){},transaction(){
-   let finish,aborted=false,written=false,next;
+   let finish,aborted=false,pending=0;const writes=new Map();
    const ready=tail;tail=new Promise(resolve=>finish=resolve);
-   const tx={objectStore:()=>({get(){const request={};ready.then(()=>{
-    request.result=structuredClone(value);request.onsuccess?.();
-    queueMicrotask(()=>{if(!aborted){if(written)value=next;tx.oncomplete?.();}finish();});
-   });return request;},put(record){written=true;next=structuredClone(record);}}),abort(){aborted=true;queueMicrotask(()=>tx.onabort?.());}};
+   const settle=()=>queueMicrotask(()=>{if(pending>0)return;if(!aborted){for(const [key,value] of writes)data.set(key,value);tx.oncomplete?.();}finish();});
+   const tx={objectStore:()=>({get(key){const request={};pending++;ready.then(()=>{
+    const value=writes.has(key)?writes.get(key):data.get(key);request.result=value===undefined?undefined:structuredClone(value);
+    request.onsuccess?.();pending--;settle();
+   });return request;},put(record,key){writes.set(key,structuredClone(record));}}),abort(){aborted=true;queueMicrotask(()=>tx.onabort?.());}};
    return tx;
   }};opening.onsuccess();
  });return opening;}};
 }
+test('the first save after a page adopts a record keeps that record as an earlier session',async()=>{
+ const record=session=>({version:1,savedAt:'2026-10-26T00:00:00Z',session});
+ const db=database(null);
+ // page 1 starts empty and saves twice: nothing earlier to keep
+ let page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('A1'));await page.save(record('A2'));
+ assert.equal((await page.load()).session,'A2');assert.deepEqual(await page.loadEarlier(),[]);
+ // page 2 loads A2, does not recover it and saves new work: A2 is kept
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('B1'));await page.save(record('B2'));
+ assert.equal((await page.load()).session,'B2');assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['A2']);
+ // pages 3, 4 and 5 do the same; at most three earlier sessions, newest first
+ for(const name of ['C','D','E']){page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record(name));}
+ assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['D','C','B2']);
+ // adopting the latest record again (a reviewed replacement) still keeps it before the next save
+ const latest=await page.load();page.adopt(latest);page.adopt(latest);await page.save(record('F'));
+ assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['E','D','C']);
+ // a conflicting save changes neither key
+ const other=indexedNotebookStore(db);other.adopt(await other.load());await page.save(record('G'));
+ await assert.rejects(other.save(record('H')),{code:'recovery-conflict'});
+ assert.equal((await other.load()).session,'G');assert.deepEqual((await other.loadEarlier()).map(r=>r.session),['E','D','C']);
+});
 test('concurrent notebook writers cannot replace a newer committed recovery',async()=>{
  const db=database(null),a=indexedNotebookStore(db),b=indexedNotebookStore(db);
  a.adopt(await a.load());b.adopt(await b.load());

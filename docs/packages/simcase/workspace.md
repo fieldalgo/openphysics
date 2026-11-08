@@ -374,7 +374,13 @@ fields are labeled `recovered`, not newly computed. Recovery starts a new input
 undo history and keeps the document unsaved until you save a file/session. No
 solver is started. Input-only recovery and pending-job recovery remain separate.
 
-This is the latest single snapshot for the browser origin, shared across tabs.
+Starting new work without recovering does not discard the stored session. The first
+automatic save after a page opens moves the stored session to the earlier sessions,
+newest first, keeping at most three; **Recover earlier session** lists each with its
+run count and time and recovers it through the same replacement dialog. Recovering
+an earlier session keeps the current one as an earlier session at the next save.
+
+The latest snapshot is a single record for the browser origin, shared across tabs.
 Each write checks the previously observed revision in the same database transaction.
 If another tab has saved since this tab loaded or recovered the notebook, automatic
 storage stops without overwriting that record. Save session to preserve this tab,

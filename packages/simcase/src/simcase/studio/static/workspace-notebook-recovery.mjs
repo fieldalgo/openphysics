@@ -10,10 +10,14 @@ export function readNotebookRecovery(record){
 
 // A legacy record has no revision; include its payload to detect same-time writes.
 export function recoveryRevision(record){return record==null?null:record.revision??record.savedAt+'\0'+record.session;}
+// How many earlier sessions the store keeps. The first save after a page adopts a
+// record moves that record here instead of dropping it, so a session the user did
+// not recover (for example after missing the prompt) survives the next session.
+export const EARLIER_SESSIONS=3;
 export function indexedNotebookStore(factory=globalThis.indexedDB){
- let expected,epoch=0;
- const adopt=record=>{expected=recoveryRevision(record);epoch++;};
- const transact=(mode,record)=>new Promise((resolve,reject)=>{
+ let expected,epoch=0,wroteSinceAdopt=false;
+ const adopt=record=>{expected=recoveryRevision(record);epoch++;wroteSinceAdopt=false;};
+ const transact=(mode,record,key='latest')=>new Promise((resolve,reject)=>{
   if(!factory){reject(new Error('Browser database unavailable.'));return;}
   if(mode==='readwrite'&&expected===undefined){reject(new Error('Read browser recovery before saving.'));return;}
   const baseline=expected,startedEpoch=epoch;
@@ -26,20 +30,27 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
    const db=opening.result;if(settled){db.close();return;}
    let tx,request,failure;
    try{
-    tx=db.transaction('snapshots',mode);const snapshots=tx.objectStore('snapshots');request=snapshots.get('latest');
+    tx=db.transaction('snapshots',mode);const snapshots=tx.objectStore('snapshots');request=snapshots.get(key);
     if(mode==='readwrite')request.onsuccess=()=>{
      if(recoveryRevision(request.result)!==baseline){
       failure=Object.assign(new Error('Another tab changed browser recovery. Save this session to a file, then recover the latest browser session before continuing automatic recovery.'),{code:'recovery-conflict'});tx.abort();return;
      }
-     snapshots.put(saved,'latest');
+     if(wroteSinceAdopt||request.result==null){snapshots.put(saved,'latest');return;}
+     const earlier=snapshots.get('earlier');
+     earlier.onsuccess=()=>{
+      const list=Array.isArray(earlier.result)?earlier.result:[];
+      if(recoveryRevision(list[0])!==recoveryRevision(request.result))snapshots.put([request.result,...list].slice(0,EARLIER_SESSIONS),'earlier');
+      snapshots.put(saved,'latest');
+     };
     };
    }catch(error){db.close();reject(error);return;}
-   tx.oncomplete=()=>{db.close();if(mode==='readwrite'&&epoch===startedEpoch)expected=recoveryRevision(saved);resolve(mode==='readonly'?request.result:saved);};
+   tx.oncomplete=()=>{db.close();if(mode==='readwrite'&&epoch===startedEpoch){expected=recoveryRevision(saved);wroteSinceAdopt=true;}resolve(mode==='readonly'?request.result:saved);};
    tx.onabort=()=>{db.close();reject(failure||tx.error||new Error('Browser recovery transaction aborted.'));};
    tx.onerror=()=>{}; // Abort is the final failure event; the prior record remains atomic.
   };
  });
- return {load:()=>transact('readonly'),adopt,save:record=>transact('readwrite',record)};
+ const loadEarlier=async()=>{const list=await transact('readonly',null,'earlier');return Array.isArray(list)?list:[];};
+ return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record)};
 }
 
 // Coalesce rapid edits and serialize writes so an older completion cannot win.
