@@ -16,6 +16,12 @@ requires the six OpenPhysics packages, which release together with it.
 | `physmat` | materials and optical dispersion |
 | `simcase` | model document, headless runner and the optional browser studio |
 
+**0.1.0 is not on PyPI yet.** PyPI holds only the empty `0.0.1` name reservations,
+so these commands install nothing useful today, and pip may still report success.
+Until the release, [install from a source checkout](../../overview.md#install-from-source) or from wheels built
+from it, and pin the version (`"openphysics[studio]==0.1.0"`) so that pip refuses
+instead of picking `0.0.1`. The commands below are for the release.
+
 ```bash
 pip install openphysics                  # the six packages, headless
 pip install "openphysics[studio]"        # plus the local browser Studio
