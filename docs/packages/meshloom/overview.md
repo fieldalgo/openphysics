@@ -117,8 +117,9 @@ names may change before the mesher's public API.
   outward), and `interfaces` by region pair (wound from the lower region to the
   higher). There is no refinement: the mesh has the input points and the points
   boundary recovery needed. The plan's C10 adversarial inputs are meshed this way
-  and checked against V1–V4 on every platform's installed wheel (twisted prism,
-  near-coplanar quadrilaterals, stacked layers, a 4³ box lattice, 5° and 30°
+  and checked against V1–V4 on every platform's installed wheel (the Schönhardt
+  prism and the Chazelle polyhedron, which need Steiner points, a cospherical prism
+  with an interior vertex, near-coplanar quadrilaterals, stacked layers, a 4³ box lattice, 5° and 30°
   wedges, a 1:100 slab, and touching, nested and stacked shells). C13 fuzzing runs
   200 seeded assemblies of dyadic boxes and n-gon prisms, some with 1-ulp jitter, in a
   child process with a 60 s progress limit: each must give a valid mesh or a typed
