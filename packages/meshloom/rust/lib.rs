@@ -164,7 +164,7 @@ fn mixed_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes>, s
         return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
     }
     let s: Vec<mixed::SPoint> = ts.iter().enumerate()
-        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+        .map(|(j, &t)| mixed::SPoint::seg(ends[2 * j], ends[2 * j + 1], t)).collect();
     mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
     let q = u32s(query.as_bytes(), "query index")?;
     if q.len() % k != 0 {
@@ -213,7 +213,7 @@ fn spoint_coords<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, seg: &Bound
         return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
     }
     let s: Vec<mixed::SPoint> = ts.iter().enumerate()
-        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+        .map(|(j, &t)| mixed::SPoint::seg(ends[2 * j], ends[2 * j + 1], t)).collect();
     mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
     let m = mixed::Mixed { input: &input, s: &s };
     let out: Vec<f64> = (0..s.len() as u32).flat_map(|j| m.rounded(mixed::Pt::S(j))).collect();
