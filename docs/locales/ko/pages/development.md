@@ -356,7 +356,9 @@ python -m twine check --strict .validation/simcase/*
 사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
 릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
-필수 CI처럼 `--tag` 없이 돌리면 `[Unreleased]` 절도 받아들입니다. 0.x에서 안정적으로
+또 패키지 README와 문서 페이지(변경 기록 제외)에 "아직 PyPI에 없다"는 문구가 남아 있으면
+거부합니다. 패키지 README가 그대로 PyPI 설명이 되기 때문입니다. 필수 CI처럼 `--tag` 없이
+돌리면 `[Unreleased]` 절과 그 문구를 받아들입니다. 0.x에서 안정적으로
 유지하는 것도 변경 기록에 있습니다.
 
 README는 PyPI 설명으로도 쓰이지만, 링크가 패키지 디렉터리 기준 상대 경로라 PyPI에서는

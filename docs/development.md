@@ -409,8 +409,10 @@ sets it in every `packages/<name>/pyproject.toml` and in each import package's
 minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x) and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
-release; without `--tag`, as required CI runs it, it accepts an `[Unreleased]`
-section. The changelog also says what 0.x keeps stable.
+release, and also refuses package READMEs and documentation pages (other than
+changelogs) that still say the release is not on PyPI yet, because a package README
+becomes its PyPI description; without `--tag`, as required CI runs it, it accepts an
+`[Unreleased]` section and that wording. The changelog also says what 0.x keeps stable.
 
 The README is also the PyPI description, but its links are relative to the
 package directory and would break there. Each package's `setup.py` therefore
