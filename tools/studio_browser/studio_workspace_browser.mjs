@@ -173,7 +173,10 @@ try {
   await page.until("/Browser recovery saved/.test(document.getElementById('autosave-status').textContent)", 'browser recovery saved', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
-  stage('server stopped', await stopServer(server));
+  const stopped = await stopServer(server);
+  stage('server stopped', stopped);
+  // a server still running would answer the restart check and hide a failed restart
+  if (stopped.exit === null && stopped.signal === null) throw new Error('Studio did not stop within 15 s');
   server = await startServer('server-2');
   await toGeometry(); await page.click('#run-optical');
   await page.until("/Studio was restarted/.test(document.getElementById('job-message').textContent)&&/^Connected/.test(document.getElementById('connection-status').textContent)", 'reconnect after restart', 20000);
