@@ -319,7 +319,10 @@ def _div_kind(a: str, b: str, path: str) -> str:
 # --------------------------------------------------------------------------- parsing
 
 class _Reader:
-    def __init__(self, doc: dict):
+    """Reads lengths of one document; ``evaluator`` evaluates its parameters (the design
+    velocity pass, ``simcase.geometry_velocity``, passes one that also carries derivatives)."""
+
+    def __init__(self, doc: dict, evaluator=None):
         g = doc.get("geometry")
         if not isinstance(g, dict):
             raise GeometryError("geometry: expected an object")
@@ -346,7 +349,7 @@ class _Reader:
                 raise GeometryError(f"{path}.kind: expected 'length' or 'ratio'")
             if "range" in spec and (not isinstance(spec["range"], list) or len(spec["range"]) != 2):
                 raise GeometryError(f"{path}.range: expected [lo, hi]")
-        self.ev = _Evaluator(params)
+        self.ev = (evaluator or _Evaluator)(params)
         for name in params:
             self.ev.parameter(name, f"geometry.parameters.{name}")
         self.roundings: list[Rounding] = []
@@ -383,7 +386,10 @@ def _keys(obj: dict, required: set, optional: set, path: str, reserved: set = fr
 
 def parse(doc: dict) -> GeometryModel:
     """Read the version 1 ``geometry`` block of ``doc`` (which also gives ``units``)."""
-    r = _Reader(doc)
+    return _parse(_Reader(doc), doc)
+
+
+def _parse(r: _Reader, doc: dict) -> GeometryModel:
     comps = doc["geometry"]["components"]
     if not isinstance(comps, dict) or not comps:
         raise GeometryError("geometry.components: expected a non-empty object")
