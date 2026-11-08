@@ -129,6 +129,11 @@ def _seeded(seed: str, value):
     """An evaluator class whose parameter ``seed`` takes ``value`` (a Fraction or a _Dual)."""
 
     class _Seeded(_Evaluator):
+        def __init__(self, parameters):
+            # ranges bound sweeps and optimisers, not the derivative or the probe: drop them here
+            super().__init__({k: {kk: vv for kk, vv in spec.items() if kk != "range"} if isinstance(spec, dict)
+                              else spec for k, spec in parameters.items()})
+
         def parameter(self, name, path):
             if name == seed and name not in self.values:
                 self.values[name] = (value, self.raw[name].get("kind", "length"))
@@ -229,8 +234,9 @@ class DesignVelocity:
         m = self.curves[curve]
         (ax, ay), (bx, by) = self.complex.vertices[k.a], self.complex.vertices[k.b]
         if k.kind == "line":
-            dx, dy = float(bx - ax), float(by - ay)
-            dvx, dvy = float(m.vb[0] - m.va[0]), float(m.vb[1] - m.va[1])
+            # the two ends may lie in different fields Q(sqrt D1), Q(sqrt D2): combine them in floats
+            dx, dy = float(bx) - float(ax), float(by) - float(ay)
+            dvx, dvy = float(m.vb[0]) - float(m.va[0]), float(m.vb[1]) - float(m.va[1])
             return (dx * dvx + dy * dvy) / math.hypot(dx, dy)
         cx, cy = k.params["center"]
         r = math.sqrt(k.params["r2"])
@@ -244,14 +250,15 @@ class DesignVelocity:
         (outward for the cell on the left)."""
         m = self.curves[k.index]
         (ax, ay), (bx, by) = self.complex.vertices[k.a], self.complex.vertices[k.b]
+        # the two ends may lie in different fields Q(sqrt D1), Q(sqrt D2): combine them in floats
+        ex, ey = float(bx) - float(ax), float(by) - float(ay)
         if k.kind == "line":
-            sx, sy = (m.va[0] + m.vb[0]) * Fraction(1, 2), (m.va[1] + m.vb[1]) * Fraction(1, 2)
-            return float(sx * (by - ay) - sy * (bx - ax))
+            sx, sy = (float(m.va[0]) + float(m.vb[0])) / 2, (float(m.va[1]) + float(m.vb[1])) / 2
+            return sx * ey - sy * ex
         # a counter-clockwise arc: the cell on the left is inside the circle, n = outward radial
         r = math.sqrt(k.params["r2"])
         _ta, _tb, span = _angles(k, self.complex)
-        rigid = m.vc[0] * (by - ay) - m.vc[1] * (bx - ax)
-        return float(rigid) + float(m.dr) * r * span
+        return float(m.vc[0]) * ey - float(m.vc[1]) * ex + float(m.dr) * r * span
 
     def node_velocity(self, mesh):
         """The design velocity of the mesh nodes that lie on curves (the hand-off to galerkin).
@@ -661,7 +668,8 @@ def _changed_features(a, b, comp) -> list:
     names = {p.split(".")[0] for key in diff for p in key[1]}
     cells = (a[0] - b[0]) + (b[0] - a[0])
     names |= {key[0][1] for key, _n in cells.items() if key[0][0] != "exterior"}
-    return sorted(names) or [f.id for f in comp.features]
+    ids = {f.id for f in comp.features} | {"domain"}
+    return sorted(names & ids) or [f.id for f in comp.features]
 
 
 def _features_in(message: str, comp) -> list:
