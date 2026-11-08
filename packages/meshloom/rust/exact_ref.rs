@@ -566,7 +566,7 @@ mod mixed_tests {
 
         fn push_s(&mut self, a: P3, b: P3, t: f64) {
             let (ia, ib) = (self.input(a), self.input(b));
-            self.s.push(SPoint { a: ia, b: ib, t });
+            self.s.push(SPoint::seg(ia, ib, t));
             self.query.push(Pt::S(self.s.len() as u32 - 1));
             self.refs.push(RefPt::S(a, b, t));
         }
@@ -796,7 +796,7 @@ mod mixed_tests {
     #[test]
     fn rounded_s_points_are_the_nearest_doubles_and_bad_tables_are_refused() {
         let input = [[0.0, 0.0, 0.0], [1.0, 3.0, 0.1]];
-        let s = [SPoint { a: 0, b: 1, t: 1.0 / 3.0 }];
+        let s = [SPoint::seg(0, 1, 1.0 / 3.0)];
         let m = Mixed { input: &input, s: &s };
         let x = m.rounded(Pt::S(0));
         // a is the origin, so the exact point is t * b: one correctly rounded product
@@ -805,7 +805,7 @@ mod mixed_tests {
         assert_eq!(x.to_vec(), want);
         // a sum that rounds: the nearest double of a + t (b - a), against the reference
         let input2 = [[1.0, -0.1, 7.0], [3.0, 0.3, -2.0]];
-        let s2 = [SPoint { a: 0, b: 1, t: 0.1 }];
+        let s2 = [SPoint::seg(0, 1, 0.1)];
         let m2 = Mixed { input: &input2, s: &s2 };
         let y = m2.rounded(Pt::S(0));
         for k in 0..3 {
@@ -823,9 +823,9 @@ mod mixed_tests {
 
         assert_eq!(m.id(Pt::S(0)), 2);
         assert_eq!(m.from_id(2), Pt::S(0));
-        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 0, t: 0.5 }]).is_err());
-        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 1, t: 1.0 }]).is_err());
-        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 2, t: 0.5 }]).is_err());
-        assert!(crate::mixed::check_spoints(&input, &[SPoint { a: 0, b: 1, t: f64::NAN }]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint::seg(0, 0, 0.5)]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint::seg(0, 1, 1.0)]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint::seg(0, 2, 0.5)]).is_err());
+        assert!(crate::mixed::check_spoints(&input, &[SPoint::seg(0, 1, f64::NAN)]).is_err());
     }
 }

@@ -25,12 +25,54 @@
 use crate::bigint::Big;
 use crate::predicates::{self as pr, Counters, P3};
 
-/// p = a + t (b - a) on the input segment a-b.
+/// A Steiner point, by kind (global indices after the input points, in insertion
+/// order):
+/// - on a segment: p = a + t (b - a) for input points a and b (`c == NONE`);
+/// - on a facet (F point): p = a + t (b - a) + u (c - a) for input points a, b and c
+///   of the facet, with dyadic t and u, so p is exactly in the facet's plane;
+/// - in a volume: p itself, doubles (`a == NONE`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SPoint {
     pub a: u32,
     pub b: u32,
     pub t: f64,
+    pub c: u32,
+    pub u: f64,
+    pub p: P3,
+}
+
+/// The `c` (and, for volume points, `a`) of a kind that does not use it.
+pub const NONE: u32 = u32::MAX;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Segment,
+    Facet,
+    Volume,
+}
+
+impl SPoint {
+    pub fn seg(a: u32, b: u32, t: f64) -> SPoint {
+        SPoint { a, b, t, c: NONE, u: 0.0, p: [0.0; 3] }
+    }
+
+    pub fn fac(a: u32, b: u32, c: u32, t: f64, u: f64) -> SPoint {
+        SPoint { a, b, t, c, u, p: [0.0; 3] }
+    }
+
+    pub fn vol(p: P3) -> SPoint {
+        SPoint { a: NONE, b: NONE, t: 0.0, c: NONE, u: 0.0, p }
+    }
+
+    pub fn kind(&self) -> Kind {
+        if self.a == NONE {
+            Kind::Volume
+        } else if self.c == NONE {
+            Kind::Segment
+        } else {
+            Kind::Facet
+        }
+    }
 }
 
 /// A point by kind and index: an input point, or an S point (index into the S table).
@@ -62,6 +104,24 @@ pub struct Mixed<'a> {
 /// strictly between 0 and 1.
 pub fn check_spoints(input: &[P3], s: &[SPoint]) -> Result<(), String> {
     for (k, sp) in s.iter().enumerate() {
+        match sp.kind() {
+            Kind::Volume => {
+                if !sp.p.iter().all(|x| x.is_finite()) {
+                    return Err(format!("volume point {k} has a coordinate that is not finite"));
+                }
+                continue;
+            }
+            Kind::Facet => {
+                if sp.c as usize >= input.len() || sp.c == sp.a || sp.c == sp.b || !sp.u.is_finite() || !sp.t.is_finite() {
+                    return Err(format!("F point {k} has an invalid third point or parameter"));
+                }
+                if sp.a as usize >= input.len() || sp.b as usize >= input.len() || sp.a == sp.b {
+                    return Err(format!("F point {k} refers to points that do not exist or are equal"));
+                }
+                continue;
+            }
+            Kind::Segment => {}
+        }
         if sp.a as usize >= input.len() || sp.b as usize >= input.len() {
             return Err(format!("S point {k} refers to a point that does not exist"));
         }
@@ -106,12 +166,22 @@ impl<'a> Mixed<'a> {
             Pt::In(i) => self.input[i as usize].map(Iv::point),
             Pt::S(k) => {
                 let sp = self.s[k as usize];
+                if sp.kind() == Kind::Volume {
+                    return sp.p.map(Iv::point);
+                }
                 let (a, b) = (&self.input[sp.a as usize], &self.input[sp.b as usize]);
                 let t = Iv::point(sp.t);
-                std::array::from_fn(|c| {
+                let mut x: [Iv; 3] = std::array::from_fn(|c| {
                     let (ac, bc) = (Iv::point(a[c]), Iv::point(b[c]));
                     ac.add(&t.mul(&bc.sub(&ac)))
-                })
+                });
+                if sp.kind() == Kind::Facet {
+                    let (cc, u) = (&self.input[sp.c as usize], Iv::point(sp.u));
+                    for k in 0..3 {
+                        x[k] = x[k].add(&u.mul(&Iv::point(cc[k]).sub(&Iv::point(a[k]))));
+                    }
+                }
+                x
             }
         }
     }
@@ -121,12 +191,22 @@ impl<'a> Mixed<'a> {
             Pt::In(i) => self.input[i as usize].map(Dy::from_f64),
             Pt::S(k) => {
                 let sp = self.s[k as usize];
+                if sp.kind() == Kind::Volume {
+                    return sp.p.map(Dy::from_f64);
+                }
                 let (a, b) = (&self.input[sp.a as usize], &self.input[sp.b as usize]);
                 let t = Dy::from_f64(sp.t);
-                std::array::from_fn(|c| {
+                let mut x: [Dy; 3] = std::array::from_fn(|c| {
                     let (ac, bc) = (Dy::from_f64(a[c]), Dy::from_f64(b[c]));
                     ac.add(&t.mul(&bc.sub(&ac)))
-                })
+                });
+                if sp.kind() == Kind::Facet {
+                    let (cc, u) = (&self.input[sp.c as usize], Dy::from_f64(sp.u));
+                    for k in 0..3 {
+                        x[k] = x[k].add(&u.mul(&Dy::from_f64(cc[k]).sub(&Dy::from_f64(a[k]))));
+                    }
+                }
+                x
             }
         }
     }
@@ -489,6 +569,38 @@ impl crate::delaunay::Geom for MixedPoints {
 }
 
 impl Mixed<'_> {
+    /// True when p lies strictly inside the diametral ball of segment a-b (the ball
+    /// with a-b as diameter): (a - p) . (b - p) < 0, exactly.
+    pub fn in_diametral_ball(&self, p: Pt, a: Pt, b: Pt) -> bool {
+        self.dot_sign(p, a, b) < 0
+    }
+
+    /// Sign of |p - o|^2 - R^2 for the equatorial ball of triangle abc (centre o its
+    /// circumcentre in its plane, radius R its circumradius), exactly: negative inside,
+    /// zero on the sphere, positive outside. With u = b - a, w = c - a, n = u x w and
+    /// q = p - a, o - a = (|u|^2 (w x n) + |w|^2 (n x u)) / (2 |n|^2), and the sign is
+    /// that of 2 |n|^2 |q|^2 - 2 (|u|^2 (w x n) + |w|^2 (n x u)) . q. A degenerate
+    /// triangle (n = 0) gives 0.
+    pub fn equatorial_sign(&self, p: Pt, a: Pt, b: Pt, c: Pt) -> i8 {
+        let (ea, eb, ec, ep) = (self.exact(a), self.exact(b), self.exact(c), self.exact(p));
+        let (u, w, q) = (diff(&eb, &ea), diff(&ec, &ea), diff(&ep, &ea));
+        let cross = |x: &[Dy; 3], y: &[Dy; 3]| -> [Dy; 3] {
+            [x[1].mul(&y[2]).sub(&x[2].mul(&y[1])), x[2].mul(&y[0]).sub(&x[0].mul(&y[2])),
+             x[0].mul(&y[1]).sub(&x[1].mul(&y[0]))]
+        };
+        let dot = |x: &[Dy; 3], y: &[Dy; 3]| x[0].mul(&y[0]).add(&x[1].mul(&y[1])).add(&x[2].mul(&y[2]));
+        let n = cross(&u, &w);
+        let nn = dot(&n, &n);
+        if nn.exact_sign() == 0 {
+            return 0;
+        }
+        let (uu, ww) = (dot(&u, &u), dot(&w, &w));
+        let (wn, nu) = (cross(&w, &n), cross(&n, &u));
+        let off: [Dy; 3] = std::array::from_fn(|k| uu.mul(&wn[k]).add(&ww.mul(&nu[k])));
+        let two = Dy::from_f64(2.0);
+        two.mul(&nn).mul(&dot(&q, &q)).sub(&two.mul(&dot(&off, &q))).exact_sign()
+    }
+
     /// Sign of (a - o) . (b - o), exactly.
     pub fn dot_sign(&self, o: Pt, a: Pt, b: Pt) -> i8 {
         let (eo, ea, eb) = (self.exact(o), self.exact(a), self.exact(b));
@@ -527,5 +639,107 @@ impl crate::facet::PlanePred for MixedPlane<'_> {
     fn same_direction(&self, _axis: usize, v: u32, x: u32, y: u32) -> bool {
         let p = |i: u32| self.m.from_id(i);
         self.m.dot_sign(p(v), p(x), p(y)) > 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lcg(s: &mut u64) -> f64 {
+        *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (*s >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    /// A dyadic parameter k / 2^m in (0, 1).
+    fn dyadic(s: &mut u64) -> f64 {
+        let m = 1 + (lcg(s) * 40.0) as i32;
+        let q = 2f64.powi(m);
+        ((lcg(s) * (q - 1.0)).floor() + 1.0) / q
+    }
+
+    /// F points lie exactly in their facet's plane, and the interval filter agrees with
+    /// the exact dyadic evaluation on F, S and volume points.
+    #[test]
+    fn facet_points_are_in_their_plane_and_filters_agree() {
+        let mut s = 7u64;
+        let mut n = MixedCounters::default();
+        for _ in 0..300 {
+            // an oblique triangle with arbitrary doubles, plus two free points
+            let input: Vec<P3> = (0..5).map(|_| [lcg(&mut s) * 10.0 - 5.0, lcg(&mut s) * 3.0, lcg(&mut s) - 0.5]).collect();
+            let (t, u) = (dyadic(&mut s) / 2.0, dyadic(&mut s) / 2.0);
+            let pts = [SPoint::fac(0, 1, 2, t, u), SPoint::seg(3, 4, dyadic(&mut s)),
+                       SPoint::vol([lcg(&mut s), lcg(&mut s), lcg(&mut s)])];
+            check_spoints(&input, &pts).unwrap();
+            let m = Mixed { input: &input, s: &pts };
+            let f = Pt::S(0);
+            assert_eq!(m.orient3d([Pt::In(0), Pt::In(1), Pt::In(2), f], &mut n), 0, "in the plane");
+            // any four of {inputs, F, S, V}: the filtered sign equals the exact sign
+            let all = [Pt::In(0), Pt::In(1), Pt::In(2), Pt::In(3), Pt::In(4), Pt::S(0), Pt::S(1), Pt::S(2)];
+            for k in 0..20 {
+                let q: [Pt; 4] = std::array::from_fn(|i| all[(k * 3 + i * 5 + (lcg(&mut s) * 8.0) as usize) % 8]);
+                let exact = orient(&q.map(|p| m.exact(p))).exact_sign();
+                assert_eq!(m.orient3d(q, &mut n), exact);
+                let q5: [Pt; 5] = std::array::from_fn(|i| all[(k * 7 + i * 3 + (lcg(&mut s) * 8.0) as usize) % 8]);
+                let exact5 = -insph(&q5.map(|p| m.exact(p))).exact_sign(); // insphere = -det
+                assert_eq!(m.insphere(q5, &mut n), exact5);
+            }
+            // a volume point behaves exactly as an input point with the same doubles
+            let mut input2 = input.clone();
+            input2.push(pts[2].p);
+            let m2 = Mixed { input: &input2, s: &[] };
+            assert_eq!(m.orient3d([Pt::In(0), Pt::In(3), Pt::In(4), Pt::S(2)], &mut n),
+                       m2.orient3d([Pt::In(0), Pt::In(3), Pt::In(4), Pt::In(5)], &mut n));
+            // the rounded F point is within a few ulps of the plane's exact point
+            let r = m.rounded(f);
+            let (a, b, c) = (input[0], input[1], input[2]);
+            for k in 0..3 {
+                let x = a[k] + t * (b[k] - a[k]) + u * (c[k] - a[k]);
+                assert!((r[k] - x).abs() <= 1e-14 * (1.0 + x.abs()));
+            }
+        }
+    }
+
+    #[test]
+    fn diametral_and_equatorial_balls() {
+        let input: Vec<P3> = vec![[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [1.0, 1.0, 1.4142], [1.0, 1.0, 1.4143],
+                                  [2.0, 2.0, 0.0], [1.0, 0.0, 0.5], [1.0, 0.0, 1.0], [3.0, 0.0, 0.0]];
+        let m = Mixed { input: &input, s: &[] };
+        let p = Pt::In;
+        // equatorial ball of (0,0,0), (2,0,0), (0,2,0): centre (1,1,0), radius^2 = 2
+        assert_eq!(m.equatorial_sign(p(3), p(0), p(1), p(2)), -1);
+        assert_eq!(m.equatorial_sign(p(4), p(0), p(1), p(2)), 1);
+        assert_eq!(m.equatorial_sign(p(5), p(0), p(1), p(2)), 0, "(2,2,0) is on the circle");
+        assert_eq!(m.equatorial_sign(p(5), p(0), p(2), p(1)), 0, "orientation does not matter");
+        assert_eq!(m.equatorial_sign(p(3), p(1), p(2), p(0)), -1, "nor the vertex order");
+        // diametral ball of (0,0,0)-(2,0,0): centre (1,0,0), radius 1
+        assert!(m.in_diametral_ball(p(6), p(0), p(1)));
+        assert!(!m.in_diametral_ball(p(7), p(0), p(1)), "on the sphere is not inside");
+        assert!(!m.in_diametral_ball(p(8), p(0), p(1)));
+        // F points: the equatorial test on a scaled oblique triangle against f64 where
+        // the margin is large
+        let mut s = 3u64;
+        let mut checked = 0;
+        for _ in 0..2000 {
+            let tri: Vec<P3> = (0..3).map(|_| [lcg(&mut s) * 4.0, lcg(&mut s) * 4.0, lcg(&mut s) * 4.0]).collect();
+            let q = [lcg(&mut s) * 4.0, lcg(&mut s) * 4.0, lcg(&mut s) * 4.0];
+            let input: Vec<P3> = vec![tri[0], tri[1], tri[2], q];
+            let m = Mixed { input: &input, s: &[] };
+            let sub = |x: P3, y: P3| [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
+            let dot = |x: P3, y: P3| x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+            let cr = |x: P3, y: P3| [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+            let (u, w) = (sub(tri[1], tri[0]), sub(tri[2], tri[0]));
+            let nv = cr(u, w);
+            let nn = dot(nv, nv);
+            let off = [0, 1, 2].map(|k| (dot(u, u) * cr(w, nv)[k] + dot(w, w) * cr(nv, u)[k]) / (2.0 * nn));
+            let o = [tri[0][0] + off[0], tri[0][1] + off[1], tri[0][2] + off[2]];
+            let (d, r2) = (dot(sub(q, o), sub(q, o)), dot(off, off));
+            if (d - r2).abs() > 1e-6 * r2.max(1.0) && nn > 1e-6 {
+                let want = if d < r2 { -1 } else { 1 };
+                assert_eq!(m.equatorial_sign(Pt::In(3), Pt::In(0), Pt::In(1), Pt::In(2)), want);
+                checked += 1;
+            }
+        }
+        assert!(checked > 1500);
     }
 }
