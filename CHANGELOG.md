@@ -88,6 +88,8 @@ What each package implements, and its limits, is in the
   explicit transmission-line JSON v2 preserves the legacy version-1 contract.
 - `sipi`: strict `sipi.circuit/1` inputs preserve RLGC/Touchstone or nested line-extraction documents, named sources and passive loads; restore terminal response and explicit crosstalk. [Contract](docs/packages/sipi/circuit_document.md).
 
+- `meshloom`: facet recovery fills each side of a cavity with the Delaunay tetrahedralization of its vertices when it conforms, falling back to gift-wrapping; the result is the same and cavity filling is no longer quadratic in practice (a cavity of 6,413 tetrahedra: 77.6 s before, 0.06 s now). [Documentation](docs/packages/meshloom/overview.md#kernel-building-blocks).
+
 - `meshloom`: `mesh_plc` repairs tetrahedra that rounding to doubles makes flat or inverted, by 2-3 flips and edge removals that keep every facet face and segment edge; it refuses what flips cannot repair instead of returning an invalid mesh. [Documentation](docs/packages/meshloom/overview.md#kernel-building-blocks).
 
 - `meshloom`: `mesh_plc` turns a recovered PLC into a mesh in the plan's output contract without refinement: regions (every bounded component, or the even-odd domain of closed surfaces with `domain="parity"`), points on segments rounded once to doubles, every tetrahedron certified with exact `orient3d > 0` on the output doubles, boundary faces by facet wound outward and interfaces between regions. Internal (`meshloom._core`). [Documentation](docs/packages/meshloom/overview.md#kernel-building-blocks).

@@ -37,6 +37,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::delaunay::Geom;
 use crate::mixed::{MixedCounters, MixedPoints};
+use crate::predicates::P3;
 
 const NONE: u32 = u32::MAX;
 /// For each vertex slot i of a positive tetrahedron, its opposite face oriented so
@@ -56,6 +57,9 @@ pub struct FacetStats {
     /// gift-wrap apex choices
     pub apexes: u64,
     pub largest_cavity: u32,
+    /// cavity sides filled by the Delaunay fast path, and by gift-wrapping
+    pub fast: u32,
+    pub wrapped: u32,
 }
 
 fn key(f: [u32; 3]) -> [u32; 3] {
@@ -251,9 +255,115 @@ impl Front {
     }
 }
 
+/// The cavity vertices of one side as a point set of their own (local index -> global
+/// index), with the same exact predicates and the same perturbation by global index.
+struct SubPoints<'a> {
+    m: crate::mixed::Mixed<'a>,
+    ids: &'a [u32],
+    n: MixedCounters,
+}
+
+impl crate::delaunay::Geom for SubPoints<'_> {
+    fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    fn orient3d(&mut self, v: [u32; 4]) -> i8 {
+        let p = v.map(|i| self.m.from_id(self.ids[i as usize]));
+        self.m.orient3d(p, &mut self.n)
+    }
+
+    fn insphere_sos(&mut self, v: [u32; 5]) -> i8 {
+        let p = v.map(|i| self.m.from_id(self.ids[i as usize]));
+        self.m.insphere_sos(p, &mut self.n)
+    }
+
+    fn same(&self, a: u32, b: u32) -> bool {
+        self.m.same(self.m.from_id(self.ids[a as usize]), self.m.from_id(self.ids[b as usize]))
+    }
+
+    fn collinear(&self, a: u32, b: u32, c: u32) -> bool {
+        let p = [a, b, c].map(|i| self.m.from_id(self.ids[i as usize]));
+        let mut n = MixedCounters::default();
+        (0..3).all(|axis| self.m.orient2d_proj(axis, p, &mut n) == 0)
+    }
+
+    fn counters(&self) -> crate::predicates::Counters {
+        self.n.input
+    }
+}
+
+/// The fast path for one side of a cavity (design note section 4, step 2): the
+/// Delaunay tetrahedralization of the side's vertices, of which the tetrahedra reached
+/// from the inner side of the front without crossing it are kept. It succeeds only if
+/// every front face is a face of that tetrahedralization and the kept tetrahedra are
+/// bounded by exactly the front; otherwise None, and gift-wrapping fills the side.
+fn fast_fill(g: &MixedPoints, front: &Front, verts: &[u32]) -> Option<Vec<[u32; 4]>> {
+    if verts.len() < 4 {
+        return None;
+    }
+    let m = g.view();
+    let coords: Vec<P3> = verts.iter().map(|&v| m.rounded(m.from_id(v))).collect();
+    let order = crate::delaunay::brio_order(&coords);
+    let sub = SubPoints { m: g.view(), ids: verts, n: MixedCounters::default() };
+    let mesh = crate::delaunay::Mesh::build(sub, &order, false).ok()?;
+    let tets: Vec<[u32; 4]> = mesh.tets().iter().map(|t| t.map(|i| verts[i as usize])).collect();
+    // oriented faces of the tetrahedralization: rotate_min(inward face) -> tetrahedron
+    let mut by_face: HashMap<[u32; 3], usize> = HashMap::with_capacity(4 * tets.len());
+    for (i, v) in tets.iter().enumerate() {
+        for k in 0..4 {
+            by_face.insert(rotate_min(face(v, k)), i);
+        }
+    }
+    let walls: HashSet<[u32; 3]> = front.all().map(|f| key(*f)).collect();
+    let mut keep = vec![false; tets.len()];
+    let mut stack = Vec::new();
+    for f in front.all() {
+        let t = *by_face.get(&rotate_min(*f))?; // the tetrahedron on the front face's inner side
+        if !keep[t] {
+            keep[t] = true;
+            stack.push(t);
+        }
+    }
+    while let Some(t) = stack.pop() {
+        let v = tets[t];
+        for k in 0..4 {
+            let f = face(&v, k);
+            if walls.contains(&key(f)) {
+                continue;
+            }
+            // the neighbour across f holds f with the opposite orientation
+            let u = *by_face.get(&rotate_min([f[0], f[2], f[1]]))?; // a hull face: the cavity leaks
+            if !keep[u] {
+                keep[u] = true;
+                stack.push(u);
+            }
+        }
+    }
+    let out: Vec<[u32; 4]> = tets.iter().zip(&keep).filter(|(_, &k)| k).map(|(t, _)| *t).collect();
+    // the kept tetrahedra must be bounded by exactly the front (each front face once)
+    let mut bound: HashMap<[u32; 3], u32> = HashMap::new();
+    for v in &out {
+        for k in 0..4 {
+            *bound.entry(rotate_min(face(v, k))).or_default() += 1;
+        }
+    }
+    let mut outer: Vec<[u32; 3]> = bound.keys().filter(|f| !bound.contains_key(&rotate_min([f[0], f[2], f[1]])))
+        .copied().collect();
+    let mut want: Vec<[u32; 3]> = front.all().map(|f| rotate_min(*f)).collect();
+    // a constraint face inside the side is in the front twice; its two sides are both kept
+    outer.sort_unstable();
+    want.retain(|f| !front.faces.get(&key(*f)).is_some_and(|l| l.len() == 2));
+    want.sort_unstable();
+    if outer != want {
+        return None;
+    }
+    Some(out)
+}
+
 /// Fills one half (sigma = +1 above the plane, -1 below) of the cavity `cav`.
 fn fill_half(g: &mut MixedPoints, cx: &Complex, cav: &HashSet<u32>, reg: &mut Region, constraints: &HashSet<[u32; 3]>,
-             sigma: i8, stats: &mut FacetStats) -> Result<Vec<[u32; 4]>, String> {
+             sigma: i8, stats: &mut FacetStats, fast: bool) -> Result<Vec<[u32; 4]>, String> {
     let mut front = Front::default();
     let mut verts: Vec<u32> = Vec::new();
     let mut cav_sorted: Vec<u32> = cav.iter().copied().collect();
@@ -303,6 +413,11 @@ fn fill_half(g: &mut MixedPoints, cx: &Complex, cav: &HashSet<u32>, reg: &mut Re
     }
     verts.sort_unstable();
     verts.dedup();
+    if let Some(out) = fast.then(|| fast_fill(g, &front, &verts)).flatten() {
+        stats.fast += 1;
+        return Ok(out);
+    }
+    stats.wrapped += 1;
     let limit = 64 + 8 * verts.len() * verts.len();
     let mut out = Vec::new();
     while let Some(f) = front.pop() {
@@ -373,6 +488,12 @@ fn fits(g: &mut MixedPoints, reg: &mut Region, front: &Front, verts: &[u32], t: 
 /// (vertices: global indices of `g`). Returns the new tetrahedralization.
 pub fn recover_facets(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[u32; 3]>])
                       -> Result<(Vec<[u32; 4]>, FacetStats), String> {
+    recover_facets_with(g, tets, subfacets, true)
+}
+
+/// As [`recover_facets`]; `fast = false` fills every cavity side by gift-wrapping.
+pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[u32; 3]>], fast: bool)
+                           -> Result<(Vec<[u32; 4]>, FacetStats), String> {
     let n = g.len();
     let mut cx = Complex::new(n, tets);
     let constraints: HashSet<[u32; 3]> = subfacets.iter().flatten().map(|t| key(*t)).collect();
@@ -434,9 +555,9 @@ pub fn recover_facets(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[
         }
         // 2-3. fill, enlarging across faces that are not locally Delaunay
         let new = loop {
-            let mut new = fill_half(g, &cx, &cav, &mut reg, &constraints, 1, &mut stats)
+            let mut new = fill_half(g, &cx, &cav, &mut reg, &constraints, 1, &mut stats, fast)
                 .map_err(|e| format!("facet {f0}, above: {e}"))?;
-            new.extend(fill_half(g, &cx, &cav, &mut reg, &constraints, -1, &mut stats)
+            new.extend(fill_half(g, &cx, &cav, &mut reg, &constraints, -1, &mut stats, fast)
                 .map_err(|e| format!("facet {f0}, below: {e}"))?);
             let apex: HashMap<[u32; 3], u32> = new.iter()
                 .flat_map(|t| (0..4).map(move |i| (key(face(t, i)), t[i]))).collect();
@@ -674,5 +795,33 @@ mod tests {
         no_interface[1].clear();
         let e = verify_cdt(&mut g, &b.tets, &no_interface, chains, &hull).unwrap_err();
         assert!(e.contains("locally Delaunay"), "{e}");
+    }
+
+    #[test]
+    fn fast_path_and_gift_wrapping_give_the_same_tetrahedralization() {
+        // the constrained Delaunay tetrahedralization is unique under the perturbation
+        for seed in 1..6 {
+            let plc = stacked(120, seed);
+            let pr = crate::recovery::recover_plc(&plc, 60).unwrap();
+            let mut g = MixedPoints::new(plc.points.clone());
+            for s in &pr.rec.s {
+                g.push(*s);
+            }
+            let (fast, sf) = recover_facets_with(&mut g, &pr.rec.tets, &pr.subfacets, true).unwrap();
+            let (slow, ss) = recover_facets_with(&mut g, &pr.rec.tets, &pr.subfacets, false).unwrap();
+            assert!(sf.fast > 0 && sf.wrapped == 0 && ss.fast == 0 && ss.wrapped > 0);
+            let canon = |t: &Vec<[u32; 4]>| {
+                let mut v: Vec<[u32; 4]> = t.iter().map(|x| {
+                    let mut y = *x;
+                    y.sort_unstable();
+                    y
+                }).collect();
+                v.sort_unstable();
+                v
+            };
+            assert_eq!(canon(&fast), canon(&slow), "seed {seed}");
+            let hull = hull_faces(&pr.rec.tets);
+            verify_cdt(&mut g, &fast, &pr.subfacets, &pr.rec.chains, &hull).unwrap();
+        }
     }
 }
