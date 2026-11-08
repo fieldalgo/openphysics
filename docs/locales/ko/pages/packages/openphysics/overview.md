@@ -16,6 +16,12 @@ OpenPhysics 패키지 여섯 개를 의존성으로 요구합니다.
 | `physmat` | 재료 및 광학 분산 |
 | `simcase` | 모델 문서, 헤드리스 실행기, 선택적 브라우저 스튜디오 |
 
+**0.1.0은 아직 PyPI에 없습니다.** PyPI에는 빈 `0.0.1` 이름 예약만 있으므로 지금은 아래
+명령이 쓸모 있는 것을 설치하지 않으며, pip가 성공이라고 보고할 수도 있습니다. 릴리스 전까지는
+[소스 checkout에서 설치](../../overview.md#소스에서-설치)하거나 거기서 만든 wheel로 설치하고, pip가 `0.0.1`을
+고르지 않고 거부하도록 버전을 고정하세요(`"openphysics[studio]==0.1.0"`). 아래 명령은
+릴리스용입니다.
+
 ```bash
 pip install openphysics                  # 여섯 패키지, 헤드리스
 pip install "openphysics[studio]"        # 로컬 브라우저 Studio 포함
