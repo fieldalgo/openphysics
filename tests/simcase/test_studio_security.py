@@ -254,15 +254,34 @@ def test_every_response_carries_the_policy(client, path):
 
 def test_policy_hashes_exactly_the_inline_classic_script(client):
     served = client.get("/")
-    page = served.text
-    inline = re.findall(rb"<script>(.*?)</script>", served.content, flags=re.S)
-    assert len(inline) == 1
-    # Hash the served bytes independently of the code that built the header.
-    expected = "'sha256-" + base64.b64encode(hashlib.sha256(inline[0]).digest()).decode() + "'"
+    # Cut the one inline block out of the served bytes by plain search, independently of
+    # the parser that built the header, and hash it.
+    head, _, rest = served.content.partition(b"<script>")
+    inline, _, tail = rest.partition(b"</script>")
+    assert head and tail and b"<script>" not in tail
+    expected = "'sha256-" + base64.b64encode(hashlib.sha256(inline).digest()).decode() + "'"
     assert re.findall(r"'sha256-[^']+'", served.headers["content-security-policy"]) == [expected]
-    # workspace.html has no inline script at all
-    assert not re.findall(r"<script>(.*?)</script>", client.get("/workspace").text, flags=re.S)
-    assert not re.search(r"\son[a-z]+=", page + client.get("/workspace").text)
+    workspace = client.get("/workspace").text
+    assert security.inline_scripts(workspace) == []  # only external and module scripts
+    assert len(security.inline_scripts(served.text)) == 1
+
+
+@pytest.mark.parametrize("page", ["index.html", "workspace.html"])
+def test_shipped_pages_have_no_inline_handlers(page):
+    from html.parser import HTMLParser
+
+    handlers = []
+
+    class Attrs(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            handlers.extend((tag, name) for name, _ in attrs if name.startswith("on"))
+    Attrs().feed((server.STATIC / page).read_text(encoding="utf-8"))
+    assert handlers == []
+
+
+def test_inline_script_parser_matches_any_case_and_skips_src():
+    html = '<SCRIPT>a\r\nb</SCRIPT ><script src="/x.js"></script><Script type="module">c</script>'
+    assert security.inline_scripts(html) == ["a\r\nb", "c"]
 
 
 @pytest.mark.parametrize("path", ["/docs", "/redoc", "/docs/oauth2-redirect"])
