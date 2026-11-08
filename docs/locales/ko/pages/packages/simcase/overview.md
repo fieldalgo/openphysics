@@ -286,6 +286,10 @@ simcase-studio --workspace    # experimental model workspace at /workspace
 python -m simcase.studio --port 9000 --no-browser
 ```
 
+Studio는 `http://127.0.0.1:<port>`나 `http://localhost:<port>`로 여세요. 서버는 다른
+호스트 이름과 다른 웹 페이지가 보낸 상태 변경 요청을 거부하고, `--host`가 loopback
+주소가 아니면 경고합니다. 자세한 내용은 [보안 안내](../../security.md#브라우저-studio)에 있습니다.
+
 기본 설치는 헤드리스를 유지합니다. `fastapi`, `uvicorn`은 `studio` extra에만 포함되므로 배치·HPC 사용자가 문서를 실행하기 위해 웹 스택을 받을 필요가 없습니다.
 
 ![형상](../../../../../packages/simcase/geometry.png)
