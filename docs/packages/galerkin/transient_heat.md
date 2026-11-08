@@ -60,7 +60,7 @@ on valid used-node geometry. Do not copy a steady mandatory-anchor rule.
 | volumetric_heat_capacity | finite positive scalar c, J/(m³ K), or `{region name: c}` |
 | time_s | finite real 1D seconds, at least two, nonnegative, strictly increasing with finite positive differences |
 | initial_temperature_k | finite real exactly (N,) K at time_s[0] |
-| dirichlet | fixed exterior integer node -> scalar K or callback(time_s)->scalar K |
+| dirichlet | fixed integer node (exterior or interior, as in [steady heat](thermal_steady2d.md)) -> scalar K or callback(time_s)->scalar K |
 | heat_source | finite scalar W/m³, `{region name: Q}`, or callback(points_m,time_s)->exactly (Q,) W/m³ |
 | outward_flux | `None` or `{boundary_edges tag: g}`, g in W/m² (positive removes heat); scalar, callback(points_m, outward_normals)->exactly (Q,), callback(time_s)->scalar or callback(points_m, outward_normals, time_s)->exactly (Q,) |
 | convection | `None` or `{boundary_edges tag: (h, T_amb)}`, h ≥ 0 in W/(m² K), T_amb in K; each a scalar or any of the same callback forms |

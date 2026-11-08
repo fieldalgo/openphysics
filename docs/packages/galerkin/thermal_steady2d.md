@@ -36,14 +36,17 @@ result = solve_steady_heat(
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, reference coordinates `(N,2)` in m, integer triangles `(M,3)` |
 | conductivity | Required finite real scalar k>0, W/(m K), or `{region name: k}` piecewise constant on `mesh.region_names` ([multimaterial](multimaterial.md)); no tensors or k varying inside a region |
-| dirichlet | Mapping exterior integer node ID -> finite scalar temperature in K |
+| dirichlet | Mapping integer node ID (exterior or interior) -> finite scalar temperature in K |
 | heat_source | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; or mesh-bound `ElementHeatSource(mesh, values)` for elementwise `(M,)` W/m^3; default zero |
 
 With the default insulated boundary, each connected component requires at least
 one prescribed temperature; the optional Robin extension can also anchor it. No node is silently pinned,
 no springs or least-squares regularization are added, and pure-Neumann heat
-problems are outside this API. Dirichlet data must be on the actual topological
-exterior boundary, not an interior node or a trusted boundary tag alone.
+problems are outside this API. Dirichlet nodes are validated as node indices,
+never trusted from a boundary tag alone; an interior node may be fixed (a
+prescribed temperature on an internal surface), and its reaction is the heat
+that surface injects, which the balance identity counts like any thermostat
+(2026-11-08; the electric, Joule and 3D solvers keep their exterior rule).
 Unselected natural edges have insulation. Boundary node tags can construct the
 Dirichlet mapping. Optional prescribed outward flux and Robin edge-tag inputs,
 including additional result fields and modified balance equations, are documented

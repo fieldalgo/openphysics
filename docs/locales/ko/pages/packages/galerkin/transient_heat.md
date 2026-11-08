@@ -59,7 +59,7 @@ anchor 규칙을 가져오면 안 됩니다.
 | volumetric_heat_capacity | 유한한 양의 scalar c, J/(m³ K), 또는 `{영역 이름: c}` |
 | time_s | 유한 실수 1D 초, 최소 두 개, 음이 아니며 유한 양의 차이로 엄격히 증가 |
 | initial_temperature_k | time_s[0]의 유한 실수 정확히 (N,) K |
-| dirichlet | 고정 외곽 정수 절점 -> scalar K 또는 callback(time_s)->scalar K |
+| dirichlet | 고정 정수 절점(외부나 내부, [정상 열](thermal_steady2d.md)과 같음) -> scalar K 또는 callback(time_s)->scalar K |
 | heat_source | 유한 scalar W/m³, `{영역 이름: Q}`, 또는 callback(points_m,time_s)->정확히 (Q,) W/m³ |
 | outward_flux | `None` 또는 `{boundary_edges 태그: g}`, g는 W/m²(양수면 열 제거); scalar, callback(points_m, outward_normals)->정확히 (Q,), callback(time_s)->scalar 또는 callback(points_m, outward_normals, time_s)->정확히 (Q,) |
 | convection | `None` 또는 `{boundary_edges 태그: (h, T_amb)}`, h ≥ 0은 W/(m² K), T_amb는 K; 각각 scalar 또는 같은 callback 형식 중 하나 |
