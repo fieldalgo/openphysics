@@ -5,7 +5,7 @@
 Install the Studio workspace, design two silicon waveguides, compare them and keep
 the work across a restart. The [workspace guide](workspace.md) is the full reference.
 
-OpenPhysics 0.1.0 is not on PyPI yet (only empty `0.0.1` name reservations are), so
+OpenPhysics 0.0.2 is not on PyPI yet (only empty `0.0.1` name reservations are), so
 you install from a folder of wheel files built from the repository (a *wheelhouse*).
 Third-party packages such as NumPy and FastAPI still come from PyPI, so the computer
 needs internet access during installation.
@@ -35,7 +35,7 @@ Linux and macOS:
 ```sh
 python3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 python3.12 -m venv ~/op-studio
-~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.1.0"
+~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.0.2"
 ~/op-studio/bin/simcase-studio --help
 ```
 
@@ -45,7 +45,7 @@ activation script or execution policy change is needed):
 ```powershell
 py -3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 py -3.12 -m venv "$HOME\op-studio"
-& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.1.0"
+& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.0.2"
 & "$HOME\op-studio\Scripts\simcase-studio.exe" --help
 ```
 
@@ -92,8 +92,8 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 
 ## Tested platforms
 
-Checked on Linux (Python 3.12.3, headless Chromium) on 2026-11-08 with wheels built
-from commit `da230150`: the pinned install in a new environment (14 s with downloads
+Checked on Linux (Python 3.12.3, headless Chromium) on 2026-11-08 with 0.0.2 wheels
+built from the repository: the pinned install in a new environment (14 s with downloads
 already cached), steps 4 and 5, **Ctrl+C**, a restart and recovery from the start
 page, which restored the comparison unchanged. **macOS and Windows are not verified
 for these steps yet**; earlier Windows checks are listed in the

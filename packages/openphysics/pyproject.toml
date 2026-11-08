@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openphysics"
-version = "0.1.0"
+version = "0.0.2"
 description = "OpenPhysics multiphysics simulation suite: installs the six OpenPhysics packages"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"
@@ -24,12 +24,12 @@ classifiers = [
 # A meta distribution: it ships no code, only these requirements. The six
 # packages release in lockstep with it.
 dependencies = [
-  "galerkin>=0.1.0,<0.2",
-  "galerkin-refsol>=0.1.0,<0.2",
-  "meshine>=0.1.0,<0.2",
-  "gmshio>=0.1.0,<0.2",
-  "physmat>=0.1.0,<0.2",
-  "simcase>=0.1.0,<0.2",
+  "galerkin>=0.0.2,<0.1",
+  "galerkin-refsol>=0.0.2,<0.1",
+  "meshine>=0.0.2,<0.1",
+  "gmshio>=0.0.2,<0.1",
+  "physmat>=0.0.2,<0.1",
+  "simcase>=0.0.2,<0.1",
 ]
 
 [project.urls]
@@ -40,10 +40,10 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 [project.optional-dependencies]
 # The same extras as the packages that define them. No extra installs Gmsh:
 # gmshio runs it as a separate program, installed on its own (pip install gmsh).
-studio = ["simcase[studio]>=0.1.0,<0.2"]
-export = ["simcase[export]>=0.1.0,<0.2"]
-rii = ["physmat[rii]>=0.1.0,<0.2"]
-sipi = ["sipi>=0.1.0,<0.2"]
+studio = ["simcase[studio]>=0.0.2,<0.1"]
+export = ["simcase[export]>=0.0.2,<0.1"]
+rii = ["physmat[rii]>=0.0.2,<0.1"]
+sipi = ["sipi>=0.0.2,<0.1"]
 
 [tool.setuptools]
 packages = []

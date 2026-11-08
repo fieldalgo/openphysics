@@ -24,8 +24,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
-- 문서: 작업 공간 빠른 시작(영·한). wheelhouse 만들기, Linux·macOS·Windows에서 Python 확인과 `==0.1.0` 고정 설치, Studio 켜고 끄기, 설계 두 개와 비교, 재시작 뒤 작업 이어가기. Linux에서 확인했고 macOS와 Windows는 아직 확인하지 않았습니다.
-- 문서: `openphysics` 패키지 페이지가 0.1.0이 아직 PyPI에 없다는 것(빈 `0.0.1` 예약만 있음)을 밝히고, 소스 설치를 안내하며 wheel 설치에 `==0.1.0` 고정을 권합니다.
+- 모든 배포판의 버전을 0.1.0 대신 0.0.2로 바꿨습니다. 첫 PyPI 릴리스에 계획한 버전입니다(사용자 결정, 2026-11-08). 우리 배포판 사이의 의존성은 `>=0.0.2,<0.1`입니다. 아직 아무것도 게시하지 않았습니다.
+- 문서: 작업 공간 빠른 시작(영·한). wheelhouse 만들기, Linux·macOS·Windows에서 Python 확인과 `==0.0.2` 고정 설치, Studio 켜고 끄기, 설계 두 개와 비교, 재시작 뒤 작업 이어가기. Linux에서 확인했고 macOS와 Windows는 아직 확인하지 않았습니다.
+- 문서: `openphysics` 패키지 페이지가 0.0.2가 아직 PyPI에 없다는 것(빈 `0.0.1` 예약만 있음)을 밝히고, 소스 설치를 안내하며 wheel 설치에 `==0.0.2` 고정을 권합니다.
 - `simcase`: Studio 작업 공간에서 **Save session**을 첫 번째 기본 저장 버튼으로 두고, 입력만 저장하는 버튼 이름을 **Save inputs only**(여는 버튼은 **Open inputs file**)로 바꿨습니다. 저장 버튼마다 고정 설명이 붙고, 완료한 실행이 세션 파일에 없으면 입력만 저장한 뒤에도 헤더가 저장된 것처럼 보이지 않고 *Results not saved*를 표시합니다.
 - `simcase`: Studio 작업 공간 시작 화면이 이 브라우저에 복구 세션이 있으면 **Continue where you left off**를 보여 줍니다. 마지막 세션이나 이전 세션을 복구하거나, 세션 파일을 열거나, 새로 시작할 수 있습니다. 재시작 후 새로고침하면 빈 화면처럼 보이고 복구 버튼이 닫힌 도움말 안에 있던 문제를 고쳤습니다.
 - `simcase`: Studio 작업 공간이 새로 연 페이지가 복구하지 않은 브라우저 복구 세션을 보관합니다. 첫 자동 저장이 그 세션을 최대 세 개의 이전 세션으로 옮기고, **Recover earlier session**으로 실행과 비교째 되살립니다. 전에는 복구 안내를 놓치고 새 작업을 시작하면 경고 없이 덮어썼습니다.
@@ -186,8 +187,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - Scalar/full-vector 모드 PML·일정 반경 굽힘: 복소 후보 진단, 물리창 추적, 총 감쇠, Studio 입력 및 독립 slab/원통 기준 검증.
 
-구현 패키지 여섯 개와 `openphysics` 메타 배포판의 첫 PyPI 릴리스이며, 0.1.0으로
-계획돼 있습니다.
+구현 패키지 여섯 개와 `openphysics` 메타 배포판의 첫 PyPI 릴리스이며, 0.0.2로
+계획돼 있습니다(0.0.1은 빈 이름 예약이 쓰고 있고, PyPI는 버전을 다시 쓰지 않습니다).
 
 ### Added
 
@@ -209,7 +210,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
   `openphysics` 0.0.1은 다른 여섯 이름의 0.0.1과 마찬가지로 빈 이름 예약이었습니다.
 - 모든 패키지가 Python 3.12 이상을 요구합니다. numpy·scipy·shapely·matplotlib의 최소 버전은
   Python 3.12 휠이 있는 첫 릴리스인 1.26, 1.11.2, 2.0.2, 3.8로 올렸습니다.
-- 패키지 사이의 의존성은 0.1 계열(`>=0.1.0,<0.2`)로 제한됩니다.
+- 패키지 사이의 의존성은 0.0 계열(`>=0.0.2,<0.1`)로 제한됩니다.
 
 - 온도 의존 2D 정상 Joule heating: 유효 범위 물성, 완화 Picard 반복, 실패 이력 및 독립 검증 추가.
 

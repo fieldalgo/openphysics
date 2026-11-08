@@ -24,8 +24,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- Docs: a workspace quick start (English and Korean): build a wheelhouse, install with a Python check and the `==0.1.0` pin on Linux, macOS and Windows, start and stop Studio, two designs and a comparison, and keeping work across a restart. Checked on Linux; macOS and Windows not yet verified.
-- Docs: the `openphysics` package page says that 0.1.0 is not on PyPI yet (only the empty `0.0.1` reservations are), points to the source installation and pins `==0.1.0` for wheel installs.
+- Every distribution is versioned 0.0.2 instead of 0.1.0, the version planned for the first PyPI release (user decision, 2026-11-08); requirements between our own distributions are `>=0.0.2,<0.1`. Nothing has been published.
+- Docs: a workspace quick start (English and Korean): build a wheelhouse, install with a Python check and the `==0.0.2` pin on Linux, macOS and Windows, start and stop Studio, two designs and a comparison, and keeping work across a restart. Checked on Linux; macOS and Windows not yet verified.
+- Docs: the `openphysics` package page says that 0.0.2 is not on PyPI yet (only the empty `0.0.1` reservations are), points to the source installation and pins `==0.0.2` for wheel installs.
 - `simcase`: Studio workspace makes **Save session** the first and primary save button; the inputs-only save is renamed **Save inputs only** (and its opener **Open inputs file**), each save button has a fixed description, and while completed runs are not in a session file the header says *Results not saved* instead of reading as saved after an inputs-only save.
 - `simcase`: Studio workspace start page shows **Continue where you left off** when this browser holds a recovery session: recover the last or an earlier session, open a session file, or start new. After a restart and reload the page no longer looks empty with the recovery control inside a closed help section.
 - `simcase`: Studio workspace keeps the browser recovery session that a newly opened page did not recover: the first automatic save moves it to up to three earlier sessions, and **Recover earlier session** brings one back with its runs and comparison. Before, starting new work after missing the recovery prompt replaced it without a warning.
@@ -205,7 +206,8 @@ What each package implements, and its limits, is in the
   elementwise Joule heating for same-mesh thermal consumers.
 
 The first release of the six implementation packages and the `openphysics` meta
-distribution on PyPI, planned as 0.1.0.
+distribution on PyPI, planned as 0.0.2 (0.0.1 is taken by the empty name
+reservations, and PyPI does not reuse a version).
 
 ### Added
 
@@ -224,5 +226,5 @@ distribution on PyPI, planned as 0.1.0.
 - Every package requires Python 3.12 or later. The minimum numpy, scipy, shapely
   and matplotlib are now 1.26, 1.11.2, 2.0.2 and 3.8, their first releases with
   Python 3.12 wheels.
-- Requirements between the packages are limited to the 0.1 series
-  (`>=0.1.0,<0.2`).
+- Requirements between the packages are limited to the 0.0 series
+  (`>=0.0.2,<0.1`).

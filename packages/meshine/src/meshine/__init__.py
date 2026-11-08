@@ -23,6 +23,6 @@ from .mesh import TriMesh
 from .mesh3d import MeshCheckError, TetMesh, check, write_msh
 from .refine import MeshSizeLimitError, generate
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 __all__ = ["Domain", "Circle", "TriMesh", "TetMesh", "MeshCheckError", "check", "write_msh", "extrude", "generate",
            "MeshSizeLimitError", "box_sides", "rectangle", "shapes", "__version__"]

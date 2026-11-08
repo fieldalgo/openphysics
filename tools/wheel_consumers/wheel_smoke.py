@@ -33,7 +33,7 @@ from packaging.requirements import Requirement  # noqa: E402
 meta = {}
 for requirement in map(Requirement, metadata.requires("openphysics")):
     extra = str(requirement.marker).split('"')[1] if requirement.marker else ""
-    assert str(requirement.specifier) == "<0.2,>=0.1.0", requirement
+    assert str(requirement.specifier) == "<0.1,>=0.0.2", requirement
     meta.setdefault(extra, set()).add((requirement.name, frozenset(requirement.extras)))
 assert meta == {
     "": {(name, frozenset()) for name in

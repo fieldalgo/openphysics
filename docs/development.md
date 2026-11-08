@@ -406,7 +406,7 @@ python -m twine check --strict .validation/simcase/*
 All nine distributions release together under one version. A version change
 sets it in every `packages/<name>/pyproject.toml` and in each import package's
 `__version__`, and meshloom's `Cargo.toml`, keeps the requirements between our own distributions inside that
-minor series (`>=0.1.0,<0.2` for 0.1.x) and renames the
+minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x) and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
 release; without `--tag`, as required CI runs it, it accepts an `[Unreleased]`

@@ -33,6 +33,6 @@ thermal3d   steady heat in three dimensions: sine-product manufactured box and a
 from . import (slab, lossy_slab, fiber, metallic, electrostatics, scattering, benchmarks, cavity,
                material_cavity, wall_loss, joule_slab, bent_slab, thermal3d)
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 __all__ = ["slab", "lossy_slab", "fiber", "metallic", "electrostatics", "scattering", "benchmarks",
            "cavity", "material_cavity", "wall_loss", "joule_slab", "bent_slab", "thermal3d"]

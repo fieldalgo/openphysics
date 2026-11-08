@@ -353,7 +353,7 @@ python -m twine check --strict .validation/simcase/*
 
 배포판 아홉 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
 `packages/<name>/pyproject.toml`과 각 import 패키지의 `__version__`, meshloom의 `Cargo.toml`을 바꾸고, 우리 배포판
-사이의 의존성은 그 마이너 계열 안(0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
+사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
 릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
 필수 CI처럼 `--tag` 없이 돌리면 `[Unreleased]` 절도 받아들입니다. 0.x에서 안정적으로

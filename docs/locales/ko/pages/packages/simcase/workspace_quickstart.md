@@ -5,7 +5,7 @@
 Studio 작업 공간을 설치하고, 실리콘 도파관 설계 두 개를 만들어 비교한 뒤, 재시작해도
 작업이 남게 합니다. 전체 설명은 [작업 공간 안내](workspace.md)에 있습니다.
 
-OpenPhysics 0.1.0은 아직 PyPI에 없습니다(빈 `0.0.1` 이름 예약만 있음). 그래서 저장소에서
+OpenPhysics 0.0.2는 아직 PyPI에 없습니다(빈 `0.0.1` 이름 예약만 있음). 그래서 저장소에서
 만든 wheel 파일 폴더(*wheelhouse*)로 설치합니다. NumPy·FastAPI 같은 다른 패키지는 PyPI에서
 받으므로 설치하는 동안 인터넷이 필요합니다.
 
@@ -34,7 +34,7 @@ Linux와 macOS:
 ```sh
 python3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 python3.12 -m venv ~/op-studio
-~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.1.0"
+~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.0.2"
 ~/op-studio/bin/simcase-studio --help
 ```
 
@@ -44,7 +44,7 @@ Windows(PowerShell. 환경의 프로그램을 직접 부르므로 활성화 스�
 ```powershell
 py -3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 py -3.12 -m venv "$HOME\op-studio"
-& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.1.0"
+& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.0.2"
 & "$HOME\op-studio\Scripts\simcase-studio.exe" --help
 ```
 
@@ -90,7 +90,7 @@ py -3.12 -m venv "$HOME\op-studio"
 
 ## 검증한 플랫폼
 
-2026-11-08에 Linux(Python 3.12.3, headless Chromium)에서 커밋 `da230150`으로 만든 wheel로
+2026-11-08에 Linux(Python 3.12.3, headless Chromium)에서 저장소로 만든 0.0.2 wheel로
 확인했습니다. 새 환경에서 버전을 고정한 설치(다운로드 캐시가 있을 때 14초), 4·5단계,
 **Ctrl+C**, 재시작, 시작 화면에서의 복구까지 했고 비교가 그대로 돌아왔습니다. **macOS와
 Windows에서는 이 단계를 아직 확인하지 않았습니다.** 이전 Windows 확인 기록은

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meshine"
-version = "0.1.0"
+version = "0.0.2"
 description = "Quality triangle mesher for multi-material planar domains (constrained Delaunay refinement)"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"

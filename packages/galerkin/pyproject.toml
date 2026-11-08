@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "galerkin"
-version = "0.1.0"
+version = "0.0.2"
 description = "Pure-Python finite-element engine for electromagnetics, heat conduction and elasticity, validated against analytical solutions"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"
@@ -34,12 +34,12 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 # it. tests/galerkin/test_independence.py enforces that separation.
 test = [
     "pytest",
-    "galerkin-refsol>=0.1.0,<0.2",
+    "galerkin-refsol>=0.0.2,<0.1",
     # meshers, exercised through galerkin.from_mesher. Neither is a runtime
     # dependency; gmshio additionally wants a `gmsh` executable on PATH
     # (pip install gmsh), which it runs as a separate process and never links.
-    "meshine>=0.1.0,<0.2",
-    "gmshio>=0.1.0,<0.2",
+    "meshine>=0.0.2,<0.1",
+    "gmshio>=0.0.2,<0.1",
 ]
 figures = ["matplotlib>=3.8"]
 # Optional array libraries for derivatives (galerkin.core.backend). NumPy, the

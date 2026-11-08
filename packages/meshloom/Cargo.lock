@@ -16,7 +16,7 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "meshloom-kernel"
-version = "0.1.0"
+version = "0.0.2"
 dependencies = [
  "pyo3",
 ]

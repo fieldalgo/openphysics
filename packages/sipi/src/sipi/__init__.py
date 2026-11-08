@@ -37,7 +37,7 @@ from .quasistatic import LineParameters, capacitance_matrix, line_parameters
 
 from .network import LineNetwork, rlgc_network, quasistatic_network
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 __all__ = ["CrossSection", "Layer", "Trace", "PolygonTrace", "DielectricRegion", "MeshedCrossSection", "LineParameters",
            "LineNetwork", "rlgc_network", "quasistatic_network",
            "capacitance_matrix", "line_parameters", "CrossSectionDocument",
