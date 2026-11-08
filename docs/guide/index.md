@@ -73,7 +73,7 @@ After running, follow [results, export and trust](../results/index.md).
 
 ## Experimental model workspace
 
-[Workspace guidance](../packages/simcase/workspace.md) covers the bounded optical
+Start with the [workspace quick start](../packages/simcase/workspace_quickstart.md): install, two designs, a comparison and recovery. [Workspace guidance](../packages/simcase/workspace.md) covers the bounded optical
 runner, the steady heat plate and input/session saving. The heated-waveguide screen is a setup preview,
 not a coupled solve. Its file formats and capabilities differ from the original
 optical and thermal Studio editors.
