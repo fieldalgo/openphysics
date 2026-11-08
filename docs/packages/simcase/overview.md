@@ -524,6 +524,11 @@ simcase-studio --workspace    # experimental model workspace at /workspace
 python -m simcase.studio --port 9000 --no-browser
 ```
 
+Open Studio at `http://127.0.0.1:<port>` or `http://localhost:<port>`: the
+server refuses other host names and state-changing requests from other web
+pages, and warns when `--host` is not a loopback address. Details are in the
+[security notes](../../security.md#browser-studio).
+
 The base install stays headless — `fastapi` and `uvicorn` arrive only with the
 `studio` extra, so a batch or an HPC user never pulls a web stack to run a
 document.

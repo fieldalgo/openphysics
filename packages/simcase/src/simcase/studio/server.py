@@ -14,8 +14,9 @@ this file is written as an ordinary consumer of the engine, not as a part of it.
 from __future__ import annotations
 
 import json
+import logging
+import sys
 import threading
-import traceback
 import uuid
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from simcase import __version__, Document, DocumentError, build_mesh, examples, 
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
+from . import security
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version="0.1.0")
@@ -37,6 +39,17 @@ app = FastAPI(title="simcase studio", version="0.1.0")
 _workspace_instance = uuid.uuid4().hex
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
+_MAX_RUNNING_JOBS = 4    # optical solves at once; more get 429
+_MAX_FINISHED_JOBS = 16  # newest finished optical jobs kept; older ones are freed
+_log = logging.getLogger("simcase.studio")
+
+# Hosts a browser may address besides loopback; ``main`` adds an explicit --host.
+_extra_hosts: set[str] = set()
+_csp = security.content_security_policy(security.inline_script_hashes(STATIC / "index.html"))
+app.add_middleware(security.StudioGuard, csp=_csp, extra_hosts=_extra_hosts)
+# The interactive API docs load Swagger UI from a CDN, which the policy forbids.
+app.router.routes[:] = [r for r in app.router.routes
+                        if getattr(r, "path", None) not in ("/docs", "/docs/oauth2-redirect", "/redoc")]
 _thermal_jobs = thermal.ThermalJobs()
 _region_limits = regions.RegionLimits()
 
@@ -263,10 +276,10 @@ def _run_job(job_id: str, doc: Document):
             payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:
             _jobs[job_id].update(status="done", result=payload)
-    except Exception as exc:  # report anything to the browser
+    except Exception as exc:  # report anything to the browser; the traceback stays in the server log
+        _log.warning("optical job %s failed", job_id, exc_info=True)
         with _jobs_lock:
-            _jobs[job_id].update(status="error", error=f"{type(exc).__name__}: {exc}",
-                                 traceback=traceback.format_exc())
+            _jobs[job_id].update(status="error", error=f"{type(exc).__name__}: {exc}")
             diagnostic = getattr(exc, "diagnostics", getattr(exc.__cause__, "diagnostics", None))
             if diagnostic is not None:
                 _jobs[job_id]["open_boundary"] = diagnostic
@@ -305,6 +318,11 @@ def start_run(body: DocBody, request: Request = None):
     _require_studio_physics(doc)
     job_id = uuid.uuid4().hex[:8]
     with _jobs_lock:
+        if sum(job["status"] == "running" for job in _jobs.values()) >= _MAX_RUNNING_JOBS:
+            raise HTTPException(429, f"Studio is already running {_MAX_RUNNING_JOBS} optical jobs; wait for one to finish.")
+        finished = [key for key, job in _jobs.items() if job["status"] != "running"]
+        for key in finished[:-_MAX_FINISHED_JOBS]:
+            del _jobs[key]  # dicts keep insertion order: the oldest finished jobs go first
         _jobs[job_id] = {"status": "running", "log": [], "result": None, "error": None}
     threading.Thread(target=_run_job, args=(job_id, doc), daemon=True).start()
     return {"job": job_id}
@@ -654,8 +672,16 @@ def main(argv=None):
     ap.add_argument("--workspace", action="store_true",
                     help="open the experimental model workspace instead of the classic editor")
     args = ap.parse_args(argv)
+    host = args.host.strip("[]")
+    if not security.is_loopback(host):
+        print(f"warning: --host {args.host} makes Studio reachable from other machines. Studio has no "
+              "accounts or encryption; use it only on a network you trust.", file=sys.stderr)
+    if host not in ("0.0.0.0", "::"):
+        _extra_hosts.add(host.lower())
     path = "/workspace" if args.workspace else "/"
-    url = f"http://{args.host}:{args.port}{path}"
+    # A wildcard bind is opened through loopback of the same family (``::`` may be IPv6-only).
+    url_host = {"0.0.0.0": "127.0.0.1", "::": "[::1]"}.get(host, f"[{host}]" if ":" in host else host)
+    url = f"http://{url_host}:{args.port}{path}"
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     print(f"simcase studio at {url}")
