@@ -458,14 +458,16 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
     def test_actual_runtime_lumping_detected_by_n8_product(self):
         e, m, k, fixed, lam, phi = mode_truth(8)
         ts = np.linspace(0, 1/lam, 9)
-        original = engine.assemble_mass
+        original = engine._element_matrices
         def lump(*args, **kwargs):
-            matrix = original(*args, **kwargs).tocsr(copy=True)
-            row = np.asarray(matrix.sum(axis=1)).ravel()
-            matrix.data[:] = 0
-            matrix.setdiag(row)
-            return matrix
-        with patch.object(engine, "assemble_mass", lump):
+            # row-sum lumping of every element mass matrix: the assembled mass is then lumped too
+            mass, stiffness = original(*args, **kwargs)
+            lumped = np.zeros_like(mass)
+            rows = mass.sum(axis=2)
+            for i in range(3):
+                lumped[:, i, i] = rows[:, i]
+            return lumped, stiffness
+        with patch.object(engine, "_element_matrices", lump):
             r = solve(e.xy, e.cells, ts, 300+phi, {int(i): 300.0 for i in fixed})
         product = np.r_[1.0, np.cumprod(1/(1+lam*np.diff(ts)))]
         with self.assertRaisesRegex(AssertionError, "wrong mass"):

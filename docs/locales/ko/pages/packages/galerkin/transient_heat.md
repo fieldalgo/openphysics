@@ -243,8 +243,9 @@ m 단위 (r, z)이고 r ≥ 0이며, 모든 적분은 [축대칭 정상 열전�
 `coordinate_system`과 `nodal_rate_unit`(`"W"`)을 기록합니다(필드 이름은 Cartesian
 `_w_per_m` 철자를 유지하고 [simcase 영역 adapter](../simcase/thermal_regions2d.md#축대칭-문서)가
 바꿔 적습니다). 정상 페이지의 축 규칙이 그대로 적용됩니다. 축에만 놓인 절점의 Dirichlet
-데이터와 축 변의 비영 열유속·h는 거부하며(경계 거부는 데이터를 처음 표본화하는 시각
-index 0에 연결됨), 축 자체에는 조건이 필요 없습니다. 기본값은 Cartesian 풀이와 bit 단위로
+데이터와 축 변의 비영 열유속·h는 거부하며(경계 거부는 그 값을 처음 표본화한 시각 index에
+연결됨: 정적 데이터는 index 0, 축에서 뒤늦게 비영이 되는 콜백은 그 시각), 축 자체에는 조건이
+필요 없습니다. 기본값은 Cartesian 풀이와 bit 단위로
 같습니다. JAX·PyTorch 입력은 Cartesian과 같이 지원하며 측도는 정적 기하입니다.
 
 검사 G7-1~G7-4(`tests/galerkin/test_transient_heat_axisymmetric.py`, 2026-11-08 HQ 작업

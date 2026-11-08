@@ -273,8 +273,9 @@ functional J K; the result records `coordinate_system` and `nodal_rate_unit`
 [simcase region adapter](../simcase/thermal_regions2d.md#axisymmetric-documents)
 renames them). The axis rules of the steady page apply: Dirichlet data on
 nodes lying only on the axis, and a nonzero flux or h on an axis edge, are
-refused (the boundary refusal is chained to time index 0, where the data are
-first sampled); the axis itself needs no condition. The default is bit for bit
+refused (the boundary refusal is chained to the time index at which the
+offending value is first sampled: index 0 for static data, later for a
+callback that becomes nonzero on the axis); the axis itself needs no condition. The default is bit for bit
 the Cartesian solve. JAX and PyTorch inputs are supported as in the Cartesian
 case; the measure is static geometry.
 
