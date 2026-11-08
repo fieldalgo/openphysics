@@ -26,8 +26,10 @@ For build reviews and first-user checks, use the [acceptance checklist](workspac
    even if you edit the model while waiting. Stop waiting pauses observation only.
 5. Name and **Pin selected run** as a reference. Change the model and run again,
    then use **Compare** to choose A/B, candidate, component, probe and line profile.
-6. **Save session** creates a portable file with the model, retained results and
-   view settings. Wait for **Browser recovery saved** before relying on local
+6. **Save session**, the first save button, creates a portable file with the model,
+   retained results and view settings. **Save inputs only** keeps the model without
+   results; while completed runs are not in a session file, the header says
+   *Results not saved*. Wait for **Browser recovery saved** before relying on local
    recovery. After a reload or a Studio restart, the start page shows **Continue
    where you left off** with the last browser session and any earlier ones; choose
    one to recover it, open a session file, or start new.
