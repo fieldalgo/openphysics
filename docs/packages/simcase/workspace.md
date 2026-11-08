@@ -28,7 +28,9 @@ For build reviews and first-user checks, use the [acceptance checklist](workspac
    then use **Compare** to choose A/B, candidate, component, probe and line profile.
 6. **Save session** creates a portable file with the model, retained results and
    view settings. Wait for **Browser recovery saved** before relying on local
-   recovery. After reload, expand recovery help and choose **Recover last session**.
+   recovery. After a reload or a Studio restart, the start page shows **Continue
+   where you left off** with the last browser session and any earlier ones; choose
+   one to recover it, open a session file, or start new.
 
 Use **Import runs from file** to add results to the current notebook while keeping
 the model. Use **Open session** to replace both model and notebook. Current/earlier
@@ -368,7 +370,8 @@ completed runs, names, comparison and field view. Writes are debounced and seria
 the footer reports pending, saving, committed or failed storage separately from
 portable file save status. An empty new tab does not erase the prior notebook.
 
-After reload, expand Connection, recovery and layout help → Recover last session.
+After reload, choose the last session on the start page's **Continue where you left off**
+card, or expand Connection, recovery and layout help → Recover last session.
 The complete record is validated before the existing replacement dialog; recovered
 fields are labeled `recovered`, not newly computed. Recovery starts a new input
 undo history and keeps the document unsaved until you save a file/session. No

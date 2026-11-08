@@ -24,6 +24,7 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `simcase`: Studio workspace start page shows **Continue where you left off** when this browser holds a recovery session: recover the last or an earlier session, open a session file, or start new. After a restart and reload the page no longer looks empty with the recovery control inside a closed help section.
 - `simcase`: Studio workspace keeps the browser recovery session that a newly opened page did not recover: the first automatic save moves it to up to three earlier sessions, and **Recover earlier session** brings one back with its runs and comparison. Before, starting new work after missing the recovery prompt replaced it without a warning.
 - `simcase`: Studio workspace reconnects by itself after a server restart. Run against a restarted server reconnects and asks to run again (it no longer says "work may continue" for a request the server refused); an unreachable server disables Run with that reason and the page checks every 3 seconds until Studio is back at the same address.
 - `simcase`: `SubspaceSweepResult.field_representation` names the layout of the saved and served vector-subspace fields (`"vector-subspace-edge-nodal-v1"`, unchanged). Studio now reads it there and imports only names in `simcase.__all__`; its guard test also refuses relative imports that leave the Studio package.
