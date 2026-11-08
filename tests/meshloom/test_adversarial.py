@@ -11,7 +11,8 @@ its area) and V4 (region volumes against the analytic volumes, relative 1e-12, e
 on axis-aligned inputs). V18 itself grades C10 at three refinement sizes; refinement
 does not exist yet, so these are the boundary-recovery checks only.
 
-Cases: the twisted (Schonhardt) prism, a cospherical cube with an interior vertex,
+Cases: the twisted (Schonhardt) prism, the Chazelle polyhedron (three grooves on each
+side), a cospherical triangular prism and a cospherical cube with interior vertices,
 near-coplanar quadrilaterals (a 1e-9 fold), stacked layers, a 4^3 lattice of boxes,
 5 and 30 degree wedges, a 1:100 slab, and the configurations the C14 validity rule makes
 valid: an edge with four facets, two shells touching at a vertex, a box standing on a
@@ -127,8 +128,7 @@ def check(m, points, facets, volumes, exact):
                 else:
                     nn = math.sqrt(float(sum(c * c for c in n)))
                     assert abs(float(d)) / nn <= 4 * 2.0 ** -52 * diag(points), "V3(b)"
-        area_in = sum(abs(float(sum(ni * ci for ni, ci in zip(n, cross(sub(P[lp[1]], P[lp[0]]), sub(P[lp[2]], P[lp[0]]))))))
-                      for lp in [loop[0:1] + loop[i:i + 2] for i in range(1, len(loop) - 1)])
+        area_in = float(sum(c * c for c in n))  # Newell: |n| = 2 area; n.n = |n| * 2 area, as below
         # the facet's area is covered by its exterior faces and, where another region
         # sits on it, by interface faces in its plane and within its bounding box
         lo = [min(P[i][c] for i in loop) for c in range(3)]
@@ -165,9 +165,10 @@ def twisted_prism(twist_deg=30.0):
     b.facet(top)
     for i in range(3):
         j = (i + 1) % 3
-        # each side quad split along the "bad" diagonal: the Schonhardt configuration
-        b.facet([bottom[i], bottom[j], top[i]])
-        b.facet([bottom[j], top[j], top[i]])
+        # each side quad split along its reflex diagonal (bottom i to top j): the
+        # Schonhardt configuration, which no tetrahedralization without Steiner points has
+        b.facet([bottom[i], bottom[j], top[j]])
+        b.facet([bottom[i], top[j], top[i]])
     pts, facets = b.arrays()
     # volume of the twisted prism with these side triangles: exact via divergence theorem
     return pts, facets, None
@@ -267,7 +268,53 @@ def cases():
     b.box((2, 1, 1), (3, 3, 2), skip=("x0",))
     pts, facets = b.arrays()
     out["edge-inside-a-facet"] = (pts, facets, [16.0, 2.0, 2.0], True)
+    out["chazelle-3"] = chazelle(3, w=0.25, height=2.0, gap=0.0625)
+
+    b = Builder()  # a triangular prism with its six vertices on the unit sphere, rounded
+    r, h = 0.8, 0.6
+    bottom = [(r * math.cos(2 * math.pi * k / 3), r * math.sin(2 * math.pi * k / 3), -h) for k in range(3)]
+    top = [(x, y, h) for x, y, _ in bottom]
+    b.facet(bottom[::-1])
+    b.facet(top)
+    for i in range(3):
+        j = (i + 1) % 3
+        b.facet([bottom[i], bottom[j], top[j], top[i]])
+    pts, facets = b.arrays()
+    pts = np.vstack([pts, [[0.0, 0.0, 0.0]]])  # the interior vertex
+    out["cospherical-prism-interior-vertex"] = (pts, facets, [abs(divergence_volume(pts[:6], facets))], False)
     return out
+
+
+def chazelle(n, w, height, gap):
+    """A box (n+1) x (n+1) x height with n V-grooves along x cut into its top and n along
+    y into its bottom, their apex lines `2 gap` apart: the Chazelle polyhedron, which
+    needs Steiner points inside to be tetrahedralized."""
+    b = Builder()
+    L, H = n + 1.0, height
+    dt, db = H / 2 + gap, H / 2 - gap  # apex heights of the top and bottom grooves
+    xs = [0.0] + [v for j in range(1, n + 1) for v in (j - w, j + w)] + [L]
+    for k in range(0, len(xs), 2):  # bottom strips and top strips
+        x0, x1 = xs[k], xs[k + 1]
+        b.facet([(x0, 0, 0), (x0, L, 0), (x1, L, 0), (x1, 0, 0)])
+        b.facet([(0, x0, H), (L, x0, H), (L, x1, H), (0, x1, H)])
+    for j in range(1, n + 1):  # groove walls
+        b.facet([(j - w, 0, 0), (j - w, L, 0), (j, L, db), (j, 0, db)])
+        b.facet([(j, 0, db), (j, L, db), (j + w, L, 0), (j + w, 0, 0)])
+        b.facet([(0, j - w, H), (L, j - w, H), (L, j, dt), (0, j, dt)])
+        b.facet([(0, j, dt), (L, j, dt), (L, j + w, H), (0, j + w, H)])
+    for x in (0.0, L):  # x faces: notched at the top by the grooves along x
+        loop = [(x, 0, 0), (x, L, 0), (x, L, H)]
+        for i in range(n, 0, -1):
+            loop += [(x, i + w, H), (x, i, dt), (x, i - w, H)]
+        b.facet(loop + [(x, 0, H)])
+    for y in (0.0, L):  # y faces: notched at the bottom by the grooves along y
+        loop = [(0, y, 0)]
+        for j in range(1, n + 1):
+            loop += [(j - w, y, 0), (j, y, db), (j + w, y, 0)]
+        b.facet(loop + [(L, y, 0), (L, y, H), (0, y, H)])
+    pts, facets = b.arrays()
+    volume = L * L * H - n * L * w * (H - dt) - n * L * w * db
+    return pts, facets, [volume], True
 
 
 CASES = cases()
@@ -278,3 +325,6 @@ def test_c10_case(name):
     pts, facets, volumes, exact = CASES[name]
     m = mesh_plc(pts, facets)
     check(m, pts, facets, volumes, exact)
+    if name in ("schonhardt", "chazelle-3"):
+        # neither has a tetrahedralization without Steiner points
+        assert (m["node_source"] >= len(pts)).sum() > 0
