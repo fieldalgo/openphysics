@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: Studio 작업 공간 시작 화면이 이 브라우저에 복구 세션이 있으면 **Continue where you left off**를 보여 줍니다. 마지막 세션이나 이전 세션을 복구하거나, 세션 파일을 열거나, 새로 시작할 수 있습니다. 재시작 후 새로고침하면 빈 화면처럼 보이고 복구 버튼이 닫힌 도움말 안에 있던 문제를 고쳤습니다.
 - `simcase`: Studio 작업 공간이 새로 연 페이지가 복구하지 않은 브라우저 복구 세션을 보관합니다. 첫 자동 저장이 그 세션을 최대 세 개의 이전 세션으로 옮기고, **Recover earlier session**으로 실행과 비교째 되살립니다. 전에는 복구 안내를 놓치고 새 작업을 시작하면 경고 없이 덮어썼습니다.
 - `simcase`: Studio 작업 공간이 서버 재시작 뒤 스스로 다시 연결합니다. 재시작된 서버에 Run하면 다시 연결하고 다시 실행하라고 안내합니다(서버가 거부한 요청에 "work may continue"라고 하지 않습니다). 서버에 연결할 수 없으면 그 이유와 함께 Run이 꺼지고, 같은 주소로 Studio가 돌아올 때까지 3초마다 확인합니다.
 - `simcase`: `SubspaceSweepResult.field_representation`이 저장·전송하는 벡터 부분공간 필드의 layout 이름(`"vector-subspace-edge-nodal-v1"`, 그대로)을 알려 줍니다. Studio는 이 값을 여기서 읽고 `simcase.__all__`에 있는 이름만 가져옵니다. Studio 가드 시험은 Studio 패키지 밖으로 나가는 상대 import도 거부합니다.

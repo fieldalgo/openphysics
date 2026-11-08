@@ -200,7 +200,7 @@ else inspector+=pair('Status','Not executed')+'<p>Settings and validation will b
 if(isHeat())inspector=heatInspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML='<h2>Physics connections</h2><p>One-way sequence · design configuration</p><div class="flow"><button data-select="Electric currents"><strong>Electric currents</strong>Voltage → current density</button><label><input data-toggle="heat" type="checkbox" '+(state.heat?'checked':'')+'> Joule heating → Heat transfer</label><div class="arrow">Q [W/m³] → T [K]</div><label><input data-toggle="structure" type="checkbox" '+(state.structure?'checked':'')+' '+(!state.heat?'disabled':'')+'> Thermal expansion → Solid mechanics</label><div class="arrow">T [K] → displacement [m]</div><label><input data-toggle="optics" type="checkbox" '+(state.optics?'checked':'')+'> Optical modes · material / geometry update</label></div><p>Field mapping, deformed mesh and material laws are pending. Two-way feedback is not configured.</p>';
-else if(ui.page==='Applications')renderApplications($('canvas'));
+else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer());
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>';
@@ -434,13 +434,23 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
  try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
+  latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt}:null;
   if(recovered){$('autosave-status').textContent='Previous browser session available · '+recovered.session.runs.length+' runs';$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
   else $('autosave-status').textContent='Completed sessions will be saved for browser recovery';
   await renderEarlierSessions();
+  if(ui.page==='Applications')render();
  }catch(error){if(version!==notebookLoadVersion)return;$('autosave-status').textContent='Browser recovery unavailable · save a session file';$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
 }
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 let earlierSessions=[];
+// The landing page offers to resume until the page has runs or the user starts new.
+let latestOffer=null,resumeDismissed=false;
+function resumeOffer(){
+ if(resumeDismissed||runs.length)return null;
+ return {latest:latestOffer,earlier:earlierSessions.map(r=>({runs:r.session.runs.length,savedAt:r.savedAt})),
+  onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),
+  onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
+}
 async function renderEarlierSessions(){
  const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];
  let list=[];try{list=await notebookStore.loadEarlier();}catch{return;}
@@ -462,10 +472,11 @@ async function recoverEarlier(index,opener){
  }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
 $('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNotebookRecovery();
-$('recover-notebook').onclick=async()=>{
+$('recover-notebook').onclick=()=>recoverLatest($('recover-notebook'));
+async function recoverLatest(opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,opener:$('recover-notebook'),label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };

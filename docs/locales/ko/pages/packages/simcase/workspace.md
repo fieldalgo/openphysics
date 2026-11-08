@@ -26,8 +26,9 @@
 5. 기준 실행에 이름을 붙이고 **Pin selected run**으로 고정합니다. 모델을 변경해
    다시 실행한 뒤 **Compare**에서 A/B, 후보, 성분, probe와 단면을 선택합니다.
 6. **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다. 로컬 복구를
-   사용하려면 **Browser recovery saved**를 확인합니다. 새로고침 후 복구 도움말을
-   펼쳐 **Recover last session**을 선택합니다.
+   사용하려면 **Browser recovery saved**를 확인합니다. 새로고침하거나 Studio를 다시
+   켜면 시작 화면에 **Continue where you left off** 카드가 마지막 브라우저 세션과 이전
+   세션을 보여 줍니다. 하나를 골라 복구하거나, 세션 파일을 열거나, 새로 시작합니다.
 
 현재 모델을 유지하고 결과만 추가하려면 **Import runs from file**을, 모델과 노트북을
 모두 교체하려면 **Open session**을 사용합니다. Current/earlier input 표시는 결과의
@@ -325,8 +326,8 @@ IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름
 저장 완료·실패를 파일 저장 상태와 구분해 표시합니다. 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
-새로고침 후 Connection, recovery and layout help → Recover last session으로
-복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
+새로고침 후 시작 화면의 **Continue where you left off** 카드에서 마지막 세션을 고르거나
+Connection, recovery and layout help → Recover last session으로 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
 아닌 `recovered`로 표기합니다. 입력 Undo 이력은 새로 시작하고 파일/세션을 저장할
 때까지 미저장 상태를 유지합니다. 솔버는 실행하지 않습니다. 입력만 복구하는 기능과
 대기 작업 복구는 별도입니다.

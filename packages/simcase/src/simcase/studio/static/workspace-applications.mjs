@@ -12,8 +12,36 @@ export function templatePhysics(id){
  if(!application)throw new Error('Unknown application template.');
  return {...application.physics};
 }
-export function renderApplications(host){
+// What the landing page offers to resume: the latest browser session and the
+// earlier ones (C1), each as {runs, savedAt}. Empty when there is nothing.
+export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleString()){
+ const line=(label,item)=>label+' · '+item.runs+(item.runs===1?' run':' runs')+' · saved '+when(item.savedAt);
+ const choices=[];
+ if(latest)choices.push({kind:'latest',label:line('Last session in this browser',latest)});
+ earlier.forEach((item,index)=>choices.push({kind:'earlier',index,label:line('Earlier session',item)}));
+ return choices;
+}
+// resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
+// onOpenFile(), onStartNew()}; shown above the templates when there is something.
+function resumeCard(resume){
+ const choices=resumeChoices(resume.latest,resume.earlier);if(!choices.length)return null;
+ const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
+ const heading=document.createElement('h3');heading.id='resume-heading';heading.textContent='Continue where you left off';
+ const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
+ const actions=document.createElement('div');actions.className='resume-actions';
+ for(const choice of choices){
+  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?'Recover: ':'Recover earlier: ')+choice.label;
+  if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.onclick=()=>resume.onLatest(button);}
+  else{button.dataset.resumeEarlier=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
+  actions.append(button);
+ }
+ const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file…';open.onclick=()=>resume.onOpenFile();
+ const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
+ actions.append(open,fresh);card.append(heading,note,actions);return card;
+}
+export function renderApplications(host,resume=null){
  host.replaceChildren();
+ const card=resume?resumeCard(resume):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';
  const cards=document.createElement('div');cards.className='cards';

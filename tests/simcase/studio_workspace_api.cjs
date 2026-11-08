@@ -3,11 +3,11 @@
 
 const {before}=require('node:test');
 let solverApi;
-let APPLICATIONS,templatePhysics;
+let APPLICATIONS,templatePhysics,resumeChoices;
 let opticalBlock,opticalDocument;
 before(async()=>{
 ({solverApi}=await import('../../packages/simcase/src/simcase/studio/static/workspace-api.mjs'));
-({APPLICATIONS,templatePhysics}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
+({APPLICATIONS,templatePhysics,resumeChoices}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
 ({opticalBlock,opticalDocument}=await import('../../packages/simcase/src/simcase/studio/static/workspace-optical.mjs'));
 });
 const test=require('node:test');
@@ -50,4 +50,12 @@ test('application availability agrees with actual execution gates',async()=>{
 
 test('HTTP failure status reaches job recovery without replacing server detail',async()=>{
  for(const status of [404,409,500])await assert.rejects(solverApi('/api/jobs/12345678',undefined,async()=>({ok:false,status,json:async()=>({detail:'Captured server detail'})})),error=>error.status===status&&error.message==='Captured server detail');
+});
+test('the landing page offers the latest and earlier browser sessions to resume',()=>{
+ const when=t=>t;
+ assert.deepEqual(resumeChoices(null,[],when),[]);
+ assert.deepEqual(resumeChoices({runs:2,savedAt:'T1'},[{runs:1,savedAt:'T0'}],when),[
+  {kind:'latest',label:'Last session in this browser · 2 runs · saved T1'},
+  {kind:'earlier',index:0,label:'Earlier session · 1 run · saved T0'}]);
+ assert.deepEqual(resumeChoices(null,[{runs:3,savedAt:'T0'}],when).map(c=>c.kind),['earlier']);
 });
