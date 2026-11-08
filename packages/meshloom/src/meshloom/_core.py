@@ -189,13 +189,30 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     ``boundary_faces`` and ``boundary_nodes`` by facet index (faces wound outward),
     ``interfaces`` keyed by region pairs (a < b, wound from a to b), and ``node_source``
     (each node's global point index: input points first, then S points).
+
+    Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
+    witness type 6), ``RecoveryError``, ``RoundingError``, or ``MeshError`` for an
+    internal failure; all are ``ValueError``.
     """
     kernel = _require()
+    if domain not in ("regions", "parity"):
+        raise ValueError("domain must be 'regions' or 'parity'")
     p = _points(points)
     s = np.ascontiguousarray(np.asarray(np.zeros((0, 2)) if segments is None else segments,
                                         dtype="<i8").reshape(-1, 2))
+    check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
-    out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+    try:
+        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+    except ValueError as e:
+        if len(e.args) != 3:
+            raise
+        kind, msg, ids = e.args
+        if kind == "NotClosed":
+            raise NotClosed(msg, {"type": 6, "segment": (int(ids[0]), int(ids[1])),
+                                  "facets": tuple(int(x) for x in ids[2:])}) from None
+        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError}.get(kind, MeshError)
+        raise cls(msg) from None
 
     def i64(b, *shape):
         return np.frombuffer(b, dtype="<i8").reshape(*shape).astype(np.int64)
@@ -283,6 +300,38 @@ class InvalidPLC(ValueError):
         super().__init__(message)
         self.witness_type = witness_type
         self.witness = witness
+
+
+class MeshError(ValueError):
+    """``mesh_plc`` produced no mesh for a PLC that passed ``check_plc``. ``kind`` is
+    ``"NotClosed"``, ``"RecoveryFail"``, ``"RoundingFail"`` or ``"Internal"``."""
+
+    kind = "Internal"
+
+
+class NotClosed(MeshError):
+    """With ``domain="parity"``: the surface is not closed. ``witness`` is ``{"type": 6,
+    "segment": (u, v), "facets": (f, ...)}``: the elementary segment between input points
+    u and v (a piece of a facet boundary) lies on the boundary of an odd number of facets
+    (witness type 6 of the C14 validity rule)."""
+
+    kind = "NotClosed"
+
+    def __init__(self, message: str, witness: dict):
+        super().__init__(message)
+        self.witness = witness
+
+
+class RecoveryError(MeshError):
+    """Boundary recovery failed (a cavity without a filling, the depth limit)."""
+
+    kind = "RecoveryFail"
+
+
+class RoundingError(MeshError):
+    """Rounding to doubles made points equal or tetrahedra that flips cannot repair."""
+
+    kind = "RoundingFail"
 
 
 def _sub(a, b):

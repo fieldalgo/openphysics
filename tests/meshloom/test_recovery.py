@@ -488,7 +488,15 @@ def test_parity_refuses_surfaces_that_are_not_closed():
     # three stacked cells of different materials: interface edges have three facets
     pts, facets = voxel_plc({(0, 0, 0): "a", (0, 0, 1): "b", (0, 0, 2): "c"})
     assert len(mesh_plc(pts, facets)["region_names"]) == 3
-    with pytest.raises(ValueError, match="parity"):
+    from meshloom._core import NotClosed
+    with pytest.raises(NotClosed) as e:
         mesh_plc(pts, facets, domain="parity")
+    w = e.value.witness
+    assert w["type"] == 6 and len(w["facets"]) % 2 == 1 and e.value.kind == "NotClosed"
+    # the witness: the segment's endpoints are input points of every facet it names
+    u, v = w["segment"]
+    for f in w["facets"]:
+        loop = facets[f][0]
+        assert u in loop and v in loop
     with pytest.raises(ValueError, match="domain"):
         mesh_plc(pts, facets, domain="inside")

@@ -7,9 +7,10 @@
 overlapping) and n-gon prisms ("cylinders"), some with a 1-ulp jitter on vertices. Each
 case is meshed with ``mesh_plc`` in a child process; a case that makes no progress for
 60 s is a hang. Every outcome must be either a mesh that passes V1 (exact orient3d > 0
-on the doubles) and the V2 contract checks, or a typed error (``ValueError`` and its
-subclasses, such as ``InvalidPLC``, or ``RuntimeError`` for the documented depth
-limit). Panics, other exceptions and hangs fail. ``MESHLOOM_FUZZ_OFFSET`` shifts the
+on the doubles) and the V2 contract checks, or a typed error (``InvalidPLC``, a
+``MeshError`` such as ``NotClosed``, or ``RuntimeError`` for the documented depth
+limit). Odd seeds mesh the even-odd domain (``domain="parity"``), even seeds every
+region. Panics, other exceptions and hangs fail. ``MESHLOOM_FUZZ_OFFSET`` shifts the
 seeds; outside CI, ``MESHLOOM_FUZZ_CASES`` raises the count.
 """
 
@@ -106,13 +107,14 @@ def valid(m):
 
 def run_child(seeds):
     """Child process: one JSON line per case."""
-    from meshloom._core import mesh_plc
+    from meshloom._core import InvalidPLC, MeshError, mesh_plc
     for s in seeds:
         pts, facets = case(s)
+        domain = "parity" if s % 2 else "regions"  # odd seeds: the even-odd domain of C14
         try:
-            m = mesh_plc(pts, facets)
+            m = mesh_plc(pts, facets, domain=domain)
             out = {"seed": s, "outcome": "mesh", "invalid": valid(m), "regions": len(m["region_names"])}
-        except (ValueError, RuntimeError) as e:
+        except (InvalidPLC, MeshError, RuntimeError) as e:
             out = {"seed": s, "outcome": "typed", "type": type(e).__name__, "msg": str(e)[:200]}
         except BaseException as e:  # panics (pyo3 PanicException) and anything else
             out = {"seed": s, "outcome": "untyped", "type": type(e).__name__, "msg": str(e)[:200]}

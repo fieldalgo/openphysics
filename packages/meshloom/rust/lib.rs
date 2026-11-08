@@ -413,11 +413,18 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
         .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
         .collect::<PyResult<_>>()?;
     let plc = plc::Plc { points, segments, facets };
-    let (m, b) = py.detach(move || -> Result<_, String> {
-        let b = facetrec::recover_boundary(&plc, max_depth)?;
-        let m = mesh::build(&plc.points, &b, domain)?;
+    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "Internal", message, ids)
+    let (m, b) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
+        let b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+        let m = mesh::build(&plc.points, &b, domain).map_err(|e| match &e {
+            mesh::MeshError::NotClosed { segment, facets } => {
+                ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
+            }
+            mesh::MeshError::Rounding(_) => ("RoundingFail", e.to_string(), vec![]),
+            mesh::MeshError::Internal(_) => ("Internal", e.to_string(), vec![]),
+        })?;
         Ok((m, b.stats))
-    }).map_err(PyValueError::new_err)?;
+    }).map_err(|(kind, msg, ids)| PyValueError::new_err((kind, msg, ids)))?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
             for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
