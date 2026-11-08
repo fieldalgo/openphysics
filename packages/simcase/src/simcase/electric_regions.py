@@ -45,6 +45,14 @@ def refuse_region_joule(data):
                                 f'{PHYSICS} only; a Joule document takes the rectangle form')
 
 
+def _neutral(call, *args):
+    """Run a region heat check on an electric document: its key refusals say "thermal keys"."""
+    try:
+        return call(*args)
+    except DocumentError as exc:
+        raise DocumentError(str(exc).replace('unsupported thermal keys', 'unsupported keys')) from None
+
+
 def validate_region_electric(doc):
     d = doc.data
     _object(d, {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'},
@@ -71,9 +79,9 @@ def validate_region_electric(doc):
         raise DocumentError(f'{PHYSICS}: an axisymmetric component is not supported for electric conduction '
                             '(galerkin.electric has no axisymmetric measure)')
     region_geometry(doc, 'electric')
-    region_materials_table(doc, ('electrical_conductivity_s_m',), 'steady electric conduction')
-    _boundary_data(p, path, boundary_names(doc))
-    region_mesh_settings(doc)
+    _neutral(region_materials_table, doc, ('electrical_conductivity_s_m',), 'steady electric conduction')
+    _neutral(_boundary_data, p, path, boundary_names(doc))
+    _neutral(region_mesh_settings, doc)
     if d['study'] != {'type': 'single'}:
         raise DocumentError(f'{PHYSICS} supports only study {{"type":"single"}}')
     _object(d['results'], {'save_fields', 'plots'}, 'results')
@@ -103,10 +111,6 @@ def _boundary_data(p, path, names):
     if not bc:
         raise DocumentError(f'{path}.dirichlet_potential_v: at least one boundary potential is required; '
                             'gauge-only inputs are unsupported')
-    for a in ('left', 'right'):
-        for b in ('bottom', 'top'):
-            if a in bc and b in bc and bc[a] != bc[b]:
-                raise DocumentError(f'{path}.dirichlet_potential_v: conflicting potentials at the {a}/{b} corner')
     if set(bc) & set(p.get('outward_current_a_m2', {})):
         raise DocumentError(f'{path}: a current condition overlaps a fixed potential on the same boundary')
 
@@ -141,35 +145,69 @@ def region_inputs(doc, mesh, region_materials):
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
                                     'borders a void feature only, or a selection without mesh edges)')
+    def edge_set(edges):
+        return {tuple(sorted(map(int, e))) for e in np.asarray(edges).reshape(-1, 2)}
+    selected = getattr(mesh, 'selection_edges', None) or {}
+    potentials = p['dirichlet_potential_v']
+    held = {tag: edge_set(mesh.boundary_edges[tag] if tag in mesh.boundary_edges else selected.get(tag, []))
+            for tag in potentials}
+    names = sorted(potentials)
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if held[a] & held[b]:
+                raise DocumentError(f'{path}.dirichlet_potential_v: {a!r} and {b!r} share mesh edges; give that '
+                                    'boundary one entry')
+    # a node two boundaries fix (where they meet) counts for the first name in name order, so the
+    # attribution does not depend on the key order of the document
     fixed, fixed_by = {}, {}
-    for tag, value in p['dirichlet_potential_v'].items():
+    for tag in names:
+        value = float(potentials[tag])
         for node in map(int, mesh.boundary[tag]):
-            if node in fixed and fixed[node] != float(value):
+            if node in fixed and fixed[node] != value:
                 raise DocumentError(f'{path}.dirichlet_potential_v: {fixed_by[node]!r} and {tag!r} share node {node} '
                                     'with different potentials')
-            fixed[node] = float(value)
+            fixed[node] = value
             fixed_by.setdefault(node, tag)
     current = {tag: float(v) for tag, v in p.get('outward_current_a_m2', {}).items()}
-    edges = {tag: {tuple(sorted(map(int, e))) for e in np.asarray(mesh.boundary_edges[tag]).reshape(-1, 2)}
-             for tag in current}
+    edges = {tag: edge_set(mesh.boundary_edges[tag]) for tag in current}
     names = sorted(edges)
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             if edges[a] & edges[b]:
                 raise DocumentError(f'{path}.outward_current_a_m2: {a!r} and {b!r} share mesh edges; give that '
                                     'boundary one entry')
-    selected = getattr(mesh, 'selection_edges', None) or {}
-    for b in p['dirichlet_potential_v']:
-        held = mesh.boundary_edges.get(b, selected.get(b))
-        if held is None:
-            continue
-        held = {tuple(sorted(map(int, e))) for e in np.asarray(held).reshape(-1, 2)}
-        for a, e in edges.items():
-            if a != b and e & held:
-                raise DocumentError(f'{path}.outward_current_a_m2.{a}: {a!r} shares mesh edges with the fixed '
-                                    f'potential {b!r}; a current condition does not apply on a fixed edge')
+    for a, e in edges.items():
+        # an edge whose two nodes are fixed, by one boundary or by two, takes no current
+        both = sorted({fixed_by[u] for edge in e if edge[0] in fixed and edge[1] in fixed for u in edge})
+        if both:
+            raise DocumentError(f'{path}.outward_current_a_m2.{a}: {a!r} has mesh edges whose nodes are fixed by '
+                                f'{both}; a current condition does not apply on a fixed edge')
+    _refuse_floating_parts(mesh, fixed, path)
     return (dict(conductivity=conductivity, dirichlet=dict(sorted(fixed.items())), outward_current=current),
             fixed_by)
+
+
+def _refuse_floating_parts(mesh, fixed, path):
+    """Every connected part of the conductor needs a fixed potential; a document cannot set the
+    reference potential that a floating part would need."""
+    t = np.asarray(mesh.triangles)
+    parent = np.arange(len(mesh.nodes))
+
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    for a, b, c in t:
+        for u, v in ((a, b), (b, c)):
+            ru, rv = root(int(u)), root(int(v))
+            if ru != rv:
+                parent[ru] = rv
+    anchored = {root(n) for n in fixed}
+    floating = sorted({mesh.region_names[int(r)] for tri, r in zip(t, mesh.regions) if root(int(tri[0])) not in anchored})
+    if floating:
+        raise DocumentError(f'{path}.dirichlet_potential_v: a conductor part with regions {floating} touches no '
+                            'fixed potential (it is surrounded by void); give one of its boundaries a potential')
 
 
 def run_region_electric(doc, verbose=True, *, mesh_limits=None):
@@ -220,8 +258,8 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     add('dirichlet_potential_v', list(fixed.values()), 'V', 'electric_dirichlet_nodes')
     free = np.setdiff1d(np.arange(mesh.num_nodes), list(fixed))
     reaction = np.asarray(electric.reaction)
-    # current leaving through each fixed boundary, A/m of depth; a node that two boundaries fix
-    # (a corner) counts for the first boundary listed in the document
+    # current injected into the conductor through each fixed boundary (positive in), A/m of
+    # depth; a node two boundaries fix counts for the first of them in name order
     terminal = {tag: float(sum(reaction[n] for n, by in fixed_by.items() if by == tag))
                 for tag in p['dirichlet_potential_v']}
     diagnostics = dict(

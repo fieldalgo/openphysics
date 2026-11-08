@@ -407,7 +407,7 @@ def test_c8_limits_refuse_documents_without_regions(monkeypatch, name):
     forbid(monkeypatch, meshine, 'generate')
     forbid_solvers(monkeypatch)
     for limit in ('max_nodes', 'max_triangles', 'max_input_vertices'):
-        with pytest.raises(ValueError, match='mesh limits apply only to thermal region documents'):
+        with pytest.raises(ValueError, match='mesh limits apply only to region documents'):
             run(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), verbose=False, **{limit: 10 ** 6})
     with pytest.raises(ValueError, match='expected a steady or transient heat region document'):
         check_mesh_limits(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), max_input_vertices=10 ** 6)
@@ -619,5 +619,5 @@ def test_port_limits_reach_a_runner_only_through_its_kind(monkeypatch, accepts):
         assert run(doc, verbose=False, max_nodes=7, max_input_vertices=9).kwargs == {
             'verbose': False, 'mesh_limits': _MeshLimits(max_nodes=7, max_input_vertices=9)}
     else:
-        with pytest.raises(ValueError, match='mesh limits apply only to thermal region documents'):
+        with pytest.raises(ValueError, match='mesh limits apply only to region documents'):
             run(doc, verbose=False, max_nodes=7)

@@ -74,8 +74,10 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 - 결과 형식은 `electric.steady2d-regions-result-v1`, 필드 layout은 `electric2d-p1-node-cell-regions-v1`이다.
 - 필드는 직사각형 필드에 `triangle_regions`를 더한 것이다.
 - 요약에는 `region_names`, `region_materials`, `region_conductivity_s_m`, `diagnostics.terminal_reaction_current_a_per_m`이 들어간다.
-  - 마지막 값은 고정된 경계마다 나가는 전류이며 단위는 깊이 1 m당 A다.
-  - 두 경계가 함께 고정한 절점은 먼저 적힌 경계에 센다.
+  - 마지막 값은 고정된 경계마다 도체로 들어가는 전류이며(들어가는 쪽이 양수) 단위는 깊이 1 m당 A다.
+  - 두 경계가 함께 고정한 절점은 이름 순서로 먼저인 경계에 센다.
+- 같은 메시 변에 전위 이름 둘을 주거나, 고정 전위가 하나도 없는 도체 부분이 있으면 이름을 밝혀 거부한다.
+- 영역 결과도 직사각형 결과처럼 VTU로 내보내며, 셀 데이터 `triangle_regions`가 더해진다.
 
 `joule.steady2d`와 `joule.temperature2d`는 직사각형 형식을 유지하며, 영역 형상은 이름을 밝혀 거부한다.
 

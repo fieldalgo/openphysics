@@ -17,7 +17,7 @@ region run meshes before anything is solved::
 
 Every check runs before the solve and raises ``MeshLimitError``. A limit left at None is
 not checked, and with no limit the run is exactly the unlimited one. The limits apply to
-steady and transient heat region documents only. See
+steady and transient heat region documents and region electric conduction documents only. See
 docs/packages/simcase/thermal_regions2d.md, "Mesh limits for callers".
 """
 from __future__ import annotations
@@ -89,7 +89,8 @@ def _mesh_limits(max_nodes=None, max_triangles=None, max_input_vertices=None) ->
 
 def _is_region_document(data) -> bool:
     """A document whose physics kind takes mesh limits for it (the registry's
-    ``PhysicsKind.accepts_mesh_limits``): a steady or transient heat region document."""
+    ``PhysicsKind.accepts_mesh_limits``): a steady or transient heat region document or a region
+    electric conduction document."""
     from .registry import kind_of
     accepts = kind_of(data).accepts_mesh_limits
     return accepts is not None and bool(accepts(data))
