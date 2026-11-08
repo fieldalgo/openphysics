@@ -136,6 +136,10 @@ python -m pip install -r tools/requirements-py312-windows-thermal.txt
 python -X utf8 tools/check_platform_install.py
 ```
 
+마지막 단계인 설치된 Studio 작업 공간 브라우저 점검에는 `PATH`에 Node 22 이상과 미리 설치된
+Chrome, Chromium 또는 Edge가 필요합니다(흔한 위치에서 찾거나 `CHROME_PATH`로 지정). 없으면
+건너뛰지 않고 실패합니다.
+
 requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이 아닙니다.
 
 ## CI가 돌리는 것
@@ -215,14 +219,17 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 영역 VTU/PVD 소비자 시험(`tests/simcase/test_export_regions.py`)을 확인합니다.
 복사해 실행하는 wheel 소비자는 `test_thermal_simcase_wheel.py`,
 `test_electric_joule_wheel.py`, `test_transient_thermomechanical_wheel.py`,
-`test_cavity_wheel.py`(Studio 검사는 제외: 이식 가능한 고정 버전 목록은 Studio extra를
-설치하지 않습니다), `test_sipi_wheel.py`(스트립라인·마이크로스트립·JSON 문서·DC 평면을
+`test_cavity_wheel.py`(Studio 검사는 `check_distributions.py`에서 돌리므로 제외),
+`test_sipi_wheel.py`(스트립라인·마이크로스트립·JSON 문서·DC 평면을
 거친 메시에서 Cohn, Hammerstad–Jensen, 정확한 저항과 명시한 허용치로 비교)와
 `test_vector_modes_wheel.py`(완전 벡터 슬래브 모드를 `refsol.slab`과, PML 누설 슬래브를
 외향 근 분산식과 비교하고, `vector_slab` 예제를 PML 유무로 `simcase` CLI에서 실행)입니다.
 나머지 `test_*_wheel.py` 소비자는 배포 검사에서 Linux에서만 돕니다. 2026-11-02에 추가한
 소비자 세 개는 Linux에서 확인했으며, macOS와 Windows의 첫 실행은 CI 작업 자체입니다.
 설치 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
+Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스와 같은 버전)도 설치하고,
+러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
+설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

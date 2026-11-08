@@ -145,7 +145,10 @@ python -m pip install -r tools/requirements-py312-windows-thermal.txt
 python -X utf8 tools/check_platform_install.py
 ```
 
-The requirements file's historical name does not limit it to Windows.
+The requirements file's historical name does not limit it to Windows. Its last step,
+the installed Studio workspace browser check, needs Node 22 or newer on `PATH` and a
+preinstalled Chrome, Chromium or Edge (found in the usual places, or named by
+`CHROME_PATH`); without them the check fails rather than skips.
 
 ## What CI runs
 
@@ -244,8 +247,8 @@ simultaneous writers, existing targets) and two source target-protection
 fixtures, plus region VTU/PVD export consumers (the export extra is installed).
 The wheel consumers it copies and runs are `test_thermal_simcase_wheel.py`,
 `test_electric_joule_wheel.py`, `test_transient_thermomechanical_wheel.py`,
-`test_cavity_wheel.py` (without its Studio check: the portable pins do not
-install the Studio extra), `test_sipi_wheel.py` (stripline, microstrip, JSON
+`test_cavity_wheel.py` (without its Studio check, which runs in
+`check_distributions.py`), `test_sipi_wheel.py` (stripline, microstrip, JSON
 document and DC plane against Cohn, Hammerstad–Jensen and exact resistances on
 coarse meshes with stated bounds) and `test_vector_modes_wheel.py` (full-vector
 slab modes against `refsol.slab`, a PML leaky slab against its outgoing-root
@@ -254,6 +257,10 @@ the `simcase` CLI). The other `test_*_wheel.py` consumers run on Linux only, in
 the distribution check. The three consumers added on 2026-11-02 were verified
 on Linux; their first macOS and Windows runs are the CI jobs themselves.
 This is installed acceptance, not a full macOS or Windows regression.
+It also installs the Studio extra's pins (`tools/requirements-py312-studio.txt`, the
+Linux versions) and runs the installed workspace in the runner's browser
+(`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
+session, a server restart with the page open and recovery from the start page.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

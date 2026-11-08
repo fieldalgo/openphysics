@@ -26,8 +26,8 @@ python3.12 -m venv ../op-build
 ## 2. 설치
 
 [python.org](https://www.python.org/downloads/)의 Python 3.12 이상이 필요합니다(macOS는
-`brew install python@3.12`도 됩니다). 버전 확인을 먼저 하는 이유는, 낮은 Python이면 빈 `0.0.1`
-패키지를 조용히 설치하기 때문입니다.
+`brew install python@3.12`도 됩니다). 버전 확인을 먼저 하는 이유는, 낮은 Python이면
+분명한 메시지로 멈추게 하기 위해서입니다. pip도 그 Python에서는 고정한 버전을 거부합니다.
 
 Linux와 macOS:
 

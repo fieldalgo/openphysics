@@ -27,8 +27,8 @@ Copy the `wheelhouse` folder to your home folder.
 ## 2. Install
 
 You need Python 3.12 or newer from [python.org](https://www.python.org/downloads/)
-(on macOS also `brew install python@3.12`). The version check comes first because an
-older Python would quietly install the empty `0.0.1` package instead.
+(on macOS also `brew install python@3.12`). The version check comes first so that an
+older Python stops with a clear message; pip would refuse the pinned version on it.
 
 Linux and macOS:
 
