@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenPhysics Studio · Geometry lab</title>
+<link rel="stylesheet" href="/geometry-lab-assets/geometry-lab.css"></head>
+<body>
+<header><strong>OpenPhysics <span>Studio</span></strong><span>Geometry lab</span><span class="badge">EXPERIMENTAL</span></header>
+<div class="actions">
+ <label>Start from <select id="starter"><option value="">Choose…</option><option value="geometry_v1_soi_strip">SOI strip (example)</option><option value="geometry_v1_imprint_rib">Imprinted rib (example)</option><option value="new">New document</option></select></label>
+ <button id="open-file">Open file</button><input id="file" type="file" accept=".json,application/json" hidden>
+ <button id="save-file" disabled>Save JSON</button>
+ <label>Component <select id="component" disabled></select></label>
+ <span id="status" role="status">Open or create a version 1 geometry document.</span>
+</div>
+<p class="note">Experimental: works on version 1 geometry documents through the exact 2D engine. The document stays in this page; nothing is stored on the server. It runs no physics.</p>
+<section id="refusal" role="alert" hidden></section>
+<main>
+ <aside id="parameters"><h2>Parameters</h2><p class="muted" id="no-parameters">No parameters.</p><div id="parameter-rows"></div></aside>
+ <section class="drawing"><svg id="view" viewBox="0 0 800 560" role="img" aria-label="Region complex"></svg><div id="unit" class="muted"></div></section>
+ <aside id="lists">
+  <h2>Regions</h2><ul id="regions"></ul>
+  <h2>Selections</h2><ul id="selections"></ul>
+  <h2>Boundary tags</h2><ul id="tags"></ul>
+  <h2>Engine listing</h2><pre id="summary"></pre>
+ </aside>
+</main>
+<footer><a href="/">Classic Studio</a></footer>
+<script type="module" src="/geometry-lab-assets/geometry-lab-app.mjs"></script>
+</body></html>

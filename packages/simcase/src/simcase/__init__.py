@@ -27,7 +27,8 @@ __version__ = "0.0.2"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
            "run", "RunResult", "ElectricJouleRunResult", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
-           "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area_m2"]
+           "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area_m2",
+           "GeometryError", "parse_geometry", "evaluate_geometry"]
 
 
 _loading = False
@@ -67,6 +68,8 @@ def _import_runner() -> None:
     from .tracking import ModeTrackingError
     from .physics_pml_modes import ModeSelectionError
     from .units import unit_vocabulary
+    from .geometry_document import GeometryError, parse as parse_geometry
+    from .geometry_engine import evaluate as evaluate_geometry
     names = dict(locals())
     globals().update({k: names[k] for k in __all__ if k != "__version__"})
 

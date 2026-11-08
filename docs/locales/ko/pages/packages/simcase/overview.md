@@ -341,6 +341,8 @@ Studio endpoint는 FastAPI test client로 검사하며, n_eff가 슬랩 참조�
 
 같은 서버의 `/workspace`에서 [실험적 모델 작업공간](workspace.md)을 사용할 수 있습니다. 네이티브 JavaScript 모듈과 별도 지원 범위 계약을 사용하며, 기존 광학·열 편집기도 유지됩니다.
 
+`/geometry-lab`의 실험적 [형상 실험실](geometry_lab.md)은 버전 1 형상 문서의 파라미터를 편집하고 정확 엔진의 영역 복합체를 그립니다. 별도 페이지이며 물리 계산은 하지 않습니다.
+
 ## 전체 구성에서의 위치
 
 ```

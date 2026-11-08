@@ -46,7 +46,9 @@ domain, namer, materials = rc.to_domain(size)   # the meshine hand-off, size in 
 of a version 1 document (cells, curves with provenance and tags, selections)
 as a diagnostic; it reads the geometry block without the physics validation of
 `Document.load`, so void, merged, `path` and multi-component documents are
-shown too. It is not a persisted format.
+shown too. It is not a persisted format. The experimental Studio
+[geometry lab](geometry_lab.md) draws the same complex and re-evaluates it as
+parameters change.
 
 - A `Cell` is one face. A region that later features cut into pieces, or that
   `region` merges from several features, has several cells with the same
