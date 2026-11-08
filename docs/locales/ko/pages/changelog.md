@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: 로컬 Studio 서버가 같은 브라우저의 다른 웹 페이지를 거부합니다. `Host`가 `127.0.0.1`, `localhost`, `::1`, 명시한 `--host`, 또는 연결의 주소와 포트가 아니면 403입니다(DNS 재바인딩). 상태를 바꾸는 요청의 `Origin`이 다른 origin이면(없을 때는 다른 origin의 `Referer`나 `Sec-Fetch-Site: cross-site`/`same-site`이면) 403이고, 이 헤더를 하나도 보내지 않는 클라이언트는 그대로입니다. 광학 경로는 1 MiB 이하의 `application/json`만 받고(415/413, 본문을 되돌려 보내지 않음), 광학 작업은 동시에 4개까지(429) 실행하며 끝난 작업은 최근 16개만 남깁니다. 작업 상태에 traceback을 더는 넣지 않습니다. 응답에 고전 화면과 `/workspace`가 만족하는 Content-Security-Policy가 붙고(서버 스크립트와 해시된 인라인 블록 하나, 프레임 삽입 금지), 고전 편집기는 마크업으로 쓰는 문서 글자를 이스케이프하며, `/docs`·`/redoc`(CDN Swagger UI)은 꺼졌고, loopback이 아닌 `--host`는 경고합니다. 검사는 `tests/simcase/test_studio_security.py`. [문서](security.md#브라우저-studio).
 - 모든 배포판의 버전을 0.1.0 대신 0.0.2로 바꿨습니다. 첫 PyPI 릴리스에 계획한 버전입니다(사용자 결정, 2026-11-08). 우리 배포판 사이의 의존성은 `>=0.0.2,<0.1`입니다. 아직 아무것도 게시하지 않았습니다.
 - 문서: 작업 공간 빠른 시작(영·한). wheelhouse 만들기, Linux·macOS·Windows에서 Python 확인과 `==0.0.2` 고정 설치, Studio 켜고 끄기, 설계 두 개와 비교, 재시작 뒤 작업 이어가기. Linux에서 확인했고 macOS와 Windows는 아직 확인하지 않았습니다.
 - 문서: `openphysics` 패키지 페이지가 0.0.2가 아직 PyPI에 없다는 것(빈 `0.0.1` 예약만 있음)을 밝히고, 소스 설치를 안내하며 wheel 설치에 `==0.0.2` 고정을 권합니다.
