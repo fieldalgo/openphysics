@@ -384,7 +384,7 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
-For heat region documents, `run` also takes optional mesh limits
+For heat region documents and region electric conduction documents, `run` also takes optional mesh limits
 (`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
 counts the loop vertices a document passes to the mesher without meshing it.
 Both raise `MeshLimitError`. `region_complexity` counts shapes, circles,

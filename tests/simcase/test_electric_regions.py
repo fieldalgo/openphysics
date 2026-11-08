@@ -185,3 +185,57 @@ def test_mesh_limits_reach_a_region_electric_document():
     assert registry.kind_of(raw).accepts_mesh_limits(raw)
     with pytest.raises(MeshLimitError):
         run(Document.from_dict(raw), verbose=False, max_triangles=100)
+
+
+def test_a_conductor_part_with_no_fixed_potential_is_refused_by_name():
+    ring = {"name": "ring", "type": "circle", "cx": 1.0, "cy": 0.5, "r": 0.4, "material": None}
+    island = {"name": "island", "type": "circle", "cx": 1.0, "cy": 0.5, "r": 0.2, "material": "B"}
+    raw = strip([ring, island], {"dirichlet_potential_v": {"left": 1.0, "right": 0.0}}, size=0.1)
+    with pytest.raises(DocumentError, match=r"conductor part with regions \['island'\] touches no fixed potential"):
+        run(Document.from_dict(raw), verbose=False)
+
+
+def test_two_potential_names_on_the_same_edges_are_refused_and_attribution_ignores_key_order():
+    hole = {"name": "hole", "type": "circle", "cx": 1.0, "cy": 0.5, "r": 0.3, "material": None}
+    raw = strip([hole], {"dirichlet_potential_v": {"outer": 1.0, "left": 0.0, "hb": 1.0}}, size=0.1,
+                selections={"hb": {"boundary": {"of": "hole"}}})
+    with pytest.raises(DocumentError, match="'hb' and 'outer' share mesh edges"):
+        run(Document.from_dict(raw), verbose=False)
+    # one name per boundary; reversing the key order gives the same terminal currents
+    forward = strip([hole], {"dirichlet_potential_v": {"outer": 1.0, "left": 0.0, "right": 0.0}}, size=0.1)
+    backward = strip([hole], {"dirichlet_potential_v": {"right": 0.0, "left": 0.0, "outer": 1.0}}, size=0.1)
+    a = run(Document.from_dict(forward), verbose=False).summary()["diagnostics"]["terminal_reaction_current_a_per_m"]
+    b = run(Document.from_dict(backward), verbose=False).summary()["diagnostics"]["terminal_reaction_current_a_per_m"]
+    assert a == b
+    # positive in: the 1 V hole wall injects current, the grounded sides take it out
+    assert a["outer"] > 0 and a["left"] < 0 and a["right"] < 0
+    assert abs(a["outer"] + a["left"] + a["right"]) <= 1e-12 * a["outer"]
+
+
+def test_a_current_on_edges_whose_nodes_are_fixed_is_refused_by_name():
+    notch = {"name": "notch", "type": "rect", "x": 1.9, "y": 0.9, "w": 0.1, "h": 0.1, "material": None}
+    raw = strip([notch], {"dirichlet_potential_v": {"wall": 0.0, "right": 0.0, "left": 1.0},
+                          "outward_current_a_m2": {"ledge": 1.0}}, size=0.25,
+                selections={"wall": {"boundary": "notch.left"}, "ledge": {"boundary": "notch.bottom"}})
+    with pytest.raises(DocumentError, match="'ledge' has mesh edges whose nodes are fixed by"):
+        run(Document.from_dict(raw), verbose=False)
+
+
+def test_electric_key_refusals_do_not_say_thermal():
+    raw = strip([RIGHT_HALF], {"dirichlet_potential_v": {"left": 1.0, "nowhere": 0.0}})
+    with pytest.raises(DocumentError) as error:
+        Document.from_dict(raw)
+    assert "unsupported keys ['nowhere']" in str(error.value) and "thermal" not in str(error.value)
+
+
+def test_a_region_result_exports_to_vtu_with_region_ids(tmp_path):
+    meshio = pytest.importorskip("meshio")
+    from simcase.export import SUPPORTED_LAYOUTS, export_fields
+    assert SUPPORTED_LAYOUTS[-1] == "electric2d-p1-node-cell-regions-v1"
+    result = run(Document.from_dict(strip([RIGHT_HALF], {"dirichlet_potential_v": {"left": 1.0, "right": 0.0}})),
+                 verbose=False)
+    result.save(tmp_path / "out")
+    vtu = export_fields(tmp_path / "out" / "fields.npz", tmp_path / "out" / "fields.vtu")
+    mesh = meshio.read(vtu)
+    np.testing.assert_array_equal(mesh.point_data["potential_v"], result.fields["potential_v"])
+    np.testing.assert_array_equal(mesh.cell_data["triangle_regions"][0], result.fields["triangle_regions"])

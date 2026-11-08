@@ -215,7 +215,7 @@ def test_g7_5_the_transient_result_keeps_its_own_identifiers_and_full_revolution
     # the saved history exports to VTU and PVD with (r, z) points, the _w rates and the region ids
     meshio = pytest.importorskip("meshio")
     from simcase.export import SUPPORTED_LAYOUTS, export_fields, export_time_series
-    assert SUPPORTED_LAYOUTS[-1] == "thermal-axisymmetric-transient-p1-node-cell-regions-v1"
+    assert SUPPORTED_LAYOUTS[13] == "thermal-axisymmetric-transient-p1-node-cell-regions-v1"   # later layouts go after it
     vtu = export_fields(tmp_path / "out" / "fields.npz", tmp_path / "out" / "last.vtu", time_index=-1)
     mesh = meshio.read(vtu)
     np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])

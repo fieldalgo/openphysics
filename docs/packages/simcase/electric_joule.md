@@ -86,9 +86,11 @@ material, or 0.2 `shapes`) uses the geometry, mesh and boundary names of
 The result format is `electric.steady2d-regions-result-v1` with field layout
 `electric2d-p1-node-cell-regions-v1`: the rectangle fields plus `triangle_regions`,
 and in the summary `region_names`, `region_materials`, `region_conductivity_s_m` and
-`diagnostics.terminal_reaction_current_a_per_m`, the current leaving through each fixed
-boundary in A per metre of depth (a node fixed by two boundaries counts for the first
-one listed). `joule.steady2d` and `joule.temperature2d` keep the rectangle form and
+`diagnostics.terminal_reaction_current_a_per_m`, the current injected into the conductor
+through each fixed boundary in A per metre of depth (positive in; a node fixed by two
+boundaries counts for the first in name order). Two potential names on the same mesh edges
+and a conductor part with no fixed potential are refused by name. A region result exports to
+VTU like the rectangle one, plus the cell data `triangle_regions`. `joule.steady2d` and `joule.temperature2d` keep the rectangle form and
 refuse region geometry by name.
 
 Independent checks (`tests/simcase/test_electric_regions.py`, pre-registered E1 to E7):
