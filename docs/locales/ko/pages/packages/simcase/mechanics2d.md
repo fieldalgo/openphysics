@@ -163,8 +163,10 @@ NumPy 2.5.4, SciPy 1.18.1(2026-11-02) 측정값이다.
 
 **재료.** 쓰인 재료마다 `young_modulus_pa`(> 0)와 `poisson_ratio`(−1 < ν < 0.5)가 있어야 한다.
 열탄성 문서는 `thermal_expansion_per_k`(유한, 부호 있음)와 영역 열 키 `conductivity_w_mk`(> 0)도
-필요하다. galerkin 인자 이름(`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`)에 문서의
-SI 접미사를 붙인 것으로, 직사각형 physics 키와 같다. `materials` 표는 다른 영역 물리와 공유하며,
+필요하다. α는 선팽창 계수다. galerkin 인자 이름(`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`)에
+문서의 SI 접미사를 붙인 것으로, E·ν·α는 직사각형 physics 키와 같다. 전도도 키는 영역 열의
+`conductivity_w_mk`이며 직사각형 열탄성 physics 키 `thermal_conductivity_w_mk`가 아니다. 표에 그 이름을
+쓰면 `conductivity_w_mk`를 쓰라고 알려 주며 거부한다. `materials` 표는 다른 영역 물리와 공유하며,
 각 물리는 필요한 키를 읽고 있는 키는 모두 검사한다. 내장 광학 재료에서 성질을 가져오지 않는다.
 `physics`의 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`,
 `thermal_conductivity_w_mk`, `conductivity_w_mk`는 이름을 밝혀 거부한다.
@@ -201,7 +203,8 @@ SI 접미사를 붙인 것으로, 직사각형 physics 키와 같다. `materials
 [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한))은 영역 문서에 적용되며, 직사각형
 문서는 거부한다.
 
-**실행과 결과.** 실행기는 영역을 한 번 메시하고(영역 열처럼 meshine, 미터 단위) E·ν·α를 영역 이름으로
+**실행과 결과.** 실행기는 영역 열처럼 영역을 한 번 메시하고(문서의 마이크로미터 사본을 meshine으로 메시한 뒤 절점을 한 번
+미터로 바꿈) E·ν·α를 영역 이름으로
 대응시켜 `solve_elasticity`를, 또는 영역별 전도도로 `solve_steady_heat`, `freeze_temperature`,
 `solve_thermoelasticity`를 부른다. 결과 ID는 `mechanics.elasticity2d-regions-result-v1`(배치
 `mechanics2d-p1-regions-v1`)과 `mechanics.thermoelastic2d-regions-result-v1`(배치
@@ -209,7 +212,13 @@ SI 접미사를 붙인 것으로, 직사각형 physics 키와 같다. `materials
 번호, `int64`)를 더한 것이다. 요약은 스칼라 재료 항목 대신 `region_names`(`triangle_regions`의 번호
 순서), `regions`(영역마다 재료, 삼각형 수, 메시 면적 m²), `materials` 표, 경계 데이터(`displacement_m`,
 `traction_pa`, `pressure_pa`와 그 부호, 열탄성은 열 데이터), 메시(절점, 삼각형, 크기, 요청·달성 최소각)를
-담는다. 진단, 단위, 저장, 내보내기는 직사각형 결과와 같다.
+담는다. 진단, 단위, 저장은 직사각형 결과와 같다. `simcase.export`는 두 영역 배치를 아직 받지 않는다(지원하지 않는 필드
+배치로 거부).
+
+`units.length`를 따르는 것은 길이(형상, `mesh.size`)뿐이고, SI 접미사가 붙은 값은 길이 단위와 상관없이 SI다.
+같은 문서를 m, mm, µm, nm로 쓰면 저장 배열이 비트까지 같다(같은 파일의 회귀 시험; 2026-11-08 독립 단위
+검토가 측정, 사전 등록 아님). 저장 좌표는 마이크로미터 메시에 1e-6을 곱한 값이라 끝자리가 어긋날 수 있다
+(0.1 m가 0.09999999999999999로 읽힘). 절점은 허용오차로 고른다.
 
 **검증**(`tests/simcase/test_mechanics_regions.py`; R0–R7은 2026-11-08 코드 전에 HQ 작업 기록에
 사전 등록했고 같은 날 Linux, Python 3.12, 고정 환경에서 측정):

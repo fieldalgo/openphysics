@@ -75,7 +75,10 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   the domain or another shape from outside) are not meshed.
 - `materials`: `{material name: {...}}` with `conductivity_w_mk` > 0 (required
   for every material used), optional `volumetric_heat_capacity_j_m3k` > 0 (not
-  used by steady heat) and an optional `source` note. Thermal properties are
+  used by steady heat) and an optional `source` note. The table is shared with region
+  mechanics, so `young_modulus_pa`, `poisson_ratio` and `thermal_expansion_per_k` are
+  accepted and checked when present (not used by heat;
+  [mechanics](mechanics2d.md#material-regions-and-named-boundaries)). Thermal properties are
   never taken from built-in optical materials; every used material must be
   defined here. Unused materials are allowed.
 - `physics.<name>`: `type`, `heat_source_w_m3` (one number, or `{region name:
