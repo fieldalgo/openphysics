@@ -121,7 +121,8 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 | `fonttools`, `pyparsing`, `six` | matplotlib | MIT | |
 | `pillow` | matplotlib | MIT-CMU | Bundles image, font and compression libraries under permissive terms (FreeType: FTL OR GPL-2.0-or-later, used under the FTL): shared libraries on Linux and macOS, statically linked on Windows |
 | `packaging` | matplotlib | Apache-2.0 OR BSD-2-Clause | |
-| `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | |
+| `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | From 4.0.0 the metadata declares only BSD-3-Clause; the LICENSE file still grants both, so the inventory keeps both (`metadata_spdx`) |
+| `tzdata` | python-dateutil (from 4.0.0) | Apache-2.0 | Time zone data files only |
 | `array-api-compat` | galerkin (`>=1.15`) | MIT | Pure Python; lets one implementation run on NumPy, JAX and PyTorch arrays (`galerkin.core.backend`) |
 
 ### Optional extras
@@ -304,7 +305,9 @@ The check reads installed metadata and each distribution's RECORD file list with
 
 - an installed distribution has no reviewed entry in the inventory;
 - installed metadata declares a different SPDX expression, or mentions a
-  copyleft license the entry does not record (unless the entry explains why);
+  copyleft license the entry does not record (unless the entry explains why). A
+  narrower declaration recorded as the entry's reviewed `metadata_spdx` passes
+  only when the entry's expression has no OR and records every declared license;
 - a runtime or optional dependency of a first-party package is not permissive
   (external processes are checked by the GPL rule below instead);
 - a weak-copyleft test or tool dependency is not marked `test_only`;

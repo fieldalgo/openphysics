@@ -195,6 +195,31 @@ def test_metadata_change_must_be_reviewed(tmp_path):
     assert any("mentions a copyleft license" in e for e in errors)
 
 
+def test_reviewed_narrower_metadata_expression_passes(tmp_path):
+    install(tmp_path, "narrow", expression="BSD-3-Clause")
+    reviewed = {"spdx": "Apache-2.0 AND BSD-3-Clause", "metadata_spdx": "BSD-3-Clause",
+                "review": "LICENSE file still grants both licenses."}
+    errors, _ = run(tmp_path, {"narrow": reviewed})
+    assert errors == []
+    errors, _ = run(tmp_path, {"narrow": {**reviewed, "review": ""}})
+    assert any("metadata_spdx needs a review" in e for e in errors)
+    errors, _ = run(tmp_path, {"narrow": {**reviewed, "review": "   "}})
+    assert any("metadata_spdx needs a review" in e for e in errors)
+    errors, _ = run(tmp_path, {"narrow": {**reviewed, "metadata_spdx": "MIT"}})
+    assert any("metadata declares" in e for e in errors)
+
+
+@pytest.mark.parametrize("declared", ["LGPL-2.1-only", "MPL-2.0"])
+def test_metadata_spdx_cannot_hide_a_copyleft_declaration_behind_or(tmp_path, declared):
+    # A record "MIT OR <copyleft>" would pass the permissive policy while the
+    # package declares only the copyleft license.
+    install(tmp_path, "orlib", expression=declared)
+    entry = {"spdx": f"MIT OR {declared}", "metadata_spdx": declared, "test_only": True, "review": "x"}
+    errors, _ = run(tmp_path, {"orlib": entry}, galerkin={"requires": ["orlib"]})
+    assert any("without OR" in e for e in errors)
+    assert any("metadata declares" in e for e in errors)
+
+
 def test_undeclared_copyleft_classifier_needs_review(tmp_path):
     install(tmp_path, "mixed", classifiers=["License :: OSI Approved :: GNU General Public License (GPL)"])
     errors, _ = run(tmp_path, {"mixed": {"spdx": "BSD-2-Clause"}})
@@ -377,6 +402,10 @@ def test_inventory_entries_are_valid_and_documented():
             assert entry.get("test_only") and entry.get("review"), name
         if "GPL-2.0-or-later" in ids:
             assert "external_process" in entry, name
+        if "metadata_spdx" in entry:
+            declared = check_licenses.identifiers(check_licenses.parse_expression(entry["metadata_spdx"]))
+            assert declared <= ids and str(entry.get("review", "")).strip(), name
+            assert not check_licenses.has_or(check_licenses.parse_expression(entry["spdx"])), name
     for doc in check_licenses.DOCS:
         text = doc.read_text(encoding="utf-8")
         for name in INVENTORY["distributions"]:

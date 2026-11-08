@@ -21,7 +21,11 @@ are always rejected, also as external processes: any identifier of the family
 (deprecated ids such as ``AGPL-3.0``, ``+`` forms and LicenseRef- names
 included) in the inventory or in installed metadata fails. Installed metadata
 that names a different expression, or a copyleft family the entry does not
-record, also fails.
+record, also fails. When a release's metadata is narrower than its license files,
+the entry keeps the files' expression and records the declared one as
+``metadata_spdx`` with a ``review``; that declaration is then accepted, but only
+if the recorded expression has no OR and records every declared id, so the
+policy check of the recorded expression covers the declared one.
 
 Bundled native files: every shared library (.so, .dylib, .dll) that a
 third-party distribution installs, other than its own Python extension modules,
@@ -120,6 +124,10 @@ def identifiers(node):
     if isinstance(node, str):
         return {node.split(" WITH ")[0]}
     return set().union(*(identifiers(item) for item in node[1]))
+
+
+def has_or(node):
+    return not isinstance(node, str) and (node[0] == "OR" or any(has_or(item) for item in node[1]))
 
 
 def satisfies(node, allowed):
@@ -392,7 +400,22 @@ def check(paths, inventory, check_docs=True, platform=None):
             errors.append(f"{name}: {error}")
             continue
         ids = identifiers(tree)
-        if expression and expression.replace(" ", "") != entry["spdx"].replace(" ", ""):
+        accepted = {entry["spdx"].replace(" ", "")}
+        declared_tree = None
+        if "metadata_spdx" in entry:
+            # Only a narrower declaration of an all-AND record: every declared id is
+            # recorded, so the record carries at least the obligations declared.
+            try:
+                declared_tree = parse_expression(entry["metadata_spdx"])
+            except (ValueError, IndexError) as error:
+                errors.append(f"{name}: metadata_spdx: {error}")
+            if not str(entry.get("review", "")).strip():
+                errors.append(f"{name}: metadata_spdx needs a review explaining why it differs from spdx")
+            elif declared_tree is not None and (has_or(tree) or not identifiers(declared_tree) <= ids):
+                errors.append(f"{name}: metadata_spdx must name only ids of an spdx without OR")
+            else:
+                accepted.add(entry["metadata_spdx"].replace(" ", ""))
+        if expression and expression.replace(" ", "") not in accepted:
             errors.append(f"{name} {dist.version}: metadata declares {expression!r}, inventory records "
                           f"{entry['spdx']!r}; review the change")
         declared_text = " ".join(filter(None, [expression, short, *classifiers]))
@@ -419,6 +442,7 @@ def check(paths, inventory, check_docs=True, platform=None):
             permissive | weak if entry.get("test_only") else permissive)
         if not satisfies(tree, allowed):
             errors.append(f"{name} {dist.version}: {entry['spdx']} is not allowed for {klass} use")
+
     if check_docs:
         for doc in DOCS:
             text = doc.read_text(encoding="utf-8")
