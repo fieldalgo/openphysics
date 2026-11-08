@@ -414,14 +414,15 @@ except MeshLimitError as exc:
 Every check runs before the solve. Each limit is a positive `int` or `None`, and
 `None` is not checked: with no limit the run is exactly the unlimited one, and
 meshine keeps its own default cap of 300,000 points unless `max_nodes` is given.
-The limits apply to region documents only: steady and transient heat, and
-[region electric conduction and steady Joule heating](electric_joule.md#material-regions-electric-steady-conduction).
-Giving one for a rectangle heat, electric or Joule document, a `joule.temperature2d`
-document or an electromagnetic or cavity document is a `ValueError`, and so is a
-`bool`, a float or a value below 1. The two heat kinds and the electric/Joule kind
-declare which of their documents take limits in the physics registry
-(`PhysicsKind.accepts_mesh_limits`), and `run` hands the limits to their runners
-through it; no other kind's runner changes. `max_nodes` needs
+The limits apply to region documents only: steady and transient heat,
+[region electric conduction and steady Joule heating](electric_joule.md#material-regions-electric-steady-conduction),
+and [region mechanics](mechanics2d.md#material-regions-and-named-boundaries).
+Giving one for a rectangle heat, electric, Joule or mechanics document, a
+`joule.temperature2d` document or an electromagnetic or cavity document is a
+`ValueError`, and so is a `bool`, a float or a value below 1. The two heat kinds,
+the electric/Joule kind and the mechanics kind declare which of their documents
+take limits in the physics registry (`PhysicsKind.accepts_mesh_limits`), and `run`
+hands the limits to their runners through it; no other kind's runner changes. `max_nodes` needs
 a meshine that has `MeshSizeLimitError`: with an older meshine installed, a run
 that sets it raises `ImportError`, and every other run is unchanged.
 

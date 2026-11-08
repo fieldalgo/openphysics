@@ -17,8 +17,8 @@ region run meshes before anything is solved::
 
 Every check runs before the solve and raises ``MeshLimitError``. A limit left at None is
 not checked, and with no limit the run is exactly the unlimited one. The limits apply to
-steady and transient heat region documents and region electric conduction and steady Joule
-heating documents only. See
+steady and transient heat region documents, region electric conduction and steady Joule
+heating documents and mechanics region documents only. See
 docs/packages/simcase/thermal_regions2d.md, "Mesh limits for callers".
 """
 from __future__ import annotations
@@ -90,8 +90,8 @@ def _mesh_limits(max_nodes=None, max_triangles=None, max_input_vertices=None) ->
 
 def _is_region_document(data) -> bool:
     """A document whose physics kind takes mesh limits for it (the registry's
-    ``PhysicsKind.accepts_mesh_limits``): a steady or transient heat region document, or a region
-    electric conduction or steady Joule heating document."""
+    ``PhysicsKind.accepts_mesh_limits``): a steady or transient heat region document, a region
+    electric conduction or steady Joule heating document, or a mechanics region document."""
     from .registry import kind_of
     accepts = kind_of(data).accepts_mesh_limits
     return accepts is not None and bool(accepts(data))
@@ -120,8 +120,8 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     micrometres, in the message. The domain is never built and the document is not
     changed. The micrometre copy is validated, as in a run, so the shapes' booleans are
     resolved twice: in that validation and for the count. ``TypeError`` for anything that
-    is not a ``Document``; ``ValueError`` for a document that is not a steady or transient
-    heat region document, or a limit that is not a positive int; ``DocumentError`` for an
+    is not a ``Document``; ``ValueError`` for a document that is not a region document (steady or
+    transient heat, electric conduction, steady Joule heating or mechanics), or a limit that is not a positive int; ``DocumentError`` for an
     unvalidated document that its validation refuses.
     """
     import copy
@@ -134,7 +134,7 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
         raise TypeError(f'check_mesh_limits: expected a Document (Document.from_dict), got {type(doc).__name__}')
     if not _is_region_document(doc.data):
         raise ValueError('check_mesh_limits: expected a region document (steady or transient heat, electric '
-                         'conduction or steady Joule heating, with region geometry)')
+                         'conduction, steady Joule heating or mechanics, with region geometry)')
     try:
         declared = units.resolve(doc.data.get('units'))
     except units.UnitError:

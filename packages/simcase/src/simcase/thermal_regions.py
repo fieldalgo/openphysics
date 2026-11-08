@@ -27,8 +27,10 @@ SIDES = ('left', 'right', 'bottom', 'top')
 AXISYMMETRIC_RESULT_FORMAT = 'thermal.axisymmetric-regions-result-v1'
 AXISYMMETRIC_FIELD_LAYOUT = 'thermal-axisymmetric-p1-node-cell-regions-v1'
 # One materials table serves every region physics of a document: each physics reads the keys it
-# needs and requires them only for the materials its regions use.
-MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'electrical_conductivity_s_m', 'source'}
+# needs and requires them only for the materials its regions use (heat: conductivity and heat
+# capacity; electric: electrical conductivity; mechanics: E, nu and alpha, see mechanics_regions.py).
+MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'electrical_conductivity_s_m', 'source',
+                 'young_modulus_pa', 'poisson_ratio', 'thermal_expansion_per_k'}
 BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
                    'convective_outward_w_per_m', 'system_rhs_w_per_m')
 
@@ -195,7 +197,7 @@ def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
 
 def region_geometry(doc, label='heat'):
     """Validate geometry.domain/background/shapes; return the shape names. ``label`` names the
-    physics in refusals."""
+    physics in refusals (``heat``, ``electric``, ``mechanics``)."""
     d = doc.data
     g = d['geometry']
     if doc.is_version_1:
@@ -290,6 +292,14 @@ def region_materials_table(doc, required, label):
             _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
         if 'electrical_conductivity_s_m' in spec:
             _number(spec['electrical_conductivity_s_m'], where+'.electrical_conductivity_s_m', positive=True)
+        if 'young_modulus_pa' in spec:
+            _number(spec['young_modulus_pa'], where+'.young_modulus_pa', positive=True)
+        if 'poisson_ratio' in spec:
+            _number(spec['poisson_ratio'], where+'.poisson_ratio')
+            if not -1 < spec['poisson_ratio'] < .5:
+                raise DocumentError(where+'.poisson_ratio: expected -1 < nu < 0.5')
+        if 'thermal_expansion_per_k' in spec:
+            _number(spec['thermal_expansion_per_k'], where+'.thermal_expansion_per_k')
         if 'source' in spec and not isinstance(spec['source'], str):
             raise DocumentError(where+'.source: expected a string')
     for where, mname in [('geometry.background.material', doc.background['material'])] + [
@@ -297,8 +307,8 @@ def region_materials_table(doc, required, label):
             for i, s in enumerate(doc.regions()) if s['material'] is not None]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
-                                '(thermal and electrical properties are never taken from built-in optical '
-                                'materials)')
+                                '(thermal, electrical and mechanical properties are never taken from built-in '
+                                'optical materials)')
         for key in required:
             if key not in materials[mname]:
                 raise DocumentError(f'materials.{mname}.{key}: required by {label}')
