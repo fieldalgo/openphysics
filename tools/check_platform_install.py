@@ -9,8 +9,12 @@ workflow (thermal-windows.yml) with the same selection.
 
 Since 2026-11-02 it also runs the cavity3d, sipi and full-vector/PML waveguide-mode
 wheel consumers (tools/wheel_consumers/) on every platform. The cavity consumer's
-Studio check is deselected here: the portable pins do not install the Studio
-extra; check_distributions.py runs it on Linux.
+Studio check is deselected here; check_distributions.py runs it on Linux.
+
+Since 2026-11-08 it installs the Studio extra's pins (requirements-py312-studio.txt)
+and runs the installed workspace in the runner's Chrome on every platform
+(tools/studio_browser/studio_workspace_browser.mjs): two designs, Compare, Save
+session, a restart with the page open and recovery from the start page.
 """
 import argparse
 from email.parser import BytesParser
@@ -164,7 +168,8 @@ def main():
         # Exact existing validation pins, without the Linux-only external Gmsh
         # executable/keyring stack. No new runtime dependency is introduced.
         pins = ROOT / "tools" / "requirements-py312-windows-thermal.txt"
-        run(python, "-I", "-X", "utf8", "-m", "pip", "install", "-r", pins, cwd=work)
+        run(python, "-I", "-X", "utf8", "-m", "pip", "install", "-r", pins,
+            "-r", ROOT / "tools" / "requirements-py312-studio.txt", cwd=work)
         run(python, "-I", "-X", "utf8", "-m", "pip", "install", "--no-index", "--no-deps",
             *wheel_files, cwd=work)
         run(python, "-I", "-m", "pip", "check", cwd=work)
@@ -222,8 +227,8 @@ def main():
         run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra",
             "--confcutdir", tests, "--basetemp", output / "consumer-files",
             "--junitxml=" + str(output / "installed-tests.xml"),
-            # The Studio extra (fastapi) is not among the portable pins, so the
-            # cavity consumer's Studio rejection check runs only in check_distributions.py.
+            # The cavity consumer's Studio rejection check stays in check_distributions.py
+            # (Linux); this script's Studio coverage is the workspace browser check below.
             # A keyword, not a node id: node ids depend on pytest's rootdir choice.
             "-k", "not test_installed_studio_explicitly_rejects_3d",
             tests / "test_thermal_simcase_wheel.py",
@@ -263,6 +268,10 @@ def main():
                  ROOT / "tests" / "simcase" / "test_steady_boundary_platform.py")):
             run(python, "-I", "-X", "utf8", "-m", "pytest", "-q", "-ra", "--confcutdir", ROOT,
                 "-k", selection, "--junitxml=" + str(output / f"{name}-tests.xml"), test_file, cwd=ROOT)
+        # The installed Studio workspace in a real browser on this OS (see the docstring).
+        # It fails rather than skips when no preinstalled Chrome or Edge is found.
+        run("node", ROOT / "tools" / "studio_browser" / "studio_workspace_browser.mjs",
+            "--python", python, "--output", output / "studio-workspace-browser", cwd=work)
 
 
 if __name__ == "__main__":
