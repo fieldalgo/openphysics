@@ -98,12 +98,21 @@ class Page {
     while (Date.now() < end) { if (await this.eval(expression).catch(() => false)) return; await sleep(200); }
     throw new Error('timed out waiting for ' + label);
   }
-  click(selector) { return this.eval(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('missing '+${JSON.stringify(selector)});e.click();return true})()`); }
+  // Runs a fixed function on the page's document with the selector as an argument, so no
+  // page code is built from values.
+  async onElement(declaration, selector) {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const result = await this.call('Runtime.callFunctionOn', {objectId: document.objectId, functionDeclaration: declaration,
+      arguments: [{value: selector}], awaitPromise: true, returnByValue: true});
+    if (result.exceptionDetails) throw new Error('page: ' + (result.exceptionDetails.exception?.description || result.exceptionDetails.text));
+    return result.result.value;
+  }
+  click(selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); }
   // Typing as a user does: focus, select, insert text, leave the field.
   async type(selector, text) {
-    await this.eval(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.focus();e.select();return true})()`);
+    await this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.focus();e.select();return true}', selector);
     await this.call('Input.insertText', {text: String(text)});
-    await this.eval(`(()=>{document.querySelector(${JSON.stringify(selector)}).blur();return true})()`);
+    await this.onElement('function(selector){this.querySelector(selector).blur();return true}', selector);
     await sleep(150);
   }
   async screenshot(name) { const png = await this.call('Page.captureScreenshot', {format: 'png'}); await writeFile(join(out, name + '.png'), Buffer.from(png.data, 'base64')); }
