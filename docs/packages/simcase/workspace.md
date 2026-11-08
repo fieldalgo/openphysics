@@ -333,8 +333,13 @@ last valid inputs and export is disabled.
 
 Workspace validate, mesh and run requests carry the connected server instance.
 A restarted/different server rejects stale requests before parsing the model or
-starting a job. Check connection before new work; old jobs do not migrate between
-server processes. Classic callers without an instance query keep their existing API.
+starting a job; old jobs do not migrate between server processes. When Run meets a
+restarted server, the page reconnects to the new server at once and asks you to
+select Run again; inputs and retained results stay. When the server cannot be
+reached at all, Run is disabled with that reason and the page checks again every
+3 seconds, reconnecting by itself once Studio is started again at the same address.
+**Check connection** retries at any time. Classic callers without an instance query
+keep their existing API.
 
 ## Line profiles
 
