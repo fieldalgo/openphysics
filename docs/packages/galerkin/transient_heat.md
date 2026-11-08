@@ -5,6 +5,7 @@
 **At a glance**
 
 - **What it does:** `galerkin.transient_heat.solve_transient_heat` advances 2D heat conduction, c·dT/dt − div(k·grad T) = Q, on a fixed conforming P1 triangle mesh with consistent mass and backward Euler. Inputs are constant isotropic k [W/(m K)] and c [J/(m³ K)], a source Q [W/m³], explicit times [s], an initial field [K], fixed Dirichlet nodes with time-dependent temperatures and, on tagged exterior edges, a prescribed outward flux g [W/m²] or convection h·(T − T_amb) with the steady solver's input forms, each constant, spatially varying or time-dependent; other boundaries are insulated.
+- **Axisymmetric:** `coordinate_system="axisymmetric"` reads the mesh as (r, z) and integrates the full revolution with the measure of [axisymmetric steady heat](thermal_axisymmetric.md); see [Axisymmetric transient heat](#axisymmetric-transient-heat).
 - **Limits:** no radiation or temperature-dependent h; time-dependent boundary data are an engine feature only (the simcase document adapter takes constants); a time-dependent h is refused with JAX or PyTorch inputs; no restart or automatic heat-to-mechanics coupling. Finite negative Kelvin is not clamped, and no discrete maximum principle is promised.
 - **Validation:** the [validation contract](transient_heat_validation.md) and [independent acceptance](transient_heat_independent_validation.md) fix backward-Euler order 0.9–1.1 against the exact discrete eigenmode product, and temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on a manufactured sine solution; the [flux and convection gates](transient_heat_validation.md#outward-flux-and-convection-gates) compare convective and constant-flux slabs with independent series, the steady solver and the per-step heat balance, and the [time-dependent gates](transient_heat_validation.md#time-dependent-flux-and-convection-gates) compare a sinusoidal ambient temperature and a ramped flux with closed forms. For the result of a specific commit, see its CI run.
 
@@ -40,7 +41,8 @@ The exact keyword-only API is:
 solve_transient_heat(
     mesh, *, conductivity, volumetric_heat_capacity,
     time_s, initial_temperature_k, dirichlet, heat_source=0.0,
-    outward_flux=None, convection=None, checkpoint_every=None)
+    outward_flux=None, convection=None, checkpoint_every=None,
+    coordinate_system="cartesian")
 ```
 
 Import this submodule explicitly; no automatic top-level export is added.
@@ -251,6 +253,48 @@ from a finite-mesh weak thermostat reaction and must be reported separately.
 
 See the [validation guide](transient_heat_validation.md) for the fixed
 gates, independent algebra/reference boundaries and reproduction.
+
+## Axisymmetric transient heat
+
+`coordinate_system="axisymmetric"` solves the same backward-Euler system on a
+body of revolution: the mesh coordinates are (r, z) in metres with r ≥ 0 and
+every integral carries the measure `2πr` of [axisymmetric steady
+heat](thermal_axisymmetric.md) (`core.measure.ScalarMeasure`). The stiffness
+carries the exact cell factor `2π r_centroid` of its constant integrand, the
+consistent mass is the **exact cubic moment of the linear radius**,
+`∫ c N_i N_j 2πr = 2π|T| c Σ_m r_m ∫ N_i N_j N_m` (`core.kernels.p1_mass_axisymmetric`,
+no quadrature; `∫ N_i N_j N_m = |T| a!b!c!/60` for the vertex multiplicities),
+the source and the flux and convection samples are weighted at the existing
+Gauss points, and the element flux stays `(q_r, q_z)` in W/m². Nodal rates
+(`source_load`, `reaction`, `residual`, `storage_rate`, the boundary loads) are
+then **W over the full revolution**, `heat_content` is J and the quadratic
+functional J K; the result records `coordinate_system` and `nodal_rate_unit`
+(`"W"`; the field names keep their Cartesian `_w_per_m` spelling, the
+[simcase region adapter](../simcase/thermal_regions2d.md#axisymmetric-documents)
+renames them). The axis rules of the steady page apply: Dirichlet data on
+nodes lying only on the axis, and a nonzero flux or h on an axis edge, are
+refused (the boundary refusal is chained to time index 0, where the data are
+first sampled); the axis itself needs no condition. The default is bit for bit
+the Cartesian solve. JAX and PyTorch inputs are supported as in the Cartesian
+case; the measure is static geometry.
+
+Checks G7-1 to G7-4 (`tests/galerkin/test_transient_heat_axisymmetric.py`,
+pre-registered in the HQ work record on 2026-11-08 and measured the same day
+on Linux, Python 3.12, pinned environment): a uniform cylinder (R 3 mm) cooling
+from 350 K with its surface held at 293.15 K against the Bessel series, radial
+subdivisions 8/16/32 with the step count scaled as the square of the
+subdivision, nodal maximum-norm error relative to the initial drop: order ≥ 0.9
+on each interval and ≤ 2e-2 at the finest (observed 1.4e-2, 2.7e-3, 8.6e-4);
+every step balances `storage = source + reaction − prescribed − convective`
+within 1e-10 of the summed rates, with and without flux and convection, and a
+prescribed end-face flux integrates to `g πR²`; a uniform insulated cylinder
+starts at `H = c T0 πR²L` within 1e-12 and warms by `Q/c` per second within
+1e-10 K; geometrically growing steps reach the axisymmetric steady solve with
+source, Dirichlet, convection and flux within 1e-8 of its rise (rates within
+1e-6); the Cartesian default equals the explicit `"cartesian"` call array for
+array; the weighted mass kernel equals a 36-point quadrature to 1e-13; the
+capacity and source derivatives of the heat content on JAX and PyTorch equal
+`T0 πR²L` and `t πR²L` (run where those libraries are installed).
 
 ## Separate headless document adapter
 

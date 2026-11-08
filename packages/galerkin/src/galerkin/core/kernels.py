@@ -28,6 +28,8 @@ shape from another space gives a wrong matrix without an error):
 
 docs/packages/galerkin/differentiation.md tabulates them.
 """
+import math
+
 import numpy as np
 
 from .backend import Backend, backend_of, namespace
@@ -108,6 +110,35 @@ def p1_mass(mesh, coeff=1.0):
     area = mesh.areas()
     coeff = xp.broadcast_to(coeff, (len(area),))
     return (coeff * _lift(xp, area))[:, None, None] * _lift(xp, _P1_MASS)
+
+
+def _p1_cubic_moments():
+    """``int_T phi_i phi_j phi_m / |T|``: a!b!c!/60 for the multiplicities of the vertices."""
+    moments = np.empty((3, 3, 3))
+    for i in range(3):
+        for j in range(3):
+            for m in range(3):
+                counts = np.bincount([i, j, m], minlength=3)
+                moments[i, j, m] = math.prod(math.factorial(int(c)) for c in counts) / 60.0
+    return moments
+
+
+_P1_MASS_RADIAL = _p1_cubic_moments()
+
+
+def p1_mass_axisymmetric(mesh, coeff=1.0):
+    """``int c phi_i phi_j 2 pi r`` with r the first coordinate; coeff scalar or (T,).
+
+    The radius is linear on a P1 triangle, r = sum_m r_m phi_m, so the weighted
+    mass is the exact cubic moment ``2 pi |T| sum_m r_m int phi_i phi_j phi_m``
+    (no quadrature). Used by galerkin.transient_heat for coordinate_system="axisymmetric".
+    """
+    xp, coeff = coefficient(coeff)
+    area = mesh.areas()
+    radius = mesh.nodes[mesh.triangles][:, :, 0]
+    moments = 2.0 * np.pi * area[:, None, None] * np.einsum("ijm,tm->tij", _P1_MASS_RADIAL, radius)
+    coeff = xp.broadcast_to(coeff, (len(area),))
+    return coeff[:, None, None] * _lift(xp, moments)
 
 
 def p1_boundary_mass(mesh, edges, coeff=1.0):

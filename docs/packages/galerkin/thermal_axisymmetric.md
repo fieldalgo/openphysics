@@ -96,5 +96,8 @@ platform results are separate from this local evidence. An additional related
 thermal/Joule/Field/forms run passed 261 tests; the final axisymmetric file alone
 passed 21 tests. These overlapping runs are not summed.
 
-This is steady scalar axisymmetric conduction. It does not add angular modes,
-structural deformation, transient heat, optical propagation or thermal radiation.
+This is scalar axisymmetric conduction, steady here and transient through
+[`solve_transient_heat(..., coordinate_system="axisymmetric")`](transient_heat.md#axisymmetric-transient-heat)
+(the same measure; the consistent mass is the exact cubic moment of the linear
+radius). It does not add angular modes, structural deformation, optical
+propagation or thermal radiation.

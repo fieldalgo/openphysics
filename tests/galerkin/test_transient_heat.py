@@ -242,6 +242,6 @@ def test_preparation_and_final_copy_failures_are_chained(monkeypatch):
         assert caught.value.time_index==2 and caught.value.time_s==.3
         assert caught.value.__cause__ is marker
     with monkeypatch.context() as context:
-        context.setattr(module,'assemble_mass',lambda *a,**k:(_ for _ in ()).throw(marker))
+        context.setattr(module,'_element_matrices',lambda *a,**k:(_ for _ in ()).throw(marker))
         with pytest.raises(TransientHeatStepError) as caught:solve()
         assert caught.value.time_index==0 and caught.value.__cause__ is marker

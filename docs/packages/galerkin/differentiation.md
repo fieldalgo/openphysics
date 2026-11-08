@@ -255,7 +255,7 @@ or space it was given:
 
 | Kernel | Element shape | Row table | Column table | Global shape |
 |---|---|---|---|---|
-| `p1_stiffness`, `p1_mass` | (T, 3, 3) | `mesh.triangles` | `mesh.triangles` | (N, N) |
+| `p1_stiffness`, `p1_mass`, `p1_mass_axisymmetric` | (T, 3, 3) | `mesh.triangles` | `mesh.triangles` | (N, N) |
 | `p1_boundary_mass(mesh, edges)` | (E_b, 2, 2) | `edges` | `edges` | (N, N) |
 | `p1_load`, the load of `p1_joule` (with `forms.vector`) | (T, 3) | `mesh.triangles` | — | (N,) |
 | `tet_stiffness`, `tet_mass` | (T, 4, 4) | `mesh.tets` | `mesh.tets` | (N, N) |
