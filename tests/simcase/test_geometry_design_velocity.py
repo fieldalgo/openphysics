@@ -416,3 +416,65 @@ def test_d8_line_nodes_interpolate():
     for i in hyp:
         s = (nodes[i][0] - 1) / 6
         assert np.allclose(nv.values[i], (s, s / 2), rtol=0, atol=1e-12)
+
+
+# ---------------------------------------------------------------- review regressions (2026-11-08)
+
+def _rounded_fd_best(d, param, region, want, perimeter=False):
+    """Best relative error of central differences of the rounded document (the D4 study)."""
+    p0 = d["geometry"]["parameters"][param]["value"]
+    best = math.inf
+    for h in (0.1, 0.01, 0.001):
+        vals = []
+        for s in (1, -1):
+            dd = copy.deepcopy(d)
+            dd["geometry"]["parameters"][param]["value"] = p0 + s * h
+            rc = evaluate(parse(dd))
+            if perimeter:
+                cells = set(rc.cells_of_region(region))
+                vals.append(sum(_curve_length(rc, k) for k in rc.curves if (k.left in cells) != (k.right in cells)))
+            else:
+                vals.append(rc.area_of_region(region))
+        fd = (vals[0] - vals[1]) / (2 * h * UM)          # pm (area) or dimensionless (length) per pm
+        best = min(best, rel(fd, want))
+    return best
+
+
+def _curve_length(rc, k):
+    (ax, ay), (bx, by) = (tuple(map(float, rc.vertices[v])) for v in (k.a, k.b))
+    if k.kind == "line":
+        return math.hypot(bx - ax, by - ay)
+    cx, cy = k.params["center"]
+    span = (math.atan2(by - cy, bx - cx) - math.atan2(ay - cy, ax - cx)) % (2 * math.pi) or 2 * math.pi
+    return math.sqrt(k.params["r2"]) * span
+
+
+def test_mixed_fields_on_one_curve():
+    # the top of rect b is cut by two circles of different radicands; circle c is cut by two others
+    d = doc([{"name": "b", "type": "rect", "x": 1, "y": 1, "w": 8, "h": "h", "material": "Si"},
+             {"name": "c1", "type": "circle", "cx": 3, "cy": 5, "r": 1.5, "material": "Ge"},
+             {"name": "c2", "type": "circle", "cx": 7, "cy": 5, "r": 1.7, "material": "Ge"}], {"h": {"value": 4.2}})
+    dv = design_velocity(d, "h")
+    assert _rounded_fd_best(d, "h", "b", dv.area_derivative("b")) <= 1e-6
+    assert _rounded_fd_best(d, "h", "b", dv.perimeter_derivative("b"), perimeter=True) <= 1e-6
+    d2 = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": "r", "material": "Si"},
+              {"name": "a1", "type": "circle", "cx": 3, "cy": 5, "r": 1.3, "material": "Ge"},
+              {"name": "a2", "type": "circle", "cx": 7.1, "cy": 5.3, "r": 1.7, "material": "Ge"}], {"r": {"value": 2}})
+    dv2 = design_velocity(d2, "r")
+    assert _rounded_fd_best(d2, "r", "c", dv2.area_derivative("c")) <= 1e-6
+    assert _rounded_fd_best(d2, "r", "c", dv2.perimeter_derivative("c"), perimeter=True) <= 1e-6
+
+
+def test_range_does_not_limit_the_probe():
+    # w2 = 2 w sits at the end of its range; the derivative with respect to w is still given
+    d = doc([{"name": "a", "type": "rect", "x": 1, "y": 1, "w": "w2", "h": 2, "material": "Si"}],
+            {"w": {"value": 2, "range": [1, 2]}, "w2": {"value": "2 * w", "range": [1, 4]}})
+    dv = design_velocity(d, "w")
+    assert rel(dv.area_derivative("a"), 4 * UM) <= 1e-12
+
+
+def test_refusal_names_features_only():
+    d = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": 2, "material": "Si"},
+             {"name": "b", "type": "rect", "x": "xb", "y": 7, "w": 1, "h": 1, "material": "Ge"}], {"xb": {"value": 5}})
+    e = _refused(d, "xb")
+    assert "background" not in e.features and {"b", "c"} <= set(e.features)
