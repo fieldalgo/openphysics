@@ -352,9 +352,9 @@ function applyProject(doc,{saved=true,resetHistory=false}={}){
   checkpointRecovery();render();updateHistory();refreshPersistence();
   notice('Project inputs restored. Results and CAD geometry are not included.');
 }
-function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,opener=document.activeElement}={}){
+function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,opener=document.activeElement}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,recoveryRecord,opener,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,recoveryRecord,keepAsLatest,opener,context:loadContext()};
   $('load-confirm').querySelector('h2').textContent=session?'Replace inputs and run history?':'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=session?'Save a session first to retain current results. Session import replaces run history and clears input undo history.':'Save your current design first if you want to keep it.';
   const summary=$('load-summary');summary.replaceChildren();
@@ -374,7 +374,7 @@ $('confirm-load').onclick=()=>{
  const pending=pendingLoad;pendingLoad=null;workspaceLoads.invalidate();dialog.close();if(!pending)return;
  if(pending.context!==loadContext()){notice('Workspace changed while reviewing the replacement. Open it again; current inputs and results kept.');return;}
  if(pending.session){
-  if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord);
+  if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   applyProject(session.input,{saved:pending.saved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=pending.source==='file'?notebookStamp():null;refreshNotebook();
   notice(pending.source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. Save session for a portable file; input undo history starts here.');
@@ -434,7 +434,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  if(state.phase==='pending')message.textContent='Browser recovery pending';
  if(state.phase==='saving')message.textContent='Saving browser recovery…';
  if(state.phase==='current')message.textContent='Current notebook already in browser recovery';
- if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;renderEarlierSessions();message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
+ if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;if(notebookStore.movedEarlier())renderEarlierSessions();message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session saved in this browser/origin; shared across tabs. Save session for a portable backup.';}
  if(state.phase==='error'){message.textContent=state.code==='recovery-conflict'?'Browser recovery changed in another tab':'Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
 }});
 async function loadNotebookRecovery(){
@@ -453,15 +453,20 @@ let earlierSessions=[];
 let latestOffer=null,resumeDismissed=false;
 function resumeOffer(){
  if(resumeDismissed||runs.length)return null;
- return {latest:latestOffer,earlier:earlierSessions.map(r=>({runs:r.session.runs.length,savedAt:r.savedAt})),
+ return {latest:latestOffer,earlier:earlierSessions.map(e=>({runs:e.recovered.session.runs.length,savedAt:e.recovered.savedAt,index:e.index})),
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),
   onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
 }
+// A later call supersedes an earlier one still reading storage, so the list is never doubled.
+let earlierGeneration=0;
 async function renderEarlierSessions(){
- const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];
+ const generation=++earlierGeneration;
  let list=[];try{list=await notebookStore.loadEarlier();}catch{return;}
+ if(generation!==earlierGeneration)return;
+ const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];
  list.forEach((record,index)=>{let recovered;try{recovered=readNotebookRecovery(record);}catch{return;}
-  earlierSessions.push(recovered);
+  // keep the storage index: a record that does not parse is skipped, not renumbered
+  earlierSessions.push({index,recovered});
   const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
   button.textContent='Recover earlier session · '+recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();
   button.onclick=()=>recoverEarlier(index,button);box.append(button);});
@@ -482,7 +487,7 @@ $('recover-notebook').onclick=()=>recoverLatest($('recover-notebook'));
 async function recoverLatest(opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
