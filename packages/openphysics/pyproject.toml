@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openphysics"
 version = "0.0.2"
-description = "OpenPhysics multiphysics simulation suite: installs the six OpenPhysics packages"
+description = "OpenPhysics multiphysics simulation suite: installs the OpenPhysics packages and the Studio app"
 dynamic = ["readme"]  # README.md with absolute links, built by setup.py
 requires-python = ">=3.12"
 license = "Apache-2.0"
@@ -21,15 +21,18 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-# A meta distribution: it ships no code, only these requirements. The six
-# packages release in lockstep with it.
+# A meta distribution: it ships no code, only these requirements and the openphysics
+# command. It installs the complete product: the six packages with Studio, VTU export
+# and the refractiveindex.info reader, and sipi (HQ decision 2026-11-08). They release
+# in lockstep with it. A library user who needs no Studio installs a package directly.
 dependencies = [
   "galerkin>=0.0.2,<0.1",
   "galerkin-refsol>=0.0.2,<0.1",
   "meshine>=0.0.2,<0.1",
   "gmshio>=0.0.2,<0.1",
-  "physmat>=0.0.2,<0.1",
-  "simcase>=0.0.2,<0.1",
+  "physmat[rii]>=0.0.2,<0.1",
+  "simcase[studio,export]>=0.0.2,<0.1",
+  "sipi>=0.0.2,<0.1",
 ]
 
 [project.urls]
@@ -38,12 +41,16 @@ Repository = "https://github.com/fieldalgo/openphysics"
 Issues = "https://github.com/fieldalgo/openphysics/issues"
 
 [project.optional-dependencies]
-# The same extras as the packages that define them. No extra installs Gmsh:
-# gmshio runs it as a separate program, installed on its own (pip install gmsh).
+# Kept for earlier commands: the base requirements already include them. Nothing
+# installs Gmsh: gmshio runs it as a separate program, installed on its own (pip install gmsh).
 studio = ["simcase[studio]>=0.0.2,<0.1"]
 export = ["simcase[export]>=0.0.2,<0.1"]
 rii = ["physmat[rii]>=0.0.2,<0.1"]
 sipi = ["sipi>=0.0.2,<0.1"]
+
+[project.scripts]
+# Studio's workspace, the product start page; simcase-studio stays for the classic editor.
+openphysics = "simcase.studio.server:product_main"
 
 [tool.setuptools]
 packages = []

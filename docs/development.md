@@ -100,7 +100,7 @@ maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
 them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
 [studies/](../studies/README.md) diagnostic scripts; people run them and
-required CI does not. The `openphysics` meta distribution has no code, tests or examples; it only declares six packages as requirements and `sipi` as an extra.
+required CI does not. The `openphysics` meta distribution has no code, tests or examples; it requires seven packages (`simcase` with its `studio` and `export` extras, `physmat` with `rii`) and provides the `openphysics` command, which opens Studio.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
 of the tools (`testpaths` in the root
 `pyproject.toml`, which also declares the `slow` marker). The root `conftest.py`
@@ -401,8 +401,8 @@ release from the tag.
 
 Each package builds from `packages/<name>`; the repository root is not a
 distribution, and `packages/openphysics` is the meta distribution that requires
-six of the other eight and forwards `sipi` as its `sipi` extra; `meshloom` is not
-part of it yet. A build-only check for one
+seven of the other eight (with the Studio, export and RII extras) and provides the
+`openphysics` command; `meshloom` is not part of it yet. A build-only check for one
 package:
 
 ```bash

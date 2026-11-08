@@ -60,7 +60,7 @@ flowchart TB
 [NOTICE](../../../../NOTICE)를 참고하세요.
 
 아홉 번째 배포인 [`openphysics`](packages/openphysics/overview.md)는
-코드 없이 구현 패키지 여섯 개를 의존성으로(`sipi`는 extra로) 요구하는 메타 배포판입니다. 0.0.2는 아직 게시되지
+코드 없이 구현 패키지 여섯 개와 Studio 웹 서버, VTU 내보내기, refractiveindex.info 읽기, `sipi`를 의존성으로 요구하고 Studio를 여는 `openphysics` 명령을 주는 메타 배포판입니다. 0.0.2는 아직 게시되지
 않았습니다. PyPI의 `openphysics`는 빈 0.0.1 이름 예약이므로 **`pip install openphysics`로는
 아직 전체 도구가 설치되지 않습니다.** 여덟 구현 패키지는 이미 이 공개 저장소에 포함돼 있으므로,
 사용하기 위해 통합 전의 개별 패키지 저장소가 필요하지 않습니다.

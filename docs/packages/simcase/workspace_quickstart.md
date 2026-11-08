@@ -35,8 +35,8 @@ Linux and macOS:
 ```sh
 python3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 python3.12 -m venv ~/op-studio
-~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.0.2"
-~/op-studio/bin/simcase-studio --help
+~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics==0.0.2"
+~/op-studio/bin/openphysics --help
 ```
 
 Windows (PowerShell; these lines call the environment's programs directly, so no
@@ -45,8 +45,8 @@ activation script or execution policy change is needed):
 ```powershell
 py -3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 py -3.12 -m venv "$HOME\op-studio"
-& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.0.2"
-& "$HOME\op-studio\Scripts\simcase-studio.exe" --help
+& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics==0.0.2"
+& "$HOME\op-studio\Scripts\openphysics.exe" --help
 ```
 
 If `--help` prints the Studio options, the installation is complete.
@@ -54,11 +54,11 @@ If `--help` prints the Studio options, the installation is complete.
 ## 3. Start and stop Studio
 
 ```sh
-~/op-studio/bin/simcase-studio --workspace                # Linux, macOS
+~/op-studio/bin/openphysics                # Linux, macOS
 ```
 
 ```powershell
-& "$HOME\op-studio\Scripts\simcase-studio.exe" --workspace  # Windows
+& "$HOME\op-studio\Scripts\openphysics.exe"  # Windows
 ```
 
 The browser opens `http://127.0.0.1:8765/workspace`. Use a current Chrome or Edge.
@@ -93,8 +93,9 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 ## Tested platforms
 
 Checked on Linux (Python 3.12.3, headless Chromium) on 2026-11-08 with 0.0.2 wheels
-built from the repository: the pinned install in a new environment (14 s with downloads
-already cached), steps 4 and 5, **Ctrl+C**, a restart and recovery from the start
-page, which restored the comparison unchanged. **macOS and Windows are not verified
+built from the repository: the plain `openphysics==0.0.2` install in a new environment
+(15 s with downloads already cached), `openphysics --help`, the `openphysics` command
+serving the workspace page, steps 4 and 5, **Ctrl+C**, a restart and recovery from the
+start page, which restored the comparison unchanged. **macOS and Windows are not verified
 for these steps yet**; earlier Windows checks are listed in the
 [acceptance checklist](workspace_acceptance.md).

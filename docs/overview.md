@@ -102,10 +102,12 @@ package has its own distribution, version, dependencies and license notices.
 | [sipi](../packages/sipi/README.md) | Signal and power integrity: quasi-static PCB transmission-line cross-sections |
 
 The ninth distribution, [openphysics](../packages/openphysics/README.md)
-(`0.0.1`), only reserves the project name: it contains no engine and does not
-install these packages. The repository root is not an installable distribution.
-**Use the checkout installation below; `pip install openphysics` does not install
-the simulation toolkit.**
+is the complete product from 0.0.2: it installs these packages with Studio and
+provides the `openphysics` command, which opens Studio. 0.0.2 is not on PyPI yet;
+PyPI holds only an empty `0.0.1` name reservation, so `pip install openphysics` from
+PyPI does not install the toolkit. The repository root is not an installable
+distribution. **Use the checkout installation below, or install 0.0.2 from a
+wheelhouse as in the [workspace quick start](packages/simcase/workspace_quickstart.md).**
 
 ## Install from source
 

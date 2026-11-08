@@ -16,7 +16,7 @@ wheels of one distribution it takes the one this interpreter supports.
 PyPI serves every distribution at VERSION, requires PyPI's SHA-256 of every
 uploaded file to equal FILE, and then installs from PyPI without a cache.
 
-Either way it installs ``openphysics[studio,export,rii,sipi]`` into a fresh venv in a
+Either way it installs ``openphysics`` (the complete product, as a user would) into a fresh venv in a
 temporary directory outside the checkout, runs ``pip check``, requires every
 distribution at the release version, runs tools/wheel_consumers/wheel_smoke.py
 from a copy, and writes a JSON report with the resolved environment.
@@ -40,7 +40,8 @@ import venv
 ROOT = Path(__file__).resolve().parents[1]
 DISTRIBUTIONS = ("galerkin", "galerkin-refsol", "meshine", "meshloom", "gmshio", "physmat", "simcase", "sipi",
                  "openphysics")
-EXTRAS = "studio,export,rii,sipi"
+# The complete product needs no extra since 2026-11-08 (Studio, export, rii and sipi are
+# base requirements of the meta distribution); install it as a user would.
 PYPI = "https://pypi.org/pypi"
 
 
@@ -91,7 +92,7 @@ def local_requirements(directory, supported=None):
     versions = {wheel_name(w)[1] for w in wheels}
     if len(versions) != 1:
         raise SystemExit(f"wheels carry different versions: {sorted(versions)}")
-    requirements = [f"{name}[{EXTRAS}] @ {w.as_uri()}" if name == "openphysics" else f"{name} @ {w.as_uri()}"
+    requirements = [f"{name} @ {w.as_uri()}"
                     for name, w in sorted(found.items())]
     return versions.pop(), requirements
 
@@ -162,7 +163,7 @@ def main(argv=None):
         version = args.from_pypi
         report["source"] = "PyPI"
         report["pypi_sha256"] = wait_for_pypi(version, args.sha256sums, args.wait)
-        requirements = [f"openphysics[{EXTRAS}]=={version}"]
+        requirements = [f"openphysics=={version}"]
         # The simple index can lag the JSON API for a few minutes after upload.
         attempts = 5
     report["version"] = version
@@ -198,7 +199,7 @@ def main(argv=None):
     report["passed"] = True
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"Installed openphysics[{EXTRAS}] {version} ({report['source']}) and passed the wheel smoke check")
+    print(f"Installed openphysics {version} ({report['source']}) and passed the wheel smoke check")
 
 
 if __name__ == "__main__":

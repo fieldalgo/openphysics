@@ -2,8 +2,8 @@
 
 [English](../../../../../packages/simcase/workspace.md) | **한국어**
 
-선택 의존성 `simcase[studio]`를 설치한 뒤 `simcase-studio --workspace`를 실행하면
-이 작업공간이 브라우저에 바로 열립니다. 포트는 `simcase-studio --workspace --port 8770`으로
+`openphysics`(배포판 `openphysics`와 함께 설치됨)를 실행하거나, 선택 의존성 `simcase[studio]`를
+설치한 뒤 `simcase-studio --workspace`를 실행하면 이 작업공간이 브라우저에 바로 열립니다. 포트는 `simcase-studio --workspace --port 8770`으로
 지정하며, `--no-browser`를 추가하면 브라우저를 열지 않고 주소만 출력합니다.
 기존 첫 화면의 **Open experimental model workspace**를 누르거나 같은 서버의
 `/workspace`를 직접 열어도 됩니다. 기존 광학·열 편집기는 `/`에 있습니다.

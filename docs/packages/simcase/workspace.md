@@ -2,8 +2,9 @@
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/workspace.md)
 
-With the optional `simcase[studio]` dependencies installed, run
-`simcase-studio --workspace` to open this workspace directly in your browser.
+Run `openphysics` (installed with the `openphysics` distribution) or, with the
+optional `simcase[studio]` dependencies, `simcase-studio --workspace` to open this
+workspace directly in your browser.
 For another port, use `simcase-studio --workspace --port 8770`; add `--no-browser`
 to print the address without opening a browser.
 You can also follow **Open experimental model workspace** from the classic home

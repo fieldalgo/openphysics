@@ -22,8 +22,9 @@ python -m simcase geometry model.json                     # the region complex o
 
 The package and CLI are named `simcase`. The JSON version field remains
 `"openphysics": "0.2"`; it is not an import or distribution name. The separate
-`openphysics` distribution is a meta distribution that installs the six packages
-from 0.0.2; the 0.0.1 on PyPI is an empty name reservation. See the
+`openphysics` distribution is the complete product from 0.0.2: it installs the
+OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
+on PyPI is an empty name reservation. See the
 [repository setup](https://github.com/fieldalgo/openphysics/blob/main/README.md)
 for the full development install. The editable paths above require a monorepo
 checkout; an individual sdist does not contain sibling packages or the repository
