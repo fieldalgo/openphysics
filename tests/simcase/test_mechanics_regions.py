@@ -483,7 +483,11 @@ LENGTH_KEYS = ('xmin', 'xmax', 'ymin', 'ymax', 'x', 'y', 'w', 'h', 'cx', 'cy', '
 
 
 def _in_unit(raw, unit):
-    """The millimetre document ``raw`` with every length written in ``unit``; SI values untouched."""
+    """The millimetre document ``raw`` with every length written in ``unit``; SI values untouched.
+
+    The lengths are scaled by a float product: exact enough here because a version 1 block reads
+    them onto the 1 pm grid. A 0.2 document is not covered (its micrometre copy is checked by
+    the region heat length tests)."""
     out = copy.deepcopy(raw)
     k = SCALE[unit]
     comp = out['geometry']['components']['main']
