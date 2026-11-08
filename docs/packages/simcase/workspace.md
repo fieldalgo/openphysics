@@ -10,7 +10,7 @@ You can also follow **Open experimental model workspace** from the classic home
 page, or open `/workspace` on the same local server. The existing optical and heat editors
 remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is needed.
 
-For build reviews and first-user checks, use the [acceptance checklist](workspace_acceptance.md).
+New to the workspace? Start with the [quick start](workspace_quickstart.md). For build reviews and first-user checks, use the [acceptance checklist](workspace_acceptance.md).
 
 ## First optical study
 

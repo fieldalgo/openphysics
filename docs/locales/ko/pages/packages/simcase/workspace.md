@@ -9,7 +9,7 @@
 `/workspace`를 직접 열어도 됩니다. 기존 광학·열 편집기는 `/`에 있습니다.
 별도 프록시, JavaScript 빌드, CDN 또는 새 의존성은 필요하지 않습니다.
 
-빌드 검토와 첫 사용자 점검에는 [수용 점검표](workspace_acceptance.md)를 사용하세요.
+처음이면 [빠른 시작](workspace_quickstart.md)부터 따라 하세요. 빌드 검토와 첫 사용자 점검에는 [수용 점검표](workspace_acceptance.md)를 사용하세요.
 
 ## 첫 광학 해석
 
