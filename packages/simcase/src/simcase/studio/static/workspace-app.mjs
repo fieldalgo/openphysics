@@ -328,7 +328,7 @@ function refreshPersistence(){
   const clean=!edits.dirty;
   // Results not in a session file outrank a clean input snapshot: saving inputs only
   // must not read as saved while completed runs would be lost.
-  const runsUnsaved=runs.length>0&&savedNotebookState!==notebookStamp();
+  const runsUnsaved=runs.length>0&&savedRunsState!==runsStamp();
   $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):runsUnsaved?'Results not saved · use Save session':(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
   refreshNotebook();refreshWorkflow();
 }
@@ -376,7 +376,7 @@ $('confirm-load').onclick=()=>{
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
-  applyProject(session.input,{saved:pending.saved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=pending.source==='file'?notebookStamp():null;refreshNotebook();
+  applyProject(session.input,{saved:pending.saved,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();savedNotebookState=pending.source==='file'?notebookStamp():null;savedRunsState=pending.source==='file'?runsStamp():null;refreshNotebook();
   notice(pending.source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. Save session for a portable file; input undo history starts here.');
  }else applyProject(pending.input,{saved:pending.saved});
 };
@@ -401,7 +401,7 @@ function showRecovery(){
 }
 function checkpointRecovery(){
  try{writeRecovery(localStorage,current());recoverable=readRecovery(localStorage);showRecovery();}
- catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save file or Save session.';}
+ catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save inputs only or Save session.';}
 }
 try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
@@ -426,7 +426,7 @@ document.addEventListener('keydown',event=>{
  else if(event.key.toLowerCase()==='y'){event.preventDefault();if(edits.canRedo)$('redo-edit').click();}
 });
 
-let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null;
+let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
 let notebookRecoveryRecord=null,notebookLoadVersion=0;
 const notebookStore=indexedNotebookStore();
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
@@ -524,6 +524,8 @@ $('confirm-recovery-replace').onclick=async()=>{
 
 function currentView(){return {...fieldView,probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
+// The completed runs as a session file keeps them; inputs and view settings are not results.
+function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]));}
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
 function refreshNotebook(){const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(stamp,captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()));const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Session file changed · export a portable copy':'Session matches last file open or download request'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
@@ -753,7 +755,7 @@ $('confirm-run-import').onclick=()=>{
  compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
 };
 
-$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
+$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');downloadFile(new Blob([text],{type:'application/json'}),'studio-session-v2.json');edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();refreshPersistence();notice('Session download requested: current inputs, up to six results and comparison choices.');}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});
