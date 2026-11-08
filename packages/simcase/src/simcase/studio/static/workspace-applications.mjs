@@ -18,7 +18,8 @@ export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleStri
  const line=(label,item)=>label+' · '+item.runs+(item.runs===1?' run':' runs')+' · saved '+when(item.savedAt);
  const choices=[];
  if(latest)choices.push({kind:'latest',label:line('Last session in this browser',latest)});
- earlier.forEach((item,index)=>choices.push({kind:'earlier',index,label:line('Earlier session',item)}));
+ // index: the record's place in storage, which recovery reads (given by the caller, else the position)
+ earlier.forEach((item,position)=>choices.push({kind:'earlier',index:item.index??position,label:line('Earlier session',item)}));
  return choices;
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),

@@ -134,3 +134,18 @@ test('replacement refuses an active write and supersedes a queued older snapshot
  await assert.rejects(saver.replaceReviewed(null,'new',()=> 'new'),/busy/);assert.equal(adoptions,0);complete();await writing;
  saver.schedule('queued',()=> 'queued');const replacement=saver.replaceReviewed(null,'new',()=> 'new');assert.equal(stored.session,'new');assert.equal(adoptions,1);complete();await replacement;assert.equal(saver.savedStamp,'new');assert.equal(saver.pending,false);
 });
+test('continuing the recovered latest session replaces it and keeps no duplicate earlier copy',async()=>{
+ const record=session=>({version:1,savedAt:'2026-10-26T00:00:00Z',session});
+ const db=database(null);
+ let page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('A'));
+ // a new page does not recover A and saves new work: A is kept as an earlier session
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('B'));
+ assert.equal(page.movedEarlier(),true);assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['A']);
+ await page.save(record('B2'));assert.equal(page.movedEarlier(),false);
+ // another page recovers the latest session (B2) and continues it: it is replaced, A stays
+ for(const next of ['C','D','E']){
+  page=indexedNotebookStore(db);const latest=await page.load();page.adopt(latest,{kept:true});
+  await page.save(record(next));assert.equal(page.movedEarlier(),false);
+ }
+ assert.equal((await page.load()).session,'E');assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['A']);
+});

@@ -15,12 +15,14 @@ export function recoveryRevision(record){return record==null?null:record.revisio
 // not recover (for example after missing the prompt) survives the next session.
 export const EARLIER_SESSIONS=3;
 export function indexedNotebookStore(factory=globalThis.indexedDB){
- let expected,epoch=0,wroteSinceAdopt=false;
- const adopt=record=>{expected=recoveryRevision(record);epoch++;wroteSinceAdopt=false;};
+ let expected,epoch=0,wroteSinceAdopt=false,movedOnLastSave=false;
+ // kept: the page continues this very record (it recovered the latest session), so its
+ // next save replaces it instead of keeping it as an earlier session
+ const adopt=(record,{kept=false}={})=>{expected=recoveryRevision(record);epoch++;wroteSinceAdopt=kept;};
  const transact=(mode,record,key='latest')=>new Promise((resolve,reject)=>{
   if(!factory){reject(new Error('Browser database unavailable.'));return;}
   if(mode==='readwrite'&&expected===undefined){reject(new Error('Read browser recovery before saving.'));return;}
-  const baseline=expected,startedEpoch=epoch;
+  const baseline=expected,startedEpoch=epoch,keepPrevious=!wroteSinceAdopt;let moved=false;
   const saved=mode==='readwrite'?{...record,revision:Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('')}:null;
   let settled=false;const opening=factory.open('openphysics-studio-notebook',1);
   opening.onupgradeneeded=()=>{const db=opening.result;if(!db.objectStoreNames.contains('snapshots'))db.createObjectStore('snapshots');};
@@ -35,22 +37,24 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
      if(recoveryRevision(request.result)!==baseline){
       failure=Object.assign(new Error('Another tab changed browser recovery. Save this session to a file, then recover the latest browser session before continuing automatic recovery.'),{code:'recovery-conflict'});tx.abort();return;
      }
-     if(wroteSinceAdopt||request.result==null){snapshots.put(saved,'latest');return;}
+     if(!keepPrevious||request.result==null){snapshots.put(saved,'latest');return;}
      const earlier=snapshots.get('earlier');
      earlier.onsuccess=()=>{
       const list=Array.isArray(earlier.result)?earlier.result:[];
-      if(recoveryRevision(list[0])!==recoveryRevision(request.result))snapshots.put([request.result,...list].slice(0,EARLIER_SESSIONS),'earlier');
+      if(recoveryRevision(list[0])!==recoveryRevision(request.result)){snapshots.put([request.result,...list].slice(0,EARLIER_SESSIONS),'earlier');moved=true;}
       snapshots.put(saved,'latest');
      };
     };
    }catch(error){db.close();reject(error);return;}
-   tx.oncomplete=()=>{db.close();if(mode==='readwrite'&&epoch===startedEpoch){expected=recoveryRevision(saved);wroteSinceAdopt=true;}resolve(mode==='readonly'?request.result:saved);};
+   tx.oncomplete=()=>{db.close();if(mode==='readwrite'){movedOnLastSave=moved;if(epoch===startedEpoch){expected=recoveryRevision(saved);wroteSinceAdopt=true;}}resolve(mode==='readonly'?request.result:saved);};
    tx.onabort=()=>{db.close();reject(failure||tx.error||new Error('Browser recovery transaction aborted.'));};
    tx.onerror=()=>{}; // Abort is the final failure event; the prior record remains atomic.
   };
  });
  const loadEarlier=async()=>{const list=await transact('readonly',null,'earlier');return Array.isArray(list)?list:[];};
- return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record)};
+ // whether the last committed save moved a record to the earlier sessions
+ const movedEarlier=()=>movedOnLastSave;
+ return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record),movedEarlier};
 }
 
 // Coalesce rapid edits and serialize writes so an older completion cannot win.

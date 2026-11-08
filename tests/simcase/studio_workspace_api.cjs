@@ -59,3 +59,7 @@ test('the landing page offers the latest and earlier browser sessions to resume'
   {kind:'earlier',index:0,label:'Earlier session · 1 run · saved T0'}]);
  assert.deepEqual(resumeChoices(null,[{runs:3,savedAt:'T0'}],when).map(c=>c.kind),['earlier']);
 });
+test('an earlier session choice keeps its storage index when an unreadable record is skipped',()=>{
+ const choices=resumeChoices(null,[{runs:1,savedAt:'T0',index:0},{runs:2,savedAt:'T2',index:2}],t=>t);
+ assert.deepEqual(choices.map(c=>c.index),[0,2]);
+});
