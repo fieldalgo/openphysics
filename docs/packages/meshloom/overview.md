@@ -92,8 +92,12 @@ names may change before the mesher's public API.
   the subfacets that are not yet faces. `recover_boundary(points, segments, facets)`
   goes on and makes every subfacet a face: around each connected region of missing
   subfacets of a facet it removes the tetrahedra whose interiors cross the region and
-  refills each side of the facet plane by gift-wrapping (every new tetrahedron the
-  exact Delaunay choice among the cavity vertices that see its face). It then verifies
+  refills each side of the facet plane. Each side is first filled with the Delaunay
+  tetrahedralization of its own vertices, keeping the tetrahedra inside the cavity;
+  when that does not conform to the side's boundary, gift-wrapping fills it (every new
+  tetrahedron the exact Delaunay choice among the cavity vertices that see its face).
+  Both give the same result: the constrained Delaunay tetrahedralization is unique
+  under the perturbation. It then verifies
   the result from the arrays: positive tetrahedra, the hull unchanged, every point a
   vertex, every subfacet a face, every segment piece an edge, and every other interior
   face locally Delaunay, which makes the result a constrained Delaunay
@@ -181,10 +185,10 @@ See [third-party software](../../third-party.md).
   makes flat or inverted and that no flip repairs raises `ValueError`; flips cannot
   repair an inversion against a facet face itself (in a synthetic test with points
   snapped to a coarse grid, every interior inversion was repaired and inversions at
-  the fixed boundary were refused). No meshing test has needed a repair yet. Facet recovery fills cavities by gift-wrapping only: a cavity
-  without a constrained Delaunay filling (none so far in the tests) is an error, not
-  yet repaired with extra points, and the fill takes time quadratic in the cavity
-  size (the faster cavity path comes with the rest of boundary recovery).
+  the fixed boundary were refused). No meshing test has needed a repair yet. A cavity without a constrained Delaunay filling
+  (none so far in the tests) is an error, not yet repaired with extra points. The
+  gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
+  filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.

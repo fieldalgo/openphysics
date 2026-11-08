@@ -88,6 +88,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
 - `sipi`: strict `sipi.circuit/1`에 RLGC/Touchstone 또는 형상 선로 문서와 소스/부하를 저장해 단자 응답·명시 누화를 재현합니다. [계약](packages/sipi/circuit_document.md).
 
+- `meshloom`: 면 복원이 공동의 각 쪽을, 맞으면 그 꼭짓점들의 Delaunay 사면체 분할로 채우고 아니면 gift-wrapping으로 채웁니다. 결과는 같고, 공동 채우기가 실제로 더 이상 제곱으로 늘지 않습니다(사면체 6,413개 공동: 전 77.6초, 지금 0.06초). [문서](packages/meshloom/overview.md#커널-구성-요소)
+
 - `meshloom`: `mesh_plc`는 double로 반올림해 납작해지거나 뒤집힌 사면체를, 모든 면(facet)의 면과 선분의 변을 지키는 2-3 flip과 변 제거로 고칩니다. 고칠 수 없으면 잘못된 메시를 내지 않고 거부합니다. [문서](packages/meshloom/overview.md#커널-구성-요소)
 
 - `meshloom`: `mesh_plc`는 복원한 PLC를 세분화 없이 계획의 출력 계약을 따르는 메시로 만듭니다. 영역(경계로 닫힌 성분마다, 또는 `domain="parity"`일 때 닫힌 표면의 짝홀 영역), 선분 위 점은 double로 한 번 반올림, 모든 사면체는 출력 double에서 정확한 `orient3d > 0`으로 인증, 바깥쪽으로 감긴 면별 경계 면과 영역 사이 interface를 냅니다. 내부 기능(`meshloom._core`). [문서](packages/meshloom/overview.md#커널-구성-요소)

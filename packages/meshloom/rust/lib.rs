@@ -374,6 +374,8 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
     d.set_item("blocked", r.stats.blocked)?;
     d.set_item("apexes", r.stats.apexes)?;
     d.set_item("largest_cavity", r.stats.largest_cavity)?;
+    d.set_item("fast_sides", r.stats.fast)?;
+    d.set_item("wrapped_sides", r.stats.wrapped)?;
     d.set_item("constrained_faces", r.report.constrained_faces)?;
     d.set_item("delaunay_faces", r.report.delaunay_faces)?;
     d.set_item("hull_faces", r.report.hull_faces)?;
