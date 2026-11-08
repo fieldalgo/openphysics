@@ -238,6 +238,80 @@ engine is unit-free, so nothing re-reads the block); the copy records that unit
 in `geometry_block_unit` and refuses `to_dict()` and `save()`. Results record
 the original document.
 
+## Design velocity (stage 4)
+
+`simcase.geometry_velocity` implements the [stage 4
+amendment](geometry_document.md#parameters-sweeps-and-derivatives-frozen) of the
+contract (2026-11-08). For one independent length parameter p, it gives
+V = ∂x/∂p of a 2D or axisymmetric component. It imports only the standard
+library, and NumPy for meshes. Nothing else changes: `parse`, `evaluate` and
+`to_domain` give the same results whether or not a derivative is asked for.
+
+```python
+from simcase.geometry_velocity import design_velocity, TopologyChange
+
+dv = design_velocity(document, "w")      # the document dict; component= when there are several
+dv.defining["geometry.components.xs.features[0].w"]   # Fraction(1)
+dv.vertices[v]                           # (Vx, Vy) as Q2, exact
+dv.curves[i]                             # CurveMotion: va, vb (ends); vc, dr for an arc or circle
+dv.area_derivative("core")               # d(area)/dp in pm
+dv.perimeter_derivative("core")          # dimensionless
+dv.complex                               # the RegionComplex at p, equal to evaluate()'s
+
+domain, namer, _ = dv.complex.to_domain(size)
+nv = dv.node_velocity(generate(domain, namer))
+nv.values, nv.curve, nv.vertex           # (N, 2) V of nodes on curves; their curve and vertex, -1 otherwise
+```
+
+**What V is.** x and p are both lengths in the document unit, so V is
+dimensionless. V is computed at the rounded geometry, from the unrounded
+expressions:
+- **Length fields.** The expressions are evaluated once more with p as a dual
+  number.
+- **Vertices.** V solves the exact linear constraints of every curve and
+  defining point through the vertex, in its field: rational, or a + b√D on a
+  circle.
+- **Split points of a whole circle.** They move radially.
+- **Points along a curve.** On a line, a point moves with the end velocities
+  interpolated linearly. On an arc, it moves with vc + dr·n, plus the ends'
+  tangential parts interpolated in angle. The normal part is fixed by the
+  geometry; the tangential part is a convention.
+
+**Node velocity.** `node_velocity(mesh)` reads the curves' mesh edges as
+`provenance_edges` does: exterior boundaries, interfaces and internal
+constraints. It returns:
+- the V of each node on a curve;
+- the curve and the vertex each node lies on;
+- zero for interior nodes, which galerkin moves. galerkin does not read this yet.
+
+**Refused.** `TopologyChange` is a `GeometryError`. Its `features` hold the ids
+of the features involved (`domain` for a domain side), and the message names
+them and the location. It is raised when:
+- the constraints at a vertex disagree, for example a touch that opens, an
+  overlap that starts or three concurrent curves that separate;
+- the constraints fix one direction only (a tangent contact);
+- the exact evaluations at p ± δ differ in combinatorial signature, with
+  δ = 2⁻²⁰ pm / 2^⌈log₂ max |V|⌉ (`dv.delta_pm`).
+
+`exact_complex(document, p, offset)` is that unrounded evaluation. Also refused
+by name:
+- unknown, ratio and derived parameters;
+- `3d` components;
+- `path` arcs whose start, centre or end moves (static arcs are taken).
+
+**Checked** (`tests/simcase/test_geometry_design_velocity.py`, pre-registered
+D1–D8, 2026-11-08):
+
+| Check | Criterion | Result |
+|---|---|---|
+| Closed forms | rect dA/dw = h, dP/dw = 2; circle dA/dr = 2πr, dP/dr = 2π, within 1e-12; corner V exact | pass |
+| Derived points | line–line V exact; line–circle dx/dr = ±r/√(r² − 1) within 1e-12 | pass |
+| Exact finite differences | linear dependence exact; y = 8/a observed order ≥ 1.9, ≤ 1e-9 at the smallest step | order 2.000; 3.6e-12 at 2⁻¹⁶ µm |
+| Rounded-document finite differences | area of a cut circle, h = 1 µm to 1 nm, best within 1e-6 | 4.3e-10 at 1 nm (2.2e-12 at 0.1 nm; the 1 pm rounding floor appears at 1 pm) |
+| Topology | touching rects, a corner leaving a domain side, tangent circles, a segment through a corner, a moving closed-path start: refused with the features; a touch linked by an expression is not refused | pass |
+| Unchanged outputs | `parse` and `evaluate` unchanged; the complex is equal before and after a derivative | pass |
+| Node velocity | circle nodes V·n = dr/dp within 1e-12, tangential 0; vertex nodes equal the vertex V | pass |
+
 ## Validation
 
 The pre-registered checks G2-1 to G2-7 (HQ work record, 2026-11-04) are in
