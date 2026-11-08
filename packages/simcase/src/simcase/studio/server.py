@@ -26,7 +26,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import physmat
-from simcase import __version__, Document, DocumentError, build_mesh, examples, run, unit_vocabulary
+from simcase import (__version__, Document, DocumentError, SubspaceSweepResult, build_mesh, examples, run,
+                     unit_vocabulary)
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
@@ -240,10 +241,9 @@ def _run_job(job_id: str, doc: Document):
         res = run(doc, verbose=False)
         for line in res.log:
             record(line)
-        from ..subspace_result import FIELD_REPRESENTATION, SubspaceSweepResult
         if isinstance(res, SubspaceSweepResult):
             with _jobs_lock:
-                _jobs[job_id].update(status="done", result=_subspace_payload(res, FIELD_REPRESENTATION))
+                _jobs[job_id].update(status="done", result=_subspace_payload(res, res.field_representation))
             return
         ng = res.group_index()
         payload = {

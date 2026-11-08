@@ -16,6 +16,7 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass
+from typing import ClassVar
 from pathlib import Path
 
 import numpy as np
@@ -42,6 +43,10 @@ class SubspaceSweepResult(RunResult):
     eigenfields with the existing max-centroid normalization. ``frame_transforms``
     hold block-diagonal T with frame = raw @ T for every component.
     """
+
+    #: Layout name of the saved and served vector fields (``summary.json``,
+    #: ``fields.npz`` and the Studio payload).
+    field_representation: ClassVar[str] = FIELD_REPRESENTATION
 
     cluster_offsets: np.ndarray | None = None
     frame_transforms: list[np.ndarray] | None = None
