@@ -391,7 +391,7 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
             ("initial_temperature_k", np.full(len(x), np.inf)),
             ("initial_temperature_k", np.zeros(len(x), dtype=complex)),
             ("dirichlet", {True: 0}), ("dirichlet", {1.5: 0}),
-            ("dirichlet", {5: 0}), ("dirichlet", {-1: 0}), ("dirichlet", []),
+            ("dirichlet", {len(x): 0}), ("dirichlet", {-1: 0}), ("dirichlet", []),   # an interior node is valid since 2026-11-08
             ("heat_source", True), ("heat_source", complex(1, 0)),
             ("heat_source", np.nan)]
         for key, value in changes:
