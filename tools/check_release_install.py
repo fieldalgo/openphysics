@@ -16,9 +16,10 @@ wheels of one distribution it takes the one this interpreter supports.
 PyPI serves every distribution at VERSION, requires PyPI's SHA-256 of every
 uploaded file to equal FILE, and then installs from PyPI without a cache.
 
-Either way it installs ``openphysics`` (the complete product, as a user would) into a fresh venv in a
-temporary directory outside the checkout, runs ``pip check``, requires every
-distribution at the release version, runs tools/wheel_consumers/wheel_smoke.py
+Either way it installs the complete product, ``openphysics``, and ``meshloom``, which
+the product does not include yet (``--wheels`` names all nine wheels by URL), into a
+fresh venv in a temporary directory outside the checkout, runs ``pip check``, requires
+every distribution at the release version, runs tools/wheel_consumers/wheel_smoke.py
 from a copy, and writes a JSON report with the resolved environment.
 """
 
@@ -97,6 +98,11 @@ def local_requirements(directory, supported=None):
     return versions.pop(), requirements
 
 
+def pypi_requirements(version):
+    """What a user installs from PyPI: the product, plus meshloom, which it does not include yet."""
+    return [f"openphysics=={version}", f"meshloom=={version}"]
+
+
 def pypi_files(name, version):
     """{filename: sha256} PyPI lists for one release, or None while it is not there yet."""
     try:
@@ -163,7 +169,7 @@ def main(argv=None):
         version = args.from_pypi
         report["source"] = "PyPI"
         report["pypi_sha256"] = wait_for_pypi(version, args.sha256sums, args.wait)
-        requirements = [f"openphysics=={version}"]
+        requirements = pypi_requirements(version)
         # The simple index can lag the JSON API for a few minutes after upload.
         attempts = 5
     report["version"] = version
