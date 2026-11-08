@@ -100,7 +100,8 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 | `fonttools`, `pyparsing`, `six` | matplotlib | MIT | |
 | `pillow` | matplotlib | MIT-CMU | 허용형 조건의 이미지·글꼴·압축 라이브러리를 포함함(FreeType: FTL OR GPL-2.0-or-later, FTL로 사용). Linux·macOS에서는 공유 라이브러리, Windows에서는 정적 링크 |
 | `packaging` | matplotlib | Apache-2.0 OR BSD-2-Clause | |
-| `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | |
+| `python-dateutil` | matplotlib | Apache-2.0 AND BSD-3-Clause | 4.0.0부터 메타데이터는 BSD-3-Clause만 적지만 LICENSE 파일은 여전히 두 라이선스를 모두 부여하므로 목록은 둘 다 유지(`metadata_spdx`) |
+| `tzdata` | python-dateutil(4.0.0부터) | Apache-2.0 | 시간대 데이터 파일만 |
 | `array-api-compat` | galerkin(`>=1.15`) | MIT | 순수 Python. 같은 구현이 NumPy·JAX·PyTorch 배열에서 돌게 함(`galerkin.core.backend`) |
 
 ### 선택 extra
@@ -271,7 +272,8 @@ python tools/check_licenses.py --report .validation/licenses.json
 
 - 설치된 배포판에 검토된 목록 항목이 없을 때
 - 설치된 메타데이터가 다른 SPDX 식을 선언하거나, 항목에 없는 copyleft 라이선스를
-  언급할 때(항목에 이유를 적은 경우 제외)
+  언급할 때(항목에 이유를 적은 경우 제외). 더 좁은 선언을 항목의 검토된 `metadata_spdx`로
+  기록한 경우는 항목의 식에 OR가 없고 선언한 라이선스를 모두 기록했을 때만 통과
 - 자체 패키지의 runtime·optional 의존성이 허용형이 아닐 때(external process는 대신 아래 GPL
   규칙으로 검사)
 - 약한 copyleft 시험·도구 의존성에 `test_only` 표시가 없을 때
