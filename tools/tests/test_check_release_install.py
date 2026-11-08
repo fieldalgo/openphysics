@@ -45,6 +45,18 @@ def test_local_requirements_name_every_wheel_by_url(tmp_path):
     assert [r for r in requirements if r.startswith("galerkin-refsol @ ")]
 
 
+def test_pypi_install_reaches_every_distribution():
+    # The release check requires all nine at the release version, so what it installs
+    # from PyPI (with the product's own requirements) must name each of them.
+    import tomllib
+    from packaging.requirements import Requirement
+    meta = tomllib.loads((install.ROOT / "packages" / "openphysics" / "pyproject.toml").read_text(encoding="utf-8"))
+    product = {Requirement(r).name for r in meta["project"]["dependencies"]}
+    named = {Requirement(r).name for r in install.pypi_requirements("0.0.2")}
+    assert named | product == set(install.DISTRIBUTIONS)
+    assert install.pypi_requirements("0.0.2") == ["openphysics==0.0.2", "meshloom==0.0.2"]
+
+
 def test_local_requirements_need_every_distribution_at_one_version(tmp_path):
     with pytest.raises(SystemExit, match="expected wheels for each"):
         install.local_requirements(wheels(tmp_path / "a", names=install.DISTRIBUTIONS[:-1]))
