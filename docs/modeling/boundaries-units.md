@@ -42,7 +42,10 @@ entering the body, not positive outward flow. Exact equations and callback rules
   count of three fixed DOFs is not enough if they leave a rotation free.
 - Traction is force per area in global Cartesian directions. It is not a scalar
   pressure or total nodal force. Remaining natural boundaries are traction-free
-  under the relevant mechanical contract.
+  under the relevant mechanical contract. Region mechanics documents also take a
+  scalar `pressure_pa` per named boundary: the traction −p n with n the outward
+  normal, so a positive pressure pushes on the body
+  ([contract](../packages/simcase/mechanics2d.md#material-regions-and-named-boundaries)).
 - Plane stress and plane strain are different physical approximations, not
   alternative accuracy settings. Thermal expansion also requires a reference
   temperature; fixing thermal nodes never automatically fixes mechanical nodes.

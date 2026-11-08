@@ -20,6 +20,7 @@ import numpy as np
 
 from .schema import DocumentError, check_format_units_and_tags
 from .thermal import _number
+from .thermal_regions import MATERIAL_KEYS as SHARED_MATERIAL_KEYS
 from .thermal_regions import (SIDES, _sides, boundary_names, build_region_mesh, covered_shapes,
                               has_region_geometry, is_axisymmetric, region_geometry, region_inputs,
                               region_materials_table, region_mesh_settings, region_source)
@@ -91,11 +92,11 @@ def validate_region_mechanics(doc):
     thermal = kind == THERMOELASTIC
     path = 'physics.'+name
     if thermal:
-        _keys(d['units'], {'length', 'temperature'}, 'units')
+        _keys(d.get('units'), {'length', 'temperature'}, 'units')
         if 'length' not in doc.scale.declared or d['units'].get('temperature') != 'K':
             raise DocumentError(f'{kind} requires explicit units.length and units.temperature="K"')
     else:
-        _keys(d['units'], {'length'}, 'units')
+        _keys(d.get('units'), {'length'}, 'units')
         if 'length' not in doc.scale.declared:
             raise DocumentError(f'{kind} requires explicit units.length')
     if is_axisymmetric(doc):
@@ -115,6 +116,16 @@ def validate_region_mechanics(doc):
     if missing:
         raise DocumentError(f'{path}: missing {sorted(missing)}')
     names = region_geometry(doc, 'mechanics')
+    materials = d['materials']
+    if isinstance(materials, dict):
+        # the shared table's keys, refused here in mechanics words; the shared check follows
+        for mname, spec in materials.items():
+            if isinstance(spec, dict) and 'thermal_conductivity_w_mk' in spec:
+                raise DocumentError(f'materials.{mname}.thermal_conductivity_w_mk: the materials table names thermal '
+                                    'conductivity conductivity_w_mk (the rectangle thermoelastic physics key '
+                                    'thermal_conductivity_w_mk is not a material key)')
+            if isinstance(spec, dict):
+                _keys(spec, SHARED_MATERIAL_KEYS, f'materials.{mname}')
     region_materials_table(doc, MATERIAL_KEYS[kind], kind)
     if p['plane'] not in PLANES:
         raise DocumentError(path+'.plane: expected "stress" or "strain"')
@@ -154,6 +165,7 @@ def validate_region_mechanics(doc):
         _number(p['reference_temperature_k'], path+'.reference_temperature_k', nonnegative=True)
         region_source(p, names, path)
         _sides(p, name, SIDES, (tags, outside, inside))
+    _keys(d['mesh'], {'size', 'min_angle', 'controls'}, 'mesh')
     region_mesh_settings(doc)
     if d['study'] != {'type': 'single'}:
         raise DocumentError(f'{kind} supports only study {{"type":"single"}}')

@@ -68,6 +68,8 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   메시하지 않습니다.
 - `materials`: `{재료 이름: {...}}`. 사용하는 모든 재료에 `conductivity_w_mk` > 0(필수),
   선택 `volumetric_heat_capacity_j_m3k` > 0(정상 열전도는 쓰지 않음), 선택 `source` 메모.
+  표는 영역 기계와 공유하므로 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`도 있으면 받아
+  검사합니다(열전도는 쓰지 않음; [기계](mechanics2d.md#재료-영역과-이름-있는-경계)).
   열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야 합니다.
   쓰지 않는 재료는 허용합니다. 같은 표에 [영역 전기 전도](electric_joule.md#재료-영역-전기-정상-전도)용
   `electrical_conductivity_s_m` > 0을 둘 수 있고 열은 이를 무시합니다(2026-11-08부터; 전에는 모르는
