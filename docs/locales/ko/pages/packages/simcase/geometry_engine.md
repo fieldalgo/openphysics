@@ -166,6 +166,67 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
 말합니다(엔진은 단위와 무관해 블록을 다시 읽지 않음). 사본은 그 단위를 `geometry_block_unit`에 적고 `to_dict()`·
 `save()`를 거부합니다. 결과는 원본 문서를 기록합니다.
 
+## 설계 속도 (4단계)
+
+`simcase.geometry_velocity`는 계약의 [4단계 보완](geometry_document.md#파라미터-스윕-미분동결)(2026-11-08)을
+구현합니다. 2D·축대칭 구성 요소의 독립 길이 파라미터 p 하나에 대해 V = ∂x/∂p를 줍니다. 표준 라이브러리만
+가져오고, 메시에는 NumPy를 씁니다. 다른 것은 바뀌지 않습니다. 미분을 요청하든 않든 `parse`·`evaluate`·`to_domain`
+결과는 같습니다.
+
+```python
+from simcase.geometry_velocity import design_velocity, TopologyChange
+
+dv = design_velocity(document, "w")      # 문서 dict; 구성 요소가 여럿이면 component=
+dv.defining["geometry.components.xs.features[0].w"]   # Fraction(1)
+dv.vertices[v]                           # (Vx, Vy), Q2로 정확
+dv.curves[i]                             # CurveMotion: va, vb(양 끝); 원호·원은 vc, dr
+dv.area_derivative("core")               # d(넓이)/dp, pm
+dv.perimeter_derivative("core")          # 무차원
+dv.complex                               # p에서의 RegionComplex, evaluate() 결과와 같음
+
+domain, namer, _ = dv.complex.to_domain(size)
+nv = dv.node_velocity(generate(domain, namer))
+nv.values, nv.curve, nv.vertex           # (N, 2) 곡선 위 노드의 V; 놓인 곡선과 꼭짓점, 아니면 -1
+```
+
+**V란.** x와 p가 모두 문서 단위의 길이이므로 V는 무차원입니다. 반올림된 형상에서, 반올림하지 않은 식으로
+구합니다.
+- **길이 필드.** p를 이중수로 넣고 식을 한 번 더 평가합니다.
+- **꼭짓점.** V는 그 점을 지나는 모든 곡선과 정의점의 정확한 일차 조건을 꼭짓점의 체에서 풉니다. 체는
+  유리수이거나, 원 위라면 a + b√D입니다.
+- **온전한 원의 분할점.** 반지름 방향으로 움직입니다.
+- **곡선 위 점.** 직선에서는 양 끝 속도를 선형 보간한 속도로 움직입니다. 원호에서는 vc + dr·n에, 양 끝의 접선
+  성분을 각도로 보간한 값을 더해 움직입니다. 법선 성분은 형상이 정하고, 접선 성분은 약속입니다.
+
+**노드 속도.** `node_velocity(mesh)`는 곡선의 메시 변을 `provenance_edges`와 같은 방식으로 읽습니다(외부 경계,
+계면, 내부 제약). 다음을 돌려줍니다.
+- 곡선 위 각 노드의 V;
+- 각 노드가 놓인 곡선과 꼭짓점;
+- 내부 노드는 0. 내부 노드는 galerkin이 움직입니다. galerkin은 아직 이 값을 읽지 않습니다.
+
+**거부.** `TopologyChange`는 `GeometryError`의 하위입니다. `features`에 관련 피처 id(도메인
+변은 `domain`)를 담고, 메시지에 피처와 위치를 밝힙니다. 다음 경우에 일어납니다.
+- 한 꼭짓점의 조건이 서로 어긋날 때. 예: 닿음이 벌어짐, 겹침이 시작됨, 한 점에서 만나던 세 곡선이 갈라짐;
+- 조건이 한 방향만 정할 때(접선 접촉);
+- p ± δ의 정확한 평가가 조합 서명에서 다를 때. δ = 2⁻²⁰ pm / 2^⌈log₂ max |V|⌉(`dv.delta_pm`)입니다.
+
+`exact_complex(document, p, offset)`가 그 반올림 없는 평가입니다. 다음도 이름을 밝혀 거부합니다.
+- 없는·ratio·유도 파라미터;
+- `3d` 구성 요소;
+- 시작·중심·끝이 움직이는 `path` 원호(고정된 원호는 받음).
+
+**확인**(`tests/simcase/test_geometry_design_velocity.py`, 사전 등록 D1–D8, 2026-11-08):
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| 닫힌 식 | 사각형 dA/dw = h, dP/dw = 2; 원 dA/dr = 2πr, dP/dr = 2π, 1e-12 이내; 모서리 V 정확 | 통과 |
+| 유도점 | 직선–직선 V 정확; 직선–원 dx/dr = ±r/√(r² − 1), 1e-12 이내 | 통과 |
+| 정확 산술 유한차분 | 선형 의존은 정확; y = 8/a는 관측 차수 ≥ 1.9, 최소 스텝에서 ≤ 1e-9 | 차수 2.000; 2⁻¹⁶ µm에서 3.6e-12 |
+| 반올림 문서 유한차분 | 잘린 원의 넓이, h = 1 µm부터 1 nm, 최선 1e-6 이내 | 1 nm에서 4.3e-10(0.1 nm에서 2.2e-12; 1 pm에서 반올림 바닥이 보임) |
+| 위상 | 맞닿은 사각형, 도메인 변을 떠나는 모서리, 접하는 원, 모서리를 지나는 segment, 움직이는 닫힌 path 시작점: 피처를 밝혀 거부; 식으로 묶인 닿음은 거부하지 않음 | 통과 |
+| 출력 무변경 | `parse`·`evaluate` 그대로; 미분 전후 복합체가 같음 | 통과 |
+| 노드 속도 | 원 노드 V·n = dr/dp 1e-12 이내, 접선 0; 꼭짓점 노드 = 꼭짓점 V | 통과 |
+
 ## 검증
 
 사전 등록 검사 G2-1..G2-7(HQ 작업 기록, 2026-11-04)은 `tests/simcase/test_geometry_engine.py`에 있고 shapely가
