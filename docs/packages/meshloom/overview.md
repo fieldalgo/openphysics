@@ -109,8 +109,12 @@ names may change before the mesher's public API.
   component reaching a hull face that is not a facet is outside. With
   `domain="regions"` every other component is a region (a multi-region PLC);
   with `domain="parity"` the components an odd number of facets away from the
-  outside form one region (the even-odd domain of closed surfaces; a surface that is
-  not closed, such as an edge with three facets, raises `ValueError`). Points on
+  outside form one region (the even-odd domain of closed surfaces; a face shared by
+  two touching shells counts twice). Errors are typed, all `ValueError`: `InvalidPLC`
+  from the input check with its witness, `NotClosed` in parity mode with witness type 6
+  (an elementary segment on the boundary of an odd number of facets, such as an edge
+  with three facets), `RecoveryError`, `RoundingError`, and `MeshError` for anything
+  else. Points on
   segments are rounded once to the nearest double, input points are kept bit for bit,
   unused points are dropped, and every tetrahedron is certified with exact
   `orient3d > 0` on the output doubles. Tetrahedra that rounding makes flat or

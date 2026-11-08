@@ -67,7 +67,7 @@ class Builder:
         return np.array(self.points, dtype=float), self.facets
 
 
-def check(m, points, facets, volumes, exact):
+def check(m, points, facets, volumes, exact, euler=True):
     """V1-V4 from the arrays (Fraction), returns the sorted region volumes."""
     nodes, tets, regions = m["nodes"], m["tetrahedra"], m["regions"]
     q = [[F(x) for x in p] for p in nodes.tolist()]
@@ -99,7 +99,7 @@ def check(m, points, facets, volumes, exact):
             sides = {int(regions[t]) for t, _ in owners[tuple(sorted(f))]}
             assert sides == {a, b}, "V2 interface"
     # V2 Euler characteristic per region (every region here is a ball)
-    for r in range(k):
+    for r in range(k if euler else 0):
         ts = [t for t, rr in zip(tets.tolist(), regions.tolist()) if rr == r]
         V = len({x for t in ts for x in t})
         E = len({tuple(sorted((t[i], t[j]))) for t in ts for i in range(4) for j in range(i + 1, 4)})
@@ -129,14 +129,16 @@ def check(m, points, facets, volumes, exact):
                     nn = math.sqrt(float(sum(c * c for c in n)))
                     assert abs(float(d)) / nn <= 4 * 2.0 ** -52 * diag(points), "V3(b)"
         area_in = float(sum(c * c for c in n))  # Newell: |n| = 2 area; n.n = |n| * 2 area, as below
-        # the facet's area is covered by its exterior faces and, where another region
-        # sits on it, by interface faces in its plane and within its bounding box
+        # the facet's area is covered by the mesh faces in its plane within its bounds:
+        # exterior faces, interface faces where another region sits on it, and inner
+        # faces where the even-odd domain continues across it (touching shells)
         lo = [min(P[i][c] for i in loop) for c in range(3)]
         hi = [max(P[i][c] for i in loop) for c in range(3)]
-        cover = faces.tolist() + [
-            f for fs in m["interfaces"].values() for f in fs.tolist()
+        cover = {tuple(sorted(f)) for f in faces.tolist()} | {
+            f for f in owners
             if all(sum(ni * di for ni, di in zip(n, sub(q[x], o))) == 0 and
-                   all(lo[c] <= q[x][c] <= hi[c] for c in range(3)) for x in f)]
+                   all(lo[c] <= q[x][c] <= hi[c] for c in range(3)) for x in f)}
+        cover = [list(f) for f in cover]
         area_out = sum(abs(float(sum(ni * ci for ni, ci in zip(n, cross(sub(q[f[1]], q[f[0]]), sub(q[f[2]], q[f[0]]))))))
                        for f in cover)
         assert abs(area_out - area_in) <= 1e-12 * area_in, f"V3(a) facet {tag}"
@@ -328,3 +330,18 @@ def test_c10_case(name):
     if name in ("schonhardt", "chazelle-3"):
         # neither has a tetrahedralization without Steiner points
         assert (m["node_source"] >= len(pts)).sum() > 0
+
+
+# the even-odd domain of closed surfaces (C14's domain): touching shells are one region,
+# a face shared by two shells is crossed twice and does not change the parity
+PARITY = {"box-on-a-larger-box": [18.0], "shells-touching-at-a-vertex": [2.0], "edge-with-four-facets": [2.0],
+          "chazelle-3": None, "schonhardt": None, "slab-1-100": [100.0]}
+
+
+@pytest.mark.parametrize("name", sorted(PARITY))
+def test_c10_case_as_even_odd_domain(name):
+    pts, facets, volumes, exact = CASES[name]
+    m = mesh_plc(pts, facets, domain="parity")
+    assert len(m["region_names"]) == 1
+    check(m, pts, facets, PARITY[name] or volumes, exact, euler=name not in ("shells-touching-at-a-vertex",
+                                                                             "edge-with-four-facets"))

@@ -54,6 +54,28 @@ pub struct TetMesh {
     pub repair: RepairStats,
 }
 
+/// Why `build` produced no mesh.
+#[derive(Debug, Clone)]
+pub enum MeshError {
+    /// parity mode: an elementary segment (input points `segment`) lies on the boundary
+    /// of an odd number of facets (`facets`), so the surface is not closed (witness 6)
+    NotClosed { segment: [u32; 2], facets: Vec<u32> },
+    /// rounding to doubles left points equal or tetrahedra that flips cannot repair
+    Rounding(String),
+    Internal(String),
+}
+
+impl std::fmt::Display for MeshError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MeshError::NotClosed { segment, facets } => write!(f,
+                "the segment {}-{} is on the boundary of {} facets {:?}: the surface is not closed", segment[0], segment[1],
+                facets.len(), facets),
+            MeshError::Rounding(m) | MeshError::Internal(m) => write!(f, "{m}"),
+        }
+    }
+}
+
 fn key(f: [u32; 3]) -> [u32; 3] {
     let mut k = f;
     k.sort_unstable();
@@ -65,13 +87,60 @@ fn face(t: &[u32; 4], i: usize) -> [u32; 3] {
 }
 
 /// Labels, rounds and certifies the result of boundary recovery.
-pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, String> {
+pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, MeshError> {
+    if domain == Domain::Parity {
+        closed(points.len(), b)?;
+    }
+    build_inner(points, b, domain).map_err(|e| {
+        if e.starts_with("rounding") || e.contains("repair") {
+            MeshError::Rounding(e)
+        } else {
+            MeshError::Internal(e)
+        }
+    })
+}
+
+/// Witness 6 of the C14 validity rule: an elementary segment on the boundary of an odd
+/// number of facets. A facet's boundary edges are the edges used once by its subfacets.
+fn closed(n: usize, b: &Boundary) -> Result<(), MeshError> {
+    let mut on: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
+    for (f, tris) in b.plc.subfacets.iter().enumerate() {
+        let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
+        for t in tris {
+            for k in 0..3 {
+                let (u, v) = (t[k], t[(k + 1) % 3]);
+                *uses.entry((u.min(v), u.max(v))).or_default() += 1;
+            }
+        }
+        for (e, c) in uses {
+            if c == 1 {
+                on.entry(e).or_default().push(f as u32);
+            }
+        }
+    }
+    let mut odd: Vec<((u32, u32), Vec<u32>)> = on.into_iter().filter(|(_, fs)| fs.len() % 2 == 1).collect();
+    odd.sort_unstable();
+    if let Some(((u, v), mut facets)) = odd.into_iter().next() {
+        facets.sort_unstable();
+        let s = &b.plc.rec.s;
+        // the input segment this piece lies on
+        let seg = |x: u32| (x as usize >= n).then(|| { let p = s[x as usize - n]; [p.a, p.b] });
+        let segment = seg(u).or_else(|| seg(v)).unwrap_or([u, v]);
+        return Err(MeshError::NotClosed { segment: [segment[0].min(segment[1]), segment[0].max(segment[1])], facets });
+    }
+    Ok(())
+}
+
+fn build_inner(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, String> {
     let tets = &b.tets;
     // the facets of each subfacet (two facets can share one, e.g. touching shells)
+    // facets per subfacet: a face shared by two touching shells is crossed twice
+    let mut multiplicity: HashMap<[u32; 3], u32> = HashMap::new();
     let mut facet_of: HashMap<[u32; 3], u32> = HashMap::new();
     for (f, tris) in b.plc.subfacets.iter().enumerate() {
         for t in tris {
             facet_of.entry(key(*t)).or_insert(f as u32);
+            *multiplicity.entry(key(*t)).or_default() += 1;
         }
     }
     let mut owners: HashMap<[u32; 3], Vec<(u32, usize)>> = HashMap::with_capacity(2 * tets.len());
@@ -113,13 +182,15 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, Str
         }
     }
     // the component graph across subfacets
-    let mut adj: Vec<Vec<(u32, u32)>> = vec![Vec::new(); ncomp as usize];
+    // (component, facet, parity change: the number of facets on the face, mod 2)
+    let mut adj: Vec<Vec<(u32, u32, u8)>> = vec![Vec::new(); ncomp as usize];
     for (k, list) in &owners {
         if let (Some(&f), [(a, _), (b2, _)]) = (facet_of.get(k), list.as_slice()) {
             let (ca, cb) = (comp[*a as usize], comp[*b2 as usize]);
             if ca != cb {
-                adj[ca as usize].push((cb, f));
-                adj[cb as usize].push((ca, f));
+                let flip = (multiplicity[k] % 2) as u8;
+                adj[ca as usize].push((cb, f, flip));
+                adj[cb as usize].push((ca, f, flip));
             }
         }
     }
@@ -141,8 +212,9 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, Str
             for (k, list) in &owners {
                 if let ([(t, _)], Some(&f)) = (list.as_slice(), facet_of.get(k)) {
                     let c = comp[*t as usize];
-                    adj[out].push((c, f));
-                    adj[c as usize].push((out as u32, f));
+                    let flip = (multiplicity[k] % 2) as u8;
+                    adj[out].push((c, f, flip));
+                    adj[c as usize].push((out as u32, f, flip));
                 }
             }
             let mut parity = vec![u8::MAX; ncomp as usize + 1];
@@ -155,8 +227,8 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, Str
                 }
             }
             while let Some(c) = stack.pop() {
-                for &(d, f) in &adj[c as usize] {
-                    let p = parity[c as usize] ^ 1;
+                for &(d, f, flip) in &adj[c as usize] {
+                    let p = parity[c as usize] ^ flip;
                     if parity[d as usize] == u8::MAX {
                         parity[d as usize] = p;
                         stack.push(d);
