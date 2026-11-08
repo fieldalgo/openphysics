@@ -20,11 +20,13 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 - **Start from**에서 동봉 예제(`examples/simcase/geometry_v1_soi_strip.json`,
   `geometry_v1_imprint_rib.json`, 페이지에 들어 있음)나 사각형 하나짜리 새 문서를 고르거나, **Open file**로 JSON
   문서를 엽니다.
-- **Parameters**에 파라미터와 평가된 값이 나옵니다. `range`가 있고 숫자로 쓴 파라미터에는 슬라이더가 붙고, 모든
-  파라미터에 숫자나 식(`2 * t + 0.1`)을 받는 입력 칸이 있습니다.
+- **Parameters**에 파라미터와 평가된 값이 나옵니다. `range`가 있고 숫자로 쓴 파라미터에는 슬라이더가 붙습니다.
+  슬라이더 간격은 10의 거듭제곱(범위 안에 200칸 이상)이라 저장되는 값이 짧은 소수로 남습니다. 모든 파라미터에 숫자나
+  식(`2 * t + 0.1`)을 받는 입력 칸이 있습니다. double로 담을 수 없는 수(`1e999`, `1e-400`)는 페이지에서 거부하고, 입력
+  칸은 문서가 가진 값으로 돌아갑니다.
 - 편집할 때마다 문서 전체를 서버로 보내고, 서버가 문서를 파싱해 구성 요소 하나를 평가합니다. 그림은 셀을 영역별로
   칠하고(빈 공간 셀은 칠하지 않음) 모든 곡선을 그립니다. 원호와 원은 그리기용으로만 점을 찍습니다. 영역, 이름 붙은
-  선택, 경계 태그를 누르면 해당 셀이나 곡선이 강조됩니다. **Engine listing**은 같은 문서에 대해
+  선택, 경계 태그를 누르면 해당 셀이나 곡선이 강조되고, 강조는 새 응답마다 이름으로 다시 찾습니다. **Engine listing**은 같은 문서에 대해
   `python -m simcase geometry`가 출력하는 글입니다.
 - 엔진이 거부한 문서는 마지막으로 받아들인 그림을 흐리게 남기고 엔진의 메시지를 그대로 보입니다. 메시지는 피처,
   선택 또는 파라미터 이름을 밝힙니다(예: `feature 'bow': its boundary crosses itself …`,
@@ -59,6 +61,7 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | GL-4 저장한 글이 편집한 문서와 같은 모델로 다시 파싱됨 | 같은 파일과 브라우저 검사 |
 | GL-5 실제 브라우저: 두 시작 문서, 슬라이더·입력 편집, 거부, 저장에서 콘솔 오류와 정책 위반 없음 | `tools/studio_browser/geometry_lab_browser.mjs`(로컬, Playwright 필요, CI 밖) |
 | GL-6 페이지의 순수 도우미 | `tests/simcase/studio_geometry_lab.cjs` |
+| 문서 자체와 비교한 그리기 자료: 원호·원의 표본 점이 그 원 위에 있고 반시계 방향으로 돌며, 그린 루프의 면적이 엔진 면적과 2e-3 이내, nm·µm·mm에서 길이·면적 단위 | `tests/simcase/test_studio_geometry_lab.py` |
 | GL-7 `/`와 `/workspace`가 실험실을 불러오거나 링크하지 않음, 실험실 모듈은 공개 이름만 가져옴 | `tests/simcase/test_studio_geometry_lab.py` |
 
 ## 한계

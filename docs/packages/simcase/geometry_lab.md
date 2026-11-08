@@ -25,13 +25,16 @@ python -m simcase.studio            # then open http://127.0.0.1:8765/geometry-l
   `geometry_v1_imprint_rib.json`, built into the page), a new one-rectangle
   document, or **Open file** with any JSON document.
 - **Parameters** are listed with their evaluated value. A parameter written as
-  a plain number with a `range` gets a slider; every parameter has a text field
-  that takes a number or an expression (`2 * t + 0.1`).
+  a plain number with a `range` gets a slider, whose step is a power of ten
+  (at least 200 steps over the range) so that saved values stay short decimals;
+  every parameter has a text field that takes a number or an expression
+  (`2 * t + 0.1`). A number a double cannot hold (`1e999`, `1e-400`) is refused
+  in the page and the field returns to the value the document holds.
 - Every edit sends the whole document to the server, which parses it and
   evaluates one component. The drawing shows the cells filled by region (void
   cells unfilled) and every curve; arcs and circles are sampled for drawing
   only. Click a region, a named selection or a boundary tag to highlight its
-  cells or curves. **Engine listing** is the text `python -m simcase geometry`
+  cells or curves; the highlight follows each new answer by name. **Engine listing** is the text `python -m simcase geometry`
   prints for the same document.
 - A document the engine refuses keeps the last accepted drawing, dimmed, and
   shows the engine's message unchanged; it names the feature, selection or
@@ -74,6 +77,7 @@ Registered before the page was written:
 | GL-4 the saved text parses back to the edited document and the same model | same, and the browser check |
 | GL-5 real browser: both starters, slider and text edits, a refusal and a save, with no console error and no policy violation | `tools/studio_browser/geometry_lab_browser.mjs` (local; needs Playwright, not in CI) |
 | GL-6 the page's pure helpers | `tests/simcase/studio_geometry_lab.cjs` |
+| Drawing data against the document itself: sampled arc and circle points lie on their circles and run counter-clockwise, drawn loops enclose the engine's areas within 2e-3, lengths and areas in nm, µm and mm | `tests/simcase/test_studio_geometry_lab.py` |
 | GL-7 `/` and `/workspace` do not load or link the lab; the lab's module imports only public names | `tests/simcase/test_studio_geometry_lab.py` |
 
 ## Limits

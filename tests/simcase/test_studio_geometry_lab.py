@@ -9,6 +9,7 @@ is studio_geometry_lab.cjs.
 import ast
 import copy
 import json
+import math
 import re
 import subprocess
 import sys
@@ -237,3 +238,68 @@ def test_gl7_the_lab_module_imports_only_public_simcase_names():
     assert names == ["GeometryError", "evaluate_geometry", "parse_geometry"]
     assert set(names) <= set(simcase.__all__)
     assert simcase.parse_geometry is parse and simcase.evaluate_geometry is evaluate
+
+
+# ---- drawing data checked against the document itself, not the engine's formulas --------
+
+def _shoelace(points):
+    return 0.5 * sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]))
+
+
+def _loop_points(view, loop):
+    pts = []
+    for index, forward in loop:
+        run = view["curves"][index]["points"]
+        run = run if forward else run[::-1]
+        pts += run[1:] if pts else run
+    return pts[:-1]
+
+
+def test_arcs_and_circles_are_drawn_on_their_circles_counter_clockwise(client):
+    doc = {"units": {"length": "nm"}, "geometry": {"version": 1, "components": {"xs": {
+        "dimension": "2d", "domain": {"xmin": -3000, "xmax": 3000, "ymin": -3000, "ymax": 3000},
+        "background": {"material": "a"},
+        "features": [
+            {"name": "disc", "type": "circle", "cx": -1500, "cy": 0, "r": 1000, "material": "b"},
+            {"name": "bar", "type": "rect", "x": -1700, "y": -2000, "w": 400, "h": 4000, "material": "c"},
+            {"name": "ring", "type": "circle", "cx": 1500, "cy": 1500, "r": 700, "material": "b"},
+            {"name": "half", "type": "path", "material": "c", "start": [500, -1500],
+             "segments": [{"arc": {"center": [1500, -1500], "to": [2500, -1500], "ccw": False}}]}]}}}}
+    view = lab(client, doc)
+    assert view["ok"] is True
+    circles = {"disc": ((-1500, 0), 1000), "ring": ((1500, 1500), 700), "half": ((1500, -1500), 1000)}
+    curved = [k for k in view["curves"] if k["kind"] != "line"]
+    assert curved
+    for k in curved:
+        (cx, cy), r = next(circles[f.split(".")[0]] for f in k["provenance"] if f.split(".")[0] in circles)
+        pts = k["points"]
+        assert len(pts) >= 3
+        for x, y in pts:
+            assert abs(((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 - r) <= 1e-9 * r
+        turns = [(x0 - cx) * (y1 - cy) - (x1 - cx) * (y0 - cy) for (x0, y0), (x1, y1) in zip(pts, pts[1:])]
+        assert min(turns) > 0                       # counter-clockwise from vertex a to b
+    # The drawn loops enclose the engine's areas up to the sampling of the curves.
+    for cell in view["cells"]:
+        drawn = _shoelace(_loop_points(view, cell["loops"][0])) - sum(
+            abs(_shoelace(_loop_points(view, hole))) for hole in cell["loops"][1:])
+        assert drawn == pytest.approx(cell["area"], rel=2e-3)
+    areas = {r["name"]: r["area"] for r in view["regions"]}
+    assert areas["ring"] == pytest.approx(math.pi * 700 ** 2, rel=1e-12)
+    assert areas["half"] == pytest.approx(math.pi * 1000 ** 2 / 2, rel=1e-12)
+    assert areas["bar"] == 400 * 4000 and view["unit"] == "nm"     # whole rect, exact in nm
+
+
+def test_lengths_and_areas_are_in_the_document_unit(client):
+    def rect_doc(unit, scale):
+        return {"units": {"length": unit}, "geometry": {"version": 1, "components": {"xs": {
+            "dimension": "2d", "domain": {"xmin": -2 * scale, "xmax": 2 * scale, "ymin": -1 * scale, "ymax": 1 * scale},
+            "background": {"material": "a"},
+            "features": [{"name": "r", "type": "rect", "x": -0.25 * scale, "y": -0.5 * scale, "w": 0.5 * scale,
+                          "h": 0.75 * scale, "material": "b"}]}}}}
+    for unit, scale in (("um", 1), ("nm", 1000), ("mm", 0.001)):
+        view = lab(client, rect_doc(unit, scale))
+        assert view["domain"] == {"xmin": -2 * scale, "xmax": 2 * scale, "ymin": -1 * scale, "ymax": 1 * scale}
+        r = next(x for x in view["regions"] if x["name"] == "r")
+        assert r["area"] == pytest.approx(0.375 * scale ** 2, rel=1e-15)
+        corners = {tuple(p) for k in view["curves"] if "r.left" in k["provenance"] for p in k["points"]}
+        assert corners == {(-0.25 * scale, -0.5 * scale), (-0.25 * scale, 0.25 * scale)}

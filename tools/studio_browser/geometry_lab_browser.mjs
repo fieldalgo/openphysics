@@ -71,6 +71,27 @@ try {
   assert.equal(narrow, (await api(edited)).body.summary);
   report.stages.push({edit: 'w = 0.9 by slider, then 0.4 typed', summaryChanged: true});
 
+  // A highlighted selection follows the current answer after an edit, not the old indices.
+  await page.click('#selections li[data-key="selection:rib_walls"]');
+  const lit = () => page.evaluate(() => [...document.querySelectorAll('#view path.curve.lit')].map(p => Number(p.dataset.curve)));
+  const wallsNow = async () => (await api(edited)).body.selections.find(x => x.name === 'rib_walls').entries;
+  assert.deepEqual(await lit(), await wallsNow());
+  edited.geometry.parameters.slab.value = 0.15;
+  await page.fill('#param-slab', '0.15'); await page.press('#param-slab', 'Enter'); await settled();
+  assert.deepEqual(await lit(), await wallsNow());
+  report.stages.push({highlightFollowsEdit: await lit()});
+
+  // A local refusal (overflow) is not hidden by an answer already on its way, and the field
+  // goes back to the value the document holds.
+  await page.fill('#param-slab', '0.12'); await page.press('#param-slab', 'Enter');
+  await page.fill('#param-slab', '1e999'); await page.press('#param-slab', 'Enter');
+  await page.waitForTimeout(800);
+  assert.ok(await page.isVisible('#refusal'));
+  assert.match(await page.textContent('#refusal'), /too large/);
+  assert.equal(await page.inputValue('#param-slab'), '0.12');
+  edited.geometry.parameters.slab.value = 0.12;
+  report.stages.push({localRefusalKept: true});
+
   // A refusal by name: an expression naming an unknown parameter.
   await page.fill('#param-w', 'nope * 2'); await page.press('#param-w', 'Enter'); await settled();
   const refusal = await page.textContent('#refusal');

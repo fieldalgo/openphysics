@@ -3,7 +3,7 @@
 // The experimental geometry lab page: holds one version 1 document, sends it whole to the
 // exact engine on every edit, and draws what the engine answers.
 import {areaLabel,cellPath,copyDocument,curvePath,highlightOf,isVersion1,newDocument,refusalText,
- regionColor,saveName,serializeDocument,setParameter,sliderOf,viewTransform} from './geometry-lab-model.mjs';
+ regionColor,saveName,serializeDocument,setParameter,sliderOf,sliderValue,viewTransform} from './geometry-lab-model.mjs';
 import {STARTERS} from './geometry-lab-starters.mjs';
 
 const $=id=>document.getElementById(id);
@@ -36,6 +36,7 @@ async function evaluate(){
 }
 
 function refuse(text){
+ ++state.request;                         // an answer already on its way must not hide this
  $('refusal').textContent='Refused: '+text;$('refusal').hidden=false;
  $('view').classList.add('stale');
  status(state.view?'Not evaluated: the drawing shows the last accepted document.':'Not evaluated.');
@@ -62,12 +63,13 @@ function renderParameters(){
   if(slider){
    range=el('input',{type:'range',min:slider.min,max:slider.max,step:slider.step,'aria-label':name+' slider'});
    range.value=String(entry.value);
-   range.addEventListener('input',()=>{text.value=range.value;edit(name,Number(range.value));});
+   range.addEventListener('input',()=>{const v=sliderValue(slider,range.value);text.value=String(v);edit(name,v);});
    box.append(range,el('small',{},`range ${slider.min} … ${slider.max}`));
   }
   text.addEventListener('change',()=>{
-   const ok=edit(name,text.value);
-   if(ok&&range&&typeof state.doc.geometry.parameters[name].value==='number')range.value=text.value;
+   const ok=edit(name,text.value),held=state.doc.geometry.parameters[name].value;
+   if(!ok)text.value=String(held);        // the field shows what the document holds; the refusal says why
+   else if(range&&typeof held==='number')range.value=String(held);
   });
   box.append(el('small',{class:'evaluated',id:'value-'+name}));
   rows.append(box);
@@ -82,7 +84,7 @@ function edit(name,value){
 function render(){
  const v=state.view,svg=$('view');
  const view=viewTransform(v.domain,800,560);
- const lit=highlightOf(v,state.highlight);
+ const lit=highlightOf(v,state.highlight);   // looked up by key in this answer
  svg.replaceChildren();
  for(const cell of v.cells){
   const cls='cell'+(cell.void?' void':'')+(lit.cells.has(cell.index)?' lit':'');
@@ -100,10 +102,10 @@ function render(){
  for(const p of v.parameters){const e=$('value-'+p.name);if(e)e.textContent=`= ${p.value} ${p.kind==='length'?v.unit:''}`;}
  const select=$('component');select.replaceChildren(...v.components.map(n=>{const o=el('option',{value:n},n);o.selected=n===v.component;return o;}));
  select.disabled=v.components.length<2;
- list('regions',v.regions.map(r=>({key:'region:'+r.name,item:{kind:'region-name',name:r.name},swatch:r.void?null:regionColor(v,r.name),
+ list('regions',v.regions.map(r=>({key:'region:'+r.name,swatch:r.void?null:regionColor(v,r.name),
   label:r.name,detail:`${r.void?'void':r.material} · ${areaLabel(r.area,v.unit)}`})));
- list('selections',v.selections.map(s=>({key:'selection:'+s.name,item:s,label:s.name,detail:`${s.kind} · ${s.entries.length}`})),'No named selections.');
- list('tags',v.tags.map(t=>({key:'tag:'+t.tag,item:{kind:'boundary',curves:t.curves},label:t.tag,detail:`${t.curves.length} curves`})));
+ list('selections',v.selections.map(s=>({key:'selection:'+s.name,label:s.name,detail:`${s.kind} · ${s.entries.length}`})),'No named selections.');
+ list('tags',v.tags.map(t=>({key:'tag:'+t.tag,label:t.tag,detail:`${t.curves.length} curves`})));
  $('summary').textContent=v.summary;
 }
 
@@ -112,10 +114,10 @@ function list(id,rows,empty='None.'){
  if(!rows.length){ul.append(el('li',{class:'muted'},empty));return;}
  for(const row of rows){
   const li=el('li',{'data-key':row.key,tabindex:'0'});
-  if(state.highlight?.key===row.key)li.classList.add('active');
+  if(state.highlight===row.key)li.classList.add('active');
   if(row.swatch!==undefined){const s=el('span',{class:'swatch'+(row.swatch?'':' void')});if(row.swatch)s.style.background=row.swatch;li.append(s);}
   li.append(el('code',{},row.label),el('small',{},row.detail));
-  const pick=()=>{state.highlight=state.highlight?.key===row.key?null:{...row.item,key:row.key};render();};
+  const pick=()=>{state.highlight=state.highlight===row.key?null:row.key;render();};
   li.addEventListener('click',pick);
   li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}});
   ul.append(li);
