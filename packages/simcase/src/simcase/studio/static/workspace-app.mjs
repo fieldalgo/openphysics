@@ -26,7 +26,10 @@ import {solverApi} from './workspace-api.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 
-(()=>{'use strict';const $=id=>document.getElementById(id);const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+(()=>{'use strict';const $=id=>document.getElementById(id);
+// A reload always opens the start page, so a restored scroll position would hide its top.
+if('scrollRestoration' in history)history.scrollRestoration='manual';
+const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
