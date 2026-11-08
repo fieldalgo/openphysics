@@ -12,3 +12,14 @@ export function checkWorkspaceCapabilities(caps){
  if(typeof caps.server_instance!=='string'||! /^[a-f0-9]{32}$/.test(caps.server_instance))throw new Error('Invalid server instance.');
  return {version:caps.simcase_version,instance:caps.server_instance};
 }
+// What a failed request means for the connection. 'restarted': the server answered
+// with another instance (a restart). 'unreachable': no answer at all. 'request': any
+// other failure, which says nothing about the connection.
+export function connectionFailure(error){
+ if(error?.status===409&&/restarted or changed/.test(String(error.message)))return 'restarted';
+ if(error instanceof TypeError||error?.name==='TypeError')return 'unreachable';
+ return 'request';
+}
+export const RESTARTED_MESSAGE='Studio was restarted. This page reconnected to the new server; your inputs and retained results are unchanged. Select Run optical study again.';
+export const UNREACHABLE_MESSAGE='Studio server is not reachable. Start Studio again with the same command and keep this address; this page reconnects by itself.';
+export const RECONNECTED_MESSAGE='Reconnected to Studio. Your inputs and retained results are unchanged.';

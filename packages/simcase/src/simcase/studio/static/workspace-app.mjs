@@ -11,7 +11,7 @@ import {installShapeEditor,SNAP_STEPS} from './workspace-shape-editor.mjs';
 import {sectionSvg,MATERIAL_FILL,WINDOW_VIEW,shapesView} from './workspace-section.mjs';
 import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS} from './workspace-shapes.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
-import {checkWorkspaceCapabilities} from './workspace-connection.mjs';
+import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHABLE_MESSAGE,RECONNECTED_MESSAGE} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
@@ -509,7 +509,10 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Model'&&ui.selection==='Study'&&isOptical())renderOpticalStudy();
 }
 
-const preflight=new OpticalPreflight(solverApi,()=>{if(ui.page==='Model'&&ui.selection==='Study')render();});
+// Requests other than Run go through this: a lost server starts automatic
+// reconnection, and a restarted server is reconnected so the next request works.
+const watchedApi=(path,body)=>solverApi(path,body).catch(error=>{const kind=connectionFailure(error);if(kind==='unreachable')connectionLost();else if(kind==='restarted'&&connection.ready)connectWorkspace();throw error;});
+const preflight=new OpticalPreflight(watchedApi,()=>{if(ui.page==='Model'&&ui.selection==='Study')render();});
 function renderOpticalStudy(){
  const host=$('canvas'),panel=$('inspector');host.innerHTML='<h2>Optical study</h2><p>Review the current input, optionally check it, then run explicitly.</p>'+pair('Geometry',escapeHtml(designSummary(current().model)))+pair('Wavelength',state.wavelength+' nm')+pair('Core mesh',state.coreMesh+' nm')+pair('Background',setup.materials.Oxide);
  const actions=document.createElement('div');actions.className='study-actions';
@@ -534,7 +537,7 @@ function renderOpticalStudy(){
 }
 
 let meshView='Full window';
-const meshPreview=new MeshPreview((path,body)=>solverApi(path+'?workspace_instance='+encodeURIComponent(connection.instance),body),()=>{if(ui.page==='Model'&&ui.selection==='Mesh')render();});
+const meshPreview=new MeshPreview((path,body)=>watchedApi(path+'?workspace_instance='+encodeURIComponent(connection.instance),body),()=>{if(ui.page==='Model'&&ui.selection==='Mesh')render();});
 function renderMeshPreview(){
  document.querySelector('.workspace > .note').textContent='Actual mesh in µm; preview is attached to captured inputs. Shaded triangles belong to shapes; dark triangles to the silica background.';
  const host=$('canvas'),panel=$('inspector');host.innerHTML='<h2>Optical mesh</h2><p>Generate the actual triangular mesh without solving optical modes.</p>';
@@ -714,7 +717,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
 
 let pendingJob=null;
 let jobPhase='idle',jobOperation=0,jobResumeBlocked=false;
-const jobMonitor=new OpticalJobMonitor({api:solverApi,onState:state=>{
+const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  $('job-message').textContent=state.message;
  if(state.phase==='done')setPending(null);
@@ -754,7 +757,13 @@ $('run-optical').onclick=async()=>{
   const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance),{doc});
   const record=validatePending({version:1,job:started.job,input:capture.input,revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString()});
   setPending(record);await jobMonitor.follow(record,serverInstance);
- }catch(error){jobPhase='error';$('job-message').textContent='Calculation request failed: '+error.message+' If submission reached the server, work may continue.';notice($('job-message').textContent);}
+ }catch(error){
+  const phase=jobPhase,kind=connectionFailure(error);jobPhase='error';
+  if(kind==='restarted'){await connectWorkspace();$('job-message').textContent=connection.ready?RESTARTED_MESSAGE:connection.message;}
+  else if(kind==='unreachable'){$('job-message').textContent=UNREACHABLE_MESSAGE;connectionLost();}
+  else $('job-message').textContent='Calculation request failed: '+error.message+(phase==='submitting'?' If submission reached the server, work may continue.':'');
+  notice($('job-message').textContent);
+ }
  finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
 };
 
@@ -764,6 +773,17 @@ async function connectWorkspace(){
  try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v5'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v5';}
  catch(error){connection.message='Studio connection unavailable or incompatible: '+error.message;$('workspace-tools').open=true;}
  finally{$('connection-status').textContent=connection.message;$('connect-workspace').disabled=false;refreshJobControls();render();refreshJobControls();}
+}
+// While the server cannot be reached, check every 3 s and reconnect when it is back.
+let reconnectTimer=null;
+function connectionLost(){
+ connection.ready=false;connection.message=UNREACHABLE_MESSAGE;$('connection-status').textContent=connection.message;notice(UNREACHABLE_MESSAGE);render();refreshJobControls();
+ if(reconnectTimer)return;
+ reconnectTimer=setInterval(async()=>{
+  try{await solverApi('/api/workspace/capabilities/v5');}catch{return;}
+  clearInterval(reconnectTimer);reconnectTimer=null;await connectWorkspace();
+  if(connection.ready){notice(RECONNECTED_MESSAGE);if($('job-message').textContent===UNREACHABLE_MESSAGE)$('job-message').textContent=RECONNECTED_MESSAGE;}
+ },3000);
 }
 $('connect-workspace').onclick=connectWorkspace;
 $('run-heat').onclick=()=>{runHeat().catch(error=>notice('Heat run failed: '+error.message));};heatController?.loadCapability();

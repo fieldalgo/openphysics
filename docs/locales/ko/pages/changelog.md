@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: Studio 작업 공간이 서버 재시작 뒤 스스로 다시 연결합니다. 재시작된 서버에 Run하면 다시 연결하고 다시 실행하라고 안내합니다(서버가 거부한 요청에 "work may continue"라고 하지 않습니다). 서버에 연결할 수 없으면 그 이유와 함께 Run이 꺼지고, 같은 주소로 Studio가 돌아올 때까지 3초마다 확인합니다.
 - `simcase`: `SubspaceSweepResult.field_representation`이 저장·전송하는 벡터 부분공간 필드의 layout 이름(`"vector-subspace-edge-nodal-v1"`, 그대로)을 알려 줍니다. Studio는 이 값을 여기서 읽고 `simcase.__all__`에 있는 이름만 가져옵니다. Studio 가드 시험은 Studio 패키지 밖으로 나가는 상대 import도 거부합니다.
 - `simcase`: 과도 영역 열이 정상 영역 열처럼 버전 1 `axisymmetric` 구성 요소를 회전체로 풉니다. 결과는 자체 식별자(`thermal.axisymmetric-transient-regions-result-v1`, `thermal-axisymmetric-transient-p1-node-cell-regions-v1`)와 전체 회전 열량 W(`source_load_w`·`reaction_w`·`residual_w`·`storage_rate_w`), `heat_content_j`, `quadratic_functional_jk`를 가지며 `export_fields`·`export_time_series`가 그 layout을 받습니다. Studio는 축대칭 문서를 계속 거부합니다. 검사 G7-5는 `tests/simcase/test_thermal_axisymmetric_regions.py`. [문서](packages/simcase/thermal_regions2d.md#축대칭-문서).
 - `galerkin`: `solve_transient_heat`가 `coordinate_system="axisymmetric"`을 받습니다. (r, z) 메시를 축대칭 정상 열의 측도로 전체 회전에 걸쳐 적분하고(가중 강성·열원·경계 표본; 일관 질량은 선형 반지름의 정확한 3차 모멘트 `core.kernels.p1_mass_axisymmetric`), 절점 열량은 W·열량은 J이며 결과가 `coordinate_system`·`nodal_rate_unit`을 기록하고 정상 솔버의 축 규칙이 적용됩니다. 기본값은 Cartesian 풀이와 bit 단위로 같습니다. 검사 G7-1~4(Bessel 급수 냉각 수렴·단계별 열수지·정확한 열량·정상 극한)는 `tests/galerkin/test_transient_heat_axisymmetric.py`. [문서](packages/galerkin/transient_heat.md#축대칭-과도-열).
