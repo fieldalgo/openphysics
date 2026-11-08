@@ -434,14 +434,22 @@ def build_region_mesh(doc, limits=None):
         # a boundary selection names its nodes for Dirichlet data; an exterior one also tags its
         # edges for flux and convection, beside the side or outer tag the same edges carry
         _tags, outside, _inside = boundary_names(doc)
+        on_axis = (np.asarray(tri.nodes, dtype=float)[:, 0] == 0.0) if 'axis' in exterior_sides(doc)[0] else None
         for name, edges in selections.items():
-            if len(edges) == 0:
-                continue                                  # without a mesh edge: no data (refused by name)
+            edges = np.asarray(edges, dtype=int).reshape(-1, 2)
+            nodes = np.unique(edges)
+            if on_axis is not None:
+                # the symmetry axis is not a physical boundary: a selection's nodes on it carry
+                # no Dirichlet data (galerkin refuses axis-only Dirichlet nodes); the end faces
+                # may still fix an axis end point through their own tag
+                nodes = nodes[~on_axis[nodes]]
+            if len(nodes) == 0:
+                continue                                  # without a mesh node: no data (refused by name)
             if name in boundary or name in boundary_edges:
                 raise DocumentError(f'selection {name!r} shares its name with a mesh tag')
-            boundary[name] = np.unique(np.asarray(edges, dtype=int))     # Dirichlet nodes, interior too
+            boundary[name] = nodes                                       # Dirichlet nodes, interior too
             if name in outside:
-                boundary_edges[name] = np.asarray(edges, dtype=int).reshape(-1, 2)   # flux and convection
+                boundary_edges[name] = edges                             # flux and convection
     mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
                 boundary=boundary, boundary_edges=boundary_edges,
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
@@ -495,7 +503,7 @@ def region_inputs(doc, mesh, region_materials):
         source = {r: float(source.get(r, 0.0)) for r in mesh.region_names}
     else:
         source = float(source)
-    prescribed = {}
+    prescribed, prescribed_by = {}, {}
     for label, table in (('dirichlet_temperature_k', mesh.boundary), ('outward_flux_w_m2', mesh.boundary_edges),
                          ('convection', mesh.boundary_edges)):
         for tag in p.get(label, {}):
@@ -505,8 +513,10 @@ def region_inputs(doc, mesh, region_materials):
     for tag, value in p.get('dirichlet_temperature_k', {}).items():
         for node in mesh.boundary[tag]:
             if int(node) in prescribed and prescribed[int(node)] != value:
-                raise DocumentError(f'{path}: conflicting corner temperature at node {node}')
+                raise DocumentError(f'{path}.dirichlet_temperature_k: {prescribed_by[int(node)]!r} and {tag!r} '
+                                    f'share node {node} with different temperatures')
             prescribed[int(node)] = float(value)
+            prescribed_by[int(node)] = tag
     flux = {tag: float(v) for tag, v in p.get('outward_flux_w_m2', {}).items()}
     convection = {tag: (float(v['h_w_m2k']), float(v['ambient_temperature_k']))
                   for tag, v in p.get('convection', {}).items()}
@@ -539,8 +549,14 @@ def _refuse_doubled_edges(mesh, path, flux, convection, dirichlet):
                                         'one entry')
     # a natural condition on a fully Dirichlet edge is refused by the solver; here by name,
     # for a side tag and a selection that carry the same edges (names alone are checked at
-    # load); an interface selection has no edge tag and cannot overlap a natural condition
-    fixed = edge_sets([tag for tag in dirichlet if tag in mesh.boundary_edges])
+    # load). A selection without an edge tag (an interface selection that touches a side) is
+    # read through its selection edges, so a side's flux under a fixed selection is named too.
+    selected = getattr(mesh, 'selection_edges', None) or {}
+    fixed = {}
+    for tag in dirichlet:
+        edges = mesh.boundary_edges.get(tag, selected.get(tag))
+        if edges is not None:
+            fixed[tag] = {tuple(sorted(map(int, e))) for e in np.asarray(edges).reshape(-1, 2)}
     for label, table in (('outward_flux_w_m2', flux), ('convection', convection)):
         for a, e in edge_sets(table).items():
             for b, f in fixed.items():

@@ -153,7 +153,8 @@ def transient_region_inputs(doc, mesh, region_materials):
         for node in mesh.boundary[tag]:
             node = int(node)
             if node in sampled_nodes and sampled_nodes[node] != values:
-                raise DocumentError(f'mesh.boundary.{tag}: conflicting corner node {node}')
+                raise DocumentError(f'{where}.dirichlet_temperature_k.{tag}: node {node} already carries another '
+                                    'temperature history from an overlapping boundary')
             if not _agree(float(initial[node]), values[0]):
                 raise DocumentError(f'mesh.boundary.{tag}: initial t0 mismatch; no projection')
             sampled_nodes[node] = values
