@@ -5,7 +5,11 @@
 A thermal.transient2d document whose geometry has ``background``/``shapes``
 takes conductivity and volumetric heat capacity from ``materials``. Initial
 data (uniform or affine), sampled side Dirichlet data and the requested-time
-contract are those of the rectangle documents. See docs/packages/simcase/thermal_regions2d.md.
+contract are those of the rectangle documents. A version 1 ``axisymmetric``
+component is a body of revolution: the mesh is (r, z), galerkin's axisymmetric
+measure solves it and the result carries its own identifiers with full-revolution
+rates in W (``_w``), heat content in J and quadratic functional in J K.
+See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
 from dataclasses import dataclass, field
@@ -16,14 +20,19 @@ import numpy as np
 
 from . import units
 from .schema import DocumentError
-from .thermal_regions import (build_region_mesh, covered_shapes, has_region_geometry, region_geometry,
-                              region_materials_table, region_mesh_settings, region_source)
+from .thermal_regions import (_named_sides, build_region_mesh, covered_shapes, exterior_sides,
+                              has_region_geometry, is_axisymmetric, region_geometry, region_materials_table,
+                              region_mesh_settings, region_source)
 from .transient_thermal import TransientThermalRunResult, _FIELD_SPEC
 from .transient_thermal_contract import (PHYSICS, SIDES, _agree, _array, _initial_value, _number,
                                          _object, _samples)
 
 RESULT_FORMAT = 'thermal.transient2d-regions-result-v1'
 FIELD_LAYOUT = 'thermal2d-transient-p1-node-cell-regions-v1'
+#: the result identifiers of an axisymmetric run: full-revolution rates in W, content in J,
+#: never the Cartesian per-metre identifiers (docs/packages/galerkin/thermal_axisymmetric.md)
+AXISYMMETRIC_RESULT_FORMAT = 'thermal.axisymmetric-transient-regions-result-v1'
+AXISYMMETRIC_FIELD_LAYOUT = 'thermal-axisymmetric-transient-p1-node-cell-regions-v1'
 
 
 def is_transient_region_thermal(data):
@@ -48,10 +57,6 @@ def validate_transient_region_thermal(doc):
     except (units.UnitError, OverflowError, TypeError, ValueError) as exc:
         raise DocumentError(f'units: {exc}') from exc
     names = region_geometry(doc)
-    from .thermal_regions import is_axisymmetric
-    if is_axisymmetric(doc):
-        raise DocumentError(f'component {doc.component.name!r}: transient heat takes 2d components only; the '
-                            'transient solver is Cartesian (per metre of depth)')
     region_materials_table(doc, ('conductivity_w_mk', 'volumetric_heat_capacity_j_m3k'), 'transient heat')
     region_mesh_settings(doc)
     _object(d['study'], {'type', 'time_s'}, 'study', {'type', 'time_s'})
@@ -95,7 +100,9 @@ def validate_transient_region_thermal(doc):
     boundary = p['dirichlet_temperature_k']
     from .thermal_regions import boundary_names
     tags, outside, inside = boundary_names(doc)
-    _object(boundary, set(SIDES) | tags | outside | inside, where+'.dirichlet_temperature_k')
+    # an axisymmetric domain at r = 0 has the axis in place of left: both refused by name
+    _, sides = exterior_sides(doc)
+    _named_sides(boundary, set(sides) | tags | outside | inside, where+'.dirichlet_temperature_k')
     sampled = {tag: _samples(value, times, where+'.dirichlet_temperature_k.'+tag)
                for tag, value in boundary.items()}
     for horizontal in ('left', 'right'):
@@ -126,6 +133,8 @@ def transient_region_summary(doc):
               for s in doc.regions()]
     lines += [f'  material {m}: k={v.get("conductivity_w_mk")} W/(m K), '
               f'c={v.get("volumetric_heat_capacity_j_m3k")} J/(m^3 K)' for m, v in doc['materials'].items()]
+    if is_axisymmetric(doc):
+        lines.append('  axisymmetric (r, z): full-revolution rates in W, heat content in J')
     lines.append('  output: SI time/node/cell histories, triangle regions; rates at interval ends only')
     return '\n'.join(lines)
 
@@ -273,6 +282,80 @@ class TransientRegionRunResult(TransientThermalRunResult):
         return result
 
 
+_PER_METRE = {'_w_per_m': '_w', '_j_per_m': '_j', '_jk_per_m': '_jk'}
+_UNITS = {'W/m': 'W', 'J/m': 'J', 'J K/m': 'J K'}
+
+
+def _axisymmetric_name(key):
+    """The field name of a full-revolution quantity: ``storage_rate_w_per_m`` becomes
+    ``storage_rate_w``, ``heat_content_j_per_m`` ``heat_content_j``."""
+    for suffix, replacement in _PER_METRE.items():
+        if key.endswith(suffix):
+            return key[:-len(suffix)]+replacement
+    return key
+
+
+def _cartesian_name(key):
+    """The inverse of ``_axisymmetric_name`` for the keys of a transient region result."""
+    for suffix, replacement in _PER_METRE.items():
+        if key.endswith(replacement) and not key.endswith(suffix):
+            return key[:-len(replacement)]+suffix
+    return key
+
+
+@dataclass(frozen=True)
+class AxisymmetricTransientRegionRunResult(TransientRegionRunResult):
+    """The result of an axisymmetric run: the same histories with the nodal rates in W over the
+    full revolution, the heat content in J and the quadratic functional in J K, under their own
+    result identifiers and ``_w``/``_j``/``_jk`` field names. The inherited ``_per_m`` attributes
+    return the same arrays (the public read path of TransientThermalRunResult); the saved fields
+    and the summary carry the full-revolution names and units only."""
+    result_format = AXISYMMETRIC_RESULT_FORMAT
+    field_layout = AXISYMMETRIC_FIELD_LAYOUT
+
+    @property
+    def source_load_w(self): return self.solution.source_load_w_per_m
+
+    @property
+    def reaction_w(self): return self.solution.reaction_w_per_m
+
+    @property
+    def residual_w(self): return self.solution.residual_w_per_m
+
+    @property
+    def storage_rate_w(self): return self.solution.storage_rate_w_per_m
+
+    @property
+    def heat_content_j(self): return self.solution.heat_content_j_per_m
+
+    @property
+    def quadratic_functional_jk(self): return self.solution.quadratic_functional_jk_per_m
+
+    def _raw_arrays(self):
+        arrays = super()._raw_arrays()
+        return {_axisymmetric_name(key): a for key, a in arrays.items()}
+
+    def _summary(self, arrays):
+        if getattr(self.solution, 'coordinate_system', 'cartesian') != 'axisymmetric':
+            raise ValueError('axisymmetric transient result requires an axisymmetric solution')
+        result = super()._summary({_cartesian_name(key): a for key, a in arrays.items()})
+        result['result_format'], result['field_layout'] = AXISYMMETRIC_RESULT_FORMAT, AXISYMMETRIC_FIELD_LAYOUT
+        for table in ('field_units', 'field_locations', 'field_time_axes', 'field_shapes'):
+            result[table] = {_axisymmetric_name(key): (_UNITS.get(v, v) if table == 'field_units' else v)
+                             for key, v in result[table].items()}
+        for key in ('source_heat_w_per_m', 'storage_heat_w_per_m', 'outward_heat_w_per_m',
+                    'heat_balance_defect_w_per_m', 'heat_content_j_per_m', 'quadratic_functional_jk_per_m'):
+            result[_axisymmetric_name(key)] = result.pop(key)
+        result['heat_content_definition'] = ('H=1^T M T with the per-region capacity and the measure 2*pi*r; '
+                                             'J over the full revolution, chosen zero at 0 K')
+        result['quadratic_functional_definition'] = 'V=0.5 T^T M T; J K over the full revolution; not stored heat'
+        result['coordinate_system'] = 'axisymmetric'
+        result['nodal_heat_rate_unit'] = 'W'
+        result['coordinates'] = '(r, z) in metres; volume measure 2*pi*r dr dz, full revolution'
+        json.dumps(result, allow_nan=False)
+        return result
+
+
 def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
     from galerkin.transient_heat import solve_transient_heat
     doc.validate()
@@ -286,8 +369,10 @@ def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
     inputs = transient_region_inputs(doc, mesh, region_materials)
     mesh_seconds = time.perf_counter()-started
     started = time.perf_counter()
+    axisymmetric = is_axisymmetric(doc)
     try:
-        solution = solve_transient_heat(mesh, **inputs)
+        solution = solve_transient_heat(mesh, **inputs,
+                                        coordinate_system='axisymmetric' if axisymmetric else 'cartesian')
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     solve_seconds = time.perf_counter()-started
@@ -296,10 +381,11 @@ def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
            f'regions {mesh.region_names}',
            *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
            f'transient heat: {len(solution.time_s)} requested times; full histories retained',
-           'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m')
-    result = TransientRegionRunResult(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log,
-                                      np.array(mesh.regions, copy=True), tuple(mesh.region_names),
-                                      dict(region_materials))
+           ('SI: K, flux W/m^2, nodal rates W (full revolution; axisymmetric (r, z)); H J; quadratic V J K'
+            if axisymmetric else 'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m'))
+    cls = AxisymmetricTransientRegionRunResult if axisymmetric else TransientRegionRunResult
+    result = cls(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log,
+                 np.array(mesh.regions, copy=True), tuple(mesh.region_names), dict(region_materials))
     result.summary()
     if verbose:
         print('\n'.join(log))

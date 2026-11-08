@@ -181,10 +181,12 @@ Python 3.12 고정 환경에서 측정): 빈 판 속 빈 구멍이 있는 강철
 
 ## 축대칭 문서
 
-[버전 1 형상 블록](geometry_document.md)에 `axisymmetric` 구성 요소가 있는 `thermal.steady2d` 영역 문서는 회전체입니다.
+[버전 1 형상 블록](geometry_document.md)에 `axisymmetric` 구성 요소가 있는 `thermal.steady2d`·`thermal.transient2d` 영역
+문서는 회전체입니다.
 구성 요소의 (x, y)는 (r, z), `domain.xmin`은 안쪽 반지름(속이 찬 물체는 `0`)이고 피처·재료·열원은 같은 방식으로
 적용됩니다. 메시는 [2단계 엔진](geometry_engine.md)이 (r, z)로 만들고, galerkin의
-[축대칭 측도](../galerkin/thermal_axisymmetric.md)(`coordinate_system="axisymmetric"`, 부피 측도 `2πr dr dz`)로 풉니다.
+[축대칭 측도](../galerkin/thermal_axisymmetric.md)(`coordinate_system="axisymmetric"`, 부피 측도 `2πr dr dz`; 과도 러너는
+[축대칭 과도 열](../galerkin/transient_heat.md#축대칭-과도-열))로 풉니다.
 
 - **변.** `xmin == 0`이면 r = 0 변은 메시 태그 `axis`이며 대칭축입니다. 자연 정칙성을 가지므로
   `dirichlet_temperature_k`·`outward_flux_w_m2`·`convection` 항목을 받지 않습니다(이름 밝혀 거부; 그런 도메인에 없는
@@ -196,15 +198,28 @@ Python 3.12 고정 환경에서 측정): 빈 판 속 빈 구멍이 있는 강철
   요약의 진단은 `_w`로 끝나고(`source_heat_w`·`outward_heat_w` 등) `coordinate_system: "axisymmetric"`·
   `nodal_heat_rate_unit: "W"`를 기록합니다. 온도(K)·열유속(W/m²)·삼각형 영역·넓이(`area_m2`, 자오면 단면)는 Cartesian
   실행과 같습니다. Cartesian 식별자와 `_w_per_m` 이름은 이런 결과에 쓰지 않습니다.
-- **받지 않는 곳.** 도파관 러너(회전체는 그 물리가 아님; `xmin`과 무관하게 검증에서 거부), 과도 영역 러너(과도 솔버는
-  Cartesian), Studio(축대칭 payload 없음)는 축대칭 구성 요소를 이름 밝혀 거부합니다. `export_fields`는 저장한 결과를 (r, z)
-  점의 VTU로 씁니다.
+- **과도 결과.** `thermal.transient2d` 문서는 `AxisymmetricTransientRegionRunResult`를 돌려주며 식별자는
+  `thermal.axisymmetric-transient-regions-result-v1`과 `thermal-axisymmetric-transient-p1-node-cell-regions-v1`입니다.
+  [과도 영역 결과](#과도-문서)의 이력에서 절점 열량은 W의 `source_load_w`·`reaction_w`·`residual_w`·`storage_rate_w`,
+  열량은 J의 `heat_content_j`, 이차 functional은 J K의 `quadratic_functional_jk`입니다. 요약의 합계도 같은 꼴로 끝나고
+  (`source_heat_w`·`storage_heat_w`·`outward_heat_w`·`heat_balance_defect_w`·`heat_content_j`·`quadratic_functional_jk`)
+  `coordinate_system: "axisymmetric"`·`nodal_heat_rate_unit: "W"`를 기록합니다. Dirichlet 이름은 정상과 같고(`axis`와
+  r = 0의 `left`는 이름 밝혀 거부), 초기장·표본 이력·열원 map은 Cartesian 과도 규칙 그대로입니다.
+- **받지 않는 곳.** 도파관 러너(회전체는 그 물리가 아님; `xmin`과 무관하게 검증에서 거부)와 Studio(정상·과도 모두 축대칭
+  payload 없음)는 축대칭 구성 요소를 이름 밝혀 거부합니다. `export_fields`·`export_time_series`는 저장한 결과를 (r, z)
+  점의 VTU·PVD로 씁니다.
 
 검사 G4-1~G4-5(`tests/simcase/test_thermal_axisymmetric_regions.py`, 2026-11-07 HQ 작업 기록에 사전 등록, 같은 날 Linux·
 Python 3.12 고정 환경에서 측정): 균일 가열 속찬 원통(반지름 3 mm, 메시 0.1 mm)이 모든 절점에서 정확한 포물선
 `Q (R² − r²) / (4k)`와 축 상승의 2e-3 이내로 일치하고 `Q π R² L`을 1e-9 이내로 흡수하며 열 균형 결함 1e-10 이내; 전도 껍질
 속 가열 코어가 해석적 축·경계면 상승과 2e-3 이내; 열원 없는 환형이 중간 반지름에서 온도 차의 1e-3 이내로 대수 전도;
 축·left 거부, 다른 러너·Studio 거부, 결과 식별자·필드 이름.
+
+검사 G7-5(같은 파일, 2026-11-08 사전 등록·같은 날 측정): 과도 원통 문서가 과도 축대칭 식별자와 `_w`/`_j`/`_jk` 이름만으로
+돌아오고 저장·내보내기(시각 index의 VTU와 PVD 시계열)되며, 열원 전력은 `Q π R² L`의 1e-12, t0의 열량은 `c T0 π R² L`의
+1e-12, 단계별 열수지 결함은 열량의 1e-10 이내; 기하급수로 커지는 단계로 같은 메시의 정상 축대칭 문서 온도에 상승의 1e-6
+이내(reaction 1e-6)로 도달; 축·left 거부와 과도 문서의 Studio 거부. 엔진 수준 검사 G7-1~G7-4(Bessel 급수 냉각 수렴·
+열수지·정확한 열량·정상 극한·Cartesian 기본값)는 [galerkin 페이지](../galerkin/transient_heat.md#축대칭-과도-열)에 있습니다.
 
 ## 검증
 

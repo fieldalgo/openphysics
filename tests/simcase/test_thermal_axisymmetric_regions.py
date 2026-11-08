@@ -106,13 +106,9 @@ def test_g4_4_axis_data_and_a_left_side_at_r_zero_are_refused_by_name(physics, m
         Document.from_dict(raw)
 
 
-def test_g4_4_other_runners_refuse_an_axisymmetric_component_by_name():
-    transient = copy.deepcopy(EXAMPLES["transient_thermal_regions"])
+def test_g4_4_the_waveguide_runner_refuses_an_axisymmetric_component_by_name():
+    # the transient region runner takes an axisymmetric component since stage 2f (G7-5 below)
     from simcase.geometry_document import from_v02
-    transient["geometry"] = from_v02(transient["geometry"])
-    transient["geometry"]["components"]["main"]["dimension"] = "axisymmetric"
-    with pytest.raises(DocumentError, match="transient heat takes 2d components only"):
-        Document.from_dict(transient)
     for xmin in (0.0, 1.0):                           # at r = 0 (an axis tag) and as an annulus (four plain tags)
         em = copy.deepcopy(EXAMPLES["soi_strip"])
         em["geometry"] = from_v02(em["geometry"])
@@ -163,3 +159,102 @@ def test_g4_5_the_result_keeps_its_own_identifiers_and_full_revolution_field_nam
     np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
     np.testing.assert_array_equal(mesh.point_data["load_w"], saved["load_w"])
     assert "load_w_per_m" not in mesh.point_data and "triangle_regions" in mesh.cell_data
+
+
+# -- stage 2f: axisymmetric transient region heat (checks G7-5, HQ work record 2026-11-08) -----------------
+
+C_PLA = 1.8e6
+
+
+def cylinder_transient(times=(0.0, 1.0, 2.0), size_mm=0.2, source=Q, dirichlet=None, initial=TB, **physics):
+    """The cylinder of ``cylinder`` as a transient document: PLA with a heat capacity, uniform initial field."""
+    raw = cylinder(size_mm=size_mm, source=source, dirichlet=dirichlet)
+    raw["name"] = "axisymmetric cylinder transient"
+    raw["units"]["time"] = "s"
+    raw["materials"]["pla"]["volumetric_heat_capacity_j_m3k"] = C_PLA
+    raw["physics"]["heat1"].update({"type": "thermal.transient2d", "initial_temperature_k": initial, **physics})
+    raw["study"] = {"type": "transient", "time_s": list(times)}
+    return raw
+
+
+def test_g7_5_the_transient_result_keeps_its_own_identifiers_and_full_revolution_names(tmp_path):
+    result = run(Document.from_dict(cylinder_transient()), verbose=False)
+    assert type(result).__name__ == "AxisymmetricTransientRegionRunResult"
+    assert result.result_format == "thermal.axisymmetric-transient-regions-result-v1"
+    assert result.field_layout == "thermal-axisymmetric-transient-p1-node-cell-regions-v1"
+    arrays = result._raw_arrays()
+    assert not any(k.endswith("_per_m") for k in arrays), sorted(arrays)
+    assert set(arrays) >= {"source_load_w", "reaction_w", "residual_w", "storage_rate_w", "heat_content_j",
+                           "quadratic_functional_jk", "triangle_regions", "dirichlet_temperatures_k"}
+    assert np.array_equal(result.storage_rate_w, result.storage_rate_w_per_m)   # the inherited read path
+    assert np.array_equal(result.heat_content_j, result.heat_content_j_per_m)
+    summary = result.summary()
+    assert summary["result_format"] == "thermal.axisymmetric-transient-regions-result-v1"
+    assert summary["coordinate_system"] == "axisymmetric" and summary["nodal_heat_rate_unit"] == "W"
+    units = summary["field_units"]
+    assert units["source_load_w"] == "W" and units["heat_content_j"] == "J" and units["quadratic_functional_jk"] == "J K"
+    assert summary["field_time_axes"]["storage_rate_w"] == "time_s[1:]" and "storage_rate_w_per_m" not in units
+    assert set(summary) >= {"source_heat_w", "storage_heat_w", "outward_heat_w", "heat_balance_defect_w",
+                            "heat_content_j", "quadratic_functional_jk"}
+    assert not any(k.endswith("_per_m") for k in summary)
+    # physics of the saved numbers: full-revolution source power and the exact uniform content at t0
+    R, L = 3e-3, 1e-3
+    assert abs(summary["source_heat_w"][-1]/(Q*math.pi*R*R*L)-1) < 1e-12
+    assert abs(summary["heat_content_j"][0]/(C_PLA*TB*math.pi*R*R*L)-1) < 1e-12
+    scale = np.max(abs(arrays["storage_rate_w"]).sum(axis=1)+abs(arrays["source_load_w"][1:]).sum(axis=1)
+                   +abs(arrays["reaction_w"]).sum(axis=1))
+    assert np.max(np.abs(summary["heat_balance_defect_w"])) <= 1e-10*scale
+    result.save(tmp_path / "out")
+    saved = np.load(tmp_path / "out" / "fields.npz")
+    assert str(saved["result_format"]) == "thermal.axisymmetric-transient-regions-result-v1"
+    assert "storage_rate_w" in saved.files and "storage_rate_w_per_m" not in saved.files
+    # the Cartesian transient region example keeps its identifiers and names
+    plain = run(Document.from_dict(EXAMPLES["transient_thermal_regions"]), verbose=False)
+    assert plain.result_format == "thermal.transient2d-regions-result-v1"
+    assert "storage_rate_w_per_m" in plain._raw_arrays() and plain.summary()["heat_content_definition"].endswith("0 K")
+    # the saved history exports to VTU and PVD with (r, z) points, the _w rates and the region ids
+    meshio = pytest.importorskip("meshio")
+    from simcase.export import SUPPORTED_LAYOUTS, export_fields, export_time_series
+    assert SUPPORTED_LAYOUTS[-1] == "thermal-axisymmetric-transient-p1-node-cell-regions-v1"
+    vtu = export_fields(tmp_path / "out" / "fields.npz", tmp_path / "out" / "last.vtu", time_index=-1)
+    mesh = meshio.read(vtu)
+    np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+    np.testing.assert_array_equal(mesh.point_data["storage_rate_w"], saved["storage_rate_w"][-1])
+    assert "triangle_regions" in mesh.cell_data and not any(k.endswith("_per_m") for k in mesh.point_data)
+    pvd = export_time_series(tmp_path / "out" / "fields.npz", tmp_path / "series")
+    assert pvd.exists() and len(list(pvd.parent.glob("*.vtu"))) == 3
+
+
+def test_g7_5_the_long_time_limit_equals_the_steady_axisymmetric_document():
+    """A heated cylinder held at TB on its outer radius reaches the steady document's solution."""
+    steady = run(Document.from_dict(cylinder(size_mm=0.2)), verbose=False)
+    times = [0.0] + np.cumsum(2.0**np.arange(-4, 22)).tolist()
+    transient = run(Document.from_dict(cylinder_transient(times=times)), verbose=False)
+    np.testing.assert_array_equal(transient.mesh_nodes_m, steady.mesh_nodes_m)
+    rise = float(np.max(abs(steady.temperature_k-TB)))
+    assert rise > 0.1
+    np.testing.assert_allclose(transient.temperature_k[-1], steady.temperature_k, rtol=0, atol=1e-6*rise)
+    power = Q*math.pi*(3e-3)**2*1e-3
+    assert abs(transient.reaction_w[-1].sum()/steady.reaction_w.sum()-1) < 1e-6
+    assert abs(steady.reaction_w.sum()/power+1) < 1e-9
+    assert abs(transient.storage_rate_w[-1].sum()) < 1e-8*power
+
+
+@pytest.mark.parametrize("dirichlet, message", [
+    ({"axis": TB}, "'axis' is the symmetry axis"),
+    ({"left": TB}, "has no left side; its r = 0 side is the axis"),
+])
+def test_g7_5_transient_axis_data_and_a_left_side_at_r_zero_are_refused_by_name(dirichlet, message):
+    with pytest.raises(DocumentError, match=message):
+        Document.from_dict(cylinder_transient(dirichlet=dirichlet))
+
+
+def test_g7_5_studio_refuses_a_transient_axisymmetric_document_at_validation():
+    from fastapi.testclient import TestClient
+    from simcase.studio import server
+    with TestClient(server.app) as client:
+        response = client.post("/api/thermal/transient/validate",
+                               json={"doc": cylinder_transient(), "client_revision": 1, "request_seq": 1})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False and "axisymmetric" in body["error"]["message"]

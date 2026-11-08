@@ -236,13 +236,14 @@ long-time solution with an interface selection matches the steady one within
 
 ## Axisymmetric documents
 
-A `thermal.steady2d` region document whose [version 1 geometry
-block](geometry_document.md) has an `axisymmetric` component is a body of
-revolution: the component's (x, y) are (r, z), `domain.xmin` is the inner
+A `thermal.steady2d` or `thermal.transient2d` region document whose [version 1
+geometry block](geometry_document.md) has an `axisymmetric` component is a body
+of revolution: the component's (x, y) are (r, z), `domain.xmin` is the inner
 radius (`0` for a solid) and the same features, materials and sources apply.
 The mesh is built in (r, z) by the [stage 2 engine](geometry_engine.md) and
 solved with galerkin's [axisymmetric measure](../galerkin/thermal_axisymmetric.md)
-(`coordinate_system="axisymmetric"`, volume measure `2πr dr dz`).
+(`coordinate_system="axisymmetric"`, volume measure `2πr dr dz`; the transient
+runner through [axisymmetric transient heat](../galerkin/transient_heat.md#axisymmetric-transient-heat)).
 
 - **Sides.** With `xmin == 0` the r = 0 side is the mesh tag `axis`, which is
   the symmetry axis: it carries natural regularity and takes no
@@ -261,11 +262,25 @@ solved with galerkin's [axisymmetric measure](../galerkin/thermal_axisymmetric.m
   Temperature (K), heat flux (W/m²), triangle regions and areas (`area_m2`,
   the meridional section) are as in a Cartesian run. The Cartesian
   identifiers and `_w_per_m` names are never used for such a result.
+- **Transient result.** A `thermal.transient2d` document returns an
+  `AxisymmetricTransientRegionRunResult` with the identifiers
+  `thermal.axisymmetric-transient-regions-result-v1` and
+  `thermal-axisymmetric-transient-p1-node-cell-regions-v1`: the histories of
+  a [transient region result](#transient-documents) with the nodal rates in W
+  under `source_load_w`, `reaction_w`, `residual_w` and `storage_rate_w`, the
+  heat content in J as `heat_content_j` and the quadratic functional in J K as
+  `quadratic_functional_jk`; the summary's totals end the same way
+  (`source_heat_w`, `storage_heat_w`, `outward_heat_w`, `heat_balance_defect_w`,
+  `heat_content_j`, `quadratic_functional_jk`) and it records
+  `coordinate_system: "axisymmetric"` and `nodal_heat_rate_unit: "W"`. The
+  Dirichlet names are those of the steady case (`axis` and a `left` at r = 0
+  refused by name); the initial field, sampled histories and source map are
+  the Cartesian transient contract.
 - **Not taken.** The waveguide runner (a body of revolution is not its
-  physics; refused at validation whatever `xmin` is), the transient region
-  runner (the transient solver is Cartesian) and Studio (no axisymmetric
-  payload) refuse an axisymmetric component by name. `export_fields` writes
-  the saved result as a VTU with (r, z) points.
+  physics; refused at validation whatever `xmin` is) and Studio (no
+  axisymmetric payload, steady or transient) refuse an axisymmetric component
+  by name. `export_fields` and `export_time_series` write the saved results as
+  VTU and PVD with (r, z) points.
 
 Checks G4-1 to G4-5 (`tests/simcase/test_thermal_axisymmetric_regions.py`,
 pre-registered in the HQ work record on 2026-11-07, measured the same day on
@@ -277,6 +292,19 @@ conducting shell matches the analytic axis and interface rises within 2e-3; a
 source-free annulus conducts logarithmically within 1e-3 of the temperature
 difference at the mid radius; the axis and left-side refusals, the other
 runners' and Studio's refusals, and the result identifiers and field names.
+
+Checks G7-5 (same file, pre-registered on 2026-11-08 and measured the same
+day): the transient cylinder document returns the transient axisymmetric
+identifiers with `_w`/`_j`/`_jk` names only, saves and exports them (VTU at a
+time index and the PVD series), its source power is `Q π R² L` within 1e-12,
+its heat content at t0 `c T0 π R² L` within 1e-12 and its per-step balance
+defect within 1e-10 of the rates; with geometrically growing steps it reaches
+the steady axisymmetric document's temperatures within 1e-6 of the rise on
+the same mesh (reaction within 1e-6); the axis and left-side refusals and the
+Studio refusal of the transient document. The engine-level checks G7-1 to
+G7-4 (Bessel-series cooling convergence, balances, exact content, steady
+limit, Cartesian default) are on the
+[galerkin page](../galerkin/transient_heat.md#axisymmetric-transient-heat).
 
 ## Validation
 
