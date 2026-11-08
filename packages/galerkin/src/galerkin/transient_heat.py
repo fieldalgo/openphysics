@@ -349,7 +349,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     k>0 W/(m K), c>0 J/(m^3 K), explicit increasing nonnegative seconds,
     finite initial (N,) K. Finite negative K and signed sources are allowed;
     no clamping, maximum principle or physical temperature validity is implied.
-    dirichlet: fixed exterior integer node -> scalar K or callback(time_s).
+    dirichlet: fixed integer node (exterior or interior) -> scalar K or callback(time_s).
     Q: scalar W/m^3 or callback(points_m,time_s)->exactly(Q,) W/m^3.
     outward_flux maps mesh.boundary_edges tags to g (W/m^2), convection maps
     tags to (h, ambient) with h>=0 (W/(m^2 K), K): q.n = g+h*(T-ambient) as in
@@ -418,13 +418,13 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     if tuple(initial.shape) != (len(p),):
         raise ValueError("initial_temperature_k must have exactly shape (N,)")
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map exterior integer nodes to Kelvin values")
+        raise ValueError("dirichlet must map integer nodes to Kelvin values")
     conditions = {}
     for node, value in dirichlet.items():
         if (isinstance(node, (bool, np.bool_))
                 or not isinstance(node, (int, np.integer))
-                or not 0 <= node < len(p) or node not in exterior):
-            raise ValueError("Dirichlet nodes must be exterior integer node indices")
+                or not 0 <= node < len(p)):
+            raise ValueError(f"Dirichlet nodes must be integer node indices inside the mesh's {len(p)} nodes")
         conditions[int(node)] = value if callable(value) else _value(value, "Dirichlet temperature")
     fixed = np.array(sorted(conditions), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)

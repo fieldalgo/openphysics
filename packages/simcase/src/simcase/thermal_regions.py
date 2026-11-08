@@ -128,10 +128,11 @@ def boundary_names(doc):
     name, ``outer`` on the border of a void feature or a sliver gap) and its boundary
     selections. Returns ``(tags, exterior_selections, interior_selections)``; a selection is
     exterior when every curve it holds borders the exterior (the domain or a void), interior
-    otherwise. Data may name the tags and the exterior selections; an interior selection is
-    refused by name (galerkin fixes and loads exterior nodes only). A 0.2 document has none. An
-    unnamed exterior boundary is insulated (HQ decision 2026-11-08: a void border is insulated
-    unless named)."""
+    otherwise. Dirichlet data may name the tags and every selection (galerkin fixes interior
+    nodes too, HQ decision 2026-11-08: a prescribed temperature on an interface); flux and
+    convection the tags and the exterior selections only, an interior one being refused by
+    name. A 0.2 document has none. An unnamed exterior boundary is insulated (HQ decision
+    2026-11-08: a void border is insulated unless named)."""
     if not getattr(doc, 'is_version_1', False):
         return set(), set(), set()
     rc = doc.complex()
@@ -159,9 +160,10 @@ def void_area_m2(doc):
 def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
     path = f'physics.{name}'
     tags, outside, inside = names
-    dirichlet_ok = flux_ok = set(allowed) | tags | outside
+    dirichlet_ok = set(allowed) | tags | outside | inside
+    flux_ok = set(allowed) | tags | outside
     bc = p.get('dirichlet_temperature_k', {})
-    _named_sides(bc, dirichlet_ok, path+'.dirichlet_temperature_k', inside)
+    _named_sides(bc, dirichlet_ok, path+'.dirichlet_temperature_k')
     for tag, value in bc.items():
         _number(value, f'{path}.dirichlet_temperature_k.{tag}', nonnegative=True)
     for a in ('left', 'right'):
@@ -322,8 +324,7 @@ def _named_sides(value, allowed, path, interior=()):
         for key in value:
             if key in interior and key not in allowed:
                 raise DocumentError(f"{path}.{key}: selection {key!r} lies on an interface between two regions; "
-                                    "boundary data applies to exterior boundaries only (galerkin fixes and loads "
-                                    "exterior nodes)")
+                                    "flux and convection apply to exterior boundaries only (Dirichlet may fix it)")
     _object(value, allowed, path)
 
 
@@ -434,12 +435,13 @@ def build_region_mesh(doc, limits=None):
         # edges for flux and convection, beside the side or outer tag the same edges carry
         _tags, outside, _inside = boundary_names(doc)
         for name, edges in selections.items():
-            if name not in outside or len(edges) == 0:
-                continue                                  # interior, or without a mesh edge: no data
+            if len(edges) == 0:
+                continue                                  # without a mesh edge: no data (refused by name)
             if name in boundary or name in boundary_edges:
                 raise DocumentError(f'selection {name!r} shares its name with a mesh tag')
-            boundary[name] = np.unique(np.asarray(edges, dtype=int))
-            boundary_edges[name] = np.asarray(edges, dtype=int).reshape(-1, 2)
+            boundary[name] = np.unique(np.asarray(edges, dtype=int))     # Dirichlet nodes, interior too
+            if name in outside:
+                boundary_edges[name] = np.asarray(edges, dtype=int).reshape(-1, 2)   # flux and convection
     mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
                 boundary=boundary, boundary_edges=boundary_edges,
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
@@ -494,11 +496,12 @@ def region_inputs(doc, mesh, region_materials):
     else:
         source = float(source)
     prescribed = {}
-    for label in ('dirichlet_temperature_k', 'outward_flux_w_m2', 'convection'):
+    for label, table in (('dirichlet_temperature_k', mesh.boundary), ('outward_flux_w_m2', mesh.boundary_edges),
+                         ('convection', mesh.boundary_edges)):
         for tag in p.get(label, {}):
-            if tag not in mesh.boundary_edges:
+            if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
-                                    'borders a void feature only, or a selection whose curves are inside the mesh)')
+                                    'borders a void feature only, or a selection without mesh edges)')
     for tag, value in p.get('dirichlet_temperature_k', {}).items():
         for node in mesh.boundary[tag]:
             if int(node) in prescribed and prescribed[int(node)] != value:
@@ -535,8 +538,9 @@ def _refuse_doubled_edges(mesh, path, flux, convection, dirichlet):
                     raise DocumentError(f'{path}.{label}: {a!r} and {b!r} share mesh edges; give that boundary '
                                         'one entry')
     # a natural condition on a fully Dirichlet edge is refused by the solver; here by name,
-    # for a side tag and a selection that carry the same edges (names alone are checked at load)
-    fixed = edge_sets(dirichlet)
+    # for a side tag and a selection that carry the same edges (names alone are checked at
+    # load); an interface selection has no edge tag and cannot overlap a natural condition
+    fixed = edge_sets([tag for tag in dirichlet if tag in mesh.boundary_edges])
     for label, table in (('outward_flux_w_m2', flux), ('convection', convection)):
         for a, e in edge_sets(table).items():
             for b, f in fixed.items():

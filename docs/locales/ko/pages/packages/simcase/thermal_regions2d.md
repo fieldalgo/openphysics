@@ -161,9 +161,11 @@ thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_o
 
 - [2단계 엔진](geometry_engine.md)이 선언하는 외부 태그: `boundary_tags` 이름, 빈 공간 피처(`material: null`)나
   sliver 틈의 경계에 붙는 `outer`.
-- 곡선이 모두 외부(도메인이나 빈 공간)에 놓인 구성 요소의 경계 선택(`selections`). 메시는 같은 변이 가진 변 태그나
-  `outer` 태그 옆에 선택 이름으로 절점을 이름 짓고 변에 태그를 붙입니다(`mesh.boundary[이름]`,
-  `mesh.boundary_edges[이름]`). 두 영역 사이 경계면의 선택은 이름 밝혀 거부합니다(galerkin은 외부 절점만 고정·부하).
+- 구성 요소의 경계 선택(`selections`). 메시는 선택 이름으로 절점을 이름 짓고(`mesh.boundary[이름]`), 선택의 곡선이
+  모두 외부(도메인이나 빈 공간)에 놓이면 같은 변이 가진 변 태그나 `outer` 태그 옆에 변 태그도 붙입니다
+  (`mesh.boundary_edges[이름]`). `dirichlet_temperature_k`는 어떤 선택이든, 두 영역 사이 경계면도 이름 지을 수
+  있습니다(내부 표면의 처방 온도; galerkin이 내부 절점을 고정, 2026-11-08). flux·convection은 외부 변이 필요하므로
+  경계면 선택은 이름 밝혀 거부합니다.
 
 빈 공간 피처는 구멍입니다. 메시하지 않으며 그 경계는 외부 경계이고 **이름을 짓지 않으면 단열**입니다(HQ 결정
 2026-11-08). 빈 공간만 접하는 변은 메시 변이 없어 데이터를 주면 이름 밝혀 거부됩니다. 메시 변 하나는 flux 항목 하나·

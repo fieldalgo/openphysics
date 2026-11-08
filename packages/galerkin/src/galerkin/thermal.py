@@ -147,7 +147,9 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     every mesh.region_names entry. heat_source is scalar Q, {region name: Q},
     a callback receiving (Q,2) metre coordinates and returning (Q,) W/m^3,
     or ElementHeatSource(mesh, values) with (M,) W/m^3 in exact cell order.
-    dirichlet maps exterior integer node indices to scalar temperatures in K;
+    dirichlet maps integer node indices (exterior or interior: a prescribed
+    temperature on an internal surface is an ordinary constraint, and its
+    reaction is the heat that surface injects) to scalar temperatures in K;
     every disconnected component requires Dirichlet or positive Robin support.
     outward_flux maps edge tags to g; convection maps tags to (h, ambient).
     q.n = g+h*(T-ambient), h>=0. Boundary scalars or callbacks
@@ -167,15 +169,15 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     if is_per_region(conductivity):
         k = region_property(mesh, conductivity, "conductivity", positive=True, live=True)
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map exterior node indices to temperatures in K")
+        raise ValueError("dirichlet must map node indices to temperatures in K")
     prescribed = {}
     anchors = [0.0]*count
     constrained = np.zeros(count, dtype=bool)
     for node, value in dirichlet.items():
         if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)):
             raise ValueError("Dirichlet node indices must be integers")
-        if not 0 <= node < len(p) or node not in boundary:
-            raise ValueError("Dirichlet node must lie on the exterior mesh boundary")
+        if not 0 <= node < len(p):
+            raise ValueError(f"Dirichlet node {node} is outside the mesh's {len(p)} nodes")
         value = real_value(value, "Dirichlet temperature")
         if tuple(value.shape) != ():
             raise ValueError("Dirichlet temperature must be scalar")

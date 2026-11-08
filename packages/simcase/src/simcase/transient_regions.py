@@ -95,11 +95,7 @@ def validate_transient_region_thermal(doc):
     boundary = p['dirichlet_temperature_k']
     from .thermal_regions import boundary_names
     tags, outside, inside = boundary_names(doc)
-    for key in boundary if isinstance(boundary, dict) else ():
-        if key in inside:
-            raise DocumentError(f"{where}.dirichlet_temperature_k.{key}: selection {key!r} lies on an interface "
-                                "between two regions; boundary data applies to exterior boundaries only")
-    _object(boundary, set(SIDES) | tags | outside, where+'.dirichlet_temperature_k')
+    _object(boundary, set(SIDES) | tags | outside | inside, where+'.dirichlet_temperature_k')
     sampled = {tag: _samples(value, times, where+'.dirichlet_temperature_k.'+tag)
                for tag, value in boundary.items()}
     for horizontal in ('left', 'right'):

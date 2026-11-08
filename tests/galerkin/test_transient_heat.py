@@ -177,7 +177,7 @@ def test_invalid_initial(bad):
     with pytest.raises(ValueError):solve(initial_temperature_k=bad)
 
 
-@pytest.mark.parametrize('data',[None,{True:300.},{1.0:300.},{4:300.},{99:300.},
+@pytest.mark.parametrize('data',[None,{True:300.},{1.0:300.},{99:300.},
                                   {0:True},{0:[300.]},{0:1j}])
 def test_invalid_dirichlet(data):
     with pytest.raises(ValueError):solve(dirichlet=data)

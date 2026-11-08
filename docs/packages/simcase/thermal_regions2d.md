@@ -197,12 +197,15 @@ four domain sides:
 - the exterior tags the [stage 2 engine](geometry_engine.md) declares: a
   `boundary_tags` name, and `outer` on the border of a void feature
   (`material: null`) or of a sliver gap;
-- a boundary selection of the component (`selections`) whose curves all lie on
-  the exterior (the domain or a void); the mesh names its nodes and tags its
-  edges under the selection's name (`mesh.boundary[name]`,
-  `mesh.boundary_edges[name]`), beside the side or `outer` tag the same edges
-  carry. A selection on an interface between two regions is refused by name:
-  galerkin fixes and loads exterior nodes only.
+- a boundary selection of the component (`selections`); the mesh names its
+  nodes under the selection's name (`mesh.boundary[name]`) and, when every
+  curve of the selection lies on the exterior (the domain or a void), tags its
+  edges too (`mesh.boundary_edges[name]`), beside the side or `outer` tag the
+  same edges carry. `dirichlet_temperature_k` may name any selection, an
+  interface between two regions included (a prescribed temperature on an
+  internal surface; galerkin fixes interior nodes, 2026-11-08); flux and
+  convection need exterior edges, so an interface selection is refused by name
+  for them.
 
 A void feature is a hole: it is not meshed and its border is an exterior
 boundary that is **insulated unless named** (HQ decision 2026-11-08). A side
@@ -221,9 +224,15 @@ selection, matches the logarithmic profile within 1e-3 of the temperature
 difference at the mid radius; a flux on the hole wall gives exactly `g` times
 the wall's polygon length and a convection on it the series-resistance rate
 within 2e-3, both with heat balance within 1e-10; an unnamed hole is insulated
-with the balance within 1e-10; the refusals (interface selections, unknown
-names, a region selection, doubled edges); the transient runner's Dirichlet on
-a selection and its refusals; a 0.2 document keeps its four sides.
+with the balance within 1e-10; the refusals (interface selections for flux and
+convection, unknown names, a region selection, doubled edges); the transient
+runner's Dirichlet on a selection and its refusals; a 0.2 document keeps its
+four sides. G6-2 and G6-3 (2026-11-08): an interface selection fixed at a
+temperature gives the same outward heat on the domain sides as the same
+rectangle cut out as a void with that temperature on its wall, within 1e-3, and
+the fixed region sits at that temperature within 1e-9; the transient runner's
+long-time solution with an interface selection matches the steady one within
+1e-6.
 
 ## Axisymmetric documents
 

@@ -136,9 +136,16 @@ def test_invalid_conductivity(k):
 
 
 @pytest.mark.parametrize('bc',[{}, {True:300.}, {1.5:300.}, {-1:300.}, {999:300.},
-                               {4:300.}, {0:np.nan}, {0:1j}, {0:[300.]}, []])
+                               {0:np.nan}, {0:1j}, {0:[300.]}, []])
 def test_invalid_dirichlet_and_nullspace(bc):
     with pytest.raises(ValueError):solve_steady_heat(rectangle_mesh(1.,1.,2,2),conductivity=1.,dirichlet=bc)
+
+
+def test_an_interior_node_may_be_fixed():
+    # the centre node of the 2 x 2 grid is interior; fixing it alone anchors the one component
+    # (HQ decision 2026-11-08; tests/galerkin/test_thermal_interior_dirichlet.py has the exact check)
+    r=solve_steady_heat(rectangle_mesh(1.,1.,2,2),conductivity=1.,dirichlet={4:300.})
+    np.testing.assert_allclose(r.temperature,300.,rtol=0,atol=1e-12)
 
 
 @pytest.mark.parametrize('source',[np.nan,np.inf,1j,[1.,2.],True,

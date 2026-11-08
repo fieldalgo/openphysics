@@ -117,11 +117,10 @@ def test_g5_3_an_unnamed_void_border_is_insulated():
 @pytest.mark.parametrize("physics, message", [
     ({"outward_flux_w_m2": {"seam": 1.0}}, "lies on an interface between two regions"),
     ({"convection": {"seam": {"h_w_m2k": 1.0, "ambient_temperature_k": 300.0}}}, "lies on an interface"),
-    ({"dirichlet_temperature_k": {"seam": 340.0}}, "lies on an interface"),
     ({"dirichlet_temperature_k": {"nowhere": 300.0}}, "unsupported thermal keys \\['nowhere'\\]"),
     ({"dirichlet_temperature_k": {"core_region": 300.0}}, "unsupported thermal keys \\['core_region'\\]"),
 ])
-def test_g5_4_interior_selections_unknown_names_and_region_selections_are_refused(physics, message):
+def test_g5_4_interior_flux_unknown_names_and_region_selections_are_refused(physics, message):
     core = {"name": "core", "type": "rect", "x": 10.0, "y": 5.0, "w": 10.0, "h": 10.0, "material": "steel"}
     raw = plate([core], physics={"dirichlet_temperature_k": {"left": 300.0}, **physics},
                 selections={"seam": {"boundary": {"of": "core"}}, "core_region": {"region": "core"}})
@@ -129,13 +128,13 @@ def test_g5_4_interior_selections_unknown_names_and_region_selections_are_refuse
         Document.from_dict(raw)
 
 
-def test_g5_4_an_interior_selection_carries_no_mesh_tag_and_doubled_flux_edges_are_refused():
+def test_g5_4_an_interior_selection_names_its_nodes_but_carries_no_edge_tag_and_doubled_flux_edges_are_refused():
     core = {"name": "core", "type": "rect", "x": 10.0, "y": 5.0, "w": 10.0, "h": 10.0, "material": "steel"}
     raw = plate([core], physics={"dirichlet_temperature_k": {"left": 300.0}},
                 selections={"seam": {"boundary": {"of": "core"}}})
     result = run(Document.from_dict(raw), verbose=False)
-    assert "seam" not in result.mesh.boundary and "seam" not in result.mesh.boundary_edges
-    assert len(result.mesh.selection_edges["seam"]) >= 40                      # the edges are still readable
+    assert len(result.mesh.boundary["seam"]) >= 40 and "seam" not in result.mesh.boundary_edges
+    assert len(result.mesh.selection_edges["seam"]) >= 40
     doubled = _annulus(dirichlet_temperature_k={"rim": 300.0}, outward_flux_w_m2={"inner": 1.0, "hole_wall": 1.0})
     with pytest.raises(DocumentError, match="'hole_wall' and 'inner' share mesh edges"):
         run(Document.from_dict(doubled), verbose=False)
@@ -151,8 +150,7 @@ def test_g5_5_the_transient_runner_fixes_a_selection_and_refuses_an_unknown_name
     seam = copy.deepcopy(raw)
     seam["geometry"]["components"]["main"]["selections"]["seam"] = {"boundary": {"of": "core"}}
     seam["physics"]["heat1"]["dirichlet_temperature_k"] = {"left": 300.0, "seam": 300.0}
-    with pytest.raises(DocumentError, match="lies on an interface"):
-        Document.from_dict(seam)
+    assert run(Document.from_dict(seam), verbose=False).summary()["dirichlet_nodes"] > 60   # interface fixed too
     bad = copy.deepcopy(raw)
     bad["physics"]["heat1"]["dirichlet_temperature_k"] = {"left": 300.0, "nowhere": 300.0}
     with pytest.raises(DocumentError, match="nowhere"):
@@ -214,3 +212,47 @@ def test_a_natural_condition_on_a_dirichlet_boundary_under_another_name_is_refus
         raw = _annulus(dirichlet_temperature_k={"inner": 400.0, "rim": 300.0}, **physics)
         with pytest.raises(DocumentError, match="shares mesh edges with the Dirichlet boundary 'inner'"):
             run(Document.from_dict(raw), verbose=False)
+
+
+# ----------------------------------------------------------------- interface Dirichlet (G6-2, G6-3; 2026-11-08)
+
+def test_g6_2_a_fixed_interface_matches_the_same_rectangle_cut_out_as_a_void():
+    core = {"name": "core", "type": "rect", "x": 10.0, "y": 5.0, "w": 10.0, "h": 10.0, "material": "steel"}
+    fixed = plate([core], physics={"dirichlet_temperature_k": {"left": 300.0, "right": 300.0, "seam": 340.0}},
+                  selections={"seam": {"boundary": {"of": "core"}}}, size=0.5)
+    hole = plate([dict(core, material=None)], physics={"dirichlet_temperature_k": {"left": 300.0, "right": 300.0,
+                                                                                 "wall": 340.0}},
+                 selections={"wall": {"boundary": {"of": "core"}}}, size=0.5)
+    a = run(Document.from_dict(fixed), verbose=False)
+    b = run(Document.from_dict(hole), verbose=False)
+    nodes = a.mesh_nodes_m
+    inside = (nodes[:, 0] > 10e-3 - 1e-12) & (nodes[:, 0] < 20e-3 + 1e-12) & (nodes[:, 1] > 5e-3 - 1e-12) \
+        & (nodes[:, 1] < 15e-3 + 1e-12)
+    assert inside.sum() > 50 and np.max(np.abs(a.temperature_k[inside] - 340.0)) <= 1e-9 * 340.0
+    sa, sb = a.summary(), b.summary()
+    # the heat the interface injects leaves through the sides: the same in both, at discretization level
+    out_a = -sa["thermostat_outward_heat_w_per_m"]
+    assert out_a != 0.0 and abs(sa["normalized_heat_balance_defect"]) <= 1e-10
+    sides_a = float(a.reaction_w_per_m[np.concatenate([a.mesh.boundary["left"], a.mesh.boundary["right"]])].sum())
+    sides_b = float(b.reaction_w_per_m[np.concatenate([b.mesh.boundary["left"], b.mesh.boundary["right"]])].sum())
+    assert abs(sides_a - sides_b) <= 1e-3 * abs(sides_b)
+    assert sa["dirichlet_nodes"] == sb["dirichlet_nodes"]     # the interface nodes only; the enclosed region follows
+
+
+def test_g6_3_the_transient_runner_fixes_an_interface_and_reaches_the_steady_solution():
+    core = {"name": "core", "type": "rect", "x": 10.0, "y": 5.0, "w": 10.0, "h": 10.0, "material": "steel"}
+    steady = plate([core], physics={"dirichlet_temperature_k": {"left": 300.0, "right": 300.0, "seam": 340.0}},
+                   selections={"seam": {"boundary": {"of": "core"}}}, size=1.0)
+    moving = plate([core], kind="transient", size=1.0, selections={"seam": {"boundary": {"of": "core"}}},
+                   physics={"initial_temperature_k": 300.0,
+                            "dirichlet_temperature_k": {"left": 300.0, "right": 300.0, "seam": 300.0}})
+    # the interface starts at 300 K (t0 consistency) and steps to 340 K
+    # backward Euler reaches the steady state as the last step grows (its residual scales with
+    # the plate's 32 s diffusion time over the step), so the study ends with two very long steps
+    moving["physics"]["heat1"]["dirichlet_temperature_k"]["seam"] = {"values_k": [300.0] + [340.0] * 5}
+    moving["study"]["time_s"] = [0.0, 1.0, 10.0, 100.0, 1e4, 1e6]
+    a = run(Document.from_dict(steady), verbose=False)
+    b = run(Document.from_dict(moving), verbose=False)
+    final = np.asarray(b.temperature_k)[-1]
+    assert final.shape == a.temperature_k.shape
+    assert np.max(np.abs(final - a.temperature_k)) <= 1e-6 * 40.0

@@ -35,14 +35,15 @@ result = solve_steady_heat(
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, 기준 좌표 `(N,2)` m, 정수 삼각형 `(M,3)` |
 | conductivity | 필수 유한 실수 스칼라 k>0, W/(m K), 또는 `mesh.region_names` 위 구간 상수 `{영역 이름: k}`([multimaterial](multimaterial.md)). tensor·영역 안에서 변하는 k 없음 |
-| dirichlet | 외부 정수 절점 ID→유한 스칼라 온도 K 매핑 |
+| dirichlet | 정수 절점 ID(외부나 내부)→유한 스칼라 온도 K 매핑 |
 | heat_source | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백 또는 메시 사본에 결합한 요소별 `(M,)` W/m^3의 `ElementHeatSource(mesh, values)`. 기본값 0 |
 
 기본 단열 경계에서는 연결 성분마다 적어도 하나의 처방 온도가 필요하며, 선택적 Robin
 확장도 성분을 고정할 수 있습니다. 절점을 몰래 pin하지 않고 spring이나 최소제곱
-정규화를 넣지 않으며 순수 Neumann 문제는 API 범위 밖입니다. Dirichlet 데이터는 내부
-절점이나 신뢰한 tag만이 아닌 실제 위상적 외부 경계에 있어야 합니다. 선택하지 않은
-자연 edge는 단열입니다. 경계 절점 tag로 Dirichlet 매핑을 만들 수 있습니다. 선택적
+정규화를 넣지 않으며 순수 Neumann 문제는 API 범위 밖입니다. Dirichlet 절점은 tag를 믿지 않고
+절점 번호로 검증합니다. 내부 절점도 고정할 수 있으며(내부 표면의 처방 온도) 그 reaction은 그
+표면이 주입하는 열로, 열수지 항등식이 다른 온도 조절점처럼 셉니다(2026-11-08; 전기·Joule·3D
+솔버는 외부 규칙 유지). 선택하지 않은 자연 edge는 단열입니다. 경계 절점 tag로 Dirichlet 매핑을 만들 수 있습니다. 선택적
 처방 외향 flux·Robin edge-tag 입력, 추가 결과 필드와 바뀐 열수지 방정식은 소스 트리의
 `docs/packages/galerkin/thermal_flux_robin.md`를 보십시오. 해당 가이드·예제는 배포본에
 포함되지 않습니다. 한국어 설명은 [flux·Robin 가이드](thermal_flux_robin.md)에 있습니다.
