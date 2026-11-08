@@ -51,6 +51,7 @@ pub struct TetMesh {
     pub interfaces: Vec<(u32, u32, [u32; 3])>,
     /// for each output node, its global point index (input points first, then S points)
     pub source: Vec<u32>,
+    pub repair: RepairStats,
 }
 
 fn key(f: [u32; 3]) -> [u32; 3] {
@@ -192,7 +193,6 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, Str
         return Err("the domain is empty".into());
     }
     let region_count = number.len() as u32;
-    let region_of_tet: HashMap<usize, u32> = kept.iter().copied().zip(regions.iter().copied()).collect();
     // 3. rounding and renumbering
     let m = Mixed { input: points, s: &b.plc.rec.s };
     let mut new_id: HashMap<u32, u32> = HashMap::new();
@@ -219,42 +219,249 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, Str
             }
         }
     }
-    // 4. certification
+    // 4. certification, with flip repair of what rounding made flat or inverted
+    let fixed_faces: HashSet<[u32; 3]> = facet_of.keys()
+        .filter_map(|k| Some(key(k.map(|g| new_id.get(&g).copied()).iter().copied().collect::<Option<Vec<u32>>>()?
+            .try_into().ok()?))).collect();
+    let fixed_edges: HashSet<(u32, u32)> = b.plc.rec.chains.iter()
+        .flat_map(|c| c.windows(2).map(|w| (w[0], w[1])))
+        .filter_map(|(a, c)| Some((*new_id.get(&a)?, *new_id.get(&c)?)))
+        .map(|(a, c)| (a.min(c), a.max(c))).collect();
+    let mut labels: Vec<u32> = (0..out_tets.len() as u32).collect();
+    let rs = repair(&nodes, &mut out_tets, &mut labels, &fixed_faces, &fixed_edges)?;
+    // flips stay inside one region
+    let regions: Vec<u32> = labels.iter().map(|&l| regions[l as usize]).collect();
     for (t, v) in out_tets.iter().enumerate() {
-        let p = v.map(|i| nodes[i as usize]);
-        if orient3d_exact(&p[0], &p[1], &p[2], &p[3]) <= 0 {
-            return Err(format!("rounding to doubles made tetrahedron {t} flat or inverted near {:?} (no flip repair yet)", p[0]));
+        if orient(&nodes, *v) <= 0 {
+            return Err(format!("tetrahedron {t} failed certification after repair"));
         }
     }
-    // boundary faces and interfaces
+    {
+        let mut count: HashMap<[u32; 3], u32> = HashMap::new();
+        for v in &out_tets {
+            for i in 0..4 {
+                let c = count.entry(key(face(v, i))).or_default();
+                *c += 1;
+                if *c > 2 {
+                    return Err(format!("face {:?} is in more than two tetrahedra after repair", key(face(v, i))));
+                }
+            }
+        }
+    }
+    // boundary faces and interfaces, from the output arrays
+    let facet_out: HashMap<[u32; 3], u32> = facet_of.iter()
+        .filter_map(|(k, &f)| Some((key([*new_id.get(&k[0])?, *new_id.get(&k[1])?, *new_id.get(&k[2])?]), f)))
+        .collect();
+    let mut owners_out: HashMap<[u32; 3], Vec<usize>> = HashMap::with_capacity(2 * out_tets.len());
+    for (j, v) in out_tets.iter().enumerate() {
+        for i in 0..4 {
+            owners_out.entry(key(face(v, i))).or_default().push(j);
+        }
+    }
     let mut boundary = Vec::new();
     let mut interfaces = Vec::new();
-    let mut seen_iface: HashSet<[u32; 3]> = HashSet::new();
-    for (j, &t) in kept.iter().enumerate() {
-        let v = tets[t];
+    for (j, v) in out_tets.iter().enumerate() {
         for i in 0..4 {
-            let k = key(face(&v, i));
-            let other = owners[&k].iter().find(|(u, _)| *u as usize != t).map(|(u, _)| *u as usize);
+            let f = face(v, i);
+            let k = key(f);
+            let outward = [f[0], f[2], f[1]];
             let r = regions[j];
-            let outward = {
-                let f = face(&out_tets[j], i);
-                [f[0], f[2], f[1]]
-            };
-            match other.and_then(|u| region_of_tet.get(&u).copied()) {
+            match owners_out[&k].iter().copied().find(|&u| u != j) {
                 None => {
-                    let f = *facet_of.get(&k).ok_or_else(|| format!("boundary face {k:?} of the domain is not a subfacet"))?;
-                    boundary.push((f, outward));
+                    let tag = *facet_out.get(&k).ok_or_else(|| format!("boundary face {k:?} of the domain is not a subfacet"))?;
+                    boundary.push((tag, outward));
                 }
-                Some(r2) if r2 != r => {
-                    if r < r2 && seen_iface.insert(k) {
-                        interfaces.push((r, r2, outward));
-                    }
-                }
+                Some(u) if regions[u] > r => interfaces.push((r, regions[u], outward)),
                 Some(_) => {}
             }
         }
     }
-    Ok(TetMesh { nodes, tets: out_tets, regions, region_count, boundary, interfaces, source })
+    Ok(TetMesh { nodes, tets: out_tets, regions, region_count, boundary, interfaces, source, repair: rs })
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RepairStats {
+    /// tetrahedra that rounding made flat or inverted
+    pub inverted: u32,
+    pub flips23: u32,
+    pub flips32: u32,
+    /// edge removals with a ring of four to seven tetrahedra
+    pub removals: u32,
+}
+
+fn orient(nodes: &[P3], t: [u32; 4]) -> i8 {
+    let p = t.map(|i| nodes[i as usize]);
+    orient3d_exact(&p[0], &p[1], &p[2], &p[3])
+}
+
+/// True when replacing `gone` by `new` leaves every face in at most two tetrahedra and
+/// adds no face twice (`faces` is the face map before the change).
+fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[usize], new: &[[u32; 4]]) -> bool {
+    let mut delta: HashMap<[u32; 3], i32> = HashMap::new();
+    for &r in gone {
+        for i in 0..4 {
+            *delta.entry(key(face(&tets[r], i))).or_default() -= 1;
+        }
+    }
+    for v in new {
+        for i in 0..4 {
+            *delta.entry(key(face(v, i))).or_default() += 1;
+        }
+    }
+    delta.iter().all(|(k, d)| faces.get(k).map_or(0, |l| l.len() as i32) + d <= 2)
+}
+
+/// Repairs tetrahedra that are flat or inverted on `nodes` by 2-3 and 3-2 flips that
+/// keep every face of `fixed_faces` and every edge of `fixed_edges`. A flip is applied
+/// only when all of its new tetrahedra are positive. `labels` follows the tetrahedra
+/// (a flip never crosses a fixed face, so its tetrahedra share one label).
+pub fn repair(nodes: &[P3], tets: &mut Vec<[u32; 4]>, labels: &mut Vec<u32>, fixed_faces: &HashSet<[u32; 3]>,
+              fixed_edges: &HashSet<(u32, u32)>) -> Result<RepairStats, String> {
+    let mut st = RepairStats::default();
+    let bad0 = tets.iter().filter(|t| orient(nodes, **t) <= 0).count();
+    st.inverted = bad0 as u32;
+    if bad0 == 0 {
+        return Ok(st);
+    }
+    let edge = |a: u32, b: u32| (a.min(b), a.max(b));
+    for _round in 0..64 * (bad0 + 1) {
+        let bad: Vec<usize> = (0..tets.len()).filter(|&t| orient(nodes, tets[t]) <= 0).collect();
+        if bad.is_empty() {
+            return Ok(st);
+        }
+        let mut faces: HashMap<[u32; 3], Vec<usize>> = HashMap::new();
+        let mut edges: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+        for (i, v) in tets.iter().enumerate() {
+            for k in 0..4 {
+                faces.entry(key(face(v, k))).or_default().push(i);
+                for l in k + 1..4 {
+                    edges.entry(edge(v[k], v[l])).or_default().push(i);
+                }
+            }
+        }
+        let mut done = false;
+        for &t in &bad {
+        // edge removal (3-2 for a ring of three, 4-4 for four, up to seven): the
+        // tetrahedra around an edge of t replaced by a fan triangulation of the ring
+        let v = tets[t];
+        'edges: for k in 0..4 {
+            for l in k + 1..4 {
+                let (d, e) = (v[k], v[l]);
+                if fixed_edges.contains(&edge(d, e)) {
+                    continue;
+                }
+                let ring_tets = edges[&edge(d, e)].clone();
+                let n = ring_tets.len();
+                if !(3..=7).contains(&n) || ring_tets.iter().any(|&r| labels[r] != labels[t]) {
+                    continue;
+                }
+                // faces through the edge must not be fixed; the ring in cyclic order
+                let mut link: HashMap<u32, Vec<u32>> = HashMap::new();
+                let mut blocked = false;
+                for &r in &ring_tets {
+                    let xy: Vec<u32> = tets[r].iter().copied().filter(|&x| x != d && x != e).collect();
+                    for &x in &xy {
+                        if fixed_faces.contains(&key([d, e, x])) {
+                            blocked = true;
+                        }
+                    }
+                    link.entry(xy[0]).or_default().push(xy[1]);
+                    link.entry(xy[1]).or_default().push(xy[0]);
+                }
+                if blocked || link.len() != n || link.values().any(|w| w.len() != 2) {
+                    continue; // an edge on the boundary, or a ring that is not a cycle
+                }
+                let start = *link.keys().min().unwrap();
+                let mut ring = vec![start];
+                let mut prev = start;
+                let mut cur = link[&start][0];
+                while cur != start {
+                    ring.push(cur);
+                    let next = if link[&cur][0] == prev { link[&cur][1] } else { link[&cur][0] };
+                    prev = cur;
+                    cur = next;
+                }
+                if ring.len() != n {
+                    continue;
+                }
+                for apex in 0..n {
+                    let mut new = Vec::with_capacity(2 * (n - 2));
+                    let mut ok = true;
+                    for j in 1..n - 1 {
+                        let (x, y, z) = (ring[apex], ring[(apex + j) % n], ring[(apex + j + 1) % n]);
+                        let (sd, se) = (orient(nodes, [x, y, z, d]), orient(nodes, [x, y, z, e]));
+                        if sd == 0 || se == 0 || sd == se {
+                            ok = false;
+                            break;
+                        }
+                        new.push(if sd > 0 { [x, y, z, d] } else { [x, z, y, d] });
+                        new.push(if se > 0 { [x, y, z, e] } else { [x, z, y, e] });
+                    }
+                    if !ok || !local_ok(&faces, tets, &ring_tets, &new) {
+                        continue;
+                    }
+                    let lab = labels[t];
+                    let mut gone = ring_tets.clone();
+                    gone.sort_unstable_by(|x, y| y.cmp(x));
+                    for r in gone {
+                        tets.swap_remove(r);
+                        labels.swap_remove(r);
+                    }
+                    labels.extend(std::iter::repeat_n(lab, new.len()));
+                    tets.extend(new);
+                    if n == 3 { st.flips32 += 1 } else { st.removals += 1 }
+                    done = true;
+                    break 'edges;
+                }
+            }
+        }
+        if !done {
+            // 2-3: a face of t that is not fixed, with its neighbour
+            for k in 0..4 {
+                let f = face(&v, k);
+                let fk = key(f);
+                if fixed_faces.contains(&fk) {
+                    continue;
+                }
+                let Some(u) = faces[&fk].iter().copied().find(|&u| u != t) else { continue };
+                if labels[u] != labels[t] {
+                    continue;
+                }
+                let d = v[k];
+                let e = *tets[u].iter().find(|x| !f.contains(x)).unwrap();
+                let s = [(f[0], f[1]), (f[1], f[2]), (f[2], f[0])].map(|(x, y)| orient(nodes, [x, y, d, e]));
+                if s.iter().any(|&x| x == 0) || !(s.iter().all(|&x| x > 0) || s.iter().all(|&x| x < 0)) {
+                    continue;
+                }
+                let new: Vec<[u32; 4]> = [(f[0], f[1]), (f[1], f[2]), (f[2], f[0])].iter()
+                    .map(|&(x, y)| if s[0] > 0 { [x, y, d, e] } else { [y, x, d, e] }).collect();
+                if new.iter().any(|n| orient(nodes, *n) <= 0) || edges.contains_key(&edge(d, e))
+                    || !local_ok(&faces, tets, &[t, u], &new) {
+                    continue;
+                }
+                let lab = labels[t];
+                for r in if t > u { [t, u] } else { [u, t] } {
+                    tets.swap_remove(r);
+                    labels.swap_remove(r);
+                }
+                tets.extend(new);
+                labels.extend([lab; 3]);
+                st.flips23 += 1;
+                done = true;
+                break;
+            }
+        }
+        if done {
+            break;
+        }
+        }
+        if !done {
+            let p = tets[bad[0]].map(|i| nodes[i as usize]);
+            return Err(format!("rounding to doubles made {} tetrahedra flat or inverted (one near {:?}), and no flip repairs them",
+                               bad.len(), p[0]));
+        }
+    }
+    Err("flip repair did not finish".into())
 }
 
 #[cfg(test)]
@@ -316,5 +523,68 @@ mod tests {
         assert!(near(volume(&p, 0), 63.0)); // the shell between the boxes
         assert!(p.interfaces.is_empty());
         assert_eq!(p.boundary.len(), 24); // both boxes bound the shell
+    }
+
+    fn lcg(s: &mut u64) -> f64 {
+        *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (*s >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    /// Delaunay tetrahedra of random points, then the points snapped to multiples of
+    /// 2^-8 or 2^-10 (a coarse stand-in for rounding): flat and inverted tetrahedra
+    /// appear. Interior ones must be repaired; ones against the fixed hull may be
+    /// refused; whatever repair returns must be valid.
+    #[test]
+    fn flip_repair_on_snapped_points() {
+        let (mut repaired, mut refused, mut flips, mut interior) = (0, 0, 0, 0);
+        for (step, seed) in [8i32, 10].into_iter().flat_map(|s| (1..200u64).map(move |k| (s, k))) {
+            let mut s = seed;
+            // random points, then snapped to multiples of 2^-step
+            let jit: Vec<P3> = (0..400).map(|_| [lcg(&mut s), lcg(&mut s), lcg(&mut s)]).collect();
+            let q = (1u64 << step) as f64;
+            let grid: Vec<P3> = jit.iter().map(|p| p.map(|x| (x * q).round() / q)).collect();
+            let distinct: HashSet<[u64; 3]> = grid.iter().map(|p| p.map(f64::to_bits)).collect();
+            if distinct.len() < grid.len() {
+                continue; // equal points after rounding are refused before repair
+            }
+            let out = crate::delaunay::tetrahedralize(&jit, None).unwrap();
+            let mut tets = out.tets.clone();
+            let hull = crate::facetrec::hull_faces(&tets);
+            let mut labels = vec![0u32; tets.len()];
+            let before = tets.iter().filter(|t| orient(&grid, **t) <= 0).count();
+            // inversions against the fixed boundary cannot be flipped away
+            let on_hull = tets.iter().filter(|t| orient(&grid, **t) <= 0)
+                .filter(|v| (0..4).any(|i| hull.contains(&key(face(v, i))))).count();
+            if before > 0 && on_hull == 0 {
+                interior += 1;
+            }
+            match repair(&grid, &mut tets, &mut labels, &hull, &HashSet::new()) {
+                Ok(st) => {
+                    assert_eq!(st.inverted as usize, before);
+                    assert!(tets.iter().all(|t| orient(&grid, *t) > 0));
+                    let mut count: HashMap<[u32; 3], u32> = HashMap::new();
+                    for v in &tets {
+                        for i in 0..4 {
+                            *count.entry(key(face(v, i))).or_default() += 1;
+                        }
+                    }
+                    assert!(count.values().all(|&c| c <= 2));
+                    let now: HashSet<[u32; 3]> = count.iter().filter(|(_, &c)| c == 1).map(|(k, _)| *k).collect();
+                    assert_eq!(now, hull, "the boundary is kept");
+                    let used: HashSet<u32> = tets.iter().flatten().copied().collect();
+                    assert_eq!(used.len(), grid.len());
+                    if before > 0 {
+                        repaired += 1;
+                        flips += st.flips23 + st.flips32 + st.removals;
+                    }
+                }
+                Err(_) => {
+                    assert!(on_hull > 0, "seed {seed}: {before} interior inversions not repaired");
+                    refused += 1;
+                }
+            }
+        }
+        assert!(interior > 0 && repaired >= interior && flips > 0, "repaired {repaired}, interior {interior}, refused {refused}");
+        eprintln!("snapped points: {interior} with interior inversions, {repaired} repaired, {refused} refused (hull), {flips} flips");
     }
 }

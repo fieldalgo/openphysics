@@ -436,6 +436,9 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     ];
     let d = PyDict::new(py);
     d.set_item("region_count", m.region_count)?;
+    d.set_item("inverted_after_rounding", m.repair.inverted)?;
+    d.set_item("flips23", m.repair.flips23)?;
+    d.set_item("flips32", m.repair.flips32)?;
     d.set_item("regions_filled", b.regions)?;
     d.set_item("cavity_tetrahedra", b.removed)?;
     Ok((out, d))

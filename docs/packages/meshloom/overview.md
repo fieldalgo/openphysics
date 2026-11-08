@@ -109,7 +109,10 @@ names may change before the mesher's public API.
   not closed, such as an edge with three facets, raises `ValueError`). Points on
   segments are rounded once to the nearest double, input points are kept bit for bit,
   unused points are dropped, and every tetrahedron is certified with exact
-  `orient3d > 0` on the output doubles. It returns `nodes`, `tetrahedra`, `regions`,
+  `orient3d > 0` on the output doubles. Tetrahedra that rounding makes flat or
+  inverted are repaired by 2-3 flips and edge removals (rings of three to seven
+  tetrahedra), which never remove a facet face or a segment edge and are applied only
+  when every new tetrahedron is positive and every face stays in at most two. It returns `nodes`, `tetrahedra`, `regions`,
   `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
   outward), and `interfaces` by region pair (wound from the lower region to the
   higher). There is no refinement: the mesh has the input points and the points
@@ -168,8 +171,10 @@ See [third-party software](../../third-party.md).
 
 - No refinement or quality improvement yet: `mesh_plc` returns the boundary-conforming
   mesh of the input and recovery points only. A tetrahedron that rounding to doubles
-  makes flat or inverted raises `ValueError` (flip repair comes next); none has
-  occurred in the tests. Facet recovery fills cavities by gift-wrapping only: a cavity
+  makes flat or inverted and that no flip repairs raises `ValueError`; flips cannot
+  repair an inversion against a facet face itself (in a synthetic test with points
+  snapped to a coarse grid, every interior inversion was repaired and inversions at
+  the fixed boundary were refused). No meshing test has needed a repair yet. Facet recovery fills cavities by gift-wrapping only: a cavity
   without a constrained Delaunay filling (none so far in the tests) is an error, not
   yet repaired with extra points, and the fill takes time quadratic in the cavity
   size (the faster cavity path comes with the rest of boundary recovery).
