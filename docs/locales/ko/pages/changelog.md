@@ -88,6 +88,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
   기존 버전 1을 보존하는 명시적 선로 JSON 버전 2를 추가했습니다.
 - `sipi`: strict `sipi.circuit/1`에 RLGC/Touchstone 또는 형상 선로 문서와 소스/부하를 저장해 단자 응답·명시 누화를 재현합니다. [계약](packages/sipi/circuit_document.md).
 
+- `meshloom`: `mesh_plc`는 복원한 PLC를 세분화 없이 계획의 출력 계약을 따르는 메시로 만듭니다. 영역(경계로 닫힌 성분마다, 또는 `domain="parity"`일 때 닫힌 표면의 짝홀 영역), 선분 위 점은 double로 한 번 반올림, 모든 사면체는 출력 double에서 정확한 `orient3d > 0`으로 인증, 바깥쪽으로 감긴 면별 경계 면과 영역 사이 interface를 냅니다. 내부 기능(`meshloom._core`). [문서](packages/meshloom/overview.md#커널-구성-요소)
+
 - `meshloom`: 경계 복원의 두 번째 부분인 면 복원을 추가했습니다. `recover_plc`는 선분 복원이 선분 위에 넣은 점을 넣어 모든 면을 다시 삼각 분할하고, 아직 면이 아닌 subfacet을 알려 줍니다. `recover_boundary`는 빠진 영역을 지나는 사면체를 지우고 면 평면의 양쪽을 정확한 gift-wrapping으로 다시 채워 그 subfacet을 모두 면으로 만든 뒤, 결과가 제약 Delaunay 사면체 분할인지(모든 subfacet이 면, 나머지 내부 면은 국소 Delaunay, 볼록 껍질 그대로) 배열에서 검증합니다. 내부 기능(`meshloom._core`)이며 영역 표시는 아직 없습니다. [문서](packages/meshloom/overview.md#커널-구성-요소)
 
 - `meshloom`: 경계 복원의 첫 부분인 선분 복원을 추가했습니다. `recover_segments`는 검사한 PLC의 모든 기본 선분을 Delaunay 사면체 분할의 변 사슬로 만들고, 새 점은 선분 위에만 넣습니다(예각 꼭짓점의 지연 보호 구, 이어서 빠진 조각 반분, 깊이 한도를 넘으면 무한 반복 대신 오류). Delaunay 커널이 기하에 대해 일반화되어 선분 위 점을 정확한 혼합 술어로 삽입하며, 입력 점만의 처리량은 그대로입니다. `benchmarks/benchmark_recovery.py`가 V15 선분 복원 카운터를 기록합니다. 내부 기능(`meshloom._core`)입니다. [문서](packages/meshloom/overview.md#커널-구성-요소).

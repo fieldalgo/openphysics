@@ -99,6 +99,21 @@ names may change before the mesher's public API.
   face locally Delaunay, which makes the result a constrained Delaunay
   tetrahedralization. A cavity it cannot fill raises `ValueError`; the tetrahedra
   still fill the convex hull (no region labels yet).
+- **Mesh without refinement.** `mesh_plc(points, facets, segments=None,
+  domain="regions")` goes on from boundary recovery to a mesh in the plan's output
+  contract. Tetrahedra joined by a face that is not a facet form a component; a
+  component reaching a hull face that is not a facet is outside. With
+  `domain="regions"` every other component is a region (a multi-region PLC);
+  with `domain="parity"` the components an odd number of facets away from the
+  outside form one region (the even-odd domain of closed surfaces; a surface that is
+  not closed, such as an edge with three facets, raises `ValueError`). Points on
+  segments are rounded once to the nearest double, input points are kept bit for bit,
+  unused points are dropped, and every tetrahedron is certified with exact
+  `orient3d > 0` on the output doubles. It returns `nodes`, `tetrahedra`, `regions`,
+  `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
+  outward), and `interfaces` by region pair (wound from the lower region to the
+  higher). There is no refinement: the mesh has the input points and the points
+  boundary recovery needed.
 
 ```python
 import numpy as np
@@ -151,9 +166,10 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No mesh generation yet: input PLCs are checked and their segments and facets
-  recovered, but there are no region labels, rounding to doubles, refinement or
-  improvement yet. Facet recovery fills cavities by gift-wrapping only: a cavity
+- No refinement or quality improvement yet: `mesh_plc` returns the boundary-conforming
+  mesh of the input and recovery points only. A tetrahedron that rounding to doubles
+  makes flat or inverted raises `ValueError` (flip repair comes next); none has
+  occurred in the tests. Facet recovery fills cavities by gift-wrapping only: a cavity
   without a constrained Delaunay filling (none so far in the tests) is an error, not
   yet repaired with extra points, and the fill takes time quadratic in the cavity
   size (the faster cavity path comes with the rest of boundary recovery).
