@@ -29,10 +29,20 @@ test('a parameter edit changes exactly that value and leaves the input untouched
  assert.throws(()=>M.setParameter(doc,'nope',1),/Unknown parameter nope/);
  assert.throws(()=>M.setParameter(doc,'w',''),/empty/);
  assert.throws(()=>M.setParameter(doc,'w',Infinity),/finite/);
+ assert.throws(()=>M.setParameter(doc,'w','1e999'),/too large/);
+ assert.throws(()=>M.setParameter(doc,'w','-1e999'),/too large/);
+ assert.throws(()=>M.setParameter(doc,'w','1e-400'),/too small/);
+ assert.equal(M.setParameter(doc,'w','0e5').geometry.parameters.w.value,0);
+ assert.equal(M.setParameter(doc,'w','0.000').geometry.parameters.w.value,0);
 });
 
-test('a slider is offered only for a plain number with a numeric range',()=>{
- assert.deepEqual(M.sliderOf({written:0.5,range:[0.3,0.9]}),{min:0.3,max:0.9,step:(0.9-0.3)/200});
+test('a slider is offered only for a plain number with a numeric range, in short decimal steps',()=>{
+ const sl=M.sliderOf({written:0.5,range:[0.3,0.9]});
+ assert.deepEqual(sl,{min:0.3,max:0.9,step:0.001,decimals:3});
+ assert.equal(M.sliderValue(sl,'0.6030000000000001'),0.603);
+ assert.equal(M.sliderValue(sl,'0.95'),0.9);assert.equal(M.sliderValue(sl,'0.1'),0.3);
+ assert.deepEqual(M.sliderOf({written:500,range:[200,2000]}),{min:200,max:2000,step:1,decimals:0});
+ assert.deepEqual(M.sliderOf({written:3,range:[0,1000]}),{min:0,max:1000,step:1,decimals:0});
  assert.equal(M.sliderOf({written:'w/2',range:[0.3,0.9]}),null);
  assert.equal(M.sliderOf({written:0.5,range:null}),null);
  assert.equal(M.sliderOf({written:0.5,range:[0.9,0.3]}),null);
@@ -73,13 +83,22 @@ test('cell paths follow each loop through its curves in their direction, holes a
  assert.equal(M.curvePath([[0.12345,1],[2,3]],view),'M0.123 1 L2 3');
 });
 
-test('highlights: region selections light cells, boundary selections and tags light curves',()=>{
- const view={regions:[{name:'rib',cells:[4,5]},{name:'background',cells:[0]}]};
- assert.deepEqual([...M.highlightOf(view,{kind:'region',entries:[1,3]}).cells],[1,3]);
- assert.deepEqual([...M.highlightOf(view,{kind:'region-name',name:'rib'}).cells],[4,5]);
- assert.deepEqual([...M.highlightOf(view,{kind:'boundary',entries:[9,15]}).curves],[9,15]);
- assert.deepEqual([...M.highlightOf(view,{kind:'boundary',curves:[1,2]}).curves],[1,2]);
- const none=M.highlightOf(view,null);assert.equal(none.cells.size+none.curves.size,0);
+test('highlights are looked up by key in the current answer, never carried as indices',()=>{
+ const before={regions:[{name:'rib',cells:[4,5]},{name:'background',cells:[0]}],
+  selections:[{name:'wall',kind:'boundary',entries:[4,7,10,11]},{name:'si',kind:'region',entries:[1,3]}],
+  tags:[{tag:'left',curves:[5,6]}]};
+ const after={regions:[{name:'rib',cells:[2]}],selections:[{name:'wall',kind:'boundary',entries:[4,5,7,8,11]}],tags:[]};
+ assert.deepEqual([...M.highlightOf(before,'selection:wall').curves],[4,7,10,11]);
+ assert.deepEqual([...M.highlightOf(after,'selection:wall').curves],[4,5,7,8,11]);
+ assert.deepEqual([...M.highlightOf(before,'selection:si').cells],[1,3]);
+ assert.deepEqual([...M.highlightOf(before,'region:rib').cells],[4,5]);
+ assert.deepEqual([...M.highlightOf(after,'region:rib').cells],[2]);
+ assert.deepEqual([...M.highlightOf(before,'tag:left').curves],[5,6]);
+ for(const key of ['tag:left','selection:si','region:gone',null,'odd']){
+  const h=M.highlightOf(after,key);assert.equal(h.cells.size+h.curves.size,0,String(key));
+ }
+ assert.deepEqual([...M.highlightOf(before,'region:a:b').cells],[]);
+ assert.deepEqual([...M.highlightOf({regions:[{name:'a:b',cells:[9]}]},'region:a:b').cells],[9]);
 });
 
 test('a refusal is shown with the engine message unchanged',()=>{

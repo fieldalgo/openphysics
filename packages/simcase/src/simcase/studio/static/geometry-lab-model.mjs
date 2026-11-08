@@ -22,21 +22,38 @@ export function setParameter(doc,name,value){
  return out;
 }
 
-/** A field's text as the document should hold it: a number when it is one, else the trimmed text. */
+/**
+ * A field's text as the document should hold it: a number when it is one, else the trimmed
+ * text (an expression). A number a double cannot hold (overflow, or a non-zero value that
+ * underflows to zero) is refused rather than written as null or 0.
+ */
 export function parseWritten(value){
  if(typeof value==='number'){if(!Number.isFinite(value))throw new Error('A parameter value must be finite');return value;}
  const text=String(value).trim();
  if(text==='')throw new Error('A parameter value cannot be empty');
- return /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(text)?Number(text):text;
+ if(!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(text))return text;
+ const number=Number(text);
+ if(!Number.isFinite(number))throw new Error(`${text} is too large for a number`);
+ if(number===0&&/[1-9]/.test(text.replace(/[eE].*$/,'')))throw new Error(`${text} is too small for a number`);
+ return number;
 }
 
-/** A slider is offered for a parameter written as a plain number with a numeric [lo, hi] range. */
+/**
+ * A slider is offered for a parameter written as a plain number with a numeric [lo, hi] range.
+ * Its step is a power of ten (at least 200 steps over the range), so slider values stay short
+ * decimals in the saved document; `sliderValue` rounds a slider position to that step.
+ */
 export function sliderOf(parameter){
  const r=parameter.range;
  if(typeof parameter.written!=='number'||!Array.isArray(r)||r.length!==2)return null;
  const [lo,hi]=r;
- if(typeof lo!=='number'||typeof hi!=='number'||!(hi>lo))return null;
- return {min:lo,max:hi,step:(hi-lo)/200};
+ if(typeof lo!=='number'||typeof hi!=='number'||!Number.isFinite(lo)||!Number.isFinite(hi)||!(hi>lo))return null;
+ const exponent=Math.floor(Math.log10((hi-lo)/200));
+ return {min:lo,max:hi,step:10**exponent,decimals:Math.max(0,-exponent)};
+}
+export function sliderValue(slider,position){
+ const v=Number(Number(position).toFixed(Math.min(slider.decimals,20)));
+ return Math.min(slider.max,Math.max(slider.min,v));
 }
 
 /** The document as saved: two-space JSON with a final newline. */
@@ -78,12 +95,22 @@ export function cellPath(cell,curves,view){
  }).join(' ');
 }
 
-/** What a selection or tag lights up: cell indices for regions, curve indices for boundaries. */
-export function highlightOf(view,item){
- if(!item)return {cells:new Set(),curves:new Set()};
- if(item.kind==='region')return {cells:new Set(item.entries),curves:new Set()};
- if(item.kind==='region-name')return {cells:new Set(view.regions.find(r=>r.name===item.name)?.cells||[]),curves:new Set()};
- return {cells:new Set(),curves:new Set(item.entries||item.curves||[])};
+/**
+ * What a highlighted list row lights up in the current answer, looked up by its key
+ * (`region:<name>`, `selection:<name>` or `tag:<tag>`) so that indices are never carried
+ * from one evaluation to the next: cell indices for regions, curve indices for boundaries.
+ */
+export function highlightOf(view,key){
+ const none={cells:new Set(),curves:new Set()};
+ if(!key||!view)return none;
+ const at=key.indexOf(':'),kind=key.slice(0,at),name=key.slice(at+1);
+ if(kind==='region')return {cells:new Set(view.regions.find(r=>r.name===name)?.cells||[]),curves:new Set()};
+ if(kind==='selection'){
+  const s=view.selections.find(x=>x.name===name);if(!s)return none;
+  return s.kind==='region'?{cells:new Set(s.entries),curves:new Set()}:{cells:new Set(),curves:new Set(s.entries)};
+ }
+ if(kind==='tag')return {cells:new Set(),curves:new Set(view.tags.find(t=>t.tag===name)?.curves||[])};
+ return none;
 }
 
 /** The text shown for a refusal: the engine's own message, nothing added or removed. */
