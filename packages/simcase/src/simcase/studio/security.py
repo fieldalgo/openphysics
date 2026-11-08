@@ -27,6 +27,7 @@ import hashlib
 import ipaddress
 import json
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -48,11 +49,42 @@ def is_loopback(host: str) -> bool:
         return False
 
 
+class _InlineScripts(HTMLParser):
+    """Collect the text of every ``<script>`` without ``src``, exactly as written."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.blocks: list[str] = []
+        self._open = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script" and not any(name == "src" for name, _ in attrs):
+            self._open = []
+
+    def handle_data(self, data):
+        if self._open is not None:
+            self._open.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self._open is not None:
+            self.blocks.append("".join(self._open))
+            self._open = None
+
+
+def inline_scripts(html: str) -> list[str]:
+    parser = _InlineScripts()
+    parser.feed(html)
+    parser.close()
+    return parser.blocks
+
+
 def inline_script_hashes(page: Path) -> list[str]:
     """CSP source expressions for the inline ``<script>`` blocks of a shipped page."""
-    # Raw bytes, as the browser hashes them: a CRLF copy must not silently break the page.
-    blocks = re.findall(rb"<script>(.*?)</script>", page.read_bytes(), flags=re.S)
-    return ["'sha256-" + base64.b64encode(hashlib.sha256(b).digest()).decode() + "'" for b in blocks]
+    # Decode the raw bytes without newline translation, as the browser hashes them:
+    # a CRLF copy must not silently break the page.
+    blocks = inline_scripts(page.read_bytes().decode("utf-8"))
+    return ["'sha256-" + base64.b64encode(hashlib.sha256(b.encode("utf-8")).digest()).decode() + "'"
+            for b in blocks]
 
 
 def content_security_policy(script_hashes) -> str:
