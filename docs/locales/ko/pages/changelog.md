@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: 형상 문서 계약의 4단계 보완(2026-11-08 승인) `simcase.geometry_velocity`. `design_velocity(document, p)`는 `2d`·`axisymmetric` 구성 요소의 독립 길이 파라미터 하나에 대해 모든 길이 필드·꼭짓점(정의점·유도점)·곡선(직선 양 끝; 원호·원의 중심과 dr/dp)의 정확한 무차원 설계 속도 V = dx/dp, `area_derivative`, `perimeter_derivative`, 곡선 위 메시 노드의 V와 그 곡선·꼭짓점을 주는 `node_velocity(mesh)`(galerkin으로 넘기는 자료이며, galerkin은 아직 읽지 않음)를 줍니다. p에서 위상이 바뀌면 피처를 밝혀 `TopologyChange`로 거부합니다. 꼭짓점의 조건이 일치하며 두 성분을 다 정해야 하고, p ± δ(δ = 2^-20 pm / 2^ceil(log2 max|V|))에서 반올림 없는 정확한 평가가 조합 서명을 유지해야 합니다. ratio·유도 파라미터, `3d` 구성 요소, 움직이는 `path` 원호, 접선 접촉은 이름을 밝혀 거부합니다. 기존 출력은 그대로입니다. [문서](packages/simcase/geometry_engine.md#설계-속도-4단계).
 - 모든 배포판의 버전을 0.1.0 대신 0.0.2로 바꿨습니다. 첫 PyPI 릴리스에 계획한 버전입니다(사용자 결정, 2026-11-08). 우리 배포판 사이의 의존성은 `>=0.0.2,<0.1`입니다. 아직 아무것도 게시하지 않았습니다.
 - 문서: 작업 공간 빠른 시작(영·한). wheelhouse 만들기, Linux·macOS·Windows에서 Python 확인과 `==0.0.2` 고정 설치, Studio 켜고 끄기, 설계 두 개와 비교, 재시작 뒤 작업 이어가기. Linux에서 확인했고 macOS와 Windows는 아직 확인하지 않았습니다.
 - 문서: `openphysics` 패키지 페이지가 0.0.2가 아직 PyPI에 없다는 것(빈 `0.0.1` 예약만 있음)을 밝히고, 소스 설치를 안내하며 wheel 설치에 `==0.0.2` 고정을 권합니다.
