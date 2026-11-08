@@ -88,3 +88,8 @@ Registered before the page was written:
   measured times are in the [engine's validation](geometry_engine.md#validation).
 - Not linked from the pilot pages, and not covered by the installed-wheel
   browser check.
+- Written for the local Studio server. A refusal returns only the reader's or
+  engine's message, which is built from the submitted document; any other
+  error is a generic 500 without exception text (tested). Serving Studio to
+  other people would also need limits on request size and evaluation time,
+  which this page does not set.

@@ -303,3 +303,20 @@ def test_lengths_and_areas_are_in_the_document_unit(client):
         assert r["area"] == pytest.approx(0.375 * scale ** 2, rel=1e-15)
         corners = {tuple(p) for k in view["curves"] if "r.left" in k["provenance"] for p in k["points"]}
         assert corners == {(-0.25 * scale, -0.5 * scale), (-0.25 * scale, 0.25 * scale)}
+
+
+def test_only_engine_refusals_reach_the_page_never_a_traceback():
+    """A refusal carries the reader's or engine's message, which is built from the submitted
+    document; anything else is the server's generic 500 with no exception text. This keeps
+    holding if Studio is ever served beyond the local machine."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from simcase.studio import app
+    quiet = TestClient(app, raise_server_exceptions=False)
+    broken = {"units": "um", "geometry": {"version": 1, "components": {}}}   # a reader bug: AttributeError
+    response = quiet.post("/api/geometry-lab/evaluate", json={"doc": broken})
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"
+    assert "Traceback" not in response.text and "AttributeError" not in response.text and ".py" not in response.text
+    source = (Path(simcase.__file__).parent / "studio" / "geometry_api.py").read_text(encoding="utf-8")
+    assert source.count("except ") == 1 and "except GeometryError as exc:" in source
