@@ -581,13 +581,15 @@ def test_port_only_an_unvalidated_document_is_validated_before_its_copy(monkeypa
         check_mesh_limits(bad, max_input_vertices=10 ** 6)
 
 
-def test_port_only_the_heat_kinds_take_mesh_limits():
+def test_port_only_the_region_kinds_take_mesh_limits():
     takes = {k.name for k in registry.kinds() if k.accepts_mesh_limits is not None}
-    assert takes == {'thermal.steady2d', 'thermal.transient2d'}
+    # electric_joule since 2026-11-08: its region documents (electric.steady2d) mesh like region heat
+    assert takes == {'thermal.steady2d', 'thermal.transient2d', 'electric_joule'}
     for name in ('thermal_regions', 'transient_thermal_regions'):
         data = examples.EXAMPLES[name]
         assert registry.kind_of(data).accepts_mesh_limits(data)
-    for name in ('thermal_slab', 'thermal_boundary', 'transient_thermal_uniform'):
+    for name in ('thermal_slab', 'thermal_boundary', 'transient_thermal_uniform', 'electric_rectangle',
+                 'joule_rectangle', 'joule_temperature'):
         data = examples.EXAMPLES[name]
         assert not registry.kind_of(data).accepts_mesh_limits(data)
 
