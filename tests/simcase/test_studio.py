@@ -42,6 +42,9 @@ def test_studio_uses_only_the_public_api():
             if isinstance(node, ast.Import):
                 leaks += [f"{path.name}: import {a.name}" for a in node.names
                           if a.name.split(".")[0] == "simcase" and a.name != "simcase"]
+            elif isinstance(node, ast.ImportFrom) and node.level > 1:
+                # A relative import above studio/ reaches simcase without naming it.
+                leaks.append(f"{path.name}:{node.lineno}: from {'.' * node.level}{node.module or ''} import ...")
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 if node.module.split(".")[0] != "simcase":
                     continue
