@@ -15,7 +15,9 @@ discretization.
 Format `openphysics: "0.2"`. One named physics entry, `study: {"type":"single"}`,
 a homogeneous 2D rectangle `geometry.domain` (`xmin,xmax,ymin,ymax`),
 `mesh.subdivisions: [nx,ny]` positive integers, and `materials: {}`. There are no
-shapes, regions, sweeps, remeshing or thickness. `units` holds exactly `length`
+sweeps, remeshing or thickness. A document whose geometry declares material regions
+takes the [region contract](#material-regions-and-named-boundaries) instead; this
+section and the next describe the rectangle documents, which it leaves unchanged. `units` holds exactly `length`
 (the existing length vocabulary); SI-suffixed values always use the indicated SI
 unit, independently of the length unit. Unknown keys, nonfinite numbers, booleans
 as numbers and conflicting corners are rejected. At most 200,000 triangles are
@@ -174,11 +176,143 @@ document cannot express them. J3 and K3 therefore use the quadratic bars above,
 derived in the tests from the Navier equation, independent of the solver, and K2
 uses the shear-free `uniform_combined` state.
 
+## Material regions and named boundaries
+
+A `mechanics.elasticity2d` or `mechanics.thermoelastic2d` document whose `geometry`
+has `background` or `shapes` (0.2), or a [version 1 geometry block](geometry_document.md)
+with features or a background material, describes several materials. It uses the
+geometry, mesh and boundary names of [region heat](thermal_regions2d.md):
+`mesh.size` (and `min_angle`, default 28), shapes or features over a background,
+later features winning. A version 1 homogeneous rectangle without a background
+material is still a rectangle document.
+
+The shipped examples are `elastic_regions` (a quarter of a thick steel pipe under
+inner pressure, the bore and outer surface named through `boundary_tags`) and
+`thermoelastic_regions` (a steel–aluminium bimetal strip heated by 50 K, clamped at
+the left end):
+
+```json
+{
+  "openphysics": "0.2",
+  "name": "Quarter of a thick steel pipe under 10 MPa inner pressure",
+  "units": {"length": "mm"},
+  "geometry": {"version": 1, "components": {"main": {
+    "dimension": "2d", "domain": {"xmin": 0, "xmax": 9, "ymin": 0, "ymax": 9},
+    "background": {"material": "steel"},
+    "features": [
+      {"name": "outside", "type": "rect", "x": 0, "y": 0, "w": 9, "h": 9, "material": null},
+      {"name": "wall", "type": "circle", "cx": 0, "cy": 0, "r": 9, "material": "steel"},
+      {"name": "bore", "type": "circle", "cx": 0, "cy": 0, "r": 3, "material": null}],
+    "finalize": "later_wins",
+    "boundary_tags": [
+      {"tag": "inner", "select": {"boundary": {"of": "bore"}}},
+      {"tag": "outer_wall", "select": {"boundary": {"between": ["wall", "outside"]}}}]}}},
+  "materials": {"steel": {"young_modulus_pa": 200e9, "poisson_ratio": 0.3, "source": "document value"}},
+  "physics": {"pipe": {"type": "mechanics.elasticity2d", "plane": "strain",
+    "displacement_m": {"left": {"x": 0}, "bottom": {"y": 0}},
+    "pressure_pa": {"inner": 10e6}}},
+  "mesh": {"size": 0.5}, "study": {"type": "single"},
+  "results": {"save_fields": true, "plots": false}
+}
+```
+
+**Materials.** Every used material gives `young_modulus_pa` (> 0) and
+`poisson_ratio` (−1 < ν < 0.5); a thermoelastic document also needs
+`thermal_expansion_per_k` (finite, signed) and the region heat key
+`conductivity_w_mk` (> 0). These are the names of the galerkin arguments
+(`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`) with the document's SI
+suffix, the same as the rectangle physics keys. The `materials` table is shared with
+the other region physics; each reads the keys it needs and validates every key it
+finds. Properties are never taken from built-in optical materials. In `physics`,
+`young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`,
+`thermal_conductivity_w_mk` and `conductivity_w_mk` are refused by name.
+
+**Physics keys.** `type`, `plane`, `displacement_m` (required), and optionally
+`traction_pa`, `pressure_pa` and `body_force_n_m3` (constant `[fx, fy]` in N/m³). A
+thermoelastic document adds `reference_temperature_k` (≥ 0, required) and the
+region heat keys `heat_source_w_m3` (a number or `{region name: number}`),
+`dirichlet_temperature_k`, `outward_flux_w_m2` and `convection`, with the region
+heat rules (a Dirichlet anchor or positive h; Dirichlet may fix an interface
+selection, flux and convection may not). `units` is exactly `length` for
+elasticity and `length` plus `temperature: "K"` for thermoelasticity.
+
+**Boundary names.** `displacement_m`, `traction_pa` and `pressure_pa` take the
+names region heat takes for its exterior data: the four domain sides, a
+`boundary_tags` name, `outer` on the border of a void feature, and a boundary
+selection whose curves all lie on the exterior. An interface selection is refused
+by name: galerkin fixes exterior nodes only, and a traction needs exterior edges.
+An unnamed exterior boundary, a void border included, is traction free.
+
+- `displacement_m`: `{name: {"x": m, "y": m}}`; each listed component is
+  prescribed on every node of that boundary. Two names that fix a shared node to
+  different values are refused when the document runs.
+- `traction_pa`: `{name: [tx, ty]}`, a constant global Cartesian vector in Pa.
+- `pressure_pa`: `{name: p}` in Pa, the traction `−p n` with `n` the outward
+  normal of each boundary edge; a positive pressure pushes on the body. It is the
+  load a curved named boundary needs (the galerkin `−p·normal` callback on the
+  reference boundary; no follower update).
+- One boundary takes one load: a name in both `traction_pa` and `pressure_pa`, or
+  two names that share mesh edges and both carry a load, are refused. A nonzero
+  traction or pressure component on an edge whose same displacement component is
+  prescribed is refused, as on the rectangle.
+
+**Rigid-body rule.** At load, some boundary must fix `x` and some `y`. When the
+document runs, every connected part of the mesh (a void can cut the body in
+pieces) must be held against all three planar rigid motions; a part that is not is
+refused by name with its regions. This is the rank test galerkin applies.
+
+**Refused.** An axisymmetric component (plane mechanics does not describe a body
+of revolution), a void background, a feature or shape that the domain cuts away or
+that is a sliver, `mesh.subdivisions`, plots, and a study other than single. The
+refusals found at load leave the CLI with exit 2; those found on the mesh (an
+unheld part, a shared node fixed twice, a name without mesh edges, a doubled load)
+with exit 1, as for region heat. Mesh limits (`max_input_vertices`, `max_nodes`,
+`max_triangles`, see [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers))
+apply to region documents; the rectangle documents refuse them.
+
+**Run and results.** The runner meshes the regions once (meshine, in metres, as
+region heat), maps E, ν and α by region name and calls `solve_elasticity`, or
+`solve_steady_heat` with conductivity by region, `freeze_temperature` and
+`solve_thermoelasticity`. The result IDs are `mechanics.elasticity2d-regions-result-v1`
+(layout `mechanics2d-p1-regions-v1`) and `mechanics.thermoelastic2d-regions-result-v1`
+(layout `thermoelastic2d-p1-regions-v1`). The arrays are those of the rectangle
+layouts plus `triangle_regions` (one region id per triangle, `int64`). In place of
+the scalar material entries, the summary holds `region_names` (the index order of
+`triangle_regions`), `regions` (material, triangle count and meshed area in m² per
+region), the `materials` table, the boundary data (`displacement_m`, `traction_pa`,
+`pressure_pa` and its sign, and for thermoelasticity the heat data) and the mesh
+(nodes, triangles, size, requested and achieved minimum angle). Diagnostics,
+units, saving and export are those of the rectangle results.
+
+**Validation** (`tests/simcase/test_mechanics_regions.py`; checks R0 to R7
+pre-registered in the HQ work record on 2026-11-08 before the code; measured the
+same day on Linux, Python 3.12, the pinned environment):
+
+| Check | Criterion | Measured |
+|---|---|---|
+| R0 | `elastic_plate` and `thermoelastic_bar`: saved arrays and summary (timings and versions aside) SHA-256 identical before and after | identical |
+| R1 | a region run equals the direct galerkin calls on the same mesh, byte for byte (elastic with pressure, traction and body force, and thermoelastic with per-region source, flux and convection, both in both planes); the mechanical arguments are rebuilt in the test the way the runner builds them, so R1 checks the hand-off, and R2–R5 the physics (R4 the pressure sign) | identical bytes |
+| R2 | two layers in series (ν = 0, E 200 and 70 GPa), version 1 and 0.2, both planes: end displacement s(L₁/E₁ + L₂/E₂) and σxx = s within 1e-10 | ≤ 2.7e-15 displacement, ≤ 1.8e-14 stress |
+| R3 | two layers in parallel (ν = 0.3) under a prescribed end displacement: end reaction Σ E′ᵢhᵢ d/L within 1e-10 (E′ = E plane stress, E/(1−ν²) plane strain) | ≤ 2.2e-14 |
+| R4 | Lamé pipe (a = 3, b = 9 mm, plane strain, inner pressure through a `boundary_tags` name): largest nodal radial error ≤ 1e-2 of u_r(a) at h = 0.25 mm; order ≥ 1.8 over h = 0.5, 0.25, 0.125 mm; the bore selection gives the same displacement as the tag | 1.4e-2, 3.1e-3, 8.4e-4 (orders 2.22, 1.89); identical |
+| R5 | confined bilayer free expansion (+50 K, ν = 0, both planes): end displacement ΔT(α₁L₁ + α₂L₂) and σyy = −EᵢαᵢΔT per region within 1e-10 | ≤ 1.5e-14, ≤ 6.3e-15 |
+| R5b | series conduction (k 45 and 237 W/(m K), 400 to 300 K): interface temperature within 1e-9, end displacement against the closed-form integral within 2e-3 | 3.7e-16, 2.5e-6 |
+| R6 | 35 refusals by name (interface selections for displacement, traction and pressure; unknown names; material keys in physics; missing or invalid material keys; void background; dropped features and shapes; axisymmetric; subdivisions; units; an unheld part; a shared node fixed twice; a doubled load; a pressure or traction on a prescribed component under its own or another name; a side without mesh edges; thermoelastic heat refusals); CLI exit 2 at load and 1 on the mesh, no output; a boundary held tangentially and pressed normally is accepted | all refused; accepted |
+| R7 | mesh limits reach region mechanics; the rectangle documents refuse them | passed |
+
+R4's sizes were chosen after a first measurement at h = 1 mm (a 16-sided bore,
+about two elements across the wall), whose order to 0.5 mm is 0.97; that level is
+before the asymptotic range and is kept out of the gate. A check outside the
+pre-registration: the bimetal example's tip deflection is within 1.3 % of
+Timoshenko's bimetal formula (beam theory), gated at 2 %.
+
 ## Limits
 
-One homogeneous isotropic rectangle, side-constant data, static small strain, a
-single study. No regions or shapes, no normal/tangential traction, no distributed
-or point loads, no dynamics, 3D or Studio form. Thermal stress is one-way from a
+Rectangle documents: one homogeneous isotropic rectangle, side-constant data.
+Region documents: piecewise constant isotropic materials, constant tractions and
+pressures per named boundary, no interface displacement or load, no axisymmetric
+component. Both: static small strain, a single study, no general normal/tangential
+or distributed traction, no point loads, no dynamics, 3D or Studio form. Thermal stress is one-way from a
 steady heat solve on the same mesh: no mechanical feedback, no temperature-dependent
 properties, no transient temperatures, no prescribed external temperature field
 (the Python [transient](../galerkin/transient_thermal_mechanical.md) and

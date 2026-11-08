@@ -718,6 +718,7 @@ keyword.
 | FEM 2D (meshine) | `2d` components (and `axisymmetric` once a runner exists); `rect`, `circle`, `polygon`, `trapezoid` | `path` and `segment` until stage 2; reserved keywords |
 | [stage 2 engine](geometry_engine.md) (`simcase.geometry_engine`) | `2d` and `axisymmetric` components with every 2D feature, both finalize modes, void and merged regions; its hand-off gives meshine the complex as loops; the runners read such a document through `doc.regions()`, and `mesh.controls` `circle_segments`, `size` and the distance grading reach its hand-off (2026-11-06/07) | `3d`; a `path` whose boundary meets itself; an arc whose `to` is not on its circle (the end point must be a grid point); at the hand-off, a `segment` curve inside one cell; axisymmetric outside region heat (the waveguide runner and Studio refuse it; steady and transient region heat take it with full-revolution rates, 2026-11-07/08), void in the waveguide runner (region heat takes it as an insulated-unless-named hole, 2026-11-08) |
 | [design velocity](geometry_engine.md#design-velocity-stage-4) (`simcase.geometry_velocity`, stage 4) | one independent length parameter of a `2d` or `axisymmetric` component; static `path` arcs; the meshine mesh of the complex's last hand-off for node velocities | ratio and derived parameters; `3d`; moving `path` arcs; tangent contacts; any topology change at p (both tests of the probe) |
+| [region mechanics](mechanics2d.md#material-regions-and-named-boundaries) (`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | `2d` components through the stage 2 engine, with E, ν, α and k from `materials` and the boundary names of region heat for displacement, traction and pressure (2026-11-08) | `axisymmetric`; a void background; interface selections for displacement, traction and pressure (galerkin fixes exterior nodes only) |
 | FEM 2.5D (`meshine.extrude`) | `layers`, and `extrude` along z | sloped or curved sidewalls: the extruder makes vertical prisms only (`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | `box` with the grid-plane rule | other 3D features |
 | FEM 3D (meshloom, stage 5) | the stage 5 combinations | everything else, until a gmshio route exists |
@@ -963,3 +964,4 @@ listed here too.
   (first-order vertex test and exact probe at p ± δ) and what is refused, under
   "Parameters, sweeps and derivatives". The earlier frozen text is unchanged.
   Also: a consumers row and a status sentence (not frozen sections).
+- 2026-11-08: The consumers table names region mechanics (not frozen sections).

@@ -12,7 +12,9 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 
 `openphysics:"0.2"`, 이름 있는 physics 하나, `study:{"type":"single"}`,
 `geometry.domain`의 `xmin,xmax,ymin,ymax` 직사각형, 양의 정수 `mesh.subdivisions:[nx,ny]`,
-`materials:{}`를 사용한다. 도형·영역·sweep·재메시·두께는 없다. `units`에는 `length`만
+`materials:{}`를 사용한다. sweep·재메시·두께는 없다. 형상이 재료 영역을 선언하는 문서는
+대신 [영역 계약](#재료-영역과-이름-있는-경계)을 따른다. 이 절과 다음 절은 직사각형 문서를 설명하며,
+영역 계약은 이를 바꾸지 않는다. `units`에는 `length`만
 (기존 길이 단위 중 하나) 들어가며, SI 접미사가 붙은 값은 길이 단위와 무관하게 그 SI 단위를
 쓴다. 알 수 없는 키, 비유한 수, 숫자 대신 boolean, 모서리의 상충 조건은 거부한다. 할당 전
 최대 200,000 삼각형을 검사한다. results 기본값은 `save_fields:true,plots:false`이며 plot과
@@ -147,10 +149,92 @@ NumPy 2.5.4, SciPy 1.18.1(2026-11-02) 측정값이다.
 표현할 수 없다. 그래서 J3·K3는 위의 2차 막대 해를 쓰며(테스트에서 Navier 방정식으로 솔버와
 독립적으로 유도), K2는 전단 없는 `uniform_combined` 상태를 쓴다.
 
+## 재료 영역과 이름 있는 경계
+
+`geometry`에 `background`나 `shapes`가 있거나(0.2), 피처나 배경 재료가 있는
+[버전 1 형상 블록](geometry_document.md)을 가진 `mechanics.elasticity2d`·`mechanics.thermoelastic2d`
+문서는 여러 재료를 기술한다. [영역 열전도](thermal_regions2d.md)와 같은 형상·메시·경계 이름을 쓴다:
+`mesh.size`(와 `min_angle`, 기본 28), 배경 위의 도형이나 피처, 나중 피처가 이긴다. 배경 재료가 없는
+버전 1 균질 직사각형은 여전히 직사각형 문서다.
+
+예제는 `elastic_regions`(내압을 받는 두꺼운 강관의 1/4, 구멍과 바깥면을 `boundary_tags`로 이름 붙임)와
+`thermoelastic_regions`(50 K 가열한 강·알루미늄 바이메탈 띠, 왼쪽 끝 고정)다. 문서 예는
+[영문 문서](../../../../../packages/simcase/mechanics2d.md#material-regions-and-named-boundaries)를 본다.
+
+**재료.** 쓰인 재료마다 `young_modulus_pa`(> 0)와 `poisson_ratio`(−1 < ν < 0.5)가 있어야 한다.
+열탄성 문서는 `thermal_expansion_per_k`(유한, 부호 있음)와 영역 열 키 `conductivity_w_mk`(> 0)도
+필요하다. galerkin 인자 이름(`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`)에 문서의
+SI 접미사를 붙인 것으로, 직사각형 physics 키와 같다. `materials` 표는 다른 영역 물리와 공유하며,
+각 물리는 필요한 키를 읽고 있는 키는 모두 검사한다. 내장 광학 재료에서 성질을 가져오지 않는다.
+`physics`의 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`,
+`thermal_conductivity_w_mk`, `conductivity_w_mk`는 이름을 밝혀 거부한다.
+
+**physics 키.** `type`, `plane`, `displacement_m`(필수)와 선택 `traction_pa`, `pressure_pa`,
+`body_force_n_m3`(N/m³ 상수 `[fx, fy]`). 열탄성 문서는 `reference_temperature_k`(≥ 0, 필수)와 영역
+열 키 `heat_source_w_m3`(수 또는 `{영역 이름: 수}`), `dirichlet_temperature_k`, `outward_flux_w_m2`,
+`convection`을 더하며 영역 열 규칙을 따른다(Dirichlet 기준점 또는 양의 h; Dirichlet은 경계면 선택을
+고정할 수 있고 flux·대류는 안 됨). `units`는 탄성이면 `length`만, 열탄성이면 `length`와
+`temperature: "K"`다.
+
+**경계 이름.** `displacement_m`, `traction_pa`, `pressure_pa`는 영역 열이 외부 데이터에 받는 이름을
+받는다: 영역의 네 변, `boundary_tags` 이름, 빈 공간 피처 둘레의 `outer`, 곡선이 모두 외부에 있는 경계
+선택. 경계면 선택은 이름을 밝혀 거부한다: galerkin은 외부 절점만 고정하고 traction은 외부 변이 필요하다.
+이름 없는 외부 경계(빈 공간 둘레 포함)는 traction이 없다.
+
+- `displacement_m`: `{이름: {"x": m, "y": m}}`. 적힌 성분을 그 경계의 모든 절점에 처방한다. 공유 절점을
+  다른 값으로 고정하는 두 이름은 실행할 때 거부한다.
+- `traction_pa`: `{이름: [tx, ty]}`, Pa 단위의 전역 직교좌표 상수 벡터.
+- `pressure_pa`: `{이름: p}`(Pa), 경계 변마다 바깥 법선 `n`에 대한 traction `−p n`. 양의 압력이 물체를
+  누른다. 곡선인 이름 있는 경계에 필요한 하중이다(기준 경계에서 galerkin `−p·normal` 콜백, 추종 갱신 없음).
+- 한 경계에는 하중 하나: `traction_pa`와 `pressure_pa`에 같은 이름, 또는 메시 변을 공유하면서 둘 다
+  하중을 받는 두 이름은 거부한다. 같은 변위 성분이 처방된 변의 0 아닌 traction·압력 성분은 직사각형처럼
+  거부한다.
+
+**강체 규칙.** 읽을 때 어떤 경계가 `x`를, 어떤 경계가 `y`를 고정해야 한다. 실행할 때 메시의 연결된
+부분마다(빈 공간이 몸체를 나눌 수 있음) 평면 강체 운동 셋이 모두 막혀야 하며, 막히지 않은 부분은 그
+영역 이름과 함께 거부한다. galerkin이 쓰는 rank 검사와 같다.
+
+**거부.** 축대칭 구성 요소(평면 역학은 회전체를 기술하지 않음), 빈 공간 배경, 영역이 잘라 내거나 너무
+얇은 피처·도형, `mesh.subdivisions`, plot, single이 아닌 study. 읽을 때 찾은 거부는 CLI 종료 코드 2,
+메시에서 찾은 거부(고정되지 않은 부분, 두 번 고정된 공유 절점, 메시 변 없는 이름, 겹친 하중)는 영역 열처럼
+종료 코드 1이다. 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`,
+[호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한))은 영역 문서에 적용되며, 직사각형
+문서는 거부한다.
+
+**실행과 결과.** 실행기는 영역을 한 번 메시하고(영역 열처럼 meshine, 미터 단위) E·ν·α를 영역 이름으로
+대응시켜 `solve_elasticity`를, 또는 영역별 전도도로 `solve_steady_heat`, `freeze_temperature`,
+`solve_thermoelasticity`를 부른다. 결과 ID는 `mechanics.elasticity2d-regions-result-v1`(배치
+`mechanics2d-p1-regions-v1`)과 `mechanics.thermoelastic2d-regions-result-v1`(배치
+`thermoelastic2d-p1-regions-v1`)이다. 배열은 직사각형 배치의 배열에 `triangle_regions`(삼각형마다 영역
+번호, `int64`)를 더한 것이다. 요약은 스칼라 재료 항목 대신 `region_names`(`triangle_regions`의 번호
+순서), `regions`(영역마다 재료, 삼각형 수, 메시 면적 m²), `materials` 표, 경계 데이터(`displacement_m`,
+`traction_pa`, `pressure_pa`와 그 부호, 열탄성은 열 데이터), 메시(절점, 삼각형, 크기, 요청·달성 최소각)를
+담는다. 진단, 단위, 저장, 내보내기는 직사각형 결과와 같다.
+
+**검증**(`tests/simcase/test_mechanics_regions.py`; R0–R7은 2026-11-08 코드 전에 HQ 작업 기록에
+사전 등록했고 같은 날 Linux, Python 3.12, 고정 환경에서 측정):
+
+| 검사 | 기준 | 측정 |
+|---|---|---|
+| R0 | `elastic_plate`·`thermoelastic_bar`: 저장 배열과 요약(시간·버전 제외) SHA-256 변경 전후 동일 | 동일 |
+| R1 | 같은 메시에서 영역 실행 = galerkin 직접 호출, 바이트 동일(압력·traction·체적력 탄성과 영역별 열원·flux·대류 열탄성, 둘 다 두 평면). 역학 인자는 시험에서 실행기와 같은 방식으로 다시 만들므로 R1은 넘기기를, R2–R5는 물리(R4는 압력 부호)를 검사 | 바이트 동일 |
+| R2 | 직렬 두 층(ν = 0, E 200·70 GPa), 버전 1과 0.2, 두 평면: 끝 변위 s(L₁/E₁ + L₂/E₂)와 σxx = s, 1e-10 이내 | 변위 ≤ 2.7e-15, 응력 ≤ 1.8e-14 |
+| R3 | 병렬 두 층(ν = 0.3), 끝 변위 처방: 끝 반력 Σ E′ᵢhᵢ d/L, 1e-10 이내(평면응력 E′ = E, 평면변형률 E/(1−ν²)) | ≤ 2.2e-14 |
+| R4 | Lamé 관(a = 3, b = 9 mm, 평면변형률, `boundary_tags` 이름으로 내압): h = 0.25 mm에서 최대 절점 반지름 오차 ≤ u_r(a)의 1e-2; h = 0.5, 0.25, 0.125 mm에서 차수 ≥ 1.8; 구멍 선택이 태그와 같은 변위 | 1.4e-2, 3.1e-3, 8.4e-4(차수 2.22, 1.89); 동일 |
+| R5 | 구속된 두 층 자유 팽창(+50 K, ν = 0, 두 평면): 끝 변위 ΔT(α₁L₁ + α₂L₂)와 영역별 σyy = −EᵢαᵢΔT, 1e-10 이내 | ≤ 1.5e-14, ≤ 6.3e-15 |
+| R5b | 직렬 전도(k 45·237 W/(m K), 400→300 K): 계면 온도 1e-9 이내, 끝 변위가 닫힌 적분식과 2e-3 이내 | 3.7e-16, 2.5e-6 |
+| R6 | 이름 밝힌 거부 35개(변위·traction·압력의 경계면 선택, 모르는 이름, physics의 재료 키, 빠지거나 잘못된 재료 키, 빈 공간 배경, 떨어진 피처·도형, 축대칭, subdivisions, units, 고정되지 않은 부분, 두 번 고정된 공유 절점, 겹친 하중, 같은 이름이나 다른 이름으로 처방된 성분에 준 압력·traction, 메시 변 없는 변, 열탄성 열 거부); 읽을 때 CLI 종료 2·메시에서 1, 출력 없음; 접선으로 고정하고 법선으로 누른 경계는 받음 | 모두 거부; 받음 |
+| R7 | 메시 상한이 영역 기계에 전달, 직사각형 문서는 거부 | 통과 |
+
+R4의 크기는 h = 1 mm(16각형 구멍, 벽 두께에 요소 약 둘)의 첫 측정 뒤에 정했다. 그 수준에서 0.5 mm까지의
+차수는 0.97로, 점근 범위 전이라 검사에서 뺐다. 사전 등록 밖의 검사: 바이메탈 예제의 끝 처짐이
+Timoshenko 바이메탈 식(보 이론)과 1.3 % 이내이며 2 %로 검사한다.
+
 ## 한계
 
-균질 등방 직사각형 하나, 변마다 상수인 데이터, 정적 소변형률, 단일 study. 영역·도형, 법선/접선
-traction, 분포·점 하중, 동역학, 3D, Studio 양식은 없다. 열응력은 같은 메시의 정상 열전도에서
+직사각형 문서: 균질 등방 직사각형 하나, 변마다 상수인 데이터. 영역 문서: 구간별 상수 등방 재료, 이름 있는
+경계마다 상수 traction·압력, 경계면 변위·하중 없음, 축대칭 없음. 공통: 정적 소변형률, 단일 study. 일반
+법선/접선·분포 traction, 점 하중, 동역학, 3D, Studio 양식은 없다. 열응력은 같은 메시의 정상 열전도에서
 단방향으로만 온다: 역학 되먹임, 온도 의존 물성, 과도 온도, 외부에서 처방한 온도장은 없다(Python
 [과도](../galerkin/transient_thermal_mechanical.md)·[처방 온도](../galerkin/prescribed_temperature_thermoelasticity.md)
 흐름은 Python 전용). 구조적으로 유효한 모델도 수치적으로

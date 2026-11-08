@@ -602,6 +602,7 @@ part       := [A-Za-z0-9_-]+
 | FEM 2D(meshine) | `2d` 구성 요소(러너가 생기면 `axisymmetric`도); `rect`, `circle`, `polygon`, `trapezoid` | 2단계 전 `path`·`segment`; 예약 키워드 |
 | [2단계 엔진](geometry_engine.md)(`simcase.geometry_engine`) | 모든 2D 피처·두 finalize 모드·빈 공간·병합 영역을 가진 `2d`·`axisymmetric` 구성 요소. 넘기기는 복합체를 루프로 meshine에 줌. 러너는 그런 문서를 `doc.regions()`로 읽고 `mesh.controls`의 `circle_segments`·`size`·거리 등급이 넘기기에 닿음(2026-11-06/07) | `3d`; 경계가 자기와 만나는 `path`; `to`가 자기 원 위에 없는 원호(끝점은 격자점이어야 함); 넘기기에서 셀 하나 안의 `segment` 곡선; 영역 열 밖의 축대칭(도파관 러너와 Studio는 거부; 정상·과도 영역 열은 전체 회전 열량으로 받음, 2026-11-07/08), 도파관 러너에서 빈 공간(영역 열은 이름 없으면 단열인 구멍으로 받음, 2026-11-08) |
 | [설계 속도](geometry_engine.md#설계-속도-4단계)(`simcase.geometry_velocity`, 4단계) | `2d`·`axisymmetric` 구성 요소의 독립 길이 파라미터 하나; 고정된 `path` 원호; 노드 속도에는 복합체의 마지막 넘기기에서 만든 meshine 메시 | ratio·유도 파라미터; `3d`; 움직이는 `path` 원호; 접선 접촉; p에서의 모든 위상 변화(탐침의 두 판정) |
+| [영역 기계](mechanics2d.md#재료-영역과-이름-있는-경계)(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | 2단계 엔진을 거친 `2d` 구성 요소. E·ν·α·k는 `materials`에서, 변위·traction·압력은 영역 열과 같은 경계 이름으로(2026-11-08) | `axisymmetric`; 빈 공간 배경; 변위·traction·압력의 경계면 선택(galerkin은 외부 절점만 고정) |
 | FEM 2.5D(`meshine.extrude`) | `layers`, z 방향 `extrude` | 기울거나 휜 옆면. 압출기는 수직 프리즘만 만듦(`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | 격자면 규칙을 지키는 `box` | 다른 3D 피처 |
 | FEM 3D(meshloom, 5단계) | 5단계 조합 | 그 밖의 모든 것(gmshio 경로가 생길 때까지) |
@@ -813,3 +814,4 @@ sipi에서 옮기는 방식:
 - 2026-11-08: 4단계 보완(2026-11-08 사용자 승인). "파라미터, 스윕, 미분" 아래에 설계 속도(파라미터, 주는 것,
   메시 노드), 위상 탐침(꼭짓점 1차 판정과 p ± δ 정확 탐침), 거부 항목을 추가. 기존 동결 본문은 그대로. 소비자
   표 행과 상태 문장도 추가(동결 절 아님).
+- 2026-11-08: 소비자 표에 영역 기계를 적음(동결 절 아님).

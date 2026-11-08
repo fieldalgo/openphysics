@@ -26,7 +26,10 @@ SIDES = ('left', 'right', 'bottom', 'top')
 #: Cartesian per-metre identifiers (galerkin docs/packages/galerkin/thermal_axisymmetric.md)
 AXISYMMETRIC_RESULT_FORMAT = 'thermal.axisymmetric-regions-result-v1'
 AXISYMMETRIC_FIELD_LAYOUT = 'thermal-axisymmetric-p1-node-cell-regions-v1'
-MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'source'}
+#: the union of every region physics' material keys; each physics reads the keys it needs
+#: (heat: conductivity and heat capacity; mechanics: E, nu and alpha, see mechanics_regions.py)
+MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'source',
+                 'young_modulus_pa', 'poisson_ratio', 'thermal_expansion_per_k'}
 BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
                    'convective_outward_w_per_m', 'system_rhs_w_per_m')
 
@@ -191,12 +194,13 @@ def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
         raise DocumentError(f'{path}: natural condition overlaps a fully Dirichlet side')
 
 
-def region_geometry(doc):
-    """Validate geometry.domain/background/shapes; return the shape names."""
+def region_geometry(doc, label='heat'):
+    """Validate geometry.domain/background/shapes; return the shape names. ``label`` names the
+    physics in the refusals (``heat``, ``mechanics``)."""
     d = doc.data
     g = d['geometry']
     if doc.is_version_1:
-        return _version_1_region_geometry(doc)
+        return _version_1_region_geometry(doc, label)
     _object(g, {'domain', 'background', 'shapes'}, 'geometry')
     dom = g.get('domain')
     _object(dom, {'xmin', 'xmax', 'ymin', 'ymax'}, 'geometry.domain')
@@ -219,11 +223,11 @@ def region_geometry(doc):
     names = set()
     for i, s in enumerate(shapes):
         _shape(s, i, names)
-    refuse_dropped_shapes(doc)
+    refuse_dropped_shapes(doc, label)
     return names
 
 
-def _version_1_region_geometry(doc):
+def _version_1_region_geometry(doc, label='heat'):
     """The region checks of a version 1 block: the reader has checked the geometry itself;
     here the domain must be finite in metres, the background needs a material, a void feature
     (``material: null``) is a hole whose border is an exterior boundary (insulated unless named,
@@ -234,18 +238,18 @@ def _version_1_region_geometry(doc):
     for key, value in dom.items():
         _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
     if not isinstance(doc.background.get('material'), str) or not doc.background['material']:
-        raise DocumentError('geometry.background.material: expected a material name (region heat takes no void '
-                            'background)')
+        raise DocumentError(f'geometry.background.material: expected a material name (region {label} takes no '
+                            'void background)')
     names = {r['name'] for r in doc.regions() if r['material'] is not None}
     from .geometry import dropped_features
     dropped = dropped_features(doc)
     if dropped:
-        raise DocumentError(' '.join(dropped) + ' A heat region document refuses a feature that contributes no '
-                            'material.')
+        raise DocumentError(' '.join(dropped) + f' A {label} region document refuses a feature that '
+                            'contributes no material.')
     return names
 
 
-def refuse_dropped_shapes(doc):
+def refuse_dropped_shapes(doc, label='heat'):
     """Refuse a named shape that lies outside the domain or below the sliver limit.
 
     geometry.resolve_regions drops such a shape and leaves a note in doc.notes, which
@@ -262,7 +266,7 @@ def refuse_dropped_shapes(doc):
     finally:
         doc.notes = saved
     if dropped:
-        raise DocumentError(' '.join(dropped)+' A heat region document refuses a shape that '
+        raise DocumentError(' '.join(dropped)+f' A {label} region document refuses a shape that '
                             'contributes no material.')
 
 
@@ -285,6 +289,14 @@ def region_materials_table(doc, required, label):
             _number(spec['conductivity_w_mk'], where+'.conductivity_w_mk', positive=True)
         if 'volumetric_heat_capacity_j_m3k' in spec:
             _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
+        if 'young_modulus_pa' in spec:
+            _number(spec['young_modulus_pa'], where+'.young_modulus_pa', positive=True)
+        if 'poisson_ratio' in spec:
+            _number(spec['poisson_ratio'], where+'.poisson_ratio')
+            if not -1 < spec['poisson_ratio'] < .5:
+                raise DocumentError(where+'.poisson_ratio: expected -1 < nu < 0.5')
+        if 'thermal_expansion_per_k' in spec:
+            _number(spec['thermal_expansion_per_k'], where+'.thermal_expansion_per_k')
         if 'source' in spec and not isinstance(spec['source'], str):
             raise DocumentError(where+'.source: expected a string')
     for where, mname in [('geometry.background.material', doc.background['material'])] + [
@@ -292,7 +304,7 @@ def region_materials_table(doc, required, label):
             for i, s in enumerate(doc.regions()) if s['material'] is not None]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
-                                '(thermal properties are never taken from built-in optical materials)')
+                                '(thermal and mechanical properties are never taken from built-in optical materials)')
         for key in required:
             if key not in materials[mname]:
                 raise DocumentError(f'materials.{mname}.{key}: required by {label}')
