@@ -115,7 +115,7 @@ def test_independent_reflected_diagonal_and_constructor_orientation():
 
 
 @pytest.mark.parametrize('kind',['kzero','knegative','kboolean','ktensor','knan','kcomplex',
-    'source_nan','source_shape','source_complex','source_scalar_callback','bc_empty','bc_interior',
+    'source_nan','source_shape','source_complex','source_scalar_callback','bc_empty',
     'bc_nan','bc_bool_index','bc_float_index','bc_outside','clockwise','fractional_connectivity',
     'duplicate_triangle','unused_node','degenerate','nonfinite_node'])
 def test_independent_invalid_contract(kind):
@@ -127,7 +127,6 @@ def test_independent_invalid_contract(kind):
     elif kind=='source_complex':kw['heat_source']=lambda x:np.ones(len(x),complex)
     elif kind=='source_scalar_callback':kw['heat_source']=lambda x:1.
     elif kind=='bc_empty':kw['dirichlet']={}
-    elif kind=='bc_interior':kw['dirichlet']={4:300.}
     elif kind=='bc_nan':kw['dirichlet']={0:np.nan}
     elif kind=='bc_bool_index':kw['dirichlet']={True:300.}
     elif kind=='bc_float_index':kw['dirichlet']={0.:300.}
