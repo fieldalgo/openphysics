@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Strict headless rectangle adapters for the existing 2D elasticity and thermoelastic solvers.
+"""Strict headless adapters for the existing 2D elasticity and thermoelastic solvers.
+
+A document whose geometry declares material regions (a 0.2 ``background``/``shapes`` block or a
+version 1 region component) takes the region path of mechanics_regions.py; the rest of this
+module is the rectangle contract below, unchanged.
 
 One homogeneous isotropic rectangle, plane stress or plane strain, side-constant
 displacement components and global Cartesian side tractions, an optional constant
@@ -106,6 +110,10 @@ def rigid_modes_fixed(fixed):
 
 
 def validate_mechanics(doc):
+    from .mechanics_regions import is_region_mechanics, validate_region_mechanics
+    if is_region_mechanics(doc.data):
+        validate_region_mechanics(doc)
+        return
     d = doc.data
     top = {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'}
     _object(d, top, 'document', top)
@@ -163,6 +171,10 @@ def validate_mechanics(doc):
 
 
 def document_summary(doc):
+    from .mechanics_regions import is_region_mechanics, region_mechanics_summary
+    if is_region_mechanics(doc.data):
+        doc.validate()
+        return region_mechanics_summary(doc)
     doc.validate()
     name, p = doc.sole_physics()
     thermal = p['type'] == THERMOELASTIC
@@ -272,31 +284,51 @@ def build_rectangle(doc):
     return mesh
 
 
-def run_mechanics(doc, verbose=True):
+def run_mechanics(doc, verbose=True, *, mesh_limits=None):
+    from .mechanics_regions import is_region_mechanics, run_region_mechanics
+    if is_region_mechanics(doc.data):
+        return run_region_mechanics(doc, verbose=verbose, mesh_limits=mesh_limits)
+    doc.validate()
+    doc = Document.from_dict(doc.data)
+    thermal = doc.sole_physics()[1]['type'] == THERMOELASTIC
+    start = time.perf_counter()
+    mesh = build_rectangle(doc)
+    inputs = solver_inputs(doc, mesh)
+    heat_args = heat_inputs(doc, mesh) if thermal else None
+    return solve_and_package(doc, mesh, inputs, heat_args, time.perf_counter()-start, verbose)
+
+
+def solve_and_package(doc, mesh, inputs, heat_args, mesh_time, verbose, region=None):
+    """Solve a validated document's mechanics on ``mesh`` and return its MechanicsRunResult.
+
+    ``inputs`` are the mechanical solver arguments, ``heat_args`` the steady heat arguments of a
+    thermoelastic document (None otherwise). ``region`` is None for a rectangle document; a
+    region document (mechanics_regions.py) passes ``triangle_regions``, ``result_format``,
+    ``field_layout``, ``metadata`` (replacing the scalar material entries), ``summary`` (the log
+    header) and ``log`` (extra log lines).
+    """
     from galerkin.elasticity import solve_elasticity
     from galerkin.thermal import solve_steady_heat
     from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
     import galerkin
     import scipy
     from . import __version__
-    doc.validate()
-    doc = Document.from_dict(doc.data)
     name, p = doc.sole_physics()
     kind = p['type']
     thermal = kind == THERMOELASTIC
     start = time.perf_counter()
-    mesh = build_rectangle(doc)
-    inputs = solver_inputs(doc, mesh)
-    heat_args = heat_inputs(doc, mesh) if thermal else None
-    mesh_time = time.perf_counter()-start
-    start = time.perf_counter()
     heat = snapshot = None
-    if thermal:
-        heat = solve_steady_heat(mesh, **heat_args)
-        snapshot = freeze_temperature(mesh, heat.temperature)
-        solved = solve_thermoelasticity(mesh, snapshot, **inputs)
-    else:
-        solved = solve_elasticity(mesh, **inputs)
+    try:
+        if thermal:
+            heat = solve_steady_heat(mesh, **heat_args)
+            snapshot = freeze_temperature(mesh, heat.temperature)
+            solved = solve_thermoelasticity(mesh, snapshot, **inputs)
+        else:
+            solved = solve_elasticity(mesh, **inputs)
+    except (ValueError, RuntimeError) as exc:
+        if region is None:
+            raise
+        raise ValueError(f'physics.{name} ({kind}): {exc}') from exc
     solve_time = time.perf_counter()-start
     arrays, field_units, locations = {}, {}, {}
     def add(key, value, unit, location):
@@ -304,6 +336,8 @@ def run_mechanics(doc, verbose=True):
         field_units[key], locations[key] = unit, location
     add('nodes_m', mesh.nodes, 'm', 'nodes')
     add('triangles', mesh.triangles, '1', 'triangle_connectivity')
+    if region is not None:
+        add('triangle_regions', region['triangle_regions'], '1', 'triangles')
     diagnostics = {}
     if thermal:
         add('temperature_k', heat.temperature, 'K', 'nodes')
@@ -361,18 +395,25 @@ def run_mechanics(doc, verbose=True):
                            physical_elastic_energy_j_per_m=float(solved.physical_elastic_energy))
     diagnostic_units = dict(free_residual='N/m', applied_load='N/m', support_reaction='N/m', force_balance='N/m',
                             strain_energy='J/m', max_displacement='m', max_abs_stress='Pa')
-    metadata = dict(name=doc['name'], physics_name=name, physics_type=kind, status='solved',
-        result_format=kind+'-result-v1', field_layout=FIELD_LAYOUTS[kind], mesh_length_unit='m',
-        input_units=copy.deepcopy(doc['units']), plane=p['plane'],
-        young_modulus_pa=inputs['young_modulus'], poisson_ratio=inputs['poisson_ratio'],
-        body_force_n_m3=list(inputs['body_force']),
+    if region is None:
+        metadata = dict(name=doc['name'], physics_name=name, physics_type=kind, status='solved',
+            result_format=kind+'-result-v1', field_layout=FIELD_LAYOUTS[kind], mesh_length_unit='m',
+            input_units=copy.deepcopy(doc['units']), plane=p['plane'],
+            young_modulus_pa=inputs['young_modulus'], poisson_ratio=inputs['poisson_ratio'])
+    else:
+        metadata = dict(name=doc['name'], physics_name=name, physics_type=kind, status='solved',
+            result_format=region['result_format'], field_layout=region['field_layout'], mesh_length_unit='m',
+            input_units=copy.deepcopy(doc['units']), plane=p['plane'], **region['metadata'])
+    metadata.update(body_force_n_m3=list(inputs['body_force']),
         displacement_components=list(COMPONENTS), strain_components=list(STRAIN_COMPONENTS),
         stress_components=list(STRESS_COMPONENTS))
     if thermal:
-        metadata.update(thermal_expansion_per_k=inputs['thermal_expansion_per_k'],
-                        reference_temperature_k=inputs['reference_temperature_k'],
-                        thermal_conductivity_w_mk=heat_args['conductivity'],
-                        temperature_snapshot=dict(mesh_hash=snapshot.mesh_hash,
+        if region is None:
+            metadata.update(thermal_expansion_per_k=inputs['thermal_expansion_per_k'])
+        metadata.update(reference_temperature_k=inputs['reference_temperature_k'])
+        if region is None:
+            metadata.update(thermal_conductivity_w_mk=heat_args['conductivity'])
+        metadata.update(temperature_snapshot=dict(mesh_hash=snapshot.mesh_hash,
                                                   temperature_hash=snapshot.temperature_hash,
                                                   snapshot_hash=snapshot.snapshot_hash))
         diagnostic_units.update(source_heat='W/m', outward_heat='W/m', heat_power_defect='W/m',
@@ -383,7 +424,8 @@ def run_mechanics(doc, verbose=True):
         diagnostic_units=diagnostic_units, timings_s=dict(mesh=mesh_time, solve=solve_time),
         software_versions=dict(simcase=__version__, galerkin=galerkin.__version__, numpy=np.__version__,
                                scipy=scipy.__version__))
-    log = [document_summary(doc), f'Solved {mesh.num_nodes} nodes, {mesh.num_triangles} triangles; '
+    log = [document_summary(doc) if region is None else region['summary'], *([] if region is None else region['log']),
+           f'Solved {mesh.num_nodes} nodes, {mesh.num_triangles} triangles; '
            f'max displacement {diagnostics["max_displacement_m"]:.12g} m, '
            f'strain energy {diagnostics["strain_energy_j_per_m"]:.12g} J/m of depth']
     if thermal:
@@ -399,8 +441,15 @@ def _defaults():
     return defaults()
 
 
+def _accepts_mesh_limits(data):
+    """Region documents take mesh limits (simcase.mesh_limits); rectangle documents do not."""
+    from .mechanics_regions import is_region_mechanics
+    return is_region_mechanics(data)
+
+
 register(PhysicsKind(
     name='mechanics', types=frozenset(TYPES), precedence=15,
     validate=validate_mechanics, run=run_mechanics, summary=document_summary,
     result_types=(MechanicsRunResult,), defaults=_defaults, fresh_output=True,
-    stage_refusal='{stage} is an EM stage; use run(document) for mechanics physics'))
+    stage_refusal='{stage} is an EM stage; use run(document) for mechanics physics',
+    accepts_mesh_limits=_accepts_mesh_limits))

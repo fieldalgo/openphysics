@@ -49,6 +49,8 @@ prints a supplied example.
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
+| `mechanics.elasticity2d` with regions | Static linear elasticity with named material regions (E and ν from the materials table) and the boundary names of region heat: displacements, Cartesian tractions and pressures | `elastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |
+| `mechanics.thermoelastic2d` with regions | Region heat, then thermal stress with per-material E, ν and α on the same mesh | `thermoelastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
 | `thermal.transient2d` | Transient homogeneous rectangular heat: backward Euler, explicit times, constant or sampled side Dirichlet, insulation, constant outward flux and convection | `transient_thermal_uniform`, `transient_thermal_boundary` | [Transient heat](thermal_transient2d.md) |
@@ -384,7 +386,7 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
-For heat region documents and region electric conduction and steady Joule heating documents, `run` also takes optional mesh limits
+For heat region documents, region electric conduction and steady Joule heating documents and mechanics region documents, `run` also takes optional mesh limits
 (`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
 counts the loop vertices a document passes to the mesher without meshing it.
 Both raise `MeshLimitError`. `region_complexity` counts shapes, circles,
