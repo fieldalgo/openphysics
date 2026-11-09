@@ -409,7 +409,7 @@ def test_c8_limits_refuse_documents_without_regions(monkeypatch, name):
     for limit in ('max_nodes', 'max_triangles', 'max_input_vertices'):
         with pytest.raises(ValueError, match='mesh limits apply only to region documents'):
             run(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), verbose=False, **{limit: 10 ** 6})
-    with pytest.raises(ValueError, match='expected a steady or transient heat region document'):
+    with pytest.raises(ValueError, match='check_mesh_limits: expected a region document'):
         check_mesh_limits(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), max_input_vertices=10 ** 6)
 
 
@@ -583,7 +583,8 @@ def test_port_only_an_unvalidated_document_is_validated_before_its_copy(monkeypa
 
 def test_port_only_the_region_kinds_take_mesh_limits():
     takes = {k.name for k in registry.kinds() if k.accepts_mesh_limits is not None}
-    # electric_joule since 2026-11-08: its region documents (electric.steady2d) mesh like region heat
+    # electric_joule since 2026-11-08: its region documents (electric.steady2d; joule.steady2d since
+    # 2026-11-09) mesh like region heat
     assert takes == {'thermal.steady2d', 'thermal.transient2d', 'electric_joule'}
     for name in ('thermal_regions', 'transient_thermal_regions'):
         data = examples.EXAMPLES[name]

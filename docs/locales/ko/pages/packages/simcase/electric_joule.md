@@ -79,7 +79,7 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 - 같은 메시 변에 전위 이름 둘을 주거나, 고정 전위가 하나도 없는 도체 부분이 있으면 이름을 밝혀 거부한다.
 - 영역 결과도 직사각형 결과처럼 VTU로 내보내며, 셀 데이터 `triangle_regions`가 더해진다.
 
-`joule.steady2d`와 `joule.temperature2d`는 직사각형 형식을 유지하며, 영역 형상은 이름을 밝혀 거부한다.
+영역 위의 정상 Joule 가열은 [다음 절](#재료-영역-정상-joule-가열)에 있다. `joule.temperature2d`는 직사각형 형식을 유지하며, 영역 형상은 이름을 밝혀 거부한다.
 
 독립 검증(`tests/simcase/test_electric_regions.py`, 미리 등록한 E1–E7):
 
@@ -90,6 +90,40 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 | 동축 원형 전극(r = 3, 9 mm, 192각형) | I = 2πσ(V_a − V_b) / ln(b/a) | 메시 0.8, 0.4, 0.2 mm에서 상대 오차 2.0e-3, 6.6e-4, 1.4e-4(마지막 단계 차수 2.3) |
 | Joule 전력 | 공급 전력 V·I | 상대 1e-10 |
 | 직사각형 문서 | 이 변경 전 결과 | 직사각형 전기·Joule 예제 전부 비트 단위로 같음 |
+
+## 재료 영역 (정상 Joule 가열)
+
+형상에 영역이 있는 `joule.steady2d` 문서는 위의 영역 전기 전도를 풀고, 그 Joule 발열로
+[영역 열](thermal_regions2d.md)을 데운다. 메시는 하나다.
+
+- **전도도**
+  - 영역이 쓰는 모든 재료에 `electrical_conductivity_s_m`과 `conductivity_w_mk`가 둘 다 있어야 한다.
+  - physics 항목에는 `conductivity_s_m`, `thermal_conductivity_w_mk`, `heat_source_w_m3`를 두지 않는다. 열원은 전류뿐이다(다른 열원을 더하는 것은 지원하지 않는다).
+- **경계 데이터**
+  - `dirichlet_potential_v`와 `outward_current_a_m2`는 영역 전기 전도가 받는 이름(외부 경계만)을 받는다.
+  - `dirichlet_temperature_k`, `outward_flux_w_m2`, `convection`은 영역 열이 받는 이름을 받는다. 그래서 Dirichlet 온도는 경계면 선택도 고정할 수 있다.
+  - 전위가 하나 이상, 그리고 Dirichlet 온도나 양수 대류 계수가 있어야 한다.
+- **그 밖**: `units.temperature`는 `"K"`여야 한다. 축대칭 구성 요소와 빈 공간 배경은 거부하며, 영역 메시 한도가 적용된다.
+
+솔버는 열 하중이 절점마다 Joule 하중과 같은지, 바깥으로 나가는 열이 Joule 전력과 같은지 확인한다.
+
+**결과**
+- 결과 형식은 `joule.steady2d-regions-result-v1`, 필드 layout은 `electric-joule2d-p1-node-cell-regions-v1`이다.
+- 필드는 직사각형 Joule 필드에 `triangle_regions`를 더한 것이다. 요약에는 `region_conductivity_s_m`, `region_thermal_conductivity_w_mk`, 단자 전류가 들어간다.
+- 직사각형 Joule 결과처럼 VTU로 내보내며 `triangle_regions`가 더해진다.
+- 영역 위의 온도 의존 전도도(`joule.temperature2d`)는 아직 지원하지 않는다.
+
+독립 검증(`tests/simcase/test_joule_regions.py`, 미리 등록한 J1–J7). 오차는 절점 온도 오차의 최댓값을 온도 상승으로 나눈 값이다.
+
+| 확인 | 기준 | 결과 |
+|---|---|---|
+| 직렬 두 재료, 양 끝 Dirichlet | 구간 이차 T(x), T와 k dT/dx 연속 | 메시 0.25, 0.125, 0.0625 mm에서 2.1e-2, 4.6e-3, 1.1e-3(차수 2.1) |
+| 같은 띠, 한 끝 대류 | Robin 끝 조건 | 1.2e-2, 2.7e-3, 6.5e-4(차수 2.1) |
+| 같은 온도로 고정한 동축 전극(192각형) | T(r) − T0 = −C (ln r − ln a)(ln r − ln b) / 2, C = σV² / (k ln²(b/a)) | 0.4, 0.2, 0.1 mm에서 3.8e-3, 1.8e-3, 4.9e-4(마지막 단계 차수 1.9) |
+| 전력 | 공급 V·I, Joule, 바깥으로 나가는 열 | 상대 1.4e-14까지 같음 |
+| 직사각형 문서 | 이 변경 전 결과 | `joule_rectangle`, `joule_temperature`, `electric_rectangle` 필드 해시가 직전 커밋과 같음(작성 때 확인; 시험은 직사각형 경로를 타는지 확인) |
+
+동축 확인은 0.8, 0.4, 0.2 mm로 미리 등록했고 거기서 실패했다. 마지막 단계 차수가 1.03이었다. 가장 큰 절점 오차는 Joule 발열(∝ 1/r²)이 가장 가파른 안쪽 전극 옆(r ≈ 3.3 mm)에 있고, 이 거친 비정렬 메시(h/a ≥ 0.07)에서는 아직 점근 영역이 아니다. 같은 메시에서 정확한 해석 발열로 영역 열만 풀어도 같은 꺾임이 나오므로(1.58, 1.17, 0.1 mm에서 1.99) Joule 결합 탓이 아니고, 원의 변 수를 메시와 함께 늘려도 꺾임이 남으므로(1.10, 1.40, 1.67) 고정된 경계 해상도 탓도 아니다. 같은 메시에서 면적 가중 L2 오차는 고르게 수렴한다(차수 1.60, 1.71, 2.16). 기준값은 그대로이고, 메시 열만 한 단계 더 곱다.
 
 ## 실행·저장
 
@@ -139,7 +173,7 @@ CLI 종료값: 입력 오류 2, 풀이·비수렴·I/O 오류 1, 성공 0.
 기존 출력과 중단된 저장을 검사한다. 기존 솔버의 독립 도구 비교는 유지하며 새로운
 이산화는 추가하지 않는다.
 
-이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. Joule 문서의 영역별 물성,
+이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 온도 의존 Joule 문서의 영역 형상,
 경계면 전위, 축대칭 전도, 임의 σ 함수,
 기준 전위만 주는 전류 조건, 과도, 3D, Studio, 릴리스는 제외한다. 저장한 필드는
 `simcase.export`로 ParaView에서 볼 수 있다([ParaView로 보기](overview.md#paraview로-보기));
