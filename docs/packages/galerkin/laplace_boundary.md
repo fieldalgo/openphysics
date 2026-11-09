@@ -32,6 +32,7 @@ closed, with no repeated closing vertex; either orientation is accepted.
 | `polygons` | List or tuple of 1–16 finite real `(n,2)` arrays, each a simple strictly convex polygon with at least three vertices. No collinear edges, touching, overlap, nesting, zero thickness or wall contact. |
 | `width`, `height` | Finite positive real scalars, with width/height in `[0.25,4]`. |
 | `panels_per_edge` | Integer 1–256, default 32. At most 2048 panels in total. Every edge uses cubic endpoint grading. |
+| `interpolation_degree` | One of the integers 10, 12, 14, 16, default 10. Compare degree−2 with the requested degree. No automatic change. |
 | `ground_modes` | Integer 64–4096, default 512. Compare this cosine truncation with twice as many modes; return the refined result. |
 
 The cluster bounding box must be at least its largest extent away from each
@@ -63,8 +64,10 @@ quadrature to avoid cancellation. The smooth side/top image correction uses a
 tensor Chebyshev basis on the conductor cluster. The bottom current Gram matrix
 comes from a cosine harmonic-measure Parseval sum.
 
-The implementation compares degree/order 8/6 with 10/8 and an extended image
-sum. The image count follows the rectangle aspect ratio. Ground truncation is
+The implementation compares degrees `interpolation_degree-2` and
+`interpolation_degree`, with quadrature orders 6/8 and an extended image sum.
+The default remains degree 8/10. A geometry rejected at the default may be
+re-evaluated with an explicitly higher degree; the `1e-10` criterion is unchanged. The image count follows the rectangle aspect ratio. Ground truncation is
 compared at `ground_modes`/`2*ground_modes` and quadrature orders 6/8. It checks
 raw reciprocity before averaging roundoff and requires a positive-definite
 Cholesky factorization. There is no diagonal jitter, tolerance relaxation or
@@ -84,6 +87,7 @@ Run from the repository root:
 OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q \
   tests/galerkin/test_laplace_panel_integrals.py \
   tests/galerkin/test_laplace_boundary.py \
+  tests/galerkin/test_laplace_boundary_interpolation.py \
   tests/galerkin/test_crosscheck_skfem_laplace_boundary.py
 ```
 
@@ -107,3 +111,8 @@ OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q \
 Runtime uses existing NumPy/SciPy dependencies only. scikit-fem is test-only.
 No new Windows/macOS, browser, JSON document, external-material or full-wave
 support is established by these tests.
+
+At a fixed 4 m × 2 m rectangle with three 64-sided circular conductors, the
+default degree is deliberately refused: the 8→10 change is about `2.35e-10`.
+Explicit degrees 12/14/16 agree to `1e-10`, including every surface Gram matrix.
+This is refinement at unchanged geometry, not a relaxed tolerance or a larger box.

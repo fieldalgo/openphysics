@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 접지 직사각형 경계 패널에서 보간 차수 10/12/14/16을 명시할 수 있다. 기본 10과 기존 거부 동작을 유지하며 높은 차수에서도 같은 세분 허용값과 외곽 기하를 사용한다.
+
 - `galerkin`: 바닥 접지 직사각형의 균질 Laplace 경계 패널 API 추가. 상호적인 에너지 조립·단위 전류 표면 Gram 인자·명시적 기하/자원/세분 검사. [계약과 검증](packages/galerkin/laplace_boundary.md).
 
 - `simcase`: `units`가 객체가 아닌 버전 1 형상 문서(예: `"units": "um"`)를 이름을 밝혀 거부합니다. 전에는 형상 리더가 AttributeError로 멈춰 Studio 형상 실험 탭이 500을 돌려주고 `simcase geometry`가 traceback을 출력했습니다.

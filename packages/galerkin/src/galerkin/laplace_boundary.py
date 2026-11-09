@@ -129,7 +129,8 @@ def _relative(a, b):
     return float(np.max(abs(a - b)) / np.max(abs(b)))
 
 
-def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, ground_modes=512):
+def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, ground_modes=512,
+                             interpolation_degree=10):
     """Solve convex closed conductors over a grounded bottom in a rectangle.
 
     Side/top normal flux is zero. All lengths are metres. Each polygon is a
@@ -139,6 +140,8 @@ def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, gro
     edge. Width/height is in [0.25,4]. The total height includes all material
     layers when this homogeneous kernel is composed with a dielectric model.
 
+    interpolation_degree explicitly selects 10, 12, 14 or 16 (default 10).
+    Compare degree-2 with degree; never change the requested degree silently.
     Quadrature/interpolation and ground Fourier refinement must agree to
     1e-10; these checks do not replace panel and outer-domain convergence.
     Ill-conditioned or unresolved inputs raise ValueError without fallback.
@@ -146,14 +149,17 @@ def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, gro
     width, height = _positive(width, "width"), _positive(height, "height")
     count = _integer(panels_per_edge, "panels_per_edge", 1, 256)
     modes = _integer(ground_modes, "ground_modes", 64, 4096)
+    degree = _integer(interpolation_degree, "interpolation_degree", 10, 16)
+    if degree % 2:
+        raise ValueError("interpolation_degree must be one of 10, 12, 14, 16")
     polygons, unit, w, h = _admit(polygons, width, height, count)
     a, b, owners = kernel.panels(polygons, count, "cubic")
     length = np.linalg.norm(b - a, axis=1)
     if np.any(length <= 128 * np.finfo(float).eps):
         raise ValueError("graded panel length is unresolved at the domain scale")
     images = max(8, int(np.ceil((h / w) * np.log(1e14) / np.pi)) + 1)
-    coarse, _ = kernel.matrix(a, b, w, h, degree=8, order=6, images=images)
-    matrix, reciprocity = kernel.matrix(a, b, w, h, degree=10, order=8, images=images + 2)
+    coarse, _ = kernel.matrix(a, b, w, h, degree=degree - 2, order=6, images=images)
+    matrix, reciprocity = kernel.matrix(a, b, w, h, degree=degree, order=8, images=images + 2)
     matrix_error = _relative(coarse, matrix)
     if not np.isfinite(matrix_error) or matrix_error > 1e-10:
         raise ValueError("boundary matrix quadrature/interpolation did not converge")

@@ -30,6 +30,7 @@ print(capacitance_f_per_m)
 | `polygons` | 유한 실수 `(n,2)` 배열 1–16개의 list/tuple. 각 경계는 꼭짓점 3개 이상의 단순하고 엄격히 볼록한 다각형. 일직선 변·접촉·겹침·포함·두께 0·벽 접촉은 거부. |
 | `width`, `height` | 유한 양의 실수, 폭/높이는 `[0.25,4]`. |
 | `panels_per_edge` | 정수 1–256, 기본 32. 전체 패널 최대 2048개. 각 변 끝을 cubic 분포로 세분. |
+| `interpolation_degree` | 정수 10/12/14/16 중 하나, 기본 10. degree−2와 요청한 차수를 비교하며 자동 변경하지 않음. |
 | `ground_modes` | 정수 64–4096, 기본 512. 두 배의 cosine 모드와 비교하고 세분 결과 반환. |
 
 도체 전체 bounding box는 양옆·윗벽에서 자신의 최대 길이 이상 떨어져야 한다.
@@ -57,7 +58,9 @@ Boolean 제어값, 유한하지 않은 좌표, 해상도가 부족한 계는 결
 매끄러운 양옆·윗벽 영상 보정만 도체 영역의 tensor Chebyshev 기저로 보간한다.
 바닥 전류 Gram 행렬은 cosine harmonic-measure의 Parseval 합으로 구한다.
 
-차수/구적 8/6과 10/8 및 확장 영상합을 비교한다. 영상 수는 직사각형 종횡비를
+`interpolation_degree-2`와 `interpolation_degree`를 구적 차수 6/8 및 확장 영상합으로
+비교한다. 기본은 여전히 보간 8/10이다. 기본 차수에서 거부된 기하는 명시적으로
+높은 차수를 요청하여 재평가할 수 있으며 `1e-10` 기준은 그대로이다. 영상 수는 직사각형 종횡비를
 따른다. 접지는 `ground_modes`/`2*ground_modes`, 구적 6/8로 비교한다. 반올림
 평균 전에 원행렬 상호성을 검사하고 양의 정부호 Cholesky 분해를 요구한다.
 대각 jitter, 허용값 완화, 다른 모델로의 fallback은 없다.
@@ -75,6 +78,7 @@ Boolean 제어값, 유한하지 않은 좌표, 해상도가 부족한 계는 결
 OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q \
   tests/galerkin/test_laplace_panel_integrals.py \
   tests/galerkin/test_laplace_boundary.py \
+  tests/galerkin/test_laplace_boundary_interpolation.py \
   tests/galerkin/test_crosscheck_skfem_laplace_boundary.py
 ```
 
@@ -93,3 +97,8 @@ OPENPHYSICS_REQUIRE_CROSSCHECK=1 python -m pytest -q \
 
 런타임은 기존 NumPy/SciPy만 사용하며 scikit-fem은 시험 전용이다.
 이 검사로 새 Windows/macOS·브라우저·JSON 문서·외부 재료·full-wave 지원을 확립하지 않는다.
+
+4 m × 2 m 고정 외곽에 64변 원형 도체 3개를 둔 시험은 기본 차수를 의도적으로
+거부한다. 8→10 변화가 약 `2.35e-10`이기 때문이다. 명시적 12/14/16 차수에서는
+각 표면 Gram 행렬을 포함해 `1e-10` 이내로 일치한다. 기하를 유지한 세분이며
+허용값 완화나 외곽 확대로 통과시킨 결과가 아니다.
