@@ -8,6 +8,11 @@ is where thermal and mechanical data (thermal conductivity, specific heat,
 Young's modulus, ...) go as the solver grows into other physics. Each property
 is a ``Property`` with a value (constant, or a callable of temperature), a
 unit string, and a source.
+
+``datum_temperature`` is the temperature (K) at which the source of the optical
+data states them; ``datum_assumed`` is True for a library record whose source
+states none, so that a reader can report the assumption (units convention,
+answer 3.8). ``vacuum`` has neither: it is exact at every temperature.
 """
 
 from __future__ import annotations
@@ -37,6 +42,8 @@ class Material:
     source: str = ""                       # citation for the optical model
     properties: dict[str, Property] = field(default_factory=dict)
     aliases: tuple[str, ...] = ()
+    datum_temperature: float | None = None    # K at which the optical source states its data
+    datum_assumed: bool = False               # a library record whose source states no temperature
 
     # -- optical shortcuts -------------------------------------------------
 
