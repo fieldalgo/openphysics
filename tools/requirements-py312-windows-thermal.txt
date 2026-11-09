@@ -21,7 +21,7 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 pyyaml==6.0.3
 scipy==1.18.1
-setuptools==84.0.0
+setuptools==84.1.0
 shapely==2.2.0
 six==1.17.0
 wheel==0.48.0
