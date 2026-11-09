@@ -35,6 +35,11 @@ glass = physmat.constant(1.5, name="my glass")
 custom = physmat.Material("doped SiO2", physmat.Sellmeier(B=[...], C=[...], range_um=(0.3, 2.0)))
 ```
 
+## 단위와 물리량 등록부
+
+`physmat.units`는 OpenPhysics 단위 규칙의 물리량 등록부이자 정확한 단위 변환기입니다.
+`physmat.units.q("200 GPa", "youngs_modulus")`는 `2e11`(Pa)이고, 압력에 쓴 `"10 mPa"`는 이름을 밝혀 거부합니다. Python 표준 라이브러리만 씁니다. 아직 아무것도 이 모듈을 쓰지 않습니다. 모델 문서와 솔버는 지금의 단위를 쓰고, 이 페이지의 함수도 지금의 인수(파장은 마이크로미터, 온도는 켈빈, Ciddor 공기 모델만 섭씨 `temperature_c`)를 그대로 받습니다. [physmat.units](units.md)를 보세요.
+
 ## 내장 재료
 
 | 이름 | 모델 | 출처 |
