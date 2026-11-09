@@ -13,6 +13,7 @@ import time
 
 import numpy as np
 
+from . import views
 from .schema import DocumentError
 from .thermal import _OwnedOutput, require_fresh_output
 from .steady_boundary_contract import has_natural_conditions
@@ -290,11 +291,10 @@ def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
     if p['type'] != PHYSICS:
         raise DocumentError(f'expected {PHYSICS}')
     started = time.perf_counter()
-    dom = doc.domain
-    origin = np.array([doc.scale.to_si(dom[a+'min'], {'length': 1}) for a in 'xy'])
-    upper = np.array([doc.scale.to_si(dom[a+'max'], {'length': 1}) for a in 'xy'])
-    mesh = rectangle_mesh(*(upper-origin), *doc['mesh']['subdivisions'])
-    mesh.nodes += origin
+    # the mesh subtracts the converted corners (views.LENGTH_FORMULAS); numpy scalars, as always
+    grid = views.rectangle_mesh(doc, 'corners')
+    mesh = rectangle_mesh(*np.asarray(grid.lengths), *grid.subdivisions)
+    mesh.nodes += np.array(grid.origin)
     inputs = transient_solver_inputs(doc, mesh)
     mesh_seconds = time.perf_counter()-started
     started = time.perf_counter()

@@ -11,7 +11,7 @@ from itertools import combinations
 
 import numpy as np
 
-from . import units
+from . import units, views
 from .schema import DocumentError
 
 PHYSICS = "thermal.steady2d"
@@ -167,17 +167,18 @@ def steady_boundary_inputs(doc, mesh):
     Dirichlet selects complete node sides; natural conditions select actual
     boundary_edges tags. Fully fixed natural edges reject; a single fixed
     endpoint retains its consistent load. Mesh geometry is validated by the
-    existing engine, with no new solver or assembly.
+    existing engine, with no new solver or assembly. The values come from the document's
+    internal SI view (``simcase.views.steady_rectangle``).
     """
-    bounds, side_bc, k, q, flux, convection, _ = _validated(doc)
-    lower = np.array([bounds["xmin"], bounds["ymin"]])
-    upper = np.array([bounds["xmax"], bounds["ymax"]])
+    grid, heat = views.steady_rectangle(doc)
+    lower = np.array(grid.origin)
+    upper = np.array(grid.upper)
     p, owners, expected_edges = rectangle_exterior_edges(mesh, lower, upper)
     node_tags, edge_tags = getattr(mesh, "boundary", None), getattr(mesh, "boundary_edges", None)
     if not isinstance(node_tags, Mapping) or not isinstance(edge_tags, Mapping):
         raise DocumentError("mesh: boundary node and edge mappings required")
     prescribed = {}
-    for tag, value in side_bc.items():
+    for tag, value in heat.dirichlet.items():
         ids = np.asarray(node_tags.get(tag, []))
         # Boundary identity comes from verified exterior edges, not a broad
         # coordinate mask that could also include nearby interior nodes.
@@ -191,9 +192,10 @@ def steady_boundary_inputs(doc, mesh):
             if int(node) in prescribed and prescribed[int(node)] != value:
                 raise DocumentError("mesh.boundary: conflicting Dirichlet corner")
             prescribed[int(node)] = value
-    validate_natural_edges(mesh, p, owners, expected_edges, prescribed, flux, convection)
-    return {"conductivity": k, "dirichlet": dict(sorted(prescribed.items())),
-            "heat_source": q, "outward_flux": dict(flux), "convection": dict(convection)}
+    validate_natural_edges(mesh, p, owners, expected_edges, prescribed, heat.outward_flux, heat.convection)
+    return {"conductivity": heat.conductivity, "dirichlet": dict(sorted(prescribed.items())),
+            "heat_source": heat.heat_source, "outward_flux": dict(heat.outward_flux),
+            "convection": dict(heat.convection)}
 
 
 def rectangle_exterior_edges(mesh, lower, upper):

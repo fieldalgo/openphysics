@@ -16,6 +16,7 @@ import time
 
 import numpy as np
 
+from . import views
 from .schema import SHAPE_TYPES, DocumentError
 from .thermal import PHYSICS, ThermalRunResult, _number, _object
 
@@ -414,15 +415,15 @@ def build_region_mesh(doc, limits=None):
     before."""
     from galerkin.mesh import Mesh
     from meshine import generate
-    from .geometry import build_domain, size_function
-    from .runner import micrometre_document
+    from .geometry import build_domain
     from . import units
-    canonical = micrometre_document(doc)
+    grid = views.region_mesh(doc)
+    canonical = grid.canonical
     if limits is None:
         domain, namer, region_materials = build_domain(canonical)
-        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), **_grading(canonical))
+        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, **_grading(canonical))
     else:
-        tri, region_materials = _limited_mesh(canonical, limits, generate)
+        tri, region_materials = _limited_mesh(grid, limits, generate)
     doc.notes.extend(note for note in canonical.notes
                      if note.startswith(('geometry.', 'mesh.controls:')) and note not in doc.notes)
     if tri.num_triangles == 0:
@@ -466,7 +467,7 @@ def build_region_mesh(doc, limits=None):
             boundary[name] = nodes                                       # Dirichlet nodes, interior too
             if name in outside:
                 boundary_edges[name] = edges                             # flux and convection
-    mesh = Mesh(np.asarray(tri.nodes, dtype=float)*units.UM_IN_SI, tri.triangles,
+    mesh = Mesh(views.handback_m(tri.nodes), tri.triangles,
                 boundary=boundary, boundary_edges=boundary_edges,
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
                 provenance_edges=provenance_edges_of(canonical, tri), selection_edges=selections)
@@ -484,20 +485,22 @@ def _grading(canonical):
     return {} if size_fn is None else {'size_fn': size_fn}
 
 
-def _limited_mesh(doc, limits, generate):
-    """(meshine mesh, region materials) of the micrometre document ``doc`` under ``limits``:
-    the loop vertices are counted before Domain.build, and max_points is passed only when
-    max_nodes is set, so meshine otherwise keeps its own default cap."""
-    from .geometry import _domain_from_regions, size_function
+def _limited_mesh(grid, limits, generate):
+    """(meshine mesh, region materials) of the region mesh view ``grid`` (views.RegionMesh) under
+    ``limits``: the loop vertices of its micrometre document are counted before Domain.build,
+    and max_points is passed only when max_nodes is set, so meshine otherwise keeps its own
+    default cap."""
+    from .geometry import _domain_from_regions
     from .mesh_limits import MeshLimitError
+    doc = grid.canonical
     domain, namer, region_materials, _count = _domain_from_regions(
         doc, max_input_vertices=limits.max_input_vertices)
     grading = _grading(doc)
     if limits.max_nodes is None:
-        return generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), **grading), region_materials
+        return generate(domain, namer, min_angle=grid.minimum_angle_deg, **grading), region_materials
     from meshine import MeshSizeLimitError     # here: an older meshine fails only limited runs
     try:
-        tri = generate(domain, namer, min_angle=float(doc['mesh']['min_angle']), max_points=limits.max_nodes,
+        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, max_points=limits.max_nodes,
                        **grading)
     except MeshSizeLimitError as exc:
         raise MeshLimitError('nodes', limits.max_nodes) from exc
@@ -505,12 +508,13 @@ def _limited_mesh(doc, limits, generate):
 
 
 def region_inputs(doc, mesh, region_materials):
-    """solve_steady_heat keyword arguments for a meshed region document."""
-    name, p = doc.sole_physics()
+    """solve_steady_heat keyword arguments for a meshed region document (from its internal SI
+    view, ``simcase.views.region_heat``)."""
+    name, _ = doc.sole_physics()
     path = f'physics.{name}'
-    materials = doc['materials']
-    conductivity = {r: float(materials[m]['conductivity_w_mk']) for r, m in region_materials.items()}
-    source = p.get('heat_source_w_m3', 0.0)   # a Joule document has none (simcase.joule_regions)
+    heat = views.region_heat(doc)
+    conductivity = {r: float(heat.conductivity[m]) for r, m in region_materials.items()}
+    source = heat.heat_source   # a Joule document has none (simcase.joule_regions)
     if isinstance(source, dict):
         dropped = set(source)-set(mesh.region_names)
         if dropped:
@@ -520,23 +524,23 @@ def region_inputs(doc, mesh, region_materials):
     else:
         source = float(source)
     prescribed, prescribed_by = {}, {}
-    for label, table in (('dirichlet_temperature_k', mesh.boundary), ('outward_flux_w_m2', mesh.boundary_edges),
-                         ('convection', mesh.boundary_edges)):
-        for tag in p.get(label, {}):
+    for label, table, given in (('dirichlet_temperature_k', mesh.boundary, heat.dirichlet),
+                                ('outward_flux_w_m2', mesh.boundary_edges, heat.outward_flux),
+                                ('convection', mesh.boundary_edges, heat.convection)):
+        for tag in given:
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
                                     'borders a void feature only, or a selection without mesh edges)')
-    for tag, value in p.get('dirichlet_temperature_k', {}).items():
+    for tag, value in heat.dirichlet.items():
         for node in mesh.boundary[tag]:
             if int(node) in prescribed and prescribed[int(node)] != value:
                 raise DocumentError(f'{path}.dirichlet_temperature_k: {prescribed_by[int(node)]!r} and {tag!r} '
                                     f'share node {node} with different temperatures')
             prescribed[int(node)] = float(value)
             prescribed_by[int(node)] = tag
-    flux = {tag: float(v) for tag, v in p.get('outward_flux_w_m2', {}).items()}
-    convection = {tag: (float(v['h_w_m2k']), float(v['ambient_temperature_k']))
-                  for tag, v in p.get('convection', {}).items()}
-    _refuse_doubled_edges(mesh, path, flux, convection, p.get('dirichlet_temperature_k', {}))
+    flux = {tag: float(v) for tag, v in heat.outward_flux.items()}
+    convection = {tag: (float(h), float(ambient)) for tag, (h, ambient) in heat.convection.items()}
+    _refuse_doubled_edges(mesh, path, flux, convection, heat.dirichlet)
     return dict(conductivity=conductivity, dirichlet=dict(sorted(prescribed.items())),
                 heat_source=source, outward_flux=flux, convection=convection)
 
