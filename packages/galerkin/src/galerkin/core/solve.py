@@ -18,9 +18,10 @@ the transpose (``A^{-T}``), PyTorch through the conjugate transpose
 solve receives the real part of its gradient, as both libraries define it.
 
 First derivatives in reverse mode only. JAX forward mode (``jvp``, ``jacfwd``)
-through this solve is refused by ``jax.custom_vjp`` itself, and a second
-PyTorch backward pass is refused by ``once_differentiable``; neither returns a
-silently wrong number.
+through this solve is refused by ``jax.custom_vjp`` itself. A PyTorch backward
+pass that builds a graph (``create_graph=True``) is refused at the solve, and a
+second pass through a cotangent that requires grad by ``once_differentiable``;
+neither returns a silently wrong number.
 """
 import sys
 
@@ -213,6 +214,18 @@ def _torch_function():
             grad = grad.real
         return grad.to(dtype)
 
+    @once_differentiable
+    def _backward(ctx, g):
+        values, x = ctx.saved_tensors
+        lu = _factor(ctx.rows, ctx.cols, values.detach().cpu().numpy(), ctx.shape)
+        lam = torch.as_tensor(_apply(lu, g.detach().cpu().numpy(), "H"), device=g.device)
+        lam2, x2 = (lam, x) if lam.ndim == 2 else (lam[:, None], x[:, None])
+        rows = torch.as_tensor(ctx.rows, device=g.device)
+        cols = torch.as_tensor(ctx.cols, device=g.device)
+        grad_values = -torch.sum(lam2[rows] * x2[cols].conj(), dim=1)
+        value_dtype, rhs_dtype = ctx.dtypes
+        return None, None, None, like(grad_values, value_dtype), like(lam, rhs_dtype)
+
     class SparseSolve(torch.autograd.Function):
         # The factor is not kept between the passes: it is computed again in
         # backward from the saved values, as on JAX. A factor held on the graph
@@ -229,17 +242,15 @@ def _torch_function():
             return x
 
         @staticmethod
-        @once_differentiable
         def backward(ctx, g):
-            values, x = ctx.saved_tensors
-            lu = _factor(ctx.rows, ctx.cols, values.detach().cpu().numpy(), ctx.shape)
-            lam = torch.as_tensor(_apply(lu, g.detach().cpu().numpy(), "H"), device=g.device)
-            lam2, x2 = (lam, x) if lam.ndim == 2 else (lam[:, None], x[:, None])
-            rows = torch.as_tensor(ctx.rows, device=g.device)
-            cols = torch.as_tensor(ctx.cols, device=g.device)
-            grad_values = -torch.sum(lam2[rows] * x2[cols].conj(), dim=1)
-            value_dtype, rhs_dtype = ctx.dtypes
-            return None, None, None, like(grad_values, value_dtype), like(lam, rhs_dtype)
+            # PyTorch runs backward with grad mode on exactly when create_graph=True. The
+            # cotangents below carry no graph, so a second pass through them would return
+            # a partial (wrong) number whenever the assembly is nonlinear in the inputs;
+            # once_differentiable alone catches only a cotangent that requires grad.
+            if torch.is_grad_enabled():
+                raise RuntimeError("galerkin.core.solve: second derivatives (create_graph=True) are not "
+                                   "supported; the adjoint solve gives first derivatives only")
+            return _backward(ctx, g)
 
     _TORCH_FUNCTION = SparseSolve
     return _TORCH_FUNCTION

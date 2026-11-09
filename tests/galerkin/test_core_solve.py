@@ -200,9 +200,27 @@ def test_torch_second_derivative_is_refused():
     n = b.size
     v = torch.as_tensor(values).requires_grad_()
     x = solve(CooMatrix(rows, cols, v, (n, n)), torch.as_tensor(b))
-    (grad,) = torch.autograd.grad((x ** 2).sum(), v, create_graph=True)
-    with pytest.raises(RuntimeError, match="once_differentiable"):
-        grad.sum().backward()
+    # a graph-building backward is refused at the solve (before 2026-11-09 the first pass
+    # ran and once_differentiable refused only the second one)
+    with pytest.raises(RuntimeError, match="second derivatives"):
+        torch.autograd.grad((x ** 2).sum(), v, create_graph=True)
+
+
+def test_torch_second_derivative_through_a_nonlinear_assembly_is_refused():
+    # The cotangent of x needs no grad here (a plain sum), but the matrix is nonlinear
+    # in p: once_differentiable did not fire and the second pass returned a partial
+    # number (review 2026-11-09). It must be refused, not wrong.
+    torch = _torch()
+    rows, cols, values, b = _system()
+    n = b.size
+    p = torch.tensor(1.3, dtype=torch.float64, requires_grad=True)
+    x = solve(CooMatrix(rows, cols, torch.as_tensor(values) * p ** 2, (n, n)), torch.as_tensor(b))
+    with pytest.raises(RuntimeError, match="second derivatives"):
+        torch.autograd.grad(x.sum(), p, create_graph=True)
+    # the first derivative still works
+    x = solve(CooMatrix(rows, cols, torch.as_tensor(values) * p ** 2, (n, n)), torch.as_tensor(b))
+    (g,) = torch.autograd.grad(x.sum(), p)
+    assert float(g) == pytest.approx(-2.0 / 1.3 * float(x.sum()), rel=1e-12)
 
 
 def _laplacian_terms(n=6):
