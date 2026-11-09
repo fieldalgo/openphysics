@@ -1,0 +1,66 @@
+{
+  "openphysics": "0.2",
+  "name": "layers",
+  "units": {
+    "length": "mm"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 100.0,
+      "ymin": 0.0,
+      "ymax": 20.0
+    },
+    "background": {
+      "material": "steel"
+    },
+    "shapes": [
+      {
+        "name": "alu",
+        "type": "rect",
+        "material": "aluminium",
+        "x": 60.0,
+        "y": 0.0,
+        "w": 40.0,
+        "h": 20.0
+      }
+    ]
+  },
+  "materials": {
+    "steel": {
+      "young_modulus_pa": 200000000000.0,
+      "poisson_ratio": 0.0,
+      "thermal_expansion_per_k": 1.2e-05,
+      "conductivity_w_mk": 45.0
+    },
+    "aluminium": {
+      "young_modulus_pa": 70000000000.0,
+      "poisson_ratio": 0.0,
+      "thermal_expansion_per_k": 2.3e-05,
+      "conductivity_w_mk": 237.0
+    }
+  },
+  "mesh": {
+    "size": 5.0
+  },
+  "physics": {
+    "bar": {
+      "type": "mechanics.elasticity2d",
+      "plane": "strain",
+      "displacement_m": {
+        "left": {
+          "x": 0.0
+        },
+        "bottom": {
+          "y": 0.0
+        }
+      },
+      "traction_pa": {
+        "right": [
+          1000000.0,
+          0.0
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "openphysics": "0.2",
+  "name": "layers",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 100.0,
+          "ymin": 0.0,
+          "ymax": 20.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "alu",
+            "type": "rect",
+            "material": "aluminium",
+            "x": 60.0,
+            "y": 0.0,
+            "w": 40.0,
+            "h": 20.0
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "young_modulus_pa": 200000000000.0,
+      "poisson_ratio": 0.0,
+      "thermal_expansion_per_k": 1.2e-05,
+      "conductivity_w_mk": 45.0
+    },
+    "aluminium": {
+      "young_modulus_pa": 70000000000.0,
+      "poisson_ratio": 0.0,
+      "thermal_expansion_per_k": 2.3e-05,
+      "conductivity_w_mk": 237.0
+    }
+  },
+  "mesh": {
+    "size": 5.0
+  },
+  "physics": {
+    "bar": {
+      "type": "mechanics.thermoelastic2d",
+      "plane": "strain",
+      "reference_temperature_k": 300.0,
+      "dirichlet_temperature_k": {
+        "left": 350.0,
+        "right": 350.0,
+        "bottom": 350.0,
+        "top": 350.0
+      },
+      "displacement_m": {
+        "left": {
+          "x": 0.0
+        },
+        "bottom": {
+          "y": 0.0
+        },
+        "top": {
+          "y": 0.0
+        }
+      }
+    }
+  }
+}

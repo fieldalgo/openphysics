@@ -1,0 +1,116 @@
+{
+  "openphysics": "0.2",
+  "name": "pipe",
+  "units": {
+    "length": "mm"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 9.0,
+          "ymin": 0.0,
+          "ymax": 9.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "cut",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 9.0,
+            "h": 9.0,
+            "material": null
+          },
+          {
+            "name": "disc",
+            "type": "circle",
+            "cx": 0.0,
+            "cy": 0.0,
+            "r": 9.0,
+            "material": "steel"
+          },
+          {
+            "name": "hole",
+            "type": "circle",
+            "cx": 0.0,
+            "cy": 0.0,
+            "r": 3.0,
+            "material": null
+          }
+        ],
+        "finalize": "later_wins",
+        "boundary_tags": [
+          {
+            "tag": "inner",
+            "select": {
+              "boundary": {
+                "of": "hole"
+              }
+            }
+          },
+          {
+            "tag": "rim",
+            "select": {
+              "boundary": {
+                "between": [
+                  "disc",
+                  "cut"
+                ]
+              }
+            }
+          }
+        ],
+        "selections": {
+          "bore": {
+            "boundary": {
+              "of": "hole"
+            }
+          }
+        }
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "young_modulus_pa": 200000000000.0,
+      "poisson_ratio": 0.3
+    }
+  },
+  "mesh": {
+    "size": 0.75
+  },
+  "physics": {
+    "pipe": {
+      "type": "mechanics.elasticity2d",
+      "plane": "strain",
+      "displacement_m": {
+        "left": {
+          "x": 0.0
+        },
+        "bottom": {
+          "y": 0.0
+        }
+      },
+      "pressure_pa": {
+        "inner": 1000000.0
+      },
+      "body_force_n_m3": [
+        100000.0,
+        -200000.0
+      ],
+      "traction_pa": {
+        "rim": [
+          300000.0,
+          -100000.0
+        ]
+      }
+    }
+  }
+}

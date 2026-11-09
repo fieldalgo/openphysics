@@ -242,6 +242,15 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 [탄성](benchmark_elasticity.md)·[전기](benchmark_electric.md)·[미분](benchmark_derivatives.md)
 벤치마크 안내에 있습니다.
 
+**단위 배치 동등성(수동 실행 전용).** `units-batch-equivalence` job은
+`OPENPHYSICS_BATCH_BASELINE`을 `main`과의 merge base로 두고
+`tests/simcase/test_units_batch_equivalence.py`를 Ubuntu 24.04, macOS 15, Windows 2022에서
+한 플랫폼씩 실행합니다. `examples/simcase`의 모든 문서와 고정 fixture를 기준 커밋과 실행한
+커밋에서 각각 기록해, [단위 배치 비교 도구](../../../../tools/units_batch/README.md)의 변환을
+거쳐 solver·mesher 입력과 저장 바이트가 같은지 봅니다. 수동 실행(`gh workflow run
+validate.yml --ref <branch>`)에서만 돌고 push와 pull request에서는 건너뜁니다. `tests`에
+들어 있지 않으므로 플랫폼마다 결과를 따로, 주장하는 커밋의 실행에서 읽습니다.
+
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
 실행을 대체합니다.
@@ -284,6 +293,8 @@ notices, slow 연구.
   `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
   환경 정보, 체크섬, 설치 위치, JUnit XML, `numeric-runtime.json`이 들어 있습니다.
+- 단위 배치 동등성(수동 실행 전용): `units-batch-equivalence-<os>-<run_id>`. 비교
+  보고서(문서와 배열마다의 SHA-256 표), 실행 계획, 양쪽 기록의 manifest가 들어 있습니다.
 
 일부 단계는 통과한 시험의 stdout도 JUnit `system-out`에 남깁니다
 (`-o junit_logging=all -o junit_log_passing_tests=true`). 통과한 시험이 출력한 수치
