@@ -58,6 +58,22 @@ custom = physmat.Material("doped SiO2", physmat.Sellmeier(B=[...], C=[...], rang
 
 Si, SiO2, Si3N4 및 금속에는 실온 밀도, 열전도율, 비열, Young 계수, Poisson 비, 열팽창계수, 열광학계수가 편람 수준의 시작값으로 붙어 있습니다. 각 값은 `source` 문자열을 갖습니다. 실제로 의존하기 전에 확인하세요. 예외는 Cu와 Al의 열전도율로, 출판된 식에서 계산한 온도의 함수입니다([아래](#금속-열전도율의-온도-의존성-hust--lankford-1984)).
 
+각 레코드는 광학 데이터의 온도도 `Material.datum_temperature`(K)로 밝힙니다. 값은 그 레코드의 refractiveindex.info 레코드(`tools/rii-revision.txt`에 고정한 데이터베이스 리비전)가 주는 대로입니다. 출처가 "상온"이라고만 하거나 온도를 주지 않으면 `datum_temperature`는 `None`이고 `datum_assumed`가 True이므로, 문서 리더가 그 가정을 알릴 수 있습니다(단위 규칙 답 3.8). `vacuum`은 둘 다 아닙니다. n = 1은 어느 온도에서나 성립합니다. `standard_air(...)`는 만든 조건의 온도를 밝힙니다.
+
+| 기준 온도 | 레코드 |
+|---|---|
+| 288.15 K (15 °C) | `standard_air` |
+| 292.15 K (19 °C) | `MgF2` |
+| 293.15 K (20 °C) | `SiO2`, `Al2O3` |
+| 294.15 K (21 °C) | `LiNbO3` |
+| 295 K | `Ge`(데이터베이스 조건) |
+| 295.15 K (22 °C) | `GaAs` |
+| 297.15 K (24 °C) | `CaF2` |
+| 298.15 K (25 °C) | `H2O` |
+| 299.15 K (26 °C) | `Si` |
+| 300 K | `Si_visible` |
+| 가정("상온"이거나 밝히지 않음) | `Si3N4`, `InP`, `TiO2`, `Au`, `Ag`, `Cu`, `Al` |
+
 ## 공기 (Ciddor 1996)
 
 `air`는 진공(n = 1)입니다. `standard_air`는 P. E. Ciddor, "Refractive index of air: new equations for the visible and near infrared", *Appl. Opt.* **35**, 1566–1573 (1996)의 습한 공기 모델로, 출판된 식에서 구현했습니다. 표준 건조 공기의 분산과 CO2 보정, 수증기의 분산, BIPM 1981/91 습공기 밀도(포화 수증기압, 증강 계수, 압축률 Z), 밀도비 혼합 규칙으로 이루어집니다.
