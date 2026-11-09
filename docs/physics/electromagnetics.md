@@ -60,3 +60,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 [Terminated network V/I and frequency crosstalk](../packages/sipi/termination.md) use named Thevenin sources and passive impedances; Python only.
 
 - [Saved circuit inputs: extraction/network, sources, loads and crosstalk](../packages/sipi/circuit_document.md)
+
+- [Homogeneous Laplace boundary panels: contract and validation](../packages/galerkin/laplace_boundary.md)
