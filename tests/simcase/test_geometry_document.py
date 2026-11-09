@@ -113,6 +113,10 @@ def test_out_of_range_and_undeclared_units_are_refused():
     with pytest.raises(GeometryError, match="unknown length unit"):
         parse(v1({"length": "furlong"}, plate([])))
     assert pm_per_unit({"length": "um"}) == 10 ** 6
+    # a units string instead of an object is refused by name, not an AttributeError
+    for units in ("um", ["um"], 1.0):
+        with pytest.raises(GeometryError, match="units: expected an object"):
+            parse(v1(units, plate([])))
 
 
 # ----------------------------------------------------------------- S1-3: expressions and kinds

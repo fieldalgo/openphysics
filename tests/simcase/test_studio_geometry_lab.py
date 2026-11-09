@@ -305,16 +305,23 @@ def test_lengths_and_areas_are_in_the_document_unit(client):
         assert corners == {(-0.25 * scale, -0.5 * scale), (-0.25 * scale, 0.25 * scale)}
 
 
-def test_only_engine_refusals_reach_the_page_never_a_traceback():
+def test_only_engine_refusals_reach_the_page_never_a_traceback(monkeypatch):
     """A refusal carries the reader's or engine's message, which is built from the submitted
     document; anything else is the server's generic 500 with no exception text. This keeps
     holding if Studio is ever served beyond the local machine."""
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
-    from simcase.studio import app
+    from simcase.studio import app, geometry_api
     quiet = TestClient(app, raise_server_exceptions=False)
-    broken = {"units": "um", "geometry": {"version": 1, "components": {}}}   # a reader bug: AttributeError
-    response = quiet.post("/api/geometry-lab/evaluate", json={"doc": broken})
+    # a units string was a reader bug (AttributeError) until 2026-11-09; it is now a refusal
+    doc = {"units": "um", "geometry": {"version": 1, "components": {}}}
+    response = quiet.post("/api/geometry-lab/evaluate", json={"doc": doc})
+    assert response.status_code == 200 and response.json()["refused"].startswith("units: expected an object")
+
+    def bug(*args, **kwargs):                                                # any other exception
+        raise AttributeError("'str' object has no attribute 'get' in geometry_document.py")
+    monkeypatch.setattr(geometry_api, "evaluate_view", bug)
+    response = quiet.post("/api/geometry-lab/evaluate", json={"doc": {"units": {"length": "um"}}})
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
     assert "Traceback" not in response.text and "AttributeError" not in response.text and ".py" not in response.text
