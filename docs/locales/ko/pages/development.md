@@ -94,7 +94,7 @@ NumPy·JAX).
 physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
 있습니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
 [studies/](../../../../studies/README.md)에는 진단 스크립트가 있습니다. 사람이 돌리며 필수 CI는 돌리지
-않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고 여섯 패키지를 의존성으로, `sipi`를 extra로 선언할 뿐입니다. 루트에서 `python -m pytest`를
+않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고, 일곱 패키지(`studio`·`export` extra를 포함한 `simcase`, `rii`를 포함한 `physmat`)를 요구하며 Studio를 여는 `openphysics` 명령을 제공합니다. 루트에서 `python -m pytest`를
 실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
 표시도 이 파일에서 선언합니다. 루트 `conftest.py`는 각 패키지의 `src/` 폴더를 import 경로
 맨 앞에 두므로, 시험은 이 checkout의 코드를 사용합니다.
@@ -350,7 +350,7 @@ notices, slow 연구.
 커밋에 `vX.Y.Z` 태그를 달고 그 태그로 GitHub 릴리스를 게시합니다.
 
 각 패키지는 `packages/<name>`에서 빌드합니다. 저장소 루트는 배포물이 아니며,
-`packages/openphysics`는 나머지 여덟 개 중 여섯 개를 요구하고 `sipi`는 `sipi` extra로 넘기는 메타 배포판입니다. `meshloom`은 아직 포함하지 않습니다. 패키지 하나만 빌드해
+`packages/openphysics`는 나머지 여덟 개 중 일곱 개를 (Studio·export·RII extra와 함께) 요구하고 `openphysics` 명령을 제공하는 메타 배포판입니다. `meshloom`은 아직 포함하지 않습니다. 패키지 하나만 빌드해
 확인하려면:
 
 ```bash

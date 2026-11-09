@@ -327,7 +327,7 @@ def test_r6_material_and_geometry_refusals():
     _refuse(raw, 'materials.steel.young_modulus_pa: expected a finite positive number')
     raw = layered(displacement_m=SUPPORT)
     raw['materials'] = {'steel': raw['materials']['steel']}
-    _refuse(raw, "material 'aluminium' is not defined in materials \\(thermal and mechanical properties")
+    _refuse(raw, "material 'aluminium' is not defined in materials \\(thermal, electrical and mechanical properties")
     raw = layered(displacement_m=SUPPORT)
     raw['geometry']['components']['main']['background'] = {'material': None}
     _refuse(raw, 'region mechanics takes no void background')

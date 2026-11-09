@@ -481,7 +481,8 @@ def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, ma
     """Run a document with the runner of its physics kind (``registry``).
 
     ``max_nodes``, ``max_triangles`` and ``max_input_vertices`` are optional mesh limits for
-    steady and transient heat and mechanics region documents only (see simcase.mesh_limits): each limit
+    steady and transient heat, region electric conduction and mechanics region documents only
+    (see simcase.mesh_limits): each limit
     given is a positive int, checked before the solve, and a document over it raises
     MeshLimitError. Giving one for any other document is a ValueError. Only
     max_input_vertices bounds the work before meshing; give it for documents from others.
@@ -495,7 +496,7 @@ def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, ma
     if limits is None:
         return kind.run(doc, verbose=verbose)
     if not _is_region_document(doc.data):
-        raise ValueError("mesh limits apply only to thermal and mechanics region documents")
+        raise ValueError("mesh limits apply only to region documents (heat, electric conduction and mechanics)")
     return kind.run(doc, verbose=verbose, mesh_limits=limits)
 
 

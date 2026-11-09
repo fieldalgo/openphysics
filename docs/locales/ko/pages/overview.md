@@ -91,11 +91,12 @@ Python 전용 기능이 JSON이나 Studio에도 자동으로 제공되는 것은
 | [simcase](packages/simcase/overview.md) | JSON 문서, 헤드리스 실행기와 선택적 로컬 Studio |
 | [sipi](packages/sipi/overview.md) | 신호·전원 무결성: 준정적 PCB 전송선 단면 |
 
-아홉 번째 배포인 [openphysics](packages/openphysics/overview.md)(`0.0.1`)는
-프로젝트 이름만 예약합니다. 엔진을 포함하지 않고 위 패키지들을 설치하지도 않습니다.
-저장소 루트 자체도 설치 가능한 배포가 아닙니다.
-**아래 소스 설치 방법을 사용하세요. `pip install openphysics`만으로는 시뮬레이션
-도구 모음이 설치되지 않습니다.**
+아홉 번째 배포인 [openphysics](packages/openphysics/overview.md)는 0.0.2부터 완제품입니다.
+위 패키지들을 Studio와 함께 설치하고, Studio를 여는 `openphysics` 명령을 제공합니다.
+0.0.2는 아직 PyPI에 없고 PyPI에는 빈 `0.0.1` 이름 예약만 있으므로, PyPI에서
+`pip install openphysics`를 해도 도구 모음이 설치되지 않습니다. 저장소 루트 자체도
+설치 가능한 배포가 아닙니다. **아래 소스 설치 방법을 쓰거나,
+[작업 공간 빠른 시작](packages/simcase/workspace_quickstart.md)처럼 wheelhouse에서 0.0.2를 설치하세요.**
 
 ## 소스에서 설치
 

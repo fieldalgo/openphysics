@@ -9,6 +9,8 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 
 ## 범위·입력
 
+이 절은 직사각형 형식이다. `electric.steady2d`는
+[재료 영역](#재료-영역-전기-정상-전도)도 받는다.
 `openphysics:"0.2"`, 이름 있는 physics 하나, `study:{"type":"single"}`,
 `geometry.domain`의 `xmin,xmax,ymin,ymax` 직사각형, 양의 정수
 `mesh.subdivisions:[nx,ny]`, `materials:{}`를 사용한다. 단일 균질 재료의
@@ -50,6 +52,44 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 온도·전도도 결함과 전기 재평가를 통한 비선형 열 잔차(정규화값 ≤1e-8)를 검사한다.
 선형 잔차·보존 gate는 바꾸지 않는다. 정규화와 정지식은 위 솔버 계약을 참조한다.
 문서는 항상 Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
+
+## 재료 영역 (전기 정상 전도)
+
+형상에 영역이 있는 `electric.steady2d` 문서(feature나 배경 재료가 있는
+[버전 1 형상 블록](geometry_document.md), 또는 0.2 `shapes`)는
+[영역 열](thermal_regions2d.md)과 같은 형상·메시·경계 이름을 쓴다.
+
+- **전도도**
+  - `materials.<name>.electrical_conductivity_s_m`(> 0)이 각 영역의 전도도다. 영역이 쓰는 모든 재료에 있어야 한다.
+  - 같은 재료 표에 열 물성(`conductivity_w_mk`, `volumetric_heat_capacity_j_m3k`)을 함께 둘 수 있고, 물리마다 필요한 키만 읽는다.
+  - 내장 광학 재료는 쓰지 않는다. physics 항목에는 `conductivity_s_m`을 두지 않는다.
+- **경계 데이터**
+  - `dirichlet_potential_v`와 `outward_current_a_m2`는 도메인 변, 형상이 선언한 외부 태그(`boundary_tags` 이름, 빈 공간 feature 경계의 `outer`), 외부 경계 선택을 받는다.
+  - 두 영역 사이 경계면 선택은 둘 다 거부한다. 전기 솔버가 외부 절점만 고정하기 때문이다.
+  - 다음은 이름을 밝혀 거부한다: 메시 변이 없는 이름, 같은 변에 전류를 준 두 이름, 다른 이름으로 고정된 경계의 변에 준 전류, 공유 절점을 서로 다른 전위로 고정하는 두 경계.
+- **이름 없는 경계**: 빈 공간 경계를 포함해 이름 없는 외부 경계는 절연이다. 전위는 하나 이상 있어야 한다.
+- **메시와 거부**: `mesh`는 영역 열처럼 `{"size", "min_angle", "controls"}`이고 영역 메시 한도가 적용된다. 빈 공간 배경과 축대칭 구성 요소는 거부한다.
+
+**결과**
+- 결과 형식은 `electric.steady2d-regions-result-v1`, 필드 layout은 `electric2d-p1-node-cell-regions-v1`이다.
+- 필드는 직사각형 필드에 `triangle_regions`를 더한 것이다.
+- 요약에는 `region_names`, `region_materials`, `region_conductivity_s_m`, `diagnostics.terminal_reaction_current_a_per_m`이 들어간다.
+  - 마지막 값은 고정된 경계마다 도체로 들어가는 전류이며(들어가는 쪽이 양수) 단위는 깊이 1 m당 A다.
+  - 두 경계가 함께 고정한 절점은 이름 순서로 먼저인 경계에 센다.
+- 같은 메시 변에 전위 이름 둘을 주거나, 고정 전위가 하나도 없는 도체 부분이 있으면 이름을 밝혀 거부한다.
+- 영역 결과도 직사각형 결과처럼 VTU로 내보내며, 셀 데이터 `triangle_regions`가 더해진다.
+
+`joule.steady2d`와 `joule.temperature2d`는 직사각형 형식을 유지하며, 영역 형상은 이름을 밝혀 거부한다.
+
+독립 검증(`tests/simcase/test_electric_regions.py`, 미리 등록한 E1–E7):
+
+| 확인 | 기준 | 결과 |
+|---|---|---|
+| 직렬 두 층 | 구간 선형 전위, I = V / Σ(L_i / (σ_i h)) | 절점 오차 1e-10 V 이하, 전류 상대 1e-10 |
+| 병렬 두 층 | I = V Σ(σ_i h_i) / L | 상대 1e-10 |
+| 동축 원형 전극(r = 3, 9 mm, 192각형) | I = 2πσ(V_a − V_b) / ln(b/a) | 메시 0.8, 0.4, 0.2 mm에서 상대 오차 2.0e-3, 6.6e-4, 1.4e-4(마지막 단계 차수 2.3) |
+| Joule 전력 | 공급 전력 V·I | 상대 1e-10 |
+| 직사각형 문서 | 이 변경 전 결과 | 직사각형 전기·Joule 예제 전부 비트 단위로 같음 |
 
 ## 실행·저장
 
@@ -99,7 +139,8 @@ CLI 종료값: 입력 오류 2, 풀이·비수렴·I/O 오류 1, 성공 0.
 기존 출력과 중단된 저장을 검사한다. 기존 솔버의 독립 도구 비교는 유지하며 새로운
 이산화는 추가하지 않는다.
 
-이 계약은 직사각형·단일 재료·단일 study에 한정된다. 영역별 물성, 임의 σ 함수,
+이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. Joule 문서의 영역별 물성,
+경계면 전위, 축대칭 전도, 임의 σ 함수,
 기준 전위만 주는 전류 조건, 과도, 3D, Studio, 릴리스는 제외한다. 저장한 필드는
 `simcase.export`로 ParaView에서 볼 수 있다([ParaView로 보기](overview.md#paraview로-보기));
 그 내보내기는 저장된 배열을 복사할 뿐 이 계약에 아무것도 더하지 않는다.

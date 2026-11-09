@@ -34,8 +34,8 @@ Linux와 macOS:
 ```sh
 python3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 python3.12 -m venv ~/op-studio
-~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics[studio]==0.0.2"
-~/op-studio/bin/simcase-studio --help
+~/op-studio/bin/python -m pip install --find-links ~/wheelhouse "openphysics==0.0.2"
+~/op-studio/bin/openphysics --help
 ```
 
 Windows(PowerShell. 환경의 프로그램을 직접 부르므로 활성화 스크립트나 실행 정책 변경이
@@ -44,8 +44,8 @@ Windows(PowerShell. 환경의 프로그램을 직접 부르므로 활성화 스�
 ```powershell
 py -3.12 -c "import sys; assert sys.version_info >= (3, 12), sys.version"
 py -3.12 -m venv "$HOME\op-studio"
-& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics[studio]==0.0.2"
-& "$HOME\op-studio\Scripts\simcase-studio.exe" --help
+& "$HOME\op-studio\Scripts\python.exe" -m pip install --find-links "$HOME\wheelhouse" "openphysics==0.0.2"
+& "$HOME\op-studio\Scripts\openphysics.exe" --help
 ```
 
 `--help`가 Studio 옵션을 보여 주면 설치가 끝난 것입니다.
@@ -53,11 +53,11 @@ py -3.12 -m venv "$HOME\op-studio"
 ## 3. Studio 켜고 끄기
 
 ```sh
-~/op-studio/bin/simcase-studio --workspace                # Linux, macOS
+~/op-studio/bin/openphysics                # Linux, macOS
 ```
 
 ```powershell
-& "$HOME\op-studio\Scripts\simcase-studio.exe" --workspace  # Windows
+& "$HOME\op-studio\Scripts\openphysics.exe"  # Windows
 ```
 
 브라우저가 `http://127.0.0.1:8765/workspace`를 엽니다. 최신 Chrome이나 Edge를 쓰세요.
@@ -91,7 +91,8 @@ py -3.12 -m venv "$HOME\op-studio"
 ## 검증한 플랫폼
 
 2026-11-08에 Linux(Python 3.12.3, headless Chromium)에서 저장소로 만든 0.0.2 wheel로
-확인했습니다. 새 환경에서 버전을 고정한 설치(다운로드 캐시가 있을 때 14초), 4·5단계,
-**Ctrl+C**, 재시작, 시작 화면에서의 복구까지 했고 비교가 그대로 돌아왔습니다. **macOS와
+확인했습니다. 새 환경에서 extra 없는 `openphysics==0.0.2` 설치(다운로드 캐시가 있을 때 15초),
+`openphysics --help`, `openphysics` 명령의 작업 공간 페이지, 4·5단계, **Ctrl+C**, 재시작,
+시작 화면에서의 복구까지 했고 비교가 그대로 돌아왔습니다. **macOS와
 Windows에서는 이 단계를 아직 확인하지 않았습니다.** 이전 Windows 확인 기록은
 [수용 점검표](workspace_acceptance.md)에 있습니다.

@@ -25,7 +25,9 @@ optical cross-section from rectangles, circles and polygons of ten lossless
 materials, inspect its mesh, run modes, compare designs and save or recover a
 session; its steady heat application solves one homogeneous rectangular plate
 with a condition per side. After installing `simcase[studio]` in the configured
-runtime, launch it with `simcase-studio --workspace`. The heated-waveguide
+runtime, launch it with `simcase-studio --workspace`. The `openphysics` command does
+the same; it comes with the `openphysics` distribution, which the workspace quick
+start installs and the source installation below does not. The heated-waveguide
 application card is setup only: electrical heating and mechanical deformation
 do not run in this workspace yet.
 
@@ -110,10 +112,12 @@ package has its own distribution, version, dependencies and license notices.
 | [sipi](packages/sipi/README.md) | Signal and power integrity: quasi-static PCB transmission-line cross-sections |
 
 The ninth distribution, [openphysics](packages/openphysics/README.md)
-(`0.0.1`), only reserves the project name: it contains no engine and does not
-install these packages. The repository root is not an installable distribution.
-**Use the checkout installation below; `pip install openphysics` does not install
-the simulation toolkit.**
+is the complete product from 0.0.2: it installs these packages with Studio and
+provides the `openphysics` command, which opens Studio. 0.0.2 is not on PyPI yet;
+PyPI holds only an empty `0.0.1` name reservation, so `pip install openphysics` from
+PyPI does not install the toolkit. The repository root is not an installable
+distribution. **Use the checkout installation below, or install 0.0.2 from a
+wheelhouse as in the [workspace quick start](docs/packages/simcase/workspace_quickstart.md).**
 
 ## Install from source
 

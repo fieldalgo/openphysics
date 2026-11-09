@@ -26,9 +26,10 @@ SIDES = ('left', 'right', 'bottom', 'top')
 #: Cartesian per-metre identifiers (galerkin docs/packages/galerkin/thermal_axisymmetric.md)
 AXISYMMETRIC_RESULT_FORMAT = 'thermal.axisymmetric-regions-result-v1'
 AXISYMMETRIC_FIELD_LAYOUT = 'thermal-axisymmetric-p1-node-cell-regions-v1'
-#: the union of every region physics' material keys; each physics reads the keys it needs
-#: (heat: conductivity and heat capacity; mechanics: E, nu and alpha, see mechanics_regions.py)
-MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'source',
+# One materials table serves every region physics of a document: each physics reads the keys it
+# needs and requires them only for the materials its regions use (heat: conductivity and heat
+# capacity; electric: electrical conductivity; mechanics: E, nu and alpha, see mechanics_regions.py).
+MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'electrical_conductivity_s_m', 'source',
                  'young_modulus_pa', 'poisson_ratio', 'thermal_expansion_per_k'}
 BOUNDARY_FIELDS = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
                    'convective_outward_w_per_m', 'system_rhs_w_per_m')
@@ -196,7 +197,7 @@ def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
 
 def region_geometry(doc, label='heat'):
     """Validate geometry.domain/background/shapes; return the shape names. ``label`` names the
-    physics in the refusals (``heat``, ``mechanics``)."""
+    physics in refusals (``heat``, ``electric``, ``mechanics``)."""
     d = doc.data
     g = d['geometry']
     if doc.is_version_1:
@@ -238,14 +239,14 @@ def _version_1_region_geometry(doc, label='heat'):
     for key, value in dom.items():
         _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
     if not isinstance(doc.background.get('material'), str) or not doc.background['material']:
-        raise DocumentError(f'geometry.background.material: expected a material name (region {label} takes no '
-                            'void background)')
+        raise DocumentError(f'geometry.background.material: expected a material name (region {label} takes no void '
+                            'background)')
     names = {r['name'] for r in doc.regions() if r['material'] is not None}
     from .geometry import dropped_features
     dropped = dropped_features(doc)
     if dropped:
-        raise DocumentError(' '.join(dropped) + f' A {label} region document refuses a feature that '
-                            'contributes no material.')
+        raise DocumentError(' '.join(dropped) + f' A {label} region document refuses a feature that contributes no '
+                            'material.')
     return names
 
 
@@ -289,6 +290,8 @@ def region_materials_table(doc, required, label):
             _number(spec['conductivity_w_mk'], where+'.conductivity_w_mk', positive=True)
         if 'volumetric_heat_capacity_j_m3k' in spec:
             _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
+        if 'electrical_conductivity_s_m' in spec:
+            _number(spec['electrical_conductivity_s_m'], where+'.electrical_conductivity_s_m', positive=True)
         if 'young_modulus_pa' in spec:
             _number(spec['young_modulus_pa'], where+'.young_modulus_pa', positive=True)
         if 'poisson_ratio' in spec:
@@ -304,7 +307,8 @@ def region_materials_table(doc, required, label):
             for i, s in enumerate(doc.regions()) if s['material'] is not None]:
         if mname not in materials:
             raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
-                                '(thermal and mechanical properties are never taken from built-in optical materials)')
+                                '(thermal, electrical and mechanical properties are never taken from built-in '
+                                'optical materials)')
         for key in required:
             if key not in materials[mname]:
                 raise DocumentError(f'materials.{mname}.{key}: required by {label}')

@@ -407,9 +407,9 @@ def test_c8_limits_refuse_documents_without_regions(monkeypatch, name):
     forbid(monkeypatch, meshine, 'generate')
     forbid_solvers(monkeypatch)
     for limit in ('max_nodes', 'max_triangles', 'max_input_vertices'):
-        with pytest.raises(ValueError, match='mesh limits apply only to thermal and mechanics region documents'):
+        with pytest.raises(ValueError, match='mesh limits apply only to region documents'):
             run(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), verbose=False, **{limit: 10 ** 6})
-    with pytest.raises(ValueError, match='expected a steady or transient heat or a mechanics region document'):
+    with pytest.raises(ValueError, match='expected a region document'):
         check_mesh_limits(Document.from_dict(copy.deepcopy(examples.EXAMPLES[name])), max_input_vertices=10 ** 6)
 
 
@@ -583,12 +583,14 @@ def test_port_only_an_unvalidated_document_is_validated_before_its_copy(monkeypa
 
 def test_port_only_the_region_kinds_take_mesh_limits():
     takes = {k.name for k in registry.kinds() if k.accepts_mesh_limits is not None}
-    assert takes == {'thermal.steady2d', 'thermal.transient2d', 'mechanics'}
+    # electric_joule since 2026-11-08: its region documents (electric.steady2d) mesh like region heat;
+    # mechanics since 2026-11-08: its region documents (elasticity and thermoelasticity) too
+    assert takes == {'thermal.steady2d', 'thermal.transient2d', 'electric_joule', 'mechanics'}
     for name in ('thermal_regions', 'transient_thermal_regions', 'elastic_regions', 'thermoelastic_regions'):
         data = examples.EXAMPLES[name]
         assert registry.kind_of(data).accepts_mesh_limits(data)
-    for name in ('thermal_slab', 'thermal_boundary', 'transient_thermal_uniform', 'elastic_plate',
-                 'thermoelastic_bar'):
+    for name in ('thermal_slab', 'thermal_boundary', 'transient_thermal_uniform', 'electric_rectangle',
+                 'joule_rectangle', 'joule_temperature', 'elastic_plate', 'thermoelastic_bar'):
         data = examples.EXAMPLES[name]
         assert not registry.kind_of(data).accepts_mesh_limits(data)
 
@@ -618,5 +620,5 @@ def test_port_limits_reach_a_runner_only_through_its_kind(monkeypatch, accepts):
         assert run(doc, verbose=False, max_nodes=7, max_input_vertices=9).kwargs == {
             'verbose': False, 'mesh_limits': _MeshLimits(max_nodes=7, max_input_vertices=9)}
     else:
-        with pytest.raises(ValueError, match='mesh limits apply only to thermal and mechanics region documents'):
+        with pytest.raises(ValueError, match='mesh limits apply only to region documents'):
             run(doc, verbose=False, max_nodes=7)

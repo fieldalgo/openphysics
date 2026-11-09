@@ -71,7 +71,9 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   표는 영역 기계와 공유하므로 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`도 있으면 받아
   검사합니다(열 해석은 쓰지 않음; [기계](mechanics2d.md#재료-영역과-이름-있는-경계)).
   열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야 합니다.
-  쓰지 않는 재료는 허용합니다.
+  쓰지 않는 재료는 허용합니다. 같은 표에 [영역 전기 전도](electric_joule.md#재료-영역-전기-정상-전도)용
+  `electrical_conductivity_s_m` > 0을 둘 수 있고 열은 이를 무시합니다(2026-11-08부터; 전에는 모르는
+  키로 거부).
 - `physics.<name>`: `type`, `heat_source_w_m3`(숫자 하나, 또는 `{영역 이름: 숫자}`이며
   적지 않은 영역은 0), 사각형 문서와 같은 변 규칙의 `dirichlet_temperature_k`,
   `outward_flux_w_m2`, `convection`(모서리 충돌 거부, Dirichlet 변이나 양의 Robin 고정 필요,
@@ -319,10 +321,11 @@ except MeshLimitError as exc:
 
 모든 검사는 풀이 전에 실행됩니다. 각 상한은 양의 `int` 또는 `None`이며 `None`은 검사하지 않습니다.
 상한이 없으면 실행은 상한 없는 실행과 정확히 같고, `max_nodes`를 주지 않으면 meshine은 자체 기본
-상한인 300,000점을 유지합니다. 상한은 정상·과도 영역 문서에만 적용됩니다. 사각형 열전도 문서나 전자기,
-공진기, 전기·줄 가열 문서에 상한을 주면 `ValueError`이고, `bool`, 부동소수점 수, 1보다 작은 값도
-마찬가지입니다. 두 열전도 종류는 어떤 문서가 상한을 받는지 물리 등록표(`PhysicsKind.accepts_mesh_limits`)에
-선언하고, `run`은 이를 통해 그 실행기에 상한을 넘깁니다. 다른 종류의 실행기는 바뀌지 않습니다.
+상한인 300,000점을 유지합니다. 상한은 영역 문서(정상·과도 열전도,
+영역 전기 전도, [영역 기계](mechanics2d.md#재료-영역과-이름-있는-경계))에만 적용됩니다. 사각형 열전도·전기·줄 가열·기계
+문서나 전자기, 공진기 문서에 상한을 주면 `ValueError`이고, `bool`, 부동소수점 수, 1보다 작은 값도
+마찬가지입니다. 각 종류는 어떤 문서가 상한을 받는지 물리 등록표(`PhysicsKind.accepts_mesh_limits`)에
+선언하고, `run`은 이를 통해 그 실행기에 상한을 넘깁니다.
 `max_nodes`에는 `MeshSizeLimitError`가 있는 meshine이 필요합니다. 더 오래된 meshine이 설치되어 있으면 이
 상한을 준 실행은 `ImportError`를 발생시키고, 다른 실행은 그대로입니다.
 

@@ -41,7 +41,9 @@ Supported layouts:
   frequencies, quality factors and wall conductivities are not per cell and
   stay in ``fields.npz`` and ``summary.json``
 - electric conduction and Joule heating (``electric-joule2d-p1-v1``, the layout
-  of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``):
+  of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``; and
+  ``electric2d-p1-node-cell-regions-v1`` of region ``electric.steady2d``, which adds
+  the static integer cell data ``triangle_regions``):
   point data ``potential_v`` and the nodal electric load, reaction, prescribed
   outward current and residual arrays; cell data ``electric_field_v_m``,
   ``current_density_a_m2``, ``conductivity_s_m`` and ``joule_heating_w_m3`` at
@@ -113,6 +115,7 @@ _AXISYMMETRIC_REGIONS = "thermal-axisymmetric-p1-node-cell-regions-v1"   # (r, z
 _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v1"
 _TRANSIENT_AXISYMMETRIC_REGIONS = "thermal-axisymmetric-transient-p1-node-cell-regions-v1"   # (r, z); rates in W
 _ELECTRIC_JOULE = "electric-joule2d-p1-v1"
+_ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v1"   # electric.steady2d on material regions
 _MODES = "em-modes2d-p1-node-centroid-v1"
 _MODES_SUBSPACE = "em-modes2d-subspace-raw-v1"
 _MECHANICS = "mechanics2d-p1-v1"
@@ -125,7 +128,7 @@ _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _STEADY_REGIONS, _TRA
                     _TRANSIENT_BOUNDARY, _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, _STEADY_REGIONS, _TRANSIENT_REGIONS,
                      _ELECTRIC_JOULE, _CAVITY_COMPLEX, _TRANSIENT_BOUNDARY, _MODES, *_MECHANICS_LAYOUTS,
-                     _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
+                     _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS, _ELECTRIC_REGIONS)
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
@@ -206,7 +209,7 @@ def _transient_at(data, index):
 
 def _region_cell_data(data, layout):
     """Static dimensionless region IDs, without renumbering or interpolation."""
-    if layout not in _REGION_LAYOUTS:
+    if layout not in (*_REGION_LAYOUTS, _ELECTRIC_REGIONS):
         return {}
     regions = np.asarray(data.get("triangle_regions"))
     if (regions.shape != (len(data["triangles"]),) or regions.dtype.kind not in "iu"
@@ -483,8 +486,9 @@ def export_fields(fields_npz, output, *, time_index=-1):
     layout = _layout(data)
     if layout in _THERMAL_LAYOUTS:
         parts = _thermal(data, layout, time_index)
-    elif layout == _ELECTRIC_JOULE:
+    elif layout in (_ELECTRIC_JOULE, _ELECTRIC_REGIONS):
         parts = _electric_joule(data)
+        parts[3].update(_region_cell_data(data, layout))
     elif layout in _MECHANICS_LAYOUTS:
         parts = _mechanics(data, layout)
     elif layout == _CAVITY:

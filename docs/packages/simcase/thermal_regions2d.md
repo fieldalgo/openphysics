@@ -80,7 +80,10 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   accepted and checked when present (not used by heat;
   [mechanics](mechanics2d.md#material-regions-and-named-boundaries)). Thermal properties are
   never taken from built-in optical materials; every used material must be
-  defined here. Unused materials are allowed.
+  defined here. Unused materials are allowed. The same table may hold
+  `electrical_conductivity_s_m` > 0 for [region electric
+  conduction](electric_joule.md#material-regions-electric-steady-conduction); heat
+  ignores it (since 2026-11-08; before, it was refused as an unknown key).
 - `physics.<name>`: `type`, `heat_source_w_m3` (one number, or `{region name:
   number}` with regions not listed at zero), `dirichlet_temperature_k`,
   `outward_flux_w_m2` and `convection` with the side rules of the rectangle
@@ -414,12 +417,13 @@ except MeshLimitError as exc:
 Every check runs before the solve. Each limit is a positive `int` or `None`, and
 `None` is not checked: with no limit the run is exactly the unlimited one, and
 meshine keeps its own default cap of 300,000 points unless `max_nodes` is given.
-The limits apply to steady and transient region documents only; giving one for
-a rectangle heat document or an electromagnetic, cavity or electric/Joule
-document is a `ValueError`, and so is a `bool`, a float or a value below 1. The
-two heat kinds declare which of their documents take limits in the physics
-registry (`PhysicsKind.accepts_mesh_limits`), and `run` hands the limits to
-their runners through it; no other kind's runner changes. `max_nodes` needs
+The limits apply to region documents only: steady and transient heat, region
+electric conduction and [region mechanics](mechanics2d.md#material-regions-and-named-boundaries).
+Giving one for a rectangle heat, electric/Joule or mechanics document or an
+electromagnetic or cavity document is a `ValueError`, and so is a `bool`, a float
+or a value below 1. Each kind declares which of its documents take limits in the
+physics registry (`PhysicsKind.accepts_mesh_limits`), and `run` hands the limits
+to their runners through it. `max_nodes` needs
 a meshine that has `MeshSizeLimitError`: with an older meshine installed, a run
 that sets it raises `ImportError`, and every other run is unchanged.
 

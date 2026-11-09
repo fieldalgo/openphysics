@@ -13,6 +13,8 @@ from .steady_boundary_contract import SIDES, _number, _object, validate_steady_b
 from .thermal import _OwnedOutput
 from . import units
 from .registry import PhysicsKind, register
+from .electric_regions import (FIELD_LAYOUT as REGION_FIELD_LAYOUT, is_region_electric, refuse_region_joule,
+                               region_summary, run_region_electric, validate_region_electric)
 
 TYPES = {'electric.steady2d', 'joule.steady2d', 'joule.temperature2d'}
 FIELD_LAYOUT = 'electric-joule2d-p1-v1'
@@ -67,6 +69,12 @@ def _model(spec, path):
 
 def validate_electric_joule(doc):
     d = doc.data
+    if is_region_electric(d):
+        from .schema import check_format_units_and_tags
+        check_format_units_and_tags(doc)
+        validate_region_electric(doc)
+        return
+    refuse_region_joule(d)
     top = {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'}
     _object(d, top, 'document', top)
     _object(d['units'], {'length', 'temperature'}, 'units', {'length'})
@@ -134,6 +142,8 @@ def validate_electric_joule(doc):
 
 def document_summary(doc):
     doc.validate()
+    if is_region_electric(doc.data):
+        return region_summary(doc)
     name, p = doc.sole_physics()
     return (f'{doc["name"]} (openphysics 0.2)\n  physics {name}: {p["type"]}, headless single steady rectangle\n'
             f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
@@ -159,6 +169,8 @@ def failure_evidence(exc):
 
 class ElectricJouleRunResult:
     """Owned numeric evidence. Public field/summary access returns independent copies."""
+    FIELD_LAYOUT = FIELD_LAYOUT
+
     def __init__(self, doc, arrays, metadata, log):
         self.doc = doc.copy()
         self.doc.validate()
@@ -190,7 +202,7 @@ class ElectricJouleRunResult:
             owned.write('log.txt', lambda f: f.write(('\n'.join(self._log)+'\n').encode('utf-8')))
             if self.doc['results']['save_fields']:
                 arrays = dict(self._arrays, result_format=summary['result_format'],
-                              field_layout=FIELD_LAYOUT, mesh_length_unit='m', metadata_json=encoded.decode('utf-8'))
+                              field_layout=self.FIELD_LAYOUT, mesh_length_unit='m', metadata_json=encoded.decode('utf-8'))
                 owned.write('fields.npz', lambda f: np.savez_compressed(f, **arrays))
             owned.write('summary.json', lambda f: f.write(encoded))
             owned.finish()
@@ -202,7 +214,14 @@ class ElectricJouleRunResult:
         return owned.path
 
 
-def run_electric_joule(doc, verbose=True):
+class RegionElectricRunResult(ElectricJouleRunResult):
+    """Owned numeric evidence of a region electric run (``electric.steady2d-regions-result-v1``)."""
+    FIELD_LAYOUT = REGION_FIELD_LAYOUT
+
+
+def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
+    if is_region_electric(doc.data):
+        return run_region_electric(doc, verbose, mesh_limits=mesh_limits)
     from galerkin import rectangle_mesh
     from galerkin.electric import solve_steady_electric
     from galerkin.joule_heating import solve_steady_joule_heat
@@ -315,4 +334,5 @@ register(PhysicsKind(
     name='electric_joule', types=frozenset(TYPES), precedence=10,
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
     result_types=(ElectricJouleRunResult,), defaults=_defaults, fresh_output=True,
-    stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics'))
+    stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics',
+    accepts_mesh_limits=is_region_electric))
