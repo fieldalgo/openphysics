@@ -38,7 +38,8 @@ return values of one library for the whole run: a callback that returns NumPy
 numbers at the first time and live values later is refused.
 
 Mesh coordinates, connectivity, boundary tags and region ids are fixed structure;
-derivatives with respect to node positions are not provided. `ElementHeatSource`
+derivatives with respect to node positions are not provided, except along a
+design motion of steady heat (`motion=`, [shape derivatives](shape_derivative.md)). `ElementHeatSource`
 and `ElementConductivity` hold NumPy values. A callback receives NumPy coordinates
 and normals and may return live values; lift the coordinates into the same library
 when they enter the expression (PyTorch does not combine tensors with NumPy arrays).
