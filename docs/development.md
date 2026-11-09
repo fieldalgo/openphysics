@@ -279,6 +279,17 @@ Timing and profiling commands for the solvers are in the
 [electric](benchmark_electric.md) and [derivative](benchmark_derivatives.md)
 benchmark guides.
 
+**Units-batch equivalence (manual dispatch only).** The `units-batch-equivalence`
+job runs `tests/simcase/test_units_batch_equivalence.py` with
+`OPENPHYSICS_BATCH_BASELINE` set to the merge base with `main`, on Ubuntu 24.04,
+macOS 15 and Windows 2022, one platform at a time. It records every
+`examples/simcase` document and frozen fixture on the baseline and on the
+dispatched commit and requires the same solver and mesher inputs and saved bytes,
+under the transforms of the [units-batch harness](../tools/units_batch/README.md).
+Only a manual dispatch runs it (`gh workflow run validate.yml --ref <branch>`);
+pushes and pull requests skip it. It is not part of `tests`, so each platform's
+result is read on its own, from the run of the commit it is claimed for.
+
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
 `queue: single`, so a new push supersedes the older run.
@@ -330,6 +341,9 @@ Each job uploads its artifacts, even after a failure:
 - Installed platforms: `installed-packages-<os>-<run_id>` with every command's
   exit and log, environment details, checksums, installed origins, JUnit XML and
   `numeric-runtime.json`.
+- Units-batch equivalence (manual dispatch only):
+  `units-batch-equivalence-<os>-<run_id>` with the comparison report (a SHA-256
+  table per document and array), the plan and both recording manifests.
 
 Some stages store the stdout of passing tests in JUnit `system-out`
 (`-o junit_logging=all -o junit_log_passing_tests=true`). This keeps numerical

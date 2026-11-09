@@ -1,0 +1,104 @@
+{
+  "openphysics": "0.2",
+  "name": "canonical region heat",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 123.456,
+      "xmax": 133.456,
+      "ymin": -3.2,
+      "ymax": 2.8
+    },
+    "background": {
+      "material": "a",
+      "mesh_size": 1.5
+    },
+    "shapes": [
+      {
+        "name": "plate",
+        "type": "rect",
+        "material": "b",
+        "x": 123.456,
+        "y": -3.2,
+        "w": 4.0,
+        "h": 6.0,
+        "mesh_size": 1.0
+      },
+      {
+        "name": "disk",
+        "type": "circle",
+        "material": "a",
+        "cx": 125.456,
+        "cy": -0.2,
+        "r": 0.8,
+        "mesh_size": 0.4
+      },
+      {
+        "name": "patch",
+        "type": "polygon",
+        "material": "b",
+        "points": [
+          [
+            129.456,
+            -2.2
+          ],
+          [
+            132.456,
+            -2.2
+          ],
+          [
+            132.456,
+            1.8
+          ],
+          [
+            129.456,
+            1.8
+          ]
+        ],
+        "mesh_size": 0.75
+      }
+    ]
+  },
+  "materials": {
+    "a": {
+      "conductivity_w_mk": 2.0
+    },
+    "b": {
+      "conductivity_w_mk": 9.0
+    }
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.steady2d",
+      "heat_source_w_m3": {
+        "plate": 200000.0,
+        "disk": 300000.0
+      },
+      "dirichlet_temperature_k": {
+        "left": 300.0
+      },
+      "outward_flux_w_m2": {
+        "bottom": -40.0
+      },
+      "convection": {
+        "right": {
+          "h_w_m2k": 25.0,
+          "ambient_temperature_k": 290.0
+        }
+      }
+    }
+  },
+  "mesh": {
+    "size": 1.5
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}
