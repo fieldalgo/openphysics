@@ -35,3 +35,7 @@ plot = ["matplotlib>=3.8"]
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["physmat*"]
+
+[tool.setuptools.package-data]
+# physmat.units: the quantity registry and its generated unit tables
+physmat = ["quantities.json", "unit_tables.json"]

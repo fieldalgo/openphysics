@@ -38,6 +38,16 @@ glass = physmat.constant(1.5, name="my glass")
 custom = physmat.Material("doped SiO2", physmat.Sellmeier(B=[...], C=[...], range_um=(0.3, 2.0)))
 ```
 
+## Units and the quantity registry
+
+`physmat.units` is the quantity registry and exact unit converter of the
+OpenPhysics units convention: `physmat.units.q("200 GPa", "youngs_modulus")`
+gives `2e11` (Pa), and `"10 mPa"` for a pressure is refused by name. It uses
+only the Python standard library. Nothing uses it yet: model documents and the
+solvers keep their current units, and the functions on this page keep their
+current arguments (wavelengths in micrometres, temperatures in kelvin, and Celsius
+`temperature_c` for the Ciddor air model). See [physmat.units](units.md).
+
 ## Built-in materials
 
 | name | model | source |
