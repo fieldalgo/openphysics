@@ -101,7 +101,9 @@ Each refusal names the reason:
 - live conductivity, source, boundary or Dirichlet values together with a motion:
   t is the one live input of such a call;
 - `coordinate_system="axisymmetric"`;
-- `motion=` on any other solver: it is not a keyword there.
+- `motion=` on any other solver: it is not a keyword there;
+- second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
+  ([refused](differentiation.md#refused-not-approximated)).
 
 ## Validation
 

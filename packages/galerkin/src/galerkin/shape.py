@@ -23,6 +23,7 @@ refusals are listed in docs/packages/galerkin/shape_derivative.md.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -102,6 +103,13 @@ def extend_velocity(mesh: Mesh, values, known, *, method: str = "harmonic"):
     fixed = np.flatnonzero(known)
     if not len(fixed):
         raise ValueError("extend_velocity: no known node")
+    from scipy.sparse.csgraph import connected_components
+    _count, labels = connected_components(K, directed=False)
+    unanchored = sorted(set(labels.tolist()) - set(labels[fixed].tolist()))
+    if unanchored:
+        nodes = np.flatnonzero(np.isin(labels, unanchored))
+        raise ValueError(f"extend_velocity: {len(unanchored)} connected component(s) have no known node "
+                         f"(for example node {int(nodes[0])}); give every component at least one known node")
     out = np.empty((n, 2))
     for k in range(2):
         out[:, k] = scipy_solve_dirichlet(K, np.zeros(n), {(int(i),): values[i, k] for i in fixed})
@@ -129,9 +137,13 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, di
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
         for tag, value in (table or {}).items():
             _numpy_data(value, f"{name}[{tag!r}]")
+    if not isinstance(dirichlet, Mapping):
+        raise ValueError("dirichlet must map node indices to temperatures in K")
     for node, value in dirichlet.items():
         _numpy_data(value, "Dirichlet temperature")
     t0 = float(to_numpy(t))
+    if not math.isfinite(t0):
+        raise ValueError(f"motion: t must be finite, got {t0!r}")
     lo, hi = admissible_interval(mesh, W)
     if not lo < t0 < hi:
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
@@ -209,12 +221,13 @@ def _velocity(mesh: Mesh, velocity):
 
 
 def _numpy_data(value, name):
-    if callable(value):
-        raise TypeError(f"motion: {name} is a callback; with a moving mesh its sample points move too, which this "
-                        "slice does not differentiate. Give a scalar or a region table")
     if type(value).__name__ == "ElementHeatSource":
         raise TypeError(f"motion: {name} is an ElementHeatSource; give a scalar or a region table")
-    items = value.values() if is_per_region(value) else (value if isinstance(value, tuple) else (value,))
+    items = value.values() if is_per_region(value) else (value if isinstance(value, (tuple, list)) else (value,))
+    for v in (value, *items):
+        if callable(v):
+            raise TypeError(f"motion: {name} is a callback; with a moving mesh its sample points move too, which "
+                            "this slice does not differentiate. Give a scalar or a region table")
     for v in items:
         if is_live(v):
             raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
@@ -247,9 +260,10 @@ def _signed_area(nodes, tris):
 
 def _real_roots(a, b, c):
     """Real roots of a t^2 + b t + c (c, the area at t = 0, is nonzero)."""
-    scale = max(abs(a), abs(b), abs(c))
-    if abs(a) <= 1e-14 * scale:
-        return [] if abs(b) <= 1e-14 * scale else [-c / b]
+    # no relative threshold on a: a, b and c carry different powers of t, and the stable
+    # formula below gives both roots accurately however small a is (review 2026-11-09)
+    if a == 0:
+        return [] if b == 0 else [-c / b]
     disc = b * b - 4 * a * c
     if disc < 0:
         return []

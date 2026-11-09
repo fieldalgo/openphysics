@@ -78,6 +78,8 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet 값: 그런 호출에서 live 입력은 t 하나입니다.
 - `coordinate_system="axisymmetric"`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
+- 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
+  ([거부 목록](differentiation.md#근사하지-않고-거부하는-것)).
 
 ## 검증
 
