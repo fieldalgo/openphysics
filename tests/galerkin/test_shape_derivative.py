@@ -312,3 +312,64 @@ def test_s8_refusals():
         solve_steady_heat(m, **common, coordinate_system="axisymmetric", motion=MeshMotion(W, t))
     with pytest.raises(TypeError, match="only t is live"):
         solve_steady_heat(m, **common, motion=MeshMotion(xp.asarray(W), t))
+
+
+# ---------------------------------------------------------------- independent review regressions (2026-11-09)
+
+def test_review_live_or_callable_values_inside_a_convection_pair_are_refused():
+    torch = _torch()
+    m, W = _slab()
+    left = [int(i) for i in m.boundary["left"]]
+    common = dict(conductivity={"a": 2.0, "b": 5.0}, dirichlet={i: 1.0 for i in left})
+    t = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
+    h = torch.tensor(8.0, dtype=torch.float64, requires_grad=True)
+    # a list pair with a live h once ran and returned dJ/dh = 0 (the correction removed it)
+    with pytest.raises(TypeError, match=r"convection\['right'\] is live"):
+        solve_steady_heat(m, **common, convection={"right": [h, 280.0]}, motion=MeshMotion(W, t))
+    with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
+        solve_steady_heat(m, **common, convection={"right": (lambda p, n: np.ones(len(p)), 280.0)},
+                          motion=MeshMotion(W, t))
+    with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
+        solve_steady_heat(m, **common, convection={"right": [8.0, lambda p, n: np.ones(len(p))]},
+                          motion=MeshMotion(W, t))
+
+
+def test_review_small_motion_keeps_its_inversion_bound():
+    m = Mesh(np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), np.array([[0, 1, 2]]), {})
+    for s in (1e-6, 1e-7, 1e-9):
+        W = s * np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]])          # 2A = 1 - s^2 t^2
+        lo, hi = admissible_interval(m, W)
+        assert hi == pytest.approx(1 / s, rel=1e-12) and lo == pytest.approx(-1 / s, rel=1e-12)
+
+
+def test_review_extension_refuses_a_component_without_known_nodes():
+    a = rectangle_mesh(1.0, 1.0, 2, 2)
+    nodes = np.vstack([a.nodes, a.nodes + [3.0, 0.0]])
+    tris = np.vstack([a.triangles, a.triangles + a.num_nodes])
+    m = Mesh(nodes, tris, {})
+    known = np.zeros(m.num_nodes, dtype=bool)
+    known[: a.num_nodes] = True
+    with pytest.raises(ValueError, match="1 connected component"):
+        extend_velocity(m, np.zeros((m.num_nodes, 2)), known)
+
+
+def test_review_messages_name_the_input():
+    xp = _xp("jax")
+    m, W = _slab()
+    with pytest.raises(ValueError, match="t must be finite"):
+        solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet={0: 1.0}, motion=MeshMotion(W, xp.asarray(np.nan)))
+    with pytest.raises(ValueError, match="dirichlet must map node indices"):
+        solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet=[(0, 1.0)], motion=MeshMotion(W, xp.asarray(0.0)))
+
+
+def test_review_torch_second_derivative_is_refused():
+    torch = _torch()
+    m = rectangle_mesh(1.0, 0.5, 6, 3)
+    x, y = m.nodes[:, 0], m.nodes[:, 1]
+    W = np.stack([0.1 * x * y, 0.05 * x], axis=1)
+    left = [int(i) for i in m.boundary["left"]]
+    t = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
+    J = torch.sum(solve_steady_heat(m, conductivity=2.0, dirichlet={i: 300.0 for i in left}, heat_source=3.0,
+                                    motion=MeshMotion(W, t)).temperature)
+    with pytest.raises(RuntimeError, match="second derivatives"):
+        torch.autograd.grad(J, t, create_graph=True)
