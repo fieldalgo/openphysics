@@ -1,0 +1,68 @@
+{
+  "openphysics": "0.2",
+  "name": "220 nm dielectric slab, vector TE",
+  "units": {
+    "length": "m"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": -5e-08,
+      "xmax": 5e-08,
+      "ymin": -1.5e-06,
+      "ymax": 1.72e-06
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -5e-08,
+        "y": 0.0,
+        "w": 1e-07,
+        "h": 2.2e-07,
+        "material": "film",
+        "mesh_size": 1.2e-08
+      }
+    ]
+  },
+  "materials": {
+    "film": {
+      "n": 3.48
+    },
+    "clad": {
+      "n": 1.444
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "wavelength": 1.55e-06,
+      "num_modes": 1,
+      "n_cladding": 1.444,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "size": 6e-08,
+    "grading": {
+      "center": [
+        0.0,
+        1.1e-07
+      ],
+      "near": 1.2e-08,
+      "far": 6e-08,
+      "distance": 1e-06
+    }
+  },
+  "study": {
+    "type": "single"
+  }
+}

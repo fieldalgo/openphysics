@@ -1,0 +1,89 @@
+{
+  "openphysics": "0.2",
+  "name": "Steel-aluminium bimetal strip heated by 50 K",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 50.0,
+          "ymin": 0.0,
+          "ymax": 2.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "aluminium",
+            "type": "rect",
+            "x": 0.0,
+            "y": 1.0,
+            "w": 50.0,
+            "h": 1.0,
+            "material": "aluminium"
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "young_modulus_pa": 200000000000.0,
+      "poisson_ratio": 0.3,
+      "thermal_expansion_per_k": 1.2e-05,
+      "conductivity_w_mk": 45.0,
+      "source": "document value"
+    },
+    "aluminium": {
+      "young_modulus_pa": 70000000000.0,
+      "poisson_ratio": 0.33,
+      "thermal_expansion_per_k": 2.3e-05,
+      "conductivity_w_mk": 237.0,
+      "source": "document value"
+    }
+  },
+  "mesh": {
+    "size": 0.25
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "strip": {
+      "type": "mechanics.thermoelastic2d",
+      "plane": "stress",
+      "reference_temperature_k": 293.15,
+      "dirichlet_temperature_k": {
+        "left": 343.15,
+        "right": 343.15,
+        "bottom": 343.15,
+        "top": 343.15
+      },
+      "displacement_m": {
+        "left": {
+          "x": 1e-07,
+          "y": 0.0
+        }
+      },
+      "body_force_n_m3": [
+        0.0,
+        -100000.0
+      ],
+      "pressure_pa": {
+        "right": 2000000.0
+      }
+    }
+  }
+}
