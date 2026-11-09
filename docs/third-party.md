@@ -129,7 +129,7 @@ Version ranges are the package requirements; the exact CI versions are pinned in
 
 | Distribution | Extra | SPDX |
 |---|---|---|
-| `fastapi` | `simcase[studio]` (`>=0.100`) | MIT |
+| `fastapi` | `simcase[studio]` (`>=0.109.1`) | MIT |
 | `uvicorn` | `simcase[studio]` (`>=0.20`) | BSD-3-Clause |
 | `starlette`, `idna` | fastapi | BSD-3-Clause |
 | `click` | uvicorn | BSD-3-Clause |

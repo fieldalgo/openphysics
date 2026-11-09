@@ -108,7 +108,7 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 
 | 배포판 | Extra | SPDX |
 |---|---|---|
-| `fastapi` | `simcase[studio]`(`>=0.100`) | MIT |
+| `fastapi` | `simcase[studio]`(`>=0.109.1`) | MIT |
 | `uvicorn` | `simcase[studio]`(`>=0.20`) | BSD-3-Clause |
 | `starlette`, `idna` | fastapi | BSD-3-Clause |
 | `click` | uvicorn | BSD-3-Clause |
