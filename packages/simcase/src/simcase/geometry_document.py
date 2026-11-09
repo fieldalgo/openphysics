@@ -139,6 +139,8 @@ class GeometryModel:
 
 def pm_per_unit(units) -> Fraction:
     """Grid points per document length unit, exactly."""
+    if units is not None and not isinstance(units, dict):
+        raise GeometryError(f'units: expected an object such as {{"length": "um"}}, got {units!r}')
     length = (units or {}).get("length", _MISSING)
     if length is _MISSING:
         raise GeometryError("units.length: a version 1 geometry block needs a declared length unit")
