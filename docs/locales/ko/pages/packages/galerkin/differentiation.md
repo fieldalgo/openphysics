@@ -37,7 +37,7 @@ NumPy는 미분하지 않습니다.
 값을 돌려주는 콜백은 거부합니다.
 
 메시 좌표, 연결, 경계 태그, 영역 번호는 고정된 구조입니다. 노드 위치에 대한
-미분은 제공하지 않습니다. `ElementHeatSource`와 `ElementConductivity`는 NumPy
+미분은 제공하지 않습니다. 예외는 정상 열의 설계 이동(`motion=`, [형상 미분](shape_derivative.md))입니다. `ElementHeatSource`와 `ElementConductivity`는 NumPy
 값을 담습니다. 콜백은 NumPy 좌표와 법선을 받고, 살아 있는 값을 돌려줄 수
 있습니다. 좌표를 식에 쓸 때는 같은 라이브러리로 올리십시오(PyTorch는 텐서와
 NumPy 배열을 섞어 계산하지 않습니다).

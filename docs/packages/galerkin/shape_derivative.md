@@ -1,0 +1,121 @@
+# Shape derivatives: moving the mesh with a design parameter
+
+**English** | [한국어](../../locales/ko/pages/packages/galerkin/shape_derivative.md)
+
+[galerkin overview](overview.md) · [Derivatives with JAX and PyTorch](differentiation.md)
+
+`galerkin.shape` gives derivatives with respect to a design parameter that moves
+the mesh, such as a layer thickness or a hole radius. This first slice covers
+steady Cartesian heat (`galerkin.thermal.solve_steady_heat`). The other solvers
+follow the same frame later.
+
+## What is differentiated
+
+A design parameter t moves every node: **X(t) = X₀ + t·W**.
+- **W** is a fixed NumPy mesh velocity of shape (N, 2): node motion in the
+  mesh's length unit per unit of t.
+- **t** is the only live value, a JAX or PyTorch scalar. Its number is the step
+  at which the solve runs, usually 0, i.e. the mesh as given.
+- Connectivity, tags and regions stay fixed.
+
+The derivative is the exact derivative of the discrete solution on that moving
+mesh: moving the nodes by ±h·W and solving again gives the same value up to
+finite-difference truncation.
+
+The solve runs once on the moved mesh with the ordinary solver, so every input
+check, residual tolerance and heat balance applies unchanged. One more live
+solve then attaches the derivative: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). Here A(t)
+and b(t) are assembled from X₀ + t·W in the live library (P1 stiffness, region
+sources, and the flux and Robin terms on the moving edges), and T equals T₀ up to
+rounding. `temperature`, `heat_flux`, `load`, `reaction` and `residual` carry the
+derivative.
+
+```python
+import jax
+import jax.numpy as jnp
+from galerkin.shape import MeshMotion, admissible_interval, extend_velocity
+from galerkin.thermal import solve_steady_heat
+
+jax.config.update("jax_enable_x64", True)
+W = extend_velocity(mesh, boundary_velocity, on_curve)   # (N, 2)
+lo, hi = admissible_interval(mesh, W)                    # no element inverts for lo < t < hi
+
+
+def heat_in(t):
+    r = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, motion=MeshMotion(W, t))
+    return jnp.sum(r.reaction[hot])
+
+
+dQ = jax.grad(heat_in)(jnp.asarray(0.0))
+```
+
+With PyTorch, pass `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`
+and call `.backward()`.
+
+## The mesh velocity
+
+Nodes on the geometry's curves move as the design moves them. For a version 1
+geometry document, `simcase.geometry_velocity.design_velocity(document,
+p).node_velocity(meshine_mesh)` gives them
+([design velocity](../simcase/geometry_engine.md#design-velocity-stage-4)). Its
+`values` are dimensionless (∂x/∂p, with x and p in the document unit), so t is
+then the parameter change in the mesh's length unit. `galerkin.interop.from_mesher`
+keeps the meshine node order.
+
+`extend_velocity(mesh, values, known, method="harmonic")` moves every other node.
+It solves a Laplace problem per component on the same mesh, with the known
+nodes' values as Dirichlet data:
+- `"harmonic"` (the default) uses unit diffusivity. It reproduces an affine
+  motion exactly.
+- `"stiffened"` divides the diffusivity by the element area, so that small
+  elements move more rigidly.
+
+The choice changes the discrete derivative only at discretisation level; the
+difference vanishes as the mesh is refined (validation S4 below). It mainly
+decides how far a step can go before an element inverts.
+
+## Element inversion and remeshing
+
+Each element's signed area under X₀ + t·W is a quadratic in t.
+`admissible_interval(mesh, W)` returns the nearest roots on each side over all
+elements: the open interval in which no element inverts. A solve at a step
+outside it raises `galerkin.shape.ElementInversion`, which names the interval.
+The derivative at t = 0 is always defined.
+
+galerkin never remeshes: a derivative belongs to the mesh it was computed on.
+The caller regenerates the mesh from the geometry at the new parameter value.
+The recommended trigger is a step that leaves half of the admissible interval, or
+a minimum angle that falls below the mesher's `min_angle`. Across a remesh the
+functional and its derivative change at discretisation level, the size of the
+convergence errors below.
+
+## Refused
+
+Each refusal names the reason:
+- a NumPy `t` (`TypeError`): NumPy does not differentiate. To solve on a moved
+  mesh, move the nodes and solve that mesh;
+- a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
+- a step outside the admissible interval (`ElementInversion`);
+- coordinate callbacks for the heat source, outward flux or convection, and
+  `ElementHeatSource`: their sample points move with the mesh;
+- live conductivity, source, boundary or Dirichlet values together with a motion:
+  t is the one live input of such a call;
+- `coordinate_system="axisymmetric"`;
+- `motion=` on any other solver: it is not a keyword there.
+
+## Validation
+
+`tests/galerkin/test_shape_derivative.py` holds checks S1–S8, pre-registered
+before the implementation. They were measured on 2026-11-09 on Linux with JAX
+0.12.0.1 and PyTorch 2.14.1+cpu.
+
+| Check | Criterion | Result |
+|---|---|---|
+| S1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a probe temperature, the Dirichlet heat and the mean temperature, with a source, convection and flux on moving sides; relative 1e-6, JAX and PyTorch | 1.7e-9, 9.2e-10, 4.1e-9 |
+| S2 two-layer slab | dR/dL₁ = 1/k₁ − 1/k₂, relative 1e-10 | exact to about 1e-14 |
+| S3 annulus | inner radius from the geometry engine's node velocities; dQ/da = 2πk/(a ln²(b/a)); observed order ≥ 1.5, finest within 1e-3 | 8.1e-3, 2.1e-3, 5.8e-4 at sizes 0.8, 0.4, 0.2; order 1.97 and 1.84 |
+| S4 extension independence | harmonic vs stiffened derivative gap: order ≥ 1, finest within 1e-3 | 2.4e-4, 5.4e-5, 1.6e-5; order 2.1 and 1.8 |
+| S5 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| | pass |
+| S6 inversion bound | the interval equals the exact roots; a step beyond it is refused | pass |
+| S7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `627eb28` (measured); `motion=None` equals no keyword (test) |
+| S8 refusals | as listed above | pass |
