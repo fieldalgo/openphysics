@@ -9,6 +9,7 @@ engine itself imports nothing but the standard library.
 """
 
 import copy
+import gc
 import json
 import math
 import random
@@ -565,16 +566,27 @@ def _pcb_case():
     return v1(feats[:200], dom=(0, 1000, 0, 1000), bg="fr4")
 
 
+def _timed(fn):
+    """``(fn(), seconds)`` with the cyclic garbage collector paused, as ``timeit`` does: after
+    thousands of tests in one process a full collection of the whole heap costs about as much
+    as the 0.2 s budget, and when it lands inside the timed call it measures the heap, not the
+    engine (installed-tests on #223: 0.73 s against 0.067 s on main for the same engine)."""
+    gc.collect()
+    gc.disable()
+    try:
+        t = time.perf_counter()
+        out = fn()
+        return out, time.perf_counter() - t
+    finally:
+        gc.enable()
+
+
 def test_g2_7_time_of_the_studio_maximum_and_a_pcb_like_plane():
     rng = random.Random(7)
     studio = next(d for d in iter(lambda: _studio_max_case(rng), 1) if d is not None)
-    t = time.perf_counter()
-    rc = check_euler(run(studio))
-    studio_s = time.perf_counter() - t
+    rc, studio_s = _timed(lambda: check_euler(run(studio)))
     pcb = _pcb_case()
-    t = time.perf_counter()
-    rc2 = check_euler(run(pcb))
-    pcb_s = time.perf_counter() - t
+    rc2, pcb_s = _timed(lambda: check_euler(run(pcb)))
     print(f"G2-7: Studio maximum (8 shapes x 12 vertices) {studio_s:.3f} s, {len(rc.cells)} cells; "
           f"PCB-like 200 features {pcb_s:.2f} s, {len(rc2.cells)} cells, {len(rc2.curves)} curves")
     assert studio_s < 0.2, studio_s
