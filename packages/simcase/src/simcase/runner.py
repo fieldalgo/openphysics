@@ -27,7 +27,7 @@ import physmat
 from galerkin import Mesh
 from meshine import TriMesh, generate, shapes as mshapes
 
-from . import physics_em_modes2d
+from . import physics_em_modes2d, views
 from .geometry import build_domain, provenance_edges_of, size_function
 from .mesh_limits import _is_region_document, _mesh_limits
 from . import units
@@ -99,17 +99,17 @@ def build_mesh(doc: Document) -> MeshedModel:
         raise DocumentError(refusal.format(stage="build_mesh"))
     # Geometry and meshing run in micrometres whatever the document declares: the
     # same device written in nm, um or m then gives meshine the same doubles, and
-    # so the same mesh. Coordinates go back to the document unit afterwards.
-    canonical = micrometre_document(doc)
+    # so the same mesh (views.modes_mesh). Coordinates go back to the document unit afterwards.
+    grid = views.modes_mesh(doc)
+    canonical = grid.canonical
     domain, namer, region_materials = build_domain(canonical)
     doc.notes.extend(note for note in canonical.notes if note.startswith(("geometry.", "mesh.controls:")))
-    mcfg = canonical["mesh"]
     size_fn = None
-    if mcfg.get("grading"):
-        g = mcfg["grading"]
-        size_fn = mshapes.size_graded(g["near"], g["far"], g["distance"], center=tuple(g["center"]))
+    if grid.grading is not None:
+        g = grid.grading
+        size_fn = mshapes.size_graded(g.near, g.far, g.distance, center=g.center)
     size_fn = _combined_size(size_fn, size_function(canonical))
-    tri_um = generate(domain, namer, min_angle=mcfg.get("min_angle", 28.0), size_fn=size_fn)
+    tri_um = generate(domain, namer, min_angle=grid.minimum_angle_deg, size_fn=size_fn)
     if tri_um.num_triangles == 0 or tri_um.num_nodes == 0:
         raise DocumentError(
             f"meshing produced {tri_um.num_nodes} nodes and {tri_um.num_triangles} triangles. An empty mesh is "
@@ -247,23 +247,17 @@ def solve_point(model: MeshedModel, physics: dict) -> dict:
 
 
 def _solve_in_micrometres(model: MeshedModel, physics: dict) -> dict:
-    """``solve_point`` on the micrometre mesh. A vector field's line integrals are in um."""
-    wl = physics["wavelength"]
-    eps = model.eps_per_triangle(wl)
-    mesh, wl_solve = model.mesh, wl
-    if model.solver_mesh is not None:
-        mesh, wl_solve = model.solver_mesh, units.to_micrometres(wl, model.doc.scale)
-    pml, bend = copy.deepcopy(physics.get("pml")), copy.deepcopy(physics.get("bend"))
-    if model.solver_mesh is not None:
-        um = lambda v: units.length_to_micrometres(v, model.doc.scale)
-        if pml is not None: pml["thickness"] = {k: um(v) for k,v in pml["thickness"].items()}
-        if bend is not None:
-            for key in ("radius", "origin"):
-                if key in bend: bend[key] = um(bend[key])
+    """``solve_point`` on the micrometre mesh. A vector field's line integrals are in um.
+
+    The solve point is the physics entry's internal view (``views.modes_inputs``): in
+    micrometres on the micrometre mesh, as written on a model assembled by hand."""
+    eps = model.eps_per_triangle(physics["wavelength"])
+    mesh = model.mesh if model.solver_mesh is None else model.solver_mesh
+    point = views.modes_inputs(physics, None if model.solver_mesh is None else model.doc.scale)
     # physmat uses n+ik; the retained modal phasor is exp(+i omega t-i beta z).
-    result = physics_em_modes2d.solve(mesh, np.conjugate(eps), wl_solve, physics["boundary"],
-                                    int(physics["num_modes"]), physics["formulation"], physics.get("n_cladding"),
-                                    n_target=physics.get("n_target"), pml=pml, bend=bend)
+    result = physics_em_modes2d.solve(mesh, np.conjugate(eps), point.wavelength, point.boundary,
+                                      point.num_modes, point.formulation, point.n_cladding,
+                                      n_target=point.n_target, pml=point.pml, bend=point.bend)
     if "open_boundary" in result:
         diagnostic = result["open_boundary"]
         if model.solver_mesh is not None:
@@ -522,7 +516,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | Subspace
     for r, m in model.materials.items():
         say(f"  {r}: {m.name}  [{m.source.split(';')[0]}]")
 
-    wl_um = units.to_micrometres(doc.sole_physics()[1]["wavelength"], doc.scale)
+    wl_um = views.modes_inputs(doc.sole_physics()[1], doc.scale).wavelength
     for region, material in model.materials.items():
         try:
             n = material.index(wl_um).real

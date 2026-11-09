@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from . import views
 from .schema import Document, DocumentError
 from .registry import PhysicsKind, register
 
@@ -391,24 +392,23 @@ def _run_material_cavity(doc: Document, verbose: bool) -> CavityRunResult:
     if solve is None or region_type is None:
         raise RuntimeError("em.cavity3d with materials or conducting walls requires a galerkin "
                            "build providing solve_material_cavity_box")
-    p = doc.sole_physics()[1]
-    dom = doc.domain
-    lengths_m = [doc.scale.to_si(dom[a + "max"] - dom[a + "min"], {"length": 1}) for a in "xyz"]
-    origin_m = np.array([doc.scale.to_si(dom[a + "min"], {"length": 1}) for a in "xyz"])
-    materials = _cavity_materials(doc.data)
+    cavity_view = views.cavity_inputs(doc)
+    box = cavity_view.box
+    lengths_m = list(box.lengths)
+    materials = cavity_view.materials
     regions = []
-    background = doc["geometry"]["background"]["material"]
+    background = cavity_view.background
     if background != "vacuum":
         eps, mu = materials[background]
         regions.append(region_type(tuple((0.0, length) for length in lengths_m), eps, mu))
-    for bounds, name in _cavity_shapes(doc, materials):
+    for bounds, name in cavity_view.boxes:
         eps, mu = materials[name]
         regions.append(region_type(bounds, eps, mu))
     start = time.perf_counter()
-    cavity = solve(lengths_m, [int(n) for n in doc["mesh"]["subdivisions"]], regions=regions,
-                   num_modes=int(p["num_modes"]), target_frequency_hz=p["target_frequency_hz"],
-                   wall_conductivity_s_per_m=_cavity_boundary(p["boundary"], "boundary"))
-    cavity.mesh.nodes += origin_m
+    cavity = solve(lengths_m, list(box.subdivisions), regions=regions,
+                   num_modes=cavity_view.num_modes, target_frequency_hz=cavity_view.target_frequency,
+                   wall_conductivity_s_per_m=cavity_view.wall_conductivity)
+    cavity.mesh.nodes += np.array(box.origin)
     timings = {"mesh_and_solve": time.perf_counter() - start}
     q = ", ".join("inf" if math.isinf(v) else f"{v:.8g}" for v in cavity.quality_factors)
     log = [doc.summary(),
@@ -431,14 +431,12 @@ def run_cavity(doc: Document, *, verbose: bool = True) -> CavityRunResult:
     if solve_cavity_box is None:
         raise RuntimeError("em.cavity3d requires a matching cavity-enabled galerkin build "
                            "providing solve_cavity_box")
-    p = doc.sole_physics()[1]
-    dom = doc.domain
-    lengths_m = [doc.scale.to_si(dom[a + "max"] - dom[a + "min"], {"length": 1}) for a in "xyz"]
-    origin_m = np.array([doc.scale.to_si(dom[a + "min"], {"length": 1}) for a in "xyz"])
+    cavity_view = views.cavity_inputs(doc)
+    box = cavity_view.box
     start = time.perf_counter()
-    cavity = solve_cavity_box(lengths_m, [int(n) for n in doc["mesh"]["subdivisions"]],
-                              num_modes=int(p["num_modes"]), target_frequency_hz=p["target_frequency_hz"])
-    cavity.mesh.nodes += origin_m
+    cavity = solve_cavity_box(list(box.lengths), list(box.subdivisions),
+                              num_modes=cavity_view.num_modes, target_frequency_hz=cavity_view.target_frequency)
+    cavity.mesh.nodes += np.array(box.origin)
     timings = {"mesh_and_solve": time.perf_counter() - start}
     log = [doc.summary(), "frequencies_hz: " + ", ".join(f"{v:.12g}" for v in cavity.frequencies_hz),
            "near-target candidate search; no complete lowest-spectrum guarantee; multiplicities are retained"]
