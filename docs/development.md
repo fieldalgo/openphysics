@@ -98,7 +98,10 @@ Each package's pages (contracts and validation reports) are in
 the pinned validation environments, the reviewed license inventory and
 maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
-them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
+them required CI runs. `physmat/unit_tables.json` is generated from
+`physmat/quantities.json` by `python -m physmat.units --write` (`--check`
+compares); the generator ships in the package, so that
+`tests/physmat/test_units.py` (R3) checks it against installed wheels too. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
 [studies/](../studies/README.md) diagnostic scripts; people run them and
 required CI does not. The `openphysics` meta distribution has no code, tests or examples; it requires seven packages (`simcase` with its `studio` and `export` extras, `physmat` with `rii`) and provides the `openphysics` command, which opens Studio.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
