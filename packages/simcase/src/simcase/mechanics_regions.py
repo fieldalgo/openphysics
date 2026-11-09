@@ -18,6 +18,7 @@ import time
 
 import numpy as np
 
+from . import views
 from .schema import DocumentError, check_format_units_and_tags
 from .thermal import _number
 from .thermal_regions import MATERIAL_KEYS as SHARED_MATERIAL_KEYS
@@ -224,23 +225,25 @@ def rigid_free_regions(mesh, fixed):
 
 
 def region_mechanics_inputs(doc, mesh, region_materials):
-    """The solve_elasticity (or solve_thermoelasticity) keyword arguments of a meshed region document.
+    """The solve_elasticity (or solve_thermoelasticity) keyword arguments of a meshed region document,
+    from its internal SI view (``simcase.views.region_mechanics``).
 
     E, nu (and alpha) are {region name: value} from ``materials``; Dirichlet DOFs are sorted by
     (node, component); each traction is a global [tx, ty] in Pa and each pressure p the callback
     ``-p * outward normal`` on its boundary edges.
     """
-    name, p = doc.sole_physics()
+    name, _ = doc.sole_physics()
     path = f'physics.{name}'
-    materials = doc['materials']
-    for label, table in (('displacement_m', mesh.boundary), ('traction_pa', mesh.boundary_edges),
-                         ('pressure_pa', mesh.boundary_edges)):
-        for tag in p.get(label, {}):
+    m = views.region_mechanics(doc)
+    for label, table, given in (('displacement_m', mesh.boundary, m.displacement),
+                                ('traction_pa', mesh.boundary_edges, m.traction),
+                                ('pressure_pa', mesh.boundary_edges, m.pressure)):
+        for tag in given:
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
                                     'borders a void feature only, or a selection without mesh edges)')
     fixed, fixed_by = {}, {}
-    for tag, components in p['displacement_m'].items():
+    for tag, components in m.displacement.items():
         for component, value in components.items():
             for node in mesh.boundary[tag]:
                 key = (int(node), COMPONENTS.index(component))
@@ -254,8 +257,8 @@ def region_mechanics_inputs(doc, mesh, region_materials):
         raise DocumentError(f'{path}.displacement_m: constraints leave a rigid-body motion free in the part of the '
                             f'body made of regions {free[0]}; each connected part needs x and y fixed and rotation '
                             'blocked')
-    traction = {tag: [float(v) for v in vector] for tag, vector in p.get('traction_pa', {}).items()}
-    pressure = {tag: float(v) for tag, v in p.get('pressure_pa', {}).items()}
+    traction = {tag: [float(v) for v in vector] for tag, vector in m.traction.items()}
+    pressure = {tag: float(v) for tag, v in m.pressure.items()}
     loaded = sorted(set(traction) | set(pressure))
     edges = {tag: _edge_set(mesh, tag) for tag in loaded}
     for i, a in enumerate(loaded):
@@ -278,15 +281,14 @@ def region_mechanics_inputs(doc, mesh, region_materials):
     loads = dict(traction)
     for tag, value in pressure.items():
         loads[tag] = (lambda points, normals, value=value: -value * normals)
-    inputs = dict(young_modulus={r: float(materials[m]['young_modulus_pa']) for r, m in region_materials.items()},
-                  poisson_ratio={r: float(materials[m]['poisson_ratio']) for r, m in region_materials.items()},
-                  plane=p['plane'], dirichlet=fixed,
-                  body_force=tuple(float(v) for v in p.get('body_force_n_m3', [0., 0.])),
+    inputs = dict(young_modulus={r: float(m.young_modulus[k]) for r, k in region_materials.items()},
+                  poisson_ratio={r: float(m.poisson_ratio[k]) for r, k in region_materials.items()},
+                  plane=m.plane, dirichlet=fixed,
+                  body_force=tuple(float(v) for v in m.body_force),
                   traction=dict(sorted(loads.items())) or None)
-    if p['type'] == THERMOELASTIC:
-        inputs.update(reference_temperature_k=float(p['reference_temperature_k']),
-                      thermal_expansion_per_k={r: float(materials[m]['thermal_expansion_per_k'])
-                                               for r, m in region_materials.items()})
+    if m.thermoelastic:
+        inputs.update(reference_temperature_k=float(m.reference_temperature),
+                      thermal_expansion_per_k={r: float(m.thermal_expansion[k]) for r, k in region_materials.items()})
     return inputs
 
 

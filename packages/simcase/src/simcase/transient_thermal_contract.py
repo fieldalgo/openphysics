@@ -15,7 +15,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from . import units
+from . import units, views
 from .schema import DocumentError
 from .steady_boundary_contract import (
     has_natural_conditions, natural_conditions, rectangle_exterior_edges, validate_natural_edges,
@@ -237,17 +237,18 @@ def transient_solver_inputs(doc, mesh):
             or not np.isfinite(nodes).all() or len(nodes) < 3):
         raise DocumentError("mesh.nodes: expected finite (N,2) SI coordinates")
     nodes = np.asarray(nodes, dtype=float).copy()
-    x0, y0, lx, ly = _domain(doc)
+    # the contract's extent converts max - min (views.LENGTH_FORMULAS)
+    grid, heat = views.rectangle_mesh(doc, "difference"), views.transient_rectangle_heat(doc)
+    (x0, y0), (lx, ly) = grid.origin, grid.lengths
     tolerance = 64*np.finfo(float).eps*np.maximum(np.abs([x0, y0]), [lx, ly])
     if (np.any(nodes < np.array([x0, y0])-tolerance)
             or np.any(nodes > np.array([x0+lx, y0+ly])+tolerance)):
         raise DocumentError("mesh.nodes: coordinates outside the declared SI rectangle")
-    times = np.array(doc["study"]["time_s"], dtype=float, copy=True)
-    spec = p["initial_temperature_k"]
+    times = heat.time
+    spec = heat.initial_temperature
     with np.errstate(over="ignore", invalid="ignore"):
-        initial = (np.full(len(nodes), float(spec)) if not isinstance(spec, dict)
-                   else spec["origin_temperature_k"]
-                   + (nodes-np.array([x0, y0]))@np.array(spec["gradient_k_per_m"], dtype=float))
+        initial = (np.full(len(nodes), spec) if not isinstance(spec, views.AffineTemperature)
+                   else spec.origin_temperature + (nodes-np.array([x0, y0]))@spec.gradient)
     if not np.isfinite(initial).all():
         raise DocumentError("initial_temperature_k: nonfinite field at mesh nodes")
     sampled_nodes = {}
@@ -256,7 +257,7 @@ def transient_solver_inputs(doc, mesh):
         raise DocumentError("mesh.boundary: expected a mapping of exterior sides")
     side_axis_value = {"left": (0, x0), "right": (0, x0+lx),
                        "bottom": (1, y0), "top": (1, y0+ly)}
-    for tag, value in p["dirichlet_temperature_k"].items():
+    for tag, values in heat.dirichlet.items():
         ids = np.asarray(boundary_nodes.get(tag, []))
         if (ids.ndim != 1 or not len(ids) or ids.dtype.kind not in "iu"
                 or np.any(ids < 0) or np.any(ids >= len(nodes))
@@ -268,7 +269,6 @@ def transient_solver_inputs(doc, mesh):
         expected = np.flatnonzero(abs(nodes[:, axis]-location) <= tolerance[axis])
         if not np.array_equal(np.sort(ids), expected):
             raise DocumentError(f"mesh.boundary.{tag}: selection must cover the complete side")
-        values = tuple(_samples(value, times, f"physics.{name}.dirichlet_temperature_k.{tag}"))
         for node in ids:
             node = int(node)
             if node in sampled_nodes and sampled_nodes[node] != values:
@@ -290,16 +290,15 @@ def transient_solver_inputs(doc, mesh):
 
     boundary = {node: (values[0] if all(v == values[0] for v in values) else lookup(values))
                 for node, values in sorted(sampled_nodes.items())}
-    inputs = {"conductivity": float(p["conductivity_w_mk"]),
-              "volumetric_heat_capacity": float(p["volumetric_heat_capacity_j_m3k"]),
+    inputs = {"conductivity": heat.conductivity,
+              "volumetric_heat_capacity": heat.volumetric_heat_capacity,
               "time_s": times, "initial_temperature_k": initial.copy(),
-              "dirichlet": boundary, "heat_source": float(p.get("heat_source_w_m3", 0.))}
-    if has_natural_conditions(p):
-        flux, convection = natural_conditions(p, f"physics.{name}", p["dirichlet_temperature_k"])
+              "dirichlet": boundary, "heat_source": heat.heat_source}
+    if heat.boundary_layout:
         lower, upper = np.array([x0, y0]), np.array([x0+lx, y0+ly])
         exterior = rectangle_exterior_edges(mesh, lower, upper)
-        validate_natural_edges(mesh, *exterior, sampled_nodes, flux, convection)
-        inputs.update(outward_flux=dict(flux), convection=dict(convection))
+        validate_natural_edges(mesh, *exterior, sampled_nodes, heat.outward_flux, heat.convection)
+        inputs.update(outward_flux=dict(heat.outward_flux), convection=dict(heat.convection))
     return inputs
 
 
