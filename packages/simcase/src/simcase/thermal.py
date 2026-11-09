@@ -14,6 +14,7 @@ import time
 
 import numpy as np
 
+from . import views
 from .schema import DocumentError
 from .registry import PhysicsKind, register
 
@@ -556,12 +557,10 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     doc = doc.copy()  # retain an independent validated document snapshot
     doc.validate()
     name, p = doc.sole_physics()
-    dom = doc.domain
-    origin = np.array([doc.scale.to_si(dom[a+'min'], {'length': 1}) for a in 'xy'])
-    lengths = [doc.scale.to_si(dom[a+'max']-dom[a+'min'], {'length': 1}) for a in 'xy']
+    grid = views.rectangle_mesh(doc, 'difference')
     t0 = time.perf_counter()
-    mesh = rectangle_mesh(*lengths, *map(int, doc['mesh']['subdivisions']))
-    mesh.nodes += origin
+    mesh = rectangle_mesh(*grid.lengths, *grid.subdivisions)
+    mesh.nodes += np.array(grid.origin)
     from .steady_boundary_contract import steady_boundary_inputs
     boundary_enabled = 'outward_flux_w_m2' in p or 'convection' in p
     if boundary_enabled:
@@ -569,8 +568,9 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
         prescribed = kwargs['dirichlet']
     else:
         # Preserve legacy side-to-node conversion and numerical call path.
+        heat = views.rectangle_heat(doc)
         prescribed = {}
-        for tag, value in p['dirichlet_temperature_k'].items():
+        for tag, value in heat.dirichlet.items():
             nodes = mesh.boundary.get(tag)
             if nodes is None or not len(nodes):
                 raise DocumentError(f'physics.{name}.dirichlet_temperature_k.{tag}: empty or unknown exterior tag')
@@ -579,8 +579,7 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
                     raise DocumentError(f'physics.{name}: conflicting corner temperature at node {node}')
                 prescribed[int(node)] = value
         prescribed = dict(sorted(prescribed.items()))
-        kwargs = dict(conductivity=p['conductivity_w_mk'], dirichlet=prescribed,
-                      heat_source=p['heat_source_w_m3'])
+        kwargs = dict(conductivity=heat.conductivity, dirichlet=prescribed, heat_source=heat.heat_source)
     fixed = np.array(sorted(prescribed), dtype=int)
     t_mesh = time.perf_counter()-t0
     # Capture the calculation before entering the producer, not after it returns.
@@ -628,7 +627,7 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
             # No K-only scale is presented as the Robin engine's normalized guard.
             'free_residual_max_w_per_m': float(np.max(abs(solution.residual[free]))) if len(free) else 0.}
     else:
-        stiffness = assemble_stiffness(mesh, p['conductivity_w_mk'])
+        stiffness = assemble_stiffness(mesh, heat.conductivity)
         increment = solution.temperature-prescribed[int(fixed[0])]
         scale = max(float(np.max(abs(stiffness)@abs(increment)+abs(solution.load))), np.finfo(float).tiny)
         free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)

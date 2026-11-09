@@ -18,7 +18,7 @@ import time
 
 import numpy as np
 
-from . import units
+from . import views
 from .schema import DocumentError
 from .thermal_regions import (_named_sides, build_region_mesh, covered_shapes, exterior_sides,
                               has_region_geometry, is_axisymmetric, region_geometry, region_materials_table,
@@ -91,8 +91,8 @@ def validate_transient_region_thermal(doc):
     else:
         _number(spec, initial_path)
     dom = doc.domain
-    to_si = lambda v: units.length_to_micrometres(v, doc.scale)*units.UM_IN_SI
-    x0, y0, x1, y1 = (to_si(dom[k]) for k in ('xmin', 'ymin', 'xmax', 'ymax'))
+    # the corners come back from micrometres as the mesh nodes do (views.region_corner_m)
+    x0, y0, x1, y1 = (views.region_corner_m(dom[k], doc.scale) for k in ('xmin', 'ymin', 'xmax', 'ymax'))
     corners = ((x0, y0), (x0, y1), (x1, y0), (x1, y1))
     initial = [_number(_initial_value(spec, x, y, (x0, y0)), initial_path+' at domain corner')
                for x, y in corners]
@@ -140,22 +140,22 @@ def transient_region_summary(doc):
 
 
 def transient_region_inputs(doc, mesh, region_materials):
-    name, p = doc.sole_physics()
+    """solve_transient_heat keyword arguments for a meshed region document (from its internal SI
+    view, ``simcase.views.transient_region_heat``)."""
+    name, _ = doc.sole_physics()
     where = f'physics.{name}'
-    materials = doc['materials']
-    times = np.array(doc['study']['time_s'], dtype=float, copy=True)
+    heat = views.transient_region_heat(doc)
+    times = heat.time
     nodes = np.asarray(mesh.nodes, dtype=float)
-    dom = doc.domain
-    origin = units.length_to_micrometres([dom['xmin'], dom['ymin']], doc.scale)*units.UM_IN_SI
-    spec = p['initial_temperature_k']
+    origin = views.region_origin_m(doc)
+    spec = heat.initial_temperature
     with np.errstate(over='ignore', invalid='ignore'):
-        initial = (np.full(len(nodes), float(spec)) if not isinstance(spec, dict)
-                   else spec['origin_temperature_k']+(nodes-origin)@np.array(spec['gradient_k_per_m'], dtype=float))
+        initial = (np.full(len(nodes), spec) if not isinstance(spec, views.AffineTemperature)
+                   else spec.origin_temperature+(nodes-origin)@spec.gradient)
     if not np.isfinite(initial).all():
         raise DocumentError('initial_temperature_k: nonfinite field at mesh nodes')
     sampled_nodes = {}
-    for tag, value in p['dirichlet_temperature_k'].items():
-        values = tuple(_samples(value, times, f'{where}.dirichlet_temperature_k.{tag}'))
+    for tag, values in heat.dirichlet.items():
         if tag not in mesh.boundary:
             raise DocumentError(f'{where}.dirichlet_temperature_k.{tag}: no mesh edge lies on {tag!r} (a side that '
                                 'borders a void feature only)')
@@ -181,7 +181,7 @@ def transient_region_inputs(doc, mesh, region_materials):
 
     boundary = {node: (values[0] if all(v == values[0] for v in values) else lookup(values))
                 for node, values in sorted(sampled_nodes.items())}
-    source = p['heat_source_w_m3']
+    source = heat.heat_source
     if isinstance(source, dict):
         dropped = set(source)-set(mesh.region_names)
         if dropped:
@@ -190,8 +190,8 @@ def transient_region_inputs(doc, mesh, region_materials):
         source = {r: float(source.get(r, 0.)) for r in mesh.region_names}
     else:
         source = float(source)
-    return {'conductivity': {r: float(materials[m]['conductivity_w_mk']) for r, m in region_materials.items()},
-            'volumetric_heat_capacity': {r: float(materials[m]['volumetric_heat_capacity_j_m3k'])
+    return {'conductivity': {r: float(heat.conductivity[m]) for r, m in region_materials.items()},
+            'volumetric_heat_capacity': {r: float(heat.volumetric_heat_capacity[m])
                                          for r, m in region_materials.items()},
             'time_s': times, 'initial_temperature_k': initial.copy(), 'dirichlet': boundary,
             'heat_source': source}

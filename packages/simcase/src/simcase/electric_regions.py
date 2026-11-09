@@ -20,6 +20,7 @@ import time
 
 import numpy as np
 
+from . import views
 from .schema import DocumentError
 from .steady_boundary_contract import _number, _object
 from .thermal_regions import (SIDES, _named_sides, boundary_names, build_region_mesh, covered_shapes,
@@ -135,21 +136,22 @@ def region_summary(doc):
 
 
 def region_inputs(doc, mesh, region_materials):
-    """solve_steady_electric keyword arguments for a meshed region document, and the boundary
-    name that fixes each Dirichlet node."""
-    name, p = doc.sole_physics()
+    """solve_steady_electric keyword arguments for a meshed region document (from its internal SI
+    view, ``simcase.views.region_electric``), and the boundary name that fixes each Dirichlet node."""
+    name, _ = doc.sole_physics()
     path = f'physics.{name}'
-    materials = doc['materials']
-    conductivity = {r: float(materials[m]['electrical_conductivity_s_m']) for r, m in region_materials.items()}
-    for label, table in (('dirichlet_potential_v', mesh.boundary), ('outward_current_a_m2', mesh.boundary_edges)):
-        for tag in p.get(label, {}):
+    electric = views.region_electric(doc)
+    conductivity = {r: float(electric.conductivity[m]) for r, m in region_materials.items()}
+    for label, table, given in (('dirichlet_potential_v', mesh.boundary, electric.dirichlet),
+                                ('outward_current_a_m2', mesh.boundary_edges, electric.outward_current)):
+        for tag in given:
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
                                     'borders a void feature only, or a selection without mesh edges)')
     def edge_set(edges):
         return {tuple(sorted(map(int, e))) for e in np.asarray(edges).reshape(-1, 2)}
     selected = getattr(mesh, 'selection_edges', None) or {}
-    potentials = p['dirichlet_potential_v']
+    potentials = electric.dirichlet
     held = {tag: edge_set(mesh.boundary_edges[tag] if tag in mesh.boundary_edges else selected.get(tag, []))
             for tag in potentials}
     names = sorted(potentials)
@@ -169,7 +171,7 @@ def region_inputs(doc, mesh, region_materials):
                                     'with different potentials')
             fixed[node] = value
             fixed_by.setdefault(node, tag)
-    current = {tag: float(v) for tag, v in p.get('outward_current_a_m2', {}).items()}
+    current = {tag: float(v) for tag, v in electric.outward_current.items()}
     edges = {tag: edge_set(mesh.boundary_edges[tag]) for tag in current}
     names = sorted(edges)
     for i, a in enumerate(names):

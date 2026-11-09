@@ -12,7 +12,7 @@ import numpy as np
 from .schema import Document, DocumentError
 from .steady_boundary_contract import SIDES, _number, _object, validate_steady_boundary, steady_boundary_inputs
 from .thermal import _OwnedOutput
-from . import units
+from . import units, views
 from .registry import PhysicsKind, register
 from .electric_regions import (FIELD_LAYOUT as REGION_FIELD_LAYOUT, is_region_electric, refuse_region_joule,
                                region_summary, run_region_electric, validate_region_electric)
@@ -250,31 +250,29 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     name, p = doc.sole_physics()
     kind = p['type']
     start = time.perf_counter()
-    bounds = {k: doc.scale.to_si(v, {'length': 1}) for k, v in doc.domain.items()}
-    mesh = rectangle_mesh(bounds['xmax']-bounds['xmin'], bounds['ymax']-bounds['ymin'],
-                          *doc['mesh']['subdivisions'])
-    mesh.nodes += [bounds['xmin'], bounds['ymin']]
+    # the mesh subtracts the converted corners (views.LENGTH_FORMULAS)
+    grid = views.rectangle_mesh(doc, 'corners')
+    mesh = rectangle_mesh(*grid.lengths, *grid.subdivisions)
+    mesh.nodes += grid.origin
     heat_args = steady_boundary_inputs(_thermal_document(doc), mesh)
     heat_args.pop('heat_source')
-    electric_fixed = _fixed(mesh, p['dirichlet_potential_v'])
-    electric_args = dict(dirichlet=electric_fixed, outward_current=p.get('outward_current_a_m2', {}))
+    inputs = views.rectangle_electric(doc)
+    electric_fixed = _fixed(mesh, inputs.dirichlet)
+    electric_args = dict(dirichlet=electric_fixed, outward_current=inputs.outward_current)
     mesh_time = time.perf_counter()-start
     start = time.perf_counter()
     coupled = nonlinear = None
     if kind == 'joule.temperature2d':
-        options = dict(p.get('iteration', {}))
-        if 'temperature_atol_k' in options:
-            options['temperature_atol'] = options.pop('temperature_atol_k')
         nonlinear = solve_temperature_joule_heat(mesh,
-            electrical_conductivity=_model(p['conductivity_model'], 'conductivity_model'),
+            electrical_conductivity=inputs.conductivity_model,
             thermal_conductivity=heat_args['conductivity'], electric_dirichlet=electric_fixed,
-            thermal_dirichlet=heat_args['dirichlet'], initial_temperature=p['initial_temperature_k'],
+            thermal_dirichlet=heat_args['dirichlet'], initial_temperature=inputs.initial_temperature,
             outward_current=electric_args['outward_current'], outward_flux=heat_args['outward_flux'],
-            convection=heat_args['convection'], method='picard', **options)
+            convection=heat_args['convection'], method='picard', **inputs.iteration)
         coupled = nonlinear.coupled
         electric = coupled.electrical
     else:
-        electric = solve_steady_electric(mesh, conductivity=p['conductivity_s_m'], **electric_args)
+        electric = solve_steady_electric(mesh, conductivity=inputs.conductivity, **electric_args)
         if kind == 'joule.steady2d':
             coupled = solve_steady_joule_heat(mesh, electrical_result=electric, **heat_args)
     solve_time = time.perf_counter()-start

@@ -26,7 +26,7 @@ import numpy as np
 from .schema import Document, DocumentError
 from .steady_boundary_contract import SIDES, _number, _object, validate_steady_boundary, steady_boundary_inputs
 from .thermal import _OwnedOutput
-from . import units
+from . import units, views
 from .registry import PhysicsKind, register
 
 ELASTIC = 'mechanics.elasticity2d'
@@ -259,28 +259,30 @@ def solver_inputs(doc, mesh):
     solve. Dirichlet DOFs are sorted by (node, component); the body force is a (2,)
     tuple and each traction a global Cartesian [tx, ty] list in Pa. ``mesh`` must be
     the document's rectangle in metres (``build_rectangle``); the shared heat mesh
-    checks run on it first.
+    checks run on it first. The values come from the document's internal SI view
+    (``simcase.views.rectangle_mechanics``).
     """
-    name, p = doc.sole_physics()
+    doc.sole_physics()      # one physics entry, refused by name before any mesh check
     steady_boundary_inputs(_thermal_document(doc), mesh)
-    traction = {side: [float(v) for v in vector] for side, vector in p.get('traction_pa', {}).items()}
-    inputs = dict(young_modulus=float(p['young_modulus_pa']), poisson_ratio=float(p['poisson_ratio']),
-                  plane=p['plane'], dirichlet=_fixed_dofs(mesh, p['displacement_m']),
-                  body_force=tuple(float(v) for v in p.get('body_force_n_m3', [0., 0.])),
+    m = views.rectangle_mechanics(doc)
+    traction = {side: [float(v) for v in vector] for side, vector in m.traction.items()}
+    inputs = dict(young_modulus=float(m.young_modulus), poisson_ratio=float(m.poisson_ratio),
+                  plane=m.plane, dirichlet=_fixed_dofs(mesh, m.displacement),
+                  body_force=tuple(float(v) for v in m.body_force),
                   traction=traction or None)
-    if p['type'] == THERMOELASTIC:
-        inputs.update(reference_temperature_k=float(p['reference_temperature_k']),
-                      thermal_expansion_per_k=float(p['thermal_expansion_per_k']))
+    if m.thermoelastic:
+        inputs.update(reference_temperature_k=float(m.reference_temperature),
+                      thermal_expansion_per_k=float(m.thermal_expansion))
     return inputs
 
 
 def build_rectangle(doc):
-    """The document's structured rectangle mesh in metres, nodes offset to the domain origin."""
+    """The document's structured rectangle mesh in metres, nodes offset to the domain origin; the
+    side lengths subtract the converted corners (views.LENGTH_FORMULAS)."""
     from galerkin import rectangle_mesh
-    bounds = {k: doc.scale.to_si(v, {'length': 1}) for k, v in doc.domain.items()}
-    mesh = rectangle_mesh(bounds['xmax']-bounds['xmin'], bounds['ymax']-bounds['ymin'],
-                          *doc['mesh']['subdivisions'])
-    mesh.nodes += [bounds['xmin'], bounds['ymin']]
+    grid = views.rectangle_mesh(doc, 'corners')
+    mesh = rectangle_mesh(*grid.lengths, *grid.subdivisions)
+    mesh.nodes += grid.origin
     return mesh
 
 
