@@ -27,8 +27,8 @@ python -m simcase geometry model.json                     # 버전 1 형상 블�
 |---|---|---|---|
 | `em.modes2d` | 수동 흡수를 포함한 2D 도파 모드, 스칼라 또는 전체 벡터. 단일 지점과 모드 추적 파장 sweep | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | 이 페이지, [부분공간 추적](vector_subspace_tracking.md) |
 | `em.cavity3d` | 직육면체 고유모드: 진공 PEC, 또는 손실 직육면체 재료와 도체 벽의 복소 주파수와 Q; SI JSON/NPZ 출력 | `cavity_box`, `cavity_lossy_slab` | [공진기 문서](cavity3d.md) |
-| `electric.steady2d` | 직사각형 정상 전기전도 | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
-| `joule.steady2d` | 상수 물성 정상 Joule heating | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
+| `electric.steady2d` | 정상 전기전도: 균질 직사각형, 또는 형상 블록의 재료 영역 | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
+| `joule.steady2d` | 상수 물성 정상 Joule heating: 균질 직사각형, 또는 재료 영역 | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | 온도 의존 정상 Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | 균질 직사각형의 정적 선형탄성: 평면응력·평면변형률, 변별 변위 성분, 직교좌표계 변 traction, 상수 체적력 | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | 변별 상수 경계 데이터의 정상 열전도 후 같은 메시의 열응력, 전체 변 traction | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
@@ -196,7 +196,7 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
-영역이 있는 열전도 문서와 영역 전기 전도 문서에서는 `run`이 선택적인 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`)도 받고, `check_mesh_limits`는 메시하지 않고 문서가 메시 생성기에 넘기는 루프 꼭짓점 수를 셉니다. 둘 다 `MeshLimitError`를 발생시킵니다. `region_complexity`는 `Document.from_dict` 전에 원시 JSON에서 도형, 원, 다각형 점, 경계 교차를 셉니다. [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을 참고하세요.
+영역이 있는 열전도 문서와 영역 전기 전도·정상 줄 가열 문서에서는 `run`이 선택적인 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`)도 받고, `check_mesh_limits`는 메시하지 않고 문서가 메시 생성기에 넘기는 루프 꼭짓점 수를 셉니다. 둘 다 `MeshLimitError`를 발생시킵니다. `region_complexity`는 `Document.from_dict` 전에 원시 JSON에서 도형, 원, 다각형 점, 경계 교차를 셉니다. [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을 참고하세요.
 
 ## 열전도·공진기 문서
 

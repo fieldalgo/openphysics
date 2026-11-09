@@ -500,7 +500,7 @@ def region_inputs(doc, mesh, region_materials):
     path = f'physics.{name}'
     materials = doc['materials']
     conductivity = {r: float(materials[m]['conductivity_w_mk']) for r, m in region_materials.items()}
-    source = p['heat_source_w_m3']
+    source = p.get('heat_source_w_m3', 0.0)   # a Joule document has none (simcase.joule_regions)
     if isinstance(source, dict):
         dropped = set(source)-set(mesh.region_names)
         if dropped:
