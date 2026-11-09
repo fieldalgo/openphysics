@@ -6,7 +6,7 @@ anyio==4.15.1
 appdirs==1.4.4
 array-api-compat==1.16.0
 build==1.6.1
-certifi==2026.7.22
+certifi==2026.10.18
 cffi==2.1.1
 charset-normalizer==3.5.2
 click==8.5.0
