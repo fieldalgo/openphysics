@@ -140,7 +140,7 @@ def _element_source(heat_source, mesh):
 
 
 def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
-                      outward_flux=None, convection=None, coordinate_system="cartesian"):
+                      outward_flux=None, convection=None, coordinate_system="cartesian", motion=None):
     """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
 
     conductivity is finite scalar k>0 in W/(m K), or {region name: k} with
@@ -158,7 +158,15 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     coordinate_system="axisymmetric" interprets coordinates as (r,z), r>=0,
     and uses the full 2*pi*r volume and surface measure. Nodal heat rates then
     have units W, recorded on the result, instead of the Cartesian W/m.
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes
+    X0 + t*velocity and carries the derivative with respect to the JAX or
+    PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
+    if motion is not None:
+        from .shape import solve_steady_heat_moving
+        return solve_steady_heat_moving(mesh, motion, conductivity=conductivity, dirichlet=dirichlet,
+                                        heat_source=heat_source, outward_flux=outward_flux,
+                                        convection=convection, coordinate_system=coordinate_system)
     if not is_per_region(conductivity):
         k = real_value(conductivity, "conductivity")
         if tuple(k.shape) != () or to_numpy(k) <= 0:
