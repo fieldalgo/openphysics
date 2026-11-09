@@ -25,6 +25,10 @@ R11 registry self-checks: each canonical unit is on its menu; every menu unit ha
     quantity's dimension.
 R12 the existing tests/physmat tests pass unchanged.
 
+The test_p2_* tests check the registry additions and converter API of the step-2 specification
+(R-1..R-32 of its section 6) that belong to physmat; their expected values are written from that
+specification and from the refractiveindex.info records, not read from quantities.json.
+
 The exact factors below are an independent table written from the SI definitions
 (exact 2019 SI e, international inch and pound-force, 101325 Pa atmosphere, 40-digit pi),
 not read from the registry. Float comparisons are exact on purpose: every expected value
@@ -104,8 +108,9 @@ def dim_of(key: str) -> dict:
     return out
 
 
-def parse_unit(text: str) -> list[tuple[str, int]]:
-    """Independent reading of a canonical unit: [(symbol or integer, signed exponent)]."""
+def parse_unit(text: str) -> list[tuple[str, int | Fraction]]:
+    """Independent reading of a canonical unit: [(symbol or integer, signed exponent)]; a
+    half-integer exponent is written in parentheses (``1/m^(3/2)``)."""
     num, slash, den = text.partition("/")
     if den.startswith("("):
         den = den[1:-1]
@@ -115,8 +120,17 @@ def parse_unit(text: str) -> list[tuple[str, int]]:
             continue
         for item in part.split():
             sym, _, exp = item.partition("^")
-            factors.append((sym, sign * int(exp or 1)))
+            power = F(exp[1:-1]) if exp.startswith("(") else int(exp or 1)
+            factors.append((sym, sign * power))
     return factors
+
+
+def exact_power(f: Fraction, exp: int | Fraction) -> Fraction:
+    """f**exp exactly; a half-integer power occurs only on a factor of 1 (output units in m^(1/2))."""
+    if F(exp).denominator == 1:
+        return f ** int(exp)
+    assert f == 1, (f, exp)
+    return F(1)
 
 
 def expected_unit(text: str) -> tuple[Fraction, dict, int]:
@@ -124,10 +138,10 @@ def expected_unit(text: str) -> tuple[Fraction, dict, int]:
     factor, dim, angle = F(1), {}, 0
     for sym, exp in parse_unit(text):
         if sym.isdigit():
-            factor *= F(int(sym)) ** exp
+            factor *= exact_power(F(int(sym)), exp)
             continue
         f, key, a = SYMBOLS[sym]
-        factor *= f ** exp
+        factor *= exact_power(f, exp)
         angle += a * exp
         for k, v in dim_of(key).items():
             dim[k] = dim.get(k, 0) + v * exp
@@ -877,17 +891,20 @@ def test_each_path_gets_exactly_one_error():
 
 def test_diagnostic_codes_are_the_closed_list_with_en_and_ko_text():
     codes = units.DIAGNOSTIC_CODES
-    assert len(codes) == 58
-    assert sum(1 for c in codes.values() if c["severity"] == "error") == 32
-    assert sum(1 for c in codes.values() if c["severity"] == "warning") == 16
-    assert sum(1 for c in codes.values() if c["severity"] == "info") == 10
+    # 58 codes of the design, plus the 8 of the document reader (R-1): E-FORMAT, E-JSON, E-VALUE-FORM,
+    # E-MATERIAL-UNKNOWN, E-CONTRACT, W-SHAPE-DROPPED, W-PIECE-DROPPED, I-MESH-CONTROL-RAISED.
+    assert len(codes) == 66
+    assert sum(1 for c in codes.values() if c["severity"] == "error") == 37
+    assert sum(1 for c in codes.values() if c["severity"] == "warning") == 18
+    assert sum(1 for c in codes.values() if c["severity"] == "info") == 11
     for code, c in codes.items():
         assert code.startswith({"error": "E-", "warning": "W-", "info": "I-"}[c["severity"]])
         assert c["en"] and c["ko"]
     raised = {code for code, c in codes.items() if "physmat.units" in c.get("raised_by", ())}
     assert raised == {"E-KEY-UNKNOWN", "E-KEY-MISSING", "E-UNIT-MISSING", "E-UNIT-UNKNOWN", "E-UNIT-AMBIGUOUS",
                       "E-UNIT-DIMENSION", "E-UNIT-NOT-ACCEPTED", "E-DEGC-NOT-ABSOLUTE", "E-ABSOLUTE-AS-LOAD",
-                      "E-DOMAIN", "W-MAGNITUDE", "W-GAUGE-ATMOSPHERIC", "W-PM-ROUNDING", "I-PM-ROUNDING"}
+                      "E-DOMAIN", "W-MAGNITUDE", "W-GAUGE-ATMOSPHERIC", "W-PM-ROUNDING", "I-PM-ROUNDING",
+                      "E-VALUE-FORM", "E-GAIN"}
 
 
 def test_every_code_the_converter_raises_has_a_trigger():
@@ -906,6 +923,8 @@ def test_every_code_the_converter_raises_has_a_trigger():
         "W-GAUGE-ATMOSPHERIC": lambda: convert("1 bar", "gauge_pressure").diagnostics[0],
         "W-PM-ROUNDING": lambda: length_to_pm("0.0005 nm").diagnostics[0],
         "I-PM-ROUNDING": lambda: length_to_pm("0.30000000000000004 nm").diagnostics[0],
+        "E-VALUE-FORM": lambda: units.convert_complex([4.0, 0.04], "relative_permittivity").error,
+        "E-GAIN": lambda: units.convert_complex({"re": 4.0, "im": -0.04}, "relative_permittivity").error,
     }
     for code, trigger in triggers.items():
         assert trigger().code == code, code
@@ -1166,14 +1185,41 @@ OUTPUT_ONLY = {"node_coordinates": "m", "stored_heat": "J", "stored_heat_per_dep
                   for w in ("applied", "reaction", "residual", "convective", "prescribed") for d in ("", "_per_depth")}}
 
 
+# Phase-2 registry additions (spec section 6, R-7..R-22), written from the spec's table, not read
+# from quantities.json: inputs with their menus, and output-only entries with their canonical unit.
+PHASE2_MENUS = {
+    "constant": BARE, "strength": BARE, "resonance_wavelength": ("nm", "um", "m"),
+    "resonance_wavelength_squared": ("nm^2", "um^2", "m^2"), "effective_index_threshold": BARE,
+    "bend_origin": L_MENU, "search_mode_count": BARE, "mode_tracking_margin_threshold": BARE,
+    "cluster_span_tolerance": BARE, "cluster_gap_threshold": BARE,
+}
+PHASE2_OUTPUT_ONLY = {
+    **{f"{base}{d}": unit + d.replace("_per_depth", "/m")
+       for base, unit in (("heat_rate_imbalance", "W"), ("current_imbalance", "A"), ("electric_power_imbalance", "W"),
+                          ("force_imbalance", "N"), ("reaction_current", "A"), ("prescribed_current", "A"),
+                          ("residual_current", "A"), ("electric_power", "W"), ("applied_force", "N"),
+                          ("applied_body_force", "N"), ("applied_traction_force", "N"),
+                          ("thermal_equivalent_force", "N"), ("residual_force", "N"),
+                          ("stiffness_energy_functional", "J"))
+       for d in ("", "_per_depth")},
+    "relative_electrical_conductivity_change": "1", "triangle_angle": "rad", "returned_mode_count": "1",
+    "relative_residual_threshold": "1", "physical_l2_fraction": "1", "pml_l2_fraction": "1",
+    "engineering_shear_elastic_strain_xy": "1", "engineering_shear_thermal_strain_xy": "1",
+    "mode_field": "1", "electric_field_line_integral": "V", "mode_field_square_integral": "m^2",
+    "field_overlap": "m^2", "unnormalized_electric_field": "1", "unnormalized_electric_field_line_integral": "m",
+    "mass_normalized_electric_field": "1/m^(3/2)", "mass_normalized_electric_field_line_integral": "1/m^(1/2)",
+}
+
+
 def test_r11_every_menu_equals_the_design_table():
-    assert set(DESIGN_MENUS) | set(OUTPUT_ONLY) == set(BASES) and not set(DESIGN_MENUS) & set(OUTPUT_ONLY)
-    for base, menu in DESIGN_MENUS.items():
+    tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY)
+    assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
+    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
         assert units.quantity(base).unit == unit and unit not in DESIGN_MENUS[base], base
-    for base, unit in OUTPUT_ONLY.items():
+    for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY}.items():
         assert units.menu(base) == (unit,) and units.quantity(base).places == ("result",) or base in (
             "conductance_per_depth",), base
 
@@ -1345,3 +1391,444 @@ def test_star_import_keeps_builtins_and_physmat_names():
     namespace = {}
     exec("from physmat.units import *", namespace)
     assert "format" not in namespace and "names" not in namespace and "q" in namespace
+
+
+# ---- phase-2 registry additions and converter API (units and naming, step 2; spec section 6) ----------------------
+# Expected values below are written from the spec's R-items, not read from quantities.json.
+
+def test_p2_r1_reader_diagnostic_codes():
+    want = {"E-FORMAT": "error", "E-JSON": "error", "E-VALUE-FORM": "error", "E-MATERIAL-UNKNOWN": "error",
+            "E-CONTRACT": "error", "W-SHAPE-DROPPED": "warning", "W-PIECE-DROPPED": "warning",
+            "I-MESH-CONTROL-RAISED": "info"}
+    for code, severity in want.items():
+        c = units.DIAGNOSTIC_CODES[code]
+        assert c["severity"] == severity and c["en"] and c["ko"], code
+        assert units.Diagnostic(code, "a.b", "text").as_dict()["severity"] == severity
+
+
+def _names(text: str) -> list[str]:
+    return text.split()
+
+
+P2_NAMES = {  # name: (canonical unit, places) for every name R-2..R-22 makes legal
+    **{n: ("K", ("document", "material", "api", "result")) for n in _names("prescribed_temperature")},
+    "prescribed_electric_potential": ("V", ("document", "api", "result")),
+    "prescribed_displacement": ("m", ("document", "api", "result")),
+    "evaluation_temperature": ("K", ("api", "result")),
+    **{f"{w}_{b}{d}": ("W/m" if d else "W", ("result",))
+       for w, b in (("outward", "prescribed_heat_rate"), ("outward", "convective_heat_rate"),
+                    ("outward", "reaction_heat_rate"), ("ambient", "convective_heat_rate"),
+                    ("maximum", "residual_heat_rate"), ("inward", "electric_power"))
+       for d in ("", "_per_depth")},
+    **{f"{b}{d}": (u + ("/m" if d else ""), ("result",))
+       for b, u in (("heat_rate_imbalance", "W"), ("current_imbalance", "A"), ("electric_power_imbalance", "W"),
+                    ("force_imbalance", "N"), ("reaction_current", "A"), ("outward_prescribed_current", "A"),
+                    ("residual_current", "A"), ("maximum_residual_current", "A"), ("applied_force", "N"),
+                    ("applied_body_force", "N"), ("applied_traction_force", "N"), ("thermal_equivalent_force", "N"),
+                    ("residual_force", "N"), ("maximum_residual_force", "N"), ("stiffness_energy_functional", "J"))
+       for d in ("", "_per_depth")},
+    "relative_electrical_conductivity_change": ("1", ("result",)),
+    **{n: ("1", ("material",)) for n in _names("strength constant")},
+    "resonance_wavelength": ("m", ("material",)), "resonance_wavelength_squared": ("m^2", ("material",)),
+    "effective_index_threshold": ("1", ("document", "api", "result")),
+    "bend_origin": ("m", ("document", "api")),
+    "minimum_triangle_angle": ("rad", ("result",)),
+    "search_mode_count": ("1", ("document", "api", "result")), "returned_mode_count": ("1", ("result",)),
+    **{n: ("1", ("document", "api", "result"))
+       for n in _names("mode_tracking_margin_threshold cluster_span_tolerance cluster_gap_threshold")},
+    **{n: ("1", ("result",)) for n in _names("relative_residual_threshold physical_l2_fraction pml_l2_fraction "
+                                             "mean_effective_index mean_group_index "
+                                             "engineering_shear_elastic_strain_xy "
+                                             "engineering_shear_thermal_strain_xy")},
+    "maximum_displacement": ("m", ("document", "api", "result")),
+    "unnormalized_mode_field": ("1", ("result",)), "unnormalized_electric_field": ("1", ("result",)),
+    "unnormalized_electric_field_z": ("1", ("result",)),
+    "unnormalized_electric_field_line_integral": ("m", ("result",)), "unnormalized_mode_power": ("W", ("result",)),
+    "unnormalized_mode_field_square_integral": ("m^2", ("result",)), "unnormalized_field_overlap": ("m^2", ("result",)),
+    "mass_normalized_electric_field": ("1/m^(3/2)", ("result",)),
+    "mass_normalized_electric_field_line_integral": ("1/m^(1/2)", ("result",)),
+}
+
+
+def test_p2_names_are_legal_with_their_unit_and_places():
+    names = set(units.names())
+    for name, (unit, places) in P2_NAMES.items():
+        assert name in names, name
+        qo = units.quantity(name)
+        assert (qo.unit, qo.places) == (unit, places), (name, qo.unit, qo.places)
+    for name in ("unnormalized_electric_field_x", "evaluation_heat_rate", "prescribed_current_per_depth_x",
+                 "maximum_maximum_displacement", "outward_ambient_convective_heat_rate", "node_count", "element_count",
+                 "joule_heat_rate_per_depth", "minimum_principal_squared", "near_element_size"):
+        assert name not in names, name                      # spec section 6, "not added"
+    assert len(units._ENTRIES) == 242 and len(names) == 367
+
+
+def test_p2_r2_r5_temperatures_and_potentials():
+    for name in ("prescribed_temperature", "evaluation_temperature"):
+        qo = units.quantity(name)
+        assert qo.kind == "absolute" and q("25 degC", name) == 298.15
+        assert convert("0 K", name).error.code == "E-DOMAIN"
+    assert q("1 mV", "prescribed_electric_potential") == 1e-3
+    assert q("0 mm", "prescribed_displacement_x") == 0.0
+    reg = registry()
+    assert reg["output_only_words"] == ["evaluation", "unnormalized", "mass_normalized"]
+    assert set(reg["output_only_words"]) <= set(reg["qualifier_words"]["role"])
+
+
+def test_p2_r11_sellmeier_parameters():
+    for name in ("constant", "strength", "resonance_wavelength", "resonance_wavelength_squared"):
+        qo = units.quantity(name)
+        assert dict(qo.scope) == {"quantity": "refractive_index", "model": "sellmeier"} and qo.places == ("material",)
+    assert units.menu("resonance_wavelength") == ("nm", "um", "m")
+    assert units.menu("resonance_wavelength_squared") == ("nm^2", "um^2", "m^2")
+    assert convert(-0.1, "strength").error.code == "E-DOMAIN" and q(0, "strength") == 0.0
+    assert [d.code for d in convert(0.5, "constant").diagnostics] == ["W-MAGNITUDE"]
+    assert ">= 1" in convert(0.5, "constant").diagnostics[0].message
+    assert convert(1, "constant").diagnostics == () and convert(2.1, "constant").diagnostics == ()
+    # C in um^2 and lambda in um give the same exact SI values as the micrometre coefficients physmat uses.
+    c = convert("0.0684043 um^2", "resonance_wavelength_squared")
+    assert c.exact == F("0.0684043") / 10 ** 12 and bits(c.value) == bits(float(F("0.0684043e-12")))
+    assert q("68.4043 nm", "resonance_wavelength") == float(F("68.4043e-9"))
+    err = convert("0.0684043 um2", "resonance_wavelength_squared").error
+    assert err.code == "E-UNIT-NOT-ACCEPTED" and err.fix.value == "0.0684043 um^2"
+    # Model parameters are never named in a dimension hint.
+    for text, name in (("1550 nm", "frequency"), ("5 mm", "temperature"), ("1 um^2", "length")):
+        msg = convert(text, name).error.message
+        assert "resonance_wavelength" not in msg and "strength" not in msg, msg
+
+
+def test_p2_r12_to_r17_inputs_and_domains():
+    assert convert(0, "effective_index_threshold").error.code == "E-DOMAIN" and q(1.45, "effective_index_threshold")
+    assert q("-5 um", "bend_origin") == -5e-6 and q("0 mm", "bend_origin") == 0.0
+    assert units.menu("bend_origin") == L_MENU
+    assert units.quantity("minimum_triangle_angle").unit == "rad"
+    assert convert(0, "mode_tracking_margin_threshold").error.code == "E-DOMAIN"
+    assert q(1, "mode_tracking_margin_threshold") == 1.0 and convert(1.5, "mode_tracking_margin_threshold").error
+    for name in ("cluster_span_tolerance", "cluster_gap_threshold", "relative_residual_threshold"):
+        assert convert(0, name).error.code == "E-DOMAIN" and q(1e-8, name) == 1e-8
+    assert q(6, "search_mode_count") == 6.0 and convert(0, "search_mode_count").error.code == "E-DOMAIN"
+    assert convert(2.0, "returned_mode_count").error.fix.value == 2
+    assert convert("0 Hz", "target_frequency").error.code == "E-DOMAIN" and q("250 MHz", "target_frequency") == 2.5e8
+    assert units.quantity("subdivision_count").rank == ("vector",)
+
+
+def test_p2_r20_r21_statistic_definitions_and_ranks():
+    d = units.quantity("maximum_displacement")
+    assert "Euclidean norm" in d.definition["en"] and d.definition["ko"] and d.rank == ("scalar",)
+    s = units.quantity("maximum_stress")
+    assert "largest absolute in-plane cartesian" in s.definition["en"].lower() and s.rank == ("scalar",)
+    assert units.quantity("maximum_residual_force_per_depth").rank == ("scalar",)
+    assert units.quantity("displacement").rank == ("vector",) and units.quantity("displacement").definition is None
+    assert units.quantity("maximum_temperature").definition is None
+
+
+def test_p2_r22_half_power_output_units_are_exact():
+    for unit, exponent in (("1/m^(1/2)", -0.5), ("1/m^(3/2)", -1.5)):
+        rec = tables()["units"][unit]
+        assert rec["dimension"] == {"L": exponent} and rec["factor"] == "1" and rec["angle"] == 0
+    name = "mass_normalized_electric_field_line_integral"
+    for text in ("2.5 1/m^(1/2)", "2.5 m^(-1/2)"):
+        c = convert(text, name)
+        assert c.ok and c.exact == F(5, 2) and c.text == "2.5 1/m^(1/2)", text
+    assert convert("2.5 1/m(1/2)", name).error.code == "E-UNIT-UNKNOWN"     # no "written without ^" entry
+    assert units.format(0.1, "mass_normalized_electric_field", "1/m^(3/2)") == "0.1 1/m^(3/2)"
+    inputs = {u for e in registry()["quantities"].values() if {"document", "material"} & set(e["places"])
+              for u in e["menu"]}
+    assert not {"1/m^(1/2)", "1/m^(3/2)"} & inputs                       # on no input menu
+    assert units.quantity("mode_power").base == "mode_power" == units.quantity("unnormalized_mode_power").base
+
+
+def test_p2_r24_display_group_length():
+    groups = units.display_groups()
+    g = groups["length"]
+    assert tuple(g["menu"]) == units.LENGTH_UNITS and g["shape_numbers"] is True
+    want = sorted(n for n in units.names() if dict(units.quantity(n).dimension) == {"L": 1})
+    assert list(g["quantities"]) == want
+    assert {"length", "depth", "element_size", "vacuum_wavelength", "displacement", "node_coordinates",
+            "bend_origin", "pml_thickness", "position"} <= set(want) and "area" not in want
+    with pytest.raises(TypeError):
+        groups["length"]["menu"] = ("m",)
+
+
+def test_p2_r25_number_and_unit_text():
+    cases = [("30 deg", "minimum_angle", "30", "deg"), ("28.5 °", "minimum_angle", "28.5", "deg"),
+             ("148 W·m⁻¹·K⁻¹", "thermal_conductivity", "148", "W m^-1 K^-1"),
+             ("25°C", "temperature", "25", "degC"), ("1 µm", "length", "1", "um")]
+    for text, name, number, unit in cases:
+        c = convert(text, name)
+        assert c.ok and (c.number_text, c.unit_text) == (number, unit), (text, c)
+    for value, number in ((0.3, "0.3"), (Decimal("0.30"), "0.30"), (2, "2")):
+        c = convert(value, "poisson_ratio" if value != 2 else "mode_count")
+        assert (c.number_text, c.unit_text) == (number, None)
+    assert (convert("1e400 Pa", "traction").number_text, convert("1e400 Pa", "traction").unit_text) == ("1e400", "Pa")
+    assert convert("5 furlong", "length").number_text is None                  # refused before the number is read
+    # H3: the authored degree number goes to the mesher, not degrees(radians): 30 and 28.5 do not round-trip.
+    for text in ("30 deg", "28.5 deg"):
+        c = convert(text, "minimum_angle")
+        assert float(F(c.number_text)) == float(text.split()[0]) and math.degrees(c.value) != float(c.number_text)
+
+
+def test_p2_r25_convert_array_reports_every_entry():
+    a = units.convert_array({"unit": "nm", "values": [1500, -1, "x", True, [1550, 10 ** 5000]]}, "vacuum_wavelength",
+                            path="study.values")
+    assert a.values == [1.5e-06, None, None, None, [1.55e-06, None]] and a.unit == "m" and a.unit_text == "nm"
+    assert [(d.code, d.path) for d in a.diagnostics] == [
+        ("E-DOMAIN", "study.values.values[1]"), ("E-VALUE-FORM", "study.values.values[2]"),
+        ("E-VALUE-FORM", "study.values.values[3]"), ("E-DOMAIN", "study.values.values[4][1]")]
+    assert len(a.entries) == 6 and a.error.code == "E-DOMAIN" and not a.ok
+    w = units.convert_array({"unit": "Pa", "values": [210000, 2e11]}, "youngs_modulus")
+    assert w.ok and w.values == [210000.0, 2e11] and [d.code for d in w.diagnostics] == ["W-MAGNITUDE"]
+    assert units.convert_array({"unit": "µm", "values": [1]}, "length").unit_text == "um"
+    assert units.convert_array({"unit": "µm", "values": [1]}, "length").entries[0].unit_text == "um"
+    for values, code, path in (({"unit": "Mm", "values": [1]}, "E-UNIT-NOT-ACCEPTED", "unit"),
+                               ({"unit": "nm"}, "E-KEY-MISSING", "values"),
+                               ({"unit": "nm", "values": [1], "x": 1}, "E-KEY-UNKNOWN", "x"),
+                               ({"unit": 5, "values": [1]}, "E-VALUE-FORM", "unit"),
+                               ({"unit": "nm", "values": 5}, "E-VALUE-FORM", "values"),
+                               (["1 m"] * 4, "E-VALUE-FORM", ""), (5, "E-VALUE-FORM", ""),
+                               ([True], "E-VALUE-FORM", "[0]"), ({"values": ["1"]}, "E-VALUE-FORM", "values[0]")):
+        a = units.convert_array(values, "position")
+        assert a.error.code == code and a.error.path == path, (values, a.diagnostics)
+    with pytest.raises(UnitError):
+        units.convert_array([1], "no_such_quantity")
+
+
+def test_p2_r25_q_array_keeps_its_contract():
+    # q_array is convert_array that raises: TypeError for a value form, UnitError for the first error.
+    for values, name in (({"unit": "nm", "values": [1500, 1550]}, "vacuum_wavelength"),
+                         (["0 MPa", "-5 MPa"], "traction"), ({"values": [3.48, 3.47]}, "refractive_index"),
+                         ({"unit": "GPa", "values": [[200, 80]]}, "elasticity_tensor")):
+        assert q_array(values, name) == units.convert_array(values, name).values
+    with pytest.raises(TypeError, match="bare numbers"):
+        q_array({"unit": "nm", "values": [10 ** 5000, "1"]}, "length")      # a form error wins, as before
+    with pytest.raises(TypeError, match="not bool"):
+        q_array([True], "position")
+    with pytest.raises(UnitError) as info:
+        q_array({"unit": "nm", "values": [-1, 10 ** 5000]}, "vacuum_wavelength")
+    assert info.value.diagnostic.path == "values[0]"
+
+
+def test_p2_r25_is_quantity_text():
+    for text, want in (("0.5 um", True), ("10 mPa", True), ("25 degC", True), ("40%", True), ("220 ㎚", True),
+                       ("5 W/mK", True), ("1 MW/m^3", True), ("w/2", False), ("220 nm + gap", False), ("0.5", False),
+                       ("0.5um", False), ("2 furlong", False), ("", False), (0.5, False), (None, False)):
+        assert units.is_quantity_text(text) is want, text
+
+
+P2_COMPOUNDS = [  # (text, quantity, reading, SI value as written)
+    ("5 MW/m^3", "heat_source_density", "megawatt per cubic metre", 5e6),
+    ("10 mW/(m^2 K)", "heat_transfer_coefficient", "milliwatt per square metre kelvin", 0.01),
+    ("2 V/cm", "electric_field", "volt per centimetre", 200.0),
+    ("3 kW/m^3", "heat_source_density", "kilowatt per cubic metre", 3000.0),
+    ("1 MV/m", "electric_field", "megavolt per metre", 1e6),
+    ("1 mS/cm", "electrical_conductivity", "millisiemens per centimetre", 0.1),
+    ("2 kA/m^2", "current_density", "kiloampere per square metre", 2000.0),
+    ("1 W/(mm K)", "thermal_conductivity", "watt per millimetre kelvin", 1000.0),
+    ("4 g/m^3", "mass_density", "gram per cubic metre", 0.004),
+    ("3 km^2", "area", "square kilometre", 3e6),
+    ("5 1/mm", "vacuum_wavenumber", "per millimetre", 5000.0),
+]
+
+
+@pytest.mark.parametrize("text, name, reading, si", P2_COMPOUNDS)
+def test_p2_r25_compound_refusals_name_their_reading(text, name, reading, si):
+    err = convert(text, name).error
+    assert err.code == "E-UNIT-NOT-ACCEPTED" and reading in err.message, err
+    assert f"As written it is {units._num(si)}" in err.message, err.message
+    for s in err.suggestions:                                    # re-expressions keep the value
+        assert s.si_after == si or s.si_before == si, s
+
+
+def _render(factors: list) -> str:
+    num = [(s, e) for s, e in factors if e > 0]
+    den = [(s, -e) for s, e in factors if e < 0]
+
+    def one(s, e):
+        return s if e == 1 else f"{s}^{e}"
+    head = " ".join(one(*f) for f in num) or "1"
+    if not den:
+        return head
+    return f"{head}/{one(*den[0])}" if len(den) == 1 else f"{head}/({' '.join(one(*f) for f in den)})"
+
+
+def test_p2_r25_every_re_prefixed_input_compound_is_read():
+    """One factor of an input-menu compound in another common prefix is accepted or refused by name, never
+    E-UNIT-UNKNOWN (kelvin and degC factors excepted; "c" only on the metre)."""
+    reg = registry()
+    prefixable, prefixes = set(reg["prefixable"]), sorted(reg["prefixes"], key=len, reverse=True)
+
+    def split(sym):
+        for p in prefixes:
+            if sym.startswith(p) and sym[len(p):] in prefixable:
+                return p, sym[len(p):]
+        return "", sym
+    checked = 0
+    for name, e in reg["quantities"].items():
+        if not {"document", "material"} & set(e["places"]):
+            continue
+        for unit in e["menu"]:
+            factors = parse_unit(unit)
+            if not factors or any(s.isdigit() for s, _ in factors) or (len(factors) == 1 and factors[0][1] == 1):
+                continue                                    # a bare symbol: its prefixes are refused as symbols
+            for i, (sym, exp) in enumerate(factors):
+                base = split(sym)[1]
+                if base in ("K", "degC"):
+                    continue
+                for p in ("", "p", "n", "u", "m", "k", "M", "G") + (("c",) if base == "m" else ()):
+                    other = p + base
+                    if other == sym or split(other) != (p, base) or (other not in SYMBOLS and base not in prefixable):
+                        continue
+                    text = _render([(other, x) if j == i else (s, x) for j, (s, x) in enumerate(factors)])
+                    got = convert(f"1 {text}", name)
+                    assert got.ok or got.error.code == "E-UNIT-NOT-ACCEPTED", (name, text, got.error)
+                    checked += 1
+    assert checked > 1000
+
+
+def test_p2_r26_sign_sentences():
+    listed = _names("inward_heat_flux inward_current_density outward_heat_rate outward_heat_rate_per_depth "
+                    "outward_current outward_current_per_depth heat_flux gauge_pressure traction refractive_index "
+                    "relative_permittivity effective_index resonant_frequency propagation_loss bend_loss")
+    listed += [f"{b}{d}" for b in ("reaction_heat_rate", "reaction_current", "reaction_force",
+                                   "outward_prescribed_heat_rate", "outward_convective_heat_rate",
+                                   "ambient_convective_heat_rate", "generated_heat_rate", "applied_heat_rate",
+                                   "applied_force", "inward_electric_power") for d in ("", "_per_depth")]
+    for name in listed:
+        sign = units.quantity(name).sign
+        assert sign is not None and sign["en"] and sign["ko"], name
+    # Every name with a direction word carries its sentence, which says which way is positive.
+    for name in units.names():
+        word = name.split("_", 1)[0]
+        if word in ("inward", "outward"):
+            sign = units.quantity(name).sign
+            assert sign is not None, name
+            assert ("enters the body" if word == "inward" else "leaves the body") in sign["en"], name
+    assert "k >= 0 is loss" in units.quantity("refractive_index").sign["en"]
+    assert "Im >= 0 is loss" in units.quantity("relative_permittivity").sign["en"]
+    assert "Im >= 0 is loss" in units.quantity("effective_index").sign["en"]
+    assert "Im < 0 decays" in units.quantity("resonant_frequency").sign["en"]
+    assert "pushes into the body" in units.quantity("gauge_pressure").sign["en"]
+    assert "enters the body" in units.quantity("ambient_convective_heat_rate").sign["en"]    # Q7 (b)
+    assert units.quantity("temperature").sign is None
+
+
+def test_p2_r27_r28_descriptions_and_normal_components():
+    assert "Re eps_r |E|^2" in units.quantity("confinement_factor").description["en"]
+    for name in ("inward_heat_flux", "outward_heat_flux", "inward_current_density"):
+        assert units.quantity(name).rank == ("scalar",), name
+    assert units.quantity("heat_flux").rank == ("vector",) and units.quantity("current_density").rank == ("vector",)
+
+
+def test_p2_r31_echoed_inputs_are_results():
+    for name in _names("heat_transfer_coefficient heat_source_density stress_free_temperature body_force_density "
+                       "traction gauge_pressure prescribed_displacement vacuum_wavelength target_frequency mode_count "
+                       "pml_thickness pml_strength pml_order pml_minimum_physical_fraction mode_tracking_threshold "
+                       "mode_tracking_margin_threshold degeneracy_tolerance cluster_span_tolerance "
+                       "cluster_gap_threshold search_mode_count effective_index_threshold beam_waist_radius position "
+                       "thermal_conductivity volumetric_heat_capacity electrical_conductivity youngs_modulus "
+                       "poisson_ratio linear_expansion_coefficient relative_permittivity relative_permeability"):
+        assert "result" in units.quantity(name).places, name
+
+
+def test_p2_r32_did_you_mean_hints():
+    for key, names in (("n_eff", ("effective_index", "target_effective_index")), ("neff", ("effective_index",)),
+                       ("alpha", ("linear_expansion_coefficient",)), ("E", ("youngs_modulus",)),
+                       ("k0", ("vacuum_angular_wavenumber",)), ("lambda0", ("vacuum_wavelength",)),
+                       ("wl", ("vacuum_wavelength",)), ("eps_r", ("relative_permittivity",)),
+                       ("sigma", ("electrical_conductivity",))):
+        msg = _raised(lambda: units.quantity(key)).message
+        assert all(n in msg for n in names), (key, msg)
+
+
+def test_p2_r30_convert_complex_forms():
+    cc = units.convert_complex
+    c = cc({"re": 4.0, "im": 0.04}, "relative_permittivity", path="materials.slab.relative_permittivity")
+    assert c.ok and c.value == complex(4.0, 0.04) and c.exact == (F(4), F("0.04")) and c.form == "re_im"
+    c = cc({"n": Decimal("3.48"), "k": Decimal("0.01")}, "refractive_index")
+    assert c.ok and c.value == complex(3.48, 0.01) and c.form == "n_k"
+    for value, name, want in ((1.45, "refractive_index", complex(1.45, 0)), (4, "relative_permittivity", 4 + 0j),
+                              (Decimal("1"), "relative_permeability", 1 + 0j), ({"re": -20.0, "im": 1.2},
+                                                                                 "relative_permittivity", -20 + 1.2j)):
+        c = cc(value, name)
+        assert c.ok and c.value == want and type(c.value) is complex, (value, c)
+    assert cc(1.45, "refractive_index").form == "real" and cc(1.45, "refractive_index").exact == (F("1.45"), F(0))
+    # A dimensional complex quantity takes a quantity string; a real quantity takes the real forms only.
+    assert cc("50 Ohm", "characteristic_impedance").value == 50 + 0j
+    assert cc(0.3, "poisson_ratio").value == 0.3 + 0j
+
+
+def test_p2_r30_gain_and_refusals():
+    cc = units.convert_complex
+    err = cc({"re": 4.0, "im": -0.04}, "relative_permittivity", path="m.eps").error
+    assert err.code == "E-GAIN" and err.path == "m.eps.im" and "exp(+j omega t)" in err.message and err.fix is None
+    assert err.suggestions[0].value == 0.04 and err.suggestions[0].si_after == 0.04
+    err = cc({"n": 3.48, "k": -0.002}, "refractive_index", path="m.n").error
+    assert err.code == "E-GAIN" and err.path == "m.n.k" and "k = -0.002" in err.message
+    assert cc({"re": 1.0, "im": -0.5}, "relative_permeability").error.code == "E-GAIN"
+    ok = cc({"re": 4.0, "im": -0.04}, "relative_permittivity", allow_gain=True)
+    assert ok.ok and ok.value == complex(4.0, -0.04)
+    assert cc({"re": 4.0, "im": -0.0}, "relative_permittivity").ok          # -0 is zero, not gain
+    for value, name, code, path in (
+            ([4.0, -0.04], "relative_permittivity", "E-VALUE-FORM", ""),
+            ((3.48, 0.01), "refractive_index", "E-VALUE-FORM", ""),
+            ({"re": 3.48, "im": 0.01}, "refractive_index", "E-VALUE-FORM", ""),
+            ({"n": 2.0, "k": 0.0}, "relative_permittivity", "E-VALUE-FORM", ""),
+            ({"re": 50, "im": 1}, "characteristic_impedance", "E-VALUE-FORM", ""),
+            ({"re": 1, "im": 0}, "poisson_ratio", "E-VALUE-FORM", ""),
+            (True, "relative_permittivity", "E-VALUE-FORM", ""), (None, "refractive_index", "E-VALUE-FORM", ""),
+            ({"re": 4.0}, "relative_permittivity", "E-KEY-MISSING", "im"),
+            ({"n": 3.48}, "refractive_index", "E-KEY-MISSING", "k"),
+            ({"re": 4.0, "im": 0.0, "allow_gain": True}, "relative_permittivity", "E-KEY-UNKNOWN", "allow_gain"),
+            ({"n": 0, "k": 0}, "refractive_index", "E-DOMAIN", "n"),
+            ({"re": "4", "im": 0}, "relative_permittivity", "E-UNIT-UNKNOWN", "re"),
+            ({"re": 4, "im": "0.04"}, "relative_permittivity", "E-UNIT-UNKNOWN", "im"),
+            ({"re": 4, "im": [0.04]}, "relative_permittivity", "E-VALUE-FORM", "im"),
+            ({"re": 4, "im": 1e400}, "relative_permittivity", "E-DOMAIN", "im"),
+            ("4 1", "relative_permittivity", "E-UNIT-NOT-ACCEPTED", "")):
+        err = cc(value, name).error
+        assert err is not None and (err.code, err.path) == (code, path), (value, name, err)
+    assert cc({"re": 4, "im": "0.04"}, "relative_permittivity").error.fix.value == 0.04
+    assert [d.code for d in cc({"n": 200, "k": 0}, "refractive_index").diagnostics] == ["W-MAGNITUDE"]
+    with pytest.raises(UnitError):
+        cc(1.0, "no_such_quantity")
+
+
+# Library datum (R-29): the temperature each refractiveindex.info record states (pinned revision of
+# tools/rii-revision.txt, read 2026-11-09), or "assumed" where it says "room temperature" or nothing.
+LIBRARY_DATUM = {"standard_air": 288.15, "SiO2": 293.15, "Si": 299.15, "Si_visible": 300.0, "GaAs": 295.15,
+                 "Ge": 295.0, "Al2O3": 293.15, "MgF2": 292.15, "CaF2": 297.15, "LiNbO3": 294.15, "H2O": 298.15,
+                 "Si3N4": None, "InP": None, "TiO2": None, "Au": None, "Ag": None, "Cu": None, "Al": None}
+
+
+def test_p2_r29_library_datum():
+    pytest.importorskip("numpy")
+    import physmat
+    assert set(physmat.names()) == set(LIBRARY_DATUM) | {"vacuum"}
+    for name, datum in LIBRARY_DATUM.items():
+        m = physmat.get(name)
+        assert m.datum_temperature == datum and m.datum_assumed is (datum is None), name
+    vacuum = physmat.get("vacuum")                                   # exact at every temperature: nothing assumed
+    assert vacuum.datum_temperature is None and vacuum.datum_assumed is False
+    assert physmat.standard_air(temperature_c=25).datum_temperature == 298.15
+    assert physmat.standard_air().datum_temperature == 288.15
+    assert physmat.constant(1.5).datum_temperature is None and not physmat.constant(1.5).datum_assumed
+
+
+def test_p2_generator_refuses_broken_name_fields():
+    from physmat import _unit_tables
+
+    def broken(edit):
+        src = registry()
+        edit(src)
+        with pytest.raises(ValueError):
+            _unit_tables.build(src)
+    broken(lambda s: s["quantities"]["heat_flux"]["sign"].update({"outward_heat_rate": {"en": "x", "ko": "x"}}))
+    broken(lambda s: s["quantities"]["heat_flux"]["sign"].update({"inward_heat_flux": {"en": "x"}}))
+    broken(lambda s: s["quantities"]["stress"]["statistic_definitions"].update({"stress_xx": {"en": "x", "ko": "x"}}))
+    broken(lambda s: s["quantities"]["heat_flux"]["name_rank"].update({"inward_heat_flux": ["field"]}))
+    broken(lambda s: s["quantities"]["constant"].update({"hint": True}))
+    broken(lambda s: s["quantities"]["constant"].update({"scope": {"quantity": "no_such", "model": "sellmeier"}}))
+    broken(lambda s: s["quantities"]["unnormalized_electric_field"].update({"places": ["document", "result"]}))
+    broken(lambda s: s["quantities"]["mode_field_square_integral"].update({"unit": "mm^(1/2)", "menu": ["mm^(1/2)"]}))
+    broken(lambda s: s["display_groups"]["length"].update({"menu": ["m", "s"]}))
+    broken(lambda s: s["output_only_words"].append("sideways"))

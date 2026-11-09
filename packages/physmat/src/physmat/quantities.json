@@ -6,10 +6,11 @@
  "length_units": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil"],
  "qualifier_words": {
   "direction": ["inward", "outward"],
-  "role": ["ambient", "reference", "initial", "stress_free", "prescribed", "target", "generated", "transferred"],
+  "role": ["ambient", "reference", "initial", "stress_free", "prescribed", "target", "generated", "transferred", "evaluation", "unnormalized", "mass_normalized"],
   "statistic": ["maximum", "minimum", "mean"],
   "component": ["x", "y", "z", "r", "xx", "yy", "zz", "xy", "yz", "xz", "rr", "rz", "hoop"]
  },
+ "output_only_words": ["evaluation", "unnormalized", "mass_normalized"],
  "symbols": {
   "pm": {"name": "picometre", "dimension": {"L": 1}, "factor": "1/1000000000000"},
   "nm": {"name": "nanometre", "dimension": {"L": 1}, "factor": "1/1000000000"},
@@ -199,7 +200,7 @@
   "E-UNIT-NOT-ACCEPTED": {"severity": "error", "en": "The unit is not on the quantity's menu.", "ko": "물리량이 받는 단위 목록에 없는 단위.", "raised_by": ["physmat.units"]},
   "E-DEGC-NOT-ABSOLUTE": {"severity": "error", "en": "degC used for a temperature difference or inside a compound unit.", "ko": "degC를 온도차나 복합 단위 안에 씀.", "raised_by": ["physmat.units"]},
   "E-DOMAIN": {"severity": "error", "en": "The value is outside the quantity's hard domain or the range of a double.", "ko": "값이 물리량의 허용 범위나 double 범위를 벗어남.", "raised_by": ["physmat.units"]},
-  "E-GAIN": {"severity": "error", "en": "A passive material value means gain under exp(-i omega t).", "ko": "수동 재료 값이 exp(-i omega t)에서 이득을 뜻함."},
+  "E-GAIN": {"severity": "error", "en": "A passive material value means gain under exp(-i omega t).", "ko": "수동 재료 값이 exp(-i omega t)에서 이득을 뜻함.", "raised_by": ["physmat.units"]},
   "E-SPECTRAL": {"severity": "error", "en": "Not exactly one spectral key.", "ko": "스펙트럼 키가 정확히 하나가 아님."},
   "E-BASIS": {"severity": "error", "en": "A total or per-depth value does not match the component's basis.", "ko": "합 또는 깊이당 값이 구성 요소의 기준과 맞지 않음."},
   "E-CONTAINMENT": {"severity": "error", "en": "A feature lies outside its domain.", "ko": "형상 요소가 영역 밖에 있음."},
@@ -220,6 +221,11 @@
   "E-COUPLING-CYCLE": {"severity": "error", "en": "Couplings form a cycle without an iteration.", "ko": "반복 없이 결합이 순환함."},
   "E-COUPLING-NO-EFFECT": {"severity": "error", "en": "A coupling has no effect.", "ko": "효과가 없는 결합."},
   "E-TEMPERATURE-NONPOSITIVE": {"severity": "error", "en": "A solved temperature is at or below 0 K.", "ko": "풀이 결과 온도가 0 K 이하."},
+  "E-FORMAT": {"severity": "error", "en": "Missing or unsupported document format.", "ko": "문서 형식 표시가 없거나 지원하지 않는 형식."},
+  "E-JSON": {"severity": "error", "en": "Not valid JSON (NaN, Infinity and undecodable bytes included).", "ko": "올바른 JSON이 아님(NaN, Infinity, 해독할 수 없는 바이트 포함)."},
+  "E-VALUE-FORM": {"severity": "error", "en": "A JSON value of a form the slot does not take.", "ko": "자리가 받지 않는 형태의 JSON 값.", "raised_by": ["physmat.units"]},
+  "E-MATERIAL-UNKNOWN": {"severity": "error", "en": "A local material reference has no record.", "ko": "로컬 재료 참조에 해당하는 기록이 없음."},
+  "E-CONTRACT": {"severity": "error", "en": "A kind-specific refusal that no unit or naming code covers.", "ko": "단위·이름 코드가 다루지 않는 문서 종류별 거부."},
   "W-MAGNITUDE": {"severity": "warning", "en": "The value is outside the quantity's plausibility band.", "ko": "값이 물리량의 타당 범위를 벗어남.", "raised_by": ["physmat.units"]},
   "W-GEOMETRY-SCALE": {"severity": "warning", "en": "The geometry scale looks wrong.", "ko": "형상 축척이 이상해 보임."},
   "W-DEPTH-RATIO": {"severity": "warning", "en": "Depth over in-plane size is outside the usual range.", "ko": "깊이와 면내 크기의 비가 흔한 범위를 벗어남."},
@@ -236,6 +242,8 @@
   "W-STRAIN-LARGE": {"severity": "warning", "en": "Strain or displacement is large for linear elasticity.", "ko": "선형 탄성에 비해 변형률이나 변위가 큼."},
   "W-TEMPERATURE-RANGE": {"severity": "warning", "en": "Solved temperatures are outside the expected range.", "ko": "풀이 온도가 예상 범위를 벗어남."},
   "W-EFFECTIVE-INDEX-RANGE": {"severity": "warning", "en": "An effective index is outside the indices of the solved regions.", "ko": "유효 굴절률이 풀이 영역의 굴절률 범위를 벗어남."},
+  "W-SHAPE-DROPPED": {"severity": "warning", "en": "A sliver shape is dropped before meshing.", "ko": "가는 조각 형상을 메시 전에 버림."},
+  "W-PIECE-DROPPED": {"severity": "warning", "en": "A piece under the sliver limit is left out of the mesh.", "ko": "가는 조각 한도보다 작은 조각을 메시에서 뺌."},
   "I-PM-ROUNDING": {"severity": "info", "en": "A geometry value moved by less than 1e-3 pm onto the pm grid.", "ko": "형상 값이 pm 격자로 1e-3 pm 미만 옮겨짐.", "raised_by": ["physmat.units"]},
   "I-VERTEX-SNAPPED": {"severity": "info", "en": "A mesher dropped or merged an input vertex.", "ko": "메셔가 입력 꼭짓점을 버리거나 합침."},
   "I-DEFAULT-BOUNDARY": {"severity": "info", "en": "An omitted boundary gets the physics' natural condition.", "ko": "생략된 경계에 물리의 자연 조건을 씀."},
@@ -245,7 +253,11 @@
   "I-EXTRAPOLATED": {"severity": "info", "en": "A property is evaluated outside its valid range on request.", "ko": "요청에 따라 유효 범위 밖에서 물성을 계산함."},
   "I-ORDER-OF-MAGNITUDE": {"severity": "info", "en": "A library value of order-of-magnitude quality is used.", "ko": "자릿수 수준 품질의 라이브러리 값을 씀."},
   "I-OVERDETERMINED-CONSISTENT": {"severity": "info", "en": "Two consistent forms of one behaviour are given.", "ko": "한 거동의 일치하는 두 형태를 줌."},
-  "I-CONSTANT-UNDER-COUPLING": {"severity": "info", "en": "A constant property is used under a coupling.", "ko": "결합 아래에서 상수 물성을 씀."}
+  "I-CONSTANT-UNDER-COUPLING": {"severity": "info", "en": "A constant property is used under a coupling.", "ko": "결합 아래에서 상수 물성을 씀."},
+  "I-MESH-CONTROL-RAISED": {"severity": "info", "en": "A mesh control is raised to what the mesher needs.", "ko": "메시 제어 값을 메셔에 필요한 값으로 올림."}
+ },
+ "display_groups": {
+  "length": {"dimension": {"L": 1}, "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil"], "shape_numbers": true, "description": {"en": "Every length quantity and every bare shape number.", "ko": "모든 길이 물리량과 단위 없는 모든 형상 숫자."}}
  },
  "quantities": {
   "length": {
@@ -268,7 +280,7 @@
    "rank": ["vector"],
    "domain": null,
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "A position: probe positions, bend origin, beam centre.", "ko": "위치: 탐침 위치, 굽힘 원점, 빔 중심."}
   },
   "depth": {
@@ -353,11 +365,11 @@
    "unit": "1",
    "menu": ["1"],
    "kind": "count",
-   "rank": ["scalar"],
+   "rank": ["vector"],
    "domain": {"min": "1"},
    "band": null,
    "places": ["document", "api"],
-   "description": {"en": "Number of subdivisions.", "ko": "분할 개수."}
+   "description": {"en": "Number of subdivisions along each axis (a list of 2 or 3 counts).", "ko": "축마다의 분할 개수(개수 2개 또는 3개의 목록)."}
   },
   "layer_division_count": {
    "dimension": {},
@@ -459,6 +471,18 @@
    "places": ["result"],
    "description": {"en": "Mesh node coordinates (output).", "ko": "메시 절점 좌표(출력)."}
   },
+  "triangle_angle": {
+   "dimension": {},
+   "unit": "rad",
+   "menu": ["rad"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"statistic": ["minimum"]},
+   "description": {"en": "An interior angle of a mesh triangle (output).", "ko": "메시 삼각형의 내각(출력)."}
+  },
   "temperature": {
    "dimension": {"Theta": 1},
    "unit": "K",
@@ -468,7 +492,7 @@
    "domain": {"min_exclusive": "0"},
    "band": {"abs_range": ["1", "5000"]},
    "places": ["document", "material", "api", "result"],
-   "qualifiers": {"role": ["ambient", "reference", "initial", "stress_free"], "statistic": ["maximum", "minimum", "mean"]},
+   "qualifiers": {"role": ["ambient", "reference", "initial", "stress_free", "prescribed", "evaluation"], "statistic": ["maximum", "minimum", "mean"]},
    "symbols": ["T", "temp"],
    "hint": true,
    "description": {"en": "Absolute thermodynamic temperature.", "ko": "절대 열역학 온도."}
@@ -603,6 +627,7 @@
    "places": ["document", "api", "result"],
    "qualifiers": {"direction": ["outward"], "role": ["generated"]},
    "hint": true,
+   "sign": {"outward_heat_rate": {"en": "Heat through the boundary; positive leaves the body.", "ko": "경계를 지나는 열. 양수는 물체를 떠남."}, "generated_heat_rate": {"en": "Heat from the volumetric source; positive enters the body.", "ko": "체적 열원에서 온 열. 양수는 물체로 들어감."}},
    "description": {"en": "Heat flow rate, a true total (full revolution for an axisymmetric component).", "ko": "열 흐름률. 실제 합(축대칭은 한 바퀴 전체)."}
   },
   "heat_rate_per_depth": {
@@ -616,6 +641,7 @@
    "places": ["document", "api", "result"],
    "qualifiers": {"direction": ["outward"], "role": ["generated"]},
    "hint": true,
+   "sign": {"outward_heat_rate_per_depth": {"en": "Heat through the boundary; positive leaves the body.", "ko": "경계를 지나는 열. 양수는 물체를 떠남."}, "generated_heat_rate_per_depth": {"en": "Heat from the volumetric source; positive enters the body.", "ko": "체적 열원에서 온 열. 양수는 물체로 들어감."}},
    "description": {"en": "Heat flow rate per metre of depth of a planar component.", "ko": "평면 구성 요소 깊이 1 m당 열 흐름률."}
   },
   "heat_rate_per_depth_tolerance": {
@@ -639,6 +665,8 @@
    "band": {"abs_range": [null, "1e9"]},
    "places": ["document", "api", "result"],
    "qualifiers": {"direction": ["inward", "outward"]},
+   "name_rank": {"inward_heat_flux": ["scalar"], "outward_heat_flux": ["scalar"]},
+   "sign": {"heat_flux": {"en": "q = -k grad T in global components; a component is positive along its axis.", "ko": "q = -k grad T의 전체 좌표 성분. 성분은 축 방향이 양수."}, "inward_heat_flux": {"en": "Normal heat flux through the boundary; positive enters the body.", "ko": "경계를 지나는 법선 열유속. 양수는 물체로 들어감."}, "outward_heat_flux": {"en": "Normal heat flux through the boundary; positive leaves the body.", "ko": "경계를 지나는 법선 열유속. 양수는 물체를 떠남."}},
    "description": {"en": "Heat flux density.", "ko": "열유속 밀도."}
   },
   "heat_transfer_coefficient": {
@@ -649,7 +677,7 @@
    "rank": ["scalar"],
    "domain": {"min": "0"},
    "band": {"abs_range": ["0.1", "1e6"]},
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "symbols": ["h", "htc"],
    "description": {"en": "Convective heat transfer coefficient h in q = h (T - T_ambient).", "ko": "대류 열전달 계수 h(q = h (T - T_ambient))."}
   },
@@ -765,6 +793,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "sign": {"applied_heat_rate": {"en": "Right-hand side of the nodal heat balance: generated plus ambient convective minus outward prescribed; positive enters the body.", "ko": "절점 열 균형의 우변: 생성 + 주변 대류 - 밖으로 나가는 지정 열. 양수는 물체로 들어감."}},
    "description": {"en": "Nodal applied heat rate (output).", "ko": "절점 가한 열 흐름률(출력)."}
   },
   "applied_heat_rate_per_depth": {
@@ -776,6 +805,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "sign": {"applied_heat_rate_per_depth": {"en": "Right-hand side of the nodal heat balance: generated plus ambient convective minus outward prescribed; positive enters the body.", "ko": "절점 열 균형의 우변: 생성 + 주변 대류 - 밖으로 나가는 지정 열. 양수는 물체로 들어감."}},
    "description": {"en": "Nodal applied heat rate per metre of depth (output).", "ko": "깊이 1 m당 절점 가한 열 흐름률(출력)."}
   },
   "reaction_heat_rate": {
@@ -787,6 +817,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"reaction_heat_rate": {"en": "Heat the prescribed-temperature constraint injects into the body; positive enters the body.", "ko": "지정 온도 구속이 물체에 넣는 열. 양수는 물체로 들어감."}, "outward_reaction_heat_rate": {"en": "Heat through the prescribed-temperature constraints, minus the sum of the reaction; positive leaves the body.", "ko": "지정 온도 구속을 지나는 열, 반력 합의 음수. 양수는 물체를 떠남."}},
    "description": {"en": "Nodal reaction heat rate (output).", "ko": "절점 반력 열 흐름률(출력)."}
   },
   "reaction_heat_rate_per_depth": {
@@ -798,6 +830,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"reaction_heat_rate_per_depth": {"en": "Heat the prescribed-temperature constraint injects into the body; positive enters the body.", "ko": "지정 온도 구속이 물체에 넣는 열. 양수는 물체로 들어감."}, "outward_reaction_heat_rate_per_depth": {"en": "Heat through the prescribed-temperature constraints, minus the sum of the reaction; positive leaves the body.", "ko": "지정 온도 구속을 지나는 열, 반력 합의 음수. 양수는 물체를 떠남."}},
    "description": {"en": "Nodal reaction heat rate per metre of depth (output).", "ko": "깊이 1 m당 절점 반력 열 흐름률(출력)."}
   },
   "residual_heat_rate": {
@@ -809,6 +843,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
    "description": {"en": "Nodal residual heat rate (output).", "ko": "절점 잔차 열 흐름률(출력)."}
   },
   "residual_heat_rate_per_depth": {
@@ -820,7 +855,30 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
    "description": {"en": "Nodal residual heat rate per metre of depth (output).", "ko": "깊이 1 m당 절점 잔차 열 흐름률(출력)."}
+  },
+  "heat_rate_imbalance": {
+   "dimension": {"M": 1, "L": 2, "T": -3},
+   "unit": "W",
+   "menu": ["W"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Heat-balance defect: outward heat rate plus heat storage rate minus generated heat rate; 0 for an exact balance (output).", "ko": "열 균형 결손: 밖으로 나간 열 흐름률과 열 저장률의 합에서 생성 열 흐름률을 뺀 값. 정확히 균형이면 0(출력)."}
+  },
+  "heat_rate_imbalance_per_depth": {
+   "dimension": {"M": 1, "L": 1, "T": -3},
+   "unit": "W/m",
+   "menu": ["W/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Heat-balance defect per metre of depth: outward heat rate plus heat storage rate minus generated heat rate; 0 for an exact balance (output).", "ko": "깊이 1 m당 열 균형 결손: 밖으로 나간 열 흐름률과 열 저장률의 합에서 생성 열 흐름률을 뺀 값. 정확히 균형이면 0(출력)."}
   },
   "convective_heat_rate": {
    "dimension": {"M": 1, "L": 2, "T": -3},
@@ -831,6 +889,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"], "role": ["ambient"]},
+   "sign": {"outward_convective_heat_rate": {"en": "Net convective heat, the integral of h (T - ambient_temperature) phi; positive leaves the body.", "ko": "알짜 대류 열, h (T - ambient_temperature) phi의 적분. 양수는 물체를 떠남."}, "ambient_convective_heat_rate": {"en": "Ambient term of the convective load, the integral of h ambient_temperature phi; positive enters the body.", "ko": "대류 하중의 주변 항, h ambient_temperature phi의 적분. 양수는 물체로 들어감."}},
    "description": {"en": "Nodal convective heat rate (output).", "ko": "절점 대류 열 흐름률(출력)."}
   },
   "convective_heat_rate_per_depth": {
@@ -842,6 +902,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"], "role": ["ambient"]},
+   "sign": {"outward_convective_heat_rate_per_depth": {"en": "Net convective heat, the integral of h (T - ambient_temperature) phi; positive leaves the body.", "ko": "알짜 대류 열, h (T - ambient_temperature) phi의 적분. 양수는 물체를 떠남."}, "ambient_convective_heat_rate_per_depth": {"en": "Ambient term of the convective load, the integral of h ambient_temperature phi; positive enters the body.", "ko": "대류 하중의 주변 항, h ambient_temperature phi의 적분. 양수는 물체로 들어감."}},
    "description": {"en": "Nodal convective heat rate per metre of depth (output).", "ko": "깊이 1 m당 절점 대류 열 흐름률(출력)."}
   },
   "prescribed_heat_rate": {
@@ -853,6 +915,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"outward_prescribed_heat_rate": {"en": "Heat through edges with an inward_heat_flux, the integral of -inward_heat_flux phi; positive leaves the body.", "ko": "inward_heat_flux가 주어진 경계를 지나는 열, -inward_heat_flux phi의 적분. 양수는 물체를 떠남."}},
    "description": {"en": "Nodal prescribed heat rate (output).", "ko": "절점 지정 열 흐름률(출력)."}
   },
   "prescribed_heat_rate_per_depth": {
@@ -864,6 +928,8 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"outward_prescribed_heat_rate_per_depth": {"en": "Heat through edges with an inward_heat_flux, the integral of -inward_heat_flux phi; positive leaves the body.", "ko": "inward_heat_flux가 주어진 경계를 지나는 열, -inward_heat_flux phi의 적분. 양수는 물체를 떠남."}},
    "description": {"en": "Nodal prescribed heat rate per metre of depth (output).", "ko": "깊이 1 m당 절점 지정 열 흐름률(출력)."}
   },
   "thermal_energy_functional": {
@@ -908,6 +974,7 @@
    "domain": null,
    "band": null,
    "places": ["document", "api", "result"],
+   "qualifiers": {"role": ["prescribed"]},
    "symbols": ["phi", "voltage"],
    "hint": true,
    "description": {"en": "Electric potential.", "ko": "전위."}
@@ -974,6 +1041,7 @@
    "qualifiers": {"direction": ["inward", "outward"]},
    "symbols": ["I"],
    "hint": true,
+   "sign": {"inward_current": {"en": "Current through a terminal; positive enters the body.", "ko": "단자를 지나는 전류. 양수는 물체로 들어감."}, "outward_current": {"en": "Current through a terminal; positive leaves the body.", "ko": "단자를 지나는 전류. 양수는 물체를 떠남."}},
    "description": {"en": "Electric current through a boundary curve, a true total.", "ko": "경계 곡선을 지나는 전류. 실제 합."}
   },
   "current_per_depth": {
@@ -986,6 +1054,7 @@
    "band": null,
    "places": ["document", "api", "result"],
    "qualifiers": {"direction": ["inward", "outward"]},
+   "sign": {"inward_current_per_depth": {"en": "Current through a terminal; positive enters the body.", "ko": "단자를 지나는 전류. 양수는 물체로 들어감."}, "outward_current_per_depth": {"en": "Current through a terminal; positive leaves the body.", "ko": "단자를 지나는 전류. 양수는 물체를 떠남."}},
    "description": {"en": "Electric current per metre of depth.", "ko": "깊이 1 m당 전류."}
   },
   "axial_current": {
@@ -1010,8 +1079,106 @@
    "band": {"abs_range": [null, "1e12"]},
    "places": ["document", "api", "result"],
    "qualifiers": {"direction": ["inward"]},
+   "name_rank": {"inward_current_density": ["scalar"]},
    "symbols": ["J"],
+   "sign": {"inward_current_density": {"en": "Normal current density through the boundary; positive enters the body.", "ko": "경계를 지나는 법선 전류 밀도. 양수는 물체로 들어감."}},
    "description": {"en": "Electric current density.", "ko": "전류 밀도."}
+  },
+  "reaction_current": {
+   "dimension": {"I": 1},
+   "unit": "A",
+   "menu": ["A"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"reaction_current": {"en": "Current the fixed potential injects into the body; positive enters the body.", "ko": "고정 전위가 물체에 넣는 전류. 양수는 물체로 들어감."}},
+   "description": {"en": "Nodal current the fixed potential injects into the body (output).", "ko": "고정 전위가 물체에 넣는 절점 전류(출력)."}
+  },
+  "reaction_current_per_depth": {
+   "dimension": {"I": 1, "L": -1},
+   "unit": "A/m",
+   "menu": ["A/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"reaction_current_per_depth": {"en": "Current the fixed potential injects into the body; positive enters the body.", "ko": "고정 전위가 물체에 넣는 전류. 양수는 물체로 들어감."}},
+   "description": {"en": "Nodal current per metre of depth the fixed potential injects into the body (output).", "ko": "고정 전위가 물체에 넣는 깊이 1 m당 절점 전류(출력)."}
+  },
+  "prescribed_current": {
+   "dimension": {"I": 1},
+   "unit": "A",
+   "menu": ["A"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"outward_prescribed_current": {"en": "Current through edges with an inward_current_density; positive leaves the body.", "ko": "inward_current_density가 주어진 경계를 지나는 전류. 양수는 물체를 떠남."}},
+   "description": {"en": "Nodal current through edges with an inward_current_density (output).", "ko": "inward_current_density가 주어진 경계를 지나는 절점 전류(출력)."}
+  },
+  "prescribed_current_per_depth": {
+   "dimension": {"I": 1, "L": -1},
+   "unit": "A/m",
+   "menu": ["A/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"direction": ["outward"]},
+   "sign": {"outward_prescribed_current_per_depth": {"en": "Current through edges with an inward_current_density; positive leaves the body.", "ko": "inward_current_density가 주어진 경계를 지나는 전류. 양수는 물체를 떠남."}},
+   "description": {"en": "Nodal current per metre of depth through edges with an inward_current_density (output).", "ko": "inward_current_density가 주어진 경계를 지나는 깊이 1 m당 절점 전류(출력)."}
+  },
+  "residual_current": {
+   "dimension": {"I": 1},
+   "unit": "A",
+   "menu": ["A"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
+   "description": {"en": "Nodal current residual of the discrete electric balance (output).", "ko": "이산 전기 균형의 절점 전류 잔차(출력)."}
+  },
+  "residual_current_per_depth": {
+   "dimension": {"I": 1, "L": -1},
+   "unit": "A/m",
+   "menu": ["A/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
+   "description": {"en": "Nodal current residual per metre of depth of the discrete electric balance (output).", "ko": "이산 전기 균형의 깊이 1 m당 절점 전류 잔차(출력)."}
+  },
+  "current_imbalance": {
+   "dimension": {"I": 1},
+   "unit": "A",
+   "menu": ["A"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Current-balance defect: the sum of the nodal reaction currents minus the outward prescribed currents; 0 when the currents balance (output).", "ko": "전류 균형 결손: 절점 반력 전류의 합에서 밖으로 나가는 지정 전류의 합을 뺀 값. 균형이면 0(출력)."}
+  },
+  "current_imbalance_per_depth": {
+   "dimension": {"I": 1, "L": -1},
+   "unit": "A/m",
+   "menu": ["A/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Current-balance defect per metre of depth: the sum of the nodal reaction currents minus the outward prescribed currents; 0 when the currents balance (output).", "ko": "깊이 1 m당 전류 균형 결손: 절점 반력 전류의 합에서 밖으로 나가는 지정 전류의 합을 뺀 값. 균형이면 0(출력)."}
   },
   "sheet_current_density": {
    "dimension": {"I": 1, "L": -1},
@@ -1070,6 +1237,65 @@
    "places": ["result"],
    "description": {"en": "Joule heating power per metre of depth.", "ko": "깊이 1 m당 줄 발열 전력."}
   },
+  "electric_power": {
+   "dimension": {"M": 1, "L": 2, "T": -3},
+   "unit": "W",
+   "menu": ["W"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"direction": ["inward"]},
+   "sign": {"inward_electric_power": {"en": "Electric power supplied through the terminals; positive enters the body.", "ko": "단자로 공급되는 전력. 양수는 물체로 들어감."}},
+   "description": {"en": "Electric power through the terminals (output); inward_electric_power is supplied to the body.", "ko": "단자를 지나는 전력(출력). inward_electric_power는 물체에 공급되는 전력."}
+  },
+  "electric_power_per_depth": {
+   "dimension": {"M": 1, "L": 1, "T": -3},
+   "unit": "W/m",
+   "menu": ["W/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"direction": ["inward"]},
+   "sign": {"inward_electric_power_per_depth": {"en": "Electric power supplied through the terminals; positive enters the body.", "ko": "단자로 공급되는 전력. 양수는 물체로 들어감."}},
+   "description": {"en": "Electric power per metre of depth through the terminals (output); inward_electric_power_per_depth is supplied to the body.", "ko": "단자를 지나는 깊이 1 m당 전력(출력). inward_electric_power_per_depth는 물체에 공급되는 전력."}
+  },
+  "electric_power_imbalance": {
+   "dimension": {"M": 1, "L": 2, "T": -3},
+   "unit": "W",
+   "menu": ["W"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Electric-power defect: inward electric power minus Joule power; 0 for an exact balance (output).", "ko": "전력 결손: 들어온 전력에서 줄 발열량을 뺀 값. 정확히 균형이면 0(출력)."}
+  },
+  "electric_power_imbalance_per_depth": {
+   "dimension": {"M": 1, "L": 1, "T": -3},
+   "unit": "W/m",
+   "menu": ["W/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Electric-power defect per metre of depth: inward electric power minus Joule power; 0 for an exact balance (output).", "ko": "깊이 1 m당 전력 결손: 들어온 전력에서 줄 발열량을 뺀 값. 정확히 균형이면 0(출력)."}
+  },
+  "relative_electrical_conductivity_change": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min": "0"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Largest relative change of the element electrical conductivity between two iterates, max |sigma_new - sigma| / max(sigma, sigma_new) (output).", "ko": "두 반복값 사이 요소 전기전도도의 가장 큰 상대 변화, max |sigma_new - sigma| / max(sigma, sigma_new)(출력)."}
+  },
   "resistance": {
    "dimension": {"M": 1, "L": 2, "T": -3, "I": -2},
    "unit": "Ohm",
@@ -1105,6 +1331,7 @@
    "band": {"abs_range": [null, "1e5"]},
    "places": ["material", "api", "result"],
    "symbols": ["eps_r", "epsilon_r", "dk"],
+   "sign": {"relative_permittivity": {"en": "Under exp(-i omega t); Im >= 0 is loss.", "ko": "exp(-i omega t) 기준. Im >= 0이 손실."}},
    "description": {"en": "Relative permittivity epsilon_r.", "ko": "비유전율 epsilon_r."}
   },
   "loss_tangent": {
@@ -1332,9 +1559,9 @@
    "menu": ["Hz", "kHz", "MHz", "GHz", "THz"],
    "kind": "ordinary",
    "rank": ["scalar"],
-   "domain": {"min": "0"},
+   "domain": {"min_exclusive": "0"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Frequency around which an eigenfrequency search looks.", "ko": "고유주파수 탐색의 목표 주파수."}
   },
   "reference_frequency": {
@@ -1570,7 +1797,9 @@
    "domain": null,
    "band": null,
    "places": ["document", "api", "result"],
-   "qualifiers": {"component": ["x", "y", "z", "r"]},
+   "qualifiers": {"role": ["prescribed"], "statistic": ["maximum"], "component": ["x", "y", "z", "r"]},
+   "name_rank": {"maximum_displacement": ["scalar"]},
+   "statistic_definitions": {"maximum_displacement": {"en": "Largest nodal Euclidean norm of the displacement.", "ko": "절점 변위의 유클리드 노름 가운데 가장 큰 값."}},
    "symbols": ["u"],
    "description": {"en": "Displacement.", "ko": "변위."}
   },
@@ -1584,9 +1813,10 @@
    "band": null,
    "warn_inside": {"code": "W-GAUGE-ATMOSPHERIC", "range": ["90 kPa", "110 kPa"]},
    "slot_refusals": {"bara": "E-ABSOLUTE-AS-LOAD", "psia": "E-ABSOLUTE-AS-LOAD"},
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "symbols": ["p"],
    "refused_aliases": ["pressure"],
+   "sign": {"gauge_pressure": {"en": "Pressure above ambient; positive pushes into the body: traction = -gauge_pressure n, n the outward normal.", "ko": "주변 압력 기준의 압력. 양수는 물체를 누름: traction = -gauge_pressure n, n은 바깥 법선."}},
    "description": {"en": "Pressure load relative to ambient; positive pushes into the body (traction = -p n).", "ko": "주변 압력 기준의 압력 하중. 양수는 물체를 누름(traction = -p n)."}
   },
   "traction": {
@@ -1597,7 +1827,8 @@
    "rank": ["vector"],
    "domain": null,
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
+   "sign": {"traction": {"en": "Surface force per area on the body; a component is positive along its axis.", "ko": "물체 표면에 작용하는 단위 면적당 힘. 성분은 축 방향이 양수."}},
    "description": {"en": "Force per area on the body, in global Cartesian components.", "ko": "물체에 작용하는 면적당 힘(전역 직교 성분)."}
   },
   "body_force_density": {
@@ -1608,7 +1839,7 @@
    "rank": ["vector"],
    "domain": null,
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Body force per unit volume.", "ko": "단위 부피당 체적력."}
   },
   "gravitational_acceleration": {
@@ -1633,6 +1864,8 @@
    "band": null,
    "places": ["document", "api", "result"],
    "qualifiers": {"statistic": ["maximum", "minimum"], "component": ["xx", "yy", "zz", "xy", "yz", "xz", "rr", "rz", "hoop"]},
+   "name_rank": {"maximum_stress": ["scalar"]},
+   "statistic_definitions": {"maximum_stress": {"en": "Largest absolute in-plane Cartesian stress component over elements.", "ko": "요소들에 걸친 면내 직교 응력 성분의 절댓값 가운데 가장 큰 값."}},
    "symbols": ["sigma_stress"],
    "description": {"en": "Cauchy stress.", "ko": "코시 응력."}
   },
@@ -1695,6 +1928,28 @@
    "places": ["document", "api", "result"],
    "description": {"en": "Engineering shear strain gamma_xy = 2 strain_xy.", "ko": "공학 전단 변형률 gamma_xy = 2 strain_xy."}
   },
+  "engineering_shear_elastic_strain_xy": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Engineering shear elastic strain gamma_xy = 2 elastic_strain_xy (output).", "ko": "공학 전단 탄성 변형률 gamma_xy = 2 elastic_strain_xy(출력)."}
+  },
+  "engineering_shear_thermal_strain_xy": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Engineering shear thermal strain gamma_xy = 2 thermal_strain_xy (output).", "ko": "공학 전단 열 변형률 gamma_xy = 2 thermal_strain_xy(출력)."}
+  },
   "force": {
    "dimension": {"M": 1, "L": 1, "T": -2},
    "unit": "N",
@@ -1716,6 +1971,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "sign": {"reaction_force": {"en": "Force the constraint exerts on the body; a component is positive along its axis.", "ko": "구속이 물체에 가하는 힘. 성분은 축 방향이 양수."}},
    "description": {"en": "Force the constraint exerts on the body (output).", "ko": "구속이 물체에 가하는 힘(출력)."}
   },
   "force_per_depth": {
@@ -1739,7 +1995,146 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "sign": {"reaction_force_per_depth": {"en": "Force the constraint exerts on the body; a component is positive along its axis.", "ko": "구속이 물체에 가하는 힘. 성분은 축 방향이 양수."}},
    "description": {"en": "Reaction force per metre of depth (output).", "ko": "깊이 1 m당 반력(출력)."}
+  },
+  "applied_force": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"applied_force": {"en": "External force on the body; a component is positive along its axis.", "ko": "물체에 가한 외력. 성분은 축 방향이 양수."}},
+   "description": {"en": "External nodal force on the body from body forces, tractions and gauge pressures (output).", "ko": "체적력, 표면력, 게이지 압력에서 온 외부 절점 힘(출력)."}
+  },
+  "applied_force_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"applied_force_per_depth": {"en": "External force on the body; a component is positive along its axis.", "ko": "물체에 가한 외력. 성분은 축 방향이 양수."}},
+   "description": {"en": "External nodal force on the body from body forces, tractions and gauge pressures per metre of depth (output).", "ko": "체적력, 표면력, 게이지 압력에서 온 깊이 1 m당 외부 절점 힘(출력)."}
+  },
+  "applied_body_force": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force from the body force density (output).", "ko": "체적력 밀도에서 온 절점 힘(출력)."}
+  },
+  "applied_body_force_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force from the body force density per metre of depth (output).", "ko": "체적력 밀도에서 온 깊이 1 m당 절점 힘(출력)."}
+  },
+  "applied_traction_force": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force from tractions and gauge pressures (output).", "ko": "표면력과 게이지 압력에서 온 절점 힘(출력)."}
+  },
+  "applied_traction_force_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force from tractions and gauge pressures per metre of depth (output).", "ko": "표면력과 게이지 압력에서 온 깊이 1 m당 절점 힘(출력)."}
+  },
+  "thermal_equivalent_force": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force equivalent to the thermal strain (output).", "ko": "열 변형률과 같은 효과의 절점 힘(출력)."}
+  },
+  "thermal_equivalent_force_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal force equivalent to the thermal strain per metre of depth (output).", "ko": "열 변형률과 같은 효과의 깊이 1 m당 절점 힘(출력)."}
+  },
+  "residual_force": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
+   "name_rank": {"maximum_residual_force": ["scalar"]},
+   "description": {"en": "Nodal force residual of the discrete equilibrium (output).", "ko": "이산 평형의 절점 힘 잔차(출력)."}
+  },
+  "residual_force_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"statistic": ["maximum"]},
+   "name_rank": {"maximum_residual_force_per_depth": ["scalar"]},
+   "description": {"en": "Nodal force residual of the discrete equilibrium per metre of depth (output).", "ko": "이산 평형의 깊이 1 m당 절점 힘 잔차(출력)."}
+  },
+  "force_imbalance": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "N",
+   "menu": ["N"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Force-balance defect: the sum over nodes of the applied force and the reaction force; 0 at equilibrium (output).", "ko": "힘 균형 결손: 절점에 걸친 가한 힘과 반력의 합. 평형이면 0(출력)."}
+  },
+  "force_imbalance_per_depth": {
+   "dimension": {"M": 1, "T": -2},
+   "unit": "N/m",
+   "menu": ["N/m"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Force-balance defect per metre of depth: the sum over nodes of the applied force and the reaction force; 0 at equilibrium (output).", "ko": "깊이 1 m당 힘 균형 결손: 절점에 걸친 가한 힘과 반력의 합. 평형이면 0(출력)."}
   },
   "strain_energy": {
    "dimension": {"M": 1, "L": 2, "T": -2},
@@ -1762,6 +2157,28 @@
    "band": null,
    "places": ["result"],
    "description": {"en": "Strain energy per metre of depth.", "ko": "깊이 1 m당 변형 에너지."}
+  },
+  "stiffness_energy_functional": {
+   "dimension": {"M": 1, "L": 2, "T": -2},
+   "unit": "J",
+   "menu": ["J"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Half u^T K u of the total strain; not the stored elastic energy (output).", "ko": "전체 변형률의 1/2 u^T K u. 저장된 탄성 에너지가 아님(출력)."}
+  },
+  "stiffness_energy_functional_per_depth": {
+   "dimension": {"M": 1, "L": 1, "T": -2},
+   "unit": "J/m",
+   "menu": ["J/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Half u^T K u of the total strain per metre of depth; not the stored elastic energy (output).", "ko": "깊이 1 m당 전체 변형률의 1/2 u^T K u. 저장된 탄성 에너지가 아님(출력)."}
   },
   "vacuum_wavelength": {
    "dimension": {"L": 1},
@@ -1843,6 +2260,7 @@
    "places": ["material", "api", "result"],
    "symbols": ["n", "ri"],
    "refused_aliases": ["index"],
+   "sign": {"refractive_index": {"en": "n + i k under exp(-i omega t); k >= 0 is loss.", "ko": "exp(-i omega t)에서 n + i k. k >= 0이 손실."}},
    "description": {"en": "Refractive index n (n + i k as an object).", "ko": "굴절률 n(객체로는 n + i k)."}
   },
   "thermo_optic_coefficient": {
@@ -1857,6 +2275,58 @@
    "symbols": ["dn_dt", "dndt"],
    "description": {"en": "Thermo-optic coefficient dn/dT.", "ko": "열광학 계수 dn/dT."}
   },
+  "constant": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": {"range": ["1", null]},
+   "places": ["material"],
+   "hint": false,
+   "scope": {"quantity": "refractive_index", "model": "sellmeier"},
+   "description": {"en": "Constant term A of the Sellmeier model n^2 = A + sum_i B_i lambda0^2 / (lambda0^2 - C_i); usually 1 or more.", "ko": "셀마이어 모형 n^2 = A + sum_i B_i lambda0^2 / (lambda0^2 - C_i)의 상수항 A. 보통 1 이상."}
+  },
+  "strength": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min": "0"},
+   "band": null,
+   "places": ["material"],
+   "hint": false,
+   "scope": {"quantity": "refractive_index", "model": "sellmeier"},
+   "description": {"en": "Strength B_i of a Sellmeier term.", "ko": "셀마이어 항의 세기 B_i."}
+  },
+  "resonance_wavelength": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["nm", "um", "m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["material"],
+   "hint": false,
+   "scope": {"quantity": "refractive_index", "model": "sellmeier"},
+   "description": {"en": "Resonance vacuum wavelength lambda_i of a Sellmeier term, C_i = lambda_i^2.", "ko": "셀마이어 항의 공명 진공 파장 lambda_i, C_i = lambda_i^2."}
+  },
+  "resonance_wavelength_squared": {
+   "dimension": {"L": 2},
+   "unit": "m^2",
+   "menu": ["nm^2", "um^2", "m^2"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["material"],
+   "hint": false,
+   "scope": {"quantity": "refractive_index", "model": "sellmeier"},
+   "description": {"en": "Coefficient C_i of a Sellmeier term, a squared vacuum wavelength.", "ko": "셀마이어 항의 계수 C_i, 진공 파장의 제곱."}
+  },
   "effective_index": {
    "dimension": {},
    "unit": "1",
@@ -1867,7 +2337,9 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"statistic": ["mean"]},
    "symbols": ["n_eff", "neff"],
+   "sign": {"effective_index": {"en": "beta / k0 with fields exp(i (beta z - omega t)); Im >= 0 is loss along +z.", "ko": "필드 exp(i (beta z - omega t))에서 beta / k0. Im >= 0이 +z 방향 손실."}},
    "description": {"en": "Effective index of a mode (output).", "ko": "모드의 유효 굴절률(출력)."}
   },
   "group_index": {
@@ -1880,6 +2352,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "qualifiers": {"statistic": ["mean"]},
    "symbols": ["n_g", "ng"],
    "description": {"en": "Group index of a mode (output).", "ko": "모드의 군 굴절률(출력)."}
   },
@@ -1893,7 +2366,19 @@
    "domain": null,
    "band": null,
    "places": ["document", "api"],
+   "refused_aliases": ["n_eff", "neff"],
    "description": {"en": "Effective index around which modes are sought.", "ko": "모드를 찾을 유효 굴절률 목표."}
+  },
+  "effective_index_threshold": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["document", "api", "result"],
+   "description": {"en": "Lower bound on Re n_eff of guided candidates; typically the cladding index.", "ko": "도파 후보 모드의 Re n_eff 하한. 보통 클래딩 굴절률."}
   },
   "propagation_loss": {
    "dimension": {"dB": 1, "L": -1},
@@ -1905,6 +2390,7 @@
    "band": null,
    "places": ["document", "api", "result"],
    "hint": true,
+   "sign": {"propagation_loss": {"en": "Power loss per length in dB (10 log10 of a power ratio); positive is loss.", "ko": "길이당 전력 손실, dB(전력비의 10 log10). 양수가 손실."}},
    "description": {"en": "Propagation loss in dB of power per length.", "ko": "길이당 전력 dB 전파 손실."}
   },
   "bend_loss": {
@@ -1917,6 +2403,7 @@
    "band": null,
    "places": ["document", "api", "result"],
    "hint": true,
+   "sign": {"bend_loss": {"en": "Power loss per 90 deg of bend in dB (10 log10 of a power ratio); positive is loss.", "ko": "굽힘 90 deg당 전력 손실, dB(전력비의 10 log10). 양수가 손실."}},
    "description": {"en": "Bend loss in dB of power per 90 degrees of bend.", "ko": "굽힘 90도당 전력 dB 굽힘 손실."}
   },
   "phase_shift": {
@@ -2021,7 +2508,107 @@
    "domain": null,
    "band": null,
    "places": ["result"],
-   "description": {"en": "Mode power; fields are normalised to 1 W (output).", "ko": "모드 전력. 필드는 1 W로 정규화(출력)."}
+   "qualifiers": {"role": ["unnormalized"]},
+   "description": {"en": "Power carried by a mode (output); unnormalized_mode_power is that of the field as solved, read as V/m.", "ko": "모드가 나르는 전력(출력). unnormalized_mode_power는 풀이한 그대로의 필드를 V/m로 읽은 전력."}
+  },
+  "mode_field": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"role": ["unnormalized"]},
+   "description": {"en": "Scalar mode field phi (output); unnormalized_mode_field is the field as solved, scaled to a peak of 1.", "ko": "스칼라 모드 필드 phi(출력). unnormalized_mode_field는 풀이한 그대로의 필드를 최댓값 1로 맞춘 것."}
+  },
+  "mode_field_square_integral": {
+   "dimension": {"L": 2},
+   "unit": "m^2",
+   "menu": ["m^2"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"role": ["unnormalized"]},
+   "description": {"en": "Integral of |phi|^2 over the cross-section of a scalar mode field (output).", "ko": "스칼라 모드 필드의 |phi|^2를 단면에서 적분한 값(출력)."}
+  },
+  "field_overlap": {
+   "dimension": {"L": 2},
+   "unit": "m^2",
+   "menu": ["m^2"],
+   "kind": "ordinary",
+   "rank": ["matrix"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"role": ["unnormalized"]},
+   "description": {"en": "Overlap integrals of two mode fields, the integral of E_i* . E_j over the cross-section (output).", "ko": "두 모드 필드의 겹침 적분, 단면에서의 E_i* . E_j 적분(출력)."}
+  },
+  "electric_field_line_integral": {
+   "dimension": {"M": 1, "L": 2, "T": -3, "I": -1},
+   "unit": "V",
+   "menu": ["V"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Line integral of the tangential electric field along a mesh edge (output).", "ko": "메시 모서리를 따른 접선 전기장의 선적분(출력)."}
+  },
+  "unnormalized_electric_field": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "qualifiers": {"component": ["z"]},
+   "description": {"en": "Electric field of a mode as solved, a relative field without a unit (output).", "ko": "풀이한 그대로의 모드 전기장. 단위 없는 상대 필드(출력)."}
+  },
+  "unnormalized_electric_field_line_integral": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Line integral of the tangential unnormalized_electric_field along a mesh edge (output).", "ko": "메시 모서리를 따른 접선 unnormalized_electric_field의 선적분(출력)."}
+  },
+  "mass_normalized_electric_field": {
+   "dimension": {"L": -1.5},
+   "unit": "1/m^(3/2)",
+   "menu": ["1/m^(3/2)"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Cavity mode electric field normalised so that the volume integral of the mass form is 1 (output).", "ko": "질량 형식의 부피 적분이 1이 되도록 정규화한 공진기 모드 전기장(출력)."}
+  },
+  "mass_normalized_electric_field_line_integral": {
+   "dimension": {"L": -0.5},
+   "unit": "1/m^(1/2)",
+   "menu": ["1/m^(1/2)"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Edge coefficient of the mass-normalised cavity mode field: its tangential line integral along a mesh edge (output).", "ko": "질량 정규화한 공진기 모드 필드의 모서리 계수, 메시 모서리를 따른 접선 선적분(출력)."}
   },
   "confinement_factor": {
    "dimension": {},
@@ -2032,7 +2619,7 @@
    "domain": {"min": "0", "max": "1"},
    "band": null,
    "places": ["document", "api", "result"],
-   "description": {"en": "Fraction of mode power in a region.", "ko": "영역 안 모드 전력의 비율."}
+   "description": {"en": "Electric-energy fraction in a region: the integral of Re eps_r |E|^2 over the region divided by that over the whole cross-section (vector formulation), or the |phi|^2 fraction (scalar formulation).", "ko": "영역 안의 전기 에너지 비율: 영역에서의 Re eps_r |E|^2 적분을 단면 전체의 적분으로 나눈 값(벡터 정식화), 또는 |phi|^2의 비율(스칼라 정식화)."}
   },
   "overlap": {
    "dimension": {},
@@ -2076,7 +2663,7 @@
    "rank": ["scalar"],
    "domain": {"min": "0", "max": "1"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Overlap level for tracking a mode along a sweep.", "ko": "스윕에서 모드를 추적하는 겹침 기준."}
   },
   "degeneracy_tolerance": {
@@ -2087,8 +2674,74 @@
    "rank": ["scalar"],
    "domain": {"min": "0", "max": "1"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Tolerance for treating modes as degenerate.", "ko": "모드를 축퇴로 볼 허용오차."}
+  },
+  "mode_tracking_margin_threshold": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "fraction",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0", "max": "1"},
+   "band": null,
+   "places": ["document", "api", "result"],
+   "description": {"en": "Smallest accepted margin of the best overlap over the competing ones when a mode is tracked.", "ko": "모드를 추적할 때 가장 좋은 겹침이 경쟁 겹침보다 앞서야 하는 최소 여유."}
+  },
+  "cluster_span_tolerance": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["document", "api", "result"],
+   "description": {"en": "Largest effective-index difference between neighbouring modes of one tracked cluster.", "ko": "추적하는 한 묶음 안에서 이웃한 모드 사이 유효 굴절률 차의 최댓값."}
+  },
+  "cluster_gap_threshold": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["document", "api", "result"],
+   "description": {"en": "Smallest effective-index gap between a tracked cluster and the modes outside it.", "ko": "추적하는 묶음과 그 밖의 모드 사이 유효 굴절률 간격의 최솟값."}
+  },
+  "relative_residual_threshold": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Largest accepted relative residual of an eigenpair (output).", "ko": "고유쌍의 허용 최대 상대 잔차(출력)."}
+  },
+  "physical_l2_fraction": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "fraction",
+   "rank": ["scalar"],
+   "domain": {"min": "0", "max": "1"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Fraction of a mode's L2 norm inside the physical (non-PML) region (output).", "ko": "모드 L2 노름 가운데 물리 영역(PML 밖) 안의 비율(출력)."}
+  },
+  "pml_l2_fraction": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "fraction",
+   "rank": ["scalar"],
+   "domain": {"min": "0", "max": "1"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Fraction of a mode's L2 norm inside the PML (output).", "ko": "모드 L2 노름 가운데 PML 안의 비율(출력)."}
   },
   "effective_area": {
    "dimension": {"L": 2},
@@ -2109,7 +2762,7 @@
    "rank": ["scalar"],
    "domain": {"min_exclusive": "0"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Beam waist radius w_0 (1/e field radius).", "ko": "빔 허리 반지름 w_0(1/e 필드 반지름)."}
   },
   "mode_field_diameter": {
@@ -2134,6 +2787,17 @@
    "places": ["document", "api"],
    "description": {"en": "Bend radius.", "ko": "굽힘 반지름."}
   },
+  "bend_origin": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["document", "api"],
+   "description": {"en": "Coordinate along the bend axis at which the local bend radius equals bend_radius.", "ko": "굽힘 축을 따라 국소 굽힘 반지름이 bend_radius와 같은 좌표."}
+  },
   "pml_thickness": {
    "dimension": {"L": 1},
    "unit": "m",
@@ -2142,7 +2806,7 @@
    "rank": ["scalar"],
    "domain": {"min_exclusive": "0"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Thickness of a perfectly matched layer.", "ko": "완전 정합층(PML)의 두께."}
   },
   "pml_strength": {
@@ -2153,7 +2817,7 @@
    "rank": ["scalar"],
    "domain": {"min_exclusive": "0"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Absorption strength of a perfectly matched layer.", "ko": "완전 정합층의 흡수 세기."}
   },
   "pml_order": {
@@ -2164,7 +2828,7 @@
    "rank": ["scalar"],
    "domain": {"min": "1"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Polynomial order of the PML profile.", "ko": "PML 분포의 다항식 차수."}
   },
   "pml_minimum_physical_fraction": {
@@ -2175,7 +2839,7 @@
    "rank": ["scalar"],
    "domain": {"min_exclusive": "0", "max": "1"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Smallest fraction of the domain that is not PML.", "ko": "영역에서 PML이 아닌 부분의 최소 비율."}
   },
   "magnetic_field": {
@@ -2200,6 +2864,7 @@
    "domain": null,
    "band": null,
    "places": ["result"],
+   "sign": {"resonant_frequency": {"en": "Under exp(-i omega t); Im < 0 decays in time, quality_factor = Re f / (-2 Im f).", "ko": "exp(-i omega t) 기준. Im < 0이면 시간에 따라 감쇠, quality_factor = Re f / (-2 Im f)."}},
    "description": {"en": "Complex resonant frequency; the imaginary part is negative for decay (output).", "ko": "복소 공진 주파수. 감쇠하면 허수부가 음수(출력)."}
   },
   "quality_factor": {
@@ -2326,8 +2991,30 @@
    "rank": ["scalar"],
    "domain": {"min": "0"},
    "band": null,
-   "places": ["document", "api"],
+   "places": ["document", "api", "result"],
    "description": {"en": "Number of modes.", "ko": "모드 개수."}
+  },
+  "search_mode_count": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "count",
+   "rank": ["scalar"],
+   "domain": {"min": "1"},
+   "band": null,
+   "places": ["document", "api", "result"],
+   "description": {"en": "Number of modes searched at each sweep point to track the requested ones.", "ko": "요청한 모드를 추적하려고 스윕 점마다 찾는 모드 개수."}
+  },
+  "returned_mode_count": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "count",
+   "rank": ["scalar"],
+   "domain": {"min": "0"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Number of modes returned (output).", "ko": "돌려준 모드 개수(출력)."}
   },
   "iteration_limit": {
    "dimension": {},

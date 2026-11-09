@@ -71,6 +71,28 @@ each carries its `source` string. Check them before relying on them. The
 exception is the thermal conductivity of Cu and Al, which is a function of
 temperature from a published equation ([below](#thermal-conductivity-of-metals-versus-temperature-hust--lankford-1984)).
 
+Each record also states the temperature of its optical data,
+`Material.datum_temperature` in K, as its refractiveindex.info record gives it (the
+pinned database revision of `tools/rii-revision.txt`). Where the source says only
+"room temperature" or gives none, `datum_temperature` is `None` and
+`datum_assumed` is True, so that a reader can report the assumption (units
+convention, answer 3.8). `vacuum` has neither: n = 1 holds at every temperature.
+`standard_air(...)` states the temperature it is built for.
+
+| Datum | Records |
+|---|---|
+| 288.15 K (15 °C) | `standard_air` |
+| 292.15 K (19 °C) | `MgF2` |
+| 293.15 K (20 °C) | `SiO2`, `Al2O3` |
+| 294.15 K (21 °C) | `LiNbO3` |
+| 295 K | `Ge` (database conditions) |
+| 295.15 K (22 °C) | `GaAs` |
+| 297.15 K (24 °C) | `CaF2` |
+| 298.15 K (25 °C) | `H2O` |
+| 299.15 K (26 °C) | `Si` |
+| 300 K | `Si_visible` |
+| assumed ("room temperature" or none stated) | `Si3N4`, `InP`, `TiO2`, `Au`, `Ag`, `Cu`, `Al` |
+
 ## Air (Ciddor 1996)
 
 `air` is vacuum (n = 1). `standard_air` is moist air after P. E. Ciddor,

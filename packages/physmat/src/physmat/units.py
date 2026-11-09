@@ -12,9 +12,12 @@
     q_array({"unit": "nm", "values": [1500, 1550]}, "vacuum_wavelength")   # [1.5e-06, 1.55e-06]
     q("10 mPa", "gauge_pressure")                   # UnitError E-UNIT-NOT-ACCEPTED: "mPa" is millipascal
 
-``convert()`` returns the value with its diagnostics instead of raising, ``length_to_pm()``
-puts a geometry length on the integer picometre grid, and ``format()`` writes a value back
-as a quantity string. The rules are in docs/packages/physmat/units.md. No other OpenPhysics
+``convert()`` returns the value with its diagnostics instead of raising (and the number and
+unit as written), ``convert_array()`` does the same for every entry of an array,
+``convert_complex()`` reads complex values under exp(-i omega t) and refuses gain,
+``is_quantity_text()`` tells a quantity string from an expression, ``length_to_pm()`` puts a
+geometry length on the integer picometre grid, and ``format()`` writes a value back as a
+quantity string. The rules are in docs/packages/physmat/units.md. No other OpenPhysics
 package calls this module yet: documents, simcase and galerkin keep their current units
 until later steps of the units convention.
 
@@ -31,7 +34,8 @@ Data. The registry ships as two JSON package-data files next to this module:
 - ``unit_tables.json``, generated from it by ``generate_tables()`` (``python -m
   physmat.units --write``; ``--check`` compares; ``python -m physmat._unit_tables --write``
   also works when the tables do not load): canonical units, every accepted spelling, the
-  known-refused list and every legal quantity name.
+  known-refused list, every legal quantity name with the places and rank of the names that
+  differ from their base, and the display groups.
 
 JSON and not generated Python, because the registry is data that readers other than this
 module (Studio, documentation tables, CI name scans) are meant to share; JSON loads with
@@ -58,9 +62,10 @@ from importlib import resources
 from types import MappingProxyType
 from typing import Any, Mapping
 
-__all__ = ["q", "q_array", "convert", "quantity", "menu", "normalize", "length_to_pm", "pm_to_m",
-           "generate_tables", "Quantity", "Conversion", "Diagnostic", "Fix", "Suggestion", "GridLength",
-           "UnitError", "UnitWarning", "LENGTH_UNITS", "DIAGNOSTIC_CODES"]
+__all__ = ["q", "q_array", "convert", "convert_array", "convert_complex", "is_quantity_text", "quantity", "menu",
+           "display_groups", "normalize", "length_to_pm", "pm_to_m", "generate_tables", "Quantity", "Conversion",
+           "ArrayConversion", "ComplexConversion", "Diagnostic", "Fix", "Suggestion", "GridLength", "UnitError",
+           "UnitWarning", "LENGTH_UNITS", "DIAGNOSTIC_CODES"]
 
 SOURCE_FILE = "quantities.json"
 TABLES_FILE = "unit_tables.json"
@@ -94,6 +99,7 @@ _UNITS = {u: _Unit(u, _dimkey(e["dimension"]), Fraction(e["factor"]), Fraction(e
 _SPELLINGS: dict[str, str] = _TAB["spellings"]
 _REFUSED: dict[str, dict] = _TAB["refused"]
 _NAMES: dict[str, str] = _TAB["names"]
+_OVERRIDES: dict[str, dict] = _TAB["name_overrides"]
 _ENTRIES: dict[str, dict] = _SRC["quantities"]
 _ALIASES = tuple((a, b) for a, b in _SRC["character_aliases"])
 _SUPERSCRIPTS: dict[str, str] = _SRC["superscripts"]
@@ -233,7 +239,12 @@ class UnitWarning(UserWarning):
 
 @dataclass(frozen=True, eq=False)
 class Quantity:
-    """One registry quantity. ``menu`` lists canonical units; ``"1"`` means a bare number."""
+    """One registry quantity. ``menu`` lists canonical units; ``"1"`` means a bare number.
+
+    ``rank`` and ``places`` are those of the name (``inward_heat_flux`` is a scalar normal
+    component, ``evaluation_temperature`` an output); ``sign`` is the sign sentence of the name
+    and ``definition`` that of a statistic name ({"en", "ko"} or None); ``scope`` names the model
+    a model parameter belongs to ({"quantity", "model"} or None)."""
     name: str
     base: str
     dimension: Mapping[str, int]
@@ -247,6 +258,9 @@ class Quantity:
     places: tuple[str, ...]
     description: Mapping[str, str]
     status: str | None = None
+    sign: Mapping[str, str] | None = None
+    definition: Mapping[str, str] | None = None
+    scope: Mapping[str, str] | None = None
     _cache: dict = field(default_factory=dict, repr=False)
 
     @property
@@ -267,6 +281,9 @@ def _frozen(value: Any) -> Any:
     return value
 
 
+_GROUPS = _frozen(_TAB["display_groups"])
+
+
 def quantity(name: str) -> Quantity:
     """The registry entry of a quantity name (a base name or a generated qualified name)."""
     if not isinstance(name, str):
@@ -277,11 +294,14 @@ def quantity(name: str) -> Quantity:
     base = _NAMES.get(name)
     if base is None:
         raise UnitError(_unknown_quantity(name))
-    e = _ENTRIES[base]
+    e, own = _ENTRIES[base], _OVERRIDES.get(name, {})
     found = Quantity(name=name, base=base, dimension=_frozen(e["dimension"]), unit=e["unit"],
-                     menu=tuple(e["menu"]), kind=e["kind"], rank=tuple(e["rank"]), complex=e.get("complex", False),
-                     domain=_frozen(e["domain"]), band=_frozen(e["band"]), places=tuple(e["places"]),
-                     description=_frozen(e["description"]), status=e.get("status"))
+                     menu=tuple(e["menu"]), kind=e["kind"], rank=tuple(own.get("rank", e["rank"])),
+                     complex=e.get("complex", False), domain=_frozen(e["domain"]), band=_frozen(e["band"]),
+                     places=tuple(own.get("places", e["places"])), description=_frozen(e["description"]),
+                     status=e.get("status"), sign=_frozen(e.get("sign", {}).get(name)),
+                     definition=_frozen(e.get("statistic_definitions", {}).get(name)),
+                     scope=_frozen(e.get("scope")))
     _QUANTITIES[name] = found
     return found
 
@@ -294,6 +314,14 @@ def menu(name: str) -> tuple[str, ...]:
 def names() -> list[str]:
     """Every legal quantity name, sorted."""
     return sorted(_NAMES)
+
+
+def display_groups() -> Mapping[str, Mapping[str, Any]]:
+    """The display groups of ``display_units``: ``{group: {"quantities", "menu", "shape_numbers"}}``.
+
+    ``length`` holds every length quantity name; ``shape_numbers`` says that the bare shape
+    numbers of a geometry belong to the group too. A group's unit is one of its ``menu``."""
+    return _GROUPS
 
 
 def _unknown_quantity(name: str) -> Diagnostic:
@@ -455,6 +483,7 @@ class _Read:
     shown: str                  # the value as written, for messages
     text: str | None            # normalised quantity text with the canonical spelling
     integer: bool               # written as an integer literal (counts)
+    unit_text: str | None = None    # the unit as written, after the character map
 
 
 def _parse(raw: str, qo: Quantity, path: str, shown: str | None = None) -> _Read | Diagnostic:
@@ -472,7 +501,7 @@ def _parse(raw: str, qo: Quantity, path: str, shown: str | None = None) -> _Read
         if isinstance(unit, Diagnostic):
             return unit
         return _Read(_decimal_fraction(number_text), number_text, unit, shown, f"{number_text} {unit}",
-                     bool(_INTEGER.fullmatch(number_text)))
+                     bool(_INTEGER.fullmatch(number_text)), unit_text)
     m = _GLUED.fullmatch(text)
     if m:
         spaced = f"{m.group(1)} {m.group(2)}"
@@ -818,13 +847,19 @@ def _shortest_text(target: Fraction, unit: str, qo: Quantity, x: float) -> str:
 @dataclass(frozen=True)
 class Conversion:
     """Result of ``convert``: the SI value (None on error), its exact rational value, the canonical
-    unit, the normalised text (number as written, canonical unit spelling) and the diagnostics."""
+    unit, the normalised text (number as written, canonical unit spelling) and the diagnostics.
+
+    ``number_text`` is the number as written (a bare number: its decimal text) and ``unit_text``
+    the unit as written after the character map (None for a bare number), so that a caller can
+    hand on the authored number when the unit is the one it needs (``"30 deg"`` -> 30)."""
     quantity: str
     value: float | None
     exact: Fraction | None
     unit: str
     text: str | None
     diagnostics: tuple[Diagnostic, ...] = ()
+    number_text: str | None = None
+    unit_text: str | None = None
 
     @property
     def error(self) -> Diagnostic | None:
@@ -852,8 +887,9 @@ def convert(value: Any, quantity_name: str, *, path: str = "") -> Conversion:
     return _finish(read, qo, path)
 
 
-def _fail(qo: Quantity, *diagnostics: Diagnostic) -> Conversion:
-    return Conversion(qo.name, None, None, qo.unit, None, tuple(diagnostics))
+def _fail(qo: Quantity, *diagnostics: Diagnostic, read: _Read | None = None) -> Conversion:
+    texts = (None, None) if read is None else (read.number_text, read.unit_text)
+    return Conversion(qo.name, None, None, qo.unit, None, tuple(diagnostics), *texts)
 
 
 def _finish(read: _Read, qo: Quantity, path: str) -> Conversion:
@@ -861,23 +897,23 @@ def _finish(read: _Read, qo: Quantity, path: str) -> Conversion:
     if read.unit is None and not qo.bare:                                        # rule 3
         msg = (f"{read.shown} has no unit. {qo.name} takes {_menu_text(qo)} (canonical {qo.unit}). "
                "Write the unit with the number, as on a datasheet.")
-        return _fail(qo, Diagnostic("E-UNIT-MISSING", path, msg))
+        return _fail(qo, Diagnostic("E-UNIT-MISSING", path, msg), read=read)
     unit = read.unit or "1"
     if read.number is None:                                                      # rule 10
         msg = f"{read.shown} is far outside the range of a double; no value can be stored."
-        return _fail(qo, Diagnostic("E-DOMAIN", path, msg))
+        return _fail(qo, Diagnostic("E-DOMAIN", path, msg), read=read)
     exact = _to_canonical(read.number, unit, qo)
     problem = _range_problem(exact)
     if problem:
-        return _fail(qo, Diagnostic("E-DOMAIN", path, f"{read.shown} is {problem}."))
+        return _fail(qo, Diagnostic("E-DOMAIN", path, f"{read.shown} is {problem}."), read=read)
     value = float(exact)
     if qo.kind == "count" and not (read.integer and exact.denominator == 1):
         if exact.denominator == 1:                       # 2.0, 2e1, Fraction(2): the right value, written otherwise
             msg = (f"{read.shown} is not written as an integer literal; {qo.name} is a count, written as "
                    f"a JSON integer: {int(exact)}.")
-            return _fail(qo, Diagnostic("E-DOMAIN", path, msg, Fix(int(exact))))
+            return _fail(qo, Diagnostic("E-DOMAIN", path, msg, Fix(int(exact))), read=read)
         msg = f"{read.shown} is not a whole number; {qo.name} is a count, written as an integer."
-        return _fail(qo, Diagnostic("E-DOMAIN", path, msg))
+        return _fail(qo, Diagnostic("E-DOMAIN", path, msg), read=read)
     lim = _limits(qo)
     bad = _domain_problem(exact, lim["domain"], qo)                              # rule 11
     if bad:
@@ -887,9 +923,10 @@ def _finish(read: _Read, qo: Quantity, path: str) -> Conversion:
             msg += f' A fraction is written as a number up to 1 or in %: did you mean "{read.number_text} %"?'
             percent = _to_canonical(read.number, "%", qo)
             sugg = (Suggestion(f"{read.number_text} %", value, float(percent), qo.unit),) if percent <= 1 else ()
-        return _fail(qo, Diagnostic("E-DOMAIN", path, msg, suggestions=sugg))
+        return _fail(qo, Diagnostic("E-DOMAIN", path, msg, suggestions=sugg), read=read)
     found = _band(read, exact, value, unit, qo, lim, path)                       # rule 12
-    return Conversion(qo.name, value, exact, qo.unit, read.text, tuple(found))
+    return Conversion(qo.name, value, exact, qo.unit, read.text, tuple(found), read.number_text,
+                      read.unit_text)
 
 
 def _unit_suffix(qo: Quantity) -> str:
@@ -969,7 +1006,13 @@ def _band_text(spec: dict, qo: Quantity) -> str:
         else:
             parts.append(f"|value| >= {_bound_text(lo, qo)}")
     if "range" in spec:
-        parts.append(f"{_bound_text(spec['range'][0], qo)} to {_bound_text(spec['range'][1], qo)}")
+        lo, hi = spec["range"]
+        if lo is not None and hi is not None:
+            parts.append(f"{_bound_text(lo, qo)} to {_bound_text(hi, qo)}")
+        elif hi is not None:
+            parts.append(f"<= {_bound_text(hi, qo)}")
+        else:
+            parts.append(f">= {_bound_text(lo, qo)}")
     if "abs_min" in spec:
         parts.append(f"|value| >= {_bound_text(spec['abs_min'], qo)} unless exactly 0")
     if "when_unit" in spec:
@@ -1029,50 +1072,259 @@ def q_array(values: Any, quantity_name: str, *, path: str = "") -> list:
     """SI list of a tagged array ``{"unit": "nm", "values": [...]}`` (nested lists keep their
     shape), a dimensionless ``{"values": [...]}``, or a short vector of at most 3 quantity
     strings (``["0 MPa", "-5 MPa"]``). "values" may be any sequence or an array with
-    ``tolist()`` (a numpy array); numpy is never imported."""
+    ``tolist()`` (a numpy array); numpy is never imported.
+
+    Raises TypeError for a value of the wrong form, UnitError for the first error and warns
+    each warning; ``convert_array`` returns every diagnostic instead."""
+    c = convert_array(values, quantity_name, path=path)
+    form = next((d for d in c.diagnostics if d.code == "E-VALUE-FORM"), None)
+    if form is not None:
+        raise TypeError(form.message)
+    if c.error is not None:
+        raise UnitError(c.error)
+    for d in c.diagnostics:
+        warnings.warn(UnitWarning(d), stacklevel=2)
+    return c.values
+
+
+@dataclass(frozen=True)
+class ArrayConversion:
+    """Result of ``convert_array``: the SI values in the shape written (None for an entry that
+    failed; ``values`` is None when the array itself is refused), one ``Conversion`` per entry in
+    order (``entries``), the unit as written after the character map, and every diagnostic: the
+    array's own first, then each entry's, in order."""
+    quantity: str
+    values: list | None
+    unit: str
+    unit_text: str | None
+    entries: tuple[Conversion, ...] = ()
+    diagnostics: tuple[Diagnostic, ...] = ()
+
+    @property
+    def error(self) -> Diagnostic | None:
+        return next((d for d in self.diagnostics if d.severity == "error"), None)
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+
+def convert_array(values: Any, quantity_name: str, *, path: str = "") -> ArrayConversion:
+    """Convert a tagged array, a dimensionless ``{"values": [...]}`` or a short vector of at most
+    3 quantity strings, with every diagnostic, as ``convert`` does for one value.
+
+    Never raises for a bad value: a value of the wrong form (a string in a tagged array, a list
+    of more than 3 strings, an object that is no array) is ``E-VALUE-FORM`` at its path. Raises
+    UnitError only for an unknown quantity name."""
     qo = quantity(quantity_name)
-    results: list[Conversion] = []
+
+    def refused(diagnostic: Diagnostic, unit_text: str | None = None) -> ArrayConversion:
+        return ArrayConversion(qo.name, None, qo.unit, unit_text, (), (diagnostic,))
+
+    entries: list[Conversion] = []
+    unit_text = None
     if isinstance(values, Mapping):
         extra = sorted(set(values) - {"unit", "values"})
         if extra:
-            raise UnitError(Diagnostic("E-KEY-UNKNOWN", _join(path, extra[0]),
-                                       f'Unknown key "{extra[0]}" in a tagged array, which holds "unit" and "values".'))
+            return refused(Diagnostic("E-KEY-UNKNOWN", _join(path, extra[0]),
+                                      f'Unknown key "{extra[0]}" in a tagged array, which holds "unit" and "values".'))
         if "values" not in values:
-            raise UnitError(Diagnostic("E-KEY-MISSING", _join(path, "values"), 'A tagged array needs "values".'))
+            return refused(Diagnostic("E-KEY-MISSING", _join(path, "values"), 'A tagged array needs "values".'))
         unit = values.get("unit")
         data = _as_list(values["values"])
         if data is None:
-            raise TypeError('the "values" of a tagged array are a list (or an array with tolist())')
+            return refused(Diagnostic("E-VALUE-FORM", _join(path, "values"),
+                                      'the "values" of a tagged array are a list (or an array with tolist())'))
         if unit is None:
-            out = _walk(data, _join(path, "values"), lambda v, p: convert(_number_only(v), qo.name, path=p), results)
+            def one(v: Any, p: str) -> Conversion:
+                return _form(qo, p, _NUMBERS_ONLY) if not _is_number(v) else convert(v, qo.name, path=p)
         else:
             if not isinstance(unit, str):
-                raise TypeError("a tagged array's unit is a string")
-            canonical = _resolve(normalize(unit), qo, None, f'"unit": "{unit}"', _join(path, "unit"))
+                return refused(Diagnostic("E-VALUE-FORM", _join(path, "unit"), "a tagged array's unit is a string"))
+            unit_text = normalize(unit)
+            canonical = _resolve(unit_text, qo, None, f'"unit": "{unit}"', _join(path, "unit"))
             if isinstance(canonical, Diagnostic):
-                raise UnitError(canonical)
+                return refused(canonical, unit_text)
 
             def one(v: Any, p: str) -> Conversion:
-                number, text = _bare_number(_number_only(v))
-                read = _Read(number, text, canonical, f'"{text} {unit}"', f"{text} {canonical}", _integer_literal(v))
+                if not _is_number(v):
+                    return _form(qo, p, _NUMBERS_ONLY)
+                number, text = _bare_number(v)
+                read = _Read(number, text, canonical, f'"{text} {unit}"', f"{text} {canonical}", _integer_literal(v),
+                             unit_text)
                 return _finish(read, qo, p)
-            out = _walk(data, _join(path, "values"), one, results)
+        out = _walk(data, _join(path, "values"), one, entries)
     elif _as_list(values) is not None:
         vector = _as_list(values)
         if len(vector) > 3 or any(_as_list(v) is not None for v in vector):
-            raise TypeError("a list of quantity strings is a short vector of at most 3 components; write a "
-                            "tagged array {'unit': 'nm', 'values': [...]} for longer or nested lists")
-        out = [_walk(v, f"{path}[{i}]", lambda x, p: convert(x, qo.name, path=p), results)
-               for i, v in enumerate(vector)]
+            return refused(Diagnostic("E-VALUE-FORM", path,
+                                      "a list of quantity strings is a short vector of at most 3 components; write a "
+                                      "tagged array {'unit': 'nm', 'values': [...]} for longer or nested lists"))
+
+        def one(v: Any, p: str) -> Conversion:
+            if isinstance(v, str) or _is_number(v):
+                return convert(v, qo.name, path=p)
+            return _form(qo, p, f"a vector component is a quantity string or a number, not {type(v).__name__}")
+        out = [_walk(v, f"{path}[{i}]", one, entries) for i, v in enumerate(vector)]
     else:
-        raise TypeError("q_array takes {'unit': ..., 'values': [...]} or a list")
-    for c in results:
-        if c.error is not None:
-            raise UnitError(c.error)
-    for c in results:
-        for d in c.diagnostics:
-            warnings.warn(UnitWarning(d), stacklevel=2)
-    return out
+        return refused(Diagnostic("E-VALUE-FORM", path, "an array is a tagged array {'unit': ..., 'values': [...]} "
+                                  "or a list"))
+    found = tuple(d for c in entries for d in c.diagnostics)
+    return ArrayConversion(qo.name, out, qo.unit, unit_text, tuple(entries), found)
+
+
+_NUMBERS_ONLY = "the values of a tagged array are bare numbers"
+
+
+def _is_number(v: Any) -> bool:
+    return not isinstance(v, bool) and isinstance(v, (numbers.Real, Decimal))
+
+
+def _form(qo: Quantity, path: str, message: str) -> Conversion:
+    return Conversion(qo.name, None, None, qo.unit, None, (Diagnostic("E-VALUE-FORM", path, message),))
+
+
+def is_quantity_text(text: Any) -> bool:
+    """True for a quantity string: a number, one space and a unit that the spelling table accepts
+    or the known-refused list names (``"0.5 um"``, ``"10 mPa"``; attached ``"40%"`` too).
+
+    False for an expression (``"w/2"``, ``"220 nm + gap"``), a bare number and anything that is
+    not a string. A document reader uses it to tell a tagged value from an expression."""
+    if not isinstance(text, str):
+        return False
+    m = _QTY.fullmatch(normalize(text))
+    return m is not None and (m.group(2) in _SPELLINGS or m.group(2) in _REFUSED)
+
+
+# ---- complex values -----------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ComplexConversion:
+    """Result of ``convert_complex``: the complex SI value under exp(-i omega t) (None on error),
+    its exact real and imaginary parts, the canonical unit, the form read (``"real"``, ``"re_im"``
+    or ``"n_k"``) and the diagnostics."""
+    quantity: str
+    value: complex | None
+    exact: tuple[Fraction, Fraction] | None
+    unit: str
+    form: str | None
+    diagnostics: tuple[Diagnostic, ...] = ()
+
+    @property
+    def error(self) -> Diagnostic | None:
+        return next((d for d in self.diagnostics if d.severity == "error"), None)
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+
+_TIME_CONVENTION = "exp(-i omega t)"
+
+
+def convert_complex(value: Any, quantity_name: str, *, path: str = "", allow_gain: bool = False) -> ComplexConversion:
+    """Convert a value of a complex quantity under exp(-i omega t), with its diagnostics.
+
+    Forms: a real value as ``convert`` takes it (``4.0``, a quantity string); ``{"re": .., "im": ..}``
+    for a dimensionless complex quantity other than ``refractive_index``; ``{"n": .., "k": ..}``
+    for ``refractive_index``. The real part (``re``, ``n``) is checked against the quantity's domain
+    and band; the imaginary part is a bare number. For a passive material quantity
+    (``refractive_index``, ``relative_permittivity``, ``relative_permeability``) a negative
+    imaginary part or ``k`` is ``E-GAIN`` with the exp(+j omega t) hint, unless ``allow_gain``.
+    A ``[re, im]`` pair is ``E-VALUE-FORM``. Never raises for a bad value; raises UnitError only
+    for an unknown quantity name."""
+    qo = quantity(quantity_name)
+    nk = qo.base == "refractive_index"
+    keys = ("n", "k") if nk else ("re", "im")
+
+    def failed(*diagnostics: Diagnostic, form: str | None = None) -> ComplexConversion:
+        return ComplexConversion(qo.name, None, None, qo.unit, form, tuple(diagnostics))
+
+    if isinstance(value, Mapping):
+        form = "n_k" if nk else "re_im"
+        given = set(value)
+        if not qo.complex:
+            return failed(Diagnostic("E-VALUE-FORM", path, f"{qo.name} is real: write one value, not an object."))
+        if nk and given & {"re", "im"} and not given & {"n", "k"}:
+            return failed(Diagnostic("E-VALUE-FORM", path, 'refractive_index is written {"n": .., "k": ..} '
+                                     f"under {_TIME_CONVENTION}, with k >= 0 for loss; " + '{"re", "im"} is for '
+                                     "relative_permittivity and relative_permeability."), form=form)
+        if not nk and given & {"n", "k"} and not given & {"re", "im"}:
+            return failed(Diagnostic("E-VALUE-FORM", path, '"n" and "k" are written only inside refractive_index; '
+                                     f'write {{"re": .., "im": ..}} under {_TIME_CONVENTION}.'), form=form)
+        if qo.unit != "1":
+            return failed(Diagnostic("E-VALUE-FORM", path, f'{qo.name} has the unit {qo.unit}; '
+                                     '{"re": .., "im": ..} is only for a dimensionless quantity.'), form=form)
+        extra = sorted(str(k) for k in given - set(keys))
+        if extra:
+            return failed(Diagnostic("E-KEY-UNKNOWN", _join(path, extra[0]), f'Unknown key "{extra[0]}" in a '
+                                     f'complex value, which holds "{keys[0]}" and "{keys[1]}".'), form=form)
+        missing = [k for k in keys if k not in value]
+        if missing:
+            note = f" Write {keys[0]} alone as a number for a lossless value." if missing == [keys[1]] else ""
+            return failed(Diagnostic("E-KEY-MISSING", _join(path, missing[0]), f'A complex value needs "{keys[0]}" '
+                                     f'and "{keys[1]}".{note}'), form=form)
+        real = convert(value[keys[0]], qo.name, path=_join(path, keys[0])) if _readable(value[keys[0]]) else \
+            _form(qo, _join(path, keys[0]), f'"{keys[0]}" is a bare number')
+        imag = _imaginary(value[keys[1]], qo, _join(path, keys[1]))
+        found = real.diagnostics + imag.diagnostics
+        if real.error is not None or imag.error is not None:
+            return failed(*found, form=form)
+        if imag.exact < 0 and not allow_gain and qo.complex and "material" in qo.places:
+            found += (_gain(imag, qo, _join(path, keys[1]), nk),)
+            return failed(*found, form=form)
+        return ComplexConversion(qo.name, complex(real.value, imag.value), (real.exact, imag.exact), qo.unit, form,
+                                 found)
+    if _as_list(value) is not None:
+        want = '{"n": .., "k": ..}' if nk else '{"re": .., "im": ..}'
+        return failed(Diagnostic("E-VALUE-FORM", path, f"a [re, im] pair is not read: write {want} under "
+                                 f"{_TIME_CONVENTION} (a source using exp(+j omega t) has the opposite imaginary "
+                                 "sign)."))
+    if not _readable(value):
+        objects = '{"n": .., "k": ..}' if nk else '{"re": .., "im": ..}'
+        return failed(Diagnostic("E-VALUE-FORM", path, f"{qo.name} takes a number, a quantity string or "
+                                 f"{objects}, not {type(value).__name__}."))
+    c = convert(value, qo.name, path=path)
+    if c.error is not None:
+        return failed(*c.diagnostics, form="real")
+    return ComplexConversion(qo.name, complex(c.value, 0.0), (c.exact, Fraction(0)), qo.unit, "real", c.diagnostics)
+
+
+def _readable(v: Any) -> bool:
+    """A value ``convert`` reads: a string or a number (not a bool)."""
+    return isinstance(v, str) or _is_number(v)
+
+
+def _imaginary(v: Any, qo: Quantity, path: str) -> Conversion:
+    """The imaginary part (or k): a bare number, checked for range only."""
+    if isinstance(v, str):
+        text = normalize(v)
+        msg = f'"{v}" is a string; the imaginary part is a bare JSON number'
+        n = _decimal_fraction(text) if _BARE.fullmatch(text) else None
+        if n is not None and not _range_problem(n):
+            return Conversion(qo.name, None, None, qo.unit, None,
+                              (Diagnostic("E-UNIT-UNKNOWN", path, msg + f": {text}.", Fix(_bare_value(text))),))
+        return Conversion(qo.name, None, None, qo.unit, None, (Diagnostic("E-UNIT-UNKNOWN", path, msg + "."),))
+    if not _is_number(v):
+        return _form(qo, path, f"the imaginary part is a bare number, not {type(v).__name__}")
+    number, text = _bare_number(v)
+    if number is None:
+        return Conversion(qo.name, None, None, qo.unit, None,
+                          (Diagnostic("E-DOMAIN", path, f"{text} is far outside the range of a double."),))
+    problem = _range_problem(number)
+    if problem:
+        return Conversion(qo.name, None, None, qo.unit, None, (Diagnostic("E-DOMAIN", path, f"{text} is {problem}."),))
+    return Conversion(qo.name, float(number), number, qo.unit, text, (), text, None)
+
+
+def _gain(imag: Conversion, qo: Quantity, path: str, nk: bool) -> Diagnostic:
+    """E-GAIN for a negative imaginary part; the negated number is a suggestion (it changes the meaning)."""
+    part = "k" if nk else f"Im {qo.name}"
+    msg = (f"{part} = {imag.number_text} is gain under {_TIME_CONVENTION}: a passive material has "
+           f"{'k' if nk else 'an imaginary part'} >= 0, which is loss. If your source uses exp(+j omega t), "
+           f"negate the imaginary part.")
+    flipped = _bare_value(_decimal_text(-imag.exact))
+    return Diagnostic("E-GAIN", path, msg, suggestions=(Suggestion(flipped, imag.value, -imag.value, "1"),))
 
 
 def _as_list(data: Any) -> list | None:
@@ -1082,12 +1334,6 @@ def _as_list(data: Any) -> list | None:
     if not isinstance(data, Sequence) and callable(getattr(data, "tolist", None)):
         data = data.tolist()
     return list(data) if isinstance(data, Sequence) and not isinstance(data, (str, bytes)) else None
-
-
-def _number_only(v: Any) -> Any:
-    if isinstance(v, str) or isinstance(v, bool):
-        raise TypeError("the values of a tagged array are bare numbers")
-    return v
 
 
 def _join(path: str, key: str) -> str:

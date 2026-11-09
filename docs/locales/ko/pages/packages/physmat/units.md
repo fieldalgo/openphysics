@@ -4,7 +4,8 @@
 
 [문서 홈](../../index.md)
 
-상태: **OpenPhysics 단위·이름 규칙의 첫 단계.** `physmat.units`는 물리량 등록부와,
+상태: **OpenPhysics 단위·이름 규칙의 첫 단계와, 문서 리더에 필요한 등록부 항목과 변환 함수.**
+`physmat.units`는 물리량 등록부와,
 사람이 쓴 단위를 SI로 바꾸는 단 하나의 변환기를 담습니다. **아직 아무것도 이 모듈을 쓰지
 않습니다.** 모델 문서, `simcase`, `galerkin`, `sipi`, Studio는 지금의 키 이름과 단위를 그대로
 쓰고, physmat의 다른 함수도 지금의 인수(파장은 마이크로미터, 온도는 켈빈, Ciddor 공기 모델만
@@ -12,7 +13,7 @@
 라이브러리만 씁니다.
 
 ```python
-from physmat.units import q, q_array, convert
+from physmat.units import q, q_array, convert, convert_array, convert_complex
 
 q("200 GPa", "youngs_modulus")                   # 200000000000.0  (Pa)
 q("200000 MPa", "youngs_modulus")                # the same double
@@ -25,6 +26,11 @@ q("1550 THz", "vacuum_wavelength")               # UnitError E-UNIT-DIMENSION: D
 
 q("10 mPa", "gauge_pressure")                    # UnitError E-UNIT-NOT-ACCEPTED: millipascal
 convert("10 mPa", "gauge_pressure").error        # the same diagnostic, returned instead of raised
+convert("30 deg", "minimum_angle").number_text   # "30": the number as written, beside the SI value
+
+convert_array({"unit": "nm", "values": [1500, -1]}, "vacuum_wavelength")    # every entry's diagnostics
+convert_complex({"re": 4.0, "im": 0.04}, "relative_permittivity").value     # (4+0.04j), exp(-i omega t)
+convert_complex({"n": 3.48, "k": -0.002}, "refractive_index").error         # E-GAIN: k >= 0 is loss
 ```
 
 ## 값의 규칙
@@ -70,6 +76,42 @@ unit     = one entry of the spelling table
   가져오지는 않습니다.
 - 개수(`mode_count`, `pml_order` 등)는 정수 리터럴입니다. `2.0`이 아니라 `2`입니다. `2.0`,
   `Decimal("2E+1")`, `Fraction(2)`는 정수를 fix로 주는 `E-DOMAIN`입니다.
+- `Conversion.number_text`는 쓴 그대로의 숫자이고 `Conversion.unit_text`는 문자 대응표를 거친
+  뒤 쓴 그대로의 단위입니다(`"28.5 °"`: `"28.5"`와 `"deg"`. `"148 W/m/K"`: `"W/m/K"`이고
+  `text`는 `"148 W/(m K)"`). 도(degree)를 받는 메셔처럼 쓴 숫자가 필요한 쪽은 여기서 읽습니다.
+  `math.degrees(q("30 deg", "minimum_angle"))`은 정확히 30이 아닙니다.
+- `is_quantity_text(s)`는 숫자, 공백 하나, 두 표 가운데 하나에 있는 단위로 이루어진 문자열
+  (`"0.5 um"`, `"10 mPa"`, `"40%"`)이면 True, 식(`"w/2"`, `"220 nm + gap"`)이나 맨 숫자면
+  False입니다. 문서 리더가 단위 붙은 값과 식을 가릴 때 씁니다.
+
+## 배열과 복소수 값
+
+`convert_array(values, quantity, path=...)`는 위의 배열 형태를 받아 `ArrayConversion`을
+돌려줍니다. 쓴 모양 그대로의 SI 값(실패한 항목은 `None`), 항목마다의 `Conversion`, 모든
+진단을 담으며, 진단은 배열 자체의 것(모르는 키, 빠진 `values`, 거부된 단위)이 먼저이고 그다음
+항목의 것이 차례로 옵니다. 잘못된 값에 예외를 일으키지 않습니다. 단위 붙은 배열 안의 문자열이나
+bool, 문자열 4개 이상의 목록, 배열이 아닌 객체는 그 경로의 `E-VALUE-FORM`입니다. `q_array`는
+예외를 일으키는 `convert_array`입니다. 형태가 틀리면 `TypeError`, 첫 오류는 `UnitError`,
+경고는 각각 `UnitWarning`입니다.
+
+`convert_complex(value, quantity, path=..., allow_gain=False)`는 복소 물리량을 하나뿐인 시간
+규약 exp(−iωt)로 읽습니다.
+
+| 형태 | 물리량 | 예 |
+|---|---|---|
+| `convert`가 받는 실수 값 | 모두 | `1.45`, `4`, `"50 Ohm"` |
+| 맨 숫자의 `{"re": .., "im": ..}` | `refractive_index`가 아닌 무차원 복소 물리량(`relative_permittivity`, `relative_permeability`) | `{"re": 4.0, "im": 0.04}` |
+| 맨 숫자의 `{"n": .., "k": ..}` | `refractive_index`만 | `{"n": 3.48, "k": 0.01}` |
+
+실수부(`re`, `n`)는 물리량의 허용 범위와 타당 범위로 검사하고(`"n": 0`은 `E-DOMAIN`),
+허수부는 맨 숫자로서 범위만 검사합니다. 수동 재료 물리량(`refractive_index`,
+`relative_permittivity`, `relative_permeability`)에서 허수부나 `k`가 음수이면 그 부분 경로의
+`E-GAIN`이며, "출처가 exp(+jωt)를 쓴다면 허수부의 부호를 바꾸라"는 안내와 부호를 바꾼 숫자를
+suggestion으로 줍니다(fix는 아님). `allow_gain=True`면 받습니다. `[re, im]` 쌍,
+`refractive_index`의 `{"re", "im"}`, 다른 물리량의 `{"n", "k"}`, 실수 물리량이나 차원 있는
+물리량의 객체는 `E-VALUE-FORM`이고, 빠지거나 모르는 키는 `E-KEY-MISSING`이나
+`E-KEY-UNKNOWN`입니다. 결과 `ComplexConversion`은 복소 SI 값, 정확한 실수부·허수부, 읽은 형태
+(`"real"`, `"re_im"`, `"n_k"`), 진단을 담습니다.
 
 ## 정확한 변환
 
@@ -133,7 +175,8 @@ unit     = one entry of the spelling table
 붙여 쓴 형태(`W/mK`, `Nm`)와 괄호 없는 `a/b c` 형태(`W/m K`)는 절대 쓰지 않습니다. 도구가 쓰는
 정식 형태는 ASCII이며 인수를 공백 하나로 나누고, `/`는 많아야 하나, 인수가 둘 이상인 분모는
 괄호로 묶고, 지수는 `^n`으로 씁니다: `W/(m K)`, `J/(kg K)`, `kg/m^3`, `S/m`, `1/K`,
-`Ohm m`, `dB/m`.
+`Ohm m`, `dB/m`. 출력에만 쓰는 두 단위는 지수가 반정수이며 괄호 안에 씁니다: `1/m^(1/2)`,
+`1/m^(3/2)`(`m^(-1/2)`, `m^(-3/2)`로도 읽음). 어느 입력 메뉴에도 없습니다.
 
 **알려진 거부 목록.** 같은 생성기가 알아보지만 거부하는 철자를 코드와 읽는 법과 함께 씁니다.
 
@@ -143,6 +186,7 @@ unit     = one entry of the spelling table
 | 복합 단위 안의 `degC`(`W/(m degC)`, `ppm/degC`, `1/degC`, `degC/m`) | `E-DEGC-NOT-ABSOLUTE` | fix: 같은 숫자에 `K`(`"12 ppm/K"`) |
 | 붙여 쓴 형태나 `a/b c` 형태 안의 `degC`(`J/kg°C`, `W/m°C`, `W/m degC`) | `E-UNIT-AMBIGUOUS` | `K`로 쓴 읽기(`J/(kg K)`)와 "write K". fix는 없음 |
 | 메뉴 복합 단위의 대소문자 닮은꼴(`mW/(m K)` 자리의 `MW/(m K)`, `MOhm/mm`, `W/Mm^2`) | `E-UNIT-NOT-ACCEPTED` | "`MW/(m K)` is megawatt per metre kelvin" |
+| 입력 메뉴의 복합 단위에서 인수 하나의 접두어만 흔한 다른 접두어(`p n u m k M G`, 미터에는 `c`도. 켈빈 인수는 제외)로 바꾼 것: `MW/m^3`, `mW/(m^2 K)`, `kW/m^3`, `V/cm`, `mS/cm`, `1/mm`, `km^2` | `E-UNIT-NOT-ACCEPTED` | "`MW/m^3` is megawatt per cubic metre. As written it is 5e6 W/m^3". suggestion으로 메뉴 단위로 쓴 같은 값 |
 | 외래 단위(`degF`, `Mpsi`, `R`, `Np`, `Np/m`, `Btu`, `kgf/mm^2`, `oz`, `ft`, `lb`, `lbf`, `Torr`, `mmHg`, `cal`, `micron` 등) | `E-UNIT-NOT-ACCEPTED` | 정확한 환산(있으면 suggestion으로) |
 | `^` 없는 거듭제곱(`m2`, `m3`, `um2`, `W/m2`) | `E-UNIT-NOT-ACCEPTED` | fix: `m^2` |
 | 단위 `1` | `E-UNIT-NOT-ACCEPTED` | 무차원 값은 맨 숫자 |
@@ -214,8 +258,10 @@ error E-UNIT-NOT-ACCEPTED at physics.solid.conditions.bore.gauge_pressure
 
 90–110 kPa의 `gauge_pressure`는 `W-GAUGE-ATMOSPHERIC`도 냅니다. `q()`는 오류면 `UnitError`를
 일으키고 경고는 각각 `UnitWarning`으로 냅니다. `convert()`는 둘 다 돌려줍니다. 등록부는 규칙의
-진단 코드 58개 모두를 영어·한국어 한 줄 제목과 함께 담고(`DIAGNOSTIC_CODES`), 이 모듈은 그중
-14개를 냅니다.
+진단 코드 66개 모두를 영어·한국어 한 줄 제목과 함께 담습니다(`DIAGNOSTIC_CODES`). 설계의 58개와
+문서 리더를 위한 8개(`E-FORMAT`, `E-JSON`, `E-VALUE-FORM`, `E-MATERIAL-UNKNOWN`, `E-CONTRACT`,
+`W-SHAPE-DROPPED`, `W-PIECE-DROPPED`, `I-MESH-CONTROL-RAISED`)입니다. 이 모듈은 그중 16개를
+냅니다(`E-VALUE-FORM`과 `E-GAIN`은 `convert_array`와 `convert_complex`에서).
 
 **fix**는 닫힌 목록에서만 나옵니다: 복합 단위 안의 `degC`를 `K`로, 빠진 공백
 (`"2eV"` → `"2 eV"`, `"25℃"` → `"25 degC"`), `^` 없는 거듭제곱(`m2` → `m^2`), 무차원 물리량이나
@@ -234,10 +280,15 @@ JSON 파일 두 개가 모듈 옆에 패키지 데이터로 들어갑니다.
   맨 숫자), 종류(`ordinary`, `absolute`, `difference`, `fraction`, `count`), 계수(rank), 허용
   범위, 타당 범위, 쓰이는 곳, 허용 이름 수식어, "혹시"에 쓰는 기호와 거부 별칭, 차원 오류의
   힌트 표시(`hint`: 그 차원의 대표 물리량이면 true, 밝히지 않을 물리량이면 false. `family`:
-  `spectral`), 영어·한국어 설명을 줍니다. 정확한 계수를 가진 닫힌 기호 목록(`barg psig bara psia`의
-  `gauge`/`absolute` 표시 포함), 접두어, 외래 단위, 문자 대응표, 진단 코드도 담습니다.
+  `spectral`), 영어·한국어 설명을 줍니다. 해당하는 곳에는 이름마다의 부호 문장 `sign`
+  (`inward_heat_flux`: "positive enters the body"), `statistic_definitions`(`maximum_stress`),
+  기반 항목과 다른 이름의 계수 `name_rank`(`inward_heat_flux`는 스칼라인 법선 성분), 모델
+  파라미터가 속한 모델 `scope`도 줍니다. 정확한 계수를 가진 닫힌 기호 목록(`barg psig bara psia`의
+  `gauge`/`absolute` 표시 포함), 접두어, 외래 단위, 문자 대응표, 진단 코드, 출력 전용 수식어
+  낱말, 표시 묶음도 담습니다.
 - `physmat/unit_tables.json`: 원본에서 생성합니다. 차원·정확한 계수·각도 지수·이름을 가진
-  정식 단위, 받는 모든 철자, 알려진 거부 목록, 쓸 수 있는 모든 물리량 이름.
+  정식 단위, 받는 모든 철자, 알려진 거부 목록, 쓸 수 있는 모든 물리량 이름, 기반 항목과 다른
+  이름의 쓰이는 곳과 계수, 표시 묶음마다의 구성원.
 
 ```bash
 python -m physmat.units --check                    # exit 1 if unit_tables.json is stale
@@ -255,16 +306,20 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 `linear_expansion_coefficient`, `thermo_optic_coefficient`. 생성된 이름은 등록부가 허용하는
 곳에서 앞에 방향·역할·통계 낱말 하나까지, 뒤에 성분 낱말 하나를 붙입니다:
 `ambient_temperature`, `stress_free_temperature`, `maximum_temperature`, `inward_heat_flux`,
-`outward_heat_rate_per_depth`, `stress_xy`, `displacement_x`, `minimum_overlap`. `_per_depth`
-물리량은 따로 등록한 항목입니다. 시작 등록부에는 항목 188개와 이름 274개가 있습니다
-(`physmat.units.names()`).
+`outward_heat_rate_per_depth`, `stress_xy`, `displacement_x`, `minimum_overlap`,
+`prescribed_temperature`, `outward_reaction_heat_rate_per_depth`. `_per_depth` 물리량은 따로
+등록한 항목입니다. 출력 전용 역할 낱말(`evaluation`, `unnormalized`, `mass_normalized`)이 붙은
+이름은 출력이어서 쓰이는 곳이 `api`와 `result`뿐이므로, `evaluation_temperature`는 문서에서 읽지
+않습니다. 단위를 바꾸는 역할 낱말은 `reference_conductivity`처럼 따로 기반 항목을 만듭니다
+(`unnormalized_electric_field`는 단위가 없고, `mass_normalized_electric_field`는 1/m^(3/2)).
+등록부에는 항목 242개와 이름 367개가 있습니다(`physmat.units.names()`).
 
 메뉴 일부:
 
 | 물리량 | 정식 단위 | 메뉴 |
 |---|---|---|
 | `length`, `depth`, `element_size` 등 | m | `pm nm Angstrom um mm cm m km in mil` |
-| `temperature`(+ `ambient_`, `reference_`, `initial_`, `stress_free_`) | K | `K mK degC` |
+| `temperature`(+ `ambient_`, `reference_`, `initial_`, `stress_free_`, `prescribed_`, 출력 `evaluation_`) | K | `K mK degC` |
 | `temperature_difference`, `temperature_tolerance` | K | `K mK` |
 | `thermal_conductivity` | W/(m K) | `W/(m K) mW/(m K) W/(cm K)` |
 | `electrical_conductivity` | S/m | `S/m kS/m MS/m S/cm` |
@@ -295,8 +350,32 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 - 닫힌 목록의 모든 기호는 메뉴에 쓰이지 않아도 아는 단위이므로 `"5 mg"`는 모르는 단위가 아니라
   차원으로 거부됩니다.
 - 타당 범위는 항목마다 정한 대로 |값|이나 부호 있는 범위에 적용합니다. 정확히 0인 값은 |값|의
-  아래 경계에서 면제됩니다. 벡터의 노름, 텐서의 고유값, 복소수의 각 부분은 문서 리더의 몫이고,
-  여기서는 숫자 하나하나를 따로 봅니다.
+  아래 경계에서 면제됩니다. 벡터의 노름과 텐서의 고유값은 문서 리더의 몫이고, 여기서는 숫자
+  하나하나를 따로 보며 복소수는 실수부를 검사합니다.
+- **부호 문장**(`Quantity.sign`, 영어·한국어)은 방향 낱말이 붙은 모든 이름, 열·전류·힘의 절점
+  반력·하중·균형 항, `heat_flux`, `gauge_pressure`, `traction`, 그리고 복소 물리량에 있습니다:
+  `refractive_index`(k ≥ 0이 손실), `relative_permittivity`와 `effective_index`(Im ≥ 0이 손실),
+  `resonant_frequency`(Im < 0이면 감쇠), `propagation_loss`, `bend_loss`. 반력은 "구속이 물체에
+  가하는" 뜻을 지키고, `ambient_convective_heat_rate`(대류 하중의 주변 항)는 "물체로 들어감"입니다.
+  경계에서 합한 보고 값은 모두 `outward_`입니다.
+- **통계 정의.** `maximum_displacement`는 절점 변위의 유클리드 노름 가운데 가장 큰 값,
+  `maximum_stress`는 요소들에 걸친 면내 직교 응력 성분의 절댓값 가운데 가장 큰 값이며
+  (`Quantity.definition`), 둘 다 스칼라입니다.
+- **셀마이어 파라미터** `constant`(A, 타당 범위 ≥ 1), `strength`(Bᵢ ≥ 0),
+  `resonance_wavelength`(`nm um m`), `resonance_wavelength_squared`(Cᵢ, `nm^2 um^2 m^2`)는
+  `scope`가 `refractive_index` 모델 `sellmeier`이며 차원 힌트에서 밝히지 않습니다.
+- 균형 결손(`heat_rate_imbalance`, `current_imbalance`, `electric_power_imbalance`,
+  `force_imbalance`), 절점 전류와 힘, `stiffness_energy_functional`(전체 변형률의 ½ uᵀKu. 저장된
+  탄성 에너지가 아님), `minimum_triangle_angle`(rad), 모드 추적 설정과 근거, 정규화하지 않은
+  모드 필드와 질량 정규화한 모드 필드의 출력 항목이 있습니다. `target_frequency`는 > 0이고,
+  `subdivision_count`는 벡터(개수 2개 또는 3개)이며, 결과 요약이 되풀이하는 입력은 모두
+  `result`에도 둡니다(`heat_transfer_coefficient`, `body_force_density`, `traction`,
+  `gauge_pressure`, `target_frequency`, `mode_count`, `pml_` 설정, 추적 문턱값,
+  `beam_waist_radius`, `position`).
+- **표시 묶음**(`display_groups()`): `length`는 모든 길이 물리량 이름과 맨 형상 숫자를 담고,
+  단위는 `LENGTH_UNITS` 가운데 하나입니다. 문서의 `display_units`는 묶음이나 물리량을 지정합니다.
+- **라이브러리 기준 온도.** 내장 재료마다 광학 데이터의 온도를 `Material.datum_temperature`(K)로
+  밝히고, 출처가 밝히지 않으면 `datum_assumed`입니다([physmat 개요](overview.md#내장-재료)).
 
 ## 형상 피코미터 격자
 
@@ -314,9 +393,13 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 |---|---|
 | `q(value, quantity)` | SI float. `UnitError`를 일으키고 `UnitWarning`을 냄 |
 | `q_array(values, quantity)` | 단위 붙은 배열, 무차원 배열, 물리량 문자열 목록의 SI 목록 |
-| `convert(value, quantity, path=...)` | `value`, `exact`(Fraction), `unit`, `text`, `diagnostics`를 가진 `Conversion`. 잘못된 값에 예외를 일으키지 않음 |
+| `convert(value, quantity, path=...)` | `value`, `exact`(Fraction), `unit`, `text`, `diagnostics`, `number_text`, `unit_text`를 가진 `Conversion`. 잘못된 값에 예외를 일으키지 않음 |
+| `convert_array(values, quantity, path=...)` | `values`, 항목마다의 `Conversion`, 모든 진단을 가진 `ArrayConversion`. 잘못된 값에 예외를 일으키지 않음 |
+| `convert_complex(value, quantity, path=..., allow_gain=False)` | exp(−iωt)의 `ComplexConversion`: 실수 값, `{re, im}`, `{n, k}`. 수동 재료에는 `E-GAIN` |
+| `is_quantity_text(s)` | 숫자, 공백, 두 표 가운데 하나의 단위 |
 | `format(value, quantity, unit)` | 정확히 `value`로 되돌아오는 가장 짧은 숫자로 쓴 물리량 문자열 |
-| `quantity(name)`, `menu(name)`, `names()` | 등록부 조회. `Quantity` 객체는 읽기 전용 |
+| `quantity(name)`, `menu(name)`, `names()` | 등록부 조회. `Quantity` 객체는 읽기 전용이며 그 이름의 `rank`, `places`, `sign`, `definition`, `scope`를 줌 |
+| `display_groups()` | 표시 묶음(읽기 전용) |
 | `normalize(text)` | 문자 대응표, 붙임 형태, 공백 규칙 |
 | `length_to_pm(value, length_unit)`, `pm_to_m(k)` | 형상 격자 |
 | `generate_tables()` | `quantities.json`에서 만든 `unit_tables.json` 텍스트 |
@@ -348,6 +431,7 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 | R10 `q()`는 float, `q_array()`는 목록. 맨 숫자는 무차원 물리량에만 | `test_r10_*` |
 | R11 정식 단위가 메뉴에 있고, 메뉴의 모든 단위가 물리량의 차원을 가짐. 모든 메뉴가 시작 표와 같음 | `test_r11_*` |
 | R12 기존 physmat 시험이 바뀌지 않고 통과함 | `test_r12_*` |
+| 문서 리더를 위한 등록부 추가: 새 이름마다 단위와 쓰이는 곳, 리더의 코드, 방향 낱말이 붙은 모든 이름의 부호 문장, 통계 정의와 계수, 반정수 지수의 출력 단위, `length` 표시 묶음, 접두어를 바꾼 입력 복합 단위를 읽는 법과 함께 거부(모르는 단위가 되지 않음), `convert_array`, `convert_complex`와 `E-GAIN`, 라이브러리 기준 온도, 잘못된 이름 필드를 생성기가 거부 | `test_p2_*` |
 
 이 파일에는 우선순위 규칙마다, 내는 코드마다 시험이 하나씩 있으며 fix, suggestion(모든
 suggestion이 보여 준 SI 값으로 되돌아옴), 메시지, 타당 범위, pm 격자, numpy 입력, 호출한 쪽의
@@ -361,15 +445,16 @@ python -m pytest -q tests/physmat
 
 - 문서, `simcase`, `galerkin`, `sipi`, Studio는 이 변환기를 부르지 않습니다. 슬롯 표, JSON
   Schema, 10진수를 보존하는 JSON 읽기·쓰기, 생성 문서 표는 문서 리더와 함께 옵니다.
-- 위에 적지 않은 값의 형태(성분 객체, 범위, 표, 모델 계수, 복소수, 임피던스, `accept`를 가진
-  주석 값)와 경고 확인(acknowledgement)은 문서 리더의 몫입니다.
-- 값 여러 개가 필요한 검사(음속, 섭씨를 켈빈으로 쓴 값, 메시 추정 등)와 `E-GAIN`,
-  `E-SPECTRAL`, `E-BASIS`는 여기에 없습니다.
+- 위에 적지 않은 값의 형태(성분 객체, 범위, 표, 모델 계수, 임피던스, `accept`를 가진 주석
+  값)와 경고 확인(acknowledgement)은 문서 리더의 몫입니다.
+- 값 여러 개가 필요한 검사(음속, 섭씨를 켈빈으로 쓴 값, 메시 추정 등)와 `E-SPECTRAL`,
+  `E-BASIS`는 여기에 없습니다.
+- `result`에 둔 되풀이 입력 목록은 2단계 명세가 대응시킨 오늘의 결과 요약에서 왔습니다. 문서
+  종류마다의 단계가 바꾼 결과와 대조합니다.
 - 메시지는 영어입니다. 등록부는 모든 코드에 영어·한국어 제목을 둡니다. 유니코드 표시
   형태(`µm`, `°C`, `W/(m·K)`)와 표시 프로필은 여기에 없습니다.
-- 물리 상수, 같은 단위 쌍 목록, 결합 표는 아직 등록부에 없고, 항목에 `display`, `sign`,
-  `depth_exponent`, `not_to_be_confused_with` 필드도 아직 없습니다(표시 형태, 결과 메타데이터,
-  적분 기준은 나중에 옵니다).
-- 시작 등록부에서 뺀 것: `design_velocity`(단위가 파라미터에 따라 다름), `huray_populations`
-  (거칠기 항목의 목록), Sellmeier `constant`와 진동자 `strength`(모델의 구조 키), 공진기 커널
-  계수(내부용).
+- 물리 상수, 같은 단위 쌍 목록, 결합 표는 아직 등록부에 없고, 항목에 `display`,
+  `depth_exponent`, `not_to_be_confused_with` 필드도 아직 없습니다(표시 형태와 적분 기준은 나중에
+  옵니다).
+- 등록부에서 뺀 것: `design_velocity`(단위가 파라미터에 따라 다름), `huray_populations`(거칠기
+  항목의 목록), 공진기 커널 계수(내부용).

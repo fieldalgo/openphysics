@@ -20,8 +20,15 @@ Generated sections:
   ``1`` as a unit, foreign units, SI-prefixed symbols that are not on the closed
   symbol list, ``degC`` inside compounds (fix: ``K``), powers without ``^``
   (fix: ``^``), ambiguous run-together or ``a/b c`` forms (also with ``degC``
-  for ``K``) and case look-alikes of menu compounds (``MW/(m K)`` for ``mW/(m K)``);
-- ``names``: every legal quantity name -> its registry base entry.
+  for ``K``), case look-alikes of menu compounds (``MW/(m K)`` for ``mW/(m K)``)
+  and input-menu compounds with one factor in another common prefix
+  (``MW/m^3``, ``mW/(m^2 K)``, ``V/cm``), each with its reading;
+- ``names``: every legal quantity name -> its registry base entry;
+- ``name_overrides``: the places and rank of a name where they differ from its
+  base (a name with an output-only word is an output; ``inward_heat_flux`` is a
+  normal component, a scalar);
+- ``display_groups``: the members of each display group (``length``: every
+  length quantity name).
 
 Everything is sorted, so the output does not depend on hash seeds or dict order.
 Standard library only. This module reads only ``quantities.json``, so
@@ -50,11 +57,16 @@ RANKS = {"scalar", "vector", "tensor", "matrix"}
 PLACES = {"document", "material", "api", "result"}
 FAMILIES = {"spectral"}
 QUANTITY_FIELDS = {"dimension", "unit", "menu", "kind", "rank", "complex", "domain", "band", "warn_inside",
-                   "slot_refusals", "places", "qualifiers", "symbols", "refused_aliases", "status", "hint", "family",
-                   "description"}
+                   "slot_refusals", "places", "qualifiers", "name_rank", "statistic_definitions", "symbols",
+                   "refused_aliases", "status", "hint", "family", "scope", "sign", "description"}
 DOMAIN_KEYS = {"min", "min_exclusive", "max", "max_exclusive"}
 BAND_KEYS = {"abs_range", "range", "abs_min", "when_unit"}
-FACTOR_RE = re.compile(r"(?P<sym>[A-Za-z%]+|[0-9]+)(?:\^(?P<exp>-?[0-9]+))?")
+OUTPUT_PLACES = ("api", "result")
+# An exponent is an integer or a half-integer in parentheses (m^(1/2), output-only units).
+FACTOR_RE = re.compile(r"(?P<sym>[A-Za-z%]+|[0-9]+)(?:\^(?:(?P<exp>-?[0-9]+)|\((?P<half>-?[0-9]+/2)\)))?")
+# Prefixes tried on one factor of an input-menu compound ("c" on the metre only), and the bases left alone.
+VARIANT_PREFIXES = ("", "p", "n", "u", "m", "k", "M", "G")
+VARIANT_FIXED = ("K", "degC")
 LONE_K = re.compile(r"(?<![A-Za-z])K(?![A-Za-z])")
 KELVIN_END = re.compile(r"K(?![A-Za-z])")             # K as a whole symbol or glued at the end (W/mK)
 DEGC = re.compile(r"(?<![A-Za-z])degC(?![A-Za-z])")
@@ -100,22 +112,44 @@ def parse_canonical(text: str, symbols: dict) -> tuple[list, list]:
     return num, den
 
 
-def _factor(item: str, symbols: dict, text: str) -> tuple[str, int]:
+def _factor(item: str, symbols: dict, text: str) -> tuple[str, int | Fraction]:
     m = FACTOR_RE.fullmatch(item)
     if not m:
         raise ValueError(f"bad factor {item!r} in unit {text!r}")
-    sym, exp = m.group("sym"), int(m.group("exp") or 1)
+    sym = m.group("sym")
     if not sym.isdigit() and sym not in symbols:
         raise ValueError(f"unit {text!r} uses {sym!r}, which is not on the closed symbol list")
+    if m.group("half"):
+        exp = Fraction(m.group("half"))
+        if exp < 0 or exp.denominator != 2:
+            raise ValueError(f"unit {text!r}: a half-integer exponent is positive, such as ^(1/2) or ^(3/2)")
+        return sym, exp
+    exp = int(m.group("exp") or 1)
     if exp < 1 or (exp == 1 and m.group("exp")):
         raise ValueError(f"unit {text!r}: write positive exponents >= 2 only")
     return sym, exp
 
 
-def fmt(f: tuple[str, int], sign: int = 1) -> str:
+def fmt(f: tuple[str, int | Fraction], sign: int = 1) -> str:
     sym, exp = f
     exp *= sign
+    if isinstance(exp, Fraction) and exp.denominator != 1:
+        return f"{sym}^({exp})"
     return sym if exp == 1 else f"{sym}^{exp}"
+
+
+def _power(base: Fraction, exp: int | Fraction) -> Fraction:
+    """Exact base**exp; a half-integer power only of a factor of 1 (m^(1/2), not mm^(1/2))."""
+    if isinstance(exp, int) or exp.denominator == 1:
+        return base ** int(exp)
+    if base != 1:
+        raise ValueError(f"a half-integer power of the factor {base} is not exact")
+    return Fraction(1)
+
+
+def _json_dim(d: dict) -> dict:
+    """Dimension exponents for JSON: integers, or halves written as exact binary floats (-0.5, -1.5)."""
+    return {k: int(v) if Fraction(v).denominator == 1 else float(v) for k, v in d.items()}
 
 
 def render(num: list, den: list, sep: str = " ") -> str:
@@ -178,13 +212,15 @@ def unit_record(num: list, den: list, symbols: dict, pi: Fraction, order: list) 
     for sign, group in ((1, num), (-1, den)):
         for sym, exp in group:
             if sym.isdigit():
-                factor *= Fraction(int(sym)) ** (sign * exp)
+                factor *= _power(Fraction(int(sym)), sign * exp)
                 continue
             s = symbols[sym]
             dimension = dim_add(dimension, s["dimension"], sign * exp)
-            factor *= factor_of(s["factor"], pi) ** (sign * exp)
+            factor *= _power(factor_of(s["factor"], pi), sign * exp)
             angle += sign * exp * s.get("angle", 0)
-    record = {"dimension": dim_sorted(dimension, order), "factor": str(factor), "angle": angle,
+    if Fraction(angle).denominator != 1:
+        raise ValueError(f"unit {render(num, den)!r} has a fractional angle exponent")
+    record = {"dimension": _json_dim(dim_sorted(dimension, order)), "factor": str(factor), "angle": int(angle),
               "name": unit_name(num, den, symbols)}
     if not den and len(num) == 1 and num[0][1] == 1:
         for key in ("offset", "reference"):            # degC offset; gauge or absolute pressure mark
@@ -251,6 +287,7 @@ def build(src: dict) -> dict:
             if spellings.setdefault(s, u) != u:
                 raise ValueError(f"spelling {s!r} would mean both {spellings[s]!r} and {u!r}")
     _check_quantities(src, units, spellings, pi)
+    _check_names(src, units)
 
     refused: dict[str, dict] = {}
 
@@ -284,7 +321,7 @@ def build(src: dict) -> dict:
             refuse(LONE_K.sub("degC", s), {"code": "E-DEGC-NOT-ABSOLUTE", "fix": u,
                                            "reading": f"{u} written with degC in place of K"})
     for s, u in sorted(spellings.items()):                 # m2 for m^2: fix writes ^
-        if "^" in s:
+        if "^" in s and "^(" not in s:
             refuse(s.replace("^", ""), {"code": "E-UNIT-NOT-ACCEPTED", "fix": u,
                                         "reading": f"{u} written without ^"})
     for text in sorted(_ambiguous_forms(parsed)):
@@ -298,6 +335,10 @@ def build(src: dict) -> dict:
     for u in canon:                                        # MW/(m K) beside mW/(m K): case look-alikes
         for text, entry in _case_lookalikes(*parsed[u], known, pi, order):
             refuse(text, entry)
+    inputs = sorted({u for e in quantities.values() if {"document", "material"} & set(e["places"]) for u in e["menu"]})
+    for u in inputs:                                       # MW/m^3, mW/(m^2 K), V/cm: one factor re-prefixed
+        for text, entry in _prefix_variants(*parsed[u], known, src["prefixes"], src["prefixable"], pi, order):
+            refuse(text, entry)
     for s, e in refused.items():
         if e["code"] == "E-UNIT-AMBIGUOUS" and not e["readings"]:
             raise ValueError(f"ambiguous spelling {s!r} has no reading")
@@ -305,7 +346,7 @@ def build(src: dict) -> dict:
             raise ValueError(f"refused spelling {s!r} has code {e['code']!r}")
 
     return {"format": FORMAT, "note": NOTE, "units": units, "spellings": spellings, "refused": refused,
-            "names": _names(src)}
+            "names": _names(src), "name_overrides": _name_overrides(src), "display_groups": _display_groups(src)}
 
 
 def _ambiguous_forms(parsed: dict) -> set[str]:
@@ -398,18 +439,51 @@ def _case_lookalikes(num: list, den: list, known: dict, pi: Fraction, order: lis
         other = sym[0].swapcase() + sym[1:]
         if other not in known:
             continue
-        swapped = [(other, e) if j == i else (s, e) for j, (s, e) in enumerate(factors)]
-        n, d = swapped[:len(num)], swapped[len(num):]
-        dimension, factor, angle = {}, Fraction(1), 0
-        for sign, group in ((1, n), (-1, d)):
-            for s, e in group:
-                k = known[s]
-                dimension = dim_add(dimension, k["dimension"], sign * e)
-                factor *= factor_of(k["factor"], pi) ** (sign * e)
-                angle += sign * e * k.get("angle", 0)
-        out.append((render(n, d), {"code": "E-UNIT-NOT-ACCEPTED", "reading": unit_name(n, d, known),
-                                   "dimension": dim_sorted(dimension, order), "factor": str(factor),
-                                   "angle": angle}))
+        out.append(_substituted(num, den, i, other, known, pi, order))
+    return out
+
+
+def _substituted(num: list, den: list, i: int, other: str, known: dict, pi: Fraction,
+                 order: list) -> tuple[str, dict]:
+    """Text and refusal entry of a compound with factor ``i`` written as the symbol ``other``."""
+    swapped = [(other, e) if j == i else (s, e) for j, (s, e) in enumerate(num + den)]
+    n, d = swapped[:len(num)], swapped[len(num):]
+    dimension, factor, angle = {}, Fraction(1), 0
+    for sign, group in ((1, n), (-1, d)):
+        for s, e in group:
+            k = known[s]
+            dimension = dim_add(dimension, k["dimension"], sign * e)
+            factor *= factor_of(k["factor"], pi) ** (sign * e)
+            angle += sign * e * k.get("angle", 0)
+    return render(n, d), {"code": "E-UNIT-NOT-ACCEPTED", "reading": unit_name(n, d, known),
+                          "dimension": dim_sorted(dimension, order), "factor": str(factor), "angle": angle}
+
+
+def _prefix_variants(num: list, den: list, known: dict, prefixes: dict, prefixable: list, pi: Fraction,
+                     order: list) -> list[tuple[str, dict]]:
+    """An input-menu compound with one factor in another common prefix (MW/m^3 for W/m^3,
+    mW/(m^2 K) for W/(m^2 K), V/cm for V/m), so that it is refused naming its reading."""
+    factors = num + den
+    if (not den and len(num) == 1 and num[0][1] == 1) or any(
+            sym.isdigit() or not isinstance(e, int) for sym, e in factors):
+        return []                                          # a bare symbol: its prefixes are refused above
+
+    def split(sym: str) -> tuple[str, str]:                # (prefix, base) of a prefixed symbol
+        for p in sorted(prefixes, key=lambda x: (-len(x), x)):
+            if sym.startswith(p) and sym[len(p):] in prefixable:
+                return p, sym[len(p):]
+        return "", sym
+
+    out = []
+    for i, (sym, _) in enumerate(factors):
+        base = split(sym)[1]
+        if base in VARIANT_FIXED:
+            continue
+        allowed = VARIANT_PREFIXES + (("c",) if base == "m" else ())
+        for p in allowed:
+            other = p + base
+            if other != sym and other in known and split(other) == (p, base):
+                out.append(_substituted(num, den, i, other, known, pi, order))
     return out
 
 
@@ -424,25 +498,98 @@ def _text_name(t: str, symbols: dict) -> str:
         return t
 
 
-def _names(src: dict) -> dict:
-    """Every legal quantity name: base names, and at most one direction, role or statistic word
-    in front, optionally with one component word behind."""
+def _qualified(src: dict) -> dict[str, tuple[str, str | None, str | None]]:
+    """Every legal quantity name -> (base, kind of its front word, front word): base names, and at
+    most one direction, role or statistic word in front, optionally with one component word behind."""
     words = src["qualifier_words"]
-    names: dict[str, str] = {}
+    names: dict[str, tuple[str, str | None, str | None]] = {}
     for base, e in sorted(src["quantities"].items()):
         q = e.get("qualifiers", {})
         for key, allowed in q.items():
             bad = set(allowed) - set(words[key])
             if bad:
                 raise ValueError(f"{base}: qualifier words {sorted(bad)} are not in qualifier_words.{key}")
-        fronts = [""] + [w for key in ("direction", "role", "statistic") for w in q.get(key, [])]
+        fronts = [(None, "")] + [(key, w) for key in ("direction", "role", "statistic") for w in q.get(key, [])]
         backs = [""] + q.get("component", [])
-        for front in fronts:
+        for key, front in fronts:
             for back in backs:
                 name = "_".join(p for p in (front, base, back) if p)
-                if names.setdefault(name, base) != base:
-                    raise ValueError(f"quantity name {name!r} comes from both {names[name]!r} and {base!r}")
+                found = names.setdefault(name, (base, key, front or None))
+                if found[0] != base:
+                    raise ValueError(f"quantity name {name!r} comes from both {found[0]!r} and {base!r}")
     return names
+
+
+def _names(src: dict) -> dict:
+    """Every legal quantity name -> its registry base entry."""
+    return {name: base for name, (base, _, _) in _qualified(src).items()}
+
+
+def _name_overrides(src: dict) -> dict:
+    """Places and rank of a name where they differ from its base: a name with an output-only word
+    keeps only the output places, and ``name_rank`` sets the rank of a name (inward_heat_flux)."""
+    quantities, output_words = src["quantities"], set(src["output_only_words"])
+    found: dict[str, dict] = {}
+    for name, (base, _, word) in sorted(_qualified(src).items()):
+        e = quantities[base]
+        places = [p for p in e["places"] if p in OUTPUT_PLACES] if word in output_words else e["places"]
+        rank = e.get("name_rank", {}).get(name, e["rank"])
+        own = {}
+        if places != e["places"]:
+            own["places"] = places
+        if rank != e["rank"]:
+            own["rank"] = rank
+        if own:
+            found[name] = own
+    return found
+
+
+def _display_groups(src: dict) -> dict:
+    """Members of each display group: every legal name whose base has the group's dimension."""
+    order, quantities, qualified = src["dimension_bases"], src["quantities"], _qualified(src)
+    out = {}
+    for group, g in sorted(src["display_groups"].items()):
+        dim = dim_sorted(g["dimension"], order)
+        members = sorted(n for n, (base, _, _) in qualified.items()
+                         if dim_sorted(quantities[base]["dimension"], order) == dim)
+        out[group] = {"quantities": members, "shape_numbers": bool(g.get("shape_numbers")), "menu": g["menu"]}
+    return out
+
+
+def _check_names(src: dict, units: dict) -> None:
+    """Refuse name-keyed fields that name no name of their base, and malformed group or scope data."""
+    qualified, quantities = _qualified(src), src["quantities"]
+    words = src["qualifier_words"]
+    output_words = set(src["output_only_words"])
+    if not output_words <= {w for key in ("direction", "role", "statistic") for w in words[key]}:
+        raise ValueError("output_only_words must be qualifier words")
+    for base, e in quantities.items():                     # unnormalized_electric_field and the like are outputs
+        if any(base.startswith(w + "_") for w in output_words) and set(e["places"]) - set(OUTPUT_PLACES):
+            raise ValueError(f"{base}: a base that starts with an output-only word is an output")
+    for base, e in quantities.items():
+        own = {n for n, (b, _, _) in qualified.items() if b == base}
+        for field in ("sign", "statistic_definitions", "name_rank"):
+            for name, value in e.get(field, {}).items():
+                if name not in own:
+                    raise ValueError(f"{base}: {field} names {name!r}, which is not a name of this base")
+                if field == "statistic_definitions" and qualified[name][1] != "statistic":
+                    raise ValueError(f"{base}: statistic_definitions names {name!r}, which has no statistic word")
+                if field == "name_rank" and not set(value) <= RANKS:
+                    raise ValueError(f"{base}: name_rank of {name!r} is outside the closed rank list")
+                if field != "name_rank" and not (value.get("en") and value.get("ko")):
+                    raise ValueError(f"{base}: {field} of {name!r} needs en and ko")
+        scope = e.get("scope")
+        if scope is not None and (scope.get("quantity") not in quantities or not scope.get("model")
+                                  or e.get("hint") is not False):
+            raise ValueError(f"{base}: a scope names a registry quantity and its model, and a model parameter "
+                             "has hint false")
+    order = src["dimension_bases"]
+    for group, g in src["display_groups"].items():
+        dim = dim_sorted(g["dimension"], order)
+        if not g["menu"] or any(u not in units or units[u]["dimension"] != dim for u in g["menu"]):
+            raise ValueError(f"display group {group!r}: menu units need the group's dimension")
+        if not (g["description"].get("en") and g["description"].get("ko")):
+            raise ValueError(f"display group {group!r} needs an en and a ko description")
 
 
 def _check_quantities(src: dict, units: dict, spellings: dict, pi: Fraction) -> None:
