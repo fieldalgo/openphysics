@@ -75,7 +75,8 @@ repository; separate historical package repositories are not needed to use them.
   documented `thermal.steady2d` and `thermal.transient2d` subsets, including
   [material-region heat documents](packages/simcase/thermal_regions2d.md).
   [Electric/Joule documents](packages/simcase/electric_joule.md) add homogeneous
-  rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`;
+  rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d`, and
+  material regions for `electric.steady2d` and `joule.steady2d`;
   [mechanics documents](packages/simcase/mechanics2d.md) add `mechanics.elasticity2d` and
   `mechanics.thermoelastic2d` (steady heat then thermal stress).
   Python-only extensions do not

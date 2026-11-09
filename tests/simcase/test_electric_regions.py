@@ -135,8 +135,8 @@ def test_e6_a_rectangle_document_keeps_the_rectangle_path():
      "at least one boundary potential is required"),
     (lambda raw: raw["physics"]["e"].update(dirichlet_potential_v={"nowhere": 1.0}),
      "nowhere"),
-    (lambda raw: raw["physics"]["e"].update(type="joule.steady2d"),
-     "joule.steady2d: region geometry"),
+    (lambda raw: raw["physics"]["e"].update(type="joule.temperature2d"),
+     "joule.temperature2d: region geometry"),
 ])
 def test_e7_refusals_name_what_is_wrong(change, message):
     raw = strip([RIGHT_HALF], {"dirichlet_potential_v": {"left": 1.0, "right": 0.0}},
@@ -231,7 +231,7 @@ def test_electric_key_refusals_do_not_say_thermal():
 def test_a_region_result_exports_to_vtu_with_region_ids(tmp_path):
     meshio = pytest.importorskip("meshio")
     from simcase.export import SUPPORTED_LAYOUTS, export_fields
-    assert SUPPORTED_LAYOUTS[-1] == "electric2d-p1-node-cell-regions-v1"
+    assert SUPPORTED_LAYOUTS[14] == "electric2d-p1-node-cell-regions-v1"
     result = run(Document.from_dict(strip([RIGHT_HALF], {"dirichlet_potential_v": {"left": 1.0, "right": 0.0}})),
                  verbose=False)
     result.save(tmp_path / "out")

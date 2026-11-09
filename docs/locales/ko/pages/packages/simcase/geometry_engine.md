@@ -36,7 +36,8 @@ domain, namer, materials = rc.to_domain(size)   # meshine 넘기기, size는 µm
 
 `python -m simcase geometry model.json [-c component]`는 버전 1 문서의 같은 복합체(셀, 출처·태그가 붙은 곡선, 선택)를
 진단용으로 출력합니다. `Document.load`의 물리 검증 없이 형상 블록만 읽으므로 빈 공간·병합·`path`·다중 구성 요소
-문서도 보여 줍니다. 저장 형식이 아닙니다.
+문서도 보여 줍니다. 저장 형식이 아닙니다. 실험적 Studio [형상 실험실](geometry_lab.md)이 같은 복합체를 그리고
+파라미터를 바꿀 때마다 다시 평가합니다.
 
 - `Cell`은 면 하나입니다. 나중 피처가 조각낸 영역이나 `region`으로 여러 피처를 합친 영역은 같은 `region`을 가진
   셀 여러 개로 나옵니다. `loops`는 바깥 루프와 구멍들을 `(곡선 번호, 정방향)` 쌍의 목록으로 둡니다.

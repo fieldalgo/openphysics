@@ -1,0 +1,42 @@
+/* Copyright 2026 Yongha Kim (FieldAlgo) */
+/* SPDX-License-Identifier: Apache-2.0 */
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1d2430;--muted:#5b6575;--line:#d4d9e1;--accent:#2f6fb3;--warn:#a33a2c;--warn-bg:#fdeeec}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;gap:14px;align-items:center;padding:10px 18px;background:#1d2430;color:#fff}
+header strong span{font-weight:400;opacity:.8}
+.badge{margin-left:auto;font-size:11px;letter-spacing:.06em;padding:2px 8px;border:1px solid #f2b84b;color:#f2b84b;border-radius:3px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+.actions #status{color:var(--muted)}
+button,select,input{font:inherit}
+button{padding:4px 10px;border:1px solid var(--line);background:#fff;border-radius:4px;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.note{margin:8px 18px;color:var(--muted)}
+#refusal{margin:8px 18px;padding:8px 12px;border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);white-space:pre-wrap}
+main{display:grid;grid-template-columns:260px minmax(0,1fr) 300px;gap:12px;padding:0 18px 18px}
+aside,.drawing{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+h2{font-size:13px;margin:8px 0 6px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.muted{color:var(--muted)}
+.param{display:grid;grid-template-columns:1fr;gap:3px;margin-bottom:10px}
+.param label{font-weight:600}
+.param input[type=text]{width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:3px}
+.param input[type=range]{width:100%}
+.param small{color:var(--muted)}
+#view{width:100%;height:auto;display:block;background:#fbfcfd}
+#view.stale{opacity:.35}
+#view path.cell{stroke:none;fill-rule:evenodd;fill-opacity:.55}
+#view path.cell.void{fill:none}
+#view path.cell.lit{fill-opacity:.95}
+#view path.curve{fill:none;stroke:#374151;stroke-width:1}
+#view path.curve.lit{stroke:#d1242f;stroke-width:3.5}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;gap:8px;align-items:baseline;padding:3px 4px;border-radius:3px;cursor:pointer}
+li:hover,li.active{background:#eef3fa}
+li .swatch{width:12px;height:12px;flex:none;border:1px solid #0003;border-radius:2px;align-self:center}
+li .swatch.void{background:repeating-linear-gradient(45deg,#fff 0 3px,#999 3px 4px)}
+li code{font-size:12px}
+li small{margin-left:auto;color:var(--muted);text-align:right}
+pre{font-size:11px;max-height:240px;overflow:auto;background:#f3f5f8;padding:6px;margin:0;white-space:pre}
+footer{padding:0 18px 18px;color:var(--muted)}
+footer a{color:var(--accent)}
+@media (max-width:900px){main{grid-template-columns:1fr}}

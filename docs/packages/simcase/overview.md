@@ -44,8 +44,8 @@ prints a supplied example.
 |---|---|---|---|
 | `em.modes2d` | 2D waveguide modes with passive absorption, scalar or full vector; single points and wavelength sweeps with mode tracking | `soi_strip`, `slab_te_check`, `fiber`, `hadley_rib`, `hadley_rib_vector`, `vector_slab`, `vector_fiber`, `vector_slab_sweep`, `vector_fiber_subspace_sweep` | This page; [subspace tracking](vector_subspace_tracking.md) |
 | `em.cavity3d` | Rectangular-box eigenmodes: vacuum PEC, or lossy box materials and conducting walls with complex frequencies and Q; SI JSON/NPZ output | `cavity_box`, `cavity_lossy_slab` | [Cavity document](cavity3d.md) |
-| `electric.steady2d` | Homogeneous rectangle steady conduction | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
-| `joule.steady2d` | Constant-property steady Joule heating | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
+| `electric.steady2d` | Steady conduction: a homogeneous rectangle, or material regions of a geometry block | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
+| `joule.steady2d` | Constant-property steady Joule heating: a homogeneous rectangle, or material regions | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
@@ -386,7 +386,7 @@ parameter, values = study_points(doc)
 result = solve_point(model, doc.sole_physics()[1])
 ```
 
-For heat region documents and region electric conduction documents, `run` also takes optional mesh limits
+For heat region documents, region electric conduction and steady Joule heating documents and mechanics region documents, `run` also takes optional mesh limits
 (`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
 counts the loop vertices a document passes to the mesher without meshing it.
 Both raise `MeshLimitError`. `region_complexity` counts shapes, circles,
@@ -600,6 +600,8 @@ back out into its own distribution as a move rather than a rewrite; when the UI
 needs something the engine does not export, the engine exports it on purpose.
 
 The [experimental model workspace](workspace.md) is available at `/workspace` on the same server. It uses native JavaScript modules and a separate capability contract; the original optical and heat editors remain available.
+
+The experimental [geometry lab](geometry_lab.md) at `/geometry-lab` edits the parameters of a version 1 geometry document and draws the exact engine's region complex; it is a separate page and runs no physics.
 
 ## Self-checks
 

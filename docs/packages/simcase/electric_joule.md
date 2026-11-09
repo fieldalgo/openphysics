@@ -90,8 +90,9 @@ and in the summary `region_names`, `region_materials`, `region_conductivity_s_m`
 through each fixed boundary in A per metre of depth (positive in; a node fixed by two
 boundaries counts for the first in name order). Two potential names on the same mesh edges
 and a conductor part with no fixed potential are refused by name. A region result exports to
-VTU like the rectangle one, plus the cell data `triangle_regions`. `joule.steady2d` and `joule.temperature2d` keep the rectangle form and
-refuse region geometry by name.
+VTU like the rectangle one, plus the cell data `triangle_regions`. Steady Joule heating on
+regions is the [next section](#material-regions-steady-joule-heating); `joule.temperature2d`
+keeps the rectangle form and refuses region geometry by name.
 
 Independent checks (`tests/simcase/test_electric_regions.py`, pre-registered E1 to E7):
 
@@ -102,6 +103,54 @@ Independent checks (`tests/simcase/test_electric_regions.py`, pre-registered E1 
 | Coaxial circular electrodes (r = 3 and 9 mm, 192-gons) | I = 2 pi sigma (V_a - V_b) / ln(b/a) | relative error 2.0e-3, 6.6e-4, 1.4e-4 at mesh size 0.8, 0.4, 0.2 mm (order 2.3 on the last step) |
 | Joule power | supplied power V I | 1e-10 relative |
 | Rectangle documents | results before this change | every rectangle electric and Joule example bit for bit |
+
+## Material regions (steady Joule heating)
+
+A `joule.steady2d` document whose geometry has regions solves the region electric
+conduction above and heats [region heat](thermal_regions2d.md) with its Joule heating,
+on one mesh:
+
+- every material a region uses needs both `electrical_conductivity_s_m` and
+  `conductivity_w_mk`. The physics entry takes neither `conductivity_s_m` nor
+  `thermal_conductivity_w_mk`, and no `heat_source_w_m3`: the current is the only heat
+  source (an additional heat source is not supported).
+- `dirichlet_potential_v` and `outward_current_a_m2` take the names region electric
+  conduction takes (exterior boundaries only); `dirichlet_temperature_k`,
+  `outward_flux_w_m2` and `convection` take the names region heat takes, so a Dirichlet
+  temperature may also fix an interface selection. At least one potential and a Dirichlet
+  temperature or a positive convection coefficient are required.
+- `units.temperature` must be `"K"`. An axisymmetric component and a void background
+  are refused; the region mesh limits apply.
+
+The solver checks that the heat load equals the Joule load node by node and that the
+outward heat equals the Joule power. The result format is
+`joule.steady2d-regions-result-v1` with field layout
+`electric-joule2d-p1-node-cell-regions-v1`: the rectangle Joule fields plus
+`triangle_regions`, and in the summary `region_conductivity_s_m`,
+`region_thermal_conductivity_w_mk` and the terminal currents. It exports to VTU like the
+rectangle Joule result, plus `triangle_regions`. Temperature-dependent conductivity
+(`joule.temperature2d`) on regions is not supported yet.
+
+Independent checks (`tests/simcase/test_joule_regions.py`, pre-registered J1 to J7). The
+error is the largest nodal temperature error over the temperature rise:
+
+| Check | Reference | Result |
+|---|---|---|
+| Two materials in series, Dirichlet ends | piecewise quadratic T(x) with continuous T and k dT/dx | 2.1e-2, 4.6e-3, 1.1e-3 at mesh size 0.25, 0.125, 0.0625 mm (order 2.1) |
+| The same strip with a convective end | Robin end condition | 1.2e-2, 2.7e-3, 6.5e-4 (order 2.1) |
+| Coaxial electrodes held at one temperature (192-gons) | T(r) - T0 = -C (ln r - ln a)(ln r - ln b) / 2, C = sigma V^2 / (k ln^2(b/a)) | 3.8e-3, 1.8e-3, 4.9e-4 at 0.4, 0.2, 0.1 mm (order 1.9 on the last step) |
+| Power | supplied V I, Joule and outward heat | agree to 1.4e-14 relative |
+| Rectangle documents | results before this change | `joule_rectangle`, `joule_temperature`, `electric_rectangle` field hashes equal to the commit before (checked when this was written; the test checks the rectangle path is taken) |
+
+The coaxial check was pre-registered at 0.8, 0.4 and 0.2 mm, where it failed: the order of
+the last step was 1.03. The largest nodal error sits next to the inner electrode
+(r ≈ 3.3 mm), where the Joule source (∝ 1/r²) is steepest, and on these coarse
+unstructured meshes (h/a ≥ 0.07) it is not yet asymptotic. Region heat with the exact
+analytical source on the same meshes dips the same way (1.58, 1.17, then 1.99 at 0.1 mm),
+so the dip is not the Joule coupling, and scaling the circle segments with the mesh keeps
+it (1.10, 1.40, 1.67), so it is not the fixed boundary resolution. The area-weighted L2
+error converges smoothly on the same meshes (orders 1.60, 1.71, 2.16). The thresholds are
+unchanged; the sequence is one step finer.
 
 ## Run and save
 
@@ -161,7 +210,7 @@ convergence, output conflicts and interrupted writes. Existing solver independen
 reference-tool comparisons remain in force; this adapter adds no discretization.
 
 Only the above rectangle and region subsets with a single study are exposed. Region
-maps for Joule documents, interface potentials, axisymmetric conduction, arbitrary
+geometry for temperature-dependent Joule documents, interface potentials, axisymmetric conduction, arbitrary
 sigma callbacks, gauge-only currents, transient physics, 3D, Studio
 and release publishing are outside this contract. Saved fields can be viewed in
 ParaView through `simcase.export` ([Viewing in ParaView](overview.md#viewing-in-paraview));

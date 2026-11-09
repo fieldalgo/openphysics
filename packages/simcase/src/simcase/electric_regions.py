@@ -29,7 +29,7 @@ from .thermal_regions import (SIDES, _named_sides, boundary_names, build_region_
 PHYSICS = 'electric.steady2d'
 RESULT_FORMAT = 'electric.steady2d-regions-result-v1'
 FIELD_LAYOUT = 'electric2d-p1-node-cell-regions-v1'
-JOULE_TYPES = ('joule.steady2d', 'joule.temperature2d')
+NONLINEAR_JOULE = 'joule.temperature2d'
 
 
 def is_region_electric(data):
@@ -38,11 +38,12 @@ def is_region_electric(data):
 
 
 def refuse_region_joule(data):
-    """Joule documents take the rectangle path only; region geometry is refused by name."""
-    for kind in JOULE_TYPES:
-        if has_region_geometry(data, kind):
-            raise DocumentError(f'{kind}: region geometry (named material regions) is supported for '
-                                f'{PHYSICS} only; a Joule document takes the rectangle form')
+    """Temperature-dependent Joule heating takes the rectangle path only; region geometry is
+    refused by name (``joule.steady2d`` on regions is :mod:`simcase.joule_regions`)."""
+    if has_region_geometry(data, NONLINEAR_JOULE):
+        raise DocumentError(f'{NONLINEAR_JOULE}: region geometry (named material regions) is supported for '
+                            f'{PHYSICS} and joule.steady2d only; a temperature-dependent Joule document takes '
+                            'the rectangle form')
 
 
 def _neutral(call, *args):

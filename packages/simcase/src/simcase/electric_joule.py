@@ -1,6 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Strict headless rectangle adapters for the existing electric/Joule solvers."""
+"""Strict headless adapters for the existing electric/Joule solvers: rectangle documents here,
+region documents in :mod:`simcase.electric_regions` and :mod:`simcase.joule_regions`."""
 import copy
 from dataclasses import asdict
 import json
@@ -15,6 +16,7 @@ from . import units
 from .registry import PhysicsKind, register
 from .electric_regions import (FIELD_LAYOUT as REGION_FIELD_LAYOUT, is_region_electric, refuse_region_joule,
                                region_summary, run_region_electric, validate_region_electric)
+from . import joule_regions
 
 TYPES = {'electric.steady2d', 'joule.steady2d', 'joule.temperature2d'}
 FIELD_LAYOUT = 'electric-joule2d-p1-v1'
@@ -67,12 +69,17 @@ def _model(spec, path):
     return ConductivityModel(lambda t: sigma/(1.+alpha*(t-reference)), (lo, hi))
 
 
+def is_region_document(data):
+    """An electric or steady Joule document on named material regions."""
+    return is_region_electric(data) or joule_regions.is_region_joule(data)
+
+
 def validate_electric_joule(doc):
     d = doc.data
-    if is_region_electric(d):
+    if is_region_document(d):
         from .schema import check_format_units_and_tags
         check_format_units_and_tags(doc)
-        validate_region_electric(doc)
+        (validate_region_electric if is_region_electric(d) else joule_regions.validate_region_joule)(doc)
         return
     refuse_region_joule(d)
     top = {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'}
@@ -144,6 +151,8 @@ def document_summary(doc):
     doc.validate()
     if is_region_electric(doc.data):
         return region_summary(doc)
+    if joule_regions.is_region_joule(doc.data):
+        return joule_regions.region_summary(doc)
     name, p = doc.sole_physics()
     return (f'{doc["name"]} (openphysics 0.2)\n  physics {name}: {p["type"]}, headless single steady rectangle\n'
             f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
@@ -219,9 +228,16 @@ class RegionElectricRunResult(ElectricJouleRunResult):
     FIELD_LAYOUT = REGION_FIELD_LAYOUT
 
 
+class RegionJouleRunResult(ElectricJouleRunResult):
+    """Owned numeric evidence of a region Joule run (``joule.steady2d-regions-result-v1``)."""
+    FIELD_LAYOUT = joule_regions.FIELD_LAYOUT
+
+
 def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     if is_region_electric(doc.data):
         return run_region_electric(doc, verbose, mesh_limits=mesh_limits)
+    if joule_regions.is_region_joule(doc.data):
+        return joule_regions.run_region_joule(doc, verbose, mesh_limits=mesh_limits)
     from galerkin import rectangle_mesh
     from galerkin.electric import solve_steady_electric
     from galerkin.joule_heating import solve_steady_joule_heat
@@ -335,4 +351,4 @@ register(PhysicsKind(
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
     result_types=(ElectricJouleRunResult,), defaults=_defaults, fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics',
-    accepts_mesh_limits=is_region_electric))
+    accepts_mesh_limits=is_region_document))
