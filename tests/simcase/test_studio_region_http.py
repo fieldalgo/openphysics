@@ -21,8 +21,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import region_studio_fixtures as fx
-from simcase import (Document, MeshLimitError, ThermalRunResult, TransientThermalRunResult, check_mesh_limits,
-                     examples, region_complexity, run)
+from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult, TransientThermalRunResult,
+                     check_mesh_limits, examples, region_complexity, run)
 from simcase.geometry_document import from_v02
 from simcase.studio import server
 from simcase.studio import thermal_api as thermal
@@ -52,6 +52,29 @@ def envelope(doc, revision=3, sequence=5):
 
 def example(name):
     return copy.deepcopy(examples.EXAMPLES[name])
+
+
+# The format 0.2 rectangles of thermal_slab and transient_thermal_uniform (the shipped examples
+# are format 0.3 now). A version 1 geometry block on a heat document stays a format 0.2 form
+# until the region commit of the units batch, so the version 1 rectangle checks start here.
+LEGACY_RECTANGLES = {
+    'thermal_slab': {
+        'openphysics': '0.2', 'name': 'Steady heat slab', 'units': {'length': 'mm', 'temperature': 'K'},
+        'geometry': {'domain': {'xmin': 0.0, 'xmax': 30.0, 'ymin': 0.0, 'ymax': 20.0}}, 'materials': {},
+        'physics': {'heat1': {'type': 'thermal.steady2d', 'conductivity_w_mk': 12.5, 'heat_source_w_m3': 0.0,
+                              'dirichlet_temperature_k': {'left': 280.0, 'right': 315.0}}},
+        'mesh': {'subdivisions': [32, 16]}, 'study': {'type': 'single'},
+        'results': {'save_fields': True, 'plots': False}},
+    'transient_thermal_uniform': {
+        'openphysics': '0.2', 'name': 'Insulated constant-source transient heat',
+        'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
+        'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}}, 'materials': {},
+        'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 2.5,
+                              'volumetric_heat_capacity_j_m3k': 4.0, 'initial_temperature_k': 300.0,
+                              'dirichlet_temperature_k': {}, 'heat_source_w_m3': 8.0}},
+        'mesh': {'subdivisions': [4, 4]}, 'study': {'type': 'transient', 'time_s': [0.0, 0.1, 0.3]},
+        'results': {'save_fields': True, 'plots': False}},
+}
 
 
 def kind_of(doc):
@@ -293,13 +316,17 @@ def test_s4_defensive_raw_preflight_matches_the_rectangle_preflight(kind):
 def test_s4b_time_refusals_match_rectangle_bodies(client, monkeypatch, times):
     forbid(monkeypatch, server, 'run')
     region_doc, rectangle_doc = fx.transient_example(), example('transient_thermal_uniform')
-    region_doc['study']['time_s'] = rectangle_doc['study']['time_s'] = times
+    region_doc['study']['time_s'] = times
+    rectangle_doc['study']['time']['values'] = times      # a format 0.3 rectangle
     for action in ('validate', 'run'):
         region = post(client, region_doc, action)
         rectangle = post(client, rectangle_doc, action)
         assert region.status_code == rectangle.status_code
-        assert region.json()['error'] == rectangle.json()['error']
-        assert region.content == rectangle.content
+        # the same refusal; the messages name each format's key (region study.time_s is format
+        # 0.2 until its commit of the units batch, the rectangle study.time a tagged array)
+        assert region.json()['error']['code'] == rectangle.json()['error']['code']
+        assert 'requested times' in region.json()['error']['message']
+        assert 'requested times' in rectangle.json()['error']['message']
     assert_idle(server._thermal_jobs)
 
 
@@ -410,7 +437,7 @@ def test_s7_rectangle_document_with_a_stray_empty_shapes_list_takes_the_region_p
     rectangle document with a stray empty list now gets the subdivisions refusal; before
     region support it got the engine's conductivity message."""
     forbid(monkeypatch, server, 'run')
-    doc = example('thermal_slab')
+    doc = copy.deepcopy(LEGACY_RECTANGLES['thermal_slab'])
     doc['geometry']['shapes'] = []
     response = post(client, doc, 'validate')
     assert response.status_code == 200
@@ -418,6 +445,13 @@ def test_s7_rectangle_document_with_a_stray_empty_shapes_list_takes_the_region_p
         'ok': False, 'error': {'code': 'invalid_document', 'message': regions.SUBDIVISIONS,
                                'path': 'mesh.subdivisions'},
         'client_revision': 3, 'request_seq': 5}, 1 << 20)
+    # A format 0.3 rectangle with shapes is a region document, which format 0.3 reads from
+    # the region commit of the units batch on; until then the reader refuses its form.
+    doc = example('thermal_slab')
+    doc['geometry']['shapes'] = []
+    response = post(client, doc, 'validate')
+    assert response.status_code == 200 and response.json()['ok'] is False
+    assert 'not read in format 0.3 yet' in response.json()['error']['message']
 
 
 # ---- S8: the summary floor ------------------------------------------------------------
@@ -564,8 +598,9 @@ def s11_fixtures(kind):
     two_physics['physics']['second'] = copy.deepcopy(next(iter(region['physics'].values())))
     version_1 = copy.deepcopy(region)
     version_1['geometry'] = from_v02(region['geometry'])
-    version_1_rectangle = copy.deepcopy(rectangle)
-    version_1_rectangle['geometry'] = from_v02(rectangle['geometry'])
+    version_1_rectangle = copy.deepcopy(LEGACY_RECTANGLES[
+        'thermal_slab' if kind == thermal.KIND else 'transient_thermal_uniform'])
+    version_1_rectangle['geometry'] = from_v02(version_1_rectangle['geometry'])
     return {'rectangle': rectangle, 'region': region, 'shapes_only': shapes_only,
             'background_only': background_only, 'geometry_list': geometry_list, 'no_geometry': no_geometry,
             'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1,
@@ -583,11 +618,16 @@ def test_s11_applies_agrees_with_the_engine_rule(kind):
 
 
 @pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
-def test_s11_a_homogeneous_version_1_rectangle_validates_on_the_rectangle_path(client, kind):
+def test_s11_a_homogeneous_version_1_rectangle_takes_the_rectangle_path(client, kind):
+    # The rectangle path reads format 0.3 only since the units batch: the format 0.2 version 1
+    # rectangle is refused there by name, not taken as a region document.
     doc = s11_fixtures(kind)['version_1_rectangle']
     response = post(client, doc, 'validate')
-    assert response.status_code == 200 and response.json()['ok'] is True, response.text
-    assert 'version' in response.json()['doc']['geometry'] or 'shapes' not in response.json()['doc']['geometry']
+    assert response.status_code == 200 and response.json()['ok'] is False, response.text
+    assert 'format 0.2 rectangle documents are not read' in response.json()['error']['message']
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(doc)
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [('E-FORMAT', 'openphysics')]
 
 
 # ---- S15: version 1 geometry documents take the region path as written -------------------
@@ -666,19 +706,20 @@ def real():
             'transient_rectangle': run(Document.from_dict(example('transient_thermal_uniform')), verbose=False)}
 
 
-ARRAY_KEYS = {thermal.KIND: tuple(thermal.PROPERTIES.values())+('triangle_regions',),
-              transient.KIND: tuple(transient.SPEC)+('region_ids',)}
+# region results keep their format 0.2 names until their commit of the units batch
+ARRAY_KEYS = {thermal.KIND: tuple(thermal.PROPERTIES_02.values())+('triangle_regions',),
+              transient.KIND: tuple(transient.SPEC_02)+('region_ids',)}
 
 
 def probe(result, kind, edit=None):
     """A public result subclass that serves the real result's values, possibly edited, and
     records every public read."""
     if kind == thermal.KIND:
-        values = {prop: np.array(getattr(result, prop), copy=True) for prop in thermal.PROPERTIES.values()}
+        values = {prop: np.array(getattr(result, prop), copy=True) for prop in thermal.PROPERTIES_02.values()}
         values['triangle_regions'] = np.array(result.triangle_regions, copy=True)
         base = ThermalRunResult
     else:
-        values = {key: np.array(getattr(result, key), copy=True) for key in transient.SPEC}
+        values = {key: np.array(getattr(result, key), copy=True) for key in transient.SPEC_02}
         values['region_ids'] = np.array(result.region_ids, copy=True)
         base = TransientThermalRunResult
     state = {'values': values, 'names': list(result.region_names), 'summary': copy.deepcopy(result.summary()),
@@ -903,7 +944,7 @@ def test_s13_region_frames_and_histories_carry_the_region_pair(client):
     history = client.get(base+'/history', params={'result_id': identity['result_id'],
                                                   'field': 'heat_content_j_per_m', 'start': 0, 'stop': 4,
                                                   'frame_seq': 2})
-    for view, payload_format in ((frame, transient.FRAME), (history, transient.HISTORY)):
+    for view, payload_format in ((frame, transient.FRAME_02), (history, transient.HISTORY_02)):
         assert view.status_code == 200, view.text
         data = view.json()
         assert data['payload_format'] == payload_format
@@ -914,7 +955,7 @@ def test_s13_region_frames_and_histories_carry_the_region_pair(client):
     rectangle, status = finished(client, example('transient_thermal_uniform'))
     assert 'pair' not in server._thermal_jobs._records[rectangle['job']]
     frame = client.get('/api/jobs/'+rectangle['job']+'/frame', params={
-        'result_id': rectangle['result_id'], 'field': 'temperature_k', 'time_index': 1, 'frame_seq': 1}).json()
+        'result_id': rectangle['result_id'], 'field': 'temperature', 'time_index': 1, 'frame_seq': 1}).json()
     assert (frame['result_format'], frame['field_layout']) == transient.PAIR
 
 

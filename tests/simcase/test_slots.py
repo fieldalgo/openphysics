@@ -43,7 +43,8 @@ def test_the_frozen_table_equals_its_generator():
     assert text == slots.generate()
     table = json.loads(text)
     assert table["format"] == slots.TABLE_FORMAT
-    assert table["kinds"] == {}                         # no kind reads format 0.3 yet
+    # the kinds that read format 0.3 at this step of the units batch: rectangle heat (C5a)
+    assert table["kinds"] == {"thermal.steady2d": ["thermal.steady2d"], "thermal.transient2d": ["thermal.transient2d"]}
     patterns = [(e["pattern"], e.get("physics_kind") or "", e["kind"]) for e in table["slots"]]
     assert patterns == sorted(patterns)
 
@@ -103,14 +104,14 @@ def _leaves_consumed(slot, value) -> bool:
     return not (opens and isinstance(value, dict) and ("model" in value or "OBJECT" in opens))
 
 
-def _check_closure(tree, table, label):
-    """Every path outside the kinds' own parts matches exactly one slot; returns the count."""
+def _check_closure(tree, table, label, skip=KIND_PATHS):
+    """Every path outside ``skip`` (the kinds' own parts) matches exactly one slot; returns the count."""
     count, consumed = 0, []
     for path in _paths(tree):
         value = tree
         for part in path:
             value = value[part]
-        if not path or any(path[:len(k)] == k for k in KIND_PATHS):
+        if not path or any(path[:len(k)] == k for k in skip):
             continue
         if any(path[:len(c)] == c for c in consumed):
             continue
@@ -131,14 +132,22 @@ if HARNESS.is_dir():
         spec.loader.exec_module(module)
         return module
 
-    _CORPUS = sorted((ROOT / "examples" / "simcase").glob("*.json")) + sorted((HARNESS / "fixtures" / "v02").glob("*.json"))
+    _CORPUS = (sorted((ROOT / "examples" / "simcase").glob("*.json")) + sorted((HARNESS / "fixtures" / "v02").glob("*.json"))
+               + sorted((HARNESS / "fixtures" / "v03").glob("*.json")))
 
-    @pytest.mark.parametrize("path", _CORPUS, ids=lambda p: p.stem)
+    @pytest.mark.parametrize("path", _CORPUS, ids=lambda p: f"{p.parent.name}/{p.stem}")
     def test_every_shared_path_of_every_converted_document_matches_one_slot(path):
-        convert = _converter()
-        new, _writer = convert.convert(json.loads(path.read_text(encoding="utf-8")))
-        tree = json.loads(json.dumps(new))
-        assert _check_closure(tree, slots.table_for(None), path.stem) > 5
+        """A 0.2 document through the converter, a committed 0.3 document as it is. A kind that reads
+        format 0.3 has its physics paths checked too (P2-12)."""
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data["openphysics"] == "0.2":
+            data, _writer = _converter().convert(data)
+        tree = json.loads(json.dumps(data))
+        kind = registry.kind_of(tree)
+        if kind.slots is None:
+            assert _check_closure(tree, slots.table_for(None), path.stem) > 5
+        else:
+            assert _check_closure(tree, slots.table_for(kind), path.stem, skip=()) > 10
 
 
 def test_every_shared_path_of_the_toy_document_matches_one_slot(toy_kind):

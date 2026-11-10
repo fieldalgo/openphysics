@@ -7,8 +7,8 @@ No solver, filesystem output or private simcase API is implemented here.
 """
 from __future__ import annotations
 
-import copy
 from dataclasses import asdict, dataclass
+import decimal
 import json
 import math
 import threading
@@ -18,9 +18,23 @@ import numpy as np
 from simcase import Document, DocumentError, ThermalRunResult
 
 KIND = "thermal.steady2d"
-V1 = ("thermal.steady2d-result-v1", "thermal2d-p1-node-cell-v1")
-V2 = ("thermal.steady2d-result-v2", "thermal2d-p1-node-cell-boundary-v2")
-PROPERTIES = {
+# Rectangle documents are format 0.3: arrays under registry names, SI values.
+V1 = ("thermal.steady2d-result-v3", "thermal2d-p1-node-cell-v2")
+V2 = ("thermal.steady2d-result-v4", "thermal2d-p1-node-cell-boundary-v3")
+PAYLOAD = "studio-thermal-steady-v2"
+PROPERTIES = {key: key for key in (
+    "node_coordinates", "triangles", "temperature", "heat_flux", "generated_heat_rate_per_depth",
+    "reaction_heat_rate_per_depth", "residual_heat_rate_per_depth", "prescribed_node_ids", "prescribed_temperature",
+    "outward_prescribed_heat_rate_per_depth", "ambient_convective_heat_rate_per_depth",
+    "outward_convective_heat_rate_per_depth", "applied_heat_rate_per_depth")}
+BASE_FIELDS = tuple(PROPERTIES)[:9]
+BOUNDARY_FIELDS = tuple(PROPERTIES)[9:]
+#: arrays without a unit (connectivity and node indices)
+STRUCTURAL = ("triangles", "prescribed_node_ids")
+FORMAT_03 = ('thermal Studio reads format 0.3 rectangle documents ("openphysics": "0.3", values with their '
+             'units); format 0.2 rectangle documents are not read')
+# Region documents are still format 0.2 until their commit of the units batch (thermal_regions_api).
+PROPERTIES_02 = {
     "nodes_m": "mesh_nodes_m", "triangles": "mesh_triangles",
     "temperature_k": "temperature_k", "heat_flux_w_m2": "heat_flux_w_m2",
     "load_w_per_m": "load_w_per_m", "reaction_w_per_m": "reaction_w_per_m",
@@ -32,8 +46,8 @@ PROPERTIES = {
     "convective_outward_w_per_m": "convective_outward_w_per_m",
     "system_rhs_w_per_m": "system_rhs_w_per_m",
 }
-BASE_FIELDS = tuple(PROPERTIES)[:9]
-BOUNDARY_FIELDS = tuple(PROPERTIES)[9:]
+BASE_FIELDS_02 = tuple(PROPERTIES_02)[:9]
+BOUNDARY_FIELDS_02 = tuple(PROPERTIES_02)[9:]
 
 
 def limited_text(value, limit):
@@ -93,6 +107,11 @@ def v2_available():
     return all(hasattr(ThermalRunResult, PROPERTIES[key]) for key in BOUNDARY_FIELDS)
 
 
+def v2_available_02():
+    """The boundary arrays of a format 0.2 region result (thermal_regions_api)."""
+    return all(hasattr(ThermalRunResult, PROPERTIES_02[key]) for key in BOUNDARY_FIELDS_02)
+
+
 def capabilities(limits):
     pairs = ((V1, V2) if v2_available() else (V1,)) if runtime_available() else ()
     return {
@@ -103,7 +122,7 @@ def capabilities(limits):
             "mesh_preview": False, "mesh_from_result": True,
             "result_formats": [p[0] for p in pairs],
             "field_layouts": [p[1] for p in pairs],
-            "fields": ["temperature_k", "heat_flux_w_m2"],
+            "fields": ["temperature", "heat_flux"],
             "time_navigation": False, "resource_policy": "candidate-unmeasured",
             "limits": asdict(limits),
         },
@@ -159,17 +178,27 @@ def _preflight(doc, limits):
             or next(iter(physics.values())).get("type") != KIND):
         raise ThermalAPIError("unsupported_physics", "thermal Studio accepts one thermal.steady2d entry", path="physics")
     p = next(iter(physics.values()))
-    if ("outward_flux_w_m2" in p or "convection" in p) and not v2_available():
+    if doc.get("openphysics") != "0.3":
+        raise ThermalAPIError("invalid_document", FORMAT_03, path="openphysics")
+    if ("inward_heat_flux" in p or "convection" in p) and not v2_available():
         raise ThermalAPIError("unsupported_result_format", "matching public steady boundary runtime is required")
+    subdivisions(doc, limits)
+
+
+def subdivisions(doc, limits):
+    """The mesh bound of a rectangle document, checked before it is read: ``(nodes, triangles)``."""
     mesh = doc.get("mesh")
-    counts = mesh.get("subdivisions") if isinstance(mesh, dict) else None
+    counts = mesh.get("subdivision_count") if isinstance(mesh, dict) else None
     if (not isinstance(counts, list) or len(counts) != 2
             or any(type(n) is not int or n <= 0 for n in counts)):
-        raise ThermalAPIError("invalid_document", "expected two positive integer subdivisions", path="mesh.subdivisions")
+        raise ThermalAPIError("invalid_document", "expected two positive integer subdivision counts",
+                              path="mesh.subdivision_count")
     nx, ny = counts
     if (nx > limits.max_nodes or ny > limits.max_nodes
             or (nx+1)*(ny+1) > limits.max_nodes or 2*nx*ny > limits.max_triangles):
-        raise ThermalAPIError("mesh_limit_exceeded", "thermal mesh exceeds configured node/triangle limits", 413, path="mesh.subdivisions")
+        raise ThermalAPIError("mesh_limit_exceeded", "thermal mesh exceeds configured node/triangle limits", 413,
+                              path="mesh.subdivision_count")
+    return (nx+1)*(ny+1), 2*nx*ny
 
 
 @dataclass(frozen=True)
@@ -239,10 +268,55 @@ async def read_request(request, limits, *, for_run, preflight=None, runtime_chec
         raise
 
 
+def json_value(value):
+    """A format 0.3 tree (a document or summary, whose numbers may be ``Decimal``) as plain JSON
+    values: each decimal becomes the number its text reads as; a non-finite float is refused."""
+    if isinstance(value, dict):
+        return {key: json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_value(item) for item in value]
+    if isinstance(value, decimal.Decimal):
+        if not value.is_finite():
+            raise ValueError("a JSON number is finite")
+        return json.loads(str(value))
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("a JSON number is finite")
+    return value
+
+
+def document_body(doc):
+    """The document and its findings for a validation reply: format 0.3 gives the coded
+    ``diagnostics``; a format 0.2 region document its free-text ``notes``."""
+    if doc.si is not None:
+        return {"doc": json_value(doc.data), "diagnostics": [d.as_dict() for d in doc.diagnostics]}
+    return {"doc": doc.data, "notes": list(doc.notes)}
+
+
 def validation_payload(spec, limits):
-    body = {"ok": True, "doc": spec.doc.data, "summary": spec.doc.summary(),
-            "notes": list(spec.doc.notes), **spec.tags()}
+    body = {"ok": True, **document_body(spec.doc), "summary": spec.doc.summary(), **spec.tags()}
     return encode_json(body, limits.payload_bytes)
+
+
+def length_unit(doc):
+    """``(length_unit, metres per unit)`` of a format 0.3 rectangle document's geometry."""
+    from physmat.units import length_to_pm, pm_to_m
+    unit = doc.si["geometry"]["length_unit"]
+    return unit, pm_to_m(length_to_pm(1, unit).picometres)
+
+
+def _unit_03(key):
+    from physmat.units import quantity
+    return quantity(key).unit
+
+
+def _location_03(key):
+    if key == "triangles":
+        return "triangle_connectivity"
+    if key.startswith("prescribed_"):
+        return "prescribed_nodes"
+    if key == "heat_flux":
+        return "triangle_centroids"
+    return "nodes"
 
 
 def _units(key):
@@ -275,7 +349,8 @@ def _require(condition, message):
 def capture_result(result, identity, limits):
     """Read each selected public array once; encode only captured owned copies."""
     _require(isinstance(result, ThermalRunResult), "expected public ThermalRunResult")
-    summary = copy.deepcopy(result.summary())
+    _require(result.doc.si is not None, "expected a format 0.3 rectangle result")
+    summary = json_value(result.summary())
     _require(isinstance(summary, dict), "thermal summary must be an object")
     encode_json(summary, limits.metadata_bytes)
     public_format = result.result_format
@@ -292,70 +367,70 @@ def capture_result(result, identity, limits):
         _require(isinstance(value, np.ndarray), key+": expected a numeric ndarray")
         _require(value.dtype.kind in "iuf", key+": expected real nonboolean dtype")
         # Refuse malformed oversized producers before allocating another owned copy.
-        if key == "nodes_m":
+        if key == "node_coordinates":
             _require(value.ndim == 2 and value.shape[1] == 2
-                     and 3 <= len(value) <= limits.max_nodes, "invalid or oversized nodes_m")
+                     and 3 <= len(value) <= limits.max_nodes, "invalid or oversized node_coordinates")
             node_count = len(value)
         elif key == "triangles":
             _require(value.dtype.kind in "iu" and value.ndim == 2 and value.shape[1] == 3
                      and 1 <= len(value) <= limits.max_triangles, "invalid or oversized triangles")
             cell_count = len(value)
-        elif key == "heat_flux_w_m2":
-            _require(value.shape == (cell_count, 2), "invalid heat_flux_w_m2 shape before copy")
-        elif key == "dirichlet_node_ids":
+        elif key == "heat_flux":
+            _require(value.shape == (cell_count, 2), "invalid heat_flux shape before copy")
+        elif key == "prescribed_node_ids":
             _require(value.dtype.kind in "iu" and value.ndim == 1 and len(value) <= node_count,
-                     "invalid Dirichlet IDs before copy")
+                     "invalid prescribed node IDs before copy")
             fixed_count = len(value)
-        elif key == "dirichlet_temperature_k":
+        elif key == "prescribed_temperature":
             _require(value.shape == (fixed_count,), "invalid prescribed temperature shape before copy")
         else:
             _require(value.shape == (node_count,), key+": invalid nodal shape before copy")
         _require(np.isfinite(value).all(), key+": nonfinite array before copy")
         arrays[key] = value.copy(order="C")
         _require(np.isfinite(arrays[key]).all(), key+": nonfinite captured array")
-    nodes, triangles, fixed = arrays["nodes_m"], arrays["triangles"], arrays["dirichlet_node_ids"]
-    _require(nodes.ndim == 2 and nodes.shape[1] == 2 and len(nodes) >= 3, "invalid nodes_m shape")
+    nodes, triangles, fixed = arrays["node_coordinates"], arrays["triangles"], arrays["prescribed_node_ids"]
+    _require(nodes.ndim == 2 and nodes.shape[1] == 2 and len(nodes) >= 3, "invalid node_coordinates shape")
     _require(triangles.ndim == 2 and triangles.shape[1] == 3 and len(triangles) > 0
              and triangles.dtype.kind in "iu", "invalid triangle connectivity")
     n, m = len(nodes), len(triangles)
     _require(n <= limits.max_nodes and m <= limits.max_triangles, "result exceeds configured mesh limits")
     _require(not np.any(triangles < 0) and not np.any(triangles >= n), "triangle index outside nodes")
     _require(fixed.ndim == 1 and fixed.dtype.kind in "iu"
-             and (pair == V2 or len(fixed) > 0), "invalid Dirichlet IDs")
-    _require(not np.any(fixed < 0) and not np.any(fixed >= n), "Dirichlet index outside nodes")
-    _require(not np.any(np.diff(fixed.astype(np.int64)) <= 0), "Dirichlet IDs must be sorted unique")
-    shapes = {"nodes_m": (n, 2), "triangles": (m, 3), "temperature_k": (n,),
-              "heat_flux_w_m2": (m, 2), "dirichlet_node_ids": (len(fixed),),
-              "dirichlet_temperature_k": (len(fixed),)}
+             and (pair == V2 or len(fixed) > 0), "invalid prescribed node IDs")
+    _require(not np.any(fixed < 0) and not np.any(fixed >= n), "prescribed node index outside nodes")
+    _require(not np.any(np.diff(fixed.astype(np.int64)) <= 0), "prescribed node IDs must be sorted unique")
+    shapes = {"node_coordinates": (n, 2), "triangles": (m, 3), "temperature": (n,),
+              "heat_flux": (m, 2), "prescribed_node_ids": (len(fixed),),
+              "prescribed_temperature": (len(fixed),)}
     for key in keys:
         if key not in shapes:
             shapes[key] = (n,)
         _require(arrays[key].shape == shapes[key], key+": invalid shape")
-    _require(not np.any(arrays["dirichlet_temperature_k"] < 0), "negative prescribed Kelvin")
+    _require(not np.any(arrays["prescribed_temperature"] <= 0), "prescribed temperature must be above 0 K")
     with np.errstate(over="ignore", invalid="ignore"):
         v = nodes[triangles][:, 1:]-nodes[triangles][:, :1]
         det = v[:, 0, 0]*v[:, 1, 1]-v[:, 0, 1]*v[:, 1, 0]
     _require(np.isfinite(det).all() and np.all(det > 0), "triangles must be finite nondegenerate CCW")
-    for meta in ("field_units", "field_locations", "field_shapes"):
-        _require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(keys),
+    unit_keys = [key for key in keys if key not in STRUCTURAL]
+    for meta, expected in (("field_units", unit_keys), ("field_locations", keys), ("field_shapes", keys)):
+        _require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(expected),
                  "invalid "+meta+" field set")
     for key in keys:
-        _require(summary["field_units"][key] == _units(key), key+": wrong unit")
-        _require(summary["field_locations"][key] == _location(key), key+": wrong location")
+        if key not in STRUCTURAL:
+            _require(summary["field_units"][key] == _unit_03(key), key+": wrong unit")
+        _require(summary["field_locations"][key] == _location_03(key), key+": wrong location")
         shape = summary["field_shapes"][key]
         _require(isinstance(shape, list) and all(type(x) is int for x in shape)
                  and shape == list(shapes[key]), key+": wrong metadata shape")
-    doc = result.doc
-    declared = copy.deepcopy(doc["units"])
-    _require(summary.get("units") == declared and summary.get("mesh_length_unit") == "m",
-             "document/summary unit mismatch")
-    length_in_m = doc.scale.to_si(1., {"length": 1})
+    unit, length_in_m = length_unit(result.doc)
+    _require(summary.get("resolved_inputs", {}).get("geometry.domain.xmin", {}).get("length_unit") == unit,
+             "document/summary length_unit mismatch")
     _require(not isinstance(length_in_m, bool) and math.isfinite(length_in_m) and length_in_m > 0,
              "invalid display length scale")
     payload = {
-        "payload_format": "studio-thermal-steady-v1", **identity,
+        "payload_format": PAYLOAD, **identity,
         "result_format": pair[0], "field_layout": pair[1],
-        "display_length_in_m": float(length_in_m),
+        "length_unit": unit, "display_length_in_m": float(length_in_m),
         "summary": summary, "arrays": {key: arrays[key].tolist() for key in keys},
     }
     return encode_json(payload, limits.payload_bytes)

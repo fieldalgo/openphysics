@@ -13,13 +13,17 @@ import time
 
 import numpy as np
 
-from . import views
+from . import results_common, views
 from .schema import DocumentError
-from .thermal import _OwnedOutput, require_fresh_output
-from .steady_boundary_contract import has_natural_conditions
+from .thermal import (_OwnedOutput, log_lines_03, model_bytes_03, refuse_format_02,
+                      require_fresh_output, strict_series, strict_timing, strict_value)
+from .steady_boundary_contract import (
+    FORMS_03, OUTWARD_SIGN_03, REACTION_SIGN_03, has_natural_conditions,
+    has_natural_conditions_03, heat_slots,
+)
 from .transient_thermal_contract import (
-    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, V1, V2, defaults, transient_solver_inputs,
-    transient_thermal_summary, validate_transient_thermal,
+    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, V1, V2, V1_03, V2_03, defaults, transient_solver_inputs,
+    transient_thermal_summary, validate_transient_rectangle_03,
 )
 from .registry import PhysicsKind, register
 
@@ -45,6 +49,44 @@ _BOUNDARY_FIELD_SPEC = {
     'prescribed_outward_load_w_per_m': ('W/m', 'nodes', 'time_s[1:]'),
     'convective_outward_w_per_m': ('W/m', 'nodes', 'time_s[1:]'),
 }
+
+
+# Format 0.3 rectangle results: the same arrays under registry names (bytes unchanged).
+ARRAY_NAMES_03 = {
+    'nodes_m': 'node_coordinates', 'triangles': 'triangles', 'time_s': 'time', 'temperature_k': 'temperature',
+    'heat_flux_w_m2': 'heat_flux', 'source_load_w_per_m': 'generated_heat_rate_per_depth',
+    'reaction_w_per_m': 'reaction_heat_rate_per_depth', 'residual_w_per_m': 'residual_heat_rate_per_depth',
+    'storage_rate_w_per_m': 'heat_storage_rate_per_depth', 'heat_content_j_per_m': 'stored_heat_per_depth',
+    'quadratic_functional_jk_per_m': 'thermal_energy_functional_per_depth',
+    'dirichlet_node_ids': 'prescribed_node_ids', 'dirichlet_temperatures_k': 'prescribed_temperature',
+    'prescribed_outward_load_w_per_m': 'outward_prescribed_heat_rate_per_depth',
+    'convective_outward_w_per_m': 'outward_convective_heat_rate_per_depth'}
+_SOLUTION_03 = {new: old for old, new in ARRAY_NAMES_03.items()}
+#: array name -> (registry quantity or None (structural), location, time axis or None, components)
+FIELDS_03 = {
+    'node_coordinates': ('node_coordinates', 'nodes', None, ['x', 'y']),
+    'triangles': (None, 'triangle_connectivity', None, None),
+    'time': ('time', 'requested_times', 'time', None),
+    'temperature': ('temperature', 'nodes', 'time', None),
+    'heat_flux': ('heat_flux', 'triangle_centroids', 'time', ['x', 'y']),
+    'generated_heat_rate_per_depth': ('generated_heat_rate_per_depth', 'nodes', 'time', None),
+    'reaction_heat_rate_per_depth': ('reaction_heat_rate_per_depth', 'nodes', 'time[1:]', None),
+    'residual_heat_rate_per_depth': ('residual_heat_rate_per_depth', 'nodes', 'time[1:]', None),
+    'heat_storage_rate_per_depth': ('heat_storage_rate_per_depth', 'nodes', 'time[1:]', None),
+    'stored_heat_per_depth': ('stored_heat_per_depth', 'domain', 'time', None),
+    'thermal_energy_functional_per_depth': ('thermal_energy_functional_per_depth', 'domain', 'time', None),
+    'prescribed_node_ids': (None, 'prescribed_nodes', None, None),
+    'prescribed_temperature': ('prescribed_temperature', 'prescribed_nodes', 'time', None),
+    'outward_prescribed_heat_rate_per_depth': ('outward_prescribed_heat_rate_per_depth', 'nodes', 'time[1:]', None),
+    'outward_convective_heat_rate_per_depth': ('outward_convective_heat_rate_per_depth', 'nodes', 'time[1:]', None)}
+BALANCE_EQUATION_03 = ('sum(heat_storage_rate_per_depth) = sum(generated_heat_rate_per_depth at the step end) + '
+                       'sum(reaction_heat_rate_per_depth)')
+BOUNDARY_BALANCE_EQUATION_03 = (BALANCE_EQUATION_03 + ' - sum(outward_prescribed_heat_rate_per_depth) - '
+                                'sum(outward_convective_heat_rate_per_depth)')
+NATURAL_CONDITION_03 = ('q.n = -inward_heat_flux + h (T - ambient_temperature) on the selected sides; '
+                        'time-independent')
+STORED_HEAT_DEFINITION_03 = 'stored_heat_per_depth = 1^T M T; J/m, zero at 0 K'
+FUNCTIONAL_DEFINITION_03 = 'thermal_energy_functional_per_depth = 0.5 T^T M T; J K/m; not stored heat'
 
 
 @dataclass(frozen=True)
@@ -86,29 +128,50 @@ class TransientThermalRunResult:
             raise ValueError('transient result document changed after run; rerun the model')
 
     @property
+    def _v03(self):
+        return self.doc.si is not None
+
+    @property
     def boundary_enabled(self):
         """True when the document selects the boundary pair ``V2`` (key presence)."""
+        if self._v03:
+            return has_natural_conditions_03(next(iter(self.doc.si['physics'].values())))
         return has_natural_conditions(self.doc.sole_physics()[1])
 
     # Saved identifiers; the region-document result overrides them with its own.
     @property
     def result_format(self):
+        if self._v03:
+            return (V2_03 if self.boundary_enabled else V1_03)[0]
         return (V2 if self.boundary_enabled else V1)[0]
 
     @property
     def field_layout(self):
+        if self._v03:
+            return (V2_03 if self.boundary_enabled else V1_03)[1]
         return (V2 if self.boundary_enabled else V1)[1]
 
     def _field_spec(self):
         return {**_FIELD_SPEC, **_BOUNDARY_FIELD_SPEC} if self.boundary_enabled else _FIELD_SPEC
 
     def __getattr__(self, name):
+        if name.startswith('_') or name in ('doc', 'solution'):
+            raise AttributeError(name)
+        if self._v03:
+            old = _SOLUTION_03.get(name)
+            if old is not None and (old in _FIELD_SPEC or (old in _BOUNDARY_FIELD_SPEC and self.boundary_enabled)):
+                return getattr(self.solution, old)
+            if name in _FIELD_SPEC or name in _BOUNDARY_FIELD_SPEC:
+                raise AttributeError(f'{name} is the format 0.2 name; read {ARRAY_NAMES_03[name]}')
+            raise AttributeError(name)
         if name in _FIELD_SPEC or (name in _BOUNDARY_FIELD_SPEC and self.boundary_enabled):
             return getattr(self.solution, name)
         raise AttributeError(name)
 
     @property
     def mesh_nodes_m(self):
+        if self._v03:
+            raise AttributeError('mesh_nodes_m is the format 0.2 name; read node_coordinates')
         return self.solution.nodes_m
 
     @property
@@ -116,6 +179,11 @@ class TransientThermalRunResult:
         return self.solution.triangles
 
     def _raw_arrays(self):
+        if self._v03:
+            return {ARRAY_NAMES_03[key]: a for key, a in self._checked_arrays().items()}
+        return self._checked_arrays()
+
+    def _checked_arrays(self):
         # Freeze the values used by this save before writing any artifact.
         spec = self._field_spec()
         arrays = {key: np.array(getattr(self.solution, key), copy=True) for key in spec}
@@ -160,7 +228,85 @@ class TransientThermalRunResult:
         # No extra nonnegative-K rule: the linear engine explicitly allows it.
         return arrays
 
+    def _summary_03(self, arrays):
+        self._validate_document_snapshot()
+        doc = self.doc
+        doc.validate()
+        name, p = next(iter(doc.si['physics'].items()))
+        times = arrays['time']
+        if not np.array_equal(times, np.asarray(doc.si['study']['time'])):
+            raise ValueError('transient result time does not match the document')
+        for value, expected, label in (
+                (self.solution.conductivity_w_mk, p['thermal_conductivity'], 'thermal_conductivity'),
+                (self.solution.volumetric_heat_capacity_j_m3k, p['volumetric_heat_capacity'],
+                 'volumetric_heat_capacity')):
+            if not np.isfinite(value) or value <= 0 or value != expected:
+                raise ValueError(f'transient result {label} does not match the document')
+        source = arrays['generated_heat_rate_per_depth'].sum(axis=1)
+        storage = arrays['heat_storage_rate_per_depth'].sum(axis=1)
+        reaction = arrays['reaction_heat_rate_per_depth'].sum(axis=1)
+        boundary = self.boundary_enabled
+        if boundary:
+            # Returned engine terms: storage_n = f_n + reaction_n - G - C_n.
+            prescribed = arrays['outward_prescribed_heat_rate_per_depth'].sum(axis=1)
+            convective = arrays['outward_convective_heat_rate_per_depth'].sum(axis=1)
+            outward = prescribed+convective-reaction
+            defect = storage-source[1:]-reaction+prescribed+convective
+        else:
+            outward, defect = -reaction, storage-source[1:]-reaction
+        vo, ta = strict_value, strict_series
+        fields = {key: {'quantity': FIELDS_03[key][0], 'location': FIELDS_03[key][1], 'shape': list(a.shape),
+                        'time_axis': FIELDS_03[key][2], 'components': FIELDS_03[key][3]}
+                  for key, a in arrays.items()}
+        result = {
+            'name': doc.si['name'], 'physics_name': name, 'physics_type': PHYSICS,
+            **results_common.envelope(doc, result_format=self.result_format, field_layout=self.field_layout,
+                                      timing_=strict_timing(self.timings)),
+            **results_common.field_maps(fields),
+            'mesh': {'nodes': len(arrays['node_coordinates']), 'triangles': len(arrays['triangles'])},
+            'study': {'type': 'transient', 'time': ta(times.tolist(), 'time')},
+            'thermal_conductivity': vo(p['thermal_conductivity'], 'thermal_conductivity'),
+            'volumetric_heat_capacity': vo(p['volumetric_heat_capacity'], 'volumetric_heat_capacity')}
+        if 'heat_source_density' in p:
+            result['heat_source_density'] = vo(p['heat_source_density'], 'heat_source_density')
+        result.update({
+            'prescribed_nodes': len(arrays['prescribed_node_ids']),
+            'minimum_temperature': ta(arrays['temperature'].min(axis=1).tolist(), 'minimum_temperature'),
+            'maximum_temperature': ta(arrays['temperature'].max(axis=1).tolist(), 'maximum_temperature'),
+            'generated_heat_rate_per_depth': ta(source.tolist(), 'generated_heat_rate_per_depth'),
+            'heat_storage_rate_per_depth': ta(storage.tolist(), 'heat_storage_rate_per_depth'),
+            'outward_heat_rate_per_depth': ta(outward.tolist(), 'outward_heat_rate_per_depth'),
+            'heat_rate_imbalance_per_depth': ta(defect.tolist(), 'heat_rate_imbalance_per_depth'),
+            'stored_heat_per_depth': ta(arrays['stored_heat_per_depth'].tolist(), 'stored_heat_per_depth'),
+            'thermal_energy_functional_per_depth': ta(arrays['thermal_energy_functional_per_depth'].tolist(),
+                                                      'thermal_energy_functional_per_depth')})
+        if boundary:
+            result.update({
+                'inward_heat_flux': {tag: vo(v, 'inward_heat_flux') for tag, v in p.get('inward_heat_flux', {}).items()},
+                'convection': {tag: {'heat_transfer_coefficient': vo(c['heat_transfer_coefficient'],
+                                                                     'heat_transfer_coefficient'),
+                                     'ambient_temperature': vo(c['ambient_temperature'], 'ambient_temperature')}
+                               for tag, c in p.get('convection', {}).items()},
+                'outward_prescribed_heat_rate_per_depth': ta(prescribed.tolist(),
+                                                             'outward_prescribed_heat_rate_per_depth'),
+                'outward_convective_heat_rate_per_depth': ta(convective.tolist(),
+                                                             'outward_convective_heat_rate_per_depth'),
+                'outward_reaction_heat_rate_per_depth': ta((-reaction).tolist(),
+                                                           'outward_reaction_heat_rate_per_depth'),
+                'reaction_sign': REACTION_SIGN_03, 'outward_sign': OUTWARD_SIGN_03,
+                'balance_equation': BOUNDARY_BALANCE_EQUATION_03, 'natural_condition': NATURAL_CONDITION_03})
+        else:
+            result.update({'reaction_sign': REACTION_SIGN_03, 'balance_equation': BALANCE_EQUATION_03})
+        result.update({'heat_content_definition': STORED_HEAT_DEFINITION_03,
+                       'quadratic_functional_definition': FUNCTIONAL_DEFINITION_03,
+                       'save_fields': doc.si['results']['save_fields']})
+        results_common.add_depth_totals(result, doc.si['geometry']['depth'])
+        results_common.dumps_summary(result)            # finite JSON only
+        return result
+
     def _summary(self, arrays):
+        if self._v03:
+            return self._summary_03(arrays)
         self._validate_document_snapshot()
         self.doc.validate()
         name, p = self.doc.sole_physics()
@@ -252,18 +398,25 @@ class TransientThermalRunResult:
         file identity checks and native-handle lifetime handling.
         """
         owned = _OwnedOutput(outdir)
+        v03 = self._v03
         try:
             owned.write('.incomplete', lambda f: f.write(b'incomplete transient heat result\n'))
             arrays = self._raw_arrays()
             summary = self._summary(arrays)
-            encoded = json.dumps(summary, indent=2, allow_nan=False).encode('utf-8')
-            model = json.dumps(json.loads(self._document_json), indent=2, allow_nan=False).encode('utf-8')
+            if v03:
+                encoded = results_common.dumps_summary(summary).encode('utf-8')
+                model = model_bytes_03(self.doc)
+                extra = dict(metadata_json=np.asarray(results_common.metadata_json(summary)))
+            else:
+                encoded = json.dumps(summary, indent=2, allow_nan=False).encode('utf-8')
+                model = json.dumps(json.loads(self._document_json), indent=2, allow_nan=False).encode('utf-8')
+                extra = dict(mesh_length_unit=np.asarray('m'), metadata_json=np.asarray(encoded.decode('utf-8')))
             log = ('\n'.join(self.log)+'\n').encode('utf-8')
             owned.write('model.json', lambda f: f.write(model))
             owned.write('log.txt', lambda f: f.write(log))
             if summary['save_fields']:
                 arrays.update(result_format=np.asarray(self.result_format), field_layout=np.asarray(self.field_layout),
-                              mesh_length_unit=np.asarray('m'), metadata_json=np.asarray(encoded.decode('utf-8')))
+                              **extra)
                 if any(a.dtype.hasobject for a in arrays.values()):
                     raise ValueError('transient raw arrays must not contain Python objects')
                 owned.write('fields.npz', lambda f: np.savez_compressed(f, **arrays))
@@ -303,26 +456,38 @@ def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     solve_seconds = time.perf_counter()-started
-    log = (doc.summary(), f'transient heat: {len(solution.time_s)} requested times; full histories retained',
-           'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m')
-    if has_natural_conditions(p):
-        log += (f'boundary layout {V2[1]}: per-step prescribed outward load and convective '
-                'outward W/m depth; flux and convection sampled once',)
+    if doc.si is not None:
+        printed = (doc.summary(), f'transient heat: {len(solution.time_s)} requested times; full histories retained')
+        if has_natural_conditions_03(p):
+            printed += (f'boundary layout {V2_03[1]}: per-step outward_prescribed_heat_rate_per_depth and '
+                        'outward_convective_heat_rate_per_depth; inward_heat_flux and convection are constant',)
+        log = tuple(log_lines_03(doc, printed))
+    else:
+        printed = log = (doc.summary(), f'transient heat: {len(solution.time_s)} requested times; full histories '
+                                        'retained', 'SI: K, flux W/m^2, nodal rates W/m depth; H J/m; quadratic V J K/m')
+        if has_natural_conditions(p):
+            printed = log = log + (f'boundary layout {V2[1]}: per-step prescribed outward load and convective '
+                                   'outward W/m depth; flux and convection sampled once',)
     result = TransientThermalRunResult(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log)
     result.summary()  # reject malformed/nonfinite results even when no save is requested
     if verbose:
-        print('\n'.join(log))
+        print('\n'.join(printed))
     return result
 
 
 def _validate(doc):
+    """Format 0.3 rectangles; 0.2 region documents. A 0.2 rectangle (flat, or a homogeneous version 1
+    one) is refused: the rectangle form is read in format 0.3 only."""
     from .schema import reject_tagged_values
     from .transient_regions import is_transient_region_thermal, validate_transient_region_thermal
+    if doc.si is not None:
+        validate_transient_rectangle_03(doc)
+        return
     if is_transient_region_thermal(doc.data):
         reject_tagged_values(doc.data)
         validate_transient_region_thermal(doc)
         return
-    validate_transient_thermal(doc)
+    refuse_format_02(doc, 'thermal_transient2d')
 
 
 def _accepts_mesh_limits(data):
@@ -336,4 +501,4 @@ register(PhysicsKind(
     validate=_validate, run=run_transient_thermal, summary=transient_thermal_summary,
     result_types=(TransientThermalRunResult,), defaults=defaults, fresh_output=True,
     stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.transient2d',
-    accepts_mesh_limits=_accepts_mesh_limits))
+    accepts_mesh_limits=_accepts_mesh_limits, slots=heat_slots(PHYSICS, transient=True), forms_03=FORMS_03))

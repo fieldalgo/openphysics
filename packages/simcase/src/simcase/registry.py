@@ -60,6 +60,10 @@ class PhysicsKind:
     #: data only, one dict per entry. None for a kind that does not read format 0.3 yet,
     #: whose 0.3 documents are refused with ``E-CONTRACT``
     slots: tuple[dict, ...] | None = None
+    #: the geometry forms (``simcase.slots.GEOMETRY_FORMS``) whose format 0.3 documents this
+    #: kind reads; None for every form. A 0.3 document of another form is refused with
+    #: ``E-CONTRACT`` while the kind still reads that form in format 0.2 only
+    forms_03: frozenset[str] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}

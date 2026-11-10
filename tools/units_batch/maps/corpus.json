@@ -1,9 +1,17 @@
 {
   "format": "openphysics-units-batch-corpus-v1",
-  "description": "The P2-1 corpus: every examples/simcase/*.json (at the baseline and at the head) and every fixtures/v02/*.json, compared per physics type in identity mode (both sides read the 0.2 document; check P2-3) or in layout mode (the head reads the 0.3 twin: the example at the head, or fixtures/v03/<id>.json, through maps/<old field layout>.json). A kind's commit switches its types to layout and adds its maps and fixture twins in the same commit.",
+  "description": "The P2-1 corpus: every examples/simcase/*.json (at the baseline and at the head) and every fixtures/v02/*.json, compared per physics type in identity mode (both sides read the 0.2 document; check P2-3) or in layout mode (the head reads the 0.3 twin: the example at the head, or fixtures/v03/<id>.json, through maps/<old field layout>.json). A mode may be an object keyed by the 0.2 document's geometry form (rect, regions, v1) when a kind's commit converts some forms only. A kind's commit switches its types (or forms) to layout and adds its maps and fixture twins in the same commit.",
   "modes": {
-    "thermal.steady2d": "identity",
-    "thermal.transient2d": "identity",
+    "thermal.steady2d": {
+      "rect": "layout",
+      "regions": "identity",
+      "v1": "identity"
+    },
+    "thermal.transient2d": {
+      "rect": "layout",
+      "regions": "identity",
+      "v1": "identity"
+    },
     "electric.steady2d": "identity",
     "joule.steady2d": "identity",
     "joule.temperature2d": "identity",

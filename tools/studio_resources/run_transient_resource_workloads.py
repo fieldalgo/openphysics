@@ -20,16 +20,16 @@ from probe_transient_studio_resources import workload_plan
 
 def document(n, nt):
     return {
-        'openphysics':'0.2','name':'Transient resource observation',
-        'units':{'length':'m','temperature':'K','time':'s'},
-        'geometry':{'domain':{'xmin':0.0,'xmax':0.002,'ymin':0.0,'ymax':0.001}},
+        'openphysics':'0.3','name':'Transient resource observation',
+        'geometry':{'length_unit':'m','depth':None,'domain':{'xmin':0.0,'xmax':0.002,'ymin':0.0,'ymax':0.001}},
         'materials':{},
-        'physics':{'heat1':{'type':'thermal.transient2d','conductivity_w_mk':2.5,
-                           'volumetric_heat_capacity_j_m3k':4.0,
-                           'initial_temperature_k':300.0,'dirichlet_temperature_k':{},
-                           'heat_source_w_m3':8.0}},
-        'mesh':{'subdivisions':[n,n]},
-        'study':{'type':'transient','time_s':[2.0+i*0.01 for i in range(nt)]},
+        'physics':{'heat1':{'type':'thermal.transient2d','thermal_conductivity':'2.5 W/(m K)',
+                           'volumetric_heat_capacity':{'value':'4 J/(m^3 K)',
+                                                       'accept':{'W-MAGNITUDE':'resource observation'}},
+                           'initial_temperature':'300 K','prescribed_temperature':{},
+                           'heat_source_density':'8 W/m^3'}},
+        'mesh':{'subdivision_count':[n,n]},
+        'study':{'type':'transient','time':{'unit':'s','values':[2.0+i*0.01 for i in range(nt)]}},
         'results':{'save_fields':True,'plots':False}}
 
 

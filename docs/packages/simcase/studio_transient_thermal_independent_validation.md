@@ -56,7 +56,7 @@ These backward-Euler/P1 exact HTTP controls do not replace or redefine PDE conve
 
 ## Transport and independent controls
 The consumer validates all thirteen public fields. Manifest static arrays are
-nodes_m/triangles/dirichlet_node_ids; time_s is a top-level exact axis.
+node_coordinates/triangles/prescribed_node_ids; time is a top-level exact axis (format 0.3).
 Descriptors cover shapes/units/locations/time axes and initial availability.
 Default frame is Nt-1. Every dynamic field is reconstructed from all saved frames
 and compared with its paged history, then the independent expected arrays.

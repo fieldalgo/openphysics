@@ -34,9 +34,9 @@ NPZ endpoint. A view change never reruns the solver or modifies its document.
 Transient documents with material regions take a separate path on the same
 routes, described in [Region documents](#region-documents).
 
-Headless documents with `outward_flux_w_m2` or `convection` save the boundary
-layout `thermal2d-transient-p1-node-cell-boundary-v1`
-([headless guide](thermal_transient2d.md#outward-flux-and-convection-sides)).
+Headless documents with `inward_heat_flux` or `convection` save the boundary
+layout `thermal2d-transient-p1-node-cell-boundary-v2`
+([headless guide](thermal_transient2d.md#inward-heat-flux-and-convection-sides)).
 The transient validate and run routes refuse them by key presence before any
 validation or run (`unsupported_physics`, HTTP 400, no job), and the capability
 keeps the v1 pair only; run such documents headless.
@@ -55,8 +55,9 @@ Open the printed localhost address. Startup alone does not enable an absent or
 unsupported transient capability.
 
 1. Open/paste complete transient JSON and explicitly apply it. Preserve original
-   text for strict duplicate-key/finite-JSON validation. Declare length, K and s,
-   positive k/c, initial field, BC and increasing nonnegative time_s. Nonzero
+   text for strict duplicate-key/finite-JSON validation. Write format 0.3 (a geometry
+   length_unit and a unit on every value), positive k/c, initial field, BC and increasing
+   nonnegative study.time. Nonzero
    first time is valid. Dirty/invalid text invalidates old validation and results.
 2. Validate the current input through the dedicated transient capability. HTTP200
    is valid only with body ok=true. Run revalidates, takes a captured snapshot and
@@ -64,7 +65,7 @@ unsupported transient capability.
 3. Run explicitly. After completion, accept a typed manifest containing the actual
    static mesh, exact requested times and descriptors. The default selection is
    the final requested integer index Nt-1, not time0 or a rounded-time lookup.
-4. Select temperature K or cell qx/qy/magnitude at exact time_s[i]. Current-frame
+4. Select temperature K or cell qx/qy/magnitude at exact time[i]. Current-frame
    min/max and units are labelled. The same colour at different frames need not
    mean the same absolute value. No global-extrema scan/API is introduced.
 5. Explicitly open H or V history pages, at most16 rows. Pages use half-open
@@ -84,19 +85,20 @@ N nodes, M triangles, Nt requested times, D unique prescribed nodes:
 
 | Quantity | Shape | Axis / unit |
 |---|---|---|
-| nodes_m, triangles | (N,2), (M,3) | static / m, integer CCW connectivity |
-| time_s | (Nt,) | requested times / s |
-| temperature_k | (Nt,N) | time_s / nodal K |
-| heat_flux_w_m2 | (Nt,M,2) | time_s / cell-centroid W/m² |
-| source_load_w_per_m | (Nt,N) | time_s / nodal W/m of depth |
-| reaction_w_per_m, residual_w_per_m, storage_rate_w_per_m | (Nt-1,N) | time_s[1:] / nodal W/m |
-| heat_content_j_per_m | (Nt,) | time_s / H in J/m |
-| quadratic_functional_jk_per_m | (Nt,) | time_s / V in J K/m |
-| dirichlet_node_ids | (D,) | static / sorted unique integer IDs |
-| dirichlet_temperatures_k | (Nt,D) | time_s / K; D0 gives (Nt,0) |
+| node_coordinates, triangles | (N,2), (M,3) | static / m, integer CCW connectivity |
+| time | (Nt,) | requested times / s |
+| temperature | (Nt,N) | time / nodal K |
+| heat_flux | (Nt,M,2) | time / cell-centroid W/m^2 |
+| generated_heat_rate_per_depth | (Nt,N) | time / nodal W/m of depth |
+| reaction_, residual_, heat_storage_rate_per_depth | (Nt-1,N) | time[1:] / nodal W/m |
+| stored_heat_per_depth | (Nt,) | time / H in J/m |
+| thermal_energy_functional_per_depth | (Nt,) | time / V in J K/m |
+| prescribed_node_ids | (D,) | static / sorted unique integer IDs |
+| prescribed_temperature | (Nt,D) | time / K; D0 gives (Nt,0) |
 
 At index0, T, flux and diagnostic source f0 exist; reaction/residual-step/storage
-rate do not. For i>=1, the rate row is i-1 over [time_s[i-1],time_s[i]].
+rate do not. For i>=1, the rate row is i-1 over [time[i-1],time[i]] (`interval_start`,
+`interval_end` in a frame).
 Initial-rate API requests refuse422 rather than inventing a zero.
 For [2,2.03,2.1,2.4,3], default i4 means exactly3s; i2 means2.1s.
 Nearby times with identical formatted labels remain different indices.
@@ -123,12 +125,13 @@ global +y upward; arrows are view scaling. Derived overflow refuses the view.
 
 ## Typed reads and response ownership
 
-Transient result/layout IDs are thermal.transient2d-result-v1 and
-thermal2d-transient-p1-node-cell-v1. Manifest/frame/history use separate wire IDs:
-studio-thermal-transient-v1, studio-thermal-transient-frame-v1 and
-studio-thermal-transient-history-v1. No optical or steady-layout fallback.
+Transient result/layout IDs are thermal.transient2d-result-v3 and
+thermal2d-transient-p1-node-cell-v2. Manifest/frame/history use separate wire IDs:
+studio-thermal-transient-v2, studio-thermal-transient-frame-v2 and
+studio-thermal-transient-history-v2 (region documents, still format 0.2, keep the -v1
+frame and history IDs with their own pair). No optical or steady-layout fallback.
 
-The manifest contains static mesh, top-level time_s, immutable summary, default
+The manifest contains static mesh, top-level time, length_unit, immutable summary, default
 last index and all13 field descriptors: full shape, unit, location, axis,
 available_views, initial_available and ui_supported. Only T/q/H/V are initial UI
 fields. Frame carries one captured row; H/V frame shape is scalar[], page shape
@@ -160,7 +163,7 @@ requested-time checks are the rectangle ones, with the same codes and messages.
 | Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, the same 16 top-level fields |
 | `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids` and `triangle_regions` (one region index per triangle) |
 | Descriptors | The 13 rectangle descriptors plus `triangle_regions`: shape `[M]`, unit `1`, location `triangles`, axis `static`, no views, `ui_supported=false` |
-| Frames and history pages | The rectangle IDs `studio-thermal-transient-frame-v1` and `-history-v1`, stamped with the region pair stored on the job; `triangle_regions` is not a frame or history field (400 `invalid_query`) |
+| Frames and history pages | The format 0.2 frame and page IDs `studio-thermal-transient-frame-v1` and `-history-v1`, stamped with the region pair stored on the job; `triangle_regions` is not a frame or history field (400 `invalid_query`) |
 | Capability | A nested `regions` key in the transient block, with the region pair, the three payload formats above and the five region `limits` |
 
 The raw history of a region job also holds the region indices (8 bytes per

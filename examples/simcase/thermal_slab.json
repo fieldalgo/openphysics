@@ -1,11 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Steady heat slab",
-  "units": {
-    "length": "mm",
-    "temperature": "K"
-  },
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {
       "xmin": 0.0,
       "xmax": 30.0,
@@ -17,16 +15,16 @@
   "physics": {
     "heat1": {
       "type": "thermal.steady2d",
-      "conductivity_w_mk": 12.5,
-      "heat_source_w_m3": 0.0,
-      "dirichlet_temperature_k": {
-        "left": 280.0,
-        "right": 315.0
+      "thermal_conductivity": "12.5 W/(m K)",
+      "heat_source_density": "0 W/m^3",
+      "prescribed_temperature": {
+        "left": "280 K",
+        "right": "315 K"
       }
     }
   },
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       32,
       16
     ]
