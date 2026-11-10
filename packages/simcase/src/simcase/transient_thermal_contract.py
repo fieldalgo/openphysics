@@ -3,8 +3,9 @@
 """Strict serializable transient rectangle inputs; no solver or persistence.
 
 Format 0.3 rectangle documents are checked on their SI values (the section at the end);
-there every absolute temperature is above 0 K. The 0.2 contract below stays for the
-region and version 1 documents until their commit of the units batch.
+there every absolute temperature is above 0 K; region documents are checked in
+``transient_regions``. Heat no longer reads format 0.2; the 0.2 readers below stay only where
+later commits of the units batch still share them.
 
 Temperatures are finite Kelvin, including negative mathematical values. Initial
 data are never projected. Time-dependent side data are samples at the requested
@@ -311,7 +312,10 @@ def transient_solver_inputs(doc, mesh):
 
 
 def transient_thermal_summary(doc):
-    from .transient_regions import is_transient_region_thermal, transient_region_summary
+    from .transient_regions import is_transient_region_thermal, transient_region_summary_03
+    if getattr(doc, "si", None) is not None and is_transient_region_thermal(doc.data):
+        doc.validate()
+        return transient_region_summary_03(doc)
     if getattr(doc, "si", None) is not None:
         from .steady_boundary_contract import has_natural_conditions_03
         from .thermal import _authored, rectangle_summary_03
@@ -327,8 +331,7 @@ def transient_thermal_summary(doc):
             f"initial_temperature {initial_text}; study.time {_authored(doc, 'study.time')}",
             "  rates at interval ends only"],
             V2_03 if has_natural_conditions_03(doc.si["physics"][name]) else V1_03)
-    if is_transient_region_thermal(doc.data):
-        return transient_region_summary(doc)
+    doc.validate()                    # a format 0.2 heat document is refused by name
     name, p = doc.sole_physics()
     times = doc["study"]["time_s"]
     natural = ''
@@ -380,11 +383,9 @@ def _samples_03(value, times, path):
     return [float(value)]*len(times)
 
 
-def validate_transient_rectangle_03(doc):
-    """thermal.transient2d on a rectangle, format 0.3: today's contract on SI values."""
-    from .steady_boundary_contract import _temperatures_03, natural_conditions_03, rectangle_03
-    name, p = rectangle_03(doc, "transient heat")
-    where = f"physics.{name}"
+def study_times_03(doc):
+    """The study times of a format 0.3 transient document (SI seconds): at least two, strictly
+    increasing; the registry has checked that each is finite and nonnegative."""
     study = doc.si["study"]
     if study.get("type") != "transient":
         raise DocumentError('study.type: expected "transient"')
@@ -399,6 +400,15 @@ def validate_transient_rectangle_03(doc):
     for i, (a, b) in enumerate(zip(times, times[1:]), 1):
         if not (math.isfinite(b-a) and b-a > 0):
             raise DocumentError(f"study.time step[{i}]: expected increasing times", path=f"study.time.values[{i}]")
+    return times
+
+
+def validate_transient_rectangle_03(doc):
+    """thermal.transient2d on a rectangle, format 0.3: today's contract on SI values."""
+    from .steady_boundary_contract import _temperatures_03, natural_conditions_03, rectangle_03
+    name, p = rectangle_03(doc, "transient heat", ("thermal_conductivity", "volumetric_heat_capacity"))
+    where = f"physics.{name}"
+    times = study_times_03(doc)
     grid = views.rectangle_mesh(doc, "difference")
     (origin_x, origin_y), (lx, ly) = grid.origin, grid.lengths
     spec = _initial_03(p["initial_temperature"], where+".initial_temperature")
@@ -422,6 +432,8 @@ def validate_transient_rectangle_03(doc):
                                 "(32 eps bound); no projection")
     # Constant g and (h, ambient) per side, as for steady heat; no anchor is required.
     natural_conditions_03(p, where, sampled)
+    from .thermal_regions import default_boundaries_03
+    default_boundaries_03(doc, name, p, SIDES)
 
 
 def transient_heat_inputs_03(doc):

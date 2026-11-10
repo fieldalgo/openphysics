@@ -45,8 +45,8 @@ zero and negative counts are refused). `materials` is empty, there is exactly on
 and `study` is `{"type":"single"}` (its default). `results` accepts boolean `save_fields` and
 `plots`; `plots` must be false (the default). Unknown keys are `E-KEY-UNKNOWN`; a format 0.2
 key such as `conductivity_w_mk` is refused with its new name. A format 0.2 rectangle heat
-document is refused by name (`E-FORMAT`); region documents are still read in format 0.2 until
-their commit of the units batch. Natural boundary keys use the separate
+document is refused by name (`E-FORMAT`), as is a format 0.2 region document
+([material regions](thermal_regions2d.md) read format 0.3 too). Natural boundary keys use the separate
 [boundary extension](thermal_steady_boundary2d.md).
 
 Generate the complete examples and run them:

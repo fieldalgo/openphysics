@@ -18,7 +18,7 @@ from .schema import DocumentError
 from .thermal import (_OwnedOutput, log_lines_03, model_bytes_03, refuse_format_02,
                       require_fresh_output, strict_series, strict_timing, strict_value)
 from .steady_boundary_contract import (
-    FORMS_03, OUTWARD_SIGN_03, REACTION_SIGN_03, has_natural_conditions,
+    FORMS_03, OUTWARD_SIGN_03, REACTION_SIGN_03, has_natural_conditions, rect_geometry_03,
     has_natural_conditions_03, heat_slots,
 )
 from .transient_thermal_contract import (
@@ -300,7 +300,7 @@ class TransientThermalRunResult:
         result.update({'heat_content_definition': STORED_HEAT_DEFINITION_03,
                        'quadratic_functional_definition': FUNCTIONAL_DEFINITION_03,
                        'save_fields': doc.si['results']['save_fields']})
-        results_common.add_depth_totals(result, doc.si['geometry']['depth'])
+        results_common.add_depth_totals(result, rect_geometry_03(doc)[2])
         results_common.dumps_summary(result)            # finite JSON only
         return result
 
@@ -476,17 +476,18 @@ def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
 
 
 def _validate(doc):
-    """Format 0.3 rectangles; 0.2 region documents. A 0.2 rectangle (flat, or a homogeneous version 1
-    one) is refused: the rectangle form is read in format 0.3 only."""
-    from .schema import reject_tagged_values
-    from .transient_regions import is_transient_region_thermal, validate_transient_region_thermal
+    """Format 0.3 rectangles, regions and axisymmetric regions. A format 0.2 heat document is
+    refused by name; a homogeneous version 1 rectangle compiles to the flat form (D-1)."""
+    from .thermal_regions import refuse_format_02 as refuse_regions_02
+    from .transient_regions import is_transient_region_thermal, validate_transient_region_thermal_03
     if doc.si is not None:
+        if is_transient_region_thermal(doc.data):
+            validate_transient_region_thermal_03(doc)
+            return
         validate_transient_rectangle_03(doc)
         return
     if is_transient_region_thermal(doc.data):
-        reject_tagged_values(doc.data)
-        validate_transient_region_thermal(doc)
-        return
+        refuse_regions_02()
     refuse_format_02(doc, 'thermal_transient2d')
 
 

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from simcase import Document, run
-from simcase.export import export_fields, export_time_series
+from simcase.export import export_fields, export_time_series, read_field_data
 
 meshio = pytest.importorskip("meshio", reason="install simcase[export]")
 
@@ -19,51 +19,52 @@ def _document(transient, unit="mm", scale="1"):
     def length(value):
         return float(Fraction(str(value)) * Fraction(scale))
     data = {
-        "openphysics": "0.2", "name": "region export",
-        "units": {"length": unit, "temperature": "K"},
+        "openphysics": "0.3", "name": "region export",
         "geometry": {
+            "length_unit": unit, "depth": None,
             "domain": dict(zip(("xmin", "xmax", "ymin", "ymax"), map(length, (2, 6, -1, 1)))),
             "background": {"material": "same"},
             "shapes": [{"name": "plate", "type": "rect", "material": "same",
                         **dict(zip(("x", "y", "w", "h"), map(length, (2, -1, 2, 2))))}]},
-        "materials": {"same": {"conductivity_w_mk": 2.}},
+        "materials": {"same": {"thermal_conductivity": "2 W/(m K)"}},
         "physics": {"heat": {"type": "thermal.steady2d",
-                              "heat_source_w_m3": {"plate": 1e6},
-                              "dirichlet_temperature_k": {"left": 300.},
-                              "outward_flux_w_m2": {"bottom": -40.},
-                              "convection": {"right": {"h_w_m2k": 25., "ambient_temperature_k": 290.}}}},
-        "mesh": {"size": length(1)}, "study": {"type": "single"},
+                              "heat_source_density": {"plate": "1e6 W/m^3"},
+                              "prescribed_temperature": {"left": "300 K"},
+                              "inward_heat_flux": {"bottom": "40 W/m^2"},
+                              "convection": {"right": {"heat_transfer_coefficient": "25 W/(m^2 K)",
+                                                       "ambient_temperature": "290 K"}}}},
+        "mesh": {"element_size": "1 mm"}, "study": {"type": "single"},
         "results": {"save_fields": True, "plots": False}}
     if transient:
-        data["units"]["time"] = "s"
-        data["materials"]["same"]["volumetric_heat_capacity_j_m3k"] = 2e6
+        data["materials"]["same"]["volumetric_heat_capacity"] = "2e6 J/(m^3 K)"
         p = data["physics"]["heat"]
         p["type"] = "thermal.transient2d"
-        p["initial_temperature_k"] = 300.
-        p.pop("outward_flux_w_m2")
+        p["initial_temperature"] = "300 K"
+        p.pop("inward_heat_flux")
         p.pop("convection")
-        data["study"] = {"type": "transient", "time_s": [0., .03, .11]}
+        data["study"] = {"type": "transient", "time": {"unit": "s", "values": [0., .03, .11]}}
     return data
 
 
 def _assert_vtu(path, saved, index=None):
     mesh = meshio.read(path)
-    np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+    np.testing.assert_array_equal(mesh.points[:, :2], saved["node_coordinates"])
     np.testing.assert_array_equal(mesh.points[:, 2], 0.)
     np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
     regions = mesh.cell_data["triangle_regions"][0]
     assert regions.dtype.kind in "iu"
     np.testing.assert_array_equal(regions, saved["triangle_regions"])
-    flux = saved["heat_flux_w_m2"] if index is None else saved["heat_flux_w_m2"][index]
-    np.testing.assert_array_equal(mesh.cell_data["heat_flux_w_m2"][0][:, :2], flux)
-    np.testing.assert_array_equal(mesh.cell_data["heat_flux_w_m2"][0][:, 2], 0.)
-    names = {"temperature_k", "reaction_w_per_m", "residual_w_per_m"}
+    flux = saved["heat_flux"] if index is None else saved["heat_flux"][index]
+    np.testing.assert_array_equal(mesh.cell_data["heat_flux"][0][:, :2], flux)
+    np.testing.assert_array_equal(mesh.cell_data["heat_flux"][0][:, 2], 0.)
+    names = {"temperature", "reaction_heat_rate_per_depth", "residual_heat_rate_per_depth"}
     if index is None:
-        names.update(("load_w_per_m", "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
-                      "convective_outward_w_per_m", "system_rhs_w_per_m"))
+        names.update(("generated_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+                      "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                      "applied_heat_rate_per_depth"))
     else:
-        names.update(("source_load_w_per_m", "storage_rate_w_per_m"))
-    late = {"reaction_w_per_m", "residual_w_per_m", "storage_rate_w_per_m"}
+        names.update(("generated_heat_rate_per_depth", "heat_storage_rate_per_depth"))
+    late = {"reaction_heat_rate_per_depth", "residual_heat_rate_per_depth", "heat_storage_rate_per_depth"}
     expected = names - late if index == 0 else names
     assert mesh.point_data.keys() == expected
     for name in expected:
@@ -71,6 +72,12 @@ def _assert_vtu(path, saved, index=None):
         if index is not None:
             value = value[index - 1 if name in late else index]
         np.testing.assert_array_equal(mesh.point_data[name], value, err_msg=name)
+    # P2-18: the FieldData units are the summary's field_units; the region ids have none
+    field_units = json.loads(str(saved["metadata_json"]))["field_units"]
+    block = read_field_data(path)
+    assert block["units"] == {name: field_units[name] for name in (*mesh.point_data, "heat_flux")}
+    assert "triangle_regions" not in block["units"] and "triangle_regions" not in block["conventions"]["sign"]
+    assert {k: json.loads(bytes(v).decode("utf-8")) for k, v in mesh.field_data.items()} == block
     return {"points": mesh.points, "triangles": mesh.cells_dict["triangle"],
             **mesh.point_data, **{key: value[0] for key, value in mesh.cell_data.items()}}
 
@@ -78,8 +85,7 @@ def _assert_vtu(path, saved, index=None):
 @pytest.mark.parametrize("transient", [False, True])
 def test_region_exports_preserve_saved_fields_and_unit_equivalence(tmp_path, transient):
     reference = None
-    for n, (unit, scale) in enumerate((("mm", "1"), ("m", ".001"), ("um", "1000"),
-                                        ("nm", "1000000"), ({"in_m": 2e-5}, "50"))):
+    for n, (unit, scale) in enumerate((("mm", "1"), ("m", ".001"), ("um", "1000"), ("nm", "1000000"))):
         data = _document(transient, unit, scale)
         original = copy.deepcopy(data)
         out = run(Document.from_dict(data), verbose=False).save(tmp_path / str(n))
@@ -93,7 +99,7 @@ def test_region_exports_preserve_saved_fields_and_unit_equivalence(tmp_path, tra
             if transient:
                 pvd = export_time_series(fields, out / "series", name="heat & regions")
                 entries = list(ET.parse(pvd).getroot().iter("DataSet"))
-                assert [float(e.attrib["timestep"]) for e in entries] == saved["time_s"].tolist()
+                assert [float(e.attrib["timestep"]) for e in entries] == saved["time"].tolist()
                 for index, entry in enumerate(entries):
                     assert entry.attrib["file"] == f"heat & regions_{index:05d}.vtu"
                     snapshots.append(_assert_vtu(pvd.parent / entry.attrib["file"], saved, index))

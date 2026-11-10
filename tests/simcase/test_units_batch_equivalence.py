@@ -304,13 +304,32 @@ if HARNESS.is_dir():
         else:
             assert expected == actual and type(expected) is type(actual), (path, expected, actual)
 
+    #: thermal_regions.json before the units batch (format 0.2; converted by units batch C5b)
+    THERMAL_REGIONS_02 = {
+        "openphysics": "0.2", "name": "Heated steel plate in insulation", "units": {"length": "mm", "temperature": "K"},
+        "geometry": {"domain": {"xmin": 0.0, "xmax": 40.0, "ymin": 0.0, "ymax": 20.0},
+                     "background": {"material": "insulation"},
+                     "shapes": [{"name": "plate", "type": "rect", "x": 5.0, "y": 5.0, "w": 30.0, "h": 6.0,
+                                 "material": "steel"},
+                                {"name": "heater", "type": "circle", "cx": 20.0, "cy": 8.0, "r": 2.0,
+                                 "material": "copper", "mesh_size": 0.5}]},
+        "materials": {"steel": {"conductivity_w_mk": 45.0, "source": "document value"},
+                      "copper": {"conductivity_w_mk": 400.0, "source": "document value"},
+                      "insulation": {"conductivity_w_mk": 0.04, "source": "document value"}},
+        "physics": {"heat1": {"type": "thermal.steady2d", "heat_source_w_m3": {"heater": 5000000.0},
+                              "dirichlet_temperature_k": {"bottom": 300.0},
+                              "convection": {"top": {"h_w_m2k": 10.0, "ambient_temperature_k": 295.0}}}},
+        "mesh": {"size": 2.0, "min_angle": 28.0}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False}}
+
     @pytest.mark.parametrize("name", ["thermal_regions", "joule_temperature", "soi_strip", "elastic_regions",
                                       "cavity_lossy_slab"])
     def test_the_converter_reproduces_the_converted_examples_of_the_specification(name):
         convert = _module("convert_v02")
         expected = (SPEC_EXAMPLES.get(name) or {"elastic_regions": _spec_elastic_regions,
                                                   "cavity_lossy_slab": _spec_cavity_lossy_slab}[name]())
-        old = json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
+        old = copy.deepcopy(THERMAL_REGIONS_02) if name == "thermal_regions" else \
+            json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
         new, writer = convert.convert(old)
         assert convert.check(writer) == []
         quantities = {path: quantity for path, _text, quantity, _ in writer.expected}

@@ -1,8 +1,8 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 """Format 0.3 heat rectangle checks of the units and naming batch (heat rows of P2-4, P2-5,
-P2-6, P2-9, P2-11, P2-14 and P2-19). Region and axisymmetric heat documents are still format
-0.2; their rows follow with their commit."""
+P2-6, P2-9, P2-11, P2-14 and P2-19). The region and axisymmetric rows are in
+test_units_heat_regions.py."""
 import copy
 import json
 import re
@@ -193,7 +193,9 @@ def test_p2_5_negative_controls():
     # (0.05 mm x 0.01 mm) raises no check yet (W-TIME-SCALE is deferred)
     boundary = example("transient_thermal_boundary")
     boundary["geometry"]["length_unit"] = "mm"
-    assert list(Document.from_dict(boundary).diagnostics) == []
+    found = list(Document.from_dict(boundary).diagnostics)
+    assert [d for d in found if d.severity != "info"] == []
+    assert {d.code for d in found} <= {"I-DEFAULT-BOUNDARY"}       # the insulated sides, listed
 
 
 # ---- P2-6: depth invariance -------------------------------------------------------------------

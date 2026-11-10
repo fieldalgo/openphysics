@@ -135,6 +135,20 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     if not _is_region_document(doc.data):
         raise ValueError('check_mesh_limits: expected a region document (steady or transient heat, electric '
                          'conduction, steady Joule heating or mechanics, with region geometry)')
+    from .geometry import _domain_from_regions
+    from .runner import micrometre_document
+    from .schema import _is_v03
+    if doc.si is None and isinstance(doc.data, dict) and _is_v03(doc.data.get('openphysics')):
+        doc = Document(copy.deepcopy(doc.data))     # not read yet: read it, as a run would
+        doc.validate()
+    if doc.si is not None:
+        # a format 0.3 heat region document is meshed from its hand-off (thermal_regions.handoff_03)
+        from .thermal_regions import handoff_03
+        if doc._read_json is not None and doc.canonical_json() != doc._read_json:
+            doc = doc.copy()
+            doc.validate()
+        return _domain_from_regions(micrometre_document(handoff_03(doc), validate=False),
+                                    max_input_vertices=limit)[3]
     try:
         declared = units.resolve(doc.data.get('units'))
     except units.UnitError:
@@ -145,6 +159,4 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
         # on a copy, and leave the document as it is.
         doc = Document(copy.deepcopy(doc.data))
         doc.validate()
-    from .geometry import _domain_from_regions
-    from .runner import micrometre_document
     return _domain_from_regions(micrometre_document(doc), max_input_vertices=limit)[3]
