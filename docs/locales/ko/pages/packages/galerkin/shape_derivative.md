@@ -6,7 +6,8 @@
 
 `galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 Cartesian 열
 (`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
-선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -63,8 +64,26 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 일정 체적력, 경계 태그의 일정 traction(변과 함께 움직임), Dirichlet 변위 `{(node, component): value}`를 받습니다. 변위·변형률·
 응력·부하·반력·잔차가 d/dt를 나릅니다.
 - Dirichlet 값은 노드에 붙어 노드와 함께 움직입니다.
-- 열탄성은 아직 다루지 않습니다. 온도장이 메시와 함께 어떻게 움직이는지는 따로 정해야 합니다.
 - 큰 강체 변위 오프셋(탄성 변형보다 훨씬 큰 Dirichlet 값)은 솔버 자체에서처럼 결과와 그 미분의 정밀도를 떨어뜨립니다.
+
+## 열탄성
+
+`motion=`을 받는 경로는 둘이고, 온도장이 메시와 함께 움직이는 방식이 다릅니다.
+- **정해진 온도**, `solve_thermoelasticity(mesh, snapshot, ..., motion=MeshMotion(W, t))`:
+  - 스냅샷은 주어진 메시(X₀)의 것이며, motion이 없을 때처럼 그 메시에 대해 검사합니다.
+  - 노드 온도는 Dirichlet 변위처럼 노드에 붙어 함께 움직입니다. 그래서 미분은 기하(변형률 행렬·요소 넓이·하중 변
+    길이)에서만 옵니다.
+  - 선형 탄성이 받는 것에 더해 스칼라 또는 영역별 열팽창 계수와 기준 온도를 받습니다.
+- **열 뒤 기계 워크플로**, `solve_steady_thermoelasticity(..., motion=MeshMotion(W, t))`:
+  - 일반 워크플로를 옮겨진 메시에서 한 번 돌려 모든 단계 검사와 manifest를 얻습니다.
+  - 그 뒤 열 단계를 움직이는 메시에서 다시 풀고(위 정상 열과 같음), 그 live 온도로 live 기계 단계를 풉니다. 그래서
+    미분에 온도장의 변화가 들어갑니다.
+  - `result.heat`와 `result.mechanics` 모두 d/dt를 나릅니다.
+  - `result.reference_mesh`, `result.temperature_snapshot`, manifest는 옮겨진 메시를 기술하며 미분을 나르지 않습니다.
+- 두 경로 모두 변위, 세 변형률, 응력, σzz, εzz, 외부·열 하중, 반력, 잔차, 물리 탄성 에너지가 d/dt를 나릅니다.
+  `result.temperature_snapshot`은 옮겨진 메시의 스냅샷입니다.
+- 공간에 고정된 온도장을 움직이는 노드에서 다시 샘플링하는 방식은 제공하지 않습니다. 좌표 콜백이 필요하기 때문입니다(아래
+  거부).
 
 ## 메시 속도
 
@@ -99,8 +118,9 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·outward flux·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
   `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다.
-- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·체적력·traction 값: 그런 호출에서 live 입력은
-  t 하나입니다.
+- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction 값:
+  그런 호출에서 live 입력은 t 하나입니다.
+- 다른 메시(옮겨진 메시 포함)의 온도 스냅샷: 스냅샷은 주어진 메시의 것입니다.
 - `coordinate_system="axisymmetric"`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
@@ -151,6 +171,26 @@ PyTorch 2.14.1+cpu로 측정했습니다.
 | M6 에너지 항등식 | d(½∫σ:ε)/dt = d(½ load · u)/dt, 상대 1e-10 | 통과 |
 | M7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `6f80a73`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | M8 거부 | 위 목록대로 | 통과 |
+
+`tests/galerkin/test_shape_derivative_thermoelastic.py`에 열탄성의 검사 T1–T8이 있습니다(경로 1: 정해진 스냅샷, 경로 2:
+워크플로). 2026-11-10에 T3의 메시 크기까지 사전 등록하고 같은 날 같은 버전으로 측정했습니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| T1 이산 일관성 | 두 재료·불균일 온도·중력·(경로 1) 움직이는 변의 traction이 있는 문제에서, 끝 변위·고정변 반력 합·물리 탄성 에너지(경로 2는 평균 온도도)의 미분 vs 옮긴 메시 중심차분(h = 1e-4), plane stress·plane strain; 상대 1e-6, JAX·PyTorch | 경로 1: 1.9e-9 ~ 4.9e-8; 경로 2: 2.6e-10 ~ 2.0e-8, plane strain 반력 합은 예외(아래) |
+| T2 자유 열팽창 | dδ/dL = αΔT(plane stress), (1+ν)αΔT(plane strain), 상대 1e-10 | 통과 |
+| T3 두꺼운 원통, 열 연쇄(경로 2) | 형상 엔진 노드 속도로 안 반지름; 두 면 사이 로그 정상 온도, 안쪽 고정, 바깥 자유, plane strain; 안쪽 반지름 방향 반력의 dF/da를 닫힌 해와 비교; 크기 0.4·0.2·0.1; 관측 차수 ≥ 1.0, 최세 1e-2 이내 | 1.4e-1, 3.4e-2, 8.8e-3(차수 2.1, 1.9) |
+| T4 양끝 고정 두 재료 봉(ν = 0) | σ = −ΔT(α₁L₁ + α₂L₂)/(L₁/E₁ + L₂/E₂)의 dσ/dL₁, 상대 1e-10 | 통과 |
+| T5 강체 이동 | dJ/dt = 0, 1e-12 · \|J\| 이내(에너지, 변위 합), 두 경로 | 통과 |
+| T6 온도 변화 없음 | T = T_ref이면 미분이 선형 탄성과 같음, 상대 1e-12 | 통과 |
+| T7 무변경 | `motion` 없이 두 경로 결과가 이전 코드와 같음 | 결과 배열(과 manifest) sha256이 main `e9bb438`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
+| T8 거부 | 위 목록대로 | 통과 |
+
+T1 경로 2 plane strain에서 고정변 반력 합은 약 1e3 N/m이지만, 더하는 반력 하나하나는 약 1e7 N/m입니다. 일반 워크플로
+자체의 반올림이 t = 0과 t = 1e-12의 두 풀이 사이에서 이 값을 약 1.6e-6 움직입니다. 그래서 사전 등록한 h = 1e-4에서는
+중심차분이 미분과 4.2e-6 달라 1e-6을 넘습니다. h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값
+d(ΣR_y)/dt = −f_y dA/dt와 1.2e-10 ~ 4.5e-10으로 같습니다. 시험은 이 합의 중심차분을 h = 1e-2에서 잡고 평형 검사를
+더합니다. 사전 등록한 스텝과 다른 점이며, 여기와 HQ 기록에 적었습니다. 사전 등록하지 않은 모멘트 검사도 같게 다룹니다.
 
 사전 등록은 M4의 기준을 정했고 메시 크기는 정하지 않았습니다. 크기 0.8·0.4·0.2로 처음 돌리면 1.6e-1, 4.4e-2, 1.016e-2로 차수는 약
 2지만 최세가 1e-2를 조금 넘었습니다. 시험은 한 단계 더 고운 세 크기를 쓰며, 기준은 그대로입니다.

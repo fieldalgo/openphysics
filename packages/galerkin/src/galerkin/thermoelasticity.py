@@ -223,7 +223,7 @@ class ThermoelasticResult:
 
 def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_k,
                           thermal_expansion_per_k, young_modulus, poisson_ratio,
-                          plane, dirichlet, body_force=(0.,0.), traction=None):
+                          plane, dirichlet, body_force=(0.,0.), traction=None, motion=None):
     """Solve the static mechanical stage; no automatic heat solve or transfer.
 
     Absolute T/Tref: nonnegative K; alpha: signed 1/K; E: Pa. Coordinates and
@@ -240,7 +240,19 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     JAX or PyTorch values, or callbacks returning them; the result is then in
     that library with reverse-mode derivatives
     (docs/packages/galerkin/differentiation.md). Callbacks are called once.
+
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
+    t*velocity; the snapshot belongs to the mesh as given, and its nodal
+    temperatures move with their nodes. Every result carries the derivative with
+    respect to the JAX or PyTorch scalar t (docs/packages/galerkin/shape_derivative.md).
     """
+    if motion is not None:
+        from .shape import solve_thermoelasticity_moving
+        return solve_thermoelasticity_moving(
+            mesh, temperature_snapshot, motion, reference_temperature_k=reference_temperature_k,
+            thermal_expansion_per_k=thermal_expansion_per_k, young_modulus=young_modulus,
+            poisson_ratio=poisson_ratio, plane=plane, dirichlet=dirichlet, body_force=body_force,
+            traction=traction)
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
     _verify_snapshot(temperature_snapshot, p, t)

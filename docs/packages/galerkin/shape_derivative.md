@@ -7,9 +7,11 @@
 `galerkin.shape` gives derivatives with respect to a design parameter that moves
 the mesh, such as a layer thickness or a hole radius. It covers steady Cartesian
 heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09), steady electric
-conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10) and linear
-elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10). The other solvers
-follow the same frame later.
+conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10), linear
+elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10) and
+thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10). The other
+solvers follow the same frame later.
 
 ## What is differentiated
 
@@ -83,11 +85,38 @@ force, constant tractions on boundary tags (they move with their edges) and
 Dirichlet displacements `{(node, component): value}`. The displacement, strain,
 stress, load, reaction and residual carry d/dt.
 - The Dirichlet values stay attached to their nodes as the nodes move.
-- Thermoelasticity is not covered yet: how a temperature field moves with the
-  mesh is a separate decision.
 - A large rigid displacement offset (Dirichlet values far larger than the
   elastic deformation) costs precision in the result and its derivative, as it
   does in the solver itself.
+
+## Thermoelasticity
+
+Two paths take `motion=`. They differ in how the temperature field moves with the
+mesh.
+- **A prescribed temperature**, `solve_thermoelasticity(mesh, snapshot, ...,
+  motion=MeshMotion(W, t))`:
+  - The snapshot belongs to the mesh as given (X₀) and is checked against it, as
+    without a motion.
+  - Its nodal temperatures stay attached to their nodes as they move, like
+    Dirichlet displacements. The derivative therefore comes from the geometry
+    alone: strain matrices, element areas and loaded edge lengths.
+  - It takes what linear elasticity takes, plus scalar or region thermal expansion
+    and the reference temperature.
+- **The heat-then-mechanics workflow**, `solve_steady_thermoelasticity(...,
+  motion=MeshMotion(W, t))`:
+  - The ordinary workflow runs once on the moved mesh, with every stage check and
+    its manifest.
+  - The heat stage is then solved again on the moving mesh (as in steady heat
+    above), and its live temperature drives the live mechanical stage. The
+    derivative therefore includes the change of the temperature field.
+  - `result.heat` and `result.mechanics` both carry d/dt.
+  - `result.reference_mesh`, `result.temperature_snapshot` and the manifest
+    describe the moved mesh and carry no derivative.
+- Both paths: displacement, the three strains, stress, σzz, εzz, the external
+  and thermal loads, reaction, residual and the physical elastic energy carry
+  d/dt. `result.temperature_snapshot` is the moved mesh's snapshot.
+- A temperature field fixed in space and sampled at the moving nodes is not
+  offered: that needs a coordinate callback (refused below).
 
 ## The mesh velocity
 
@@ -138,8 +167,10 @@ Each refusal names the reason:
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
-  body-force or traction values together with a motion: t is the one live input
-  of such a call;
+  thermal-expansion, reference-temperature, body-force or traction values together
+  with a motion: t is the one live input of such a call;
+- a temperature snapshot of another mesh, including the moved one: the snapshot
+  belongs to the mesh as given;
 - `coordinate_system="axisymmetric"`;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
@@ -195,6 +226,31 @@ versions.
 | M6 energy identity | d(½∫σ:ε)/dt = d(½ load · u)/dt, relative 1e-10 | pass |
 | M7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `6f80a73` (measured); `motion=None` equals no keyword (test) |
 | M8 refusals | as listed above | pass |
+
+`tests/galerkin/test_shape_derivative_thermoelastic.py` holds checks T1–T8 for
+thermoelasticity (path 1: a prescribed snapshot; path 2: the workflow), pre-registered
+on 2026-11-10 with T3's mesh sizes, and measured that day with the same versions.
+
+| Check | Criterion | Result |
+|---|---|---|
+| T1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a tip displacement, the clamped side's reaction sum and the physical elastic energy (path 2 also the mean temperature), with two materials, a nonuniform temperature, gravity and (path 1) a traction on a moving side, plane stress and plane strain; relative 1e-6, JAX and PyTorch | path 1: 1.9e-9 to 4.9e-8; path 2: 2.6e-10 to 2.0e-8, except the reaction sum in plane strain (below) |
+| T2 free thermal expansion | dδ/dL = αΔT (plane stress), (1+ν)αΔT (plane strain), relative 1e-10 | pass |
+| T3 thick cylinder, heat chained (path 2) | inner radius from the geometry engine's node velocities; logarithmic steady temperature between the faces, inner face clamped, outer free, plane strain; dF/da of the inner radial reaction against the closed form; sizes 0.4, 0.2, 0.1; observed order ≥ 1.0, finest within 1e-2 | 1.4e-1, 3.4e-2, 8.8e-3 (order 2.1 and 1.9) |
+| T4 clamped two-material bar (ν = 0) | dσ/dL₁ with σ = −ΔT(α₁L₁ + α₂L₂)/(L₁/E₁ + L₂/E₂), relative 1e-10 | pass |
+| T5 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| (energy, sum of displacements), both paths | pass |
+| T6 no temperature change | with T = T_ref the derivative equals linear elasticity's, relative 1e-12 | pass |
+| T7 unchanged | without `motion` both paths equal the previous code | sha256 of the result arrays (and the manifest) equal to main `e9bb438` (measured); `motion=None` equals no keyword (test) |
+| T8 refusals | as listed above | pass |
+
+T1, path 2, plane strain: the clamped side's reaction sum is about 1e3 N/m, while
+the reactions it sums are about 1e7 N/m. The ordinary workflow's own rounding moves
+it by about 1.6e-6 between two solves at t = 0 and t = 1e-12. At the pre-registered
+h = 1e-4 the central difference therefore differs from the derivative by 4.2e-6,
+above 1e-6. As h grows the difference falls (h = 1e-2: 4.8e-9), and the derivative
+equals the equilibrium value d(ΣR_y)/dt = −f_y dA/dt to 1.2e-10 to 4.5e-10. The test
+takes this sum's central difference at h = 1e-2 and adds the equilibrium check. This
+is a deviation from the pre-registered step, recorded here and in the HQ record. An
+extra moment check, not pre-registered, is treated the same way.
 
 The pre-registration fixed M4's criteria, not its mesh sizes. A first run with sizes
 0.8, 0.4 and 0.2 gave 1.6e-1, 4.4e-2 and 1.016e-2: order about 2, but the finest

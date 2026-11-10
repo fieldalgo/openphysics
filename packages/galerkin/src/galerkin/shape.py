@@ -16,9 +16,10 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
   result fields with their derivative with respect to t.
 
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
-``electric.solve_steady_electric`` and ``elasticity.solve_elasticity`` with scalar
-or region data and constant loads; the refusals are
-listed in docs/packages/galerkin/shape_derivative.md.
+``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
+``thermoelasticity.solve_thermoelasticity`` and
+``thermal_mechanical.solve_steady_thermoelasticity`` with scalar or region data and
+constant loads; the refusals are listed in docs/packages/galerkin/shape_derivative.md.
 """
 
 from __future__ import annotations
@@ -292,34 +293,144 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, po
 
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.velocity)
-    for name, value in (("young_modulus", young_modulus), ("poisson_ratio", poisson_ratio)):
-        _coefficient(value, name)
-    if callable(body_force):
-        raise TypeError("motion: body_force is a callback; with a moving mesh its sample points move too, which "
-                        "this slice does not differentiate. Give a constant (2,) vector")
-    if is_live(body_force) or (isinstance(body_force, (tuple, list)) and any(is_live(v) for v in body_force)):
-        raise TypeError("motion: body_force is live; in this slice only the motion's t carries a derivative")
-    for tag, value in _tags(traction, "traction").items():
-        if callable(value):
-            raise TypeError(f"motion: traction[{tag!r}] is a callback; with a moving mesh its sample points move "
-                            "too, which this slice does not differentiate. Give a constant (2,) vector")
-        if is_live(value) or (isinstance(value, (tuple, list)) and any(is_live(v) for v in value)):
-            raise TypeError(f"motion: traction[{tag!r}] is live; in this slice only the motion's t carries a "
-                            "derivative")
-    if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map (node, component) to displacement in metres")
-    for value in dirichlet.values():
-        _numpy_data(value, "Dirichlet displacement")
-    t0 = float(to_numpy(t))
-    if not math.isfinite(t0):
-        raise ValueError(f"motion: t must be finite, got {t0!r}")
-    lo, hi = admissible_interval(mesh, W)
-    if not lo < t0 < hi:
-        raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
-                               f"({lo:g}, {hi:g}))")
-    moved = _moved_mesh(mesh, W, t0)
+    _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
+    moved = _checked_step(mesh, W, t)
     base = elasticity.solve_elasticity(moved, young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
                                        dirichlet=dirichlet, body_force=body_force, traction=traction)
+    live = _elastic_live(xp, mesh, moved, t, W, young_modulus, poisson_ratio, plane, body_force, traction)
+    load = live.body + live.line
+    u, residual, reaction = _corrected(xp, live, base.displacement, load, dirichlet)
+    strain = xp.einsum("tij,tj->ti", live.B, u[live.dofs])
+    stress = strain @ live.d.T if live.d.ndim == 2 else xp.einsum("tij,tj->ti", live.d, strain)
+    return elasticity.ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress, xp.reshape(load, (-1, 2)),
+                                       xp.reshape(reaction, (-1, 2)), xp.reshape(residual, (-1, 2)), plane)
+
+
+# ----------------------------------------------------------------------------- thermoelasticity
+
+def solve_thermoelasticity_moving(mesh: Mesh, temperature_snapshot, motion: MeshMotion, *, reference_temperature_k,
+                                  thermal_expansion_per_k, young_modulus, poisson_ratio, plane, dirichlet,
+                                  body_force=(0.0, 0.0), traction=None):
+    """``thermoelasticity.solve_thermoelasticity`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    The snapshot belongs to the mesh as given (X0) and is checked against it. Its nodal
+    temperatures stay attached to their nodes as they move, as Dirichlet displacements do,
+    so the derivative comes from the geometry alone (decision 2026-11-10)."""
+    from . import thermoelasticity
+    from .core.triangles import triangle_geometry
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k)
+    _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
+    p, tris, *_ = triangle_geometry(mesh, counterclockwise=False)
+    thermoelasticity._verify_snapshot(temperature_snapshot, p, tris)
+    moved = _checked_step(mesh, W, t)
+    base = thermoelasticity.solve_thermoelasticity(
+        moved, thermoelasticity.freeze_temperature(moved, temperature_snapshot.temperature_k),
+        reference_temperature_k=reference_temperature_k, thermal_expansion_per_k=thermal_expansion_per_k,
+        young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane, dirichlet=dirichlet,
+        body_force=body_force, traction=traction)
+    return _thermoelastic_live(xp, mesh, moved, t, W, base, lift(xp, np.array(temperature_snapshot.temperature_k)),
+                               dirichlet, body_force, traction)
+
+
+def solve_steady_thermoelasticity_moving(mesh: Mesh, motion: MeshMotion, *, units, conductivity, thermal_dirichlet,
+                                         heat_source=0.0, young_modulus, poisson_ratio, plane,
+                                         thermal_expansion_per_k, reference_temperature_k, mechanical_dirichlet,
+                                         body_force=(0.0, 0.0)):
+    """``thermal_mechanical.solve_steady_thermoelasticity`` on X0 + t W, derivative with respect to ``motion.t``.
+
+    The ordinary workflow on the moved mesh gives the numbers, every stage check and the
+    manifest. The heat stage is then solved again on the moving mesh (shape derivative of
+    steady heat) and its live temperature drives the live mechanical stage, so the
+    derivative includes the change of the temperature field (decision 2026-11-10)."""
+    from . import thermal_mechanical
+    from ._thermal_mechanical_common import dirichlet_supports
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    _coefficient(conductivity, "conductivity")
+    _numpy_data(heat_source, "heat_source")
+    _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k)
+    _check_elastic_data(young_modulus, poisson_ratio, body_force, None, mechanical_dirichlet)
+    if not isinstance(thermal_dirichlet, Mapping):
+        raise ValueError("thermal_dirichlet must map node indices to temperatures in K")
+    for value in thermal_dirichlet.values():
+        _numpy_data(value, "Dirichlet temperature")
+    moved = _checked_step(mesh, W, t)
+    base = thermal_mechanical.solve_steady_thermoelasticity(
+        moved, units=units, conductivity=conductivity, thermal_dirichlet=thermal_dirichlet, heat_source=heat_source,
+        young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
+        thermal_expansion_per_k=thermal_expansion_per_k, reference_temperature_k=reference_temperature_k,
+        mechanical_dirichlet=mechanical_dirichlet, body_force=body_force)
+    heat = solve_steady_heat_moving(mesh, motion, conductivity=conductivity,
+                                    dirichlet=dirichlet_supports(thermal_dirichlet), heat_source=heat_source)
+    mechanics = _thermoelastic_live(xp, mesh, moved, t, W, base.mechanics, heat.temperature,
+                                    dirichlet_supports(mechanical_dirichlet, vector=True), body_force, None)
+    return thermal_mechanical.SteadyThermoelasticResult(base.reference_mesh, heat, base.temperature_snapshot,
+                                                        mechanics, base.manifest_json)
+
+
+def _thermoelastic_live(xp, mesh, moved, t, W, base, temperature, dirichlet, body_force, traction):
+    """The live mechanical stage for a nodal temperature (NumPy or live), corrected from ``base``."""
+    from . import elasticity, thermoelasticity
+
+    e = base.young_modulus
+    nu = base.poisson_ratio
+    alpha = base.thermal_expansion_per_k
+    tref = float(base.reference_temperature_k)
+    plane = base.plane
+    live = _elastic_live(xp, mesh, moved, t, W, e, nu, plane, body_force, traction)
+    cells = mesh.num_triangles
+    e_t, nu_t = (np.asarray(v, dtype=float) for v in elasticity.element_materials(mesh, e, nu))
+    alpha_t = _per_triangle(mesh, alpha, "thermal_expansion_per_k")
+    coefficient = np.broadcast_to(thermoelasticity._thermal_coefficient(e_t, nu_t, plane), (cells,))
+    a = lift(xp, alpha_t)[:, None] * (temperature[mesh.triangles] - tref)        # (T, 3) nodal values per element
+    q = lift(xp, np.array(coefficient))[:, None] * a
+    ac, qc = xp.mean(a, axis=1), xp.mean(q, axis=1)
+    m_vector = lift(xp, thermoelasticity._M)
+    local = xp.einsum("tji,j,t->ti", live.B, m_vector, live.area * qc)
+    thermal = scatter_add(xp, 2 * mesh.num_nodes, live.dofs.ravel(), xp.reshape(local, (-1,)))
+    external = live.body + live.line
+    load = external + thermal
+    u, residual, reaction = _corrected(xp, live, base.displacement, load, dirichlet)
+    strain = xp.einsum("tij,tj->ti", live.B, u[live.dofs])
+    th = ac[:, None] * m_vector
+    elastic = strain - th
+    stress = (strain @ live.d.T if live.d.ndim == 2 else xp.einsum("tij,tj->ti", live.d, strain)) \
+        - qc[:, None] * m_vector
+    trace = strain[:, 0] + strain[:, 1]
+    e_l, nu_l = (lift(xp, np.array(np.broadcast_to(v, (cells,)))) for v in (e_t, nu_t))
+    if plane == "strain":
+        zz = elasticity.lame(e_l, nu_l, "strain")[0] * trace - qc
+        ez = xp.zeros_like(qc)
+    else:
+        zz = xp.zeros_like(qc)
+        ez = ((1 + nu_l) * ac - nu_l * trace) / (1 - nu_l)
+    energy = thermoelasticity._physical_energy(xp, strain, a, live.area, live.d, e_l, nu_l, plane)
+    return thermoelasticity.ThermoelasticResult(
+        xp.reshape(u, (-1, 2)), strain, th, elastic, stress, zz, ez,
+        *(xp.reshape(v, (-1, 2)) for v in (external, thermal, reaction, residual)),
+        energy, base.temperature_snapshot, base.reference_temperature_k, base.thermal_expansion_per_k,
+        base.young_modulus, base.poisson_ratio, plane, xp.reshape(live.body, (-1, 2)), xp.reshape(live.line, (-1, 2)))
+
+
+@dataclass(frozen=True)
+class _ElasticLive:
+    B: object
+    d: object
+    area: object
+    dofs: np.ndarray
+    K: CooMatrix
+    body: object
+    line: object
+
+
+def _elastic_live(xp, mesh, moved, t, W, young_modulus, poisson_ratio, plane, body_force, traction):
+    """Live P1 strain matrices, constitutive matrix, stiffness, body and traction loads on X0 + t W."""
+    from . import elasticity
+
     n = mesh.num_nodes
     X = lift(xp, mesh.nodes) + t * lift(xp, W)
     tris = mesh.triangles
@@ -343,26 +454,73 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, po
     K = CooMatrix(np.repeat(dofs, 6, axis=1).ravel(), np.tile(dofs, (1, 6)).ravel(), xp.reshape(ke, (-1,)),
                   (size, size))
     f = np.asarray(to_numpy(body_force), dtype=float).reshape(2)
-    body = xp.reshape((area / 3.0)[:, None, None] * lift(xp, np.broadcast_to(f, (1, 3, 2))), (-1,))
-    load = scatter_add(xp, size, dofs.ravel(), body)
+    body = scatter_add(xp, size, dofs.ravel(),
+                       xp.reshape((area / 3.0)[:, None, None] * lift(xp, np.broadcast_to(f, (1, 3, 2))), (-1,)))
+    line = xp.zeros(size, dtype=xp.float64)
     for tag, value in _tags(traction, "traction").items():
         g = np.asarray(value, dtype=float).reshape(2)
         edges, length = _boundary_edges(xp, mesh, X, tag)
         edofs = (2 * edges[:, :, None] + np.arange(2)).reshape(-1)
         local = (length / 2.0)[:, None, None] * lift(xp, np.broadcast_to(g, (1, 2, 2)))
-        load = scatter_add(xp, size, edofs, xp.reshape(local, (-1,)), base=load)
-    u0 = lift(xp, np.asarray(to_numpy(base.displacement), dtype=float).reshape(-1))
+        line = scatter_add(xp, size, edofs, xp.reshape(local, (-1,)), base=line)
+    return _ElasticLive(B, d, area, dofs, K, body, line)
+
+
+def _corrected(xp, live, u_base, load, dirichlet):
+    """u = u0 + K^-1 (load - K u0) with the fixed DOFs held; residual and reaction at the fixed DOFs."""
+    size = live.K.shape[0]
+    u0 = lift(xp, np.asarray(to_numpy(u_base), dtype=float).reshape(-1))
     fixed_dofs = np.array(sorted(2 * int(k[0]) + int(k[1]) for k in dirichlet), dtype=int)
-    delta = core_solve.solve_dirichlet(K, load - K.matvec(u0), {tuple(fixed_dofs): 0.0} if len(fixed_dofs) else {})
+    delta = core_solve.solve_dirichlet(live.K, load - live.K.matvec(u0),
+                                       {tuple(fixed_dofs): 0.0} if len(fixed_dofs) else {})
     u = u0 + delta
-    residual = K.matvec(u) - load
+    residual = live.K.matvec(u) - load
     mask = np.zeros(size, dtype=bool)
     mask[fixed_dofs] = True
     reaction = xp.where(lift(xp, mask), residual, xp.zeros_like(residual))
-    strain = xp.einsum("tij,tj->ti", B, u[dofs])
-    stress = strain @ d.T if d.ndim == 2 else xp.einsum("tij,tj->ti", d, strain)
-    return elasticity.ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress, xp.reshape(load, (-1, 2)),
-                                       xp.reshape(reaction, (-1, 2)), xp.reshape(residual, (-1, 2)), plane)
+    return u, residual, reaction
+
+
+def _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet):
+    for name, value in (("young_modulus", young_modulus), ("poisson_ratio", poisson_ratio)):
+        _coefficient(value, name)
+    if callable(body_force):
+        raise TypeError("motion: body_force is a callback; with a moving mesh its sample points move too, which "
+                        "this slice does not differentiate. Give a constant (2,) vector")
+    if is_live(body_force) or (isinstance(body_force, (tuple, list)) and any(is_live(v) for v in body_force)):
+        raise TypeError("motion: body_force is live; in this slice only the motion's t carries a derivative")
+    for tag, value in _tags(traction, "traction").items():
+        if callable(value):
+            raise TypeError(f"motion: traction[{tag!r}] is a callback; with a moving mesh its sample points move "
+                            "too, which this slice does not differentiate. Give a constant (2,) vector")
+        if is_live(value) or (isinstance(value, (tuple, list)) and any(is_live(v) for v in value)):
+            raise TypeError(f"motion: traction[{tag!r}] is live; in this slice only the motion's t carries a "
+                            "derivative")
+    if not isinstance(dirichlet, Mapping):
+        raise ValueError("dirichlet must map (node, component) to displacement in metres")
+    for value in dirichlet.values():
+        _numpy_data(value, "Dirichlet displacement")
+
+
+def _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k):
+    if callable(reference_temperature_k):
+        raise ValueError("reference_temperature_k must be a finite nonnegative real scalar")
+    if is_live(reference_temperature_k):
+        raise TypeError("motion: reference_temperature_k is live; in this slice only the motion's t carries a "
+                        "derivative")
+    _coefficient(thermal_expansion_per_k, "thermal_expansion_per_k")
+
+
+def _checked_step(mesh, W, t):
+    """The moved NumPy mesh at the step t, refused when t is not finite or an element inverts."""
+    t0 = float(to_numpy(t))
+    if not math.isfinite(t0):
+        raise ValueError(f"motion: t must be finite, got {t0!r}")
+    lo, hi = admissible_interval(mesh, W)
+    if not lo < t0 < hi:
+        raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
+                               f"({lo:g}, {hi:g}))")
+    return _moved_mesh(mesh, W, t0)
 
 
 # ----------------------------------------------------------------------------- helpers
