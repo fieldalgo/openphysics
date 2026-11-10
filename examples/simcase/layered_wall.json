@@ -1,28 +1,64 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Two-layer wall with convection",
-  "units": {"length": "mm", "temperature": "K"},
   "geometry": {
-    "domain": {"xmin": 0, "xmax": 40, "ymin": 0, "ymax": 10},
-    "background": {"material": "low_k"},
+    "length_unit": "mm",
+    "depth": null,
+    "domain": {
+      "xmin": 0,
+      "xmax": 40,
+      "ymin": 0,
+      "ymax": 10
+    },
+    "background": {
+      "material": "low_k"
+    },
     "shapes": [
-      {"name": "left_layer", "type": "rect", "x": 0, "y": 0, "w": 10, "h": 10,
-       "material": "high_k"}
+      {
+        "name": "left_layer",
+        "type": "rect",
+        "x": 0,
+        "y": 0,
+        "w": 10,
+        "h": 10,
+        "material": "high_k"
+      }
     ]
   },
   "materials": {
-    "high_k": {"conductivity_w_mk": 10, "source": "illustrative tutorial coefficient"},
-    "low_k": {"conductivity_w_mk": 1, "source": "illustrative tutorial coefficient"}
+    "high_k": {
+      "thermal_conductivity": "10 W/(m K)",
+      "source": "illustrative tutorial coefficient"
+    },
+    "low_k": {
+      "thermal_conductivity": "1 W/(m K)",
+      "source": "illustrative tutorial coefficient"
+    }
   },
   "physics": {
     "heat": {
       "type": "thermal.steady2d",
-      "heat_source_w_m3": 0,
-      "dirichlet_temperature_k": {"left": 350},
-      "convection": {"right": {"h_w_m2k": 50, "ambient_temperature_k": 300}}
+      "heat_source_density": "0 W/m^3",
+      "prescribed_temperature": {
+        "left": "350 K"
+      },
+      "convection": {
+        "right": {
+          "heat_transfer_coefficient": "50 W/(m^2 K)",
+          "ambient_temperature": "300 K"
+        }
+      }
     }
   },
-  "mesh": {"size": 2, "min_angle": 28},
-  "study": {"type": "single"},
-  "results": {"save_fields": true, "plots": false}
+  "mesh": {
+    "element_size": "2 mm",
+    "minimum_angle": "28 deg"
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
 }

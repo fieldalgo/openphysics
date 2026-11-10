@@ -186,7 +186,8 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 `thermal.steady2d` 문서는(엔진과 같은 규칙 `simcase.has_region_geometry`,
 [재료 영역이 있는 열전도 문서](thermal_regions2d.md) 참고)
 `/api/thermal/validate`와 `/api/thermal/run`에서 Studio의 영역 경로를 따릅니다. 피처도 배경 재료도 없는 균질
-사각형을 버전 1로 쓴 문서는 읽을 때 0.2 사각형 형식으로 컴파일되어 0.2 사각형처럼 직사각형 경로를 따릅니다.
+사각형을 버전 1로 쓴 문서는 읽을 때 평면 사각형 형식으로 컴파일되어 평면 사각형처럼 직사각형 경로를 따릅니다.
+영역 문서도 직사각형처럼 형식 0.3입니다. 형식 0.2 영역 문서는 이름으로 거절합니다(`invalid_document`, 경로 `openphysics`).
 버전 1 문서는 쓴 그대로 받습니다(검증 응답과 결과는 컴파일이 아니라 그 블록을 기록, 화면도 검증 전에 문서 종류를 같은
 규칙으로 정함). raw 형상
 한도에서는 피처를 도형으로 셉니다(경로 `geometry.components`). 메시는
@@ -194,18 +195,18 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 네 변 밖 태그)은 `invalid_document`입니다.
 그 밖의 문서는 직사각형 경로를 따르며 그 코드·byte·오류는 바뀌지 않습니다.
 `tests/simcase/test_studio_rectangle_invariants.py`가 이를 고정합니다.
-`mesh.subdivisions`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
-`mesh.subdivisions`). `geometry.shapes` 키가 남은 직사각형 문서도 그 키 때문에 영역
+`mesh.subdivision_count`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
+`mesh.subdivision_count`). `geometry.shapes` 키가 남은 직사각형 문서도 그 키 때문에 영역
 문서가 되므로 같은 이유로 거절합니다.
 
 ### Wire 형식
 
 | 항목 | 영역 결과 |
 | --- | --- |
-| Result·layout ID | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
-| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, 직사각형 payload와 같은 최상위 필드 11개 |
-| `arrays` | v2 배열 13개와 `triangle_regions`(삼각형마다 영역 번호 하나, 단위 `1`, 위치 `triangles`, shape `[M]`); D=0 허용(Robin만으로 고정) |
-| `summary` | 생산자 summary 그대로이며 `region_names`(번호 순서), `regions`(이름마다 `material`, `triangles`, `area_m2`), 전체 `materials` 표, `heat_source_w_m3`, `conductivity_range_w_mk`, `mesh`(`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`)를 포함 |
+| Result·layout ID | `thermal.steady2d-regions-result-v2`, `thermal2d-p1-node-cell-regions-v2`(형식 0.2의 `-v1` 쌍은 은퇴) |
+| Payload | `payload_format = "studio-thermal-steady-regions-v2"`, `length_unit`을 포함해 직사각형 payload와 같은 최상위 필드 12개 |
+| `arrays` | 등록부 이름(`node_coordinates`, `temperature`, `heat_flux`, ...)의 경계 배열 13개와 `triangle_regions`(삼각형마다 영역 번호 하나, 단위 없음, 위치 `triangles`, shape `[M]`); D=0 허용(Robin만으로 고정) |
+| `summary` | 생산자 summary 그대로이며 `region_names`(번호 순서), `regions`(이름마다 `material`, `triangles`, m^2 단위 `{value, unit}`인 `area`), `{value, unit}` 물성을 담은 전체 `materials` 표, `heat_source_density`, `minimum_thermal_conductivity`, `maximum_thermal_conductivity`, `mesh`(`nodes`, `triangles`)를 포함 |
 | Capability | 정상 블록 안의 중첩 `regions` 키: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats`와 아래 `limits` 다섯 개 |
 
 영역 쌍은 직사각형 client가 읽는 블록 바깥 `result_formats`에 넣지 않습니다.
@@ -227,13 +228,13 @@ job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
 
 | 단계 | 검사 | 거절 |
 | --- | --- | --- |
-| Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; `mesh.subdivisions` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
+| Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; 형식 0.3; `mesh.subdivision_count` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
 | Event loop | 정상 경계(v2) 결과 runtime이 설치되어 있음(영역 결과는 항상 경계 배열을 담으므로) | `unsupported_result_format`(400) |
 | Event loop, run만 | 영역 실행용 공개 결과 API를 쓸 수 있음(블록의 `run_enabled`) | `unsupported_public_api`(400) |
 | Worker thread, `Document.from_dict` 전 | 도형 64개, 원 16개, 다각형 점 합계 512개 이하, 다음으로 경계 교차 1024개 이하(`simcase.region_complexity`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes`(버전 1 블록은 `geometry.components`) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | 도형 boolean 뒤 루프 꼭짓점 2048개 이하(`simcase.check_mesh_limits`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
-| Worker thread | 문서의 이름·단위·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
+| Worker thread | 문서의 이름·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
 | Job, 해석 전 | 메시 생성은 절점 10201개(`max_nodes`)를 넘으면 멈추고, 이어서 정확한 절점·요소 수를 10201·20000과 비교 | Job 오류 `mesh_limit_exceeded` |
 | Job | 메시 생성 뒤 드러나는 문서 오류(예: 뒤 도형이 완전히 덮은 도형의 열원) | Job 오류 `invalid_document` |
 | Job | 그 밖의 실행 실패(예: meshine이 풀지 못하는 형상, meshine의 80 round 안에 수렴하지 않는 세분) | Job 오류 `solver_failed` |

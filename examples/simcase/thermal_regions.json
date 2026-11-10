@@ -1,11 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Heated steel plate in insulation",
-  "units": {
-    "length": "mm",
-    "temperature": "K"
-  },
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {
       "xmin": 0.0,
       "xmax": 40.0,
@@ -32,44 +30,44 @@
         "cy": 8.0,
         "r": 2.0,
         "material": "copper",
-        "mesh_size": 0.5
+        "element_size": "0.5 mm"
       }
     ]
   },
   "materials": {
     "steel": {
-      "conductivity_w_mk": 45.0,
+      "thermal_conductivity": "45 W/(m K)",
       "source": "document value"
     },
     "copper": {
-      "conductivity_w_mk": 400.0,
+      "thermal_conductivity": "400 W/(m K)",
       "source": "document value"
     },
     "insulation": {
-      "conductivity_w_mk": 0.04,
+      "thermal_conductivity": "0.04 W/(m K)",
       "source": "document value"
     }
   },
   "physics": {
     "heat1": {
       "type": "thermal.steady2d",
-      "heat_source_w_m3": {
-        "heater": 5000000.0
+      "heat_source_density": {
+        "heater": "5000000 W/m^3"
       },
-      "dirichlet_temperature_k": {
-        "bottom": 300.0
+      "prescribed_temperature": {
+        "bottom": "300 K"
       },
       "convection": {
         "top": {
-          "h_w_m2k": 10.0,
-          "ambient_temperature_k": 295.0
+          "heat_transfer_coefficient": "10 W/(m^2 K)",
+          "ambient_temperature": "295 K"
         }
       }
     }
   },
   "mesh": {
-    "size": 2.0,
-    "min_angle": 28.0
+    "element_size": "2 mm",
+    "minimum_angle": "28 deg"
   },
   "study": {
     "type": "single"

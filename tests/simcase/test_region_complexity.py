@@ -49,6 +49,7 @@ from simcase import Document, RegionComplexity, examples, region_complexity
 from simcase import complexity as rc_module
 from simcase.geometry import shape_polygon
 from simcase.runner import micrometre_document
+from simcase.thermal_regions import handoff_03
 
 import region_studio_fixtures as F
 
@@ -799,11 +800,12 @@ MESHED_COPIES = {
 @pytest.mark.parametrize('name', list(MESHED_COPIES))
 def test_port_the_micrometre_copy_a_run_meshes_counts_the_same(name):
     """Port, not pre-registered. Document.from_dict resolves the document's own numbers,
-    which region_complexity counts; a run resolves the shapes again on its micrometre copy.
+    which region_complexity counts; a run resolves the shapes again on its micrometre copy
+    (made from the document's mesh hand-off, thermal_regions.handoff_03).
     A decimal unit factor can re-round exact contacts (RC-5), but on these documents the
     copy counts the same."""
     data = MESHED_COPIES[name]()
-    meshed = micrometre_document(Document.from_dict(copy.deepcopy(data))).data
-    assert (data['units']['length'], meshed['units']['length']) == ('mm', 'um')
+    meshed = micrometre_document(handoff_03(Document.from_dict(copy.deepcopy(data))), validate=False).data
+    assert (data['geometry']['length_unit'], meshed['units']['length']) == ('mm', 'um')
     assert meshed['geometry'] != data['geometry']
     assert region_complexity(meshed) == region_complexity(data)

@@ -1,0 +1,95 @@
+{
+  "openphysics": "0.3",
+  "name": "Heating a steel and insulation wall",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 40.0,
+          "ymin": 0.0,
+          "ymax": 20.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "hole",
+            "type": "circle",
+            "cx": 20.0,
+            "cy": 10.0,
+            "r": 3.0,
+            "material": null
+          }
+        ],
+        "finalize": "later_wins",
+        "boundary_tags": [
+          {
+            "tag": "inner",
+            "select": {
+              "boundary": {
+                "of": "hole"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "thermal_conductivity": "45 W/(m K)",
+      "volumetric_heat_capacity": "3600000 J/(m^3 K)",
+      "source": "document value"
+    }
+  },
+  "physics": {
+    "heat1": {
+      "type": "thermal.transient2d",
+      "initial_temperature": "300 K",
+      "heat_source_density": "0 W/m^3",
+      "prescribed_temperature": {
+        "left": {
+          "unit": "K",
+          "values": [
+            300.0,
+            310.0,
+            320.0
+          ]
+        },
+        "inner": {
+          "unit": "K",
+          "values": [
+            300.0,
+            330.0,
+            340.0
+          ]
+        }
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "1 mm",
+    "minimum_angle": "28 deg"
+  },
+  "study": {
+    "type": "transient",
+    "time": {
+      "unit": "s",
+      "values": [
+        0.0,
+        5.0,
+        10.0
+      ]
+    }
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

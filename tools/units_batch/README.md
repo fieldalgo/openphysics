@@ -137,8 +137,8 @@ listed as added. Its fields are `old_layout`, `new_layout`; `arrays` (`{old, new
 `L2*conj`, and `kernel-L1` for the nanometre and metre em fixtures, whose new nodes are the
 recorded micrometre mesher nodes times 1e-6); `arrays_removed` (`{old, check}`, `check` in
 `unit-metadata`, `time-tail`, `equals`) and `arrays_added` (regular expressions); `summary`
-(dotted path patterns with `*` for one key, `[]` for one list index, `**` for the rest and
-`["a.b"]` for a literal key; `f` in `=`, `neg`, `conj`, `L1`, `L1*conj`, `rad`
+(dotted path patterns with `*` for one key, `[]` for one list index, `[2]` for that index,
+`**` for the rest and `["a.b"]` for a literal key; `f` in `=`, `neg`, `conj`, `L1`, `L1*conj`, `rad`
 (`math.radians(old)`), `qdeg` (`q(f"{old!r} deg", "minimum_angle")`) or `removed` with a
 check; the first matching rule applies); `summary_added` (beside the always allowed
 `diagnostics`, `defaults_applied`, `resolved_inputs`, `extent`, `field_components`,
@@ -151,7 +151,13 @@ rectangle), `regions` (shapes, a background material or a materials table) and `
 geometry block). The heat rectangle commit (C5a) sets `rect` to `layout` for `thermal.steady2d`
 and `thermal.transient2d` and keeps `regions` and `v1` in identity mode; it adds the four heat
 rectangle maps and the twins `fixtures/v03/heat_transient_rectangle_sampled.json` and
-`heat_transient_rectangle_sampled_boundary.json`.
+`heat_transient_rectangle_sampled_boundary.json`. The heat region commit (C5b) sets `regions`
+and `v1` to `layout` as well and adds the four region maps
+(`thermal2d-p1-node-cell-regions-v1`, `thermal2d-transient-p1-node-cell-regions-v1`,
+`thermal-axisymmetric-p1-node-cell-regions-v1` and
+`thermal-axisymmetric-transient-p1-node-cell-regions-v1`; the achieved angle is compared
+with `rad`, and the old `outward_flux_w_m2` summary leaves with `neg`) and the twins of the
+heat region, version 1 and axisymmetric fixtures (`fixtures/v03/heat_*.json`).
 
 The only comparisons that are not bitwise are the three pre-registered ones, each within 4
 ulp: `propagation_loss` against 100 times the old `propagation_loss_db_cm`, `bend_loss`

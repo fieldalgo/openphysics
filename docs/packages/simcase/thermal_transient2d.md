@@ -59,7 +59,8 @@ exactly to metres. `depth` is `null` (per metre of depth) or a length, which add
 Unknown keys (with "did you mean" and the new name of a format 0.2 key), bool-as-number,
 non-finite values, spatially varying sources, shapes, sweeps and mixed physics are refused
 with a coded diagnostic and its path. A format 0.2 rectangle document is refused by name
-(`E-FORMAT`); region documents are read in format 0.2 until their commit of the units batch.
+(`E-FORMAT`), as is a format 0.2 region document ([material regions](thermal_regions2d.md)
+read format 0.3 too).
 The reader echoes every default in `defaults_applied`; it does not supply missing material
 constants, initial data or time samples.
 

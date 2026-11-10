@@ -51,7 +51,7 @@ export async function regionScenario({cdp, click, wait, sleep, snapshot, report,
   await wait(() => cdp.eval('document.querySelector("#status").textContent==="steady thermal result ready"'), 'steady region result');
   evidence.steady.payload = await cdp.eval('(()=>{const p=thermalController.result();return {payloadFormat:p.payload_format,'
     + 'resultFormat:p.result_format,regions:p.regions.rows.map(r=>[r.name,r.material,r.cells])}})()');
-  assert.equal(evidence.steady.payload.payloadFormat, 'studio-thermal-steady-regions-v1');
+  assert.equal(evidence.steady.payload.payloadFormat, 'studio-thermal-steady-regions-v2');
   await painted('steady-temperature', '#fieldCanvas');
   await click('[data-tab="mesh"]');
   await painted('steady-mesh', '#meshCanvas');
@@ -92,7 +92,7 @@ export async function regionScenario({cdp, click, wait, sleep, snapshot, report,
   await wait(() => cdp.eval('!!transientController.state().frame&&!transientController.state().readActive'), 'transient region frame');
   evidence.transient.manifest = await cdp.eval('(()=>{const m=transientController.result();return {payloadFormat:m.payload_format,'
     + 'resultFormat:m.result_format,times:m.times.length,regions:m.regions.rows.map(r=>[r.name,r.material,r.cells])}})()');
-  assert.equal(evidence.transient.manifest.payloadFormat, 'studio-thermal-transient-regions-v1');
+  assert.equal(evidence.transient.manifest.payloadFormat, 'studio-thermal-transient-regions-v2');
   await sleep(300);
   evidence.transient.label = await cdp.eval('document.querySelector("#resInfo").textContent');
   assert.match(evidence.transient.label,

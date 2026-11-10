@@ -22,10 +22,10 @@ python -m simcase geometry model.json                     # the region complex o
 
 The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
 `"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
-quantity names, a `length_unit` per geometry component, coded diagnostics) is read for the heat
-rectangles (`thermal.steady2d` and `thermal.transient2d` on a flat rectangle), which no longer
-read format 0.2; every other kind and the region heat documents still read format 0.2 until
-their commit of the units batch: [document format 0.3](document_format.md). The separate
+quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat
+(`thermal.steady2d` and `thermal.transient2d`: rectangles, material regions, version 1 blocks and
+the axisymmetric forms), which no longer reads format 0.2; every other kind still reads format
+0.2 until its commit of the units batch: [document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -450,9 +450,9 @@ copy of saved rectangular steady heat (prescribed and insulated sides, or the
 `time_index`, default the last; the `transient-p1-node-cell-boundary-v2` layout with
 flux/convection sides adds its per-step `outward_prescribed_` and `outward_convective_` heat
 rates) and
-vacuum PEC cavity fields. Steady/transient material-region layouts are
-also supported, with integer cell data `triangle_regions` and the saved
-steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
+vacuum PEC cavity fields. Steady/transient material-region layouts (`-regions-v2`,
+axisymmetric ones with (r, z) points) are also supported, with the same arrays,
+integer cell data `triangle_regions` and the saved steady flux/convection arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
 for units, the region-name mapping and an example. Electric conduction and Joule
 results (`electric-joule2d-p1-v1`, the layout of `electric.steady2d`,
 `joule.steady2d` and `joule.temperature2d`) export point data `potential_v` with
@@ -503,8 +503,8 @@ collection `fields.pvd`, which records each stored time (seconds) as its
 timestep. Open `fields.pvd` in ParaView to step through time with the time
 controls or play an animation. Each VTU holds the arrays stored at its time, so
 the per-step rates (`reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`,
-`heat_storage_rate_per_depth`; `reaction_w_per_m`, ... for a region result) appear from the
-second time on. The heat rectangle VTU files also carry FieldData `units` and `conventions`
+`heat_storage_rate_per_depth`, for rectangle and region results alike) appear from the
+second time on. The heat VTU files also carry FieldData `units` and `conventions`
 (UTF-8 JSON in a UInt8 array) with each array's SI unit and the sign sentences. The output directory must be new or empty and nothing is
 overwritten; the collection refers to its VTU files by relative paths, so the
 directory can be moved as a whole. `name="heat"` changes the file stem. No

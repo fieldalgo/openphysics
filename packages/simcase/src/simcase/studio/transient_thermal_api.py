@@ -45,36 +45,10 @@ DYNAMIC = set(SPEC)-{"node_coordinates", "triangles", "time", "prescribed_node_i
 STATIC = ("node_coordinates", "triangles", "time", "prescribed_node_ids")
 FORMAT_03 = ('transient Studio reads format 0.3 rectangle documents ("openphysics": "0.3", values with their '
              'units); format 0.2 rectangle documents are not read')
-# Region documents are still format 0.2 until their commit of the units batch (thermal_regions_api):
-# their records keep the 0.2 names, frame and history identifiers.
-FRAME_02 = "studio-thermal-transient-frame-v1"
-HISTORY_02 = "studio-thermal-transient-history-v1"
-SPEC_02 = {
-    "nodes_m": ("m", "nodes", "static"),
-    "triangles": ("1", "triangle_connectivity", "static"),
-    "time_s": ("s", "requested_times", "time_s"),
-    "temperature_k": ("K", "nodes", "time_s"),
-    "heat_flux_w_m2": ("W/m^2", "triangle_centroids", "time_s"),
-    "source_load_w_per_m": ("W/m", "nodes", "time_s"),
-    "reaction_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "residual_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "storage_rate_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "heat_content_j_per_m": ("J/m", "domain", "time_s"),
-    "quadratic_functional_jk_per_m": ("J K/m", "domain", "time_s"),
-    "dirichlet_node_ids": ("1", "dirichlet_nodes", "static"),
-    "dirichlet_temperatures_k": ("K", "dirichlet_nodes", "time_s"),
-}
-UI_FIELDS_02 = {"temperature_k", "heat_flux_w_m2", "heat_content_j_per_m",
-                "quadratic_functional_jk_per_m"}
-DYNAMIC_02 = set(SPEC_02)-{"nodes_m", "triangles", "time_s", "dirichlet_node_ids"}
-
-
 def _family(record_pair):
-    """``(spec, time key, frame id, history id, rate axis)`` of a record: format 0.3 rectangle
-    records under registry names, format 0.2 region records under their 0.2 names."""
-    if tuple(record_pair) == PAIR:
-        return SPEC, "time", FRAME, HISTORY, "time[1:]"
-    return SPEC_02, "time_s", FRAME_02, HISTORY_02, "time_s[1:]"
+    """``(spec, time key, frame id, history id, rate axis)`` of a record: rectangle and region
+    records alike carry the registry names (format 0.3)."""
+    return SPEC, "time", FRAME, HISTORY, "time[1:]"
 
 
 def require(condition, message, status=400, code="invalid_result"):
@@ -186,7 +160,7 @@ def capture_result(result, identity, limits, document):
     require(result.doc.canonical_json(separators=(",", ":"))
             == original, "public result document does not match accepted snapshot")
     unit, scale = common.length_unit(document)
-    require(summary.get("resolved_inputs", {}).get("geometry.domain.xmin", {}).get("length_unit") == unit,
+    require(common.domain_input(summary, document).get("length_unit") == unit,
             "transient document/summary length_unit mismatch")
     n, m, nt = preflight(common.json_value(document.data), limits)
     captured = {}
@@ -299,7 +273,7 @@ def parse_query(query, *, history):
     require(0 < len(values["result_id"]) <= 128
             and re.fullmatch(r"[A-Za-z0-9._~-]+", values["result_id"]) is not None,
             "invalid result identity", code="invalid_query")
-    require(values["field"] in DYNAMIC | DYNAMIC_02, "unsupported transient field", code="invalid_query")
+    require(values["field"] in DYNAMIC, "unsupported transient field", code="invalid_query")
     for key in expected-{"result_id", "field"}:
         values[key] = _query_integer(values[key], signed=key != "frame_seq")
     return values
@@ -321,8 +295,7 @@ def encode_view(record, query, *, history):
             # Display scale is captured in immutable manifest, bounded <=4MiB.
             "display_length_in_m": record["display_length_in_m"],
             "frame_seq": query["frame_seq"], "field": key, "unit": unit, "location": location}
-    v03 = time_key == "time"
-    start_key, end_key = ("interval_start", "interval_end") if v03 else ("interval_start_s", "interval_end_s")
+    start_key, end_key = "interval_start", "interval_end"
     if history:
         start, stop = query["start"], query["stop"]
         require(0 <= start < stop <= nt and stop-start <= PAGE_ROWS,

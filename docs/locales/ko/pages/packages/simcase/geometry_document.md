@@ -529,7 +529,7 @@ part       := [A-Za-z0-9_-]+
 **물리.** 기존 키는 모양이 그대로입니다.
 - 변을 가리키는 키는 boundary 문자열이므로 `boundary: {left: pec}`는 그대로 검증됩니다
   (`packages/simcase/src/simcase/schema.py:316-318`).
-- 영역을 가리키는 키는 region 문자열이므로 `heat_source_w_m3: {heater: ...}`는 그대로 검증됩니다
+- 영역을 가리키는 키는 region 문자열이므로 `heat_source_density: {heater: ...}`(형식 0.2: `heat_source_w_m3`)는 그대로 검증됩니다
   (`packages/simcase/src/simcase/thermal_regions.py:189-199`).
 - `heater_top` 같은 다른 경계 이름은 이 계약이 허용하지만, 아직 받는 러너가 없습니다. 지금 영역 열은
   변이 아닌 태그를 모두 거부하고(`packages/simcase/src/simcase/thermal_regions.py:285-288`), EM은 정확히
@@ -642,8 +642,8 @@ part       := [A-Za-z0-9_-]+
 ```
 
 `physics`·`materials`·`mesh` 블록은 생략했으며 지금처럼 동작합니다.
-`dirichlet_temperature_k: {"bottom": 300}`의 `bottom`은 메시 태그로, `heat_source_w_m3: {"heater": 1e15}`의
-`heater`는 영역으로 풀립니다. `w = 501`인 스윕 점에서는 `x = -250.5` nm, 곧 −250500 pm이므로 격자
+`prescribed_temperature: {"bottom": "300 K"}`의 `bottom`은 메시 태그로, `heat_source_density: {"heater": "1e15 W/m^3"}`의
+`heater`는 영역으로 풀립니다(형식 0.3 이름). `w = 501`인 스윕 점에서는 `x = -250.5` nm, 곧 −250500 pm이므로 격자
 위에 있습니다.
 
 ### 사다리꼴 트레이스가 있는 sipi 마이크로스트립

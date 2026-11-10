@@ -1,0 +1,603 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "thermal-axisymmetric-p1-node-cell-regions-v1 (format 0.2 axisymmetric region heat) -> thermal-axisymmetric-p1-node-cell-regions-v2 (format 0.3): every array keeps its bytes under its registry name (axisymmetric: the plain full-revolution names); unit and location metadata, the sign and definition texts and the input echoes of the mesh block are rewritten, not compared (the inputs are compared by P2-2)",
+ "old_layout": "thermal-axisymmetric-p1-node-cell-regions-v1",
+ "new_layout": "thermal-axisymmetric-p1-node-cell-regions-v2",
+ "arrays": [
+  {
+   "old": "nodes_m",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "temperature_k",
+   "new": "temperature",
+   "f": "="
+  },
+  {
+   "old": "heat_flux_w_m2",
+   "new": "heat_flux",
+   "f": "="
+  },
+  {
+   "old": "load_w",
+   "new": "generated_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "reaction_w",
+   "new": "reaction_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "residual_w",
+   "new": "residual_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_node_ids",
+   "new": "prescribed_node_ids",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_temperature_k",
+   "new": "prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_load_w",
+   "new": "outward_prescribed_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "ambient_load_w",
+   "new": "ambient_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "convective_outward_w",
+   "new": "outward_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "system_rhs_w",
+   "new": "applied_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "triangle_regions",
+   "new": "triangle_regions",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_name",
+   "new": "physics_name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "nodal_heat_rate_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_units.nodes_m",
+   "new": "field_units.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_locations.nodes_m",
+   "new": "field_locations.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.nodes_m.[]",
+   "new": "field_shapes.node_coordinates.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangles",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangles",
+   "new": "field_locations.triangles",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangles.[]",
+   "new": "field_shapes.triangles.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.temperature_k",
+   "new": "field_units.temperature",
+   "f": "="
+  },
+  {
+   "old": "field_locations.temperature_k",
+   "new": "field_locations.temperature",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.temperature_k.[]",
+   "new": "field_shapes.temperature.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.heat_flux_w_m2",
+   "new": "field_units.heat_flux",
+   "f": "="
+  },
+  {
+   "old": "field_locations.heat_flux_w_m2",
+   "new": "field_locations.heat_flux",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.heat_flux_w_m2.[]",
+   "new": "field_shapes.heat_flux.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_w",
+   "new": "field_units.generated_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_w",
+   "new": "field_locations.generated_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_w.[]",
+   "new": "field_shapes.generated_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.reaction_w",
+   "new": "field_units.reaction_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.reaction_w",
+   "new": "field_locations.reaction_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.reaction_w.[]",
+   "new": "field_shapes.reaction_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.residual_w",
+   "new": "field_units.residual_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.residual_w",
+   "new": "field_locations.residual_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.residual_w.[]",
+   "new": "field_shapes.residual_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_node_ids.[]",
+   "new": "field_shapes.prescribed_node_ids.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_temperature_k",
+   "new": "field_units.prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "field_locations.dirichlet_temperature_k",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_temperature_k.[]",
+   "new": "field_shapes.prescribed_temperature.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.prescribed_outward_load_w",
+   "new": "field_units.outward_prescribed_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.prescribed_outward_load_w",
+   "new": "field_locations.outward_prescribed_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.prescribed_outward_load_w.[]",
+   "new": "field_shapes.outward_prescribed_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.ambient_load_w",
+   "new": "field_units.ambient_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.ambient_load_w",
+   "new": "field_locations.ambient_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.ambient_load_w.[]",
+   "new": "field_shapes.ambient_convective_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.convective_outward_w",
+   "new": "field_units.outward_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.convective_outward_w",
+   "new": "field_locations.outward_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.convective_outward_w.[]",
+   "new": "field_shapes.outward_convective_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.system_rhs_w",
+   "new": "field_units.applied_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_locations.system_rhs_w",
+   "new": "field_locations.applied_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.system_rhs_w.[]",
+   "new": "field_shapes.applied_heat_rate.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangle_regions",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangle_regions",
+   "new": "field_locations.triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangle_regions.[]",
+   "new": "field_shapes.triangle_regions.[]",
+   "f": "="
+  },
+  {
+   "old": "region_names.[]",
+   "new": "region_names.[]",
+   "f": "="
+  },
+  {
+   "old": "regions.*.material",
+   "new": "regions.*.material",
+   "f": "="
+  },
+  {
+   "old": "regions.*.triangles",
+   "new": "regions.*.triangles",
+   "f": "="
+  },
+  {
+   "old": "regions.*.area_m2",
+   "new": "regions.*.meridional_area.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.conductivity_w_mk",
+   "new": "materials.*.thermal_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.volumetric_heat_capacity_j_m3k",
+   "new": "materials.*.volumetric_heat_capacity.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.source",
+   "new": "materials.*.source",
+   "f": "="
+  },
+  {
+   "old": "reaction_sign",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "outward_sign",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "load_definition",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.triangles",
+   "new": "mesh.triangles",
+   "f": "="
+  },
+  {
+   "old": "mesh.size",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.size_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.min_angle_deg",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "study.type",
+   "new": "study.type",
+   "f": "="
+  },
+  {
+   "old": "heat_source_w_m3.*",
+   "new": "heat_source_density.*.value",
+   "f": "="
+  },
+  {
+   "old": "heat_source_w_m3",
+   "new": "heat_source_density.value",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_nodes",
+   "new": "prescribed_nodes",
+   "f": "="
+  },
+  {
+   "old": "temperature_min_k",
+   "new": "minimum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "temperature_max_k",
+   "new": "maximum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "coordinate_system",
+   "new": "coordinate_system",
+   "f": "="
+  },
+  {
+   "old": "coordinates",
+   "new": "coordinates",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_temperature_k.*",
+   "new": "prescribed_temperature.*.value",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_temperature_k",
+   "new": "prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "outward_flux_w_m2.*",
+   "new": "inward_heat_flux.*.value",
+   "f": "neg"
+  },
+  {
+   "old": "outward_flux_w_m2",
+   "new": "inward_heat_flux",
+   "f": "="
+  },
+  {
+   "old": "convection.*.h_w_m2k",
+   "new": "convection.*.heat_transfer_coefficient.value",
+   "f": "="
+  },
+  {
+   "old": "convection.*.ambient_temperature_k",
+   "new": "convection.*.ambient_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "convection",
+   "new": "convection",
+   "f": "="
+  },
+  {
+   "old": "conductivity_range_w_mk.[0]",
+   "new": "minimum_thermal_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "conductivity_range_w_mk.[1]",
+   "new": "maximum_thermal_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "source_heat_w",
+   "new": "generated_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_heat_w",
+   "new": "outward_prescribed_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "convective_outward_heat_w",
+   "new": "outward_convective_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "thermostat_outward_heat_w",
+   "new": "outward_reaction_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "outward_heat_w",
+   "new": "outward_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "heat_balance_defect_w",
+   "new": "heat_rate_imbalance.value",
+   "f": "="
+  },
+  {
+   "old": "free_residual_max_w",
+   "new": "maximum_residual_heat_rate.value",
+   "f": "="
+  },
+  {
+   "old": "normalized_heat_balance_defect",
+   "new": "relative_conservation_residual.value",
+   "f": "="
+  },
+  {
+   "old": "mesh_min_angle_deg",
+   "new": "minimum_triangle_angle.value",
+   "f": "rad"
+  }
+ ],
+ "summary_added": [
+  "reaction_sign",
+  "*.unit",
+  "*.*.unit",
+  "*.*.*.unit",
+  "study.time.unit",
+  "field_locations.prescribed_node_ids",
+  "field_locations.prescribed_temperature",
+  "outward_sign",
+  "load_definition",
+  "prescribed_temperature.*.unit",
+  "inward_heat_flux.*.unit",
+  "convection.*.*.unit"
+ ],
+ "identifiers": [
+  "result_format",
+  "field_layout"
+ ],
+ "vtu": [
+  {
+   "old": "temperature_k",
+   "new": "temperature",
+   "f": "="
+  },
+  {
+   "old": "heat_flux_w_m2",
+   "new": "heat_flux",
+   "f": "="
+  },
+  {
+   "old": "load_w",
+   "new": "generated_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "reaction_w",
+   "new": "reaction_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "residual_w",
+   "new": "residual_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_load_w",
+   "new": "outward_prescribed_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "ambient_load_w",
+   "new": "ambient_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "convective_outward_w",
+   "new": "outward_convective_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "system_rhs_w",
+   "new": "applied_heat_rate",
+   "f": "="
+  },
+  {
+   "old": "triangle_regions",
+   "new": "triangle_regions",
+   "f": "="
+  }
+ ],
+ "vtu_added": []
+}

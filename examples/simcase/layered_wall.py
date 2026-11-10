@@ -20,15 +20,15 @@ def main():
         from simcase.export import export_fields
 
     document = Document.load(Path(__file__).with_suffix('.json'))
-    document.data['mesh']['size'] = args.mesh_size_mm
+    document.data['mesh']['element_size'] = f'{args.mesh_size_mm!r} mm'
     result = run(document, verbose=False)
     out = result.save(args.output)
     with np.load(out / 'fields.npz', allow_pickle=False) as fields:
-        print(f"Temperature range (K): {fields['temperature_k'].min():.6f} "
-              f"{fields['temperature_k'].max():.6f}")
-        print(f"Mean x flux (W/m^2): {fields['heat_flux_w_m2'][:, 0].mean():.6f}")
-        print(f"Thermostat input (W/m): {fields['reaction_w_per_m'].sum():.6f}")
-        print(f"Convective output (W/m): {fields['convective_outward_w_per_m'].sum():.6f}")
+        print(f"Temperature range (K): {fields['temperature'].min():.6f} "
+              f"{fields['temperature'].max():.6f}")
+        print(f"Mean x flux (W/m^2): {fields['heat_flux'][:, 0].mean():.6f}")
+        print(f"Thermostat input (W/m): {fields['reaction_heat_rate_per_depth'].sum():.6f}")
+        print(f"Convective output (W/m): {fields['outward_convective_heat_rate_per_depth'].sum():.6f}")
         print(f"Triangles: {len(fields['triangles'])}")
     if args.export:
         export_fields(out / 'fields.npz', out / 'view.vtu')

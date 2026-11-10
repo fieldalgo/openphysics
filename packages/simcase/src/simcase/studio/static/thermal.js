@@ -26,28 +26,14 @@
   const LAYOUT = {payload_format:'studio-thermal-steady-v2', pairs:PAIRS, base:BASE, added:ADDED,
     boundary:'thermal.steady2d-result-v4', nodes:'node_coordinates', fixed:'prescribed_node_ids',
     flux:'heat_flux', format:'0.3'};
-  // Region documents are still format 0.2 until their commit of the units batch: their payloads
-  // keep the 0.2 names, checked by the same code under this layout.
-  const LEGACY = {payload_format:'studio-thermal-steady-v1',
-    pairs:{'thermal.steady2d-result-v1':'thermal2d-p1-node-cell-v1',
-      'thermal.steady2d-result-v2':'thermal2d-p1-node-cell-boundary-v2'},
-    base:{nodes_m:['m','nodes',2], triangles:['1','triangle_connectivity',3],
-      temperature_k:['K','nodes',0], heat_flux_w_m2:['W/m^2','triangle_centroids',2],
-      load_w_per_m:['W/m','nodes',0], reaction_w_per_m:['W/m','nodes',0],
-      residual_w_per_m:['W/m','nodes',0], dirichlet_node_ids:['1','dirichlet_nodes',0],
-      dirichlet_temperature_k:['K','dirichlet_nodes',0]},
-    added:['prescribed_outward_load_w_per_m','ambient_load_w_per_m','convective_outward_w_per_m','system_rhs_w_per_m'],
-    boundary:'thermal.steady2d-result-v2', nodes:'nodes_m', fixed:'dirichlet_node_ids', flux:'heat_flux_w_m2',
-    format:'0.2'};
-  // The arrays of a view, whichever names its payload carries.
+  // The arrays of a view under the names the views use.
   function named(a) {
-    return {nodes:a.node_coordinates??a.nodes_m, triangles:a.triangles, temperature:a.temperature??a.temperature_k,
-      flux:a.heat_flux??a.heat_flux_w_m2};
+    return {nodes:a.node_coordinates, triangles:a.triangles, temperature:a.temperature, flux:a.heat_flux};
   }
-  // Region documents: their own pair and payload format, advertised in a nested
-  // capability block so that a rectangle-only client never sees them.
-  const REGION = {result_format:'thermal.steady2d-regions-result-v1',
-    field_layout:'thermal2d-p1-node-cell-regions-v1', payload_format:'studio-thermal-steady-regions-v1'};
+  // Region documents (format 0.3 too): their own pair and payload format, advertised in a
+  // nested capability block so that a rectangle-only client never sees them.
+  const REGION = {result_format:'thermal.steady2d-regions-result-v2',
+    field_layout:'thermal2d-p1-node-cell-regions-v2', payload_format:'studio-thermal-steady-regions-v2'};
   const REGION_CAPABILITY = {result_formats:[REGION.result_format], field_layouts:[REGION.field_layout],
     payload_formats:[REGION.payload_format]};
   const REGION_LIMITS = ['max_shapes','max_circles','max_polygon_points','max_boundary_crossings','max_input_vertices'];
@@ -160,11 +146,19 @@
     if(seen.has(value))fail('cyclic JSON metadata');seen.add(value);
     Object.values(value).forEach(v=>finiteJSON(v,seen));seen.delete(value);
   }
+  // The length_unit the summary's inputs give the geometry's domain: a flat block, or the one
+  // component of a version 1 block.
+  function domainUnit(s) {
+    const inputs=s?.resolved_inputs;
+    if (!object(inputs)) return undefined;
+    const found=Object.keys(inputs).filter(k=>/^geometry(\.components\.[A-Za-z_][A-Za-z0-9_-]*)?\.domain\.xmin$/.test(k));
+    return found.length===1 ? inputs[found[0]]?.length_unit : undefined;
+  }
   function validatePayload(input, expected) { return checkPayload(input, expected, LAYOUT); }
   function checkPayload(input, expected, L) {
     finiteJSON(input);
     const allowed=['payload_format','kind','job','result_id','client_revision','request_seq',
-      'result_format','field_layout','arrays','summary','display_length_in_m',...(L.format==='0.3'?['length_unit']:[])];
+      'result_format','field_layout','arrays','summary','display_length_in_m','length_unit'];
     if(!object(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('unknown wire field');
     if(['neff','group_index','wavelength','modes','parameter','time_s','time'].some(k=>k in (input.summary||{})))
       fail('optical/transient summary keys are unsupported');
@@ -219,19 +213,9 @@
     if (ids.some((v,i)=>!integer(v)||v>=N||(i&&v<=ids[i-1]))) fail('unique sorted fixed IDs');
     if(!finite(input.display_length_in_m)||input.display_length_in_m<=0)
       fail('display length conversion');
-    let label;
-    if (L.format==='0.3') {
-      // The geometry's length_unit names the display unit; the summary's inputs agree with it.
-      label=input.length_unit;
-      if (typeof label!=='string' || !label
-          || s.resolved_inputs?.['geometry.domain.xmin']?.length_unit!==label) fail('geometry length_unit');
-    } else {
-      const declared=s.units?.length;
-      label=typeof declared==='string' ? declared
-        : object(declared)&&Object.keys(declared).length===1&&finite(declared.in_m)&&declared.in_m>0
-          ? String(declared.in_m)+' m' : null;
-      if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m')fail('explicit length/K units');
-    }
+    // The geometry's length_unit names the display unit; the summary's inputs agree with it.
+    const label=input.length_unit;
+    if (typeof label!=='string' || !label || domainUnit(s)!==label) fail('geometry length_unit');
     // Copy the validated finite summary; no backend text is interpreted as HTML.
     const summary = clone(s);
     return Object.freeze({...input, arrays, summary, lengthLabel:label});
@@ -246,33 +230,37 @@
         || names.some(n=>typeof n!=='string'||!n) || new Set(names).size!==names.length) fail('region names');
     const R=names.length;
     if (!Array.isArray(ids) || ids.length!==M || ids.some(v=>!integer(v)||v>=R)) fail('triangle region indices');
-    const regions=summary.regions, materials=summary.materials, source=summary.heat_source_w_m3;
+    // value objects {value, unit}: a source is absent (none), one value, or one per region
+    const regions=summary.regions, materials=summary.materials, source=summary.heat_source_density;
+    const vo=(x,unit)=>object(x)&&Object.keys(x).length===2&&finite(x.value)&&x.unit===unit;
     if (!object(regions) || Object.keys(regions).length!==R || !names.every(n=>Object.hasOwn(regions,n)))
       fail('summary regions and names disagree');
     if (!object(materials)) fail('summary materials');
-    if (!finite(source) && !object(source)) fail('summary heat source');
+    const uniform=vo(source,'W/m^3');
+    if (source!==undefined && !uniform && !(object(source) && Object.values(source).every(v=>vo(v,'W/m^3'))))
+      fail('summary heat source');
     const cells=new Array(R).fill(0);
     for (const v of ids) cells[v]++;
     const rows=names.map((name,index)=>{
       const entry=regions[name];
       if (!object(entry) || Object.keys(entry).length!==3
-          || !['material','triangles','area_m2'].every(k=>Object.hasOwn(entry,k))) fail('region entry keys');
+          || !['material','triangles','area'].every(k=>Object.hasOwn(entry,k))) fail('region entry keys');
       if (!integer(entry.triangles) || entry.triangles!==cells[index]) fail('region cell count');
-      if (!finite(entry.area_m2) || entry.area_m2<0) fail('region area');
+      if (!vo(entry.area,'m^2') || entry.area.value<0) fail('region area');
       const material=entry.material;
       if (typeof material!=='string' || !Object.hasOwn(materials,material) || !object(materials[material]))
         fail('region material is not in the materials table');
-      const spec=materials[material], k=spec.conductivity_w_mk;
-      if (!finite(k) || k<=0) fail('region conductivity');
+      const spec=materials[material];
+      if (!vo(spec.thermal_conductivity,'W/(m K)') || spec.thermal_conductivity.value<=0) fail('region conductivity');
       let q=0;
-      if (finite(source)) q=source;
-      else if (Object.hasOwn(source,name)) { q=source[name]; if (!finite(q)) fail('region heat source'); }
-      const row={index, name, color:PALETTE[index%PALETTE.length], material, k, q,
-        cells:entry.triangles, area_m2:entry.area_m2, source:typeof spec.source==='string'?spec.source:''};
+      if (uniform) q=source.value;
+      else if (source!==undefined && Object.hasOwn(source,name)) q=source[name].value;
+      const row={index, name, color:PALETTE[index%PALETTE.length], material, k:spec.thermal_conductivity.value, q,
+        cells:entry.triangles, area:entry.area.value, source:typeof spec.source==='string'?spec.source:''};
       if (transient) {
-        const c=spec.volumetric_heat_capacity_j_m3k;
-        if (!finite(c) || c<=0) fail('region heat capacity');
-        row.rhoC=c;
+        const c=spec.volumetric_heat_capacity;
+        if (!vo(c,'J/(m^3 K)') || c.value<=0) fail('region heat capacity');
+        row.rhoC=c.value;
       }
       return Object.freeze(row);
     });
@@ -300,22 +288,24 @@
     const s=input.summary, a=input.arrays;
     if (!object(s) || !object(a) || s.result_format!==REGION.result_format || s.field_layout!==REGION.field_layout)
       fail('region summary and payload pairs disagree');
-    if (!Object.hasOwn(a,'triangle_regions') || METADATA.some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))
+    if (!Object.hasOwn(a,'triangle_regions')
+        || ['field_locations','field_shapes'].some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))
       fail('missing triangle_regions');
-    // Relabel a copy as a 0.2 boundary rectangle payload, top-level and summary pair alike, and
-    // reuse every unchanged check (D=0, connectivity, CCW, units, ownership).
-    const v2=clone(input), V2=LEGACY.boundary;
-    v2.payload_format=LEGACY.payload_format;
-    v2.result_format=v2.summary.result_format=V2;
-    v2.field_layout=v2.summary.field_layout=LEGACY.pairs[V2];
-    delete v2.arrays.triangle_regions;
-    for (const m of METADATA) delete v2.summary[m].triangle_regions;
-    const accepted=checkPayload(v2, expected, LEGACY);
+    // Relabel a copy as a boundary rectangle payload, top-level and summary pair alike, and
+    // reuse every unchanged check (D=0, connectivity, CCW, units, ownership). The region ids
+    // are structural: no unit.
+    const rect=clone(input), V4=LAYOUT.boundary;
+    rect.payload_format=LAYOUT.payload_format;
+    rect.result_format=rect.summary.result_format=V4;
+    rect.field_layout=rect.summary.field_layout=LAYOUT.pairs[V4];
+    delete rect.arrays.triangle_regions;
+    for (const m of METADATA) delete rect.summary[m].triangle_regions;
+    const accepted=checkPayload(rect, expected, LAYOUT);
     const M=accepted.arrays.triangles.length;
-    if (s.field_units.triangle_regions!=='1' || s.field_locations.triangle_regions!=='triangles'
+    if (Object.hasOwn(s.field_units,'triangle_regions') || s.field_locations.triangle_regions!=='triangles'
         || JSON.stringify(s.field_shapes.triangle_regions)!==JSON.stringify([M])) fail('triangle_regions metadata');
     const table=regionTable(s, a.triangle_regions, M, false, limits);
-    const edges=regionEdges(accepted.arrays.triangles, table.ids, accepted.arrays.nodes_m.length);
+    const edges=regionEdges(accepted.arrays.triangles, table.ids, accepted.arrays.node_coordinates.length);
     return Object.freeze({...accepted, payload_format:input.payload_format, result_format:input.result_format,
       field_layout:input.field_layout, summary:clone(s), regions:Object.freeze({...table, edges})});
   }
@@ -564,7 +554,7 @@
       result:()=>result,state:()=>({cap,result,error}),renderToken:field=>gate.renderToken(field),
       renderCurrent:t=>gate.renderCurrent(t)};
   }
-  return {TYPE,PAIRS,BASE,ADDED,LEGACY,named,soleType,capability,validatePayload,Ownership,
+  return {TYPE,PAIRS,BASE,ADDED,LAYOUT,domainUnit,named,soleType,capability,validatePayload,Ownership,
     strictParse,viewModel,barycentric,sample,transform,color,draw,createController,
     REGION,PALETTE,hasRegionGeometry,regionCapability,validateRegionPayload,regionTable,regionEdges,locate};
 });

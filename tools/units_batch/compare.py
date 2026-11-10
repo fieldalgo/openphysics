@@ -193,11 +193,12 @@ def compare_trees_identity(old, new, label: str, result: Result):
 
 # -- path patterns of the maps ---------------------------------------------------------------
 
-_SEGMENT = re.compile(r'\["([^"]*)"\]|\[\]|\*\*|\*|[^.\[\]]+')
+_SEGMENT = re.compile(r'\["([^"]*)"\]|\[(\d+)\]|\[\]|\*\*|\*|[^.\[\]]+')
 
 
 def parse_pattern(text: str) -> list:
-    """Dotted segments; ``*`` one key, ``[]`` one list index, ``**`` any rest, ``["a.b"]`` literal."""
+    """Dotted segments; ``*`` one key, ``[]`` one list index, ``[2]`` that index, ``**`` any rest,
+    ``["a.b"]`` literal."""
     out, pos = [], 0
     while pos < len(text):
         if text[pos] == ".":
@@ -208,6 +209,7 @@ def parse_pattern(text: str) -> list:
             raise ValueError(f"bad pattern {text!r} at {pos}")
         token = m.group(0)
         out.append(("lit", m.group(1)) if m.group(1) is not None else
+                   ("lit", int(m.group(2))) if m.group(2) is not None else
                    ("idx", None) if token == "[]" else ("rest", None) if token == "**" else
                    ("key", None) if token == "*" else ("lit", token))
         pos = m.end()

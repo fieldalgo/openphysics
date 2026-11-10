@@ -4,13 +4,13 @@
   "modes": {
     "thermal.steady2d": {
       "rect": "layout",
-      "regions": "identity",
-      "v1": "identity"
+      "regions": "layout",
+      "v1": "layout"
     },
     "thermal.transient2d": {
       "rect": "layout",
-      "regions": "identity",
-      "v1": "identity"
+      "regions": "layout",
+      "v1": "layout"
     },
     "electric.steady2d": "identity",
     "joule.steady2d": "identity",

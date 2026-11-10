@@ -23,7 +23,7 @@ RESULT_FORMAT = 'thermal.steady2d-result-v1'
 FIELD_LAYOUT = 'thermal2d-p1-node-cell-v1'
 
 # Format 0.3 rectangle results: the saved arrays under registry names (bytes unchanged), and
-# the summary's balance values. 0.2 names stay for the region results until their commit.
+# the summary's balance values. Region results use the same names (thermal_regions.NAMES_03).
 ARRAY_NAMES_03 = {
     'nodes_m': 'node_coordinates', 'triangles': 'triangles', 'temperature_k': 'temperature',
     'heat_flux_w_m2': 'heat_flux', 'load_w_per_m': 'generated_heat_rate_per_depth',
@@ -63,8 +63,7 @@ _FORMAT_02 = ('format 0.2 rectangle heat documents are not read: units now trave
 
 
 def refuse_format_02(doc, label):
-    """A 0.2 rectangle heat document: refused by name (region documents are still read in format
-    0.2 until their commit of the units batch)."""
+    """A 0.2 rectangle heat document (flat, or a homogeneous version 1 one): refused by name."""
     raise DocumentError(_FORMAT_02.replace('thermal_steady2d', label), path='openphysics', code='E-FORMAT')
 
 
@@ -201,9 +200,10 @@ def _authored(doc, path, unit=''):
 
 def rectangle_summary_03(doc, label, lines, versions=None):
     """The summary text of a format 0.3 rectangle heat document."""
+    from .steady_boundary_contract import rect_geometry_03
     name, p = next(iter(doc.si['physics'].items()))
     where = f'physics.{name}'
-    g = doc.data['geometry']
+    g = rect_geometry_03(doc)[1]
     dom = ', '.join(f'{k} {g["domain"][k]}' for k in ('xmin', 'xmax', 'ymin', 'ymax'))
     out = [f'{doc.si["name"]} (openphysics 0.3)', f'  physics {name}: {PHYSICS if not label else label}',
            f'  domain {dom} ({g["length_unit"]}); subdivision_count {doc.si["mesh"]["subdivision_count"]}',
@@ -228,19 +228,17 @@ def rectangle_summary_03(doc, label, lines, versions=None):
 
 
 def thermal_summary(doc):
-    from .thermal_regions import is_region_thermal, region_summary
+    from .thermal_regions import is_region_thermal, refuse_format_02 as refuse_regions_02, region_summary_03
     if doc.si is not None:
+        if is_region_thermal(doc.data):
+            from .thermal_regions import region_result_versions_03
+            return region_summary_03(doc, f'{PHYSICS}, single steady heat, named material regions', [],
+                                     region_result_versions_03(doc))
         from .steady_boundary_contract import steady_result_versions_03
         return rectangle_summary_03(doc, f'{PHYSICS}, single steady heat', [], steady_result_versions_03(doc))
     if is_region_thermal(doc.data):
-        return region_summary(doc)
-    name, p = doc.sole_physics()
-    return (f'{doc["name"]} (openphysics 0.2)\n'
-            f'  physics {name}: {PHYSICS}, single steady heat\n'
-            f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
-            f'  k={p["conductivity_w_mk"]} W/(m K), Q={p["heat_source_w_m3"]} W/m^3\n'
-            f'  Dirichlet {p["dirichlet_temperature_k"]} K; remaining exterior insulated\n'
-            '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth')
+        refuse_regions_02()
+    refuse_format_02(doc, 'thermal_steady2d')
 
 
 def require_fresh_output(path):
@@ -526,7 +524,7 @@ class ThermalRunResult:
     @property
     def boundary_enabled(self): return self._result_format.endswith(('-v2', '-v4'))
 
-    # format 0.2 names (region results until their commit); a 0.3 result refuses them
+    # the format 0.2 names: a format 0.3 result refuses them, naming the registry name
     prescribed_outward_load_w_per_m = _Renamed('prescribed_outward_load', 'outward_prescribed_heat_rate_per_depth')
     ambient_load_w_per_m = _Renamed('ambient_load', 'ambient_convective_heat_rate_per_depth')
     convective_outward_w_per_m = _Renamed('convective_outward', 'outward_convective_heat_rate_per_depth')
@@ -675,7 +673,8 @@ class ThermalRunResult:
                                     for tag, c in p.get('convection', {}).items()}
             result['outward_sign'] = OUTWARD_SIGN_03
             result['load_definition'] = LOAD_DEFINITION_03
-        results_common.add_depth_totals(result, doc.si['geometry']['depth'])
+        from .steady_boundary_contract import rect_geometry_03
+        results_common.add_depth_totals(result, rect_geometry_03(doc)[2])
         results_common.dumps_summary(result)            # finite JSON only
         return result
 
@@ -888,45 +887,24 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
 
 
 def _validate(doc):
-    """Format 0.3 rectangles; then 0.2 region documents. A 0.2 rectangle (flat, or a homogeneous
-    version 1 one) is refused: the rectangle form is read in format 0.3 only."""
-    from .schema import check_format_units_and_tags
-    from .thermal_regions import is_region_thermal, validate_region_thermal
+    """Format 0.3 rectangles, regions and axisymmetric regions. A format 0.2 heat document is
+    refused by name; a homogeneous version 1 rectangle compiles to the flat form (D-1)."""
+    from .thermal_regions import is_region_thermal, refuse_format_02 as refuse_regions_02
     if doc.si is not None:
+        if is_region_thermal(doc.data):
+            from .thermal_regions import validate_region_thermal_03
+            validate_region_thermal_03(doc)
+            return
         from .steady_boundary_contract import validate_steady_rectangle_03
         validate_steady_rectangle_03(doc)
         return
     if is_region_thermal(doc.data):
-        check_format_units_and_tags(doc)
-        validate_region_thermal(doc)
-        return
+        refuse_regions_02()
     refuse_format_02(doc, 'thermal_steady2d')
 
 
 def _summary(doc):
-    from .schema import steady_boundary_requested
-    from .thermal_regions import is_region_thermal, region_summary
-    if doc.si is not None:
-        doc.validate()
-        return thermal_summary(doc)
-    if is_region_thermal(doc.data):
-        return region_summary(doc)
-    if steady_boundary_requested(doc.data):
-        from .steady_boundary_contract import steady_result_versions
-        doc.validate()
-        name, p = doc.sole_physics()
-        result_format, field_layout = steady_result_versions(doc)
-        return (
-            f'{doc["name"]} (openphysics 0.2)\n'
-            f'  physics {name}: thermal.steady2d, single steady heat\n'
-            f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
-            f'  k={p["conductivity_w_mk"]} W/(m K), Q={p["heat_source_w_m3"]} W/m^3\n'
-            f'  Dirichlet {p["dirichlet_temperature_k"]} K; '
-            f'outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
-            f'convection {p.get("convection", {})}\n'
-            '  q.n = g_out + h*(T-T_ambient); unselected natural sides insulated\n'
-            f'  result: {result_format}; layout: {field_layout}\n'
-            '  output: coordinates m, temperature K, flux W/m^2, nodal heat W/m of depth')
+    doc.validate()
     return thermal_summary(doc)
 
 
