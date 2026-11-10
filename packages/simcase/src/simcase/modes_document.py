@@ -12,13 +12,14 @@ complex values under exp(-i omega t). The validator here checks the document on 
 
 The mode kernel (``physics_em_modes2d``, ``physics_pml_modes``, the trackers and
 ``mode_postprocessing``) keeps its micrometre frame and exp(+i omega t) (phase-2 spec §1.2,
-§3.8). ``kernel_document`` builds the hand-off it reads: a micrometre document in the kernel's
-own keys, with shape numbers ``float(Fraction(pm, 10**6))`` and every tagged length
-``float(exact metres * 10**6)`` (hazard H2), the mesher's angle as written (H3) and the
-Sellmeier coefficients in square micrometres from their exact values (H13). The hand-off is
-checked against the kernel contract (``Document.validate_em_modes2d``), as the micrometre copy
-of a format 0.2 document was; nobody writes it. The runner (``simcase.runner``) converts the
-kernel's answers back once (``_to_public``).
+§3.8). ``kernel_document`` builds the hand-off it reads: the document's micrometre frame
+(``views.micrometre_frame``: shape numbers ``float(Fraction(pm, 10**6))``, every tagged length
+``float(exact metres * 10**6)``, hazard H2, and the mesher's angle as written, H3) with the
+physics, study and results in the kernel's own keys, and the Sellmeier coefficients in square
+micrometres from their exact values (H13). The document's own checks (``validate_03``) cover
+what the kernel needs; of the retired kernel contract only its tracking check stays on the
+hand-off (a vector sweep's settings, resolved by the tracker). Nobody writes it. The runner
+(``simcase.runner``) converts the kernel's answers back once (``_to_public``).
 """
 
 from __future__ import annotations
@@ -29,9 +30,8 @@ from fractions import Fraction
 import physmat
 from physmat.units import Diagnostic
 
-from . import units
-from .schema import HANDOFF_FORMAT as KERNEL_FORMAT
-from .schema import Document, DocumentError
+from . import views
+from .schema import DocumentError
 
 TYPE = "em.modes2d"
 #: the kernel's boundary order (the format 0.2 default physics entry)
@@ -61,11 +61,10 @@ _FORMAT_02 = ('format 0.2 em.modes2d documents are not read: units now travel wi
               '(docs/packages/simcase/document_format.md)')
 
 
-class ModesHandOff(Document):
-    """The micrometre kernel document of a format 0.3 ``em.modes2d`` document
-    (``kernel_document``): the kernel's own keys and frame. It is checked against the kernel
-    contract and never written or read by a user."""
-    is_handoff = True
+class ModesHandOff(views.MicrometreFrame):
+    """The micrometre kernel hand-off of a format 0.3 ``em.modes2d`` document
+    (``kernel_document``): its micrometre frame with the physics, study and results in the
+    kernel's own keys and frame. It is never validated, written or read by a user."""
 
 
 def _refuse(message, path=None, code="E-CONTRACT"):
@@ -219,13 +218,19 @@ def _domain_m(doc, base):
 # -- validation ------------------------------------------------------------------------------------
 
 def validate(doc):
-    """The ``em.modes2d`` contract: format 0.3 documents, and the kernel hand-off (format 0.2 in
-    the kernel's keys). Another format 0.2 document of this type is refused by name; a document
-    no kind claims gets the fallback's report."""
+    """The ``em.modes2d`` contract on a format 0.3 document. A document that was not read as
+    format 0.3 is refused by name (``E-FORMAT`` at ``openphysics``): a format 0.2 document of this
+    type with its conversion hint, any other with the reader's (this kind is the registry's
+    fallback, so a document no kind claims ends here)."""
     if doc.si is None:
-        if getattr(doc, "is_handoff", False) or not is_modes(doc.data):
-            return Document.validate_em_modes2d(doc)
-        raise DocumentError(_FORMAT_02, path="openphysics", code="E-FORMAT")
+        if is_modes(doc.data):
+            raise DocumentError(_FORMAT_02, path="openphysics", code="E-FORMAT")
+        from .resolve import format_refusal
+        refusal = format_refusal(doc.data) if isinstance(doc.data, dict) else None
+        if refusal is None:
+            raise DocumentError("document: expected a format 0.3 document object, read by Document.from_dict",
+                                path="openphysics", code="E-FORMAT")
+        raise DocumentError(refusal.message, path=refusal.path, code=refusal.code)
     validate_03(doc)
 
 
@@ -244,8 +249,8 @@ def validate_03(doc):
     _gaussian(doc, dom)
     _default_boundaries(doc, name, a)
     if "version" in doc.data["geometry"]:
-        # a version 1 block is handed off (and its segments checked) at load, as format 0.2 did;
-        # the hand-off is kept on the document and meshed by build_mesh
+        # a version 1 block's region view is made (and its segments checked) at load; it is kept
+        # on the document and meshed by build_mesh
         from .thermal_regions import handoff_03
         handoff_03(doc)
 
@@ -481,7 +486,7 @@ def summary(doc) -> str:
     """The one-paragraph text of ``Document.summary`` and ``simcase validate``."""
     from .thermal import _authored
     if doc.si is None:
-        return Document.em_modes2d_summary(doc)
+        validate(doc)                   # a document that was not read as format 0.3 is refused by name
     base, block, _ = component(doc)
     name, p, a, path = entry(doc)
     unit = block["length_unit"]
@@ -622,19 +627,16 @@ def kernel_results(doc) -> dict:
 
 
 def kernel_document(doc) -> ModesHandOff:
-    """The micrometre hand-off of a validated format 0.3 document, checked against the kernel
-    contract. Geometry and mesh come from the region hand-off (``thermal_regions.handoff_03``)
-    turned into micrometres (``runner.micrometre_document``); material references stay as
-    written (the runner resolves them, ``optical_material``)."""
-    from .runner import micrometre_document
+    """The micrometre hand-off of a validated format 0.3 document: its micrometre frame
+    (``views.micrometre_frame``, from the region view ``thermal_regions.handoff_03``) with the
+    radial grading, the physics, the study and the results in the kernel's keys and
+    micrometres; material references stay as written (the runner resolves them,
+    ``optical_material``). A vector sweep's tracking settings are resolved once more here, as
+    the kernel contract did."""
     from .thermal_regions import handoff_03
-    h = handoff_03(doc)
-    mu = micrometre_document(h, validate=False)
-    d = mu.data
+    k = views.micrometre_frame(doc, handoff_03(doc), ModesHandOff)
+    d = k.data
     name = entry(doc)[0]
-    d["openphysics"] = KERNEL_FORMAT
-    d["name"] = doc.si.get("name", "untitled")
-    d["materials"] = {}
     d["physics"] = {name: kernel_physics(doc, name)}
     mesh = (doc.si.get("mesh") or {})
     grading = None
@@ -645,12 +647,17 @@ def kernel_document(doc) -> ModesHandOff:
     d["mesh"]["grading"] = grading
     d["study"] = kernel_study(doc)
     d["results"] = kernel_results(doc)
-    k = ModesHandOff(d)
-    k.scale = units.resolve(d["units"])
-    for attr in ("geometry_block_unit", "geometry_model", "geometry_complex", "geometry_source"):
-        setattr(k, attr, getattr(mu, attr))
-    k.geometry_roundings = list(mu.geometry_roundings)
-    k.validate()
+    st = d["study"]
+    if st["type"] == "sweep" and d["physics"][name]["formulation"] == "vector":
+        # the tracking check of the retired kernel contract, kept on purpose on this view: the
+        # tracker's resolver on the hand-off's own settings, with the same arguments and at the
+        # same point as before (redundant with the run-time call; the contract's check and the
+        # recorded calls stay as they were)
+        from .tracking import tracking_settings
+        try:
+            tracking_settings(int(d["physics"][name]["num_modes"]), st.get("tracking"))
+        except (ValueError, OverflowError) as exc:
+            raise DocumentError(str(exc)) from None
     return k
 
 

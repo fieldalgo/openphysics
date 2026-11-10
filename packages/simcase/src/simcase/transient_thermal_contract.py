@@ -3,16 +3,14 @@
 """Strict serializable transient rectangle inputs; no solver or persistence.
 
 Format 0.3 rectangle documents are checked on their SI values (the section at the end);
-there every absolute temperature is above 0 K; region documents are checked in
-``transient_regions``. Heat no longer reads format 0.2; the 0.2 readers below stay only where
-later commits of the units batch still share them.
+every absolute temperature is above 0 K; region documents are checked in
+``transient_regions``.
 
-Temperatures are finite Kelvin, including negative mathematical values. Initial
-data are never projected. Time-dependent side data are samples at the requested
+Initial data are never projected. Time-dependent side data are samples at the requested
 times, with no interpolation, extrapolation, or serialized callback language.
-Outward flux and convection sides reuse the steady boundary contract's readers
+Inward flux and convection sides reuse the steady boundary contract's readers
 (same keys, limits and messages) and are time-independent constants; a document
-that carries either key saves the boundary result/layout pair ``V2``.
+that carries either key saves the boundary result/layout pair ``V2_03``.
 """
 import math
 import sys
@@ -20,17 +18,11 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from . import units, views
+from . import views
 from .schema import DocumentError
-from .steady_boundary_contract import (
-    has_natural_conditions, natural_conditions, rectangle_exterior_edges, validate_natural_edges,
-)
+from .steady_boundary_contract import rectangle_exterior_edges, validate_natural_edges
 
 PHYSICS = "thermal.transient2d"
-RESULT_FORMAT = "thermal.transient2d-result-v1"
-FIELD_LAYOUT = "thermal2d-transient-p1-node-cell-v1"
-V1 = (RESULT_FORMAT, FIELD_LAYOUT)
-V2 = ("thermal.transient2d-result-v2", "thermal2d-transient-p1-node-cell-boundary-v1")
 SIDES = ("left", "right", "bottom", "top")
 
 
@@ -38,17 +30,6 @@ def is_transient_thermal(data):
     return (isinstance(data, dict) and isinstance(data.get("physics"), dict)
             and any(isinstance(p, dict) and p.get("type") == PHYSICS
                     for p in data["physics"].values()))
-
-
-def _object(value, allowed, path, required=()):
-    if not isinstance(value, dict):
-        raise DocumentError(f"{path}: expected an object")
-    unknown = set(value)-set(allowed)
-    if unknown:
-        raise DocumentError(f"{path}: unsupported keys {sorted(map(str, unknown))}")
-    missing = set(required)-set(value)
-    if missing:
-        raise DocumentError(f"{path}: missing keys {sorted(missing)}")
 
 
 def _number(value, path, *, positive=False, integer=False):
@@ -64,158 +45,20 @@ def _number(value, path, *, positive=False, integer=False):
     return float(value)
 
 
-def _array(value, path, length=None):
-    if not isinstance(value, list) or (length is not None and len(value) != length):
-        shape = f"exactly {length} entries" if length is not None else "an array"
-        raise DocumentError(f"{path}: expected {shape}")
-    return [_number(v, f"{path}[{i}]") for i, v in enumerate(value)]
-
-
-def _domain(doc):
-    dom = doc.data["geometry"]["domain"]
-    p = {key: _number(doc.scale.to_si(value, {"length": 1}),
-                      f"geometry.domain.{key} in metres") for key, value in dom.items()}
-    lengths = []
-    for axis in "xy":
-        extent = _number(dom[axis+"max"]-dom[axis+"min"],
-                         f"geometry.domain.{axis} extent", positive=True)
-        length = _number(doc.scale.to_si(extent, {"length": 1}),
-                         f"geometry.domain.{axis} extent in metres", positive=True)
-        _number(p[axis+"min"]+length, f"geometry.domain.{axis} endpoint in metres")
-        if not p[axis+"min"] < p[axis+"min"]+length:
-            raise DocumentError(f"geometry.domain.{axis}: SI extent is not representable")
-        lengths.append(length)
-    return p["xmin"], p["ymin"], lengths[0], lengths[1]
-
-
-def _initial_value(spec, x, y, origin):
-    if isinstance(spec, dict):
-        gx, gy = spec["gradient_k_per_m"]
-        return spec["origin_temperature_k"]+gx*(x-origin[0])+gy*(y-origin[1])
-    return spec
-
-
-def _samples(value, times, path):
-    if isinstance(value, dict):
-        _object(value, {"values_k"}, path, {"values_k"})
-        return _array(value["values_k"], path+".values_k", len(times))
-    return [_number(value, path)]*len(times)
-
-
 def _agree(initial, prescribed):
     return abs(initial-prescribed) <= 32*sys.float_info.epsilon*max(
         1., abs(initial), abs(prescribed))
 
 
-def validate_transient_thermal(doc):
-    d = doc.data
-    _object(d, {"openphysics", "name", "units", "geometry", "materials",
-                "physics", "mesh", "study", "results"}, "document",
-            {"openphysics", "name", "units", "geometry", "materials", "physics",
-             "mesh", "study", "results"})
-    if d["openphysics"] != "0.2":
-        raise DocumentError('openphysics: expected format string "0.2"')
-    if not isinstance(d["name"], str):
-        raise DocumentError("name: expected a string")
-    _object(d["units"], {"length", "temperature", "time"}, "units",
-            {"length", "temperature", "time"})
-    if d["units"]["temperature"] != "K" or d["units"]["time"] != "s":
-        raise DocumentError('thermal.transient2d requires temperature="K" and time="s"')
-    try:
-        doc.scale = units.resolve(d["units"])
-    except (units.UnitError, OverflowError, TypeError, ValueError) as exc:
-        raise DocumentError(f"units: {exc}") from exc
-    _object(d["geometry"], {"domain"}, "geometry", {"domain"})
-    dom = d["geometry"]["domain"]
-    _object(dom, {"xmin", "xmax", "ymin", "ymax"}, "geometry.domain",
-            {"xmin", "xmax", "ymin", "ymax"})
-    for key, value in dom.items():
-        _number(value, f"geometry.domain.{key}")
-    origin_x, origin_y, lx, ly = _domain(doc)
-    if not isinstance(d["materials"], dict) or d["materials"]:
-        raise DocumentError("materials: transient heat requires an empty object")
-    _object(d["mesh"], {"subdivisions"}, "mesh", {"subdivisions"})
-    subdivisions = d["mesh"]["subdivisions"]
-    if not isinstance(subdivisions, list) or len(subdivisions) != 2:
-        raise DocumentError("mesh.subdivisions: expected [nx, ny]")
-    for i, value in enumerate(subdivisions):
-        _number(value, f"mesh.subdivisions[{i}]", positive=True, integer=True)
-    _object(d["study"], {"type", "time_s"}, "study", {"type", "time_s"})
-    if d["study"]["type"] != "transient":
-        raise DocumentError('study.type: expected "transient"')
-    times = _array(d["study"]["time_s"], "study.time_s")
-    if len(times) < 2 or times[0] < 0:
-        raise DocumentError("study.time_s: need at least two nonnegative increasing seconds")
-    for i, (a, b) in enumerate(zip(times, times[1:]), 1):
-        _number(b-a, f"study.time_s step[{i}]", positive=True)
-    if not isinstance(d["physics"], dict) or len(d["physics"]) != 1:
-        raise DocumentError("physics: exactly one transient heat entry is required")
-    name, p = next(iter(d["physics"].items()))
-    if not isinstance(name, str) or not name.isidentifier():
-        raise DocumentError("physics name must be an identifier")
-    where = f"physics.{name}"
-    keys = {"type", "conductivity_w_mk", "volumetric_heat_capacity_j_m3k",
-            "initial_temperature_k", "dirichlet_temperature_k", "heat_source_w_m3"}
-    _object(p, keys | {"outward_flux_w_m2", "convection"}, where, keys-{"heat_source_w_m3"})
-    if p["type"] != PHYSICS:
-        raise DocumentError(f"{where}.type: expected {PHYSICS}")
-    for key in ("conductivity_w_mk", "volumetric_heat_capacity_j_m3k"):
-        _number(p[key], f"{where}.{key}", positive=True)
-    p.setdefault("heat_source_w_m3", 0.)
-    _number(p["heat_source_w_m3"], where+".heat_source_w_m3")
-    spec = p["initial_temperature_k"]
-    initial_path = where+".initial_temperature_k"
-    if isinstance(spec, dict):
-        _object(spec, {"type", "origin_temperature_k", "gradient_k_per_m"}, initial_path,
-                {"type", "origin_temperature_k", "gradient_k_per_m"})
-        if spec["type"] != "affine":
-            raise DocumentError(f"{initial_path}.type: expected affine")
-        _number(spec["origin_temperature_k"], initial_path+".origin_temperature_k")
-        _array(spec["gradient_k_per_m"], initial_path+".gradient_k_per_m", 2)
-    else:
-        _number(spec, initial_path)
-    corners = ((origin_x, origin_y), (origin_x, origin_y+ly),
-               (origin_x+lx, origin_y), (origin_x+lx, origin_y+ly))
-    initial = [_number(_initial_value(spec, x, y, (origin_x, origin_y)),
-                       initial_path+" at domain corner") for x, y in corners]
-    side_corners = {"left": (0, 1), "right": (2, 3), "bottom": (0, 2), "top": (1, 3)}
-    boundary = p["dirichlet_temperature_k"]
-    _object(boundary, SIDES, where+".dirichlet_temperature_k")
-    sampled = {tag: _samples(value, times, where+".dirichlet_temperature_k."+tag)
-               for tag, value in boundary.items()}
-    for horizontal in ("left", "right"):
-        for vertical in ("bottom", "top"):
-            if (horizontal in sampled and vertical in sampled
-                    and sampled[horizontal] != sampled[vertical]):
-                raise DocumentError(f"{where}.dirichlet_temperature_k: conflicting corner "
-                                    f"temperatures on {horizontal}/{vertical}")
-    for tag, values in sampled.items():
-        if any(not _agree(initial[i], values[0]) for i in side_corners[tag]):
-            raise DocumentError(f"{where}.dirichlet_temperature_k.{tag}: initial t0 mismatch "
-                                "(32 eps bound); no projection")
-    # Same reader as thermal.steady2d: constant g and (h, ambient) per side, no
-    # time samples. The mass/time term keeps the system well posed, so no anchor
-    # is required and h=0 is only an insulated side.
-    natural_conditions(p, where, sampled)
-    _object(d["results"], {"save_fields", "plots"}, "results", {"save_fields", "plots"})
-    if any(not isinstance(d["results"][key], bool) for key in ("save_fields", "plots")):
-        raise DocumentError("results.save_fields and results.plots must be booleans")
-    if d["results"]["plots"]:
-        raise DocumentError("results.plots: transient heat is headless; plots=true unsupported")
-    doc.notes = []
-
-
 def transient_result_versions(doc):
     """Return the (result_format, field_layout) pair a validated document saves.
 
-    Presence of ``outward_flux_w_m2`` or ``convection`` selects ``V2``; every
-    other document keeps the legacy ``V1`` identifiers and arrays.
+    Presence of ``inward_heat_flux`` or ``convection`` selects ``V2_03``; every
+    other document saves ``V1_03``.
     """
+    from .steady_boundary_contract import has_natural_conditions_03
     doc.validate()
-    if getattr(doc, "si", None) is not None:
-        from .steady_boundary_contract import has_natural_conditions_03
-        return V2_03 if has_natural_conditions_03(doc.sole_physics()[1]) else V1_03
-    return V2 if has_natural_conditions(doc.sole_physics()[1]) else V1
+    return V2_03 if has_natural_conditions_03(doc.sole_physics()[1]) else V1_03
 
 
 def transient_solver_inputs(doc, mesh):
@@ -224,10 +67,10 @@ def transient_solver_inputs(doc, mesh):
     The caller constructs its SI rectangle mesh. Initial data are evaluated by
     coordinates, never by assumed node ordering. Only requested-time lookup is
     supported for sampled side data. No engine or file operation is performed.
-    With ``outward_flux_w_m2`` or ``convection`` the result also carries the
+    With ``inward_heat_flux`` or ``convection`` the result also carries the
     engine's ``outward_flux`` and ``convection`` mappings over complete exterior
     sides of ``mesh.boundary_edges``, validated as in the steady contract;
-    without them the six legacy keywords are returned unchanged.
+    without them the six engine keywords are returned.
     """
     doc.validate()
     name, p = doc.sole_physics()
@@ -251,8 +94,7 @@ def transient_solver_inputs(doc, mesh):
         initial = (np.full(len(nodes), spec) if not isinstance(spec, views.AffineTemperature)
                    else spec.origin_temperature + (nodes-np.array([x0, y0]))@spec.gradient)
     if not np.isfinite(initial).all():
-        key = "initial_temperature" if getattr(doc, "si", None) is not None else "initial_temperature_k"
-        raise DocumentError(f"{key}: nonfinite field at mesh nodes")
+        raise DocumentError("initial_temperature: nonfinite field at mesh nodes")
     sampled_nodes = {}
     boundary_nodes = getattr(mesh, "boundary", None)
     if not isinstance(boundary_nodes, Mapping):
@@ -305,41 +147,23 @@ def transient_solver_inputs(doc, mesh):
 
 
 def transient_thermal_summary(doc):
+    from .steady_boundary_contract import has_natural_conditions_03
+    from .thermal import _authored, rectangle_summary_03
     from .transient_regions import is_transient_region_thermal, transient_region_summary_03
-    if getattr(doc, "si", None) is not None and is_transient_region_thermal(doc.data):
-        doc.validate()
+    doc.validate()                    # a document that was not read as format 0.3 is refused by name
+    if is_transient_region_thermal(doc.data):
         return transient_region_summary_03(doc)
-    if getattr(doc, "si", None) is not None:
-        from .steady_boundary_contract import has_natural_conditions_03
-        from .thermal import _authored, rectangle_summary_03
-        doc.validate()
-        name = next(iter(doc.si["physics"]))
-        where = f"physics.{name}"
-        times = doc.si["study"]["time"]
-        initial = doc.si["physics"][name]["initial_temperature"]
-        initial_text = ("affine from " + _authored(doc, where + ".initial_temperature.reference_temperature")
-                        if isinstance(initial, dict) else _authored(doc, where + ".initial_temperature"))
-        return rectangle_summary_03(doc, f"{PHYSICS}, {len(times)} explicit times", [
-            f"  volumetric_heat_capacity {_authored(doc, where + '.volumetric_heat_capacity')}; "
-            f"initial_temperature {initial_text}; study.time {_authored(doc, 'study.time')}",
-            "  rates at interval ends only"],
-            V2_03 if has_natural_conditions_03(doc.si["physics"][name]) else V1_03)
-    doc.validate()                    # a format 0.2 heat document is refused by name
-    name, p = doc.sole_physics()
-    times = doc["study"]["time_s"]
-    natural = ''
-    if has_natural_conditions(p):
-        natural = (f'  outward flux {p.get("outward_flux_w_m2", {})} W/m^2; '
-                   f'convection {p.get("convection", {})}\n'
-                   '  q.n = g_out + h*(T-T_ambient), sampled once; unselected natural sides insulated\n')
-    return (f'{doc["name"]} (openphysics 0.2)\n'
-            f'  physics {name}: {PHYSICS}, {len(times)} explicit times in s\n'
-            f'  domain {doc.domain} {doc.length_unit}; mesh {doc["mesh"]["subdivisions"]}\n'
-            f'  k={p["conductivity_w_mk"]} W/(m K), '
-            f'c={p["volumetric_heat_capacity_j_m3k"]} J/(m^3 K)\n'
-            + natural +
-            '  output: SI time/node/cell histories; rates at interval ends only')
-
+    name = next(iter(doc.si["physics"]))
+    where = f"physics.{name}"
+    times = doc.si["study"]["time"]
+    initial = doc.si["physics"][name]["initial_temperature"]
+    initial_text = ("affine from " + _authored(doc, where + ".initial_temperature.reference_temperature")
+                    if isinstance(initial, dict) else _authored(doc, where + ".initial_temperature"))
+    return rectangle_summary_03(doc, f"{PHYSICS}, {len(times)} explicit times", [
+        f"  volumetric_heat_capacity {_authored(doc, where + '.volumetric_heat_capacity')}; "
+        f"initial_temperature {initial_text}; study.time {_authored(doc, 'study.time')}",
+        "  rates at interval ends only"],
+        V2_03 if has_natural_conditions_03(doc.si["physics"][name]) else V1_03)
 
 
 # -- format 0.3 ------------------------------------------------------------------------------------

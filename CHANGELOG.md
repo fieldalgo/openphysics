@@ -12,18 +12,53 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The Python API of every package may change in any minor release (0.1 to 0.2).
   Patch releases (0.1.x) fix bugs and are not meant to change the API.
-- The JSON model document format `"openphysics": "0.2"` is a contract: a document
+- The JSON model document format `"openphysics": "0.3"` is a contract: a document
   that is valid in this format keeps validating and keeps its meaning. A change
-  that would break that gets a new format version.
+  that would break that gets a new format version. Format 0.2 documents are not
+  read: every reader refuses one by name (`E-FORMAT` at `openphysics`, with what to
+  write instead).
 - Saved result format and field layout identifiers, such as
-  `thermal.steady2d-result-v1` or `cavity3d-edge-v1`, are contracts: a file
+  `thermal.steady2d-result-v3` or `cavity3d-edge-v2`, are contracts: a file
   carrying an identifier keeps that layout. A changed layout gets a new identifier.
+- Every identifier that results, Studio payloads and adapters carried before the
+  units and naming batch is retired. A retired identifier is never given to
+  another layout, and `simcase.export` refuses a file that carries a retired field
+  layout by name (`simcase.export.RETIRED_LAYOUTS` names the layout that replaced
+  each one):
+  - result formats: `thermal.steady2d-result-v1`, `thermal.steady2d-result-v2`,
+    `thermal.transient2d-result-v1`, `thermal.transient2d-result-v2`,
+    `thermal.steady2d-regions-result-v1`, `thermal.transient2d-regions-result-v1`,
+    `thermal.axisymmetric-regions-result-v1`,
+    `thermal.axisymmetric-transient-regions-result-v1`, `electric.steady2d-result-v1`,
+    `joule.steady2d-result-v1`, `joule.temperature2d-result-v1`,
+    `electric.steady2d-regions-result-v1`, `joule.steady2d-regions-result-v1`,
+    `mechanics.elasticity2d-result-v1`, `mechanics.thermoelastic2d-result-v1`,
+    `mechanics.elasticity2d-regions-result-v1` and
+    `mechanics.thermoelastic2d-regions-result-v1`;
+  - field layouts: `thermal2d-p1-node-cell-v1`, `thermal2d-p1-node-cell-boundary-v2`,
+    `thermal2d-transient-p1-node-cell-v1`, `thermal2d-transient-p1-node-cell-boundary-v1`,
+    `thermal2d-p1-node-cell-regions-v1`, `thermal2d-transient-p1-node-cell-regions-v1`,
+    `thermal-axisymmetric-p1-node-cell-regions-v1`,
+    `thermal-axisymmetric-transient-p1-node-cell-regions-v1`, `electric-joule2d-p1-v1`,
+    `electric2d-p1-node-cell-regions-v1`, `electric-joule2d-p1-node-cell-regions-v1`,
+    `mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`, `mechanics2d-p1-regions-v1`,
+    `thermoelastic2d-p1-regions-v1`, `em-modes2d-p1-node-centroid-v1`,
+    `em-modes2d-subspace-raw-v1`, `cavity3d-edge-v1` and `cavity3d-edge-complex-v1`;
+  - result schemas and field representations: `openphysics.modes2d/2`,
+    `openphysics.pml-candidates/1`, `vector-edge-nodal-v1`,
+    `vector-subspace-edge-nodal-v1`, `pml-scalar-nodal-v1` and `pml-vector-edge-nodal-v1`;
+  - Studio payloads and adapters: `studio-thermal-steady-v1`,
+    `studio-thermal-steady-regions-v1`, `studio-thermal-transient-v1`,
+    `studio-thermal-transient-regions-v1`, `studio-thermal-transient-frame-v1`,
+    `studio-thermal-transient-history-v1`, `optical-fixed-v1`, `optical-rectangle-v2`,
+    `optical-rectangle-v3`, `optical-shapes-v4` and `optical-shapes-v5`.
 
 What each package implements, and its limits, is in the
 [overview](docs/overview.md).
 
 ## [Unreleased]
 
+- `simcase`: **the kernel hand-offs build no format 0.2 tree** (units and naming batch, commit C11b, the last of C11). meshine and the mode kernel receive the document's micrometre frame, built from its exact values: each shape number from its picometre count (`float(Fraction(k, 10**6))`), each element size and each control or grading length from its exact metres (`float(exact * 10**6)`); a version 1 block keeps its exact model. The region checks read a region view of the document in its own `length_unit`. The batch's equivalence check is unchanged by this: its recorded mesher and solver inputs, calls and saved bytes compare as before (79 documents equal to the baseline, 8 with the stated deviation). Removed (internal): `simcase.units`; `runner.micrometre_document`; the unit-declared geometry reading (`geometry_document.parse_handoff`, `pm_per_unit`, the reader's `units` branch and `GeometryModel.units_length`, `.pm_per_unit` and `.to_unit`); the kernel contract of the hand-off (`schema.HANDOFF_FORMAT`, `PHYSICS_REQUIRES`, `check_format_units_and_tags`, `reject_tagged_values`, `Document.validate_em_modes2d` and `em_modes2d_summary`): each of its checks is a format 0.3 refusal of the document, tested one by one, and its tracking check of a vector sweep stays on the hand-off (the same `tracking_settings` call, kept on purpose); `Document.scale`, `geometry_block_unit` and `check_mesh_controls`; the format 0.2 branches of the heat runners and contracts (`thermal.validate_thermal`, `transient_thermal_contract.validate_transient_thermal` and the 0.2 result identifiers they saved); `materials.resolve_material` and `material_table`. `simcase.geometry_document.to_v02` and `from_v02` are renamed `to_flat` and `from_flat`: they compile between a version 1 component and a format 0.3 flat block. `geometry.build_domain` and `geometry.size_function` take the micrometre frame only and refuse anything else with a `TypeError` that names `simcase.build_domain`. No stage passes the mesher's findings on by filtering note text (P2-9). [Document format](docs/packages/simcase/document_format.md).
 - `simcase`: `simcase.build_domain(doc)` reads format 0.3 documents, which the stage API of the waveguide commit (units batch C8) was to provide. For a document that meshine meshes (material regions of heat, electric conduction, steady Joule heating and mechanics, and every `em.modes2d` form) it returns `(Domain, namer, materials)` exactly as `run` hands them to `meshine.generate`, in the micrometre meshing frame whatever `length_unit` the document declares. Before, it raised `KeyError` on every format 0.3 document (`'size'`, or `'units'` for a version 1 block). A rectangle or cavity box document, which galerkin meshes on its structured grid, is refused by name (`E-CONTRACT`; before the units batch it raised `KeyError` too), and a document of another format, such as an internal kernel hand-off, with `E-FORMAT`. `simcase.build_domain` is no longer the internal `simcase.geometry.build_domain`, which a run calls on the hand-off. [Overview](docs/packages/simcase/overview.md).
 - `simcase`: **the format 0.2 reading of user documents is retired** (units and naming batch, commit C11a). `simcase.FORMAT` is `"0.3"`. Every public reader refuses a document that is not format 0.3 by name (`E-FORMAT` at `openphysics`, with what to write instead): `Document.from_dict`, `load` and `loads`, `check_mesh_limits`, `simcase.geometry_document.parse` (`simcase.parse_geometry`), `design_velocity` and `exact_complex`, the Studio geometry lab and `python -m simcase geometry`; the last five read the `units` block of a 0.2 document before. A 0.2 document of a known kind keeps its kind's conversion hint; a document without a format key or physics gets the general one. A physics type that no kind claims is `E-VALUE-FORM` at `physics.<name>.type`, naming the nine types this release reads. Removed: the format 0.2 defaults (`schema.DEFAULTS`, `DEFAULT_PHYSICS`, `PhysicsKind.defaults` and the kinds' default functions; a kind brings its physics slots instead), `simcase.unit_vocabulary` (use `simcase.quantities`), `simcase.void_area_m2` (now `simcase.void_area`, which reads a format 0.3 document), and the unused 0.2 cavity helpers and 0.2 view builders (internal). `simcase.reader` refuses a string or key with an unpaired surrogate (`E-JSON` at its path) on every surface, with the words Studio used, so `simcase validate` and `run` refuse it instead of failing. A version 1 `3d` component with a feature other than a box is refused at that feature's `type` path. The sipi and meshine geometry adapters write format 0.3 parts (below). The kernel hand-offs keep their internal unit-declared trees (`simcase.units`, the micrometre copy) until a later step.
 - `meshine`: `meshine.geometry_v1.to_geometry_v1(domain, length_unit=..., materials=None)` writes format 0.3 parts (units and naming batch, commit C11a), with the same arguments. It returns `{"geometry", "mesh"}` instead of `{"units", "geometry", "mesh_size", "mesh_controls"}`: the component declares `length_unit` and `depth` (null) instead of a top-level `units` block; a region's size is its feature's `element_size`, a quantity string in that unit (was the bare number `mesh_size`); the default size is `mesh.element_size` (was `mesh_size`) and each `Circle`'s vertex count a `mesh.controls` entry with `circle_segment_count` (was `mesh_controls` with `circle_segments`). `length_unit` is one of the format 0.3 length units `pm nm Angstrom um mm cm m in mil` (`meshine.geometry_v1.LENGTH_UNITS`); another declaration, such as `{"in_m": ...}`, is refused with `ValueError` naming them.

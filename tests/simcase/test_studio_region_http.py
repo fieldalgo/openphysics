@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 import region_studio_fixtures as fx
 from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult, TransientThermalRunResult,
                      check_mesh_limits, examples, region_complexity, run)
-from simcase.geometry_document import from_v02
+from simcase.geometry_document import from_flat
 from simcase.studio import server
 from simcase.studio import thermal_api as thermal
 from simcase.studio import thermal_regions_api as regions
@@ -592,9 +592,9 @@ def s11_fixtures(kind):
     two_physics = copy.deepcopy(region)
     two_physics['physics']['second'] = copy.deepcopy(next(iter(region['physics'].values())))
     version_1 = copy.deepcopy(region)
-    version_1['geometry'] = from_v02(region['geometry'])
+    version_1['geometry'] = from_flat(region['geometry'])
     version_1_rectangle = copy.deepcopy(rectangle)
-    version_1_rectangle['geometry'] = from_v02(version_1_rectangle['geometry'])
+    version_1_rectangle['geometry'] = from_flat(version_1_rectangle['geometry'])
     return {'rectangle': rectangle, 'region': region, 'shapes_only': shapes_only,
             'background_only': background_only, 'geometry_list': geometry_list, 'no_geometry': no_geometry,
             'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1,
@@ -620,7 +620,7 @@ def test_s11_a_homogeneous_version_1_rectangle_takes_the_rectangle_path(client, 
     assert Document.from_dict(doc).geometry_flat is not None
     # format 0.2: the rectangle path refuses it by name, not taken as a region document
     legacy = copy.deepcopy(LEGACY_RECTANGLES['thermal_slab' if kind == thermal.KIND else 'transient_thermal_uniform'])
-    legacy['geometry'] = from_v02(legacy['geometry'])
+    legacy['geometry'] = from_flat(legacy['geometry'])
     response = post(client, legacy, 'validate')
     assert response.status_code == 200 and response.json()['ok'] is False, response.text
     assert 'format 0.2 rectangle documents are not read' in response.json()['error']['message']
@@ -635,7 +635,7 @@ def version_1_copy(doc, merge=None):
     """``doc`` with its geometry rewritten as a version 1 block; with ``merge`` = (a, b, name),
     the two named rectangles become one region ``name`` (same material)."""
     out = copy.deepcopy(doc)
-    out['geometry'] = from_v02(doc['geometry'])
+    out['geometry'] = from_flat(doc['geometry'])
     if merge:
         a, b, name = merge
         comp = out['geometry']['components']['main']

@@ -111,8 +111,9 @@ later shape) is refused when the document runs.
 
 ## Mesh and solve
 
-Geometry and global/per-region mesh sizes are first converted to micrometres
-with the same decimal-ratio conversion used by electromagnetic documents.
+Geometry and global/per-region element sizes first go to micrometres from the
+document's exact values, as for electromagnetic documents: each shape number from
+its picometre count, each size from its exact value.
 meshine then performs constrained Delaunay refinement with the requested
 minimum angle. Its canonical coordinates are converted directly to SI metres
 for the heat solver, without a round trip through the document unit.
@@ -490,8 +491,8 @@ vertices in millimetres and 50 in the micrometre copy that is meshed, and 50 is
 what is counted. `check_mesh_limits(doc, *, max_input_vertices)` returns the
 count of a region document without building the domain or changing the
 document, or raises `MeshLimitError`. It counts the micrometre copy a run meshes:
-for a format 0.3 document, the copy made from the document's geometry and mesh
-hand-off (`thermal_regions.handoff_03`). A `Document` that was never read
+the micrometre frame made from the document's exact values (`views.region_mesh`).
+A `Document` that was never read
 (`Document(data)`, `Document.copy()`) is read first, as its run would read it.
 An isolated circle whose own count is
 over the limit is refused before its vertices are made, with that count's

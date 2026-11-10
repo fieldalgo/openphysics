@@ -181,6 +181,17 @@ def test_json_dumps_is_never_called_on_document_data():
     assert uses >= 19
 
 
+def test_p2_9_no_stage_copies_diagnostics_by_note_text():
+    """P2-9: a stage passes the mesher's findings on by path (``mesh_diagnostics_03``), never by
+    filtering note text on a prefix; the last two such filters (the region mesh and the engine
+    hand-off) went with the kernel hand-offs' 0.2 trees (units batch C11b)."""
+    source = Path(simcase.__file__).parent
+    pattern = re.compile(r"startswith\(\(?[\"'](geometry\.|mesh\.controls:)")
+    hits = [f"{p.name}:{i}" for p in sorted(source.rglob("*.py"))
+            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1) if pattern.search(line)]
+    assert hits == []
+
+
 def test_canonical_json_of_a_0_3_document_keeps_its_decimals(toy_kind):
     text = toy.text(toy.document(physics__bar__poisson_ratio="@")).replace('"@"', "0.30000000000000000001")
     doc = _doc(text)

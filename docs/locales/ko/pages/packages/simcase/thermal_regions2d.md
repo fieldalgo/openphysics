@@ -95,8 +95,8 @@ Reader는 모든 기본값을 `defaults_applied`에, 읽은 모든 값을 `resol
 
 ## 메시와 풀이
 
-기하와 전역·영역별 메시 크기를 전자기 문서와 같은 십진 비율 환산으로 먼저 마이크로미터로
-바꿉니다. meshine이 요청한 최소각으로 제약 Delaunay 세분을 한 뒤, 정규화된 좌표를 문서
+기하와 전역·영역별 요소 크기를 전자기 문서처럼 문서의 정확한 값에서 먼저 마이크로미터로
+옮깁니다. 도형 수는 그 pm 개수에서, 크기는 그 정확한 값에서 옮깁니다. meshine이 요청한 최소각으로 제약 Delaunay 세분을 한 뒤, 정규화된 좌표를 문서
 단위로 되돌리는 과정 없이 SI 미터로 직접 환산해 열 솔버에 넘깁니다. 모든 도형 경계가 요소 변으로 이어지므로 삼각형마다 한 영역에 속합니다.
 곡선 경계는 내접 다각형이라 원의 메시 면적은 pi r^2보다 O(h^2)만큼 작습니다. 메시한 문제는
 열전도율과 열원을 영역 이름으로 연결해 `galerkin.thermal.solve_steady_heat`에 넘깁니다
@@ -374,7 +374,7 @@ except MeshLimitError as exc:
 메시하는 마이크로미터 사본에서는 50개이며, 세는 수는 50입니다.
 `check_mesh_limits(doc, *, max_input_vertices)`는 영역 문서의 이 수를 영역을 만들거나 문서를
 바꾸지 않고 반환하거나, `MeshLimitError`를 발생시킵니다. 실행이 메시하는 마이크로미터 사본을 셉니다.
-형식 0.3 문서에서는 문서의 기하·메시 hand-off(`thermal_regions.handoff_03`)로 만든 사본입니다. 읽지
+문서의 정확한 값으로 만든 µm 프레임(`views.region_mesh`)입니다. 읽지
 않은 `Document`(`Document(data)`, `Document.copy()`)는 그 실행처럼 먼저 읽습니다. 자기 수만으로 상한을 넘는 고립된 원은
 꼭짓점을 만들기 전에 거절하고 메시지에 그 수의 추정값을(마이크로미터로) 적으므로, `max_input_vertices`를
 주면 0에 가까운 `mesh.element_size`는 나눗셈, 오버플로, 메모리 오류가 아니라 `MeshLimitError`를

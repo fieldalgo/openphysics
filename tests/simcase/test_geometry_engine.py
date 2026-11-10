@@ -25,7 +25,7 @@ from shapely.ops import unary_union
 
 from meshine import Circle, generate
 from simcase.examples import EXAMPLES
-from simcase.geometry_document import _MISSING, GeometryError, from_v02, parse
+from simcase.geometry_document import _MISSING, GeometryError, from_flat, parse
 from simcase.geometry_engine import Q2, cmp, cross_sign, evaluate
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -513,7 +513,7 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
     g = doc["geometry"]
     assert doc["openphysics"] == "0.3"
     units = {"length": g["length_unit"]}       # a format 0.3 flat block declares its own length_unit and depth
-    model = parse({"openphysics": "0.3", "geometry": from_v02(g)})
+    model = parse({"openphysics": "0.3", "geometry": from_flat(g)})
     if "zmin" in g["domain"]:
         with pytest.raises(GeometryError, match="2d and axisymmetric"):
             evaluate(model)
@@ -661,7 +661,7 @@ def _kernel_canonical(doc):
 def test_a_version_1_document_is_meshed_by_the_engine():
     from simcase import Document, build_domain
     raw = copy.deepcopy(EXAMPLES["soi_strip"])
-    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"] = from_flat(raw["geometry"])
     comp = raw["geometry"]["components"]["main"]
     comp["boundary_tags"] = [{"tag": "port", "select": {"boundary": {"between": ["background", "exterior"]}}}]
     doc = Document.from_dict(raw)
@@ -764,7 +764,7 @@ def test_random_circles_rects_and_polygons_never_break_the_arrangement():
 
 def _soi_v1(**component_extra):
     raw = copy.deepcopy(EXAMPLES["soi_strip"])
-    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"] = from_flat(raw["geometry"])
     raw["geometry"]["components"]["main"].update(component_extra)
     return raw
 
@@ -827,7 +827,7 @@ def test_meshed_models_of_version_1_documents_carry_provenance_edges():
     assert set(model.solver_mesh.provenance_edges) == set(prov)
     assert build_mesh(Document.from_dict(copy.deepcopy(EXAMPLES["soi_strip"]))).mesh.provenance_edges is None
     raw = copy.deepcopy(EXAMPLES["thermal_regions"])
-    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"] = from_flat(raw["geometry"])
     mesh, _materials, _tri = build_region_mesh_03(Document.from_dict(raw))
     assert set(mesh.provenance_edges) >= {"plate.top", "heater.boundary", "domain.left"}
     assert len(mesh.provenance_edges["heater.boundary"]) >= 16
@@ -1105,7 +1105,7 @@ def test_whole_circle_edges_are_read_back_at_any_vertex_count(size_nm):
 
 def _imprint_regions_doc():
     raw = copy.deepcopy(EXAMPLES["thermal_regions"])
-    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"] = from_flat(raw["geometry"])
     comp = raw["geometry"]["components"]["main"]
     comp["finalize"] = "imprint"
     comp["features"].append({"name": "cut", "type": "segment", "points": [[0, 10], [40, 10]]})
@@ -1122,9 +1122,9 @@ def test_mesh_limits_take_the_engine_route_for_version_1_documents():
     assert free.num_nodes == limited.num_nodes and limited.provenance_edges is not None
     assert len(limited.provenance_edges["cut.line"]) >= 1
     count = check_mesh_limits(doc, max_input_vertices=10 ** 6)
+    from simcase import views
     from simcase.geometry import _domain_from_model
-    from simcase.runner import micrometre_document
-    assert count == _domain_from_model(micrometre_document(handoff_03(doc), validate=False))[3]
+    assert count == _domain_from_model(views.region_mesh(handoff_03(doc)).canonical)[3]
     with pytest.raises(Exception, match="input_vertices"):
         check_mesh_limits(doc, max_input_vertices=3)
     result = run(doc, verbose=False, max_input_vertices=10 ** 6)
@@ -1255,7 +1255,7 @@ def _regions_doc(features, physics_source=None, material_extra=None):
     """A region heat document on the 0..40 x 0..20 mm plate, written as version 1; the source is
     a quantity string or a number in W/m^3 (or {region: either})."""
     raw = copy.deepcopy(EXAMPLES["thermal_regions"])
-    raw["geometry"] = from_v02(raw["geometry"])
+    raw["geometry"] = from_flat(raw["geometry"])
     comp = raw["geometry"]["components"]["main"]
     comp["features"] = features
     (name, p), = raw["physics"].items()
@@ -1430,8 +1430,7 @@ def test_g3_7_size_on_a_region_selection_refines_its_cells_and_a_boundary_is_ref
 
 
 def test_g3_7_document_mesh_controls_are_checked_at_load_and_converted_with_the_units():
-    from simcase import Document, DocumentError
-    from simcase.runner import micrometre_document
+    from simcase import Document, DocumentError, views
     from simcase.thermal_regions import build_region_mesh_03 as build_region_mesh, handoff_03
     raw = _regions_doc([{"name": "heater", "type": "circle", "cx": 20, "cy": 10, "r": 3, "material": "copper"}],
                        physics_source={"heater": 1e6})
@@ -1439,8 +1438,8 @@ def test_g3_7_document_mesh_controls_are_checked_at_load_and_converted_with_the_
                                {"select": "heater", "element_size": "0.5 mm"}]
     doc = Document.from_dict(raw)                                     # length_unit mm
     assert doc.controls_pm() == [{"select": "heater", "circle_segments": 48}, {"select": "heater", "size": 500_000_000}]
-    um = micrometre_document(handoff_03(doc), validate=False)        # the copy a run meshes
-    assert um.mesh_controls()[1]["size"] == 500.0 and um.controls_pm() == doc.controls_pm()
+    um = views.region_mesh(handoff_03(doc)).canonical                # the frame a run meshes
+    assert um["mesh"]["controls"][1]["size"] == 500.0 and um.controls_pm() == doc.controls_pm()
     mesh = build_region_mesh(doc)[0]
     assert len(mesh.provenance_edges["heater.boundary"]) >= 48
     plain = copy.deepcopy(raw)
@@ -1481,7 +1480,7 @@ def test_a_circle_segments_raise_is_noted_on_the_document_by_both_runners():
     run(doc, verbose=False)
     assert [d.code for d in doc.diagnostics].count("I-MESH-CONTROL-RAISED") == 1   # a second run adds no duplicate
     transient = copy.deepcopy(EXAMPLES["transient_thermal_regions"])
-    transient["geometry"] = from_v02(transient["geometry"])
+    transient["geometry"] = from_flat(transient["geometry"])
     comp = transient["geometry"]["components"]["main"]
     comp["features"] = [{"name": "heater", "type": "circle", "cx": 15, "cy": 2.5, "r": 2, "material": "steel"},
                         {"name": "bar", "type": "rect", "x": 17.02, "y": 1, "w": 5, "h": 3, "material": "steel"}]
@@ -1517,7 +1516,7 @@ def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere()
     from simcase import Document, DocumentError, run as run_document
     from simcase.thermal_regions import has_region_geometry
     slab = copy.deepcopy(SLAB_02)
-    slab["geometry"] = from_v02(slab["geometry"])
+    slab["geometry"] = from_flat(slab["geometry"])
     kind = next(iter(slab["physics"].values()))["type"]
     assert not has_region_geometry(slab, kind)
     # format 0.2: it would compile to the flat rectangle, which reads format 0.3 only since the
@@ -1526,9 +1525,9 @@ def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere()
         Document.from_dict(slab)
     assert [(d.code, d.path) for d in caught.value.diagnostics] == [("E-FORMAT", "openphysics")]
     assert "format 0.2 rectangle heat documents are not read" in str(caught.value)
-    # format 0.3 (D-1): it compiles to the flat rectangle (to_v02) and runs as thermal_slab does
+    # format 0.3 (D-1): it compiles to the flat rectangle (to_flat) and runs as thermal_slab does
     v03 = copy.deepcopy(EXAMPLES["thermal_slab"])
-    v03["geometry"] = from_v02(v03["geometry"])
+    v03["geometry"] = from_flat(v03["geometry"])
     assert not has_region_geometry(v03, kind)
     doc = Document.from_dict(v03)
     assert doc.geometry_flat is not None and not doc.is_version_1
@@ -1545,20 +1544,18 @@ def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere()
         assert not has_region_geometry(odd, kind)
 
 
-def test_the_micrometre_copy_of_a_version_1_document_refuses_to_serialise():
-    from simcase import Document, DocumentError
-    from simcase.runner import micrometre_document
+def test_the_micrometre_frame_of_a_version_1_document_refuses_to_serialise():
+    from simcase import Document, DocumentError, views
     from simcase.thermal_regions import handoff_03
     doc = Document.from_dict(_regions_doc([{"name": "heater", "type": "rect", "x": 5, "y": 5, "w": 10, "h": 10,
                                             "material": "copper"}]))
-    um = micrometre_document(handoff_03(doc), validate=False)        # the copy a run meshes
-    assert um["units"]["length"] == "um" and um.domain["xmax"] == 40000.0 and um.geometry_block_unit == "mm"
-    with pytest.raises(DocumentError, match="micrometre copy"):
+    um = views.region_mesh(handoff_03(doc)).canonical                # the frame a run meshes
+    assert um.length_unit == "um" and um.domain["xmax"] == 40000.0 and um.geometry_model is doc.geometry_model
+    with pytest.raises(DocumentError, match="kernel hand-off"):
         um.to_dict()
-    with pytest.raises(DocumentError, match="micrometre copy"):
-        um.copy().to_dict()
-    assert micrometre_document(um, validate=False).geometry_block_unit == "mm"
-    assert doc.geometry_block_unit is None and doc.to_dict()["geometry"] == doc.data["geometry"]
+    with pytest.raises(DocumentError, match="kernel hand-off"):
+        handoff_03(doc).to_dict()
+    assert doc.to_dict()["geometry"] == doc.data["geometry"]
 
 
 def test_mesh_controls_of_an_unvalidated_document_are_refused_by_name_at_the_hand_off():
@@ -1628,8 +1625,8 @@ def test_g3_8_a_whole_circle_and_a_hole_are_graded_from_their_true_outline():
 def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runners():
     import numpy as np
     from simcase import Document, DocumentError, build_mesh, check_mesh_limits
-    from simcase.geometry import build_domain                   # the internal builder, on the hand-off
-    from simcase.runner import micrometre_document
+    from simcase import views
+    from simcase.geometry import build_domain                   # the internal builder, on the micrometre frame
     from simcase.thermal_regions import build_region_mesh_03 as build_region_mesh, handoff_03
     raw = _regions_doc([{"name": "heater", "type": "rect", "x": 15, "y": 7, "w": 10, "h": 6, "material": "copper"}],
                        physics_source={"heater": 1e6})
@@ -1638,8 +1635,8 @@ def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runner
     raw["mesh"]["controls"] = [{"select": "rim", "near": "0.2 mm", "far": "2 mm", "refinement_distance": "5 mm"}]
     doc = Document.from_dict(raw)
     assert doc.controls_pm() == [{"select": "rim", "near": 200_000_000, "far": 2_000_000_000, "distance": 5_000_000_000}]
-    um = micrometre_document(handoff_03(doc), validate=False)        # the copy a run meshes
-    assert um.mesh_controls() == [{"select": "rim", "near": 200.0, "far": 2000.0, "distance": 5000.0}]
+    um = views.region_mesh(handoff_03(doc)).canonical                # the frame a run meshes
+    assert um["mesh"]["controls"] == [{"select": "rim", "near": 200.0, "far": 2000.0, "distance": 5000.0}]
     assert um.controls_pm() == doc.controls_pm()
     mesh = build_region_mesh(doc)[0]
     coarse = build_region_mesh(plain)[0]
@@ -1648,15 +1645,18 @@ def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runner
     far_away = lengths[centres[:, 0] > 0.035]
     assert len(mesh.nodes) > 2 * len(coarse.nodes) and on_rim.mean() < 0.4 * far_away.mean()
     assert check_mesh_limits(doc, max_input_vertices=10 ** 6) == check_mesh_limits(plain, max_input_vertices=10 ** 6)
-    # the shared complex was last handed off in micrometres by the mesh-limit check: the public
-    # helper refuses the millimetre hand-off rather than mixing units, and agrees after a build
+    # the builder and the grading take the micrometre frame only (never a millimetre view); the
+    # shared complex keeps the unit of its last hand-off and refuses a grading in another unit
+    # rather than mixing units
     from simcase.geometry import size_function
-    handoff = handoff_03(doc)
-    with pytest.raises(DocumentError, match="pm per mesher unit"):
-        size_function(handoff)
-    build_domain(handoff)
-    assert size_function(handoff)(15.0, 10.0) == pytest.approx(0.2)
-    assert size_function(handoff)(40.0, 10.0) == pytest.approx(2.0)
+    with pytest.raises(TypeError, match="micrometre frame"):
+        size_function(handoff_03(doc))
+    frame = views.region_mesh(handoff_03(doc)).canonical
+    build_domain(frame)
+    assert size_function(frame)(15000.0, 10000.0) == pytest.approx(200.0)
+    assert size_function(frame)(40000.0, 10000.0) == pytest.approx(2000.0)
+    with pytest.raises(GeometryError, match="pm per mesher unit"):
+        frame.geometry_complex.size_function(doc.controls_pm(), unit_pm=10 ** 9)
     em = _soi_v1(selections={"edge": {"boundary": {"of": "core"}}})
     em["mesh"]["controls"] = [{"select": "edge", "near": "0.005 um", "far": "0.2 um", "refinement_distance": "0.3 um"}]
     graded = build_mesh(Document.from_dict(em)).mesh                           # metres

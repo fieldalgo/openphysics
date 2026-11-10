@@ -18,7 +18,7 @@ import time
 import numpy as np
 
 from . import views
-from .schema import SHAPE_TYPES, Document, DocumentError
+from .schema import Document, DocumentError
 from .thermal import PHYSICS, ThermalRunResult, _number
 
 SIDES = ('left', 'right', 'bottom', 'top')
@@ -41,7 +41,7 @@ def has_region_geometry(data, physics_type):
 def _version_1_has_regions(geometry):
     """A raw version 1 block that Document.from_dict keeps as a 2D region component: its one
     component has features or a background material. A homogeneous rectangle (neither) is
-    compiled to the 0.2 rectangle form at load and takes the rectangle path, as does a 3D
+    compiled to the flat rectangle form at load and takes the rectangle path, as does a 3D
     component (cavity form). A block of another shape is left to the reader to refuse and
     counted as a region block, so the refusal names it."""
     components = geometry.get('components')
@@ -90,7 +90,7 @@ def boundary_names(doc):
     otherwise. Dirichlet data may name the tags and every selection (galerkin fixes interior
     nodes too, HQ decision 2026-11-08: a prescribed temperature on an interface); flux and
     convection the tags and the exterior selections only, an interior one being refused by
-    name. A 0.2 document has none. An unnamed exterior boundary is insulated (HQ decision
+    name. A flat block has none. An unnamed exterior boundary is insulated (HQ decision
     2026-11-08: a void border is insulated unless named)."""
     if not getattr(doc, 'is_version_1', False):
         return set(), set(), set()
@@ -121,11 +121,11 @@ def _version_1_region_geometry(doc, label='heat'):
     here the domain must be finite in metres, the background needs a material, a void feature
     (``material: null``) is a hole whose border is an exterior boundary (insulated unless named,
     HQ decision 2026-11-08), and a feature that the domain cuts away or that is a sliver is
-    refused by name, as a dropped 0.2 shape is. A feature that later features cover is not.
+    refused by name, as a dropped flat shape is. A feature that later features cover is not.
     Returns the names of the material regions."""
-    dom = doc.domain
-    for key, value in dom.items():
-        _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
+    from fractions import Fraction
+    for key, k in doc.component.domain.items():
+        _number(float(Fraction(k, 10 ** 12)), f'geometry.domain.{key} in metres')
     if not isinstance(doc.background.get('material'), str) or not doc.background['material']:
         raise DocumentError(f'geometry.background.material: expected a material name (region {label} takes no void '
                             'background)')
@@ -168,11 +168,13 @@ def covered_shapes(doc, mesh):
 # -- format 0.3 -----------------------------------------------------------------------------------
 # Region and axisymmetric heat documents read "openphysics": "0.3" (units batch C5b; phase-2 spec
 # §4.1, §4.2). The checks read the resolved SI tree (``doc.si``, pm counts for shape numbers) and
-# name the format 0.3 keys. The mesh is made from a hand-off document (``handoff_03``): the
-# geometry and mesh block in the component's length unit, which ``runner.micrometre_document``
-# turns into the same micrometre model the mesher received for format 0.2 (hazards H2, H11;
-# decision D-1 keeps the mesh routes). The electric and Joule (C6) and mechanics (C7) region
-# kinds use the same helpers; the format 0.2 region readers were deleted with C7.
+# name the format 0.3 keys. The checks that need the geometry read its region view
+# (``handoff_03``); the mesher receives the document's micrometre frame (``views.region_mesh``,
+# hazards H2, H11; decision D-1 keeps the mesh routes). The electric and Joule (C6) and mechanics
+# (C7) region kinds use the same helpers.
+
+#: the keys each flat shape type takes (beside type, name, material and element_size)
+SHAPE_TYPES = {'rect': {'x', 'y', 'w', 'h'}, 'circle': {'cx', 'cy', 'r'}, 'polygon': {'points'}}
 
 RESULT_FORMAT_03 = 'thermal.steady2d-regions-result-v2'
 FIELD_LAYOUT_03 = 'thermal2d-p1-node-cell-regions-v2'
@@ -200,11 +202,30 @@ def _refuse(message, path=None, code='E-CONTRACT'):
 
 
 class RegionHandOff(Document):
-    """The mesh hand-off of a format 0.3 region document (``handoff_03``): its geometry and mesh
-    block in the component's length unit, in the form ``runner.micrometre_document`` turns into
-    the micrometre model the mesher receives. It carries no physics and is never validated as a
-    document of its own; no user writes it."""
+    """The region view of a validated format 0.3 region document (``handoff_03``): the geometry
+    block that the mesh-time checks read (regions, sides, boundary names, dropped and covered
+    shapes) in the component's length unit, and the document it was made from (``source``),
+    whose micrometre frame the mesher receives (``views.region_mesh``). A flat block holds each
+    shape and domain number as its 1 pm grid value; a version 1 block is read through the
+    document's exact model. It carries no physics, is never validated or written, and no user
+    writes it."""
     is_handoff = True
+    #: the format 0.3 document the view was made from
+    source = None
+    #: the component's length_unit and its grid points per unit, exactly
+    unit = None
+    ppu = None
+
+    @property
+    def length_unit(self) -> str:
+        return self.unit
+
+    def _pm_per_unit(self):
+        return self.ppu
+
+    def controls_pm(self) -> list[dict]:
+        """The ``mesh.controls`` entries in integer pm, from the document's exact values."""
+        return self.source.controls_pm()
 
 
 def _plain(value):
@@ -240,105 +261,53 @@ def handoff_03(doc):
     """The ``RegionHandOff`` of a format 0.3 region document (kept on the document while its
     tree is unchanged). Flat shape and domain numbers are their 1 pm grid values in the
     component's length unit (``float(Fraction(k) / pm per unit)``: the authored double when it
-    lies on the grid, the rounded value that I-/W-PM-ROUNDING reports when it does not; version 1
-    blocks are put on the grid by their exact pm model); element sizes, control lengths and length
-    parameters are given in the component's length unit from their exact values; the angle is the
-    authored degree number (H3)."""
+    lies on the grid, the rounded value that I-/W-PM-ROUNDING reports when it does not), element
+    sizes are given in that unit from their exact values; a version 1 block is the document's
+    exact model, whose segments are checked against the mesher's hand-off here."""
     from fractions import Fraction
-    from physmat.units import convert, is_quantity_text
-    from . import units
+    from physmat.units import convert
     key = doc.canonical_json()
     cached = getattr(doc, '_region_handoff', None)
     if cached is not None and cached[0] == key:
         return cached[1]
     base, block, _ = component_03(doc)
     unit = block['length_unit']
-    per_unit = convert(f'1 {unit}', 'length').exact
-
-    def length(path):
-        return float(Fraction(doc.exact(path)) / per_unit)
+    per_unit = Fraction(convert(f'1 {unit}', 'length').exact)
+    ppu = per_unit * 10 ** 12
+    pm = doc._need_v03('handoff_03()').pm
 
     def sized(item, path, keep):
         out = {k: _plain(v) for k, v in item.items() if k in keep}
         if 'element_size' in item:
-            out['mesh_size'] = length(f'{path}.element_size')
+            out['mesh_size'] = float(Fraction(doc.exact(f'{path}.element_size')) / per_unit)
         return out
+
+    def on_grid(value, path):
+        # a shape number is the grid value the reader stored (spec §2 rule 4); the other leaves
+        # (names, types, materials) as written
+        if isinstance(value, dict):
+            return {k: on_grid(v, f'{path}.{k}') for k, v in value.items()}
+        if isinstance(value, list):
+            return [on_grid(v, f'{path}[{i}]') for i, v in enumerate(value)]
+        k = pm.get(path)
+        return _plain(value) if k is None else float(Fraction(k) / ppu)
+
     g = doc.data['geometry']
-    skip = {'length_unit', 'depth', 'accept', 'element_size', 'background', 'shapes', 'features'}
     if 'version' in g:
-        (cname, comp), = g['components'].items()
-        new = {k: _plain(v) for k, v in comp.items() if k not in skip}
-        if 'background' in comp:
-            new['background'] = sized(comp['background'], f'{base}.background', {'material'})
-        if 'features' in comp:
-            new['features'] = [sized(f, f'{base}.features[{i}]', set(f) - {'element_size'})
-                               for i, f in enumerate(comp['features'])]
-        geometry = {'version': g['version'], 'components': {cname: new}}
-        if 'parameters' in g:
-            params = {}
-            for name, spec in g['parameters'].items():
-                where = f'geometry.parameters.{name}'
-                item = _plain(spec)
-                if spec.get('kind', 'length') == 'length':
-                    if is_quantity_text(spec.get('value')):
-                        item['value'] = length(f'{where}.value')
-                    if 'range' in spec:
-                        item['range'] = [float(Fraction(convert(v, 'length').exact) / per_unit)
-                                         if is_quantity_text(v) else _plain(v) for v in spec['range']]
-                params[name] = item
-            geometry = {'version': g['version'], 'parameters': params, 'components': {cname: new}}
+        geometry = _plain(g)
     else:
-        pm_per_unit = per_unit * 10 ** 12
-
-        def on_grid(value, path):
-            # a shape number reaches the mesher as the grid value the reader stored (spec §2
-            # rule 4); the other leaves (names, types, materials) as written
-            if isinstance(value, dict):
-                return {k: on_grid(v, f'{path}.{k}') for k, v in value.items()}
-            if isinstance(value, list):
-                return [on_grid(v, f'{path}[{i}]') for i, v in enumerate(value)]
-            pm = doc._need_v03('handoff_03()').pm.get(path)
-            return _plain(value) if pm is None else float(Fraction(pm) / pm_per_unit)
-
         geometry = {'domain': on_grid(g['domain'], 'geometry.domain')}
         if 'background' in g:
             geometry['background'] = sized(g['background'], 'geometry.background', {'material'})
         geometry['shapes'] = [on_grid(sized(s, f'geometry.shapes[{i}]', set(s) - {'element_size'}),
                                       f'geometry.shapes[{i}]')
                               for i, s in enumerate(g.get('shapes') or [])]
-    m = doc.data.get('mesh') or {}
-    mesh = {'size': length('mesh.element_size'),
-            'min_angle': doc.degrees('mesh.minimum_angle') if 'minimum_angle' in m else 28.0}
-    if m.get('controls'):
-        names = {'element_size': 'size', 'near': 'near', 'far': 'far', 'refinement_distance': 'distance'}
-        controls = []
-        for i, entry in enumerate(m['controls']):
-            item = {'select': _plain(entry['select'])}
-            for k, engine in names.items():
-                if k in entry:
-                    item[engine] = length(f'mesh.controls[{i}].{k}')
-            if 'circle_segment_count' in entry:
-                item['circle_segments'] = int(entry['circle_segment_count'])
-            controls.append(item)
-        mesh['controls'] = controls
-    # a length_unit the 0.2 unit table lacks (in, mil, Angstrom) travels as the numeric unit
-    # {"in_m": <metres>}: the double of its exact decimal, which the micrometre and picometre
-    # ratios read back exactly (units.micrometres_per_length, geometry_document.pm_per_unit)
-    spec = unit if unit in units.BASE_UNITS['length'] else {'in_m': float(per_unit)}
-    tree = {'openphysics': '0.2', 'name': doc.si['name'], 'units': {'length': spec}, 'geometry': geometry,
-            'materials': {}, 'physics': {}, 'mesh': mesh, 'study': {'type': 'single'},
-            'results': {'save_fields': False, 'plots': False}}
-    h = RegionHandOff(tree)
-    h.scale = units.resolve(tree['units'])
+    h = RegionHandOff({'name': doc.si['name'], 'geometry': geometry})
+    h.source, h.unit, h.ppu = doc, unit, ppu
     if 'version' in g:
-        from .geometry_document import GeometryError, parse_handoff
-        try:
-            model = parse_handoff(tree)
-        except GeometryError as exc:
-            raise DocumentError(str(exc)) from None
-        h.geometry_model, h.geometry_source = model, copy.deepcopy(geometry)
-        h.geometry_roundings = list(model.roundings)
+        h.geometry_model = doc.geometry_model
         if any(f.type == 'segment' for f in h.component.features):
+            from .geometry_document import GeometryError
             from .geometry_engine import check_handoff
             try:
                 check_handoff(h.complex())
@@ -619,19 +588,17 @@ def build_region_mesh_03(doc, limits=None):
 
 
 def build_region_mesh(doc, limits=None):
-    """meshine mesh in SI metres with named regions and box-side tags, of a format 0.3 region
-    hand-off (``handoff_03``; ``build_region_mesh_03`` takes the document itself). A format 0.2
-    document is refused: its region reader is gone (units batch C7).
+    """meshine mesh in SI metres with named regions and box-side tags, of the region view of a
+    format 0.3 document (``handoff_03``; ``build_region_mesh_03`` takes the document itself).
 
     ``limits`` (simcase.mesh_limits._MeshLimits) bounds the loop vertices of the micrometre
-    document that is meshed before meshine builds its domain, passes max_nodes to meshine
+    frame that is meshed before meshine builds its domain, passes max_nodes to meshine
     as max_points, and compares the exact node and triangle counts after meshing; each
     check whose limit is None is skipped, and without limits the mesh is made exactly as
     before."""
     from galerkin.mesh import Mesh
     from meshine import generate
     from .geometry import build_domain
-    from . import units
     if not getattr(doc, 'is_handoff', False):
         raise TypeError('build_region_mesh takes the region hand-off of a format 0.3 document (handoff_03); '
                         'use build_region_mesh_03(document)')
@@ -642,8 +609,8 @@ def build_region_mesh(doc, limits=None):
         tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, **_grading(canonical))
     else:
         tri, region_materials = _limited_mesh(grid, limits, generate)
-    doc.notes.extend(note for note in canonical.notes
-                     if note.startswith(('geometry.', 'mesh.controls:')) and note not in doc.notes)
+    # the frame is made fresh for this mesh: its notes are the mesher's findings on it
+    doc.notes.extend(note for note in canonical.notes if note not in doc.notes)
     if tri.num_triangles == 0:
         raise DocumentError('meshing produced no triangles; check mesh.size against the domain')
     sides = set(exterior_sides(doc)[0])
@@ -690,14 +657,14 @@ def build_region_mesh(doc, limits=None):
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
                 provenance_edges=provenance_edges_of(canonical, tri), selection_edges=selections)
     region_materials = {r: region_materials[r] for r in mesh.region_names}
-    # Keep the diagnostic triangulation in document units, as before.
-    tri = replace(tri, nodes=units.lengths_from_micrometres(tri.nodes, doc.scale))
+    # Keep the diagnostic triangulation in the component's length unit, as before.
+    tri = replace(tri, nodes=views.from_micrometres(tri.nodes, doc.length_unit))
     return mesh, region_materials, tri
 
 
 def _grading(canonical):
     """meshine's ``size_fn`` keyword for a version 1 document's distance gradings, after its
-    domain is built; empty otherwise, so a 0.2 document's call is exactly as before."""
+    domain is built; empty otherwise (a flat block), so its call is exactly as before."""
     from .geometry import size_function
     size_fn = size_function(canonical)
     return {} if size_fn is None else {'size_fn': size_fn}
@@ -705,7 +672,7 @@ def _grading(canonical):
 
 def _limited_mesh(grid, limits, generate):
     """(meshine mesh, region materials) of the region mesh view ``grid`` (views.RegionMesh) under
-    ``limits``: the loop vertices of its micrometre document are counted before Domain.build,
+    ``limits``: the loop vertices of its micrometre frame are counted before Domain.build,
     and max_points is passed only when max_nodes is set, so meshine otherwise keeps its own
     default cap."""
     from .geometry import _domain_from_regions

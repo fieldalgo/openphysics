@@ -1,15 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Material names in the document -> physmat Material objects, and the format 0.3 rules.
+"""Material references of a format 0.3 document (rule 2.6).
 
-physmat is micrometre-native, so a 0.2 document that supplies its own dispersion
-coefficients has them converted here: a Sellmeier C carries length squared and a
-validity range carries length, both in the document's units.
-
-Format 0.3 (rule 2.6): a material reference is a local name, which resolves only to its
-record in ``materials``, or ``physmat:<Name>``, matched exactly against ``physmat.names()``
-(no case folding, no aliases). Which library references a document may use is its kind's
+A material reference is a local name, which resolves only to its record in ``materials``, or
+``physmat:<Name>``, matched exactly against ``physmat.names()`` (no case folding, no aliases). Which library references a document may use is its kind's
 policy: ``any``, ``vacuum`` (only ``physmat:vacuum``) or ``none``. A local name is any
 non-empty string without ``:``. ``check_record_model`` checks the Sellmeier model form of
 ``refractive_index`` beyond what each of its values checks on its own.
@@ -22,37 +17,8 @@ import difflib
 import physmat
 from physmat.units import Diagnostic, Suggestion
 
-from . import units
-from .schema import Document, DocumentError
-
 LIBRARY_PREFIX = "physmat:"
 LIBRARY_POLICIES = ("any", "vacuum", "none")
-
-
-def resolve_material(doc: Document, name: str) -> physmat.Material:
-    custom = doc["materials"].get(name)
-    if custom is not None:
-        if "sellmeier" in custom:
-            s = custom["sellmeier"]
-            rng = tuple(s.get("range", (0.0, float("inf"))))
-            # Each coefficient is converted exactly, so the same glass written in nm,
-            # um or m reaches physmat as the same doubles.
-            model = physmat.Sellmeier([float(b) for b in s["B"]],
-                                      [units.length_to_micrometres(c, doc.scale, power=2) for c in s["C"]],
-                                      s.get("A", 1.0),
-                                      tuple(units.length_to_micrometres(r, doc.scale) for r in rng), name)
-            return physmat.Material(name, model, custom.get("source", "document"))
-        return physmat.Material(name, physmat.Constant(float(custom["n"]), float(custom.get("k", 0.0)), name),
-                                custom.get("source", "document"))
-    try:
-        return physmat.get(name)
-    except KeyError:
-        raise DocumentError(f"material {name!r} is neither defined in the document nor built into physmat "
-                            f"(built-ins: {physmat.names()})") from None
-
-
-def material_table(doc: Document, region_materials: dict[str, str]) -> dict[str, physmat.Material]:
-    return {region: resolve_material(doc, mat) for region, mat in region_materials.items()}
 
 
 # -- format 0.3 -----------------------------------------------------------------------------------

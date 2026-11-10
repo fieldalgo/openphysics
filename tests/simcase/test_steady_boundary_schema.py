@@ -178,9 +178,9 @@ def test_utf8_load_save_roundtrip_and_invalid_load(tmp_path):
 def test_validator_stays_non_mutating_and_schema_writes_no_default():
     doc = Document.from_dict(boundary_document())
     before = copy.deepcopy(doc.data)
-    scale, notes = doc.scale, doc.notes
+    notes = doc.notes
     validate_steady_boundary(doc)
-    assert doc.data == before and doc.scale is scale and doc.notes is notes
+    assert doc.data == before and doc.notes is notes
     doc.validate()
     assert doc.data == before and "heat_source_density" not in doc.sole_physics()[1]
     assert not doc.diagnostics.errors

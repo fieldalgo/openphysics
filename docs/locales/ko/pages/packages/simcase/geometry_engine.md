@@ -120,12 +120,12 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
 버전 1 형상 블록을 가진 문서는 이 경로로 메시됩니다. `Document.from_dict`가 파싱한 모델(`doc.geometry_model`,
 정수 pm, 단위 없음)을 들고, 2D 영역 구성 요소라면 **블록 자체를 `doc.data`에 그대로 둡니다**. 검증기·요약·결과
 파일은 접근자 `doc.domain`·`doc.background`·`doc.regions()`(선언된 영역마다 한 항목, 병합 피처는 가장 작은
-`mesh_size`로 한 항목, 빈 공간은 `material` None)로 읽고, 정규 µm 사본은 블록을 다시 읽지 않고 모델을 옮기며,
+`mesh_size`로 한 항목, 빈 공간은 `material` None)로 읽고, 메셔가 받는 µm 프레임은 블록을 다시 읽지 않고 모델을 옮기며,
 `build_domain`은 복합체를 한 번 평가해(`doc.complex()`) 위처럼 meshine에 넘깁니다(평면 블록 경로의 sliver 규칙: 도메인 넓이의
 `1e-12` 미만 조각은 빼고 `doc.notes`에 기록). 메시 한도 경로(`check_mesh_limits`, `max_input_vertices`를 준 실행)도
 같은 엔진 경로로 같은 루프 꼭짓점을 셉니다. 그래서 `imprint`·`segment`·빈 공간·병합 영역·`path` 문서가 읽히고
 실행됩니다. 균질 사각형 구성 요소와 상자만 있는 3D 구성 요소는 지금처럼 그 종류가 읽는 평면 블록으로 손실 없이
-컴파일됩니다(`to_v02`).
+컴파일됩니다(`to_flat`).
 
 러너가 이름을 밝혀 거부하는 것: 도파관 러너는 도메인 네 변의 바깥 변만 받으므로 변 이름을 바꾸는 `boundary_tags`,
 빈 공간 영역, sliver 틈은 솔버 전에 거부됩니다. 영역 열은 빈 공간 피처를 구멍으로 받고(경계는 이름 없으면 단열)
@@ -161,12 +161,15 @@ rc.selection_edges(mesh, "wall")     # 경계 선택의 변
   셀의 크기와도 최솟값을 씁니다. 두 러너 모두 적용합니다(`runner.build_mesh`, 영역 열 메시 빌더, 메시 한도 경로).
 
 `rc.to_domain(size, controls=[...])`는 같은 항목을 엔진 이름(`size`, `near`, `far`, `distance`, `circle_segments`)과
-pm 길이로 받고(`Document.controls_pm()`), `rc.size_function(controls, unit_pm)`은 넘기기 뒤 메셔 단위의 등급 크기 함수(문서는
-`geometry.size_function(doc)`), `rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
+pm 길이로 받고(`Document.controls_pm()`), `rc.size_function(controls, unit_pm)`은 넘기기 뒤 메셔 단위의 등급 크기 함수(µm
+프레임은 `geometry.size_function(frame)`), `rc.select(expr)`는 대상을 `("region", 셀)`이나 `("boundary", 곡선)`으로 풉니다.
 
-커널 넘기기의 µm 사본(`runner.micrometre_document`, 내부용)은 버전 1 블록을 구성 요소 자신의 단위로 둔 채 `units.length`만 µm라고
-말합니다(엔진은 단위와 무관해 블록을 다시 읽지 않음). 사본은 그 단위를 `geometry_block_unit`에 적고 `to_dict()`·
-`save()`를 거부합니다. 결과는 원본 문서를 기록합니다.
+실행은 문서의 µm 프레임(`views.MicrometreFrame`, 내부용)을 메시합니다. `views.region_mesh`와
+`modes_document.kernel_document`가 문서의 정확한 값으로 만듭니다. 평면 도형 수는 그 pm 개수를 µm로 옮긴
+`float(Fraction(k, 10**6))`이고, 요소 크기와 제어 길이는 `float(정확한 미터 값 * 10**6)`입니다. 버전 1 블록은 정확한
+모델을 그대로 두고 엔진이 그것을 µm로 읽습니다(엔진은 단위와 무관해 블록을 다시 읽지 않음).
+`geometry.build_domain`과 `geometry.size_function`은 프레임만 받습니다. 프레임은 그것과 함께 만드는 영역 뷰
+(`thermal_regions.handoff_03`)처럼 쓰이지 않으며 `to_dict()`가 거부합니다. 결과는 원본 문서를 기록합니다.
 
 ## 설계 속도 (4단계)
 

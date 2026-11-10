@@ -13,7 +13,7 @@
 [형식 0.3](document_format.md) 문서(`"openphysics": "0.3"`)는 `geometry` 블록에 `"version": 1`을 두고, 구성
 요소마다 `length_unit`을(`2d` 구성 요소는 `depth`도) 선언합니다. `Document.from_dict`와 `Document.load`는 이런
 블록을 `parse`로 읽습니다. 문서는 블록을 쓴 그대로 둡니다(`doc.data`). 2D 영역 구성 요소는 접근자
-`doc.domain`·`doc.background`·`doc.regions()`로 읽고, 균질 사각형이나 상자만 있는 3D 구성 요소는 `to_v02`로 그
+`doc.domain`·`doc.background`·`doc.regions()`로 읽고, 균질 사각형이나 상자만 있는 3D 구성 요소는 `to_flat`으로 그
 종류가 읽는 평면 블록으로 컴파일됩니다(`doc.geometry_flat`). 메시는 파싱한 모델(`doc.geometry_model`)을 들고
 있는 [2단계 엔진](geometry_engine.md)이 만듭니다. `version`이 없는 블록은 형식 0.3의 평면 형태 가운데
 하나입니다. `parse`는 다른 형식의 문서를 `Document.from_dict`처럼 이름을 밝혀 거부합니다(`openphysics`에서
@@ -24,7 +24,7 @@
   `W-PM-ROUNDING`), `model.roundings`에도 남습니다.
 
 ```python
-from simcase.geometry_document import parse, from_v02, layer_stack
+from simcase.geometry_document import parse, from_flat, layer_stack
 
 model = parse({"openphysics": "0.3", "geometry": {
     "version": 1,
@@ -49,7 +49,7 @@ model.roundings                          # [] : 모든 값이 이미 1 pm 격자
   반올림하고, 경로·원래 값·변위와 함께 `model.roundings`에 남깁니다.
 - **작은 피처.** 메시 생성기의 상대 허용오차(컴포넌트 경계 상자 대각선의 3 × 10⁻⁸)보다 작은 피처는
   메시에서 사라지는 대신 이름을 밝혀 거부합니다. 이런 다중 스케일 형상의 메시는 지원하지 않습니다.
-- **평면 블록.** `from_v02`는 평면 `geometry` 블록(`length_unit`·`depth` 포함)을 버전 1로 쓰고, `to_v02`는
+- **평면 블록.** `from_flat`은 평면 `geometry` 블록(`length_unit`·`depth` 포함)을 버전 1로 쓰고, `to_flat`은
   2D 컴포넌트나 상자만 있는 3D 컴포넌트를 다시 평면 블록으로(요소 크기 없이) 컴파일합니다. 사다리꼴은 정확한
   꼭짓점의 다각형이 됩니다.
 - **층 쌓기.** `layer_stack`은 `layers` 피처를 z 높이(pm)와 `meshine.extrude`가 받는 영역 × 층 표로
@@ -97,7 +97,7 @@ out["mesh"]        # {"element_size": "0.6 um", "controls": [{"select": ..., "ci
 
 - 선택자 해석과 영역 구성 만들기. [2단계 엔진](geometry_engine.md)이 그 일을 하고 문서를 메시합니다.
 - 원통·구·`extrude` 피처를 `Document`로 읽는 것. 그 종류들은 평면 컴파일을 읽는데 거기에는 이들의 형식이 없으므로
-  `to_v02`가 이름을 밝혀 거부합니다. 2D 영역 구성 요소(`path`·병합 영역·빈 공간·`imprint`·`segment` 포함)는 쓴
+  `to_flat`이 이름을 밝혀 거부합니다. 2D 영역 구성 요소(`path`·병합 영역·빈 공간·`imprint`·`segment` 포함)는 쓴
   그대로 문서에 남아 `doc.domain`·`doc.background`·`doc.regions()`로 읽힙니다. 축대칭 구성 요소는 정상 영역 열에서만
   실행됩니다. 균질 사각형과 상자만 있는 3D 구성 요소는 평면 블록으로 컴파일됩니다.
 - 설계 속도 제공(4단계).

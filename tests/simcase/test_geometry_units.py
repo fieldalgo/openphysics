@@ -3,10 +3,11 @@
 """Version 1 geometry blocks in format 0.3 (units batch C4, critique K8; C11a).
 
 A format 0.3 block declares ``length_unit`` per component (and ``depth`` on a 2d one), its
-geometry parameters carry their unit, and element sizes are quantity strings. The kernel
-hand-off's own reading of its unit-declared tree (``parse_handoff``) gives the same picometre
-model as the format 0.3 reading; the design velocity does not depend on the length unit;
-every refusal carries its diagnostic code and path. Since C11a the public readers (``parse``,
+geometry parameters carry their unit, and element sizes are quantity strings. The format 0.3
+reading of the pre-batch geometry gives the picometre model its micrometre numbers mean
+(computed here; the unit-declared reading of the kernel hand-off, which it was compared with
+before, is gone since C11b); the design velocity does not depend on the length unit; every
+refusal carries its diagnostic code and path. Since C11a the public readers (``parse``,
 ``design_velocity``, the geometry lab and ``simcase geometry``) refuse a format 0.2 document
 by name (``E-FORMAT``).
 """
@@ -119,21 +120,23 @@ RECT02 = {"openphysics": "0.2", "units": {"length": "um"},
 
 @pytest.mark.parametrize("name", EXAMPLES)
 def test_the_same_geometry_gives_the_same_picometre_model(name):
-    """The kernel hand-off's unit-declared reading and the format 0.3 reading agree."""
+    """The format 0.3 reading of the pre-batch geometry holds the picometres its micrometre
+    numbers mean: each literal times 10**6, each expression of the parameters evaluated here on
+    their exact values."""
     old = _example(name)
-    m2, m3 = gd.parse_handoff(old), gd.parse(as_v03(old))
-    assert (m2.format, m3.format) == ("0.2", "0.3")
-    assert m3.pm_per_unit is None and m3.units_length is None
-    for cname, c2 in m2.components.items():
+    m3 = gd.parse(as_v03(old))
+    um = lambda v: Fraction(repr(v)) * 10 ** 6                                  # noqa: E731
+    params = {n: um(spec["value"]) for n, spec in old["geometry"]["parameters"].items()}
+    expressions = {"-w/2": -params["w"] / 2, **params}
+    value = lambda v: expressions[v] if isinstance(v, str) else um(v)          # noqa: E731
+    assert m3.format == "0.3" and m3.parameters == {n: (pm, "length") for n, pm in params.items()}
+    for cname, c2 in old["geometry"]["components"].items():
         c3 = m3.components[cname]
         assert (c3.length_unit, c3.pm_per_unit, c3.depth) == ("um", Fraction(10 ** 6), None)
-        assert (c2.length_unit, c2.pm_per_unit) == ("um", Fraction(10 ** 6))
-        assert c3.domain == c2.domain and c3.background == c2.background
-        assert [(f.id, f.type, f.material, f.mesh_size, f.data) for f in c3.features] == \
-               [(f.id, f.type, f.material, f.mesh_size, f.data) for f in c2.features]
-    for pname, (value, kind) in m2.parameters.items():
-        assert m3.parameters[pname] == (value * 10 ** 6, kind)          # exact pm
-    assert evaluate(m3).summary(m3) == evaluate(m2).summary(m2)
+        assert c3.domain == {k: um(v) for k, v in c2["domain"].items()} and c3.background == c2["background"]
+        assert [(f.name, f.type, f.material, f.mesh_size, f.data) for f in c3.features] == [
+            (f["name"], f["type"], f["material"], um(f["mesh_size"]), {k: value(f[k]) for k in ("x", "y", "w", "h")})
+            for f in c2["features"]]
 
 
 def test_each_component_reads_its_own_unit():
@@ -280,11 +283,11 @@ def test_a_unit_inside_an_expression_asks_for_a_parameter():
     _refusal(g, code="E-KEY-UNKNOWN", path="geometry.length_unit")
 
 
-def test_to_v02_carries_the_unit_and_depth():
+def test_to_flat_carries_the_unit_and_depth():
     homogeneous = _block(features=[], background={})
-    flat = gd.to_v02(gd.parse(read({"openphysics": "0.3", "geometry": homogeneous})))
+    flat = gd.to_flat(gd.parse(read({"openphysics": "0.3", "geometry": homogeneous})))
     assert flat == {"length_unit": "um", "depth": None, "domain": {"xmin": 0.0, "xmax": 10.0, "ymin": 0.0, "ymax": 10.0}}
-    back = gd.from_v02({"length_unit": "mm", "depth": "40 mm", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}})
+    back = gd.from_flat({"length_unit": "mm", "depth": "40 mm", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}})
     assert back["components"]["main"]["length_unit"] == "mm" and back["components"]["main"]["depth"] == "40 mm"
 
 

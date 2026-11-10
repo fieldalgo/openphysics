@@ -7,34 +7,43 @@ frozen view here and hands its fields to today's solver and mesher signatures. T
 that turn a view into node and edge data (Dirichlet nodes, boundary edges, region maps) stay
 in the kind modules, beside the mesh they need.
 
-Every view of this module is built from the resolved SI values of a format 0.3 document, or
-(region and em.modes2d meshes and solve points) from its kernel hand-off
-(``thermal_regions.handoff_03``, ``modes_document.kernel_document``), and holds exactly what
-the runners passed before the views existed: the same doubles, the same Python number types
-(counts are ints, hazard H8) and the same mapping orders (H6); the adapters keep their
-``float()`` and ``int()`` calls at the hand-off. Lengths are converted here, once:
+Every view of this module is built from the resolved SI values and exact values of a format
+0.3 document (region and em.modes2d meshes through its region view, ``thermal_regions.handoff_03``,
+and em.modes2d solve points through its kernel hand-off, ``modes_document.kernel_document``) and
+holds exactly what the runners passed before the views existed: the same doubles, the same Python
+number types (counts are ints, hazard H8) and the same mapping orders (H6); the adapters keep
+their ``float()`` and ``int()`` calls at the hand-off. Lengths are converted here, once:
 
 - a structured rectangle or box (``RectangleMesh``): corners in metres, and side lengths by
   the operation order of the kind that uses them (hazard H17 b);
-- a region mesh (``RegionMesh``): the document's micrometre copy, which the geometry is
-  built from, and the angle number meshine receives (H2, H3). Mesh nodes come back as
-  micrometres times 1e-6 (``handback_m``, H11), and so does every corner a region kind uses
-  in a solver input or a contract check (``region_origin_03``, H17 a);
+- a region mesh (``RegionMesh``): the document's micrometre frame (``MicrometreFrame``), which
+  the geometry is built from, and the angle number meshine receives (H2, H3). Each shape
+  number reaches the mesher from its pm grid value, ``float(Fraction(k, 10**6))``, and each
+  element size or control length from its exact value, ``float(exact * 10**6)``; never as a
+  product of a document-unit double. Mesh nodes come back as micrometres times 1e-6
+  (``handback_m``, H11), and so does every corner a region kind uses in a solver input or a
+  contract check (``region_origin_03``, H17 a);
 - an em.modes2d solve point (``ModesInputs``): the wavelength, PML and bend lengths in
   micrometres, the kernel frame (H13).
 
-Containers in a view are built fresh for each view and are not shared with the document (the
-micrometre copy of a version 1 document shares its exact geometry model, as it always has).
+The micrometre helpers are private to this module. Containers in a view are built fresh for
+each view and are not shared with the document (the micrometre frame of a version 1 document
+shares its exact geometry model).
 """
 
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
+from fractions import Fraction
 
 import numpy as np
 
-from . import units
+from .schema import Document
+
+#: the mesher's and the mode kernel's micrometre, in metres: a mesher length comes back as
+#: ``x_um * 1e-6`` (hazard H11)
+UM_IN_SI = 1e-6
 
 #: how a kind computes a rectangle side length from the document (hazard H17 b):
 #: ``difference`` converts ``max - min``; ``corners`` subtracts the converted corners
@@ -95,9 +104,9 @@ class RadialGrading:
 class RegionMesh:
     """What a region mesh is made from.
 
-    ``canonical`` is the document's micrometre copy (``runner.micrometre_document``): the
-    geometry, the element size and the mesh controls the mesher receives, in micrometres
-    (a version 1 model travels with it in integer pm). ``minimum_angle_deg`` is the number
+    ``canonical`` is the document's micrometre frame (``MicrometreFrame``): the geometry, the
+    element size and the mesh controls the mesher receives, in micrometres (a version 1 model
+    travels with it in integer pm). ``minimum_angle_deg`` is the number
     meshine receives as ``min_angle``, in degrees as the document wrote it (hazard H3).
     ``grading`` is an em.modes2d radial grading, None otherwise.
     """
@@ -106,12 +115,12 @@ class RegionMesh:
     grading: RadialGrading | None = None
 
 
-def region_mesh(doc) -> RegionMesh:
-    """The region mesh of the hand-off (``thermal_regions.handoff_03``) of a validated heat,
-    electric, Joule or mechanics region document."""
-    from .runner import micrometre_document
-    canonical = micrometre_document(doc, validate=False)
-    return RegionMesh(canonical, float(doc["mesh"]["min_angle"]))
+def region_mesh(view) -> RegionMesh:
+    """The region mesh of a validated heat, electric, Joule or mechanics region document, from
+    its region view (``thermal_regions.handoff_03``): the micrometre frame of the document
+    (``micrometre_frame``) and the angle number meshine receives (H3)."""
+    canonical = micrometre_frame(view.source, view)
+    return RegionMesh(canonical, float(canonical["mesh"]["min_angle"]))
 
 
 def modes_mesh(handoff) -> RegionMesh:
@@ -128,7 +137,132 @@ def modes_mesh(handoff) -> RegionMesh:
 
 def handback_m(values_um) -> np.ndarray:
     """Mesher coordinates in micrometres, in metres: ``x_um * 1e-6`` elementwise (hazard H11)."""
-    return np.asarray(values_um, dtype=float) * units.UM_IN_SI
+    return np.asarray(values_um, dtype=float) * UM_IN_SI
+
+
+# -- the micrometre frame -------------------------------------------------------------------------
+
+def _um_of_pm(k) -> float:
+    """A shape number's micrometre double from its pm count: ``float(Fraction(k, 10**6))`` (H2)."""
+    return float(Fraction(k, 10 ** 6))
+
+
+def _um_of_exact(exact) -> float:
+    """A tagged length's micrometre double from its exact metres: ``float(exact * 10**6)`` (H2)."""
+    return float(Fraction(exact) * 10 ** 6)
+
+
+def _exact(doc, path):
+    """The exact SI value at ``path``, or at ``path.value`` for an annotated value."""
+    value = doc.exact(path)
+    return doc.exact(path + ".value") if value is None else value
+
+
+def _plain(value):
+    """An authored tree with each decimal as the double its JSON text gives (integers stay)."""
+    from decimal import Decimal
+    if isinstance(value, dict):
+        return {k: _plain(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_plain(v) for v in value]
+    if isinstance(value, Decimal):
+        return float(value)
+    return copy.deepcopy(value)
+
+
+class MicrometreFrame(Document):
+    """The geometry and mesh block of a format 0.3 region or em.modes2d document in the
+    micrometre frame that meshine and the mode kernel receive (internal; never written or read
+    by a user). Built by ``micrometre_frame`` from the document's exact values: a flat shape or
+    domain number as ``float(Fraction(k, 10**6))`` of its pm count, an element size, a control
+    length or a grading length as ``float(exact * 10**6)`` (hazard H2); a version 1 block keeps
+    its exact pm model (``geometry_model``, shared with the region view). The block uses the
+    geometry builder's keys (``mesh_size``, ``mesh.size``, ``min_angle``)."""
+    is_handoff = True
+    #: the format 0.3 document this frame was built from
+    source = None
+
+    @property
+    def length_unit(self) -> str:
+        return "um"
+
+    def _pm_per_unit(self):
+        return Fraction(10 ** 6)
+
+    def controls_pm(self) -> list[dict]:
+        """The ``mesh.controls`` entries in integer pm, from the document's exact values."""
+        return self.source.controls_pm()
+
+
+def micrometre_frame(doc, view, cls=MicrometreFrame) -> MicrometreFrame:
+    """The ``MicrometreFrame`` of a validated format 0.3 region or em.modes2d document ``doc``,
+    whose region view (``thermal_regions.handoff_03``) is ``view``; ``cls`` is the frame class
+    (the em kernel hand-off subclasses it)."""
+    pm = doc._need_v03("micrometre_frame()").pm
+    g = doc.data["geometry"]
+
+    def sized(item, path, keep):
+        out = {k: _plain(v) for k, v in item.items() if k in keep}
+        if "element_size" in item:
+            out["mesh_size"] = _um_of_exact(_exact(doc, f"{path}.element_size"))
+        return out
+
+    def on_grid(value, path):
+        # a shape number reaches the mesher as its pm grid value (spec §2 rule 4); the other
+        # leaves (names, types, materials) as written
+        if isinstance(value, dict):
+            return {k: on_grid(v, f"{path}.{k}") for k, v in value.items()}
+        if isinstance(value, list):
+            return [on_grid(v, f"{path}[{i}]") for i, v in enumerate(value)]
+        k = pm.get(path)
+        return _plain(value) if k is None else _um_of_pm(k)
+
+    if "version" in g:
+        geometry = _plain(g)                          # read through the exact model, never re-read
+    else:
+        geometry = {"domain": on_grid(g["domain"], "geometry.domain")}
+        if "background" in g:
+            geometry["background"] = sized(g["background"], "geometry.background", {"material"})
+        geometry["shapes"] = [on_grid(sized(s, f"geometry.shapes[{i}]", set(s) - {"element_size"}),
+                                      f"geometry.shapes[{i}]")
+                              for i, s in enumerate(g.get("shapes") or [])]
+    m = doc.data.get("mesh") or {}
+    mesh = {"size": _um_of_exact(_exact(doc, "mesh.element_size")),
+            "min_angle": doc.degrees("mesh.minimum_angle") if "minimum_angle" in m else 28.0}
+    if m.get("controls"):
+        names = {"element_size": "size", "near": "near", "far": "far", "refinement_distance": "distance"}
+        controls = []
+        for i, entry in enumerate(m["controls"]):
+            item = {"select": _plain(entry["select"])}
+            for key, engine in names.items():
+                if key in entry:
+                    item[engine] = _um_of_exact(_exact(doc, f"mesh.controls[{i}].{key}"))
+            if "circle_segment_count" in entry:
+                item["circle_segments"] = int(entry["circle_segment_count"])
+            controls.append(item)
+        mesh["controls"] = controls
+    frame = cls({"name": doc.si.get("name", "untitled"), "geometry": geometry, "mesh": mesh})
+    frame.source = doc
+    # a version 1 model is unit-free (integer pm): the frame reads it in micrometres
+    frame.geometry_model = view.geometry_model
+    frame.geometry_complex = view.geometry_complex
+    return frame
+
+
+def from_micrometres(values_um, unit: str) -> np.ndarray:
+    """Micrometre lengths in the length unit ``unit`` (a component's ``length_unit``):
+    elementwise, one multiply or divide by the exact integer the ratio allows, so a micrometre
+    component gets the same array back (the diagnostic triangulation of a region run)."""
+    from physmat.units import convert
+    ratio = Fraction(convert(f"1 {unit}", "length").exact) * 10 ** 6         # micrometres per unit
+    values = np.asarray(values_um)
+    if ratio == 1:
+        return values
+    if ratio.numerator == 1:
+        return values * float(ratio.denominator)
+    if ratio.denominator == 1:
+        return values / float(ratio.numerator)
+    return values * float(ratio.denominator) / float(ratio.numerator)
 
 
 # -- heat -----------------------------------------------------------------------------------------
@@ -229,8 +363,7 @@ def transient_region_heat_03(doc) -> HeatInputs:
 def region_origin_03(doc, base) -> np.ndarray:
     """The lower domain corner of a format 0.3 region document, [x, y] in metres, by the
     micrometre hand-back of its pm counts: ``float(Fraction(k, 10**6)) * 1e-6`` (H17 a)."""
-    from fractions import Fraction
-    return np.array([float(Fraction(doc.pm(f"{base}.domain.{a}min"), 10 ** 6)) for a in "xy"]) * units.UM_IN_SI
+    return np.array([float(Fraction(doc.pm(f"{base}.domain.{a}min"), 10 ** 6)) for a in "xy"]) * UM_IN_SI
 
 
 # -- electric conduction and Joule heating ------------------------------------------------------
@@ -343,10 +476,9 @@ def region_mechanics(doc) -> MechanicsInputs:
 class ModesInputs:
     """One em.modes2d solve point in the kernel frame.
 
-    With a scale, ``wavelength`` and the PML thicknesses and bend radius and origin are in
-    micrometres, each converted once (``units.length_to_micrometres``); without one (a model
-    assembled by hand, which has no micrometre mesh) they are as written. ``num_modes`` is a
-    Python int; the rest is as written. ``pml`` and ``bend`` are copies.
+    ``wavelength`` and the PML thicknesses and bend radius and origin are in micrometres, as the
+    kernel hand-off (``modes_document.kernel_document``) or ``modes_document.stage_point`` gives
+    them. ``num_modes`` is a Python int; the rest is as given. ``pml`` and ``bend`` are copies.
     """
     wavelength: object
     boundary: dict
@@ -358,22 +490,10 @@ class ModesInputs:
     bend: dict | None
 
 
-def modes_inputs(physics: dict, scale=None) -> ModesInputs:
-    """The solve point of one em.modes2d physics entry, in micrometres when ``scale`` is given."""
-    wavelength = physics["wavelength"]
+def modes_inputs(physics: dict) -> ModesInputs:
+    """The solve point of one em.modes2d physics entry in the kernel's keys and micrometres."""
     pml, bend = copy.deepcopy(physics.get("pml")), copy.deepcopy(physics.get("bend"))
-    if scale is not None:
-        wavelength = units.to_micrometres(wavelength, scale)
-
-        def um(value):
-            return units.length_to_micrometres(value, scale)
-        if pml is not None:
-            pml["thickness"] = {k: um(v) for k, v in pml["thickness"].items()}
-        if bend is not None:
-            for key in ("radius", "origin"):
-                if key in bend:
-                    bend[key] = um(bend[key])
-    return ModesInputs(wavelength=wavelength, boundary=dict(physics["boundary"]), num_modes=int(physics["num_modes"]),
+    return ModesInputs(wavelength=physics["wavelength"], boundary=dict(physics["boundary"]), num_modes=int(physics["num_modes"]),
                        formulation=physics["formulation"], n_cladding=physics.get("n_cladding"),
                        n_target=physics.get("n_target"), pml=pml, bend=bend)
 

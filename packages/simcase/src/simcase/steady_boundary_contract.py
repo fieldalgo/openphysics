@@ -3,12 +3,10 @@
 """Strict steady rectangle boundary inputs, independent of schema dispatch.
 
 The public document reader is connected separately. These helpers read a
-Document without mutating its data, scale or notes. They do not solve or save.
+Document without mutating its data or diagnostics. They do not solve or save.
 Format 0.3 rectangle documents are read by ``simcase.resolve`` against ``heat_slots``
-and checked on their SI values here (the section at the end); the format 0.2 reader is gone
-(units batch C7), ``natural_conditions`` stays for the transient contract's sampled data.
+and checked on their SI values here (the section at the end).
 """
-import math
 from collections.abc import Mapping
 from itertools import combinations
 
@@ -19,63 +17,6 @@ from .schema import DocumentError
 
 PHYSICS = "thermal.steady2d"
 SIDES = ("left", "right", "bottom", "top")
-V1 = ("thermal.steady2d-result-v1", "thermal2d-p1-node-cell-v1")
-V2 = ("thermal.steady2d-result-v2", "thermal2d-p1-node-cell-boundary-v2")
-
-
-def _object(value, allowed, path, required=()):
-    if not isinstance(value, dict):
-        raise DocumentError(f"{path}: expected an object")
-    if set(value)-set(allowed):
-        raise DocumentError(f"{path}: unsupported keys {sorted(map(str, set(value)-set(allowed)))}")
-    if set(required)-set(value):
-        raise DocumentError(f"{path}: missing keys {sorted(set(required)-set(value))}")
-
-
-def _number(value, path, *, positive=False, nonnegative=False, integer=False):
-    try:
-        ok = (isinstance(value, (int, float)) and not isinstance(value, bool)
-              and math.isfinite(value))
-    except OverflowError:
-        ok = False
-    if (not ok or (positive and value <= 0) or (nonnegative and value < 0)
-            or (integer and not isinstance(value, int))):
-        raise DocumentError(f"{path}: expected a finite valid "
-                            + ("positive integer" if integer else "number"))
-    return float(value)
-
-
-def has_natural_conditions(p):
-    """Presence, not truth: an empty or null mapping still selects the boundary layout."""
-    return "outward_flux_w_m2" in p or "convection" in p
-
-
-def natural_conditions(p, path, prescribed):
-    """Read the ``outward_flux_w_m2`` and ``convection`` side mappings of one physics entry.
-
-    Shared by the steady and transient rectangle contracts, so both accept the
-    same key names, value forms and limits and raise the same messages: sides are
-    ``left``/``right``/``bottom``/``top``; g is a finite signed W/m²; convection is
-    exactly ``{"h_w_m2k": h >= 0, "ambient_temperature_k": K >= 0}``; a side in
-    ``prescribed`` (a side-to-Dirichlet mapping) cannot also carry a natural
-    condition. Returns ``({side: g}, {side: (h, ambient)})`` as plain floats.
-    """
-    flux = p.get("outward_flux_w_m2", {})
-    _object(flux, SIDES, path+".outward_flux_w_m2")
-    flux = {tag: _number(value, path+".outward_flux_w_m2."+tag) for tag, value in flux.items()}
-    robin = p.get("convection", {})
-    _object(robin, SIDES, path+".convection")
-    convection = {}
-    for tag, value in robin.items():
-        where = path+".convection."+tag
-        members = {"h_w_m2k", "ambient_temperature_k"}
-        _object(value, members, where, members)
-        h = _number(value["h_w_m2k"], where+".h_w_m2k", nonnegative=True)
-        ambient = _number(value["ambient_temperature_k"], where+".ambient_temperature_k", nonnegative=True)
-        convection[tag] = (h, ambient)
-    if set(prescribed) & (set(flux) | set(convection)):
-        raise DocumentError(path+": natural condition overlaps a fully Dirichlet side")
-    return flux, convection
 
 
 def validate_steady_boundary(doc):
@@ -85,20 +26,20 @@ def validate_steady_boundary(doc):
     engine permits finite mathematical Kelvin and does not clamp the solution.
     Empty natural mappings select v2 by presence but do not provide an anchor.
     The document is format 0.3, checked on its SI values (``validate_steady_rectangle_03``); a
-    format 0.2 document is refused by name.
+    document that was not read as format 0.3 is refused by name.
     """
     _require_03(doc)
     validate_steady_rectangle_03(doc)
 
 
 def steady_result_versions(doc):
-    """Return independent result/layout IDs; absent new keys keep legacy v1."""
+    """Return independent result/layout IDs: ``V2_03`` with inward_heat_flux or convection, else ``V1_03``."""
     _require_03(doc)
     return steady_result_versions_03(doc)
 
 
 def _require_03(doc):
-    """The rectangle readers read format 0.3 only (the 0.2 reader is gone since units batch C7)."""
+    """The rectangle readers read format 0.3 only."""
     if getattr(doc, "si", None) is None:
         from .thermal import refuse_format_02
         refuse_format_02(doc, "thermal_steady2d")
@@ -302,7 +243,7 @@ def _refuse(message, path=None, code="E-CONTRACT"):
 
 def rect_geometry_03(doc):
     """``(base path, flat block, depth)`` of a format 0.3 rectangle: the flat geometry block, or
-    the homogeneous version 1 ``2d`` component compiled to the flat form by ``to_v02`` (D-1),
+    the homogeneous version 1 ``2d`` component compiled to the flat form by ``to_flat`` (D-1),
     whose numbers keep their pm counts at the component's paths."""
     if doc.geometry_flat is not None:
         (cname,) = doc.data["geometry"]["components"]

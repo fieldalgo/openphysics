@@ -15,8 +15,8 @@ import pytest
 
 from meshine import Circle, Domain, box_sides, extrude, generate, rectangle
 from simcase.examples import EXAMPLES
-from simcase.geometry_document import (GeometryError, from_v02, layer_stack, parse, pm_per_length_unit,
-                                       to_v02)
+from simcase.geometry_document import (GeometryError, from_flat, layer_stack, parse, pm_per_length_unit,
+                                       to_flat)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,9 +76,9 @@ def test_all_current_documents_are_walked():
 @pytest.mark.parametrize("name", sorted(DOCS))
 def test_v02_round_trip_is_exact(name):
     flat = _flat(copy.deepcopy(DOCS[name]))
-    model = parse({"openphysics": "0.3", "geometry": from_v02(flat)})
+    model = parse({"openphysics": "0.3", "geometry": from_flat(flat)})
     assert model.roundings == []
-    assert to_v02(model) == flat
+    assert to_flat(model) == flat
 
 
 def test_v02_names_that_cannot_be_ids_get_positions():
@@ -86,11 +86,11 @@ def test_v02_names_that_cannot_be_ids_get_positions():
          "background": {"material": "a"},
          "shapes": [{"name": "top", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1, "material": "b"},
                     {"name": "my core", "type": "circle", "cx": 0.5, "cy": 0.5, "r": 0.1, "material": "c"}]}
-    comp = from_v02(g)["components"]["main"]
+    comp = from_flat(g)["components"]["main"]
     assert [f.get("id") for f in comp["features"]] == ["s0", "s1"]
-    model = parse({"openphysics": "0.3", "geometry": from_v02(g)})
+    model = parse({"openphysics": "0.3", "geometry": from_flat(g)})
     assert [f.name for f in model.components["main"].features] == ["top", "my core"]
-    assert to_v02(model) == g
+    assert to_flat(model) == g
 
 
 # ----------------------------------------------------------------- S1-2: the 1 pm grid
@@ -234,20 +234,20 @@ def test_imprint_is_parsed_but_refused_by_the_02_compiler():
                                    "material": "Si"}], finalize="imprint")))
     assert model.components["xs"].finalize == "imprint"
     with pytest.raises(GeometryError, match="imprint' needs the stage 2 engine"):
-        to_v02(model)
+        to_flat(model)
 
 
 def test_void_is_parsed_but_refused_by_the_02_compiler():
     model = parse(v1("um", plate([{"name": "hole", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
                                    "material": None}])))
     with pytest.raises(GeometryError, match="void .material null. needs the stage 2 engine"):
-        to_v02(model)
+        to_flat(model)
 
 
 def test_trapezoid_compiles_to_its_exact_corners():
     model = parse(v1("m", plate([{"name": "t", "type": "trapezoid", "cx": 5, "y": 1, "w": 3,
                                                "w_top": "2.8", "h": 0.035, "material": "Cu"}])))
-    (s,) = to_v02(model)["shapes"]
+    (s,) = to_flat(model)["shapes"]
     assert s["type"] == "polygon"
     assert s["points"] == [[3.5, 1.0], [6.5, 1.0], [6.4, 1.035], [3.6, 1.035]]
 
@@ -383,7 +383,7 @@ def test_the_reader_imports_without_the_solver_chain():
 
 def _as_v1(name):
     doc = copy.deepcopy(DOCS[name])
-    doc["geometry"] = from_v02(doc["geometry"])
+    doc["geometry"] = from_flat(doc["geometry"])
     return doc
 
 
