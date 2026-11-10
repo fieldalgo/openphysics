@@ -17,7 +17,9 @@ and returns, for one independent length parameter ``p``:
   to galerkin, which moves interior nodes.
 
 ``V`` is dimensionless: x and p are both lengths in the document unit, so V does
-not depend on the unit.
+not depend on the unit. In a format 0.3 document both are exact picometres: each
+component reads its numbers in its own ``length_unit`` and a length parameter carries its
+unit, so V is the same number.
 
 The derivative is refused, with the features named, when the topology of the
 complex is not constant around ``p``. Two tests decide that, both exact:
@@ -43,6 +45,8 @@ import math
 from collections import Counter
 from dataclasses import dataclass, field
 from fractions import Fraction
+
+from physmat import units as _qty
 
 from .geometry_document import (_MISSING, GeometryError, GeometryModel, _Evaluator, _parse, _pick, _Reader,
                                 _tokens, parse)
@@ -143,7 +147,9 @@ def _seeded(seed: str, value):
 
 
 class _RecordingReader(_Reader):
-    """Records the exact (unrounded) value of every length field and returns the base pm count."""
+    """Records the exact (unrounded) value of every length field and returns the base pm count.
+
+    A 0.2 document records values in its unit; a 0.3 document in pm (``_record_scale``)."""
 
     def __init__(self, doc, evaluator, base: dict | None = None):
         self.exact: dict[str, object] = {}
@@ -152,13 +158,12 @@ class _RecordingReader(_Reader):
 
     def length(self, raw, path):
         value, kind = self.ev.value(raw, path)
-        if kind == "ratio":
-            raise GeometryError(f"{path}: expected a length, the expression is a ratio")
-        self.exact[path] = value
+        exact = self.exact_pm(value, kind, path)
+        self.exact[path] = exact if self.v03 else value
         if self._base is not None:
             return self._base[path]
-        v = value.v if isinstance(value, _Dual) else value
-        return round(v * self.ppu)
+        v = exact.v if isinstance(exact, _Dual) else exact
+        return round(v)
 
 
 class _TableReader(_Reader):
@@ -372,6 +377,11 @@ def design_velocity(document: dict, parameter: str, component: str | None = None
     return DesignVelocity(parameter, rc, defining, vertices, curves, delta)
 
 
+def _record_scale(model: GeometryModel):
+    """Grid points per recorded unit: the document unit (0.2), or 1 (0.3 records pm)."""
+    return model.pm_per_unit if model.format == "0.2" else Fraction(1)
+
+
 def _check_parameter(document: dict, name: str) -> None:
     params = document["geometry"].get("parameters", {})
     if name not in params:
@@ -382,6 +392,8 @@ def _check_parameter(document: dict, name: str) -> None:
         raise GeometryError(f"design velocity: geometry.parameters.{name} is a {kind}; the contract defines V = dx/dp "
                             "for length parameters")
     raw = spec["value"]
+    if isinstance(raw, str) and _qty.is_quantity_text(raw):
+        return                                            # a tagged length (format 0.3) is independent
     if isinstance(raw, str) and any(k == "name" for k, _t in _tokens(raw, f"geometry.parameters.{name}.value")):
         raise GeometryError(f"design velocity: geometry.parameters.{name} is derived from other parameters "
                             f"({raw!r}); differentiate with respect to an independent parameter")
@@ -623,6 +635,9 @@ def signature(rc: RegionComplex):
 def exact_complex(document: dict, parameter: str, offset, component: str | None = None):
     """The complex at ``parameter + offset`` (offset in the document unit, exact), unrounded.
 
+    For a format 0.3 document the offset is a length quantity string (``"1e-6 um"``) or an
+    exact number of picometres.
+
     Each length field takes its base pm count (rounded once, as ``parse`` does) plus the exact
     change of its expression, on a grid ``S`` times finer than 1 pm so that every value is an
     integer. Returns ``(complex, S)``: the complex's coordinates are in pm / S. The probe and the
@@ -633,11 +648,16 @@ def exact_complex(document: dict, parameter: str, offset, component: str | None 
     base = _RecordingReader(document, _seeded(parameter, p0))
     _parse(base, document)
     base_exact = {path: Fraction(x) for path, x in base.exact.items()}
+    if model.format == "0.3" and isinstance(offset, str):
+        grid = _qty.length_to_pm(offset, path="offset")
+        if grid.error is not None:
+            raise GeometryError(f"offset: {grid.error.message}", path="offset", code=grid.error.code)
+        offset = grid.exact
     return _exact_complex(document, model, _pick(model, component).name, parameter, p0, Fraction(offset), base_exact)
 
 
 def _exact_complex(document, model, cname, parameter, p0, offset, base_exact):
-    ppu = model.pm_per_unit
+    ppu = _record_scale(model)
     k0 = {path: round(x * ppu) for path, x in base_exact.items()}
     rec = _RecordingReader(document, _seeded(parameter, p0 + offset), base=k0)
     _parse(rec, document)
@@ -650,7 +670,7 @@ def _exact_complex(document, model, cname, parameter, p0, offset, base_exact):
 
 def _probe(document, model: GeometryModel, comp, rc: RegionComplex, parameter: str, p0, delta_pm, base_exact) -> None:
     base_sig = signature(rc)
-    step = delta_pm / model.pm_per_unit
+    step = delta_pm / _record_scale(model)
     for s in (1, -1):
         where = f"{parameter} {'+' if s > 0 else '-'} delta"
         try:

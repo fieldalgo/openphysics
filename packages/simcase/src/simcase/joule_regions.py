@@ -19,7 +19,6 @@ A rectangle document keeps the existing path (:mod:`simcase.electric_joule`) unc
 """
 
 import copy
-import json
 import time
 
 import numpy as np
@@ -124,7 +123,7 @@ def run_region_joule(doc, verbose=True, *, mesh_limits=None):
     heat_kwargs = heat_inputs(doc, mesh, region_materials)
     heat_kwargs.pop('heat_source')
     t_mesh = time.perf_counter()-t0
-    calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    calculation_json = doc.canonical_json(separators=(',', ':'))
     t0 = time.perf_counter()
     try:
         electric = solve_steady_electric(mesh, **electric_kwargs)
@@ -132,7 +131,7 @@ def run_region_joule(doc, verbose=True, *, mesh_limits=None):
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
-    if json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False) != calculation_json:
+    if doc.canonical_json(separators=(',', ':')) != calculation_json:
         raise ValueError('Joule calculation inputs changed during the solve')
     electric, heat = coupled.electrical, coupled.thermal
     arrays, field_units, locations = {}, {}, {}

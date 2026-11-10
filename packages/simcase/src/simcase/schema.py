@@ -34,6 +34,14 @@ A document is a JSON object with these sections (lengths use its declared unit):
 
 The same file drives a script, a command line run, and the optional studio: the GUI
 is an editor for this document, nothing more.
+
+Format 0.3 (``"openphysics": "0.3"``, docs/packages/simcase/document_format.md) is read
+beside 0.2 by ``simcase.resolve``: values carry their units, keys are registry quantity names
+and each geometry component declares its ``length_unit``. A document with that exact
+envelope takes the 0.3 path; ``doc.data`` then holds the authored tree (exact ``Decimal``
+numbers, never changed) and ``doc.si`` the resolved SI tree. No physics kind reads format
+0.3 yet: each kind's document is refused with ``E-CONTRACT`` until its commit of the units
+batch. Every other document takes the 0.2 path, unchanged.
 """
 
 from __future__ import annotations
@@ -41,11 +49,13 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from . import units
+from .diagnostics import DiagnosticList, DocumentError
 from .units import Scale, UnitError
 from .mode_postprocessing import validate_mode_overlap
 from .tracking import tracking_settings
@@ -83,10 +93,6 @@ def steady_boundary_requested(data) -> bool:
         isinstance(p, dict) and p.get("type") == "thermal.steady2d"
         and ("outward_flux_w_m2" in p or "convection" in p)
         for p in physics.values())
-
-
-class DocumentError(ValueError):
-    pass
 
 
 def __getattr__(name: str):
@@ -212,11 +218,25 @@ class Document:
     #: the region complex the engine built when this document was meshed
     #: (simcase.geometry_engine.RegionComplex); set by geometry.build_domain
     geometry_complex: object = field(default=None, init=False, repr=False)
+    #: format 0.3: the resolved SI tree (same keys as ``data``, without ``accept``); None for 0.2
+    si: dict | None = field(default=None, init=False, repr=False, compare=False)
+    #: every coded diagnostic, append-only (``simcase.diagnostics.DiagnosticList``)
+    diagnostics: DiagnosticList = field(default_factory=DiagnosticList, init=False, repr=False, compare=False)
+    #: format 0.3: ``[{"path", "value", "reason"}]`` of every default the reader applied
+    defaults_applied: list = field(default_factory=list, init=False, repr=False, compare=False)
+    #: the bytes the document was read from, when it came from a file or a text
+    source_bytes: bytes | None = field(default=None, init=False, repr=False, compare=False)
+    #: format 0.3: the flat form a homogeneous 2d or a box-only 3d version 1 component compiles to
+    geometry_flat: dict | None = field(default=None, init=False, repr=False, compare=False)
+    _resolution: object = field(default=None, init=False, repr=False, compare=False)
 
     # -- construction --------------------------------------------------------
 
     @classmethod
     def from_dict(cls, d: dict) -> "Document":
+        if isinstance(d, dict) and _is_v03(d.get("openphysics")):
+            from .resolve import resolve_tree
+            return cls._accepted(resolve_tree(d))
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
         source, roundings, model, complex_ = None, [], None, None
@@ -260,7 +280,113 @@ class Document:
 
     @classmethod
     def load(cls, path: str | Path) -> "Document":
+        raw = Path(path).read_bytes()
+        if declares_v03(raw):
+            from .resolve import resolve_text
+            return cls._accepted(resolve_text(raw))
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+    @classmethod
+    def loads(cls, text: str | bytes) -> "Document":
+        """A document from its JSON text (str or bytes)."""
+        if declares_v03(text):
+            from .resolve import resolve_text
+            return cls._accepted(resolve_text(text))
+        return cls.from_dict(json.loads(text))
+
+    @classmethod
+    def _accepted(cls, result) -> "Document":
+        doc = result.document()
+        if doc is None:
+            raise DocumentError("the document is refused", diagnostics=list(result.diagnostics))
+        return doc
+
+    @classmethod
+    def _from_resolution(cls, result) -> "Document":
+        """The format 0.3 document of a resolution (``simcase.resolve``), before its kind validates it."""
+        doc = cls(result.tree)
+        doc.si = result.si
+        doc.diagnostics = result.diagnostics
+        doc.defaults_applied = result.defaults_applied
+        doc.source_bytes = result.source_bytes
+        doc.geometry_model = result.geometry_model
+        doc.geometry_flat = result.geometry_flat
+        doc._resolution = result
+        if result.geometry_model is not None:
+            doc.geometry_source = copy.deepcopy(result.tree["geometry"])
+        return doc
+
+    # -- format 0.3 ----------------------------------------------------------
+
+    @property
+    def format(self) -> str:
+        """``"0.3"`` for a document read by the format 0.3 reader, else ``"0.2"``."""
+        return "0.2" if self.si is None else "0.3"
+
+    def canonical_json(self, separators=(",", ":")) -> str:
+        """The authored tree as sorted, decimal-preserving JSON (``reader.dumps``); for a 0.2 tree
+        of floats the same bytes as ``json.dumps(data, sort_keys=True, ...)``."""
+        from .reader import dumps
+        return dumps(self.data, sort_keys=True, separators=separators, allow_nan=False)
+
+    def _need_v03(self, what: str):
+        if self._resolution is None:
+            raise DocumentError(f"{what} is defined for format 0.3 documents only")
+        return self._resolution
+
+    def exact(self, path: str):
+        """The exact SI value (a Fraction, or a list of them) of a tagged value or shape number, or None."""
+        return self._need_v03("exact()").exact.get(path)
+
+    def pm(self, path: str) -> int:
+        """The picometre count of a shape number."""
+        return self._need_v03("pm()").pm[path]
+
+    def um(self, path: str):
+        """The micrometre double of a length, from its exact value (hazard H2): never si / 1e-6."""
+        from fractions import Fraction
+        exact = self.exact(path)
+        if exact is None:
+            raise KeyError(path)
+        if isinstance(exact, list):
+            return [None if e is None else float(Fraction(e) * 10 ** 6) for e in exact]
+        return float(Fraction(exact) * 10 ** 6)
+
+    def degrees(self, path: str) -> float:
+        """The angle number meshine takes (hazard H3): the authored number when written in deg,
+        else math.degrees of the SI value."""
+        from fractions import Fraction
+        c = self._need_v03("degrees()").conversions[path]
+        if c.unit_text == "deg":
+            return float(Fraction(c.number_text))
+        return math.degrees(c.value)
+
+    def authored(self, path: str):
+        """The authored token (a string or a number) of a value."""
+        return self._need_v03("authored()").authored.get(path)
+
+    def resolved_inputs(self) -> dict:
+        """``{path: {"authored", "value", "unit"[, "length_unit"]}}`` of every authored input slot."""
+        return copy.deepcopy(self._need_v03("resolved_inputs()").inputs)
+
+    def extent_lines(self) -> list[str]:
+        """One line per geometry component: what its numbers mean (``simcase.checks``)."""
+        return list(self._need_v03("extent_lines()").extent)
+
+    def spelling_fixes(self) -> list[dict]:
+        """``[{"path", "written", "fix"}]``: value-preserving respellings (character aliases)."""
+        return copy.deepcopy(self._need_v03("spelling_fixes()").spelling_fixes)
+
+    def with_value(self, path: str, si, exact=None) -> "Document":
+        """A copy with one resolved value replaced (a sweep point); the authored tree is unchanged."""
+        from .reader import split_path
+        from .resolve import _assign
+        other = self.copy()
+        _assign(other.si, split_path(path), si)
+        if other._resolution is not None and exact is not None:
+            other._resolution = copy.copy(other._resolution)
+            other._resolution.exact = {**other._resolution.exact, path: exact}
+        return other
 
     def to_dict(self) -> dict:
         """The document as written: a version 1 geometry block comes back unchanged.
@@ -278,6 +404,12 @@ class Document:
         return data
 
     def save(self, path: str | Path) -> None:
+        if self.si is not None:
+            from .reader import dumps
+            data = self.source_bytes if self.source_bytes is not None else \
+                (dumps(self.data, indent=2) + "\n").encode("utf-8")
+            Path(path).write_bytes(data)
+            return
         Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
 
     def copy(self) -> "Document":
@@ -287,6 +419,14 @@ class Document:
         other.geometry_roundings = list(self.geometry_roundings)
         other.geometry_model = self.geometry_model
         other.geometry_complex = self.geometry_complex
+        if self.si is not None:
+            other.scale = self.scale
+            other.si = copy.deepcopy(self.si)
+            other.diagnostics = self.diagnostics.copy()
+            other.defaults_applied = copy.deepcopy(self.defaults_applied)
+            other.source_bytes = self.source_bytes
+            other.geometry_flat = copy.deepcopy(self.geometry_flat)
+            other._resolution = self._resolution
         return other
 
     # -- access --------------------------------------------------------------
@@ -310,6 +450,8 @@ class Document:
     @property
     def is_version_1(self) -> bool:
         """``data['geometry']`` is a version 1 block (a 2D region component kept as written)."""
+        if self.si is not None:
+            return self.geometry_model is not None and self.geometry_flat is None
         return self.geometry_model is not None and "version" in self.data["geometry"]
 
     @property
@@ -402,8 +544,20 @@ class Document:
     # -- validation ----------------------------------------------------------
 
     def validate(self) -> None:
-        """The contract of the document's physics kind (``registry``)."""
-        kind_of(self.data).validate(self)
+        """The contract of the document's physics kind (``registry``).
+
+        A format 0.3 document keeps its diagnostics: validating it again appends only what is
+        new, so a runner that re-validates neither loses nor doubles an entry."""
+        if self.si is None:
+            kind_of(self.data).validate(self)
+            return
+        kept, self.diagnostics = self.diagnostics, DiagnosticList()
+        try:
+            kind_of(self.data).validate(self)
+        finally:
+            fresh, self.diagnostics = self.diagnostics, kept
+            seen = {(d.code, d.path, d.message) for d in kept}
+            kept.extend(d for d in fresh if (d.code, d.path, d.message) not in seen)
 
     def mesh_controls(self) -> list[dict]:
         """The contract's ``mesh.controls`` entries, as written (``[]`` when absent)."""
@@ -470,8 +624,23 @@ class Document:
         """``mesh_controls()`` with each ``size`` as an integer pm count, for the engine hand-off.
 
         The entries are checked first (``check_mesh_controls``), so a document built without
-        ``from_dict`` is refused by name here rather than failing inside the engine."""
+        ``from_dict`` is refused by name here rather than failing inside the engine. A format
+        0.3 document's controls are rounded to pm from their exact values, under the engine's
+        names (``size``, ``near``, ``far``, ``distance``, ``circle_segments``)."""
         from fractions import Fraction
+        if self.si is not None:
+            names = {"element_size": "size", "near": "near", "far": "far", "refinement_distance": "distance"}
+            out = []
+            for i, entry in enumerate(self.si.get("mesh", {}).get("controls") or []):
+                where = f"mesh.controls[{i}]"
+                item = {"select": entry["select"]}
+                for key, engine in names.items():
+                    if key in entry:
+                        item[engine] = int(round(Fraction(self.exact(f"{where}.{key}")) * 10 ** 12))
+                if "circle_segment_count" in entry:
+                    item["circle_segments"] = int(entry["circle_segment_count"])
+                out.append(item)
+            return out
         self.check_mesh_controls()
         unit_pm = self._pm_per_unit()
         out = []
@@ -628,6 +797,7 @@ class Document:
     def summary(self) -> str:
         return kind_of(self.data).summary(self)
 
+
     def em_modes2d_summary(self) -> str:
         p, m, st = self.data["physics"], self.data["mesh"], self.data["study"]
         dom, bg = self.domain, self.background
@@ -644,3 +814,25 @@ class Document:
         lines.append(f"  mesh: size {m['size']} {length}" + (f", grading {m['grading']} ({length})" if m.get("grading") else ""))
         lines.append(f"  study: {st['type']}" + (f" over {st['parameter']} x{len(st['values'])}" if st["type"] == "sweep" else ""))
         return "\n".join(lines)
+
+
+def _is_v03(value) -> bool:
+    return isinstance(value, str) and value == "0.3"
+
+
+_V03_TEXT = re.compile(r'"openphysics"\s*:\s*"0\.3"')
+
+
+def declares_v03(raw) -> bool:
+    """True for a document text whose envelope is the format 0.3 string, read exactly; for text
+    that is not readable JSON, when the text holds that envelope (the 0.3 reader then reports
+    why it cannot read it). Every other text takes the 0.2 path, unchanged."""
+    from .reader import parse
+    tree, _found = parse(raw)
+    if isinstance(tree, dict):
+        return _is_v03(tree.get("openphysics"))
+    if tree is not None:
+        return False
+    if isinstance(raw, (bytes, bytearray, memoryview)):
+        raw = bytes(raw).decode("utf-8", "replace")
+    return isinstance(raw, str) and _V03_TEXT.search(raw) is not None
