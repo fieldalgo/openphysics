@@ -133,10 +133,10 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, di
     W = _velocity(mesh, motion.velocity)
     if coordinate_system != "cartesian":
         raise ValueError("motion: shape derivatives cover Cartesian heat in this slice; axisymmetric is refused")
-    for name, value in (("conductivity", conductivity), ("heat_source", heat_source)):
-        _numpy_data(value, name)
+    _coefficient(conductivity, "conductivity")
+    _numpy_data(heat_source, "heat_source")
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
-        for tag, value in (table or {}).items():
+        for tag, value in _tags(table, name).items():
             _numpy_data(value, f"{name}[{tag!r}]")
     if not isinstance(dirichlet, Mapping):
         raise ValueError("dirichlet must map node indices to temperatures in K")
@@ -213,8 +213,8 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
     W = _velocity(mesh, motion.velocity)
     if type(conductivity).__name__ == "ElementConductivity":
         raise TypeError("motion: conductivity is an ElementConductivity; give a scalar or a region table")
-    _numpy_data(conductivity, "conductivity")
-    for tag, value in (outward_current or {}).items():
+    _coefficient(conductivity, "conductivity")
+    for tag, value in _tags(outward_current, "outward_current").items():
         _numpy_data(value, f"outward_current[{tag!r}]")
     for name, table in (("dirichlet", dirichlet), ("reference_potential", reference_potential or {})):
         if not isinstance(table, Mapping):
@@ -246,27 +246,78 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
         outward = scatter_add(xp, n, edges.ravel(), xp.reshape((float(g) * length / 2.0)[:, None]
                                                                 * xp.ones((1, 2), dtype=xp.float64), (-1,)),
                               base=outward)
-    V0 = lift(xp, np.asarray(base.potential))
-    fixed = {(int(node),): 0.0 for node in (*dirichlet, *(reference_potential or {}))}
-    delta = core_solve.solve_dirichlet(K, -outward - K.matvec(V0), fixed)
-    potential = V0 + delta
-    residual = K.matvec(potential) + outward
+    # Work with the increment over each component's offset, as electric.py does: a large
+    # common-mode voltage times a rounding-level sum must not reach residual or power.
+    from .core.triangles import triangle_geometry
+    _p, _t, _a, _b, count, labels = triangle_geometry(moved)
+    gauges = reference_potential or {}
+    offsets = np.zeros(count)
+    anchored = np.zeros(count, dtype=bool)
+    for node, value in (*dirichlet.items(), *gauges.items()):
+        if not anchored[labels[node]]:
+            offsets[labels[node]], anchored[labels[node]] = float(value), True
+    _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, outward_current)
+    I0 = lift(xp, np.asarray(base.potential) - offsets[labels])
+    fixed = {(int(node),): 0.0 for node in (*dirichlet, *gauges)}
+    delta = core_solve.solve_dirichlet(K, -outward - K.matvec(I0), fixed)
+    increment = I0 + delta
+    potential = increment + lift(xp, offsets[labels])
+    residual = K.matvec(increment) + outward
     prescribed = np.array(sorted(int(i) for i in dirichlet), dtype=int)
     reaction = scatter_add(xp, n, prescribed, residual[prescribed])
-    gx = xp.sum(b * potential[tris], axis=1) / (2.0 * area)
-    gy = xp.sum(c * potential[tris], axis=1) / (2.0 * area)
+    gx = xp.sum(b * increment[tris], axis=1) / (2.0 * area)
+    gy = xp.sum(c * increment[tris], axis=1) / (2.0 * area)
     field = -xp.stack([gx, gy], axis=1)
     current = sigma[:, None] * field
     heat = xp.sum(current * field, axis=1)
     load = scatter_add(xp, n, tris.ravel(), xp.reshape((heat * area / 3.0)[:, None]
                                                        * xp.ones((1, 3), dtype=xp.float64), (-1,)))
     power = xp.sum(area * heat)
-    supplied = xp.sum(potential * (reaction - outward))
+    supplied = xp.sum(increment * (reaction - outward))
     return electric.SteadyElectricResult(base.mesh, potential, field, current, sigma, heat, load, power, reaction,
                                          outward, residual, supplied)
 
 
 # ----------------------------------------------------------------------------- helpers
+
+def _tags(table, name):
+    """A boundary-data table as a mapping; anything else gets the solver's own refusal."""
+    if table is None:
+        return {}
+    if not isinstance(table, Mapping):
+        raise ValueError(f"{name} must map boundary edge tags to conditions")
+    return table
+
+
+def _coefficient(value, name):
+    if callable(value):
+        raise ValueError(f"{name} must be a finite scalar > 0 or a table of region names")
+    _numpy_data(value, name)
+
+
+def _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, outward_current):
+    """Refuse a motion that changes the net imposed current of a component without Dirichlet
+    volts: next to t0 that problem has no solution, so it has no derivative."""
+    if all(anchored[k] and any(labels[n] == k for n in dirichlet) for k in range(count)):
+        return
+    rate = np.zeros(count)
+    scale = np.zeros(count)
+    for tag, g in (outward_current or {}).items():
+        edges = np.asarray(mesh.boundary_edges[tag], dtype=int)
+        e = moved.nodes[edges[:, 1]] - moved.nodes[edges[:, 0]]
+        de = W[edges[:, 1]] - W[edges[:, 0]]
+        dlen = np.sum(e * de, axis=1) / np.hypot(e[:, 0], e[:, 1])
+        np.add.at(rate, labels[edges[:, 0]], float(g) * dlen)
+        np.add.at(scale, labels[edges[:, 0]], abs(float(g) * dlen))
+    for k in range(count):
+        if any(labels[n] == k for n in dirichlet):
+            continue
+        if abs(rate[k]) > 1e-12 * max(scale[k], np.finfo(float).tiny) and scale[k] > 0:
+            raise ValueError(f"motion: component {k} has current data only, and the motion changes its net "
+                             f"imposed current (rate {rate[k]:g} A/m per unit t); next to t the problem has no "
+                             "solution, so it has no derivative. Keep the current-carrying sides' lengths, or "
+                             "fix a Dirichlet volt on that component")
+
 
 def _live_t(t):
     if not is_live(t):

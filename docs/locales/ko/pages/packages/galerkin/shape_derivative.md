@@ -50,8 +50,11 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 - 옮겨진 메시에서 일반 풀이가 돌고, 잔차·전류 수지·전력 수지 검사를 그대로 거칩니다.
 - live 풀이 한 번이 X₀ + t·W로 시스템을 다시 조립합니다: 영역 전도도를 쓴 P1 강성, 움직이는 변의 outward current.
 - 모든 필드가 d/dt를 나릅니다: `potential`·`electric_field`·`current_density`·`joule_heating`·`joule_load`·
-  `joule_power_per_length`·`reaction`·`residual`·`supplied_power_per_length`.
-- Dirichlet 전압과 `reference_potential` 게이지(전류 자료만 있는 성분)를 모두 받습니다.
+  `joule_power_per_length`·`reaction`·`prescribed_outward_load`·`residual`·`supplied_power_per_length`.
+  `result.mesh`는 옮겨진 메시의 NumPy 스냅샷이라, 그 좌표에는 미분이 없습니다.
+- Dirichlet 전압과 `reference_potential` 게이지(전류 자료만 있는 성분)를 모두 받습니다. 게이지 성분에서는 이동이 알짜
+  주입 전류를 0으로 유지해야 합니다(예: 전류가 흐르는 변의 길이를 유지). 그렇지 않으면 t 근처에 해가 없으므로 거부합니다.
+- 솔버처럼 전압을 각 성분의 오프셋에 대한 값으로 다루므로, 큰 공통 전압이 전력이나 그 미분에 섞이지 않습니다.
 - 이산 전력 항등식(Joule 전력 = 공급 전력)이 미분에서도 성립합니다(검증 E5).
 
 ## 메시 속도
@@ -122,3 +125,5 @@ PyTorch 2.14.1+cpu로 측정했습니다.
 | E6 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `a0a432b`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | E7 게이지 성분 | 전류 자료와 `reference_potential`만 있는 성분: E1 기준 | 통과 |
 | E8 거부 | 위 목록대로 | 통과 |
+
+그 뒤 독립 검토가 회귀 시험을 더했습니다: 1e9 V까지의 공통 전압(E5 기준), 전류만 있는 성분의 수지를 바꾸는 이동(거부).

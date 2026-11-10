@@ -61,10 +61,16 @@ and call `.backward()`.
 - One live solve re-assembles the system from X₀ + t·W: P1 stiffness with region
   conductivity, and the outward current on moving edges.
 - Every field carries d/dt: `potential`, `electric_field`, `current_density`,
-  `joule_heating`, `joule_load`, `joule_power_per_length`, `reaction`, `residual`
-  and `supplied_power_per_length`.
+  `joule_heating`, `joule_load`, `joule_power_per_length`, `reaction`,
+  `prescribed_outward_load`, `residual` and `supplied_power_per_length`.
+  `result.mesh` is the NumPy snapshot of the moved mesh; its coordinates carry no
+  derivative.
 - Dirichlet volts and `reference_potential` gauges (components with only current
-  data) are both taken.
+  data) are both taken. On a gauge component the motion must keep the net imposed
+  current at zero, for example by keeping the current-carrying sides' lengths.
+  Otherwise the problem has no solution next to t, and the call is refused.
+- As in the solver, volts are taken relative to each component's offset, so a
+  large common-mode voltage does not reach the power or its derivative.
 - The discrete power identity, Joule power = supplied power, also holds for the
   derivatives (validation E5).
 
@@ -153,3 +159,7 @@ with the same versions.
 | E6 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `a0a432b` (measured); `motion=None` equals no keyword (test) |
 | E7 gauge component | a component with only current data and a `reference_potential`: E1 criterion | pass |
 | E8 refusals | as listed above | pass |
+
+An independent review then added regression tests: a common-mode voltage up to
+1e9 V (E5 criterion), and a motion that changes a current-only component's
+balance (refused).
