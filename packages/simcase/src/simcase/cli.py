@@ -182,13 +182,14 @@ def _format_03(args, raw: bytes) -> int:
 def explain_rows(result) -> list[dict]:
     """One row per input slot: every authored input, then every default the reader applied."""
     from .reader import display_path, split_path
-    from .resolve import _lookup
+    from .resolve import _MISSING, _lookup
     rows = [{"path": path, **entry, "default": False} for path, entry in result.inputs.items()]
     for d in result.defaults_applied:
         segments = split_path(d["path"])
         slot = result.table.match(segments, result.tree)
         quantity = slot[0].get("quantity") if slot else None
-        row = {"path": display_path(segments), "authored": None, "value": _lookup(result.si, segments),
+        value = _lookup(result.si, segments)
+        row = {"path": display_path(segments), "authored": None, "value": None if value is _MISSING else value,
                "default": True, "reason": d["reason"], "default_value": d["value"]}
         if quantity is not None:
             from physmat.units import quantity as registry_quantity

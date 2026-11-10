@@ -24,10 +24,13 @@ test('readiness follows the public contract: an anchor, matching corners and ser
 });
 test('the solver document uses mm and K and adds natural-condition keys only when used',()=>{
  const d=H.heatDocument(H.DEFAULT_THERMAL);
- assert.deepEqual(d,{openphysics:'0.2',name:'Workspace steady heat',units:{length:'mm',temperature:'K'},geometry:{domain:{xmin:0,xmax:30,ymin:0,ymax:20}},materials:{},
-  physics:{heat1:{type:'thermal.steady2d',conductivity_w_mk:12.5,heat_source_w_m3:0,dirichlet_temperature_k:{left:280,right:315}}},mesh:{subdivisions:[32,16]},study:{type:'single'},results:{save_fields:true,plots:false}});
+ // format 0.3: each value carries its unit; the form's outward flux becomes the inward one
+ assert.deepEqual(d,{openphysics:'0.3',name:'Workspace steady heat',geometry:{length_unit:'mm',depth:null,domain:{xmin:0,xmax:30,ymin:0,ymax:20}},materials:{},
+  physics:{heat1:{type:'thermal.steady2d',thermal_conductivity:'12.5 W/(m K)',heat_source_density:'0 W/m^3',prescribed_temperature:{left:'280 K',right:'315 K'}}},mesh:{subdivision_count:[32,16]},study:{type:'single'},results:{save_fields:true,plots:false}});
  const mixed=H.heatDocument(plate({left:{type:'flux',flux:-500},top:{type:'convection',h:10,ambient:290}},{source:1e5})).physics.heat1;
- assert.deepEqual(mixed.dirichlet_temperature_k,{right:315});assert.deepEqual(mixed.outward_flux_w_m2,{left:-500});assert.deepEqual(mixed.convection,{top:{h_w_m2k:10,ambient_temperature_k:290}});
+ assert.deepEqual(mixed.prescribed_temperature,{right:'315 K'});assert.deepEqual(mixed.inward_heat_flux,{left:'500 W/m^2'});
+ assert.deepEqual(mixed.convection,{top:{heat_transfer_coefficient:'10 W/(m^2 K)',ambient_temperature:'290 K'}});
+ assert.equal(H.heatDocument(plate({left:{type:'flux',flux:0}})).physics.heat1.inward_heat_flux.left,'0 W/m^2');
  assert.equal(H.sideText({type:'convection',h:10,ambient:290}),'h = 10 W/(m²·K), T∞ = 290 K');assert.equal(H.thermalSummary(H.DEFAULT_THERMAL),'30 × 20 mm · k 12.5 W/(m·K)');
 });
 test('projects store the heat plate from version 5; heat alone is a valid application',()=>{

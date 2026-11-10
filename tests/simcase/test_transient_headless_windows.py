@@ -24,18 +24,17 @@ from simcase.thermal import _OwnedOutput
 
 def model():
     return {
-        "openphysics": "0.2", "name": "Transient \u0394 \ud55c\uae00",
-        "units": {"length": "mm", "temperature": "K", "time": "s"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 2, "ymin": 0, "ymax": 1}},
+        "openphysics": "0.3", "name": "Transient \u0394 \ud55c\uae00",
+        "geometry": {"length_unit": "mm", "depth": None, "domain": {"xmin": 0, "xmax": 2, "ymin": 0, "ymax": 1}},
         "materials": {},
         "physics": {"heat1": {
-            "type": "thermal.transient2d", "conductivity_w_mk": 2,
-            "volumetric_heat_capacity_j_m3k": 1000,
-            "initial_temperature_k": 300,
-            "dirichlet_temperature_k": {"left": 300}, "heat_source_w_m3": 2,
+            "type": "thermal.transient2d", "thermal_conductivity": "2 W/(m K)",
+            "volumetric_heat_capacity": "1000 J/(m^3 K)",
+            "initial_temperature": "300 K",
+            "prescribed_temperature": {"left": "300 K"}, "heat_source_density": "2 W/m^3",
         }},
-        "mesh": {"subdivisions": [2, 2]},
-        "study": {"type": "transient", "time_s": [0, 0.01, 0.025]},
+        "mesh": {"subdivision_count": [2, 2]},
+        "study": {"type": "transient", "time": {"unit": "s", "values": [0, 0.01, 0.025]}},
         "results": {"save_fields": True, "plots": False},
     }
 
@@ -49,21 +48,21 @@ def test_transient_saved_history_and_closed_handles(tmp_path, save_fields):
     result.save(out)
     assert json.loads((out / "model.json").read_text(encoding="utf-8"))["name"] == data["name"]
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
-    assert summary["result_format"] == "thermal.transient2d-result-v1"
-    assert summary["field_layout"] == "thermal2d-transient-p1-node-cell-v1"
-    assert summary["study"]["time_s"] == data["study"]["time_s"]
-    assert summary["rate_time_s"] == data["study"]["time_s"][1:]
+    assert summary["result_format"] == "thermal.transient2d-result-v3"
+    assert summary["field_layout"] == "thermal2d-transient-p1-node-cell-v2"
+    assert summary["study"]["time"] == data["study"]["time"]
+    assert summary["field_time_axes"]["reaction_heat_rate_per_depth"] == "time[1:]"
     assert summary["save_fields"] is save_fields
     assert not (out / ".incomplete").exists()
     assert not list(tmp_path.glob(".simcase-pin-*"))
     if save_fields:
         with np.load(out / "fields.npz", allow_pickle=False) as arrays:
             assert all(not arrays[key].dtype.hasobject for key in arrays.files)
-            np.testing.assert_array_equal(arrays["temperature_k"], result.temperature_k)
-            np.testing.assert_array_equal(arrays["time_s"], data["study"]["time_s"])
-            assert arrays["temperature_k"].shape[0] == 3
-            assert arrays["storage_rate_w_per_m"].shape[0] == 2
-            assert arrays["reaction_w_per_m"].shape[0] == 2
+            np.testing.assert_array_equal(arrays["temperature"], result.temperature)
+            np.testing.assert_array_equal(arrays["time"], data["study"]["time"]["values"])
+            assert arrays["temperature"].shape[0] == 3
+            assert arrays["heat_storage_rate_per_depth"].shape[0] == 2
+            assert arrays["reaction_heat_rate_per_depth"].shape[0] == 2
     else:
         assert not (out / "fields.npz").exists()
     # Open handles must not keep a successful Windows output from moving/deleting.
@@ -119,13 +118,13 @@ def test_transient_isolated_cli_writes_fresh_history(tmp_path):
     assert child.returncode == 0, (child.stdout, child.stderr)
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     assert summary["physics_type"] == "thermal.transient2d"
-    assert summary["study"]["time_s"] == data["study"]["time_s"]
+    assert summary["study"]["time"] == data["study"]["time"]
     assert not (out / ".incomplete").exists()
     assert not (out / "results.png").exists()
     assert not list(tmp_path.glob(".simcase-pin-*"))
     with np.load(out / "fields.npz", allow_pickle=False) as arrays:
-        assert arrays["temperature_k"].shape[0] == 3
-        assert arrays["reaction_w_per_m"].shape[0] == 2
+        assert arrays["temperature"].shape[0] == 3
+        assert arrays["reaction_heat_rate_per_depth"].shape[0] == 2
         assert all(not arrays[key].dtype.hasobject for key in arrays.files)
     moved = tmp_path / "moved-cli-history"
     out.rename(moved)
@@ -216,5 +215,5 @@ def test_transient_concurrent_writers_preserve_winner(tmp_path, monkeypatch):
     assert not (out / ".incomplete").exists()
     assert (out / "summary.json").is_file()
     with np.load(out / "fields.npz", allow_pickle=False) as arrays:
-        np.testing.assert_array_equal(arrays["temperature_k"], result.temperature_k)
+        np.testing.assert_array_equal(arrays["temperature"], result.temperature)
     assert not list(tmp_path.glob(".simcase-pin-*"))

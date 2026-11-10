@@ -7,7 +7,7 @@
 이 checkout은 기존 열 엔진을 이용해 `thermal.steady2d` 경계 확장을
 `Document.from_dict`, JSON 읽기, 검증, 문서 summary, `run(Document)`,
 `ThermalRunResult`, CLI와 JSON/NPZ 저장에 연결합니다.
-[기존 가이드](thermal_steady2d.md)는 원래 v1 계약을 보존합니다.
+[직사각형 가이드](thermal_steady2d.md)는 경계 키가 없는 기본 layout을 설명합니다.
 같은 checkout에서 만든 서로 일치하는 패키지를 사용하세요.
 
 [독립 검증 보고서](steady_boundary_independent_validation.md)는 고정 수용 기준,
@@ -18,21 +18,22 @@
 
 ## 입력과 지원 범위
 
-형식 `"openphysics": "0.2"`, 단일 `thermal.steady2d` physics,
-균질 직사각형, P1 삼각형, 상수 등방
-`conductivity_w_mk > 0` W/(m K), 부호 있는 상수
-`heat_source_w_m3` W/m³(기본 0)을 사용합니다. 길이 단위와
-`temperature: "K"`를 선언합니다. 형상은 미터로 변환하며 SI 접미사는
-선언된 길이 단위와 독립입니다. 메시 분할수는 불리언이 아닌 양의 JSON 정수입니다.
-Study는 single, plots는 false입니다.
+형식 `"openphysics": "0.3"`, 단일 `thermal.steady2d` physics, 균질 직사각형, P1 삼각형,
+양의 상수 등방 `thermal_conductivity`(예: `"2 W/(m K)"`), 부호 있는 상수
+`heat_source_density`(예: `"0 W/m^3"`, 없으면 열원 없음)를 사용합니다. 형상은
+`length_unit`을 선언하고 모든 값은 자기 단위를 함께 써서 SI로 읽습니다.
+`subdivision_count`는 양의 JSON 정수 두 개입니다. Study는 single, plots는 false입니다.
 
 | Physics 필드 | 계약 |
 | --- | --- |
-| `dirichlet_temperature_k` | 필수 side→온도 매핑; 유한한 입력 K >= 0 |
-| `outward_flux_w_m2` | 선택적 side→부호 있는 상수 g 매핑, W/m² |
-| `convection` | 선택적 side→객체 매핑; 정확히 `h_w_m2k`, `ambient_temperature_k` 포함 |
-| `h_w_m2k` | 유한한 h >= 0, W/(m² K) |
-| `ambient_temperature_k` | 유한한 주변 K >= 0; h=0일 때도 검사 |
+| `prescribed_temperature` | 필수 side→온도 매핑; 각각 0 K보다 큼 |
+| `inward_heat_flux` | 선택적 side→부호 있는 상수 매핑, W/m^2, 물체 안쪽이 양 |
+| `convection` | 선택적 side→객체 매핑; 정확히 `heat_transfer_coefficient`, `ambient_temperature` 포함 |
+| `heat_transfer_coefficient` | h >= 0, 예: `"4 W/(m^2 K)"` |
+| `ambient_temperature` | 0 K보다 큼; h=0일 때도 검사 |
+
+엔진은 외향 flux g를 받으며 simcase는 `0.0 - inward_heat_flux`(정확한 부호 반전)를 넘깁니다.
+형식 0.2 `outward_flux_w_m2` 키는 이 규칙을 메시지에 담아 거부합니다.
 
 Side 이름은 정확히 left/right/bottom/top입니다. 지정하지 않은 자연 경계는
 단열입니다. Null, 수치 필드의 불리언, 비유한 수, 알 수 없는 키, callback,
@@ -72,7 +73,7 @@ sum(fQ) = total_outward
 
 K와 H의 단위는 W/(m K)입니다. 모든 절점 load, rhs, residual, reaction과
 적분 열량률은 면외 깊이당 W/m이며 q는 W/m²입니다.
-`load_w_per_m`는 합성 rhs가 아닌 체적 열원 fQ를 유지합니다.
+`generated_heat_rate_per_depth`는 합성 rhs가 아닌 체적 열원 fQ를 유지합니다.
 Thermostat 기여만 -sum(reaction)이며 flux나 대류가 있으면 전체 외향 열량과
 다릅니다. 과도 storage나 heat-content 양을 추가하지 않습니다.
 
@@ -96,20 +97,21 @@ B_e = h*Ta*ell/2 * [1,1]
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Steady additive outward flux and convection",
-  "units": {"length": "m", "temperature": "K"},
-  "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+  "geometry": {"length_unit": "m", "depth": null,
+               "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
   "materials": {},
   "physics": {"heat1": {
     "type": "thermal.steady2d",
-    "conductivity_w_mk": 2,
-    "heat_source_w_m3": 0,
-    "dirichlet_temperature_k": {"left": 300},
-    "outward_flux_w_m2": {"right": 2},
-    "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}}
+    "thermal_conductivity": "2 W/(m K)",
+    "heat_source_density": "0 W/m^3",
+    "prescribed_temperature": {"left": "300 K"},
+    "inward_heat_flux": {"right": "-2 W/m^2"},
+    "convection": {"right": {"heat_transfer_coefficient": "4 W/(m^2 K)",
+                             "ambient_temperature": "290 K"}}
   }},
-  "mesh": {"subdivisions": [8, 8]},
+  "mesh": {"subdivision_count": [8, 8]},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
@@ -157,7 +159,7 @@ with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
     assert isinstance(result, ThermalRunResult)
     summary = result.summary()
     result.save(root / "api_results")
-    assert summary["result_format"] == "thermal.steady2d-result-v2"
+    assert summary["result_format"] == "thermal.steady2d-result-v4"
     json.dumps(summary, allow_nan=False)
 ```
 
@@ -169,56 +171,53 @@ Context가 끝나면 임시 출력을 제거합니다. 결과를 보존하려면
 
 `summary()`는 JSON-safe dictionary를 반환합니다. `result_format`,
 `field_layout`, `boundary_enabled`는 캡처한 layout을 식별합니다.
-공개 배열 속성 이름은 아래와 같지만 `nodes_m`는 `mesh_nodes_m`,
-`triangles`는 `mesh_triangles`입니다. `dirichlet_node_ids`,
-`dirichlet_temperature_k`는 공개 result attribute입니다.
+공개 배열 속성 이름은 아래와 같습니다.
 온도에 광학 유효굴절률이나 모드 정규화를 붙이지 않습니다.
 
 ## 버전과 원시 필드 계약
 
-새 매핑 키 중 하나라도 존재하면 빈 객체여도
-`thermal.steady2d-result-v2`, `thermal2d-p1-node-cell-boundary-v2`를 선택합니다.
-둘 다 없으면 기존 v1 식별자와 배열 9개를 유지합니다. 빈 기본값을 삽입하거나
-비어 있지 않은 값으로 버전을 추론하지 마세요. Null은 잘못된 입력입니다.
-입력 형식은 0.2를 유지합니다.
+매핑 키 중 하나라도 존재하면 빈 객체여도
+`thermal.steady2d-result-v4`, `thermal2d-p1-node-cell-boundary-v3`를 선택합니다.
+둘 다 없으면 `thermal.steady2d-result-v3`, `thermal2d-p1-node-cell-v2`와 배열 9개입니다.
+빈 기본값을 삽입하거나 비어 있지 않은 값으로 버전을 추론하지 마세요. Null은 잘못된
+입력입니다. 형식 0.2 식별자(`-result-v1`, `-result-v2`, `-cell-v1`, `-boundary-v2`)는
+은퇴했습니다.
 
 | NPZ 배열 | Shape | 위치 / 의미 | 단위 |
 | --- | --- | --- | --- |
-| `nodes_m` | (N,2) | 절점, SI 좌표 | m |
-| `triangles` | (M,3) | 정수 CCW 연결 정보 | 1 |
-| `temperature_k` | (N,) | 절점 | K |
-| `heat_flux_w_m2` | (M,2) | 삼각형 중심, -k grad(T) | W/m² |
-| `load_w_per_m` | (N,) | 절점, 열원 fQ만 | W/m |
-| `reaction_w_per_m` | (N,) | 절점, 내향 thermostat 반력 | W/m |
-| `residual_w_per_m` | (N,) | 절점, A*T-rhs | W/m |
-| `dirichlet_node_ids` | (D,) | 정렬·중복 없는 지정 정수 ID | 1 |
-| `dirichlet_temperature_k` | (D,) | 대응하는 지정값 | K |
-| `prescribed_outward_load_w_per_m` | (N,) | 절점, G; v2만 | W/m |
-| `ambient_load_w_per_m` | (N,) | 절점, B; v2만 | W/m |
-| `convective_outward_w_per_m` | (N,) | 절점, C; v2만 | W/m |
-| `system_rhs_w_per_m` | (N,) | 절점, fQ+B-G; v2만 | W/m |
+| `node_coordinates` | (N,2) | 절점, SI 좌표 | m |
+| `triangles` | (M,3) | 정수 CCW 연결 정보 | (구조) |
+| `temperature` | (N,) | 절점 | K |
+| `heat_flux` | (M,2) | 삼각형 중심, -k grad(T) | W/m^2 |
+| `generated_heat_rate_per_depth` | (N,) | 절점, 열원 fQ만 | W/m |
+| `reaction_heat_rate_per_depth` | (N,) | 절점, 구속이 주입하는 열 | W/m |
+| `residual_heat_rate_per_depth` | (N,) | 절점, A*T-rhs | W/m |
+| `prescribed_node_ids` | (D,) | 정렬·중복 없는 지정 정수 ID | (구조) |
+| `prescribed_temperature` | (D,) | 대응하는 지정값 | K |
+| `outward_prescribed_heat_rate_per_depth` | (N,) | 절점, G; 경계 layout만 | W/m |
+| `ambient_convective_heat_rate_per_depth` | (N,) | 절점, B; 경계 layout만 | W/m |
+| `outward_convective_heat_rate_per_depth` | (N,) | 절점, C; 경계 layout만 | W/m |
+| `applied_heat_rate_per_depth` | (N,) | 절점, fQ+B-G; 경계 layout만 | W/m |
 
-Robin만으로 고정하면 두 Dirichlet 배열의 shape은 (0,)이며 node ID는 정수입니다.
-전체 residual은 위 A와 rhs를 사용합니다. 소비자는 `allow_pickle=False`로
-읽고 format/layout, 단위, shape, 유한한 수치 타입과 metadata를 검사해야 합니다.
-누락된 v2 필드에 임의의 0을 채우면 안 됩니다. Summary metadata에는 `field_units`, `field_locations`, `field_shapes`,
-`mesh_length_unit="m"`, 원래 문서 단위, 경계 매핑, 고정 절점 수,
-온도 극값과 mesh/solve 시간이 있습니다. NPZ에는 Unicode scalar
-`result_format`, `field_layout`, `mesh_length_unit`, `metadata_json`도
-저장하며 metadata JSON은 summary와 같습니다. Python object 배열은 없습니다.
+Robin만으로 고정하면 두 지정 배열의 shape은 (0,)이며 node ID는 정수입니다.
+전체 residual은 위 A와 rhs를 사용합니다. 소비자는 `allow_pickle=False`로 읽고
+format/layout, 단위, shape, 유한한 수치 타입과 metadata를 검사해야 합니다. 누락된 경계
+필드에 임의의 0을 채우면 안 됩니다. Summary에는 `field_units`(구조 배열은 단위 없음),
+`field_locations`, `field_shapes`, `field_components`, `diagnostics`, `defaults_applied`,
+`resolved_inputs`, `{"value", "unit"}` 꼴의 경계 매핑, 고정 절점 수, 온도 극값,
+`timing.wall_time`이 있습니다. NPZ에는 scalar `result_format`, `field_layout`,
+`metadata_json`도 저장하며 metadata JSON은 summary와 같습니다. Python object 배열은 없습니다.
 
-V2 진단은 `source_heat_w_per_m`, `prescribed_outward_heat_w_per_m`,
-`convective_outward_heat_w_per_m`, `thermostat_outward_heat_w_per_m`,
-`outward_heat_w_per_m`, `heat_balance_defect_w_per_m`,
-`normalized_heat_balance_defect`, `free_residual_max_w_per_m`입니다.
-부호 있는 defect는 전체 외향 열량에서 열원을 뺀 값입니다.
-정규화 defect는 그 절댓값을 절점 열원·반력·G·C 기여의 절댓값 합으로 나누며
-양의 부동소수점 하한을 사용합니다. 자유 residual 최대값은 W/m 차원량이며
-자유 절점이 없으면 0입니다. V2에는 v1의 `normalized_free_residual` 진단을
-게시하지 않습니다. K만 사용하는 정규화는 Robin 엔진의 guard가 아닙니다.
-Summary 검사가 엔진의 원래 물리 residual·열수지 guard나 독립 수용을
-대체하지 않습니다. 검토한 구현은 v2 차원량 자유 residual과 기존 정규화를
-분리해 유지합니다.
+경계 layout의 열수지 값(각각 `{"value", "unit"}`)은 `generated_heat_rate_per_depth`,
+`outward_prescribed_heat_rate_per_depth`, `outward_convective_heat_rate_per_depth`,
+`outward_reaction_heat_rate_per_depth`, `outward_heat_rate_per_depth`,
+`heat_rate_imbalance_per_depth`, `relative_conservation_residual`,
+`maximum_residual_heat_rate_per_depth`입니다. 부호 있는 불균형은 전체 외향 열량에서 열원을
+뺀 값입니다. 정규화 값은 그 절댓값을 절점 열원·반력·G·C 기여의 절댓값 합으로 나누며 양의
+부동소수점 하한을 사용합니다. 잔차 최대값은 W/m 차원량이며 자유 절점이 없으면 0입니다. 경계
+layout은 기본 layout의 `relative_residual`을 게시하지 않습니다. K만 사용하는 정규화는 Robin
+엔진의 guard가 아닙니다. Summary 검사가 엔진의 원래 물리 residual·열수지 guard나 독립 수용을
+대체하지 않습니다.
 
 ## 형상·수명·검증 한계
 

@@ -78,9 +78,9 @@ visible Mesh/Results tab redraws the current accepted result without solving.
 
 | Display/data | Contract |
 | --- | --- |
-| Coordinates | Raw `arrays.nodes_m` in m; axes divide by top-level `display_length_in_m`, the captured positive metres-per-document-length-unit scale |
-| Temperature | `temperature_k`, nodal P1, K; linear interpolation and labelled colorbar |
-| Flux | `heat_flux_w_m2`, constant per triangle, W/m²; global qx/qy or magnitude |
+| Coordinates | Raw `arrays.node_coordinates` in m; axes divide by top-level `display_length_in_m`, the metres per unit of the geometry's `length_unit` (named by `length_unit`) |
+| Temperature | `temperature`, nodal P1, K; linear interpolation and labelled colorbar |
+| Flux | `heat_flux`, constant per triangle, W/m^2; global qx/qy or magnitude |
 | Arrows | Actual cell centroids and global directions; labelled view gain, no physical rescaling |
 | Source/reaction/rates | Nodal W/m of out-of-plane depth, distinct from W/m² flux |
 
@@ -110,11 +110,11 @@ missing fields and malformed payloads must not reach the display.
 ## Fixed wire envelope
 
 ```text
-payload_format = "studio-thermal-steady-v1"
+payload_format = "studio-thermal-steady-v2"
 kind = "thermal.steady2d"
 job, result_id, client_revision, request_seq
 result_format, field_layout
-display_length_in_m
+length_unit, display_length_in_m
 summary
 arrays
 ```
@@ -222,7 +222,7 @@ path `mesh.subdivisions`), and so is a rectangle document with a stray
 | Item | Region result |
 | --- | --- |
 | Result and layout IDs | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
-| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, the same 11 top-level fields as the rectangle payload |
+| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, the 11 top-level fields of the format 0.2 rectangle payload (no `length_unit`; arrays under their 0.2 names) |
 | `arrays` | The thirteen v2 arrays plus `triangle_regions`: one region index per triangle (unit `1`, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
 | `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area_m2`), the whole `materials` table, `heat_source_w_m3`, `conductivity_range_w_mk` and `mesh` (`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`) |
 | Capability | A nested `regions` key in the steady block: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats` and the five `limits` below |

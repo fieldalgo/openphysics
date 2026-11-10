@@ -505,8 +505,12 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
     from simcase import Document
     from simcase.geometry import resolve_regions
     doc = copy.deepcopy(CURRENT[name])
-    model = parse({"units": doc["units"], "geometry": from_v02(doc["geometry"])})
     g = doc["geometry"]
+    if doc.get("openphysics") == "0.3":    # a format 0.3 flat block declares its own length_unit and depth
+        units, g = {"length": g["length_unit"]}, {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
+    else:
+        units = doc["units"]
+    model = parse({"units": units, "geometry": from_v02(g)})
     if "zmin" in g["domain"]:
         with pytest.raises(GeometryError, match="2d and axisymmetric"):
             evaluate(model)
@@ -1465,16 +1469,28 @@ def test_a_circle_segments_raise_is_noted_on_the_document_by_both_runners():
     assert any(n.startswith("mesh.controls: circle_segments 8 of the circle of ['ring.boundary'] raised to") for n in doc.notes)
 
 
+#: thermal_slab as format 0.2 (examples/simcase/thermal_slab.json before the units batch)
+SLAB_02 = {
+    "openphysics": "0.2", "name": "Steady heat slab", "units": {"length": "mm", "temperature": "K"},
+    "geometry": {"domain": {"xmin": 0.0, "xmax": 30.0, "ymin": 0.0, "ymax": 20.0}}, "materials": {},
+    "physics": {"heat1": {"type": "thermal.steady2d", "conductivity_w_mk": 12.5, "heat_source_w_m3": 0.0,
+                          "dirichlet_temperature_k": {"left": 280.0, "right": 315.0}}},
+    "mesh": {"subdivisions": [32, 16]}, "study": {"type": "single"}, "results": {"save_fields": True, "plots": False}}
+
+
 def test_a_homogeneous_version_1_rectangle_takes_the_rectangle_path_everywhere():
-    from simcase import Document, run
+    from simcase import Document, DocumentError
     from simcase.thermal_regions import has_region_geometry
-    slab = copy.deepcopy(EXAMPLES["thermal_slab"])
+    slab = copy.deepcopy(SLAB_02)          # the version 1 heat route is read in format 0.2 until C5b
     slab["geometry"] = from_v02(slab["geometry"])
     kind = next(iter(slab["physics"].values()))["type"]
     assert not has_region_geometry(slab, kind)
-    doc = Document.from_dict(slab)
-    assert not doc.is_version_1 and not has_region_geometry(doc.data, kind)
-    assert run(doc, verbose=False).summary()["physics_type"] == kind
+    # it compiles to the flat rectangle and takes the rectangle path, which reads format 0.3 only
+    # since the units batch: refused there by name, never taken as a region document
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(slab)
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [("E-FORMAT", "openphysics")]
+    assert "format 0.2 rectangle heat documents are not read" in str(caught.value)
     regions = _regions_doc([], physics_source=0.0)    # no features, but a background material
     assert has_region_geometry(regions, kind) and Document.from_dict(regions).is_version_1
     for features in ({"a": 1}, "x", 0):               # not a feature list: the reader refuses it, never a region

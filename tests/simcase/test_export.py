@@ -4,6 +4,7 @@
 """VTU and ParaView time-series export of saved fields through meshio (simcase[export])."""
 
 from pathlib import Path
+import json
 import xml.etree.ElementTree as ET
 
 import copy
@@ -12,7 +13,7 @@ import numpy as np
 import pytest
 
 from simcase import Document, examples, run
-from simcase.export import export_fields, export_time_series
+from simcase.export import read_field_data, export_fields, export_time_series
 
 meshio = pytest.importorskip("meshio", reason="install the export extra: pip install 'simcase[export]'")
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples" / "simcase"
@@ -29,30 +30,49 @@ def test_steady_heat_vtu_round_trip(tmp_path):
     out = export_fields(fields, tmp_path / "slab.vtu")
     with np.load(fields) as saved:
         mesh = meshio.read(out)
-        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+        np.testing.assert_array_equal(mesh.points[:, :2], saved["node_coordinates"])
         np.testing.assert_array_equal(mesh.points[:, 2], 0.0)
         np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
-        np.testing.assert_array_equal(mesh.point_data["temperature_k"], saved["temperature_k"])
-        flux = mesh.cell_data["heat_flux_w_m2"][0]
-        np.testing.assert_array_equal(flux[:, :2], saved["heat_flux_w_m2"])
+        np.testing.assert_array_equal(mesh.point_data["temperature"], saved["temperature"])
+        flux = mesh.cell_data["heat_flux"][0]
+        np.testing.assert_array_equal(flux[:, :2], saved["heat_flux"])
         np.testing.assert_array_equal(flux[:, 2], 0.0)
+        field_units = json.loads(str(saved["metadata_json"]))["field_units"]
     # Independent structural check of the VTK XML header.
     piece = ET.parse(out).getroot().find(".//Piece")
     assert int(piece.get("NumberOfPoints")) == len(mesh.points)
     assert int(piece.get("NumberOfCells")) == len(mesh.cells_dict["triangle"])
+    # P2-18: the FieldData unit block, UInt8 UTF-8 JSON, read by xml.etree and by meshio alike
+    names = set(mesh.point_data) | set(mesh.cell_data)
+    block = read_field_data(out)
+    assert block["units"] == {name: field_units[name] for name in names}
+    assert block["conventions"]["sign"]["heat_flux"].startswith("q = -k grad T")
+    assert set(block["conventions"]["sign"]) == {"heat_flux", "generated_heat_rate_per_depth",
+                                                 "reaction_heat_rate_per_depth"}
+    assert {k: json.loads(bytes(v).decode("utf-8")) for k, v in mesh.field_data.items()} == block
+    assert all(a.get("type") == "UInt8" for a in ET.parse(out).getroot().iter("DataArray")
+               if a.get("Name") in ("units", "conventions"))
+    assert b'type="String"' not in out.read_bytes()
+
+
+def test_a_heat_layout_saved_before_the_units_batch_is_refused_by_name(tmp_path):
+    fields = tmp_path / "fields.npz"
+    np.savez(fields, field_layout=np.array("thermal2d-p1-node-cell-v1"))
+    with pytest.raises(ValueError, match=r"saved before the units and naming batch \(layout thermal2d-p1-node-cell-v1\)"):
+        export_fields(fields, tmp_path / "old.vtu")
 
 
 def test_transient_heat_exports_the_selected_time(tmp_path):
     fields = _saved(tmp_path, "transient_thermal_uniform.json")
     with np.load(fields) as saved:
-        times = len(saved["time_s"])
+        times = len(saved["time"])
         for index in (0, times - 1):
             mesh = meshio.read(export_fields(fields, tmp_path / f"t{index}.vtu", time_index=index))
-            np.testing.assert_array_equal(mesh.point_data["temperature_k"], saved["temperature_k"][index])
-            np.testing.assert_array_equal(mesh.cell_data["heat_flux_w_m2"][0][:, :2],
-                                          saved["heat_flux_w_m2"][index])
+            np.testing.assert_array_equal(mesh.point_data["temperature"], saved["temperature"][index])
+            np.testing.assert_array_equal(mesh.cell_data["heat_flux"][0][:, :2],
+                                          saved["heat_flux"][index])
             # Reaction starts at the second stored time.
-            assert ("reaction_w_per_m" in mesh.point_data) is (index > 0)
+            assert ("reaction_heat_rate_per_depth" in mesh.point_data) is (index > 0)
         with pytest.raises(IndexError):
             export_fields(fields, tmp_path / "bad.vtu", time_index=times)
 
@@ -96,29 +116,34 @@ def test_transient_time_series_matches_every_stored_time(tmp_path):
     assert pvd == out / "fields.pvd"
     entries = _collection(pvd)
     with np.load(fields) as saved:
-        times = saved["time_s"]
+        times = saved["time"]
         assert len(times) >= 3
-        # repr-written timesteps round-trip exactly; names are relative and ordered.
+        # repr-written timesteps (s) round-trip exactly; names are relative and ordered.
         assert [t for t, _ in entries] == times.tolist()
         assert [f for _, f in entries] == [f"fields_{k:05d}.vtu" for k in range(len(times))]
         assert sorted(p.name for p in out.iterdir()) == sorted([pvd.name] + [f for _, f in entries])
         for k, (_, name) in enumerate(entries):
             mesh = meshio.read(out / name)
-            np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+            np.testing.assert_array_equal(mesh.points[:, :2], saved["node_coordinates"])
             np.testing.assert_array_equal(mesh.points[:, 2], 0.0)
             np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
-            np.testing.assert_array_equal(mesh.point_data["temperature_k"], saved["temperature_k"][k])
-            np.testing.assert_array_equal(mesh.point_data["source_load_w_per_m"],
-                                          saved["source_load_w_per_m"][k])
-            for late in ("reaction_w_per_m", "residual_w_per_m", "storage_rate_w_per_m"):
+            np.testing.assert_array_equal(mesh.point_data["temperature"], saved["temperature"][k])
+            np.testing.assert_array_equal(mesh.point_data["generated_heat_rate_per_depth"],
+                                          saved["generated_heat_rate_per_depth"][k])
+            for late in ("reaction_heat_rate_per_depth", "residual_heat_rate_per_depth",
+                         "heat_storage_rate_per_depth"):
                 # These histories start at the second stored time.
                 if k == 0:
                     assert late not in mesh.point_data
                 else:
                     np.testing.assert_array_equal(mesh.point_data[late], saved[late][k - 1])
-            flux = mesh.cell_data["heat_flux_w_m2"][0]
-            np.testing.assert_array_equal(flux[:, :2], saved["heat_flux_w_m2"][k])
+            flux = mesh.cell_data["heat_flux"][0]
+            np.testing.assert_array_equal(flux[:, :2], saved["heat_flux"][k])
             np.testing.assert_array_equal(flux[:, 2], 0.0)
+            # each VTU of the series carries the units of its own arrays
+            assert read_field_data(out / name)["units"] == {
+                n: json.loads(str(saved["metadata_json"]))["field_units"][n]
+                for n in (*mesh.point_data, *mesh.cell_data)}
 
 
 def test_time_series_accepts_an_empty_directory_and_a_custom_name(tmp_path):
@@ -204,6 +229,7 @@ def test_time_series_keeps_a_collection_it_did_not_create(tmp_path, monkeypatch)
 
 _NOT_EXPORTED = ("nodes_m", "triangles", "field_layout", "result_format", "mesh_length_unit",
                  "metadata_json", "dirichlet_node_ids", "dirichlet_temperature_k",
+                 "node_coordinates", "prescribed_node_ids", "prescribed_temperature",
                  "electric_dirichlet_node_ids", "dirichlet_potential_v",
                  "thermal_dirichlet_node_ids")
 
@@ -217,7 +243,8 @@ def _assert_every_field_array_exported(fields, mesh):
                 assert name not in mesh.point_data and name not in mesh.cell_data
                 continue
             array = saved[name]
-            if array.shape == (len(saved["nodes_m"]),):
+            nodes = saved["node_coordinates"] if "node_coordinates" in saved.files else saved["nodes_m"]
+            if array.shape == (len(nodes),):
                 np.testing.assert_array_equal(mesh.point_data[name], array)
             elif array.shape == (len(saved["triangles"]),):
                 np.testing.assert_array_equal(mesh.cell_data[name][0], array)
@@ -228,7 +255,7 @@ def _assert_every_field_array_exported(fields, mesh):
                 np.testing.assert_array_equal(vector[:, 2], 0.0)
             exported.add(name)
         assert exported == set(mesh.point_data) | set(mesh.cell_data)
-        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+        np.testing.assert_array_equal(mesh.points[:, :2], nodes)
         np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
     return exported
 
@@ -236,13 +263,13 @@ def _assert_every_field_array_exported(fields, mesh):
 def test_steady_boundary_heat_exports_its_boundary_loads(tmp_path):
     fields = _saved(tmp_path, "thermal_boundary.json")
     with np.load(fields) as saved:
-        assert str(saved["field_layout"]) == "thermal2d-p1-node-cell-boundary-v2"
+        assert str(saved["field_layout"]) == "thermal2d-p1-node-cell-boundary-v3"
     mesh = meshio.read(export_fields(fields, tmp_path / "boundary.vtu"))
     exported = _assert_every_field_array_exported(fields, mesh)
-    assert {"temperature_k", "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
-            "convective_outward_w_per_m", "system_rhs_w_per_m"} <= set(mesh.point_data)
-    assert set(mesh.cell_data) == {"heat_flux_w_m2"}
-    assert exported == set(mesh.point_data) | {"heat_flux_w_m2"}
+    assert {"temperature", "outward_prescribed_heat_rate_per_depth", "ambient_convective_heat_rate_per_depth",
+            "outward_convective_heat_rate_per_depth", "applied_heat_rate_per_depth"} <= set(mesh.point_data)
+    assert set(mesh.cell_data) == {"heat_flux"}
+    assert exported == set(mesh.point_data) | {"heat_flux"}
     with pytest.raises(ValueError, match="time series export needs layout"):
         export_time_series(fields, tmp_path / "series")
 

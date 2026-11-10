@@ -143,6 +143,10 @@ def _resolve(tree, result: Resolution) -> Resolution:
     if kind.slots is None:
         diags.append(_unread_kind(tree, kind))
         return result
+    form = slots.geometry_form(tree.get("geometry"))
+    if kind.forms_03 is not None and form is not None and form not in kind.forms_03:
+        diags.append(_unread_form(tree, kind, form))
+        return result
     result.table = slots.table_for(kind)
     walker = _Walker(result)
     result.si = walker.walk()
@@ -160,6 +164,22 @@ def _unread_kind(tree, kind) -> Diagnostic:
                 return Diagnostic("E-CONTRACT", path, f"{path}: {entry['type']!r} documents are not read in format "
                                                       f"0.3 yet; this release reads them in format 0.2")
     return Diagnostic("E-CONTRACT", "physics", "physics: no entry has a type this release reads in format 0.3")
+
+
+_FORM_WORDS = {"rect": "a flat rectangle", "regions": "flat regions (background and shapes)",
+               "v1": "a version 1 geometry block"}
+
+
+def _unread_form(tree, kind, form) -> Diagnostic:
+    """A kind that reads format 0.3 for some geometry forms only (during the units batch)."""
+    read = " or ".join(_FORM_WORDS[f] for f in sorted(kind.forms_03))
+    for name, entry in tree["physics"].items():
+        if isinstance(entry, dict) and entry.get("type") in kind.types:
+            path = display_path(["physics", name, "type"])
+            return Diagnostic("E-CONTRACT", "geometry", f"geometry: {entry['type']!r} documents on {_FORM_WORDS[form]} "
+                                                        f"are not read in format 0.3 yet; this release reads them in "
+                                                        f"format 0.2, and reads {read} in format 0.3 ({path})")
+    return Diagnostic("E-CONTRACT", "geometry", f"geometry: {_FORM_WORDS[form]} is not read in format 0.3 yet")
 
 
 # -- the walk -------------------------------------------------------------------------------------
@@ -265,6 +285,8 @@ class _Walker:
             where = path + [name]
             self.r.defaults_applied.append({"path": display_path(where), "value": default,
                                             "reason": e.get("default_reason", "default")})
+            if default is None:
+                continue                  # an absence (no source, no body force): nothing to resolve
             saved, self.recording = self.recording, False      # a default is no authored input
             try:
                 resolved = self.slot(e, reader.read(default), where)
@@ -560,6 +582,8 @@ class _Walker:
                 return self.array(name, value, path, authored, accept, record)
             if "CO" in forms:
                 return self.components(slot, value, path, accept, record)
+            if "OBJECT" in forms:
+                return self.obj(slot, value, path)          # a typed object whose keys are slots
             self.error("E-VALUE-FORM", path, f"{name} takes {self._forms_text(forms, qo)} here, not this object")
             return None
         self.error("E-VALUE-FORM", path, f"{name} takes {self._forms_text(forms, qo)} here")
@@ -634,8 +658,10 @@ class _Walker:
     def _forms_text(forms, qo) -> str:
         words = {"QS": "a quantity string", "TA": "a tagged array", "SL": "a list of at most 3 quantity strings",
                  "CO": "a component object", "BD": "a number", "BC": "an integer", "NULL": "null",
-                 "MODEL": "a model object", "CX": '{"re": .., "im": ..}', "NK": '{"n": .., "k": ..}'}
-        listed = [words[f] for f in ("QS", "BD", "BC", "TA", "SL", "CO", "CX", "NK", "MODEL", "NULL") if f in forms]
+                 "MODEL": "a model object", "CX": '{"re": .., "im": ..}', "NK": '{"n": .., "k": ..}',
+                 "OBJECT": "an object"}
+        listed = [words[f] for f in ("QS", "BD", "BC", "TA", "SL", "CO", "CX", "NK", "MODEL", "OBJECT", "NULL")
+                  if f in forms]
         if "QS" in forms and qo.bare and "BD" not in forms:
             listed[0] = "a number"
         return " or ".join(listed) or "no value"

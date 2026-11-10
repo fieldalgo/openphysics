@@ -188,13 +188,13 @@ def observe(args, out: Path, report: dict):
     if state.get("status") != "done":
         raise ValueError("server terminal error; original responses preserved")
     entry, manifest = observer.request(endpoint + "/result", save=True)
-    if entry["status"] != 200 or manifest.get("payload_format") != "studio-thermal-transient-v1":
+    if entry["status"] != 200 or manifest.get("payload_format") != "studio-thermal-transient-v2":
         raise ValueError("unexpected transient manifest")
     result_id = manifest.get("result_id")
-    times = manifest.get("time_s")
+    times = manifest.get("time")
     if not isinstance(result_id, str) or not isinstance(times, list) or not 2 <= len(times) <= 128:
         raise ValueError("manifest identity/time count unavailable")
-    query = urllib.parse.urlencode({"result_id": result_id, "field": "temperature_k",
+    query = urllib.parse.urlencode({"result_id": result_id, "field": "temperature",
                                    "time_index": len(times) - 1, "frame_seq": 1})
     path = endpoint + "/frame?" + query
     first, frame = observer.request(path, save=True)
@@ -204,7 +204,7 @@ def observe(args, out: Path, report: dict):
         current, _ = observer.request(path)
         if any(current[k] != first[k] for k in ("status", "response_bytes", "sha256")):
             raise ValueError("same complete frame query changed bytes/status")
-    query = urllib.parse.urlencode({"result_id": result_id, "field": "heat_content_j_per_m",
+    query = urllib.parse.urlencode({"result_id": result_id, "field": "stored_heat_per_depth",
                                    "start": 0, "stop": min(16, len(times)), "frame_seq": 2})
     entry, page = observer.request(endpoint + "/history?" + query, save=True)
     if entry["status"] != 200 or page.get("result_id") != result_id:

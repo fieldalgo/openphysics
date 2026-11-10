@@ -18,30 +18,32 @@ headless API와 CLI를 설명합니다. Studio는 전용 열 경로로 이 문�
 
 ## 입력
 
-문서 형식은 `"openphysics": "0.2"`입니다. `units.length`(예: `m`, `mm`, `um`)와
-`units.temperature: "K"`를 선언합니다. 형상 경계 좌표는 선언한 길이 단위를
-사용하며, adapter가 메시 생성과 조립 전에 미터로 변환합니다. 다음 고정 접미사
-필드는 문서 길이 단위와 관계없이 SI 의미를 갖습니다.
+문서 형식은 `"openphysics": "0.3"`이며, 모든 값이 단위를 함께 씁니다(읽기 규칙은
+[문서 형식](document_format.md)). 평면 직사각형 형상은 `length_unit`(예: `m`, `mm`, `um`)을
+선언하고, 네 `domain` 경계는 그 단위의 숫자이며 메시 생성 전에 피코미터 정수를 거쳐
+정확히 미터로 바뀝니다. `depth`는 `null`(깊이 1 m당 결과)이거나 `"40 mm"` 같은 길이이며,
+길이를 주면 깊이당 값 옆에 총량이 붙습니다. 물리 항목은 다음을 가집니다.
 
-- `conductivity_w_mk`: 유한한 양의 상수, W/(m K).
-- `heat_source_w_m3`: 부호를 가질 수 있는 유한한 상수, W/m³. 기본값은 0입니다.
-- `dirichlet_temperature_k`: `left`, `right`, `bottom`, `top` 중 하나 이상을 유한한
-  비음수 켈빈 온도에 대응시키는 비어 있지 않은 매핑입니다. 지정하지 않은 외벽은 단열입니다.
+- `thermal_conductivity`: 양수, `"12.5 W/(m K)"` 같은 단위 문자열.
+- `heat_source_density`: 부호를 가질 수 있음, 예: `"100000 W/m^3"`. 없으면 열원이 없으며
+  (reader가 `defaults_applied`에 남기고 문서에는 아무것도 쓰지 않습니다).
+- `prescribed_temperature`: `left`, `right`, `bottom`, `top` 중 하나 이상을 0 K보다 높은
+  절대 온도(예: `"280 K"`, `"25 degC"`)에 대응시키는 비어 있지 않은 매핑. 지정하지 않은
+  외벽은 단열입니다.
 
-서로 인접한 지정 경계는 모서리 절점을 공유합니다. 같은 온도는 중복을 제거하고,
-상충하는 온도는 매핑 순서와 관계없이 거절합니다. 0 K도 유효한 지정값입니다.
-직사각형은 연결되어 있으며 비어 있지 않은 Dirichlet 집합이 상수 영공간을 제거합니다.
-하위 엔진도 연결 성분별 구속을 검사합니다. 임의의 분리된 메시는 이 문서 형식의
-범위 밖입니다.
+인접한 지정 변은 모서리 절점을 공유합니다. 같은 모서리 값은 하나로 합치고, 충돌하는 값은
+매핑 순서와 관계없이 거부합니다. 단위 일괄 변경부터 절대 온도는 0 K보다 커야 합니다
+(`E-DOMAIN`). 풀이된 온도 자체는 잘라내지 않습니다. 직사각형은 연결되어 있고, 비어 있지
+않은 지정 변 집합이 상수 영공간을 제거합니다. 기반 엔진도 구성 요소 제약을 검사하며,
+임의의 분리된 메시는 이 문서 형식의 범위 밖입니다.
 
-`mesh`에는 `subdivisions: [nx, ny]`만 들어갑니다. 각 값은 불리언이 아닌 양의
-JSON 정수여야 합니다. `4`는 허용하지만 `4.0`, `true`, 0과 음수는 거절합니다.
-`geometry`에는 유한하고 엄격히 순서가 맞는 네 `domain` 경계값만 들어갑니다.
-`materials`는 비어 있어야 하며 physics는 정확히 하나, `study`는
-`{"type":"single"}`이어야 합니다. `results`는 불리언 `save_fields`와 `plots`를
-받으며 `plots`는 기본값인 false만 허용합니다. 광학 재료·분산·파장 키, shapes,
-sweep, 추가 키, 영역별 k, 시간 의존, 결합 해석, 3D 요청은 이 정상 경로에서 거절합니다.
-자연 경계 키는 legacy v1 검증기가 아닌 별도 경계 확장 계약을 사용합니다.
+`mesh`에는 `subdivision_count: [nx, ny]`만 있으며 양의 JSON 정수여야 합니다(`4.0`,
+`true`, 0, 음수는 거부). `materials`는 비어 있고 물리는 하나이며 `study`는
+`{"type":"single"}`(기본값)입니다. `results`는 불리언 `save_fields`와 `plots`를 받고
+`plots`는 false(기본값)여야 합니다. 알 수 없는 키는 `E-KEY-UNKNOWN`이며,
+`conductivity_w_mk` 같은 형식 0.2 키는 새 이름과 함께 거부합니다. 형식 0.2 직사각형 열
+문서는 이름으로 거부합니다(`E-FORMAT`). 영역 문서는 단위 일괄 변경의 해당 커밋까지 형식
+0.2로 읽습니다. 자연 경계 키는 별도의 [경계 확장](thermal_steady_boundary2d.md)을 따릅니다.
 
 완전한 예제를 생성하고 실행합니다.
 
@@ -73,38 +75,41 @@ assert isinstance(result, ThermalRunResult)
 result.save("fresh_results")
 ```
 
-`result_format`은 `thermal.steady2d-result-v1`, `field_layout`은
-`thermal2d-p1-node-cell-v1`입니다. 이 값은 입력 형식 0.2 및 광학·공진기 결과
-형식과 독립적으로 열전도 출력을 식별합니다. 온도에 neff, 파장, 모드 정규화를
-붙이지 않습니다.
+`result_format`은 `thermal.steady2d-result-v3`, `field_layout`은
+`thermal2d-p1-node-cell-v2`입니다(형식 0.2 식별자 `-result-v1`과 `-cell-v1`은 은퇴했으며
+`simcase export`가 이름으로 거부합니다). 온도에 neff, 파장, 모드 정규화를 붙이지 않습니다.
 
-| NPZ 키 | Shape | 위치 | 단위 |
+| NPZ 키 | 모양 | 위치 | 단위 |
 | --- | --- | --- | --- |
-| `nodes_m` | (N,2) | 절점의 SI 좌표 | m |
-| `triangles` | (M,3) | 정수 절점 연결 정보, CCW | 1 |
-| `temperature_k` | (N,) | 절점 | K |
-| `heat_flux_w_m2` | (M,2) | 삼각형 중심, q=-k grad T | W/m² |
-| `load_w_per_m` | (N,) | 절점에 조립된 열원 | W/m |
-| `reaction_w_per_m` | (N,) | 절점의 내향 구속 반력 | W/m |
-| `residual_w_per_m` | (N,) | 전체 조립 잔차 K T - load | W/m |
-| `dirichlet_node_ids` | (D,) | 정렬되고 중복이 없는 지정 절점 인덱스 | 1 |
-| `dirichlet_temperature_k` | (D,) | 대응하는 지정 온도 | K |
+| `node_coordinates` | (N,2) | 절점, SI 좌표 | m |
+| `triangles` | (M,3) | 정수 절점 연결, 반시계 | (구조) |
+| `temperature` | (N,) | 절점 | K |
+| `heat_flux` | (M,2) | 삼각형 중심, q=-k grad T | W/m^2 |
+| `generated_heat_rate_per_depth` | (N,) | 조립된 절점 열원 | W/m |
+| `reaction_heat_rate_per_depth` | (N,) | 절점, 구속이 주입하는 열 | W/m |
+| `residual_heat_rate_per_depth` | (N,) | 전체 조립 K T - load 잔차 | W/m |
+| `prescribed_node_ids` | (D,) | 정렬된 고유 지정 절점 번호 | (구조) |
+| `prescribed_temperature` | (D,) | 대응하는 지정 값 | K |
 
-결과 속성은 `mesh_nodes_m`, `mesh_triangles` 및 위 표의 물리량·Dirichlet 배열
-이름 7개입니다. 지정 절점의 반력은 `K T - load`이며 자유 절점 반력은 0입니다.
-전체 residual은 지정 절점 반력과 반올림 오차 수준의 자유 절점 잔차를 모두
-보존합니다. 순 외향 열량은 중복 없는 지정 절점 반력 합의 **음수**입니다.
-절점 W/m 양은 단위 깊이당 적분값이고 flux는 W/m²입니다. 요소 flux는 요소 경계에서
-불연속이며 절점장이 아닙니다. flux와 residual은 엔진의 동치 연결 성분 offset
-좌표에서 평가합니다.
+결과 속성도 같은 이름입니다. 반력은 지정 절점에서 `K T - load`이고 자유 절점에서는
+0입니다. 전체 잔차는 고정 절점의 반력과 반올림 크기의 자유 성분을 유지합니다. 순 바깥쪽
+열은 고유 지정 절점 반력 합의 **음수**입니다. 깊이당 물리량은 깊이 1 m당 적분이며 열유속은
+W/m^2입니다. 요소 열유속은 요소 경계에서 불연속이며 절점 필드가 아닙니다. 열유속과 잔차는
+엔진의 등가 구성 요소 오프셋 좌표를 사용합니다.
 
-`summary.json`에는 format/layout ID, 원래 문서 단위, SI 메시 단위, 배열 9개의
-단위·위치·shape, 지정 절점 수, 온도, 열원·외향 열량·열수지 진단, 시간이 기록됩니다.
-수치는 유한해야 합니다. `fields.npz`에는 object 배열 없이 Unicode 스칼라 식별자와
-`metadata_json`도 들어갑니다. 소비자는 `numpy.load(path, allow_pickle=False)`를
-사용하고 식별자를 검사한 뒤 배열을 해석해야 합니다. `save_fields=false`이면
-NPZ 전체를 생략하고 summary, model, log는 남깁니다. 이때도 원시 배열의 수치·shape
-검사와 유한한 JSON 검증은 수행합니다. 저장 좌표는 문서 단위가 아닌 SI입니다.
+`summary.json`에는 식별자, `diagnostics` 목록, `defaults_applied`, `resolved_inputs`(각 입력의
+작성 텍스트, SI 값, 단위), `extent` 줄, `timing.wall_time`, `field_units`(구조 배열은 단위
+없음), `field_locations`, `field_shapes`, `field_components`, 그리고 `{"value", "unit"}` 꼴의
+값 `thermal_conductivity`, `minimum_temperature`, `maximum_temperature`,
+`generated_heat_rate_per_depth`, `outward_heat_rate_per_depth`,
+`heat_rate_imbalance_per_depth`, `relative_conservation_residual`, `relative_residual`이
+있습니다. `depth`를 주면 각 `*_per_depth` 값 뒤에 총량(`generated_heat_rate` 등, `깊이당 값 x
+depth`)이 붙습니다. 숫자는 유한해야 합니다. `fields.npz`에는 스칼라 식별자와
+`metadata_json`이 있고 객체 배열은 없으며, `mesh_length_unit`은 없어졌습니다(좌표는 SI이고
+`field_units`가 그렇게 밝힙니다). 소비자는 `numpy.load(path, allow_pickle=False)`를 쓰고 배열을
+해석하기 전에 식별자를 검증해야 합니다. `save_fields=false`는 NPZ 전체를 생략하고 summary,
+model, log는 유지합니다. `model.json`은 작성된 문서 바이트이며 `log.txt`는 extent 줄로 시작해
+모든 진단으로 끝납니다.
 
 ## 출력 소유권과 실패
 

@@ -53,7 +53,7 @@ rate는 Nt-1 interval에 있고 초기 zero row가 아니다.
 
 ## transport와 독립 음성 대조
 13개 public field 전부 검증한다. manifest static 배열은
-nodes_m/triangles/dirichlet_node_ids이며 time_s는 정확 top-level 축이다.
+node_coordinates/triangles/prescribed_node_ids이며 time은 정확 top-level 축이다(형식 0.3).
 descriptor의 shape/unit/location/time axis/initial availability를 확인한다.
 기본 frame은 Nt-1이다. 모든 동적 field를 전 저장 frame에서 재구성하여 history와
 대조한 뒤 독립 기대 배열과 검사한다. T는 nodal, 공급 q는 cell-centered이며 절점

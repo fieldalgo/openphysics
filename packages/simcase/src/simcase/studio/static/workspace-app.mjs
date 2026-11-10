@@ -83,7 +83,7 @@ function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[
 
 // ---- Steady heat plate: a form over the public thermal.steady2d routes (thermal.js controller). ----
 const HEAT_NODES=['Geometry','Materials','Heat transfer','Mesh','Study'];
-const heatDrafts=new Map();let heatSide='left',heatField='temperature_k',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
+const heatDrafts=new Map();let heatSide='left',heatField='temperature',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
 const heatController=globalThis.ThermalStudio?.createController({
  request:async(method,url,body)=>{const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;},
  onState:next=>{heatState=next;refreshHeatControls();},
@@ -164,19 +164,19 @@ function heatResults(){
  const same=heatRun.signature===heatSignature(),run=heatRun,s=run.payload.summary||{};
  host.innerHTML='<h2>Steady temperature and heat flux</h2>';
  const desc=document.createElement('p');desc.textContent=`${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${thermalSummary(run.input)} · ${SIDES.map(side=>side+': '+sideText(run.input.sides[side])).join(' · ')} · ${run.input.nx} × ${run.input.ny} divisions`;host.append(desc);
- const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature_k','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
+ const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
  const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='heat-field-canvas';canvas.style.cssText='display:block;width:100%;height:360px;cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
  const probe=document.createElement('p');probe.id='heat-probe';probe.setAttribute('role','status');host.append(probe);
  const note=document.createElement('p');note.textContent='Temperature is interpolated linearly inside each triangle (P1); heat flux is constant per triangle. Colours span this result\'s own minimum to maximum. Click the plot to read a value. Heat results are kept in this tab only; save the input file to keep the design.';host.append(note);
  const T=globalThis.ThermalStudio;
  const draw=()=>{if(!canvas.isConnected)return;try{const model=T.viewModel(run.payload,heatField);T.draw(canvas,model,{arrows:heatArrows});canvas.setAttribute('aria-label',`${model.field} ${model.min} to ${model.max} ${model.unit}`);
-  if(heatProbe){const v=T.sample(model,heatProbe);probe.textContent=v===null?'No triangle contains this point.':`At (${heatProbe[0].toFixed(4)}, ${heatProbe[1].toFixed(4)}) ${model.lengthLabel}: ${heatField==='temperature_k'?'T':heatField==='magnitude'?'|q|':heatField} = ${v.toPrecision(6)} ${model.unit}${model.nodal?' (P1 interpolation)':' (triangle value)'}`;}else probe.textContent='No point selected.';
+  if(heatProbe){const v=T.sample(model,heatProbe);probe.textContent=v===null?'No triangle contains this point.':`At (${heatProbe[0].toFixed(4)}, ${heatProbe[1].toFixed(4)}) ${model.lengthLabel}: ${heatField==='temperature'?'T':heatField==='magnitude'?'|q|':heatField} = ${v.toPrecision(6)} ${model.unit}${model.nodal?' (P1 interpolation)':' (triangle value)'}`;}else probe.textContent='No point selected.';
   canvas.onclick=event=>{const r=canvas.getBoundingClientRect(),tr=T.transform(model,Math.round(r.width),Math.round(r.height));heatProbe=tr.inverse(event.clientX-r.left,event.clientY-r.top);draw();};
  }catch(error){probe.textContent='Plot unavailable: '+error.message;}};
  $('heat-field').onchange=()=>{heatField=$('heat-field').value;draw();};$('heat-arrows').onchange=()=>{heatArrows=$('heat-arrows').checked;draw();};
  heatResize=new ResizeObserver(draw);heatResize.observe(canvas);draw();
- const t=run.payload.arrays.temperature_k;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
- $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',run.payload.arrays.nodes_m.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
+ const named=globalThis.ThermalStudio.named(run.payload.arrays),t=named.temperature;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+ $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',named.nodes.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
  const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>setThermal(run.input,'Heat inputs restored from the run.');$('inspector').append(restore);
 }
 function renderHeat(){

@@ -29,6 +29,17 @@ def _docs():
 
 
 DOCS = _docs()
+#: the documents still in format 0.2; a format 0.3 rectangle (heat, units batch C5a) declares
+#: geometry.length_unit and depth in its flat block instead of units.length
+DOCS_02 = sorted(k for k, v in DOCS.items() if v.get("openphysics") == "0.2")
+
+
+def _units_and_flat(doc):
+    """``(units, flat 0.2 geometry block)`` of a 0.2 document, or of a 0.3 one's flat block."""
+    g = doc["geometry"]
+    if doc.get("openphysics") == "0.3":
+        return {"length": g["length_unit"]}, {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
+    return doc["units"], g
 
 
 def v1(units, components, parameters=None):
@@ -53,10 +64,10 @@ def test_all_current_documents_are_walked():
 
 @pytest.mark.parametrize("name", sorted(DOCS))
 def test_v02_round_trip_is_exact(name):
-    doc = copy.deepcopy(DOCS[name])
-    model = parse({"units": doc["units"], "geometry": from_v02(doc["geometry"])})
+    units, flat = _units_and_flat(copy.deepcopy(DOCS[name]))
+    model = parse({"units": units, "geometry": from_v02(flat)})
     assert model.roundings == []
-    assert to_v02(model) == doc["geometry"]
+    assert to_v02(model) == flat
 
 
 def test_v02_names_that_cannot_be_ids_get_positions():
@@ -361,7 +372,7 @@ def _as_v1(name):
     return doc
 
 
-@pytest.mark.parametrize("name", sorted(DOCS))
+@pytest.mark.parametrize("name", DOCS_02)
 def test_a_document_with_version_1_geometry_runs_the_same_input(name):
     from simcase import Document
     v1_doc = _as_v1(name)

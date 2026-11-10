@@ -8,19 +8,42 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
   const TYPE = 'thermal.steady2d';
+  // Rectangle documents are format 0.3: arrays under registry names, SI values. A structural
+  // array (connectivity, node indices) has no unit.
   const PAIRS = {
-    'thermal.steady2d-result-v1': 'thermal2d-p1-node-cell-v1',
-    'thermal.steady2d-result-v2': 'thermal2d-p1-node-cell-boundary-v2'
+    'thermal.steady2d-result-v3': 'thermal2d-p1-node-cell-v2',
+    'thermal.steady2d-result-v4': 'thermal2d-p1-node-cell-boundary-v3'
   };
   const BASE = {
-    nodes_m: ['m','nodes',2], triangles: ['1','triangle_connectivity',3],
-    temperature_k: ['K','nodes',0], heat_flux_w_m2: ['W/m^2','triangle_centroids',2],
-    load_w_per_m: ['W/m','nodes',0], reaction_w_per_m: ['W/m','nodes',0],
-    residual_w_per_m: ['W/m','nodes',0], dirichlet_node_ids: ['1','dirichlet_nodes',0],
-    dirichlet_temperature_k: ['K','dirichlet_nodes',0]
+    node_coordinates: ['m','nodes',2], triangles: [null,'triangle_connectivity',3],
+    temperature: ['K','nodes',0], heat_flux: ['W/m^2','triangle_centroids',2],
+    generated_heat_rate_per_depth: ['W/m','nodes',0], reaction_heat_rate_per_depth: ['W/m','nodes',0],
+    residual_heat_rate_per_depth: ['W/m','nodes',0], prescribed_node_ids: [null,'prescribed_nodes',0],
+    prescribed_temperature: ['K','prescribed_nodes',0]
   };
-  const ADDED = ['prescribed_outward_load_w_per_m','ambient_load_w_per_m',
-    'convective_outward_w_per_m','system_rhs_w_per_m'];
+  const ADDED = ['outward_prescribed_heat_rate_per_depth','ambient_convective_heat_rate_per_depth',
+    'outward_convective_heat_rate_per_depth','applied_heat_rate_per_depth'];
+  const LAYOUT = {payload_format:'studio-thermal-steady-v2', pairs:PAIRS, base:BASE, added:ADDED,
+    boundary:'thermal.steady2d-result-v4', nodes:'node_coordinates', fixed:'prescribed_node_ids',
+    flux:'heat_flux', format:'0.3'};
+  // Region documents are still format 0.2 until their commit of the units batch: their payloads
+  // keep the 0.2 names, checked by the same code under this layout.
+  const LEGACY = {payload_format:'studio-thermal-steady-v1',
+    pairs:{'thermal.steady2d-result-v1':'thermal2d-p1-node-cell-v1',
+      'thermal.steady2d-result-v2':'thermal2d-p1-node-cell-boundary-v2'},
+    base:{nodes_m:['m','nodes',2], triangles:['1','triangle_connectivity',3],
+      temperature_k:['K','nodes',0], heat_flux_w_m2:['W/m^2','triangle_centroids',2],
+      load_w_per_m:['W/m','nodes',0], reaction_w_per_m:['W/m','nodes',0],
+      residual_w_per_m:['W/m','nodes',0], dirichlet_node_ids:['1','dirichlet_nodes',0],
+      dirichlet_temperature_k:['K','dirichlet_nodes',0]},
+    added:['prescribed_outward_load_w_per_m','ambient_load_w_per_m','convective_outward_w_per_m','system_rhs_w_per_m'],
+    boundary:'thermal.steady2d-result-v2', nodes:'nodes_m', fixed:'dirichlet_node_ids', flux:'heat_flux_w_m2',
+    format:'0.2'};
+  // The arrays of a view, whichever names its payload carries.
+  function named(a) {
+    return {nodes:a.node_coordinates??a.nodes_m, triangles:a.triangles, temperature:a.temperature??a.temperature_k,
+      flux:a.heat_flux??a.heat_flux_w_m2};
+  }
   // Region documents: their own pair and payload format, advertised in a nested
   // capability block so that a rectangle-only client never sees them.
   const REGION = {result_format:'thermal.steady2d-regions-result-v1',
@@ -85,7 +108,7 @@
         || new Set(c.result_formats).size!==c.result_formats.length
         || !c.result_formats.every((f,i)=>PAIRS[f]===c.field_layouts[i])
         || !Array.isArray(c.fields) || c.fields.length!==2
-        || !['temperature_k','heat_flux_w_m2'].every(f=>c.fields.includes(f))
+        || !['temperature','heat_flux'].every(f=>c.fields.includes(f))
         || !object(c.limits)) return null;
     const integerLimits=['request_bytes','max_nodes','max_triangles','payload_bytes','active_jobs',
       'terminal_jobs','terminal_bytes','log_bytes','error_bytes','metadata_bytes','status_bytes'];
@@ -137,16 +160,17 @@
     if(seen.has(value))fail('cyclic JSON metadata');seen.add(value);
     Object.values(value).forEach(v=>finiteJSON(v,seen));seen.delete(value);
   }
-  function validatePayload(input, expected) {
+  function validatePayload(input, expected) { return checkPayload(input, expected, LAYOUT); }
+  function checkPayload(input, expected, L) {
     finiteJSON(input);
     const allowed=['payload_format','kind','job','result_id','client_revision','request_seq',
-      'result_format','field_layout','arrays','summary','display_length_in_m'];
+      'result_format','field_layout','arrays','summary','display_length_in_m',...(L.format==='0.3'?['length_unit']:[])];
     if(!object(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('unknown wire field');
-    if(['neff','group_index','wavelength','modes','parameter','time_s'].some(k=>k in (input.summary||{})))
+    if(['neff','group_index','wavelength','modes','parameter','time_s','time'].some(k=>k in (input.summary||{})))
       fail('optical/transient summary keys are unsupported');
 
-    if (!object(input) || input.payload_format !== 'studio-thermal-steady-v1'
-        || input.kind !== TYPE || PAIRS[input.result_format] !== input.field_layout || !identity(input))
+    if (!object(input) || input.payload_format !== L.payload_format
+        || input.kind !== TYPE || L.pairs[input.result_format] !== input.field_layout || !identity(input))
       fail('unsupported payload, result/layout pair or identity');
     if (expected && ['job','result_id','client_revision','request_seq'].some(k=>input[k]!==expected[k]))
       fail('response ownership mismatch');
@@ -154,25 +178,27 @@
     if (!object(a) || !object(s) || s.physics_type !== TYPE
         || s.result_format !== input.result_format || s.field_layout !== input.field_layout)
       fail('summary and arrays do not match the typed result');
-    const spec = {...BASE};
-    if (input.result_format.endsWith('-v2')) ADDED.forEach(k=>spec[k]=['W/m','nodes',0]);
+    const spec = {...L.base}, boundary = input.result_format === L.boundary;
+    if (boundary) L.added.forEach(k=>spec[k]=['W/m','nodes',0]);
     if (Object.keys(a).length !== Object.keys(spec).length || Object.keys(a).some(k=>!spec[k]))
       fail('unexpected or missing physical arrays');
-    const N = a.nodes_m?.length, M = a.triangles?.length, D = a.dirichlet_node_ids?.length;
+    const N = a[L.nodes]?.length, M = a.triangles?.length, D = a[L.fixed]?.length;
     if (!integer(N) || N<3 || !integer(M) || M<1 || !integer(D) || D>N
-        || (input.result_format.endsWith('-v1') && D===0)) fail('invalid N/M/D');
-    for(const meta of ['field_units','field_locations','field_shapes'])
-      if(!object(s[meta])||Object.keys(s[meta]).length!==Object.keys(spec).length
-          ||Object.keys(s[meta]).some(k=>!spec[k]))fail('metadata field set '+meta);
+        || (!boundary && D===0)) fail('invalid N/M/D');
+    const unitKeys=Object.keys(spec).filter(k=>spec[k][0]!==null);
+    for(const [meta,keys] of [['field_units',unitKeys],['field_locations',Object.keys(spec)],['field_shapes',Object.keys(spec)]])
+      if(!object(s[meta])||Object.keys(s[meta]).length!==keys.length
+          ||Object.keys(s[meta]).some(k=>!keys.includes(k)))fail('metadata field set '+meta);
     if(s.mesh?.nodes!==N||s.mesh?.triangles!==M)fail('summary mesh counts');
     const arrays = {};
     for (const [key,[unit,location,cols]] of Object.entries(spec)) {
-      const rows = key==='triangles'||key==='heat_flux_w_m2' ? M : key.startsWith('dirichlet_') ? D : N;
+      const rows = key==='triangles'||key===L.flux ? M : spec[key][1].endsWith('_nodes') && key!==L.nodes ? D : N;
       const shape = cols ? [rows,cols] : [rows];
       const values = a[key];
       if (!Array.isArray(values) || values.length!==rows
           || JSON.stringify(s.field_shapes?.[key])!==JSON.stringify(shape)
-          || s.field_units?.[key]!==unit || s.field_locations?.[key]!==location)
+          || (unit===null ? Object.hasOwn(s.field_units,key) : s.field_units?.[key]!==unit)
+          || s.field_locations?.[key]!==location)
         fail('shape/unit/location for '+key);
       arrays[key] = values.map(row=>{
         if (cols) {
@@ -183,7 +209,7 @@
         return row;
       });
     }
-    const nodes = arrays.nodes_m, tris = arrays.triangles, ids = arrays.dirichlet_node_ids;
+    const nodes = arrays[L.nodes], tris = arrays.triangles, ids = arrays[L.fixed];
     for (const tri of tris) {
       if (tri.some(i=>!integer(i)||i>=N) || new Set(tri).size!==3) fail('connectivity');
       const [p,q,r]=tri.map(i=>nodes[i]);
@@ -193,11 +219,19 @@
     if (ids.some((v,i)=>!integer(v)||v>=N||(i&&v<=ids[i-1]))) fail('unique sorted fixed IDs');
     if(!finite(input.display_length_in_m)||input.display_length_in_m<=0)
       fail('display length conversion');
-    const declared=s.units?.length;
-    const label=typeof declared==='string' ? declared
-      : object(declared)&&Object.keys(declared).length===1&&finite(declared.in_m)&&declared.in_m>0
-        ? String(declared.in_m)+' m' : null;
-    if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m')fail('explicit length/K units');
+    let label;
+    if (L.format==='0.3') {
+      // The geometry's length_unit names the display unit; the summary's inputs agree with it.
+      label=input.length_unit;
+      if (typeof label!=='string' || !label
+          || s.resolved_inputs?.['geometry.domain.xmin']?.length_unit!==label) fail('geometry length_unit');
+    } else {
+      const declared=s.units?.length;
+      label=typeof declared==='string' ? declared
+        : object(declared)&&Object.keys(declared).length===1&&finite(declared.in_m)&&declared.in_m>0
+          ? String(declared.in_m)+' m' : null;
+      if (!label || s.units?.temperature!=='K' || s.mesh_length_unit!=='m')fail('explicit length/K units');
+    }
     // Copy the validated finite summary; no backend text is interpreted as HTML.
     const summary = clone(s);
     return Object.freeze({...input, arrays, summary, lengthLabel:label});
@@ -268,15 +302,15 @@
       fail('region summary and payload pairs disagree');
     if (!Object.hasOwn(a,'triangle_regions') || METADATA.some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))
       fail('missing triangle_regions');
-    // Relabel a copy as a v2 rectangle payload, top-level and summary pair alike, and
-    // reuse every unchanged v2 check (D=0, connectivity, CCW, units, ownership).
-    const v2=clone(input), V2='thermal.steady2d-result-v2';
-    v2.payload_format='studio-thermal-steady-v1';
+    // Relabel a copy as a 0.2 boundary rectangle payload, top-level and summary pair alike, and
+    // reuse every unchanged check (D=0, connectivity, CCW, units, ownership).
+    const v2=clone(input), V2=LEGACY.boundary;
+    v2.payload_format=LEGACY.payload_format;
     v2.result_format=v2.summary.result_format=V2;
-    v2.field_layout=v2.summary.field_layout=PAIRS[V2];
+    v2.field_layout=v2.summary.field_layout=LEGACY.pairs[V2];
     delete v2.arrays.triangle_regions;
     for (const m of METADATA) delete v2.summary[m].triangle_regions;
-    const accepted=validatePayload(v2, expected);
+    const accepted=checkPayload(v2, expected, LEGACY);
     const M=accepted.arrays.triangles.length;
     if (s.field_units.triangle_regions!=='1' || s.field_locations.triangle_regions!=='triangles'
         || JSON.stringify(s.field_shapes.triangle_regions)!==JSON.stringify([M])) fail('triangle_regions metadata');
@@ -329,14 +363,15 @@
     capabilityCurrent(seq) { return seq===this.capSeq; }
   }
 
-  function viewModel(payload, field='temperature_k') {
-    const a=payload.arrays, scale=payload.display_length_in_m;
-    const nodes=a.nodes_m.map(p=>p.map(x=>x/scale));
+  // View fields: 'temperature' (nodal), or the heat flux 'qx', 'qy', 'magnitude' (per cell).
+  function viewModel(payload, field='temperature') {
+    const a=named(payload.arrays), scale=payload.display_length_in_m;
+    const nodes=a.nodes.map(p=>p.map(x=>x/scale));
     if (nodes.some(p=>p.some(x=>!finite(x)))) fail('display coordinates overflow');
     let values,unit;
-    if (field==='temperature_k') { values=a.temperature_k.slice(); unit='K'; }
+    if (field==='temperature') { values=a.temperature.slice(); unit='K'; }
     else if (['qx','qy','magnitude'].includes(field)) {
-      values=a.heat_flux_w_m2.map(q=>field==='qx'?q[0]:field==='qy'?q[1]:Math.hypot(q[0],q[1])); unit='W/m²';
+      values=a.flux.map(q=>field==='qx'?q[0]:field==='qy'?q[1]:Math.hypot(q[0],q[1])); unit='W/m²';
     } else fail('unsupported steady field; no time/history selection');
     if (values.some(v=>!finite(v))) fail('derived field magnitude overflow');
     let min=Infinity,max=-Infinity,xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
@@ -345,8 +380,8 @@
     if (![max-min,xmax-xmin,ymax-ymin].every(finite)||xmax<=xmin||ymax<=ymin)
       fail('display range overflow or degeneracy');
     const model={nodes,triangles:a.triangles,values,min,max,unit,field,
-      nodal:field==='temperature_k',domain:{xmin,xmax,ymin,ymax},lengthLabel:payload.lengthLabel,
-      flux:a.heat_flux_w_m2};
+      nodal:field==='temperature',domain:{xmin,xmax,ymin,ymax},lengthLabel:payload.lengthLabel,
+      flux:a.flux};
     if (payload.regions) model.regions=payload.regions;   // rectangle models keep their exact keys
     return model;
   }
@@ -529,7 +564,7 @@
       result:()=>result,state:()=>({cap,result,error}),renderToken:field=>gate.renderToken(field),
       renderCurrent:t=>gate.renderCurrent(t)};
   }
-  return {TYPE,PAIRS,BASE,ADDED,soleType,capability,validatePayload,Ownership,
+  return {TYPE,PAIRS,BASE,ADDED,LEGACY,named,soleType,capability,validatePayload,Ownership,
     strictParse,viewModel,barycentric,sample,transform,color,draw,createController,
     REGION,PALETTE,hasRegionGeometry,regionCapability,validateRegionPayload,regionTable,regionEdges,locate};
 });
