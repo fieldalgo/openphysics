@@ -5,8 +5,8 @@
 [galerkin 개요](overview.md) · [JAX·PyTorch로 미분하기](differentiation.md)
 
 `galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 Cartesian 열
-(`galerkin.thermal.solve_steady_heat`, 2026-11-09)과 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10)를
-다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+(`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
+선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -57,6 +57,14 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 - 솔버처럼 전압을 각 성분의 오프셋에 대한 값으로 다루므로, 큰 공통 전압이 전력이나 그 미분에 섞이지 않습니다.
 - 이산 전력 항등식(Joule 전력 = 공급 전력)이 미분에서도 성립합니다(검증 E5).
 
+## 선형 탄성
+
+`solve_elasticity(mesh, ..., motion=MeshMotion(W, t))`는 plane stress·plane strain, 스칼라 또는 영역별 영률·푸아송비,
+일정 체적력, 경계 태그의 일정 traction(변과 함께 움직임), Dirichlet 변위 `{(node, component): value}`를 받습니다. 변위·변형률·
+응력·부하·반력·잔차가 d/dt를 나릅니다.
+- Dirichlet 값은 노드에 붙어 노드와 함께 움직입니다.
+- 열탄성은 아직 다루지 않습니다. 온도장이 메시와 함께 어떻게 움직이는지는 따로 정해야 합니다.
+
 ## 메시 속도
 
 형상의 곡선 위 노드는 설계가 움직이는 대로 움직입니다. 버전 1 형상 문서라면 `simcase.geometry_velocity.design_velocity(document,
@@ -88,9 +96,10 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - NumPy `t`(`TypeError`): NumPy는 미분하지 않습니다. 옮겨진 메시에서 풀려면 노드를 옮겨 그 메시를 푸십시오.
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
-- 열원·outward flux·convection·outward current의 좌표 콜백(convection 쌍 안의 것 포함), `ElementHeatSource`와
-  `ElementConductivity`: 표본점이 메시와 함께 움직입니다.
-- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위 값: 그런 호출에서 live 입력은 t 하나입니다.
+- 열원·outward flux·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
+  `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다.
+- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·체적력·traction 값: 그런 호출에서 live 입력은
+  t 하나입니다.
 - `coordinate_system="axisymmetric"`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
@@ -127,3 +136,20 @@ PyTorch 2.14.1+cpu로 측정했습니다.
 | E8 거부 | 위 목록대로 | 통과 |
 
 그 뒤 독립 검토가 회귀 시험을 더했습니다: 1e9 V까지의 공통 전압(E5 기준), 전류만 있는 성분의 수지를 바꾸는 이동(거부).
+
+`tests/galerkin/test_shape_derivative_elasticity.py`에 선형 탄성의 검사 M1–M8이 있습니다. 2026-11-10에 사전 등록하고 같은 날
+같은 버전으로 측정했습니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| M1 이산 일관성 | 두 재료·중력·움직이는 변의 traction이 있는 문제에서, 끝 변위·고정변 반력·변형 에너지의 미분 vs 옮긴 메시 중심차분(h = 1e-4), plane stress·plane strain; 상대 1e-6, JAX·PyTorch | 2.6e-10 ~ 9.6e-9 |
+| M2 일축 봉 | dδ/dL = σ/E, 상대 1e-10 | 통과 |
+| M3 직렬 두 재료(ν = 0) | dδ/dL₁ = σ(1/E₁ − 1/E₂), 상대 1e-10 | 통과 |
+| M4 두꺼운 원통(plane strain) | 형상 엔진 노드 속도로 안 반지름, 그 위에 반지름 방향 변위 U₀, 바깥 자유; Lamé 해의 dF/da와 비교; 관측 차수 ≥ 1.0, 최세 1e-2 이내 | 크기 0.4·0.2·0.1에서 4.4e-2, 1.0e-2, 2.6e-3(차수 약 2) |
+| M5 강체 이동 | dJ/dt = 0, 1e-12 · \|J\| 이내(변형 에너지, 변위 합) | 통과 |
+| M6 에너지 항등식 | d(½∫σ:ε)/dt = d(½ load · u)/dt, 상대 1e-10 | 통과 |
+| M7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `6f80a73`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
+| M8 거부 | 위 목록대로 | 통과 |
+
+사전 등록은 M4의 기준을 정했고 메시 크기는 정하지 않았습니다. 크기 0.8·0.4·0.2로 처음 돌리면 1.6e-1, 4.4e-2, 1.016e-2로 차수는 약
+2지만 최세가 1e-2를 조금 넘었습니다. 시험은 한 단계 더 고운 세 크기를 쓰며, 기준은 그대로입니다.

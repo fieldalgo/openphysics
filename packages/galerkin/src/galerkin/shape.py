@@ -16,8 +16,9 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
   returns the temperature, flux, loads and reactions with their derivative with
   respect to t.
 
-``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian) and
-``electric.solve_steady_electric`` with scalar or region data; the refusals are
+``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
+``electric.solve_steady_electric`` and ``elasticity.solve_elasticity`` with scalar
+or region data and constant loads; the refusals are
 listed in docs/packages/galerkin/shape_derivative.md.
 """
 
@@ -276,6 +277,93 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
     supplied = xp.sum(increment * (reaction - outward))
     return electric.SteadyElectricResult(base.mesh, potential, field, current, sigma, heat, load, power, reaction,
                                          outward, residual, supplied)
+
+
+# ----------------------------------------------------------------------------- elasticity
+
+def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, poisson_ratio, plane, dirichlet,
+                            body_force=(0.0, 0.0), traction=None):
+    """``elasticity.solve_elasticity`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    The ordinary solve on the moved mesh gives the numbers and all checks; one live solve
+    of the system assembled from the live coordinates (P1 strain matrices, element areas,
+    the constant body force and the constant tractions on moving edges) attaches the
+    derivative to the displacement, strain, stress, load, reaction and residual."""
+    from . import elasticity
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    for name, value in (("young_modulus", young_modulus), ("poisson_ratio", poisson_ratio)):
+        _coefficient(value, name)
+    if callable(body_force):
+        raise TypeError("motion: body_force is a callback; with a moving mesh its sample points move too, which "
+                        "this slice does not differentiate. Give a constant (2,) vector")
+    if is_live(body_force) or (isinstance(body_force, (tuple, list)) and any(is_live(v) for v in body_force)):
+        raise TypeError("motion: body_force is live; in this slice only the motion's t carries a derivative")
+    for tag, value in _tags(traction, "traction").items():
+        if callable(value):
+            raise TypeError(f"motion: traction[{tag!r}] is a callback; with a moving mesh its sample points move "
+                            "too, which this slice does not differentiate. Give a constant (2,) vector")
+        if is_live(value) or (isinstance(value, (tuple, list)) and any(is_live(v) for v in value)):
+            raise TypeError(f"motion: traction[{tag!r}] is live; in this slice only the motion's t carries a "
+                            "derivative")
+    if not isinstance(dirichlet, Mapping):
+        raise ValueError("dirichlet must map (node, component) to displacement in metres")
+    for value in dirichlet.values():
+        _numpy_data(value, "Dirichlet displacement")
+    t0 = float(to_numpy(t))
+    if not math.isfinite(t0):
+        raise ValueError(f"motion: t must be finite, got {t0!r}")
+    lo, hi = admissible_interval(mesh, W)
+    if not lo < t0 < hi:
+        raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
+                               f"({lo:g}, {hi:g}))")
+    moved = _moved_mesh(mesh, W, t0)
+    base = elasticity.solve_elasticity(moved, young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
+                                       dirichlet=dirichlet, body_force=body_force, traction=traction)
+    n = mesh.num_nodes
+    X = lift(xp, mesh.nodes) + t * lift(xp, W)
+    tris = mesh.triangles
+    b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
+    gx, gy = b / (2.0 * area)[:, None], c / (2.0 * area)[:, None]
+    zero = xp.zeros_like(gx)
+    # B (T, 3, 6) with DOF order 2*node + component: rows exx, eyy, gamma_xy
+    exx = xp.reshape(xp.stack([gx, zero], axis=2), (-1, 6))
+    eyy = xp.reshape(xp.stack([zero, gy], axis=2), (-1, 6))
+    gxy = xp.reshape(xp.stack([gy, gx], axis=2), (-1, 6))
+    B = xp.stack([exx, eyy, gxy], axis=1)
+    e, nu = elasticity.element_materials(mesh, young_modulus, poisson_ratio)
+    d = lift(xp, np.asarray(elasticity.constitutive(np, np.asarray(e, dtype=float), np.asarray(nu, dtype=float),
+                                                    plane)))
+    if d.ndim == 2:
+        ke = xp.einsum("tji,jk,tkl,t->til", B, d, B, area)
+    else:
+        ke = xp.einsum("tji,tjk,tkl,t->til", B, d, B, area)
+    dofs = (2 * tris[:, :, None] + np.arange(2)).reshape(-1, 6)
+    size = 2 * n
+    K = CooMatrix(np.repeat(dofs, 6, axis=1).ravel(), np.tile(dofs, (1, 6)).ravel(), xp.reshape(ke, (-1,)),
+                  (size, size))
+    f = np.asarray(to_numpy(body_force), dtype=float).reshape(2)
+    body = xp.reshape((area / 3.0)[:, None, None] * lift(xp, np.broadcast_to(f, (1, 3, 2))), (-1,))
+    load = scatter_add(xp, size, dofs.ravel(), body)
+    for tag, value in _tags(traction, "traction").items():
+        g = np.asarray(value, dtype=float).reshape(2)
+        edges, length = _boundary_edges(xp, mesh, X, tag)
+        edofs = (2 * edges[:, :, None] + np.arange(2)).reshape(-1)
+        local = (length / 2.0)[:, None, None] * lift(xp, np.broadcast_to(g, (1, 2, 2)))
+        load = scatter_add(xp, size, edofs, xp.reshape(local, (-1,)), base=load)
+    u0 = lift(xp, np.asarray(to_numpy(base.displacement), dtype=float).reshape(-1))
+    fixed_dofs = np.array(sorted(2 * int(k[0]) + int(k[1]) for k in dirichlet), dtype=int)
+    delta = core_solve.solve_dirichlet(K, load - K.matvec(u0), {tuple(fixed_dofs): 0.0} if len(fixed_dofs) else {})
+    u = u0 + delta
+    residual = K.matvec(u) - load
+    mask = np.zeros(size, dtype=bool)
+    mask[fixed_dofs] = True
+    reaction = xp.where(lift(xp, mask), residual, xp.zeros_like(residual))
+    strain = xp.einsum("tij,tj->ti", B, u[dofs])
+    stress = strain @ d.T if d.ndim == 2 else xp.einsum("tij,tj->ti", d, strain)
+    return elasticity.ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress, xp.reshape(load, (-1, 2)),
+                                       xp.reshape(reaction, (-1, 2)), xp.reshape(residual, (-1, 2)), plane)
 
 
 # ----------------------------------------------------------------------------- helpers

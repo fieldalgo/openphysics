@@ -6,9 +6,10 @@
 
 `galerkin.shape` gives derivatives with respect to a design parameter that moves
 the mesh, such as a layer thickness or a hole radius. It covers steady Cartesian
-heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09) and steady electric
-conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10). The other
-solvers follow the same frame later.
+heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09), steady electric
+conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10) and linear
+elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10). The other solvers
+follow the same frame later.
 
 ## What is differentiated
 
@@ -74,6 +75,17 @@ and call `.backward()`.
 - The discrete power identity, Joule power = supplied power, also holds for the
   derivatives (validation E5).
 
+## Linear elasticity
+
+`solve_elasticity(mesh, ..., motion=MeshMotion(W, t))` takes plane stress and
+plane strain, scalar or region Young's modulus and Poisson ratio, a constant body
+force, constant tractions on boundary tags (they move with their edges) and
+Dirichlet displacements `{(node, component): value}`. The displacement, strain,
+stress, load, reaction and residual carry d/dt.
+- The Dirichlet values stay attached to their nodes as the nodes move.
+- Thermoelasticity is not covered yet: how a temperature field moves with the
+  mesh is a separate decision.
+
 ## The mesh velocity
 
 Nodes on the geometry's curves move as the design moves them. For a version 1
@@ -118,11 +130,13 @@ Each refusal names the reason:
   mesh, move the nodes and solve that mesh;
 - a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
 - a step outside the admissible interval (`ElementInversion`);
-- coordinate callbacks for the heat source, outward flux, convection or outward
-  current, also inside a convection pair, and `ElementHeatSource` and
-  `ElementConductivity`: their sample points move with the mesh;
-- live conductivity, source, boundary, Dirichlet or reference values together
-  with a motion: t is the one live input of such a call;
+- coordinate callbacks for the heat source, outward flux, convection, outward
+  current, body force or traction, also inside a convection pair, and
+  `ElementHeatSource` and `ElementConductivity`: their sample points move with
+  the mesh;
+- live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
+  body-force or traction values together with a motion: t is the one live input
+  of such a call;
 - `coordinate_system="axisymmetric"`;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
@@ -163,3 +177,23 @@ with the same versions.
 An independent review then added regression tests: a common-mode voltage up to
 1e9 V (E5 criterion), and a motion that changes a current-only component's
 balance (refused).
+
+`tests/galerkin/test_shape_derivative_elasticity.py` holds checks M1–M8 for linear
+elasticity, pre-registered on 2026-11-10 and measured that day with the same
+versions.
+
+| Check | Criterion | Result |
+|---|---|---|
+| M1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a tip displacement, the clamped-side reaction and the strain energy, with two materials, gravity and a traction on a moving side, plane stress and plane strain; relative 1e-6, JAX and PyTorch | 2.6e-10 to 9.6e-9 |
+| M2 uniaxial bar | dδ/dL = σ/E, relative 1e-10 | pass |
+| M3 two materials in series (ν = 0) | dδ/dL₁ = σ(1/E₁ − 1/E₂), relative 1e-10 | pass |
+| M4 thick cylinder (plane strain) | inner radius from the geometry engine's node velocities, radial displacement U₀ on it, outer face free; dF/da against the Lamé solution; observed order ≥ 1.0, finest within 1e-2 | 4.4e-2, 1.0e-2, 2.6e-3 at sizes 0.4, 0.2, 0.1 (order about 2) |
+| M5 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| (strain energy, sum of displacements) | pass |
+| M6 energy identity | d(½∫σ:ε)/dt = d(½ load · u)/dt, relative 1e-10 | pass |
+| M7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `6f80a73` (measured); `motion=None` equals no keyword (test) |
+| M8 refusals | as listed above | pass |
+
+The pre-registration fixed M4's criteria, not its mesh sizes. A first run with sizes
+0.8, 0.4 and 0.2 gave 1.6e-1, 4.4e-2 and 1.016e-2: order about 2, but the finest
+just above 1e-2. The test uses the next finer three sizes; the criteria are
+unchanged.
