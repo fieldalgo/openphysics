@@ -51,4 +51,6 @@ where = ["src"]
 include = ["simcase*"]
 
 [tool.setuptools.package-data]
+# simcase.slots: the generated slot table of format 0.3 documents
+simcase = ["slot_table.json"]
 "simcase.studio" = ["static/*"]
