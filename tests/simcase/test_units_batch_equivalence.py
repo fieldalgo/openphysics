@@ -194,6 +194,33 @@ if HARNESS.is_dir():
         refused = _compare(old, new, "--plan", str(plan), "--maps", str(maps))
         assert refused.returncode != 0 and "times2" in (refused.stdout + refused.stderr)
 
+    def test_an_absent_default_passes_only_for_a_zero_with_its_default_listed():
+        """absent_default (units batch C7): the 0.2 echo of a zero the reader filled in may be
+        missing on the new side only when it is +0.0 and the new summary lists the default; a
+        given value is compared as usual, and the rule is refused on anything but '='."""
+        compare = _module("compare")
+        layout_map = compare.LayoutMap({
+            "format": "openphysics-units-batch-map-v1", "old_layout": "old", "new_layout": "new",
+            "summary": [{"old": "body_force_n_m3.[]", "new": "body_force_density.values.[]", "f": "=",
+                         "absent_default": "body_force_density"}],
+            "summary_added": ["body_force_density.unit"]}, "test")
+        listed = {"defaults_applied": [{"path": "physics.plate.body_force_density", "value": None, "reason": "r"}]}
+
+        def failures(old, new):
+            result = compare.Result("doc", "layout")
+            compare.compare_trees_layout(old, new, layout_map, {}, "summary.json", result)
+            return result.failures, result.counts["absent_defaults"]
+        assert failures({"body_force_n_m3": [0.0, 0.0]}, listed) == ([], 2)
+        assert failures({"body_force_n_m3": [0.0, 5.0]}, listed)[0]                       # a nonzero is lost
+        assert failures({"body_force_n_m3": [-0.0, 0.0]}, listed)[0]                      # -0.0 is not +0.0
+        assert failures({"body_force_n_m3": [0.0, 0.0]}, {"defaults_applied": []})[0]   # no default listed
+        given = {"body_force_density": {"unit": "N/m^3", "values": [0.0, 5.0]}, **listed}
+        assert failures({"body_force_n_m3": [0.0, 5.0]}, given) == ([], 0)
+        assert failures({"body_force_n_m3": [0.0, 4.0]}, given)[0]
+        with pytest.raises(ValueError, match="absent_default"):
+            compare.LayoutMap({"format": "openphysics-units-batch-map-v1", "old_layout": "o",
+                               "summary": [{"old": "a", "new": "b", "f": "neg", "absent_default": "b"}]}, "test")
+
     def test_the_exceptions_are_the_preregistered_ones_within_4_ulp():
         compare = _module("compare")
         assert set(compare.EXCEPTIONS) == {"propagation_loss", "bend_loss", "group_index_length_frame"}
@@ -255,9 +282,27 @@ if HARNESS.is_dir():
                       "values": {"unit": "um", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}}},
     }
 
+    #: elastic_regions.json before the units batch (format 0.2; converted by units batch C7)
+    ELASTIC_REGIONS_02 = {
+        "openphysics": "0.2", "name": "Quarter of a thick steel pipe under 10 MPa inner pressure",
+        "units": {"length": "mm"},
+        "geometry": {"version": 1, "components": {"main": {
+            "dimension": "2d", "domain": {"xmin": 0.0, "xmax": 9.0, "ymin": 0.0, "ymax": 9.0},
+            "background": {"material": "steel"},
+            "features": [{"name": "outside", "type": "rect", "x": 0.0, "y": 0.0, "w": 9.0, "h": 9.0, "material": None},
+                         {"name": "wall", "type": "circle", "cx": 0.0, "cy": 0.0, "r": 9.0, "material": "steel"},
+                         {"name": "bore", "type": "circle", "cx": 0.0, "cy": 0.0, "r": 3.0, "material": None}],
+            "finalize": "later_wins",
+            "boundary_tags": [{"tag": "inner", "select": {"boundary": {"of": "bore"}}},
+                              {"tag": "outer_wall", "select": {"boundary": {"between": ["wall", "outside"]}}}]}}},
+        "materials": {"steel": {"young_modulus_pa": 200000000000.0, "poisson_ratio": 0.3, "source": "document value"}},
+        "mesh": {"size": 0.5}, "study": {"type": "single"}, "results": {"save_fields": True, "plots": False},
+        "physics": {"pipe": {"type": "mechanics.elasticity2d", "plane": "strain",
+                             "displacement_m": {"left": {"x": 0.0}, "bottom": {"y": 0.0}},
+                             "pressure_pa": {"inner": 10000000.0}}}}
+
     def _spec_elastic_regions():
-        data = json.loads((ROOT / "examples" / "simcase" / "elastic_regions.json").read_text(encoding="utf-8"))
-        data = copy.deepcopy(data)
+        data = copy.deepcopy(ELASTIC_REGIONS_02)
         data["openphysics"] = "0.3"
         del data["units"]
         main = data["geometry"]["components"]["main"]
@@ -345,7 +390,8 @@ if HARNESS.is_dir():
         convert = _module("convert_v02")
         expected = (SPEC_EXAMPLES.get(name) or {"elastic_regions": _spec_elastic_regions,
                                                   "cavity_lossy_slab": _spec_cavity_lossy_slab}[name]())
-        frozen = {"thermal_regions": THERMAL_REGIONS_02, "joule_temperature": JOULE_TEMPERATURE_02}
+        frozen = {"thermal_regions": THERMAL_REGIONS_02, "joule_temperature": JOULE_TEMPERATURE_02,
+                  "elastic_regions": ELASTIC_REGIONS_02}
         old = copy.deepcopy(frozen[name]) if name in frozen else \
             json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
         new, writer = convert.convert(old)

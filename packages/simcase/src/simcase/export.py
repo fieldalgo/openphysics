@@ -80,20 +80,22 @@ Supported layouts:
   the transverse edge coefficients, tracking and open-boundary diagnostics stay
   in ``fields.npz``. The subspace layout ``em-modes2d-subspace-raw-v1`` (raw
   eigenpair columns per cluster) is refused.
-- 2D linear elasticity (``mechanics2d-p1-v1``, the layout of
-  ``mechanics.elasticity2d``): point data ``displacement_m`` and the nodal
-  ``load_n_per_m``, ``reaction_n_per_m`` and ``residual_n_per_m`` arrays as
-  vectors with a zero z component; cell data one named scalar per saved
-  component, ``exx``, ``eyy``, ``gxy`` (engineering shear, dimensionless) from
-  ``strain`` and ``sxx_pa``, ``syy_pa``, ``sxy_pa`` from ``stress_pa``.
-- steady heat then thermal stress (``thermoelastic2d-p1-v1``, the layout of
-  ``mechanics.thermoelastic2d``): point data ``temperature_k`` and the nodal
-  heat arrays (W/m) as scalars, ``displacement_m`` and the nodal external,
-  thermal, body, traction, reaction and residual N/m arrays as vectors; cell
-  data ``heat_flux_w_m2`` (vector), ``sigma_zz_pa`` and ``epsilon_zz``
-  (scalars) and the named components ``total_exx``, ``total_eyy``,
-  ``total_gxy``, ``thermal_exx``, …, ``elastic_exx``, …, ``sxx_pa``,
-  ``syy_pa``, ``sxy_pa``.
+- 2D linear elasticity (``mechanics2d-p1-v2``, the layout of
+  ``mechanics.elasticity2d``): point data ``displacement`` and the nodal
+  ``applied_force_per_depth``, ``reaction_force_per_depth`` and
+  ``residual_force_per_depth`` arrays as vectors with a zero z component; cell
+  data one named scalar per saved component, by its ``field_components`` name:
+  ``strain_xx``, ``strain_yy``, ``engineering_shear_strain_xy`` from ``strain``
+  and ``stress_xx``, ``stress_yy``, ``stress_xy`` from ``stress``.
+- steady heat then thermal stress (``thermoelastic2d-p1-v2``, the layout of
+  ``mechanics.thermoelastic2d``): point data ``temperature`` and the nodal heat
+  rates (W/m) as scalars, ``displacement`` and the nodal applied, thermal
+  equivalent, body, traction, reaction and residual force arrays (N/m) as
+  vectors; cell data ``heat_flux`` (vector), ``stress_zz`` and ``strain_zz``
+  (scalars) and the named components of ``strain``, ``thermal_strain``
+  (``thermal_strain_xx``, ..., ``engineering_shear_thermal_strain_xy``),
+  ``elastic_strain`` and ``stress``. Both mechanics layouts carry the FieldData
+  ``units`` and ``conventions``; the region mechanics layouts are not exported.
 
 Dirichlet node lists, ``metadata_json`` and the summary are not copied: the
 arrays named above are exported when the saved file holds them, nothing else.
@@ -131,6 +133,8 @@ RETIRED_LAYOUTS: dict[str, str] = {
     "electric-joule2d-p1-v1": "electric-joule2d-p1-v2",
     "electric2d-p1-node-cell-regions-v1": "electric2d-p1-node-cell-regions-v2",
     "electric-joule2d-p1-node-cell-regions-v1": "electric-joule2d-p1-node-cell-regions-v2",
+    "mechanics2d-p1-v1": "mechanics2d-p1-v2",
+    "thermoelastic2d-p1-v1": "thermoelastic2d-p1-v2",
 }
 
 # rectangle heat (format 0.3): arrays under registry names, SI, with VTU unit metadata
@@ -153,8 +157,9 @@ _JOULE_REGIONS = "electric-joule2d-p1-node-cell-regions-v2"   # joule.steady2d o
 _ELECTRIC_LAYOUTS = (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS)
 _MODES = "em-modes2d-p1-node-centroid-v1"
 _MODES_SUBSPACE = "em-modes2d-subspace-raw-v1"
-_MECHANICS = "mechanics2d-p1-v1"
-_THERMOELASTIC = "thermoelastic2d-p1-v1"
+# mechanics (format 0.3): arrays under registry names, SI, with VTU unit metadata
+_MECHANICS = "mechanics2d-p1-v2"
+_THERMOELASTIC = "thermoelastic2d-p1-v2"
 _MECHANICS_LAYOUTS = (_MECHANICS, _THERMOELASTIC)
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS, _TRANSIENT_BOUNDARY, _TRANSIENT_AXISYMMETRIC_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS, _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
@@ -179,22 +184,23 @@ _ELECTRIC_NODAL = ("electric_potential", "joule_power_per_depth", "reaction_curr
                    "applied_heat_rate_per_depth", "evaluation_temperature")
 _ELECTRIC_CELL_VECTORS = ("electric_field", "current_density", "heat_flux")
 _ELECTRIC_CELL_SCALARS = ("electrical_conductivity", "joule_power_density")
-# mechanics2d-p1-v1 and thermoelastic2d-p1-v1: (N,) nodal scalars, (N,2) nodal
+# mechanics2d-p1-v2 and thermoelastic2d-p1-v2: (N,) nodal scalars, (N,2) nodal
 # vectors, (T,2) cell vectors, (T,) cell scalars and (T,3) element arrays split
-# into named scalar cell data in the saved component order. Dirichlet node and
-# DOF lists stay in fields.npz; absent arrays are skipped.
-_MECHANICS_NODAL_SCALARS = ("temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m",
-                            "thermal_residual_w_per_m", "prescribed_outward_heat_w_per_m",
-                            "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
-                            "thermal_system_rhs_w_per_m")
-_MECHANICS_NODAL = ("displacement_m", "load_n_per_m", "load_external_n_per_m", "load_thermal_n_per_m",
-                    "load_body_n_per_m", "load_traction_n_per_m", "reaction_n_per_m", "residual_n_per_m")
-_MECHANICS_CELL_VECTORS = ("heat_flux_w_m2",)
-_MECHANICS_CELL_SCALARS = ("sigma_zz_pa", "epsilon_zz")
-_MECHANICS_CELL = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa"),
-                   "total_strain": ("total_exx", "total_eyy", "total_gxy"),
-                   "thermal_strain": ("thermal_exx", "thermal_eyy", "thermal_gxy"),
-                   "elastic_strain": ("elastic_exx", "elastic_eyy", "elastic_gxy")}
+# into named scalar cell data, their field_components names in the saved order.
+# Prescribed node and DOF lists stay in fields.npz; absent arrays are skipped.
+_MECHANICS_NODAL_SCALARS = ("temperature", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+                            "residual_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+                            "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                            "applied_heat_rate_per_depth")
+_MECHANICS_NODAL = ("displacement", "applied_force_per_depth", "thermal_equivalent_force_per_depth",
+                    "applied_body_force_per_depth", "applied_traction_force_per_depth", "reaction_force_per_depth",
+                    "residual_force_per_depth")
+_MECHANICS_CELL_VECTORS = ("heat_flux",)
+_MECHANICS_CELL_SCALARS = ("stress_zz", "strain_zz")
+_MECHANICS_CELL = {"strain": ("strain_xx", "strain_yy", "engineering_shear_strain_xy"),
+                   "thermal_strain": ("thermal_strain_xx", "thermal_strain_yy", "engineering_shear_thermal_strain_xy"),
+                   "elastic_strain": ("elastic_strain_xx", "elastic_strain_yy", "engineering_shear_elastic_strain_xy"),
+                   "stress": ("stress_xx", "stress_yy", "stress_xy")}
 # cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
 _CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
 
@@ -307,7 +313,7 @@ def _electric_joule(data):
 
 
 def _mechanics(data, layout):
-    points = _points(data["nodes_m"])
+    points = _points(data["node_coordinates"])
     triangles = np.asarray(data["triangles"], dtype=np.int64)
     cells = [("triangle", triangles)]
     point_data, cell_data = {}, {}
@@ -342,8 +348,8 @@ def _mechanics(data, layout):
                 raise ValueError(f"{name}: expected three components per triangle, got shape {values.shape}")
             for k, component in enumerate(components):
                 cell_data[component] = [np.ascontiguousarray(values[:, k])]
-    if "displacement_m" not in point_data:
-        raise ValueError(f"{layout} export needs the saved displacement_m array")
+    if "displacement" not in point_data:
+        raise ValueError(f"{layout} export needs the saved displacement array")
     return points, cells, point_data, cell_data
 
 
@@ -596,7 +602,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
     meshio = _meshio()
     mesh = meshio.Mesh(points, cells, point_data=point_data, cell_data=cell_data)
     meshio.vtu.write(output, mesh, binary=True, compression="zlib")
-    if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS):
+    if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS, *_MECHANICS_LAYOUTS):
         inject_field_data(output, *_unit_metadata([name for name in (*point_data, *cell_data)
                                                    if name not in _STRUCTURAL]))
     return output

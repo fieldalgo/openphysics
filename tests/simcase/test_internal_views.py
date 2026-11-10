@@ -23,13 +23,17 @@ from simcase.thermal_examples import TRANSIENT_THERMAL_REGIONS
 MM = units.resolve({"length": "mm"})
 
 
-def rectangle(physics, length_units=None):
-    """A rectangle whose two length formulas give different doubles along x."""
+def box_02():
+    """A format 0.2 cavity box (em.cavity3d, a kind still read in 0.2) whose two length formulas
+    give different doubles along x; the rectangle kinds read format 0.3 since units batch C7."""
     return Document.from_dict({
-        "openphysics": "0.2", "name": "views", "units": length_units or {"length": "mm", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8}},
-        "materials": {}, "physics": {"p": physics}, "mesh": {"subdivisions": [4, 3]},
-        "study": {"type": "single"}, "results": {"save_fields": False, "plots": False}})
+        "openphysics": "0.2", "name": "views", "units": {"length": "mm"},
+        "geometry": {"domain": {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8, "zmin": 0.0, "zmax": 1.0},
+                     "background": {"material": "vacuum"}, "shapes": []},
+        "physics": {"em1": {"type": "em.cavity3d", "boundary": "pec", "search": "near_target",
+                            "target_frequency_hz": 250000000.0, "num_modes": 5}},
+        "mesh": {"subdivisions": [4, 3, 2]}, "study": {"type": "single"},
+        "results": {"save_fields": False, "plots": False}})
 
 
 def rectangle_03(physics):
@@ -45,9 +49,6 @@ def rectangle_03(physics):
 HEAT = {"type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)", "prescribed_temperature": {"left": "300 K"}}
 ELECTRIC = {"type": "electric.steady2d", "electrical_conductivity": "1e6 S/m",
             "prescribed_electric_potential": {"left": "0 V", "right": "1 V"}}
-#: a kind still read in format 0.2 (mechanics, until its commit of the units batch)
-MECHANICS = {"type": "mechanics.elasticity2d", "plane": "stress", "young_modulus_pa": 2e11, "poisson_ratio": 0.3,
-             "displacement_m": {"left": {"x": 0.0}, "bottom": {"y": 0.0}}, "traction_pa": {"right": [1e6, 0.0]}}
 
 
 def si(value):
@@ -55,15 +56,15 @@ def si(value):
 
 
 def test_rectangle_lengths_keep_each_kinds_operation_order():
-    doc = rectangle(MECHANICS, {"length": "mm"})
-    difference, corners = (views.rectangle_mesh(doc, formula) for formula in views.LENGTH_FORMULAS)
+    doc = box_02()
+    difference, corners = (views.rectangle_mesh(doc, formula, axes="xy") for formula in views.LENGTH_FORMULAS)
     assert difference.origin == corners.origin == (si(123.456), si(-3.2))
     assert difference.upper == corners.upper == (si(133.456), si(2.8))
     assert difference.lengths == (si(133.456 - 123.456), si(2.8 - -3.2))
     assert corners.lengths == (si(133.456) - si(123.456), si(2.8) - si(-3.2))
     # the formulas disagree here, so which one a kind uses is part of what it hands galerkin
     assert difference.lengths[0] == 0.009999999999999986 and corners.lengths[0] == 0.009999999999999981
-    assert difference.subdivisions == (4, 3) and all(type(n) is int for n in difference.subdivisions)
+    assert difference.subdivisions == (4, 3, 2) and all(type(n) is int for n in difference.subdivisions)
     with pytest.raises(dataclasses.FrozenInstanceError):
         difference.lengths = corners.lengths
     with pytest.raises(ValueError, match="formula"):

@@ -1,0 +1,953 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "thermoelastic2d-p1-regions-v1 (format 0.2 region mechanics.thermoelastic2d; the old applied_load_n_per_m is removed, the achieved angle is compared with rad and the old outward_flux_w_m2 leaves with neg) -> thermoelastic2d-p1-regions-v2 (format 0.3): every array keeps its bytes under its registry name; the numeric diagnostics move to balance; a body force or heat source the 0.2 reader filled with zero is absent from the new summary when the document gives none (absent_default); unit, location and component metadata, the sign text and the input echoes of the mesh block are rewritten, not compared (the inputs are compared by P2-2)",
+ "old_layout": "thermoelastic2d-p1-regions-v1",
+ "new_layout": "thermoelastic2d-p1-regions-v2",
+ "arrays": [
+  {
+   "old": "nodes_m",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "triangle_regions",
+   "new": "triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "temperature_k",
+   "new": "temperature",
+   "f": "="
+  },
+  {
+   "old": "heat_flux_w_m2",
+   "new": "heat_flux",
+   "f": "="
+  },
+  {
+   "old": "thermal_load_w_per_m",
+   "new": "generated_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "thermal_reaction_w_per_m",
+   "new": "reaction_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "thermal_residual_w_per_m",
+   "new": "residual_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_heat_w_per_m",
+   "new": "outward_prescribed_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "ambient_load_w_per_m",
+   "new": "ambient_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "convective_outward_heat_w_per_m",
+   "new": "outward_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "thermal_system_rhs_w_per_m",
+   "new": "applied_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "thermal_dirichlet_node_ids",
+   "new": "thermal_prescribed_node_ids",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_temperature_k",
+   "new": "prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "displacement_m",
+   "new": "displacement",
+   "f": "="
+  },
+  {
+   "old": "total_strain",
+   "new": "strain",
+   "f": "="
+  },
+  {
+   "old": "thermal_strain",
+   "new": "thermal_strain",
+   "f": "="
+  },
+  {
+   "old": "elastic_strain",
+   "new": "elastic_strain",
+   "f": "="
+  },
+  {
+   "old": "stress_pa",
+   "new": "stress",
+   "f": "="
+  },
+  {
+   "old": "sigma_zz_pa",
+   "new": "stress_zz",
+   "f": "="
+  },
+  {
+   "old": "epsilon_zz",
+   "new": "strain_zz",
+   "f": "="
+  },
+  {
+   "old": "load_external_n_per_m",
+   "new": "applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "load_thermal_n_per_m",
+   "new": "thermal_equivalent_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "load_body_n_per_m",
+   "new": "applied_body_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "load_traction_n_per_m",
+   "new": "applied_traction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "reaction_n_per_m",
+   "new": "reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "residual_n_per_m",
+   "new": "residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_node_ids",
+   "new": "prescribed_node_ids",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_components",
+   "new": "prescribed_components",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_displacement_m",
+   "new": "prescribed_displacement",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_name",
+   "new": "physics_name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "status",
+   "new": "status",
+   "f": "="
+  },
+  {
+   "old": "plane",
+   "new": "plane",
+   "f": "="
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "input_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "diagnostic_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "displacement_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "strain_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "stress_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_units.nodes_m",
+   "new": "field_units.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_locations.nodes_m",
+   "new": "field_locations.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.nodes_m.[]",
+   "new": "field_shapes.node_coordinates.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangles",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangles",
+   "new": "field_locations.triangles",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangles.[]",
+   "new": "field_shapes.triangles.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangle_regions",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangle_regions",
+   "new": "field_locations.triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangle_regions.[]",
+   "new": "field_shapes.triangle_regions.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.temperature_k",
+   "new": "field_units.temperature",
+   "f": "="
+  },
+  {
+   "old": "field_locations.temperature_k",
+   "new": "field_locations.temperature",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.temperature_k.[]",
+   "new": "field_shapes.temperature.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.heat_flux_w_m2",
+   "new": "field_units.heat_flux",
+   "f": "="
+  },
+  {
+   "old": "field_locations.heat_flux_w_m2",
+   "new": "field_locations.heat_flux",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.heat_flux_w_m2.[]",
+   "new": "field_shapes.heat_flux.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_load_w_per_m",
+   "new": "field_units.generated_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.thermal_load_w_per_m",
+   "new": "field_locations.generated_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.thermal_load_w_per_m.[]",
+   "new": "field_shapes.generated_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_reaction_w_per_m",
+   "new": "field_units.reaction_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.thermal_reaction_w_per_m",
+   "new": "field_locations.reaction_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.thermal_reaction_w_per_m.[]",
+   "new": "field_shapes.reaction_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_residual_w_per_m",
+   "new": "field_units.residual_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.thermal_residual_w_per_m",
+   "new": "field_locations.residual_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.thermal_residual_w_per_m.[]",
+   "new": "field_shapes.residual_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.prescribed_outward_heat_w_per_m",
+   "new": "field_units.outward_prescribed_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.prescribed_outward_heat_w_per_m",
+   "new": "field_locations.outward_prescribed_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.prescribed_outward_heat_w_per_m.[]",
+   "new": "field_shapes.outward_prescribed_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.ambient_load_w_per_m",
+   "new": "field_units.ambient_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.ambient_load_w_per_m",
+   "new": "field_locations.ambient_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.ambient_load_w_per_m.[]",
+   "new": "field_shapes.ambient_convective_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.convective_outward_heat_w_per_m",
+   "new": "field_units.outward_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.convective_outward_heat_w_per_m",
+   "new": "field_locations.outward_convective_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.convective_outward_heat_w_per_m.[]",
+   "new": "field_shapes.outward_convective_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_system_rhs_w_per_m",
+   "new": "field_units.applied_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.thermal_system_rhs_w_per_m",
+   "new": "field_locations.applied_heat_rate_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.thermal_system_rhs_w_per_m.[]",
+   "new": "field_shapes.applied_heat_rate_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.thermal_dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.thermal_dirichlet_node_ids.[]",
+   "new": "field_shapes.thermal_prescribed_node_ids.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_temperature_k",
+   "new": "field_units.prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "field_locations.dirichlet_temperature_k",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_temperature_k.[]",
+   "new": "field_shapes.prescribed_temperature.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.displacement_m",
+   "new": "field_units.displacement",
+   "f": "="
+  },
+  {
+   "old": "field_locations.displacement_m",
+   "new": "field_locations.displacement",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.displacement_m.[]",
+   "new": "field_shapes.displacement.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.total_strain",
+   "new": "field_units.strain",
+   "f": "="
+  },
+  {
+   "old": "field_locations.total_strain",
+   "new": "field_locations.strain",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.total_strain.[]",
+   "new": "field_shapes.strain.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.thermal_strain",
+   "new": "field_units.thermal_strain",
+   "f": "="
+  },
+  {
+   "old": "field_locations.thermal_strain",
+   "new": "field_locations.thermal_strain",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.thermal_strain.[]",
+   "new": "field_shapes.thermal_strain.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.elastic_strain",
+   "new": "field_units.elastic_strain",
+   "f": "="
+  },
+  {
+   "old": "field_locations.elastic_strain",
+   "new": "field_locations.elastic_strain",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.elastic_strain.[]",
+   "new": "field_shapes.elastic_strain.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.stress_pa",
+   "new": "field_units.stress",
+   "f": "="
+  },
+  {
+   "old": "field_locations.stress_pa",
+   "new": "field_locations.stress",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.stress_pa.[]",
+   "new": "field_shapes.stress.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.sigma_zz_pa",
+   "new": "field_units.stress_zz",
+   "f": "="
+  },
+  {
+   "old": "field_locations.sigma_zz_pa",
+   "new": "field_locations.stress_zz",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.sigma_zz_pa.[]",
+   "new": "field_shapes.stress_zz.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.epsilon_zz",
+   "new": "field_units.strain_zz",
+   "f": "="
+  },
+  {
+   "old": "field_locations.epsilon_zz",
+   "new": "field_locations.strain_zz",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.epsilon_zz.[]",
+   "new": "field_shapes.strain_zz.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_external_n_per_m",
+   "new": "field_units.applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_external_n_per_m",
+   "new": "field_locations.applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_external_n_per_m.[]",
+   "new": "field_shapes.applied_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_thermal_n_per_m",
+   "new": "field_units.thermal_equivalent_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_thermal_n_per_m",
+   "new": "field_locations.thermal_equivalent_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_thermal_n_per_m.[]",
+   "new": "field_shapes.thermal_equivalent_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_body_n_per_m",
+   "new": "field_units.applied_body_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_body_n_per_m",
+   "new": "field_locations.applied_body_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_body_n_per_m.[]",
+   "new": "field_shapes.applied_body_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_traction_n_per_m",
+   "new": "field_units.applied_traction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_traction_n_per_m",
+   "new": "field_locations.applied_traction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_traction_n_per_m.[]",
+   "new": "field_shapes.applied_traction_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.reaction_n_per_m",
+   "new": "field_units.reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.reaction_n_per_m",
+   "new": "field_locations.reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.reaction_n_per_m.[]",
+   "new": "field_shapes.reaction_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.residual_n_per_m",
+   "new": "field_units.residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.residual_n_per_m",
+   "new": "field_locations.residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.residual_n_per_m.[]",
+   "new": "field_shapes.residual_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_node_ids.[]",
+   "new": "field_shapes.prescribed_node_ids.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_components",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.dirichlet_components",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_components.[]",
+   "new": "field_shapes.prescribed_components.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_displacement_m",
+   "new": "field_units.prescribed_displacement",
+   "f": "="
+  },
+  {
+   "old": "field_locations.dirichlet_displacement_m",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_displacement_m.[]",
+   "new": "field_shapes.prescribed_displacement.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.applied_load_n_per_m.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "diagnostics.support_reaction_n_per_m.[]",
+   "new": "balance.reaction_force_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.force_balance_n_per_m.[]",
+   "new": "balance.force_imbalance_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.free_residual_n_per_m",
+   "new": "balance.maximum_residual_force_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.max_displacement_m",
+   "new": "balance.maximum_displacement.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.max_abs_stress_pa",
+   "new": "balance.maximum_stress.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.external_load_n_per_m.[]",
+   "new": "balance.applied_force_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.thermal_load_n_per_m.[]",
+   "new": "balance.thermal_equivalent_force_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.strain_energy_j_per_m",
+   "new": "balance.stiffness_energy_functional_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.physical_elastic_energy_j_per_m",
+   "new": "balance.strain_energy_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.source_heat_w_per_m",
+   "new": "balance.generated_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.outward_heat_w_per_m",
+   "new": "balance.outward_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.heat_power_defect_w_per_m",
+   "new": "balance.heat_rate_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.thermal_free_residual_w_per_m",
+   "new": "balance.maximum_residual_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.temperature_min_k",
+   "new": "balance.minimum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.temperature_max_k",
+   "new": "balance.maximum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "body_force_n_m3.[]",
+   "new": "body_force_density.values.[]",
+   "f": "=",
+   "absent_default": "body_force_density"
+  },
+  {
+   "old": "reference_temperature_k",
+   "new": "stress_free_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "temperature_snapshot.*",
+   "new": "temperature_snapshot.*",
+   "f": "="
+  },
+  {
+   "old": "region_names.[]",
+   "new": "region_names.[]",
+   "f": "="
+  },
+  {
+   "old": "regions.*.material",
+   "new": "regions.*.material",
+   "f": "="
+  },
+  {
+   "old": "regions.*.triangles",
+   "new": "regions.*.triangles",
+   "f": "="
+  },
+  {
+   "old": "regions.*.area_m2",
+   "new": "regions.*.area.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.young_modulus_pa",
+   "new": "materials.*.youngs_modulus.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.poisson_ratio",
+   "new": "materials.*.poisson_ratio.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.thermal_expansion_per_k",
+   "new": "materials.*.linear_expansion_coefficient.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.conductivity_w_mk",
+   "new": "materials.*.thermal_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.source",
+   "new": "materials.*.source",
+   "f": "="
+  },
+  {
+   "old": "displacement_m.*.*",
+   "new": "prescribed_displacement.*.*.value",
+   "f": "="
+  },
+  {
+   "old": "displacement_m",
+   "new": "prescribed_displacement",
+   "f": "="
+  },
+  {
+   "old": "traction_pa.*.[]",
+   "new": "traction.*.values.[]",
+   "f": "="
+  },
+  {
+   "old": "traction_pa",
+   "new": "traction",
+   "f": "="
+  },
+  {
+   "old": "pressure_pa.*",
+   "new": "gauge_pressure.*.value",
+   "f": "="
+  },
+  {
+   "old": "pressure_pa",
+   "new": "gauge_pressure",
+   "f": "="
+  },
+  {
+   "old": "pressure_sign",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.triangles",
+   "new": "mesh.triangles",
+   "f": "="
+  },
+  {
+   "old": "mesh.size",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.size_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.min_angle_deg",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.achieved_min_angle_deg",
+   "new": "mesh.minimum_triangle_angle.value",
+   "f": "rad"
+  },
+  {
+   "old": "heat_source_w_m3.*",
+   "new": "heat_source_density.*.value",
+   "f": "="
+  },
+  {
+   "old": "heat_source_w_m3",
+   "new": "heat_source_density.value",
+   "f": "=",
+   "absent_default": "heat_source_density"
+  },
+  {
+   "old": "dirichlet_temperature_k.*",
+   "new": "prescribed_temperature.*.value",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_temperature_k",
+   "new": "prescribed_temperature",
+   "f": "="
+  },
+  {
+   "old": "outward_flux_w_m2.*",
+   "new": "inward_heat_flux.*.value",
+   "f": "neg"
+  },
+  {
+   "old": "outward_flux_w_m2",
+   "new": "inward_heat_flux",
+   "f": "="
+  },
+  {
+   "old": "convection.*.h_w_m2k",
+   "new": "convection.*.heat_transfer_coefficient.value",
+   "f": "="
+  },
+  {
+   "old": "convection.*.ambient_temperature_k",
+   "new": "convection.*.ambient_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "convection",
+   "new": "convection",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "study.type",
+  "balance.*.unit",
+  "body_force_density.unit",
+  "field_locations.thermal_prescribed_node_ids",
+  "field_locations.prescribed_temperature",
+  "field_locations.prescribed_node_ids",
+  "field_locations.prescribed_components",
+  "field_locations.prescribed_displacement",
+  "stress_free_temperature.unit",
+  "regions.*.area.unit",
+  "materials.*.*.unit",
+  "prescribed_displacement.*.*.unit",
+  "traction.*.unit",
+  "gauge_pressure.*.unit",
+  "gauge_pressure_sign",
+  "mesh.minimum_triangle_angle.unit",
+  "heat_source_density.unit",
+  "heat_source_density.*.unit",
+  "prescribed_temperature.*.unit",
+  "inward_heat_flux.*.unit",
+  "convection.*.*.unit"
+ ],
+ "identifiers": [
+  "result_format",
+  "field_layout"
+ ],
+ "vtu": [],
+ "vtu_added": []
+}
