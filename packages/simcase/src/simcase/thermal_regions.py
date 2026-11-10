@@ -240,9 +240,12 @@ def depth_03(doc):
 
 def handoff_03(doc):
     """The ``RegionHandOff`` of a format 0.3 region document (kept on the document while its
-    tree is unchanged). Shape numbers keep their authored values; element sizes, control lengths
-    and length parameters are given in the component's length unit from their exact values;
-    the angle is the authored degree number (H3)."""
+    tree is unchanged). Flat shape and domain numbers are their 1 pm grid values in the
+    component's length unit (``float(Fraction(k) / pm per unit)``: the authored double when it
+    lies on the grid, the rounded value that I-/W-PM-ROUNDING reports when it does not; version 1
+    blocks are put on the grid by their exact pm model); element sizes, control lengths and length
+    parameters are given in the component's length unit from their exact values; the angle is the
+    authored degree number (H3)."""
     from fractions import Fraction
     from physmat.units import convert, is_quantity_text
     from . import units
@@ -287,10 +290,23 @@ def handoff_03(doc):
                 params[name] = item
             geometry = {'version': g['version'], 'parameters': params, 'components': {cname: new}}
     else:
-        geometry = {'domain': _plain(g['domain'])}
+        pm_per_unit = per_unit * 10 ** 12
+
+        def on_grid(value, path):
+            # a shape number reaches the mesher as the grid value the reader stored (spec §2
+            # rule 4); the other leaves (names, types, materials) as written
+            if isinstance(value, dict):
+                return {k: on_grid(v, f'{path}.{k}') for k, v in value.items()}
+            if isinstance(value, list):
+                return [on_grid(v, f'{path}[{i}]') for i, v in enumerate(value)]
+            pm = doc._need_v03('handoff_03()').pm.get(path)
+            return _plain(value) if pm is None else float(Fraction(pm) / pm_per_unit)
+
+        geometry = {'domain': on_grid(g['domain'], 'geometry.domain')}
         if 'background' in g:
             geometry['background'] = sized(g['background'], 'geometry.background', {'material'})
-        geometry['shapes'] = [sized(s, f'geometry.shapes[{i}]', set(s) - {'element_size'})
+        geometry['shapes'] = [on_grid(sized(s, f'geometry.shapes[{i}]', set(s) - {'element_size'}),
+                                      f'geometry.shapes[{i}]')
                               for i, s in enumerate(g.get('shapes') or [])]
     m = doc.data.get('mesh') or {}
     mesh = {'size': length('mesh.element_size'),
