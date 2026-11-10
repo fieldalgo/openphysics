@@ -57,7 +57,7 @@ def _import_runner() -> None:
     from .thermal import ThermalRunResult
     from .transient_thermal import TransientThermalRunResult
     from . import examples
-    from .geometry import build_domain
+    from .stage_domain import build_domain
     from .mesh_limits import MeshLimitError, check_mesh_limits
     from .complexity import RegionComplexity, region_complexity
     from .thermal_regions import has_region_geometry, void_area

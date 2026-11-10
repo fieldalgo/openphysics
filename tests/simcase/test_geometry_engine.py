@@ -668,13 +668,13 @@ def test_a_version_1_document_is_meshed_by_the_engine():
     assert doc.geometry_model is not None and doc.copy().geometry_model is doc.geometry_model
     canonical = _kernel_canonical(doc)
     assert canonical.geometry_model is not None and canonical.is_version_1
-    domain, namer, materials = build_domain(canonical)
+    domain, namer, materials = build_domain(doc)                  # the public stage: what a run meshes
     mesh = generate(domain, namer)
     assert materials == {"core": "physmat:Si", "background": "physmat:SiO2"}
     assert set(mesh.boundary_edges) == {"port"}                   # boundary_tags reach the mesh
     assert set(mesh.region_names) == {"core", "background"}
     del comp["boundary_tags"]
-    domain, namer, _materials = build_domain(_kernel_canonical(Document.from_dict(raw)))
+    domain, namer, _materials = build_domain(Document.from_dict(raw))
     assert set(generate(domain, namer).boundary_edges) == {"left", "right", "bottom", "top"}
 
 
@@ -684,7 +684,7 @@ def test_the_flat_route_is_untouched_for_flat_documents():
     assert doc.geometry_model is None
     canonical = _kernel_canonical(doc)
     assert canonical.geometry_model is None
-    domain, namer, materials = build_domain(canonical)
+    domain, namer, materials = build_domain(doc)                  # the public stage: what a run meshes
     assert materials == {"core": "physmat:Si", "background": "physmat:SiO2"} and callable(namer)
 
 
@@ -785,7 +785,7 @@ def test_an_imprint_document_loads_runs_and_keeps_the_covered_boundary():
     doc = Document.from_dict(raw)
     assert doc.is_version_1 and [r["name"] for r in doc.regions()] == ["core", "wide"]
     assert doc.to_dict()["geometry"]["components"]["main"]["finalize"] == "imprint"
-    rc_domain, namer, materials = build_domain(_kernel_canonical(doc))
+    rc_domain, namer, materials = build_domain(doc)                       # the public stage
     mesh = generate(rc_domain, namer)
     assert set(mesh.region_names) == {"wide", "background"}                   # core is covered, as a region
     from simcase.geometry_engine import evaluate
@@ -1627,7 +1627,8 @@ def test_g3_8_a_whole_circle_and_a_hole_are_graded_from_their_true_outline():
 
 def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runners():
     import numpy as np
-    from simcase import Document, DocumentError, build_domain, build_mesh, check_mesh_limits
+    from simcase import Document, DocumentError, build_mesh, check_mesh_limits
+    from simcase.geometry import build_domain                   # the internal builder, on the hand-off
     from simcase.runner import micrometre_document
     from simcase.thermal_regions import build_region_mesh_03 as build_region_mesh, handoff_03
     raw = _regions_doc([{"name": "heater", "type": "rect", "x": 15, "y": 7, "w": 10, "h": 6, "material": "copper"}],
