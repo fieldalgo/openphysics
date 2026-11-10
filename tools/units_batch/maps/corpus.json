@@ -18,6 +18,6 @@
     "mechanics.elasticity2d": "layout",
     "mechanics.thermoelastic2d": "layout",
     "em.modes2d": "layout",
-    "em.cavity3d": "identity"
+    "em.cavity3d": "layout"
   }
 }

@@ -135,17 +135,17 @@ EXAMPLES = {"soi_strip": SOI_STRIP, "slab_te_check": SLAB_TE_CHECK, "hadley_rib"
 
 
 CAVITY_BOX = {
-    "openphysics": "0.2",
+    "openphysics": "0.3",
     "name": "Vacuum PEC cube, modes near 250 MHz",
-    "units": {"length": "m"},
     "geometry": {
+        "length_unit": "m",
         "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1},
-        "background": {"material": "vacuum"},
+        "background": {"material": "physmat:vacuum"},
         "shapes": [],
     },
     "physics": {"em1": {"type": "em.cavity3d", "boundary": "pec", "search": "near_target",
-                         "target_frequency_hz": 250000000.0, "num_modes": 5}},
-    "mesh": {"subdivisions": [6, 6, 6]},
+                         "target_frequency": "250 MHz", "mode_count": 5}},
+    "mesh": {"subdivision_count": [6, 6, 6]},
     "study": {"type": "single"},
     "results": {"save_fields": True, "plots": False},
 }
@@ -153,20 +153,21 @@ CAVITY_BOX = {
 EXAMPLES["cavity_box"] = CAVITY_BOX
 
 CAVITY_LOSSY_SLAB = {
-    "openphysics": "0.2",
+    "openphysics": "0.3",
     "name": "Copper box with a lossy dielectric slab, Q near 150 MHz",
-    "units": {"length": "m"},
     "geometry": {
+        "length_unit": "m",
         "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.6},
-        "background": {"material": "vacuum"},
+        "background": {"material": "physmat:vacuum"},
         "shapes": [{"type": "box", "name": "slab", "material": "lossy_dielectric",
                     "xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.3}],
     },
-    "materials": {"lossy_dielectric": {"relative_permittivity": [4.0, -0.04]}},
-    "physics": {"em1": {"type": "em.cavity3d", "boundary": {"conductivity_s_per_m": 58000000.0},
-                         "search": "near_target", "target_frequency_hz": 150000000.0,
-                         "num_modes": 3}},
-    "mesh": {"subdivisions": [8, 8, 8]},
+    # exp(-i omega t): Im relative_permittivity >= 0 is loss
+    "materials": {"lossy_dielectric": {"relative_permittivity": {"re": 4.0, "im": 0.04}}},
+    "physics": {"em1": {"type": "em.cavity3d", "boundary": {"electrical_conductivity": "58 MS/m"},
+                         "search": "near_target", "target_frequency": "150 MHz",
+                         "mode_count": 3}},
+    "mesh": {"subdivision_count": [8, 8, 8]},
     "study": {"type": "single"},
     "results": {"save_fields": True, "plots": False},
 }

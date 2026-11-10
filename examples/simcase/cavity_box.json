@@ -1,10 +1,8 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Vacuum PEC cube, modes near 250 MHz",
-  "units": {
-    "length": "m"
-  },
   "geometry": {
+    "length_unit": "m",
     "domain": {
       "xmin": 0,
       "xmax": 1,
@@ -14,7 +12,7 @@
       "zmax": 1
     },
     "background": {
-      "material": "vacuum"
+      "material": "physmat:vacuum"
     },
     "shapes": []
   },
@@ -23,12 +21,12 @@
       "type": "em.cavity3d",
       "boundary": "pec",
       "search": "near_target",
-      "target_frequency_hz": 250000000.0,
-      "num_modes": 5
+      "target_frequency": "250 MHz",
+      "mode_count": 5
     }
   },
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       6,
       6,
       6
