@@ -125,7 +125,8 @@ python -m simcase.slots --write      # regenerate it (deterministic, sorted)
 - `depth`는 길이(`"40 mm"`, `> 0`)이거나 깊이 1 m당을 뜻하는 `null`입니다.
 - **형상 숫자**는 구성 요소 단위의 맨 숫자이며 1 pm 정수 격자에 한 번 올립니다
   (`physmat.units.length_to_pm`). 옮겨진 값은 `I-PM-ROUNDING`(1e-3 pm 미만)이나
-  `W-PM-ROUNDING`입니다. 해석한 트리에서 형상 숫자는 그 pm 개수의 `pm_to_m`입니다.
+  `W-PM-ROUNDING`입니다. 해석한 트리에서 형상 숫자는 그 pm 개수의 `pm_to_m`이며, 메시 생성기도
+  같은 격자 값을 받으므로 옮겨진 숫자는 진단이 알린 저장 값 자리에 메시됩니다.
 - **버전 1 블록**([형상 문서](geometry_document.md))은 문법을 그대로 두고 구성 요소마다 읽습니다.
   각 구성 요소의 숫자와 식 안의 리터럴은 그 구성 요소의 `length_unit`이므로 두 구성 요소가 다른
   단위를 쓸 수 있습니다. 형상 `parameters`는 모든 구성 요소 밖에 있고 단위를 함께 씁니다. 길이
