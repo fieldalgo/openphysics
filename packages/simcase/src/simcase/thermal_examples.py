@@ -1,21 +1,23 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Headless-only homogeneous steady heat examples; thermal constants use SI."""
+"""Heat examples. The rectangle ones are format 0.3 (values carry their units); the region ones
+are still format 0.2 until their commit of the units batch."""
 import copy
 
 THERMAL_SLAB = {
-    'openphysics': '0.2', 'name': 'Steady heat slab',
-    'units': {'length': 'mm', 'temperature': 'K'},
-    'geometry': {'domain': {'xmin': 0., 'xmax': 30., 'ymin': 0., 'ymax': 20.}},
+    'openphysics': '0.3', 'name': 'Steady heat slab',
+    'geometry': {'length_unit': 'mm', 'depth': None,
+                 'domain': {'xmin': 0., 'xmax': 30., 'ymin': 0., 'ymax': 20.}},
     'materials': {},
-    'physics': {'heat1': {'type': 'thermal.steady2d', 'conductivity_w_mk': 12.5,
-                          'heat_source_w_m3': 0., 'dirichlet_temperature_k': {'left': 280., 'right': 315.}}},
-    'mesh': {'subdivisions': [32, 16]}, 'study': {'type': 'single'},
+    'physics': {'heat1': {'type': 'thermal.steady2d', 'thermal_conductivity': '12.5 W/(m K)',
+                          'heat_source_density': '0 W/m^3',
+                          'prescribed_temperature': {'left': '280 K', 'right': '315 K'}}},
+    'mesh': {'subdivision_count': [32, 16]}, 'study': {'type': 'single'},
     'results': {'save_fields': True, 'plots': False},
 }
 THERMAL_MIXED = copy.deepcopy(THERMAL_SLAB)
 THERMAL_MIXED['name'] = 'Steady heat with uniform source'
-THERMAL_MIXED['physics']['heat1']['heat_source_w_m3'] = 1e5
+THERMAL_MIXED['physics']['heat1']['heat_source_density'] = '100000 W/m^3'
 
 # Named material regions (EM-style shapes); conductivity comes from materials.
 THERMAL_REGIONS = {

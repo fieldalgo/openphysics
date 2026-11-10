@@ -75,7 +75,7 @@ def history(client,accepted,field,start,stop,sequence):
 
 def collect(client,accepted,manifest,a,data):
     shapes = metadata(data,a)
-    nt = len(a["time_s"])
+    nt = len(a["time"])
     for field in sorted(DYNAMIC):
         first = 1 if field in STEP_FIELDS else 0
         values = []
@@ -100,7 +100,7 @@ def collect(client,accepted,manifest,a,data):
         assert type(payload["stop"]) is int and payload["stop"] == nt
         assert payload["time_indices"] == list(range(first,nt))
         assert all(type(v) is int for v in payload["time_indices"])
-        assert payload["time_s"] == data["study"]["time_s"][first:nt]
+        assert payload["time"] == data["study"]["time"]["values"][first:nt]
         assert payload["unit"] == FIELD_UNITS[field]
         assert payload["location"] == manifest["fields"][field]["location"]
         assert payload["display_length_in_m"] == manifest["display_length_in_m"]
@@ -111,8 +111,8 @@ def collect(client,accepted,manifest,a,data):
         page = numeric(payload["arrays"][field],shape)
         assert np.array_equal(page,a[field]),field
         if field in STEP_FIELDS:
-            assert payload["interval_start_s"] == data["study"]["time_s"][first-1:nt-1]
-            assert payload["interval_end_s"] == data["study"]["time_s"][first:nt]
+            assert payload["interval_start"] == data["study"]["time"]["values"][first-1:nt-1]
+            assert payload["interval_end"] == data["study"]["time"]["values"][first:nt]
     assert set(a) == set(FIELD_UNITS)
     return a
 
@@ -133,11 +133,11 @@ def test_studio_transient_independent_all13_physical_frames_and_history(client,u
     audit(a,case,data,manifest["summary"])
     expected = expected_arrays(a,case,data)
     print(json.dumps({"gate":"studio_transient_independent_exact","case":case,"unit":unit,
-                      "time_s":a["time_s"].tolist(),
+                      "time":a["time"].tolist(),
                       "max_absolute_error":{key:float(np.max(abs(a[key]-value),initial=0.))
                                             for key,value in expected.items()},
-                      "heat_content_j_per_m":a["heat_content_j_per_m"].tolist(),
-                      "quadratic_functional_jk_per_m":a["quadratic_functional_jk_per_m"].tolist()},
+                      "stored_heat_per_depth":a["stored_heat_per_depth"].tolist(),
+                      "thermal_energy_functional_per_depth":a["thermal_energy_functional_per_depth"].tolist()},
                      allow_nan=False))
     original = public_arrays(data)
     for field in FIELD_UNITS:
@@ -154,8 +154,8 @@ def test_studio_transient_independent_nt2_scalar_frames(client):
     accepted,manifest,a = finished(client,data,sequence=20)
     collect(client,accepted,manifest,a,data)
     audit(a,"uniform_absolute",data,manifest["summary"])
-    assert a["storage_rate_w_per_m"].shape == (1,len(a["nodes_m"]))
-    for field in ("heat_content_j_per_m","quadratic_functional_jk_per_m"):
+    assert a["heat_storage_rate_per_depth"].shape == (1,len(a["node_coordinates"]))
+    for field in ("stored_heat_per_depth","thermal_energy_functional_per_depth"):
         response = frame(client,accepted,field,0,902)
         assert response.status_code == 200,response.text
         payload = response.json()
@@ -174,13 +174,14 @@ def test_studio_transient_independent_capability_and_input_refusal(client):
     assert response.status_code == 200 and response.json()["ok"] is True
     bad = []
     for times in ([2],[2,2],[3,2],[2,True]):
-        d = copy.deepcopy(valid);d["study"]["time_s"] = times;bad.append(d)
-    for change,value in (("initial_temperature_k",True),
-                         ("dirichlet_temperature_k",{"left":301}),
-                         ("volumetric_heat_capacity_j_m3k",0)):
+        d = copy.deepcopy(valid);d["study"]["time"]["values"] = times;bad.append(d)
+    for change,value in (("initial_temperature",True),
+                         ("prescribed_temperature",{"left":"301 K"}),
+                         ("volumetric_heat_capacity","0 J/(m^3 K)")):
         d = copy.deepcopy(valid);d["physics"]["heat1"][change] = value;bad.append(d)
-    for unit,key in (("ms","time"),("C","temperature")):
-        d = copy.deepcopy(valid);d["units"][key] = unit;bad.append(d)
+    # format 0.3 carries units on the values: a units block is unknown, a time needs a time unit
+    d = copy.deepcopy(valid);d["units"] = {"time":"s"};bad.append(d)
+    d = copy.deepcopy(valid);d["study"]["time"]["unit"] = "K";bad.append(d)
     for data in bad:
         response = client.post(cap["validate"],json=envelope(data))
         assert response.status_code == 200 and response.json()["ok"] is False,response.text
@@ -195,7 +196,7 @@ def test_studio_transient_independent_capability_and_input_refusal(client):
 
 def test_studio_transient_independent_query_and_identity_refusal(client):
     accepted,manifest,a = finished(client,model(),sequence=30)
-    base = {"result_id":accepted["result_id"],"field":"temperature_k","time_index":1,"frame_seq":1}
+    base = {"result_id":accepted["result_id"],"field":"temperature","time_index":1,"frame_seq":1}
     path = "/api/jobs/"+accepted["job"]+"/frame"
     for changed,status in (({"time_index":"true"},400),({"time_index":1.5},400),
                            ({"time_index":-1},422),({"time_index":5},422),
@@ -209,8 +210,8 @@ def test_studio_transient_independent_query_and_identity_refusal(client):
     duplicate = list(base.items())+[("time_index",2)]
     assert client.get(path,params=duplicate).status_code == 400
     for start,stop,status in ((0,0,422),(-1,2,422),(0,6,422)):
-        assert history(client,accepted,"heat_content_j_per_m",start,stop,4).status_code == status
-    assert history(client,accepted,"storage_rate_w_per_m",0,2,4).status_code == 422
+        assert history(client,accepted,"stored_heat_per_depth",start,stop,4).status_code == status
+    assert history(client,accepted,"heat_storage_rate_per_depth",0,2,4).status_code == 422
 
 
 class PublicTransientProbe(TransientThermalRunResult):
@@ -225,20 +226,20 @@ class PublicTransientProbe(TransientThermalRunResult):
         if fault == "layout":
             self.metadata["field_layout"] = "wrong-layout"
         elif fault == "unit":
-            self.metadata["field_units"]["heat_content_j_per_m"] = "J K/m"
+            self.metadata["field_units"]["stored_heat_per_depth"] = "J K/m"
         elif fault == "shape":
-            self.captured["heat_flux_w_m2"] = self.captured["heat_flux_w_m2"][1:]
+            self.captured["heat_flux"] = self.captured["heat_flux"][1:]
         elif fault == "nonfinite":
-            self.captured["temperature_k"][0,0] = np.nan
+            self.captured["temperature"][0,0] = np.nan
         elif fault == "bool":
-            self.captured["temperature_k"] = np.ones_like(self.captured["temperature_k"],dtype=bool)
+            self.captured["temperature"] = np.ones_like(self.captured["temperature"],dtype=bool)
         elif fault == "index":
-            self.captured["triangles"][0,0] = len(self.captured["nodes_m"])
+            self.captured["triangles"][0,0] = len(self.captured["node_coordinates"])
         elif fault == "time":
-            self.captured["time_s"][0] += .001
+            self.captured["time"][0] += .001
         elif fault == "rate_axis":
-            x = self.captured["storage_rate_w_per_m"]
-            self.captured["storage_rate_w_per_m"] = np.concatenate((x[:1],x))
+            x = self.captured["heat_storage_rate_per_depth"]
+            self.captured["heat_storage_rate_per_depth"] = np.concatenate((x[:1],x))
         else:
             raise AssertionError(fault)
 
@@ -267,9 +268,9 @@ def test_studio_transient_independent_malformed_producer_no_publication(client,m
 
 def test_studio_transient_independent_real_history_page_boundaries(client):
     data = model("uniform_absolute")
-    data["study"]["time_s"] = [2+i/16 for i in range(17)]
+    data["study"]["time"]["values"] = [2+i/16 for i in range(17)]
     accepted,manifest,a = finished(client,data,sequence=50)
-    for field in ("heat_content_j_per_m","quadratic_functional_jk_per_m"):
+    for field in ("stored_heat_per_depth","thermal_energy_functional_per_depth"):
         for start,stop in ((0,16),(16,17)):
             response = history(client,accepted,field,start,stop,500+start)
             assert response.status_code == 200,response.text
@@ -282,15 +283,15 @@ def test_studio_transient_independent_real_history_page_boundaries(client):
             assert type(p["frame_seq"]) is int and p["frame_seq"] == 500+start
             assert p["time_indices"] == list(range(start,stop))
             assert all(type(i) is int for i in p["time_indices"])
-            times = np.asarray(data["study"]["time_s"][start:stop])
-            assert p["time_s"] == times.tolist()
+            times = np.asarray(data["study"]["time"]["values"][start:stop])
+            assert p["time"] == times.tolist()
             assert p["shape"] == [stop-start] and type(p["shape"][0]) is int
             assert p["unit"] == FIELD_UNITS[field] and p["location"] == "domain"
             temperature = 300+2*times
-            expected = 8e-6*temperature if field=="heat_content_j_per_m" else 4e-6*temperature**2
+            expected = 8e-6*temperature if field=="stored_heat_per_depth" else 4e-6*temperature**2
             actual = numeric(p["arrays"][field],[stop-start])
             require_close(actual,expected,float(np.max(abs(expected))),field)
-    assert history(client,accepted,"heat_content_j_per_m",0,17,700).status_code == 422
+    assert history(client,accepted,"stored_heat_per_depth",0,17,700).status_code == 422
 
 
 @pytest.mark.parametrize("fault",("heat_vs_quadratic","storage_zero","source_sign",
@@ -304,19 +305,19 @@ def test_studio_transient_independent_oracle_rejects_wrong_runtime_arrays(fault)
     summary = result.summary()
     audit(a,case,data,summary)
     if fault=="heat_vs_quadratic":
-        a["heat_content_j_per_m"] = a["quadratic_functional_jk_per_m"].copy()
+        a["stored_heat_per_depth"] = a["thermal_energy_functional_per_depth"].copy()
     elif fault=="storage_zero":
-        a["storage_rate_w_per_m"] *= 0
+        a["heat_storage_rate_per_depth"] *= 0
     elif fault=="source_sign":
-        a["source_load_w_per_m"] *= -1
+        a["generated_heat_rate_per_depth"] *= -1
     elif fault=="temperature_origin":
-        a["temperature_k"] -= 4
+        a["temperature"] -= 4
     elif fault=="flux_sign":
-        a["heat_flux_w_m2"] *= -1
+        a["heat_flux"] *= -1
     elif fault=="support_sign":
-        a["reaction_w_per_m"] *= -1
+        a["reaction_heat_rate_per_depth"] *= -1
     else:
-        x = a["storage_rate_w_per_m"]
-        a["storage_rate_w_per_m"] = np.concatenate((np.zeros_like(x[:1]),x))
+        x = a["heat_storage_rate_per_depth"]
+        a["heat_storage_rate_per_depth"] = np.concatenate((np.zeros_like(x[:1]),x))
     with pytest.raises(AssertionError):
         audit(a,case,data,summary)

@@ -274,6 +274,31 @@ def test_signed_flux_source_and_unclamped_negative_solution():
     validate_steady_boundary(d)
 
 
+def test_signed_flux_and_unclamped_negative_solution_format_03():
+    # Format 0.3 twin: 0 K is outside the registry domain, so the left side is at 1 K and the
+    # right side loses 10 W/m^2 (inward_heat_flux -10 W/m^2). The solution minimum is -4 K
+    # (measured; -5 K with 0 K): the solver still does not clamp a negative temperature.
+    d = Document.from_dict({
+        "openphysics": "0.3", "name": "Boundary slab",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+        "materials": {}, "physics": {"heat1": {
+            "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)", "heat_source_density": "0 W/m^3",
+            "prescribed_temperature": {"left": "1 K"}, "inward_heat_flux": {"right": "-10 W/m^2"},
+            "convection": {}}},
+        "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False}})
+    kw = steady_boundary_inputs(d, rectangle_mesh(1, 1, 2, 2))
+    assert kw["outward_flux"] == {"right": 10.}            # outward = 0.0 - inward (hazard H1)
+    result = solve_steady_heat(rectangle_mesh(1, 1, 2, 2), **kw)
+    assert result.temperature.min() < 0
+    np.testing.assert_allclose(result.temperature.min(), -4., rtol=0, atol=1e-12)
+    d.data["physics"]["heat1"]["prescribed_temperature"] = {"left": "0 K"}
+    with pytest.raises(DocumentError) as caught:
+        d.validate()
+    assert [(e.code, e.path) for e in caught.value.diagnostics if e.severity == "error"] == [
+        ("E-DOMAIN", "physics.heat1.prescribed_temperature.left")]
+
+
 def test_invalid_mesh_does_not_change_document():
     d = document()
     before = copy.deepcopy(d.data)

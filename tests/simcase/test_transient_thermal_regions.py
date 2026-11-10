@@ -149,18 +149,23 @@ def test_uniform_region_document_matches_the_rectangle_document():
     data['materials']['insulation'] = dict(data['materials']['steel'])
     data['physics']['heat1']['heat_source_w_m3'] = 1e5
     r = run(Document.from_dict(data), verbose=False)
-    rect = {'openphysics': '0.2', 'name': 'rectangle', 'units': data['units'],
-            'geometry': {'domain': data['geometry']['domain']}, 'materials': {},
-            'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 45.,
-                                  'volumetric_heat_capacity_j_m3k': 3.6e6, 'initial_temperature_k': 300.,
-                                  'heat_source_w_m3': 1e5,
-                                  'dirichlet_temperature_k': {'left': 300., 'right': 300.}}},
-            'mesh': {'subdivisions': [60, 10]}, 'study': data['study'], 'results': data['results']}
+    # the rectangle form reads format 0.3 (units batch C5a); the same values with their units
+    rect = {'openphysics': '0.3', 'name': 'rectangle',
+            'geometry': {'length_unit': data['units']['length'], 'depth': None,
+                         'domain': data['geometry']['domain']}, 'materials': {},
+            'physics': {'heat1': {'type': 'thermal.transient2d', 'thermal_conductivity': '45 W/(m K)',
+                                  'volumetric_heat_capacity': '3600000 J/(m^3 K)', 'initial_temperature': '300 K',
+                                  'heat_source_density': '100000 W/m^3',
+                                  'prescribed_temperature': {'left': '300 K', 'right': '300 K'}}},
+            'mesh': {'subdivision_count': [60, 10]},
+            'study': {'type': 'transient', 'time': {'unit': 's', 'values': data['study']['time_s']}},
+            'results': data['results']}
     q = run(Document.from_dict(rect), verbose=False)
     for a, b in ((r, q),):
         s1, s2 = a.summary(), b.summary()
-        np.testing.assert_allclose(s1['source_heat_w_per_m'], s2['source_heat_w_per_m'], rtol=1e-12)
-        np.testing.assert_allclose(s1['temperature_max_k'], s2['temperature_max_k'], rtol=0, atol=2e-3)
+        np.testing.assert_allclose(s1['source_heat_w_per_m'], s2['generated_heat_rate_per_depth']['values'],
+                                   rtol=1e-12)
+        np.testing.assert_allclose(s1['temperature_max_k'], s2['maximum_temperature']['values'], rtol=0, atol=2e-3)
 
 
 def test_saved_region_history_and_summary(tmp_path):

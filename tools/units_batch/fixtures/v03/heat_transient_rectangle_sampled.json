@@ -1,0 +1,61 @@
+{
+  "openphysics": "0.3",
+  "name": "Insulated constant-source transient heat",
+  "geometry": {
+    "length_unit": "m",
+    "depth": null,
+    "domain": {
+      "xmin": 0,
+      "xmax": 1,
+      "ymin": 0,
+      "ymax": 1
+    }
+  },
+  "materials": {},
+  "physics": {
+    "heat1": {
+      "type": "thermal.transient2d",
+      "thermal_conductivity": "2.5 W/(m K)",
+      "volumetric_heat_capacity": {
+        "value": "4 J/(m^3 K)",
+        "accept": {
+          "W-MAGNITUDE": "value carried over from the 0.2 document"
+        }
+      },
+      "initial_temperature": "300 K",
+      "prescribed_temperature": {
+        "left": {
+          "unit": "K",
+          "values": [
+            300.0,
+            300.2,
+            300.6
+          ]
+        },
+        "right": "300 K"
+      },
+      "heat_source_density": "8 W/m^3"
+    }
+  },
+  "mesh": {
+    "subdivision_count": [
+      3,
+      2
+    ]
+  },
+  "study": {
+    "type": "transient",
+    "time": {
+      "unit": "s",
+      "values": [
+        0.0,
+        0.1,
+        0.3
+      ]
+    }
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

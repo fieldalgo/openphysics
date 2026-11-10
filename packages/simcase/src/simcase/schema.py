@@ -229,6 +229,8 @@ class Document:
     #: format 0.3: the flat form a homogeneous 2d or a box-only 3d version 1 component compiles to
     geometry_flat: dict | None = field(default=None, init=False, repr=False, compare=False)
     _resolution: object = field(default=None, init=False, repr=False, compare=False)
+    #: format 0.3: the canonical JSON of ``data`` when it was read; a changed tree is read again
+    _read_json: str | None = field(default=None, init=False, repr=False, compare=False)
 
     # -- construction --------------------------------------------------------
 
@@ -314,7 +316,24 @@ class Document:
         doc._resolution = result
         if result.geometry_model is not None:
             doc.geometry_source = copy.deepcopy(result.tree["geometry"])
+        doc._read_json = doc.canonical_json()
         return doc
+
+    def _read_again(self, refusal="the document was changed after it was read and is now refused") -> None:
+        """A format 0.3 document whose authored tree was changed after it was read (by a caller;
+        simcase never changes ``data``), or that was constructed without reading: read it (again),
+        so that ``validate`` checks what it holds now. Refused with the reader's diagnostics;
+        otherwise the SI tree follows the new values."""
+        from .resolve import resolve_tree
+        again = resolve_tree(copy.deepcopy(self.data))
+        fresh = again.document()
+        if fresh is None:
+            raise DocumentError(refusal, diagnostics=list(again.diagnostics))
+        seen = {(d.code, d.path, d.message) for d in self.diagnostics}
+        self.diagnostics.extend(d for d in fresh.diagnostics if (d.code, d.path, d.message) not in seen)
+        self.si, self.defaults_applied, self._resolution = fresh.si, fresh.defaults_applied, fresh._resolution
+        self.geometry_model, self.geometry_flat, self.source_bytes = fresh.geometry_model, fresh.geometry_flat, None
+        self._read_json = self.canonical_json()
 
     # -- format 0.3 ----------------------------------------------------------
 
@@ -440,6 +459,7 @@ class Document:
             other.source_bytes = self.source_bytes
             other.geometry_flat = copy.deepcopy(self.geometry_flat)
             other._resolution = self._resolution
+            other._read_json = self._read_json
         return other
 
     # -- access --------------------------------------------------------------
@@ -561,9 +581,20 @@ class Document:
 
         A format 0.3 document keeps its diagnostics: validating it again appends only what is
         new, so a runner that re-validates neither loses nor doubles an entry."""
+        if self.si is None and isinstance(self.data, dict) and _is_v03(self.data.get("openphysics")):
+            # ``Document(data)`` of a format 0.3 tree: read it now, as ``from_dict`` would
+            self._diagnostics = DiagnosticList()
+            self._read_again("the document is refused")
         if self.si is None:
             kind_of(self.data).validate(self)
             return
+        if self._read_json is not None:
+            try:
+                changed = self.canonical_json() != self._read_json
+            except (TypeError, ValueError):          # a value JSON cannot hold (NaN, an object)
+                changed = True
+            if changed:
+                self._read_again()
         kept, self.diagnostics = self.diagnostics, DiagnosticList()
         try:
             kind_of(self.data).validate(self)

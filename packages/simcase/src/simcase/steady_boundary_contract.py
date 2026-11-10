@@ -4,6 +4,9 @@
 
 The public document reader is connected separately. These helpers read a
 Document without mutating its data, scale or notes. They do not solve or save.
+Format 0.3 rectangle documents are read by ``simcase.resolve`` against ``heat_slots``
+and checked on their SI values here (the section at the end); the 0.2 readers stay for
+the electric, Joule and mechanics kinds until their own commits of the units batch.
 """
 import math
 from collections.abc import Mapping
@@ -152,12 +155,18 @@ def validate_steady_boundary(doc):
     Nonnegative prescribed/ambient Kelvin is a document policy; the unchanged
     engine permits finite mathematical Kelvin and does not clamp the solution.
     Empty natural mappings select v2 by presence but do not provide an anchor.
+    A format 0.3 document is checked on its SI values (``validate_steady_rectangle_03``).
     """
+    if getattr(doc, "si", None) is not None:
+        validate_steady_rectangle_03(doc)
+        return
     _validated(doc)
 
 
 def steady_result_versions(doc):
     """Return independent result/layout IDs; absent new keys keep legacy v1."""
+    if getattr(doc, "si", None) is not None:
+        return steady_result_versions_03(doc)
     return _validated(doc)[-1]
 
 
@@ -276,3 +285,172 @@ def validate_natural_edges(mesh, p, owners, expected_edges, prescribed, flux, co
                 found.add(edge)
             if found != expected_edges[tag]:
                 raise DocumentError(f"mesh.boundary_edges.{tag}: selection must cover the complete SI side")
+
+
+# -- format 0.3 ------------------------------------------------------------------------------------
+#
+# A format 0.3 rectangle heat document (``"openphysics": "0.3"``) is read by ``simcase.resolve``
+# against the slots below; the checks here run on its resolved SI tree (``doc.si``). Region and
+# version 1 heat documents are still read in format 0.2 (``forms_03``).
+
+V1_03 = ("thermal.steady2d-result-v3", "thermal2d-p1-node-cell-v2")
+V2_03 = ("thermal.steady2d-result-v4", "thermal2d-p1-node-cell-boundary-v3")
+#: the geometry forms whose format 0.3 heat documents this release reads
+FORMS_03 = frozenset({"rect"})
+_SOURCE_ABSENT = "absent: no volumetric heat source (no value is assumed)"
+REACTION_SIGN_03 = ('reaction_heat_rate_per_depth: heat the prescribed-temperature constraint injects into the '
+                    'body; outward_reaction_heat_rate_per_depth = -sum(reaction_heat_rate_per_depth)')
+OUTWARD_SIGN_03 = ('outward_heat_rate_per_depth = sum(outward_prescribed_heat_rate_per_depth + '
+                   'outward_convective_heat_rate_per_depth - reaction_heat_rate_per_depth)')
+LOAD_DEFINITION_03 = ('generated_heat_rate_per_depth: the volumetric source only; applied_heat_rate_per_depth = '
+                      'generated_heat_rate_per_depth + ambient_convective_heat_rate_per_depth - '
+                      'outward_prescribed_heat_rate_per_depth')
+
+
+def heat_slots(physics_type, *, transient=False):
+    """The physics slots of a rectangle heat entry (``simcase.slots``), data only."""
+    p = "physics.*{" + physics_type + "}"
+
+    def q(key, quantity, forms=("QS", "AV"), kind="quantity", **extra):
+        return {"pattern": f"{p}.{key}", "kind": kind, "quantity": quantity, "forms": list(forms), **extra}
+
+    def obj(key, **extra):
+        return {"pattern": f"{p}.{key}", "kind": "structural", "forms": ["OBJECT"], **extra}
+
+    out = [{"pattern": f"{p}.type", "kind": "enum", "values": [physics_type], "required": True},
+           q("thermal_conductivity", "thermal_conductivity", kind="material_property", required=True),
+           q("heat_source_density", "heat_source_density", default=None, default_reason=_SOURCE_ABSENT),
+           obj("prescribed_temperature", required=True),
+           q("prescribed_temperature.*", "prescribed_temperature", ("QS", "AV", "TA") if transient else ("QS", "AV")),
+           obj("inward_heat_flux"), q("inward_heat_flux.*", "inward_heat_flux"),
+           obj("convection"), obj("convection.*"),
+           q("convection.*.heat_transfer_coefficient", "heat_transfer_coefficient", required=True),
+           q("convection.*.ambient_temperature", "ambient_temperature", required=True)]
+    if transient:
+        out += [q("volumetric_heat_capacity", "volumetric_heat_capacity", kind="material_property", required=True),
+                q("initial_temperature", "initial_temperature", ("QS", "AV", "OBJECT"), required=True),
+                {"pattern": f"{p}.initial_temperature.type", "kind": "enum", "values": ["affine"], "required": True},
+                q("initial_temperature.reference_temperature", "reference_temperature", required=True),
+                q("initial_temperature.temperature_gradient", "temperature_gradient", ("SL", "TA"), required=True)]
+    results = {"save_fields": True, "plots": False}
+    out += [{"pattern": "name", "kind": "override", "default": "untitled",
+             "default_reason": "structural default: the document has no name"},
+            {"pattern": "results", "kind": "override", "default": results,
+             "default_reason": "structural default of heat documents"},
+            {"pattern": "results.save_fields", "kind": "override", "default": True,
+             "default_reason": "structural default of heat documents"},
+            {"pattern": "results.plots", "kind": "override", "default": False,
+             "default_reason": "structural default of heat documents (headless)"}]
+    if not transient:
+        out.append({"pattern": "study", "kind": "override", "default": {"type": "single"},
+                    "default_reason": "structural default: one steady solve"})
+    return tuple(out)
+
+
+def _refuse(message, path=None, code="E-CONTRACT"):
+    raise DocumentError(message, path=path, code=code)
+
+
+def rectangle_03(doc, label):
+    """The checks every format 0.3 rectangle heat document shares; returns ``(name, entry)``
+    of its one physics entry (SI values). ``label`` names the physics in messages."""
+    si = doc.si
+    doc.sole_physics()                       # one physics entry; several are not coupled yet
+    name, p = next(iter(si["physics"].items()))
+    if not isinstance(name, str) or not name.isidentifier():
+        _refuse("physics: name must be an identifier")
+    dom = doc.data["geometry"]["domain"]
+    extra = sorted(set(dom) - {"xmin", "xmax", "ymin", "ymax"})
+    if extra:
+        _refuse(f"geometry.domain: unsupported keys {extra}; a rectangle heat document is 2D")
+    for axis in "xy":
+        lo, hi = doc.pm(f"geometry.domain.{axis}min"), doc.pm(f"geometry.domain.{axis}max")
+        if not lo < hi:
+            _refuse(f"geometry.domain.{axis} extent: expected a positive extent (xmin < xmax, ymin < ymax)",
+                    f"geometry.domain.{axis}max")
+    if si.get("materials"):
+        _refuse(f"materials: {label} on a rectangle requires an empty object; "
+                "thermal_conductivity is homogeneous and given on the physics entry")
+    mesh = si.get("mesh")
+    if mesh is None or "subdivision_count" not in mesh:
+        _refuse("mesh.subdivision_count: a rectangle heat document needs [nx, ny]", "mesh.subdivision_count",
+                "E-KEY-MISSING")
+    extra = sorted(set(doc.data["mesh"]) - {"subdivision_count"})
+    if extra:
+        _refuse(f"mesh: a rectangle heat document takes subdivision_count only, got {extra}; element sizes "
+                "belong to region documents")
+    if len(mesh["subdivision_count"]) != 2:
+        _refuse("mesh.subdivision_count: expected [nx, ny]")
+    results = si["results"]
+    if results.get("plots"):
+        _refuse(f"results.plots: {label} is headless; plots=true is not supported")
+    return name, p
+
+
+def _temperatures_03(p, path, sides=SIDES):
+    temperatures = p["prescribed_temperature"]
+    extra = sorted(set(temperatures) - set(sides))
+    if extra:
+        _refuse(f"{path}.prescribed_temperature: unsupported keys {extra}; a rectangle takes {list(sides)}")
+    return temperatures
+
+
+def natural_conditions_03(p, path, prescribed):
+    """``({side: outward g}, {side: (h, ambient)})`` of an SI heat entry; ``inward_heat_flux`` is
+    negated as ``0.0 - x`` (hazard H1), so galerkin keeps receiving its outward flux."""
+    flux = p.get("inward_heat_flux", {})
+    extra = sorted(set(flux) - set(SIDES))
+    if extra:
+        _refuse(f"{path}.inward_heat_flux: unsupported keys {extra}; a rectangle takes {list(SIDES)}")
+    robin = p.get("convection", {})
+    extra = sorted(set(robin) - set(SIDES))
+    if extra:
+        _refuse(f"{path}.convection: unsupported keys {extra}; a rectangle takes {list(SIDES)}")
+    outward = {tag: 0.0 - float(value) for tag, value in flux.items()}
+    convection = {tag: (float(c["heat_transfer_coefficient"]), float(c["ambient_temperature"]))
+                  for tag, c in robin.items()}
+    if set(prescribed) & (set(outward) | set(convection)):
+        _refuse(path + ": natural condition overlaps a fully prescribed-temperature side")
+    return outward, convection
+
+
+def has_natural_conditions_03(p):
+    """Presence selects the boundary layout, as in format 0.2 (an empty object included)."""
+    return "inward_heat_flux" in p or "convection" in p
+
+
+def validate_steady_rectangle_03(doc):
+    """thermal.steady2d on a rectangle, format 0.3: the checks of today's contract on SI values."""
+    name, p = rectangle_03(doc, "steady heat")
+    path = "physics." + name
+    if doc.si["study"] != {"type": "single"}:
+        _refuse('thermal.steady2d supports only study {"type": "single"}')
+    prescribed = {tag: float(v) for tag, v in _temperatures_03(p, path).items()}
+    for a in ("left", "right"):
+        for b in ("bottom", "top"):
+            if a in prescribed and b in prescribed and prescribed[a] != prescribed[b]:
+                _refuse(f"{path}.prescribed_temperature: conflicting corner temperatures on {a}/{b}")
+    flux, convection = natural_conditions_03(p, path, prescribed)
+    if not has_natural_conditions_03(p):
+        if not prescribed:
+            _refuse(f"{path}.prescribed_temperature: at least one exterior side is required")
+    elif not prescribed and not any(h > 0 for h, _ in convection.values()):
+        _refuse(path + ": requires a prescribed-temperature or positive-convection anchor; pure Neumann "
+                "is unsupported")
+
+
+def heat_inputs_03(doc):
+    """The heat inputs (``views.HeatInputs``) of a validated format 0.3 steady rectangle."""
+    name, p = next(iter(doc.si["physics"].items()))
+    prescribed = {tag: float(v) for tag, v in p["prescribed_temperature"].items()}
+    flux, convection = natural_conditions_03(p, "physics." + name, prescribed)
+    source = p.get("heat_source_density")
+    return views.HeatInputs(conductivity=float(p["thermal_conductivity"]),
+                            heat_source=0.0 if source is None else float(source),     # hazard H9
+                            dirichlet=prescribed, outward_flux=flux, convection=convection,
+                            boundary_layout=has_natural_conditions_03(p))
+
+
+def steady_result_versions_03(doc):
+    """The (result_format, field_layout) pair a format 0.3 steady rectangle saves."""
+    return V2_03 if has_natural_conditions_03(next(iter(doc.si["physics"].values()))) else V1_03

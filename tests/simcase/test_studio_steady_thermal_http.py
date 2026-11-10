@@ -17,18 +17,17 @@ from simcase.studio import thermal_api as thermal
 
 
 def model(boundary=False, robin_only=False):
-    p = dict(type='thermal.steady2d', conductivity_w_mk=2., heat_source_w_m3=0.,
-             dirichlet_temperature_k={'left': 300., 'right': 293.})
-    if boundary:
-        p.update(dirichlet_temperature_k={'left': 300.}, outward_flux_w_m2={'right': 2.},
-                 convection={'right': {'h_w_m2k': 4., 'ambient_temperature_k': 290.}})
+    p = dict(type='thermal.steady2d', thermal_conductivity='2 W/(m K)', heat_source_density='0 W/m^3',
+             prescribed_temperature={'left': '300 K', 'right': '293 K'})
+    convection = {'right': {'heat_transfer_coefficient': '4 W/(m^2 K)', 'ambient_temperature': '290 K'}}
+    if boundary:   # 2 W/m^2 leaves through the right side
+        p.update(prescribed_temperature={'left': '300 K'}, inward_heat_flux={'right': '-2 W/m^2'},
+                 convection=convection)
     if robin_only:
-        p.update(dirichlet_temperature_k={}, outward_flux_w_m2={},
-                 convection={'right': {'h_w_m2k': 4., 'ambient_temperature_k': 290.}})
-    return dict(openphysics='0.2', name='Studio steady control',
-                units={'length': 'm', 'temperature': 'K'},
-                geometry={'domain': dict(xmin=0., xmax=1., ymin=0., ymax=1.)},
-                materials={}, physics={'heat1': p}, mesh={'subdivisions': [2, 2]},
+        p.update(prescribed_temperature={}, inward_heat_flux={}, convection=convection)
+    return dict(openphysics='0.3', name='Studio steady control',
+                geometry={'length_unit': 'm', 'depth': None, 'domain': dict(xmin=0., xmax=1., ymin=0., ymax=1.)},
+                materials={}, physics={'heat1': p}, mesh={'subdivision_count': [2, 2]},
                 study={'type': 'single'}, results={'save_fields': True, 'plots': False})
 
 
@@ -110,18 +109,18 @@ def test_real_public_v1_validation_run_and_immutable_result(client):
     assert result.status_code == 200, result.text
     assert result.headers['cache-control'] == 'no-store'
     data = result.json()
-    assert data['payload_format'] == 'studio-thermal-steady-v1'
+    assert data['payload_format'] == 'studio-thermal-steady-v2'
     assert data['result_format'] == thermal.V1[0]
     assert set(data['arrays']) == set(thermal.BASE_FIELDS)
     assert data['display_length_in_m'] == 1.
     assert 'coordinates' not in data and 'neff' not in data
-    nodes = np.asarray(data['arrays']['nodes_m'])
-    np.testing.assert_allclose((np.asarray(data['arrays']['temperature_k'])-(300.-7.*nodes[:, 0]))/7.,
+    nodes = np.asarray(data['arrays']['node_coordinates'])
+    np.testing.assert_allclose((np.asarray(data['arrays']['temperature'])-(300.-7.*nodes[:, 0]))/7.,
                                0., rtol=0., atol=1e-10)
-    np.testing.assert_allclose((np.asarray(data['arrays']['heat_flux_w_m2'])-[14., 0.])/14.,
+    np.testing.assert_allclose((np.asarray(data['arrays']['heat_flux'])-[14., 0.])/14.,
                                0., rtol=0., atol=1e-10)
     encoded = result.content
-    data['arrays']['temperature_k'][0] = -999.
+    data['arrays']['temperature'][0] = -999.
     assert client.get('/api/jobs/'+token['job']+'/result').content == encoded
     assert before == envelope()
     assert_no_active(server._thermal_jobs)
@@ -145,14 +144,14 @@ def test_v2_public_run_or_explicit_unavailable_dependency(client, robin_only):
     assert set(data['arrays']) == set(thermal.PROPERTIES)
     assert data['result_format'] == thermal.V2[0]
     if robin_only:
-        assert data['arrays']['dirichlet_node_ids'] == []
-        assert data['arrays']['dirichlet_temperature_k'] == []
-        np.testing.assert_allclose(data['arrays']['temperature_k'], 290., rtol=0., atol=1e-10)
+        assert data['arrays']['prescribed_node_ids'] == []
+        assert data['arrays']['prescribed_temperature'] == []
+        np.testing.assert_allclose(data['arrays']['temperature'], 290., rtol=0., atol=1e-10)
     else:
         s = data['summary']
         np.testing.assert_allclose(
-            [s['prescribed_outward_heat_w_per_m'], s['convective_outward_heat_w_per_m'],
-             s['thermostat_outward_heat_w_per_m']], [2., 12., -14.], rtol=0., atol=14e-10)
+            [s['outward_prescribed_heat_rate_per_depth']['value'], s['outward_convective_heat_rate_per_depth']['value'],
+             s['outward_reaction_heat_rate_per_depth']['value']], [2., 12., -14.], rtol=0., atol=14e-10)
     assert_no_active(server._thermal_jobs)
 
 
@@ -181,8 +180,8 @@ def test_type_and_mesh_preflight_before_uuid_thread_run(client, monkeypatch, kin
     elif kind == 'transient': data['physics']['heat1']['type'] = 'thermal.transient2d'
     elif kind == 'cavity': data['physics']['heat1']['type'] = 'em.cavity3d'
     elif kind == 'mixed': data['physics']['other'] = {'type': 'em.modes2d'}
-    elif kind == 'mesh': data['mesh']['subdivisions'] = [100000, 100000]
-    else: data['mesh']['subdivisions'] = [True, 2]
+    elif kind == 'mesh': data['mesh']['subdivision_count'] = [100000, 100000]
+    else: data['mesh']['subdivision_count'] = [True, 2]
     forbid_allocation(monkeypatch)
     r = post(client, body=envelope(data))
     assert r.status_code == (413 if kind == 'mesh' else 400)
@@ -192,7 +191,7 @@ def test_type_and_mesh_preflight_before_uuid_thread_run(client, monkeypatch, kin
 
 def test_logical_schema_failure_is_not_transport_success(client, monkeypatch):
     data = model()
-    data['physics']['heat1']['conductivity_w_mk'] = -2.
+    data['physics']['heat1']['thermal_conductivity'] = '-2 W/(m K)'
     forbid_allocation(monkeypatch)
     response = post(client, '/api/thermal/validate', envelope(data))
     assert response.status_code == 200 and response.json()['ok'] is False
@@ -379,24 +378,24 @@ def test_success_logs_are_bounded_including_json_escaping():
 
 def fake_result(legacy=False):
     values = {
-        'nodes_m': np.array([[0., 0.], [1., 0.], [0., 1.], [1., 1.]]),
+        'node_coordinates': np.array([[0., 0.], [1., 0.], [0., 1.], [1., 1.]]),
         'triangles': np.array([[0, 1, 3], [0, 3, 2]], dtype=int),
-        'temperature_k': np.array([300., 293., 300., 293.]),
-        'heat_flux_w_m2': np.array([[14., 0.], [14., 0.]]),
-        'load_w_per_m': np.zeros(4), 'reaction_w_per_m': np.array([-7., 0., -7., 0.]),
-        'residual_w_per_m': np.array([-7., 0., -7., 0.]),
-        'dirichlet_node_ids': np.array([0, 2], dtype=int),
-        'dirichlet_temperature_k': np.array([300., 300.]),
-        'prescribed_outward_load_w_per_m': np.array([0., 1., 0., 1.]),
-        'ambient_load_w_per_m': np.array([0., 580., 0., 580.]),
-        'convective_outward_w_per_m': np.array([0., 6., 0., 6.]),
-        'system_rhs_w_per_m': np.array([0., 579., 0., 579.]),
+        'temperature': np.array([300., 293., 300., 293.]),
+        'heat_flux': np.array([[14., 0.], [14., 0.]]),
+        'generated_heat_rate_per_depth': np.zeros(4), 'reaction_heat_rate_per_depth': np.array([-7., 0., -7., 0.]),
+        'residual_heat_rate_per_depth': np.array([-7., 0., -7., 0.]),
+        'prescribed_node_ids': np.array([0, 2], dtype=int),
+        'prescribed_temperature': np.array([300., 300.]),
+        'outward_prescribed_heat_rate_per_depth': np.array([0., 1., 0., 1.]),
+        'ambient_convective_heat_rate_per_depth': np.array([0., 580., 0., 580.]),
+        'outward_convective_heat_rate_per_depth': np.array([0., 6., 0., 6.]),
+        'applied_heat_rate_per_depth': np.array([0., 579., 0., 579.]),
     }
     if legacy:
-        values['dirichlet_node_ids'] = np.arange(4, dtype=int)
-        values['dirichlet_temperature_k'] = values['temperature_k'].copy()
-        values['reaction_w_per_m'] = np.array([-7., 7., -7., 7.])
-        values['residual_w_per_m'] = values['reaction_w_per_m'].copy()
+        values['prescribed_node_ids'] = np.arange(4, dtype=int)
+        values['prescribed_temperature'] = values['temperature'].copy()
+        values['reaction_heat_rate_per_depth'] = np.array([-7., 7., -7., 7.])
+        values['residual_heat_rate_per_depth'] = values['reaction_heat_rate_per_depth'].copy()
     def id_getter(key):
         def read(self):
             self.id_reads[key] = self.id_reads.get(key, 0)+1
@@ -408,8 +407,8 @@ def fake_result(legacy=False):
             self.reads[key] = self.reads.get(key, 0)+1
             assert self.reads[key] == 1, 'public property read twice'
             value = self.values[key]
-            if key == 'system_rhs_w_per_m' and self.mutate_after_capture:
-                self.values['nodes_m'][0, 0] = 99.
+            if key == 'applied_heat_rate_per_depth' and self.mutate_after_capture:
+                self.values['node_coordinates'][0, 0] = 99.
             return value
         return property(read)
     def summary(self):
@@ -428,10 +427,11 @@ def fake_result(legacy=False):
     obj.id_reads = {}
     obj.public_ids = dict(result_format=pair[0], field_layout=pair[1])
     obj.metadata = dict(physics_type=thermal.KIND, result_format=pair[0], field_layout=pair[1],
-                        units={'length': 'm', 'temperature': 'K'}, mesh_length_unit='m',
+                        resolved_inputs={'geometry.domain.xmin': {'authored': 0.0, 'value': 0.0, 'unit': 'm',
+                                                                  'length_unit': 'm'}},
                         field_shapes={k: list(values[k].shape) for k in keys},
-                        field_units={k: thermal._units(k) for k in keys},
-                        field_locations={k: thermal._location(k) for k in keys})
+                        field_units={k: thermal._unit_03(k) for k in keys if k not in thermal.STRUCTURAL},
+                        field_locations={k: thermal._location_03(k) for k in keys})
     return obj
 
 
@@ -444,12 +444,12 @@ def test_public_property_once_copy_survives_later_source_mutation():
     result.mutate_after_capture = True
     encoded = thermal.capture_result(result, IDENTITY, thermal.ThermalLimits())
     payload = json.loads(encoded)
-    assert payload['arrays']['nodes_m'][0][0] == 0.
-    assert result.values['nodes_m'][0, 0] == 99.
+    assert payload['arrays']['node_coordinates'][0][0] == 0.
+    assert result.values['node_coordinates'][0, 0] == 99.
     assert result.reads == {key: 1 for key in thermal.PROPERTIES}
     assert result.id_reads == {'result_format': 1, 'field_layout': 1}
-    result.values['temperature_k'][:] = -999.
-    assert json.loads(encoded)['arrays']['temperature_k'][0] == 300.
+    result.values['temperature'][:] = -999.
+    assert json.loads(encoded)['arrays']['temperature'][0] == 300.
     assert payload['display_length_in_m'] == 1.
 
 
@@ -458,19 +458,19 @@ def test_public_property_once_copy_survives_later_source_mutation():
                                   'meta_shape', 'pair', 'public_format', 'public_layout', 'metadata_nan'])
 def test_payload_dtype_shape_layout_and_metadata_refusal(fault):
     obj = fake_result()
-    if fault == 'bool': obj.values['temperature_k'] = np.ones(4, dtype=bool)
-    elif fault == 'object': obj.values['temperature_k'] = np.ones(4, dtype=object)
-    elif fault == 'list': obj.values['temperature_k'] = [300.]*4
+    if fault == 'bool': obj.values['temperature'] = np.ones(4, dtype=bool)
+    elif fault == 'object': obj.values['temperature'] = np.ones(4, dtype=object)
+    elif fault == 'list': obj.values['temperature'] = [300.]*4
     elif fault == 'float_index': obj.values['triangles'] = obj.values['triangles'].astype(float)
     elif fault == 'index': obj.values['triangles'][0, 0] = 4
     elif fault == 'clockwise': obj.values['triangles'][0] = obj.values['triangles'][0][::-1]
-    elif fault == 'shape': obj.values['heat_flux_w_m2'] = np.ones(2)
-    elif fault == 'nan': obj.values['load_w_per_m'][0] = np.nan
-    elif fault == 'missing': obj.values['ambient_load_w_per_m'] = None
-    elif fault == 'duplicate': obj.values['dirichlet_node_ids'] = np.array([0, 0])
-    elif fault == 'unit': obj.metadata['field_units']['load_w_per_m'] = 'N/m'
-    elif fault == 'location': obj.metadata['field_locations']['heat_flux_w_m2'] = 'nodes'
-    elif fault == 'meta_shape': obj.metadata['field_shapes']['temperature_k'] = [True]
+    elif fault == 'shape': obj.values['heat_flux'] = np.ones(2)
+    elif fault == 'nan': obj.values['generated_heat_rate_per_depth'][0] = np.nan
+    elif fault == 'missing': obj.values['ambient_convective_heat_rate_per_depth'] = None
+    elif fault == 'duplicate': obj.values['prescribed_node_ids'] = np.array([0, 0])
+    elif fault == 'unit': obj.metadata['field_units']['generated_heat_rate_per_depth'] = 'N/m'
+    elif fault == 'location': obj.metadata['field_locations']['heat_flux'] = 'nodes'
+    elif fault == 'meta_shape': obj.metadata['field_shapes']['temperature'] = [True]
     elif fault == 'pair': obj.metadata['field_layout'] = thermal.V1[1]
     elif fault == 'public_format': obj.public_ids['result_format'] = thermal.V1[0]
     elif fault == 'public_layout': obj.public_ids['field_layout'] = thermal.V1[1]
@@ -481,14 +481,14 @@ def test_payload_dtype_shape_layout_and_metadata_refusal(fault):
 
 def test_v2_empty_d_and_negative_solved_temperature_remain_numeric():
     obj = fake_result()
-    obj.values['dirichlet_node_ids'] = np.array([], dtype=int)
-    obj.values['dirichlet_temperature_k'] = np.array([], dtype=float)
-    obj.values['temperature_k'][:] -= 500.
-    for key in ('dirichlet_node_ids', 'dirichlet_temperature_k'):
+    obj.values['prescribed_node_ids'] = np.array([], dtype=int)
+    obj.values['prescribed_temperature'] = np.array([], dtype=float)
+    obj.values['temperature'][:] -= 500.
+    for key in ('prescribed_node_ids', 'prescribed_temperature'):
         obj.metadata['field_shapes'][key] = [0]
     data = json.loads(thermal.capture_result(obj, IDENTITY, thermal.ThermalLimits()))
-    assert data['arrays']['dirichlet_node_ids'] == []
-    assert max(data['arrays']['temperature_k']) < 0.
+    assert data['arrays']['prescribed_node_ids'] == []
+    assert max(data['arrays']['temperature']) < 0.
 
 
 def test_summary_and_complete_payload_byte_budgets_include_overhead():
@@ -533,14 +533,14 @@ def test_thermal_routes_refuse_time_query_and_expired_ids(lifecycle_client, suff
     assert client.get('/api/jobs/thermal-unknown'+suffix).status_code == 404
 
 
-@pytest.mark.parametrize('key', ['nodes_m', 'triangles', 'heat_flux_w_m2'])
+@pytest.mark.parametrize('key', ['node_coordinates', 'triangles', 'heat_flux'])
 def test_oversized_public_arrays_refuse_before_copy(key):
     class NoCopy(np.ndarray):
         def copy(self, *args, **kwargs):
             raise AssertionError('oversized producer was copied')
     obj = fake_result()
     limits = thermal.ThermalLimits()
-    if key == 'nodes_m':
+    if key == 'node_coordinates':
         limits = replace(limits, max_nodes=3)
     elif key == 'triangles':
         limits = replace(limits, max_triangles=1)
@@ -601,7 +601,7 @@ def test_status_encoding_failure_removes_only_unpublished_own_record_and_release
 def test_invalid_mesh_validation_is_logical_but_run_is_bad_request(client, monkeypatch, subdivisions):
     forbid_allocation(monkeypatch)
     doc = model()
-    doc['mesh']['subdivisions'] = subdivisions
+    doc['mesh']['subdivision_count'] = subdivisions
     for route, status in [('/api/thermal/validate', 200), ('/api/thermal/run', 400)]:
         response = post(client, route, envelope(doc))
         assert response.status_code == status

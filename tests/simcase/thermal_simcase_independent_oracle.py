@@ -9,14 +9,16 @@ import numpy as np
 
 L, H, K, SOURCE, LEFT, RIGHT = .03, .02, 12.5, 1e5, 280., 315.
 LENGTH_FACTORS = {'m': 1., 'mm': 1e-3, 'um': 1e-6}
-FORMAT = 'thermal.steady2d-result-v1'
-LAYOUT = 'thermal2d-p1-node-cell-v1'
-UNITS = {'nodes_m': 'm', 'triangles': '1', 'temperature_k': 'K',
-         'heat_flux_w_m2': 'W/m^2', 'load_w_per_m': 'W/m',
-         'reaction_w_per_m': 'W/m', 'residual_w_per_m': 'W/m',
-         'dirichlet_node_ids': '1', 'dirichlet_temperature_k': 'K'}
+FORMAT = 'thermal.steady2d-result-v3'
+LAYOUT = 'thermal2d-p1-node-cell-v2'
+# saved array -> SI unit; None for the structural arrays, which carry no unit
+UNITS = {'node_coordinates': 'm', 'triangles': None, 'temperature': 'K',
+         'heat_flux': 'W/m^2', 'generated_heat_rate_per_depth': 'W/m',
+         'reaction_heat_rate_per_depth': 'W/m', 'residual_heat_rate_per_depth': 'W/m',
+         'prescribed_node_ids': None, 'prescribed_temperature': 'K'}
 
-LOCATIONS = {key: ('cell' if key in ('triangles','heat_flux_w_m2') else 'prescribed_node' if key.startswith('dirichlet_') else 'node') for key in UNITS}
+LOCATIONS = {key: ('triangle_centroids' if key == 'heat_flux' else 'triangle_connectivity' if key == 'triangles'
+                   else 'prescribed_nodes' if key.startswith('prescribed_') else 'nodes') for key in UNITS}
 
 
 def rectangle(n, unit='m', origin=(.007, -.004)):
@@ -106,46 +108,45 @@ def analytic_sample(n=8, unit='m', source=SOURCE):
     residual = action(rows,cols,entries,temperature-LEFT)-load
     ids, values = prescribed_nodes(tags,{'left':LEFT,'right':RIGHT})
     reaction = np.zeros(len(nodes));reaction[ids] = residual[ids]
-    return dict(nodes_m=nodes, triangles=triangles, temperature_k=temperature,
-                heat_flux_w_m2=flux, load_w_per_m=load,
-                reaction_w_per_m=reaction,residual_w_per_m=residual,
-                dirichlet_node_ids=ids,dirichlet_temperature_k=values)
+    return dict(node_coordinates=nodes, triangles=triangles, temperature=temperature,
+                heat_flux=flux, generated_heat_rate_per_depth=load,
+                reaction_heat_rate_per_depth=reaction,residual_heat_rate_per_depth=residual,
+                prescribed_node_ids=ids,prescribed_temperature=values)
 
 
 def interpolation_errors(n, order=6):
     """Analytic interpolation convergence only; does not imply a FEM solve ran."""
     raw = analytic_sample(n)
-    nodes, tri = raw['nodes_m'],raw['triangles']
+    nodes, tri = raw['node_coordinates'],raw['triangles']
     z,w = np.polynomial.legendre.leggauss(order);z=(z+1)/2;w=w/2
     r,s=np.meshgrid(z,z,indexing='ij');wr,ws=np.meshgrid(w,w,indexing='ij')
     bary=np.stack([(1-r)*(1-s),r*(1-s),s],axis=-1).reshape(-1,3)
     weights=(2*wr*ws*(1-s)).ravel()
     points=np.einsum('qa,tad->tqd',bary,nodes[tri])
     exact_t,exact_q=closed_form(points)
-    th=np.einsum('qa,ta->tq',bary,raw['temperature_k'][tri])
+    th=np.einsum('qa,ta->tq',bary,raw['temperature'][tri])
     area,_=geometry(nodes,tri)
     dt=(th-exact_t)/(RIGHT-LEFT)
-    dq=(raw['heat_flux_w_m2'][:,None]-exact_q)/(K*(RIGHT-LEFT)/L)
+    dq=(raw['heat_flux'][:,None]-exact_q)/(K*(RIGHT-LEFT)/L)
     return np.array([np.sqrt(np.sum(area[:,None]*weights*dt**2)/(L*H)),
                      np.sqrt(np.sum(area[:,None]*weights*np.sum(dq*dq,axis=-1))/(L*H))])
 
 
 def document(n=8, unit='mm', source=SOURCE, fields=True):
     factor=LENGTH_FACTORS[unit]
-    return {'openphysics':'0.2','name':'Independent translated heat fixture',
-            'units':{'length':unit,'temperature':'K'},
-            'geometry':{'domain':{'xmin':.007/factor,'xmax':.037/factor,
+    return {'openphysics':'0.3','name':'Independent translated heat fixture',
+            'geometry':{'length_unit':unit,'depth':None,
+                        'domain':{'xmin':.007/factor,'xmax':.037/factor,
                                   'ymin':-.004/factor,'ymax':.016/factor}},
             'materials':{},'physics':{'independent_heat':{'type':'thermal.steady2d',
-            'conductivity_w_mk':K,'heat_source_w_m3':source,
-            'dirichlet_temperature_k':{'left':LEFT,'right':RIGHT}}},
-            'mesh':{'subdivisions':[n,n]},'study':{'type':'single'},
+            'thermal_conductivity':f'{K!r} W/(m K)','heat_source_density':f'{float(source)!r} W/m^3',
+            'prescribed_temperature':{'left':f'{LEFT!r} K','right':f'{RIGHT!r} K'}}},
+            'mesh':{'subdivision_count':[n,n]},'study':{'type':'single'},
             'results':{'save_fields':fields,'plots':False}}
 
 
 def result_arrays(result):
-    names={'nodes_m':'mesh_nodes_m','triangles':'mesh_triangles'}
-    return {key:np.asarray(getattr(result,names.get(key,key))) for key in UNITS}
+    return {key:np.asarray(getattr(result,key)) for key in UNITS}
 
 
 def errors_from_actual(raw,order=6):
@@ -153,43 +154,44 @@ def errors_from_actual(raw,order=6):
     r,s=np.meshgrid(z,z,indexing='ij');wr,ws=np.meshgrid(w,w,indexing='ij')
     bary=np.stack([(1-r)*(1-s),r*(1-s),s],axis=-1).reshape(-1,3)
     weights=(2*wr*ws*(1-s)).ravel()
-    tri=raw['triangles'];points=np.einsum('qa,tad->tqd',bary,raw['nodes_m'][tri])
+    tri=raw['triangles'];points=np.einsum('qa,tad->tqd',bary,raw['node_coordinates'][tri])
     exact_t,exact_q=closed_form(points)
-    th=np.einsum('qa,ta->tq',bary,raw['temperature_k'][tri])
-    area,_=geometry(raw['nodes_m'],tri)
-    dt=(th-exact_t)/35;dq=(raw['heat_flux_w_m2'][:,None]-exact_q)/(K*35/L)
+    th=np.einsum('qa,ta->tq',bary,raw['temperature'][tri])
+    area,_=geometry(raw['node_coordinates'],tri)
+    dt=(th-exact_t)/35;dq=(raw['heat_flux'][:,None]-exact_q)/(K*35/L)
     return np.array([np.sqrt(np.sum(area[:,None]*weights*dt**2)/(L*H)),
                      np.sqrt(np.sum(area[:,None]*weights*np.sum(dq*dq,axis=-1))/(L*H))])
 
 
 def validate_actual_raw(raw,source=SOURCE):
     """Independent physical assertions, never producer summary-derived answers."""
-    n=len(raw['nodes_m']);m=len(raw['triangles']);d=len(raw['dirichlet_node_ids'])
+    n=len(raw['node_coordinates']);m=len(raw['triangles']);d=len(raw['prescribed_node_ids'])
     shapes=[(n,2),(m,3),(n,),(m,2),(n,),(n,),(n,),(d,),(d,)]
     for (name,value),shape in zip(raw.items(),shapes):
         assert value.dtype.kind in 'iuf' and value.shape==shape and np.all(np.isfinite(value)),name
-    tri=raw['triangles'];ids=raw['dirichlet_node_ids'];p=raw['nodes_m']
+    tri=raw['triangles'];ids=raw['prescribed_node_ids'];p=raw['node_coordinates']
     assert tri.dtype.kind in 'iu' and np.all(tri>=0) and np.all(tri<n)
     assert ids.dtype.kind in 'iu' and np.array_equal(ids,np.unique(ids)) and np.all(ids>=0) and np.all(ids<n)
-    assert np.all(raw['temperature_k']>=0) and np.all(raw['dirichlet_temperature_k']>=0)
+    assert np.all(raw['temperature']>=0) and np.all(raw['prescribed_temperature']>=0)
     area,grad=geometry(p,tri)
     scale=abs(source*L*H)+2*K*35*H/L
     rows,cols,entries,load=original_system(p,tri,source)
-    np.testing.assert_allclose((raw['load_w_per_m']-load)/scale,0,atol=1e-10)
-    residual=action(rows,cols,entries,raw['temperature_k']-LEFT)-load
-    np.testing.assert_allclose((raw['residual_w_per_m']-residual)/scale,0,atol=1e-10)
+    np.testing.assert_allclose((raw['generated_heat_rate_per_depth']-load)/scale,0,atol=1e-10)
+    residual=action(rows,cols,entries,raw['temperature']-LEFT)-load
+    np.testing.assert_allclose((raw['residual_heat_rate_per_depth']-residual)/scale,0,atol=1e-10)
     fixed=np.flatnonzero(np.isclose(p[:,0],.007,rtol=0,atol=1e-15)|np.isclose(p[:,0],.037,rtol=0,atol=1e-15))
     np.testing.assert_array_equal(ids,fixed)
     expected_values=np.where(p[ids,0]<.02,LEFT,RIGHT)
-    np.testing.assert_array_equal(raw['dirichlet_temperature_k'],expected_values)
+    np.testing.assert_array_equal(raw['prescribed_temperature'],expected_values)
     reaction=np.zeros(n);reaction[ids]=residual[ids]
-    np.testing.assert_allclose((raw['reaction_w_per_m']-reaction)/scale,0,atol=1e-10)
+    np.testing.assert_allclose((raw['reaction_heat_rate_per_depth']-reaction)/scale,0,atol=1e-10)
     free=np.setdiff1d(np.arange(n),ids)
-    np.testing.assert_allclose(raw['residual_w_per_m'][free]/scale,0,atol=1e-10)
-    q=-K*np.einsum('ti,tij->tj',raw['temperature_k'][tri]-LEFT,grad)
-    np.testing.assert_allclose((raw['heat_flux_w_m2']-q)/(K*35/L),0,atol=1e-10)
+    np.testing.assert_allclose(raw['residual_heat_rate_per_depth'][free]/scale,0,atol=1e-10)
+    q=-K*np.einsum('ti,tij->tj',raw['temperature'][tri]-LEFT,grad)
+    np.testing.assert_allclose((raw['heat_flux']-q)/(K*35/L),0,atol=1e-10)
     sides,total=continuous_heat(source)
-    actual=-np.array([raw['reaction_w_per_m'][p[:,0]<.007+1e-15].sum(),raw['reaction_w_per_m'][p[:,0]>.037-1e-15].sum()])
+    reaction=raw['reaction_heat_rate_per_depth']
+    actual=-np.array([reaction[p[:,0]<.007+1e-15].sum(),reaction[p[:,0]>.037-1e-15].sum()])
     np.testing.assert_allclose((actual-sides)/scale,0,atol=1e-10)
-    assert abs(raw['load_w_per_m'].sum()-total)/scale<=1e-10
-    assert abs(raw['reaction_w_per_m'].sum()+total)/scale<=1e-10
+    assert abs(raw['generated_heat_rate_per_depth'].sum()-total)/scale<=1e-10
+    assert abs(reaction.sum()+total)/scale<=1e-10

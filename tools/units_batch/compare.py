@@ -343,7 +343,9 @@ class LayoutMap:
                 raise ValueError(f"{source}: removed check {rule.get('check')!r} is not in the closed list")
             self.summary.append((parse_pattern(rule["old"]), None if f == "removed" else parse_pattern(rule["new"]),
                                  f, rule))
-        self.summary_added = [parse_pattern(p) for p in (*ADDED_ALWAYS, *data.get("summary_added", []))]
+        # an always-added key covers its whole subtree (resolved_inputs, diagnostics, ...)
+        self.summary_added = [parse_pattern(p) for p in (*(f"{k}.**" for k in ADDED_ALWAYS),
+                                                         *data.get("summary_added", []))]
         self.identifiers = [parse_pattern(p) for p in data.get("identifiers", [])]
         self.vtu = {r["old"]: (r["new"], ALIASES.get(r.get("f", "="), r.get("f", "="))) for r in data.get("vtu", [])}
         self.vtu_added = [re.compile(p) for p in data.get("vtu_added", [])]
@@ -566,7 +568,26 @@ def _vtu_arrays(form: dict) -> dict:
     return out
 
 
-def compare_exports(old: dict, new: dict, old_dir: Path, new_dir: Path, lmap, result: Result):
+def layout_renames(maps: Path) -> dict:
+    """old field layout -> new field layout of every layout map: the identifiers a kind's commit
+    replaces. Identifier strings are not compared (P2-1), so an export refusal that lists the
+    supported layouts is compared after this renaming."""
+    out = {}
+    for path in sorted(Path(maps).glob("*.json")):
+        data = _load_json(path)
+        if data.get("format") == "openphysics-units-batch-map-v1" and data.get("new_layout"):
+            out[data["old_layout"]] = data["new_layout"]
+    return out
+
+
+def _renamed(message: str, renames: dict) -> str:
+    # the longest identifiers first, so that one is never replaced inside another
+    for old in sorted(renames, key=len, reverse=True):
+        message = re.sub(r"(?<![\w-])" + re.escape(old) + r"(?![\w-])", "\0" + renames[old] + "\0", message)
+    return message.replace("\0", "")
+
+
+def compare_exports(old: dict, new: dict, old_dir: Path, new_dir: Path, lmap, result: Result, renames=None):
     a, b = old.get("export", {}), new.get("export", {})
     if set(a) != set(b):
         result.fail(f"exports: {sorted(a)} != {sorted(b)}")
@@ -576,7 +597,8 @@ def compare_exports(old: dict, new: dict, old_dir: Path, new_dir: Path, lmap, re
             result.fail(f"export {name}: {x['status']} != {y['status']}")
             continue
         if x["status"] == "refused":
-            same = x["exception"][0] == y["exception"][0] and (lmap is not None or x["exception"] == y["exception"])
+            renamed = [x["exception"][0], _renamed(x["exception"][1], renames or {})] + list(x["exception"][2:])
+            same = x["exception"][0] == y["exception"][0] and (lmap is not None or renamed == list(y["exception"]))
             if not same:
                 result.fail(f"export {name}: refusal {x['exception']} != {y['exception']}")
             continue
@@ -699,7 +721,7 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
             compare_trees_identity(_load_json(old_dir / "result" / "model.json"),
                                    _load_json(new_dir / "result" / "model.json"), "model.json", result)
         compare_arrays_identity(arrays_a, arrays_b, result)
-        compare_exports(old, new, old_dir, new_dir, None, result)
+        compare_exports(old, new, old_dir, new_dir, None, result, layout_renames(maps))
     else:
         lmap = _map_for(old_dir, maps, result)
         if lmap is None:

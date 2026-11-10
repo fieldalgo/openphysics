@@ -14,13 +14,92 @@ import time
 
 import numpy as np
 
-from . import views
+from . import results_common, views
 from .schema import DocumentError
 from .registry import PhysicsKind, register
 
 PHYSICS = 'thermal.steady2d'
 RESULT_FORMAT = 'thermal.steady2d-result-v1'
 FIELD_LAYOUT = 'thermal2d-p1-node-cell-v1'
+
+# Format 0.3 rectangle results: the saved arrays under registry names (bytes unchanged), and
+# the summary's balance values. 0.2 names stay for the region results until their commit.
+ARRAY_NAMES_03 = {
+    'nodes_m': 'node_coordinates', 'triangles': 'triangles', 'temperature_k': 'temperature',
+    'heat_flux_w_m2': 'heat_flux', 'load_w_per_m': 'generated_heat_rate_per_depth',
+    'reaction_w_per_m': 'reaction_heat_rate_per_depth', 'residual_w_per_m': 'residual_heat_rate_per_depth',
+    'dirichlet_node_ids': 'prescribed_node_ids', 'dirichlet_temperature_k': 'prescribed_temperature',
+    'prescribed_outward_load_w_per_m': 'outward_prescribed_heat_rate_per_depth',
+    'ambient_load_w_per_m': 'ambient_convective_heat_rate_per_depth',
+    'convective_outward_w_per_m': 'outward_convective_heat_rate_per_depth',
+    'system_rhs_w_per_m': 'applied_heat_rate_per_depth'}
+#: array name -> (registry quantity or None for a structural array, location, components)
+FIELDS_03 = {
+    'node_coordinates': ('node_coordinates', 'nodes', ['x', 'y']),
+    'triangles': (None, 'triangle_connectivity', None),
+    'temperature': ('temperature', 'nodes', None),
+    'heat_flux': ('heat_flux', 'triangle_centroids', ['x', 'y']),
+    'generated_heat_rate_per_depth': ('generated_heat_rate_per_depth', 'nodes', None),
+    'reaction_heat_rate_per_depth': ('reaction_heat_rate_per_depth', 'nodes', None),
+    'residual_heat_rate_per_depth': ('residual_heat_rate_per_depth', 'nodes', None),
+    'prescribed_node_ids': (None, 'prescribed_nodes', None),
+    'prescribed_temperature': ('prescribed_temperature', 'prescribed_nodes', None),
+    'outward_prescribed_heat_rate_per_depth': ('outward_prescribed_heat_rate_per_depth', 'nodes', None),
+    'ambient_convective_heat_rate_per_depth': ('ambient_convective_heat_rate_per_depth', 'nodes', None),
+    'outward_convective_heat_rate_per_depth': ('outward_convective_heat_rate_per_depth', 'nodes', None),
+    'applied_heat_rate_per_depth': ('applied_heat_rate_per_depth', 'nodes', None)}
+BALANCE_03 = {
+    'source_heat_w_per_m': 'generated_heat_rate_per_depth', 'outward_heat_w_per_m': 'outward_heat_rate_per_depth',
+    'heat_balance_defect_w_per_m': 'heat_rate_imbalance_per_depth',
+    'normalized_heat_balance_defect': 'relative_conservation_residual', 'normalized_free_residual': 'relative_residual',
+    'prescribed_outward_heat_w_per_m': 'outward_prescribed_heat_rate_per_depth',
+    'convective_outward_heat_w_per_m': 'outward_convective_heat_rate_per_depth',
+    'thermostat_outward_heat_w_per_m': 'outward_reaction_heat_rate_per_depth',
+    'free_residual_max_w_per_m': 'maximum_residual_heat_rate_per_depth'}
+from .steady_boundary_contract import LOAD_DEFINITION_03, OUTWARD_SIGN_03, REACTION_SIGN_03  # noqa: E402
+_FORMAT_02 = ('format 0.2 rectangle heat documents are not read: units now travel with each value ("300 K", '
+              '"12.5 W/(m K)") and the geometry declares its length_unit. Write "openphysics": "0.3" '
+              '(docs/packages/simcase/thermal_steady2d.md)')
+
+
+def refuse_format_02(doc, label):
+    """A 0.2 rectangle heat document: refused by name (region documents are still read in format
+    0.2 until their commit of the units batch)."""
+    raise DocumentError(_FORMAT_02.replace('thermal_steady2d', label), path='openphysics', code='E-FORMAT')
+
+
+def strict_value(value, quantity_name):
+    """A value object whose non-finite value is refused when the summary is written (heat
+    summaries keep refusing non-finite numbers, as before the units batch)."""
+    from physmat.units import quantity
+    return {'value': float(value), 'unit': quantity(quantity_name).unit}
+
+
+def strict_series(values, quantity_name):
+    from physmat.units import quantity
+    return {'unit': quantity(quantity_name).unit, 'values': [float(v) for v in values]}
+
+
+def strict_timing(timings):
+    """``timing.wall_time`` of a heat summary; a non-finite wall time is refused like any value."""
+    return {'wall_time': {key: strict_value(timings[key], 'wall_time') for key in ('mesh', 'solve')}}
+
+
+class _Renamed:
+    """A format 0.2 result property: read on 0.2 results, refused on format 0.3 results."""
+
+    def __init__(self, attribute, new):
+        self.attribute, self.new = attribute, new
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, obj, owner=None):
+        if obj is None:
+            return self
+        if obj.doc.si is not None:
+            raise AttributeError(f'{self.name} is the format 0.2 name; read {self.new}')
+        return getattr(obj.solution, self.attribute)
 
 
 def is_thermal(data):
@@ -108,8 +187,51 @@ def validate_thermal(doc):
     doc.notes = []
 
 
+def _authored(doc, path, unit=''):
+    """The authored text of a value, for the summary line (a bare number gets ``unit``)."""
+    value = doc.authored(path)
+    if value is None:
+        value = doc.authored(path + '.value')          # an annotated value
+    if isinstance(value, dict) and 'value' in value:
+        value = value['value']
+    if isinstance(value, dict) and 'unit' in value:
+        return f"[{', '.join(str(v) for v in value['values'])}] {value['unit']}"
+    return value if isinstance(value, str) else f'{value} {unit}'.strip()
+
+
+def rectangle_summary_03(doc, label, lines, versions=None):
+    """The summary text of a format 0.3 rectangle heat document."""
+    name, p = next(iter(doc.si['physics'].items()))
+    where = f'physics.{name}'
+    g = doc.data['geometry']
+    dom = ', '.join(f'{k} {g["domain"][k]}' for k in ('xmin', 'xmax', 'ymin', 'ymax'))
+    out = [f'{doc.si["name"]} (openphysics 0.3)', f'  physics {name}: {PHYSICS if not label else label}',
+           f'  domain {dom} ({g["length_unit"]}); subdivision_count {doc.si["mesh"]["subdivision_count"]}',
+           f'  thermal_conductivity {_authored(doc, where + ".thermal_conductivity")}'
+           + (f', heat_source_density {_authored(doc, where + ".heat_source_density")}'
+              if 'heat_source_density' in p else ', no heat_source_density')]
+    temperatures = {tag: _authored(doc, f'{where}.prescribed_temperature.{tag}')
+                    for tag in p['prescribed_temperature']}
+    if 'inward_heat_flux' in p or 'convection' in p:
+        flux = {tag: _authored(doc, f'{where}.inward_heat_flux.{tag}') for tag in p.get('inward_heat_flux', {})}
+        convection = {tag: {k: _authored(doc, f'{where}.convection.{tag}.{k}') for k in c}
+                      for tag, c in p.get('convection', {}).items()}
+        out.append(f'  prescribed_temperature {temperatures}; inward_heat_flux {flux}; convection {convection}')
+        out.append('  q.n = -inward_heat_flux + h (T - ambient_temperature); unselected natural sides insulated')
+    else:
+        out.append(f'  prescribed_temperature {temperatures}; remaining exterior insulated')
+    out += lines
+    if versions is not None:
+        out.append(f'  result: {versions[0]}; layout: {versions[1]}')
+    out.append('  output: SI (node_coordinates m, temperature K, heat_flux W/m^2, nodal heat rates W/m of depth)')
+    return '\n'.join(out)
+
+
 def thermal_summary(doc):
     from .thermal_regions import is_region_thermal, region_summary
+    if doc.si is not None:
+        from .steady_boundary_contract import steady_result_versions_03
+        return rectangle_summary_03(doc, f'{PHYSICS}, single steady heat', [], steady_result_versions_03(doc))
     if is_region_thermal(doc.data):
         return region_summary(doc)
     name, p = doc.sole_physics()
@@ -364,7 +486,10 @@ class ThermalRunResult:
         self._fixed_snapshot = np.array(self.dirichlet_node_ids, copy=True)
         self._temperature_snapshot = np.array(self.dirichlet_temperature_k, copy=True)
         physics = self.doc.sole_physics()[1]
-        if 'outward_flux_w_m2' in physics or 'convection' in physics:
+        if self.doc.si is not None:
+            from .steady_boundary_contract import steady_result_versions_03
+            self._result_format, self._field_layout = steady_result_versions_03(self.doc)
+        elif 'outward_flux_w_m2' in physics or 'convection' in physics:
             from .steady_boundary_contract import steady_result_versions
             self._result_format, self._field_layout = steady_result_versions(self.doc)
         else:
@@ -399,52 +524,90 @@ class ThermalRunResult:
     def field_layout(self): return self._field_layout
 
     @property
-    def boundary_enabled(self): return self._result_format.endswith('-v2')
+    def boundary_enabled(self): return self._result_format.endswith(('-v2', '-v4'))
+
+    # format 0.2 names (region results until their commit); a 0.3 result refuses them
+    prescribed_outward_load_w_per_m = _Renamed('prescribed_outward_load', 'outward_prescribed_heat_rate_per_depth')
+    ambient_load_w_per_m = _Renamed('ambient_load', 'ambient_convective_heat_rate_per_depth')
+    convective_outward_w_per_m = _Renamed('convective_outward', 'outward_convective_heat_rate_per_depth')
+    system_rhs_w_per_m = _Renamed('system_rhs', 'applied_heat_rate_per_depth')
+    temperature_k = _Renamed('temperature', 'temperature')
+    heat_flux_w_m2 = _Renamed('heat_flux', 'heat_flux')
+    load_w_per_m = _Renamed('load', 'generated_heat_rate_per_depth')
+    reaction_w_per_m = _Renamed('reaction', 'reaction_heat_rate_per_depth')
+    residual_w_per_m = _Renamed('residual', 'residual_heat_rate_per_depth')
 
     @property
-    def prescribed_outward_load_w_per_m(self): return self.solution.prescribed_outward_load
-
-    @property
-    def ambient_load_w_per_m(self): return self.solution.ambient_load
-
-    @property
-    def convective_outward_w_per_m(self): return self.solution.convective_outward
-
-    @property
-    def system_rhs_w_per_m(self): return self.solution.system_rhs
-
-    @property
-    def mesh_nodes_m(self): return self.mesh.nodes
+    def mesh_nodes_m(self):
+        if self.doc.si is not None:
+            raise AttributeError('mesh_nodes_m is the format 0.2 name; read node_coordinates')
+        return self.mesh.nodes
 
     @property
     def mesh_triangles(self): return self.mesh.triangles
 
+    # registry names (format 0.3)
     @property
-    def temperature_k(self): return self.solution.temperature
+    def node_coordinates(self): return self.mesh.nodes
 
     @property
-    def heat_flux_w_m2(self): return self.solution.heat_flux
+    def triangles(self): return self.mesh.triangles
 
     @property
-    def load_w_per_m(self): return self.solution.load
+    def temperature(self): return self.solution.temperature
 
     @property
-    def reaction_w_per_m(self): return self.solution.reaction
+    def heat_flux(self): return self.solution.heat_flux
 
     @property
-    def residual_w_per_m(self): return self.solution.residual
+    def generated_heat_rate_per_depth(self): return self.solution.load
+
+    @property
+    def reaction_heat_rate_per_depth(self): return self.solution.reaction
+
+    @property
+    def residual_heat_rate_per_depth(self): return self.solution.residual
+
+    @property
+    def outward_prescribed_heat_rate_per_depth(self): return self.solution.prescribed_outward_load
+
+    @property
+    def ambient_convective_heat_rate_per_depth(self): return self.solution.ambient_load
+
+    @property
+    def outward_convective_heat_rate_per_depth(self): return self.solution.convective_outward
+
+    @property
+    def applied_heat_rate_per_depth(self): return self.solution.system_rhs
+
+    @property
+    def prescribed_node_ids(self): return self.dirichlet_node_ids
+
+    @property
+    def prescribed_temperature(self): return self.dirichlet_temperature_k
+
+    @property
+    def balance(self):
+        """The heat balance values of the summary, under the names this result saves them."""
+        return dict(self.diagnostics)
 
     def _raw_arrays(self):
+        if self.doc.si is not None:
+            return {ARRAY_NAMES_03[key]: a for key, a in self._checked_arrays().items()}
+        return self._checked_arrays()
+
+    def _checked_arrays(self):
+        sol = self.solution
         arrays = dict(nodes_m=np.asarray(self.mesh.nodes), triangles=np.asarray(self.mesh.triangles),
-                      temperature_k=np.asarray(self.temperature_k), heat_flux_w_m2=np.asarray(self.heat_flux_w_m2),
-                      load_w_per_m=np.asarray(self.load_w_per_m), reaction_w_per_m=np.asarray(self.reaction_w_per_m),
-                      residual_w_per_m=np.asarray(self.residual_w_per_m), dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
+                      temperature_k=np.asarray(sol.temperature), heat_flux_w_m2=np.asarray(sol.heat_flux),
+                      load_w_per_m=np.asarray(sol.load), reaction_w_per_m=np.asarray(sol.reaction),
+                      residual_w_per_m=np.asarray(sol.residual), dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
                       dirichlet_temperature_k=np.asarray(self.dirichlet_temperature_k))
         if self.boundary_enabled:
-            arrays.update(prescribed_outward_load_w_per_m=np.asarray(self.prescribed_outward_load_w_per_m),
-                          ambient_load_w_per_m=np.asarray(self.ambient_load_w_per_m),
-                          convective_outward_w_per_m=np.asarray(self.convective_outward_w_per_m),
-                          system_rhs_w_per_m=np.asarray(self.system_rhs_w_per_m))
+            arrays.update(prescribed_outward_load_w_per_m=np.asarray(sol.prescribed_outward_load),
+                          ambient_load_w_per_m=np.asarray(sol.ambient_load),
+                          convective_outward_w_per_m=np.asarray(sol.convective_outward),
+                          system_rhs_w_per_m=np.asarray(sol.system_rhs))
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
@@ -479,7 +642,46 @@ class ThermalRunResult:
             raise ValueError('thermal prescribed temperature must be nonnegative kelvin')
         return arrays
 
+    def _summary_03(self):
+        arrays = self._raw_arrays()
+        doc = self.doc
+        name, p = next(iter(doc.si['physics'].items()))
+        vo = strict_value
+        fields = {key: {'quantity': FIELDS_03[key][0], 'location': FIELDS_03[key][1], 'shape': list(a.shape),
+                        'components': FIELDS_03[key][2]} for key, a in arrays.items()}
+        maps = results_common.field_maps(fields)
+        del maps['field_time_axes']                      # a steady result has no time axis
+        result = {'name': doc.si['name'], 'physics_name': name, 'physics_type': PHYSICS,
+                  **results_common.envelope(doc, result_format=self.result_format, field_layout=self.field_layout,
+                                            timing_=strict_timing(self.timings)),
+                  **maps, 'reaction_sign': REACTION_SIGN_03,
+                  'mesh': {'nodes': len(self.mesh.nodes), 'triangles': len(self.mesh.triangles)},
+                  'study': {'type': 'single'},
+                  'thermal_conductivity': vo(p['thermal_conductivity'], 'thermal_conductivity')}
+        if 'heat_source_density' in p:
+            result['heat_source_density'] = vo(p['heat_source_density'], 'heat_source_density')
+        result['prescribed_temperature'] = {tag: vo(v, 'prescribed_temperature')
+                                            for tag, v in p['prescribed_temperature'].items()}
+        result['prescribed_nodes'] = len(self.dirichlet_node_ids)
+        result['minimum_temperature'] = vo(self.solution.temperature.min(), 'minimum_temperature')
+        result['maximum_temperature'] = vo(self.solution.temperature.max(), 'maximum_temperature')
+        for key, value in self.diagnostics.items():
+            result[key] = vo(value, key)
+        if self.boundary_enabled:
+            result['inward_heat_flux'] = {tag: vo(v, 'inward_heat_flux') for tag, v in p.get('inward_heat_flux', {}).items()}
+            result['convection'] = {tag: {'heat_transfer_coefficient': vo(c['heat_transfer_coefficient'],
+                                                                           'heat_transfer_coefficient'),
+                                          'ambient_temperature': vo(c['ambient_temperature'], 'ambient_temperature')}
+                                    for tag, c in p.get('convection', {}).items()}
+            result['outward_sign'] = OUTWARD_SIGN_03
+            result['load_definition'] = LOAD_DEFINITION_03
+        results_common.add_depth_totals(result, doc.si['geometry']['depth'])
+        results_common.dumps_summary(result)            # finite JSON only
+        return result
+
     def summary(self):
+        if self.doc.si is not None:
+            return self._summary_03()
         arrays = self._raw_arrays()
         name, p = self.doc.sole_physics()
         result = {'name': self.doc['name'], 'physics_name': name, 'physics_type': PHYSICS,
@@ -518,15 +720,25 @@ class ThermalRunResult:
 
     def save(self, outdir):
         owned = _OwnedOutput(outdir)
+        v03 = self.doc.si is not None
         try:
             owned.write('.incomplete', lambda f: f.write(b'incomplete thermal result\n'))
             summary = self.summary()
-            encoded = json.dumps(summary, indent=2, allow_nan=False).encode()
-            owned.write('model.json', lambda f: f.write(self._document_json.encode('utf-8')))
-            owned.write('log.txt', lambda f: f.write(('\n'.join(self.log)+'\n').encode()))
-            if self.doc['results']['save_fields']:
+            if v03:
+                encoded = results_common.dumps_summary(summary).encode('utf-8')
+                model = model_bytes_03(self.doc)
+                save_fields = self.doc.si['results']['save_fields']
+                extra = dict(metadata_json=results_common.metadata_json(summary))
+            else:
+                encoded = json.dumps(summary, indent=2, allow_nan=False).encode()
+                model = self._document_json.encode('utf-8')
+                save_fields = self.doc['results']['save_fields']
+                extra = dict(mesh_length_unit='m', metadata_json=encoded.decode())
+            owned.write('model.json', lambda f: f.write(model))
+            owned.write('log.txt', lambda f: f.write(('\n'.join(self.log)+'\n').encode('utf-8')))
+            if save_fields:
                 arrays = dict(self._raw_arrays(), result_format=self.result_format, field_layout=self.field_layout,
-                              mesh_length_unit='m', metadata_json=encoded.decode())
+                              **extra)
                 if any(np.asarray(v).dtype.hasobject for v in arrays.values()):
                     raise ValueError('thermal raw arrays must not contain Python objects')
                 for key, value in arrays.items():
@@ -542,6 +754,21 @@ class ThermalRunResult:
         finally:
             owned.close()
         return owned.path
+
+
+def model_bytes_03(doc):
+    """``model.json`` of a format 0.3 result: the authored bytes, else decimal-preserving JSON."""
+    if doc.source_bytes is not None:
+        return doc.source_bytes
+    from .reader import dumps
+    return (dumps(doc.data, indent=2, ensure_ascii=False)+'\n').encode('utf-8')
+
+
+def log_lines_03(doc, lines):
+    """``log.txt`` of a format 0.3 run: the extent lines, the summary, the run lines, every diagnostic."""
+    from .diagnostics import render_text
+    text = render_text(doc.diagnostics)
+    return [*doc.extent_lines(), *lines, *([text] if text else [])]
 
 
 def run_thermal(doc, verbose=True, *, mesh_limits=None):
@@ -562,7 +789,8 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     mesh = rectangle_mesh(*grid.lengths, *grid.subdivisions)
     mesh.nodes += np.array(grid.origin)
     from .steady_boundary_contract import steady_boundary_inputs
-    boundary_enabled = 'outward_flux_w_m2' in p or 'convection' in p
+    v03 = doc.si is not None
+    boundary_enabled = ('inward_heat_flux' in p if v03 else 'outward_flux_w_m2' in p) or 'convection' in p
     if boundary_enabled:
         kwargs = steady_boundary_inputs(doc, mesh)
         prescribed = kwargs['dirichlet']
@@ -573,7 +801,8 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
         for tag, value in heat.dirichlet.items():
             nodes = mesh.boundary.get(tag)
             if nodes is None or not len(nodes):
-                raise DocumentError(f'physics.{name}.dirichlet_temperature_k.{tag}: empty or unknown exterior tag')
+                key = 'prescribed_temperature' if v03 else 'dirichlet_temperature_k'
+                raise DocumentError(f'physics.{name}.{key}.{tag}: empty or unknown exterior tag')
             for node in nodes:
                 if int(node) in prescribed and prescribed[int(node)] != value:
                     raise DocumentError(f'physics.{name}: conflicting corner temperature at node {node}')
@@ -638,10 +867,19 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
                        'heat_balance_defect_w_per_m': outward-source_heat,
                        'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
                        'normalized_free_residual': float(np.max(abs(solution.residual[free]))/scale) if len(free) else 0.}
-    log = [doc.summary(), f'temperature K: {solution.temperature.min():.12g} to {solution.temperature.max():.12g}',
-           f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
+    if v03:
+        diagnostics = {BALANCE_03[key]: value for key, value in diagnostics.items()}
+        printed = [doc.summary(), f'temperature: {solution.temperature.min():.12g} K to '
+                                  f'{solution.temperature.max():.12g} K',
+                   f'generated_heat_rate_per_depth {source_heat:.12g} W/m; '
+                   f'outward_heat_rate_per_depth {outward:.12g} W/m']
+        log = log_lines_03(doc, printed)
+    else:
+        printed = log = [doc.summary(), f'temperature K: {solution.temperature.min():.12g} to '
+                                        f'{solution.temperature.max():.12g}',
+                         f'source {source_heat:.12g} W/m; signed outward {outward:.12g} W/m of depth']
     if verbose:
-        print('\n'.join(log))
+        print('\n'.join(printed))
     result = ThermalRunResult(doc, mesh, solution, fixed, np.array(list(prescribed.values())), diagnostics,
                               {'mesh': t_mesh, 'solve': t_solve}, log)
     result.summary()  # Validate complete output even without saving raw fields.
@@ -650,29 +888,27 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
 
 
 def _validate(doc):
-    """Region documents, strict boundary documents, then the single rectangle."""
-    from .schema import check_format_units_and_tags, steady_boundary_requested
+    """Format 0.3 rectangles; then 0.2 region documents. A 0.2 rectangle (flat, or a homogeneous
+    version 1 one) is refused: the rectangle form is read in format 0.3 only."""
+    from .schema import check_format_units_and_tags
     from .thermal_regions import is_region_thermal, validate_region_thermal
+    if doc.si is not None:
+        from .steady_boundary_contract import validate_steady_rectangle_03
+        validate_steady_rectangle_03(doc)
+        return
     if is_region_thermal(doc.data):
         check_format_units_and_tags(doc)
         validate_region_thermal(doc)
         return
-    if steady_boundary_requested(doc.data):
-        from .steady_boundary_contract import validate_steady_boundary
-        from . import units
-        validate_steady_boundary(doc)
-        # Schema normalization is separate from the non-mutating validator.
-        doc.scale = units.resolve(doc.data["units"])
-        doc.sole_physics()[1].setdefault("heat_source_w_m3", 0.0)
-        doc.notes = []
-        return
-    check_format_units_and_tags(doc)
-    validate_thermal(doc)
+    refuse_format_02(doc, 'thermal_steady2d')
 
 
 def _summary(doc):
     from .schema import steady_boundary_requested
     from .thermal_regions import is_region_thermal, region_summary
+    if doc.si is not None:
+        doc.validate()
+        return thermal_summary(doc)
     if is_region_thermal(doc.data):
         return region_summary(doc)
     if steady_boundary_requested(doc.data):
@@ -700,9 +936,19 @@ def _accepts_mesh_limits(data):
     return is_region_thermal(data)
 
 
+def _slots():
+    from .steady_boundary_contract import heat_slots
+    return heat_slots(PHYSICS)
+
+
+def _forms():
+    from .steady_boundary_contract import FORMS_03
+    return FORMS_03
+
+
 register(PhysicsKind(
     name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
     validate=_validate, run=run_thermal, summary=_summary,
     result_types=(ThermalRunResult,), defaults=defaults, fresh_output=True,
     stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d',
-    accepts_mesh_limits=_accepts_mesh_limits))
+    accepts_mesh_limits=_accepts_mesh_limits, slots=_slots(), forms_03=_forms()))

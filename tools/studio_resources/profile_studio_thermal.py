@@ -23,17 +23,16 @@ import urllib.request
 
 def model(n):
     return {
-        "openphysics": "0.2", "name": "Studio resource observation",
-        "units": {"length": "m", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+        "openphysics": "0.3", "name": "Studio resource observation",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
         "materials": {},
         "physics": {"heat1": {
-            "type": "thermal.steady2d", "conductivity_w_mk": 2,
-            "heat_source_w_m3": 0, "dirichlet_temperature_k": {"left": 300},
-            "outward_flux_w_m2": {"right": 2},
-            "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}},
+            "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)",
+            "heat_source_density": "0 W/m^3", "prescribed_temperature": {"left": "300 K"},
+            "inward_heat_flux": {"right": "-2 W/m^2"},
+            "convection": {"right": {"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "290 K"}},
         }},
-        "mesh": {"subdivisions": [n, n]}, "study": {"type": "single"},
+        "mesh": {"subdivision_count": [n, n]}, "study": {"type": "single"},
         "results": {"save_fields": True, "plots": False},
     }
 
@@ -166,10 +165,9 @@ def worker(conn, source_root):
                 summary = result.summary()
                 arrays = {}
                 for key in summary["field_shapes"]:
-                    prop = {"nodes_m": "mesh_nodes_m", "triangles": "mesh_triangles"}.get(key, key)
-                    arrays[key] = getattr(result, prop)
+                    arrays[key] = getattr(result, key)
                 response = {"ok": True, "public_run_s": elapsed,
-                            "nodes": len(arrays["nodes_m"]), "cells": len(arrays["triangles"]),
+                            "nodes": len(arrays["node_coordinates"]), "cells": len(arrays["triangles"]),
                             "raw_array_bytes": sum(np.asarray(a).nbytes for a in arrays.values()),
                             "result_format": result.result_format, "field_layout": result.field_layout}
                 del arrays, result, doc, summary
@@ -296,7 +294,7 @@ def one_case(n, source_root):
             raise RuntimeError("wire differs from the reviewed top-level display scale contract")
         report["display_length_in_m"] = scale
         arrays = payload.get("arrays", {})
-        if (len(arrays.get("nodes_m", ())) != (n+1)**2
+        if (len(arrays.get("node_coordinates", ())) != (n+1)**2
                 or len(arrays.get("triangles", ())) != 2*n*n):
             raise RuntimeError("actual response silently changed the requested mesh size")
         report["wire"] = {key: payload.get(key) for key in

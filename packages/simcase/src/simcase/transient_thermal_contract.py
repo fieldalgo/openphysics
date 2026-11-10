@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Strict serializable transient rectangle inputs; no solver or persistence.
 
+Format 0.3 rectangle documents are checked on their SI values (the section at the end);
+there every absolute temperature is above 0 K. The 0.2 contract below stays for the
+region and version 1 documents until their commit of the units batch.
+
 Temperatures are finite Kelvin, including negative mathematical values. Initial
 data are never projected. Time-dependent side data are samples at the requested
 times, with no interpolation, extrapolation, or serialized callback language.
@@ -214,6 +218,9 @@ def transient_result_versions(doc):
     other document keeps the legacy ``V1`` identifiers and arrays.
     """
     doc.validate()
+    if getattr(doc, "si", None) is not None:
+        from .steady_boundary_contract import has_natural_conditions_03
+        return V2_03 if has_natural_conditions_03(doc.sole_physics()[1]) else V1_03
     return V2 if has_natural_conditions(doc.sole_physics()[1]) else V1
 
 
@@ -250,7 +257,8 @@ def transient_solver_inputs(doc, mesh):
         initial = (np.full(len(nodes), spec) if not isinstance(spec, views.AffineTemperature)
                    else spec.origin_temperature + (nodes-np.array([x0, y0]))@spec.gradient)
     if not np.isfinite(initial).all():
-        raise DocumentError("initial_temperature_k: nonfinite field at mesh nodes")
+        key = "initial_temperature" if getattr(doc, "si", None) is not None else "initial_temperature_k"
+        raise DocumentError(f"{key}: nonfinite field at mesh nodes")
     sampled_nodes = {}
     boundary_nodes = getattr(mesh, "boundary", None)
     if not isinstance(boundary_nodes, Mapping):
@@ -304,6 +312,21 @@ def transient_solver_inputs(doc, mesh):
 
 def transient_thermal_summary(doc):
     from .transient_regions import is_transient_region_thermal, transient_region_summary
+    if getattr(doc, "si", None) is not None:
+        from .steady_boundary_contract import has_natural_conditions_03
+        from .thermal import _authored, rectangle_summary_03
+        doc.validate()
+        name = next(iter(doc.si["physics"]))
+        where = f"physics.{name}"
+        times = doc.si["study"]["time"]
+        initial = doc.si["physics"][name]["initial_temperature"]
+        initial_text = ("affine from " + _authored(doc, where + ".initial_temperature.reference_temperature")
+                        if isinstance(initial, dict) else _authored(doc, where + ".initial_temperature"))
+        return rectangle_summary_03(doc, f"{PHYSICS}, {len(times)} explicit times", [
+            f"  volumetric_heat_capacity {_authored(doc, where + '.volumetric_heat_capacity')}; "
+            f"initial_temperature {initial_text}; study.time {_authored(doc, 'study.time')}",
+            "  rates at interval ends only"],
+            V2_03 if has_natural_conditions_03(doc.si["physics"][name]) else V1_03)
     if is_transient_region_thermal(doc.data):
         return transient_region_summary(doc)
     name, p = doc.sole_physics()
@@ -321,3 +344,100 @@ def transient_thermal_summary(doc):
             + natural +
             '  output: SI time/node/cell histories; rates at interval ends only')
 
+
+
+# -- format 0.3 ------------------------------------------------------------------------------------
+#
+# A format 0.3 rectangle document is read by ``simcase.resolve`` against
+# ``steady_boundary_contract.heat_slots(PHYSICS, transient=True)``; these checks run on its SI
+# values. Absolute temperatures are now above 0 K (the registry domain).
+
+V1_03 = ("thermal.transient2d-result-v3", "thermal2d-transient-p1-node-cell-v2")
+V2_03 = ("thermal.transient2d-result-v4", "thermal2d-transient-p1-node-cell-boundary-v2")
+
+
+def _initial_03(spec, path):
+    if isinstance(spec, dict):
+        gradient = spec["temperature_gradient"]
+        if len(gradient) != 2:
+            raise DocumentError(f"{path}.temperature_gradient: expected exactly 2 entries (x, y)")
+        return views.AffineTemperature(float(spec["reference_temperature"]), np.array(gradient, dtype=float))
+    return float(spec)
+
+
+def _initial_value_03(spec, x, y, origin):
+    if isinstance(spec, views.AffineTemperature):
+        gx, gy = map(float, spec.gradient)     # Python floats overflow to inf without a warning
+        return spec.origin_temperature+gx*(x-origin[0])+gy*(y-origin[1])
+    return spec
+
+
+def _samples_03(value, times, path):
+    if isinstance(value, list):
+        if len(value) != len(times):
+            raise DocumentError(f"{path}.values: expected exactly {len(times)} entries, one per study time")
+        return [float(v) for v in value]
+    return [float(value)]*len(times)
+
+
+def validate_transient_rectangle_03(doc):
+    """thermal.transient2d on a rectangle, format 0.3: today's contract on SI values."""
+    from .steady_boundary_contract import _temperatures_03, natural_conditions_03, rectangle_03
+    name, p = rectangle_03(doc, "transient heat")
+    where = f"physics.{name}"
+    study = doc.si["study"]
+    if study.get("type") != "transient":
+        raise DocumentError('study.type: expected "transient"')
+    extra = sorted(set(study) - {"type", "time"})
+    if extra:
+        raise DocumentError(f"study: unsupported keys {extra}; a transient study takes type and time")
+    if "time" not in study:
+        raise DocumentError("study.time: a transient study needs its times", path="study.time", code="E-KEY-MISSING")
+    times = study["time"]
+    if len(times) < 2:
+        raise DocumentError("study.time: need at least two nonnegative increasing times")
+    for i, (a, b) in enumerate(zip(times, times[1:]), 1):
+        if not (math.isfinite(b-a) and b-a > 0):
+            raise DocumentError(f"study.time step[{i}]: expected increasing times", path=f"study.time.values[{i}]")
+    grid = views.rectangle_mesh(doc, "difference")
+    (origin_x, origin_y), (lx, ly) = grid.origin, grid.lengths
+    spec = _initial_03(p["initial_temperature"], where+".initial_temperature")
+    corners = ((origin_x, origin_y), (origin_x, origin_y+ly),
+               (origin_x+lx, origin_y), (origin_x+lx, origin_y+ly))
+    initial = [_number(_initial_value_03(spec, x, y, (origin_x, origin_y)),
+                       where+".initial_temperature at domain corner") for x, y in corners]
+    side_corners = {"left": (0, 1), "right": (2, 3), "bottom": (0, 2), "top": (1, 3)}
+    boundary = _temperatures_03(p, where)
+    sampled = {tag: _samples_03(value, times, where+".prescribed_temperature."+tag)
+               for tag, value in boundary.items()}
+    for horizontal in ("left", "right"):
+        for vertical in ("bottom", "top"):
+            if (horizontal in sampled and vertical in sampled
+                    and sampled[horizontal] != sampled[vertical]):
+                raise DocumentError(f"{where}.prescribed_temperature: conflicting corner "
+                                    f"temperatures on {horizontal}/{vertical}")
+    for tag, values in sampled.items():
+        if any(not _agree(initial[i], values[0]) for i in side_corners[tag]):
+            raise DocumentError(f"{where}.prescribed_temperature.{tag}: initial t0 mismatch "
+                                "(32 eps bound); no projection")
+    # Constant g and (h, ambient) per side, as for steady heat; no anchor is required.
+    natural_conditions_03(p, where, sampled)
+
+
+def transient_heat_inputs_03(doc):
+    """The heat inputs (``views.HeatInputs``) of a validated format 0.3 transient rectangle."""
+    from .steady_boundary_contract import has_natural_conditions_03, natural_conditions_03
+    name, p = next(iter(doc.si["physics"].items()))
+    where = f"physics.{name}"
+    times = np.array(doc.si["study"]["time"], dtype=float, copy=True)
+    dirichlet = {tag: tuple(_samples_03(value, times, f"{where}.prescribed_temperature.{tag}"))
+                 for tag, value in p["prescribed_temperature"].items()}
+    natural = has_natural_conditions_03(p)
+    flux, convection = natural_conditions_03(p, where, dirichlet) if natural else ({}, {})
+    source = p.get("heat_source_density")
+    return views.HeatInputs(conductivity=float(p["thermal_conductivity"]),
+                            heat_source=0.0 if source is None else float(source),     # hazard H9
+                            dirichlet=dirichlet, outward_flux=flux, convection=convection, boundary_layout=natural,
+                            volumetric_heat_capacity=float(p["volumetric_heat_capacity"]), time=times,
+                            initial_temperature=_initial_03(p["initial_temperature"],
+                                                            where+".initial_temperature"))

@@ -83,7 +83,7 @@ def raw_preflight(raw, kind, limits):
                 or next(iter(physics.values())).get("type") != common.KIND):
             raise common.ThermalAPIError("unsupported_physics", "thermal Studio accepts one thermal.steady2d entry",
                                          path="physics")
-        if not common.v2_available():   # region results always carry the boundary arrays
+        if not common.v2_available_02():   # region results always carry the boundary arrays
             raise common.ThermalAPIError("unsupported_result_format",
                                          "matching public steady boundary runtime is required")
     else:
@@ -151,13 +151,14 @@ class RegionInput:
 
 def runtime_available(kind, limits):
     if kind == common.KIND:
-        return common.runtime_available() and common.v2_available()
+        return common.runtime_available() and common.v2_available_02()
     return transient.runtime_available(limits)
 
 
 def capability(kind, limits, rlimits):
     pair = STEADY_PAIR if kind == common.KIND else TRANSIENT_PAIR
-    formats = [STEADY_PAYLOAD] if kind == common.KIND else [TRANSIENT_MANIFEST, transient.FRAME, transient.HISTORY]
+    formats = [STEADY_PAYLOAD] if kind == common.KIND else [TRANSIENT_MANIFEST, transient.FRAME_02,
+                                                                       transient.HISTORY_02]
     return {"supported": True, "run_enabled": runtime_available(kind, limits),
             "result_formats": [pair[0]], "field_layouts": [pair[1]], "payload_formats": formats,
             "limits": asdict(rlimits)}
@@ -384,10 +385,10 @@ def capture_steady(result, identity, limits, rlimits, spec):
     doc = result.doc
     _require(doc.canonical_json() == spec.run_doc.canonical_json(),
              "public result document does not match accepted snapshot")
-    keys = common.BASE_FIELDS+common.BOUNDARY_FIELDS
+    keys = common.BASE_FIELDS_02+common.BOUNDARY_FIELDS_02
     arrays = {}
     for key in keys:
-        value = getattr(result, common.PROPERTIES[key])  # one property read
+        value = getattr(result, common.PROPERTIES_02[key])  # one property read
         _require(isinstance(value, np.ndarray), key+": expected a numeric ndarray")
         _require(value.dtype.kind in "iuf", key+": expected real nonboolean dtype")
         if key == "nodes_m":
@@ -478,9 +479,9 @@ def capture_transient(result, identity, limits, rlimits, spec):
     require(summary.get("units") == document["units"] and summary.get("mesh_length_unit") == "m",
             "transient document/SI units mismatch")
     nt = len(document["study"]["time_s"])
-    spec_fields = dict(transient.SPEC, triangle_regions=("1", "triangles", "static"))
+    spec_fields = dict(transient.SPEC_02, triangle_regions=("1", "triangles", "static"))
     order = ("nodes_m", "triangles", "time_s", "dirichlet_node_ids")+tuple(
-        k for k in transient.SPEC if k not in {"nodes_m", "triangles", "time_s", "dirichlet_node_ids"})
+        k for k in transient.SPEC_02 if k not in {"nodes_m", "triangles", "time_s", "dirichlet_node_ids"})
     captured, total = {}, 0
     n = m = fixed_count = None
     for key in order+("triangle_regions",):
@@ -555,9 +556,9 @@ def capture_transient(result, identity, limits, rlimits, spec):
                 "transient metadata mismatch: "+key)
         descriptors[key] = {"shape": list(captured[key].shape), "unit": unit,
                             "location": location, "axis": axis,
-                            "available_views": ["frame", "history"] if key in transient.DYNAMIC else [],
+                            "available_views": ["frame", "history"] if key in transient.DYNAMIC_02 else [],
                             "initial_available": axis != "time_s[1:]",
-                            "ui_supported": key in transient.UI_FIELDS}
+                            "ui_supported": key in transient.UI_FIELDS_02}
     check_regions(summary, result.region_names, ids, x, tri, document, rlimits, transient.KIND)
     scale = document.scale.to_si(1., {"length": 1})
     require(type(scale) in (int, float) and math.isfinite(scale) and scale > 0,

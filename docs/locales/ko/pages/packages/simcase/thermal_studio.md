@@ -69,9 +69,9 @@ Editor는 중복키 검출을 포함한 엄격 검증을 위해 원래 JSON텍�
 
 | 표시/데이터 | 계약 |
 | --- | --- |
-| 좌표 | raw `arrays.nodes_m`는 m; 축은 최상위 `display_length_in_m`(캡처 문서의 양수 metres-per-document-length-unit scale)로 나눔 |
-| 온도 | `temperature_k`, 절점 P1, K; 선형 보간·단위 colorbar |
-| Flux | `heat_flux_w_m2`, 삼각형별 상수, W/m²; 전역 qx/qy 또는 크기 |
+| 좌표 | raw `arrays.node_coordinates`는 m; 축은 최상위 `display_length_in_m`(형상 `length_unit` 한 단위의 미터 값, `length_unit`이 이름을 줌)로 나눔 |
+| 온도 | `temperature`, 절점 P1, K; 선형 보간·단위 colorbar |
+| Flux | `heat_flux`, 삼각형별 상수, W/m^2; 전역 qx/qy 또는 크기 |
 | 화살표 | 실제 요소 중심·전역 방향; 명시한 view gain이며 물리값 재조정 아님 |
 | 열원/반력/rate | 면외 깊이당 절점 W/m이며 W/m² flux와 구분 |
 
@@ -98,11 +98,11 @@ V1 raw배열은 9개, v2는 13개이며 Robin-only v2의 Dirichlet 절점 수는
 ## 고정 wire envelope
 
 ```text
-payload_format = "studio-thermal-steady-v1"
+payload_format = "studio-thermal-steady-v2"
 kind = "thermal.steady2d"
 job, result_id, client_revision, request_seq
 result_format, field_layout
-display_length_in_m
+length_unit, display_length_in_m
 summary
 arrays
 ```

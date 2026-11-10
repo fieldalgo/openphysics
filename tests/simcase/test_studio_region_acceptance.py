@@ -156,7 +156,7 @@ def test_a4_steady_wire_arrays_equal_a_direct_run(client):
     doc = fx.steady_example()
     _, payload = submit(client, doc)
     direct = run(Document.from_dict(copy.deepcopy(doc)), verbose=False)
-    expected = {key: getattr(direct, prop) for key, prop in thermal.PROPERTIES.items()}
+    expected = {key: getattr(direct, prop) for key, prop in thermal.PROPERTIES_02.items()}  # region: 0.2 names
     expected['triangle_regions'] = direct.triangle_regions
     assert set(payload['arrays']) == set(expected)
     for key, value in expected.items():

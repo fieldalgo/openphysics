@@ -171,16 +171,17 @@ EXAMPLES["vector_fiber_subspace_sweep"] = VECTOR_FIBER_SUBSPACE_SWEEP
 EXAMPLES.update(thermal_slab=THERMAL_SLAB, thermal_mixed=THERMAL_MIXED, thermal_regions=THERMAL_REGIONS)
 
 TRANSIENT_THERMAL_UNIFORM = {
-    'openphysics': '0.2', 'name': 'Insulated constant-source transient heat',
-    'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
-    'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
+    'openphysics': '0.3', 'name': 'Insulated constant-source transient heat',
+    'geometry': {'length_unit': 'm', 'depth': None, 'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
     'materials': {},
-    'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 2.5,
-                         'volumetric_heat_capacity_j_m3k': 4.,
-                         'initial_temperature_k': 300., 'dirichlet_temperature_k': {},
-                         'heat_source_w_m3': 8.}},
-    'mesh': {'subdivisions': [4, 4]},
-    'study': {'type': 'transient', 'time_s': [0., .1, .3]},
+    'physics': {'heat1': {'type': 'thermal.transient2d', 'thermal_conductivity': '2.5 W/(m K)',
+                         # c = 4 J/(m^3 K) is below the plausibility band: a manufactured solution
+                         'volumetric_heat_capacity': {'value': '4 J/(m^3 K)',
+                                                      'accept': {'W-MAGNITUDE': 'manufactured solution'}},
+                         'initial_temperature': '300 K', 'prescribed_temperature': {},
+                         'heat_source_density': '8 W/m^3'}},
+    'mesh': {'subdivision_count': [4, 4]},
+    'study': {'type': 'transient', 'time': {'unit': 's', 'values': [0., .1, .3]}},
     'results': {'save_fields': True, 'plots': False},
 }
 EXAMPLES['transient_thermal_uniform'] = TRANSIENT_THERMAL_UNIFORM
@@ -189,53 +190,18 @@ EXAMPLES['transient_thermal_regions'] = TRANSIENT_THERMAL_REGIONS
 
 # Constant-boundary steady example; supported by the headless runner only.
 THERMAL_BOUNDARY = {
-    "openphysics": "0.2",
-    "name": "Steady additive outward flux and convection",
-    "units": {
-        "length": "m",
-        "temperature": "K"
-    },
-    "geometry": {
-        "domain": {
-            "xmin": 0,
-            "xmax": 1,
-            "ymin": 0,
-            "ymax": 1
-        }
-    },
-    "materials": {},
-    "physics": {
-        "heat1": {
-            "type": "thermal.steady2d",
-            "conductivity_w_mk": 2,
-            "heat_source_w_m3": 0,
-            "dirichlet_temperature_k": {
-                "left": 300
-            },
-            "outward_flux_w_m2": {
-                "right": 2
-            },
-            "convection": {
-                "right": {
-                    "h_w_m2k": 4,
-                    "ambient_temperature_k": 290
-                }
-            }
-        }
-    },
-    "mesh": {
-        "subdivisions": [
-            8,
-            8
-        ]
-    },
-    "study": {
-        "type": "single"
-    },
-    "results": {
-        "save_fields": True,
-        "plots": False
-    }
+    'openphysics': '0.3', 'name': 'Steady additive outward flux and convection',
+    'geometry': {'length_unit': 'm', 'depth': None, 'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
+    'materials': {},
+    'physics': {'heat1': {'type': 'thermal.steady2d', 'thermal_conductivity': '2 W/(m K)',
+                          'heat_source_density': '0 W/m^3', 'prescribed_temperature': {'left': '300 K'},
+                          # 2 W/m^2 leaves the body through the right side
+                          'inward_heat_flux': {'right': '-2 W/m^2'},
+                          'convection': {'right': {'heat_transfer_coefficient': '4 W/(m^2 K)',
+                                                   'ambient_temperature': '290 K'}}}},
+    'mesh': {'subdivision_count': [8, 8]},
+    'study': {'type': 'single'},
+    'results': {'save_fields': True, 'plots': False},
 }
 EXAMPLES['thermal_boundary'] = THERMAL_BOUNDARY
 
@@ -243,17 +209,17 @@ EXAMPLES['thermal_boundary'] = THERMAL_BOUNDARY
 # bottom, so the field is one-dimensional in x and comparable with the
 # refsol.transient_heat_robin.ConvectiveSlab series. Headless runner only (boundary layout).
 TRANSIENT_THERMAL_BOUNDARY = {
-    'openphysics': '0.2', 'name': 'Convective cooling of a slab',
-    'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
-    'geometry': {'domain': {'xmin': 0, 'xmax': 0.05, 'ymin': 0, 'ymax': 0.01}},
+    'openphysics': '0.3', 'name': 'Convective cooling of a slab',
+    'geometry': {'length_unit': 'm', 'depth': None, 'domain': {'xmin': 0, 'xmax': 0.05, 'ymin': 0, 'ymax': 0.01}},
     'materials': {},
-    'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 50.,
-                         'volumetric_heat_capacity_j_m3k': 3.6e6,
-                         'initial_temperature_k': 400., 'dirichlet_temperature_k': {},
-                         'heat_source_w_m3': 0.,
-                         'convection': {'right': {'h_w_m2k': 500., 'ambient_temperature_k': 300.}}}},
-    'mesh': {'subdivisions': [20, 2]},
-    'study': {'type': 'transient', 'time_s': [0., 10., 20., 40., 80.]},
+    'physics': {'heat1': {'type': 'thermal.transient2d', 'thermal_conductivity': '50 W/(m K)',
+                         'volumetric_heat_capacity': '3600000 J/(m^3 K)',
+                         'initial_temperature': '400 K', 'prescribed_temperature': {},
+                         'heat_source_density': '0 W/m^3',
+                         'convection': {'right': {'heat_transfer_coefficient': '500 W/(m^2 K)',
+                                                  'ambient_temperature': '300 K'}}}},
+    'mesh': {'subdivision_count': [20, 2]},
+    'study': {'type': 'transient', 'time': {'unit': 's', 'values': [0., 10., 20., 40., 80.]}},
     'results': {'save_fields': True, 'plots': False},
 }
 EXAMPLES['transient_thermal_boundary'] = TRANSIENT_THERMAL_BOUNDARY

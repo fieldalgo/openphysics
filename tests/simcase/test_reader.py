@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """The exact document reader of format 0.3 (units batch C4, check P2-10).
 
-No built-in kind reads format 0.3 yet, so the 0.3 path is tested on the test-only kind of
-``units_toy_kind``. Today's 0.2 documents must behave exactly as before: they never take the
-0.3 path, and ``Document.canonical_json()`` gives the bytes ``json.dumps`` gave at every
-serialiser of ``doc.data``.
+The 0.3 path is tested on the test-only kind of ``units_toy_kind``; rectangle heat reads
+format 0.3 since units batch C5a, and its converted examples take the 0.3 path. The documents
+still on 0.2 must behave exactly as before: they never take the 0.3 path, and
+``Document.canonical_json()`` gives the bytes ``json.dumps`` gave at every serialiser of
+``doc.data``.
 """
 
 from __future__ import annotations
@@ -32,7 +33,10 @@ import units_toy_kind as toy
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = sorted((ROOT / "examples" / "simcase").glob("*.json"))
+EXAMPLES_03 = [p for p in EXAMPLES if json.loads(p.read_text(encoding="utf-8"))["openphysics"] == "0.3"]
+EXAMPLES_02 = [p for p in EXAMPLES if p not in EXAMPLES_03]
 FIXTURES = ROOT / "tools" / "units_batch" / "fixtures" / "v02"
+FIXTURES_03 = ROOT / "tools" / "units_batch" / "fixtures" / "v03"
 
 
 @pytest.fixture
@@ -304,22 +308,30 @@ def test_the_format_is_the_string_0_3(toy_kind, value, needle):
 
 
 def test_a_kind_without_slots_refuses_format_0_3():
-    data = json.loads((ROOT / "examples" / "simcase" / "thermal_slab.json").read_text(encoding="utf-8"))
+    data = json.loads((ROOT / "examples" / "simcase" / "electric_rectangle.json").read_text(encoding="utf-8"))
     data["openphysics"] = "0.3"
     with pytest.raises(DocumentError) as caught:
         Document.from_dict(data)
     [d] = caught.value.diagnostics
-    assert (d.code, d.path) == ("E-CONTRACT", "physics.heat1.type")
+    assert (d.code, d.path) == ("E-CONTRACT", "physics.electric.type")
     assert "not read in format 0.3 yet" in str(caught.value)
 
 
-@pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
+@pytest.mark.parametrize("path", EXAMPLES_02, ids=lambda p: p.stem)
 def test_today_s_documents_take_the_0_2_path(path):
     raw = path.read_bytes()
     assert not declares_v03(raw)
     doc = Document.load(path)
     assert doc.si is None and doc.format == "0.2" and not hasattr(doc, "diagnostics")   # as before
     assert doc.data["openphysics"] == "0.2"
+
+
+@pytest.mark.parametrize("path", EXAMPLES_03, ids=lambda p: p.stem)
+def test_converted_documents_take_the_0_3_path(path):
+    """The examples of the kinds that read format 0.3 (rectangle heat, units batch C5a)."""
+    assert declares_v03(path.read_bytes())
+    doc = Document.load(path)
+    assert doc.si is not None and doc.format == "0.3" and not doc.diagnostics.errors
 
 
 def test_unreadable_0_3_text_is_refused_by_the_0_3_reader():
@@ -341,9 +353,11 @@ def _builtins():
 
 def _check_canonical(data, label):
     doc = Document.from_dict(copy.deepcopy(data))
+    # a 0.3 tree holds Decimals; its decimals are those of the Python values it was read from
+    tree = doc.data if doc.si is None else data
     for separators in ((",", ":"), (", ", ": ")):
         assert doc.canonical_json(separators=separators) == json.dumps(
-            doc.data, sort_keys=True, separators=separators, allow_nan=False), (label, separators)
+            tree, sort_keys=True, separators=separators, allow_nan=False), (label, separators)
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
@@ -359,8 +373,14 @@ def test_canonical_json_equals_json_dumps_for_every_built_in_example(name, data)
 if FIXTURES.is_dir():
     # tools/ is not copied to the installed-package run, where a skip would fail it
 
-    @pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.json")), ids=lambda p: p.stem)
+    @pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.json")) + sorted(FIXTURES_03.glob("*.json")),
+                             ids=lambda p: f"{p.parent.name}/{p.stem}")
     def test_canonical_json_equals_json_dumps_for_every_fixture(path):
+        if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
+            # a converted form: its 0.2 fixture is read by the baseline code only
+            with pytest.raises(DocumentError, match="format 0.2 rectangle heat documents are not read"):
+                Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
+            return
         _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)
 
 
