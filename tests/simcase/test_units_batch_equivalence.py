@@ -228,6 +228,102 @@ if HARNESS.is_dir():
         assert compare.ulp_distance(1.0, float.fromhex("0x1.0000000000004p+0")) == 4
         assert compare.ulp_distance(-0.0, 0.0) == 0 and compare.ulp_distance(1.0, -1.0) > 4
 
+    #: the em maps' exceptions (README "The em.modes2d commit"): (map, where, pattern, kind)
+    EM_EXCEPTIONS = {
+        ("em-modes2d-p1-node-centroid-v1", "summary", "propagation_loss.values.[].[]", "propagation_loss"),
+        ("em-modes2d-p1-node-centroid-v1", "summary", "bend_loss.values.[].[]", "bend_loss"),
+        ("em-modes2d-subspace-raw-v1", "array", "mean_group_index", "group_index_length_frame"),
+        ("em-modes2d-subspace-raw-v1", "summary", "mean_group_index.values.[].[]", "group_index_length_frame")}
+    #: the summary families each exception may match (the spec's losses and group index, l.1746-1748)
+    EM_EXCEPTION_FAMILIES = {"propagation_loss": ("propagation_loss", "values"), "bend_loss": ("bend_loss", "values"),
+                             "group_index_length_frame": ("mean_group_index", "values")}
+
+    def _em_maps():
+        compare = _module("compare")
+        return compare, {name: compare.LayoutMap.load(HARNESS / "maps", name)
+                         for name in ("em-modes2d-p1-node-centroid-v1", "em-modes2d-subspace-raw-v1")}
+
+    def test_the_em_exception_patterns_are_the_spec_ones():
+        """Every exception of the em maps is listed in EM_EXCEPTIONS (and the README), and each
+        summary pattern matches the new path of exactly the rule it was written for."""
+        compare, maps = _em_maps()
+        found = set()
+        for name, lmap in maps.items():
+            for where, target, rule in lmap.exceptions:
+                found.add((name, where, rule["new"], rule["kind"]))
+                if where != "summary":
+                    assert target == EM_EXCEPTION_FAMILIES[rule["kind"]][0]
+                    continue
+                hits = [new for _old, news, f, _r in lmap.summary if f != "removed" for new in news if new == target]
+                assert len(hits) == 1, (name, rule["new"], hits)
+                assert [v for k, v in target if k == "lit"] == list(EM_EXCEPTION_FAMILIES[rule["kind"]])
+        assert found == EM_EXCEPTIONS
+        readme = (HARNESS / "README.md").read_text(encoding="utf-8")
+        for name, where, pattern, kind in EM_EXCEPTIONS:
+            assert f"| `{name}` | {where} | `{pattern}` | `{kind}` |" in readme
+
+    def test_the_em_rules_alternatives_and_array_leaves():
+        """Alternatives: exactly one new path is present. An array leaf equals its saved array's
+        entry on each side; the arrays themselves are compared by their own rule."""
+        import numpy as np
+        compare = _module("compare")
+        lmap = compare.LayoutMap({
+            "format": "openphysics-units-batch-map-v1", "old_layout": "old", "new_layout": "new",
+            "summary": [{"old": "neff.[]", "new": ["n.values.[]", "n.re.[]"], "f": "="},
+                        {"old": "p.value.[]", "f": "array", "part": "real", "old_array": "p",
+                         "new": ["q.re.[]", "r.values.[]"], "new_array": ["q", "r"]},
+                        {"old": "p.imag.[]", "f": "array", "part": "imag", "old_array": "p", "new": "q.im.[]",
+                         "new_array": "q"}],
+            "summary_added": ["n.unit", "q.unit"]}, "test")
+
+        def failures(old, new, arrays=None):
+            result = compare.Result("doc", "layout")
+            compare.compare_trees_layout(old, new, lmap, {}, "summary.json", result, arrays)
+            return result.failures
+        assert failures({"neff": [1.5]}, {"n": {"unit": "1", "values": [1.5]}}) == []
+        assert failures({"neff": [1.5]}, {"n": {"unit": "1", "re": [1.5]}}) == []
+        assert failures({"neff": [1.5]}, {"n": {"unit": "1", "values": [1.5], "re": [1.5]}})   # both forms
+        old_p = np.array([2.0 + 0.0j, -3.0 + 0.0j])
+        new_q = np.conj(old_p) * 1e-12
+        arrays = ({"p": old_p}, {"q": new_q})
+        tree_old = {"p": {"value": [2.0, -3.0], "imag": [0.0, 0.0]}}
+        tree_new = {"q": {"unit": "W", "re": new_q.real.tolist(), "im": new_q.imag.tolist()}}
+        assert failures(tree_old, tree_new, arrays) == []
+        assert failures(tree_old, {"q": {"unit": "W", "re": [2e-12, -3e-12], "im": [9.0, 0.0]}}, arrays)
+        assert failures(tree_old, tree_new, ({"p": old_p}, {"q": new_q * 2}))
+        assert failures(tree_old, tree_new)                                   # no arrays: refused
+        with pytest.raises(ValueError, match="array rule"):
+            compare.LayoutMap({"format": "openphysics-units-batch-map-v1", "old_layout": "o",
+                               "summary": [{"old": "a", "new": "b", "f": "array"}]}, "test")
+
+    def test_the_em_call_rules_vtu_and_collection():
+        """D-24 renames material names only for the old document's local materials; D-22 maps the
+        scalar solve's n_cladding to None and leaves a vector solve alone; imag-conj is a VTU-only
+        transform; the collection transform applies to old wavelength sweeps only."""
+        import numpy as np
+        compare = _module("compare")
+        material = ["physmat.Material", "SiO2", ["object", "physmat.dispersion.Constant",
+                                                 [["n0", ["num", "float", "0x1.71a9fbe76c8b4p+0"]],
+                                                  ["label", "SiO2"]]]]
+        renamed = compare._d24_material_names(material, {"SiO2"})
+        assert renamed[1] == "oxide" and renamed[2][2][1] == ["label", "oxide"]
+        assert compare._d24_material_names(material, set()) == material                 # library SiO2 stays
+        rule = {"function": "simcase.physics_em_modes2d.solve", "index": 6, "when": {"index": 5, "equals": "scalar"},
+                "new": None}
+        scalar = {"function": rule["function"], "args": ["list", ["m", "e", 1, "b", 1, "scalar", 1.444]]}
+        vector = {"function": rule["function"], "args": ["list", ["m", "e", 1, "b", 1, "vector", 1.444]]}
+        out = compare._apply_call_rules([scalar, vector], {"arguments": [rule]}, ())
+        assert out[0]["args"][1][6] is None and out[1]["args"][1][6] == 1.444
+        assert scalar["args"][1][6] == 1.444                                              # the record is not changed
+        base = {"format": "openphysics-units-batch-map-v1", "old_layout": "o"}
+        assert compare.LayoutMap({**base, "vtu": [{"old": "a", "new": "b", "f": "imag-conj"}]}, "t").vtu["a"][1] \
+            == "imag-conj"
+        with pytest.raises(ValueError, match="closed list"):
+            compare.LayoutMap({**base, "arrays": [{"old": "a", "new": "b", "f": "imag-conj"}]}, "t")
+        with pytest.raises(ValueError, match="collection"):
+            compare.LayoutMap({**base, "collection": "L2"}, "t")
+        assert np.negative(np.array([0.0, -2.0])).tobytes() == np.conj(np.array([0j, -2j])).imag.tobytes()
+
     # The converted examples of the phase-2 specification (section 4.10). Spellings may
     # differ from the converter's (decision D-15); every value must have the same exact value.
     SPEC_EXAMPLES = {
@@ -281,6 +377,20 @@ if HARNESS.is_dir():
             "study": {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
                       "values": {"unit": "um", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}}},
     }
+
+    #: soi_strip.json before the units batch (format 0.2; converted by units batch C8)
+    SOI_STRIP_02 = {
+        "openphysics": "0.2", "name": "SOI strip waveguide 500 x 220 nm", "units": {"length": "um"},
+        "geometry": {"domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
+                     "background": {"material": "SiO2"},
+                     "shapes": [{"name": "core", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22,
+                                 "material": "Si", "mesh_size": 0.02}]},
+        "physics": {"em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55, "num_modes": 2,
+                            "n_cladding": 1.45,
+                            "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}}},
+        "mesh": {"size": 0.25, "grading": {"center": [0.0, 0.11], "near": 0.02, "far": 0.16, "distance": 1.0}},
+        "study": {"type": "sweep", "parameter": "physics.em1.wavelength",
+                  "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}}
 
     #: elastic_regions.json before the units batch (format 0.2; converted by units batch C7)
     ELASTIC_REGIONS_02 = {
@@ -391,7 +501,7 @@ if HARNESS.is_dir():
         expected = (SPEC_EXAMPLES.get(name) or {"elastic_regions": _spec_elastic_regions,
                                                   "cavity_lossy_slab": _spec_cavity_lossy_slab}[name]())
         frozen = {"thermal_regions": THERMAL_REGIONS_02, "joule_temperature": JOULE_TEMPERATURE_02,
-                  "elastic_regions": ELASTIC_REGIONS_02}
+                  "elastic_regions": ELASTIC_REGIONS_02, "soi_strip": SOI_STRIP_02}
         old = copy.deepcopy(frozen[name]) if name in frozen else \
             json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
         new, writer = convert.convert(old)
@@ -531,6 +641,111 @@ if HARNESS.is_dir():
         print(f"P2-2: {checked} documents resolve to the converter output")
         assert checked > 0
 
+    #: The eight nanometre and metre em fixtures and their micrometre twins. They are compared
+    #: under the pre-registered rules and reported as different: their old run post-processed in
+    #: the document unit, the new one in the micrometre kernel frame (spec §3.8). This stated
+    #: deviation (README) is checked by the substitute checks below, never counted as a pass.
+    NM_M_TWINS = {f"em_length_{unit}_{name}": twin for unit in ("nm", "m")
+                  for name, twin in (("fiber", "fiber"), ("sellmeier_rib", "em_sellmeier_range"),
+                                     ("vector_slab", "vector_slab"),
+                                     ("subspace_sweep", "vector_fiber_subspace_sweep"))}
+    #: (v) the only differences the eight may show, old against new: the post-processing calls
+    #: and the arrays, summary leaves and VTU points that depend on the document unit
+    NM_M_ALLOWED = (
+        r"calls\[\d+\] galerkin\.mode_overlap\.\w+\.",
+        r"calls\[\d+\] galerkin\.assembly\.assemble_mass\.",
+        r"export (fields\.vtu|sweep/fields_\d+\.vtu) points differ$",
+        r"fields\.npz (confinement -> confinement_factor|field_overlap -> unnormalized_field_overlap"
+        r"|mode_power -> unnormalized_mode_(power|field_square_integral)|nodes -> node_coordinates"
+        r"|values -> vacuum_wavelength|(vector|raw)_transverse -> unnormalized_electric_field_line_integral) \(",
+        r"fields\.npz mean_group_index \(group_index_length_frame\): \d+ ulp",
+        r"summary\.json (cluster_mean_group_index|mode_postprocessing\.confinement\.value|study\.values)\[")
+
+    def _postprocessing_free(calls):
+        """The recorded calls without the post-processing ones (``galerkin.mode_overlap.*`` and the
+        calls they make, recorded after them at a greater depth)."""
+        out, skip_below = [], None
+        for call in calls:
+            if skip_below is not None and call["depth"] > skip_below:
+                continue
+            skip_below = None
+            if call["function"].startswith("galerkin.mode_overlap."):
+                skip_below = call["depth"]
+                continue
+            out.append(call)
+        return out
+
+    def _nm_m_substitute_checks(rec_old: Path, rec_new: Path, report: dict) -> list[str]:
+        """The substitute checks of the stated deviation (README): (i) to (v). Returns the
+        measured maxima, old against new, reported and never turned into a bound."""
+        import re
+        import numpy as np
+        compare = _module("compare")
+        compare.MAX_FAILURES = 10 ** 6
+        status = {d["id"]: d["status"] for d in report["documents"]}
+        lines = []
+        for doc, twin in sorted(NM_M_TWINS.items()):
+            old_record = json.loads((rec_old / doc / "record.json").read_text(encoding="utf-8"))
+            new_record = json.loads((rec_new / doc / "record.json").read_text(encoding="utf-8"))
+            # (i) mesher, material, kernel-solve, eigensolver and tracker calls, bitwise
+            result = compare.Result(doc, "layout")
+            compare.compare_calls({"calls": _postprocessing_free(old_record["calls"])},
+                                  {"calls": _postprocessing_free(new_record["calls"])}, result)
+            assert result.equal, (doc, "(i)", result.failures[:5])
+            # (ii) node_coordinates: the recorded micrometre mesher nodes times 1e-6 (spec l.1749)
+            kernel = np.load(rec_old / doc / "mesher_outputs.npz")
+            last = max(int(k.split("_")[1]) for k in kernel.files if k.startswith("nodes_"))
+            new_arrays = dict(np.load(rec_new / doc / "result" / "fields.npz"))
+            assert (kernel[f"nodes_{last}"] * 1e-6).tobytes() == new_arrays["node_coordinates"].tobytes(), (doc, "(ii)")
+            # (iii) the new run equals the new run of its micrometre twin, array by array
+            twin_arrays = dict(np.load(rec_new / twin / "result" / "fields.npz"))
+            assert set(new_arrays) == set(twin_arrays), (doc, "(iii)")
+            for key in new_arrays:
+                if key != "metadata_json":
+                    a, b = new_arrays[key], twin_arrays[key]
+                    assert a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes(), (doc, key)
+            skip = {"name", "resolved_inputs", "extent", "diagnostics", "defaults_applied"}
+            trees = [json.loads((rec_new / d / "result" / "summary.json").read_text(encoding="utf-8")) for d in (doc, twin)]
+            trees += [json.loads(str(new_arrays["metadata_json"])), json.loads(str(twin_arrays["metadata_json"]))]
+            for x, y in ((trees[0], trees[1]), (trees[2], trees[3])):
+                a = {p: v for p, v in compare.leaves(x).items() if p[0] not in skip}
+                b = {p: v for p, v in compare.leaves(y).items() if p[0] not in skip}
+                assert a.keys() == b.keys() and all(compare._hex(a[p]) == compare._hex(b[p]) if
+                                                    compare._hex(a[p]) is not None else a[p] == b[p] for p in a), \
+                    (doc, "(iii) summary")
+            twin_record = json.loads((rec_new / twin / "record.json").read_text(encoding="utf-8"))
+            assert new_record["export"] == twin_record["export"], (doc, "(iii) VTU")
+            # (iv) the twin passes the comparison
+            assert status[twin] == "equal", (twin, "(iv)")
+            # (v) every difference from the old run is on the listed set
+            found = compare.compare_document(doc, rec_old / doc, rec_new / doc, "layout", HARNESS / "maps")
+            assert not found.equal
+            stray = [f for f in found.failures if not any(re.match(p, f) for p in NM_M_ALLOWED)]
+            assert not stray, (doc, "(v)", stray[:5])
+            # the measured differences, old against new (reported only)
+            old_arrays = dict(np.load(rec_old / doc / "result" / "fields.npz"))
+            unit = float(old_arrays["length_unit_to_m"])
+            measured = []
+            for old_key, new_key, power in (("vector_transverse", "unnormalized_electric_field_line_integral", 1),
+                                            ("raw_transverse", "unnormalized_electric_field_line_integral", 1),
+                                            ("mode_power", "unnormalized_mode_power", 2),
+                                            ("mode_power", "unnormalized_mode_field_square_integral", 2),
+                                            ("field_overlap", "unnormalized_field_overlap", 2)):
+                if old_key in old_arrays and new_key in new_arrays:
+                    old_si, new = np.conj(old_arrays[old_key]) * unit ** power, new_arrays[new_key]
+                    measured.append(f"{old_key} {np.max(np.abs(old_si - new)) / np.max(np.abs(new)):.2e} relative")
+            for old_key, new_key in (("confinement", "confinement_factor"),
+                                     ("cluster_mean_group_index", "mean_group_index")):
+                if old_key in old_arrays:
+                    pairs = zip(old_arrays[old_key].ravel(), new_arrays[new_key].ravel())
+                    ulps = max((compare.ulp_distance(float(x), float(y)) for x, y in pairs
+                                if np.isfinite(x) and np.isfinite(y)), default=0)
+                    measured.append(f"{old_key} {ulps:.0f} ulp")
+            measured.append(f"values {float(old_arrays['values'][0])!r} (document unit) against "
+                            f"{float(new_arrays['vacuum_wavelength'][0])!r} m")
+            lines.append(f"{doc}: " + "; ".join(measured))
+        return lines
+
     @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE"),
                         reason="not run: P2-1 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
                                "(the merge base with main); see tools/units_batch/README.md")
@@ -584,7 +799,29 @@ if HARNESS.is_dir():
                     shutil.copy2(tmp_path / f"rec_{side}" / "manifest.json", folder / f"manifest_{side}.json")
                 (folder / "compare.txt").write_text(f"baseline {baseline}\nhead {head}\n" + result.stdout,
                                                     encoding="utf-8")
-            assert result.returncode == 0, result.stdout + result.stderr
+            # every document compares equal except the eight nanometre and metre em fixtures of
+            # the stated deviation, which are reported as different and checked by substitutes
+            data = json.loads(report.read_text(encoding="utf-8"))
+            assert not data["problems"], data["problems"]
+            different = sorted(d["id"] for d in data["documents"] if d["status"] != "equal")
+            assert different == sorted(NM_M_TWINS), result.stdout
+            total = len(data["documents"])
+            assert f"{total} documents compared: {total - 8} equal, 8 different" in result.stdout, result.stdout
+            measured = _nm_m_substitute_checks(tmp_path / "rec_old", tmp_path / "rec_new", data)
+            print("stated deviation, nanometre and metre em fixtures (substitute checks i-v passed); measured, "
+                  "old against new:\n" + "\n".join(measured))
+            # the exception patterns match only the spec's leaves in the em corpus
+            compare, maps = _em_maps()
+            for d in data["documents"]:
+                record = json.loads((tmp_path / "rec_new" / d["id"] / "record.json").read_text(encoding="utf-8"))
+                summary = tmp_path / "rec_new" / d["id"] / "result" / "summary.json"
+                if record.get("load", {}).get("kind") != "em.modes2d" or not summary.exists():
+                    continue
+                for path in compare.leaves(json.loads(summary.read_text(encoding="utf-8"))):
+                    for lmap in maps.values():
+                        for where, target, rule in lmap.exceptions:
+                            if where == "summary" and compare.match(target, path) is not None:
+                                assert path[:2] == EM_EXCEPTION_FAMILIES[rule["kind"]], (d["id"], path)
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(base)], cwd=ROOT, capture_output=True)
             subprocess.run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)

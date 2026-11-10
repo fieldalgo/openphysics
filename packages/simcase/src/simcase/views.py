@@ -132,16 +132,16 @@ def region_mesh(doc) -> RegionMesh:
     return RegionMesh(canonical, float(doc["mesh"]["min_angle"]))
 
 
-def modes_mesh(doc) -> RegionMesh:
-    """The mesh of a validated em.modes2d document: the angle as written, 28 when absent."""
-    from .runner import micrometre_document
-    canonical = micrometre_document(doc)
-    mesh = canonical["mesh"]
+def modes_mesh(handoff) -> RegionMesh:
+    """The mesh of the micrometre kernel hand-off of an em.modes2d document
+    (``modes_document.kernel_document``, already in micrometres): the angle as written, 28 when
+    absent."""
+    mesh = handoff["mesh"]
     grading = None
     if mesh.get("grading"):
         g = mesh["grading"]
         grading = RadialGrading(g["near"], g["far"], g["distance"], tuple(g["center"]))
-    return RegionMesh(canonical, mesh.get("min_angle", 28.0), grading)
+    return RegionMesh(handoff, mesh.get("min_angle", 28.0), grading)
 
 
 def handback_m(values_um) -> np.ndarray:

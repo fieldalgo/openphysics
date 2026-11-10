@@ -429,15 +429,31 @@ function drawThermalViews() {
 
 function log(msg, cls) { const el = document.createElement('div'); if (cls) el.className = cls; el.textContent = msg; $('log').appendChild(el); $('log').scrollTop = 1e9; }
 function status(s) { $('status').textContent = s; }
-function lengthUnit(units = doc?.units) {
-  const length = units?.length;
-  if (typeof length === 'string') return length;
-  if (length && typeof length.in_m === 'number') return `${length.in_m} m`;
-  return 'undeclared';
+// Format 0.3 optical documents: the shape numbers are in geometry.length_unit; every other length is a
+// quantity string with its unit ("1.55 um"). Results come in SI (metres) under exp(-i omega t); the page
+// draws them in the document's length_unit (display only, the server's display block).
+function lengthUnit(g = doc?.geometry) { return typeof g?.length_unit === 'string' ? g.length_unit : 'undeclared'; }
+function displayUnit(data) { return data?.display?.length_unit ?? lengthUnit(); }
+function inDisplay(data, metres) { return metres / data.display.metres_per_length_unit; }
+function shown(value) { return typeof value === 'number' ? +value.toPrecision(12) : value; }
+// Mesh and result payloads: node coordinates in metres, drawn in the document's unit (kept once computed).
+function displayNodes(data) { return data.nodes ??= data.node_coordinates.map(p => p.map(v => inDisplay(data, v))); }
+function withDisplayNodes(data) { displayNodes(data); return data; }
+// A section 5.3.4 series: a tagged array {unit, values}, or the complex form {unit, re, im, time_convention}.
+function re(series) { return series ? (series.values ?? series.re) : null; }
+function im(series) { return series?.im ?? null; }
+function studyValues(data) {
+  if (data.study_values) return data.study_values.values.map(shown);
+  return data.vacuum_wavelength.values.map(v => shown(inDisplay(data, v)));
 }
+function wavelengthStudy(data) { return !data.study_values; }
 function studyLabel(data) {
   const path = data.parameter;
-  return (path || 'λ') + (!path || path.endsWith('.wavelength') ? ` (${lengthUnit(data.summary.units)})` : '');
+  return (path || 'vacuum_wavelength') + (wavelengthStudy(data) ? ` (${displayUnit(data)})` : '');
+}
+function scalarMagnitudes(data, p, m) {
+  const f = data.unnormalized_mode_field[p], a = f.real[m], b = f.imag?.[m];
+  return a.map((v, i) => b ? Math.hypot(v, b[i]) : Math.abs(v));
 }
 
 // ------------------------------------------------------------------ colours
@@ -511,14 +527,14 @@ function drawMesh() {
   if (!meshData || !doc) return;
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
   const cols = meshData.region_names.map(n => hashColor(meshData.region_materials[n] || n));
-  drawTriangles(ctx, T, meshData.nodes, meshData.triangles, t => cols[meshData.regions[t]], meshData.triangles.length < 40000);
-  drawAxes(ctx, T, dom, W, H, lengthUnit(meshData.units));
+  drawTriangles(ctx, T, displayNodes(meshData), meshData.triangles, t => cols[meshData.regions[t]], meshData.triangles.length < 40000);
+  drawAxes(ctx, T, dom, W, H, displayUnit(meshData));
   $('meshLegend').innerHTML = meshData.region_names.map((n, i) => `<div><i style="background:${cols[i]}"></i>${esc(n)} (${esc(meshData.region_materials[n])})</div>`).join('');
   const s = meshData.stats; $('meshInfo').textContent = `${s.nodes} nodes, ${s.triangles} triangles, min angle ${s.min_angle}°, mean quality ${s.quality_mean}`;
 }
 
 // ------------------------------------------------------------------ results view
-const SUBSPACE_REPRESENTATION = 'vector-subspace-edge-nodal-v1';
+const SUBSPACE_REPRESENTATION = 'vector-subspace-edge-nodal-v2';
 // Cluster results are shown only for the exact versioned layout; member columns are not branches.
 function subspaceOf(data) {
   const sub = data?.subspace;
@@ -530,15 +546,15 @@ function subspaceOf(data) {
 function drawSubspaceField(sub, p, c) {
   const cv = $('fieldCanvas'); const [ctx, W, H] = fitCanvas(cv);
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H), density = sub.density[p][c];
-  drawTriangles(ctx, T, resultData.nodes, resultData.triangles, t => cmap(density[t]), false);
+  drawTriangles(ctx, T, displayNodes(resultData), resultData.triangles, t => cmap(density[t]), false);
   ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
-  drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
-  const cluster = sub.clusters[c], o = cluster.columns, band = sub.raw_neff[p].slice(o[0], o[1]);
+  drawAxes(ctx, T, dom, W, H, displayUnit(resultData));
+  const cluster = sub.clusters[c], o = cluster.columns, band = sub.effective_index[p].slice(o[0], o[1]);
   const point = resultData.summary.mode_tracking.points[p].clusters[c];
-  const match = point.min_principal_squared === undefined ? ', seed point (arbitrary frame)' : `, smallest principal value² ${point.min_principal_squared.toFixed(4)}`;
-  $('resInfo').textContent = `${sub.density_label}, cluster ${cluster.id} (rank ${cluster.rank}) at ${studyLabel(resultData)} = ${resultData.values[p]}: ` +
-    `n_eff ${Math.min(...band).toFixed(6)} to ${Math.max(...band).toFixed(6)}, mean ${sub.cluster_mean_neff[p][c].toFixed(6)}, ` +
-    `mean-index derivative n_g ${sub.cluster_mean_group_index[p][c].toFixed(4)}${match} (not energy density or a polarized mode)`;
+  const match = point.minimum_principal_squared === undefined ? ', seed point (arbitrary frame)' : `, smallest principal value² ${point.minimum_principal_squared.toFixed(4)}`;
+  $('resInfo').textContent = `${sub.density_label}, cluster ${cluster.id} (rank ${cluster.rank}) at ${studyLabel(resultData)} = ${studyValues(resultData)[p]}: ` +
+    `n_eff ${Math.min(...band).toFixed(6)} to ${Math.max(...band).toFixed(6)}, mean ${sub.mean_effective_index[p][c].toFixed(6)}, ` +
+    `mean-index derivative n_g ${sub.mean_group_index[p][c].toFixed(4)}${match} (not energy density or a polarized mode)`;
 }
 function vectorMagnitudes(field, mode, component) {
   const re = field.real[mode], im = field.imag[mode];
@@ -554,13 +570,14 @@ function drawField() {
   const sub = subspaceOf(resultData);
   if (sub) { drawSubspaceField(sub, p, m); return; }
   const vector = resultData.vector_fields?.[p], component = $('componentSel').value || 'magnitude';
-  const f = vector ? vectorMagnitudes(vector, m, component) : resultData.fields[p][m];
+  const f = vector ? vectorMagnitudes(vector, m, component) : scalarMagnitudes(resultData, p, m);
   const dom = doc.geometry.domain; const T = transformFor(dom, W, H);
   // Vector components share the mode's |E| scale, so a small Ez stays small.
   const scaleValues = vector ? vectorMagnitudes(vector, m, 'magnitude') : f;
   let vmax = 0; for (const v of scaleValues) vmax = Math.max(vmax, Math.abs(v)); vmax = vmax || 1;
-  const nodes = resultData.nodes, tris = resultData.triangles;
-  const physical = resultData.summary.open_boundary?.[p]?.physical_bounds;
+  const nodes = displayNodes(resultData), tris = resultData.triangles;
+  const bounds = resultData.summary.open_boundary?.[p]?.physical_bounds;      // {unit: "m", values: [[x0, y0], [x1, y1]]}
+  const physical = bounds && bounds.values.map(q => q.map(v => inDisplay(resultData, v)));
   if (physical) vmax = 1;
   drawTriangles(ctx, T, nodes, tris, t => {
     if (physical) { const c = [0,1].map(dim => tris[t].reduce((sum,i) => sum+nodes[i][dim],0)/3);
@@ -568,16 +585,17 @@ function drawField() {
     if (vector) return cmap(f[t] / vmax);
     const [a, b, c] = tris[t]; return cmap((Math.abs(f[a]) + Math.abs(f[b]) + Math.abs(f[c])) / (3 * vmax)); }, false);
   ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; doc.geometry.shapes.forEach(s => { shapePath(ctx, s, T); ctx.stroke(); }); ctx.restore();
-  drawAxes(ctx, T, dom, W, H, lengthUnit(resultData.summary.units));
-  const lab = `${studyLabel(resultData)} = ${resultData.values[p]}`;
+  drawAxes(ctx, T, dom, W, H, displayUnit(resultData));
+  const lab = `${studyLabel(resultData)} = ${studyValues(resultData)[p]}`;
   const fieldLabel = vector ? (component === 'magnitude' ? '|E|' : ['|Ex|', '|Ey|', '|Ez|'][+component]) : '|field|';
   const tracking = resultData.summary.mode_tracking, point = tracking?.points[p];
   const identity = tracking ? `tracked branch ${m + 1}` : `mode ${m + 1}`;
   const openPoint = resultData.summary.open_boundary?.[p];
   const openCandidate = openPoint?.candidates.find(c => c.candidate === openPoint.selected_candidates?.[m]);
   const match = point ? (point.overlaps === null ? ', seed point' : `, overlap ${point.overlaps[m].toFixed(3)}`) : '';
-  $('resInfo').textContent = `${fieldLabel}, ${identity} at ${lab}: n_eff = ${resultData.neff[p][m].toFixed(6)}${match}` +
-    (resultData.neff_imag ? `, Im n_eff = ${resultData.neff_imag[p][m].toExponential(4)}, ${resultData.propagation_loss_db_cm[p][m].toFixed(4)} dB/cm` : '') +
+  const imag = im(resultData.effective_index);
+  $('resInfo').textContent = `${fieldLabel}, ${identity} at ${lab}: n_eff = ${re(resultData.effective_index)[p][m].toFixed(6)}${match}` +
+    (imag ? `, Im n_eff = ${imag[p][m].toExponential(4)}, ${re(resultData.propagation_loss)[p][m].toExponential(4)} ${resultData.propagation_loss.unit}` : '') +
     (vector ? ' (relative amplitude, common |E| scale)' : '') + (resultData.summary.open_boundary ? ` — PML candidate, stability not checked${openCandidate ? ', '+openCandidate.attenuation_status : ''}` : '');
 }
 function drawSweep() {
@@ -586,7 +604,7 @@ function drawSweep() {
   const cv = $('sweepCanvas'); const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
   if (!resultData) return;
   const sub = subspaceOf(resultData);
-  const xs = resultData.values, ys = sub ? sub.cluster_mean_neff : resultData.neff; const nm = ys[0].length;
+  const xs = studyValues(resultData).map((v, i) => typeof v === 'number' ? v : i), ys = sub ? sub.mean_effective_index : re(resultData.effective_index); const nm = ys[0].length;
   if (xs.length < 2) { ctx.fillStyle = '#6b7280'; ctx.font = '12px system-ui'; ctx.fillText('single study point — see table', 20, 30); return; }
   const m = { l: 50, r: 16, t: 20, b: 34 };
   let ymin = Infinity, ymax = -Infinity; ys.forEach(r => r.forEach(v => { ymin = Math.min(ymin, v); ymax = Math.max(ymax, v); }));
@@ -596,7 +614,7 @@ function drawSweep() {
   ctx.fillStyle = '#6b7280'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
   ctx.fillText(studyLabel(resultData), W / 2, H - 8); ctx.fillText(xs[0], X(xs[0]), H - m.b + 14); ctx.fillText(xs[xs.length - 1], X(xs[xs.length - 1]), H - m.b + 14);
   ctx.textAlign = 'right'; ctx.fillText(ymin.toFixed(4), m.l - 4, Y(ymin) + 4); ctx.fillText(ymax.toFixed(4), m.l - 4, Y(ymax) + 4);
-  ctx.textAlign = 'left'; ctx.fillText(sub ? 'cluster mean n_eff' : (resultData.neff_imag ? 'Re n_eff' : 'n_eff'), m.l + 4, m.t - 6);
+  ctx.textAlign = 'left'; ctx.fillText(sub ? 'cluster mean n_eff' : (im(resultData.effective_index) ? 'Re n_eff' : 'n_eff'), m.l + 4, m.t - 6);
   const palette = ['#2f6fed', '#e8590c', '#0b7a5a', '#8e44ad'];
   for (let j = 0; j < nm; j++) { ctx.strokeStyle = palette[j % 4]; ctx.fillStyle = palette[j % 4]; ctx.lineWidth = 1.5; ctx.beginPath();
     xs.forEach((x, i) => i ? ctx.lineTo(X(x), Y(ys[i][j])) : ctx.moveTo(X(x), Y(ys[i][j]))); ctx.stroke();
@@ -674,20 +692,23 @@ function fillResultTable() {
   }
   const sub = subspaceOf(resultData);
   if (sub) { fillSubspaceTable(sub); return; }
-  const nm = resultData.neff[0].length, ng = resultData.group_index;
+  const neff = re(resultData.effective_index), neffImag = im(resultData.effective_index), loss = resultData.propagation_loss;
+  const nm = neff[0].length, ng = re(resultData.group_index), ngImag = im(resultData.group_index);
   const tracked = !!resultData.summary.mode_tracking, ngCount = ng ? (tracked ? nm : 1) : 0;
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + esc(studyLabel(resultData)) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
-  resultData.values.forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + resultData.neff[i].map((x,j) => `<td>${x.toFixed(6)}${resultData.neff_imag ? `<br>Im n_eff: ${resultData.neff_imag[i][j].toExponential(4)}<br>${resultData.propagation_loss_db_cm[i][j].toFixed(4)} dB/cm` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}${resultData.summary.group_index_imag ? `<br>Im n_g: ${resultData.summary.group_index_imag[i][j].toExponential(4)}` : ''}</td>`).join('') + '</tr>'; });
+  studyValues(resultData).forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + neff[i].map((x,j) => `<td>${x.toFixed(6)}${neffImag ? `<br>Im n_eff: ${neffImag[i][j].toExponential(4)}<br>${re(loss)[i][j].toExponential(4)} ${esc(loss.unit)}` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}${ngImag ? `<br>Im n_g: ${ngImag[i][j].toExponential(4)}` : ''}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
-  if (resultData.neff_imag && !resultData.summary.open_boundary) h += '<div class="hint">Material absorption only; exp(+iωt−iβz), Im n_eff &lt; 0 means attenuation. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';
+  if (neffImag) h += '<div class="hint">Time convention exp(−iωt), fields ∝ exp(i(βz − ωt)): Im n_eff &gt; 0 means attenuation; the loss is 40π/ln 10 · Im n_eff / λ0 in dB/m.</div>';
+  if (neffImag && !resultData.summary.open_boundary) h += '<div class="hint">Material absorption only. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';
   if (resultData.summary.open_boundary) {
     h += '<div class="hint">PML candidates: stability not checked. Total attenuation includes material absorption and radiation. Fractions are positive L2 diagnostics, not energy. Grey field regions are artificial PML; normalization and tracking use the physical window.</div>';
     resultData.summary.open_boundary.forEach((point,i) => {
       h += `<details><summary>Point ${i+1}: all ${point.candidates.length} searched candidates</summary><table class="res"><tr><th>Candidate</th><th>Re / Im n_eff</th><th>Physical L2</th><th>Residual</th><th>Selection / reason</th></tr>`;
-      point.candidates.forEach(c => { h += `<tr><td>${esc(c.candidate)}</td><td>${c.neff_real.toFixed(6)} / ${c.neff_imag.toExponential(3)}</td><td>${c.physical_l2_fraction.toFixed(4)}</td><td>${c.pencil_residual.toExponential(2)}</td><td>${esc(c.reasons.join(', '))}; ${esc(c.attenuation_status)}</td></tr>`; });
+      point.candidates.forEach(c => { h += `<tr><td>${esc(c.candidate)}</td><td>${c.effective_index.re.toFixed(6)} / ${c.effective_index.im.toExponential(3)}</td><td>${c.physical_l2_fraction.toFixed(4)}</td><td>${c.relative_residual.toExponential(2)}</td><td>${esc(c.reasons.join(', '))}; ${esc(c.attenuation_status)}</td></tr>`; });
       h += '</table></details>';
     });
-    if (resultData.summary.bend_loss_db_90deg) h += '<div class="hint">Bend total attenuation (dB/90°, reference radius): '+resultData.summary.bend_loss_db_90deg.map(row => row.map(x => x.toExponential(4)).join(', ')).join(' / ')+'</div>';
+    const bend = resultData.summary.bend_loss;
+    if (bend) h += '<div class="hint">Bend total attenuation ('+esc(bend.unit)+', reference radius): '+bend.values.map(row => row.map(x => x.toExponential(4)).join(', ')).join(' / ')+'</div>';
   }
   if (tracked) h += '<div class="hint" style="margin:0 10px">Branch numbers follow the modes seeded at the first wavelength. Refine the wavelength spacing to check group-index accuracy.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
@@ -696,24 +717,23 @@ function fillResultTable() {
 function fillSubspaceTable(sub) {
   const head = sub.clusters.map(c => `<th>mean n_eff cluster ${esc(c.id)} (rank ${esc(c.rank)})</th><th>band width ${esc(c.id)}</th><th>mean-index n_g ${esc(c.id)}</th>`).join('');
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Cluster results"><table class="res"><tr><th>' + esc(studyLabel(resultData)) + '</th>' + head + '</tr>';
-  resultData.values.forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + sub.clusters.map((c, j) => { const band = sub.raw_neff[i].slice(c.columns[0], c.columns[1]);
-    return `<td>${sub.cluster_mean_neff[i][j].toFixed(6)}</td><td>${(Math.max(...band) - Math.min(...band)).toExponential(2)}</td><td>${sub.cluster_mean_group_index[i][j].toFixed(4)}</td>`; }).join('') + '</tr>'; });
+  studyValues(resultData).forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + sub.clusters.map((c, j) => { const band = sub.effective_index[i].slice(c.columns[0], c.columns[1]);
+    return `<td>${sub.mean_effective_index[i][j].toFixed(6)}</td><td>${(Math.max(...band) - Math.min(...band)).toExponential(2)}</td><td>${sub.mean_group_index[i][j].toFixed(4)}</td>`; }).join('') + '</tr>'; });
   h += '</table></div>';
   h += '<div class="hint" style="margin:0 10px">Clusters are tracked as subspaces (electric-l2-subspace-v1). Members inside a cluster are not tracked individually, so no member group index is shown; n_g is the derivative of the cluster mean index. Refine the wavelength spacing, mesh and candidate budget to check it.</div>';
   const t = resultData.timings; h += `<div class="hint" style="margin:0 10px">mesh ${t.mesh.toFixed(2)} s, solve ${t.solve.toFixed(2)} s</div>`;
   $('resTable').innerHTML = h;
 }
 function physKey() { return Object.keys(doc.physics)[0]; }
-let unitVocab = null;
-function unitSummary() { const u = doc.units || {}; const k = Object.keys(u); return k.length ? k.map(d => `${d} ${typeof u[d] === 'string' ? u[d] : 'custom'}`).join(', ') : 'none declared'; }
 function populateResultSelectors() {
   $('componentLabel').hidden = !resultData.vector_fields;
   $('componentSel').value = 'magnitude';
-  $('ptSel').innerHTML = resultData.values.map((v, i) => `<option value="${i}">${esc(studyLabel(resultData))} = ${esc(v)}</option>`).join('');
-  $('ptSel').value = Math.floor(resultData.values.length / 2);
+  const values = studyValues(resultData);
+  $('ptSel').innerHTML = values.map((v, i) => `<option value="${i}">${esc(studyLabel(resultData))} = ${esc(v)}</option>`).join('');
+  $('ptSel').value = Math.floor(values.length / 2);
   const sub = subspaceOf(resultData);
   $('modeSel').innerHTML = sub ? sub.clusters.map((c, j) => `<option value="${j}">cluster ${esc(c.id)} (rank ${esc(c.rank)})</option>`).join('')
-    : resultData.neff[0].map((_, j) => `<option value="${j}">${resultData.summary.mode_tracking ? 'branch ' : ''}${j + 1}</option>`).join('');
+    : re(resultData.effective_index)[0].map((_, j) => `<option value="${j}">${resultData.summary.mode_tracking ? 'branch ' : ''}${j + 1}</option>`).join('');
 }
 
 // ------------------------------------------------------------------ tree
@@ -725,14 +745,22 @@ function buildTree() {
   node('geometry', 'Geometry', 0, '▾'); node('geometry.domain', 'Domain', 1, '□'); node('geometry.background', `Background · ${doc.geometry.background.material}`, 1, '▨');
   doc.geometry.shapes.forEach((s, i) => node(`shape:${i}`, `${s.name} · ${s.type} · ${s.material}`, 1, '◇'));
   const add = document.createElement('div'); add.className = 'add'; add.innerHTML = '<button>+ shape</button>'; add.querySelector('button').onclick = addShape; t.appendChild(add);
-  node('units', `Units · ${unitSummary()}`, 0, '⊛');
   node('materials', 'Materials', 0, '▾');
-  Object.keys(doc.materials).forEach(k => node(`material:${k}`, `${k} · ${doc.materials[k].sellmeier ? 'Sellmeier' : 'n=' + doc.materials[k].n}`, 1, '◈'));
+  doc.materials = doc.materials || {};
+  Object.keys(doc.materials).forEach(k => node(`material:${k}`, `${k} · ${indexLabel(doc.materials[k].refractive_index)}`, 1, '◈'));
   const addm = document.createElement('div'); addm.className = 'add'; addm.innerHTML = '<button>+ custom material</button>'; addm.querySelector('button').onclick = addMaterial; t.appendChild(addm);
   Object.keys(doc.physics).forEach(k => node(`physics:${k}`, `Physics ${k} · ${doc.physics[k].type}`, 0, '∿')); node('mesh', 'Mesh', 0, '△'); node('study', `Study · ${doc.study.type}`, 0, '⇶'); node('results', 'Results', 0, '▤');
 }
-function addShape() { const n = doc.geometry.shapes.length; doc.geometry.shapes.push({ name: `shape${n + 1}`, type: 'rect', x: 0, y: 0, w: 0.5, h: 0.2, material: doc.geometry.background.material }); selected = `shape:${n}`; refresh(); }
-function addMaterial() { let k = 'custom'; let i = 1; while (doc.materials[k]) k = `custom${i++}`; doc.materials[k] = { n: 1.5, k: 0 }; selected = `material:${k}`; refresh(); }
+function addShape() { const n = doc.geometry.shapes.length, d = doc.geometry.domain;
+  doc.geometry.shapes.push({ name: `shape${n + 1}`, type: 'rect', x: 0, y: 0, w: shown((d.xmax - d.xmin) / 6), h: shown((d.ymax - d.ymin) / 12), material: doc.geometry.background.material }); selected = `shape:${n}`; refresh(); }
+function addMaterial() { let k = 'custom'; let i = 1; doc.materials = doc.materials || {}; while (doc.materials[k]) k = `custom${i++}`; doc.materials[k] = { refractive_index: 1.5 }; selected = `material:${k}`; refresh(); }
+// A refractive index record: a number, {n, k} (k >= 0 is loss under exp(-i omega t)), or a dispersion model.
+function indexLabel(index) { return index?.model ? index.model : typeof index === 'object' && index ? `n=${index.n}, k=${index.k}` : `n=${index}`; }
+// Quantity strings ("1.55 um") are edited as text; the server reads and checks them.
+function qty(path, v) { return `<input type="text" data-path="${esc(path)}" data-kind="qty" value="${esc(v ?? '')}" placeholder="value unit, e.g. 1.55 um">`; }
+// "<number> <unit>" scaled by f, for defaults derived from another quantity.
+function scaledQty(text, f) { const m = /^(\S+) (.+)$/.exec(String(text ?? '')); return m && Number.isFinite(+m[1]) ? `${shown(+m[1] * f)} ${m[2]}` : text; }
+function fmtLength(metres) { return metres === null ? '∞' : `${shown(metres * 1e6)} µm`; }
 
 // ------------------------------------------------------------------ properties panel
 function materialOptions(current) {
@@ -747,94 +775,91 @@ function sel(path, v, opts) { return `<select data-path="${esc(path)}">${opts.ma
 
 function renderProps() {
   const P = $('props'); let h = '';
-  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">OpenPhysics format ${esc(doc.openphysics)}, lengths in ${esc(lengthUnit())}</div>`;
+  if (selected === 'model') h = '<h3>Model</h3>' + row('name', txt('name', doc.name)) + `<div class="hint">OpenPhysics format ${esc(doc.openphysics)}; shape numbers in ${esc(lengthUnit())}, every other length written with its unit</div>`;
   else if (selected === 'geometry') h = '<h3>Geometry</h3><div class="hint">Shapes are stacked in order: later shapes cut earlier ones; the background fills the rest. Select a shape or add one.</div>';
-  else if (selected === 'geometry.domain') { const d = doc.geometry.domain; h = '<h3>Domain</h3>' + ['xmin', 'xmax', 'ymin', 'ymax'].map(k => row(k, num(`geometry.domain.${k}`, d[k]))).join(''); }
-  else if (selected === 'geometry.background') { const b = doc.geometry.background; h = '<h3>Background</h3>' + row('material', `<select data-path="geometry.background.material">${materialOptions(b.material)}</select>`) + row('mesh size', num('geometry.background.mesh_size', b.mesh_size ?? '')) + matHint(b.material); }
+  else if (selected === 'geometry.domain') { const d = doc.geometry.domain; h = '<h3>Domain</h3>' + row('length unit', txt('geometry.length_unit', doc.geometry.length_unit ?? '')) + ['xmin', 'xmax', 'ymin', 'ymax'].map(k => row(`${k} (${lengthUnit()})`, num(`geometry.domain.${k}`, d[k]))).join('') + '<div class="hint">The length unit says what the shape and domain numbers mean (nm, um, m, …). Changing it does not rescale them.</div>'; }
+  else if (selected === 'geometry.background') { const b = doc.geometry.background; h = '<h3>Background</h3>' + row('material', `<select data-path="geometry.background.material">${materialOptions(b.material)}</select>`) + row('element size', qty('geometry.background.element_size', b.element_size)) + matHint(b.material); }
   else if (selected.startsWith('shape:')) {
     const i = +selected.split(':')[1], s = doc.geometry.shapes[i]; const p = `geometry.shapes.${i}`;
     h = `<h3>Shape ${i + 1}</h3>` + row('name', txt(`${p}.name`, s.name)) + row('type', sel(`${p}.type`, s.type, ['rect', 'circle', 'polygon']));
     if (s.type === 'rect') h += ['x', 'y', 'w', 'h'].map(k => row(k, num(`${p}.${k}`, s[k]))).join('');
     else if (s.type === 'circle') h += ['cx', 'cy', 'r'].map(k => row(k, num(`${p}.${k}`, s[k]))).join('');
     else h += row('points', `<input type="text" data-path="${p}.points" data-kind="points" value="${esc(s.points.map(q => q.join(',')).join('; '))}">`) + '<div class="hint">x,y pairs separated by ;</div>';
-    h += row('material', `<select data-path="${p}.material">${materialOptions(s.material)}</select>`) + row('mesh size', num(`${p}.mesh_size`, s.mesh_size ?? '')) + matHint(s.material);
+    h += row('material', `<select data-path="${p}.material">${materialOptions(s.material)}</select>`) + row('element size', qty(`${p}.element_size`, s.element_size)) + matHint(s.material);
     h += `<div class="actions"><button data-act="up">▲ up</button><button data-act="down">▼ down</button><button data-act="del" class="danger">delete</button></div>`;
   }
-  else if (selected === 'materials') h = '<h3>Materials</h3><div class="hint">Names not defined here are looked up in physmat (' + materials.length + ' built-ins with dispersion). Add a custom constant material with + custom material.</div>' +
-    '<div class="hint">' + materials.map(m => `<b>${esc(m.name)}</b> ${esc(m.range_um[0])}–${esc(m.range_um[1] ?? '∞')} um`).join('<br>') + '</div>';
-  else if (selected.startsWith('material:')) { const k = selected.slice(9), m = doc.materials[k];
+  else if (selected === 'materials') h = '<h3>Materials</h3><div class="hint">A material is a local record here, or a library material written "physmat:&lt;Name&gt;" (' + materials.length + ' built-ins with dispersion). Add a custom constant material with + custom material.</div>' +
+    '<div class="hint">' + materials.map(m => { const [lo, hi] = m.valid.vacuum_wavelength.values; return `<b>${esc(m.name)}</b> ${esc(fmtLength(lo))}–${esc(fmtLength(hi))}`; }).join('<br>') + '</div>';
+  else if (selected.startsWith('material:')) { const k = selected.slice(9), m = doc.materials[k], index = m.refractive_index;
     h = `<h3>Custom material</h3>` + row('name', `<input type="text" data-kind="matname" data-old="${esc(k)}" value="${esc(k)}">`);
-    h += m.sellmeier ? `<div class="hint">Sellmeier dispersion. Edit B, C, A and range in the JSON tab. C uses squared document length; range uses ${esc(lengthUnit())}.</div>` : row('n', num(`materials.${k}.n`, m.n)) + row('k', num(`materials.${k}.k`, m.k ?? 0));
+    h += index?.model ? `<div class="hint">${esc(index.model)} dispersion. Edit its terms, constant and valid range in the JSON tab; each length carries its unit ("0.0684 um^2", "6.7 um").</div>`
+      : row('n', `<input type="number" step="any" data-kind="nk" data-material="${esc(k)}" data-part="n" value="${esc(typeof index === 'object' && index ? index.n : index)}">`) +
+        row('k', `<input type="number" step="any" min="0" data-kind="nk" data-material="${esc(k)}" data-part="k" value="${esc(typeof index === 'object' && index ? index.k : 0)}">`) +
+        '<div class="hint">n + i k under exp(−iωt): k ≥ 0 is absorption; a negative k (gain) is refused.</div>';
     h += `<div class="actions"><button data-act="delmat" class="danger">delete</button></div>`; }
   else if (selected.startsWith('physics:')) { const pk = selected.slice(8), p = doc.physics[pk]; h = `<h3>Physics · ${esc(pk)}</h3>` + row('type', sel(`physics.${pk}.type`, p.type, ['em.modes2d'])) + row('formulation', sel(`physics.${pk}.formulation`, p.formulation, ['scalar', 'vector'])) +
-    row(`wavelength (${lengthUnit()})`, num(`physics.${pk}.wavelength`, p.wavelength)) + row('num modes', num(`physics.${pk}.num_modes`, p.num_modes, 1)) +
-    row('target index (optional)', num(`physics.${pk}.n_target`, p.n_target ?? '')) +
-    (p.formulation === 'vector' ? row('cladding index', num(`physics.${pk}.n_cladding`, p.n_cladding ?? '')) +
+    row('vacuum wavelength', qty(`physics.${pk}.vacuum_wavelength`, p.vacuum_wavelength)) + row('mode count', num(`physics.${pk}.mode_count`, p.mode_count, 1)) +
+    row('target effective index (optional)', num(`physics.${pk}.target_effective_index`, p.target_effective_index ?? '')) +
+    (p.formulation === 'vector' ? row('effective index threshold', num(`physics.${pk}.effective_index_threshold`, p.effective_index_threshold ?? '')) +
       '<div class="hint">Set the exterior guiding threshold, valid throughout the study. Passive absorption is supported. For metals, set a target index to search nearby candidates; check mesh and window convergence. PEC fixes tangential E; PMC is natural. Use vector_slab for the TE example.</div>' :
       '<div class="hint">Scalar: exact for TE slabs, approximate for 2D high-contrast cores. PEC sets the scalar field to zero; PMC is natural.</div>') +
     row('open boundary PML', `<select data-kind="pml-toggle" data-physics="${esc(pk)}"><option value="off" ${!p.pml ? 'selected' : ''}>off</option><option value="on" ${p.pml ? 'selected' : ''}>on</option></select>`) +
-    (p.pml ? ['left','right','bottom','top'].map(side => row(`PML ${side} (${lengthUnit()})`, num(`physics.${pk}.pml.thickness.${side}`, p.pml.thickness[side] ?? 0))).join('') +
-      row('PML strength', num(`physics.${pk}.pml.strength`, p.pml.strength ?? 3)) + row('PML order (2–4)', num(`physics.${pk}.pml.order`, p.pml.order ?? 2, 1)) +
-      row('minimum physical L2 fraction', num(`physics.${pk}.pml.min_physical_fraction`, p.pml.min_physical_fraction ?? .1)) +
+    (p.pml ? ['left','right','bottom','top'].map(side => row(`PML ${side}`, qty(`physics.${pk}.pml.pml_thickness.${side}`, p.pml.pml_thickness[side]))).join('') +
+      row('PML strength', num(`physics.${pk}.pml.pml_strength`, p.pml.pml_strength ?? 3)) + row('PML order (2–4)', num(`physics.${pk}.pml.pml_order`, p.pml.pml_order ?? 2, 1)) +
+      row('minimum physical L2 fraction', num(`physics.${pk}.pml.pml_minimum_physical_fraction`, p.pml.pml_minimum_physical_fraction ?? .1)) +
       '<div class="hint">Set a positive target index. The domain includes PML strips; extend materials through them. Outer PML faces require PEC. Candidate fractions are heuristic; vary mesh, window, thickness and strength independently.</div>' +
       row('constant-radius bend', `<select data-kind="bend-toggle" data-physics="${esc(pk)}"><option value="off" ${!p.bend ? 'selected' : ''}>off</option><option value="on" ${p.bend ? 'selected' : ''}>on</option></select>`) +
-      (p.bend ? row(`radius (${lengthUnit()})`, num(`physics.${pk}.bend.radius`, p.bend.radius)) + row('outward axis', sel(`physics.${pk}.bend.axis`, p.bend.axis ?? 'x', ['x','y'])) + row(`reference origin (${lengthUnit()})`, num(`physics.${pk}.bend.origin`, p.bend.origin ?? 0)) : '') : '') +
+      (p.bend ? row('bend radius', qty(`physics.${pk}.bend.bend_radius`, p.bend.bend_radius)) + row('outward axis', sel(`physics.${pk}.bend.axis`, p.bend.axis ?? 'x', ['x','y'])) + row('bend origin', qty(`physics.${pk}.bend.bend_origin`, p.bend.bend_origin)) : '') : '') +
     '<h3 style="margin-top:12px">Boundaries</h3>' +
     ['left', 'right', 'top', 'bottom'].map(k => row(k, sel(`physics.${pk}.boundary.${k}`, p.boundary[k], ['pec', 'pmc']))).join(''); }
-  else if (selected === 'units') {
-    const u = doc.units || {}; const dims = unitVocab ? unitVocab.dimensions : Object.keys(u);
-    h = '<h3>Units</h3><div class="hint">What the numbers in this document mean. A dimension left at SI is SI; the physics still requires the ones it reads, so those cannot be left out.</div>';
-    h += dims.map(d => {
-      const syms = unitVocab ? unitVocab.symbols[d] : [];
-      const cur = typeof u[d] === 'string' ? u[d] : '';
-      const opts = ['<option value="">SI</option>'].concat(syms.map(x => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`)).join('');
-      return row(d, `<select data-kind="unit" data-dim="${esc(d)}">${opts}</select>`);
-    }).join('');
-    if (Object.values(u).some(v => typeof v !== 'string')) h += '<div class="hint">This document uses a numeric escape hatch for at least one dimension; edit it in the JSON view.</div>'; }
-  else if (selected === 'mesh') { const m = doc.mesh; const g = m.grading; h = '<h3>Mesh</h3>' + row('size', num('mesh.size', m.size)) + row('min angle', num('mesh.min_angle', m.min_angle ?? 28)) +
+  else if (selected === 'mesh') { const m = doc.mesh; const g = m.grading; h = '<h3>Mesh</h3>' + row('element size', qty('mesh.element_size', m.element_size)) + row('minimum angle', qty('mesh.minimum_angle', m.minimum_angle ?? '')) +
     row('grading', `<select data-kind="grading"><option ${g ? '' : 'selected'}>off</option><option ${g ? 'selected' : ''}>on</option></select>`);
-    if (g) h += row('center x', num('mesh.grading.center.0', g.center[0])) + row('center y', num('mesh.grading.center.1', g.center[1])) + row('near', num('mesh.grading.near', g.near)) + row('far', num('mesh.grading.far', g.far)) + row('distance', num('mesh.grading.distance', g.distance));
-    h += '<div class="hint">Per-shape sizes are set on each shape. Grading grows the size linearly from near (at center) to far (at distance).</div>'; }
+    if (g) h += row('position x', qty('mesh.grading.position.0', g.position[0])) + row('position y', qty('mesh.grading.position.1', g.position[1])) + row('near', qty('mesh.grading.near', g.near)) + row('far', qty('mesh.grading.far', g.far)) + row('refinement distance', qty('mesh.grading.refinement_distance', g.refinement_distance));
+    h += '<div class="hint">Per-shape element sizes are set on each shape. Grading grows the size linearly from near (at position) to far (at the refinement distance). Minimum angle defaults to 28 deg.</div>'; }
   else if (selected === 'study') { const s = doc.study; h = '<h3>Study</h3>' + row('type', sel('study.type', s.type, ['single', 'sweep']));
-    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" value="${esc((s.values || []).join(', '))}">`) + '<div class="hint">The mesh is fixed throughout the study. Scalar studies can sweep physics parameters. Vector studies can sweep only wavelength, with at least three finite positive values in strictly increasing or decreasing order. Isolated modes are tracked between points; missing, ambiguous or nearly degenerate modes stop the run. Advanced study.tracking settings are available in JSON. Refine wavelength spacing to check group-index accuracy.</div>'; }
+    const tagged = s.values && !Array.isArray(s.values);
+    if (s.type === 'sweep') h += row('parameter', txt('study.parameter', s.parameter ?? `physics.${physKey()}.vacuum_wavelength`)) + row('values', `<input type="text" data-path="study.values" data-kind="list" data-tagged="${tagged ? 'yes' : ''}" value="${esc((tagged ? s.values.values : s.values || []).join(', '))}">`) + (tagged ? row('values unit', `<input type="text" data-kind="values-unit" value="${esc(s.values.unit)}">`) : '') + '<div class="hint">The mesh is fixed throughout the study. Scalar studies can sweep physics parameters. Vector studies can sweep only wavelength, with at least three finite positive values in strictly increasing or decreasing order. Isolated modes are tracked between points; missing, ambiguous or nearly degenerate modes stop the run. Advanced study.tracking settings are available in JSON. Refine wavelength spacing to check group-index accuracy.</div>'; }
   else if (selected === 'results') h = '<h3>Results</h3><div class="hint">Run writes n_eff and fields per study point. Wavelength sweeps also report group index; vector sweeps require successful mode tracking at every point. Branch numbers follow the first point, and field info reports overlap with the preceding point. Use the point, mode and component selectors above the field view.</div>';
   P.innerHTML = h;
   P.querySelectorAll('[data-path]').forEach(el => el.addEventListener('change', onPropChange));
-  P.querySelectorAll('[data-kind="unit"]').forEach(el => el.addEventListener('change', e => {
-    const d = e.target.dataset.dim, v = e.target.value;
-    doc.units = doc.units || {};
-    if (v) doc.units[d] = v; else delete doc.units[d];
-    meshData = null; refresh();
-  }));
+  P.querySelectorAll('[data-kind="values-unit"]').forEach(el => el.addEventListener('change', e => { invalidateDocument(); doc.study.values.unit = e.target.value.trim(); meshData = null; refresh(); }));
+  P.querySelectorAll('[data-kind="nk"]').forEach(el => el.addEventListener('change', e => {
+    invalidateDocument(); const m = doc.materials[e.target.dataset.material], index = m.refractive_index;
+    const nk = typeof index === 'object' && index ? { ...index } : { n: index, k: 0 }; nk[e.target.dataset.part] = Number(e.target.value);
+    m.refractive_index = nk.k === 0 ? nk.n : nk; meshData = null; refresh(); }));
   P.querySelectorAll('[data-kind="matname"]').forEach(el => el.addEventListener('change', renameMaterial));
-  P.querySelectorAll('[data-kind="grading"]').forEach(el => el.addEventListener('change', e => { invalidateDocument(); doc.mesh.grading = e.target.value === 'on' ? { center: [0, 0], near: doc.mesh.size / 5, far: doc.mesh.size, distance: 1 } : null; refresh(); }));
+  P.querySelectorAll('[data-kind="grading"]').forEach(el => el.addEventListener('change', e => { invalidateDocument(); const u = lengthUnit(), size = doc.mesh.element_size;
+    doc.mesh.grading = e.target.value === 'on' ? { position: [`0 ${u}`, `0 ${u}`], near: scaledQty(size, 1 / 5), far: size, refinement_distance: scaledQty(size, 4) } : null; refresh(); }));
   P.querySelectorAll('[data-kind="pml-toggle"], [data-kind="bend-toggle"]').forEach(el => el.addEventListener('change', e => {
     invalidateDocument(); const p = doc.physics[e.target.dataset.physics], d = doc.geometry.domain;
     if (e.target.dataset.kind === 'pml-toggle') {
+      const u = lengthUnit(), w = `${shown((d.xmax-d.xmin)/10)} ${u}`, t = `${shown((d.ymax-d.ymin)/10)} ${u}`;
       if (e.target.value === 'off') { delete p.pml; delete p.bend; }
-      else p.pml = {thickness: {left: (d.xmax-d.xmin)/10, right: (d.xmax-d.xmin)/10, bottom: (d.ymax-d.ymin)/10, top: (d.ymax-d.ymin)/10}, strength: 3, order: 2, min_physical_fraction: .1};
+      else p.pml = {pml_thickness: {left: w, right: w, bottom: t, top: t}, pml_strength: 3, pml_order: 2, pml_minimum_physical_fraction: .1};
     } else if (e.target.value === 'off') delete p.bend;
-    else p.bend = {radius: 5*Math.max(d.xmax-d.xmin,d.ymax-d.ymin), axis: 'x', origin: d.xmin};
+    else p.bend = {bend_radius: `${shown(5*Math.max(d.xmax-d.xmin,d.ymax-d.ymin))} ${lengthUnit()}`, axis: 'x', bend_origin: `${shown(d.xmin)} ${lengthUnit()}`};
     meshData = null; refresh();
   }));
   P.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', onAction));
 }
-function matHint(name) { const m = materials.find(x => x.name === name || x.aliases.includes(name)); if (m) return `<div class="hint">${esc(m.source)}<br>valid ${esc(m.range_um[0])}–${esc(m.range_um[1] ?? '∞')} um</div>`;
-  if (doc.materials[name]) return `<div class="hint">custom ${doc.materials[name].sellmeier ? 'Sellmeier' : 'constant'} material</div>`; return `<div class="hint" style="color:#b42318">unknown material</div>`; }
+function matHint(name) { const m = materials.find(x => x.name === name); if (m) { const [lo, hi] = m.valid.vacuum_wavelength.values; return `<div class="hint">${esc(m.source)}<br>valid ${esc(fmtLength(lo))}–${esc(fmtLength(hi))}</div>`; }
+  if (doc.materials?.[name]) return `<div class="hint">custom ${doc.materials[name].refractive_index?.model ? esc(doc.materials[name].refractive_index.model) : 'constant'} material</div>`;
+  return `<div class="hint" style="color:#b42318">unknown material${materials.some(x => x.name === 'physmat:' + name) ? `; the library material is written "physmat:${esc(name)}"` : ''}</div>`; }
 
 function setPath(obj, path, value) { const parts = path.split('.'); let o = obj; for (const p of parts.slice(0, -1)) o = o[p]; const last = parts[parts.length - 1];
   if (value === '' || value === null) delete o[last]; else o[last] = value; }
 function onPropChange(e) {
   invalidateDocument();
   const el = e.target, path = el.dataset.path; let v = el.value;
-  if (el.dataset.kind === 'list') v = v.split(/[,\s]+/).filter(Boolean).map(Number);
+  if (el.dataset.kind === 'list') { v = v.split(/[,\s]+/).filter(Boolean).map(x => Number.isFinite(Number(x)) ? Number(x) : x);
+    if (el.dataset.tagged) v = { unit: doc.study.values.unit, values: v }; }
   else if (el.dataset.kind === 'points') v = v.split(';').map(s => s.trim()).filter(Boolean).map(s => s.split(',').map(Number));
   else if (el.type === 'number') v = v === '' ? '' : Number(v);
   if (path.endsWith('.type') && path.startsWith('geometry.shapes')) { const s = doc.geometry.shapes[+path.split('.')[2]]; const c = shapeCenter(s);
     if (v === 'rect') Object.assign(s, { x: c[0] - .25, y: c[1] - .1, w: .5, h: .2 }); if (v === 'circle') Object.assign(s, { cx: c[0], cy: c[1], r: .5 }); if (v === 'polygon') s.points = [[c[0] - .5, c[1] - .5], [c[0] + .5, c[1] - .5], [c[0], c[1] + .5]];
     for (const k of ['x', 'y', 'w', 'h', 'cx', 'cy', 'r', 'points']) if (!({ rect: ['x', 'y', 'w', 'h'], circle: ['cx', 'cy', 'r'], polygon: ['points'] })[v].includes(k)) delete s[k]; }
   setPath(doc, path, v);
-  if (path === 'study.type' && v === 'sweep' && !doc.study.values) { doc.study.parameter = `physics.${physKey()}.wavelength`; doc.study.values = [1.5, 1.55, 1.6]; }
+  if (path === 'study.type' && v === 'sweep' && !doc.study.values) { doc.study.parameter = `physics.${physKey()}.vacuum_wavelength`; doc.study.values = { unit: 'um', values: [1.5, 1.55, 1.6] }; }
   meshData = null; refresh();
 }
 function renameMaterial(e) { const old = e.target.dataset.old, nw = e.target.value.trim(); if (!nw || nw === old || doc.materials[nw]) return; invalidateDocument(); doc.materials[nw] = doc.materials[old]; delete doc.materials[old];
@@ -923,7 +948,7 @@ async function doValidate() {
   try {
     const r=await api.post('/api/validate',{doc});
     if(revision!==documentRevision||sequence!==inputSequence)return false;
-    if(r.ok){doc=r.doc;editorDirty=false;rawDocumentText=null;refresh();log('valid:\n'+r.summary);(r.notes||[]).forEach(n=>log('warning: '+n,'err'));status('valid');}
+    if(r.ok){doc=r.doc;editorDirty=false;rawDocumentText=null;refresh();log('valid:\n'+r.summary);(r.notes||[]).forEach(n=>log('warning: '+n,'err'));(r.diagnostics||[]).forEach(d=>log(`${d.severity} ${d.code} at ${d.path}: ${d.message}`,d.severity==='info'?undefined:'err'));status('valid');}
     else{invalidateDocument();log('invalid: '+r.error,'err');status('invalid document');}
     return r.ok;
   } catch(error) {if(revision===documentRevision&&sequence===inputSequence){log('validation failed: '+error.message,'err');status('validation failed');}return false;}
@@ -932,7 +957,7 @@ async function doMesh() {
   if (isHeadlessThermal()) { invalidateDocument(); refresh(); return; }
   const revision = invalidateDocument(); status('meshing…'); $('meshBtn').disabled = true;
   try { const data = await api.post('/api/mesh', { doc }); if (revision !== documentRevision) return;
-    meshData = data; showTab('mesh'); status(`mesh: ${meshData.stats.triangles} triangles`); log(`mesh: ${meshData.stats.nodes} nodes, ${meshData.stats.triangles} triangles, min angle ${meshData.stats.min_angle}°`); }
+    meshData = withDisplayNodes(data); (data.diagnostics || []).forEach(d => log(`${d.severity} ${d.code} at ${d.path}: ${d.message}`, d.severity === 'info' ? undefined : 'err')); showTab('mesh'); status(`mesh: ${meshData.stats.triangles} triangles`); log(`mesh: ${meshData.stats.nodes} nodes, ${meshData.stats.triangles} triangles, min angle ${meshData.stats.min_angle}°`); }
   catch (e) { if (revision === documentRevision) { log('mesh failed: ' + e.message, 'err'); status('mesh failed'); } }
   finally { if (revision === documentRevision) $('meshBtn').disabled = false; }
 }
@@ -955,7 +980,7 @@ async function doRun() {
         if (revision !== documentRevision || currentJob !== job) return;
         if (isHeadlessThermalType(data.summary?.physics_type)) throw new Error('Studio cannot render headless thermal results');
         subspaceOf(data);
-        resultData = data; populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
+        resultData = withDisplayNodes(data); populateResultSelectors(); fillResultTable(); showTab('results'); status('done'); break; }
       if (j.status === 'error') { log(j.error, 'err'); if (j.open_boundary) log(JSON.stringify(j.open_boundary), 'err'); status('run failed'); break; } } }
   catch (e) { if (revision === documentRevision) { log('run failed: ' + e.message, 'err'); status('run failed'); } }
   finally { if (revision === documentRevision) $('runBtn').disabled = false; }
@@ -1011,7 +1036,7 @@ window.addEventListener('resize', redrawAll);
   if (transientController) transientController.loadCapability().then(()=>{if(isTransientDoc()&&!editorDirty)refresh();});
   if (thermalController) thermalController.loadCapability().then(()=>{if(isHeadlessThermal()&&!isTransientDoc()&&!editorDirty)refresh();});
   try { const ex = await api.get('/api/examples'); $('exampleSel').innerHTML = ex.examples.map(n => `<option>${esc(n)}</option>`).join(''); $('exampleSel').value = 'soi_strip';
-    materials = (await api.get('/api/materials')).materials; unitVocab = await api.get('/api/units'); await loadExample('soi_strip'); }
+    materials = (await api.get('/api/materials')).materials; await loadExample('soi_strip'); }
   catch (e) { log('startup failed: ' + e.message, 'err'); }
 })();
 </script>

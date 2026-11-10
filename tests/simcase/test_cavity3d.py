@@ -220,12 +220,15 @@ def test_studio_rejects_cavity_before_starting_a_2d_job():
         assert client.get("/api/examples/cavity_box").status_code == 400
 
 
-def test_cavity_guards_preserve_2d_multiphysics_mesh_preview():
+def test_cavity_guards_preserve_2d_mesh_preview():
     data = copy.deepcopy(examples.SLAB_TE_CHECK)
-    data["physics"]["second"] = copy.deepcopy(data["physics"]["em1"])
-    doc = Document.from_dict(data)
-    model = build_mesh(doc)
+    model = build_mesh(Document.from_dict(copy.deepcopy(data)))
     assert model.tri.num_triangles > 0
+    # format 0.3 takes one physics entry per document (every 0.3 kind): a second entry is refused at
+    # read, before any mesh, where format 0.2 meshed the document and refused only the solve
+    data["physics"]["second"] = copy.deepcopy(data["physics"]["em1"])
+    with pytest.raises(DocumentError, match="2 physics .em1, second.; solving more than one"):
+        Document.from_dict(data)
 
 
 @pytest.mark.parametrize("unit,ratio", [("m", 1), ("mm", 1000), ("um", 1e6), ("nm", 1e9)])

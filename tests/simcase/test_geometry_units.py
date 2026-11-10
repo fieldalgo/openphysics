@@ -54,8 +54,56 @@ def as_v03(doc02: dict) -> dict:
     return read({"openphysics": "0.3", "geometry": g})
 
 
+#: the geometry of the two version 1 examples as format 0.2 wrote them (examples/simcase before the
+#: units batch converted their documents to format 0.3; the geometry readers are compared here)
+GEOMETRY_02 = {
+    "geometry_v1_soi_strip": {
+        "openphysics": "0.2", "units": {"length": "um"},
+        "geometry": {"version": 1, "parameters": {"w": {"value": 0.5, "range": [0.3, 0.9]}, "t": {"value": 0.22}},
+                     "components": {"xs": {
+                         "dimension": "2d", "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
+                         "background": {"material": "SiO2"},
+                         "features": [{"name": "core", "type": "rect", "x": "-w/2", "y": 0.0, "w": "w", "h": "t",
+                                       "material": "Si", "mesh_size": 0.02}],
+                         "finalize": "later_wins"}}}},
+    "geometry_v1_imprint_rib": {
+        "openphysics": "0.2", "units": {"length": "um"},
+        "geometry": {"version": 1, "parameters": {"w": {"value": 0.5, "range": [0.3, 0.9]}, "t": {"value": 0.22},
+                                                  "slab": {"value": 0.09}},
+                     "components": {"xs": {
+                         "dimension": "2d", "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
+                         "background": {"material": "SiO2"},
+                         "features": [{"name": "slab", "type": "rect", "x": -1.5, "y": 0.0, "w": 3.0, "h": "slab",
+                                       "material": "Si", "mesh_size": 0.04},
+                                      {"name": "rib", "type": "rect", "x": "-w/2", "y": 0.0, "w": "w", "h": "t",
+                                       "material": "Si", "mesh_size": 0.02}],
+                         "finalize": "imprint",
+                         "selections": {"rib_walls": {"boundary": {"between": ["rib", "background"]}},
+                                        "etch_line": {"boundary": "slab.top"},
+                                        "silicon": {"region": {"material": "Si"}}}}}}},
+}
+
+
 def _example(name):
-    return json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
+    return copy.deepcopy(GEOMETRY_02[name])
+
+
+def test_the_shipped_examples_hold_the_same_geometry():
+    """The format 0.3 examples keep these features; only material names changed (physmat: names, and
+    D-24 local records in the imprint rib)."""
+    names = {"geometry_v1_soi_strip": {"Si": "physmat:Si", "SiO2": "physmat:SiO2"},
+             "geometry_v1_imprint_rib": {"Si": "silicon", "SiO2": "oxide"}}
+    for name, renamed in names.items():
+        shipped = gd.parse(read(json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))))
+        frozen = gd.parse(as_v03(_example(name)))
+        for cname, c in frozen.components.items():
+            s = shipped.components[cname]
+            assert s.domain == c.domain and s.background == {**c.background,
+                                                             "material": renamed[c.background["material"]]}
+            assert [(f.id, f.type, f.mesh_size, f.data) for f in s.features] == \
+                   [(f.id, f.type, f.mesh_size, f.data) for f in c.features]
+            assert [f.material for f in s.features] == [renamed[f.material] for f in c.features]
+        assert shipped.parameters == frozen.parameters
 
 
 #: "h" would be a unit symbol (the hour) in format 0.3, which refuses it as a parameter name

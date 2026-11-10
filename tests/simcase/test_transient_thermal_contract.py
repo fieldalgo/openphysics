@@ -321,9 +321,13 @@ def test_steady_and_optical_schema_dispatch_unchanged():
     assert 'single steady heat' in steady.summary()
     raw['physics']['heat1']['prescribed_temperature']['left'] = '-1 K'
     with pytest.raises(DocumentError): Document.from_dict(raw)
-    optical = Document.from_dict({'units': {'length': 'um'},
-        'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}}})
-    assert optical['physics']['em1']['type'] == 'em.modes2d'
+    # a minimal format 0.2 document is completed with the default em.modes2d entry, which reads
+    # format 0.3 only since the units batch: refused by name, as every 0.2 document of a 0.3 kind
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict({'units': {'length': 'um'},
+                            'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}}})
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [('E-FORMAT', 'openphysics')]
+    assert 'format 0.2 em.modes2d documents are not read' in str(caught.value)
 
 
 def test_helper_refuses_missing_mesh_without_incidental_attribute_error():

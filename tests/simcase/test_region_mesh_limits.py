@@ -199,15 +199,22 @@ def test_build_domain_keeps_its_three_tuple():
 
 def test_build_domain_still_leaves_the_resolver_notes_on_the_document():
     """build_mesh copies the notes resolve_regions leaves on its micrometre document; an
-    electromagnetic document with a shape outside the domain must keep its note."""
-    from simcase import examples
+    electromagnetic document with a shape outside the domain must keep its note (format 0.3: a
+    coded diagnostic on the document)."""
+    from simcase import build_mesh, examples
+    from simcase.modes_document import kernel_document
+    from simcase.views import modes_mesh
     d = copy.deepcopy(examples.EXAMPLES['soi_strip'])
     d['geometry']['shapes'].append({'name': 'far', 'type': 'rect', 'x': 10.0, 'y': 10.0, 'w': 1.0, 'h': 1.0,
-                                    'material': 'Si'})
+                                    'material': 'physmat:Si'})
     doc = Document.from_dict(d)
-    doc.notes = []
-    build_domain(doc)
-    assert any("'far'" in note for note in doc.notes)
+    canonical = modes_mesh(kernel_document(doc)).canonical
+    canonical.notes = []
+    build_domain(canonical)
+    assert any("'far'" in note for note in canonical.notes)
+    build_mesh(doc)
+    assert [(x.code, x.path) for x in doc.diagnostics if "'far'" in x.message] == [
+        ('W-SHAPE-DROPPED', 'geometry.shapes')]
     assert geometry.build_domain is build_domain
 
 

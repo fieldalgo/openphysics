@@ -131,5 +131,7 @@ def test_meshine_receives_the_angle_as_written():
     assert type(grid.minimum_angle_deg) is float and grid.minimum_angle_deg == 30.
     assert grid.canonical.length_unit == "um" and grid.grading is None
     em = copy.deepcopy(examples.SLAB_TE_CHECK)
-    em["mesh"]["min_angle"] = 30.
-    assert views.modes_mesh(Document.from_dict(em)).minimum_angle_deg == 30.
+    em["mesh"]["minimum_angle"] = "30 deg"
+    from simcase.modes_document import kernel_document
+    angle = views.modes_mesh(kernel_document(Document.from_dict(em))).minimum_angle_deg   # the micrometre hand-off
+    assert type(angle) is float and angle == 30.
