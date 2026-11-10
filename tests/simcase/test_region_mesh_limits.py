@@ -632,12 +632,16 @@ def test_port_limits_reach_a_runner_only_through_its_kind(monkeypatch, accepts):
 
     def validate(doc):
         doc.notes = []
+    # format 0.3 (units batch C11a): the kind brings its physics slots instead of a 0.2 defaults merge
     registry.register(registry.PhysicsKind(
         name='test.limits', types=frozenset({'test.limits'}), precedence=50, validate=validate,
         run=lambda doc, **kwargs: _Echo(doc, kwargs), summary=lambda doc: 'test.limits',
-        result_types=(_Echo,), defaults=lambda: {'study': {'type': 'single'}},
-        accepts_mesh_limits=(lambda data: True) if accepts else None))
-    doc = Document.from_dict({'physics': {'p': {'type': 'test.limits'}}})
+        result_types=(_Echo,), accepts_mesh_limits=(lambda data: True) if accepts else None,
+        slots=({'pattern': 'physics.*{test.limits}.type', 'kind': 'enum', 'values': ['test.limits'],
+                'required': True},)))
+    doc = Document.from_dict({'openphysics': '0.3', 'geometry': {
+        'length_unit': 'm', 'depth': None, 'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
+        'physics': {'p': {'type': 'test.limits'}}, 'study': {'type': 'single'}})
     assert run(doc, verbose=False).kwargs == {'verbose': False}
     if accepts:
         assert run(doc, verbose=False, max_nodes=7, max_input_vertices=9).kwargs == {

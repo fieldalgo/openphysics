@@ -140,8 +140,8 @@ python -m simcase.studio --no-browser
 
 `http://127.0.0.1:8765`에 접속하세요. Studio는 로컬 도구이며 인증된 다중 사용자
 서비스가 아닙니다. 신뢰할 수 없는 네트워크에 노출하지 마세요. CLI 진입점은
-`simcase`, `simcase-run`, `simcase-studio`이고 문서 형식의 버전 필드는
-기존 `"openphysics": "0.2"`를 유지합니다.
+`simcase`, `simcase-run`, `simcase-studio`이고, 문서는 형식 `"openphysics": "0.3"`이며
+([문서 형식 0.3](packages/simcase/document_format.md)) 형식 0.2 문서는 이름을 밝혀 거부합니다.
 
 헤드리스 열전도 문서나 독립 Python 예제를 실행할 수도 있습니다.
 

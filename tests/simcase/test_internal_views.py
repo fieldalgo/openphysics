@@ -17,27 +17,17 @@ import numpy as np
 import pytest
 
 import galerkin
-from simcase import Document, examples, run, units, views
+from simcase import Document, examples, run, views
 from simcase.thermal_examples import TRANSIENT_THERMAL_REGIONS
 
-MM = units.resolve({"length": "mm"})
-
-
-def box_02():
-    """A format 0.2 box whose two length formulas give different doubles along x. No document
-    reader takes format 0.2 since units batch C9 (em.cavity3d was the last kind); the 0.2 view
-    stays for the kernel hand-offs until C11, so the tree is built as they build theirs: a
-    Document of the 0.2 shape with its resolved scale, not read."""
-    doc = Document({
-        "openphysics": "0.2", "name": "views", "units": {"length": "mm"},
-        "geometry": {"domain": {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8, "zmin": 0.0, "zmax": 1.0},
-                     "background": {"material": "vacuum"}, "shapes": []},
-        "physics": {"em1": {"type": "em.cavity3d", "boundary": "pec", "search": "near_target",
-                            "target_frequency_hz": 250000000.0, "num_modes": 5}},
-        "mesh": {"subdivisions": [4, 3, 2]}, "study": {"type": "single"},
-        "results": {"save_fields": False, "plots": False}})
-    doc.scale = MM
-    return doc
+def box_03():
+    """A format 0.3 box (em.cavity3d) in millimetres whose two length formulas give different doubles
+    along x. (Until units batch C11a this was a format 0.2 box read through the retired 0.2 view.)"""
+    data = copy.deepcopy(examples.EXAMPLES["cavity_box"])
+    data["geometry"]["length_unit"] = "mm"
+    data["geometry"]["domain"] = {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8, "zmin": 0.0, "zmax": 1.0}
+    data["mesh"]["subdivision_count"] = [4, 3, 2]
+    return Document.from_dict(data)
 
 
 def rectangle_03(physics):
@@ -55,19 +45,16 @@ ELECTRIC = {"type": "electric.steady2d", "electrical_conductivity": "1e6 S/m",
             "prescribed_electric_potential": {"left": "0 V", "right": "1 V"}}
 
 
-def si(value):
-    return MM.to_si(value, {"length": 1})
-
-
 def test_rectangle_lengths_keep_each_kinds_operation_order():
-    doc = box_02()
-    difference, corners = (views.rectangle_mesh(doc, formula, axes="xy") for formula in views.LENGTH_FORMULAS)
-    assert difference.origin == corners.origin == (si(123.456), si(-3.2))
-    assert difference.upper == corners.upper == (si(133.456), si(2.8))
-    assert difference.lengths == (si(133.456 - 123.456), si(2.8 - -3.2))
-    assert corners.lengths == (si(133.456) - si(123.456), si(2.8) - si(-3.2))
+    from physmat.units import pm_to_m
+    doc = box_03()
+    difference, corners = (views.rectangle_mesh(doc, formula, axes="xyz") for formula in views.LENGTH_FORMULAS)
+    assert difference.origin == corners.origin == (0.123456, -0.0032, 0.0)
+    assert difference.upper == corners.upper == (0.133456, 0.0028, 0.001)
+    assert difference.lengths == (pm_to_m(10 ** 10), pm_to_m(6 * 10 ** 9), pm_to_m(10 ** 9)) == (0.01, 0.006, 0.001)
+    assert corners.lengths == (0.133456 - 0.123456, 0.0028 - -0.0032, 0.001 - 0.0)
     # the formulas disagree here, so which one a kind uses is part of what it hands galerkin
-    assert difference.lengths[0] == 0.009999999999999986 and corners.lengths[0] == 0.009999999999999981
+    assert difference.lengths[0] == 0.01 and corners.lengths[0] == 0.009999999999999995
     assert difference.subdivisions == (4, 3, 2) and all(type(n) is int for n in difference.subdivisions)
     with pytest.raises(dataclasses.FrozenInstanceError):
         difference.lengths = corners.lengths
@@ -109,9 +96,7 @@ def test_each_rectangle_runner_meshes_with_its_own_formula(monkeypatch, physics,
 
 def test_region_nodes_and_corners_come_back_from_micrometres():
     # H17 a: an origin in millimetres is moved to micrometres and back, as the mesh nodes are
-    assert views.region_corner_m(-3.2, MM) == -0.0031999999999999997 != si(-3.2)
-    np.testing.assert_array_equal(views.region_corner_m([123.456, -3.2], MM),
-                                  [views.region_corner_m(123.456, MM), -0.0031999999999999997])
+    # (the 0.2 region_corner_m helper is retired in C11a; the 0.3 corner below goes the same way)
     # H11: 50 mm meshed in micrometres comes back as 50000 um times 1e-6, not 0.05
     assert views.handback_m([[50000.0, 0.0]])[0, 0] == 0.049999999999999996
     data = copy.deepcopy(TRANSIENT_THERMAL_REGIONS)
@@ -120,6 +105,7 @@ def test_region_nodes_and_corners_come_back_from_micrometres():
     doc = Document.from_dict(data)
     # format 0.3: from the pm counts of the corner by the same micrometre hand-back
     np.testing.assert_array_equal(views.region_origin_03(doc, "geometry"), [0.0, -0.0031999999999999997])
+    assert views.region_origin_03(doc, "geometry")[1] != -3.2e-3          # not the correctly rounded corner
     heat = views.transient_region_heat_03(doc)
     assert heat.dirichlet == {"left": (300.,) * 9, "right": (300.,) * 9}
     assert heat.conductivity == {"steel": 45., "insulation": .5}

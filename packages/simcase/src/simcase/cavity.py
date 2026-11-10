@@ -22,9 +22,7 @@ background or conducting walls run the complex material cavity solver and give
 ``cavity3d-edge-complex-v2``. The cavity refuses the 2D stage API (``build_mesh``,
 ``solve_point``).
 
-The format 0.2 helpers further down (``_cavity_materials``, ``_cavity_boundary``,
-``_cavity_shapes``, ``uses_material_solver``) serve only the format 0.2 view builder
-``views.cavity_inputs`` until the 0.2 reader is retired; no format 0.2 cavity document is read.
+A format 0.2 cavity document is refused by name (``E-FORMAT``).
 """
 
 from __future__ import annotations
@@ -55,132 +53,9 @@ _FORMAT_02 = ('format 0.2 em.cavity3d documents are not read: units now travel w
               '(docs/packages/simcase/cavity3d.md)')
 
 
-# -- format 0.2 helpers of the view builder (views.cavity_inputs; retired with the 0.2 reader) ----
-
-def _object(value, allowed, path):
-    if not isinstance(value, dict):
-        raise DocumentError(f"{path}: expected an object")
-    unknown = set(value) - set(allowed)
-    if unknown:
-        raise DocumentError(f"{path}: unsupported cavity keys {sorted(unknown)}")
-
-
-def _number(value, path, *, positive=False, integer=False):
-    try:
-        valid = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-    except OverflowError:
-        valid = False
-    if not valid or (positive and value <= 0) or (integer and int(value) != value):
-        kind = "positive integer" if integer else "finite positive number" if positive else "finite number"
-        raise DocumentError(f"{path}: expected a {kind}")
-
-
 WALL_NAMES = {"xmin": "x0", "xmax": "x1", "ymin": "y0", "ymax": "y1", "zmin": "z0", "zmax": "z1"}
 _GRID_TOLERANCE = 1e-9
 
-
-def _complex_constant(value, path):
-    """A JSON real number or [real, imag] pair; passive under exp(+j*omega*t)."""
-    if isinstance(value, (list, tuple)):
-        if len(value) != 2:
-            raise DocumentError(f"{path}: expected a number or [real, imag]")
-        _number(value[0], f"{path}[0]", positive=True)
-        _number(value[1], f"{path}[1]")
-        if value[1] > 0:
-            raise DocumentError(f"{path}[1]: imaginary part must be <= 0 (passive, exp(+j*omega*t))")
-        return complex(value[0], value[1])
-    _number(value, path, positive=True)
-    return complex(value)
-
-
-def _cavity_materials(d):
-    materials = d["materials"]
-    if not isinstance(materials, dict):
-        raise DocumentError("materials: expected an object")
-    resolved = {}
-    for name, spec in materials.items():
-        path = f"materials.{name}"
-        if not isinstance(name, str) or not name or name == "vacuum":
-            raise DocumentError(f"{path}: material names must be non-empty and not 'vacuum'")
-        _object(spec, {"relative_permittivity", "relative_permeability"}, path)
-        if "relative_permittivity" not in spec:
-            raise DocumentError(f"{path}: relative_permittivity is required")
-        resolved[name] = (_complex_constant(spec["relative_permittivity"], f"{path}.relative_permittivity"),
-                          _complex_constant(spec.get("relative_permeability", 1.0),
-                                            f"{path}.relative_permeability"))
-    return resolved
-
-
-def _cavity_boundary(boundary, path):
-    """'pec', or {"conductivity_s_per_m": S/m or {wall: S/m}} with walls xmin..zmax."""
-    if boundary == "pec":
-        return None
-    _object(boundary, {"conductivity_s_per_m"}, path)
-    value = boundary.get("conductivity_s_per_m")
-    if isinstance(value, dict):
-        if not value:
-            raise DocumentError(f"{path}.conductivity_s_per_m: name at least one wall")
-        unknown = set(value) - set(WALL_NAMES)
-        if unknown:
-            raise DocumentError(f"{path}.conductivity_s_per_m: unknown walls {sorted(unknown)}; "
-                                f"use {list(WALL_NAMES)}")
-        for wall, sigma in value.items():
-            _number(sigma, f"{path}.conductivity_s_per_m.{wall}", positive=True)
-        return {WALL_NAMES[wall]: float(sigma) for wall, sigma in value.items()}
-    _number(value, f"{path}.conductivity_s_per_m", positive=True)
-    return float(value)
-
-
-def _cavity_shapes(doc, materials):
-    """Validated box shapes as (bounds relative to the domain origin in metres, name)."""
-    g = doc.data["geometry"]
-    shapes = g.get("shapes")
-    if not isinstance(shapes, list):
-        raise DocumentError("geometry.shapes: expected a list")
-    dom = g["domain"]
-    cells = doc.data["mesh"]["subdivisions"]
-    names, boxes = set(), []
-    for i, shape in enumerate(shapes):
-        path = f"geometry.shapes[{i}]"
-        keys = {axis + side for axis in "xyz" for side in ("min", "max")}
-        _object(shape, keys | {"type", "name", "material"}, path)
-        if shape.get("type") != "box":
-            raise DocumentError(f"{path}: em.cavity3d supports only type 'box'")
-        missing = (keys | {"name", "material"}) - set(shape)
-        if missing:
-            raise DocumentError(f"{path}: missing {sorted(missing)}")
-        name = shape["name"]
-        if not isinstance(name, str) or not name or name in names:
-            raise DocumentError(f"{path}.name: expected a unique non-empty string")
-        names.add(name)
-        if shape["material"] not in materials:
-            raise DocumentError(f"{path}.material: {shape['material']!r} is not defined in materials")
-        bounds = []
-        for a, axis in enumerate("xyz"):
-            low, high = shape[axis + "min"], shape[axis + "max"]
-            _number(low, f"{path}.{axis}min")
-            _number(high, f"{path}.{axis}max")
-            if not dom[axis + "min"] <= low < high <= dom[axis + "max"]:
-                raise DocumentError(f"{path}: needs {axis}min < {axis}max inside the domain")
-            extent = dom[axis + "max"] - dom[axis + "min"]
-            for label, value in ((axis + "min", low), (axis + "max", high)):
-                position = (value - dom[axis + "min"]) / extent * cells[a]
-                if abs(position - round(position)) > _GRID_TOLERANCE * max(1, cells[a]):
-                    raise DocumentError(
-                        f"{path}.{label}: must lie on a mesh grid plane (multiples of "
-                        f"{extent / cells[a]:g} {doc.length_unit} from {axis}min); adjust mesh.subdivisions")
-            bounds.append((doc.scale.to_si(low - dom[axis + "min"], {"length": 1}),
-                           doc.scale.to_si(high - dom[axis + "min"], {"length": 1})))
-        boxes.append((tuple(bounds), shape["material"]))
-    return boxes
-
-
-def uses_material_solver(doc: Document) -> bool:
-    """True when a format 0.2 study needs the complex material/impedance cavity solver."""
-    d = doc.data
-    p = doc.sole_physics()[1]
-    return bool(d["materials"] or d["geometry"]["shapes"] or p.get("boundary") != "pec"
-                or d["geometry"]["background"] != {"material": "vacuum"})
 
 # -- format 0.3: slots ------------------------------------------------------------------------------
 
@@ -754,17 +629,8 @@ class CavityRunResult:
         return outdir
 
 
-def _defaults() -> dict:
-    """The format 0.2 merge base; a format 0.3 document takes its defaults from the slots."""
-    import copy
-    from .schema import DEFAULTS
-    defaults = copy.deepcopy(DEFAULTS)
-    defaults.update(physics={}, mesh={}, results={"save_fields": True, "plots": False})
-    return defaults
-
-
 register(PhysicsKind(
     name="em.cavity3d", types=frozenset({TYPE}), precedence=40,
     validate=validate_cavity, run=run_cavity, summary=cavity_summary,
-    result_types=(CavityRunResult,), defaults=_defaults,
+    result_types=(CavityRunResult,),
     stage_refusal="{stage} is a 2D stage; use run(document) for em.cavity3d", slots=cavity_slots()))
