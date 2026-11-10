@@ -271,6 +271,12 @@ def test_h8_refusals():
         call(convection={"right": (lambda points, normals, time: np.ones(len(points)), 290.0)})
     with pytest.raises(TypeError, match="Dirichlet temperature is a callback of coordinates"):
         call(dirichlet={0: lambda a, b: 300.0})
+    with pytest.raises(TypeError, match="must be a constant or a callback\\(time_s\\) with one positional"):
+        call(dirichlet={0: lambda: 300.0})
+    with pytest.raises(TypeError, match=r"outward_flux\['top'\] must be a constant or a callback\(time_s\)"):
+        call(outward_flux={"top": lambda *, time: 1.0})
+    with pytest.raises(TypeError, match="initial_temperature_k is live"):
+        call(initial_temperature_k=[xp.asarray(300.0)] * m.num_nodes)
     with pytest.raises(TypeError, match="conductivity is live"):
         call(conductivity=xp.asarray(1.5))
     with pytest.raises(TypeError, match="volumetric_heat_capacity is live"):

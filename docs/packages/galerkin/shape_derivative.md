@@ -135,8 +135,10 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
   as they move, as in thermoelasticity.
 - Callbacks of time alone, `callback(time_s)`, are taken for the Dirichlet values,
   the outward flux and the convection h and ambient. They do not depend on node
-  positions. A callback of time must return NumPy numbers. Callbacks of
-  coordinates are refused, as everywhere.
+  positions. A callback of time must return NumPy numbers and must be pure: it is
+  called once for the ordinary solve and once more for the derivative. (A
+  time-dependent h that returns a live value gets the solver's own refusal of a
+  live time-dependent h.) Callbacks of coordinates are refused, as everywhere.
 - `checkpoint_every` is refused with a motion: every step is kept.
 
 ## The mesh velocity

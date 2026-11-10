@@ -95,7 +95,9 @@ outward flux와 convection(변과 함께 움직임), Dirichlet 값을 받습니�
   나릅니다: 온도, 열유속, 열원 하중, 반력, 잔차, 저장률, 열량, 이차 범함수, prescribed·convective outward.
 - 초기 온도와 Dirichlet 값은 열탄성처럼 노드에 붙어 함께 움직입니다.
 - 시간만의 콜백 `callback(time_s)`은 Dirichlet 값, outward flux, convection의 h와 ambient에 쓸 수 있습니다. 노드 위치와
-  무관하기 때문입니다. 시간 콜백은 NumPy 숫자를 돌려줘야 합니다. 좌표 콜백은 어디서나처럼 거부합니다.
+  무관하기 때문입니다. 시간 콜백은 NumPy 숫자를 돌려줘야 하고 순수해야 합니다. 일반 풀이에 한 번, 미분에 한 번 더
+  불리기 때문입니다. (live 값을 돌려주는 시간 의존 h는 솔버 자체의 live 시간 의존 h 거부를 받습니다.) 좌표 콜백은
+  어디서나처럼 거부합니다.
 - motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
 
 ## 메시 속도

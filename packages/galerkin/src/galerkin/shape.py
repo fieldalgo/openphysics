@@ -333,7 +333,8 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity,
     _coefficient(conductivity, "conductivity")
     _coefficient(volumetric_heat_capacity, "volumetric_heat_capacity")
     _numpy_data(heat_source, "heat_source")
-    if is_live(initial_temperature_k):
+    if is_live(initial_temperature_k) or (isinstance(initial_temperature_k, (list, tuple))
+                                          and any(is_live(v) for v in initial_temperature_k)):
         raise TypeError("motion: initial_temperature_k is live; in this slice only the motion's t carries a "
                         "derivative")
     if not isinstance(dirichlet, Mapping):
@@ -486,9 +487,11 @@ def _time_only(value, name):
         parameters = None
     required = None if parameters is None else [
         p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) and p.default is p.empty]
-    if required is None or len(required) != 1 or any(p.kind is p.VAR_POSITIONAL for p in parameters):
+    if required is not None and len(required) in (2, 3) and not any(p.kind is p.VAR_POSITIONAL for p in parameters):
         raise TypeError(f"motion: {name} is a callback of coordinates; with a moving mesh its sample points move "
                         "too, which this slice does not differentiate. Give a constant or a callback(time_s)")
+    if required is None or len(required) != 1 or any(p.kind is p.VAR_POSITIONAL for p in parameters):
+        raise TypeError(f"motion: {name} must be a constant or a callback(time_s) with one positional parameter")
 
 
 # ----------------------------------------------------------------------------- thermoelasticity
