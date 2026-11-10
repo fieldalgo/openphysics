@@ -78,28 +78,26 @@ mesh = meshine.extrude(footprint, [model.components["pkg"].to_unit(z) for z in s
 ## Adapters from sipi and meshine
 
 Two packages write their own geometry as version 1 blocks. They emit plain
-dictionaries and do not depend on simcase; `parse` checks what they write. They
-still declare their length unit the format 0.2 way, in a `units` block (and a
-meshine feature's bare `mesh_size`): a format 0.3 document puts that unit on
-each component as `length_unit`, with `depth`, and a mesh size into an
-`element_size` with its unit, as `tests/simcase/test_geometry_adapters.py` does.
+dictionaries in format 0.3 and do not depend on simcase; `parse` checks what they
+write, with the envelope added. Each component declares its `length_unit` and
+`depth` (null, per metre of depth).
 
 ```python
 from sipi import geometry_v1 as sipi_v1
 out = sipi_v1.to_geometry_v1(section)          # a sipi CrossSection, in metres
-geometry = out["geometry"]
-for comp in geometry["components"].values():
-    comp.update(length_unit=out["units"]["length"], depth=None)
-model = parse({"openphysics": "0.3", "geometry": geometry})
+model = parse({"openphysics": "0.3", "geometry": out["geometry"]})
 out["materials"], out["conductors"], out["boundaries"], out["renamed"]
 
 from meshine import geometry_v1 as meshine_v1
 out = meshine_v1.to_geometry_v1(domain, length_unit="um")   # a Domain before build()
-out["mesh_size"], out["mesh_controls"]         # default size, Circle vertex counts
+model = parse({"openphysics": "0.3", "geometry": out["geometry"]})
+out["mesh"]        # {"element_size": "0.6 um", "controls": [{"select": ..., "circle_segment_count": 32}]}
 ```
 
-- **sipi:** layers bottom-up, then local dielectric regions, then traces in trace
-  order, so later features win as sipi's own cuts do. A rectangle trace is a
+- **sipi:** one component in metres; layers bottom-up, then local dielectric
+  regions, then traces in trace order, so later features win as sipi's own cuts do.
+  Each layer and region's material carries `relative_permittivity` and
+  `loss_tangent`. A rectangle trace is a
   `rect`, a tapered one a `trapezoid`, a zero-thickness one a `segment` and a
   `PolygonTrace` a `polygon`. A trace whose name a layer or region already uses is
   renamed `<name>-trace` and listed in `renamed`. Derived coordinates (a trace's
@@ -107,8 +105,12 @@ out["mesh_size"], out["mesh_controls"]         # default size, Circle vertex cou
 - **meshine:** regions in containment order; a hole that no region fills exactly
   becomes a void feature, and regions inside it still come later. Same-name loops
   merge through `region`. A `Domain` has no unit and no materials, so
-  `length_unit` is required and each region's material is its name unless
-  `materials` maps it. A boundary-name callback cannot be carried over.
+  `length_unit` is required, one of `pm nm Angstrom um mm cm m in mil` (another
+  declaration, such as `{"in_m": ...}`, is refused naming them), and each region's
+  material is its name unless `materials` maps it. A region's own size is its
+  feature's `element_size`, the default size is `mesh.element_size` and each
+  `Circle`'s vertex count is a `circle_segment_count` control. A boundary-name
+  callback cannot be carried over.
 
 `examples/simcase/geometry_v1_soi_strip.json` is the SOI strip example written
 with version 1 geometry and parameters; `geometry_v1_imprint_rib.json` is a rib

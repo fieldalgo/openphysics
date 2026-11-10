@@ -63,33 +63,32 @@ mesh = meshine.extrude(footprint, [model.components["pkg"].to_unit(z) for z in s
 
 ## sipi와 meshine 어댑터
 
-두 패키지는 자기 형상을 버전 1 블록으로 씁니다. 결과는 단순한 사전이며 simcase에 의존하지 않고, `parse`가
-그 결과를 검사합니다. 두 어댑터는 길이 단위를 아직 형식 0.2 방식으로 `units` 블록에 선언합니다(meshine
-피처는 단위 없는 `mesh_size`도 씀). 형식 0.3 문서는 그 단위를 구성 요소마다 `length_unit`으로(`depth`와 함께)
-두고, 메시 크기는 단위를 붙인 `element_size`로 둡니다. `tests/simcase/test_geometry_adapters.py`가 그렇게 합니다.
+두 패키지는 자기 형상을 버전 1 블록으로 씁니다. 결과는 형식 0.3의 단순한 사전이며 simcase에 의존하지 않고,
+`parse`가 봉투를 더한 그 결과를 검사합니다. 구성 요소마다 `length_unit`과 `depth`(null, 깊이 1 m당)를 선언합니다.
 
 ```python
 from sipi import geometry_v1 as sipi_v1
 out = sipi_v1.to_geometry_v1(section)          # sipi CrossSection, 미터 단위
-geometry = out["geometry"]
-for comp in geometry["components"].values():
-    comp.update(length_unit=out["units"]["length"], depth=None)
-model = parse({"openphysics": "0.3", "geometry": geometry})
+model = parse({"openphysics": "0.3", "geometry": out["geometry"]})
 out["materials"], out["conductors"], out["boundaries"], out["renamed"]
 
 from meshine import geometry_v1 as meshine_v1
 out = meshine_v1.to_geometry_v1(domain, length_unit="um")   # build() 전의 Domain
-out["mesh_size"], out["mesh_controls"]         # 기본 크기, Circle 꼭짓점 수
+model = parse({"openphysics": "0.3", "geometry": out["geometry"]})
+out["mesh"]        # {"element_size": "0.6 um", "controls": [{"select": ..., "circle_segment_count": 32}]}
 ```
 
-- **sipi:** 층을 아래부터, 그다음 국소 유전체 영역, 그다음 트레이스를 트레이스 순서로 둡니다. 그래서 나중
-  피처 우선 규칙이 sipi 자체의 자르기와 같아집니다. 사각형 트레이스는 `rect`, 사다리꼴은 `trapezoid`, 두께 0은
+- **sipi:** 미터 단위의 구성 요소 하나. 층을 아래부터, 그다음 국소 유전체 영역, 그다음 트레이스를 트레이스
+  순서로 둡니다. 그래서 나중 피처 우선 규칙이 sipi 자체의 자르기와 같아집니다. 층과 영역의 재료는
+  `relative_permittivity`와 `loss_tangent`를 가집니다. 사각형 트레이스는 `rect`, 사다리꼴은 `trapezoid`, 두께 0은
   `segment`, `PolygonTrace`는 `polygon`입니다. 층이나 영역과 이름이 같은 트레이스는 `<name>-trace`로 바꾸고
   `renamed`에 남깁니다. 유도 좌표(트레이스 왼쪽 아래 꼭짓점, 층 경계)는 정확하게 씁니다.
 - **meshine:** 영역을 포함 순서로 둡니다. 어떤 영역으로도 정확히 채워지지 않는 구멍은 빈 공간 피처가 되고,
   그 안의 영역은 여전히 뒤에 와서 이깁니다. 같은 이름의 루프는 `region`으로 합칩니다. `Domain`에는 단위와 재료가
-  없으므로 `length_unit`이 필수이고, `materials`로 정하지 않으면 영역 재료는 영역 이름입니다. 경계 이름 함수는
-  옮길 수 없습니다.
+  없으므로 `length_unit`이 필수이며 `pm nm Angstrom um mm cm m in mil` 가운데 하나입니다(`{"in_m": ...}` 같은 다른
+  선언은 이 단위들을 밝혀 거부). `materials`로 정하지 않으면 영역 재료는 영역 이름입니다. 영역 자신의 크기는 그
+  피처의 `element_size`, 기본 크기는 `mesh.element_size`, `Circle`의 꼭짓점 수는 `circle_segment_count` 제어가
+  됩니다. 경계 이름 함수는 옮길 수 없습니다.
 
 `examples/simcase/geometry_v1_imprint_rib.json`은 슬랩과 리브가 같은 실리콘인 리브 도파관으로, `finalize: "imprint"`가 식각선을 남기고
 선택이 그 선과 리브 벽을 이름 짓습니다. `examples/simcase/geometry_v1_soi_strip.json`은 SOI 스트립 예제를 버전 1 형상과 파라미터로 쓴 것입니다.

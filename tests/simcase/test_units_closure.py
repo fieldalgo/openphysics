@@ -18,7 +18,7 @@
   ``result`` in its registry places.
 
 P2-12 over everything (examples, fixtures, built-ins, Studio starters and JS builder documents)
-is in ``test_slots.py``.
+is in ``test_slots.py``; the geometry adapters' parts are checked here, with (a).
 """
 
 from __future__ import annotations
@@ -130,6 +130,35 @@ def test_no_shipped_or_tool_document_is_format_0_2():
     assert found == []
     # pre-registered floor: the 32 example JSON files, the 55 fixtures and the built-ins at least
     assert checked >= 100, checked
+
+
+def test_the_geometry_adapters_write_format_0_3_parts():
+    """sipi.geometry_v1 and meshine.geometry_v1 write format 0.3 parts: with the envelope a user
+    adds, no units block and no suffixed key, and every path of the geometry and mesh parts
+    matches exactly one slot (P2-12)."""
+    pytest.importorskip("sipi")
+    import meshine.geometry_v1 as meshine_v1
+    import sipi.geometry_v1 as sipi_v1
+    from meshine import shapes
+    from sipi import templates
+    from test_slots import _closed
+    outs = {
+        "sipi microstrip": sipi_v1.to_geometry_v1(templates.microstrip(width=0.3e-3, substrate_height=0.2e-3,
+                                                                       eps_r=4.3, thickness=35e-6)),
+        "sipi masked": sipi_v1.to_geometry_v1(templates.with_surface_mask(
+            templates.microstrip(width=0.3e-3, substrate_height=0.2e-3, eps_r=4.3, thickness=35e-6),
+            thickness=20e-6, eps_r=3.5)),
+        "meshine rib": meshine_v1.to_geometry_v1(shapes.rib_waveguide(slab_thickness=0.3, size_core=0.1,
+                                                                      size_far=0.6)[0], length_unit="um"),
+        "meshine fiber": meshine_v1.to_geometry_v1(shapes.circular_fiber(core_radius=1.0, domain_radius=4.0,
+                                                                         size_core=0.2), length_unit="um"),
+    }
+    for label, out in outs.items():
+        assert "units" not in out, label
+        parts = {"openphysics": "0.3", **{k: out[k] for k in ("geometry", "mesh", "materials") if k in out}}
+        assert _problems(parts) == [], label
+        closed = {"openphysics": "0.3", **{k: out[k] for k in ("geometry", "mesh") if k in out}}
+        assert _closed(closed, label) > 10, label
 
 
 def test_the_suffix_check_finds_a_0_2_key_and_skips_chosen_names():

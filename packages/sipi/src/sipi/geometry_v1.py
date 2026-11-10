@@ -4,8 +4,9 @@
 """A cross-section as a version 1 geometry block (the simcase geometry document contract).
 
 ``to_geometry_v1`` writes a ``CrossSection`` in the form of
-``docs/packages/simcase/geometry_document.md``: one ``2d`` component in metres whose
-features are the layers bottom-up, then the local dielectric regions, then the traces
+``docs/packages/simcase/geometry_document.md``, as format 0.3 parts (the caller adds
+``"openphysics": "0.3"``): one ``2d`` component with ``length_unit`` ``"m"`` and ``depth``
+null (per metre of length) whose features are the layers bottom-up, then the local dielectric regions, then the traces
 in trace order. Later features win, which reproduces sipi's rule that a region cuts
 the layers it lies in and a conductor cuts the dielectric. The block is a plain
 dictionary; sipi does not depend on the reader that checks it.
@@ -68,11 +69,13 @@ def _ident(name: str, prefix: str, index: int, used: set) -> dict:
 
 
 def to_geometry_v1(section: CrossSection) -> dict:
-    """The version 1 document parts of ``section``.
+    """The format 0.3 document parts of ``section``.
 
-    Returns ``{"units", "geometry", "materials", "conductors", "boundaries", "renamed"}``:
-    ``units`` and ``geometry`` form a document's geometry; ``materials`` maps each layer
-    and region name to its ``eps_r`` and ``tan_delta`` (and ``conductor`` to metal);
+    Returns ``{"geometry", "materials", "conductors", "boundaries", "renamed"}``:
+    ``geometry`` is a document's version 1 geometry block, its component in metres
+    (``length_unit`` ``"m"``, ``depth`` null); ``materials`` maps each layer
+    and region name to its ``relative_permittivity`` and ``loss_tangent`` (sipi's ``eps_r``
+    and ``tan_delta`` under their registry names), and ``conductor`` to metal;
     ``conductors`` lists the signal and ground traces in trace order by region name;
     ``boundaries`` holds the box flags; ``renamed`` maps a trace whose name a layer or
     region already uses to its region name in the block.
@@ -87,13 +90,13 @@ def to_geometry_v1(section: CrossSection) -> dict:
         features.append({"name": lay.name, **_ident(lay.name, "layer", i, used), "type": "rect",
                          "x": _write(-half), "y": _write(y), "w": _write(2 * half), "h": lay.thickness,
                          "material": lay.name})
-        materials[lay.name] = {"eps_r": lay.eps_r, "tan_delta": lay.tan_delta}
+        materials[lay.name] = {"relative_permittivity": lay.eps_r, "loss_tangent": lay.tan_delta}
         y += t
     height = y
     for i, reg in enumerate(section.dielectric_regions):
         features.append({"name": reg.name, **_ident(reg.name, "region", i, used), "type": "polygon",
                          "points": [list(p) for p in reg.vertices], "material": reg.name})
-        materials[reg.name] = {"eps_r": reg.eps_r, "tan_delta": reg.tan_delta}
+        materials[reg.name] = {"relative_permittivity": reg.eps_r, "loss_tangent": reg.tan_delta}
     signals, grounds = [], []
     dielectric = {f["name"] for f in features}
     for i, tr in enumerate(section.traces):
@@ -117,10 +120,10 @@ def to_geometry_v1(section: CrossSection) -> dict:
         (grounds if tr.ground else signals).append(name)
     if any(t.thickness > 0 or isinstance(t, PolygonTrace) for t in section.traces):
         materials[CONDUCTOR] = {"conductor": True}
-    component = {"dimension": "2d",
+    component = {"dimension": "2d", "length_unit": "m", "depth": None,
                  "domain": {"xmin": _write(-half), "xmax": _write(half), "ymin": 0, "ymax": _write(height)},
                  "background": {"material": None}, "features": features, "finalize": "later_wins"}
-    return {"units": {"length": "m"}, "geometry": {"version": 1, "components": {"section": component}},
+    return {"geometry": {"version": 1, "components": {"section": component}},
             "materials": materials, "conductors": {"signals": signals, "ground": grounds},
             "boundaries": {"bottom": section.bottom, "top": section.top, "sides": section.sides},
             "renamed": renamed}
