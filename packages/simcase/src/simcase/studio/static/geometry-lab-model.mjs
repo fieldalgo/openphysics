@@ -18,16 +18,28 @@ export function quantityOf(text){
 
 /**
  * A copy of `doc` with `geometry.parameters[name].value` replaced.
- * A finite number stays a JSON number, except for a parameter written with its unit (format 0.3,
- * "0.5 um"): a bare number then keeps that unit. Any other text is kept as written (an
- * expression, or a quantity string), which the engine evaluates or refuses by name.
+ * A finite number stays a JSON number, except for a parameter with a unit (format 0.3): a bare
+ * number then takes the unit of the value it replaces ("0.5 um"), or, when that value has none
+ * (an expression such as "2 * t", or a bare number), the one unit its range is written in
+ * (["0.3 um", "0.9 um"]), the unit the slider uses. A parameter with neither (dimensionless, or
+ * a length without a range) gets the number as typed, and the engine names a missing unit. Any
+ * other text is kept as written (an expression, or a quantity string), which the engine
+ * evaluates or refuses by name.
  */
 export function setParameter(doc,name,value){
  const out=copyDocument(doc);const params=out.geometry?.parameters;
  if(!params||typeof params[name]!=='object'||params[name]===null)throw new Error('Unknown parameter '+name);
- const written=parseWritten(value),held=quantityOf(params[name].value);
- params[name].value=typeof written==='number'&&held?`${written} ${held.unit}`:written;
+ const written=parseWritten(value),unit=parameterUnit(params[name]);
+ params[name].value=typeof written==='number'&&unit?`${written} ${unit}`:written;
  return out;
+}
+
+/** The unit a bare number of this parameter takes: its value's, else its range's one unit, else null. */
+function parameterUnit(parameter){
+ const held=quantityOf(parameter.value);
+ if(held)return held.unit;
+ const r=parameter.range,bounds=Array.isArray(r)&&r.length===2?r.map(quantityOf):[];
+ return bounds.length===2&&bounds.every(b=>b&&b.unit===bounds[0].unit)?bounds[0].unit:null;
 }
 
 /**

@@ -64,7 +64,7 @@ function renderParameters(){
    range=el('input',{type:'range',min:slider.min,max:slider.max,step:slider.step,'aria-label':name+' slider'});
    const unit=slider.unit?' '+slider.unit:'';
    range.value=String(slider.unit?quantityOf(entry.value).number:entry.value);
-   range.addEventListener('input',()=>{const v=sliderValue(slider,range.value);text.value=String(v)+unit;edit(name,v);});
+   range.addEventListener('input',()=>{const v=sliderValue(slider,range.value);text.value=String(v)+unit;edit(name,String(v)+unit);});
    box.append(range,el('small',{},`range ${slider.min} … ${slider.max}${unit}`));
   }
   text.addEventListener('change',()=>{
