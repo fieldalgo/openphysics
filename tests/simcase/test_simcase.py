@@ -14,7 +14,6 @@ import physmat
 from meshine import TriMesh
 from refsol import benchmarks, fiber, slab
 from simcase import Document, DocumentError, build_mesh, examples, run, solve_point
-from simcase import units
 from simcase.geometry import resolve_regions
 from simcase.runner import RunResult
 
@@ -32,70 +31,6 @@ def test_examples_validate_and_roundtrip(tmp_path):
 
 # ---- units -----------------------------------------------------------------------
 
-SYSTEMS = [("mm-t-s", {"length": "mm", "mass": "t", "time": "s"}),
-           ("nm-kg-fs", {"length": "nm", "mass": "kg", "time": "fs"})]
-
-
-@pytest.mark.parametrize("label,block", SYSTEMS)
-@pytest.mark.parametrize("dim,value_si", [
-    ({"length": -1, "mass": 1, "time": -2}, 2e11),      # Young's modulus, Pa
-    ({"length": -3, "mass": 1}, 7850.0),                # density
-    ({"length": 1, "time": -2}, 9.80665),               # g
-])
-def test_conversion_round_trips_at_two_systems(label, block, dim, value_si):
-    """One system is not enough; see the vacuity test below for why."""
-    scale = units.resolve(block)
-    factor = scale.factor(dim)
-    assert factor != 1.0, f"VACUOUS at {label}: factor is 1.0, so an inverted conversion is invisible"
-    doc_value = scale.from_si(value_si, dim)
-    assert doc_value == pytest.approx(value_si / factor)
-    assert scale.to_si(doc_value, dim) == pytest.approx(value_si)
-
-
-def test_the_thermal_conductivity_trap_is_real_and_is_why_two_systems_are_tested():
-    """W/(m K) is L+1 M+1 T-3 Th-1, so mm and tonne cancel exactly.
-
-    A test of this quantity written only at (mm, t, s) passes with the conversion
-    inverted. It is the canonical sign-flip case, and it is invisible there.
-    """
-    conductivity = {"length": 1, "mass": 1, "time": -3, "temperature": -1}
-    assert units.resolve({"length": "mm", "mass": "t", "time": "s"}).factor(conductivity) == 1.0
-    other = units.resolve({"length": "nm", "mass": "kg", "time": "fs"})
-    assert other.factor(conductivity) != 1.0
-    assert other.to_si(other.from_si(50.0, conductivity), conductivity) == pytest.approx(50.0)
-
-
-def test_the_published_structural_table_falls_out_of_the_rule():
-    """mm-tonne-second, derived rather than looked up."""
-    s = units.resolve({"length": "mm", "mass": "t", "time": "s"})
-    assert s.from_si(2e11, {"length": -1, "mass": 1, "time": -2}) == pytest.approx(2.0e5)
-    assert s.from_si(7850.0, {"length": -3, "mass": 1}) == pytest.approx(7.85e-9)
-    assert s.from_si(9.80665, {"length": 1, "time": -2}) == pytest.approx(9806.65)
-
-
-@pytest.mark.parametrize("text,length_exponent", [
-    ("Pa", -1), ("N", 1), ("N/m", 0), ("N*m", 2), ("W/(m K)", 1), ("J/(kg K)", 2),
-    ("S/m", -3), ("F/m", -3), ("1/K", 0), ("-", 0),
-])
-def test_unit_strings_carry_full_dimension_vectors(text, length_exponent):
-    """A watt hides an m^2, so counting 'm' tokens gets W/(m K) backwards."""
-    dim, _ = units.parse_unit_string(text)
-    assert dim.get("length", 0) == length_exponent
-
-
-def test_unit_strings_are_case_sensitive_and_fractional_exponents_parse():
-    assert units.parse_unit_string("S")[0] != units.parse_unit_string("s")[0]   # siemens vs second
-    assert units.parse_unit_string("T")[0] != units.parse_unit_string("t")[0]   # tesla vs tonne
-    dim, factor = units.parse_unit_string("MPa*m^1/2")                          # fracture toughness
-    assert dim["length"] == Fraction(-1, 2) and factor == pytest.approx(1e6)
-
-
-@pytest.mark.parametrize("bad", ["furlong", "min", "Pa/", "m/(s", "m^"])
-def test_unknown_or_malformed_unit_strings_are_errors(bad):
-    with pytest.raises(units.UnitError):
-        units.parse_unit_string(bad)
-
-
 def test_a_document_cannot_get_its_units_by_forgetting():
     """Format 0.3 (every kind since the cavity moved): the lengths need geometry.length_unit, and
     a format 0.2 units block is an unknown key, not a way to declare them."""
@@ -111,31 +46,8 @@ def test_a_document_cannot_get_its_units_by_forgetting():
     assert ("E-KEY-UNKNOWN", "units") in [(e.code, e.path) for e in caught.value.diagnostics]
 
 
-# The format 0.2 unit declaration has no document reader left (C9 moved the last kind); the kernel
-# hand-offs still build their 0.2-shaped trees through units.resolve until C11, so it is tested here.
-@pytest.mark.parametrize("block,msg", [
-    ({"lenght": "um"}, "unknown key"),
-    ({"length": "furlong"}, "unknown unit"),
-    ({"length": "kg"}, "unit of mass"),
-    ({"temperature": "C"}, "unknown unit"),
-    ({"length": {"in_s": 1e-6}}, "escape hatch"),
-    ({"length": {"in_m": 0}}, "finite and positive"),
-])
-def test_unit_declarations_that_must_be_refused(block, msg):
-    with pytest.raises(units.UnitError, match=msg):
-        units.resolve(block)
-
-
-def test_the_escape_hatch_is_a_unit_like_any_other():
-    assert units.resolve({"length": {"in_m": 1e-10}}).size("length") == 1e-10   # angstrom
-
-
 def test_tagged_quantities_are_reserved():
-    """Format 0.2 refused [value, unit] pairs (reserved); format 0.3 writes "250 MHz" and refuses a pair
-    by its value form."""
-    from simcase.schema import reject_tagged_values
-    with pytest.raises(DocumentError, match="reserved"):
-        reject_tagged_values({"mesh": {"size": [0.25, "um"]}})
+    """Format 0.3 writes "250 MHz" and refuses a [value, unit] pair by its value form."""
     d = copy.deepcopy(examples.CAVITY_BOX)
     d["physics"]["em1"]["target_frequency"] = [250, "MHz"]
     with pytest.raises(DocumentError) as caught:

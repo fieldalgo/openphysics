@@ -23,7 +23,7 @@ from shapely.ops import unary_union
 import meshine.geometry_v1 as meshine_v1
 import sipi.geometry_v1 as sipi_v1
 from meshine import Circle, Domain, box_sides, rectangle, shapes
-from simcase.geometry_document import RESERVED_IDS, GeometryError, parse, to_v02
+from simcase.geometry_document import RESERVED_IDS, GeometryError, parse, to_flat
 from sipi import CrossSection, DielectricRegion, Layer, PolygonTrace, Trace, templates
 from sipi.polygons import trace_shape
 
@@ -206,7 +206,7 @@ def test_an_unfilled_hole_becomes_void_and_regions_inside_it_still_win():
     got = later_wins_areas(model.components["domain"], model.components["domain"].pm_per_unit)
     assert got["ring"] == 64.0 and got["island"] == 4.0 and got["ring-hole1"] == 32.0
     with pytest.raises(GeometryError, match="void"):
-        to_v02(model)
+        to_flat(model)
 
 
 def test_the_fiber_keeps_exact_circles_and_their_vertex_counts():

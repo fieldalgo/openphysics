@@ -163,15 +163,15 @@ picometres, unit-free) and, for a 2D region component, **keeps the block
 itself in `doc.data`**: the validators, summaries and result files read it
 through the accessors `doc.domain`, `doc.background` and `doc.regions()` (one
 entry per declared region, merged features as one entry with the smallest
-`mesh_size`, `material` None for void), the canonical micrometre copy carries
-the model without re-reading the block, and `build_domain` evaluates the
+`mesh_size`, `material` None for void), the micrometre frame the mesher receives
+carries the model without re-reading the block, and `build_domain` evaluates the
 complex once (`doc.complex()`) and hands it to meshine as above, with the
 flat-block route's sliver rule (a piece under `1e-12` of the domain area is left out and noted in
 `doc.notes`). The mesh-limit routes (`check_mesh_limits`, a run with
 `max_input_vertices`) take the same engine route and count the same loop
 vertices. So `imprint`, `segment`, void, merged regions and `path` documents
 load and run. A homogeneous rectangle component and a box-only 3D component are
-still compiled to the flat block their kinds read (`to_v02`), losslessly.
+still compiled to the flat block their kinds read (`to_flat`), losslessly.
 
 What the runners refuse, by name: the waveguide runner takes exterior edges on
 the four domain sides only, so a `boundary_tags` entry that renames a side, a
@@ -231,16 +231,19 @@ keys are those of [format 0.3](document_format.md); lengths are quantity strings
 names (`size`, `near`, `far`, `distance`, `circle_segments`) with lengths in
 picometres (`Document.controls_pm()`);
 `rc.size_function(controls, unit_pm)` is the gradings' size function in mesher
-units after a hand-off (`geometry.size_function(doc)` for a document);
+units after a hand-off (`geometry.size_function(frame)` for a micrometre frame);
 `rc.select(expr)` resolves a target to `("region", cells)` or
 `("boundary", curves)`.
 
-The kernel hand-off's micrometre copy (`runner.micrometre_document`, internal)
-keeps a version 1 block in the component's own unit while its `units.length` says
-micrometres (the
-engine is unit-free, so nothing re-reads the block); the copy records that unit
-in `geometry_block_unit` and refuses `to_dict()` and `save()`. Results record
-the original document.
+A run meshes the document's micrometre frame (`views.MicrometreFrame`, internal),
+which `views.region_mesh` and `modes_document.kernel_document` build from the
+document's exact values: a flat shape number is its picometre count in
+micrometres, `float(Fraction(k, 10**6))`, and an element size or a control length
+is `float(exact metres * 10**6)`; a version 1 block keeps its exact model, which
+the engine reads in micrometres (it is unit-free, so nothing re-reads the block).
+`geometry.build_domain` and `geometry.size_function` take a frame only. A frame,
+like the region view it is made with (`thermal_regions.handoff_03`), is never
+written: `to_dict()` refuses it. Results record the original document.
 
 ## Design velocity (stage 4)
 

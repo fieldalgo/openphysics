@@ -14,16 +14,48 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - 모든 패키지의 Python API는 마이너 릴리스(0.1에서 0.2)마다 바뀔 수 있습니다. 패치
   릴리스(0.1.x)는 버그를 고치며 API를 바꾸려는 것이 아닙니다.
-- JSON 모델 문서 형식 `"openphysics": "0.2"`는 계약입니다. 이 형식으로 유효한 문서는 계속
-  유효하고 뜻도 그대로입니다. 이를 깨는 변경에는 새 형식 버전을 붙입니다.
-- 저장 결과의 형식·필드 layout 식별자(예: `thermal.steady2d-result-v1`,
-  `cavity3d-edge-v1`)는 계약입니다. 어떤 식별자가 붙은 파일은 그 layout을 유지합니다.
+- JSON 모델 문서 형식 `"openphysics": "0.3"`은 계약입니다. 이 형식으로 유효한 문서는 계속
+  유효하고 뜻도 그대로입니다. 이를 깨는 변경에는 새 형식 버전을 붙입니다. 형식 0.2 문서는 읽지
+  않습니다. 모든 읽기가 무엇을 대신 써야 하는지와 함께 이름을 밝혀 거부합니다(`openphysics`에서
+  `E-FORMAT`).
+- 저장 결과의 형식·필드 layout 식별자(예: `thermal.steady2d-result-v3`,
+  `cavity3d-edge-v2`)는 계약입니다. 어떤 식별자가 붙은 파일은 그 layout을 유지합니다.
   layout이 바뀌면 새 식별자를 붙입니다.
+- 단위·이름 배치 이전에 결과, Studio 페이로드, 어댑터가 달던 식별자는 모두 은퇴했습니다. 은퇴한
+  식별자는 다른 layout에 다시 쓰지 않으며, `simcase.export`는 은퇴한 필드 layout을 단 파일을 이름을
+  밝혀 거부합니다(`simcase.export.RETIRED_LAYOUTS`가 각각을 대신한 layout을 적습니다).
+  - 결과 형식: `thermal.steady2d-result-v1`, `thermal.steady2d-result-v2`,
+    `thermal.transient2d-result-v1`, `thermal.transient2d-result-v2`,
+    `thermal.steady2d-regions-result-v1`, `thermal.transient2d-regions-result-v1`,
+    `thermal.axisymmetric-regions-result-v1`,
+    `thermal.axisymmetric-transient-regions-result-v1`, `electric.steady2d-result-v1`,
+    `joule.steady2d-result-v1`, `joule.temperature2d-result-v1`,
+    `electric.steady2d-regions-result-v1`, `joule.steady2d-regions-result-v1`,
+    `mechanics.elasticity2d-result-v1`, `mechanics.thermoelastic2d-result-v1`,
+    `mechanics.elasticity2d-regions-result-v1`, `mechanics.thermoelastic2d-regions-result-v1`
+  - 필드 layout: `thermal2d-p1-node-cell-v1`, `thermal2d-p1-node-cell-boundary-v2`,
+    `thermal2d-transient-p1-node-cell-v1`, `thermal2d-transient-p1-node-cell-boundary-v1`,
+    `thermal2d-p1-node-cell-regions-v1`, `thermal2d-transient-p1-node-cell-regions-v1`,
+    `thermal-axisymmetric-p1-node-cell-regions-v1`,
+    `thermal-axisymmetric-transient-p1-node-cell-regions-v1`, `electric-joule2d-p1-v1`,
+    `electric2d-p1-node-cell-regions-v1`, `electric-joule2d-p1-node-cell-regions-v1`,
+    `mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`, `mechanics2d-p1-regions-v1`,
+    `thermoelastic2d-p1-regions-v1`, `em-modes2d-p1-node-centroid-v1`,
+    `em-modes2d-subspace-raw-v1`, `cavity3d-edge-v1`, `cavity3d-edge-complex-v1`
+  - 결과 스키마와 필드 표현: `openphysics.modes2d/2`, `openphysics.pml-candidates/1`,
+    `vector-edge-nodal-v1`, `vector-subspace-edge-nodal-v1`, `pml-scalar-nodal-v1`,
+    `pml-vector-edge-nodal-v1`
+  - Studio 페이로드와 어댑터: `studio-thermal-steady-v1`, `studio-thermal-steady-regions-v1`,
+    `studio-thermal-transient-v1`, `studio-thermal-transient-regions-v1`,
+    `studio-thermal-transient-frame-v1`, `studio-thermal-transient-history-v1`,
+    `optical-fixed-v1`, `optical-rectangle-v2`, `optical-rectangle-v3`, `optical-shapes-v4`,
+    `optical-shapes-v5`
 
 각 패키지가 구현하는 범위와 한계는 [개요](overview.md)에 있습니다.
 
 ## [Unreleased]
 
+- `simcase`: **커널 넘기기가 형식 0.2 트리를 만들지 않습니다**(단위·이름 배치, 커밋 C11b, C11의 마지막). meshine과 모드 커널은 문서의 정확한 값으로 만든 µm 프레임을 받습니다. 도형 수는 그 pm 개수에서(`float(Fraction(k, 10**6))`), 요소 크기와 제어·등급 길이는 그 정확한 미터 값에서(`float(exact * 10**6)`) 옮기고, 버전 1 블록은 정확한 모델을 그대로 둡니다. 영역 검사는 문서 자신의 `length_unit`으로 둔 영역 뷰를 읽습니다. 배치의 동등성 검사는 이로 바뀌지 않습니다. 기록한 메셔·솔버 입력, 호출, 저장 바이트가 전처럼 비교됩니다(기준과 같은 문서 79개, 밝힌 편차의 문서 8개). 없앤 것(내부용): `simcase.units`; `runner.micrometre_document`; 단위를 선언한 형상 읽기(`geometry_document.parse_handoff`, `pm_per_unit`, 읽기의 `units` 분기, `GeometryModel.units_length`·`.pm_per_unit`·`.to_unit`); 넘기기의 커널 계약(`schema.HANDOFF_FORMAT`, `PHYSICS_REQUIRES`, `check_format_units_and_tags`, `reject_tagged_values`, `Document.validate_em_modes2d`, `em_modes2d_summary`). 그 검사마다 문서를 형식 0.3이 거부하며 하나씩 시험하고, 벡터 스윕의 추적 설정 검사는 일부러 넘기기에 그대로 둡니다(전과 같은 `tracking_settings` 호출). `Document.scale`, `geometry_block_unit`, `check_mesh_controls`; 열 실행기와 계약의 형식 0.2 분기(`thermal.validate_thermal`, `transient_thermal_contract.validate_transient_thermal`, 그것들이 저장하던 0.2 결과 식별자); `materials.resolve_material`, `material_table`. `simcase.geometry_document.to_v02`와 `from_v02`는 `to_flat`과 `from_flat`으로 이름을 바꿨습니다. 버전 1 구성 요소와 형식 0.3 평면 블록 사이를 컴파일합니다. `geometry.build_domain`과 `geometry.size_function`은 µm 프레임만 받고, 다른 것은 `simcase.build_domain`을 밝히는 `TypeError`로 거부합니다. 어떤 단계도 메모 텍스트를 걸러 메셔의 발견을 넘기지 않습니다(P2-9). [문서 형식](packages/simcase/document_format.md).
 - `simcase`: `simcase.build_domain(doc)`이 형식 0.3 문서를 읽습니다. 도파 모드 커밋(단위·이름 배치 C8)의 단계 API가 제공하기로 했던 것입니다. meshine이 메시하는 문서(열, 전기 전도, 정상 줄 가열, 기계의 재료 영역과 모든 `em.modes2d` 형태)에는 `run`이 `meshine.generate`에 넘기는 것과 똑같은 `(Domain, namer, materials)`를, 문서가 선언한 `length_unit`과 관계없이 마이크로미터 메시 기준틀로 돌려줍니다. 예전에는 모든 형식 0.3 문서에서 `KeyError`가 났습니다(`'size'`, 버전 1 블록이면 `'units'`). galerkin이 구조 격자로 메시하는 사각형·공진기 상자 문서는 이름을 밝혀 거부하고(`E-CONTRACT`. 단위 배치 전에도 `KeyError`가 났음), 내부 커널 넘기기 같은 다른 형식의 문서는 `E-FORMAT`으로 거부합니다. `simcase.build_domain`은 더 이상 실행이 넘기기에 부르는 내부 `simcase.geometry.build_domain`이 아닙니다. [개요](packages/simcase/overview.md).
 - `simcase`: **사용자 문서의 형식 0.2 읽기를 은퇴했습니다**(단위·이름 배치, 커밋 C11a). `simcase.FORMAT`은 `"0.3"`입니다. 모든 공개 읽기가 형식 0.3이 아닌 문서를 무엇을 대신 써야 하는지와 함께 이름을 밝혀 거부합니다(`openphysics`에서 `E-FORMAT`): `Document.from_dict`, `load`, `loads`, `check_mesh_limits`, `simcase.geometry_document.parse`(`simcase.parse_geometry`), `design_velocity`, `exact_complex`, Studio 형상 실험실, `python -m simcase geometry`. 마지막 다섯은 예전에 0.2 문서의 `units` 블록을 읽었습니다. 알려진 종류의 0.2 문서는 그 종류의 변환 안내를 그대로 받고, 형식 키나 물리가 없는 문서는 일반 안내를 받습니다. 어떤 종류도 맡지 않는 물리 유형은 `physics.<이름>.type`에서 `E-VALUE-FORM`이며 이 릴리스가 읽는 유형 아홉 개를 밝힙니다. 없앤 것: 형식 0.2 기본값(`schema.DEFAULTS`, `DEFAULT_PHYSICS`, `PhysicsKind.defaults`와 종류마다의 기본값 함수. 종류는 대신 물리 슬롯을 가져옴), `simcase.unit_vocabulary`(`simcase.quantities`를 쓰세요), `simcase.void_area_m2`(이제 형식 0.3 문서를 읽는 `simcase.void_area`), 쓰이지 않던 0.2 공진기 도우미와 0.2 뷰 생성기(내부용). `simcase.reader`가 짝 없는 대리 문자가 든 문자열이나 키를 모든 곳에서 그 경로의 `E-JSON`으로 Studio와 같은 문구로 거부하므로, `simcase validate`와 `run`도 실패하는 대신 거부합니다. 상자가 아닌 피처가 있는 버전 1 `3d` 구성 요소는 그 피처의 `type` 경로에서 거부합니다. sipi와 meshine 형상 어댑터도 형식 0.3 부분을 씁니다(아래). 커널 넘기기는 내부의 단위 선언 트리(`simcase.units`, µm 사본)를 이후 단계까지 유지합니다.
 - `meshine`: `meshine.geometry_v1.to_geometry_v1(domain, length_unit=..., materials=None)`가 같은 인수로 형식 0.3 부분을 씁니다(단위·이름 배치, 커밋 C11a). `{"units", "geometry", "mesh_size", "mesh_controls"}` 대신 `{"geometry", "mesh"}`를 돌려줍니다. 최상위 `units` 블록 대신 구성 요소가 `length_unit`과 `depth`(null)를 선언하고, 영역 크기는 그 단위의 물리량 문자열인 피처의 `element_size`(예전에는 단위 없는 `mesh_size`), 기본 크기는 `mesh.element_size`(예전 `mesh_size`), `Circle`의 꼭짓점 수는 `circle_segment_count`를 가진 `mesh.controls` 항목(예전 `circle_segments`를 가진 `mesh_controls`)입니다. `length_unit`은 형식 0.3 길이 단위 `pm nm Angstrom um mm cm m in mil`(`meshine.geometry_v1.LENGTH_UNITS`) 가운데 하나이며, `{"in_m": ...}` 같은 다른 선언은 이 단위들을 밝힌 `ValueError`로 거부합니다.

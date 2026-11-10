@@ -37,7 +37,6 @@ from meshine import TriMesh, generate, shapes as mshapes
 from . import modes_document, physics_em_modes2d, results_common, views
 from .geometry import build_domain, provenance_edges_of, size_function
 from .mesh_limits import _is_region_document, _mesh_limits
-from . import units
 from .fields import VectorField
 from . import mode_postprocessing
 from .registry import PhysicsKind, kind_of, kind_of_type, register
@@ -67,7 +66,7 @@ PML_CANDIDATES_SCHEMA = "openphysics.pml-candidates/2"
 #: the modal phasor's propagation factor beside ``time_convention`` (exp(-i omega t))
 PROPAGATION = "exp(+i beta z)"
 #: the kernel's micrometre in metres: every kernel length comes back as ``x_um * 1e-6`` (H11)
-KERNEL_LENGTH = units.UM_IN_SI
+KERNEL_LENGTH = views.UM_IN_SI
 #: the kernel's square micrometre in square metres
 KERNEL_AREA = 1e-12
 
@@ -185,95 +184,6 @@ def _combined_size(*functions):
 def _solver_mesh(tri: TriMesh, provenance_edges: dict | None = None) -> Mesh:
     return Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
                 boundary_edges=dict(tri.boundary_edges), provenance_edges=provenance_edges)
-
-
-def micrometre_document(doc: Document, *, validate: bool = True) -> Document:
-    """The same EM or region heat document with every length in micrometres.
-
-    Each number is converted once and exactly where it is representable
-    (``units.length_to_micrometres``). A micrometre document comes back equal.
-    This lists geometry/mesh lengths shared by EM and region heat documents,
-    plus EM wavelength and dispersion lengths. SI-suffixed thermal properties
-    and study times stay unchanged. Add new length fields here.
-
-    ``validate=False`` takes the copy of a format 0.3 region hand-off
-    (``thermal_regions.handoff_03``), which holds geometry and mesh only and was
-    checked as its 0.3 document: the copy gets its unit scale and is not
-    validated as a document of its own.
-    """
-    d = copy.deepcopy(doc.data)
-    um = lambda v, power=1: units.length_to_micrometres(v, doc.scale, power)   # noqa: E731
-    g = d["geometry"]
-    if doc.is_version_1:
-        # the exact model is unit-free (integer pm); the block stays as written and the
-        # accessors read the model in the copy's micrometres
-        pass
-    else:
-        g["domain"] = {k: um(v) for k, v in g["domain"].items()}
-        if "mesh_size" in g["background"]:
-            g["background"]["mesh_size"] = um(g["background"]["mesh_size"])
-        for s in g["shapes"]:
-            for k in ("x", "y", "w", "h", "cx", "cy", "r", "mesh_size"):
-                if s.get(k) is not None:
-                    s[k] = um(s[k])
-            if "points" in s:
-                s["points"] = [[um(c) for c in p] for p in s["points"]]
-    m = d["mesh"]
-    m["size"] = um(m["size"])
-    for entry in m.get("controls") or []:
-        for k in ("size", "near", "far", "distance"):
-            if k in entry:
-                entry[k] = um(entry[k])
-    if m.get("grading"):
-        gr = m["grading"]
-        gr["center"] = [um(c) for c in gr["center"]]
-        for k in ("near", "far", "distance"):
-            gr[k] = um(gr[k])
-    for p in d["physics"].values():
-        if p.get("type") == "em.modes2d":
-            p["wavelength"] = um(p["wavelength"])
-            if "pml" in p:
-                p["pml"]["thickness"] = {k: um(v) for k,v in p["pml"]["thickness"].items()}
-            if "bend" in p:
-                for key in ("radius", "origin"):
-                    if key in p["bend"]: p["bend"][key] = um(p["bend"][key])
-    st = d["study"]
-    if st.get("type") == "sweep" and str(st.get("parameter", "")).endswith(".wavelength"):
-        st["values"] = [um(v) for v in st["values"]]
-    for spec in d["materials"].values():
-        sm = spec.get("sellmeier") if isinstance(spec, dict) else None
-        if sm:
-            sm["C"] = [um(c, 2) for c in sm["C"]]
-            if "range" in sm:
-                sm["range"] = [um(r) for r in sm["range"]]
-    gaussian = d.get("results", {}).get("mode_overlap", {}).get("gaussian")
-    if gaussian is not None:
-        gaussian["waist"] = um(gaussian["waist"])
-        gaussian["center"] = [um(c) for c in gaussian["center"]]
-    d["units"] = dict(d["units"], length="um")
-    if doc.is_version_1:
-        # the block is not re-read in micrometres: the model travels with the copy, and the
-        # block in the copy's data stays in the document's unit (geometry_block_unit), so the
-        # copy refuses to be serialised; results record the original document
-        out = Document(d)
-        out.geometry_block_unit = doc.geometry_block_unit or doc["units"]["length"]
-        out.geometry_model = doc.geometry_model
-        out.geometry_complex = doc.geometry_complex
-        out.geometry_source, out.geometry_roundings = doc.geometry_source, list(doc.geometry_roundings)
-        if validate:
-            out.validate()
-        else:
-            out.scale = units.resolve(d["units"])
-        return out
-    if validate:
-        out = Document.from_dict(d)
-    else:
-        out = Document(d)
-        out.scale = units.resolve(d["units"])
-    # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
-    out.geometry_model = doc.geometry_model
-    out.geometry_complex = doc.geometry_complex
-    return out
 
 
 def study_points(doc: Document) -> tuple[str | None, list]:

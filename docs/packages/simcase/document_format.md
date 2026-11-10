@@ -12,8 +12,9 @@ heat (`thermal.steady2d`, `thermal.transient2d`), electric conduction and Joule 
 rectangular cavities (`em.cavity3d`).** A document whose envelope is the JSON string `"0.3"` takes
 the reader described here. A format 0.2 document of any kind is refused by name (`E-FORMAT`,
 with what to write instead). The kinds moved one at a time (heat, electric and Joule,
-mechanics, `em.modes2d`, `em.cavity3d`); the internal 0.2 helpers that the kernel hand-offs
-still use are retired in a later step. A kind registered without physics slots refuses its
+mechanics, `em.modes2d`, `em.cavity3d`), and the internal 0.2 helpers of the kernel hand-offs
+went last (C11b): the mesher and the mode kernel receive a micrometre frame built from each
+document's exact values. A kind registered without physics slots refuses its
 0.3 document with `E-CONTRACT` ("documents are not read in format 0.3 yet").
 
 Format 0.3 keeps today's document skeleton (`geometry`, `materials`, `physics.<name>`,
@@ -301,19 +302,15 @@ is refused by name; each kind's step fills that table when it replaces its ident
 | `canonical_json()` gives `json.dumps`'s bytes for every example, built-in example and harness fixture | `tests/simcase/test_reader.py` |
 | The frozen slot table equals its generator; quantity slots name registry quantities placed in documents or materials; every path of every converted example and fixture outside `physics`, `study.tracking` and `results.mode_overlap` (the kinds' own slots) matches exactly one slot; a path in no slot is `E-KEY-UNKNOWN` | `tests/simcase/test_slots.py` |
 | `validate`, `run`, `explain`, `fix` and the exit codes; the result helpers; the VTU metadata read back through `xml.etree` and meshio; retired layouts | `tests/simcase/test_cli_units.py` |
-| Version 1 geometry in 0.3: the same pm model, design velocity, summary and geometry-lab view as the same geometry in 0.2; refusals with code and path | `tests/simcase/test_geometry_units.py` |
+| Version 1 geometry in 0.3: the picometre model that the numbers of the pre-batch geometry mean, the design velocity in any length unit and the geometry-lab view; a format 0.2 document refused by name; refusals with code and path | `tests/simcase/test_geometry_units.py` |
+| Every check of the retired kernel contract (the format 0.2 `em.modes2d` validator that checked the kernel hand-off until C11b) is a format 0.3 refusal of the same defect, with its code and path; its tracking check of a vector sweep also stays on the hand-off, as before | `tests/simcase/test_units_em.py` |
+| No stage passes diagnostics on by filtering note text (P2-9, a grep over `packages/simcase/src`) | `tests/simcase/test_reader.py` |
 
 They run on a test-only kind (`tests/simcase/units_toy_kind.py`), so that they do not depend
 on which built-in kinds read format 0.3 yet.
 
 ## Not done yet
 
-- The retirement of `simcase.units` and of the internal format 0.2 helpers that the kernel
-  hand-offs still use (the micrometre copy, the unit-declared geometry reading and the
-  `em.modes2d` 0.2 validator as the kernel contract). (Every kind, `em.cavity3d` last, has its
-  physics slots, examples and results under registry names; Studio reads raw bytes and serves
-  the quantities endpoint; the format 0.2 reader of user documents, `simcase.unit_vocabulary`
-  and `simcase.void_area_m2` are retired: `simcase.quantities` and `simcase.void_area`.)
 - Each remaining code is raised by the kind that needs it, with its step (`E-SPECTRAL` is
   raised by `em.modes2d` for an entry with more than one spectral key, `I-DEFAULT-BOUNDARY` by
   heat, electric/Joule, mechanics and `em.modes2d`, `E-OUTSIDE-VALID` by `joule.temperature2d`,

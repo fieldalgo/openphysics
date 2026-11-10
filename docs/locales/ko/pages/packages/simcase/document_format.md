@@ -11,7 +11,8 @@
 (`em.modes2d`), 직육면체 공진기(`em.cavity3d`)입니다.** envelope가 JSON 문자열 `"0.3"`인 문서가
 여기 적은 읽기를 거칩니다. 어떤 종류든 형식 0.2 문서는 무엇을 대신 써야 하는지와 함께 이름을 밝혀
 거부합니다(`E-FORMAT`). 종류는 하나씩 옮겨 갔습니다(열, 전기·Joule, 역학, `em.modes2d`,
-`em.cavity3d`). 커널 인계가 아직 쓰는 내부 0.2 도우미는 뒤의 단계에서 없앱니다. 물리 슬롯 없이
+`em.cavity3d`). 커널 인계의 내부 0.2 도우미는 마지막으로(C11b) 없앴습니다. 메셔와 모드 커널은 문서마다
+그 정확한 값으로 만든 µm 프레임을 받습니다. 물리 슬롯 없이
 등록한 종류는 그 0.3 문서를 `E-CONTRACT`("documents are not read in format 0.3 yet")로 거부합니다.
 
 형식 0.3은 오늘의 문서 뼈대(`geometry`, `materials`, `physics.<이름>`, `mesh`, `study`,
@@ -284,18 +285,15 @@ doc, diagnostics = reader.check(text)    # without raising: for validate, explai
 | `canonical_json()`이 모든 예제, 내장 예제, 비교 도구 fixture에서 `json.dumps`의 바이트를 줌 | `tests/simcase/test_reader.py` |
 | 고정한 슬롯 표가 생성기와 같음; 물리량 슬롯은 문서나 재료 자리에 둔 등록부 물리량을 가리킴; 변환한 모든 예제와 fixture에서 `physics`, `study.tracking`, `results.mode_overlap`(종류의 슬롯) 밖의 경로가 슬롯 하나에 정확히 맞음; 어느 슬롯에도 없는 경로는 `E-KEY-UNKNOWN` | `tests/simcase/test_slots.py` |
 | `validate`, `run`, `explain`, `fix`와 종료 코드; 결과 도우미; `xml.etree`와 meshio로 다시 읽은 VTU 메타데이터; 은퇴한 layout | `tests/simcase/test_cli_units.py` |
-| 0.3의 버전 1 형상: 0.2로 쓴 같은 형상과 같은 pm 모델, 설계 속도, 요약, 형상 실험실 화면; 코드와 경로를 가진 거부 | `tests/simcase/test_geometry_units.py` |
+| 0.3의 버전 1 형상: 배치 이전 형상의 수가 뜻하는 pm 모델, 어떤 길이 단위에서나 같은 설계 속도, 형상 실험실 화면; 이름을 밝혀 거부하는 형식 0.2 문서; 코드와 경로를 가진 거부 | `tests/simcase/test_geometry_units.py` |
+| 은퇴한 커널 계약(C11b까지 커널 넘기기를 검사한 형식 0.2 `em.modes2d` 검증기)의 검사마다 같은 결함을 형식 0.3이 코드와 경로로 거부; 벡터 스윕의 추적 설정 검사는 전처럼 넘기기에도 남음 | `tests/simcase/test_units_em.py` |
+| 어떤 단계도 메모 텍스트를 걸러 진단을 넘기지 않음(P2-9, `packages/simcase/src`를 grep) | `tests/simcase/test_reader.py` |
 
 어느 내장 종류가 형식 0.3을 읽는지에 좌우되지 않도록 이 시험들은 시험 전용 종류
 (`tests/simcase/units_toy_kind.py`)에서 돕니다.
 
 ## 아직 하지 않은 것
 
-- `simcase.units`와, 커널 넘기기가 아직 쓰는 내부 형식 0.2 도우미(µm 사본, 단위를 선언한 형상 읽기,
-  커널 계약인 `em.modes2d` 0.2 검증기)의 은퇴. (모든 종류가, 마지막으로 `em.cavity3d`가, 물리 슬롯과 예제,
-  등록부 이름의 결과를 갖췄고, Studio는 원시 바이트를 읽고 물리량 엔드포인트를 냅니다. 사용자 문서의 형식
-  0.2 읽기와 `simcase.unit_vocabulary`, `simcase.void_area_m2`는 은퇴했습니다: `simcase.quantities`,
-  `simcase.void_area`.)
 - 남은 코드는 그것이 필요한 종류가 그 단계에서 냅니다(`E-SPECTRAL`은 분광 키를 둘 이상 준 항목에
   `em.modes2d`가, `I-DEFAULT-BOUNDARY`는 열, 전기·Joule, 역학, `em.modes2d`가, `E-OUTSIDE-VALID`는 `joule.temperature2d`가, `W-GAUGE-ATMOSPHERIC`과 `E-ABSOLUTE-AS-LOAD`는
   역학이 냅니다).
