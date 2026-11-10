@@ -316,6 +316,7 @@ def test_a_heater_that_touches_or_crosses_an_edge_at_a_small_angle_meshes(cy, ar
     import meshine
     import physmat
     import simcase
+    from simcase import views
     from simcase.geometry import build_domain, resolve_regions
     roots = [str(pathlib.Path(m.__file__).resolve().parents[1]) for m in (simcase, galerkin, meshine, physmat)]
     env = dict(os.environ)
@@ -339,7 +340,7 @@ def test_a_heater_that_touches_or_crosses_an_edge_at_a_small_angle_meshes(cy, ar
     assert set(result['areas']) == set(exact)
     for name, area in exact.items():
         assert abs(result['areas'][name]-area) <= area_tol, name
-    domain, namer, _ = build_domain(handoff(d))
+    domain, namer, _ = build_domain(views.region_mesh(handoff(d)).canonical)     # the frame meshine receives
     points, segments, _ = domain.build(namer)
     around = {}
     for s in segments:

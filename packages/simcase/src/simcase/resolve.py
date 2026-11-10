@@ -745,7 +745,7 @@ class _Walker:
                                                                "such as \"40 mm\", or null for per metre of depth")
 
     def version_1(self) -> None:
-        from .geometry_document import GeometryError, _pick, parse, to_v02
+        from .geometry_document import GeometryError, _pick, parse, to_flat
         try:
             model = parse(self.tree)
         except GeometryError as exc:
@@ -786,7 +786,7 @@ class _Walker:
             homogeneous = not comp.features and "material" not in comp.background
             if comp.dimension == "3d" or homogeneous:
                 try:
-                    self.r.geometry_flat = to_v02(model, validation=True)
+                    self.r.geometry_flat = to_flat(model, validation=True)
                 except GeometryError as exc:
                     self.extend(from_exception(exc), ["geometry"])
 

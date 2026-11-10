@@ -47,8 +47,8 @@ from shapely.geometry import LineString
 
 from simcase import Document, RegionComplexity, examples, region_complexity
 from simcase import complexity as rc_module
+from simcase import views
 from simcase.geometry import shape_polygon
-from simcase.runner import micrometre_document
 from simcase.thermal_regions import handoff_03
 
 import region_studio_fixtures as F
@@ -779,10 +779,10 @@ def test_the_names_are_exported():
     assert examples.EXAMPLES['thermal_regions']['geometry']['shapes']          # the examples are dicts
 
 
-# ---- port: the micrometre copy a run meshes --------------------------------------------------
+# ---- port: the micrometre frame a run meshes -------------------------------------------------
 
-#: Valid millimetre documents whose micrometre copies (runner.micrometre_document, as a run
-#: makes them) are counted too.
+#: Valid millimetre documents whose micrometre frames (views.region_mesh, as a run makes them)
+#: are counted too.
 MESHED_COPIES = {
     **{f'steady example, size {s}': (lambda s=s: F.steady_example(s)) for s in (2.0, 1.0, 0.5)},
     **{f'transient example, size {s}': (lambda s=s: F.transient_example(s)) for s in (2.0, 1.0, 0.5)},
@@ -798,14 +798,15 @@ MESHED_COPIES = {
 
 
 @pytest.mark.parametrize('name', list(MESHED_COPIES))
-def test_port_the_micrometre_copy_a_run_meshes_counts_the_same(name):
+def test_port_the_micrometre_frame_a_run_meshes_counts_the_same(name):
     """Port, not pre-registered. Document.from_dict resolves the document's own numbers,
-    which region_complexity counts; a run resolves the shapes again on its micrometre copy
-    (made from the document's mesh hand-off, thermal_regions.handoff_03).
+    which region_complexity counts; a run resolves the shapes again on its micrometre frame
+    (made from the document's exact values through its region view, thermal_regions.handoff_03).
     A decimal unit factor can re-round exact contacts (RC-5), but on these documents the
-    copy counts the same."""
+    frame counts the same."""
     data = MESHED_COPIES[name]()
-    meshed = micrometre_document(handoff_03(Document.from_dict(copy.deepcopy(data))), validate=False).data
-    assert (data['geometry']['length_unit'], meshed['units']['length']) == ('mm', 'um')
+    frame = views.region_mesh(handoff_03(Document.from_dict(copy.deepcopy(data)))).canonical
+    meshed = frame.data
+    assert (data['geometry']['length_unit'], frame.length_unit) == ('mm', 'um')
     assert meshed['geometry'] != data['geometry']
     assert region_complexity(meshed) == region_complexity(data)
