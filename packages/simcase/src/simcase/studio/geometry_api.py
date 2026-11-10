@@ -13,10 +13,10 @@ names the feature, selection or parameter (a 4xx status would be logged by the
 browser as a console error on every refused edit).
 
 The response is a view for this page, not a persisted format: coordinates are
-doubles in the evaluated component's length unit (the document's for a 0.2 block),
-arcs and circles are sampled for drawing only, and ``summary`` is the text
-``python -m simcase geometry`` prints. A format 0.3 parameter is reported with its
-authored value and its SI value.
+doubles in the evaluated component's length unit, arcs and circles are sampled for drawing
+only, and ``summary`` is the text ``python -m simcase geometry`` prints. A parameter is
+reported with its authored value and its SI value. A document that is not format 0.3 is
+refused by name (``E-FORMAT``, from ``parse_geometry``).
 
 The request is read from its raw bytes with ``simcase.reader`` (``bodies.read_envelope``), as
 every Studio route that takes a document: numbers keep their written digits, and a duplicate
@@ -101,11 +101,11 @@ def _evaluate(doc: dict, component: str | None) -> dict:
 def evaluate_view(doc: dict, component: str | None = None) -> dict:
     """The page's view of one evaluated component; raises ``GeometryError`` on a refusal."""
     geometry = doc.get("geometry")
-    if not isinstance(geometry, dict) or "version" not in geometry:
+    if doc.get("openphysics") == "0.3" and (not isinstance(geometry, dict) or "version" not in geometry):
         # The same words as ``python -m simcase geometry``.
-        raise GeometryError("the document has a 0.2 geometry block; the region complex needs a version 1 block "
-                            "(see docs/packages/simcase/geometry_document.md)")
-    model = parse_geometry(doc)
+        raise GeometryError("the document has a flat geometry block (no version); the region complex needs a "
+                            "version 1 block (see docs/packages/simcase/geometry_document.md)")
+    model = parse_geometry(doc)                     # another format is refused by name (E-FORMAT)
     names = list(model.components)
     flat = [n for n in names if model.components[n].dimension != "3d"]
     if component is None and len(names) > 1:
@@ -119,12 +119,10 @@ def evaluate_view(doc: dict, component: str | None = None) -> dict:
     parameters = []
     for name, (value, kind) in model.parameters.items():
         entry = raw.get(name) if isinstance(raw.get(name), dict) else {}
-        item = {"name": name, "kind": kind, "value": float(value), "written": entry.get("value"),
-                "range": entry.get("range")}
-        if getattr(model, "format", "0.2") == "0.3":
-            # a 0.3 parameter is exact pm (length) or a ratio: report its SI value and unit
-            item["value"] = float(Fraction(value) / 10 ** 12) if kind == "length" else float(value)
-            item["unit"] = "m" if kind == "length" else "1"
+        # a parameter is exact pm (length) or a ratio: report its SI value and unit
+        item = {"name": name, "kind": kind,
+                "value": float(Fraction(value) / 10 ** 12) if kind == "length" else float(value),
+                "written": entry.get("value"), "range": entry.get("range"), "unit": "m" if kind == "length" else "1"}
         parameters.append(item)
     cells = [{"index": c.index, "region": c.region, "material": _material(c.material), "void": c.void,
               "feature": c.feature, "area": c.area / scale ** 2,

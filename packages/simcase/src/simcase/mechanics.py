@@ -708,11 +708,6 @@ def solved_line(mesh, balance, thermal):
     return line
 
 
-def _defaults():
-    from .thermal import defaults
-    return defaults()
-
-
 def _accepts_mesh_limits(data):
     """Region documents take mesh limits (simcase.mesh_limits); rectangle documents do not."""
     from .mechanics_regions import is_region_mechanics
@@ -722,6 +717,6 @@ def _accepts_mesh_limits(data):
 register(PhysicsKind(
     name='mechanics', types=frozenset(TYPES), precedence=15,
     validate=validate_mechanics, run=run_mechanics, summary=document_summary,
-    result_types=(MechanicsRunResult,), defaults=_defaults, fresh_output=True,
+    result_types=(MechanicsRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for mechanics physics',
     accepts_mesh_limits=_accepts_mesh_limits, slots=mechanics_slots()))

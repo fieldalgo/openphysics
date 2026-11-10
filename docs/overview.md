@@ -150,8 +150,9 @@ python -m simcase.studio --no-browser
 
 Open `http://127.0.0.1:8765`. Studio is a local tool, not an authenticated
 multi-user service. Keep it off untrusted networks. CLI entry points are
-`simcase`, `simcase-run` and `simcase-studio`; the document format retains
-`"openphysics": "0.2"` as its version field.
+`simcase`, `simcase-run` and `simcase-studio`; documents are format
+`"openphysics": "0.3"` ([document format 0.3](packages/simcase/document_format.md)), and a format 0.2 document is refused
+by name.
 
 Try a headless heat document or standalone Python examples:
 

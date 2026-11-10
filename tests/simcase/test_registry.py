@@ -92,15 +92,22 @@ CAVITY_BOX_02 = {
 
 
 def test_unknown_type_error_lists_every_registered_type():
-    # the format 0.2 reader names the type; a format 0.3 document reports the keys its slot table
-    # cannot place instead
-    data = copy.deepcopy(CAVITY_BOX_02)
+    # a type no kind claims is refused at its own path, naming the nine types this release reads
+    # (until units batch C11a the format 0.2 reader named them; a 0.2 document is refused by name now)
+    data = copy.deepcopy(examples.EXAMPLES["cavity_box"])
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
     assert len(listed) == 9
     with pytest.raises(DocumentError) as error:
         Document.from_dict(data)
-    assert str(error.value) == f"physics.em1.type 'no.such.type' not supported ({listed})"
+    assert [(d.code, d.path) for d in error.value.diagnostics] == [("E-VALUE-FORM", "physics.em1.type")]
+    assert error.value.diagnostics[0].message == ('"no.such.type" is not one of the physics types this release reads: '
+                                                  + ", ".join(f'"{t}"' for t in listed) + ".")
+    data = copy.deepcopy(CAVITY_BOX_02)
+    data["physics"]["em1"]["type"] = "no.such.type"
+    with pytest.raises(DocumentError) as error:
+        Document.from_dict(data)
+    assert [(d.code, d.path) for d in error.value.diagnostics] == [("E-FORMAT", "openphysics")]
 
 
 @pytest.mark.parametrize("name", ["thermal_slab", "electric_rectangle", "elastic_plate"])
@@ -130,26 +137,38 @@ class _EchoResult:
 
 
 def _validate_echo(doc):
-    if not isinstance(doc["physics"]["p"].get("gain"), (int, float)):
-        raise DocumentError("physics.p.gain must be a number")
-    doc.notes = []
+    if not isinstance(doc.si["physics"]["p"].get("mode_count"), int):
+        raise DocumentError("physics.p.mode_count must be a count")
+
+
+#: what a kind brings to the format 0.3 reader: its physics slots and its own structural defaults
+_ECHO_SLOTS = (
+    {"pattern": "physics.*{test.echo}.type", "kind": "enum", "values": ["test.echo"], "required": True},
+    {"pattern": "physics.*{test.echo}.mode_count", "kind": "quantity", "quantity": "mode_count", "forms": ["BC"]},
+    {"pattern": "study", "kind": "override", "default": {"type": "single"},
+     "default_reason": "structural default of test.echo"},
+)
+_ECHO_GEOMETRY = {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}}
 
 
 def test_a_new_kind_needs_no_edit_to_schema_runner_or_stages(isolated):
+    """A kind registers its validator, runner, summary, result types, stage refusal and physics slots
+    (format 0.3; until units batch C11a the kind gave a 0.2 ``defaults`` merge instead of slots)."""
     registry.register(registry.PhysicsKind(
         name="test.echo", types=frozenset({"test.echo"}), precedence=50,
         validate=_validate_echo, run=lambda doc, verbose=True: _EchoResult(doc),
-        summary=lambda doc: f"echo gain {doc['physics']['p']['gain']}", result_types=(_EchoResult,),
-        defaults=lambda: {"study": {"type": "single"}},
-        stage_refusal="{stage} does not run test.echo"))
-    doc = Document.from_dict({"physics": {"p": {"type": "test.echo", "gain": 2}}})
-    assert doc["study"] == {"type": "single"}                # the kind's defaults
-    assert doc.summary() == "echo gain 2"
+        summary=lambda doc: f"echo count {doc.si['physics']['p']['mode_count']}", result_types=(_EchoResult,),
+        stage_refusal="{stage} does not run test.echo", slots=_ECHO_SLOTS))
+    doc = Document.from_dict({"openphysics": "0.3", "geometry": _ECHO_GEOMETRY,
+                              "physics": {"p": {"type": "test.echo", "mode_count": 2}}})
+    assert doc.si["study"] == {"type": "single"}                # the kind's defaults
+    assert [d for d in doc.defaults_applied if d["path"] == "study"][0]["reason"] == "structural default of test.echo"
+    assert doc.summary() == "echo count 2"
     assert isinstance(run(doc, verbose=False), _EchoResult)
     assert "test.echo" in schema.PHYSICS_TYPES
     with pytest.raises(DocumentError, match="^build_mesh does not run test.echo$"):
         build_mesh(doc)
     with pytest.raises(DocumentError, match="^solve_point does not run test.echo$"):
-        solve_point(None, doc["physics"]["p"])
-    with pytest.raises(DocumentError, match="gain must be a number"):
-        Document.from_dict({"physics": {"p": {"type": "test.echo"}}})
+        solve_point(None, doc.si["physics"]["p"])
+    with pytest.raises(DocumentError, match="mode_count must be a count"):
+        Document.from_dict({"openphysics": "0.3", "geometry": _ECHO_GEOMETRY, "physics": {"p": {"type": "test.echo"}}})

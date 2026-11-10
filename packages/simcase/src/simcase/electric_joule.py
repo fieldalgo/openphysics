@@ -640,11 +640,6 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     return ElectricJouleRunResult(doc, arrays, metadata, log_lines_03(doc, printed))
 
 
-def _defaults():
-    from .thermal import defaults
-    return defaults()
-
-
 def _slots():
     return electric_slots()
 
@@ -657,6 +652,6 @@ def _refuse_03(tree):
 register(PhysicsKind(
     name='electric_joule', types=frozenset(TYPES), precedence=10,
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
-    result_types=(ElectricJouleRunResult,), defaults=_defaults, fresh_output=True,
+    result_types=(ElectricJouleRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics',
     accepts_mesh_limits=is_region_document, slots=_slots(), refuse_03=_refuse_03))

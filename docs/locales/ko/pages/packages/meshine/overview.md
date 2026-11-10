@@ -156,8 +156,10 @@ python -m pytest -q tests/meshine
 ## 형상 문서로 쓰기
 
 `meshine.geometry_v1.to_geometry_v1(domain, length_unit=...)`은 `build` 전의 `Domain`을
-[simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상 블록으로 씁니다. `Domain`에는 단위가 없으므로
-`length_unit`이 필수입니다. [어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
+[simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상 블록으로 형식 0.3에 맞게 쓰고, `mesh` 부분(기본
+크기는 `element_size`, 원 꼭짓점 수는 `circle_segment_count` 제어)을 함께 돌려줍니다. `Domain`에는 단위가 없으므로
+`length_unit`이 필수이며 형식 0.3 길이 단위 `pm nm Angstrom um mm cm m in mil` 가운데 하나입니다. 단위는 구성
+요소에 적히고 영역 크기는 그 단위의 `element_size` 문자열이 됩니다. [어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
 
 ## 한계
 
