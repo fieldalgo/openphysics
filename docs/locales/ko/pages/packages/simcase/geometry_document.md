@@ -4,8 +4,8 @@
 
 [문서 홈](../../index.md)
 
-상태: **2026-11-03 승인.** [1단계 리더](geometry_reader.md)가 문서 안의 버전 1
-형상 블록을 읽고, 실행기에는 검증·기록용으로 0.2 형식을 넘깁니다. [2단계 엔진](geometry_engine.md)이 2D·축대칭
+상태: **2026-11-03 승인.** [1단계 리더](geometry_reader.md)가 [형식 0.3](document_format.md) 문서 안의 버전 1
+형상 블록을 읽으며, 구성 요소마다 `length_unit`을 선언합니다(2026-11-10 보완, [단위](#단위) 참고). [2단계 엔진](geometry_engine.md)이 2D·축대칭
 구성 요소의 영역 구성·선택자·출처 이름을 만들고 버전 1 문서를 메시하며(2026-11-04), 실행기는 아직 복합체
 자체를 읽지 않습니다. 4단계 보완(2026-11-08)이 설계 속도와 위상 탐침을 정하고,
 [`simcase.geometry_velocity`](geometry_engine.md#설계-속도-4단계)가 구현합니다.
@@ -17,7 +17,9 @@
 - **예약** 표시 키워드는 뒤 단계에서 정의합니다. 그때까지 모든 리더가 이름을 밝혀 거부합니다.
 - JSON 계약(2026-11-03 결정): 봉투는 `"openphysics": "0.2"`를 유지하고 `geometry` 블록만 `"version": 1`을
   가집니다. `version`이 없는 블록은 0.2 형식이며 그대로 동작하고, 이전하는 문서는 없습니다. Studio 프로젝트와
-  sipi JSON은 당분간 자기 형식을 유지합니다.
+  sipi JSON은 당분간 자기 형식을 유지합니다. **2026-11-10 단위·이름 배치로 대체됨:** 봉투는 `"openphysics":
+  "0.3"`이고, 형식 0.2 문서는 이름을 밝혀 거부하며(`E-FORMAT`), `version`이 없는 블록은
+  [형식 0.3](document_format.md#형상-세-형태-각각-length_unit-하나)의 평면 형태 가운데 하나입니다.
 
 ## 목적과 범위
 
@@ -108,29 +110,27 @@ BSD-3-Clause입니다. 실행기 묶음은 shapely를 import하므로(`packages/
 (`packages/simcase/src/simcase/schema.py:51-69`). `version`이 없는 `geometry` 블록은 0.2 형식이며,
 어댑터가 읽습니다([대응표](#현재-표현-대응표동결) 참고).
 
+2026-11-10 보완(형식 0.3): `units` 키는 없습니다. 구성 요소마다 `length_unit`을, `2d` 구성 요소는
+`depth`(길이, 또는 깊이 1 m당이면 `null`)를 선언합니다. 길이 파라미터는 단위를 붙이고 요소 크기는 물리량
+문자열입니다([문서 형식 0.3](document_format.md)).
+
 ### 버전
 
 `version`은 정수입니다. 형상 블록에 속하며 봉투의 `openphysics` 문자열을 대신하지 않습니다.
-봉투는 `"0.2"`를 유지하며, 호환이 깨지는 변경이 생길 때만 올립니다.
+봉투는 `"0.2"`를 유지하며, 호환이 깨지는 변경이 생길 때만 올립니다. 단위·이름 배치(2026-11-10)와 함께
+`"0.3"`으로 올랐습니다.
 
 ### 단위
 
-형상 숫자는 문서의 `units.length` 단위입니다.
+**2026-11-10 단위·이름 배치로 대체됨.** 구성 요소마다 자기 `length_unit`(`pm nm Angstrom um mm cm m in mil`
+가운데 하나)을 선언하고 맨 형상 숫자는 그 단위로 읽으며, `2d` 구성 요소는 `depth`를 선언합니다. 선언하지 않은
+단위는 구성 요소의 경로에서 거부합니다(`E-KEY-MISSING`). 문서 전체의 `units` 블록, `{"in_m": x}` 단위, 기본
+단위는 없습니다. `length` 종류의 형상 파라미터는 단위를 붙이고(`"0.5 um"`), 요소 크기는 물리량 문자열입니다.
+[문서 형식 0.3](document_format.md#형상-세-형태-각각-length_unit-하나)을 보세요.
 
-**선언 필수.** 버전 1 형상 블록이 있는 문서는 `units.length`를 선언해야 하며, 선언하지 않은
-길이는 거부합니다. `units.resolve`는 없는 차원을 SI로 다루지만
-(`packages/simcase/src/simcase/units.py:103-104`), 형상을 읽는 모든 종류가 이미 선언하지 않은
-길이를 거부합니다.
-- `em.modes2d`: `packages/simcase/src/simcase/schema.py:55,333-341`
-- `thermal.steady2d`: `packages/simcase/src/simcase/thermal.py:63-65`
-- 영역 열: `packages/simcase/src/simcase/thermal_regions.py:229-231`
-- `em.cavity3d`: `packages/simcase/src/simcase/cavity.py:169-170`
-
-**새 문서의 기본값.** Studio와 API가 새로 쓰는 문서는 `"m"`를 선언합니다.
-
-**바뀌지 않는 규칙:**
-- 단위 기호와 `{"in_m": x}` 탈출구(`packages/simcase/src/simcase/units.py:35-37,124-146`)
-- 태그 `[value, "unit"]` 쌍 거부(`packages/simcase/src/simcase/schema.py:110-118`)
+승인 당시 이 절의 내용: 형상 숫자는 문서의 `units.length` 단위이며, 버전 1 블록이 있는 문서는 이를 선언해야
+함. Studio와 API가 새로 쓰는 문서는 `"m"`를 선언함. `{"in_m": x}` 탈출구는 유지하고 태그 `[value, "unit"]`
+쌍은 거부함.
 
 **각도 없음.** 버전 1에는 각도 양이 없습니다.
 
@@ -733,7 +733,8 @@ sipi에서 옮기는 방식:
 
 **simcase 문서.** 내장 예제 20개(`packages/simcase/src/simcase/examples.py`, 거기에 등록되는 열·전기
 예제 포함)와 `examples/simcase/*.json` 25개: 문서 45개, `geometry` 블록 안의 숫자 364개.
-- 45개 모두 `units.length`를 선언합니다.
+- 45개 모두 `units.length`를 선언합니다(형식 0.2. 2026-11-10부터는 구성 요소마다 `length_unit`을 선언,
+  [단위](#단위) 참고).
 - 364개 모두 정수 pm입니다. 반올림이 필요 없습니다.
 - 새 `id`가 필요한 도형 이름은 없습니다.
 - 반올림 수준의 꼭짓점 변화가 하나 알려져 있습니다: `pml_leaky_slab.json`([내부 격자](#내부-격자-1-pm동결)
@@ -815,3 +816,7 @@ sipi에서 옮기는 방식:
   메시 노드), 위상 탐침(꼭짓점 1차 판정과 p ± δ 정확 탐침), 거부 항목을 추가. 기존 동결 본문은 그대로. 소비자
   표 행과 상태 문장도 추가(동결 절 아님).
 - 2026-11-08: 소비자 표에 영역 기계를 적음(동결 절 아님).
+- 2026-11-10: 단위·이름 배치(형식 0.3). 단위 절은 구성 요소마다의 `length_unit`과 `depth`로 대체되고, 최상위
+  구조와 버전 절이 그렇게 적으며, JSON 계약 문구는 봉투가 `"0.3"`이고 형식 0.2 문서는 이름을 밝혀 거부한다고
+  적음. 단위 절의 승인 본문은 그 자리에 요약하고, 나머지 동결 본문은 그대로. 상태 문장과 부록도 고침(동결 절
+  아님).

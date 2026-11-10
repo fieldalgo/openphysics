@@ -10,10 +10,16 @@ that no region fills becomes a void feature after its region. ``to_geometry_v1``
 writes that order. The block is a plain dictionary; meshine does not depend on the
 reader that checks it.
 
-A ``Domain`` carries no unit, so the caller names one. What the contract cannot hold
-is left out and said so: a boundary-name callback (pass ``boundary_tags`` yourself)
-and region materials (each region's material is its name unless ``materials`` maps
-it). ``Circle.n`` goes to ``mesh_controls`` and the default size to ``mesh_size``.
+The parts are those of a format 0.3 document (``"openphysics": "0.3"``, which the
+caller adds): the component declares its ``length_unit`` and ``depth`` (null, per metre
+of depth), a region's own size is its feature's ``element_size`` and the default size
+is ``mesh.element_size``, quantity strings in that unit; ``Circle.n`` goes to a
+``mesh.controls`` entry as ``circle_segment_count``.
+
+A ``Domain`` carries no unit, so the caller names one, from the format 0.3 length menu
+(``LENGTH_UNITS``). What the contract cannot hold is left out and said so: a
+boundary-name callback (pass ``boundary_tags`` yourself) and region materials (each
+region's material is its name unless ``materials`` maps it).
 """
 
 from __future__ import annotations
@@ -33,6 +39,9 @@ RESERVED_IDS = frozenset(
     ["background", "domain", "exterior", "outer", "void", "axis", "left", "right", "bottom", "top"]
     + [f"{a}{b}" for a in "xyz" for b in "01"]
     + [f"{a}{b}" for a in "xyz" for b in ("min", "max")])
+#: The length units a format 0.3 component may declare (physmat.units.LENGTH_UNITS); a test
+#: keeps this copy equal to the registry's.
+LENGTH_UNITS = ("pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil")
 
 
 def _vertices(loop) -> np.ndarray:
@@ -85,17 +94,27 @@ def _ident(name: str, used: set) -> dict:
     return {"id": f"f{k}"}
 
 
-def to_geometry_v1(domain: Domain, *, length_unit, materials: dict | None = None) -> dict:
-    """The version 1 document parts of ``domain`` (before ``build``).
+def _quantity(value: float, unit: str) -> str:
+    """A length as a format 0.3 quantity string in ``unit``: the double's shortest repr."""
+    return f"{float(value)!r} {unit}"
 
-    ``length_unit`` is the unit the domain's numbers are in, as a ``units.length``
-    declaration (``"um"``, ``"m"``, ``{"in_m": ...}``); it is required. Returns
-    ``{"units", "geometry", "mesh_size", "mesh_controls"}``.
+
+def to_geometry_v1(domain: Domain, *, length_unit, materials: dict | None = None) -> dict:
+    """The format 0.3 document parts of ``domain`` (before ``build``).
+
+    ``length_unit`` is the unit the domain's numbers are in, one of ``LENGTH_UNITS``
+    (``"um"``, ``"m"``, ...); it is required. Returns ``{"geometry", "mesh"}``: a version 1
+    ``geometry`` block whose component declares ``length_unit`` and ``depth`` (null), and
+    ``mesh`` with ``element_size`` (the domain's default size) and ``controls`` (one
+    ``circle_segment_count`` entry per circle).
     """
     if not isinstance(domain, Domain):
         raise TypeError("domain must be a meshine Domain")
     if length_unit is None:
         raise ValueError("a Domain carries no unit; give length_unit")
+    if not isinstance(length_unit, str) or length_unit not in LENGTH_UNITS:
+        raise ValueError(f"length_unit: a format 0.3 length unit is one of {' '.join(LENGTH_UNITS)}, "
+                         f"got {length_unit!r}")
     pending = list(domain._pending)
     if not pending:
         raise ValueError("the domain has no regions")
@@ -116,10 +135,10 @@ def to_geometry_v1(domain: Domain, *, length_unit, materials: dict | None = None
         if fname != name:
             f["region"] = name
         if size is not None:
-            f["mesh_size"] = float(size)
+            f["element_size"] = _quantity(size, length_unit)
         features.append(f)
         if isinstance(loops[0], Circle):
-            controls.append({"select": f.get("id", fname), "circle_segments": loops[0].n})
+            controls.append({"select": f.get("id", fname), "circle_segment_count": loops[0].n})
         for h, hole in enumerate(loops[1:], start=1):
             hv = _vertices(hole)
             # A hole that is exactly another region's outer loop is filled by that region,
@@ -133,8 +152,8 @@ def to_geometry_v1(domain: Domain, *, length_unit, materials: dict | None = None
             features.append({"name": vname, **_ident(vname, used), **_shape(hole), "material": None})
     every = np.vstack(outers)
     lo, hi = every.min(axis=0), every.max(axis=0)
-    component = {"dimension": "2d",
+    component = {"dimension": "2d", "length_unit": length_unit, "depth": None,
                  "domain": {"xmin": float(lo[0]), "xmax": float(hi[0]), "ymin": float(lo[1]), "ymax": float(hi[1])},
                  "background": {"material": None}, "features": features, "finalize": "later_wins"}
-    return {"units": {"length": length_unit}, "geometry": {"version": 1, "components": {"domain": component}},
-            "mesh_size": domain.default_size, "mesh_controls": controls}
+    return {"geometry": {"version": 1, "components": {"domain": component}},
+            "mesh": {"element_size": _quantity(domain.default_size, length_unit), "controls": controls}}

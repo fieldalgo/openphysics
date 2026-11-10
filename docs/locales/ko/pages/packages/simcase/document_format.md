@@ -55,7 +55,8 @@
 `"openphysics"`는 JSON **문자열** `"0.3"`이어야 합니다. 키가 없거나, 숫자 `0.3`이거나,
 `"0.2"`나 다른 값이면 `openphysics`에서 `E-FORMAT`이고 읽기를 멈춥니다. 이 읽기는 형식 0.2
 문서를 읽지 않습니다. 문서의 물리 유형이 오늘처럼 종류를 고르며, 아직 형식 0.3을 읽지 않는
-종류는 `physics.<이름>.type`에서 `E-CONTRACT`로 거부합니다.
+종류는 `physics.<이름>.type`에서 `E-CONTRACT`로 거부하고, 어떤 종류도 맡지 않는 유형은 그 자리에서
+이 릴리스가 읽는 물리 유형을 밝히며 `E-VALUE-FORM`입니다.
 
 최상위 키: `openphysics name geometry materials physics mesh study results display_units`.
 `units`는 "units travel with each value"와 함께 `E-KEY-UNKNOWN`입니다. `display_units`(선택)는
@@ -239,7 +240,8 @@ python -m simcase fix model.json [--in-place]
   전에 해석한 SI 값이 하나라도 비트 단위로 달라지면 쓰지 않습니다. `--in-place`가 없으면 결과를
   출력합니다.
 
-형식 0.2 문서에서 `validate`와 `run`은 예전과 같고, `explain`과 `fix`는 거부합니다.
+형식 0.2 문서는 모든 명령이 거부합니다(종료 코드 2). `validate`와 `run`은 무엇을 대신 써야 하는지와 함께
+`E-FORMAT` 거부를 출력하고, `explain`과 `fix`는 거부합니다. `simcase geometry`도 이름을 밝혀 거부합니다.
 
 ## Python
 
@@ -289,9 +291,11 @@ doc, diagnostics = reader.check(text)    # without raising: for validate, explai
 
 ## 아직 하지 않은 것
 
-- Studio의 원시 바이트 읽기와 물리량 엔드포인트, 그다음 0.2 읽기와 `simcase.units`,
-  `simcase.unit_vocabulary`의 은퇴. (모든 종류가, 마지막으로 `em.cavity3d`가, 물리 슬롯과 예제,
-  등록부 이름의 결과를 갖췄습니다.)
+- `simcase.units`와, 커널 넘기기가 아직 쓰는 내부 형식 0.2 도우미(µm 사본, 단위를 선언한 형상 읽기,
+  커널 계약인 `em.modes2d` 0.2 검증기)의 은퇴. (모든 종류가, 마지막으로 `em.cavity3d`가, 물리 슬롯과 예제,
+  등록부 이름의 결과를 갖췄고, Studio는 원시 바이트를 읽고 물리량 엔드포인트를 냅니다. 사용자 문서의 형식
+  0.2 읽기와 `simcase.unit_vocabulary`, `simcase.void_area_m2`는 은퇴했습니다: `simcase.quantities`,
+  `simcase.void_area`.)
 - 남은 코드는 그것이 필요한 종류가 그 단계에서 냅니다(`E-SPECTRAL`은 분광 키를 둘 이상 준 항목에
   `em.modes2d`가, `I-DEFAULT-BOUNDARY`는 열, 전기·Joule, 역학, `em.modes2d`가, `E-OUTSIDE-VALID`는 `joule.temperature2d`가, `W-GAUGE-ATMOSPHERIC`과 `E-ABSOLUTE-AS-LOAD`는
   역학이 냅니다).

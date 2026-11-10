@@ -7,13 +7,13 @@
 Status: **first step of the OpenPhysics units and naming convention, with the
 registry entries and converter functions the document reader needs.**
 `physmat.units` holds the quantity registry and the one converter from
-human-written units to SI. **Only the format 0.3 reader of `simcase` calls it so far**
-([document format 0.3](../simcase/document_format.md)), and no physics kind reads that
-format yet: model documents, the `simcase` runners,
-`galerkin`, `sipi` and Studio keep their current key names and units, and the
-other physmat functions keep their current arguments (wavelengths in micrometres,
-temperatures in kelvin, and Celsius `temperature_c` for the Ciddor air model),
-until later steps of the convention change them together. The module uses only
+human-written units to SI. **`simcase` calls it**: its format 0.3 reader
+([document format 0.3](../simcase/document_format.md)), through which every
+`simcase` document kind and Studio read their documents. `galerkin` and `sipi` do not
+call it yet and keep their current key names and units, and the other physmat
+functions keep their current arguments (wavelengths in micrometres, temperatures in
+kelvin, and Celsius `temperature_c` for the Ciddor air model), until later steps of
+the convention change them. The module uses only
 the Python standard library.
 
 ```python
@@ -506,17 +506,18 @@ python -m pytest -q tests/physmat
 
 ## Not done yet
 
-- Only the format 0.3 reader of `simcase` calls the converter (with its slot table,
+- Only `simcase` calls the converter: its format 0.3 reader (with its slot table,
   decimal-preserving JSON reader and writer, component objects, ranges, model
   coefficients and annotated values with `accept`;
-  [document format 0.3](../simcase/document_format.md)), and no document kind reads that
-  format yet; `galerkin`, `sipi` and Studio do not call it. The JSON Schema, tables,
-  impedances and the generated documentation tables are not done.
+  [document format 0.3](../simcase/document_format.md)), which every `simcase` document
+  kind and Studio read; `galerkin` and `sipi` do not call it yet. The JSON Schema,
+  tables, impedances and the generated documentation tables are not done.
 - Checks that need more than one value (sound speed, Celsius-as-kelvin, mesh
   estimate, ...) and `E-SPECTRAL`, `E-BASIS` are not here.
-- The list of echoed inputs placed in `result` comes from today's result summaries
-  as the step-2 specification maps them; each document kind's step checks it
-  against its converted results.
+- The list of echoed inputs placed in `result` comes from the result summaries as
+  the step-2 specification maps them; every document kind checks it against its
+  converted results, and `tests/simcase/test_units_closure.py` checks every quantity
+  that a shipped example's summary echoes.
 - Messages are English; the registry has English and Korean titles for every code.
   Unicode display forms (`µm`, `°C`, `W/(m·K)`) and display profiles are not here.
 - Physical constants, the same-unit pairs list and the coupling table are not in the

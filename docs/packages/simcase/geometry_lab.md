@@ -58,10 +58,11 @@ the routes of each physics page.
 ## What it sends and answers
 
 `POST /api/geometry-lab/evaluate` takes `{"doc": <document>, "component":
-<name or null>}`. It reads only the `geometry` block (and the `units` block of a
-format 0.2 document), as `python -m simcase geometry` does, so a document without
-physics is accepted. The shipped starters and a new document are format 0.3, whose
-component `length_unit` sets the drawing unit. The answer is `{"ok": true, ...}` with
+<name or null>}`. It reads only the `geometry` block of a format 0.3 document, as
+`python -m simcase geometry` does, so a document without physics is accepted; a
+document of another format is refused by name (`E-FORMAT`). The shipped starters
+and a new document are format 0.3, whose component `length_unit` sets the drawing
+unit. The answer is `{"ok": true, ...}` with
 the component's cells, curves (points in the component's length unit), regions with areas, selections with their entry
 indices, boundary tags, parameters (written and evaluated), roundings and the
 engine listing, or `{"ok": false, "refused": <message>}`. It is a view for this
@@ -89,7 +90,7 @@ Registered before the page was written:
 |---|---|
 | GL-1 the engine listing equals `python -m simcase geometry` for both examples; regions, selections, curve provenance and tags equal the engine's | `tests/simcase/test_studio_geometry_lab.py` |
 | GL-2 after a parameter edit (three values in the range, and an expression) cell areas, vertices, curves and selections equal a fresh engine run, compared with `==` | same |
-| GL-3 refusals carry the engine's message: a self-crossing path, an arc end off its circle, a `3d` component, an empty selection, a parameter cycle, a 0.2 block (the CLI's words) | same |
+| GL-3 refusals carry the engine's message: a self-crossing path, an arc end off its circle, a `3d` component, an empty selection, a parameter cycle, a flat block without `version` (the CLI's words) | same |
 | GL-4 the saved text parses back to the edited document and the same model | same, and the browser check |
 | GL-5 real browser: both starters, slider and text edits, a refusal and a save, with no console error and no policy violation | `tools/studio_browser/geometry_lab_browser.mjs` (local; needs Playwright, not in CI) |
 | GL-6 the page's pure helpers | `tests/simcase/studio_geometry_lab.cjs` |

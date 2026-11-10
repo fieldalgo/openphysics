@@ -159,6 +159,53 @@ def test_every_shared_path_of_the_toy_document_matches_one_slot(toy_kind):
     assert _check_closure(toy.document(), table, "toy") > 10
 
 
+def _closed(tree, label) -> int:
+    tree = json.loads(json.dumps(tree))
+    return _check_closure(tree, slots.table_for(registry.kind_of(tree)), label, skip=())
+
+
+def test_every_path_of_every_built_in_document_matches_one_slot():
+    """P2-12 over the built-in documents (``simcase.examples.EXAMPLES``), units batch C11a."""
+    from simcase import examples
+    assert len(examples.EXAMPLES) >= 20
+    for name, data in examples.EXAMPLES.items():
+        assert data["openphysics"] == "0.3", name
+        assert _closed(data, f"built-in {name}") > 10
+
+
+def _studio_documents() -> dict:
+    """The Studio starters and the output of every JS document builder, as the page writes them
+    (dumped by ``studio_document_builders.cjs``); skipped without node."""
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed; the cjs suite runs the builders itself")
+    with tempfile.TemporaryDirectory() as folder:
+        dump = Path(folder) / "builders.json"
+        done = subprocess.run([node, "--test", str(ROOT / "tests" / "simcase" / "studio_document_builders.cjs")],
+                              capture_output=True, text=True, encoding="utf-8", cwd=ROOT,
+                              env={**os.environ, "OPENPHYSICS_STUDIO_BUILDER_DUMP": str(dump)})
+        assert done.returncode == 0, done.stdout + done.stderr
+        return {label: json.loads(text) for label, text in json.loads(dump.read_text(encoding="utf-8")).items()}
+
+
+def test_every_path_of_every_studio_starter_and_builder_document_matches_one_slot():
+    """P2-12 over the Studio starters and JS builder documents (units batch C11a). The geometry
+    lab's new document is geometry only (it has no physics block, geometry_lab.md): its paths are
+    checked against the shared slots."""
+    docs = _studio_documents()
+    assert {"geometry lab starter geometry_v1_soi_strip", "geometry lab starter geometry_v1_imprint_rib",
+            "heat default", "optical default core"} <= set(docs)
+    for label, data in docs.items():
+        if "physics" not in data:
+            assert _check_closure(json.loads(json.dumps(data)), slots.table_for(None), label) > 5
+        else:
+            assert _closed(data, label) > 10
+
+
 @pytest.mark.parametrize("path, key", [
     (("geometry",), "length_unti"), (("geometry", "domain"), "zmax2"), (("geometry", "shapes", 0), "colour"),
     (("geometry", "background"), "mesh_size"), (("mesh",), "fine"), (("study",), "times"), (("results",), "vtu"),
