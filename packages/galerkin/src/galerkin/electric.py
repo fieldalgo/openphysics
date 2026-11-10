@@ -106,7 +106,7 @@ def _frozen(value):
 
 
 def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None,
-                          reference_potential=None):
+                          reference_potential=None, motion=None):
     """Solve div(-sigma grad V)=0 on a conforming 2D P1 mesh in metres.
 
     conductivity: positive scalar, exact region-name table or mesh-bound
@@ -117,7 +117,15 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
     reference_potential: node -> volts, exactly one gauge per component without
         Dirichlet support. Each such component must have zero net imposed current
         to 1e-12 relative to integral(abs(J.n)); incompatible data is never repaired.
+    motion: galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 + t*velocity
+        and every result carries the derivative with respect to the JAX or PyTorch
+        scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
+    if motion is not None:
+        from .shape import solve_steady_electric_moving
+        return solve_steady_electric_moving(mesh, motion, conductivity=conductivity, dirichlet=dirichlet,
+                                            outward_current=outward_current,
+                                            reference_potential=reference_potential)
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
     sigma = (conductivity.on_mesh(mesh) if isinstance(conductivity, ElementConductivity)
              else region_property(mesh, conductivity, "conductivity", positive=True, live=True))

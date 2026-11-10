@@ -4,8 +4,9 @@
 
 [galerkin 개요](overview.md) · [JAX·PyTorch로 미분하기](differentiation.md)
 
-`galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 이번 첫 조각은 정상
-Cartesian 열(`galerkin.thermal.solve_steady_heat`)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+`galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 Cartesian 열
+(`galerkin.thermal.solve_steady_heat`, 2026-11-09)과 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10)를
+다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -43,6 +44,16 @@ dQ = jax.grad(heat_in)(jnp.asarray(0.0))
 
 PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘기고 `.backward()`를 부릅니다.
 
+## 정상 전기 전도
+
+`solve_steady_electric(mesh, ..., motion=MeshMotion(W, t))`도 같은 방식입니다.
+- 옮겨진 메시에서 일반 풀이가 돌고, 잔차·전류 수지·전력 수지 검사를 그대로 거칩니다.
+- live 풀이 한 번이 X₀ + t·W로 시스템을 다시 조립합니다: 영역 전도도를 쓴 P1 강성, 움직이는 변의 outward current.
+- 모든 필드가 d/dt를 나릅니다: `potential`·`electric_field`·`current_density`·`joule_heating`·`joule_load`·
+  `joule_power_per_length`·`reaction`·`residual`·`supplied_power_per_length`.
+- Dirichlet 전압과 `reference_potential` 게이지(전류 자료만 있는 성분)를 모두 받습니다.
+- 이산 전력 항등식(Joule 전력 = 공급 전력)이 미분에서도 성립합니다(검증 E5).
+
 ## 메시 속도
 
 형상의 곡선 위 노드는 설계가 움직이는 대로 움직입니다. 버전 1 형상 문서라면 `simcase.geometry_velocity.design_velocity(document,
@@ -74,8 +85,9 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - NumPy `t`(`TypeError`): NumPy는 미분하지 않습니다. 옮겨진 메시에서 풀려면 노드를 옮겨 그 메시를 푸십시오.
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
-- 열원·outward flux·convection의 좌표 콜백과 `ElementHeatSource`: 표본점이 메시와 함께 움직입니다.
-- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet 값: 그런 호출에서 live 입력은 t 하나입니다.
+- 열원·outward flux·convection·outward current의 좌표 콜백(convection 쌍 안의 것 포함), `ElementHeatSource`와
+  `ElementConductivity`: 표본점이 메시와 함께 움직입니다.
+- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위 값: 그런 호출에서 live 입력은 t 하나입니다.
 - `coordinate_system="axisymmetric"`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
@@ -96,3 +108,17 @@ PyTorch 2.14.1+cpu로 측정했습니다.
 | S6 뒤집힘 한계 | 구간이 정확한 근과 같음; 넘는 스텝은 거부 | 통과 |
 | S7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `627eb28`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | S8 거부 | 위 목록대로 | 통과 |
+
+`tests/galerkin/test_shape_derivative_electric.py`에 정상 전기 전도의 검사 E1–E8이 있습니다. 2026-11-10에 사전 등록하고 같은 날
+같은 버전으로 측정했습니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| E1 이산 일관성 | 영역 전도도와 움직이는 변의 outward current가 있는 문제에서, 탐침 전위·단자 전류·Joule 전력의 미분 vs 옮긴 메시 중심차분(h = 1e-4); 상대 1e-6, JAX·PyTorch | 7.2e-10, 1.9e-9, 1.2e-9 |
+| E2 두 층 저항 | dR/dL₁ = (1/σ₁ − 1/σ₂)/H, 상대 1e-10 | 통과 |
+| E3 동축 도체 | 형상 엔진 노드 속도로 안 반지름; dI/da = 2πσΔV/(a ln²(b/a)); 관측 차수 ≥ 1.5, 최세 1e-3 이내 | 크기 0.8·0.4·0.2에서 8.1e-3, 2.1e-3, 5.8e-4 |
+| E4 강체 이동 | dJ/dt = 0, 1e-12 · \|J\| 이내(전력, 전위 합) | 통과 |
+| E5 전력 항등식 | d(Joule 전력)/dt = d(공급 전력)/dt, 상대 1e-10 | 9e-14(JAX), 5e-14(PyTorch) |
+| E6 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `a0a432b`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
+| E7 게이지 성분 | 전류 자료와 `reference_potential`만 있는 성분: E1 기준 | 통과 |
+| E8 거부 | 위 목록대로 | 통과 |

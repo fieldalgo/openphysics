@@ -5,9 +5,10 @@
 [galerkin overview](overview.md) · [Derivatives with JAX and PyTorch](differentiation.md)
 
 `galerkin.shape` gives derivatives with respect to a design parameter that moves
-the mesh, such as a layer thickness or a hole radius. This first slice covers
-steady Cartesian heat (`galerkin.thermal.solve_steady_heat`). The other solvers
-follow the same frame later.
+the mesh, such as a layer thickness or a hole radius. It covers steady Cartesian
+heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09) and steady electric
+conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10). The other
+solvers follow the same frame later.
 
 ## What is differentiated
 
@@ -51,6 +52,21 @@ dQ = jax.grad(heat_in)(jnp.asarray(0.0))
 
 With PyTorch, pass `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`
 and call `.backward()`.
+
+## Steady electric conduction
+
+`solve_steady_electric(mesh, ..., motion=MeshMotion(W, t))` works the same way:
+- The ordinary solve runs on the moved mesh, with its residual, current-balance
+  and power-balance checks.
+- One live solve re-assembles the system from X₀ + t·W: P1 stiffness with region
+  conductivity, and the outward current on moving edges.
+- Every field carries d/dt: `potential`, `electric_field`, `current_density`,
+  `joule_heating`, `joule_load`, `joule_power_per_length`, `reaction`, `residual`
+  and `supplied_power_per_length`.
+- Dirichlet volts and `reference_potential` gauges (components with only current
+  data) are both taken.
+- The discrete power identity, Joule power = supplied power, also holds for the
+  derivatives (validation E5).
 
 ## The mesh velocity
 
@@ -96,10 +112,11 @@ Each refusal names the reason:
   mesh, move the nodes and solve that mesh;
 - a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
 - a step outside the admissible interval (`ElementInversion`);
-- coordinate callbacks for the heat source, outward flux or convection, and
-  `ElementHeatSource`: their sample points move with the mesh;
-- live conductivity, source, boundary or Dirichlet values together with a motion:
-  t is the one live input of such a call;
+- coordinate callbacks for the heat source, outward flux, convection or outward
+  current, also inside a convection pair, and `ElementHeatSource` and
+  `ElementConductivity`: their sample points move with the mesh;
+- live conductivity, source, boundary, Dirichlet or reference values together
+  with a motion: t is the one live input of such a call;
 - `coordinate_system="axisymmetric"`;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
@@ -121,3 +138,18 @@ before the implementation. They were measured on 2026-11-09 on Linux with JAX
 | S6 inversion bound | the interval equals the exact roots; a step beyond it is refused | pass |
 | S7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `627eb28` (measured); `motion=None` equals no keyword (test) |
 | S8 refusals | as listed above | pass |
+
+`tests/galerkin/test_shape_derivative_electric.py` holds checks E1–E8 for
+steady electric conduction, pre-registered on 2026-11-10 and measured that day
+with the same versions.
+
+| Check | Criterion | Result |
+|---|---|---|
+| E1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a probe potential, the terminal current and the Joule power, with region conductivity and an outward current on a moving side; relative 1e-6, JAX and PyTorch | 7.2e-10, 1.9e-9, 1.2e-9 |
+| E2 two-layer resistor | dR/dL₁ = (1/σ₁ − 1/σ₂)/H, relative 1e-10 | pass |
+| E3 coaxial conductor | inner radius from the geometry engine's node velocities; dI/da = 2πσΔV/(a ln²(b/a)); observed order ≥ 1.5, finest within 1e-3 | 8.1e-3, 2.1e-3, 5.8e-4 at sizes 0.8, 0.4, 0.2 |
+| E4 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| (power, sum of potentials) | pass |
+| E5 power identity | d(Joule power)/dt = d(supplied power)/dt, relative 1e-10 | 9e-14 (JAX), 5e-14 (PyTorch) |
+| E6 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `a0a432b` (measured); `motion=None` equals no keyword (test) |
+| E7 gauge component | a component with only current data and a `reference_potential`: E1 criterion | pass |
+| E8 refusals | as listed above | pass |
