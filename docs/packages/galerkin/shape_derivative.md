@@ -8,9 +8,11 @@
 the mesh, such as a layer thickness or a hole radius. It covers steady Cartesian
 heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09), steady electric
 conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10), linear
-elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10) and
+elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10),
 thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
-`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10). The other
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10) and
+transient Cartesian heat (`galerkin.transient_heat.solve_transient_heat`,
+2026-11-10). The other
 solvers follow the same frame later.
 
 ## What is differentiated
@@ -118,6 +120,25 @@ mesh.
 - A temperature field fixed in space and sampled at the moving nodes is not
   offered: that needs a coordinate callback (refused below).
 
+## Transient heat
+
+`solve_transient_heat(mesh, ..., motion=MeshMotion(W, t))` takes region
+conductivity and heat capacity, a constant or region heat source, outward flux and
+convection on boundary tags (they move with their edges), and Dirichlet values.
+- The ordinary backward-Euler solve runs once on the moved mesh, with every step
+  check.
+- Each step then gets one live correction from the mass, stiffness and Robin
+  matrices and loads assembled from X₀ + t·W. Every history carries d/dt:
+  temperature, heat flux, source load, reaction, residual, storage rate, heat
+  content, quadratic functional, and the prescribed and convective outward rates.
+- The initial temperatures and the Dirichlet values stay attached to their nodes
+  as they move, as in thermoelasticity.
+- Callbacks of time alone, `callback(time_s)`, are taken for the Dirichlet values,
+  the outward flux and the convection h and ambient. They do not depend on node
+  positions. A callback of time must return NumPy numbers. Callbacks of
+  coordinates are refused, as everywhere.
+- `checkpoint_every` is refused with a motion: every step is kept.
+
 ## The mesh velocity
 
 Nodes on the geometry's curves move as the design moves them. For a version 1
@@ -165,13 +186,16 @@ Each refusal names the reason:
 - coordinate callbacks for the heat source, outward flux, convection, outward
   current, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
-  the mesh;
+  the mesh. Callbacks of time alone are taken in transient heat;
+- callable coefficients or Dirichlet values (other than callbacks of time in
+  transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
-  thermal-expansion, reference-temperature, body-force or traction values together
-  with a motion: t is the one live input of such a call;
+  thermal-expansion, reference-temperature, body-force, traction, heat-capacity or
+  initial-temperature values together with a motion: t is the one live input of
+  such a call;
 - a temperature snapshot of another mesh, including the moved one: the snapshot
   belongs to the mesh as given;
-- `coordinate_system="axisymmetric"`;
+- `coordinate_system="axisymmetric"`; `checkpoint_every` in transient heat;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
   ([refused](differentiation.md#refused-not-approximated)).
@@ -260,3 +284,18 @@ The pre-registration fixed M4's criteria, not its mesh sizes. A first run with s
 0.8, 0.4 and 0.2 gave 1.6e-1, 4.4e-2 and 1.016e-2: order about 2, but the finest
 just above 1e-2. The test uses the next finer three sizes; the criteria are
 unchanged.
+
+`tests/galerkin/test_shape_derivative_transient_heat.py` holds checks H1–H8 for
+transient heat, pre-registered on 2026-11-10 with H3's mesh and step counts, and
+measured that day with the same versions.
+
+| Check | Criterion | Result |
+|---|---|---|
+| H1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a final probe temperature, the final Dirichlet reaction sum, the final heat content and a weighted sum of the whole temperature history, with two materials, a source, a nonuniform initial temperature, a Dirichlet side and an outward flux that depend on time, and convection on a moving side; relative 1e-6, JAX and PyTorch | 1.2e-11 to 3.5e-9 |
+| H2 uniform solution | insulated, uniform initial temperature and source: the discrete solution is T₀ + Q t_n/c on any mesh, so dC_n/dt = (c T₀ + Q t_n) dA/dt; relative 1e-10 | pass |
+| H3 decaying sine, bar length | Dirichlet ends, initial sin(πx/L) on the nodes, the bar stretched; d/dL of the final heat content against the closed form; (nx, steps) = (10, 10), (20, 40), (40, 160); observed order ≥ 1.0, finest within 1e-2 | 2.0e-2, 5.1e-3, 1.3e-3 (order 2.0 and 2.0) |
+| H4 steady limit | after the solution reaches steady state, the probe derivative equals steady heat's, relative 1e-8 | pass |
+| H5 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| (heat content, sum of temperatures) | pass |
+| H6 heat balance | d(Σ reaction)/dt = d(Σ storage − Σ load + Σ outward)/dt at the final step, relative 1e-10 | pass |
+| H7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `3afaaa6` (measured); `motion=None` equals no keyword (test) |
+| H8 refusals | as listed above | pass |
