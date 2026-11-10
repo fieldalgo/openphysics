@@ -1,0 +1,332 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "cavity3d-edge-v1 (format 0.2 vacuum PEC em.cavity3d, SI arrays) -> cavity3d-edge-v2 (format 0.3, SI, registry names); spec section 5.3.5. The real layout holds real values only, so every array maps as computed (=); the unit strings and the target frequency and mode counts move into metadata_json and the summary; the old echo material (vacuum) and the new background material (physmat:vacuum) are identifier strings; the subdivision echo is compared with resolved_inputs.",
+ "old_layout": "cavity3d-edge-v1",
+ "new_layout": "cavity3d-edge-v2",
+ "arrays": [
+  {
+   "old": "nodes",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "tetrahedra",
+   "new": "tetrahedra",
+   "f": "="
+  },
+  {
+   "old": "edges",
+   "new": "edges",
+   "f": "="
+  },
+  {
+   "old": "tet_edges",
+   "new": "tet_edges",
+   "f": "="
+  },
+  {
+   "old": "edge_signs",
+   "new": "edge_signs",
+   "f": "="
+  },
+  {
+   "old": "pec_edge_ids",
+   "new": "pec_edge_ids",
+   "f": "="
+  },
+  {
+   "old": "frequencies_hz",
+   "new": "resonant_frequency",
+   "f": "="
+  },
+  {
+   "old": "eigenvalues_m2",
+   "new": "wavenumber_squared",
+   "f": "="
+  },
+  {
+   "old": "edge_coefficients",
+   "new": "mass_normalized_electric_field_line_integral",
+   "f": "="
+  },
+  {
+   "old": "electric_field",
+   "new": "mass_normalized_electric_field",
+   "f": "="
+  },
+  {
+   "old": "relative_residuals",
+   "new": "relative_residual",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "search",
+   "new": "search",
+   "f": "="
+  },
+  {
+   "old": "edge_orientation",
+   "new": "edge_orientation",
+   "f": "="
+  },
+  {
+   "old": "electric_field_location",
+   "new": "electric_field_location",
+   "f": "="
+  },
+  {
+   "old": "cluster_completeness",
+   "new": "cluster_completeness",
+   "f": "="
+  },
+  {
+   "old": "mode_count_policy",
+   "new": "mode_count_policy",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "frequency_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "eigenvalue_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "edge_coefficient_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "electric_field_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "target_frequency_hz",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "requested_modes",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "returned_modes",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "units.length",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "frequency_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "eigenvalue_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "edge_coefficient_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "electric_field_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "amplitude",
+   "new": "amplitude",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "edge_orientation",
+   "new": "edge_orientation",
+   "f": "="
+  },
+  {
+   "old": "electric_field_location",
+   "new": "electric_field_location",
+   "f": "="
+  },
+  {
+   "old": "cluster_completeness",
+   "new": "cluster_completeness",
+   "f": "="
+  },
+  {
+   "old": "mode_count_policy",
+   "new": "mode_count_policy",
+   "f": "="
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.tetrahedra",
+   "new": "mesh.tetrahedra",
+   "f": "="
+  },
+  {
+   "old": "mesh.edges",
+   "new": "mesh.edges",
+   "f": "="
+  },
+  {
+   "old": "mesh.subdivisions.[]",
+   "new": "resolved_inputs.[\"mesh.subdivision_count\"].value.[]",
+   "f": "="
+  },
+  {
+   "old": "study.type",
+   "new": "study.type",
+   "f": "="
+  },
+  {
+   "old": "boundary",
+   "new": "boundary",
+   "f": "="
+  },
+  {
+   "old": "search",
+   "new": "search",
+   "f": "="
+  },
+  {
+   "old": "target_frequency_hz",
+   "new": "target_frequency.value",
+   "f": "="
+  },
+  {
+   "old": "requested_modes",
+   "new": "mode_count",
+   "f": "="
+  },
+  {
+   "old": "returned_modes",
+   "new": "returned_mode_count",
+   "f": "="
+  },
+  {
+   "old": "relative_residuals.[]",
+   "new": "relative_residual.values.[]",
+   "f": "="
+  },
+  {
+   "old": "frequencies_hz.[]",
+   "new": "resonant_frequency.values.[]",
+   "f": "="
+  },
+  {
+   "old": "eigenvalues_m2.[]",
+   "new": "wavenumber_squared.values.[]",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "field_units.**",
+  "field_locations.**",
+  "field_shapes.**",
+  "target_frequency.unit",
+  "resonant_frequency.unit",
+  "wavenumber_squared.unit",
+  "relative_residual.unit"
+ ],
+ "identifiers": [
+  "field_layout",
+  "material",
+  "background.material"
+ ],
+ "vtu": [
+  {
+   "old": "electric_field_mode_0",
+   "new": "mass_normalized_electric_field_mode_0",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_1",
+   "new": "mass_normalized_electric_field_mode_1",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_2",
+   "new": "mass_normalized_electric_field_mode_2",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_3",
+   "new": "mass_normalized_electric_field_mode_3",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_4",
+   "new": "mass_normalized_electric_field_mode_4",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_5",
+   "new": "mass_normalized_electric_field_mode_5",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_6",
+   "new": "mass_normalized_electric_field_mode_6",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_7",
+   "new": "mass_normalized_electric_field_mode_7",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_8",
+   "new": "mass_normalized_electric_field_mode_8",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_9",
+   "new": "mass_normalized_electric_field_mode_9",
+   "f": "="
+  }
+ ],
+ "vtu_added": []
+}

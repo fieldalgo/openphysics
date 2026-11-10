@@ -1,10 +1,8 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Vacuum PEC box 1 x 0.6 x 0.4 m, four modes near 300 MHz",
-  "units": {
-    "length": "m"
-  },
   "geometry": {
+    "length_unit": "m",
     "domain": {
       "xmin": 0,
       "xmax": 1.0,
@@ -14,7 +12,7 @@
       "zmax": 0.4
     },
     "background": {
-      "material": "vacuum"
+      "material": "physmat:vacuum"
     },
     "shapes": []
   },
@@ -23,12 +21,12 @@
       "type": "em.cavity3d",
       "boundary": "pec",
       "search": "near_target",
-      "target_frequency_hz": 300000000.0,
-      "num_modes": 4
+      "target_frequency": "300 MHz",
+      "mode_count": 4
     }
   },
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       30,
       18,
       12

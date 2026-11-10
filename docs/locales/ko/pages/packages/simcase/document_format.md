@@ -5,15 +5,14 @@
 [문서 홈](../../index.md) · [simcase 개요](overview.md) ·
 [physmat.units](../physmat/units.md)
 
-상태: **형식 0.3의 공용 읽기가 들어왔고, 열(`thermal.steady2d`, `thermal.transient2d`), 전기
-전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`), 역학
-(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`), 도파 모드(`em.modes2d`)는 형식 0.3만
-읽습니다.** `em.cavity3d`의 제공 예제와 문서는 `"openphysics": "0.2"` 형식이며 예전과 똑같이
-읽힙니다.
-envelope가 JSON 문자열 `"0.3"`인 문서만 여기 적은 읽기를 거칩니다. 단위·이름 배치에서 각 종류의
-단계가 그 종류의 물리 슬롯을 줄 때까지, 그 종류의 0.3 문서는 `E-CONTRACT`("documents are not
-read in format 0.3 yet")로 거부됩니다. 종류는 하나씩 옮겨 갑니다(열, 전기·Joule, 역학,
-`em.modes2d`, `em.cavity3d`). 마지막 종류가 옮겨 간 뒤 0.2 읽기를 없앱니다.
+상태: **형식 0.3의 공용 읽기가 들어왔고, 모든 종류가 형식 0.3만 읽습니다. 열(`thermal.steady2d`,
+`thermal.transient2d`), 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`,
+`joule.temperature2d`), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`), 도파 모드
+(`em.modes2d`), 직육면체 공진기(`em.cavity3d`)입니다.** envelope가 JSON 문자열 `"0.3"`인 문서가
+여기 적은 읽기를 거칩니다. 어떤 종류든 형식 0.2 문서는 무엇을 대신 써야 하는지와 함께 이름을 밝혀
+거부합니다(`E-FORMAT`). 종류는 하나씩 옮겨 갔습니다(열, 전기·Joule, 역학, `em.modes2d`,
+`em.cavity3d`). 커널 인계가 아직 쓰는 내부 0.2 도우미는 뒤의 단계에서 없앱니다. 물리 슬롯 없이
+등록한 종류는 그 0.3 문서를 `E-CONTRACT`("documents are not read in format 0.3 yet")로 거부합니다.
 
 형식 0.3은 오늘의 문서 뼈대(`geometry`, `materials`, `physics.<이름>`, `mesh`, `study`,
 `results`)를 그대로 두고 단위·이름 규칙이 요구하는 것만 바꿉니다.
@@ -290,9 +289,9 @@ doc, diagnostics = reader.check(text)    # without raising: for validate, explai
 
 ## 아직 하지 않은 것
 
-- `em.cavity3d`의 물리 슬롯, 예제, 결과, Studio 부분은 그 종류의 단계에서 합니다(열, 전기·Joule,
-  역학, `em.modes2d`는 끝났습니다). 등록부 이름의 결과, Studio의 원시 바이트 읽기와 물리량
-  엔드포인트, 그다음 0.2 읽기와 `simcase.units`, `simcase.unit_vocabulary`의 은퇴가 뒤따릅니다.
+- Studio의 원시 바이트 읽기와 물리량 엔드포인트, 그다음 0.2 읽기와 `simcase.units`,
+  `simcase.unit_vocabulary`의 은퇴. (모든 종류가, 마지막으로 `em.cavity3d`가, 물리 슬롯과 예제,
+  등록부 이름의 결과를 갖췄습니다.)
 - 남은 코드는 그것이 필요한 종류가 그 단계에서 냅니다(`E-SPECTRAL`은 분광 키를 둘 이상 준 항목에
   `em.modes2d`가, `I-DEFAULT-BOUNDARY`는 열, 전기·Joule, 역학, `em.modes2d`가, `E-OUTSIDE-VALID`는 `joule.temperature2d`가, `W-GAUGE-ATMOSPHERIC`과 `E-ABSOLUTE-AS-LOAD`는
   역학이 냅니다).

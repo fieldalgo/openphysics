@@ -48,7 +48,7 @@ def test_the_frozen_table_equals_its_generator():
     assert table["kinds"] == {"thermal.steady2d": ["thermal.steady2d"], "thermal.transient2d": ["thermal.transient2d"],
                               "electric_joule": ["electric.steady2d", "joule.steady2d", "joule.temperature2d"],
                               "mechanics": ["mechanics.elasticity2d", "mechanics.thermoelastic2d"],
-                              "em.modes2d": ["em.modes2d"]}
+                              "em.modes2d": ["em.modes2d"], "em.cavity3d": ["em.cavity3d"]}
     patterns = [(e["pattern"], e.get("physics_kind") or "", e["kind"]) for e in table["slots"]]
     assert patterns == sorted(patterns)
 

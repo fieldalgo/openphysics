@@ -461,11 +461,14 @@ KERNEL_FRAME = {
     "subspace_tracking.py": "subspace tracking: Gram matrices, principal angles and frame rotations of kernel fields",
     "mode_postprocessing.py": "post-processing: <E_a, E_b>, mode power and confinement on kernel fields (spec 3.8)",
 }
-#: the boundary functions of runner.py (and the helpers only they call), the one place a complex
-#: value changes convention: _to_kernel (eps in), _to_public (results out), _public_open_boundary
-#: and _public_candidate (PML diagnostics, from _to_public), and _shown (the log text of a kernel
-#: index under exp(-i omega t))
-BOUNDARY = {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"}
+#: the boundary functions of each module that hands complex values to a kernel (and the helpers only
+#: they call), the one place a complex value changes convention. runner.py (em.modes2d): _to_kernel
+#: (eps in), _to_public (results out), _public_open_boundary and _public_candidate (PML diagnostics,
+#: from _to_public), and _shown (the log text of a kernel index under exp(-i omega t)). cavity.py
+#: (em.cavity3d, units batch C9): _to_kernel (eps and mu in, as 0.0 - Im) and _to_public (the saved
+#: arrays out; the result properties read them through it).
+BOUNDARY = {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"},
+            "cavity.py": {"_to_kernel", "_to_public"}}
 CONJUGATION = re.compile(r"np\.conj(?:ugate)?\(|\.conj\(\)|0\.0 - [\w\[\]\"'.]*imag|-\s*\w+\.imag\b")
 
 
@@ -491,9 +494,18 @@ def test_p2_15_only_the_boundary_functions_conjugate_on_the_simcase_surface():
             if not CONJUGATION.search(code) or code.strip().startswith(('"', "'")):
                 continue
             owners = [name for start, end, name in spans if start <= number <= end]
-            if not owners or not set(owners) & BOUNDARY or path.name != "runner.py":
+            if not owners or not set(owners) & BOUNDARY.get(path.name, set()):
                 found.append(f"{path.relative_to(SIMCASE)}:{number}: {line.strip()}")
     assert not found, "conjugation outside the boundary functions:\n" + "\n".join(found)
+    cavity = ast.parse((SIMCASE / "cavity.py").read_text(encoding="utf-8"))
+    used = {}
+    for f in _functions(cavity):
+        for node in ast.walk(f):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                used.setdefault(node.func.id, set()).add(f.name)
+    assert used["_to_kernel"] == {"kernel_inputs"}
+    assert used["_to_public"] <= {"arrays", "resonant_frequency", "wavenumber_squared", "mass_normalized_electric_field",
+                                  "mass_normalized_electric_field_line_integral"}
     runner = ast.parse((SIMCASE / "runner.py").read_text(encoding="utf-8"))
     callers = {}
     for f in _functions(runner):

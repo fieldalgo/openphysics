@@ -78,10 +78,23 @@ def test_every_example_document_is_claimed_by_the_kind_of_its_type(path):
     assert physics["type"] in registry.kind_of(data).types
 
 
+#: the format 0.2 cavity_box example as it was before units batch C9 (627eb28), frozen here: no kind
+#: reads format 0.2 any more, but the 0.2 reader still names an unknown type
+CAVITY_BOX_02 = {
+    "openphysics": "0.2", "name": "Vacuum PEC cube, modes near 250 MHz", "units": {"length": "m"},
+    "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1},
+                 "background": {"material": "vacuum"}, "shapes": []},
+    "physics": {"em1": {"type": "em.cavity3d", "boundary": "pec", "search": "near_target",
+                        "target_frequency_hz": 250000000.0, "num_modes": 5}},
+    "mesh": {"subdivisions": [6, 6, 6]}, "study": {"type": "single"},
+    "results": {"save_fields": True, "plots": False},
+}
+
+
 def test_unknown_type_error_lists_every_registered_type():
-    # the format 0.2 reader names the type (em.cavity3d is the kind that still reads format 0.2); a
-    # format 0.3 document reports the keys its slot table cannot place instead
-    data = copy.deepcopy(examples.EXAMPLES["cavity_box"])
+    # the format 0.2 reader names the type; a format 0.3 document reports the keys its slot table
+    # cannot place instead
+    data = copy.deepcopy(CAVITY_BOX_02)
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
     assert len(listed) == 9
