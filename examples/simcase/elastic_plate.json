@@ -1,10 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Uniaxial plate under 1 MPa",
-  "units": {
-    "length": "mm"
-  },
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {
       "xmin": 0.0,
       "xmax": 100.0,
@@ -14,7 +13,7 @@
   },
   "materials": {},
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       20,
       4
     ]
@@ -30,20 +29,20 @@
     "plate": {
       "type": "mechanics.elasticity2d",
       "plane": "stress",
-      "young_modulus_pa": 200000000000.0,
+      "youngs_modulus": "200 GPa",
       "poisson_ratio": 0.3,
-      "displacement_m": {
+      "prescribed_displacement": {
         "left": {
-          "x": 0.0
+          "x": "0 mm"
         },
         "bottom": {
-          "y": 0.0
+          "y": "0 mm"
         }
       },
-      "traction_pa": {
+      "traction": {
         "right": [
-          1000000.0,
-          0.0
+          "1 MPa",
+          "0 MPa"
         ]
       }
     }

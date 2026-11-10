@@ -74,7 +74,8 @@ class Result:
         self.id, self.mode = doc_id, mode
         self.failures: list[str] = []
         self.type_differences: list[str] = []
-        self.counts = {"calls": 0, "arrays": 0, "summary_leaves": 0, "vtu_arrays": 0, "exceptions": 0}
+        self.counts = {"calls": 0, "arrays": 0, "summary_leaves": 0, "vtu_arrays": 0, "exceptions": 0,
+                       "absent_defaults": 0}
         self.arrays: list[list] = []
 
     def fail(self, message: str):
@@ -343,6 +344,8 @@ class LayoutMap:
                 raise ValueError(f"{source}: summary transform {f!r} is not in the closed list")
             if f == "removed" and rule.get("check", "unit-metadata") not in REMOVED_CHECKS:
                 raise ValueError(f"{source}: removed check {rule.get('check')!r} is not in the closed list")
+            if "absent_default" in rule and (f != "=" or not isinstance(rule["absent_default"], str)):
+                raise ValueError(f"{source}: absent_default names an input key and applies to '=' rules only")
             self.summary.append((parse_pattern(rule["old"]), None if f == "removed" else parse_pattern(rule["new"]),
                                  f, rule))
         # an always-added key covers its whole subtree (resolved_inputs, diagnostics, ...)
@@ -519,6 +522,9 @@ def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, resu
         new_path = fill(new_pattern, captures)
         used_new.add(new_path)
         if new_path not in b:
+            if "absent_default" in rule and _absent_default(value, rule["absent_default"], new):
+                result.counts["absent_defaults"] += 1
+                continue
             result.fail(f"{where} -> {show(new_path)}: missing on the new side")
             continue
         result.counts["summary_leaves"] += 1
@@ -539,6 +545,18 @@ def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, resu
         if any(match(p, path) is not None for p in lmap.summary_added + lmap.identifiers):
             continue
         result.fail(f"{label} {show(path)}: added on the new side and not on the map's added list")
+
+
+def _absent_default(value, key: str, new_tree) -> bool:
+    """An input the 0.2 reader filled with zero and echoed, and the 0.3 reader leaves absent: it
+    records the default in ``defaults_applied`` and writes nothing (hazard H9). The old leaf must
+    be +0.0 and the new tree must list a default whose path ends in ``.<key>`` (rule
+    ``absent_default``); a given input is compared under its rule as usual."""
+    if _hex(value) != float.hex(0.0) or not isinstance(new_tree, dict):
+        return False
+    applied = new_tree.get("defaults_applied")
+    return isinstance(applied, list) and any(
+        isinstance(entry, dict) and str(entry.get("path", "")).endswith("." + key) for entry in applied)
 
 
 def _removed_leaf_check(path, value, rule, captures, old_leaves, where, result: Result):
@@ -789,6 +807,8 @@ def main(argv=None) -> int:
     equal = sum(r.equal for r in results)
     for r in results:
         types = f", {len(r.type_differences)} type differences" if r.type_differences else ""
+        if r.counts["absent_defaults"]:
+            types += f", {r.counts['absent_defaults']} absent defaults"
         print(f"{r.id}: {'equal' if r.equal else 'DIFFERENT'} ({r.mode}; {r.counts['calls']} calls, "
               f"{r.counts['arrays']} arrays, {r.counts['summary_leaves']} summary leaves, "
               f"{r.counts['vtu_arrays']} VTU arrays{types})")

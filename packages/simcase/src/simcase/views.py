@@ -125,9 +125,10 @@ class RegionMesh:
 
 
 def region_mesh(doc) -> RegionMesh:
-    """The region mesh of a validated heat, electric, Joule or mechanics region document."""
+    """The region mesh of the hand-off (``thermal_regions.handoff_03``) of a validated heat,
+    electric, Joule or mechanics region document."""
     from .runner import micrometre_document
-    canonical = micrometre_document(doc, validate=not getattr(doc, "is_handoff", False))
+    canonical = micrometre_document(doc, validate=False)
     return RegionMesh(canonical, float(doc["mesh"]["min_angle"]))
 
 
@@ -200,24 +201,15 @@ def rectangle_heat(doc) -> HeatInputs:
 
 
 def steady_rectangle(doc) -> tuple[RectangleMesh, HeatInputs]:
-    """The steady rectangle boundary contract (``steady_boundary_contract``) of a document,
-    read and validated without changing it: the grid (lengths by ``difference``) and the
-    heat inputs as the contract returns them (floats). A format 0.3 document gives the same
-    from its SI values."""
-    if getattr(doc, "si", None) is not None:
-        from .steady_boundary_contract import heat_inputs_03
-        return rectangle_mesh(doc, "difference"), heat_inputs_03(doc)
-    from .steady_boundary_contract import V2, _validated
-    bounds, sides, k, q, flux, convection, versions = _validated(doc)
-    d = doc.data
-    scale = units.resolve(d["units"])
-    dom = d["geometry"]["domain"]
-    grid = RectangleMesh(origin=(bounds["xmin"], bounds["ymin"]), upper=(bounds["xmax"], bounds["ymax"]),
-                         lengths=tuple(scale.to_si(dom[a + "max"] - dom[a + "min"], {"length": 1}) for a in "xy"),
-                         subdivisions=tuple(int(n) for n in d["mesh"]["subdivisions"]), formula="difference")
-    heat = HeatInputs(conductivity=k, heat_source=q, dirichlet=sides, outward_flux=flux, convection=convection,
-                      boundary_layout=versions == V2)
-    return grid, heat
+    """The steady rectangle boundary contract (``steady_boundary_contract``) of a format 0.3
+    document, read and validated without changing it: the grid (lengths by ``difference``) and
+    the heat inputs as the contract returns them (floats). A format 0.2 document is refused by
+    name (its reader is gone since units batch C7)."""
+    if getattr(doc, "si", None) is None:
+        from .thermal import refuse_format_02
+        refuse_format_02(doc, "thermal_steady2d")
+    from .steady_boundary_contract import heat_inputs_03
+    return rectangle_mesh(doc, "difference"), heat_inputs_03(doc)
 
 
 def _initial_temperature(spec):
@@ -385,13 +377,14 @@ def region_electric(doc) -> ElectricInputs:
 
 @dataclass(frozen=True)
 class MechanicsInputs:
-    """Mechanical-stage inputs in SI, as written.
+    """Mechanical-stage inputs in SI.
 
     ``young_modulus`` (Pa), ``poisson_ratio`` and ``thermal_expansion`` (1/K) are numbers on
     a rectangle and {material name: number} on regions. ``displacement`` maps boundary names
-    to {component: m}, ``traction`` to [tx, ty] in Pa, ``pressure`` to Pa (regions only);
-    ``body_force`` is [fx, fy] in N/m^3. ``thermoelastic`` documents add the stress-free
-    ``reference_temperature`` (K); their heat stage has its own ``HeatInputs``.
+    to {component: m}, ``traction`` to [tx, ty] in Pa, ``pressure`` to the gauge pressure in Pa
+    (regions only); ``body_force`` is [fx, fy] in N/m^3 ([0.0, 0.0] when the document gives none,
+    hazard H8). ``thermoelastic`` documents add the ``reference_temperature`` (K, the document's
+    ``stress_free_temperature``); their heat stage has its own ``HeatInputs``.
     """
     thermoelastic: bool
     plane: str
@@ -405,31 +398,32 @@ class MechanicsInputs:
     reference_temperature: object = None
 
 
-def _mechanics(p, thermoelastic, young_modulus, poisson_ratio, thermal_expansion) -> MechanicsInputs:
+def _mechanics_03(p, young_modulus, poisson_ratio, thermal_expansion) -> MechanicsInputs:
+    thermoelastic = p["type"] == "mechanics.thermoelastic2d"
+    body_force = p.get("body_force_density")
     return MechanicsInputs(
         thermoelastic=thermoelastic, plane=p["plane"], young_modulus=young_modulus, poisson_ratio=poisson_ratio,
-        displacement={tag: dict(components) for tag, components in p["displacement_m"].items()},
-        traction={tag: list(vector) for tag, vector in p.get("traction_pa", {}).items()},
-        pressure=dict(p.get("pressure_pa", {})), body_force=list(p.get("body_force_n_m3", [0., 0.])),
-        thermal_expansion=thermal_expansion,
-        reference_temperature=p["reference_temperature_k"] if thermoelastic else None)
+        displacement={tag: dict(components) for tag, components in p["prescribed_displacement"].items()},
+        traction={tag: list(vector) for tag, vector in p.get("traction", {}).items()},
+        pressure=dict(p.get("gauge_pressure", {})),
+        body_force=[0.0, 0.0] if body_force is None else list(body_force),
+        thermal_expansion=thermal_expansion if thermoelastic else None,
+        reference_temperature=p["stress_free_temperature"] if thermoelastic else None)
 
 
 def rectangle_mechanics(doc) -> MechanicsInputs:
-    """mechanics.elasticity2d or mechanics.thermoelastic2d on a rectangle, validated."""
-    _, p = doc.sole_physics()
-    thermoelastic = p["type"] == "mechanics.thermoelastic2d"
-    return _mechanics(p, thermoelastic, p["young_modulus_pa"], p["poisson_ratio"],
-                      p["thermal_expansion_per_k"] if thermoelastic else None)
+    """mechanics.elasticity2d or mechanics.thermoelastic2d on a format 0.3 rectangle, validated:
+    SI values in document order (H6)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return _mechanics_03(p, p["youngs_modulus"], p["poisson_ratio"], p.get("linear_expansion_coefficient"))
 
 
 def region_mechanics(doc) -> MechanicsInputs:
-    """mechanics.elasticity2d or mechanics.thermoelastic2d on regions, validated."""
-    _, p = doc.sole_physics()
-    thermoelastic = p["type"] == "mechanics.thermoelastic2d"
-    return _mechanics(p, thermoelastic, _material_values(doc, "young_modulus_pa"),
-                      _material_values(doc, "poisson_ratio"),
-                      _material_values(doc, "thermal_expansion_per_k") if thermoelastic else None)
+    """mechanics.elasticity2d or mechanics.thermoelastic2d on format 0.3 regions, validated: the
+    material values {material name: SI value}; the adapter maps the meshed regions to them."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return _mechanics_03(p, _material_values_03(doc, "youngs_modulus"), _material_values_03(doc, "poisson_ratio"),
+                         _material_values_03(doc, "linear_expansion_coefficient"))
 
 
 # -- em.modes2d -----------------------------------------------------------------------------------

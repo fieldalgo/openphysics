@@ -15,7 +15,7 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # 버전 1 형상 블록의 영역 복합체
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. 다른 모든 종류는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. em 종류(`em.modes2d`, `em.cavity3d`)는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(선언 단위, study 지점별 n_eff, 군굴절률, 메시 통계, 시간), `fields.npz`(메시와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 문서 사본이 생성됩니다.
 
@@ -32,7 +32,7 @@ python -m simcase geometry model.json                     # 버전 1 형상 블�
 | `joule.temperature2d` | 온도 의존 정상 Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | 균질 직사각형의 정적 선형탄성: 평면응력·평면변형률, 변별 변위 성분, 직교좌표계 변 traction, 상수 체적력 | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | 변별 상수 경계 데이터의 정상 열전도 후 같은 메시의 열응력, 전체 변 traction | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
-| 영역이 있는 `mechanics.elasticity2d` | 이름 있는 재료 영역의 정적 선형탄성(E·ν는 재료 표에서), 영역 열전도와 같은 경계 이름의 변위·직교좌표계 traction·압력 | `elastic_regions` | [영역 문서](mechanics2d.md#재료-영역과-이름-있는-경계) |
+| 영역이 있는 `mechanics.elasticity2d` | 이름 있는 재료 영역의 정적 선형탄성(E·ν는 재료 표에서), 영역 열전도와 같은 경계 이름의 변위·직교좌표계 traction·계기압 | `elastic_regions` | [영역 문서](mechanics2d.md#재료-영역과-이름-있는-경계) |
 | 영역이 있는 `mechanics.thermoelastic2d` | 영역 열전도 후 같은 메시에서 재료별 E·ν·α의 열응력 | `thermoelastic_regions` | [영역 문서](mechanics2d.md#재료-영역과-이름-있는-경계) |
 | `thermal.steady2d` | 균질 직사각형 정상 열전도: 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [정상 열전도](thermal_steady2d.md), [경계조건](thermal_steady_boundary2d.md) |
 | 영역이 있는 `thermal.steady2d` | 이름 있는 재료 영역의 정상 열전도: 배경 위 도형, 재료 표, 영역 경계를 따르는 메시 | `thermal_regions` | [영역 문서](thermal_regions2d.md) |
@@ -235,12 +235,15 @@ result = solve_point(model, doc.sole_physics()[1])
 `joule_power_density`를 모두 SI로, FieldData `units`·`conventions` 블록과 함께 내보냅니다. Joule
 결과는 `temperature`, 절점 열 배열, 셀 `heat_flux`를 더하고, `joule.temperature2d`는
 `evaluation_temperature`를 더합니다. 형식 0.2 전기 배치(`electric-joule2d-p1-v1`과 두
-`-regions-v1`)는 이름을 밝혀 거부합니다. 탄성 결과(`mechanics2d-p1-v1`,
-`mechanics.elasticity2d`의 배치)는 점 데이터 `displacement_m`과 절점 `load_n_per_m`,
-`reaction_n_per_m`, `residual_n_per_m` 벡터, 그리고 저장된 변형률·응력 성분을 스칼라 셀 데이터
-`exx`, `eyy`, `gxy`와 `sxx_pa`, `syy_pa`, `sxy_pa`로 내보냅니다. 열탄성 결과(`thermoelastic2d-p1-v1`)는
-`temperature_k`, 절점 열 배열, 셀 `heat_flux_w_m2`, `sigma_zz_pa`, `epsilon_zz`와 `total_`, `thermal_`,
-`elastic_` 변형률 성분을 더합니다. 배열은 저장된 이름과 단위
+`-regions-v1`)는 이름을 밝혀 거부합니다. 탄성 결과(`mechanics2d-p1-v2`,
+`mechanics.elasticity2d`의 배치)는 점 데이터 `displacement`와 절점 `applied_force_per_depth`,
+`reaction_force_per_depth`, `residual_force_per_depth` 벡터, 그리고 저장된 변형률·응력 성분을 성분
+이름의 스칼라 셀 데이터(`strain_xx`, `strain_yy`, `engineering_shear_strain_xy`, `stress_xx`,
+`stress_yy`, `stress_xy`)로 내보냅니다. 열탄성 결과(`thermoelastic2d-p1-v2`)는 `temperature`, 절점
+열률, 열 등가·체적력·traction 힘 배열, 셀 `heat_flux`, `stress_zz`, `strain_zz`와 `thermal_strain_…`,
+`elastic_strain_…` 성분을 더합니다. 둘 다 FieldData `units`·`conventions` 블록을 담습니다. 형식 0.2 역학
+배치(`mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`)는 이름을 밝혀 거부하며, 영역 역학 결과는 아직 내보내지
+않습니다. em·공진기 배열은 저장된 이름과 단위
 접미사를 그대로 쓰며 Dirichlet 절점 목록과 summary는 복사하지 않습니다. 재료와 손실 벽이
 있는 공진기(`cavity3d-edge-complex-v1`)는 복소 모드마다 셀 데이터
 `electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와

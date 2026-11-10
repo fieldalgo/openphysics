@@ -309,12 +309,12 @@ def test_the_format_is_the_string_0_3(toy_kind, value, needle):
 
 
 def test_a_kind_without_slots_refuses_format_0_3():
-    data = json.loads((ROOT / "examples" / "simcase" / "elastic_plate.json").read_text(encoding="utf-8"))
+    data = json.loads((ROOT / "examples" / "simcase" / "cavity_box.json").read_text(encoding="utf-8"))
     data["openphysics"] = "0.3"
     with pytest.raises(DocumentError) as caught:
         Document.from_dict(data)
     [d] = caught.value.diagnostics
-    assert (d.code, d.path) == ("E-CONTRACT", "physics.plate.type")
+    assert (d.code, d.path) == ("E-CONTRACT", "physics.em1.type")
     assert "not read in format 0.3 yet" in str(caught.value)
 
 
@@ -379,8 +379,8 @@ if FIXTURES.is_dir():
     def test_canonical_json_equals_json_dumps_for_every_fixture(path):
         if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
             # a converted form: its 0.2 fixture is read by the baseline code only
-            with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule) "
-                                                    "documents are not read"):
+            with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule|"
+                                                    "mechanics) documents are not read"):
                 Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
             return
         _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)

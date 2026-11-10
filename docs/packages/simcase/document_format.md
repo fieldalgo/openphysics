@@ -6,8 +6,9 @@
 [physmat.units](../physmat/units.md)
 
 Status: **the shared reader of format 0.3 is in place; heat (`thermal.steady2d`,
-`thermal.transient2d`) and electric conduction and Joule heating (`electric.steady2d`,
-`joule.steady2d`, `joule.temperature2d`) read format 0.3 only.** The other kinds' shipped
+`thermal.transient2d`), electric conduction and Joule heating (`electric.steady2d`,
+`joule.steady2d`, `joule.temperature2d`) and mechanics (`mechanics.elasticity2d`,
+`mechanics.thermoelastic2d`) read format 0.3 only.** The em kinds' shipped
 examples and documents are format `"openphysics": "0.2"` and are read exactly as before. A
 document whose envelope is the JSON string `"0.3"` takes the reader described here; until a
 kind's own step of the units and naming batch gives it its physics slots, its 0.3 document is
@@ -309,5 +310,6 @@ on which built-in kinds read format 0.3 yet.
   registry names; the Studio's raw-byte reading and quantities endpoint; then the
   retirement of the 0.2 reader, `simcase.units` and `simcase.unit_vocabulary`.
 - `E-SPECTRAL` is raised by the kind that needs it, with its step (`I-DEFAULT-BOUNDARY` is
-  raised by heat and electric/Joule, `E-OUTSIDE-VALID` by `joule.temperature2d`).
+  raised by heat, electric/Joule and mechanics, `E-OUTSIDE-VALID` by `joule.temperature2d`,
+  `W-GAUGE-ATMOSPHERIC` and `E-ABSOLUTE-AS-LOAD` by mechanics).
 - The JSON Schema and generated documentation tables of the slots.

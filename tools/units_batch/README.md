@@ -140,7 +140,11 @@ recorded micrometre mesher nodes times 1e-6); `arrays_removed` (`{old, check}`, 
 (dotted path patterns with `*` for one key, `[]` for one list index, `[2]` for that index,
 `**` for the rest and `["a.b"]` for a literal key; `f` in `=`, `neg`, `conj`, `L1`, `L1*conj`, `rad`
 (`math.radians(old)`), `qdeg` (`q(f"{old!r} deg", "minimum_angle")`) or `removed` with a
-check; the first matching rule applies); `summary_added` (beside the always allowed
+check; the first matching rule applies; an `=` rule may add `absent_default: <key>` for an
+input the 0.2 reader filled with zero and echoed while the 0.3 reader leaves it absent (hazard
+H9): when the new leaf is missing, the old leaf must be +0.0 and the new tree's
+`defaults_applied` must list a path ending in `.<key>`; a given input is compared as usual,
+and the report counts these leaves as absent defaults); `summary_added` (beside the always allowed
 `diagnostics`, `defaults_applied`, `resolved_inputs`, `extent`, `field_components`,
 `time_convention`, `propagation`, each with everything under it); `identifiers` (identifier
 strings, not compared); `vtu` and `vtu_added`; and `exceptions`.
@@ -164,7 +168,14 @@ Joule commit (C6) sets `electric.steady2d`, `joule.steady2d` and `joule.temperat
 region terminal currents with `neg`, the region angle with `rad`) and `maps/electric_joule.json` for the failure
 evidence of a `joule.temperature2d` solve that does not converge: no result is saved, so the
 comparator takes the map named by the document's kind (`record.json` `load.kind`). Its twins
-are `fixtures/v03/electric_*.json` and `joule_*.json`.
+are `fixtures/v03/electric_*.json` and `joule_*.json`. The mechanics commit (C7) sets
+`mechanics.elasticity2d` and `mechanics.thermoelastic2d` to `layout` for every form and adds the
+four mechanics maps (`mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`, `mechanics2d-p1-regions-v1` and
+`thermoelastic2d-p1-regions-v1`; the region angle with `rad`, the old `outward_flux_w_m2` leaves
+with `neg`, the thermoelastic `applied_load_n_per_m`, the sum of the external and thermal loads,
+removed) and the `absent_default` rule above for the 0.2 echoes `body_force_n_m3` (`[0, 0]`) and,
+on regions, `heat_source_w_m3` (`0`) of a document that gives none. Its twins are
+`fixtures/v03/mechanics_*.json`.
 
 The only comparisons that are not bitwise are the three pre-registered ones, each within 4
 ulp: `propagation_loss` against 100 times the old `propagation_loss_db_cm`, `bend_loss`
