@@ -260,3 +260,48 @@ def test_e8_refusals():
     with pytest.raises(TypeError, match="ElementConductivity"):
         solve_steady_electric(m, conductivity=ElementConductivity(m, np.full(m.num_triangles, 2.0e3)), **common,
                               motion=MeshMotion(W, t))
+
+
+# ---------------------------------------------------------------- independent review regressions (2026-11-10)
+
+@pytest.mark.parametrize("name", BACKENDS)
+@pytest.mark.parametrize("common", [0.0, 1.0e3, 1.0e6, 1.0e9])
+def test_review_large_common_mode_voltage(name, common):
+    # A terminal pair at V+1 and V: the supplied power and its derivative do not depend on V.
+    # Before the fix the motion path used absolute volts: at 1e6 V it returned 598.33 instead of 600.
+    m = rectangle_mesh(1.0, 0.6, 10, 6)
+    x, y = m.nodes[:, 0], m.nodes[:, 1]
+    W = np.stack([0.1 * x * y, 0.05 * np.sin(3 * x)], axis=1)
+    left, right = ([int(i) for i in m.boundary[s]] for s in ("left", "right"))
+    kw = dict(conductivity=1.0e3, dirichlet={**{i: common + 1.0 for i in left}, **{i: common for i in right}})
+    base = solve_steady_electric(m, **kw)
+    supplied, d_supplied = _gradient(name, lambda t: solve_steady_electric(m, **kw, motion=MeshMotion(W, t))
+                                     .supplied_power_per_length)
+    power, d_power = _gradient(name, lambda t: solve_steady_electric(m, **kw, motion=MeshMotion(W, t))
+                               .joule_power_per_length)
+    assert rel(supplied, base.supplied_power_per_length) <= 1e-9
+    assert rel(power, base.joule_power_per_length) <= 1e-12
+    assert rel(d_supplied, d_power) <= 1e-10                         # E5's criterion
+
+
+def test_review_motion_that_changes_a_current_only_balance_is_refused():
+    xp = _xp("jax")
+    m = rectangle_mesh(1.0, 0.6, 10, 6)
+    x, y = m.nodes[:, 0], m.nodes[:, 1]
+    W = np.stack([np.zeros_like(x), x * y], axis=1)                 # the right side grows, the left does not
+    gauge = int(m.boundary["left"][0])
+    with pytest.raises(ValueError, match="changes its net imposed current"):
+        solve_steady_electric(m, conductivity=1.0e3, dirichlet={}, outward_current={"left": 100.0, "right": -100.0},
+                              reference_potential={gauge: 0.0}, motion=MeshMotion(W, xp.asarray(0.0)))
+
+
+def test_review_messages():
+    xp = _xp("jax")
+    m, W = _plate()
+    left = [int(i) for i in m.boundary["left"]]
+    with pytest.raises(ValueError, match="outward_current must map boundary edge tags"):
+        solve_steady_electric(m, conductivity=2.0e3, dirichlet={i: 0.0 for i in left},
+                              outward_current=[("right", 1.0)], motion=MeshMotion(W, xp.asarray(0.0)))
+    with pytest.raises(ValueError, match="conductivity must be a finite scalar"):
+        solve_steady_electric(m, conductivity=lambda p: np.ones(len(p)), dirichlet={i: 0.0 for i in left},
+                              motion=MeshMotion(W, xp.asarray(0.0)))
