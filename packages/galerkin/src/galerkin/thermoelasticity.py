@@ -25,7 +25,8 @@ from .core.checks import one_of, real_array, real_value, require_finite
 from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
-_M = np.array([1., 1., 0.])
+# (exx, eyy, gamma_xy) of a unit isotropic in-plane strain; shared with galerkin.shape
+ISOTROPIC_STRAIN = np.array([1., 1., 0.])
 
 
 def _immutable(array, dtype):
@@ -103,7 +104,8 @@ def freeze_temperature(mesh, temperature_k):
     return TemperatureSnapshot(p, t, temperature_k)
 
 
-def _verify_snapshot(snapshot, p, t):
+def verify_snapshot(snapshot, p, t):
+    """Refuse a snapshot that is not a valid, unmodified TemperatureSnapshot of the nodes p and triangles t."""
     if not isinstance(snapshot, TemperatureSnapshot):
         raise ValueError("temperature_snapshot must be a TemperatureSnapshot from freeze_temperature")
     if (snapshot.schema_version != 1 or snapshot.length_unit != "m"
@@ -132,14 +134,15 @@ def _verify_snapshot(snapshot, p, t):
         raise ValueError("stale or mismatched mesh: coordinates, units/scale, connectivity or order changed")
 
 
-def _thermal_coefficient(young_modulus, poisson_ratio, plane):
+def thermal_coefficient(young_modulus, poisson_ratio, plane):
+    """Thermal stress per unit thermal strain of the plane reduction: E/(1-nu) or E/(1-2nu)."""
     return young_modulus/(1-poisson_ratio if plane == "stress" else 1-2*poisson_ratio)
 
 
 def _thermal_load(area, b, dofs, q_mean, num_nodes):
     """Thermal-equivalent nodal load (2N,) of the element-mean thermal stress q_mean (T,), in its library."""
     xp = namespace(q_mean)
-    local = xp.einsum("tji,j,t->ti", lift(xp, b), lift(xp, _M), lift(xp, area)*q_mean)
+    local = xp.einsum("tji,j,t->ti", lift(xp, b), lift(xp, ISOTROPIC_STRAIN), lift(xp, area)*q_mean)
     return scatter_add(xp, 2*num_nodes, dofs.ravel(), xp.reshape(local, (-1,)))
 
 
@@ -151,11 +154,11 @@ def _per_cell(value):
 _CENTROID_BARY = np.array([[2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3]])
 
 
-def _physical_energy(xp, total_strain, a_element_nodes, area, d, e, nu, plane):
+def physical_energy(xp, total_strain, a_element_nodes, area, d, e, nu, plane):
     """Reduced physical 3D elastic energy per thickness, J/m (exact for P1 with the 3-point rule)."""
     aq = a_element_nodes @ lift(xp, _CENTROID_BARY).T
     effective = aq if plane == "stress" else _per_cell(1+nu)*aq
-    delta = total_strain[:, None, :]-effective[..., None]*lift(xp, _M)
+    delta = total_strain[:, None, :]-effective[..., None]*lift(xp, ISOTROPIC_STRAIN)
     density = .5*(xp.einsum("tqi,ij,tqj->tq", delta, d, delta) if d.ndim == 2
                   else xp.einsum("tqi,tij,tqj->tq", delta, d, delta))
     if plane == "strain":
@@ -255,7 +258,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
             traction=traction)
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
-    _verify_snapshot(temperature_snapshot, p, t)
+    verify_snapshot(temperature_snapshot, p, t)
     tref = real_value(reference_temperature_k, "reference_temperature_k")
     if tuple(tref.shape) != () or to_numpy(tref) < 0:
         raise ValueError("reference_temperature_k must be a finite nonnegative real scalar")
@@ -272,7 +275,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     temperature = lift(xp, temperature_snapshot.temperature_k)
     with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
         d = constitutive(xp, e, nu, plane)
-        coefficient = _thermal_coefficient(e, nu, plane)
+        coefficient = thermal_coefficient(e, nu, plane)
         if regional:
             a = alpha[:, None]*(temperature[t]-tref)       # (T,3) nodal values per element
             q = coefficient[:, None]*a
@@ -288,7 +291,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
     body, line = lift(xp, body), lift(xp, line)
     external = body+line
     qc, ac = xp.mean(q, axis=1), xp.mean(a, axis=1)
-    m_vector = lift(xp, _M)
+    m_vector = lift(xp, ISOTROPIC_STRAIN)
     thermal = lift(xp, _thermal_load(area, b, dofs, qc, len(p)))
     load = external+thermal
     if not all(np.all(np.isfinite(to_numpy(v))) for v in (body, line, external, thermal, load)):
@@ -307,7 +310,7 @@ def solve_thermoelasticity(mesh, temperature_snapshot, *, reference_temperature_
         zz = xp.zeros_like(qc)
         ez = ((1+nu)*ac-nu*trace)/(1-nu)
     with np.errstate(over="ignore", invalid="ignore"):
-        energy = _physical_energy(xp, strain, a, area, d, e, nu, plane)
+        energy = physical_energy(xp, strain, a, area, d, e, nu, plane)
     if not all(np.all(np.isfinite(to_numpy(v))) for v in (strain, th, elastic, stress, zz, ez)):
         raise ValueError("computed thermoelastic strain/stress exceeds finite numeric range")
     numpy = backend_of(xp) is Backend.NUMPY
