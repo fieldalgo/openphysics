@@ -24,11 +24,17 @@ python -m simcase.studio            # then open http://127.0.0.1:8765/geometry-l
   (`examples/simcase/geometry_v1_soi_strip.json`,
   `geometry_v1_imprint_rib.json`, built into the page), a new one-rectangle
   document, or **Open file** with any JSON document.
-- **Parameters** are listed with their evaluated value. A parameter written as
-  a plain number with a `range` gets a slider, whose step is a power of ten
-  (at least 200 steps over the range) so that saved values stay short decimals;
-  every parameter has a text field that takes a number or an expression
-  (`2 * t + 0.1`). A number a double cannot hold (`1e999`, `1e-400`) is refused
+- **Parameters** are listed with their evaluated value. A parameter with a
+  `range` gets a slider when its value and range are plain numbers, or quantity
+  strings in one unit (`"0.5 um"` with `["0.3 um", "0.9 um"]`); its step is a
+  power of ten (at least 200 steps over the range) so that saved values stay
+  short decimals. Every parameter has a text field that takes a number, a
+  quantity (`0.4 um`) or an expression (`2 * t + 0.1`). In a format 0.3
+  document a bare number takes the parameter's unit: the unit of the value it
+  replaces, else the one unit its range is written in, so a number typed after
+  an expression keeps the unit; a dimensionless parameter, or a length
+  parameter without a range, gets the number as typed, and the engine names a
+  missing unit. A number a double cannot hold (`1e999`, `1e-400`) is refused
   in the page and the field returns to the value the document holds.
 - Every edit sends the whole document to the server, which parses it and
   evaluates one component. The drawing shows the cells filled by region (void
