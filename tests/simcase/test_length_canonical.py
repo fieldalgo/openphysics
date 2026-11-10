@@ -27,12 +27,13 @@ from __future__ import annotations
 
 import copy
 from decimal import Decimal
+from fractions import Fraction
 import re
 
 import numpy as np
 import pytest
 
-from simcase import Document, build_mesh, examples, run, solve_point, study_points, units, views
+from simcase import Document, build_mesh, examples, run, solve_point, study_points, views
 from simcase.modes_document import kernel_document
 
 #: document units per micrometre, as exact decimals
@@ -123,20 +124,20 @@ def test_lengths_convert_exactly_when_the_micrometre_value_is_representable():
     assert 1.3e-8 * 1e6 != 0.013 and k["geometry"]["shapes"][0]["mesh_size"] == 0.013
     assert 9.0 * 0.001 != 0.009 and k["mesh"]["size"] == 0.009
     assert 2.2e-7 / 1e-6 != 0.22 and k["physics"]["em1"]["wavelength"] == 0.22
-    # the format 0.2 helpers (no document reads 0.2 since units batch C9; the kernel and region
-    # hand-offs still use them until C11) keep their contract
-    nm, m, um = (units.resolve({"length": s}) for s in ("nm", "m", "um"))
-    assert units.micrometres_per_length(nm) == units.Fraction(1, 1000)
-    assert units.micrometres_per_length(m) == 10 ** 6
+    # the micrometre helpers of views (private): a shape number from its pm count, a tagged
+    # length from its exact metres, and the diagnostic hand-back to a component's unit
     for value in (1.55, 0.22, 0.012, 9.896161 ** 2, 1e-7, 123.456):
-        assert units.length_to_micrometres(value, um) == value
-    assert units.length_to_micrometres(1550, nm) == 1.55
-    assert units.length_to_micrometres(1.3e-8, m) == 0.013
-    assert units.length_to_micrometres(1e4, nm, power=2) == 0.01
-    np.testing.assert_array_equal(units.lengths_from_micrometres(np.array([1.55, 0.22]), nm), [1550.0, 220.0])
+        exact = Fraction(repr(value)) / 10 ** 6                       # the value in um, as metres
+        assert views._um_of_exact(exact) == value
+        if (exact * 10 ** 12).denominator == 1:
+            assert views._um_of_pm(int(exact * 10 ** 12)) == value
+    assert views._um_of_pm(1550 * 1000) == 1.55                      # 1550 nm
+    assert views._um_of_exact(Fraction("1.3e-8")) == 0.013          # 1.3e-8 m
+    np.testing.assert_array_equal(views.from_micrometres(np.array([1.55, 0.22]), "nm"), [1550.0, 220.0])
+    np.testing.assert_array_equal(views.from_micrometres(np.array([1.55, 0.22]), "um"), [1.55, 0.22])
 
 
-def test_a_micrometre_document_meshes_in_its_own_numbers_and_hands_back_metres():
+def test_a_document_in_micrometres_meshes_in_its_own_numbers_and_hands_back_metres():
     """um is the kernel's unit: the hand-off holds the document's numbers, and the nodes in metres are
     the mesher's micrometre nodes times 1e-6."""
     doc = Document.from_dict(_rib_with_polygon_and_sellmeier())

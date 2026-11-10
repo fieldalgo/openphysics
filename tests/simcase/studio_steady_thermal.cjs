@@ -590,7 +590,7 @@ test('J10 hasRegionGeometry on the server rule fixtures (two physics entries: fa
   const noGeometry=copy(region);delete noGeometry.geometry;
   const physicsNotDict=copy(region);physicsNotDict.physics=['heat1'];
   const twoPhysics=copy(region);twoPhysics.physics.second={type:T.TYPE};
-  // version 1 blocks, as the server's from_v02 writes them (the numbers do not matter to the rule)
+  // version 1 blocks, as geometry_document.from_flat writes them (the numbers do not matter to the rule)
   const component=(extra)=>({dimension:'2d',domain:{xmin:0,xmax:40,ymin:0,ymax:20},finalize:'later_wins',...extra});
   const versionOne=copy(region);versionOne.geometry={version:1,components:{main:component({background:{material:'steel'},
     features:[{name:'heater',type:'rect',x:1,y:1,w:2,h:2,material:'copper'}]})}};

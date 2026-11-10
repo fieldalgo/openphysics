@@ -325,9 +325,9 @@ def test_p2_8_a_physics_entry_keeps_its_own_name():
 
 
 def test_p2_8_an_axisymmetric_component_and_a_non_side_tag_are_refused_as_before():
-    from simcase.geometry_document import from_v02
+    from simcase.geometry_document import from_flat
     data = example("soi_strip")
-    data["geometry"] = from_v02(data["geometry"])
+    data["geometry"] = from_flat(data["geometry"])
     comp = data["geometry"]["components"]["main"]
     tagged = copy.deepcopy(data)
     comp.update(dimension="axisymmetric", domain={"xmin": 0, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2})
@@ -338,6 +338,128 @@ def test_p2_8_an_axisymmetric_component_and_a_non_side_tag_are_refused_as_before
         {"tag": "port", "select": {"boundary": {"between": ["background", "exterior"]}}}]
     with pytest.raises(DocumentError, match="exterior edges on the four domain sides only"):
         build_mesh(Document.from_dict(tagged))
+
+
+# ---- C11b: the former kernel contract is the format 0.3 contract ------------------------------------
+# Until C11b the micrometre kernel hand-off was checked once more by the format 0.2 em.modes2d validator
+# (Document.validate_em_modes2d), which C11b deletes with the hand-off's 0.2 envelope. Each of its
+# checks is one row here: the format 0.3 refusal (code and path) of the same defect in a document.
+# Two more stay where they were: the PML contract also runs at solve time on the micrometre mesh
+# window (physics_pml_modes.solve, test_pml_contract.py) and the tracking settings at run time
+# (tracking_settings, test_tracking.py); an axisymmetric component is refused in the test above.
+# The contract's tracking check of a vector sweep is kept on purpose on the hand-off itself
+# (kernel_document), with the same arguments at the same point as before: redundant with the
+# run-time call, it keeps the contract's check and the recorded calls as they were.
+
+KERNEL_CONTRACT = [
+    # the envelope: the hand-off format, its units block, no tagged [value, unit] pairs
+    ("soi_strip", "openphysics", "0.2", "E-FORMAT", "openphysics"),
+    ("soi_strip", "units", {"length": "um"}, "E-KEY-UNKNOWN", "units"),
+    ("soi_strip", "geometry.length_unit", DELETE, "E-KEY-MISSING", "geometry.length_unit"),   # PHYSICS_REQUIRES
+    ("soi_strip", P + "vacuum_wavelength", [1.55, "um"], "E-VALUE-FORM", P + "vacuum_wavelength"),
+    # the domain
+    ("soi_strip", "geometry.domain.xmin", DELETE, "E-KEY-MISSING", "geometry.domain.xmin"),
+    ("soi_strip", "geometry.domain", {"xmin": 1, "xmax": 1, "ymin": 0, "ymax": 1}, "E-CONTRACT",
+     "geometry.domain.xmax"),
+    # results.mode_overlap (mode_postprocessing.validate_mode_overlap)
+    ("em_gaussian_overlap_scalar", "results.mode_overlap.other", 1, "E-KEY-UNKNOWN", "results.mode_overlap.other"),
+    ("em_gaussian_overlap_scalar", "results.mode_overlap.gaussian.extra", 1, "E-KEY-UNKNOWN",
+     "results.mode_overlap.gaussian.extra"),
+    ("em_gaussian_overlap_scalar", "results.mode_overlap.gaussian.position", DELETE, "E-KEY-MISSING",
+     "results.mode_overlap.gaussian.position"),
+    ("em_gaussian_overlap_scalar", "results.mode_overlap.gaussian.beam_waist_radius", "0 um", "E-DOMAIN",
+     "results.mode_overlap.gaussian.beam_waist_radius"),
+    ("em_gaussian_overlap_scalar", "results.mode_overlap.gaussian.position", ["50 um", "0 um"], "E-CONTRACT",
+     "results.mode_overlap.gaussian.position"),
+    # the shapes and the background
+    ("soi_strip", "geometry.shapes[0].type", "ellipse", "E-VALUE-FORM", "geometry.shapes[0].type"),
+    ("soi_strip", "geometry.shapes[0].w", DELETE, "E-KEY-MISSING", "geometry.shapes[0].w"),
+    ("soi_strip", "geometry.shapes[0].name", DELETE, "E-KEY-MISSING", "geometry.shapes[0].name"),
+    ("soi_strip", "geometry.shapes[0].material", DELETE, "E-KEY-MISSING", "geometry.shapes[0].material"),
+    ("soi_strip", "geometry.shapes[0].name", "background", "E-ID-CLASH", "geometry.shapes[0].name"),
+    ("soi_strip", "geometry.shapes[0].w", 0, "E-DOMAIN", "geometry.shapes[0].w"),
+    ("soi_strip", "geometry.shapes[0].h", -1, "E-DOMAIN", "geometry.shapes[0].h"),
+    ("soi_strip", "geometry.shapes[0]", {"name": "c", "type": "circle", "cx": 0, "cy": 0, "r": 0,
+                                          "material": "physmat:Si"}, "E-DOMAIN", "geometry.shapes[0].r"),
+    ("soi_strip", "geometry.shapes[0]", {"name": "p", "type": "polygon", "points": [[0, 0], [1, 0]],
+                                          "material": "physmat:Si"}, "E-CONTRACT", "geometry.shapes[0].points"),
+    ("soi_strip", "geometry.background.material", DELETE, "E-KEY-MISSING", "geometry.background.material"),
+    # the materials (the record values: test_simcase.py::test_invalid_custom_materials_fail_at_document_validation)
+    ("soi_strip", "materials", [], "E-VALUE-FORM", "materials"),
+    # the physics map and entry
+    ("vector_slab", "physics", {"em-1": example("vector_slab")["physics"]["em1"]}, "E-CONTRACT", "physics.em-1"),
+    ("vector_slab", "physics.em1", [], "E-VALUE-FORM", "physics.em1"),
+    ("vector_slab", P + "type", "em.modes3d", "E-VALUE-FORM", P + "type"),
+    ("fiber", P + "formulation", "magic", "E-VALUE-FORM", P + "formulation"),
+    ("soi_strip", P + "target_effective_index", 0, "E-DOMAIN", P + "target_effective_index"),
+    ("fiber", P + "boundary.left", "pmx", "E-VALUE-FORM", P + "boundary.left"),
+    ("vector_slab", P + "vacuum_wavelength", "0 um", "E-DOMAIN", P + "vacuum_wavelength"),
+    ("vector_slab", P + "effective_index_threshold", DELETE, "E-KEY-MISSING", P + "effective_index_threshold"),
+    ("vector_slab", P + "effective_index_threshold", 0, "E-DOMAIN", P + "effective_index_threshold"),
+    ("vector_slab", P + "mode_count", 2.5, "E-DOMAIN", P + "mode_count"),
+    ("fiber", P + "mode_count", 0, "E-DOMAIN", P + "mode_count"),
+    # PML and bend (pml_contract.validate on the hand-off's physics)
+    ("vector_slab", P + "bend", {"bend_radius": "5 um", "axis": "y", "bend_origin": "0 um"}, "E-CONTRACT", P + "bend"),
+    ("pml_bent_slab", P + "target_effective_index", DELETE, "E-KEY-MISSING", P + "target_effective_index"),
+    ("pml_bent_slab", P + "pml.extra", 1, "E-KEY-UNKNOWN", P + "pml.extra"),
+    ("pml_bent_slab", P + "pml.pml_thickness", {}, "E-KEY-MISSING", P + "pml.pml_thickness"),
+    ("pml_bent_slab", P + "pml.pml_thickness.top", "-1 um", "E-DOMAIN", P + "pml.pml_thickness.top"),
+    ("pml_bent_slab", P + "boundary.top", "pmc", "E-CONTRACT", P + "boundary.top"),
+    ("pml_bent_slab", P + "pml.pml_thickness", {"top": "3 um", "bottom": "3.1 um"}, "E-CONTRACT",
+     P + "pml.pml_thickness"),
+    ("pml_bent_slab", P + "pml.pml_strength", 0, "E-DOMAIN", P + "pml.pml_strength"),
+    ("pml_bent_slab", P + "pml.pml_order", 5, "E-DOMAIN", P + "pml.pml_order"),
+    ("pml_bent_slab", P + "pml.pml_minimum_physical_fraction", 2, "E-DOMAIN", P + "pml.pml_minimum_physical_fraction"),
+    ("pml_bent_slab", P + "bend.axis", "z", "E-VALUE-FORM", P + "bend.axis"),
+    ("pml_bent_slab", P + "bend.bend_radius", "-1 um", "E-DOMAIN", P + "bend.bend_radius"),
+    ("pml_bent_slab", P + "bend.bend_radius", "0.1 um", "E-CONTRACT", P + "bend.bend_radius"),
+    # the mesh
+    ("soi_strip", "mesh.element_size", "0 um", "E-DOMAIN", "mesh.element_size"),
+    ("soi_strip", "mesh.grading.near", DELETE, "E-KEY-MISSING", "mesh.grading.near"),
+    # the study
+    ("soi_strip", "study", {"type": "transient"}, "E-CONTRACT", "study.type"),
+    ("soi_strip", "study", {"type": "sweep", "values": ["1.5 um"]}, "E-KEY-MISSING", "study.parameter"),
+    ("soi_strip", "study", {"type": "sweep", "parameter": P + "vacuum_wavelength"}, "E-KEY-MISSING",
+     "study.parameter"),
+    ("soi_strip", "study", {"type": "sweep", "parameter": P + "nope", "values": [1]}, "E-CONTRACT",
+     "study.parameter"),
+    ("soi_strip", "study", {"type": "sweep", "parameter": "geometry.shapes[0].w", "values": [1]}, "E-CONTRACT",
+     "study.parameter"),
+    ("pml_bent_slab", "study", {"type": "sweep", "parameter": P + "target_effective_index", "values": [1.5, 1.6]},
+     "E-CONTRACT", "study.parameter"),
+    ("vector_slab", "study", {"type": "sweep", "parameter": P + "effective_index_threshold",
+                              "values": [1.4, 1.41, 1.42]}, "E-CONTRACT", "study.parameter"),
+    ("vector_slab", "study", {"type": "sweep", "parameter": P + "vacuum_wavelength",
+                              "values": {"unit": "um", "values": [1.5, 1.6]}}, "E-CONTRACT", "study.values"),
+    ("vector_slab", "study", {"type": "sweep", "parameter": P + "vacuum_wavelength",
+                              "values": {"unit": "um", "values": [1.5, -1, 1.6]}}, "E-DOMAIN", "study.values.values[1]"),
+    ("vector_slab", "study", {"type": "sweep", "parameter": P + "vacuum_wavelength",
+                              "values": {"unit": "um", "values": [1.5, 1.6, 1.6]}}, "E-CONTRACT", "study.values"),
+    ("vector_slab_sweep", "study.tracking", {"search_mode_count": 0}, "E-DOMAIN", "study.tracking.search_mode_count"),
+    ("fiber", "study", {"type": "sweep", "parameter": P + "vacuum_wavelength",
+                        "values": {"unit": "um", "values": [1.5, 1.55, 1.6]}, "tracking": {"search_mode_count": 4}},
+     "E-CONTRACT", "study.tracking"),
+    ("fiber", "study", {"type": "sweep", "parameter": P + "formulation", "values": ["scalar", "vector"]},
+     "E-CONTRACT", "study.values"),
+]
+
+
+@pytest.mark.parametrize("name,path,value,code,where", KERNEL_CONTRACT,
+                         ids=[f"{n}:{p}={v!r}"[:90] for n, p, v, *_ in KERNEL_CONTRACT])
+def test_c11b_each_former_kernel_contract_check_is_a_format_0_3_refusal(name, path, value, code, where):
+    data = source(name)
+    put(data, path, value)
+    found = refusal(data)
+    assert (code, where) in [(d.code, d.path) for d in found], [(d.code, d.path, d.message) for d in found]
+
+
+def test_c11b_the_former_implausible_wavelength_note_is_a_magnitude_warning():
+    """The kernel contract noted an implausible wavelength; format 0.3 warns with W-MAGNITUDE."""
+    for text in ("1e-12 m", "1 m"):
+        data = example("fiber")
+        put(data, P + "vacuum_wavelength", text)
+        doc = Document.from_dict(data)
+        assert ("W-MAGNITUDE", P + "vacuum_wavelength") in [(d.code, d.path) for d in doc.diagnostics]
 
 
 # ---- P2-9: diagnostics reach every output ----------------------------------------------------------

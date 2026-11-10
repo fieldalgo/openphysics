@@ -115,7 +115,7 @@ def _flat(result) -> list[_Component]:
             pass
         shapes.append((area, side, size if isinstance(size, float) else None, s.get("name", f"shapes[{i}]")))
     background = (gs.get("background") or {}).get("element_size")
-    numbers = [k for path, k in pm.items() if path.startswith("geometry.")]
+    numbers = [k for path, k in pm.items() if path.partition(".")[0] == "geometry"]
     dimension = "3d" if len(axes) == 3 else "2d"
     return [_Component("geometry", gs.get("length_unit"), dimension, extents, gs.get("depth"), g.get("depth"),
                        shapes, background if isinstance(background, float) else None, numbers)]
