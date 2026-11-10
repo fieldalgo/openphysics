@@ -1,0 +1,562 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "electric2d-p1-node-cell-regions-v1 (format 0.2 region electric.steady2d) -> electric2d-p1-node-cell-regions-v2 (format 0.3): every array keeps its bytes under its registry name; the numeric diagnostics move to balance (the terminal currents as outward_current_per_depth, negated), the iteration records take the section 5.3.2 column names; unit and location metadata are rewritten, not compared (the inputs are compared by P2-2)",
+ "old_layout": "electric2d-p1-node-cell-regions-v1",
+ "new_layout": "electric2d-p1-node-cell-regions-v2",
+ "arrays": [
+  {
+   "old": "nodes_m",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "triangle_regions",
+   "new": "triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "potential_v",
+   "new": "electric_potential",
+   "f": "="
+  },
+  {
+   "old": "electric_field_v_m",
+   "new": "electric_field",
+   "f": "="
+  },
+  {
+   "old": "current_density_a_m2",
+   "new": "current_density",
+   "f": "="
+  },
+  {
+   "old": "conductivity_s_m",
+   "new": "electrical_conductivity",
+   "f": "="
+  },
+  {
+   "old": "joule_heating_w_m3",
+   "new": "joule_power_density",
+   "f": "="
+  },
+  {
+   "old": "joule_load_w_per_m",
+   "new": "joule_power_per_depth",
+   "f": "="
+  },
+  {
+   "old": "electric_reaction_a_per_m",
+   "new": "reaction_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_current_a_per_m",
+   "new": "outward_prescribed_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "electric_residual_a_per_m",
+   "new": "residual_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "electric_dirichlet_node_ids",
+   "new": "electric_prescribed_node_ids",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_potential_v",
+   "new": "prescribed_electric_potential",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_name",
+   "new": "physics_name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "status",
+   "new": "status",
+   "f": "="
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "input_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "iteration_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_units.nodes_m",
+   "new": "field_units.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_locations.nodes_m",
+   "new": "field_locations.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.nodes_m.[]",
+   "new": "field_shapes.node_coordinates.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangles",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangles",
+   "new": "field_locations.triangles",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangles.[]",
+   "new": "field_shapes.triangles.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangle_regions",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangle_regions",
+   "new": "field_locations.triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangle_regions.[]",
+   "new": "field_shapes.triangle_regions.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.potential_v",
+   "new": "field_units.electric_potential",
+   "f": "="
+  },
+  {
+   "old": "field_locations.potential_v",
+   "new": "field_locations.electric_potential",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.potential_v.[]",
+   "new": "field_shapes.electric_potential.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.electric_field_v_m",
+   "new": "field_units.electric_field",
+   "f": "="
+  },
+  {
+   "old": "field_locations.electric_field_v_m",
+   "new": "field_locations.electric_field",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.electric_field_v_m.[]",
+   "new": "field_shapes.electric_field.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.current_density_a_m2",
+   "new": "field_units.current_density",
+   "f": "="
+  },
+  {
+   "old": "field_locations.current_density_a_m2",
+   "new": "field_locations.current_density",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.current_density_a_m2.[]",
+   "new": "field_shapes.current_density.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.conductivity_s_m",
+   "new": "field_units.electrical_conductivity",
+   "f": "="
+  },
+  {
+   "old": "field_locations.conductivity_s_m",
+   "new": "field_locations.electrical_conductivity",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.conductivity_s_m.[]",
+   "new": "field_shapes.electrical_conductivity.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.joule_heating_w_m3",
+   "new": "field_units.joule_power_density",
+   "f": "="
+  },
+  {
+   "old": "field_locations.joule_heating_w_m3",
+   "new": "field_locations.joule_power_density",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.joule_heating_w_m3.[]",
+   "new": "field_shapes.joule_power_density.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.joule_load_w_per_m",
+   "new": "field_units.joule_power_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.joule_load_w_per_m",
+   "new": "field_locations.joule_power_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.joule_load_w_per_m.[]",
+   "new": "field_shapes.joule_power_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.electric_reaction_a_per_m",
+   "new": "field_units.reaction_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.electric_reaction_a_per_m",
+   "new": "field_locations.reaction_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.electric_reaction_a_per_m.[]",
+   "new": "field_shapes.reaction_current_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.prescribed_outward_current_a_per_m",
+   "new": "field_units.outward_prescribed_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.prescribed_outward_current_a_per_m",
+   "new": "field_locations.outward_prescribed_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.prescribed_outward_current_a_per_m.[]",
+   "new": "field_shapes.outward_prescribed_current_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.electric_residual_a_per_m",
+   "new": "field_units.residual_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.electric_residual_a_per_m",
+   "new": "field_locations.residual_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.electric_residual_a_per_m.[]",
+   "new": "field_shapes.residual_current_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.electric_dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.electric_dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.electric_dirichlet_node_ids.[]",
+   "new": "field_shapes.electric_prescribed_node_ids.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_potential_v",
+   "new": "field_units.prescribed_electric_potential",
+   "f": "="
+  },
+  {
+   "old": "field_locations.dirichlet_potential_v",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_potential_v.[]",
+   "new": "field_shapes.prescribed_electric_potential.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.current_balance_a_per_m",
+   "new": "balance.current_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.electric_free_residual_a_per_m",
+   "new": "balance.maximum_residual_current_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.supplied_power_w_per_m",
+   "new": "balance.inward_electric_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.joule_power_w_per_m",
+   "new": "balance.joule_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.electric_power_defect_w_per_m",
+   "new": "balance.electric_power_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.outward_heat_w_per_m",
+   "new": "balance.outward_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.heat_power_defect_w_per_m",
+   "new": "balance.heat_rate_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.thermal_free_residual_w_per_m",
+   "new": "balance.maximum_residual_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.temperature_min_k",
+   "new": "balance.minimum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.temperature_max_k",
+   "new": "balance.maximum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "iterations",
+   "new": "iterations",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].iteration",
+   "new": "iterations.[].iteration_count",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].temperature_defect",
+   "new": "iterations.[].temperature_change.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].conductivity_defect",
+   "new": "iterations.[].relative_electrical_conductivity_change.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].minimum_temperature",
+   "new": "iterations.[].minimum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].maximum_temperature",
+   "new": "iterations.[].maximum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].electric_free_residual",
+   "new": "iterations.[].maximum_residual_current_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].thermal_free_residual",
+   "new": "iterations.[].maximum_residual_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].nonlinear_heat_residual",
+   "new": "iterations.[].relative_residual.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].current_balance",
+   "new": "iterations.[].current_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].supplied_power_per_length",
+   "new": "iterations.[].inward_electric_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].joule_power_per_length",
+   "new": "iterations.[].joule_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].outward_heat_per_length",
+   "new": "iterations.[].outward_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].electric_power_defect",
+   "new": "iterations.[].electric_power_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].heat_power_defect",
+   "new": "iterations.[].heat_rate_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.terminal_reaction_current_a_per_m.*",
+   "new": "balance.outward_current_per_depth.*.value",
+   "f": "neg"
+  },
+  {
+   "old": "diagnostics.terminal_reaction_current_a_per_m",
+   "new": "balance.outward_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.mesh_min_angle_deg",
+   "new": "mesh.minimum_triangle_angle.value",
+   "f": "rad"
+  },
+  {
+   "old": "region_names.[]",
+   "new": "region_names.[]",
+   "f": "="
+  },
+  {
+   "old": "region_materials.*",
+   "new": "regions.*.material",
+   "f": "="
+  },
+  {
+   "old": "region_conductivity_s_m.*",
+   "new": "regions.*.electrical_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "region_thermal_conductivity_w_mk.*",
+   "new": "regions.*.thermal_conductivity.value",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "mesh.nodes",
+  "mesh.triangles",
+  "study.type",
+  "balance.*.unit",
+  "iterations.[].*.unit",
+  "field_locations.electric_prescribed_node_ids",
+  "field_locations.prescribed_electric_potential",
+  "balance.outward_current_per_depth.*.unit",
+  "mesh.minimum_triangle_angle.unit",
+  "regions.*.electrical_conductivity.unit",
+  "regions.*.thermal_conductivity.unit"
+ ],
+ "identifiers": [
+  "result_format",
+  "field_layout"
+ ],
+ "vtu": [
+  {
+   "old": "triangle_regions",
+   "new": "triangle_regions",
+   "f": "="
+  },
+  {
+   "old": "potential_v",
+   "new": "electric_potential",
+   "f": "="
+  },
+  {
+   "old": "electric_field_v_m",
+   "new": "electric_field",
+   "f": "="
+  },
+  {
+   "old": "current_density_a_m2",
+   "new": "current_density",
+   "f": "="
+  },
+  {
+   "old": "conductivity_s_m",
+   "new": "electrical_conductivity",
+   "f": "="
+  },
+  {
+   "old": "joule_heating_w_m3",
+   "new": "joule_power_density",
+   "f": "="
+  },
+  {
+   "old": "joule_load_w_per_m",
+   "new": "joule_power_per_depth",
+   "f": "="
+  },
+  {
+   "old": "electric_reaction_a_per_m",
+   "new": "reaction_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "prescribed_outward_current_a_per_m",
+   "new": "outward_prescribed_current_per_depth",
+   "f": "="
+  },
+  {
+   "old": "electric_residual_a_per_m",
+   "new": "residual_current_per_depth",
+   "f": "="
+  }
+ ],
+ "vtu_added": []
+}

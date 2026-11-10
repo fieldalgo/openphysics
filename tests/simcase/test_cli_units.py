@@ -204,7 +204,7 @@ def test_fix_applies_only_value_preserving_fixes(toy_kind, tmp_path, capsys):
 
 
 def test_fix_and_explain_refuse_a_0_2_document(tmp_path, capsys):
-    example = ROOT / "examples" / "simcase" / "electric_rectangle.json"     # a kind still read in 0.2
+    example = ROOT / "examples" / "simcase" / "elastic_plate.json"     # a kind still read in 0.2
     for command in ("fix", "explain"):
         code, _out, err = _run(capsys, command, example)
         assert code == 2 and "reads format 0.3 documents" in err
@@ -212,7 +212,7 @@ def test_fix_and_explain_refuse_a_0_2_document(tmp_path, capsys):
 
 def test_validate_of_a_0_2_document_is_unchanged(capsys):
     from simcase.schema import Document
-    example = ROOT / "examples" / "simcase" / "electric_rectangle.json"     # a kind still read in 0.2
+    example = ROOT / "examples" / "simcase" / "elastic_plate.json"     # a kind still read in 0.2
     code, out, _err = _run(capsys, "validate", example)
     assert code == 0 and out == Document.load(example).summary() + "\n"
     code, out, _err = _run(capsys, "validate", "--json", example)

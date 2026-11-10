@@ -1,0 +1,56 @@
+{
+  "openphysics": "0.3",
+  "name": "Constant-property Joule heated rectangle",
+  "geometry": {
+    "length_unit": "m",
+    "depth": null,
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 1.0,
+      "ymin": 0.0,
+      "ymax": 0.2
+    }
+  },
+  "materials": {},
+  "mesh": {
+    "subdivision_count": [
+      24,
+      6
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "electric": {
+      "type": "joule.steady2d",
+      "electrical_conductivity": "2 S/m",
+      "prescribed_electric_potential": {
+        "right": "0 V"
+      },
+      "thermal_conductivity": "1 W/(m K)",
+      "prescribed_temperature": {},
+      "inward_current_density": {
+        "left": "2 A/m^2"
+      },
+      "convection": {
+        "left": {
+          "heat_transfer_coefficient": "4 W/(m^2 K)",
+          "ambient_temperature": "300 K"
+        },
+        "right": {
+          "heat_transfer_coefficient": "4 W/(m^2 K)",
+          "ambient_temperature": "300 K"
+        }
+      },
+      "inward_heat_flux": {
+        "left": "-0.2 W/m^2",
+        "right": "-0.2 W/m^2"
+      }
+    }
+  }
+}
