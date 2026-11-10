@@ -5,8 +5,8 @@
 The public document reader is connected separately. These helpers read a
 Document without mutating its data, scale or notes. They do not solve or save.
 Format 0.3 rectangle documents are read by ``simcase.resolve`` against ``heat_slots``
-and checked on their SI values here (the section at the end); the 0.2 readers stay for
-the mechanics kinds until their commit of the units batch.
+and checked on their SI values here (the section at the end); the format 0.2 reader is gone
+(units batch C7), ``natural_conditions`` stays for the transient contract's sampled data.
 """
 import math
 from collections.abc import Mapping
@@ -14,7 +14,7 @@ from itertools import combinations
 
 import numpy as np
 
-from . import units, views
+from . import views
 from .schema import DocumentError
 
 PHYSICS = "thermal.steady2d"
@@ -43,77 +43,6 @@ def _number(value, path, *, positive=False, nonnegative=False, integer=False):
         raise DocumentError(f"{path}: expected a finite valid "
                             + ("positive integer" if integer else "number"))
     return float(value)
-
-
-def _validated(doc):
-    d = getattr(doc, "data", None)
-    top = {"openphysics", "name", "units", "geometry", "materials", "physics",
-           "mesh", "study", "results"}
-    _object(d, top, "document", top)
-    if d["openphysics"] != "0.2" or not isinstance(d["name"], str):
-        raise DocumentError('document: expected format "0.2" and a string name')
-    _object(d["units"], {"length", "temperature"}, "units", {"length", "temperature"})
-    if d["units"]["temperature"] != "K":
-        raise DocumentError('units.temperature: expected "K"')
-    try:
-        scale = units.resolve(d["units"])
-    except (units.UnitError, TypeError, ValueError, OverflowError) as exc:
-        raise DocumentError(f"units: {exc}") from exc
-    _object(d["geometry"], {"domain"}, "geometry", {"domain"})
-    dom = d["geometry"]["domain"]
-    keys = {"xmin", "xmax", "ymin", "ymax"}
-    _object(dom, keys, "geometry.domain", keys)
-    bounds = {}
-    for key in keys:
-        value = _number(dom[key], "geometry.domain."+key)
-        bounds[key] = _number(scale.to_si(value, {"length": 1}),
-                              "geometry.domain."+key+" in metres")
-    for axis in "xy":
-        _number(dom[axis+"max"]-dom[axis+"min"], "geometry.domain."+axis+" extent", positive=True)
-        _number(bounds[axis+"max"]-bounds[axis+"min"],
-                "geometry.domain."+axis+" SI extent", positive=True)
-    _object(d["materials"], set(), "materials")
-    _object(d["mesh"], {"subdivisions"}, "mesh", {"subdivisions"})
-    counts = d["mesh"]["subdivisions"]
-    if not isinstance(counts, list) or len(counts) != 2:
-        raise DocumentError("mesh.subdivisions: expected [nx, ny]")
-    for i, value in enumerate(counts):
-        _number(value, f"mesh.subdivisions[{i}]", positive=True, integer=True)
-    _object(d["study"], {"type"}, "study", {"type"})
-    if d["study"]["type"] != "single":
-        raise DocumentError('study.type: expected "single"')
-    _object(d["results"], {"save_fields", "plots"}, "results", {"save_fields", "plots"})
-    if any(not isinstance(d["results"][k], bool) for k in ("save_fields", "plots")):
-        raise DocumentError("results: expected boolean save_fields and plots")
-    if d["results"]["plots"]:
-        raise DocumentError("results.plots: steady heat is headless")
-    physics = d["physics"]
-    if not isinstance(physics, dict) or len(physics) != 1:
-        raise DocumentError("physics: exactly one steady heat entry required")
-    name, p = next(iter(physics.items()))
-    if not isinstance(name, str) or not name.isidentifier():
-        raise DocumentError("physics: name must be an identifier")
-    path = "physics."+name
-    required = {"type", "conductivity_w_mk", "dirichlet_temperature_k"}
-    _object(p, required | {"heat_source_w_m3", "outward_flux_w_m2", "convection"},
-            path, required)
-    if p["type"] != PHYSICS:
-        raise DocumentError(path+".type: expected "+PHYSICS)
-    k = _number(p["conductivity_w_mk"], path+".conductivity_w_mk", positive=True)
-    q = _number(p.get("heat_source_w_m3", 0.), path+".heat_source_w_m3")
-    bc = p["dirichlet_temperature_k"]
-    _object(bc, SIDES, path+".dirichlet_temperature_k")
-    prescribed = {tag: _number(value, path+".dirichlet_temperature_k."+tag, nonnegative=True)
-                  for tag, value in bc.items()}
-    for a in ("left", "right"):
-        for b in ("bottom", "top"):
-            if a in prescribed and b in prescribed and prescribed[a] != prescribed[b]:
-                raise DocumentError(path+".dirichlet_temperature_k: conflicting corner")
-    flux, convection = natural_conditions(p, path, prescribed)
-    if not prescribed and not any(h > 0 for h, _ in convection.values()):
-        raise DocumentError(path+": requires Dirichlet or positive Robin anchor; pure Neumann unsupported")
-    versions = V2 if has_natural_conditions(p) else V1
-    return bounds, prescribed, k, q, flux, convection, versions
 
 
 def has_natural_conditions(p):
@@ -155,19 +84,24 @@ def validate_steady_boundary(doc):
     Nonnegative prescribed/ambient Kelvin is a document policy; the unchanged
     engine permits finite mathematical Kelvin and does not clamp the solution.
     Empty natural mappings select v2 by presence but do not provide an anchor.
-    A format 0.3 document is checked on its SI values (``validate_steady_rectangle_03``).
+    The document is format 0.3, checked on its SI values (``validate_steady_rectangle_03``); a
+    format 0.2 document is refused by name.
     """
-    if getattr(doc, "si", None) is not None:
-        validate_steady_rectangle_03(doc)
-        return
-    _validated(doc)
+    _require_03(doc)
+    validate_steady_rectangle_03(doc)
 
 
 def steady_result_versions(doc):
     """Return independent result/layout IDs; absent new keys keep legacy v1."""
-    if getattr(doc, "si", None) is not None:
-        return steady_result_versions_03(doc)
-    return _validated(doc)[-1]
+    _require_03(doc)
+    return steady_result_versions_03(doc)
+
+
+def _require_03(doc):
+    """The rectangle readers read format 0.3 only (the 0.2 reader is gone since units batch C7)."""
+    if getattr(doc, "si", None) is None:
+        from .thermal import refuse_format_02
+        refuse_format_02(doc, "thermal_steady2d")
 
 
 def steady_boundary_inputs(doc, mesh):

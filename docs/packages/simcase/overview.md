@@ -25,9 +25,10 @@ The package and CLI are named `simcase`. The JSON version field is `"openphysics
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat
 (`thermal.steady2d` and `thermal.transient2d`: rectangles, material regions, version 1 blocks and
 the axisymmetric forms) and for electric conduction and Joule heating (`electric.steady2d`,
-`joule.steady2d` and `joule.temperature2d`: rectangles, and material regions for the first two),
-which no longer read format 0.2; every other kind still reads format 0.2 until its commit of the
-units batch: [document format 0.3](document_format.md). The separate
+`joule.steady2d` and `joule.temperature2d`: rectangles, and material regions for the first two)
+and for mechanics (`mechanics.elasticity2d` and `mechanics.thermoelastic2d`: rectangles and
+material regions), which no longer read format 0.2; the em kinds (`em.modes2d`, `em.cavity3d`)
+still read format 0.2 until their commits of the units batch: [document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -55,7 +56,7 @@ prints a supplied example.
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
 | `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
-| `mechanics.elasticity2d` with regions | Static linear elasticity with named material regions (E and ν from the materials table) and the boundary names of region heat: displacements, Cartesian tractions and pressures | `elastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |
+| `mechanics.elasticity2d` with regions | Static linear elasticity with named material regions (E and ν from the materials table) and the boundary names of region heat: displacements, Cartesian tractions and gauge pressures | `elastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |
 | `mechanics.thermoelastic2d` with regions | Region heat, then thermal stress with per-material E, ν and α on the same mesh | `thermoelastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |
 | `thermal.steady2d` | Steady homogeneous rectangular heat: side Dirichlet, insulation, constant outward flux and convection | `thermal_slab`, `thermal_mixed`, `thermal_boundary` | [Steady heat](thermal_steady2d.md), [boundaries](thermal_steady_boundary2d.md) |
 | `thermal.steady2d` with regions | Steady heat with named material regions: shapes over a background, a materials table, a mesh that follows region boundaries | `thermal_regions` | [Region documents](thermal_regions2d.md) |
@@ -466,13 +467,17 @@ data `electric_field`, `current_density`, `electrical_conductivity` and
 `joule_power_density`, all SI, with the FieldData `units` and `conventions` blocks; a Joule
 result adds `temperature`, its nodal heat arrays and cell `heat_flux`, and
 `joule.temperature2d` adds `evaluation_temperature`. The format 0.2 electric layouts
-(`electric-joule2d-p1-v1` and the two `-regions-v1`) are refused by name. Elasticity results (`mechanics2d-p1-v1`, the layout of
-`mechanics.elasticity2d`) export point data `displacement_m` and the nodal
-`load_n_per_m`, `reaction_n_per_m` and `residual_n_per_m` vectors, and the saved
-strain and stress components as the scalar cell data `exx`, `eyy`, `gxy` and
-`sxx_pa`, `syy_pa`, `sxy_pa`; thermoelastic results (`thermoelastic2d-p1-v1`) add
-`temperature_k`, the nodal heat arrays, cell `heat_flux_w_m2`, `sigma_zz_pa`,
-`epsilon_zz` and the `total_`, `thermal_` and `elastic_` strain components. Arrays keep their saved names and unit suffixes;
+(`electric-joule2d-p1-v1` and the two `-regions-v1`) are refused by name. Elasticity results (`mechanics2d-p1-v2`, the layout of
+`mechanics.elasticity2d`) export point data `displacement` and the nodal
+`applied_force_per_depth`, `reaction_force_per_depth` and `residual_force_per_depth` vectors,
+and the saved strain and stress components as scalar cell data under their component names
+(`strain_xx`, `strain_yy`, `engineering_shear_strain_xy`, `stress_xx`, `stress_yy`,
+`stress_xy`); thermoelastic results (`thermoelastic2d-p1-v2`) add `temperature`, the nodal
+heat rates, the thermal-equivalent, body and traction force arrays, cell `heat_flux`,
+`stress_zz`, `strain_zz` and the `thermal_strain_…` and `elastic_strain_…` components; both
+carry the FieldData `units` and `conventions` blocks. The format 0.2 mechanics layouts
+(`mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`) are refused by name; region mechanics results
+are not exported yet. The em and cavity arrays keep their saved names and unit suffixes;
 Dirichlet node lists and the summary are not copied. The cavity with materials
 and lossy walls (`cavity3d-edge-complex-v1`) exports each complex mode as the
 cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`

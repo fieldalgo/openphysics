@@ -6,9 +6,9 @@ A thermal.steady2d document whose geometry has ``background``/``shapes`` (or a v
 component with features or a background material) takes its conductivity from a
 ``materials`` table: every shape and the background name a material, and every used
 material gives ``thermal_conductivity``. The mesh follows the region boundaries (meshine,
-``mesh.element_size``). Heat documents read format 0.3; the format 0.2 region helpers here
-serve the electric, Joule and mechanics region kinds until their own commits. See
-docs/packages/simcase/thermal_regions2d.md.
+``mesh.element_size``). Heat documents read format 0.3, as do the electric, Joule and mechanics
+region kinds that share these helpers; the format 0.2 region readers are gone (units batch C7).
+See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
 from dataclasses import replace
@@ -19,14 +19,10 @@ import numpy as np
 
 from . import views
 from .schema import SHAPE_TYPES, Document, DocumentError
-from .thermal import PHYSICS, ThermalRunResult, _number, _object
+from .thermal import PHYSICS, ThermalRunResult, _number
 
 SIDES = ('left', 'right', 'bottom', 'top')
-# One materials table serves every region physics of a document: each physics reads the keys it
-# needs and requires them only for the materials its regions use (heat: conductivity and heat
-# capacity; electric: electrical conductivity; mechanics: E, nu and alpha, see mechanics_regions.py).
-MATERIAL_KEYS = {'conductivity_w_mk', 'volumetric_heat_capacity_j_m3k', 'electrical_conductivity_s_m', 'source',
-                 'young_modulus_pa', 'poisson_ratio', 'thermal_expansion_per_k'}
+
 
 def has_region_geometry(data, physics_type):
     """A document of physics_type that declares region geometry (exported by ``simcase``; Studio
@@ -64,40 +60,6 @@ def _version_1_has_regions(geometry):
 def is_region_thermal(data):
     """A steady heat document that declares region geometry."""
     return has_region_geometry(data, PHYSICS)
-
-
-def _shape(s, i, names):
-    where = f'geometry.shapes[{i}]'
-    if not isinstance(s, dict) or s.get('type') not in SHAPE_TYPES:
-        raise DocumentError(f'{where}: expected a rect, circle or polygon object')
-    t = s['type']
-    _object(s, {'type', 'name', 'material', 'mesh_size'} | SHAPE_TYPES[t], where)
-    missing = ({'name', 'material'} | SHAPE_TYPES[t])-set(s)
-    if missing:
-        raise DocumentError(f'{where} ({t}): missing {sorted(missing)}')
-    name = s['name']
-    if not isinstance(name, str) or not name or name == 'background' or name in names:
-        raise DocumentError(f'{where}.name: expected a unique nonempty string other than "background"')
-    names.add(name)
-    if not isinstance(s['material'], str) or not s['material']:
-        raise DocumentError(f'{where}.material: expected a material name')
-    if 'mesh_size' in s:
-        _number(s['mesh_size'], f'{where}.mesh_size', positive=True)
-    if t == 'polygon':
-        points = s['points']
-        if not isinstance(points, list) or len(points) < 3:
-            raise DocumentError(f'{where}.points: expected at least three [x, y] points')
-        for j, point in enumerate(points):
-            if not isinstance(point, list) or len(point) != 2:
-                raise DocumentError(f'{where}.points[{j}]: expected [x, y]')
-            for value in point:
-                _number(value, f'{where}.points[{j}]')
-        from shapely.geometry import Polygon
-        if not Polygon([tuple(p) for p in points]).is_valid:
-            raise DocumentError(f'{where}.points: polygon must not self-intersect')
-    else:
-        for key in SHAPE_TYPES[t]:
-            _number(s[key], f'{where}.{key}', positive=key in ('w', 'h', 'r'))
 
 
 def is_axisymmetric(doc):
@@ -156,73 +118,6 @@ def void_area_m2(doc):
     return sum(c.area for c in rc.cells if c.void) / pm_per_m ** 2
 
 
-def _sides(p, name, allowed=SIDES, names=(set(), set(), set())):
-    path = f'physics.{name}'
-    tags, outside, inside = names
-    dirichlet_ok = set(allowed) | tags | outside | inside
-    flux_ok = set(allowed) | tags | outside
-    bc = p.get('dirichlet_temperature_k', {})
-    _named_sides(bc, dirichlet_ok, path+'.dirichlet_temperature_k')
-    for tag, value in bc.items():
-        _number(value, f'{path}.dirichlet_temperature_k.{tag}', nonnegative=True)
-    for a in ('left', 'right'):
-        for b in ('bottom', 'top'):
-            if a in bc and b in bc and bc[a] != bc[b]:
-                raise DocumentError(f'{path}.dirichlet_temperature_k: conflicting corner temperatures on {a}/{b}')
-    flux = p.get('outward_flux_w_m2', {})
-    _named_sides(flux, flux_ok, path+'.outward_flux_w_m2', inside)
-    for tag, value in flux.items():
-        _number(value, f'{path}.outward_flux_w_m2.{tag}')
-    robin = p.get('convection', {})
-    _named_sides(robin, flux_ok, path+'.convection', inside)
-    anchored = False
-    for tag, value in robin.items():
-        where = f'{path}.convection.{tag}'
-        _object(value, {'h_w_m2k', 'ambient_temperature_k'}, where)
-        if set(value) != {'h_w_m2k', 'ambient_temperature_k'}:
-            raise DocumentError(f'{where}: needs h_w_m2k and ambient_temperature_k')
-        _number(value['h_w_m2k'], where+'.h_w_m2k', nonnegative=True)
-        _number(value['ambient_temperature_k'], where+'.ambient_temperature_k', nonnegative=True)
-        anchored |= value['h_w_m2k'] > 0
-    if not bc and not anchored:
-        raise DocumentError(f'{path}: requires Dirichlet or positive Robin anchor; pure Neumann unsupported')
-    if set(bc) & (set(flux) | set(robin)):
-        raise DocumentError(f'{path}: natural condition overlaps a fully Dirichlet side')
-
-
-def region_geometry(doc, label='heat'):
-    """Validate geometry.domain/background/shapes; return the shape names. ``label`` names the
-    physics in refusals (``heat``, ``electric``, ``mechanics``)."""
-    d = doc.data
-    g = d['geometry']
-    if doc.is_version_1:
-        return _version_1_region_geometry(doc, label)
-    _object(g, {'domain', 'background', 'shapes'}, 'geometry')
-    dom = g.get('domain')
-    _object(dom, {'xmin', 'xmax', 'ymin', 'ymax'}, 'geometry.domain')
-    if set(dom) != {'xmin', 'xmax', 'ymin', 'ymax'}:
-        raise DocumentError('geometry.domain needs xmin, xmax, ymin, ymax')
-    for key, value in dom.items():
-        _number(value, f'geometry.domain.{key}')
-        _number(doc.scale.to_si(value, {'length': 1}), f'geometry.domain.{key} in metres')
-    for axis in 'xy':
-        _number(dom[axis+'max']-dom[axis+'min'], f'geometry.domain.{axis} extent', positive=True)
-    background = g.get('background')
-    _object(background, {'material', 'mesh_size'}, 'geometry.background')
-    if not isinstance(background.get('material'), str) or not background['material']:
-        raise DocumentError('geometry.background.material: expected a material name')
-    if 'mesh_size' in background:
-        _number(background['mesh_size'], 'geometry.background.mesh_size', positive=True)
-    shapes = g.setdefault('shapes', [])
-    if not isinstance(shapes, list):
-        raise DocumentError('geometry.shapes: expected a list')
-    names = set()
-    for i, s in enumerate(shapes):
-        _shape(s, i, names)
-    refuse_dropped_shapes(doc, label)
-    return names
-
-
 def _version_1_region_geometry(doc, label='heat'):
     """The region checks of a version 1 block: the reader has checked the geometry itself;
     here the domain must be finite in metres, the background needs a material, a void feature
@@ -272,93 +167,14 @@ def covered_shapes(doc, mesh):
     return [s['name'] for s in doc.regions() if s['material'] is not None and s['name'] not in mesh.region_names]
 
 
-def region_materials_table(doc, required, label):
-    """Validate the materials table; every used material needs the `required` keys."""
-    d = doc.data
-    materials = d['materials']
-    if not isinstance(materials, dict):
-        raise DocumentError('materials: expected an object mapping names to thermal properties')
-    for mname, spec in materials.items():
-        where = f'materials.{mname}'
-        _object(spec, MATERIAL_KEYS, where)
-        if 'conductivity_w_mk' in spec:
-            _number(spec['conductivity_w_mk'], where+'.conductivity_w_mk', positive=True)
-        if 'volumetric_heat_capacity_j_m3k' in spec:
-            _number(spec['volumetric_heat_capacity_j_m3k'], where+'.volumetric_heat_capacity_j_m3k', positive=True)
-        if 'electrical_conductivity_s_m' in spec:
-            _number(spec['electrical_conductivity_s_m'], where+'.electrical_conductivity_s_m', positive=True)
-        if 'young_modulus_pa' in spec:
-            _number(spec['young_modulus_pa'], where+'.young_modulus_pa', positive=True)
-        if 'poisson_ratio' in spec:
-            _number(spec['poisson_ratio'], where+'.poisson_ratio')
-            if not -1 < spec['poisson_ratio'] < .5:
-                raise DocumentError(where+'.poisson_ratio: expected -1 < nu < 0.5')
-        if 'thermal_expansion_per_k' in spec:
-            _number(spec['thermal_expansion_per_k'], where+'.thermal_expansion_per_k')
-        if 'source' in spec and not isinstance(spec['source'], str):
-            raise DocumentError(where+'.source: expected a string')
-    for where, mname in [('geometry.background.material', doc.background['material'])] + [
-            (f'geometry.shapes[{i}].material' if not doc.is_version_1 else f'region {s["name"]!r}', s['material'])
-            for i, s in enumerate(doc.regions()) if s['material'] is not None]:
-        if mname not in materials:
-            raise DocumentError(f'{where}: material {mname!r} is not defined in materials '
-                                '(thermal, electrical and mechanical properties are never taken from built-in '
-                                'optical materials)')
-        for key in required:
-            if key not in materials[mname]:
-                raise DocumentError(f'materials.{mname}.{key}: required by {label}')
-
-
-def region_source(p, names, path):
-    """Validate heat_source_w_m3: a number or {region name: number}; default zero."""
-    source = p.setdefault('heat_source_w_m3', 0.0)
-    if isinstance(source, dict):
-        allowed = names | {'background'}
-        for region, value in source.items():
-            if region not in allowed:
-                raise DocumentError(f'{path}.heat_source_w_m3.{region}: no shape or background of that name')
-            _number(value, f'{path}.heat_source_w_m3.{region}')
-    else:
-        _number(source, f'{path}.heat_source_w_m3')
-
-
-def _named_sides(value, allowed, path, interior=()):
-    """``_object`` over the boundary names a document may give this data to; the axis, a left
-    side at r = 0 and an interior selection given flux or convection are refused by name."""
-    if isinstance(value, dict) and 'axis' in value and 'axis' not in allowed:
-        raise DocumentError(f"{path}.axis: 'axis' is the symmetry axis of an axisymmetric component; it carries "
-                            "natural regularity and takes no Dirichlet, flux or convection data")
-    if isinstance(value, dict) and 'left' in value and 'left' not in allowed:
-        raise DocumentError(f"{path}.left: an axisymmetric component whose domain starts at r = 0 has no left "
-                            "side; its r = 0 side is the axis")
-    if isinstance(value, dict):
-        for key in value:
-            if key in interior and key not in allowed:
-                raise DocumentError(f"{path}.{key}: selection {key!r} lies on an interface between two regions; "
-                                    "flux and convection apply to exterior boundaries only (Dirichlet may fix it)")
-    _object(value, allowed, path)
-
-
-def region_mesh_settings(doc):
-    mesh = doc.data['mesh']
-    _object(mesh, {'size', 'min_angle', 'controls'}, 'mesh')   # controls: Document.check_mesh_controls
-    if 'size' not in mesh:
-        raise DocumentError('mesh.size: required by a region document (document length units)')
-    _number(mesh['size'], 'mesh.size', positive=True)
-    angle = mesh.setdefault('min_angle', 28.0)
-    _number(angle, 'mesh.min_angle', positive=True)
-    if angle > 33.0:
-        raise DocumentError('mesh.min_angle: at most 33 degrees (refinement need not terminate above)')
-
-
 # -- format 0.3 -----------------------------------------------------------------------------------
 # Region and axisymmetric heat documents read "openphysics": "0.3" (units batch C5b; phase-2 spec
 # §4.1, §4.2). The checks read the resolved SI tree (``doc.si``, pm counts for shape numbers) and
 # name the format 0.3 keys. The mesh is made from a hand-off document (``handoff_03``): the
 # geometry and mesh block in the component's length unit, which ``runner.micrometre_document``
 # turns into the same micrometre model the mesher received for format 0.2 (hazards H2, H11;
-# decision D-1 keeps the mesh routes). The 0.2 helpers above stay for the electric, Joule and
-# mechanics region kinds until their own commits.
+# decision D-1 keeps the mesh routes). The electric and Joule (C6) and mechanics (C7) region
+# kinds use the same helpers; the format 0.2 region readers were deleted with C7.
 
 RESULT_FORMAT_03 = 'thermal.steady2d-regions-result-v2'
 FIELD_LAYOUT_03 = 'thermal2d-p1-node-cell-regions-v2'
@@ -789,7 +605,9 @@ def build_region_mesh_03(doc, limits=None):
 
 
 def build_region_mesh(doc, limits=None):
-    """meshine mesh in SI metres with named regions and box-side tags.
+    """meshine mesh in SI metres with named regions and box-side tags, of a format 0.3 region
+    hand-off (``handoff_03``; ``build_region_mesh_03`` takes the document itself). A format 0.2
+    document is refused: its region reader is gone (units batch C7).
 
     ``limits`` (simcase.mesh_limits._MeshLimits) bounds the loop vertices of the micrometre
     document that is meshed before meshine builds its domain, passes max_nodes to meshine
@@ -800,6 +618,9 @@ def build_region_mesh(doc, limits=None):
     from meshine import generate
     from .geometry import build_domain
     from . import units
+    if not getattr(doc, 'is_handoff', False):
+        raise TypeError('build_region_mesh takes the region hand-off of a format 0.3 document (handoff_03); '
+                        'use build_region_mesh_03(document)')
     grid = views.region_mesh(doc)
     canonical = grid.canonical
     if limits is None:
@@ -897,7 +718,8 @@ def region_inputs(doc, mesh, region_materials, heat=None, names=None):
     name, _ = doc.sole_physics()
     path = f'physics.{name}'
     key = (lambda k: k) if names is None else (lambda k: names.get(k, k))      # noqa: E731
-    heat = views.region_heat(doc) if heat is None else heat
+    if heat is None:
+        raise TypeError('region_inputs takes the heat inputs of a format 0.3 document (views.region_heat_03)')
     conductivity = {r: float(heat.conductivity[m]) for r, m in region_materials.items()}
     source = heat.heat_source   # a Joule document has none (simcase.joule_regions)
     if isinstance(source, dict):

@@ -90,9 +90,11 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Steady material-region heat (`thermal2d-p1-node-cell-regions-v2`, axisymmetric `thermal-axisymmetric-p1-node-cell-regions-v2`), including its flux/convection fields | VTU |
 | Rectangular or region transient heat | VTU for one time, PVD for all stored times |
 | Rectangular transient heat with flux/convection (`thermal2d-transient-p1-node-cell-boundary-v2`), including its two per-step load arrays | VTU for one time, PVD for all stored times |
-| Heat, electric and Joule layouts saved before format 0.3 (`RETIRED_LAYOUTS`, such as `thermal2d-p1-node-cell-regions-v1` or `electric-joule2d-p1-v1`) | Refused by name; re-create the document in format 0.3 and run it again |
+| Heat, electric, Joule and mechanics layouts saved before format 0.3 (`RETIRED_LAYOUTS`, such as `thermal2d-p1-node-cell-regions-v1`, `electric-joule2d-p1-v1` or `mechanics2d-p1-v1`) | Refused by name; re-create the document in format 0.3 and run it again |
 | Vacuum PEC cavity | VTU |
 | Electric conduction and Joule heating (`electric-joule2d-p1-v2`; regions `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`) | VTU |
+| Rectangular elasticity and thermoelasticity (`mechanics2d-p1-v2`, `thermoelastic2d-p1-v2`), strain and stress as named component scalars | VTU |
+| Region elasticity and thermoelasticity (`mechanics2d-p1-regions-v2`, `thermoelastic2d-p1-regions-v2`) | Not exported yet (refused as an unsupported layout); read `fields.npz` |
 | Cavity with materials and lossy walls (`cavity3d-edge-complex-v1`) | VTU, complex fields as `_real`/`_imag` pairs |
 | Waveguide modes (`em.modes2d`, `em-modes2d-p1-node-centroid-v1`) | VTU for a single point, PVD for a sweep (`export_sweep`); nodes converted to metres, complex modes as `_real`/`_imag` pairs; subspace sweeps (`em-modes2d-subspace-raw-v1`) and results saved without `field_layout` refused |
 

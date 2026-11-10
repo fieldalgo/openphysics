@@ -15,8 +15,8 @@
     "electric.steady2d": "layout",
     "joule.steady2d": "layout",
     "joule.temperature2d": "layout",
-    "mechanics.elasticity2d": "identity",
-    "mechanics.thermoelastic2d": "identity",
+    "mechanics.elasticity2d": "layout",
+    "mechanics.thermoelastic2d": "layout",
     "em.modes2d": "identity",
     "em.cavity3d": "identity"
   }

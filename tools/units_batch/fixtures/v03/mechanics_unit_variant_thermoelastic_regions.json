@@ -1,0 +1,87 @@
+{
+  "openphysics": "0.3",
+  "name": "Steel-aluminium bimetal strip heated by 50 K",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 50.0,
+          "ymin": 0.0,
+          "ymax": 2.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "aluminium",
+            "type": "rect",
+            "x": 0.0,
+            "y": 1.0,
+            "w": 50.0,
+            "h": 1.0,
+            "material": "aluminium"
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "youngs_modulus": "200000000000 Pa",
+      "poisson_ratio": 0.3,
+      "linear_expansion_coefficient": "1.2e-05 1/K",
+      "thermal_conductivity": "45 W/(m K)",
+      "source": "document value"
+    },
+    "aluminium": {
+      "youngs_modulus": "70000000000 Pa",
+      "poisson_ratio": 0.33,
+      "linear_expansion_coefficient": "2.3e-05 1/K",
+      "thermal_conductivity": "237 W/(m K)",
+      "source": "document value"
+    }
+  },
+  "mesh": {
+    "element_size": "0.25 mm"
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "strip": {
+      "type": "mechanics.thermoelastic2d",
+      "plane": "stress",
+      "stress_free_temperature": "293.15 K",
+      "prescribed_temperature": {
+        "left": "343.15 K",
+        "right": "343.15 K",
+        "bottom": "343.15 K",
+        "top": "343.15 K"
+      },
+      "prescribed_displacement": {
+        "left": {
+          "x": "1e-07 m",
+          "y": "0 m"
+        }
+      },
+      "body_force_density": [
+        "0 N/m^3",
+        "-100000 N/m^3"
+      ],
+      "gauge_pressure": {
+        "right": "2000000 Pa"
+      }
+    }
+  }
+}
