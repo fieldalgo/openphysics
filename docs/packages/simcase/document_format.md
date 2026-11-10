@@ -5,13 +5,15 @@
 [Documentation home](../../README.md) · [simcase overview](overview.md) ·
 [physmat.units](../physmat/units.md)
 
-Status: **the shared reader of format 0.3 is in place; no physics kind reads format 0.3 yet.**
-Every shipped example and every document written today is format `"openphysics": "0.2"`
-and is read exactly as before. A document whose envelope is the JSON string `"0.3"` takes
-the reader described here; until a kind's own step of the units and naming batch gives it
-its physics slots, its 0.3 document is refused with `E-CONTRACT` ("documents are not read in
-format 0.3 yet"). The kinds move one at a time (heat, electric and Joule, mechanics,
-`em.modes2d`, `em.cavity3d`); the 0.2 reader is retired after the last one.
+Status: **the shared reader of format 0.3 is in place; heat (`thermal.steady2d`,
+`thermal.transient2d`) and electric conduction and Joule heating (`electric.steady2d`,
+`joule.steady2d`, `joule.temperature2d`) read format 0.3 only.** The other kinds' shipped
+examples and documents are format `"openphysics": "0.2"` and are read exactly as before. A
+document whose envelope is the JSON string `"0.3"` takes the reader described here; until a
+kind's own step of the units and naming batch gives it its physics slots, its 0.3 document is
+refused with `E-CONTRACT` ("documents are not read in format 0.3 yet"). The kinds move one at a
+time (heat, electric and Joule, mechanics, `em.modes2d`, `em.cavity3d`); the 0.2 reader is
+retired after the last one.
 
 Format 0.3 keeps today's document skeleton (`geometry`, `materials`, `physics.<name>`,
 `mesh`, `study`, `results`) and changes only what the units and naming rules require:
@@ -297,8 +299,8 @@ is refused by name; each kind's step fills that table when it replaces its ident
 | `validate`, `run`, `explain`, `fix` and the exit codes; the result helpers; the VTU metadata read back through `xml.etree` and meshio; retired layouts | `tests/simcase/test_cli_units.py` |
 | Version 1 geometry in 0.3: the same pm model, design velocity, summary and geometry-lab view as the same geometry in 0.2; refusals with code and path | `tests/simcase/test_geometry_units.py` |
 
-They run on a test-only kind (`tests/simcase/units_toy_kind.py`), because no built-in kind
-reads format 0.3 yet.
+They run on a test-only kind (`tests/simcase/units_toy_kind.py`), so that they do not depend
+on which built-in kinds read format 0.3 yet.
 
 ## Not done yet
 
@@ -306,6 +308,6 @@ reads format 0.3 yet.
   Joule, mechanics, `em.modes2d`, `em.cavity3d`), each with its own step; results under
   registry names; the Studio's raw-byte reading and quantities endpoint; then the
   retirement of the 0.2 reader, `simcase.units` and `simcase.unit_vocabulary`.
-- `I-DEFAULT-BOUNDARY`, `E-SPECTRAL` and `E-OUTSIDE-VALID` are raised by the kinds that need
-  them, with their steps.
+- `E-SPECTRAL` is raised by the kind that needs it, with its step (`I-DEFAULT-BOUNDARY` is
+  raised by heat and electric/Joule, `E-OUTSIDE-VALID` by `joule.temperature2d`).
 - The JSON Schema and generated documentation tables of the slots.

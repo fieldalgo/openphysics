@@ -148,11 +148,14 @@ def main():
     jobs = [(dict(case=case, size=size),
              ["--worker", case, "--size", str(size), "--relaxation", str(args.relaxation)])
             for size in args.sizes for case in cases]
-    settings = dict(cases=cases, sizes=args.sizes, strip_m=(WIDTH, HEIGHT), conductivity_s_m=SIGMA,
-                    voltage_v=VOLTAGE, thermal_conductivity_w_mk=THERMAL_CONDUCTIVITY, wall_k=WALL,
-                    thermistor_m=(THERMISTOR_WIDTH, THERMISTOR_HEIGHT), current_density_a_m2=CURRENT_DENSITY,
-                    thermistor_conductivity_w_mk=THERMISTOR_K, thermistor_ends_k=THERMISTOR_T,
-                    resistivity_slope_per_k=ALPHA, temperature_range_k=RANGE, relaxation=args.relaxation)
+    # names without unit suffixes, values in SI units (m, S/m, V, W/(m K), K, A/m^2, 1/K); the thermistor's
+    # current density leaves through its right side (galerkin's outward_current)
+    settings = dict(cases=cases, sizes=args.sizes, strip_size=(WIDTH, HEIGHT), electrical_conductivity=SIGMA,
+                    electric_potential_difference=VOLTAGE, thermal_conductivity=THERMAL_CONDUCTIVITY,
+                    wall_temperature=WALL, thermistor_size=(THERMISTOR_WIDTH, THERMISTOR_HEIGHT),
+                    outward_current_density=CURRENT_DENSITY, thermistor_thermal_conductivity=THERMISTOR_K,
+                    thermistor_end_temperature=THERMISTOR_T, resistivity_temperature_coefficient=ALPHA,
+                    valid_temperature=RANGE, relaxation_factor=args.relaxation)
     return harness.run_parent(__file__, args.output, jobs, args.repeats, args.timeout_seconds,
                               settings, ("case", "size"), METRICS)
 

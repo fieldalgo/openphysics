@@ -491,7 +491,11 @@ def handoff_03(doc):
                 item['circle_segments'] = int(entry['circle_segment_count'])
             controls.append(item)
         mesh['controls'] = controls
-    tree = {'openphysics': '0.2', 'name': doc.si['name'], 'units': {'length': unit}, 'geometry': geometry,
+    # a length_unit the 0.2 unit table lacks (in, mil, Angstrom) travels as the numeric unit
+    # {"in_m": <metres>}: the double of its exact decimal, which the micrometre and picometre
+    # ratios read back exactly (units.micrometres_per_length, geometry_document.pm_per_unit)
+    spec = unit if unit in units.BASE_UNITS['length'] else {'in_m': float(per_unit)}
+    tree = {'openphysics': '0.2', 'name': doc.si['name'], 'units': {'length': spec}, 'geometry': geometry,
             'materials': {}, 'physics': {}, 'mesh': mesh, 'study': {'type': 'single'},
             'results': {'save_fields': False, 'plots': False}}
     h = RegionHandOff(tree)
@@ -570,10 +574,11 @@ def region_geometry_03(doc, h, label='heat'):
     return names
 
 
-def region_materials_table_03(doc, h, required, label):
+def region_materials_table_03(doc, h, required, label, properties='thermal properties'):
     """Every material a region uses is defined in ``materials`` and gives the ``required``
     properties (``E-PROPERTY-MISSING``); the reader has checked the values and flags the
-    properties no physics of the run reads (``I-UNUSED-PROPERTY``)."""
+    properties no physics of the run reads (``I-UNUSED-PROPERTY``). Returns the used material
+    names, in use order (``properties`` names them in the refusal of an undefined material)."""
     base = component_03(doc)[0]
     materials = doc.si.get('materials') or {}
     used = [(f'{base}.background.material', h.background['material'])]
@@ -581,13 +586,14 @@ def region_materials_table_03(doc, h, required, label):
              for i, r in enumerate(h.regions()) if r['material'] is not None]
     for where, mname in used:
         if mname not in materials:
-            _refuse(f'{where}: material {mname!r} is not defined in materials (thermal properties are never taken '
+            _refuse(f'{where}: material {mname!r} is not defined in materials ({properties} are never taken '
                     'from library materials)', where if where.startswith('geometry') else 'materials',
                     'E-MATERIAL-UNKNOWN')
         for key in required:
             if key not in materials[mname]:
                 _refuse(f'materials.{mname}.{key}: required by {label}', f'materials.{mname}.{key}',
                         'E-PROPERTY-MISSING')
+    return list(dict.fromkeys(mname for _where, mname in used))
 
 
 def region_source_03(p, names, path):

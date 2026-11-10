@@ -1,0 +1,61 @@
+{
+  "openphysics": "0.3",
+  "name": "Temperature-dependent Joule heated rectangle",
+  "geometry": {
+    "length_unit": "m",
+    "depth": null,
+    "domain": {
+      "xmin": 0.0,
+      "xmax": 1.0,
+      "ymin": 0.0,
+      "ymax": 0.2
+    }
+  },
+  "materials": {},
+  "mesh": {
+    "subdivision_count": [
+      24,
+      6
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "electric": {
+      "type": "joule.temperature2d",
+      "prescribed_electric_potential": {
+        "left": "1 V",
+        "right": "0 V"
+      },
+      "thermal_conductivity": "1 W/(m K)",
+      "prescribed_temperature": {
+        "left": "300 K",
+        "right": "300 K"
+      },
+      "initial_temperature": "300 K",
+      "electrical_conductivity": {
+        "model": "linear_resistivity",
+        "reference_conductivity": "2 S/m",
+        "reference_temperature": "300 K",
+        "resistivity_temperature_coefficient": "0.01 1/K",
+        "valid": {
+          "temperature": [
+            "290 K",
+            "400 K"
+          ]
+        }
+      },
+      "iteration": {
+        "relaxation_factor": 1e-12,
+        "temperature_tolerance": "1e-08 K",
+        "relative_tolerance": 1e-10,
+        "iteration_limit": 2
+      }
+    }
+  }
+}

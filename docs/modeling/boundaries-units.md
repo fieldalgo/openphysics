@@ -34,9 +34,13 @@ entering the body, not positive outward flow. Exact equations and callback rules
 
 ## Electric and mechanical constraints
 
-- Electrical voltage fixes potential. Prescribed outward current density J·n is
-  positive leaving the body. The Python electric API has an explicit pure-Neumann
-  gauge path; do not infer that the more restricted JSON input supports it.
+- Electrical voltage fixes potential (`prescribed_electric_potential` in documents). A
+  document's `inward_current_density` is positive entering the body; the Python electric
+  API takes the prescribed outward current density J·n, positive leaving the body (simcase
+  hands it the negated document value). Reported boundary currents
+  (`outward_current_per_depth`) are positive leaving. The Python electric API has an
+  explicit pure-Neumann gauge path; do not infer that the more restricted JSON input
+  supports it.
 - Mechanical displacement fixes selected components, not temperature. A connected
   2D body needs independent constraints on its three rigid modes. An arbitrary
   count of three fixed DOFs is not enough if they leave a rotation free.

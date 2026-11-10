@@ -104,10 +104,11 @@ def test_region_mesh_solve_and_saved_fields_are_identical_across_units(transient
         assert summary['resolved_inputs']['geometry.domain.xmin']['length_unit'] == unit
         # The achieved smallest angle is measured on the triangulation in the document's own
         # units, as before the units batch (P2-1 keeps it bitwise against format 0.2), so it is
-        # the one summary value that moves by rounding across length units: compared to 1e-12.
-        # This is a stated deviation from P2-5 ("identical summary values"), not a pass of it:
-        # measured at most 335 ulp (m against mm) on this problem. P2-1 and P2-5 cannot both be
-        # bitwise for this value until the mesher step measures the angle on one frame.
+        # the one summary value that moves by rounding across length units: compared to 1e-13
+        # relative. This is a stated deviation from P2-5 ("identical summary values"), not a pass
+        # of it: measured at most 335 ulp (m against mm; 1.9e-14 rad, 3.8e-14 relative) on this
+        # problem. P2-1 and P2-5 cannot both be bitwise for this value until the mesher step
+        # measures the angle on one frame.
         angle = summary.get('minimum_triangle_angle', {}).get('value', 0.0)   # steady only
         values = _hexed({k: v for k, v in summary.items() if k not in TEXTUAL + ('minimum_triangle_angle',)})
         with np.load(out/'fields.npz', allow_pickle=False) as fields:
@@ -124,7 +125,7 @@ def test_region_mesh_solve_and_saved_fields_are_identical_across_units(transient
             reference_materials = materials
             continue
         assert values == reference_values
-        assert abs(angle - reference_angle) <= 1e-12 * reference_angle
+        assert abs(angle - reference_angle) <= 1e-13 * reference_angle
         assert materials == reference_materials
         assert mesh.region_names == reference_mesh.region_names
         for attr in ('nodes', 'triangles', 'regions'):

@@ -60,7 +60,7 @@ V1_SUMMARY_KEYS = (
 EARLIER_LAYOUTS = ("thermal2d-p1-node-cell-v2", "thermal2d-p1-node-cell-boundary-v3",
                    "thermal2d-transient-p1-node-cell-v2", "cavity3d-edge-v1",
                    "thermal2d-p1-node-cell-regions-v2", "thermal2d-transient-p1-node-cell-regions-v2",
-                   "electric-joule2d-p1-v1", "cavity3d-edge-complex-v1")
+                   "electric-joule2d-p1-v2", "cavity3d-edge-complex-v1")
 METRES = {"m": Decimal(1), "mm": Decimal("0.001")}
 
 

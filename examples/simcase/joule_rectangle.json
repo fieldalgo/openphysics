@@ -1,11 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Constant-property Joule heated rectangle",
-  "units": {
-    "length": "m",
-    "temperature": "K"
-  },
   "geometry": {
+    "length_unit": "m",
+    "depth": null,
     "domain": {
       "xmin": 0.0,
       "xmax": 1.0,
@@ -15,7 +13,7 @@
   },
   "materials": {},
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       24,
       6
     ]
@@ -30,15 +28,15 @@
   "physics": {
     "electric": {
       "type": "joule.steady2d",
-      "conductivity_s_m": 2.0,
-      "dirichlet_potential_v": {
-        "left": 1.0,
-        "right": 0.0
+      "electrical_conductivity": "2 S/m",
+      "prescribed_electric_potential": {
+        "left": "1 V",
+        "right": "0 V"
       },
-      "thermal_conductivity_w_mk": 1.0,
-      "dirichlet_temperature_k": {
-        "left": 300.0,
-        "right": 300.0
+      "thermal_conductivity": "1 W/(m K)",
+      "prescribed_temperature": {
+        "left": "300 K",
+        "right": "300 K"
       }
     }
   }

@@ -69,8 +69,10 @@ shape's material and the background, including uncovered space and overlapping
 shape priority. Follow the [two-material wall tutorial](../packages/simcase/layered_wall_tutorial.md)
 to inspect the saved region assignment and flux.
 
-For temperature-dependent Joule heating, supply the law supported by the
-[Joule contract](../packages/simcase/electric_joule.md) or
+For temperature-dependent Joule heating, give `electrical_conductivity` as the
+`linear_resistivity` model of the [Joule contract](../packages/simcase/electric_joule.md)
+(`reference_conductivity`, `reference_temperature`, `resistivity_temperature_coefficient`
+and its `valid.temperature` range, each with its unit), or supply the law to the
 [Python workflow](../packages/galerkin/temperature_joule_tutorial.md).
 An optical thermo-optic coefficient does not enable an automatic coupled solve.
 

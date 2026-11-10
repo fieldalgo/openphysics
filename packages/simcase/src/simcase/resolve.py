@@ -147,6 +147,10 @@ def _resolve(tree, result: Resolution) -> Resolution:
     if kind.forms_03 is not None and form is not None and form not in kind.forms_03:
         diags.append(_unread_form(tree, kind, form))
         return result
+    refusal = kind.refuse_03(tree) if kind.refuse_03 is not None else None
+    if refusal is not None:
+        diags.append(Diagnostic("E-CONTRACT", *refusal))
+        return result
     result.table = slots.table_for(kind)
     walker = _Walker(result)
     result.si = walker.walk()
@@ -573,6 +577,9 @@ class _Walker:
                 return self.range(slot, value, path, record)
             return self.array(name, value, path, authored, accept, record)
         if isinstance(value, dict):
+            if "model" in value and "MODEL" not in forms and slot.get("model_message"):
+                self.error("E-CONTRACT", path, slot["model_message"])          # a model refused by name
+                return None
             if "model" in value and "MODEL" in forms:
                 out = self.obj(slot, value, path)
                 from .materials import check_record_model

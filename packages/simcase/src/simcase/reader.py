@@ -286,7 +286,8 @@ def dumps(obj, *, indent=None, separators=None, sort_keys: bool = False, ensure_
             return number("NaN", d)
         if d.is_infinite():
             return number("Infinity" if d > 0 else "-Infinity", d)
-        return str(d)
+        # the exponent as json.dumps writes a float's (1e-10, not Decimal's 1E-10)
+        return str(d).replace("E", "e")
 
     def key(k) -> str | None:
         if isinstance(k, str):

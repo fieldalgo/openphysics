@@ -35,9 +35,8 @@ Supported layouts:
   arrays and FieldData block, plus the static integer cell data
   ``triangle_regions`` (no unit). An axisymmetric result has (r, z) points and
   full-revolution rates without ``_per_depth`` (W, J)
-- the heat layouts saved before the units and naming batch
-  (``RETIRED_LAYOUTS``: rectangle and region alike) are refused by name:
-  re-create the document in format 0.3
+- the heat, electric and Joule layouts saved before the units and naming batch
+  (``RETIRED_LAYOUTS``) are refused by name: re-create the document in format 0.3
 - 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
   ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
   normalization, unit m^-3/2)
@@ -49,17 +48,18 @@ Supported layouts:
   and ``tet_relative_permeability_real``/``_imag`` (dimensionless). Complex
   frequencies, quality factors and wall conductivities are not per cell and
   stay in ``fields.npz`` and ``summary.json``
-- electric conduction and Joule heating (``electric-joule2d-p1-v1``, the layout
-  of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``; and
-  ``electric2d-p1-node-cell-regions-v1`` of region ``electric.steady2d`` and
-  ``electric-joule2d-p1-node-cell-regions-v1`` of region ``joule.steady2d``, which add
-  the static integer cell data ``triangle_regions``):
-  point data ``potential_v`` and the nodal electric load, reaction, prescribed
-  outward current and residual arrays; cell data ``electric_field_v_m``,
-  ``current_density_a_m2``, ``conductivity_s_m`` and ``joule_heating_w_m3`` at
-  centroids. A Joule result adds ``temperature_k``, the nodal heat arrays and
-  cell ``heat_flux_w_m2``; a temperature-dependent one adds
-  ``evaluated_temperature_k``. Each array keeps its saved name and unit suffix.
+- electric conduction and Joule heating, format 0.3 (``electric-joule2d-p1-v2``, the
+  layout of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``; and
+  ``electric2d-p1-node-cell-regions-v2`` of region ``electric.steady2d`` and
+  ``electric-joule2d-p1-node-cell-regions-v2`` of region ``joule.steady2d``, which add
+  the static integer cell data ``triangle_regions``): point data
+  ``electric_potential`` and the nodal ``joule_power_per_depth``,
+  ``reaction_current_per_depth``, ``outward_prescribed_current_per_depth`` and
+  ``residual_current_per_depth``; cell data ``electric_field``, ``current_density``,
+  ``electrical_conductivity`` and ``joule_power_density`` at centroids. A Joule result
+  adds ``temperature``, the nodal heat rates and cell ``heat_flux``; a
+  temperature-dependent one adds ``evaluation_temperature``. Each name is its
+  ``fields.npz`` name, and the FieldData block holds ``units`` and ``conventions``
 - waveguide modes (``em-modes2d-p1-node-centroid-v1``, the layout of
   ``em.modes2d`` results tracked per mode): the saved ``nodes`` are in the
   document length unit and are converted to metres with the saved
@@ -128,6 +128,9 @@ RETIRED_LAYOUTS: dict[str, str] = {
     "thermal2d-transient-p1-node-cell-regions-v1": "thermal2d-transient-p1-node-cell-regions-v2",
     "thermal-axisymmetric-p1-node-cell-regions-v1": "thermal-axisymmetric-p1-node-cell-regions-v2",
     "thermal-axisymmetric-transient-p1-node-cell-regions-v1": "thermal-axisymmetric-transient-p1-node-cell-regions-v2",
+    "electric-joule2d-p1-v1": "electric-joule2d-p1-v2",
+    "electric2d-p1-node-cell-regions-v1": "electric2d-p1-node-cell-regions-v2",
+    "electric-joule2d-p1-node-cell-regions-v1": "electric-joule2d-p1-node-cell-regions-v2",
 }
 
 # rectangle heat (format 0.3): arrays under registry names, SI, with VTU unit metadata
@@ -143,9 +146,11 @@ _HEAT_03 = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _TRANSIENT_BOUNDARY, _STEADY_
             _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
 _CAVITY = "cavity3d-edge-v1"
 _CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
-_ELECTRIC_JOULE = "electric-joule2d-p1-v1"
-_ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v1"   # electric.steady2d on material regions
-_JOULE_REGIONS = "electric-joule2d-p1-node-cell-regions-v1"   # joule.steady2d on material regions
+# electric and Joule (format 0.3): arrays under registry names, SI, with VTU unit metadata
+_ELECTRIC_JOULE = "electric-joule2d-p1-v2"
+_ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v2"   # electric.steady2d on material regions
+_JOULE_REGIONS = "electric-joule2d-p1-node-cell-regions-v2"   # joule.steady2d on material regions
+_ELECTRIC_LAYOUTS = (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS)
 _MODES = "em-modes2d-p1-node-centroid-v1"
 _MODES_SUBSPACE = "em-modes2d-subspace-raw-v1"
 _MECHANICS = "mechanics2d-p1-v1"
@@ -163,17 +168,17 @@ _RATES_03 = ("generated_heat_rate", "reaction_heat_rate", "residual_heat_rate", 
              "applied_heat_rate")
 # planar layouts save the rates per depth; the axisymmetric ones over the full revolution (plain names)
 _NODAL_03 = ("temperature", *(name + "_per_depth" for name in _RATES_03), *_RATES_03)
-# electric-joule2d-p1-v1 arrays by VTK association; absent arrays are skipped
-# (a plain electric result has no heat arrays, only joule.temperature2d has
-# evaluated_temperature_k). Dirichlet node lists are not exported.
-_ELECTRIC_NODAL = ("potential_v", "joule_load_w_per_m", "electric_reaction_a_per_m",
-                   "prescribed_outward_current_a_per_m", "electric_residual_a_per_m",
-                   "temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m",
-                   "thermal_residual_w_per_m", "prescribed_outward_heat_w_per_m",
-                   "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
-                   "thermal_system_rhs_w_per_m", "evaluated_temperature_k")
-_ELECTRIC_CELL_VECTORS = ("electric_field_v_m", "current_density_a_m2", "heat_flux_w_m2")
-_ELECTRIC_CELL_SCALARS = ("conductivity_s_m", "joule_heating_w_m3")
+# electric and Joule arrays by VTK association; absent arrays are skipped (a plain electric
+# result has no heat arrays, only joule.temperature2d has evaluation_temperature). Prescribed
+# node lists are not exported.
+_ELECTRIC_NODAL = ("electric_potential", "joule_power_per_depth", "reaction_current_per_depth",
+                   "outward_prescribed_current_per_depth", "residual_current_per_depth",
+                   "temperature", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+                   "residual_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+                   "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                   "applied_heat_rate_per_depth", "evaluation_temperature")
+_ELECTRIC_CELL_VECTORS = ("electric_field", "current_density", "heat_flux")
+_ELECTRIC_CELL_SCALARS = ("electrical_conductivity", "joule_power_density")
 # mechanics2d-p1-v1 and thermoelastic2d-p1-v1: (N,) nodal scalars, (N,2) nodal
 # vectors, (T,2) cell vectors, (T,) cell scalars and (T,3) element arrays split
 # into named scalar cell data in the saved component order. Dirichlet node and
@@ -274,7 +279,7 @@ def _region_cell_data(data, layout):
 
 
 def _electric_joule(data):
-    points = _points(data["nodes_m"])
+    points = _points(data["node_coordinates"])
     triangles = np.asarray(data["triangles"], dtype=np.int64)
     cells = [("triangle", triangles)]
     point_data, cell_data = {}, {}
@@ -296,8 +301,8 @@ def _electric_joule(data):
             if values.shape != (len(triangles),):
                 raise ValueError(f"{name}: expected one value per triangle, got shape {values.shape}")
             cell_data[name] = [values]
-    if "potential_v" not in point_data:
-        raise ValueError("electric-joule2d-p1-v1 export needs the saved potential_v array")
+    if "electric_potential" not in point_data:
+        raise ValueError("an electric or Joule export needs the saved electric_potential array")
     return points, cells, point_data, cell_data
 
 
@@ -572,7 +577,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
     layout = _layout(data)
     if layout in _HEAT_03:
         parts = _heat_03(data, layout, time_index)
-    elif layout in (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS):
+    elif layout in _ELECTRIC_LAYOUTS:
         parts = _electric_joule(data)
         parts[3].update(_region_cell_data(data, layout))
     elif layout in _MECHANICS_LAYOUTS:
@@ -591,7 +596,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
     meshio = _meshio()
     mesh = meshio.Mesh(points, cells, point_data=point_data, cell_data=cell_data)
     meshio.vtu.write(output, mesh, binary=True, compression="zlib")
-    if layout in _HEAT_03:
+    if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS):
         inject_field_data(output, *_unit_metadata([name for name in (*point_data, *cell_data)
                                                    if name not in _STRUCTURAL]))
     return output

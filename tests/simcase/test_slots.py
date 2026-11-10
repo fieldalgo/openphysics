@@ -43,8 +43,9 @@ def test_the_frozen_table_equals_its_generator():
     assert text == slots.generate()
     table = json.loads(text)
     assert table["format"] == slots.TABLE_FORMAT
-    # the kinds that read format 0.3 at this step of the units batch: rectangle heat (C5a)
-    assert table["kinds"] == {"thermal.steady2d": ["thermal.steady2d"], "thermal.transient2d": ["thermal.transient2d"]}
+    # the kinds that read format 0.3 at this step of the units batch: heat (C5), electric and Joule (C6)
+    assert table["kinds"] == {"thermal.steady2d": ["thermal.steady2d"], "thermal.transient2d": ["thermal.transient2d"],
+                              "electric_joule": ["electric.steady2d", "joule.steady2d", "joule.temperature2d"]}
     patterns = [(e["pattern"], e.get("physics_kind") or "", e["kind"]) for e in table["slots"]]
     assert patterns == sorted(patterns)
 

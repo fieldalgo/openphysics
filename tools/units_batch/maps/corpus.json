@@ -12,9 +12,9 @@
       "regions": "layout",
       "v1": "layout"
     },
-    "electric.steady2d": "identity",
-    "joule.steady2d": "identity",
-    "joule.temperature2d": "identity",
+    "electric.steady2d": "layout",
+    "joule.steady2d": "layout",
+    "joule.temperature2d": "layout",
     "mechanics.elasticity2d": "identity",
     "mechanics.thermoelastic2d": "identity",
     "em.modes2d": "identity",

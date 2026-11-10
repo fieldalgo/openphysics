@@ -24,8 +24,10 @@ The package and CLI are named `simcase`. The JSON version field is `"openphysics
 `"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat
 (`thermal.steady2d` and `thermal.transient2d`: rectangles, material regions, version 1 blocks and
-the axisymmetric forms), which no longer reads format 0.2; every other kind still reads format
-0.2 until its commit of the units batch: [document format 0.3](document_format.md). The separate
+the axisymmetric forms) and for electric conduction and Joule heating (`electric.steady2d`,
+`joule.steady2d` and `joule.temperature2d`: rectangles, and material regions for the first two),
+which no longer read format 0.2; every other kind still reads format 0.2 until its commit of the
+units batch: [document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -454,13 +456,17 @@ vacuum PEC cavity fields. Steady/transient material-region layouts (`-regions-v2
 axisymmetric ones with (r, z) points) are also supported, with the same arrays,
 integer cell data `triangle_regions` and the saved steady flux/convection arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
 for units, the region-name mapping and an example. Electric conduction and Joule
-results (`electric-joule2d-p1-v1`, the layout of `electric.steady2d`,
-`joule.steady2d` and `joule.temperature2d`) export point data `potential_v` with
-the nodal electric load, reaction, prescribed outward current and residual
-arrays, and cell data `electric_field_v_m`, `current_density_a_m2`,
-`conductivity_s_m` and `joule_heating_w_m3`; a Joule result adds `temperature_k`,
-its nodal heat arrays and cell `heat_flux_w_m2`, and `joule.temperature2d` adds
-`evaluated_temperature_k`. Elasticity results (`mechanics2d-p1-v1`, the layout of
+results (`electric-joule2d-p1-v2`, the layout of `electric.steady2d`,
+`joule.steady2d` and `joule.temperature2d`; the region layouts
+`electric2d-p1-node-cell-regions-v2` and `electric-joule2d-p1-node-cell-regions-v2` add
+`triangle_regions`) export point data `electric_potential` with the nodal
+`joule_power_per_depth`, `reaction_current_per_depth`,
+`outward_prescribed_current_per_depth` and `residual_current_per_depth` arrays, and cell
+data `electric_field`, `current_density`, `electrical_conductivity` and
+`joule_power_density`, all SI, with the FieldData `units` and `conventions` blocks; a Joule
+result adds `temperature`, its nodal heat arrays and cell `heat_flux`, and
+`joule.temperature2d` adds `evaluation_temperature`. The format 0.2 electric layouts
+(`electric-joule2d-p1-v1` and the two `-regions-v1`) are refused by name. Elasticity results (`mechanics2d-p1-v1`, the layout of
 `mechanics.elasticity2d`) export point data `displacement_m` and the nodal
 `load_n_per_m`, `reaction_n_per_m` and `residual_n_per_m` vectors, and the saved
 strain and stress components as the scalar cell data `exx`, `eyy`, `gxy` and
