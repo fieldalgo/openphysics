@@ -85,6 +85,9 @@ stress, load, reaction and residual carry d/dt.
 - The Dirichlet values stay attached to their nodes as the nodes move.
 - Thermoelasticity is not covered yet: how a temperature field moves with the
   mesh is a separate decision.
+- A large rigid displacement offset (Dirichlet values far larger than the
+  elastic deformation) costs precision in the result and its derivative, as it
+  does in the solver itself.
 
 ## The mesh velocity
 

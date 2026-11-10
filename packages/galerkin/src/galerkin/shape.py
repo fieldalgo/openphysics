@@ -12,9 +12,8 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
   curves (``simcase.geometry_velocity.DesignVelocity.node_velocity``): every other
   node moves by a harmonic extension of them.
 - ``admissible_interval`` is the exact range of t over which no element inverts.
-- ``MeshMotion(velocity, t)`` passed as ``motion=`` to ``thermal.solve_steady_heat``
-  returns the temperature, flux, loads and reactions with their derivative with
-  respect to t.
+- ``MeshMotion(velocity, t)`` passed as ``motion=`` to a supported solver returns its
+  result fields with their derivative with respect to t.
 
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
 ``electric.solve_steady_electric`` and ``elasticity.solve_elasticity`` with scalar
@@ -31,7 +30,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .core import solve as core_solve
-from .core.backend import Backend, backend_of, is_live, lift, namespace, scatter_add, to_numpy
+from .core.backend import Backend, backend_of, is_live, lift, namespace, require_float64, scatter_add, to_numpy
 from .core.materials import is_per_region, region_property
 from .core.sparse import CooMatrix
 from .mesh import Mesh
@@ -379,7 +378,7 @@ def _tags(table, name):
 
 def _coefficient(value, name):
     if callable(value):
-        raise ValueError(f"{name} must be a finite scalar > 0 or a table of region names")
+        raise ValueError(f"{name} must be a finite real scalar or a table of region names")
     _numpy_data(value, name)
 
 
@@ -412,6 +411,7 @@ def _live_t(t):
         raise TypeError("motion: t must be a JAX or PyTorch scalar; NumPy does not differentiate. To solve on a "
                         "moved mesh without a derivative, move the nodes and solve that mesh")
     xp = namespace(t)
+    require_float64(xp, "motion: t")
     if tuple(getattr(t, "shape", ())) != ():
         raise ValueError("motion: t must be a scalar")
     return xp, xp.astype(t, xp.float64) if backend_of(xp) is not Backend.NUMPY else t

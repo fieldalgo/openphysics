@@ -299,5 +299,25 @@ def test_m8_refusals():
         solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress",
                          dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)},
                          motion=MeshMotion(W, t))
+    with pytest.raises(TypeError, match="poisson_ratio is live"):
+        solve_elasticity(m, young_modulus=70e9, poisson_ratio={"host": xp.asarray(0.33), "core": 0.28},
+                         plane="stress", dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
+    with pytest.raises(ValueError, match="poisson_ratio must be a finite real scalar"):
+        solve_elasticity(m, young_modulus=70e9, poisson_ratio=lambda p: 0.3, plane="stress",
+                         dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
+    with pytest.raises(ValueError, match="dirichlet must map"):
+        solve_elasticity(m, **{**common, "dirichlet": [((0, 0), 0.0)]}, motion=MeshMotion(W, t))
     with pytest.raises(ValueError, match="traction must map boundary edge tags"):
         solve_elasticity(m, **common, traction=[("right", (1.0, 0.0))], motion=MeshMotion(W, t))
+
+
+def test_review_jax_without_x64_is_named():
+    jax = _jax()
+    m, W = _plate()
+    jax.config.update("jax_enable_x64", False)
+    try:
+        with pytest.raises(ValueError, match="galerkin needs float64"):
+            solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress", dirichlet=_clamped_left(m),
+                             motion=MeshMotion(W, jax.numpy.asarray(0.0)))
+    finally:
+        jax.config.update("jax_enable_x64", True)
