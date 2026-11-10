@@ -170,11 +170,25 @@ The second row carries no `beta^2`-free term, so `A` has a zero `e_z` block: the
 weak longitudinal component of the curl-curl equation is a constraint, and
 `beta^2 = 0` is an eigenvalue of multiplicity about the number of free nodes
 (the discrete gradients). Guided modes lie at `n_clad < Re n_eff < n_core`, far
-from it, and the shift-invert search near `n_target` never meets this cluster.
+from it, and a shift-invert search near `n_target` meets this cluster only when
+it asks for more roots than lie closer to the target than `beta^2 = 0`.
 This is how the mixed pair suppresses spurious modes: the kernel of the curl is
 represented exactly by the edge space and parked at `beta^2 = 0`, instead of
 being smeared across the spectrum as nodal vector elements do
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
+
+When a search does reach the cluster, its computed roots usually have `|beta^2|`
+at rounding level (at most `1.2e-14 |sigma|` on the slabs of
+`tests/galerkin/test_waveguide_static_roots.py`, occasionally exactly 0), and
+`E_t = e_t / beta` is undefined for them. `solve_modes` returns no root with
+`|beta^2| <= STATIC_ROOT_TOL |sigma|` (`1e-10`, that is `|n_eff| <= 1e-5 |n_target|`)
+on any path, so such a search returns fewer roots than `num_modes`. Limitation:
+when the nodal block `K - k0^2 M` of `B` is nearly singular, that is `k0^2` is
+close to an eigenvalue of `K e_z = lambda M e_z` on the free nodes (a TM cutoff of
+the PEC box), the cluster is ill-conditioned and its computed roots can exceed the
+tolerance: `2.2e-10 |sigma|` and `6.8e-9 |sigma|` were measured at relative
+distances `1e-6` and `1e-8` from such a cutoff on a square guide. Those roots are
+returned, with almost no transverse field.
 
 `A` and `B` are transpose-symmetric. For real `eps_r`, `mu_r` they are real
 symmetric and `B` is indefinite; for complex materials or coordinate factors they
@@ -267,8 +281,9 @@ forward mode this gives `Im n_eff < 0`; the square-core guide of section 3 with
 first-order value `(d n_eff / d eps_core) Im eps_core` of section 5. Amplitude
 decays as `exp(-a z)` with `a = -Im beta`, power as `exp(-2 a z)`; the dB/cm
 conversion is in [absorbing modes](../simcase/lossy_modes.md). With coordinate
-factors every candidate is kept and a nonfinite or zero root is an error, so
-that the caller records every candidate and its exclusion reason.
+factors every candidate except the static `beta^2 = 0` roots (section 3) is kept
+and a nonfinite root is an error, so that the caller records every candidate and
+its exclusion reason.
 
 **PML as a complex coordinate stretch.** Open cross-sections are truncated by
 stretching the transverse coordinates into the complex plane (Bérenger 1994 for

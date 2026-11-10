@@ -156,11 +156,23 @@ Jin 2014 도파관 장).
 두 번째 행에는 `beta^2`가 없는 항이 없으므로 `A`의 `e_z` 블록은 0입니다.
 curl-curl 방정식의 약한 종방향 성분은 제약식이고, `beta^2 = 0`은 자유 절점 수
 정도의 중복도를 가진 고유값(이산 gradient)입니다. 도파 모드는 그로부터 멀리
-`n_clad < Re n_eff < n_core`에 있고, `n_target` 근처의 shift-invert 탐색은 이
-무리를 만나지 않습니다. 혼합 쌍이 가짜 모드를 억제하는 방식이 바로 이것입니다.
+`n_clad < Re n_eff < n_core`에 있고, `n_target` 근처의 shift-invert 탐색은
+`beta^2 = 0`보다 목표에 가까운 근보다 많이 찾을 때만 이 무리에 닿습니다.
+혼합 쌍이 가짜 모드를 억제하는 방식이 바로 이것입니다.
 curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 있고, 절점 벡터
 요소처럼 스펙트럼 전체에 번지지 않습니다
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
+
+탐색이 이 무리에 닿으면 계산된 근은 보통 `|beta^2|`가 반올림 수준이고
+(`tests/galerkin/test_waveguide_static_roots.py`의 slab에서 최대 `1.2e-14 |sigma|`,
+가끔 정확히 0) `E_t = e_t / beta`가 정의되지 않습니다. `solve_modes`는 어느 경로에서도
+`|beta^2| <= STATIC_ROOT_TOL |sigma|`(`1e-10`, 곧 `|n_eff| <= 1e-5 |n_target|`)인 근을
+반환하지 않으므로, 이런 탐색은 `num_modes`보다 적은 근을 반환합니다. 한계: `B`의 절점
+블록 `K - k0^2 M`이 거의 특이할 때, 곧 `k0^2`가 자유 절점에서 `K e_z = lambda M e_z`의
+고유값(PEC 상자의 TM 차단)에 가까울 때는 무리의 조건이 나빠 계산된 근이 문턱을 넘을 수
+있습니다. 정사각 도파관에서 그런 차단으로부터 상대 거리 `1e-6`, `1e-8`일 때
+`2.2e-10 |sigma|`, `6.8e-9 |sigma|`가 측정되었습니다. 이런 근은 가로 성분이 거의 없는
+채로 반환됩니다.
 
 `A`와 `B`는 전치대칭입니다. 실수 `eps_r`, `mu_r`에서는 실대칭이고 `B`는
 부정부호(indefinite)이며, 복소 재료나 좌표 인자에서는 복소대칭이고 Hermitian이
@@ -244,9 +256,9 @@ simcase는 `Im eps > 0`을 거부합니다("passive modes use Im eps <= 0"). 이
 `eps_core = 2.25 - 0.01i`를 주면 `Im n_eff = -3.35e-3`이 나오며, 이는 5절의 1차
 값 `(d n_eff / d eps_core) Im eps_core`와도 같습니다. 진폭은 `a = -Im beta`로
 `exp(-a z)`, 전력은 `exp(-2 a z)`로 감쇠합니다. dB/cm 변환은
-[흡수 모드](../simcase/lossy_modes.md)에 있습니다. 좌표 인자가 있으면 모든 후보를
-남기고 비유한 또는 0인 근은 오류이므로, 호출자가 모든 후보와 제외 사유를 기록할
-수 있습니다.
+[흡수 모드](../simcase/lossy_modes.md)에 있습니다. 좌표 인자가 있으면 정적
+`beta^2 = 0` 근(3절)을 뺀 모든 후보를 남기고 비유한 근은 오류이므로, 호출자가 모든
+후보와 제외 사유를 기록할 수 있습니다.
 
 **복소 좌표 늘림으로서의 PML.** 열린 단면은 횡좌표를 복소 평면으로 늘려
 절단합니다(분리장 층은 Bérenger 1994; 여기서 쓰는 늘린 좌표 형식은 Chew,

@@ -53,8 +53,10 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         # Computational components in PML are artificial; the real-window
         # longitudinal field is physical Ez. All arrays retain complex phase.
         longitudinal=1j*ez.T/c.node_h[:,None]
+        # A search of only static beta^2 = 0 roots returns none; selection then refuses.
         electric=np.stack([np.column_stack([eval_edge_field(space,t)/c.factors[:,:2],
-                         1j*z[mesh.triangles].mean(axis=1)/c.factors[:,2]]) for t,z in zip(et,ez)],axis=1)
+                         1j*z[mesh.triangles].mean(axis=1)/c.factors[:,2]]) for t,z in zip(et,ez)],axis=1) \
+            if len(n) else np.zeros((mesh.num_triangles,0,3),complex)
         me=assemble_edge_mass(space)
         mp=assemble_edge_mass(space,c.physical.astype(float))
         mn=assemble_mass(scaled)

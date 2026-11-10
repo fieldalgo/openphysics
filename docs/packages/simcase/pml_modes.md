@@ -77,8 +77,11 @@ DOFs. Eligible candidates have positive real index, residual <=1e-8, physical
 fraction >= the configured threshold (default0.1, permitted0..1), and imaginary
 index <=1e-10 max(1,|Re n|). The nearest eligible candidates to the target are
 returned, ordered by descending real index at the seed point. Rejected and
-unselected candidates remain in diagnostics. A nonfinite/zero propagation root
-stops the low-level solve; it is not silently discarded.
+unselected candidates remain in diagnostics. A nonfinite propagation root
+stops the low-level solve; it is not silently discarded. Roots of the vector
+formulation's static `beta^2 = 0` family with `|beta^2| <= 1e-10 |sigma|` are not
+candidates, and a search of only such roots is refused like any search without
+an eligible candidate ([waveguide formulation](../galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation)).
 
 `abs(Im n)<=1e-10 max(1,|Re n|)` is labelled `numerically_unresolved`; its signed
 value and attenuation are preserved, never clamped to zero. This threshold is
