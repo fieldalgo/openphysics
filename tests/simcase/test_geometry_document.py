@@ -29,9 +29,10 @@ def _docs():
 
 
 DOCS = _docs()
-#: the documents still in format 0.2; a format 0.3 rectangle (heat, units batch C5a) declares
-#: geometry.length_unit and depth in its flat block instead of units.length
-DOCS_02 = sorted(k for k, v in DOCS.items() if v.get("openphysics") == "0.2")
+#: the cavity documents: the last that the version 1 round trip below read in format 0.2; they read
+#: format 0.3 since units batch C9, and a format 0.3 flat block declares geometry.length_unit itself
+DOCS_CAVITY = sorted(k for k, v in DOCS.items()
+                     if any(p.get("type") == "em.cavity3d" for p in v.get("physics", {}).values()))
 
 
 def _units_and_flat(doc):
@@ -378,24 +379,19 @@ def _as_v1(name):
     return doc
 
 
-@pytest.mark.parametrize("name", DOCS_02)
+@pytest.mark.parametrize("name", DOCS_CAVITY)
 def test_a_document_with_version_1_geometry_runs_the_same_input(name):
+    """The version 1 form of a flat cavity block (a 3d component of boxes, compiled to the flat block
+    by the reader) hands the solver the same input; repr tells every double apart (and -0.0)."""
     from simcase import Document
+    from simcase.cavity import kernel_inputs
     v1_doc = _as_v1(name)
     doc = Document.from_dict(copy.deepcopy(v1_doc))
-    expected = Document.from_dict(copy.deepcopy(DOCS[name])).data
-    if doc.is_version_1:
-        # a 2D region component stays as written; the accessors give the 0.2 reading
-        assert {k: v for k, v in doc.data.items() if k != "geometry"} == {k: v for k, v in expected.items() if k != "geometry"}
-        assert doc.data["geometry"] == v1_doc["geometry"]
-        assert doc.domain == expected["geometry"]["domain"]
-        assert doc.background == expected["geometry"]["background"]
-        assert [(r["name"], r["material"], r["mesh_size"]) for r in doc.regions()] == \
-            [(s["name"], s["material"], s.get("mesh_size")) for s in expected["geometry"]["shapes"]]
-    else:
-        assert doc.data == expected
-    assert doc.geometry_source == v1_doc["geometry"] and doc.geometry_roundings == []
-    assert doc.to_dict()["geometry"] == v1_doc["geometry"]
+    flat = Document.from_dict(copy.deepcopy(DOCS[name]))
+    assert doc.geometry_flat is not None and not doc.is_version_1      # compiled, not kept as regions
+    assert repr(kernel_inputs(doc)) == repr(kernel_inputs(flat))
+    assert json.loads(doc.canonical_json())["geometry"] == v1_doc["geometry"]        # kept as written
+    assert doc.geometry_roundings == [] and not doc.diagnostics
     assert doc.copy().to_dict() == doc.to_dict()
 
 

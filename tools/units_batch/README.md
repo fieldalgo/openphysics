@@ -241,6 +241,18 @@ equal); (iv) each twin passes the comparison; (v) every difference from the old 
 post-processing calls and the outputs that depend on them, a listed set. The founder decides
 how these eight are reported; until then the total reads 79 equal, 8 different.
 
+The em.cavity3d commit (C9) sets `em.cavity3d` to `layout`, so every physics type of the corpus
+is compared in layout mode, and adds the maps `cavity3d-edge-v1` and `cavity3d-edge-complex-v1`
+and the twins `fixtures/v03/cavity_*.json`. The real layout holds real values only and maps as
+computed (`=`); in the complex layout every complex array is conjugated (`conj`), the quality
+factors are the same doubles, the material echo's imaginary parts negate (`neg`, as the
+converter writes them) and a summary entry of a complex array is compared through the `array`
+rule. The old unit strings, target and mode counts leave with `unit-metadata` (they move into
+the summary and `metadata_json`), the subdivision echo is compared with
+`resolved_inputs.["mesh.subdivision_count"].value`, and the background material
+(`vacuum` against `physmat:vacuum`) is an identifier. The cavity maps have no exception: every
+array, summary leaf, VTU array and solver call compares bitwise.
+
 ## The converter
 
 `convert_v02.py` is a closed rule table: every key a 0.2 validator accepts is renamed, given

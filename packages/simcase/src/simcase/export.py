@@ -35,19 +35,21 @@ Supported layouts:
   arrays and FieldData block, plus the static integer cell data
   ``triangle_regions`` (no unit). An axisymmetric result has (r, z) points and
   full-revolution rates without ``_per_depth`` (W, J)
-- the heat, electric and Joule layouts saved before the units and naming batch
-  (``RETIRED_LAYOUTS``) are refused by name: re-create the document in format 0.3
-- 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
-  ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
-  normalization, unit m^-3/2)
-- 3D cavity with materials and lossy walls (``cavity3d-edge-complex-v1``):
-  VTK has no complex arrays, so each complex mode field becomes the cell data
-  ``electric_field_mode_<k>_real`` and ``electric_field_mode_<k>_imag`` (unit
-  m^-3/2, the saved normalization and ``exp(+j*omega*t)`` convention), and the
-  per-tetrahedron materials become ``tet_relative_permittivity_real``/``_imag``
-  and ``tet_relative_permeability_real``/``_imag`` (dimensionless). Complex
-  frequencies, quality factors and wall conductivities are not per cell and
-  stay in ``fields.npz`` and ``summary.json``
+- every layout saved before the units and naming batch (``RETIRED_LAYOUTS``: heat,
+  electric, Joule, mechanics, waveguide modes and the cavity) is refused by name:
+  re-create the document in format 0.3
+- 3D PEC cavity, format 0.3 (``cavity3d-edge-v2``): tetrahedra on the saved
+  ``node_coordinates`` (m) with cell data ``mass_normalized_electric_field_mode_<k>``
+  at centroids (the saved arbitrary SI normalization, unit 1/m^(3/2)) and the
+  FieldData block
+- 3D cavity with materials and lossy walls, format 0.3
+  (``cavity3d-edge-complex-v2``): VTK has no complex arrays, so each complex mode
+  field becomes the cell data ``mass_normalized_electric_field_mode_<k>_real`` and
+  ``_imag`` (unit 1/m^(3/2), the saved normalization under exp(-i omega t)), and the
+  per-tetrahedron materials become ``relative_permittivity_real``/``_imag`` and
+  ``relative_permeability_real``/``_imag`` (dimensionless); the FieldData block adds
+  the time convention. Complex frequencies, quality factors and wall conductivities
+  are not per cell and stay in ``fields.npz`` and ``summary.json``
 - electric conduction and Joule heating, format 0.3 (``electric-joule2d-p1-v2``, the
   layout of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``; and
   ``electric2d-p1-node-cell-regions-v2`` of region ``electric.steady2d`` and
@@ -139,6 +141,8 @@ RETIRED_LAYOUTS: dict[str, str] = {
     "thermoelastic2d-p1-v1": "thermoelastic2d-p1-v2",
     "em-modes2d-p1-node-centroid-v1": "em-modes2d-p1-node-centroid-v2",
     "em-modes2d-subspace-raw-v1": "em-modes2d-subspace-raw-v2",
+    "cavity3d-edge-v1": "cavity3d-edge-v2",
+    "cavity3d-edge-complex-v1": "cavity3d-edge-complex-v2",
 }
 
 # rectangle heat (format 0.3): arrays under registry names, SI, with VTU unit metadata
@@ -152,8 +156,8 @@ _TRANSIENT_REGIONS = "thermal2d-transient-p1-node-cell-regions-v2"
 _TRANSIENT_AXISYMMETRIC_REGIONS = "thermal-axisymmetric-transient-p1-node-cell-regions-v2"   # (r, z); W, plain names
 _HEAT_03 = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _TRANSIENT_BOUNDARY, _STEADY_REGIONS, _TRANSIENT_REGIONS,
             _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
-_CAVITY = "cavity3d-edge-v1"
-_CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
+_CAVITY = "cavity3d-edge-v2"
+_CAVITY_COMPLEX = "cavity3d-edge-complex-v2"
 # electric and Joule (format 0.3): arrays under registry names, SI, with VTU unit metadata
 _ELECTRIC_JOULE = "electric-joule2d-p1-v2"
 _ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v2"   # electric.steady2d on material regions
@@ -205,8 +209,9 @@ _MECHANICS_CELL = {"strain": ("strain_xx", "strain_yy", "engineering_shear_strai
                    "thermal_strain": ("thermal_strain_xx", "thermal_strain_yy", "engineering_shear_thermal_strain_xy"),
                    "elastic_strain": ("elastic_strain_xx", "elastic_strain_yy", "engineering_shear_elastic_strain_xy"),
                    "stress": ("stress_xx", "stress_yy", "stress_xy")}
-# cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
-_CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
+# cavity3d-edge-complex-v2 static per-tetrahedron complex material arrays.
+_CAVITY_COMPLEX_CELL = ("relative_permittivity", "relative_permeability")
+_CAVITY_FIELD = "mass_normalized_electric_field"
 
 
 def _meshio():
@@ -358,10 +363,10 @@ def _mechanics(data, layout):
 
 
 def _cavity(data):
-    points = _points(data["nodes"])
+    points = _points(data["node_coordinates"])
     cells = [("tetra", np.asarray(data["tetrahedra"], dtype=np.int64))]
-    fields = np.asarray(data["electric_field"], dtype=float)
-    cell_data = {f"electric_field_mode_{k}": [fields[k]] for k in range(len(fields))}
+    fields = np.asarray(data[_CAVITY_FIELD], dtype=float)
+    cell_data = {f"{_CAVITY_FIELD}_mode_{k}": [fields[k]] for k in range(len(fields))}
     return points, cells, {}, cell_data
 
 
@@ -373,17 +378,17 @@ def _real_imag(values):
 
 
 def _cavity_complex(data):
-    points = _points(data["nodes"])
+    points = _points(data["node_coordinates"])
     tetrahedra = np.asarray(data["tetrahedra"], dtype=np.int64)
     cells = [("tetra", tetrahedra)]
-    fields = np.asarray(data["electric_field"])
+    fields = np.asarray(data[_CAVITY_FIELD])
     if fields.ndim != 3 or fields.shape[1:] != (len(tetrahedra), 3):
-        raise ValueError(f"electric_field: expected shape (modes, tetrahedra, 3), got {fields.shape}")
+        raise ValueError(f"{_CAVITY_FIELD}: expected shape (modes, tetrahedra, 3), got {fields.shape}")
     cell_data = {}
     for k in range(len(fields)):
         real, imag = _real_imag(fields[k])
-        cell_data[f"electric_field_mode_{k}_real"] = [real]
-        cell_data[f"electric_field_mode_{k}_imag"] = [imag]
+        cell_data[f"{_CAVITY_FIELD}_mode_{k}_real"] = [real]
+        cell_data[f"{_CAVITY_FIELD}_mode_{k}_imag"] = [imag]
     for name in _CAVITY_COMPLEX_CELL:
         values = np.asarray(data[name])
         if values.shape != (len(tetrahedra),):
@@ -470,11 +475,12 @@ def _modes_at(arrays, index):
 
 def _modes_metadata(names):
     """The FieldData ``units`` and ``conventions`` of exported mode arrays (``<array>_mode_<k>``
-    with ``_real``/``_imag`` parts): each name's unit is its saved array's; a complex part adds
-    the time convention."""
+    with ``_real``/``_imag`` parts) and of the cavity's per-tetrahedron materials
+    (``<array>_real``/``_imag``): each name's unit is its saved array's; a complex part adds the
+    time convention."""
     from physmat import units as registry
     import re
-    pattern = re.compile(r"(.+)_mode_\d+(_real|_imag)?")
+    pattern = re.compile(r"(.+?)(?:_mode_\d+)?(_real|_imag)?")
     units, signs, complex_ = {}, {}, False
     for name in names:
         if name == "regions":
@@ -627,7 +633,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
     if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS, *_MECHANICS_LAYOUTS):
         inject_field_data(output, *_unit_metadata([name for name in (*point_data, *cell_data)
                                                    if name not in _STRUCTURAL]))
-    elif layout == _MODES:
+    elif layout in (_MODES, _CAVITY, _CAVITY_COMPLEX):
         inject_field_data(output, *_modes_metadata([*point_data, *cell_data]))
     return output
 

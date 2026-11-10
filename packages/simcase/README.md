@@ -19,12 +19,12 @@ python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
 ```
 
-The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
-`"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
+The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.3"`; it is
+not an import or distribution name. Format `"0.3"` (values with units, registry
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat,
-electric conduction and Joule heating, mechanics and waveguide modes (`em.modes2d`), which no
-longer read format 0.2; `em.cavity3d` still reads format 0.2 until its commit of the units batch:
-[document format 0.3](../../docs/packages/simcase/document_format.md). The separate
+electric conduction and Joule heating, mechanics, waveguide modes (`em.modes2d`) and rectangular
+cavities (`em.cavity3d`). No kind reads format 0.2 any more: a 0.2 document is refused by name
+(`E-FORMAT`): [document format 0.3](../../docs/packages/simcase/document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the

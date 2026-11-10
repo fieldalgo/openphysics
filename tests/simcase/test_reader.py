@@ -314,22 +314,35 @@ def test_the_format_is_the_string_0_3(toy_kind, value, needle):
 
 
 def test_a_kind_without_slots_refuses_format_0_3():
-    data = json.loads((ROOT / "examples" / "simcase" / "cavity_box.json").read_text(encoding="utf-8"))
-    data["openphysics"] = "0.3"
-    with pytest.raises(DocumentError) as caught:
-        Document.from_dict(data)
+    """Every built-in kind brings its slots since the cavity moved (C9); a kind registered without
+    them is still refused by name, before the walk."""
+    import dataclasses
+    from simcase import registry
+    registry.kinds()
+    registry.register(dataclasses.replace(toy.kind(), slots=None))
+    try:
+        with pytest.raises(DocumentError) as caught:
+            Document.from_dict(toy.document())
+    finally:
+        registry._KINDS.pop(toy.NAME, None)
     [d] = caught.value.diagnostics
-    assert (d.code, d.path) == ("E-CONTRACT", "physics.em1.type")
+    assert (d.code, d.path) == ("E-CONTRACT", "physics.bar.type")
     assert "not read in format 0.3 yet" in str(caught.value)
 
 
-@pytest.mark.parametrize("path", EXAMPLES_02, ids=lambda p: p.stem)
-def test_today_s_documents_take_the_0_2_path(path):
+def test_no_example_is_a_format_0_2_document():
+    """Every kind reads format 0.3 only since C9: no shipped example takes the 0.2 path."""
+    assert EXAMPLES and EXAMPLES_02 == []
+
+
+@pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.json")), ids=lambda p: p.stem)
+def test_a_format_0_2_document_is_refused_by_name(path):
     raw = path.read_bytes()
     assert not declares_v03(raw)
-    doc = Document.load(path)
-    assert doc.si is None and doc.format == "0.2" and not hasattr(doc, "diagnostics")   # as before
-    assert doc.data["openphysics"] == "0.2"
+    with pytest.raises(DocumentError) as caught:
+        Document.load(path)
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [("E-FORMAT", "openphysics")]
+    assert (FIXTURES_03 / path.name).is_file()      # its converted twin
 
 
 @pytest.mark.parametrize("path", EXAMPLES_03, ids=lambda p: p.stem)
@@ -385,7 +398,7 @@ if FIXTURES.is_dir():
         if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
             # a converted form: its 0.2 fixture is read by the baseline code only
             with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule|"
-                                                    "mechanics|em.modes2d) documents are not read"):
+                                                    "mechanics|em.modes2d|em.cavity3d) documents are not read"):
                 Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
             return
         _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)

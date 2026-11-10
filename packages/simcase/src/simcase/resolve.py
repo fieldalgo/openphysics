@@ -367,6 +367,8 @@ class _Walker:
         if isinstance(value, str) and value in refused:
             self.error("E-CONTRACT", path, refused[value])
             return None
+        if isinstance(value, dict) and "OBJECT" in slot.get("forms", ()):
+            return self.obj(slot, value, path)        # an enum or an object (a cavity boundary)
         allowed = slot["values"]
         if isinstance(value, dict) and slot.get("object_message"):
             self.error("E-CONTRACT", path, slot["object_message"])

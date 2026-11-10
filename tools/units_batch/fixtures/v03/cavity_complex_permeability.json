@@ -1,0 +1,68 @@
+{
+  "openphysics": "0.3",
+  "name": "Copper box with a lossy dielectric slab, Q near 150 MHz",
+  "geometry": {
+    "length_unit": "m",
+    "domain": {
+      "xmin": 0,
+      "xmax": 1,
+      "ymin": 0,
+      "ymax": 0.8,
+      "zmin": 0,
+      "zmax": 0.6
+    },
+    "background": {
+      "material": "physmat:vacuum"
+    },
+    "shapes": [
+      {
+        "type": "box",
+        "name": "slab",
+        "material": "lossy_dielectric",
+        "xmin": 0,
+        "xmax": 1,
+        "ymin": 0,
+        "ymax": 0.8,
+        "zmin": 0,
+        "zmax": 0.3
+      }
+    ]
+  },
+  "materials": {
+    "lossy_dielectric": {
+      "relative_permittivity": {
+        "re": 4.0,
+        "im": 0.04
+      },
+      "relative_permeability": {
+        "re": 1.5,
+        "im": 0.01
+      }
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.cavity3d",
+      "boundary": {
+        "electrical_conductivity": "58000000 S/m"
+      },
+      "search": "near_target",
+      "target_frequency": "150000000 Hz",
+      "mode_count": 2
+    }
+  },
+  "mesh": {
+    "subdivision_count": [
+      4,
+      4,
+      4
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

@@ -58,9 +58,9 @@ V1_SUMMARY_KEYS = (
     "stored_heat_per_depth", "thermal_energy_functional_per_depth", "reaction_sign", "balance_equation",
     "heat_content_definition", "quadratic_functional_definition", "save_fields")
 EARLIER_LAYOUTS = ("thermal2d-p1-node-cell-v2", "thermal2d-p1-node-cell-boundary-v3",
-                   "thermal2d-transient-p1-node-cell-v2", "cavity3d-edge-v1",
+                   "thermal2d-transient-p1-node-cell-v2", "cavity3d-edge-v2",
                    "thermal2d-p1-node-cell-regions-v2", "thermal2d-transient-p1-node-cell-regions-v2",
-                   "electric-joule2d-p1-v2", "cavity3d-edge-complex-v1")
+                   "electric-joule2d-p1-v2", "cavity3d-edge-complex-v2")
 METRES = {"m": Decimal(1), "mm": Decimal("0.001")}
 
 

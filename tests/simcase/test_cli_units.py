@@ -203,20 +203,23 @@ def test_fix_applies_only_value_preserving_fixes(toy_kind, tmp_path, capsys):
     assert code == 0 and path.read_bytes() == expected and "4 fix(es) written" in out
 
 
+#: a format 0.2 document: no kind reads one since units batch C9 (em.cavity3d was the last)
+V02 = ROOT / "tools" / "units_batch" / "fixtures" / "v02" / "cavity_wall_conductivity.json"
+
+
 def test_fix_and_explain_refuse_a_0_2_document(tmp_path, capsys):
-    example = ROOT / "examples" / "simcase" / "cavity_box.json"        # a kind still read in 0.2
     for command in ("fix", "explain"):
-        code, _out, err = _run(capsys, command, example)
+        code, _out, err = _run(capsys, command, V02)
         assert code == 2 and "reads format 0.3 documents" in err
 
 
-def test_validate_of_a_0_2_document_is_unchanged(capsys):
-    from simcase.schema import Document
-    example = ROOT / "examples" / "simcase" / "cavity_box.json"        # a kind still read in 0.2
-    code, out, _err = _run(capsys, "validate", example)
-    assert code == 0 and out == Document.load(example).summary() + "\n"
-    code, out, _err = _run(capsys, "validate", "--json", example)
-    assert code == 0 and json.loads(out)["valid"] is True
+def test_validate_of_a_0_2_document_names_the_format(capsys):
+    code, out, err = _run(capsys, "validate", V02)
+    assert code == 2 and out == "" and "format 0.2 em.cavity3d documents are not read" in err
+    code, out, _err = _run(capsys, "validate", "--json", V02)
+    report = json.loads(out)
+    assert code == 2 and report["valid"] is False
+    assert [(d["code"], d["path"]) for d in report["diagnostics"]] == [("E-FORMAT", "openphysics")]
 
 
 # -- the common result helpers --------------------------------------------------------------------

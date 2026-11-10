@@ -5,17 +5,16 @@
 [Documentation home](../../README.md) · [simcase overview](overview.md) ·
 [physmat.units](../physmat/units.md)
 
-Status: **the shared reader of format 0.3 is in place; heat (`thermal.steady2d`,
-`thermal.transient2d`), electric conduction and Joule heating (`electric.steady2d`,
-`joule.steady2d`, `joule.temperature2d`), mechanics (`mechanics.elasticity2d`,
-`mechanics.thermoelastic2d`) and waveguide modes (`em.modes2d`) read format 0.3 only.**
-`em.cavity3d`'s shipped examples and documents are format `"openphysics": "0.2"` and are read
-exactly as before. A
-document whose envelope is the JSON string `"0.3"` takes the reader described here; until a
-kind's own step of the units and naming batch gives it its physics slots, its 0.3 document is
-refused with `E-CONTRACT` ("documents are not read in format 0.3 yet"). The kinds move one at a
-time (heat, electric and Joule, mechanics, `em.modes2d`, `em.cavity3d`); the 0.2 reader is
-retired after the last one.
+Status: **the shared reader of format 0.3 is in place, and every kind reads format 0.3 only:
+heat (`thermal.steady2d`, `thermal.transient2d`), electric conduction and Joule heating
+(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`), mechanics
+(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`), waveguide modes (`em.modes2d`) and
+rectangular cavities (`em.cavity3d`).** A document whose envelope is the JSON string `"0.3"` takes
+the reader described here. A format 0.2 document of any kind is refused by name (`E-FORMAT`,
+with what to write instead). The kinds moved one at a time (heat, electric and Joule,
+mechanics, `em.modes2d`, `em.cavity3d`); the internal 0.2 helpers that the kernel hand-offs
+still use are retired in a later step. A kind registered without physics slots refuses its
+0.3 document with `E-CONTRACT` ("documents are not read in format 0.3 yet").
 
 Format 0.3 keeps today's document skeleton (`geometry`, `materials`, `physics.<name>`,
 `mesh`, `study`, `results`) and changes only what the units and naming rules require:
@@ -307,10 +306,9 @@ on which built-in kinds read format 0.3 yet.
 
 ## Not done yet
 
-- The physics slots, examples, results and Studio parts of `em.cavity3d`, with its own step
-  (heat, electric and Joule, mechanics and `em.modes2d` have theirs); results under
-  registry names; the Studio's raw-byte reading and quantities endpoint; then the
-  retirement of the 0.2 reader, `simcase.units` and `simcase.unit_vocabulary`.
+- The Studio's raw-byte reading and quantities endpoint; then the retirement of the 0.2
+  reader, `simcase.units` and `simcase.unit_vocabulary`. (Every kind, `em.cavity3d` last, has
+  its physics slots, examples and results under registry names.)
 - Each remaining code is raised by the kind that needs it, with its step (`E-SPECTRAL` is
   raised by `em.modes2d` for an entry with more than one spectral key, `I-DEFAULT-BOUNDARY` by
   heat, electric/Joule, mechanics and `em.modes2d`, `E-OUTSIDE-VALID` by `joule.temperature2d`,

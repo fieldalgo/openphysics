@@ -15,7 +15,7 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # 버전 1 형상 블록의 영역 복합체
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역), 도파 모드(`em.modes2d`: 평면 형상과 버전 1 블록, 스칼라, 벡터, PML, 굽힘, 추적·부분공간 sweep)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. `em.cavity3d`는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역), 도파 모드(`em.modes2d`: 평면 형상과 버전 1 블록, 스칼라, 벡터, PML, 굽힘, 추적·부분공간 sweep), 직육면체 공진기(`em.cavity3d`: 진공 PEC 상자, 상자 재료, 도체 벽)에서 읽습니다. 이제 어떤 종류도 형식 0.2를 읽지 않습니다. 0.2 문서는 무엇을 대신 써야 하는지와 함께 이름을 밝혀 거부합니다(`E-FORMAT`): [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(단위를 붙인 SI 값: study 지점별 진공 파장과 유효 굴절률, 군굴절률, 메시 통계, 시간, 진단), `fields.npz`(미터 단위 절점 좌표와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 작성한 그대로의 문서(`model.json`)가 생성됩니다.
 
@@ -221,7 +221,7 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
 동등하게 환산되는 길이 입력은 SI 메시와 필드가 동일합니다. 열 결과의 좌표는 미터이며
 저장 모델은 원래 단위를 유지합니다. [열 영역 계약](thermal_regions2d.md)을 참조하세요.
 
-[공진기 문서 계약](cavity3d.md)은 `em.cavity3d` 입력, 단위 변환, 탐색 한계, SI JSON/NPZ 결과 구성을 설명합니다.
+[공진기 문서 계약](cavity3d.md)은 `em.cavity3d` 입력(형식 0.3: `"250 MHz"`, `"58 MS/m"`, exp(−iωt) 규약의 복소 재료), 탐색 한계, SI JSON/NPZ 결과 배치 `cavity3d-edge-v2`와 `cavity3d-edge-complex-v2`를 설명합니다.
 
 [thermal.steady2d 계약](thermal_steady2d.md)은 균질 직사각형 정상 열전도 문서(형식 0.3: 형상 `length_unit`과 모든 값의 단위)를 설명합니다. 등록부 이름의 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 구속 반력은 구속이 주입하는 열이며 그 음수가 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 내향 열유속·대류와 경계 식별자·배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 기본 쌍을 유지합니다. 지정 온도가 비어 있으면 양의 Robin 고정이 필요합니다. 입력 온도는 0 K보다 크며 계산된 음의 온도는 잘라내지 않습니다.
 
@@ -258,13 +258,16 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
 열률, 열 등가·체적력·traction 힘 배열, 셀 `heat_flux`, `stress_zz`, `strain_zz`와 `thermal_strain_…`,
 `elastic_strain_…` 성분을 더합니다. 둘 다 FieldData `units`·`conventions` 블록을 담습니다. 형식 0.2 역학
 배치(`mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`)는 이름을 밝혀 거부하며, 영역 역학 결과는 아직 내보내지
-않습니다. em·공진기 배열은 저장된 이름과 단위
-접미사를 그대로 쓰며 Dirichlet 절점 목록과 summary는 복사하지 않습니다. 재료와 손실 벽이
-있는 공진기(`cavity3d-edge-complex-v1`)는 복소 모드마다 셀 데이터
-`electric_field_mode_<k>_real`과 `electric_field_mode_<k>_imag`(m^-3/2, 저장된 정규화와
-`exp(+j*omega*t)` 규약; VTK에는 복소 배열이 없음)를, 재료는
-`tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로
-내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 단일 지점
+않습니다. 진공 PEC 공진기(`cavity3d-edge-v2`)는 미터 단위 `node_coordinates`와 모드마다 셀 데이터
+`mass_normalized_electric_field_mode_<k>`(1/m^(3/2), 사면체 무게중심)를 내보내며 Dirichlet 절점 목록과
+summary는 복사하지 않습니다. 재료와 손실 벽이
+있는 공진기(`cavity3d-edge-complex-v2`)는 복소 모드마다 셀 데이터
+`mass_normalized_electric_field_mode_<k>_real`과 `..._imag`(exp(−iωt) 규약의 저장된 정규화;
+VTK에는 복소 배열이 없음)를, 재료는
+`relative_permittivity_real`/`_imag`과 `relative_permeability_real`/`_imag`으로
+내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 둘 다 FieldData
+`units`·`conventions` 블록을 담습니다. 형식 0.2 공진기 배치(`cavity3d-edge-v1`,
+`cavity3d-edge-complex-v1`)는 이름을 밝혀 거부합니다. 단일 지점
 도파관 모드 결과(`em-modes2d-p1-node-centroid-v2`, `em.modes2d`; exp(−iωt)의 SI)는 미터 단위
 `node_coordinates` 위에 내보냅니다. 각 배열은 `fields.npz` 이름에 모드별 접미사 `_mode_<k>`(0부터)를,
 복소이면 `_real`/`_imag`를 붙여 이름을 짓습니다. 스칼라 결과는 점 데이터

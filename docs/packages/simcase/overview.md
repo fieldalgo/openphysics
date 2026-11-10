@@ -20,16 +20,17 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # the region complex of a version 1 geometry block
 ```
 
-The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
-`"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
+The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.3"`; it is
+not an import or distribution name. Format `"0.3"` (values with units, registry
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat
 (`thermal.steady2d` and `thermal.transient2d`: rectangles, material regions, version 1 blocks and
 the axisymmetric forms) and for electric conduction and Joule heating (`electric.steady2d`,
 `joule.steady2d` and `joule.temperature2d`: rectangles, and material regions for the first two)
 and for mechanics (`mechanics.elasticity2d` and `mechanics.thermoelastic2d`: rectangles and
 material regions) and for waveguide modes (`em.modes2d`: flat shapes and version 1 blocks, scalar,
-vector, PML, bends, tracked and subspace sweeps), which no longer read format 0.2; `em.cavity3d`
-still reads format 0.2 until its commit of the units batch: [document format 0.3](document_format.md). The separate
+vector, PML, bends, tracked and subspace sweeps) and for rectangular cavities (`em.cavity3d`: the
+vacuum PEC box, box materials and conducting walls). No kind reads format 0.2 any more: a 0.2
+document is refused by name (`E-FORMAT`) with what to write instead: [document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -433,8 +434,9 @@ the same numerical environment; heat results retain metre coordinates and
 the saved model retains its original units. See the
 [region heat contract](thermal_regions2d.md#mesh-and-solve).
 
-The [cavity document contract](cavity3d.md) covers the `em.cavity3d` input,
-unit conversion, search limitations and the SI JSON/NPZ result layout.
+The [cavity document contract](cavity3d.md) covers the `em.cavity3d` input (format 0.3:
+`"250 MHz"`, `"58 MS/m"`, complex materials under exp(−iωt)), search limitations and the SI
+JSON/NPZ result layouts `cavity3d-edge-v2` and `cavity3d-edge-complex-v2`.
 
 The [thermal.steady2d contract](thermal_steady2d.md) describes homogeneous
 rectangular steady heat documents (format 0.3: a geometry `length_unit` and a unit on every
@@ -502,14 +504,18 @@ heat rates, the thermal-equivalent, body and traction force arrays, cell `heat_f
 `stress_zz`, `strain_zz` and the `thermal_strain_…` and `elastic_strain_…` components; both
 carry the FieldData `units` and `conventions` blocks. The format 0.2 mechanics layouts
 (`mechanics2d-p1-v1`, `thermoelastic2d-p1-v1`) are refused by name; region mechanics results
-are not exported yet. The cavity arrays keep their saved names and unit suffixes;
-Dirichlet node lists and the summary are not copied. The cavity with materials
-and lossy walls (`cavity3d-edge-complex-v1`) exports each complex mode as the
-cell data `electric_field_mode_<k>_real` and `electric_field_mode_<k>_imag`
-(m^-3/2, the saved normalization and `exp(+j*omega*t)` convention; VTK has no
-complex arrays) and the materials as `tet_relative_permittivity_real`/`_imag`
-and `tet_relative_permeability_real`/`_imag`; frequencies, quality factors and
-wall conductivities stay in `fields.npz` and `summary.json`. A single-point
+are not exported yet. A vacuum PEC cavity (`cavity3d-edge-v2`) exports its
+`node_coordinates` in metres and each mode as the cell data
+`mass_normalized_electric_field_mode_<k>` (1/m^(3/2), at tetrahedron centroids); Dirichlet
+node lists and the summary are not copied. The cavity with materials
+and lossy walls (`cavity3d-edge-complex-v2`) exports each complex mode as the
+cell data `mass_normalized_electric_field_mode_<k>_real` and `..._imag`
+(the saved normalization under exp(−iωt); VTK has no
+complex arrays) and the materials as `relative_permittivity_real`/`_imag`
+and `relative_permeability_real`/`_imag`; frequencies, quality factors and
+wall conductivities stay in `fields.npz` and `summary.json`. Both carry the FieldData `units`
+and `conventions` blocks. The format 0.2 cavity layouts (`cavity3d-edge-v1`,
+`cavity3d-edge-complex-v1`) are refused by name. A single-point
 waveguide mode result (`em-modes2d-p1-node-centroid-v2`, from `em.modes2d`; SI under
 exp(−iωt)) is exported on its `node_coordinates` in metres. Each array is named by its
 `fields.npz` name with the per-mode suffix `_mode_<k>` (zero-based) and, when complex, the

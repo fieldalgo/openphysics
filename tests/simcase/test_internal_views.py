@@ -24,9 +24,11 @@ MM = units.resolve({"length": "mm"})
 
 
 def box_02():
-    """A format 0.2 cavity box (em.cavity3d, a kind still read in 0.2) whose two length formulas
-    give different doubles along x; the rectangle kinds read format 0.3 since units batch C7."""
-    return Document.from_dict({
+    """A format 0.2 box whose two length formulas give different doubles along x. No document
+    reader takes format 0.2 since units batch C9 (em.cavity3d was the last kind); the 0.2 view
+    stays for the kernel hand-offs until C11, so the tree is built as they build theirs: a
+    Document of the 0.2 shape with its resolved scale, not read."""
+    doc = Document({
         "openphysics": "0.2", "name": "views", "units": {"length": "mm"},
         "geometry": {"domain": {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8, "zmin": 0.0, "zmax": 1.0},
                      "background": {"material": "vacuum"}, "shapes": []},
@@ -34,6 +36,8 @@ def box_02():
                             "target_frequency_hz": 250000000.0, "num_modes": 5}},
         "mesh": {"subdivisions": [4, 3, 2]}, "study": {"type": "single"},
         "results": {"save_fields": False, "plots": False}})
+    doc.scale = MM
+    return doc
 
 
 def rectangle_03(physics):

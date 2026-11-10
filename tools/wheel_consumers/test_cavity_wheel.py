@@ -71,38 +71,43 @@ def test_documented_cli_json_npz_contract(saved_cavity, cavity_example):
     assert {p.name for p in output.iterdir()} == {"model.json", "summary.json", "log.txt", "fields.npz"}
     assert Document.load(output / "model.json").data == Document.from_dict(cavity_example).data
     summary = json.loads((output / "summary.json").read_text())
-    metadata = {
-        "field_layout": "cavity3d-edge-v1", "mesh_length_unit": "m", "frequency_unit": "Hz",
-        "eigenvalue_unit": "m^-2", "edge_coefficient_unit": "m^-1/2", "electric_field_unit": "m^-3/2",
-        "normalization": "electric_mass_orthonormal_si", "search": "near_target",
+    text = {
+        "field_layout": "cavity3d-edge-v2", "normalization": "electric_mass_orthonormal_si", "search": "near_target",
         "cluster_completeness": "not_certified", "mode_count_policy": "exact_count_may_split_cluster",
         "edge_orientation": "low_node_index_to_high_node_index", "electric_field_location": "tetrahedron_centroid",
     }
+    field_units = {"node_coordinates": "m", "resonant_frequency": "Hz", "wavenumber_squared": "1/m^2",
+                   "mass_normalized_electric_field_line_integral": "1/m^(1/2)",
+                   "mass_normalized_electric_field": "1/m^(3/2)", "relative_residual": "1"}
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
         for name in arrays.files:
             assert not arrays[name].dtype.hasobject, name
-        for name, value in metadata.items():
+        for name, value in text.items():
             assert summary[name] == arrays[name].item() == value
+        metadata = json.loads(arrays["metadata_json"].item())
+        assert summary["field_units"] == metadata["field_units"] == field_units
+        assert not [name for name in (*summary, *arrays.files) if name.endswith("_unit")]
         assert "neff" not in summary and "neff" not in arrays and "triangles" not in arrays
-        count = summary["requested_modes"]
-        assert count == summary["returned_modes"] == arrays["returned_modes"].item() == 5
-        for name in ("frequencies_hz", "eigenvalues_m2", "relative_residuals"):
+        count = summary["mode_count"]
+        assert count == summary["returned_mode_count"] == metadata["returned_mode_count"] == 5
+        for name in ("resonant_frequency", "wavenumber_squared", "relative_residual"):
             assert arrays[name].shape == (count,)
-            np.testing.assert_array_equal(arrays[name], summary[name])
-        assert arrays["target_frequency_hz"].item() == summary["target_frequency_hz"] == 250e6
-        mesh = Mesh3D(arrays["nodes"], arrays["tetrahedra"])
+            assert summary[name]["unit"] == field_units[name]
+            np.testing.assert_array_equal(arrays[name], summary[name]["values"])
+        assert summary["target_frequency"] == {"value": 250e6, "unit": "Hz"}
+        mesh = Mesh3D(arrays["node_coordinates"], arrays["tetrahedra"])
         space = EdgeSpace3D(mesh)
         np.testing.assert_array_equal(space.edges, arrays["edges"])
         np.testing.assert_array_equal(space.tet_edges, arrays["tet_edges"])
         np.testing.assert_array_equal(space.signs, arrays["edge_signs"])
         np.testing.assert_array_equal(space.boundary_edge_ids(), arrays["pec_edge_ids"])
-        coefficients = arrays["edge_coefficients"]
+        coefficients = arrays["mass_normalized_electric_field_line_integral"]
         assert coefficients.shape == (space.num_edges, count)
-        assert arrays["electric_field"].shape == (count, len(mesh.tets), 3)
+        assert arrays["mass_normalized_electric_field"].shape == (count, len(mesh.tets), 3)
         np.testing.assert_array_equal(coefficients[arrays["pec_edge_ids"]], 0)
         for mode in range(count):
             np.testing.assert_allclose(eval_edge_field_3d(space, coefficients[:, mode]),
-                                       arrays["electric_field"][mode], atol=1e-10)
+                                       arrays["mass_normalized_electric_field"][mode], atol=1e-10)
 
 
 def test_cli_can_omit_raw_fields(tmp_path, cavity_example):
@@ -115,7 +120,7 @@ def test_cli_can_omit_raw_fields(tmp_path, cavity_example):
     assert "fields.npz" not in completed.stdout
     assert {p.name for p in output.iterdir()} == {"model.json", "summary.json", "log.txt"}
     summary = json.loads((output / "summary.json").read_text())
-    assert len(summary["frequencies_hz"]) == summary["returned_modes"] == 5
+    assert len(summary["resonant_frequency"]["values"]) == summary["returned_mode_count"] == 5
     assert summary["normalization"] == "electric_mass_orthonormal_si"
     assert summary["cluster_completeness"] == "not_certified"
     assert summary["mode_count_policy"] == "exact_count_may_split_cluster"

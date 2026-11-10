@@ -476,7 +476,8 @@ class CavityInputs:
     ``box`` is the domain (lengths by ``difference``). ``wall_conductivity`` is None (PEC
     walls), a number or {galerkin wall name: number} in S/m. ``materials`` maps names to
     (relative permittivity, relative permeability) as complex numbers under the kernel's
-    exp(+j omega t); ``background`` is a material name or ``"vacuum"``; ``boxes`` are the
+    exp(+j omega t); ``background`` is a local material name or ``"physmat:vacuum"`` (format 0.2
+    views give ``"vacuum"``, the reserved 0.2 literal); ``boxes`` are the
     shape boxes as ((min, max) per axis in metres from the domain origin, material name).
     ``material_solver`` is True when the complex material cavity solver runs.
     """
@@ -491,7 +492,11 @@ class CavityInputs:
 
 
 def cavity_inputs(doc) -> CavityInputs:
-    """em.cavity3d, validated."""
+    """em.cavity3d, validated: a format 0.3 document through ``cavity.kernel_inputs``; the format
+    0.2 builder below stays until the 0.2 reader is retired."""
+    if getattr(doc, "si", None) is not None:
+        from .cavity import kernel_inputs
+        return kernel_inputs(doc)
     from .cavity import _cavity_boundary, _cavity_materials, _cavity_shapes, uses_material_solver
     _, p = doc.sole_physics()
     material_solver = uses_material_solver(doc)
