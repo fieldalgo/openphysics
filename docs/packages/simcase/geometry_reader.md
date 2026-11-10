@@ -18,7 +18,7 @@ A [format 0.3](document_format.md) document (`"openphysics": "0.3"`) carries
 `Document.load` read such a block with `parse`. The document keeps the block as
 written (`doc.data`); a 2D region component is read through the accessors
 `doc.domain`, `doc.background` and `doc.regions()`, and a homogeneous rectangle
-or a box-only 3D component is compiled with `to_v02` to the flat block its kind
+or a box-only 3D component is compiled with `to_flat` to the flat block its kind
 reads (`doc.geometry_flat`). The mesh comes from the
 [stage 2 engine](geometry_engine.md), which keeps the parsed model
 (`doc.geometry_model`). A block without `version` is one of the flat forms of
@@ -32,7 +32,7 @@ format 0.3. `parse` refuses a document of another format by name (`E-FORMAT` at
   listed in `model.roundings`.
 
 ```python
-from simcase.geometry_document import parse, from_v02, layer_stack
+from simcase.geometry_document import parse, from_flat, layer_stack
 
 model = parse({"openphysics": "0.3", "geometry": {
     "version": 1,
@@ -61,8 +61,8 @@ model.roundings                          # [] : every value was already on the 1
 - **Small features.** A feature smaller than the mesher's relative tolerance
   (3 × 10⁻⁸ of the component's bounding-box diagonal) is refused by name instead
   of vanishing in the mesh. Meshing such multi-scale geometry is not supported.
-- **Flat blocks.** `from_v02` writes a flat `geometry` block (with its
-  `length_unit` and `depth`) as version 1, and `to_v02` compiles a 2D component,
+- **Flat blocks.** `from_flat` writes a flat `geometry` block (with its
+  `length_unit` and `depth`) as version 1, and `to_flat` compiles a 2D component,
   or a box-only 3D component, back to the flat block (without element sizes). A
   trapezoid becomes the polygon of its exact corners.
 - **Layer stacks.** `layer_stack` turns a `layers` feature into the z levels (pm)
@@ -122,7 +122,7 @@ keeping the etch line and selections naming it and the rib walls.
 - Resolve selectors or build the region complex: the
   [stage 2 engine](geometry_engine.md) does that, and it meshes the document.
 - Load cylinders, spheres and `extrude` features into a `Document`: their
-  kinds read the flat compilation, which has no form for them, so `to_v02`
+  kinds read the flat compilation, which has no form for them, so `to_flat`
   refuses them by name. A 2D region component (`path`, merged regions, void,
   `imprint`, `segment` included) stays in the document as written and is read
   through `doc.domain`, `doc.background` and `doc.regions()`; an axisymmetric

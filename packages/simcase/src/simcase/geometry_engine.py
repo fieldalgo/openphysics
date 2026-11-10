@@ -794,8 +794,8 @@ class RegionComplex:
     def summary(self, model: GeometryModel | None = None) -> str:
         """A diagnostic listing of the cells, curves, tags and selections (not a persisted format).
 
-        With the ``model`` the lengths and areas are given in this component's length unit (the
-        document unit of a 0.2 block); without it in picometres."""
+        With the ``model`` the lengths and areas are given in this component's length unit;
+        without it in picometres."""
         comp = model.components.get(self.component) if model is not None else None
         u = (lambda k: float(Fraction(k) / comp.pm_per_unit)) if comp is not None else (lambda k: float(k))
         unit = str(comp.length_unit) if comp is not None else "pm"
@@ -1642,7 +1642,7 @@ def _to_domain(rc: RegionComplex, size: float, unit_pm: Fraction, Circle, Domain
         return coords[v]
 
     check_handoff(rc)
-    rc.notes = [n for n in rc.notes if not n.startswith(("geometry.features: a piece of", "mesh.controls:"))]
+    rc.notes = []                               # the findings of this hand-off only (evaluate leaves none)
     poly: dict[int, list | None] = {}
     circle_objs: dict[tuple, object] = {}
     for k in rc.curves:

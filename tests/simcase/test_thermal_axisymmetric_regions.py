@@ -116,10 +116,10 @@ def test_g4_4_axis_data_and_a_left_side_at_r_zero_are_refused_by_name(physics, m
 
 def test_g4_4_the_waveguide_runner_refuses_an_axisymmetric_component_by_name():
     # the transient region runner takes an axisymmetric component since stage 2f (G7-5 below)
-    from simcase.geometry_document import from_v02
+    from simcase.geometry_document import from_flat
     for xmin in (0.0, 1.0):                           # at r = 0 (an axis tag) and as an annulus (four plain tags)
         em = copy.deepcopy(EXAMPLES["soi_strip"])
-        em["geometry"] = from_v02(em["geometry"])
+        em["geometry"] = from_flat(em["geometry"])
         comp = em["geometry"]["components"]["main"]
         comp["dimension"] = "axisymmetric"
         del comp["depth"]                             # an axisymmetric component has no depth
