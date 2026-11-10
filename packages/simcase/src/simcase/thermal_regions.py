@@ -728,7 +728,7 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     given.notes.extend(n for n in doc.notes if n.startswith(('geometry.', 'mesh.controls:')) and n not in given.notes)
     kwargs = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
-    calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    calculation_json = doc.canonical_json(separators=(',', ':'))
     axisymmetric = is_axisymmetric(doc)
     t0 = time.perf_counter()
     try:
@@ -736,7 +736,7 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
-    if json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False) != calculation_json:
+    if doc.canonical_json(separators=(',', ':')) != calculation_json:
         raise ValueError('thermal calculation inputs changed during the solve')
     fixed = np.array(list(kwargs['dirichlet']), dtype=int)
     G, C = solution.prescribed_outward_load, solution.convective_outward

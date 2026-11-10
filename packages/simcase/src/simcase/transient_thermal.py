@@ -76,7 +76,7 @@ class TransientThermalRunResult:
 
     def _current_document_json(self):
         try:
-            return json.dumps(self.doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+            return self.doc.canonical_json(separators=(',', ':'))
         except (TypeError, ValueError, OverflowError) as exc:
             raise ValueError('transient result document must remain finite JSON') from exc
 
