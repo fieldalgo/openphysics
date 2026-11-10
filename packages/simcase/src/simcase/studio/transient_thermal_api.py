@@ -148,14 +148,14 @@ def reservation(limits):
 
 def capture_result(result, identity, limits, document):
     require(isinstance(result, TransientThermalRunResult), "public transient result required")
-    original = json.dumps(document.data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    original = document.canonical_json(separators=(",", ":"))
     summary = copy.deepcopy(result.summary())
     common.encode_json(summary, limits.metadata_bytes)
     require(isinstance(summary, dict) and summary.get("physics_type") == KIND
             and (summary.get("result_format"), summary.get("field_layout")) == PAIR,
             "unsupported transient summary/result pair")
     # Producer summary validates its own bound snapshot; compare against this job too.
-    require(json.dumps(result.doc.data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    require(result.doc.canonical_json(separators=(",", ":"))
             == original, "public result document does not match accepted snapshot")
     require(summary.get("units") == document["units"] and summary.get("mesh_length_unit") == "m",
             "transient document/SI units mismatch")

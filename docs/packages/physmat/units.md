@@ -7,7 +7,9 @@
 Status: **first step of the OpenPhysics units and naming convention, with the
 registry entries and converter functions the document reader needs.**
 `physmat.units` holds the quantity registry and the one converter from
-human-written units to SI. **Nothing uses it yet:** model documents, `simcase`,
+human-written units to SI. **Only the format 0.3 reader of `simcase` calls it so far**
+([document format 0.3](../simcase/document_format.md)), and no physics kind reads that
+format yet: model documents, the `simcase` runners,
 `galerkin`, `sipi` and Studio keep their current key names and units, and the
 other physmat functions keep their current arguments (wavelengths in micrometres,
 temperatures in kelvin, and Celsius `temperature_c` for the Ciddor air model),
@@ -504,12 +506,12 @@ python -m pytest -q tests/physmat
 
 ## Not done yet
 
-- Documents, `simcase`, `galerkin`, `sipi` and Studio do not call the converter.
-  The slot table, the JSON Schema, the decimal-preserving JSON reader and writer
-  and the generated documentation tables come with the document reader.
-- Value forms other than those above (component objects, ranges, tables, model
-  coefficients, impedances, annotated values with `accept`) and acknowledgement of
-  warnings belong to the document reader.
+- Only the format 0.3 reader of `simcase` calls the converter (with its slot table,
+  decimal-preserving JSON reader and writer, component objects, ranges, model
+  coefficients and annotated values with `accept`;
+  [document format 0.3](../simcase/document_format.md)), and no document kind reads that
+  format yet; `galerkin`, `sipi` and Studio do not call it. The JSON Schema, tables,
+  impedances and the generated documentation tables are not done.
 - Checks that need more than one value (sound speed, Celsius-as-kelvin, mesh
   estimate, ...) and `E-SPECTRAL`, `E-BASIS` are not here.
 - The list of echoed inputs placed in `result` comes from today's result summaries

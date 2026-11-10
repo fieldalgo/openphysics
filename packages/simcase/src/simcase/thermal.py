@@ -371,7 +371,7 @@ class ThermalRunResult:
             self._result_format, self._field_layout = RESULT_FORMAT, FIELD_LAYOUT
 
     def _canonical_document(self):
-        return json.dumps(self.doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return self.doc.canonical_json(separators=(',', ':'))
 
     def _validated_document(self):
         # Compare BEFORE validation: restoring a removed default must not hide an edit.
@@ -583,7 +583,7 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     fixed = np.array(sorted(prescribed), dtype=int)
     t_mesh = time.perf_counter()-t0
     # Capture the calculation before entering the producer, not after it returns.
-    calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    calculation_json = doc.canonical_json(separators=(',', ':'))
     calculation_nodes = np.array(mesh.nodes, copy=True)
     calculation_triangles = np.array(mesh.triangles, copy=True)
     calculation_prescribed = dict(prescribed)
@@ -593,7 +593,7 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
-    if (json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False) != calculation_json
+    if (doc.canonical_json(separators=(',', ':')) != calculation_json
             or not np.array_equal(mesh.nodes, calculation_nodes)
             or not np.array_equal(mesh.triangles, calculation_triangles)
             or prescribed != calculation_prescribed):

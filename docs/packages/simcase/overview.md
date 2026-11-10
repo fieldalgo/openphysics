@@ -21,7 +21,10 @@ python -m simcase geometry model.json                     # the region complex o
 ```
 
 The package and CLI are named `simcase`. The JSON version field remains
-`"openphysics": "0.2"`; it is not an import or distribution name. The separate
+`"openphysics": "0.2"`; it is not an import or distribution name. The reader of the coming
+format `"0.3"` (values with units, registry quantity names, a `length_unit` per geometry
+component, coded diagnostics) is in place, and no physics kind reads that format yet:
+[document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the

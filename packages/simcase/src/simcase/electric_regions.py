@@ -15,7 +15,6 @@ exterior boundary is insulated. A rectangle document keeps the existing path
 """
 
 import copy
-import json
 import time
 
 import numpy as np
@@ -228,14 +227,14 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     given.notes.extend(n for n in doc.notes if n.startswith(('geometry.', 'mesh.controls:')) and n not in given.notes)
     kwargs, fixed_by = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
-    calculation_json = json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    calculation_json = doc.canonical_json(separators=(',', ':'))
     t0 = time.perf_counter()
     try:
         electric = solve_steady_electric(mesh, **kwargs)
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
-    if json.dumps(doc.data, sort_keys=True, separators=(',', ':'), allow_nan=False) != calculation_json:
+    if doc.canonical_json(separators=(',', ':')) != calculation_json:
         raise ValueError('electric calculation inputs changed during the solve')
     arrays, field_units, locations = {}, {}, {}
 

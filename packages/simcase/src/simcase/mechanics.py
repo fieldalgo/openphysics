@@ -204,7 +204,7 @@ class MechanicsRunResult:
     def __init__(self, doc, arrays, metadata, log):
         self.doc = doc.copy()
         self.doc.validate()
-        self._document_json = json.dumps(self.doc.data, sort_keys=True, allow_nan=False)
+        self._document_json = self.doc.canonical_json(separators=(', ', ': '))
         self._arrays = {k: np.array(v, copy=True) for k, v in arrays.items()}
         for key, array in self._arrays.items():
             if array.dtype.kind not in 'iuf' or not np.isfinite(array).all():
@@ -218,7 +218,7 @@ class MechanicsRunResult:
         return {k: a.copy() for k, a in self._arrays.items()}
 
     def summary(self):
-        if json.dumps(self.doc.data, sort_keys=True, allow_nan=False) != self._document_json:
+        if self.doc.canonical_json(separators=(', ', ': ')) != self._document_json:
             raise ValueError('mechanics result document changed after the solve; run again')
         return json.loads(self._metadata_json)
 

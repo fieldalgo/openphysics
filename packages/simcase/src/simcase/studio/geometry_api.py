@@ -13,8 +13,10 @@ names the feature, selection or parameter (a 4xx status would be logged by the
 browser as a console error on every refused edit).
 
 The response is a view for this page, not a persisted format: coordinates are
-doubles in the document's length unit, arcs and circles are sampled for drawing
-only, and ``summary`` is the text ``python -m simcase geometry`` prints.
+doubles in the evaluated component's length unit (the document's for a 0.2 block),
+arcs and circles are sampled for drawing only, and ``summary`` is the text
+``python -m simcase geometry`` prints. A format 0.3 parameter is reported with its
+authored value and its SI value.
 
 Imports from simcase are absolute and limited to ``simcase.__all__``.
 """
@@ -95,14 +97,20 @@ def evaluate_view(doc: dict, component: str | None = None) -> dict:
         # Show the first 2D component rather than refusing a multi-component document.
         component = flat[0] if flat else names[0]
     rc = evaluate_geometry(model, component)
-    scale = float(model.pm_per_unit)
+    comp = model.components[rc.component]
+    scale = float(comp.pm_per_unit)
     point = lambda v: [float(v[0]) / scale, float(v[1]) / scale]        # noqa: E731
     raw = geometry.get("parameters") or {}
     parameters = []
     for name, (value, kind) in model.parameters.items():
         entry = raw.get(name) if isinstance(raw.get(name), dict) else {}
-        parameters.append({"name": name, "kind": kind, "value": float(value),
-                           "written": entry.get("value"), "range": entry.get("range")})
+        item = {"name": name, "kind": kind, "value": float(value), "written": entry.get("value"),
+                "range": entry.get("range")}
+        if getattr(model, "format", "0.2") == "0.3":
+            # a 0.3 parameter is exact pm (length) or a ratio: report its SI value and unit
+            item["value"] = float(Fraction(value) / 10 ** 12) if kind == "length" else float(value)
+            item["unit"] = "m" if kind == "length" else "1"
+        parameters.append(item)
     cells = [{"index": c.index, "region": c.region, "material": _material(c.material), "void": c.void,
               "feature": c.feature, "area": c.area / scale ** 2,
               "loops": [[[i, bool(forward)] for i, forward in loop] for loop in c.loops]} for c in rc.cells]
@@ -119,9 +127,9 @@ def evaluate_view(doc: dict, component: str | None = None) -> dict:
         if k.tag:
             tags.setdefault(k.tag, []).append(k.index)
     return {
-        "unit": str(model.units_length), "components": names, "component": rc.component,
+        "unit": str(comp.length_unit), "components": names, "component": rc.component,
         "dimension": rc.dimension, "parameters": parameters,
-        "domain": {key: float(Fraction(v) / model.pm_per_unit) for key, v in rc.domain.items()},
+        "domain": {key: float(Fraction(v) / comp.pm_per_unit) for key, v in rc.domain.items()},
         "regions": regions, "cells": cells, "curves": curves,
         "selections": [{"name": name, "kind": kind, "entries": sorted(chosen)}
                        for name, (kind, chosen) in rc.selections.items()],

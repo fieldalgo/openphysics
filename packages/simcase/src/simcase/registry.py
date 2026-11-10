@@ -56,6 +56,10 @@ class PhysicsKind:
     #: (``simcase.mesh_limits``); the runner then gets them as ``mesh_limits``.
     #: None for a kind that takes them for no document
     accepts_mesh_limits: Callable[[Any], bool] | None = None
+    #: the slots this kind's format 0.3 documents add to the shared ones (``simcase.slots``):
+    #: data only, one dict per entry. None for a kind that does not read format 0.3 yet,
+    #: whose 0.3 documents are refused with ``E-CONTRACT``
+    slots: tuple[dict, ...] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}
