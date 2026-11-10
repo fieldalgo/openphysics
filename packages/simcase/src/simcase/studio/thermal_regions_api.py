@@ -382,7 +382,7 @@ def capture_steady(result, identity, limits, rlimits, spec):
     _require(pair == (summary.get("result_format"), summary.get("field_layout")),
              "public and summary result/layout pair disagree")
     doc = result.doc
-    _require(_exact_json(doc.data) == _exact_json(spec.run_doc.data),
+    _require(doc.canonical_json() == spec.run_doc.canonical_json(),
              "public result document does not match accepted snapshot")
     keys = common.BASE_FIELDS+common.BOUNDARY_FIELDS
     arrays = {}
@@ -466,7 +466,7 @@ def capture_transient(result, identity, limits, rlimits, spec):
     document = spec.run_doc
     require = transient.require
     require(isinstance(result, TransientThermalRunResult), "public transient result required")
-    original = _exact_json(document.data)
+    original = document.canonical_json()
     summary = copy.deepcopy(result.summary())
     common.encode_json(summary, limits.metadata_bytes)
     pair = (result.result_format, result.field_layout)
@@ -474,7 +474,7 @@ def capture_transient(result, identity, limits, rlimits, spec):
             and pair == TRANSIENT_PAIR
             and (summary.get("result_format"), summary.get("field_layout")) == TRANSIENT_PAIR,
             "unsupported transient region summary/result pair")
-    require(_exact_json(result.doc.data) == original, "public result document does not match accepted snapshot")
+    require(result.doc.canonical_json() == original, "public result document does not match accepted snapshot")
     require(summary.get("units") == document["units"] and summary.get("mesh_length_unit") == "m",
             "transient document/SI units mismatch")
     nt = len(document["study"]["time_s"])

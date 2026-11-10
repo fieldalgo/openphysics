@@ -97,13 +97,20 @@ expects. Times, frequencies and units stay in ``fields.npz`` and
 The ``.pvd`` collection is plain VTK XML written with the standard library.
 """
 
+import json
 import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import numpy as np
 
-__all__ = ["export_fields", "export_time_series", "export_sweep", "SUPPORTED_LAYOUTS"]
+__all__ = ["export_fields", "export_time_series", "export_sweep", "SUPPORTED_LAYOUTS", "RETIRED_LAYOUTS",
+           "inject_field_data", "read_field_data"]
+
+#: layout identifiers of results saved before the units and naming batch, each mapped to the
+#: identifier that replaced it; such a fields.npz is refused by name. Each kind's commit of
+#: the batch moves its identifiers here when it replaces them in SUPPORTED_LAYOUTS.
+RETIRED_LAYOUTS: dict[str, str] = {}
 
 _STEADY = "thermal2d-p1-node-cell-v1"
 _STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v2"
@@ -452,14 +459,58 @@ def _refuse_subspace():
 
 
 def _layout(data):
-    """The saved layout identifier. A file without one cannot be interpreted."""
+    """The saved layout identifier. A file without one cannot be interpreted; a retired one is refused."""
     if "field_layout" not in data:
         raise ValueError(
             "fields.npz has no 'field_layout' array, so its layout cannot be identified. A result saved "
             "before its layout was recorded (em.modes2d results before em-modes2d-p1-node-centroid-v1) must "
             "be regenerated: run its model.json again into a new directory "
             "(python -m simcase run model.json -o <new directory>) and export that fields.npz")
-    return str(data["field_layout"])
+    layout = str(data["field_layout"])
+    if layout in RETIRED_LAYOUTS:
+        raise ValueError(f"saved before the units and naming batch (layout {layout}); re-create the document in "
+                         "format 0.3 and run it")
+    return layout
+
+
+# -- unit metadata in VTU -------------------------------------------------------------------------
+
+def _uint8_array(name: str, value) -> str:
+    data = json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    numbers = " ".join(str(b) for b in data)
+    return (f'<DataArray type="UInt8" Name="{name}" NumberOfTuples="{len(data)}" format="ascii">\n'
+            f"{numbers}\n</DataArray>\n")
+
+
+def inject_field_data(path, units: dict, conventions: dict) -> None:
+    """Insert the unit metadata into a VTU file meshio wrote.
+
+    Adds ``<FieldData>`` as the first child of ``<UnstructuredGrid>`` with two ``UInt8`` arrays
+    in ASCII: ``units``, the UTF-8 bytes of a JSON map of every exported array to its canonical
+    unit, and ``conventions``, the UTF-8 bytes of a JSON object (the time convention of complex
+    arrays and the sign sentences of signed quantities). ``UInt8``, not ``String``: meshio 5.3
+    cannot read a ``String`` array back, and it drops field data when it writes VTU itself.
+    Every other byte of the file stays as written."""
+    path = Path(path)
+    data = path.read_bytes()
+    tag = b"<UnstructuredGrid>"
+    at = data.find(tag)
+    if at < 0 or data.count(tag) != 1 or b"<FieldData" in data:
+        raise ValueError(f"{path}: expected one VTU UnstructuredGrid without FieldData")
+    block = ("\n<FieldData>\n" + _uint8_array("units", units) + _uint8_array("conventions", conventions)
+             + "</FieldData>").encode("utf-8")
+    path.write_bytes(data[:at + len(tag)] + block + data[at + len(tag):])
+
+
+def read_field_data(path) -> dict:
+    """The JSON values of the ``UInt8`` FieldData arrays of a VTU file, read with ``xml.etree``."""
+    root = ET.parse(path).getroot()
+    out = {}
+    for array in root.iter("FieldData"):
+        for item in array:
+            raw = bytes(int(b) for b in (item.text or "").split())
+            out[item.get("Name")] = json.loads(raw.decode("utf-8"))
+    return out
 
 
 def _load(fields_npz):
