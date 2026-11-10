@@ -68,7 +68,7 @@ class SteadyThermoelasticResult:
 def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichlet,
                                  heat_source=0.0, young_modulus, poisson_ratio,
                                  plane, thermal_expansion_per_k, reference_temperature_k,
-                                 mechanical_dirichlet, body_force=(0., 0.)):
+                                 mechanical_dirichlet, body_force=(0., 0.), motion=None):
     """Run existing heat/freeze/mechanics APIs on one isolated SI reference mesh.
 
     units must equal {'length':'m','temperature':'K'}; no conversion/inference.
@@ -77,7 +77,18 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
     over mesh.region_names (piecewise constant; docs/packages/galerkin/multimaterial.md).
     Heat uses Dirichlet + insulation. Mechanics uses component Dirichlet and
     zero total natural traction; body force N/m^3. See the complete EN/KO guide.
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
+    t*velocity, solving the heat stage again on the moving mesh, and every heat
+    and mechanics result carries the derivative with respect to the JAX or
+    PyTorch scalar t (docs/packages/galerkin/shape_derivative.md).
     """
+    if motion is not None:
+        from .shape import solve_steady_thermoelasticity_moving
+        return solve_steady_thermoelasticity_moving(
+            mesh, motion, units=units, conductivity=conductivity, thermal_dirichlet=thermal_dirichlet,
+            heat_source=heat_source, young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
+            thermal_expansion_per_k=thermal_expansion_per_k, reference_temperature_k=reference_temperature_k,
+            mechanical_dirichlet=mechanical_dirichlet, body_force=body_force)
     chain = OneWayChain(_stage_error)
     with chain.stage('input'):
         if not isinstance(units, Mapping) or dict(units) != {'length': 'm', 'temperature': 'K'}:
