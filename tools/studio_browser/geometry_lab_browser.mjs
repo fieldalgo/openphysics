@@ -62,12 +62,12 @@ try {
   // The imprinted rib is loaded: move w with the slider to its upper end, then type 0.4.
   const slider = page.locator('input[aria-label="w slider"]');
   await slider.focus(); await page.keyboard.press('End'); await settled();
-  assert.equal(await page.inputValue('#param-w'), '0.9');
+  assert.equal(await page.inputValue('#param-w'), '0.9 um');
   const wide = await page.textContent('#summary');
   await page.fill('#param-w', '0.4'); await page.press('#param-w', 'Enter'); await settled();
   const narrow = await page.textContent('#summary');
   assert.notEqual(wide, narrow);
-  const edited = structuredClone((await docOf()).geometry_v1_imprint_rib); edited.geometry.parameters.w.value = 0.4;
+  const edited = structuredClone((await docOf()).geometry_v1_imprint_rib); edited.geometry.parameters.w.value = '0.4 um';
   assert.equal(narrow, (await api(edited)).body.summary);
   report.stages.push({edit: 'w = 0.9 by slider, then 0.4 typed', summaryChanged: true});
 
@@ -76,7 +76,7 @@ try {
   const lit = () => page.evaluate(() => [...document.querySelectorAll('#view path.curve.lit')].map(p => Number(p.dataset.curve)));
   const wallsNow = async () => (await api(edited)).body.selections.find(x => x.name === 'rib_walls').entries;
   assert.deepEqual(await lit(), await wallsNow());
-  edited.geometry.parameters.slab.value = 0.15;
+  edited.geometry.parameters.slab.value = '0.15 um';
   await page.fill('#param-slab', '0.15'); await page.press('#param-slab', 'Enter'); await settled();
   assert.deepEqual(await lit(), await wallsNow());
   report.stages.push({highlightFollowsEdit: await lit()});
@@ -88,8 +88,8 @@ try {
   await page.waitForTimeout(800);
   assert.ok(await page.isVisible('#refusal'));
   assert.match(await page.textContent('#refusal'), /too large/);
-  assert.equal(await page.inputValue('#param-slab'), '0.12');
-  edited.geometry.parameters.slab.value = 0.12;
+  assert.equal(await page.inputValue('#param-slab'), '0.12 um');
+  edited.geometry.parameters.slab.value = '0.12 um';
   report.stages.push({localRefusalKept: true});
 
   // A refusal by name: an expression naming an unknown parameter.

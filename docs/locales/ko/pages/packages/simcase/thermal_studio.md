@@ -114,8 +114,10 @@ arrays
 문서 표시 단위 선언입니다. Run identity는 kind/job/result_id와 비음수
 safe-integer counter 두 개입니다. Status는 status/log/error/has_result를
 추가합니다. 요청은 정확히 doc/client_revision/request_seq를 포함하고 UTF-8
-application/json을 사용합니다. 중복키·비유한 JSON·잘못된 envelope·미지원
-physics를 거절합니다. 열 status/result route에는 field/time selector를
+application/json을 사용합니다. 요청 바이트는 문서를 받는 다른 Studio route와
+같이 `simcase.reader`로 읽습니다. 중복키·비유한 JSON(double 범위를 넘는 숫자
+포함)·잘못된 envelope·미지원 physics를 거절하고, 앞에 붙은 UTF-8 BOM은
+받아들이며, 검증 응답은 모든 숫자를 쓴 그대로 둔 문서를 돌려줍니다. 열 status/result route에는 field/time selector를
 허용하지 않습니다. Arrays·summary·identity는 이 단일 계약을 사용합니다.
 
 ## Route 경계와 회복

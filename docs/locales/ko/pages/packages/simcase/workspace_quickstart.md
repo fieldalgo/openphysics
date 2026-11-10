@@ -87,6 +87,9 @@ py -3.12 -m venv "$HOME\op-studio"
   세션이나 이전 세션을 복구하거나, 세션 파일을 엽니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
   안내가 나오면 Run을 다시 누르세요.
+- 입력·세션 파일은 버전 6입니다. 단위·이름 일괄 변경 이전 Studio가 저장한 파일(버전 1–5)은
+  버전을 밝힌 메시지와 함께 거부되고, 그 Studio의 브라우저 초안은 나타나지 않습니다. 설계를
+  다시 넣어 저장하세요.
 
 ## 검증한 플랫폼
 
@@ -95,4 +98,7 @@ py -3.12 -m venv "$HOME\op-studio"
 `openphysics --help`, `openphysics` 명령의 작업 공간 페이지, 4·5단계, **Ctrl+C**, 재시작,
 시작 화면에서의 복구까지 했고 비교가 그대로 돌아왔습니다. **macOS와
 Windows에서는 이 단계를 아직 확인하지 않았습니다.** 이전 Windows 확인 기록은
-[수용 점검표](workspace_acceptance.md)에 있습니다.
+[수용 점검표](workspace_acceptance.md)에 있습니다. 단위·이름 일괄 변경으로 파일 버전과
+capability 확인이 버전 6이 된 뒤 2026-11-10에 Linux에서
+`tools/studio_browser/studio_workspace_browser.mjs`로 설치한 simcase wheel(headless Chrome)에 대해
+4·5단계, 재시작, 복구를 다시 확인했습니다. 위의 `openphysics` 설치로 확인한 것은 아닙니다.

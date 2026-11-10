@@ -13,9 +13,15 @@ From the repository root, in the configured development environment:
 
 ```bash
 node --test tests/simcase/*.cjs
-python -m pytest -q tests/simcase/test_studio_workspace.py
+python -m pytest -q tests/simcase/test_studio_workspace.py tests/simcase/test_studio_units.py
 python tools/check_markdown_links.py
 ```
+
+`test_studio_units.py` reads every Studio example back byte for byte, compares the
+validation diagnostics with `simcase.reader.check` and validates the output of every
+JavaScript document builder (it runs `tests/simcase/studio_document_builders.cjs`, so it
+needs Node.js); `test_studio_security.py` holds the duplicate-key, `NaN` and byte order
+mark cases of the raw request bytes.
 
 Run all `test_studio*.py` modules when changing shared Studio behavior. Follow the
 [development guide](../../development.md) for complete CI and distribution checks.
@@ -36,17 +42,18 @@ coupled physics distinguishable.
 | Choose Optical waveguide; set 600 × 300 nm and Silicon | Geometry and Study agree; no calculation starts during editing. |
 | Enter an out-of-range dimension, then navigate away and back | Invalid draft remains visible; Run is blocked; accepted model is preserved. Correcting it restores readiness. |
 | Generate Mesh; change width to 700 nm | Preview belongs to earlier inputs until explicitly regenerated; no silent solve. |
-| Check inputs, then change the model | Check report identifies its captured input and becomes stale. Run validates a fresh snapshot. |
+| Check inputs, then change the model | Check report identifies its captured input, lists the server's coded diagnostics and becomes stale. Run validates a fresh snapshot. |
 | Run at 600 × 300 nm; name and pin the result | Actual fields and two candidate indices appear with job, input and version provenance. |
 | Run at 700 × 300 nm; Compare A/B | Captured dimensions and material are identifiable. Candidate ranks are explicitly not matched modes. |
 | Add a 3000 × 90 nm silicon slab, draw it earlier than the core, add an air circle and a polygon | The list, drawing and draw order agree; an overlap note names the shape that wins. Out-of-window or crossing values stay as blocked drafts or are refused with the shape unchanged. |
 | Drag the core, move it with arrow keys, drag a rectangle edge; Undo and Redo | Each completed gesture is one undoable edit; Escape cancels a preview. The numeric inspector follows every change. |
-| Run the multi-shape design; generate its mesh; save and reopen the session; open a version-3 input file | Results, history and comparison name the shape summary; field outlines show every shape. Reopened shapes match. The version-3 file opens as one centred rectangle. |
+| Run the multi-shape design; generate its mesh; save and reopen the session; open an input file of version 5 or earlier | Results, history and comparison name the shape summary; field outlines show every shape. Reopened shapes match. The earlier file is refused with a message naming its version, and the current inputs stay. |
 | Choose Steady heat conduction; set 40 × 20 mm, Q = 2e5 W/m³, a convective top; try a negative height, mismatched corner temperatures and a 200 × 100 mesh | Each problem blocks Run with its reason; correcting it restores readiness. |
 | Run the heat study; probe the plot; switch to \|q\|; edit k; Undo; save and reopen the input file | Temperature and flux appear on the result mesh with point values; the edit marks the result as an earlier snapshot; the reopened file restores the plate. |
 | Run at 1600 nm / 40 nm core mesh, then 1400 nm / 25 nm; Compare | Results, history and comparison name each captured wavelength and core mesh. Values outside 1400–1700 nm or 20–60 nm stay as blocked drafts. |
 | Change candidate/component; inspect a point and a line | Both plots use the same physical coordinates. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
 | Save session and selected run; reopen each | Inputs, result count, names, pins, comparison and view state match the file's scope. File origin is shown; opening does not recompute. |
+| Export the run table and a line profile CSV | Every quantity column is headed `name [unit]` and holds SI values (a 1550 nm wavelength is `0.00000155`, a 0.5 µm coordinate `5e-7`). |
 | Wait for Browser recovery saved; reload; Recover last session | Results and view state return as recovered. No solver starts; input Undo starts at the recovered document. |
 | Open an empty session while a completed notebook save is queued | The queued recovery keeps its captured results; the empty session does not erase them. |
 | Open a replacement dialog, then let an in-flight calculation complete | Confirming the stale review preserves the new result and asks for another review. |

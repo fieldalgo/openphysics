@@ -333,4 +333,6 @@ def test_only_engine_refusals_reach_the_page_never_a_traceback(monkeypatch):
     assert response.text == "Internal Server Error"
     assert "Traceback" not in response.text and "AttributeError" not in response.text and ".py" not in response.text
     source = (Path(simcase.__file__).parent / "studio" / "geometry_api.py").read_text(encoding="utf-8")
-    assert source.count("except ") == 1 and "except GeometryError as exc:" in source
+    # the two specific refusals: the engine's, and the reader's for unreadable request bytes (units batch C10)
+    assert source.count("except ") == 2
+    assert "except GeometryError as exc:" in source and "except RequestRefused as exc:" in source

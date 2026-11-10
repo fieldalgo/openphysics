@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Form model for the public thermal.steady2d rectangle: lengths in mm, SI otherwise. The solver
-// document is format 0.3: every value carries its unit. The form keeps the outward heat flux that
-// saved projects store (project version 5); the document takes the inward one, 0 - outward.
+// document is format 0.3: every value carries its unit. The form and saved projects (version 6)
+// keep the inward heat flux under its registry name, as the document does (a positive value heats
+// the plate).
 export const SIDES=Object.freeze(['left','right','bottom','top']);
-export const SIDE_TYPES=Object.freeze({insulated:'Insulated (zero flux)',temperature:'Fixed temperature',flux:'Outward heat flux',convection:'Convection'});
+export const SIDE_TYPES=Object.freeze({insulated:'Insulated (zero flux)',temperature:'Fixed temperature',flux:'Inward heat flux',convection:'Convection'});
 export const DEFAULT_THERMAL=Object.freeze({width:30,height:20,conductivity:12.5,source:0,nx:32,ny:16,
  sides:Object.freeze({left:Object.freeze({type:'temperature',temperature:280}),right:Object.freeze({type:'temperature',temperature:315}),bottom:Object.freeze({type:'insulated'}),top:Object.freeze({type:'insulated'})})});
 const number=(value,name,{min=-Infinity,max=Infinity,positive=false,integer=false}={})=>{
@@ -16,7 +17,7 @@ export function validateSide(raw,side){
  if(!raw||!SIDE_TYPES[raw.type])throw new Error(`Choose a condition for the ${side} side.`);
  if(raw.type==='insulated')return {type:'insulated'};
  if(raw.type==='temperature')return {type:'temperature',temperature:number(raw.temperature,`${side} temperature [K]`,{min:0,max:1e5,positive:true})};
- if(raw.type==='flux')return {type:'flux',flux:number(raw.flux,`${side} outward heat flux [W/m²]`,{min:-1e9,max:1e9})};
+ if(raw.type==='flux')return {type:'flux',inward_heat_flux:number(raw.inward_heat_flux,`${side} inward heat flux [W/m²]`,{min:-1e9,max:1e9})};
  return {type:'convection',h:number(raw.h,`${side} heat transfer coefficient [W/(m²·K)]`,{min:0,max:1e7}),ambient:number(raw.ambient,`${side} ambient temperature [K]`,{min:0,max:1e5,positive:true})};
 }
 // Structural checks plus the public contract's anchor and corner rules; mesh limits come from the server.
@@ -44,7 +45,7 @@ export function heatDocument(raw){
  const flux={},convection={};
  for(const side of SIDES){const c=t.sides[side];
   if(c.type==='temperature')p.prescribed_temperature[side]=q(c.temperature,'K');
-  if(c.type==='flux')flux[side]=q(0-c.flux,'W/m^2');   // inward = 0 - outward (exact)
+  if(c.type==='flux')flux[side]=q(c.inward_heat_flux,'W/m^2');
   if(c.type==='convection')convection[side]={heat_transfer_coefficient:q(c.h,'W/(m^2 K)'),ambient_temperature:q(c.ambient,'K')};
  }
  // Natural-condition keys select the boundary result format, so they appear only when used.
@@ -57,7 +58,7 @@ const fmt=v=>String(Math.round(v*1e6)/1e6);
 export function sideText(c){
  if(c.type==='insulated')return 'insulated';
  if(c.type==='temperature')return `T = ${fmt(c.temperature)} K`;
- if(c.type==='flux')return `outward q = ${fmt(c.flux)} W/m²`;
+ if(c.type==='flux')return `inward q = ${fmt(c.inward_heat_flux)} W/m²`;
  return `h = ${fmt(c.h)} W/(m²·K), T∞ = ${fmt(c.ambient)} K`;
 }
 export function thermalSummary(t){return `${fmt(t.width)} × ${fmt(t.height)} mm · k ${fmt(t.conductivity)} W/(m·K)${t.source?` · Q ${fmt(t.source)} W/m³`:''}`;}
