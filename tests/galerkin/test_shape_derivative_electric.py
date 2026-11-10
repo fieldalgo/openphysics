@@ -302,6 +302,6 @@ def test_review_messages():
     with pytest.raises(ValueError, match="outward_current must map boundary edge tags"):
         solve_steady_electric(m, conductivity=2.0e3, dirichlet={i: 0.0 for i in left},
                               outward_current=[("right", 1.0)], motion=MeshMotion(W, xp.asarray(0.0)))
-    with pytest.raises(ValueError, match="conductivity must be a finite real scalar"):
+    with pytest.raises(ValueError, match="conductivity is a callback; with a motion it must be a finite real scalar"):
         solve_steady_electric(m, conductivity=lambda p: np.ones(len(p)), dirichlet={i: 0.0 for i in left},
                               motion=MeshMotion(W, xp.asarray(0.0)))

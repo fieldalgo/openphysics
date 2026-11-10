@@ -163,10 +163,11 @@ def test_t1_workflow_matches_moved_mesh_central_difference(name, plane, function
 
     value, grad = _gradient(name, lambda t: pick(_workflow_solve(m, W, t, plane), xp))
     # Deviation from the pre-registered h = 1e-4 (HQ record 2026-11-10), for the reaction sum and the moment of
-    # this path only: they sum reactions of about 1e7 N/m that cancel to about 1e3, and the ordinary workflow's
-    # own rounding moves them by about 1.6e-6 between t = 0 and t = 1e-12. At h = 1e-4 that is up to 7e-6 of the
-    # difference quotient. Measured: central differences approach the derivative as h grows (h = 1e-2: 2e-8),
-    # so they are taken there. The reaction sum is also checked exactly by equilibrium (test below).
+    # this path only, in both planes: they sum reactions of about 1e7 N/m to 10 800 N/m and 5400 N, and the
+    # ordinary workflow's own rounding moves them by about 2e-6 between t = 0 and t = 1e-12. At h = 1e-4 that
+    # is up to 4.2e-6 (sum) and 7.0e-6 (moment) of the difference quotient in plane strain (plane stress:
+    # 2.0e-8, 4.5e-7). Measured: central differences approach the derivative as h grows (h = 1e-2: 5e-9 to
+    # 4e-8), so they are taken there. Both are also checked exactly by equilibrium (tests below).
     h = 1e-2 if functional in ("reaction", "moment") else 1e-4
     fd = (float(pick(_workflow_solve(_moved(m, W, h), W, None, plane), np))
           - float(pick(_workflow_solve(_moved(m, W, -h), W, None, plane), np))) / (2 * h)
@@ -186,9 +187,27 @@ def test_t1_workflow_reaction_sum_by_equilibrium(name, plane):
     e1, e2, d1, d2 = p[:, 1] - p[:, 0], p[:, 2] - p[:, 0], w[:, 1] - w[:, 0], w[:, 2] - w[:, 0]
     sign = np.sign(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0])
     d_area = np.sum(sign * 0.5 * (d1[:, 0] * e2[:, 1] + e1[:, 0] * d2[:, 1] - d1[:, 1] * e2[:, 0] - e1[:, 1] * d2[:, 0]))
-    # measured 2026-11-10: 1.2e-10 to 4.5e-10 (the sum cancels reactions about 1e4 times larger); this bound
+    # measured 2026-11-10: 1.2e-10 to 4.5e-10 (the sum cancels reactions about 1e3 times larger); this bound
     # was set after that measurement, as the check itself is not pre-registered
     assert rel(grad, 2.7e4 * d_area) <= 1e-8, (grad, 2.7e4 * d_area)
+
+
+@pytest.mark.parametrize("name", BACKENDS)
+@pytest.mark.parametrize("plane", ["stress", "strain"])
+def test_t1_workflow_moment_by_equilibrium(name, plane):
+    """Extra (review 2026-11-10): the thermal load has no net moment and the clamped side is at x = 0, so the
+    reaction moment about y = 0.2 is f_y * sum(area * x_centroid); its derivative is taken by complex step."""
+    xp = _xp(name)
+    m, W = _plate()
+    _v, grad = _gradient(name, lambda t: _functionals(m, _workflow_solve(m, W, t, plane).mechanics, xp)["moment"]())
+    h = 1e-30
+    p = (m.nodes + 1j * h * W)[m.triangles]
+    e1, e2 = p[:, 1] - p[:, 0], p[:, 2] - p[:, 0]
+    sign = np.sign((e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]).real)
+    first_moment = np.sum(sign * 0.5 * (e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]) * p[:, :, 0].mean(axis=1))
+    exact = -2.7e4 * first_moment.imag / h
+    # measured: 1.1e-10 to 4.3e-10 (review); bound set after the measurement, as for the reaction sum
+    assert rel(grad, exact) <= 1e-8, (grad, exact)
 
 
 # ---------------------------------------------------------------- T2 free thermal expansion
@@ -392,11 +411,11 @@ def test_t8_snapshot_refusals():
         call(t=0.0)
     with pytest.raises(TypeError, match="reference_temperature_k is live"):
         call(reference_temperature_k=xp.asarray(290.0))
-    with pytest.raises(ValueError, match="reference_temperature_k must be a finite nonnegative real scalar"):
+    with pytest.raises(ValueError, match="reference_temperature_k is a callback; with a motion it must be a finite nonnegative"):
         call(reference_temperature_k=lambda: 290.0)
     with pytest.raises(TypeError, match="thermal_expansion_per_k is live"):
         call(thermal_expansion_per_k={"host": xp.asarray(2.3e-5), "core": 1.2e-5})
-    with pytest.raises(ValueError, match="thermal_expansion_per_k must be a finite real scalar"):
+    with pytest.raises(ValueError, match="thermal_expansion_per_k is a callback; with a motion it must be a finite real scalar"):
         call(thermal_expansion_per_k=lambda p: 1e-5)
     with pytest.raises(TypeError, match="young_modulus is live"):
         call(young_modulus=xp.asarray(70e9))
@@ -412,6 +431,12 @@ def test_t8_snapshot_refusals():
         call(traction={"right": lambda p, n: np.zeros((len(p), 2))})
     with pytest.raises(TypeError, match="Dirichlet displacement is live"):
         call(dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)})
+    with pytest.raises(TypeError, match="Dirichlet displacement is a callback; with a motion this slice takes"):
+        call(dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): lambda: 1e-3})
+    with pytest.raises(TypeError, match="thermal_expansion_per_k is a callback; with a motion this slice takes"):
+        call(thermal_expansion_per_k={"host": lambda: 2.3e-5, "core": 1.2e-5})
+    with pytest.raises(ValueError, match="young_modulus is a callback; with a motion it must be"):
+        call(young_modulus=lambda: 70e9)
     with pytest.raises(ValueError, match="stale or mismatched mesh"):
         call(snapshot=freeze_temperature(_moved(m, W, 0.01), _plate_temperature(m)))
     lo, hi = __import__("galerkin.shape", fromlist=["admissible_interval"]).admissible_interval(m, W)
