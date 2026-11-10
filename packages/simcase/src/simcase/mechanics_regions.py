@@ -3,42 +3,45 @@
 """Elasticity and thermoelastic documents on named material regions.
 
 A ``mechanics.elasticity2d`` or ``mechanics.thermoelastic2d`` document whose geometry declares
-regions (a 0.2 ``background``/``shapes`` block or a version 1 region component) takes E, nu and
-alpha from the shared ``materials`` table (``young_modulus_pa``, ``poisson_ratio``,
-``thermal_expansion_per_k``), and the thermoelastic heat stage takes ``conductivity_w_mk`` from
-it as region heat does. Displacement, traction and pressure data name the boundaries region heat
-names: the domain sides, ``boundary_tags`` names, ``outer`` on a void border and exterior
-boundary selections. An interface selection is refused for them: galerkin fixes exterior nodes
-only and a traction needs exterior edges. The mesh, region and heat helpers are those of
-thermal_regions.py; the solve and the result packaging are those of mechanics.py. The rectangle
-documents of mechanics.py are not changed. See docs/packages/simcase/mechanics2d.md.
+regions (flat ``background``/``shapes`` or a version 1 region component) takes
+``youngs_modulus``, ``poisson_ratio`` and ``linear_expansion_coefficient`` from the shared
+``materials`` table, and the thermoelastic heat stage takes ``thermal_conductivity`` from it as
+region heat does. ``prescribed_displacement``, ``traction`` and ``gauge_pressure`` name the
+boundaries region heat names: the domain sides, ``boundary_tags`` names, ``outer`` on a void
+border and exterior boundary selections. An interface selection is refused for them: galerkin
+fixes exterior nodes only and a traction needs exterior edges. The mesh, region and heat
+helpers are those of thermal_regions.py (the format 0.3 hand-off, ``handoff_03``); the solve
+and the result packaging are those of mechanics.py. See docs/packages/simcase/mechanics2d.md.
+
+Format 0.3 (units batch C7): the gauge pressure is handed to galerkin as today's traction
+callback ``-gauge_pressure * outward normal`` (no sign change: today's ``pressure_pa`` is the
+registry's ``gauge_pressure``); the heat stage receives ``0.0 - inward_heat_flux`` (H1) and an
+absent heat source as 0.0 (H8).
 """
-import copy
+import math
 import time
 
 import numpy as np
 
 from . import views
-from .schema import DocumentError, check_format_units_and_tags
-from .thermal import _number
-from .thermal_regions import MATERIAL_KEYS as SHARED_MATERIAL_KEYS
-from .thermal_regions import (SIDES, _sides, boundary_names, build_region_mesh, covered_shapes,
-                              has_region_geometry, is_axisymmetric, region_geometry, region_inputs,
-                              region_materials_table, region_mesh_settings, region_source)
-from .mechanics import COMPONENTS, ELASTIC, PLANES, THERMOELASTIC, TYPES, solve_and_package
+from .schema import DocumentError
+from .thermal_regions import (NAMES_03, SIDES, _refuse, boundary_names, build_region_mesh, component_03,
+                              covered_shapes, default_boundaries_03, depth_03, exterior_sides, handoff_03,
+                              has_region_geometry, mesh_controls_03, mesh_diagnostics_03, region_geometry_03,
+                              region_inputs, region_materials_table_03, region_mesh_settings_03, region_source_03,
+                              sides_03)
+from .mechanics import (COMPONENTS, ELASTIC, THERMOELASTIC, TYPES, GAUGE_PRESSURE_SIGN, MechanicsRunResult,
+                        balance_03, default_traction_free_03, displacement_components_03, entry_03, heat_text_03,
+                        boundary_text_03, result_arrays, single_study_03, solve_03, solved_line, summary_03, vector_03)
 
-RESULT_FORMATS = {ELASTIC: ELASTIC+'-regions-result-v1', THERMOELASTIC: THERMOELASTIC+'-regions-result-v1'}
-FIELD_LAYOUTS = {ELASTIC: 'mechanics2d-p1-regions-v1', THERMOELASTIC: 'thermoelastic2d-p1-regions-v1'}
-#: the material keys each type reads from ``materials`` (thermal_regions.MATERIAL_KEYS holds the union)
-MATERIAL_KEYS = {ELASTIC: ('young_modulus_pa', 'poisson_ratio'),
-                 THERMOELASTIC: ('young_modulus_pa', 'poisson_ratio', 'thermal_expansion_per_k', 'conductivity_w_mk')}
-#: physics keys of the rectangle contract that a region document takes from ``materials``
-FROM_MATERIALS = {'young_modulus_pa': 'young_modulus_pa', 'poisson_ratio': 'poisson_ratio',
-                  'thermal_expansion_per_k': 'thermal_expansion_per_k',
-                  'thermal_conductivity_w_mk': 'conductivity_w_mk', 'conductivity_w_mk': 'conductivity_w_mk'}
-HEAT_KEYS = {'reference_temperature_k', 'heat_source_w_m3', 'dirichlet_temperature_k', 'outward_flux_w_m2',
-             'convection'}
-TOP = {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'}
+RESULT_FORMATS = {ELASTIC: ELASTIC+'-regions-result-v2', THERMOELASTIC: THERMOELASTIC+'-regions-result-v2'}
+FIELD_LAYOUTS = {ELASTIC: 'mechanics2d-p1-regions-v2', THERMOELASTIC: 'thermoelastic2d-p1-regions-v2'}
+#: the material properties each type reads from ``materials``
+MATERIAL_KEYS = {ELASTIC: ('youngs_modulus', 'poisson_ratio'),
+                 THERMOELASTIC: ('youngs_modulus', 'poisson_ratio', 'linear_expansion_coefficient',
+                                 'thermal_conductivity')}
+#: the boundary data of a mechanics entry
+LOAD_KEYS = ('prescribed_displacement', 'traction', 'gauge_pressure')
 
 
 def is_region_mechanics(data):
@@ -46,155 +49,87 @@ def is_region_mechanics(data):
     return any(has_region_geometry(data, kind) for kind in TYPES)
 
 
-def _vector(value, path):
-    if not isinstance(value, list) or len(value) != 2:
-        raise DocumentError(path+': expected [x, y]')
-    for i, v in enumerate(value):
-        _number(v, f'{path}[{i}]')
-    return [float(v) for v in value]
-
-
-def _keys(value, keys, path):
-    """An object whose keys are among ``keys``; an unknown key is refused by name."""
-    if not isinstance(value, dict):
-        raise DocumentError(f'{path}: expected an object')
-    unknown = set(value) - set(keys)
-    if unknown:
-        raise DocumentError(f'{path}: unsupported mechanics keys {sorted(map(str, unknown))}')
-
-
-def _boundary_names(value, allowed, interior, path):
-    """``_keys`` over the boundaries a mechanics entry may name (an unknown name is not a domain
-    side, an exterior tag or an exterior boundary selection); an interface selection is refused
-    by name."""
-    if isinstance(value, dict):
-        for key in value:
-            if key in interior:
-                raise DocumentError(f'{path}.{key}: selection {key!r} lies on an interface between two regions; '
-                                    'displacement, traction and pressure apply to exterior boundaries only')
-    _keys(value, allowed, path)
+def _boundary_names(table, allowed, interior, where):
+    """The boundary names of one mechanics key: an interface selection and an unknown name are
+    refused by name."""
+    for key in table:
+        path = f'{where}.{key}'
+        if key in interior:
+            _refuse(f'{path}: selection {key!r} lies on an interface between two regions; displacement, traction '
+                    'and gauge pressure apply to exterior boundaries only', path)
+        if key not in allowed:
+            _refuse(f'{path}: no side, boundary tag or exterior selection of that name; expected one of '
+                    f'{sorted(allowed)}', path, 'E-SELECTION-UNKNOWN')
 
 
 def validate_region_mechanics(doc):
-    d = doc.data
-    _keys(d, TOP, 'document')
-    if not isinstance(d['name'], str):
-        raise DocumentError('name: expected a string')
-    check_format_units_and_tags(doc)
-    physics = d['physics']
-    if not isinstance(physics, dict) or len(physics) != 1:
-        raise DocumentError('physics: exactly one mechanics entry required')
-    name, p = doc.sole_physics()
-    if not isinstance(name, str) or not name.isidentifier() or not isinstance(p, dict):
-        raise DocumentError('physics: expected identifier and settings object')
-    kind = p.get('type')
-    if kind not in TYPES:
-        raise DocumentError('unsupported mechanics physics')
+    """mechanics.elasticity2d and mechanics.thermoelastic2d on regions, format 0.3."""
+    name, p, path, kind = entry_03(doc)
     thermal = kind == THERMOELASTIC
-    path = 'physics.'+name
-    if thermal:
-        _keys(d.get('units'), {'length', 'temperature'}, 'units')
-        if 'length' not in doc.scale.declared or d['units'].get('temperature') != 'K':
-            raise DocumentError(f'{kind} requires explicit units.length and units.temperature="K"')
-    else:
-        _keys(d.get('units'), {'length'}, 'units')
-        if 'length' not in doc.scale.declared:
-            raise DocumentError(f'{kind} requires explicit units.length')
-    if is_axisymmetric(doc):
-        raise DocumentError(f'component {doc.component.name!r}: {kind} takes 2d components only; an axisymmetric '
-                            'component is a body of revolution, which this plane mechanics does not describe '
-                            '(steady and transient region heat take it)')
-    for key, material_key in FROM_MATERIALS.items():
+    for key in MATERIAL_KEYS[THERMOELASTIC]:
         if key in p:
-            raise DocumentError(f'{path}.{key}: a region document takes {material_key} from materials')
-    keys = {'type', 'plane', 'displacement_m', 'traction_pa', 'pressure_pa', 'body_force_n_m3'}
-    required = {'type', 'plane', 'displacement_m'}
-    if thermal:
-        keys |= HEAT_KEYS
-        required |= {'reference_temperature_k'}
-    _keys(p, keys, path)
-    missing = required - set(p)
-    if missing:
-        raise DocumentError(f'{path}: missing {sorted(missing)}')
-    names = region_geometry(doc, 'mechanics')
-    materials = d['materials']
-    if isinstance(materials, dict):
-        # the shared table's keys, refused here in mechanics words; the shared check follows
-        for mname, spec in materials.items():
-            if isinstance(spec, dict) and 'thermal_conductivity_w_mk' in spec:
-                raise DocumentError(f'materials.{mname}.thermal_conductivity_w_mk: the materials table names thermal '
-                                    'conductivity conductivity_w_mk (the rectangle thermoelastic physics key '
-                                    'thermal_conductivity_w_mk is not a material key)')
-            if isinstance(spec, dict):
-                _keys(spec, SHARED_MATERIAL_KEYS, f'materials.{mname}')
-    region_materials_table(doc, MATERIAL_KEYS[kind], kind)
-    if p['plane'] not in PLANES:
-        raise DocumentError(path+'.plane: expected "stress" or "strain"')
-    _vector(p.get('body_force_n_m3', [0., 0.]), path+'.body_force_n_m3')
-    tags, outside, inside = boundary_names(doc)
+            _refuse(f'{path}.{key}: a region document takes {key} from materials.<m>', f'{path}.{key}')
+    if component_03(doc)[1].get('dimension') == 'axisymmetric':
+        _refuse(f'{kind} takes 2d components only; an axisymmetric component is a body of revolution, which this '
+                'plane mechanics does not describe (steady and transient region heat take it)', 'geometry.components')
+    region_mesh_settings_03(doc)
+    h = handoff_03(doc)
+    names = region_geometry_03(doc, h, 'mechanics')
+    mesh_controls_03(doc, h)
+    region_materials_table_03(doc, h, MATERIAL_KEYS[kind], kind, 'thermal, electrical and mechanical properties')
+    materials = doc.si.get('materials') or {}
+    for mname, spec in materials.items():
+        if 'youngs_modulus' in spec and not spec['youngs_modulus'] > 0:
+            _refuse('youngs_modulus: expected a positive modulus', f'materials.{mname}.youngs_modulus', 'E-DOMAIN')
+    body = p.get('body_force_density')
+    if body is not None:
+        vector_03(body, f'{path}.body_force_density', 'body_force_density')
+    tags, outside, inside = boundary_names(h)
+    sides = exterior_sides(h)[1]
     allowed = set(SIDES) | tags | outside
-    displacement = p['displacement_m']
-    _boundary_names(displacement, allowed, inside, path+'.displacement_m')
-    held = set()
-    for tag, components in displacement.items():
-        where = f'{path}.displacement_m.{tag}'
-        _keys(components, COMPONENTS, where)
-        if not components:
-            raise DocumentError(where+': expected x and/or y')
-        for component, value in components.items():
-            _number(value, where+'.'+component)
-            held.add(component)
+    for key in LOAD_KEYS:
+        _boundary_names(p.get(key, {}), allowed, inside, f'{path}.{key}')
+    displacement = p['prescribed_displacement']
+    displacement_components_03(p, path)
+    held = {c for components in displacement.values() for c in components}
     if held != set(COMPONENTS):
-        raise DocumentError(f'{path}.displacement_m: constraints leave a rigid-body motion free; fix x and y '
-                            'somewhere, and block rotation')
-    traction = p.get('traction_pa', {})
-    _boundary_names(traction, allowed, inside, path+'.traction_pa')
+        _refuse(f'{path}.prescribed_displacement: constraints leave a rigid-body motion free; fix x and y somewhere, '
+                'and block rotation', f'{path}.prescribed_displacement')
+    traction = p.get('traction', {})
     for tag, vector in traction.items():
-        t = _vector(vector, f'{path}.traction_pa.{tag}')
+        t = vector_03(vector, f'{path}.traction.{tag}', 'traction')
         for i, c in enumerate(COMPONENTS):
             if c in displacement.get(tag, {}) and t[i] != 0:
-                raise DocumentError(f'{path}.traction_pa.{tag}: nonzero {c} traction on a boundary whose {c} '
-                                    'displacement is prescribed')
-    pressure = p.get('pressure_pa', {})
-    _boundary_names(pressure, allowed, inside, path+'.pressure_pa')
-    for tag, value in pressure.items():
-        _number(value, f'{path}.pressure_pa.{tag}')
+                _refuse(f'{path}.traction.{tag}: nonzero {c} traction on a boundary whose {c} displacement is '
+                        'prescribed', f'{path}.traction.{tag}')
+    for tag in p.get('gauge_pressure', {}):
         if tag in traction:
-            raise DocumentError(f'{path}.pressure_pa.{tag}: {tag!r} also has a traction; give that boundary one '
-                                'entry')
+            _refuse(f'{path}.gauge_pressure.{tag}: {tag!r} also has a traction; give that boundary one entry',
+                    f'{path}.gauge_pressure.{tag}')
+    default_traction_free_03(doc, name, p, sides)
     if thermal:
-        _number(p['reference_temperature_k'], path+'.reference_temperature_k', nonnegative=True)
-        region_source(p, names, path)
-        _sides(p, name, SIDES, (tags, outside, inside))
-    _keys(d['mesh'], {'size', 'min_angle', 'controls'}, 'mesh')
-    region_mesh_settings(doc)
-    if d['study'] != {'type': 'single'}:
-        raise DocumentError(f'{kind} supports only study {{"type":"single"}}')
-    _keys(d['results'], {'save_fields', 'plots'}, 'results')
-    if not isinstance(d['results'].get('save_fields'), bool) or not isinstance(d['results'].get('plots'), bool):
-        raise DocumentError('results.save_fields and results.plots must be booleans')
-    if d['results']['plots']:
-        raise DocumentError(f'results.plots: {kind} is headless; plots=true is not supported')
-    doc.notes = []
+        region_source_03(p, names, path)
+        sides_03(p, name, sides, (tags, outside, inside))
+        default_boundaries_03(doc, name, p, sides)
+    single_study_03(doc, kind)
 
 
 def region_mechanics_summary(doc):
-    name, p = doc.sole_physics()
-    thermal = p['type'] == THERMOELASTIC
-    lines = [f'{doc["name"]} (openphysics 0.2)',
-             f'  physics {name}: {p["type"]}, headless single static solve, named material regions, plane '
-             f'{p["plane"]}' + (', steady heat then prescribed-temperature mechanics' if thermal else ''),
-             f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
-             f'  background: {doc.background["material"]}']
-    for s in doc.regions():
-        lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"] if s["material"] is not None else "void (hole)"}')
-    for mname, spec in doc['materials'].items():
-        lines.append(f'  material {mname}: ' + ', '.join(f'{k}={spec[k]}' for k in MATERIAL_KEYS[p['type']] if k in spec))
-    lines += [f'  displacement {p["displacement_m"]} m; traction {p.get("traction_pa", {})} Pa; '
-              f'pressure {p.get("pressure_pa", {})} Pa; other exterior traction free',
-              '  SI output: displacement m, strain 1, stress Pa; nodal loads and reactions N/m of depth; '
-              'triangle regions' + ('; temperature K, heat W/m of depth' if thermal else '')]
-    return '\n'.join(lines)
+    from .electric_regions import summary_lines_03
+    name, p, where, kind = entry_03(doc)
+    thermal = kind == THERMOELASTIC
+    out = summary_lines_03(doc, f'{kind}, headless single static solve, named material regions, plane {p["plane"]}'
+                           + (', steady heat then prescribed-temperature mechanics' if thermal else ''), ())
+    body = p.get('body_force_density')
+    from .thermal import _authored
+    out.append(boundary_text_03(doc, where, p) + ('' if body is None else
+                                                  f'; body_force_density {_authored(doc, where + ".body_force_density")}'))
+    if thermal:
+        out.append(heat_text_03(doc, where, p))
+    out += [f'  result: {RESULT_FORMATS[kind]}; layout: {FIELD_LAYOUTS[kind]}',
+            '  output: SI (displacement m, strain 1, stress Pa; nodal forces N/m of depth; triangle regions'
+            + ('; temperature K, heat rates W/m of depth)' if thermal else ')')]
+    return '\n'.join(out)
 
 
 def _edge_set(mesh, tag):
@@ -226,18 +161,18 @@ def rigid_free_regions(mesh, fixed):
 
 def region_mechanics_inputs(doc, mesh, region_materials):
     """The solve_elasticity (or solve_thermoelasticity) keyword arguments of a meshed region document,
-    from its internal SI view (``simcase.views.region_mechanics``).
+    from its internal SI view (``simcase.views.region_mechanics``), under galerkin's keywords.
 
-    E, nu (and alpha) are {region name: value} from ``materials``; Dirichlet DOFs are sorted by
-    (node, component); each traction is a global [tx, ty] in Pa and each pressure p the callback
-    ``-p * outward normal`` on its boundary edges.
+    E, nu (and alpha) are {region name: value} from ``materials``; prescribed DOFs are sorted by
+    (node, component); each traction is a global [tx, ty] in Pa and each gauge pressure p the
+    callback ``-p * outward normal`` on its boundary edges; the loads are sorted by name (H6).
     """
     name, _ = doc.sole_physics()
     path = f'physics.{name}'
     m = views.region_mechanics(doc)
-    for label, table, given in (('displacement_m', mesh.boundary, m.displacement),
-                                ('traction_pa', mesh.boundary_edges, m.traction),
-                                ('pressure_pa', mesh.boundary_edges, m.pressure)):
+    for label, table, given in (('prescribed_displacement', mesh.boundary, m.displacement),
+                                ('traction', mesh.boundary_edges, m.traction),
+                                ('gauge_pressure', mesh.boundary_edges, m.pressure)):
         for tag in given:
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
@@ -248,15 +183,15 @@ def region_mechanics_inputs(doc, mesh, region_materials):
             for node in mesh.boundary[tag]:
                 key = (int(node), COMPONENTS.index(component))
                 if key in fixed and fixed[key] != float(value):
-                    raise DocumentError(f'{path}.displacement_m: {fixed_by[key]!r} and {tag!r} share node {key[0]} '
-                                        f'with different {component} displacements')
+                    raise DocumentError(f'{path}.prescribed_displacement: {fixed_by[key]!r} and {tag!r} share node '
+                                        f'{key[0]} with different {component} displacements')
                 fixed[key], fixed_by[key] = float(value), tag
     fixed = dict(sorted(fixed.items()))
     free = rigid_free_regions(mesh, fixed)
     if free:
-        raise DocumentError(f'{path}.displacement_m: constraints leave a rigid-body motion free in the part of the '
-                            f'body made of regions {free[0]}; each connected part needs x and y fixed and rotation '
-                            'blocked')
+        raise DocumentError(f'{path}.prescribed_displacement: constraints leave a rigid-body motion free in the part '
+                            f'of the body made of regions {free[0]}; each connected part needs x and y fixed and '
+                            'rotation blocked')
     traction = {tag: [float(v) for v in vector] for tag, vector in m.traction.items()}
     pressure = {tag: float(v) for tag, v in m.pressure.items()}
     loaded = sorted(set(traction) | set(pressure))
@@ -264,8 +199,8 @@ def region_mechanics_inputs(doc, mesh, region_materials):
     for i, a in enumerate(loaded):
         for b in loaded[i + 1:]:
             if edges[a] & edges[b]:
-                raise DocumentError(f'{path}: {a!r} and {b!r} share mesh edges and both carry a traction or pressure; '
-                                    'give that boundary one entry')
+                raise DocumentError(f'{path}: {a!r} and {b!r} share mesh edges and both carry a traction or gauge '
+                                    'pressure; give that boundary one entry')
     nodes = np.asarray(mesh.nodes, dtype=float)
     for tag in loaded:
         for a, b in edges[tag]:
@@ -275,7 +210,7 @@ def region_mechanics_inputs(doc, mesh, region_materials):
                 if (a, c) in fixed and (b, c) in fixed and (
                         (tag in traction and traction[tag][c] != 0) or (tag in pressure and pressure[tag] != 0
                                                                        and normal[c])):
-                    raise DocumentError(f'{path}: {"traction_pa" if tag in traction else "pressure_pa"}.{tag} loads '
+                    raise DocumentError(f'{path}: {"traction" if tag in traction else "gauge_pressure"}.{tag} loads '
                                         f'the {COMPONENTS[c]} component of an edge whose {COMPONENTS[c]} displacement '
                                         f'{fixed_by[a, c]!r} prescribes')
     loads = dict(traction)
@@ -292,41 +227,76 @@ def region_mechanics_inputs(doc, mesh, region_materials):
     return inputs
 
 
+def regions_block_03(doc, mesh, region_materials, p, kind):
+    """The region-only summary keys of section 5.3.3: regions, the materials and the loads as SI value
+    objects, the gauge pressure sign and, for thermoelastic documents, the heat-stage echoes."""
+    from .results_common import tagged_array, value_object as vo
+    areas = mesh.areas()
+    regions = np.asarray(mesh.regions)
+    materials = doc.si['materials']
+    out = {'region_names': list(mesh.region_names),
+           'regions': {r: {'material': region_materials[r], 'triangles': int(np.sum(regions == i)),
+                           'area': vo(float(areas[regions == i].sum()), 'area')}
+                       for i, r in enumerate(mesh.region_names)},
+           'materials': {m: {key: vo(v, key) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+                             for key, v in spec.items()} for m, spec in materials.items()},
+           'prescribed_displacement': {tag: {c: vo(v, 'prescribed_displacement') for c, v in components.items()}
+                                       for tag, components in p['prescribed_displacement'].items()},
+           'traction': {tag: tagged_array(v, 'traction') for tag, v in p.get('traction', {}).items()},
+           'gauge_pressure': {tag: vo(v, 'gauge_pressure') for tag, v in p.get('gauge_pressure', {}).items()},
+           'gauge_pressure_sign': GAUGE_PRESSURE_SIGN}
+    if kind == THERMOELASTIC:
+        source = p.get('heat_source_density')
+        if isinstance(source, dict):
+            out['heat_source_density'] = {r: vo(v, 'heat_source_density') for r, v in source.items()}
+        elif source is not None:
+            out['heat_source_density'] = vo(source, 'heat_source_density')
+        out['prescribed_temperature'] = {tag: vo(v, 'prescribed_temperature')
+                                         for tag, v in p.get('prescribed_temperature', {}).items()}
+        out['inward_heat_flux'] = {tag: vo(v, 'inward_heat_flux') for tag, v in p.get('inward_heat_flux', {}).items()}
+        out['convection'] = {tag: {'heat_transfer_coefficient': vo(c['heat_transfer_coefficient'],
+                                                                   'heat_transfer_coefficient'),
+                                   'ambient_temperature': vo(c['ambient_temperature'], 'ambient_temperature')}
+                             for tag, c in p.get('convection', {}).items()}
+    return out
+
+
 def run_region_mechanics(doc, verbose=True, *, mesh_limits=None):
     doc.validate()
     given, doc = doc, doc.copy()
     doc.validate()
-    name, p = doc.sole_physics()
-    kind = p['type']
+    name, p, path, kind = entry_03(doc)
+    thermal = kind == THERMOELASTIC
     start = time.perf_counter()
-    mesh, region_materials, tri = build_region_mesh(doc, mesh_limits)
-    # the hand-off's notes (slivers left out, raised circle counts) reach the caller's document
-    given.notes.extend(n for n in doc.notes if n.startswith(('geometry.', 'mesh.controls:')) and n not in given.notes)
+    h = handoff_03(doc)
+    mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    # the mesher's findings reach the caller's document as coded diagnostics
+    for target in (given, doc):
+        mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     inputs = region_mechanics_inputs(doc, mesh, region_materials)
-    heat_args = region_inputs(doc, mesh, region_materials) if kind == THERMOELASTIC else None
+    heat_args = region_inputs(doc, mesh, region_materials, views.region_heat_03(doc), NAMES_03) if thermal else None
     mesh_time = time.perf_counter() - start
-    areas = mesh.areas()
-    regions = np.asarray(mesh.regions)
-    covered = covered_shapes(doc, mesh)
-    region = dict(
-        triangle_regions=regions.astype(np.int64), result_format=RESULT_FORMATS[kind], field_layout=FIELD_LAYOUTS[kind],
-        metadata=dict(
-            region_names=list(mesh.region_names),
-            regions={r: {'material': region_materials[r], 'triangles': int(np.sum(regions == i)),
-                         'area_m2': float(areas[regions == i].sum())} for i, r in enumerate(mesh.region_names)},
-            materials=copy.deepcopy(doc['materials']),
-            displacement_m=copy.deepcopy(p['displacement_m']), traction_pa=copy.deepcopy(p.get('traction_pa', {})),
-            pressure_pa=copy.deepcopy(p.get('pressure_pa', {})),
-            pressure_sign='traction = -pressure * outward normal; positive pressure pushes on the body',
-            mesh={'nodes': int(mesh.num_nodes), 'triangles': int(mesh.num_triangles), 'size': doc['mesh']['size'],
-                  'min_angle_deg': doc['mesh']['min_angle'], 'achieved_min_angle_deg': float(tri.min_angle()),
-                  'size_unit': doc.length_unit}),
-        summary=region_mechanics_summary(doc),
-        log=[f'mesh: {mesh.num_nodes} nodes, {mesh.num_triangles} triangles, regions {mesh.region_names}',
-             *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else [])])
-    if kind == THERMOELASTIC:
-        region['metadata'].update(heat_source_w_m3=copy.deepcopy(p['heat_source_w_m3']),
-                                  dirichlet_temperature_k=dict(p.get('dirichlet_temperature_k', {})),
-                                  outward_flux_w_m2=copy.deepcopy(p.get('outward_flux_w_m2', {})),
-                                  convection=copy.deepcopy(p.get('convection', {})))
-    return solve_and_package(doc, mesh, inputs, heat_args, mesh_time, verbose, region)
+    start = time.perf_counter()
+    solved, heat, snapshot = solve_03(mesh, inputs, heat_args, thermal, label=f'{path} ({kind})')
+    solve_time = time.perf_counter() - start
+    fixed = inputs['dirichlet']
+    heat_fixed = None if heat_args is None else heat_args['dirichlet']
+    arrays = result_arrays(mesh, solved, fixed, thermal=thermal, regions=np.asarray(mesh.regions).astype(np.int64),
+                           heat=heat, heat_fixed=heat_fixed)
+    balance = balance_03(arrays, solved, mesh, thermal=thermal, heat=heat, heat_fixed=heat_fixed)
+    metadata = summary_03(doc, result_format=RESULT_FORMATS[kind], field_layout=FIELD_LAYOUTS[kind], arrays=arrays,
+                          balance=balance, timings={'mesh': mesh_time, 'solve': solve_time}, mesh=mesh,
+                          depth=depth_03(doc), snapshot=snapshot,
+                          extra=regions_block_03(doc, mesh, region_materials, p, kind),
+                          minimum_angle=math.radians(float(tri.min_angle())))
+    covered = covered_shapes(h, mesh)
+    printed = [doc.summary(), f'mesh: {mesh.num_nodes} nodes, {mesh.num_triangles} triangles, regions '
+                              f'{mesh.region_names}',
+               *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
+               solved_line(mesh, balance, thermal)]
+    if verbose:
+        print('\n'.join(printed))
+    from .thermal import log_lines_03
+    result = MechanicsRunResult(doc, arrays, metadata, log_lines_03(doc, printed))
+    result.region_materials = region_materials
+    return result

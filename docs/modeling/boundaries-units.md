@@ -47,12 +47,17 @@ entering the body, not positive outward flow. Exact equations and callback rules
 - Traction is force per area in global Cartesian directions. It is not a scalar
   pressure or total nodal force. Remaining natural boundaries are traction-free
   under the relevant mechanical contract. Region mechanics documents also take a
-  scalar `pressure_pa` per named boundary: the traction −p n with n the outward
-  normal, so a positive pressure pushes on the body
+  scalar `gauge_pressure` per named boundary, the pressure above the surroundings: the
+  traction −gauge_pressure · n with n the outward normal, so a positive gauge pressure pushes
+  into the body (the 0.2 `pressure_pa`, same sign). An absolute pressure (`bara`, `psia`,
+  `absolute_pressure`) is refused, and 90 to 110 kPa warns that it may be atmospheric
   ([contract](../packages/simcase/mechanics2d.md#material-regions-and-named-boundaries)).
+  Reported support forces (`reaction_force_per_depth`) are the force the constraint exerts on
+  the body.
 - Plane stress and plane strain are different physical approximations, not
-  alternative accuracy settings. Thermal expansion also requires a reference
-  temperature; fixing thermal nodes never automatically fixes mechanical nodes.
+  alternative accuracy settings. Thermal expansion also requires a stress-free
+  temperature (`stress_free_temperature` in documents); fixing thermal nodes never
+  automatically fixes mechanical nodes.
 
 See [electric conduction](../packages/galerkin/electric_steady2d.md),
 [elasticity](../packages/galerkin/elasticity2d.md) and
@@ -68,8 +73,10 @@ See [electric conduction](../packages/galerkin/electric_steady2d.md),
 | Integrated 2D heat/current rate | W/m, A/m | Yes, to obtain W or A |
 | Mechanical reaction, elastic energy | N/m, J/m | Yes, to obtain N or J |
 
-Document geometry and mesh sizes use the declared length unit. SI-suffixed
-properties keep their indicated units. Meshers have no automatic physical unit
+In a document the bare shape numbers follow the geometry's `length_unit`; every other value
+carries its own unit (mesh sizes included, such as `"0.5 mm"`). A geometry `depth` of `null`
+keeps the per-depth values (W/m, N/m, J/m); a length such as `"10 mm"` (for plane stress, the
+plate thickness) adds the totals (W, N, J) beside them. Meshers have no automatic physical unit
 conversion; the thermal/mechanical Python engine expects metres. Optical APIs
 have their own wavelength/length contracts; do not apply the SI-engine rule to
 every package indiscriminately. Convert Celsius to kelvin before supplying a
