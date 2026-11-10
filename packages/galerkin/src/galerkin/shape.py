@@ -16,8 +16,9 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
   returns the temperature, flux, loads and reactions with their derivative with
   respect to t.
 
-The first slice covers steady Cartesian heat with scalar or region data; the
-refusals are listed in docs/packages/galerkin/shape_derivative.md.
+``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian) and
+``electric.solve_steady_electric`` with scalar or region data; the refusals are
+listed in docs/packages/galerkin/shape_derivative.md.
 """
 
 from __future__ import annotations
@@ -195,6 +196,74 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, di
     flux = -lift(xp, k)[:, None] * xp.stack([grad_x, grad_y], axis=1)
     return thermal.SteadyHeatResult(temperature, flux, load, reaction, residual, G, B, convective, rhs,
                                     "cartesian", base.nodal_heat_rate_unit)
+
+
+# ----------------------------------------------------------------------------- steady electric
+
+def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, dirichlet, outward_current=None,
+                                 reference_potential=None):
+    """``electric.solve_steady_electric`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    As for heat: the ordinary solve on the moved mesh gives the numbers and all checks,
+    and one live solve of the system assembled from the live coordinates attaches the
+    derivative to every result field."""
+    from . import electric
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    if type(conductivity).__name__ == "ElementConductivity":
+        raise TypeError("motion: conductivity is an ElementConductivity; give a scalar or a region table")
+    _numpy_data(conductivity, "conductivity")
+    for tag, value in (outward_current or {}).items():
+        _numpy_data(value, f"outward_current[{tag!r}]")
+    for name, table in (("dirichlet", dirichlet), ("reference_potential", reference_potential or {})):
+        if not isinstance(table, Mapping):
+            raise ValueError(f"{name} must map node indices to scalar volts")
+        for value in table.values():
+            _numpy_data(value, name)
+    t0 = float(to_numpy(t))
+    if not math.isfinite(t0):
+        raise ValueError(f"motion: t must be finite, got {t0!r}")
+    lo, hi = admissible_interval(mesh, W)
+    if not lo < t0 < hi:
+        raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
+                               f"({lo:g}, {hi:g}))")
+    moved = _moved_mesh(mesh, W, t0)
+    base = electric.solve_steady_electric(moved, conductivity=conductivity, dirichlet=dirichlet,
+                                          outward_current=outward_current, reference_potential=reference_potential)
+    n = mesh.num_nodes
+    X = lift(xp, mesh.nodes) + t * lift(xp, W)
+    tris = mesh.triangles
+    b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
+    sigma = lift(xp, _per_triangle(mesh, conductivity, "conductivity", positive=True))
+    element = sigma[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
+        / (4.0 * area)[:, None, None]
+    K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
+                  xp.reshape(element, (-1,)), (n, n))
+    outward = xp.zeros(n, dtype=xp.float64)
+    for tag, g in (outward_current or {}).items():
+        edges, length = _boundary_edges(xp, mesh, X, tag)
+        outward = scatter_add(xp, n, edges.ravel(), xp.reshape((float(g) * length / 2.0)[:, None]
+                                                                * xp.ones((1, 2), dtype=xp.float64), (-1,)),
+                              base=outward)
+    V0 = lift(xp, np.asarray(base.potential))
+    fixed = {(int(node),): 0.0 for node in (*dirichlet, *(reference_potential or {}))}
+    delta = core_solve.solve_dirichlet(K, -outward - K.matvec(V0), fixed)
+    potential = V0 + delta
+    residual = K.matvec(potential) + outward
+    prescribed = np.array(sorted(int(i) for i in dirichlet), dtype=int)
+    reaction = scatter_add(xp, n, prescribed, residual[prescribed])
+    gx = xp.sum(b * potential[tris], axis=1) / (2.0 * area)
+    gy = xp.sum(c * potential[tris], axis=1) / (2.0 * area)
+    field = -xp.stack([gx, gy], axis=1)
+    current = sigma[:, None] * field
+    heat = xp.sum(current * field, axis=1)
+    load = scatter_add(xp, n, tris.ravel(), xp.reshape((heat * area / 3.0)[:, None]
+                                                       * xp.ones((1, 3), dtype=xp.float64), (-1,)))
+    power = xp.sum(area * heat)
+    supplied = xp.sum(potential * (reaction - outward))
+    return electric.SteadyElectricResult(base.mesh, potential, field, current, sigma, heat, load, power, reaction,
+                                         outward, residual, supplied)
 
 
 # ----------------------------------------------------------------------------- helpers
