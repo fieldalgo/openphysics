@@ -23,7 +23,7 @@ python -m simcase run strip.json -o strip_results
 
 `strip.json`은 실리카 안의 500 × 220 nm 실리콘 코어를 1.40–1.70 µm의 일곱 파장에서
 전체 벡터 모드로 풀도록 기술합니다. 실행하면 파장마다 두 모드의 n_eff를 출력하고
-(예: `physics.em1.wavelength = 1.55 um: n_eff = 2.444060, 1.771237`)
+(예: `vacuum_wavelength 1.55 um: n_eff = 2.444060, 1.771237`)
 `strip_results/`를 씁니다(7단계). 첫 모드는 TE 계열(전기장이 주로 x 방향),
 둘째는 TM 계열 모드입니다.
 
@@ -38,7 +38,7 @@ from simcase import Document, examples, run
 
 def solve(doc):
     result = run(Document.from_dict(doc), verbose=False)
-    return result.neff[0]
+    return result.effective_index[0]
 
 strip = copy.deepcopy(examples.SOI_STRIP)
 strip["study"] = {"type": "single"}
@@ -49,8 +49,9 @@ print(" ".join(f"{n:.4f}" for n in solve(strip)))
 2.4441 1.7712
 ```
 
-길이는 선언한 단위, 여기서는 `"units": {"length": "um"}`를 따릅니다. 사각형을 바꿔
-코어 폭을 450 nm로 만듭니다(`x`는 왼쪽 끝, `y`는 아래쪽 끝).
+형상 숫자는 형상의 `length_unit`, 여기서는 `"um"`을 따르고, 그 밖의 모든 길이는 자기 단위를
+함께 씁니다(`"0.02 um"`, `"1550 nm"`). 사각형을 바꿔 코어 폭을 450 nm로 만듭니다(`x`는 왼쪽 끝,
+`y`는 아래쪽 끝).
 
 ```python
 narrow = copy.deepcopy(strip)
@@ -72,11 +73,11 @@ print(" ".join(f"{n:.4f}" for n in solve(narrow)))
 rib = copy.deepcopy(strip)
 rib["geometry"]["shapes"] = [
     {"name": "slab", "type": "rect", "x": -1.5, "y": 0.0, "w": 3.0, "h": 0.09,
-     "material": "Si", "mesh_size": 0.02},
+     "material": "physmat:Si", "element_size": "0.02 um"},
     {"name": "rib", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22,
-     "material": "Si", "mesh_size": 0.02},
+     "material": "physmat:Si", "element_size": "0.02 um"},
 ]
-rib["physics"]["em1"]["num_modes"] = 1
+rib["physics"]["em1"]["mode_count"] = 1
 print(f"{solve(rib)[0]:.4f}")
 ```
 
@@ -90,7 +91,7 @@ print(f"{solve(rib)[0]:.4f}")
 ```python
 sloped = copy.deepcopy(strip)
 sloped["geometry"]["shapes"][0] = {
-    "name": "core", "type": "polygon", "material": "Si", "mesh_size": 0.02,
+    "name": "core", "type": "polygon", "material": "physmat:Si", "element_size": "0.02 um",
     "points": [[-0.25, 0.0], [0.25, 0.0], [0.22, 0.22], [-0.22, 0.22]],
 }
 print(" ".join(f"{n:.4f}" for n in solve(sloped)))
@@ -102,11 +103,10 @@ print(" ".join(f"{n:.4f}" for n in solve(sloped)))
 
 ## 4. 재료
 
-재료 이름은 먼저 문서 자체의 `materials` 표에서, 그다음 내장 재료 19종에서
-찾습니다. 내장 재료에는 `Si`, `SiO2`, `Si3N4`, `LiNbO3`, `vacuum` 등이 있습니다.
-내장 재료는 분산을 담고 있어 sweep의 각 파장이 자기 굴절률을 씁니다. 내 재료는
-상수 굴절률이나 Sellmeier 계수로 줍니다. Sellmeier `C` 값의 단위는 문서 길이
-단위의 제곱입니다.
+라이브러리 재료는 `"physmat:Si"`처럼 physmat의 정확한 이름으로 씁니다. 내장 재료는 19종이며
+`Si`, `SiO2`, `Si3N4`, `LiNbO3`, `vacuum` 등이 있습니다. 내장 재료는 분산을 담고 있어 sweep의
+각 파장이 자기 굴절률을 씁니다. 접두어 없는 이름은 문서 자체의 `materials` 표의 재료이며,
+`refractive_index`를 상수나 Sellmeier 모델로 줍니다. 공명 파장은 단위를 함께 씁니다.
 
 ```python
 import physmat
@@ -114,13 +114,16 @@ import physmat
 print(len(physmat.names()), "built-in materials")
 nitride = copy.deepcopy(strip)
 nitride["materials"] = {
-    "my_sin": {"n": 2.0},
-    "my_glass": {"sellmeier": {"B": [0.6961663, 0.4079426, 0.8974794],
-                               "C": [0.0684043**2, 0.1162414**2, 9.896161**2]}},
+    "my_sin": {"refractive_index": 2.0},
+    "my_glass": {"refractive_index": {
+        "model": "sellmeier", "reference_medium": "vacuum",
+        "terms": [{"strength": 0.6961663, "resonance_wavelength": "0.0684043 um"},
+                  {"strength": 0.4079426, "resonance_wavelength": "0.1162414 um"},
+                  {"strength": 0.8974794, "resonance_wavelength": "9.896161 um"}]}},
 }
 nitride["geometry"]["background"]["material"] = "my_glass"
 nitride["geometry"]["shapes"][0].update(material="my_sin", x=-0.6, w=1.2, h=0.4)
-nitride["physics"]["em1"].update(n_cladding=1.45, num_modes=1)
+nitride["physics"]["em1"].update(effective_index_threshold=1.45, mode_count=1)
 print(f"{solve(nitride)[0]:.4f}")
 ```
 
@@ -130,8 +133,8 @@ print(f"{solve(nitride)[0]:.4f}")
 ```
 
 두 정식화 모두 수동 흡수 재료를 받습니다. [흡수 모드](lossy_modes.md)의 n+ik 예제,
-복소 굴절률·양의 dB/cm 손실과 exp(+i omega t-i beta z) 규약을 참고하세요.
-금속은 명시적 `n_target`이 필요하며 표면 플라즈몬에는 full-vector를 사용합니다. `physmat`이 읽을 수 있는
+복소 굴절률, exp(−iωt) 규약에서의 양의 dB/m 손실(Im n_eff > 0이 감쇠)을 참고하세요.
+금속은 명시적 `target_effective_index`가 필요하며 표면 플라즈몬에는 full-vector를 사용합니다. `physmat`이 읽을 수 있는
 refractiveindex.info 데이터베이스는 문서에서 쓸 수 없습니다.
 
 ## 5. 창과 메시 점검
@@ -150,11 +153,11 @@ def wider_window(doc):
     doc["geometry"]["domain"] = {"xmin": -3.0, "xmax": 3.0, "ymin": -2.4, "ymax": 2.4}
 
 def finer_core(doc):
-    doc["geometry"]["shapes"][0]["mesh_size"] = 0.01
+    doc["geometry"]["shapes"][0]["element_size"] = "0.01 um"
 
 def finer_outside(doc):
-    doc["mesh"]["size"] = 0.125
-    doc["mesh"]["grading"].update(near=0.01, far=0.08)
+    doc["mesh"]["element_size"] = "0.125 um"
+    doc["mesh"]["grading"].update(near="0.01 um", far="0.08 um")
 
 def finer_both(doc):
     finer_core(doc)
@@ -177,7 +180,7 @@ both /2       2.44634
 
 이 strip에서 창은 충분히 큽니다(3e-4). 하지만 제공 메시는 n_eff가 적어도 2e-3 낮고
 (둘 다 세분화해도 n_eff가 아직 오름), 그 오차 대부분은 코어 바깥에 있습니다. 형상의
-`mesh_size`는 그 형상 안의 요소 크기를, `mesh.size`와 `mesh.grading`은 형상 주변의
+`element_size`는 그 형상 안의 요소 크기를, `mesh.element_size`와 `mesh.grading`은 형상 주변의
 요소 크기를 정하는데, 모서리 근처에서는 장이 여전히 빠르게 변합니다. 필요한
 정밀도에서 n_eff가 더 바뀌지 않을 때까지 둘을 함께 세분화하세요. 장이 창
 가장자리에 닿으면 창을 키워야 합니다. 이 두 점검은 새 형상마다 직접 해야 합니다.
@@ -185,31 +188,31 @@ both /2       2.44634
 ## 6. rib 함정: slab 모드
 
 rib의 slab은 자체 모드를 안내하며, 창 가장자리가 전기 벽이면 이 모드가 추가 해로
-나타납니다. `n_cladding`은 n_eff 탐색의 하한이고, strip 예제의 1.45는 이 모드들을
+나타납니다. `effective_index_threshold`는 n_eff 탐색의 하한이고, strip 예제의 1.45는 이 모드들을
 들여보냅니다. rib에 모드 넷을 요청하고 창을 넓혀 보세요.
 
 ```python
-def rib_modes(half_width, n_cladding=1.45, modes=4):
+def rib_modes(half_width, threshold=1.45, modes=4):
     doc = copy.deepcopy(rib)
     doc["geometry"]["domain"].update(xmin=-half_width, xmax=half_width)
     doc["geometry"]["shapes"][0].update(x=-half_width, w=2 * half_width)
-    doc["physics"]["em1"].update(num_modes=modes, n_cladding=n_cladding)
+    doc["physics"]["em1"].update(mode_count=modes, effective_index_threshold=threshold)
     return " ".join(f"{n:.4f}" for n in solve(doc))
 
 print("half width 1.5:", rib_modes(1.5))
 print("half width 3.0:", rib_modes(3.0))
-print("n_cladding 2.2:", rib_modes(1.5, n_cladding=2.2))
+print("threshold 2.2: ", rib_modes(1.5, threshold=2.2))
 ```
 
 ```text
 half width 1.5: 2.5669 2.1157 2.0798 2.0422
 half width 3.0: 2.5668 2.1124 2.0952 2.0904
-n_cladding 2.2: 2.5669
+threshold 2.2:  2.5669
 ```
 
 rib 모드 2.5669는 창이 바뀌어도 거의 움직이지 않습니다. 나머지는 90 nm 맨 slab의
 TE 모드(n_eff 2.104) 근처에 있고 창 폭에 따라 바뀝니다. 내 rib의 모드가 아니라 벽
-사이를 오가는 slab 모드입니다. `n_cladding`을 slab 자체의 n_eff보다 높이면
+사이를 오가는 slab 모드입니다. `effective_index_threshold`를 slab 자체의 n_eff보다 높이면
 제외됩니다. 2.2로 같은 네 모드를 요청하면 rib 모드만 돌아오고, 로그에 더 적게
 찾았다고 남습니다. rib에서는 장도 보세요. slab 모드는 slab 전체로 퍼집니다.
 
@@ -220,8 +223,8 @@ TE 모드(n_eff 2.104) 근처에 있고 창 폭에 따라 바뀝니다. 내 rib�
 
 ```python
 result = run(Document.from_dict(examples.SOI_STRIP), verbose=False)
-i = result.values.index(1.55)
-print(f"n_eff {result.neff[i, 0]:.4f}  n_g {result.group_index()[i, 0]:.4f}")
+i = list(result.vacuum_wavelength).index(1.55e-6)    # metres
+print(f"n_eff {result.effective_index[i, 0]:.4f}  n_g {result.group_index()[i, 0]:.4f}")
 ```
 
 ```text
@@ -236,8 +239,8 @@ n_eff 2.4441  n_g 4.1923
 
 | 파일 | 내용 |
 |---|---|
-| `summary.json` | study 지점·모드별 n_eff, 군굴절률, 선언 단위, 저장 배치 `field_layout`과 `mesh_length_unit`·`length_unit_to_m`, 메시 통계, 시간, 모드 추적, `mode_postprocessing`(전력·구속·중첩과 단위) |
-| `fields.npz` | 메시 절점·삼각형(문서 단위), 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez), 그리고 `mode_power`·`confinement`·`field_overlap`. `numpy.load(..., allow_pickle=False)`로 읽음 |
+| `summary.json` | 단위를 붙인 SI 값: study 지점·모드별 진공 파장과 `effective_index`, `group_index`, 저장 배치 `field_layout`, 메시 통계, 시간, 모드 추적, 진단, `defaults_applied`, `mode_postprocessing`(전력·구속·중첩과 단위) |
+| `fields.npz` | `node_coordinates`(m)와 삼각형, 원시 벡터장 계수, 삼각형 중심의 전기장(Ex, Ey, Ez), 그리고 `unnormalized_mode_power`·`confinement_factor`·`unnormalized_field_overlap`. `numpy.load(..., allow_pickle=False)`로 읽음 |
 | `results.png` | 메시, 첫 모드의 \|E\|, sweep |
 | `log.txt`, `model.json` | 실행 로그와 실행한 문서 그대로 |
 
@@ -246,11 +249,12 @@ n_eff 2.4441  n_g 4.1923
 
 ### 모드 후처리
 
-`fields.npz`의 `confinement[p, m]`은 `region_names`의 영역마다 모드 에너지(`Re eps_r |E|^2`)의
-비율을 담으므로 스트립의 코어 구속률은 `core` 항목이며 행의 합은 1입니다. `mode_power[p, m]`은
-저장 진폭을 문서 단위당 볼트로 읽을 때 장이 전달하는 전력이고(장을 `sqrt(Re mode_power)`로 나누면
-1 W 모드), `field_overlap`은 행렬 `int conj(E_a) . E_b dA`입니다. JSON에
-`"results": {"mode_overlap": {"gaussian": {"waist": 0.3, "center": [0.0, 0.11]}}}`(문서 단위)를
+`fields.npz`의 `confinement_factor[p, m]`은 `region_names`의 영역마다 모드 에너지(`Re eps_r |E|^2`)의
+비율을 담으므로 스트립의 코어 구속률은 `core` 항목이며 행의 합은 1입니다.
+`unnormalized_mode_power[p, m]`은 저장 진폭을 V/m로 읽을 때 장이 전달하는 전력(와트)이고(장을
+`sqrt(Re unnormalized_mode_power)`로 나누면 1 W 모드), `unnormalized_field_overlap`은 m^2 단위의 행렬
+`int conj(E_a) . E_b dA`입니다. JSON에
+`"results": {"mode_overlap": {"gaussian": {"beam_waist_radius": "0.3 um", "position": ["0 um", "0.11 um"]}}}`를
 추가하면 그 1/e 반지름의 x 편광 Gaussian 빔이 각 모드에 결합하는 비율 `coupling_efficiency`도
 저장됩니다. 정확한 절차와 단위는 [패키지 개요](overview.md#모드-후처리)에 있습니다.
 
@@ -262,9 +266,9 @@ from simcase.export import export_sweep
 export_sweep("strip_results/fields.npz", "strip_results/paraview")
 ```
 
-컬렉션의 timestep은 문서 단위의 파장이고 점은 미터이며, 각 VTU에는
-`electric_field_mode_0_real`/`_imag`(요소중심 셀 데이터), `longitudinal_electric_mode_0_real`/
-`_imag`(점 데이터), `triangle_regions`가 들어갑니다. 단일 지점 결과는 `export_fields`로
+컬렉션의 timestep은 미터 단위의 진공 파장이고 점은 미터이며, 각 VTU에는
+`unnormalized_electric_field_mode_0_real`/`_imag`(요소중심 셀 데이터),
+`unnormalized_electric_field_z_mode_0_real`/`_imag`(점 데이터), `regions`가 들어갑니다. 단일 지점 결과는 `export_fields`로
 내보냅니다. [ParaView로 보기](overview.md#paraview로-보기)를 참고하세요.
 
 ## 8. Studio에서 같은 모델
@@ -289,7 +293,7 @@ Studio는 이 strip 예제로 열립니다. 내 JSON 파일을 열고, 형상·�
   굽힘·누설 손실은 계산하지 않습니다.
 - 곧은 도파관만: 굽힘도, 도파관을 따른 전파도 없습니다.
 - 창·메시 수렴 자동 점검이 없습니다. 5단계를 직접 하세요.
-- `n_cladding`은 직접 고르는 탐색 경계이며, 솔버가 모든 유도 모드를 찾았음을
+- `effective_index_threshold`는 직접 고르는 탐색 경계이며, 솔버가 모든 유도 모드를 찾았음을
   증명하지 않습니다.
 - 스칼라 정식화(`"formulation": "scalar"`)는 고대비 코어에 근사입니다. 이 strip에서
   2.444 대신 2.611입니다.

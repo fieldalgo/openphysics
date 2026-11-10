@@ -1,8 +1,12 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
+// /api/mesh gives node coordinates in metres (field_units); the page draws in micrometres
+// (display only): the metre coordinates times 1e6.
 export function readMesh(data){
- if(data?.units?.length!=='um')throw new Error('Mesh coordinates must be in micrometres.');
- const {nodes,triangles,regions,region_names:names,stats}=data;
+ if(data?.field_units?.node_coordinates!=='m'||'units' in (data??{}))throw new Error('Mesh coordinates must be in metres.');
+ const {node_coordinates:coordinates,triangles,regions,region_names:names,stats}=data;
+ if(!Array.isArray(coordinates)||!coordinates.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))throw new Error('Invalid mesh coordinates.');
+ const nodes=coordinates.map(p=>p.map(v=>v*1e6));
  if(!Array.isArray(nodes)||nodes.length<3||nodes.length>250000||!nodes.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))throw new Error('Invalid mesh coordinates.');
  if(!Array.isArray(triangles)||!triangles.length||triangles.length>500000||!triangles.every(t=>Array.isArray(t)&&t.length===3&&new Set(t).size===3&&t.every(i=>Number.isInteger(i)&&i>=0&&i<nodes.length)))throw new Error('Invalid mesh triangles.');
  if(!Array.isArray(names)||!names.length||names.length>512||!names.every(n=>typeof n==='string'&&n.length>0&&n.length<=80)||new Set(names).size!==names.length)throw new Error('Invalid mesh regions.');

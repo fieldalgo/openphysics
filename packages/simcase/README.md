@@ -19,8 +19,12 @@ python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
 ```
 
-The package and CLI are named `simcase`. The JSON version field remains
-`"openphysics": "0.2"`; it is not an import or distribution name. The separate
+The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
+`"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
+quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat,
+electric conduction and Joule heating, mechanics and waveguide modes (`em.modes2d`), which no
+longer read format 0.2; `em.cavity3d` still reads format 0.2 until its commit of the units batch:
+[document format 0.3](../../docs/packages/simcase/document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -30,9 +34,10 @@ checkout; an individual sdist does not contain sibling packages or the repositor
 root. When installing downloaded artifacts, pass their paths to pip together with
 local artifacts for the sibling dependencies.
 
-`model_results/` contains `summary.json` (declared units, n_eff per study point, group index,
-mesh statistics, timings), `fields.npz` (mesh and mode fields), `results.png`
-(mesh, mode, sweep), `log.txt`, and a copy of the document.
+`model_results/` contains `summary.json` (SI values with their units: the vacuum wavelength
+and effective index per study point, group index, mesh statistics, timings, diagnostics),
+`fields.npz` (node coordinates in metres and mode fields), `results.png` (mesh, mode, sweep),
+`log.txt`, and the document as written (`model.json`).
 
 ## Supported documents
 
@@ -68,55 +73,62 @@ For complex indices, attenuation units and selection, see [absorbing modes](../.
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "SOI strip waveguide 500 x 220 nm",
-  "units": {"length": "um"},
   "geometry": {
+    "length_unit": "um", "depth": null,
     "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
-    "background": {"material": "SiO2"},
+    "background": {"material": "physmat:SiO2"},
     "shapes": [
-      {"name": "core", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22, "material": "Si", "mesh_size": 0.02}
+      {"name": "core", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22, "material": "physmat:Si",
+       "element_size": "0.02 um"}
     ]
   },
-  "materials": {"myglass": {"n": 1.5}},
+  "materials": {"myglass": {"refractive_index": 1.5}},
   "physics": {
-    "em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55, "num_modes": 2,
-            "n_cladding": 1.45,
+    "em1": {"type": "em.modes2d", "formulation": "vector", "vacuum_wavelength": "1.55 um", "mode_count": 2,
+            "effective_index_threshold": 1.45,
             "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}}
   },
-  "mesh": {"size": 0.25, "grading": {"center": [0.0, 0.11], "near": 0.02, "far": 0.16, "distance": 1.0}},
-  "study": {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}
+  "mesh": {"element_size": "0.25 um",
+           "grading": {"position": ["0 um", "0.11 um"], "near": "0.02 um", "far": "0.16 um",
+                       "refinement_distance": "1 um"}},
+  "study": {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
+            "values": {"unit": "um", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}}
 }
 ```
 
-`units` declares one symbol per SI base dimension the physics needs; every
-number in the document is then a bare number in that system, and a dimension
-the physics requires but the document does not name is an error rather than a
-silent metre. `physics` is a map of named physics, and a sweep parameter names
-one of them.
-CLI summaries, saved plots and Studio geometry/mesh/result labels use the declared
-length unit, including numeric declarations such as `{"length": {"in_m": 1e-10}}`.
-This changes labels, not the stored numbers: changing a declaration alone
-reinterprets the model, so rescale its dimensional inputs when changing units.
-Built-in material previews use physmat's native micrometres and label them as such.
-For `em.modes2d`, geometry and meshing run in micrometres whatever the document
-declares: every length is converted once, with a single correctly rounded step,
-and mesh coordinates come back in the document unit for results, CLI output and
-Studio. The same device written in `nm`, `um` or `m` therefore gives the same mesh
-and bit-identical results whenever its numbers convert exactly (such as 1550 nm,
-1.55 um and 1.55e-6 m). A number that does not convert exactly can still differ
-in its last bit, and one ulp of input can change a mesh; the answer then agrees
-within the discretization, not bit for bit.
+`geometry.length_unit` says what the shape and domain numbers mean; every other length carries
+its own unit (`"1.55 um"`, `"1550 nm"`, `"1.55e-6 m"`; the vacuum wavelength takes nm, um or m),
+and a dimensional value without its unit is refused (`E-UNIT-MISSING`). `depth` is `null` (a
+cross-section). Library materials are written with their exact physmat name
+(`"physmat:Si"`); a bare name is a local record in `materials`, whose `refractive_index` is a
+number, `{"n": .., "k": ..}` (n + i k under exp(−iωt): k ≥ 0 is absorption, a negative k is
+refused with `E-GAIN`) or a dispersion model. `physics` is a map of named physics, and a sweep
+parameter names one of them. Results are SI under exp(−iωt): node coordinates and vacuum
+wavelengths in metres, the propagation loss in dB/m.
+CLI summaries, saved plots and Studio geometry/mesh/result labels use the component's
+length unit (or `display_units.length`); this changes labels, not the stored numbers.
+Built-in material previews take and return vacuum wavelengths in metres.
+For `em.modes2d`, geometry, meshing and the mode solve run in micrometres whatever the
+document declares (the kernel frame, under exp(+iωt)): every length goes to micrometres once
+from its exact value (`float(exact × 10⁶)`), and results come back in SI as the micrometre
+values times 1e-6, with every complex value conjugated once. The same device written in `nm`,
+`um` or `m` therefore gives bit-identical meshes and results (P2-5) whenever its numbers are
+the same decimals (such as 1550 nm, 1.55 um and 1.55e-6 m); a hand-back value is the kernel's
+micrometre double times 1e-6 (2.2e-07 written as `"0.22 um"` comes back as 2.2e-07 in
+`resolved_inputs` but as 2.1999999999999998e-07 in a result computed from the kernel value).
 The schema can represent multiple entries, but the current runner requires
 exactly one and rejects coupled or multiple-physics runs.
 
 Shapes are `rect`, `circle` or `polygon`; later
 shapes cut earlier ones and the background fills what is left (the boolean
 work is done with shapely). A circle that nothing overlaps is meshed as an
-exact circle. Material names are looked up in `materials` first, then in
-physmat's built-ins (`"Si"`, `"SiO2"`, `"Au"`, ...), so dispersion is applied
-automatically at every wavelength of a sweep. `study.parameter` must be an
-existing dotted path under `physics.`. Geometry, mesh and material sweeps are
+exact circle. A material is a local record in `materials`, or a physmat built-in written with
+its exact name (`"physmat:Si"`, `"physmat:SiO2"`, `"physmat:Au"`, ...), whose dispersion is
+applied automatically at every wavelength of a sweep. `study.parameter` must be an
+existing dotted path under `physics.`; the wavelength is `physics.<name>.vacuum_wavelength`,
+whose values are a tagged array (`{"unit": "um", "values": [...]}`). Geometry, mesh and material sweeps are
 rejected because the mesh is built once. Sweeping a wavelength also yields the
 group index.
 
@@ -144,7 +156,7 @@ the TE family. Change its left/right boundaries to `pmc` for the TM family.
 `vector_fiber` requests six fields, including degenerate partners.
 
 The physics entry requires `"formulation": "vector"` and a finite positive
-`n_cladding`. This dimensionless number is the user-specified lower bound of
+`effective_index_threshold`. This dimensionless number is the user-specified lower bound of
 the guided-mode search interval at the selected wavelength. For a simple
 asymmetric slab use the larger substrate/cover index; for a fiber use the
 exterior cladding index. More general structures can have slab/radiation
@@ -154,8 +166,8 @@ inference from the smallest material index.
 
 Only isotropic, nonmagnetic dielectrics with real, finite, positive permittivity
 are supported. Modes are searched near the maximum index, filtered to the open
-interval `(n_cladding, n_max)` and sorted by descending n_eff. If fewer than
-`num_modes` are found, the result contains that actual count and a log warning;
+interval `(effective_index_threshold, n_max)` and sorted by descending n_eff. If fewer than
+`mode_count` are found, the result contains that actual count and a log warning;
 zero modes is an error. This is a bounded search, not proof that all guided
 modes were found. A finite PEC/PMC computational wall is not an open boundary:
 check domain padding as well as mesh convergence for your geometry.
@@ -163,14 +175,14 @@ check domain padding as well as mesh convergence for your geometry.
 Use `"study": {"type": "single"}` for an independent point. Wavelength sweeps
 require the resolved-mode tracking contract below; other vector sweeps are rejected.
 
-`RunResult.fields` retains its original nodal scalar layout for scalar results
+`RunResult.mode_fields` holds the nodal scalar fields of scalar results
 and is empty for vector results. Vector data is in `RunResult.vector_fields`,
-one public `VectorField` object per study point:
+one public `VectorField` object per study point (SI, exp(−iωt)):
 
 | Attribute | Shape | Meaning |
 |---|---|---|
 | `edges` | `(edges, 2)` | Node pairs, oriented from lower to higher node index |
-| `transverse` | `(edges, modes)` | Transverse electric-field line integrals in document length units |
+| `transverse` | `(edges, modes)` | Transverse electric-field line integrals in metres |
 | `longitudinal` | `(nodes, modes)` | Complex Ez, including its phase relative to Ex/Ey |
 | `electric` | `(triangles, modes, 3)` | Complex Ex/Ey/Ez at triangle centroids |
 
@@ -180,17 +192,72 @@ in quadrature with the transverse field for these lossless modes. Centroid
 values stay per element, preserving interface discontinuities. Raw edge/nodal
 coefficients retain the finite-element field for reconstruction elsewhere.
 
-Vector `fields.npz` contains `edges`, `vector_transverse`, `vector_longitudinal`
-and `vector_electric`; the three field arrays have an extra leading study-point
-axis. They load with `numpy.load(..., allow_pickle=False)`. The scalar `fields`
-key is absent for vector data. `field_representation="vector-edge-nodal-v1"`
-in the archive and summary identifies this layout. Summary metadata includes
-the requested/returned mode counts, normalization and declared coordinate units.
-The model JSON format remains `"openphysics": "0.2"`.
+Vector `fields.npz` contains `edges`, `unnormalized_electric_field_line_integral` (m),
+`unnormalized_electric_field_z` and `unnormalized_electric_field` (x, y, z; unit 1); the
+three field arrays have an extra leading study-point axis. They load with
+`numpy.load(..., allow_pickle=False)`. The scalar `unnormalized_mode_field` is absent for
+vector data. `field_representation="vector-edge-nodal-v2"` in the archive and summary
+identifies this layout. Summary metadata includes `mode_count`, `returned_mode_count`,
+the normalization and `field_units` (every array's unit; `node_coordinates` in m). Every
+`em.modes2d` result, scalar or vector, records the saved file layout
+`field_layout="em-modes2d-p1-node-centroid-v2"` (P1 nodal fields; vector results add the
+centroid electric field), `node_coordinates` in metres, `vacuum_wavelength` (m, one per study
+point), `effective_index` (complex when lossy or with PML, Im n_eff ≥ 0 being loss) and
+`study_parameter` (the swept path, `""` for a single point); a sweep of another slot adds
+`study_values`. A subspace sweep records `field_layout="em-modes2d-subspace-raw-v2"` instead.
+Results saved before the units batch (layout `-v1`) are refused by name by the exporters.
 
-Studio receives `vector_fields` with `location="triangle_centroids"`, component
-names and separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point.
-The existing scalar HTTP `fields` layout is unchanged; for vectors it is empty.
+### Mode post-processing
+
+Every scalar or vector `em.modes2d` result without PML also saves, per study
+point `p` and mode `m`, three additional arrays computed with
+[`galerkin.mode_overlap`](../../docs/packages/galerkin/mode_overlap.md) in the kernel frame (the micrometre
+mesh, exp(+iωt)) and then converted once to SI under exp(−iωt): areas times 1e-12, complex
+values conjugated (`simcase.mode_postprocessing` states the exact recipe, and
+`tests/simcase/test_modes_postprocessing.py` checks that the saved values are those calls,
+converted once):
+
+| Key | Shape | Meaning |
+|---|---|---|
+| `unnormalized_mode_power` (vector, W) or `unnormalized_mode_field_square_integral` (scalar, m^2) | `(points, modes)` | vector: the complex Poynting integral `P = 1/2 int (E x H*) . z dA` of the saved field read as V/m (`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); scalar: `int |phi|^2 dA` (`scalar_power`, real) |
+| `confinement_factor` | `(points, modes, regions)` | energy fraction per region in `region_names` order: `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2` (`confinement_factor`); scalar: `int_R |phi|^2 / int |phi|^2`. Rows sum to 1 |
+| `unnormalized_field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA` in m^2 (`overlap_matrix(..., "field")`, Hermitian; scalar: `scalar_overlap`); the diagonal is `int |E|^2 dA`, which for scalar results equals the square integral |
+| `coupling_efficiency` | `(points, modes)` | only with `results.mode_overlap.gaussian`: `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)` of a Gaussian input (`coupling_efficiency` after `interpolate_vector_field`; scalar: `scalar_coupling_efficiency` at the nodes) |
+
+The saved amplitudes are relative, hence "unnormalized": read the vector amplitudes as V/m;
+`unnormalized_mode_power` is then the power of that field in watts, `Re` the time-averaged
+power carried in +z. Dividing a saved mode by `sqrt(Re unnormalized_mode_power)` gives a field
+that carries 1 W. For a lossless mode the imaginary part is roundoff; for a lossy mode
+(complex `effective_index`) it is the reactive part and the modes are not power-orthogonal.
+`confinement_factor` and `coupling_efficiency` are dimensionless. `summary.json` repeats the
+values under `mode_postprocessing` as value objects with a `unit` and `description` per key
+(complex values as `re`/`im` with `time_convention`, `confinement_factor` with its region names).
+
+The optional document block
+
+```json
+"results": {"mode_overlap": {"gaussian": {"beam_waist_radius": "0.22 um", "position": ["0 um", "0.11 um"]}}}
+```
+
+adds `coupling_efficiency` for the input field
+`exp(-((x - x0)^2 + (y - y0)^2) / w^2)`, with `w = beam_waist_radius` the 1/e field radius
+and `position = [x0, y0]`, each a length with its unit. For vector results the input is
+x-polarised and compared with the transverse mode field alone; for scalar
+results it is a scalar amplitude. The waist must be positive, the centre must
+lie inside the geometry window and no other key is accepted under
+`mode_overlap` or `gaussian`. PML results and subspace sweeps gain none of
+these keys: PML coefficients are covariant integrals in stretched coordinates,
+so the lossless Poynting formula over the window is not the physical power, and
+subspace frames are not modes ([PML modes](../../docs/packages/simcase/pml_modes.md),
+[subspace tracking](../../docs/packages/simcase/vector_subspace_tracking.md)). The VTU export is unchanged
+and writes the fields only; read the post-processing from `fields.npz` or
+`summary.json`.
+
+Studio receives `vector_fields` (`name="unnormalized_electric_field"`,
+`location="triangle_centroids"`, components `x`, `y`, `z`, unit `1`, `time_convention`) with
+separate `real`/`imag` arrays shaped `(modes, triangles, 3)` per point, and node coordinates
+in metres. Scalar results arrive as `unnormalized_mode_field` (real and, when complex,
+imaginary parts per point); for vectors it is empty.
 Select `|E|`, `|Ex|`, `|Ey|` or `|Ez|` to display magnitudes on a common |E|
 color scale. The saved PNG displays |E|; the archive preserves complex components.
 `VectorField.to_dict()` produces the same JSON-safe display samples.
@@ -203,16 +270,17 @@ python -m simcase run sweep.json -o sweep_results
 ```
 
 For vector physics, the sweep parameter must be exactly
-`physics.<name>.wavelength`. Supply at least three finite positive values in
-strictly increasing or decreasing order; unequal spacing is supported. The
-mesh, materials, boundary conditions, requested mode count and `n_cladding`
+`physics.<name>.vacuum_wavelength`. Supply at least three finite positive values in
+strictly increasing or decreasing order (a tagged array, such as
+`{"unit": "nm", "values": [1450, 1500, 1550]}`); unequal spacing is supported. The
+mesh, materials, boundary conditions, `mode_count` and `effective_index_threshold`
 remain fixed. Material dispersion is evaluated at each wavelength. The fixed
-`n_cladding` must bound the exterior/slab radiation channels over the **whole
+`effective_index_threshold` must bound the exterior/slab radiation channels over the **whole
 interval**, including dispersive claddings. A conservative upper envelope may
 exclude weakly guided modes; the starting wavelength's cladding value alone
 may admit unwanted exterior modes later.
 
-The first point seeds `num_modes` branches in descending n_eff order. Subsequent
+The first point seeds `mode_count` branches in descending n_eff order. Subsequent
 points search extra guided candidates and match those branches by a global
 one-to-one assignment that maximizes the sum of squared normalized overlaps:
 
@@ -232,10 +300,12 @@ Optional settings live under `study.tracking`:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `search_modes` | `max(2*num_modes, num_modes+4)` | Guided candidate budget; integer greater than `num_modes` |
-| `min_overlap` | `0.8` | Minimum selected squared normalized overlap, in `(0,1]` |
-| `min_margin` | `0.1` | Minimum full-assignment score gap, in `(0,1]` |
+| `search_mode_count` | `max(2*mode_count, mode_count+4)` | Guided candidate budget; integer greater than `mode_count` |
+| `mode_tracking_threshold` | `0.8` | Minimum selected squared normalized overlap, in `(0,1]` |
+| `mode_tracking_margin_threshold` | `0.1` | Minimum full-assignment score gap, in `(0,1]` |
 | `degeneracy_tolerance` | `1e-5` | Non-negative absolute n_eff separation tolerance |
+
+Defaults applied are echoed in `summary.json` `defaults_applied` with their reasons.
 
 For each selected match, the margin compares the best total assignment score
 with the best complete assignment that excludes that match. If no alternative
@@ -246,7 +316,7 @@ accuracy; reducing it does not resolve a physically degenerate pair.
 A sweep raises `ModeTrackingError` when it cannot retain the requested count,
 overlap is weak, assignment is ambiguous, or a selected candidate has a
 near-degenerate partner (including an unselected candidate). A selected mode at
-the last rank of a saturated candidate search also fails: increase `search_modes`
+the last rank of a saturated candidate search also fails: increase `search_mode_count`
 to check for an unseen partner. The search is bounded, not an exhaustive spectral
 proof. Continuation through cutoff is not implemented. The fiber's two HE11
 partners are intentionally rejected by the default tracker even when only one
@@ -261,7 +331,8 @@ missing mode or arbitrary branch through a degeneracy is returned.
 
 After every point succeeds, `group_index()` computes
 `n_g = n_eff - wavelength * d(n_eff)/d(wavelength)` on each tracked column,
-using second-order finite differences including the endpoints. The existing
+using second-order finite differences including the endpoints (computed on the kernel's
+micrometre wavelengths, so the same in any length unit). The existing
 scalar derivative behavior is unchanged. **Check both mesh/domain and wavelength
 spacing convergence.** High endpoint overlap cannot rule out an avoided crossing
 or cutoff between sparse samples and does not certify a derivative's accuracy.
@@ -273,38 +344,40 @@ margins. At the seed point overlaps/margins are `null`. Candidate ranks are not
 branch identities. Studio receives this metadata in `summary`, shows branch
 labels and overlap, and displays n_g for every tracked branch.
 
-The vector field layout remains `vector-edge-nodal-v1`, now with one entry per
+The vector field layout is `vector-edge-nodal-v2`, with one entry per
 sweep point and a constant tracked mode count. NPZ adds `group_index` and a
-Unicode scalar `mode_tracking_json` (parse with `json.loads(str(array))`). Raw
-complex fields, samples and neff all share the tracked column order. These
+Unicode scalar `mode_tracking_json` (parse with `json.loads(str(array))`; its settings
+use the names above, and `minimum_principal_squared` is the one renamed evidence key). Raw
+complex fields, samples and `effective_index` all share the tracked column order. These
 tracking additions are absent from scalar and vector-single results.
 
 ### Custom optical materials
 
-A custom material is either a constant `{"n": 1.5, "k": 0}` (finite,
-non-negative `n` and `k`; `k` defaults to zero), or a Sellmeier model:
+A custom material's `refractive_index` is a constant (`1.5`), a complex constant
+`{"n": 1.5, "k": 0.01}` (n + i k under exp(−iωt): finite positive n, k ≥ 0 is absorption, a
+negative k is gain and refused with `E-GAIN`), or a Sellmeier model:
 
 ```json
-{"glass": {"source": "coefficient reference", "sellmeier": {
-  "A": 1.0, "B": [0.7, 0.4], "C": [0.01, 0.04], "range": [0.5, 2.0]
+{"glass": {"source": "coefficient reference", "refractive_index": {
+  "model": "sellmeier", "constant": 1.0,
+  "terms": [{"strength": 0.7, "resonance_wavelength_squared": "0.01 um^2"},
+            {"strength": 0.4, "resonance_wavelength_squared": "0.04 um^2"}],
+  "valid": {"vacuum_wavelength": ["0.5 um", "2 um"]},
+  "reference_medium": "vacuum"
 }}}
 ```
 
-This example is a `materials` entry for a document in `um`. The formula is
-`n² = A + sum(B[i] * wavelength² / (wavelength² - C[i]))`. `A` (default 1) and
-`B` are dimensionless; `C` is in the document's length unit squared, and the
-optional validity `range` is in its length unit. In `nm`, the same `C` is
-`[10000, 40000]` and the range is `[500, 2000]`. The resolver converts these
-quantities to physmat's micrometre convention once at the material boundary.
-
-`B` and `C` must be non-empty finite numeric arrays of equal length; `A` must be
-finite. A supplied range needs two finite bounds with `0 <= minimum < maximum`;
-omitting it leaves the range unbounded. `source` is an optional string.
-Sellmeier requires no `n` or `k`: mixing either with `sellmeier` is an error,
-because it would silently discard the constant value. Remove a placeholder
-`n` from older workaround documents. The old `range_um` spelling is rejected;
-use `range` expressed in the declared length unit. Malformed models fail during
-document validation, before meshing or running.
+The formula is `n² = constant + sum(strength[i] * wavelength² / (wavelength² - C[i]))` with
+`C[i]` the `resonance_wavelength_squared` (or the square of `resonance_wavelength`; a term
+takes exactly one of the two). `constant` (default 1, echoed in `defaults_applied`) and the
+strengths are dimensionless; every length carries its unit, so the same model in nm writes
+`"10000 nm^2"` and `["500 nm", "2000 nm"]`. The resolver converts each to physmat's
+micrometres once, from its exact value. `valid.vacuum_wavelength` is `[lo, hi]` with lo > 0, or
+`[null, hi]` for an open lower bound; omitting `valid` leaves the range unbounded.
+`reference_medium` is required and only `"vacuum"` is read in this release; the `rii_formula`
+model is refused by name. A model needs at least one term. The format 0.2 keys (`n`, `k`,
+`sellmeier`, `A`, `B`, `C`, `range`) are refused with the new name. Malformed models fail
+during document validation, before meshing or running.
 
 ## From Python
 
@@ -312,20 +385,33 @@ document validation, before meshing or running.
 from simcase import Document, run
 doc = Document.load("model.json")
 res = run(doc)
-res.neff                 # (study points, modes)
-res.group_index()        # when sweeping wavelength
+res.effective_index      # (study points, modes); Im >= 0 is loss under exp(-i omega t)
+res.vacuum_wavelength    # (study points,), metres
+res.group_index()        # when sweeping the wavelength
+res.propagation_loss()   # dB/m: (40 pi / ln 10) Im(n_eff) / lambda0
 res.save("out/")
 ```
 
 `run` is a composition of stages that are public in their own right, so a front
-end can mesh without solving and a caching layer can redo only what changed:
+end can mesh without solving and a caching layer can redo only what changed. The
+stage API speaks SI:
 
 ```python
 from simcase import build_mesh, solve_point, study_points
-model = build_mesh(doc)                  # geometry -> mesh -> materials
-parameter, values = study_points(doc)
-result = solve_point(model, doc.sole_physics()[1])
+model = build_mesh(doc)                  # geometry -> mesh -> materials; model.tri.nodes in metres
+eps = model.relative_permittivity(1.55e-6)   # per triangle, exp(-i omega t), at a vacuum wavelength in m
+parameter, values = study_points(doc)    # ("physics.em1.vacuum_wavelength", [SI values]) for a sweep
+point = doc if parameter is None else doc.with_value(parameter, values[0])
+result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vector_field or
+                                                           # unnormalized_mode_field, in SI
 ```
+
+`build_domain` returns the mesher's domain in the micrometre meshing frame (what meshine
+receives); `MeshedModel.solver_mesh` is the micrometre kernel mesh (internal). `run` and
+`solve_point` hand the mode kernel the same doubles (a test asserts it on `soi_strip`); a
+tracked sweep searches `search_mode_count` candidates where `solve_point` asks for
+`mode_count`. `simcase.physics_em_modes2d.solve` and `simcase.mode_postprocessing` are
+kernel-frame internals (micrometres, exp(+iωt)), not public API.
 
 For heat, electric, Joule and mechanics region documents, `run` also takes optional mesh limits
 (`max_input_vertices`, `max_nodes`, `max_triangles`), and `check_mesh_limits`
@@ -400,20 +486,22 @@ document.
 ![results](../../docs/packages/simcase/results.png)
 
 - Load an example, open a `.json` from disk, download the edited document.
-- Model tree: Units, Domain, Background, shapes (rect / circle / polygon, add,
-  reorder, delete), custom materials, Physics, Mesh, Study, Results. Selecting a
-  node shows an editable form; every edit updates the geometry view and the JSON
-  tab immediately, and the validator's magnitude warnings show up next to it.
-- Materials: physmat's built-ins with their source and validity range, plus
-  document-level constant materials. Custom Sellmeier models can be entered in
-  the JSON tab; their tree/property entries identify the model and direct coefficient
-  edits to JSON, without adding a constant `n` or `k`.
+- Model tree: Domain (with the geometry `length_unit`), Background, shapes (rect / circle /
+  polygon, add, reorder, delete), custom materials, Physics, Mesh, Study, Results. Selecting a
+  node shows an editable form; lengths are edited as quantity strings with their unit
+  (`"1.55 um"`); every edit updates the geometry view and the JSON tab immediately, and the
+  validator's coded diagnostics (such as `W-GEOMETRY-SCALE`) show up in the log.
+- Materials: physmat's built-ins under their exact names (`physmat:Si`) with their source and
+  validity range, plus document-level constant materials (n and k ≥ 0 under exp(−iωt)). Custom
+  Sellmeier models can be entered in the JSON tab; their tree/property entries identify the
+  model and direct coefficient edits to JSON.
 - Generate mesh: meshine through the server, drawn by region, with node and
   triangle counts, minimum angle and mean quality.
 - Run (optical models): a background job, then the mode field (selectable study point and mode),
   an n_eff-vs-parameter chart and a group-index table for wavelength sweeps.
   Vector results add a component selector and relative amplitudes; tracked
-  sweeps identify branches and display their overlap and group indices.
+  sweeps identify branches and display their overlap and group indices. Lossy results show
+  Im n_eff (positive is attenuation under exp(−iωt)) and the propagation loss in dB/m.
 - JSON tab: edit the document by hand and apply.
 - Heat: dedicated views for `thermal.steady2d` and `thermal.transient2d`
   documents. Steady heat shows the result mesh, nodal
@@ -441,13 +529,13 @@ Used by the page, usable by anything else.
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | example documents |
 | GET | `/api/units` | the declarable base dimensions and their unit symbols |
-| GET | `/api/materials` | physmat built-ins: names, aliases, range, source |
-| POST | `/api/materials/preview` | n, k of a material over a wavelength range |
-| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes}` or `{ok: false, error}` |
-| POST | `/api/mesh` | `{doc}` -> nodes, triangles, regions, boundary edges, stats |
+| GET | `/api/materials` | physmat built-ins under their exact `physmat:` names: valid vacuum wavelengths (m), source |
+| POST | `/api/materials/preview` | n, k of a `physmat:` material over a vacuum wavelength interval in m |
+| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes, diagnostics}` or `{ok: false, error}` |
+| POST | `/api/mesh` | `{doc}` -> `node_coordinates` (m) with `field_units`, `display`, triangles, regions, boundary edges, stats, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; runs in a background thread |
 | GET | `/api/jobs/{id}` | status and log lines |
-| GET | `/api/jobs/{id}/result` | n_eff, group index, fields, mesh, timings |
+| GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss` (the summary's series), `vacuum_wavelength`, fields, `node_coordinates` (m), timings, summary |
 
 The steady and transient heat views use their own capability, validation, run and
 result routes; see the [steady](../../docs/packages/simcase/thermal_studio.md) and

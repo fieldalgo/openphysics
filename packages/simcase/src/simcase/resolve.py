@@ -149,7 +149,8 @@ def _resolve(tree, result: Resolution) -> Resolution:
         return result
     refusal = kind.refuse_03(tree) if kind.refuse_03 is not None else None
     if refusal is not None:
-        diags.append(Diagnostic("E-CONTRACT", *refusal))
+        path, message, *code = refusal
+        diags.append(Diagnostic(code[0] if code else "E-CONTRACT", path, message))
         return result
     result.table = slots.table_for(kind)
     walker = _Walker(result)

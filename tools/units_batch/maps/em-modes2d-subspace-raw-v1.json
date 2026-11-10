@@ -1,0 +1,279 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "em-modes2d-subspace-raw-v1 (format 0.2 electric-l2-subspace-v1 sweeps, document units, exp(+i omega t)) -> em-modes2d-subspace-raw-v2 (format 0.3, SI, exp(-i omega t)); spec section 5.3.4: raw columns under the unnormalized_* names (L1*conj, conj, conj), the frame transforms conjugated, the cluster means renamed; the mean group index of the nanometre and metre fixtures is the pre-registered group_index_length_frame exception",
+ "old_layout": "em-modes2d-subspace-raw-v1",
+ "new_layout": "em-modes2d-subspace-raw-v2",
+ "arrays": [
+  {
+   "old": "nodes",
+   "new": "node_coordinates",
+   "f": "L1"
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "regions",
+   "new": "regions",
+   "f": "="
+  },
+  {
+   "old": "region_names",
+   "new": "region_names",
+   "f": "="
+  },
+  {
+   "old": "edges",
+   "new": "edges",
+   "f": "="
+  },
+  {
+   "old": "values",
+   "new": "vacuum_wavelength",
+   "f": "L1"
+  },
+  {
+   "old": "raw_neff",
+   "new": "effective_index",
+   "f": "="
+  },
+  {
+   "old": "raw_transverse",
+   "new": "unnormalized_electric_field_line_integral",
+   "f": "L1*conj"
+  },
+  {
+   "old": "raw_longitudinal",
+   "new": "unnormalized_electric_field_z",
+   "f": "conj"
+  },
+  {
+   "old": "raw_electric",
+   "new": "unnormalized_electric_field",
+   "f": "conj"
+  },
+  {
+   "old": "frame_transform",
+   "new": "frame_transform",
+   "f": "conj"
+  },
+  {
+   "old": "cluster_ids",
+   "new": "cluster_ids",
+   "f": "="
+  },
+  {
+   "old": "cluster_offsets",
+   "new": "cluster_offsets",
+   "f": "="
+  },
+  {
+   "old": "cluster_mean_neff",
+   "new": "mean_effective_index",
+   "f": "="
+  },
+  {
+   "old": "cluster_mean_group_index",
+   "new": "mean_group_index",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking_json",
+   "new": "mode_tracking_json",
+   "f": "json",
+   "prefix": "mode_tracking"
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "length_unit_to_m",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "units.length",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "length_unit_to_m",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "amplitude_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.triangles",
+   "new": "mesh.triangles",
+   "f": "="
+  },
+  {
+   "old": "study.values.[]",
+   "new": "study.values.values.[]",
+   "f": "L1"
+  },
+  {
+   "old": "formulation",
+   "new": "formulation",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "n_cladding",
+   "new": "effective_index_threshold",
+   "f": "="
+  },
+  {
+   "old": "requested_modes",
+   "new": "mode_count",
+   "f": "="
+  },
+  {
+   "old": "clusters.[].id",
+   "new": "clusters.[].id",
+   "f": "="
+  },
+  {
+   "old": "clusters.[].rank",
+   "new": "clusters.[].rank",
+   "f": "="
+  },
+  {
+   "old": "clusters.[].columns.[]",
+   "new": "clusters.[].columns.[]",
+   "f": "="
+  },
+  {
+   "old": "raw_neff.[].[]",
+   "new": "effective_index.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "cluster_mean_neff.[].[]",
+   "new": "mean_effective_index.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "cluster_mean_group_index.[].[]",
+   "new": "mean_group_index.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.method",
+   "new": "mode_tracking.method",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.method",
+   "new": "mode_tracking.settings.method",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.search_modes",
+   "new": "mode_tracking.settings.search_mode_count",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.min_overlap",
+   "new": "mode_tracking.settings.mode_tracking_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.min_margin",
+   "new": "mode_tracking.settings.mode_tracking_margin_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.degeneracy_tolerance",
+   "new": "mode_tracking.settings.degeneracy_tolerance",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.cluster_span_max",
+   "new": "mode_tracking.settings.cluster_span_tolerance",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.external_gap_min",
+   "new": "mode_tracking.settings.cluster_gap_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.points.[].clusters.[].min_principal_squared",
+   "new": "mode_tracking.points.[].clusters.[].minimum_principal_squared",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.points.**",
+   "new": "mode_tracking.points.**",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "vacuum_wavelength.**",
+  "effective_index.unit",
+  "mean_effective_index.unit",
+  "mean_group_index.unit",
+  "study.values.unit",
+  "field_shapes.**",
+  "field_units.**",
+  "field_locations.**"
+ ],
+ "identifiers": [
+  "field_layout",
+  "field_representation",
+  "study.parameter",
+  "mesh.regions.*",
+  "frame_normalization",
+  "raw_neff_order",
+  "cluster_mean_group_index_meaning"
+ ],
+ "vtu": [],
+ "vtu_added": [],
+ "collection": "L1",
+ "calls": {
+  "d24_material_names": true
+ },
+ "exceptions": [
+  {
+   "where": "array",
+   "new": "mean_group_index",
+   "kind": "group_index_length_frame"
+  },
+  {
+   "where": "summary",
+   "new": "mean_group_index.values.[].[]",
+   "kind": "group_index_length_frame"
+  }
+ ]
+}

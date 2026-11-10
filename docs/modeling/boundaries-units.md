@@ -84,11 +84,12 @@ Kelvin input; changing a label does not convert a number.
 
 ## Optical signs are an interface boundary
 
-`physmat` and JSON use positive extinction coefficient n+ik for passive materials.
-The low-level mode solver uses `exp(+i omega t-i beta z)` and negative imaginary
-permittivity for passive loss. The document runner performs the conjugation at
-the boundary. Do not conjugate document materials again. Forward passive modes
-have Im n_eff<0 under this convention. Mode fields have relative normalization,
+`physmat` and JSON use positive extinction coefficient n+ik for passive materials, and
+documents and results use `exp(-i omega t+i beta z)`: forward passive modes have
+Im n_eff>0, and the propagation loss is positive in dB/m. The low-level mode solver keeps
+`exp(+i omega t-i beta z)` and negative imaginary permittivity for passive loss; simcase
+conjugates once at that boundary, inputs on the way in and results on the way out. Do not
+conjugate document materials or results again. Mode fields have relative normalization,
 not automatically V/m or unit optical power. Read the
 [lossy-mode contract](../packages/simcase/lossy_modes.md) before comparing fields
 or converting attenuation.

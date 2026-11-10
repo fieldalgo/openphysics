@@ -1,10 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "pml bent slab",
-  "units": {
-    "length": "um"
-  },
   "geometry": {
+    "length_unit": "um",
+    "depth": null,
     "domain": {
       "xmin": -0.05,
       "xmax": 0.05,
@@ -23,58 +22,58 @@
         "w": 0.1,
         "h": 0.22,
         "material": "film",
-        "mesh_size": 0.012
+        "element_size": "0.012 um"
       }
     ]
   },
   "materials": {
     "film": {
-      "n": 3.48
+      "refractive_index": 3.48
     },
     "clad": {
-      "n": 1.444
+      "refractive_index": 1.444
     }
   },
   "physics": {
     "em1": {
       "type": "em.modes2d",
       "formulation": "vector",
-      "wavelength": 1.55,
-      "num_modes": 1,
-      "n_cladding": 1.444,
+      "vacuum_wavelength": "1.55 um",
+      "mode_count": 1,
+      "target_effective_index": 2.187,
+      "effective_index_threshold": 1.444,
       "boundary": {
         "left": "pmc",
         "right": "pmc",
         "top": "pec",
         "bottom": "pec"
       },
-      "n_target": 2.187,
       "pml": {
-        "thickness": {
-          "bottom": 0.6,
-          "top": 1.0
+        "pml_thickness": {
+          "bottom": "0.6 um",
+          "top": "1 um"
         },
-        "strength": 3.0,
-        "order": 2,
-        "min_physical_fraction": 0.1
+        "pml_strength": 3.0,
+        "pml_order": 2,
+        "pml_minimum_physical_fraction": 0.1
       },
       "bend": {
-        "radius": 2.0,
-        "axis": "y",
-        "origin": 0.0
+        "bend_radius": "2 um",
+        "bend_origin": "0 um",
+        "axis": "y"
       }
     }
   },
   "mesh": {
-    "size": 0.02,
+    "element_size": "0.02 um",
     "grading": {
-      "center": [
-        0.0,
-        0.11
+      "position": [
+        "0 um",
+        "0.11 um"
       ],
-      "near": 0.01,
-      "far": 0.02,
-      "distance": 1.0
+      "near": "0.01 um",
+      "far": "0.02 um",
+      "refinement_distance": "1 um"
     }
   },
   "study": {
