@@ -242,15 +242,19 @@ on 2026-11-10 with T3's mesh sizes, and measured that day with the same versions
 | T7 unchanged | without `motion` both paths equal the previous code | sha256 of the result arrays (and the manifest) equal to main `e9bb438` (measured); `motion=None` equals no keyword (test) |
 | T8 refusals | as listed above | pass |
 
-T1, path 2, plane strain: the clamped side's reaction sum is about 1e3 N/m, while
-the reactions it sums are about 1e7 N/m. The ordinary workflow's own rounding moves
-it by about 1.6e-6 between two solves at t = 0 and t = 1e-12. At the pre-registered
-h = 1e-4 the central difference therefore differs from the derivative by 4.2e-6,
-above 1e-6. As h grows the difference falls (h = 1e-2: 4.8e-9), and the derivative
-equals the equilibrium value d(ΣR_y)/dt = −f_y dA/dt to 1.2e-10 to 4.5e-10. The test
-takes this sum's central difference at h = 1e-2 and adds the equilibrium check. This
-is a deviation from the pre-registered step, recorded here and in the HQ record. An
-extra moment check, not pre-registered, is treated the same way.
+T1, path 2: the clamped side's reaction sum is 10 800 N/m (the body force times
+the area), while the reactions it sums are about 1e7 N/m. The ordinary workflow's
+own rounding moves it by about 2e-6 N/m between two solves at t = 0 and t = 1e-12,
+and the derivative is about 1.2e3 N/m per unit t. At the pre-registered h = 1e-4
+the central difference therefore differs from the derivative by 4.2e-6 in plane
+strain, above 1e-6 (plane stress: 2.0e-8). As h grows the difference falls
+(h = 1e-2: 4.8e-9), and the derivative equals the equilibrium value
+d(ΣR_y)/dt = −f_y dA/dt to 1.2e-10 to 4.5e-10. The test therefore takes this sum's
+central difference at h = 1e-2, in both planes, and adds the equilibrium check.
+This is a deviation from the pre-registered step, recorded here and in the HQ
+record. An extra moment check, not pre-registered, is treated the same way (at
+h = 1e-4: 7.0e-6 in plane strain, 4.5e-7 in plane stress) and is also checked
+against its equilibrium value, f_y times the derivative of Σ area · x_centroid.
 
 The pre-registration fixed M4's criteria, not its mesh sizes. A first run with sizes
 0.8, 0.4 and 0.2 gave 1.6e-1, 4.4e-2 and 1.016e-2: order about 2, but the finest

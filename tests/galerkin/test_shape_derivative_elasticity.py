@@ -302,7 +302,7 @@ def test_m8_refusals():
     with pytest.raises(TypeError, match="poisson_ratio is live"):
         solve_elasticity(m, young_modulus=70e9, poisson_ratio={"host": xp.asarray(0.33), "core": 0.28},
                          plane="stress", dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
-    with pytest.raises(ValueError, match="poisson_ratio must be a finite real scalar"):
+    with pytest.raises(ValueError, match="poisson_ratio is a callback; with a motion it must be a finite real scalar"):
         solve_elasticity(m, young_modulus=70e9, poisson_ratio=lambda p: 0.3, plane="stress",
                          dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
     with pytest.raises(ValueError, match="dirichlet must map"):

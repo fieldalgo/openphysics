@@ -142,7 +142,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, di
     if not isinstance(dirichlet, Mapping):
         raise ValueError("dirichlet must map node indices to temperatures in K")
     for node, value in dirichlet.items():
-        _numpy_data(value, "Dirichlet temperature")
+        _numpy_data(value, "Dirichlet temperature", sampled=False)
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
@@ -221,7 +221,7 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
         if not isinstance(table, Mapping):
             raise ValueError(f"{name} must map node indices to scalar volts")
         for value in table.values():
-            _numpy_data(value, name)
+            _numpy_data(value, name, sampled=False)
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
@@ -357,13 +357,15 @@ def solve_steady_thermoelasticity_moving(mesh: Mesh, motion: MeshMotion, *, unit
     if not isinstance(thermal_dirichlet, Mapping):
         raise ValueError("thermal_dirichlet must map node indices to temperatures in K")
     for value in thermal_dirichlet.values():
-        _numpy_data(value, "Dirichlet temperature")
+        _numpy_data(value, "Dirichlet temperature", sampled=False)
     moved = _checked_step(mesh, W, t)
     base = thermal_mechanical.solve_steady_thermoelasticity(
         moved, units=units, conductivity=conductivity, thermal_dirichlet=thermal_dirichlet, heat_source=heat_source,
         young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
         thermal_expansion_per_k=thermal_expansion_per_k, reference_temperature_k=reference_temperature_k,
         mechanical_dirichlet=mechanical_dirichlet, body_force=body_force)
+    # The heat stage is solved once more here (the workflow's own heat result is NumPy); both solves take the
+    # same inputs and agree to rounding. The snapshot and manifest stay those of the workflow above.
     heat = solve_steady_heat_moving(mesh, motion, conductivity=conductivity,
                                     dirichlet=dirichlet_supports(thermal_dirichlet), heat_source=heat_source)
     mechanics = _thermoelastic_live(xp, mesh, moved, t, W, base.mechanics, heat.temperature,
@@ -499,12 +501,13 @@ def _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, diri
     if not isinstance(dirichlet, Mapping):
         raise ValueError("dirichlet must map (node, component) to displacement in metres")
     for value in dirichlet.values():
-        _numpy_data(value, "Dirichlet displacement")
+        _numpy_data(value, "Dirichlet displacement", sampled=False)
 
 
 def _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k):
     if callable(reference_temperature_k):
-        raise ValueError("reference_temperature_k must be a finite nonnegative real scalar")
+        raise ValueError("motion: reference_temperature_k is a callback; with a motion it must be a finite "
+                         "nonnegative real scalar")
     if is_live(reference_temperature_k):
         raise TypeError("motion: reference_temperature_k is live; in this slice only the motion's t carries a "
                         "derivative")
@@ -536,8 +539,9 @@ def _tags(table, name):
 
 def _coefficient(value, name):
     if callable(value):
-        raise ValueError(f"{name} must be a finite real scalar or a table of region names")
-    _numpy_data(value, name)
+        raise ValueError(f"motion: {name} is a callback; with a motion it must be a finite real scalar or a table "
+                         "of region names")
+    _numpy_data(value, name, sampled=False)
 
 
 def _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, outward_current):
@@ -586,14 +590,19 @@ def _velocity(mesh: Mesh, velocity):
     return W
 
 
-def _numpy_data(value, name):
+def _numpy_data(value, name, *, sampled=True):
+    """Refuse callbacks and live values with a motion. ``sampled``: the solver would call the callback at
+    coordinates (sources, boundary data); otherwise it is a value callback (coefficients, Dirichlet values)."""
     if type(value).__name__ == "ElementHeatSource":
         raise TypeError(f"motion: {name} is an ElementHeatSource; give a scalar or a region table")
     items = value.values() if is_per_region(value) else (value if isinstance(value, (tuple, list)) else (value,))
     for v in (value, *items):
-        if callable(v):
+        if callable(v) and sampled:
             raise TypeError(f"motion: {name} is a callback; with a moving mesh its sample points move too, which "
                             "this slice does not differentiate. Give a scalar or a region table")
+        if callable(v):
+            raise TypeError(f"motion: {name} is a callback; with a motion this slice takes constants only "
+                            "(t is the one live input)")
     for v in items:
         if is_live(v):
             raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
