@@ -24,14 +24,15 @@ def test_installed_cli(kind,tmp_path):
     assert solve.returncode == 0,solve.stderr
     summary = json.loads((out/'summary.json').read_text(encoding='utf-8'))
     assert summary['status'] == 'converged'
+    assert summary['result_format'] == f"{json.loads(doc.stdout)['physics']['electric']['type']}-result-v2"
     with np.load(out/'fields.npz',allow_pickle=False) as f:
-        assert f['nodes_m'].shape == (175,2)
-        assert np.isfinite(f['potential_v']).all()
+        assert f['node_coordinates'].shape == (175,2)
+        assert np.isfinite(f['electric_potential']).all()
         if kind == 'electric_rectangle':
-            np.testing.assert_allclose(f['potential_v'],1-f['nodes_m'][:,0],atol=2e-12)
-            assert summary['diagnostics']['joule_power_w_per_m'] == pytest.approx(.4,rel=1e-12)
+            np.testing.assert_allclose(f['electric_potential'],1-f['node_coordinates'][:,0],atol=2e-12)
+            assert summary['balance']['joule_power_per_depth']['value'] == pytest.approx(.4,rel=1e-12)
         else:
-            assert 300 < f['temperature_k'].max() < 300.251
+            assert 300 < f['temperature'].max() < 300.251
     before=(out/'summary.json').read_bytes()
     assert cli('run',source,'-o',out).returncode == 1
     assert (out/'summary.json').read_bytes() == before
@@ -39,7 +40,7 @@ def test_installed_cli(kind,tmp_path):
 
 def test_installed_failure(tmp_path):
     doc=json.loads(cli('example','joule_temperature').stdout)
-    doc['physics']['electric']['iteration'].update(max_iterations=1,relaxation=1e-12)
+    doc['physics']['electric']['iteration'].update(iteration_limit=1,relaxation_factor=1e-12)
     source=tmp_path/'failure.json';source.write_text(json.dumps(doc),encoding='utf-8')
     out=tmp_path/'out'
     failed=cli('run',source,'-o',out,'-q')
@@ -47,3 +48,4 @@ def test_installed_failure(tmp_path):
     assert not out.exists()
     evidence=json.loads(failed.stderr)
     assert evidence['status']=='failed' and len(evidence['iterations'])==1
+    assert len(evidence['last_iterate']['temperature']['values'])==175

@@ -18,7 +18,9 @@ before any arithmetic, so a huge literal costs nothing. A Python float is read t
 shortest ``repr``, so ``0.1`` means the decimal 0.1 as the JSON text ``0.1`` does.
 
 ``dumps`` writes what ``json.dumps`` writes, with the same arguments and defaults, and writes
-a ``Decimal`` as its own text; a tree without ``Decimal`` gives byte-identical output.
+a ``Decimal`` as its own digits, with the exponent where and as ``json.dumps`` writes a
+float's (below 1e-4 and from 1e16: ``2e-05``); a tree without ``Decimal`` gives byte-identical
+output, and a float read through its ``repr`` is written back as ``json.dumps`` writes it.
 
 Only the standard library is imported here.
 """
@@ -286,7 +288,13 @@ def dumps(obj, *, indent=None, separators=None, sort_keys: bool = False, ensure_
             return number("NaN", d)
         if d.is_infinite():
             return number("Infinity" if d > 0 else "-Infinity", d)
-        # the exponent as json.dumps writes a float's (1e-10, not Decimal's 1E-10)
+        # the exponent where and as json.dumps writes a float's (repr: below 1e-4 and from 1e16):
+        # 2e-05, 1e-10 and 1.5e+16, not Decimal's 0.00002, 1E-10 and 15000000000000000
+        if d and not -4 <= d.adjusted() < 16:
+            sign, digits, _ = d.as_tuple()
+            text = "".join(map(str, digits))
+            mantissa = text[0] + ("." + text[1:] if len(text) > 1 else "")
+            return f"{'-' if sign else ''}{mantissa}e{'-' if d.adjusted() < 0 else '+'}{abs(d.adjusted()):02d}"
         return str(d).replace("E", "e")
 
     def key(k) -> str | None:

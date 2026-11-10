@@ -169,38 +169,47 @@ and session indicators compare against the last save/open snapshot or download
 request; an unchanged indicator does not certify download completion. Browser
 recovery reports its own committed storage state separately.
 
-Version-1 inputs and sessions remain readable: their fixed core height becomes
+Version-1 inputs remain readable: their fixed core height becomes
 220 nm. New files record height and its nm unit explicitly; older editors reject
 version 2 instead of silently ignoring height. Each result retains its captured
 height, including field outlines, comparisons and CSV/PNG exports.
 
-Version-3 inputs and sessions add the wavelength and core mesh size with nm units.
+Version-3 inputs add the wavelength and core mesh size with nm units.
 Version-1 and version-2 files open at 1550 nm and 30 nm, the settings their results
 were computed with; older editors reject version 3 instead of ignoring the new
 values. Results keep their captured wavelength and core mesh in history labels,
 comparisons and CSV/PNG exports.
 
-Version-4 inputs and sessions store the shape list with nm units. Version-1 to
+Version-4 inputs store the shape list with nm units. Version-1 to
 version-3 files open as one centred rectangular core resting on y = 0 with their
 width, height and core material, which is the geometry their results were computed
 with. Results from the earlier adapters stay valid only with that single core;
 older editors reject version 4 instead of ignoring the shapes. The run table CSV
 keeps the core width, height and material columns for single-rectangle designs and
-adds a `shapes` column describing every shape. Results computed with the
-`optical-shapes-v4` adapter (silicon, silicon nitride, silica and air only) keep that
-adapter name; new results record `optical-shapes-v5`.
+adds a `shapes` column describing every shape.
+
+Session files are version 6, written since the units and naming batch: the workspace
+builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
+under their exact `physmat:` names) and each run record keeps the result's
+`effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in
+metres. Sessions of versions 1 to 5 hold results under the earlier names and the document
+length unit; the workspace refuses them by version with a message instead of reading
+them under another meaning. Their input files still open: run the design again and save
+a new session. The run table CSV keeps its columns.
 
 The workspace checks `/api/workspace/capabilities/v5` before enabling Run. Contract
-version 5 and adapter `optical-shapes-v5` declare the window in nm, at most eight
-shapes and twelve polygon vertices, the shape types and the ten materials, the
-1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
-and candidate settings,
+version 5 and adapter `optical-shapes-v7` declare the window in nm, at most eight
+shapes and twelve polygon vertices, the shape types and the ten materials with their
+`physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
+strings), the fixed window, boundary and candidate settings (`mode_count`),
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
-The earlier capability endpoints remain available for older clients.
-This is not a complete engine dependency or Git provenance record. Older
-version-1 sessions without this field remain readable with unknown provenance.
+The earlier capability endpoints remain available at the same paths and schema versions;
+because every adapter now writes format 0.3 documents and reads the new result names, each
+names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,
+`optical-shapes-v6` and `-v7`), with its values as quantity strings.
+This is not a complete engine dependency or Git provenance record.
 
 ## Scope and validation
 

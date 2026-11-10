@@ -11,18 +11,20 @@ tracking remain unsupported.
 
 ## Phasor, input and units
 
-The retained field convention is `exp(+i omega t-i beta z)`, with
-`beta = (2*pi/lambda0)*n_eff`. Forward passive absorption has **Im n_eff < 0**.
-The low-level `galerkin.solve_modes(..., eps_r, ...)` and
-`simcase.physics_em_modes2d.solve(..., eps_tri, ...)` use this same convention:
-passive epsilon has a negative imaginary part. JSON/physmat materials use the
-usual positive extinction coefficient `n+ik`; the document runner conjugates
-their epsilon at the solver boundary. Do not conjugate a document material again.
+Documents and results use `exp(-i omega t+i beta z)`, with
+`beta = (2*pi/lambda0)*n_eff`. Forward passive absorption has **Im n_eff > 0**, and a
+material written as `n + i k` absorbs for k ≥ 0 (a negative k is gain and is refused with
+`E-GAIN`). The mode kernel, the low-level `galerkin.solve_modes(..., eps_r, ...)` and the
+kernel-frame `simcase.physics_em_modes2d.solve(..., eps_tri, ...)`, keeps
+`exp(+i omega t-i beta z)`, where passive epsilon has a negative imaginary part: simcase
+conjugates every material value once on the way in and every complex result once on the way
+out. Do not conjugate a document material or a result yourself.
 
-For beta in inverse metres, amplitude decays as `exp(-a*z)` with `a=-Im beta`;
+For beta in inverse metres, amplitude decays as `exp(-a*z)` with `a=Im beta`;
 power decays as `exp(-alpha*z)` with `alpha=2*a`.
-`loss_dB_cm = 10*alpha/(100*ln(10))`. Positive loss means attenuation.
-`RunResult.propagation_loss_db_cm()` performs the wavelength-to-SI conversion.
+`propagation_loss = 10*alpha/ln(10)` dB/m `= (40 pi / ln 10) Im(n_eff) / lambda0`, with the
+vacuum wavelength in metres. Positive loss means attenuation.
+`RunResult.propagation_loss()` returns it per study point and mode.
 Indices are dimensionless. Fields have relative amplitude, not V/m or unit power.
 
 ## Python and JSON
@@ -32,57 +34,57 @@ import copy
 from simcase import Document, examples, run
 
 data = copy.deepcopy(examples.VECTOR_SLAB)
-data["materials"]["film"] = {"n": 3.48, "k": 0.01}
+data["materials"]["film"] = {"refractive_index": {"n": 3.48, "k": 0.01}}
 data["study"] = {"type": "single"}
 result = run(Document.from_dict(data), verbose=False)
-print(result.neff)                       # complex, Im < 0
-print(result.propagation_loss_db_cm())   # positive power attenuation
+print(result.effective_index)            # complex, Im > 0
+print(result.propagation_loss())         # dB/m, positive power attenuation
 result.save("absorbing_slab")
 ```
 
-`result.neff` and the NPZ `neff` retain complex values. Scalar `fields` and vector
-transverse/longitudinal/electric arrays also retain their complex components.
-JSON cannot encode Python complex numbers: a complex result declares
-`mode_result_schema: "openphysics.modes2d/2"`, keeps the existing numeric `neff`
-array as its **real part**, and supplies the same-shaped `neff_imag` and
-`propagation_loss_db_cm`. `phasor` records the sign convention. Complex spectral
-derivatives likewise use `group_index` and `group_index_imag`. The input document
-version and existing lossless numeric outputs are unchanged.
+`result.effective_index` and the NPZ `effective_index` retain complex values. Scalar
+`unnormalized_mode_field` and the vector line-integral, z and centroid arrays also retain
+their complex components. JSON cannot encode Python complex numbers: a complex result
+declares `mode_result_schema: "openphysics.modes2d/3"` and writes `effective_index` as
+`{"unit": "1", "re": [...], "im": [...], "time_convention": "exp(-i omega t)"}`, with
+`propagation_loss` (dB/m) beside it; `time_convention` and `propagation` record the sign
+convention. A complex group index takes the same `re`/`im` form. Lossless numeric outputs keep
+the plain tagged form (`{"unit": "1", "values": [...]}`).
 
-Studio shows Re n_eff, Im n_eff and dB/cm for each returned mode. Its scalar
-display is magnitude; `scalar_fields_complex` retains real/imaginary nodal data
-in the response. Vector components retain their existing complex encoding.
+Studio shows Re n_eff, Im n_eff and dB/m for each returned mode. Its scalar
+display is magnitude; `unnormalized_mode_field` retains real/imaginary nodal data
+in the response. Vector components keep separate `real`/`imag` arrays.
 Saved PNG sweep curves show the real parts of effective and group indices,
 with explicit Re labels; JSON/NPZ retain both complex components.
 
 VTK has no complex arrays either: `simcase.export` writes a complex scalar mode
-as the point data `mode_<k>_real` and `mode_<k>_imag`, and vector modes as
-`electric_field_mode_<k>_real`/`_imag` (centroid cell data) and
-`longitudinal_electric_mode_<k>_real`/`_imag` (nodal point data), with the
-saved values unchanged. `neff` and the attenuation stay in the summary and NPZ.
+as the point data `unnormalized_mode_field_mode_<k>_real` and `_imag`, and vector modes as
+`unnormalized_electric_field_mode_<k>_real`/`_imag` (centroid cell data) and
+`unnormalized_electric_field_z_mode_<k>_real`/`_imag` (nodal point data), with the
+saved values unchanged. `effective_index` and the attenuation stay in the summary and NPZ.
 
 The saved post-processing ([overview](overview.md#mode-post-processing)) is
 complex where the field is: a lossy vector mode has a nonzero imaginary
-`mode_power` (reactive part; `Re` is the +z power) and lossy modes are not
-power-orthogonal; a lossy scalar result keeps a real `mode_power`
-(`int |phi|^2 dA`) and a complex Hermitian `field_overlap`.
+`unnormalized_mode_power` (reactive part; `Re` is the +z power) and lossy modes are not
+power-orthogonal; a lossy scalar result keeps a real `unnormalized_mode_field_square_integral`
+(`int |phi|^2 dA`) and a complex Hermitian `unnormalized_field_overlap`.
 See [viewing in ParaView](overview.md#viewing-in-paraview).
 
 ## Selection, normalization and tracking
 
-Without `n_target`, the dielectric vector search uses
-`n_cladding < Re n_eff < sqrt(max Re epsilon)` and descending Re n_eff.
+Without `target_effective_index`, the dielectric vector search uses
+`effective_index_threshold < Re n_eff < sqrt(max Re epsilon)` and descending Re n_eff.
 This is a candidate filter, not a proof of confinement or search completeness.
-For non-positive Re epsilon, explicitly set the physics `n_target` to a positive
+For non-positive Re epsilon, explicitly set the physics `target_effective_index` to a positive
 real index: candidates nearest this target are selected and then sorted by
-Re n_eff. No dielectric upper bound is applied. `n_cladding` remains required for
+Re n_eff. No dielectric upper bound is applied. `effective_index_threshold` remains required for
 vector documents. Low-level `galerkin.solve_modes` additionally accepts a complex
 shift target. Refine both the mesh and the outer window before interpreting a
 candidate as a guided mode. There is no automatic attenuation cutoff.
 
 Scalar normalization fixes the peak coefficient to one. Vector normalization
 sets the largest sampled centroid |E| to one, preserving relative components;
-physical `Ez = i*ez` in the low-level return. A mode's overall phase is arbitrary.
+physical `Ez = i*ez` in the low-level (kernel-frame) return. A mode's overall phase is arbitrary.
 No nearby eigenvectors are mixed to manufacture an orthogonal eigenbasis.
 
 Resolved vector wavelength sweeps and absorbing scalar wavelength sweeps use

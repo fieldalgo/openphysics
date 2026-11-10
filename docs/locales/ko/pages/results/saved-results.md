@@ -87,11 +87,13 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | flux/convection 필드를 포함한 정상 재료 영역 열 (`thermal2d-p1-node-cell-regions-v2`, 축대칭 `thermal-axisymmetric-p1-node-cell-regions-v2`) | VTU |
 | 직사각형·영역 과도 열 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
 | 열유속·대류 변이 있는 직사각형 과도 열(`thermal2d-transient-p1-node-cell-boundary-v2`), step별 하중 배열 두 개 포함 | 한 시각은 VTU, 저장한 전체 시각은 PVD |
-| format 0.3 이전에 저장한 열 layout (`RETIRED_LAYOUTS`, 예: `thermal2d-p1-node-cell-regions-v1`) | 이름으로 거절; 문서를 format 0.3으로 다시 만들어 다시 실행 |
+| format 0.3 이전에 저장한 열·전기·Joule·역학·도파관 모드 layout (`RETIRED_LAYOUTS`, 예: `thermal2d-p1-node-cell-regions-v1`, `electric-joule2d-p1-v1`, `mechanics2d-p1-v1`, `em-modes2d-p1-node-centroid-v1`) | 이름으로 거절; 문서를 format 0.3으로 다시 만들어 다시 실행 |
 | 진공 PEC 공동 | VTU |
-| 전기 전도·Joule 가열 (`electric-joule2d-p1-v1`) | VTU |
+| 전기 전도·Joule 가열 (`electric-joule2d-p1-v2`; 영역 `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`) | VTU |
+| 직사각형 탄성·열탄성 (`mechanics2d-p1-v2`, `thermoelastic2d-p1-v2`), 변형률·응력은 이름 있는 성분 스칼라 | VTU |
+| 영역 탄성·열탄성 (`mechanics2d-p1-regions-v2`, `thermoelastic2d-p1-regions-v2`) | 아직 내보내지 않음(지원하지 않는 layout으로 거절); `fields.npz`를 읽음 |
 | 재료·손실 벽이 있는 공동 (`cavity3d-edge-complex-v1`) | VTU, 복소 장은 `_real`/`_imag` 쌍 |
-| 도파관 모드 (`em.modes2d`, `em-modes2d-p1-node-centroid-v1`) | 단일 지점은 VTU, sweep은 PVD(`export_sweep`); 절점은 미터로 변환, 복소 모드는 `_real`/`_imag` 쌍; subspace sweep(`em-modes2d-subspace-raw-v1`)과 `field_layout` 없이 저장된 결과는 거절 |
+| 도파관 모드 (`em.modes2d`, `em-modes2d-p1-node-centroid-v2`) | 단일 지점은 VTU, sweep은 PVD(`export_sweep`); `node_coordinates`는 미터, 복소 모드는 exp(−iωt)의 `_real`/`_imag` 쌍; subspace sweep(`em-modes2d-subspace-raw-v2`)과 `field_layout` 없이 저장된 결과는 거절 |
 
 영역 경로와 직사각형 boundary-v3 경로는 물리 조건이 비슷해도 layout이 다릅니다.
 내보내기 미지원이 해석 실패를 뜻하지는 않습니다. 정확한 범위와 해석은

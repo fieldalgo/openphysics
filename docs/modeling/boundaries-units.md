@@ -34,21 +34,30 @@ entering the body, not positive outward flow. Exact equations and callback rules
 
 ## Electric and mechanical constraints
 
-- Electrical voltage fixes potential. Prescribed outward current density J·n is
-  positive leaving the body. The Python electric API has an explicit pure-Neumann
-  gauge path; do not infer that the more restricted JSON input supports it.
+- Electrical voltage fixes potential (`prescribed_electric_potential` in documents). A
+  document's `inward_current_density` is positive entering the body; the Python electric
+  API takes the prescribed outward current density J·n, positive leaving the body (simcase
+  hands it the negated document value). Reported boundary currents
+  (`outward_current_per_depth`) are positive leaving. The Python electric API has an
+  explicit pure-Neumann gauge path; do not infer that the more restricted JSON input
+  supports it.
 - Mechanical displacement fixes selected components, not temperature. A connected
   2D body needs independent constraints on its three rigid modes. An arbitrary
   count of three fixed DOFs is not enough if they leave a rotation free.
 - Traction is force per area in global Cartesian directions. It is not a scalar
   pressure or total nodal force. Remaining natural boundaries are traction-free
   under the relevant mechanical contract. Region mechanics documents also take a
-  scalar `pressure_pa` per named boundary: the traction −p n with n the outward
-  normal, so a positive pressure pushes on the body
+  scalar `gauge_pressure` per named boundary, the pressure above the surroundings: the
+  traction −gauge_pressure · n with n the outward normal, so a positive gauge pressure pushes
+  into the body (the 0.2 `pressure_pa`, same sign). An absolute pressure (`bara`, `psia`,
+  `absolute_pressure`) is refused, and 90 to 110 kPa warns that it may be atmospheric
   ([contract](../packages/simcase/mechanics2d.md#material-regions-and-named-boundaries)).
+  Reported support forces (`reaction_force_per_depth`) are the force the constraint exerts on
+  the body.
 - Plane stress and plane strain are different physical approximations, not
-  alternative accuracy settings. Thermal expansion also requires a reference
-  temperature; fixing thermal nodes never automatically fixes mechanical nodes.
+  alternative accuracy settings. Thermal expansion also requires a stress-free
+  temperature (`stress_free_temperature` in documents); fixing thermal nodes never
+  automatically fixes mechanical nodes.
 
 See [electric conduction](../packages/galerkin/electric_steady2d.md),
 [elasticity](../packages/galerkin/elasticity2d.md) and
@@ -64,8 +73,10 @@ See [electric conduction](../packages/galerkin/electric_steady2d.md),
 | Integrated 2D heat/current rate | W/m, A/m | Yes, to obtain W or A |
 | Mechanical reaction, elastic energy | N/m, J/m | Yes, to obtain N or J |
 
-Document geometry and mesh sizes use the declared length unit. SI-suffixed
-properties keep their indicated units. Meshers have no automatic physical unit
+In a document the bare shape numbers follow the geometry's `length_unit`; every other value
+carries its own unit (mesh sizes included, such as `"0.5 mm"`). A geometry `depth` of `null`
+keeps the per-depth values (W/m, N/m, J/m); a length such as `"10 mm"` (for plane stress, the
+plate thickness) adds the totals (W, N, J) beside them. Meshers have no automatic physical unit
 conversion; the thermal/mechanical Python engine expects metres. Optical APIs
 have their own wavelength/length contracts; do not apply the SI-engine rule to
 every package indiscriminately. Convert Celsius to kelvin before supplying a
@@ -73,11 +84,12 @@ Kelvin input; changing a label does not convert a number.
 
 ## Optical signs are an interface boundary
 
-`physmat` and JSON use positive extinction coefficient n+ik for passive materials.
-The low-level mode solver uses `exp(+i omega t-i beta z)` and negative imaginary
-permittivity for passive loss. The document runner performs the conjugation at
-the boundary. Do not conjugate document materials again. Forward passive modes
-have Im n_eff<0 under this convention. Mode fields have relative normalization,
+`physmat` and JSON use positive extinction coefficient n+ik for passive materials, and
+documents and results use `exp(-i omega t+i beta z)`: forward passive modes have
+Im n_eff>0, and the propagation loss is positive in dB/m. The low-level mode solver keeps
+`exp(+i omega t-i beta z)` and negative imaginary permittivity for passive loss; simcase
+conjugates once at that boundary, inputs on the way in and results on the way out. Do not
+conjugate document materials or results again. Mode fields have relative normalization,
 not automatically V/m or unit optical power. Read the
 [lossy-mode contract](../packages/simcase/lossy_modes.md) before comparing fields
 or converting attenuation.

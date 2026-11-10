@@ -327,80 +327,125 @@ def test_electric_export_checks_its_arrays_and_still_refuses_other_layouts(tmp_p
         export_fields(other, tmp_path / "other.vtu")
 
 
+def _field_data_matches(vtu, summary, exported):
+    """The FieldData units are the saved field_units of each exported array (a split component
+    takes its array's unit), and the conventions carry the sign texts."""
+    from simcase.export import read_field_data
+    block = read_field_data(vtu)
+    assert set(block["units"]) == exported
+    return block
+
+
 def test_mechanics_result_exports_nodal_vectors_and_named_components(tmp_path):
     fields = _saved(tmp_path, "elastic_plate.json")
-    mesh = meshio.read(export_fields(fields, tmp_path / "plate.vtu"))
+    vtu = export_fields(fields, tmp_path / "plate.vtu")
+    mesh = meshio.read(vtu)
     with np.load(fields) as saved:
-        assert str(saved["field_layout"]) == "mechanics2d-p1-v1"
-        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
+        assert str(saved["field_layout"]) == "mechanics2d-p1-v2"
+        summary = json.loads(str(saved["metadata_json"]))
+        np.testing.assert_array_equal(mesh.points[:, :2], saved["node_coordinates"])
         np.testing.assert_array_equal(mesh.points[:, 2], 0.0)
         np.testing.assert_array_equal(mesh.cells_dict["triangle"], saved["triangles"])
-        nodal = {"displacement_m", "load_n_per_m", "reaction_n_per_m", "residual_n_per_m"}
+        nodal = {"displacement", "applied_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth"}
         assert set(mesh.point_data) == nodal
         for name in nodal:
             np.testing.assert_array_equal(mesh.point_data[name][:, :2], saved[name])
             np.testing.assert_array_equal(mesh.point_data[name][:, 2], 0.0)
-        components = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa")}
+        components = {"strain": ("strain_xx", "strain_yy", "engineering_shear_strain_xy"),
+                      "stress": ("stress_xx", "stress_yy", "stress_xy")}
+        assert {name: tuple(names) for name, names in summary["field_components"].items()
+                if name in components} == components
         assert set(mesh.cell_data) == {c for names in components.values() for c in names}
         for name, names in components.items():
             for k, component in enumerate(names):
                 np.testing.assert_array_equal(mesh.cell_data[component][0], saved[name][:, k])
-        for name in ("dirichlet_node_ids", "dirichlet_components", "dirichlet_displacement_m", "metadata_json"):
+        for name in ("prescribed_node_ids", "prescribed_components", "prescribed_displacement", "metadata_json"):
             assert name in saved.files and name not in mesh.point_data and name not in mesh.cell_data
+    block = _field_data_matches(vtu, summary, set(mesh.point_data) | set(mesh.cell_data))
+    for name in nodal:
+        assert block["units"][name] == summary["field_units"][name]
+    for name, names in components.items():
+        assert all(block["units"][c] == summary["field_units"][name] for c in names)
+    assert block["conventions"]["sign"]["reaction_force_per_depth"]
     with pytest.raises(ValueError, match="time series export needs layout"):
         export_time_series(fields, tmp_path / "series")
 
 
 def test_thermoelastic_result_exports_heat_and_mechanics_arrays(tmp_path):
     fields = _saved(tmp_path, "thermoelastic_bar.json")
-    mesh = meshio.read(export_fields(fields, tmp_path / "bar.vtu"))
+    vtu = export_fields(fields, tmp_path / "bar.vtu")
+    mesh = meshio.read(vtu)
     with np.load(fields) as saved:
-        assert str(saved["field_layout"]) == "thermoelastic2d-p1-v1"
-        np.testing.assert_array_equal(mesh.points[:, :2], saved["nodes_m"])
-        scalars = {"temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m", "thermal_residual_w_per_m",
-                   "prescribed_outward_heat_w_per_m", "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
-                   "thermal_system_rhs_w_per_m"}
-        vectors = {"displacement_m", "load_external_n_per_m", "load_thermal_n_per_m", "load_body_n_per_m",
-                   "load_traction_n_per_m", "reaction_n_per_m", "residual_n_per_m"}
+        assert str(saved["field_layout"]) == "thermoelastic2d-p1-v2"
+        summary = json.loads(str(saved["metadata_json"]))
+        np.testing.assert_array_equal(mesh.points[:, :2], saved["node_coordinates"])
+        scalars = {"temperature", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+                   "residual_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+                   "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                   "applied_heat_rate_per_depth"}
+        vectors = {"displacement", "applied_force_per_depth", "thermal_equivalent_force_per_depth",
+                   "applied_body_force_per_depth", "applied_traction_force_per_depth", "reaction_force_per_depth",
+                   "residual_force_per_depth"}
         assert set(mesh.point_data) == scalars | vectors
         for name in scalars:
             np.testing.assert_array_equal(mesh.point_data[name], saved[name])
         for name in vectors:
             np.testing.assert_array_equal(mesh.point_data[name][:, :2], saved[name])
             np.testing.assert_array_equal(mesh.point_data[name][:, 2], 0.0)
-        components = {"total_strain": ("total_exx", "total_eyy", "total_gxy"),
-                      "thermal_strain": ("thermal_exx", "thermal_eyy", "thermal_gxy"),
-                      "elastic_strain": ("elastic_exx", "elastic_eyy", "elastic_gxy"),
-                      "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa")}
-        expected_cells = {c for names in components.values() for c in names} | {"heat_flux_w_m2", "sigma_zz_pa", "epsilon_zz"}
+        components = {"strain": ("strain_xx", "strain_yy", "engineering_shear_strain_xy"),
+                      "thermal_strain": ("thermal_strain_xx", "thermal_strain_yy",
+                                         "engineering_shear_thermal_strain_xy"),
+                      "elastic_strain": ("elastic_strain_xx", "elastic_strain_yy",
+                                         "engineering_shear_elastic_strain_xy"),
+                      "stress": ("stress_xx", "stress_yy", "stress_xy")}
+        assert {name: tuple(names) for name, names in summary["field_components"].items()
+                if name in components} == components
+        expected_cells = {c for names in components.values() for c in names} | {"heat_flux", "stress_zz", "strain_zz"}
         assert set(mesh.cell_data) == expected_cells
         for name, names in components.items():
             for k, component in enumerate(names):
                 np.testing.assert_array_equal(mesh.cell_data[component][0], saved[name][:, k])
-        np.testing.assert_array_equal(mesh.cell_data["heat_flux_w_m2"][0][:, :2], saved["heat_flux_w_m2"])
-        np.testing.assert_array_equal(mesh.cell_data["sigma_zz_pa"][0], saved["sigma_zz_pa"])
-        np.testing.assert_array_equal(mesh.cell_data["epsilon_zz"][0], saved["epsilon_zz"])
-        for name in ("thermal_dirichlet_node_ids", "dirichlet_temperature_k", "dirichlet_node_ids", "metadata_json"):
+        np.testing.assert_array_equal(mesh.cell_data["heat_flux"][0][:, :2], saved["heat_flux"])
+        np.testing.assert_array_equal(mesh.cell_data["stress_zz"][0], saved["stress_zz"])
+        np.testing.assert_array_equal(mesh.cell_data["strain_zz"][0], saved["strain_zz"])
+        for name in ("thermal_prescribed_node_ids", "prescribed_temperature", "prescribed_node_ids", "metadata_json"):
             assert name in saved.files and name not in mesh.point_data and name not in mesh.cell_data
+    block = _field_data_matches(vtu, summary, set(mesh.point_data) | set(mesh.cell_data))
+    for name in (*scalars, *vectors, "heat_flux", "stress_zz", "strain_zz"):
+        assert block["units"][name] == summary["field_units"][name], name
+    for name, names in components.items():
+        assert all(block["units"][c] == summary["field_units"][name] for c in names)
+    assert block["conventions"]["sign"]["heat_flux"]
     with pytest.raises(ValueError, match="time series export needs layout"):
         export_time_series(fields, tmp_path / "series")
 
 
 def test_mechanics_export_checks_its_arrays(tmp_path):
     nodes = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
-    base = dict(field_layout="mechanics2d-p1-v1", nodes_m=nodes, triangles=np.array([[0, 1, 2]]))
+    base = dict(field_layout="mechanics2d-p1-v2", node_coordinates=nodes, triangles=np.array([[0, 1, 2]]))
     missing = tmp_path / "missing.npz"
-    np.savez(missing, **base, stress_pa=np.zeros((1, 3)))
-    with pytest.raises(ValueError, match="needs the saved displacement_m"):
+    np.savez(missing, **base, stress=np.zeros((1, 3)))
+    with pytest.raises(ValueError, match="needs the saved displacement array"):
         export_fields(missing, tmp_path / "missing.vtu")
     wrong = tmp_path / "wrong.npz"
-    np.savez(wrong, **base, displacement_m=np.zeros((3, 2)), strain=np.zeros((1, 2)))
+    np.savez(wrong, **base, displacement=np.zeros((3, 2)), strain=np.zeros((1, 2)))
     with pytest.raises(ValueError, match="strain: expected three components per triangle"):
         export_fields(wrong, tmp_path / "wrong.vtu")
     flat = tmp_path / "flat.npz"
-    np.savez(flat, **base, displacement_m=np.zeros(3))
-    with pytest.raises(ValueError, match="displacement_m: expected one 2D vector per node"):
+    np.savez(flat, **base, displacement=np.zeros(3))
+    with pytest.raises(ValueError, match="displacement: expected one 2D vector per node"):
         export_fields(flat, tmp_path / "flat.vtu")
+    # a result saved before the units batch is refused by its layout, and a region result is not exported
+    for layout in ("mechanics2d-p1-v1", "thermoelastic2d-p1-v1"):
+        retired = tmp_path / f"{layout}.npz"
+        np.savez(retired, field_layout=layout, nodes_m=nodes, triangles=np.array([[0, 1, 2]]))
+        with pytest.raises(ValueError, match=rf"saved before the units and naming batch \(layout {layout}\)"):
+            export_fields(retired, tmp_path / "retired.vtu")
+    for layout in ("mechanics2d-p1-regions-v2", "thermoelastic2d-p1-regions-v2"):
+        region = tmp_path / f"{layout}.npz"
+        np.savez(region, field_layout=layout, node_coordinates=nodes, triangles=np.array([[0, 1, 2]]))
+        with pytest.raises(ValueError, match=f"unsupported field layout '{layout}'"):
+            export_fields(region, tmp_path / "region.vtu")
     assert not any(tmp_path.glob("*.vtu"))
 
 

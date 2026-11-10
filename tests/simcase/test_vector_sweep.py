@@ -17,14 +17,20 @@ from simcase.cli import main
 import simcase.runner as runner
 
 
+def um(x):
+    return f"{x!r} um"
+
+
 def sweep_data(h=0.012, values=(1.54, 1.55, 1.56), dispersive=False):
     d = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
-    d["geometry"]["shapes"][0]["mesh_size"] = h
-    d["mesh"]["size"] = 5 * h
-    d["mesh"]["grading"].update(near=h, far=5 * h)
-    d["study"]["values"] = list(values)
+    d["geometry"]["shapes"][0]["element_size"] = um(h)
+    d["mesh"]["element_size"] = um(5 * h)
+    d["mesh"]["grading"].update(near=um(h), far=um(5 * h))
+    d["study"]["values"] = {"unit": "um", "values": list(values)}
     if dispersive:
-        d["materials"]["film"] = {"sellmeier": {"A": 1.0, "B": [11.0], "C": [0.02]}}
+        d["materials"]["film"] = {"refractive_index": {
+            "model": "sellmeier", "constant": 1.0,
+            "terms": [{"strength": 11.0, "resonance_wavelength_squared": "0.02 um^2"}], "reference_medium": "vacuum"}}
     return d
 
 
@@ -54,7 +60,7 @@ def test_vector_group_index_matches_implicit_dispersion_and_mesh_converges(dispe
     exact_n, exact_ng = analytic_te(1.55, dispersive)
     for h in (0.024, 0.012, 0.006):
         result = run(Document.from_dict(sweep_data(h=h, dispersive=dispersive)), False)
-        assert abs(result.neff[1, 0] - exact_n) < 0.003
+        assert abs(result.effective_index[1, 0] - exact_n) < 0.003
         errors.append(abs(result.group_index()[1, 0] - exact_ng))
         assert min(p["overlaps"][0] for p in result.mode_tracking["points"][1:]) > 0.99
     assert errors[-1] < 3e-4
@@ -75,7 +81,7 @@ def test_vector_nonuniform_increasing_and_decreasing_wavelengths_agree():
     values = [1.45, 1.49, 1.55, 1.62, 1.65]
     forward = run(Document.from_dict(sweep_data(values=values)), False)
     backward = run(Document.from_dict(sweep_data(values=values[::-1])), False)
-    np.testing.assert_allclose(forward.neff, backward.neff[::-1], atol=1e-10, rtol=0)
+    np.testing.assert_allclose(forward.effective_index, backward.effective_index[::-1], atol=1e-10, rtol=0)
     np.testing.assert_allclose(forward.group_index(), backward.group_index()[::-1], atol=1e-9, rtol=0)
     # This includes endpoint derivatives: first-order endpoints miss this bound.
     exact = [analytic_te(wl)[1] for wl in values]
@@ -85,43 +91,39 @@ def test_vector_nonuniform_increasing_and_decreasing_wavelengths_agree():
 @pytest.mark.parametrize("unit,ratio", [("nm", 1e3), ("um", 1.0), ("m", 1e-6)])
 def test_vector_sweep_units_saved_tracking_and_raw_fields(unit, ratio, tmp_path):
     d = sweep_data()
-    d["units"]["length"] = unit
+    # the geometry's length_unit names the shape numbers; tagged lengths keep their units
+    d["geometry"]["length_unit"] = unit
     d["geometry"]["domain"] = {k: v * ratio for k, v in d["geometry"]["domain"].items()}
     for shape in d["geometry"]["shapes"]:
-        for key in ("x", "y", "w", "h", "mesh_size"):
+        for key in ("x", "y", "w", "h"):
             shape[key] *= ratio
-    d["mesh"]["size"] *= ratio
-    gr = d["mesh"]["grading"]
-    gr["center"] = [v * ratio for v in gr["center"]]
-    for key in ("near", "far", "distance"):
-        gr[key] *= ratio
-    d["physics"]["em1"]["wavelength"] *= ratio
-    d["study"]["values"] = [v * ratio for v in d["study"]["values"]]
     result = run(Document.from_dict(d), False)
     assert abs(result.group_index()[1, 0] - analytic_te(1.55)[1]) < 1.2e-3
     output = result.save(tmp_path / unit)
     summary = json.loads((output / "summary.json").read_text())
     json.dumps(summary, allow_nan=False)
     assert summary["mode_tracking"] == result.mode_tracking
-    assert summary["units"] == {"length": unit}
+    assert set(summary["mode_tracking"]["settings"]) == {"search_mode_count", "mode_tracking_threshold",
+                                                         "mode_tracking_margin_threshold", "degeneracy_tolerance"}
+    assert "units" not in summary and summary["study"]["values"]["unit"] == "m"
     assert (output / "results.png").stat().st_size > 0
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
         assert json.loads(str(arrays["mode_tracking_json"])) == result.mode_tracking
         np.testing.assert_array_equal(arrays["group_index"], result.group_index())
-        space = EdgeSpace(Mesh(arrays["nodes"], arrays["triangles"], {}))
+        space = EdgeSpace(Mesh(arrays["node_coordinates"], arrays["triangles"], {}))
         for i in range(3):
-            electric = arrays["vector_electric"][i]
-            np.testing.assert_allclose(eval_edge_field(space, arrays["vector_transverse"][i, :, 0]),
+            electric = arrays["unnormalized_electric_field"][i]
+            np.testing.assert_allclose(eval_edge_field(space, arrays["unnormalized_electric_field_line_integral"][i, :, 0]),
                                        electric[:, 0, :2], atol=1e-12)
-            ez = arrays["vector_longitudinal"][i]
+            ez = arrays["unnormalized_electric_field_z"][i]
             np.testing.assert_allclose(ez[space.mesh.triangles].mean(axis=1), electric[:, :, 2], atol=1e-12)
             np.testing.assert_allclose(np.linalg.norm(electric, axis=2).max(axis=0), 1.0)
 
 
 def test_actual_slab_cutoff_fails_at_the_lost_point_and_cli_writes_no_result(tmp_path, capsys):
     d = sweep_data(values=[1.25, 1.35, 1.45])
-    d["physics"]["em1"]["num_modes"] = 2
-    assert [len(slab.modes(3.48, 1.444, 1.444, .22, wl)) for wl in d["study"]["values"]] == [2, 2, 1]
+    d["physics"]["em1"]["mode_count"] = 2
+    assert [len(slab.modes(3.48, 1.444, 1.444, .22, wl)) for wl in d["study"]["values"]["values"]] == [2, 2, 1]
     model = tmp_path / "cutoff.json"
     Document.from_dict(d).save(model)
     output = tmp_path / "out"
@@ -133,8 +135,9 @@ def test_actual_slab_cutoff_fails_at_the_lost_point_and_cli_writes_no_result(tmp
 
 def test_fiber_rejects_unselected_degenerate_partner_even_for_one_requested_mode():
     d = copy.deepcopy(examples.VECTOR_FIBER)
-    d["physics"]["em1"]["num_modes"] = 1
-    d["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.5, 1.55, 1.6])
+    d["physics"]["em1"]["mode_count"] = 1
+    d["study"] = dict(type="sweep", parameter="physics.em1.vacuum_wavelength",
+                      values={"unit": "um", "values": [1.5, 1.55, 1.6]})
     with pytest.raises(ModeTrackingError, match="wavelength 1.5 um.*mode 1.*near-degenerate"):
         run(Document.from_dict(d), False)
 
@@ -142,15 +145,15 @@ def test_fiber_rejects_unselected_degenerate_partner_even_for_one_requested_mode
 @pytest.mark.parametrize("failure", [RuntimeError("factor is exactly singular"),
     ArpackNoConvergence("no convergence", np.empty(0), None)])
 def test_numerical_solve_failure_keeps_wavelength_context_without_partial_output(failure, monkeypatch, tmp_path, capsys):
-    # A tracked sweep solves in micrometres and converts fields once, after tracking.
-    original = runner._solve_in_micrometres
+    # A tracked sweep solves in the kernel's micrometres and converts fields once, after tracking.
+    original = runner._kernel_solve
 
     def failing_point(model, physics):
         if physics["wavelength"] == 1.55:
             raise failure
         return original(model, physics)
 
-    monkeypatch.setattr(runner, "_solve_in_micrometres", failing_point)
+    monkeypatch.setattr(runner, "_kernel_solve", failing_point)
     model = tmp_path / "numerical-failure.json"
     Document.from_dict(sweep_data()).save(model)
     output = tmp_path / "out"
@@ -165,14 +168,15 @@ def test_numerical_solve_failure_keeps_wavelength_context_without_partial_output
     [1.5, "1.55", 1.6], None])
 def test_vector_sweep_rejects_invalid_wavelength_samples(values):
     d = sweep_data()
-    d["study"]["values"] = values
+    d["study"]["values"] = None if values is None else {"unit": "um", "values": values}
     with pytest.raises(DocumentError):
         Document.from_dict(d)
 
 
-@pytest.mark.parametrize("settings", [{"search_modes": 1}, {"search_modes": 2.5}, {"search_modes": True},
-    {"min_overlap": 0}, {"min_overlap": 1.1}, {"min_margin": 0}, {"degeneracy_tolerance": -1},
-    {"min_margin": float("nan")}, {"unknown": 1}, []])
+@pytest.mark.parametrize("settings", [{"search_mode_count": 1}, {"search_mode_count": 2.5},
+    {"search_mode_count": True}, {"mode_tracking_threshold": 0}, {"mode_tracking_threshold": 1.1},
+    {"mode_tracking_margin_threshold": 0}, {"degeneracy_tolerance": -1},
+    {"mode_tracking_margin_threshold": float("nan")}, {"unknown": 1}, {"search_modes": 6}, []])
 def test_vector_sweep_validates_tracking_settings(settings):
     d = sweep_data()
     d["study"]["tracking"] = settings
@@ -180,9 +184,12 @@ def test_vector_sweep_validates_tracking_settings(settings):
         Document.from_dict(d)
 
 
-@pytest.mark.parametrize("parameter", ["physics.em1.num_modes", "physics.em1.n_cladding", "physics.em1.formulation"])
-def test_vector_sweep_rejects_non_wavelength_parameters(parameter):
+@pytest.mark.parametrize("parameter,values", [
+    ("physics.em1.mode_count", {"values": [1, 2, 3]}), ("physics.em1.effective_index_threshold", [1.4, 1.41, 1.42]),
+    ("physics.em1.formulation", ["vector", "vector", "vector"])])
+def test_vector_sweep_rejects_non_wavelength_parameters(parameter, values):
     d = sweep_data()
     d["study"]["parameter"] = parameter
-    with pytest.raises(DocumentError, match="only the wavelength"):
+    d["study"]["values"] = values
+    with pytest.raises(DocumentError, match="only the vacuum_wavelength"):
         Document.from_dict(d)

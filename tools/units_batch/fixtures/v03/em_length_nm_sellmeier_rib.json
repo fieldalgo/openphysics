@@ -1,0 +1,118 @@
+{
+  "openphysics": "0.3",
+  "name": "220 nm Si slab, TE check against refsol",
+  "geometry": {
+    "length_unit": "nm",
+    "depth": null,
+    "domain": {
+      "xmin": -500.0,
+      "xmax": 500.0,
+      "ymin": -1200.0,
+      "ymax": 1200.0
+    },
+    "background": {
+      "material": "glass"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -500.0,
+        "y": 0.0,
+        "w": 1000.0,
+        "h": 220.0,
+        "material": "physmat:Si",
+        "element_size": "10 nm"
+      },
+      {
+        "name": "wedge",
+        "type": "polygon",
+        "material": "physmat:Si",
+        "points": [
+          [
+            -300.0,
+            -600.0
+          ],
+          [
+            300.0,
+            -600.0
+          ],
+          [
+            200.0,
+            -300.0
+          ],
+          [
+            -200.0,
+            -300.0
+          ]
+        ]
+      },
+      {
+        "name": "dot",
+        "type": "circle",
+        "cx": 250.0,
+        "cy": -800.0,
+        "r": 80.0,
+        "material": "physmat:Si",
+        "element_size": "30 nm"
+      }
+    ]
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "vacuum_wavelength": "1550 nm",
+      "mode_count": 1,
+      "boundary": {
+        "left": "pmc",
+        "right": "pmc",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "250 nm",
+    "grading": {
+      "position": [
+        "0 nm",
+        "110 nm"
+      ],
+      "near": "10 nm",
+      "far": "80 nm",
+      "refinement_distance": "1000 nm"
+    }
+  },
+  "study": {
+    "type": "single"
+  },
+  "materials": {
+    "glass": {
+      "refractive_index": {
+        "model": "sellmeier",
+        "terms": [
+          {
+            "strength": 0.6961663,
+            "resonance_wavelength_squared": "4679.14825849 nm^2"
+          },
+          {
+            "strength": 0.4079426,
+            "resonance_wavelength_squared": "13512.063073959998 nm^2"
+          },
+          {
+            "strength": 0.8974794,
+            "resonance_wavelength_squared": "97934002.53792098 nm^2"
+          }
+        ],
+        "valid": {
+          "vacuum_wavelength": [
+            "210 nm",
+            "6700 nm"
+          ]
+        },
+        "reference_medium": "vacuum"
+      }
+    }
+  }
+}

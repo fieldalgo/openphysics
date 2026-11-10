@@ -528,8 +528,13 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
     read = Document.from_dict(doc)
     if v03 and read.si is not None and "background" in g and doc["physics"]:
         from simcase.thermal_regions import handoff_03
-        if next(iter(doc["physics"].values()))["type"].startswith("thermal."):
+        kind = next(iter(doc["physics"].values()))["type"]
+        if kind.startswith("thermal."):
             read = handoff_03(read)    # heat region documents mesh their hand-off (format 0.3)
+        elif kind == "em.modes2d":     # mode documents mesh their micrometre kernel hand-off (format 0.3)
+            from simcase.modes_document import kernel_document
+            assert units == {"length": "um"}    # so the hand-off's areas are the document's
+            read = kernel_document(read)
     ref = resolve_regions(read)
     unit = float(model.pm_per_unit)
     assert [r[0] for r in ref] == rc.region_names()
@@ -648,34 +653,41 @@ def test_hand_off_rounds_each_coordinate_once():
 
 # ----------------------------------------------------------------- the runner route of version 1 documents
 
+def _kernel_canonical(doc):
+    """The micrometre geometry a mode run meshes: the kernel hand-off's canonical document."""
+    from simcase.modes_document import kernel_document
+    from simcase.views import modes_mesh
+    return modes_mesh(kernel_document(doc)).canonical
+
+
 def test_a_version_1_document_is_meshed_by_the_engine():
     from simcase import Document, build_domain
-    from simcase.runner import micrometre_document
     raw = copy.deepcopy(EXAMPLES["soi_strip"])
     raw["geometry"] = from_v02(raw["geometry"])
     comp = raw["geometry"]["components"]["main"]
     comp["boundary_tags"] = [{"tag": "port", "select": {"boundary": {"between": ["background", "exterior"]}}}]
     doc = Document.from_dict(raw)
     assert doc.geometry_model is not None and doc.copy().geometry_model is doc.geometry_model
-    canonical = micrometre_document(doc)
-    assert canonical.geometry_model is doc.geometry_model
+    canonical = _kernel_canonical(doc)
+    assert canonical.geometry_model is not None and canonical.is_version_1
     domain, namer, materials = build_domain(canonical)
     mesh = generate(domain, namer)
-    assert materials == {"core": "Si", "background": "SiO2"}
+    assert materials == {"core": "physmat:Si", "background": "physmat:SiO2"}
     assert set(mesh.boundary_edges) == {"port"}                   # boundary_tags reach the mesh
     assert set(mesh.region_names) == {"core", "background"}
     del comp["boundary_tags"]
-    domain, namer, _materials = build_domain(micrometre_document(Document.from_dict(raw)))
+    domain, namer, _materials = build_domain(_kernel_canonical(Document.from_dict(raw)))
     assert set(generate(domain, namer).boundary_edges) == {"left", "right", "bottom", "top"}
 
 
-def test_the_0_2_route_is_untouched_for_0_2_documents():
+def test_the_flat_route_is_untouched_for_flat_documents():
     from simcase import Document, build_domain
-    from simcase.runner import micrometre_document
     doc = Document.from_dict(copy.deepcopy(EXAMPLES["soi_strip"]))
     assert doc.geometry_model is None
-    domain, namer, materials = build_domain(micrometre_document(doc))
-    assert materials == {"core": "Si", "background": "SiO2"} and callable(namer)
+    canonical = _kernel_canonical(doc)
+    assert canonical.geometry_model is None
+    domain, namer, materials = build_domain(canonical)
+    assert materials == {"core": "physmat:Si", "background": "physmat:SiO2"} and callable(namer)
 
 
 # ----------------------------------------------------------------- mesh edges by curve, provenance and selection
@@ -766,7 +778,7 @@ def _run_v1(raw):
 
 def test_an_imprint_document_loads_runs_and_keeps_the_covered_boundary():
     from simcase import Document, build_domain
-    from simcase.runner import micrometre_document
+    from simcase.modes_document import kernel_document
     plain = _soi_v1()
     core = plain["geometry"]["components"]["main"]["features"][0]
     cover = dict(core, name="wide", id="wide", x=core["x"] - 0.1, w=core["w"] + 0.2)        # the same silicon, wider
@@ -775,20 +787,20 @@ def test_an_imprint_document_loads_runs_and_keeps_the_covered_boundary():
     doc = Document.from_dict(raw)
     assert doc.is_version_1 and [r["name"] for r in doc.regions()] == ["core", "wide"]
     assert doc.to_dict()["geometry"]["components"]["main"]["finalize"] == "imprint"
-    rc_domain, namer, materials = build_domain(micrometre_document(doc))
+    rc_domain, namer, materials = build_domain(_kernel_canonical(doc))
     mesh = generate(rc_domain, namer)
     assert set(mesh.region_names) == {"wide", "background"}                   # core is covered, as a region
     from simcase.geometry_engine import evaluate
     rc = evaluate(doc.geometry_model)
     assert [c.region for c in rc.cells].count("wide") == 3                    # left strip, the core footprint, right strip
-    rc.to_domain(micrometre_document(doc)["mesh"]["size"])
-    rc_domain2, namer2, _m = rc.to_domain(micrometre_document(doc)["mesh"]["size"])
+    rc.to_domain(kernel_document(doc)["mesh"]["size"])
+    rc_domain2, namer2, _m = rc.to_domain(kernel_document(doc)["mesh"]["size"])
     mesh2 = generate(rc_domain2, namer2)
     assert len(rc.provenance_edges(mesh2)["core.left"]) >= 1                    # the covered boundary is meshed
     merged = _soi_v1()
     merged["geometry"]["components"]["main"]["features"] = [cover]
     a, b = _run_v1(raw), _run_v1(merged)
-    assert abs(float(np.asarray(a.neff)[0, 0]) - float(np.asarray(b.neff)[0, 0])) < 2e-3   # same silicon, same mode
+    assert abs(float(a.effective_index[0, 0]) - float(b.effective_index[0, 0])) < 2e-3   # same silicon, same mode
 
 
 def test_a_segment_document_loads_and_runs():
@@ -799,7 +811,7 @@ def test_a_segment_document_loads_and_runs():
     doc = Document.from_dict(raw)
     assert [r["name"] for r in doc.regions()] == ["core"] and doc.is_version_1
     a, b = _run_v1(raw), _run_v1(_soi_v1())
-    assert abs(float(np.asarray(a.neff)[0, 0]) - float(np.asarray(b.neff)[0, 0])) < 2e-3
+    assert abs(float(a.effective_index[0, 0]) - float(b.effective_index[0, 0])) < 2e-3
     from simcase.geometry_engine import evaluate
     rc = evaluate(doc.geometry_model)
     assert [c.region for c in rc.cells].count("core") == 2 and len(rc.curves_with("cut.line")) == 3
@@ -1008,7 +1020,7 @@ def test_the_geometry_command_prints_the_complex(capsys, tmp_path):
     out = capsys.readouterr().out
     assert "component 'xs' (2d)" in out and "um" in out
     assert out.count("region 'rib'") == 2 and "slab.top" in out and "selection 'etch_line': 3 boundary entries" in out
-    assert "tag left" in out and "material Si" in out
+    assert "tag left" in out and "material silicon" in out     # the local record (D-24: not the library's name)
     old = tmp_path / "old.json"
     old.write_text(json.dumps(EXAMPLES["soi_strip"]), encoding="utf-8")
     assert main(["geometry", str(old)]) == 2
@@ -1135,20 +1147,22 @@ def test_the_engine_sliver_note_reaches_the_document():
     core = comp["features"][0]
     core.update({"x": 100, "y": 100, "w": 0.5, "h": 0.005})
     comp["features"].append(dict(core, name="cover", id="cover", x=100.0001, w=0.4999))
-    raw["mesh"] = {"size": 100}
+    raw["mesh"] = {"element_size": "100 um"}
     doc = Document.from_dict(raw)
     from simcase import DocumentError
     with pytest.raises(DocumentError, match="four domain sides"):      # the gap the sliver leaves is 'outer'
         build_mesh(doc)
-    assert any(n.startswith("geometry.features: a piece of 'core'") for n in doc.notes)
+    assert any(d.code == "W-PIECE-DROPPED" and d.path == "geometry.components.main.features"
+               and d.message.startswith("geometry.features: a piece of 'core'") for d in doc.diagnostics)
 
 
 def test_the_geometry_command_shows_what_the_document_route_refuses(capsys, tmp_path):
     from simcase.cli import main
     raw = _soi_v1()
     raw["geometry"]["components"]["main"]["features"].append(circle("hole", 0, 0.9, 0.1, None))
-    raw["geometry"]["components"]["plan"] = {"dimension": "2d", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1},
-                                             "background": {"material": "SiO2"}, "features": []}
+    raw["geometry"]["components"]["plan"] = {"dimension": "2d", "length_unit": "um", "depth": None,
+                                             "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1},
+                                             "background": {"material": "physmat:SiO2"}, "features": []}
     path = tmp_path / "void.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     assert main(["geometry", str(path), "-c", "main"]) == 0
@@ -1223,10 +1237,12 @@ def test_a_segment_document_evaluates_once_and_reuses_the_complex():
     raw = _soi_v1()
     raw["geometry"]["components"]["main"]["features"].append({"name": "cut", "type": "segment", "points": [[0, -1.2], [0, 1.2]]})
     doc = Document.from_dict(raw)
-    assert doc.geometry_complex is not None and doc.copy().geometry_complex is doc.geometry_complex
+    from simcase.modes_document import kernel_document
+    from simcase.thermal_regions import handoff_03
+    handoff = handoff_03(doc)                       # made and checked at load, kept on the document
+    assert handoff.geometry_complex is not None and handoff_03(doc) is handoff
     model = build_mesh(doc)
-    from simcase.runner import micrometre_document
-    assert micrometre_document(doc).geometry_complex is doc.geometry_complex
+    assert kernel_document(doc).geometry_complex is handoff.geometry_complex
     assert "cut.line" in model.mesh.provenance_edges
 
 
@@ -1300,7 +1316,7 @@ def test_g3_5_a_stadium_path_core_agrees_with_its_polygon_approximation():
     raw = _soi_v1()
     comp = raw["geometry"]["components"]["main"]
     core = comp["features"][0]
-    stadium = {"name": "core", "type": "path", "material": core["material"], "mesh_size": core["mesh_size"],
+    stadium = {"name": "core", "type": "path", "material": core["material"], "element_size": core["element_size"],
                "start": [-0.15, 0.0],
                "segments": [{"line": [0.15, 0.0]}, {"arc": {"center": [0.15, 0.11], "to": [0.15, 0.22], "ccw": True}},
                             {"line": [-0.15, 0.22]}, {"arc": {"center": [-0.15, 0.11], "to": [-0.15, 0.0], "ccw": True}}]}
@@ -1315,12 +1331,13 @@ def test_g3_5_a_stadium_path_core_agrees_with_its_polygon_approximation():
     pts = [[round(x, 6), round(y, 6)] for x, y in pts]
     poly_doc = copy.deepcopy(raw)
     poly_doc["geometry"]["components"]["main"]["features"] = [{"name": "core", "type": "polygon", "points": pts,
-                                                               "material": core["material"], "mesh_size": core["mesh_size"]}]
+                                                               "material": core["material"],
+                                                               "element_size": core["element_size"]}]
     a, b = run(Document.from_dict(raw), verbose=False), run(Document.from_dict(poly_doc), verbose=False)
-    na, nb = float(np.asarray(a.neff)[0, 0]), float(np.asarray(b.neff)[0, 0])
+    na, nb = float(a.effective_index[0, 0]), float(b.effective_index[0, 0])
     assert abs(na - nb) <= 2e-3, (na, nb)
     doc = Document.from_dict(raw)
-    assert doc.regions()[0]["type"] == "path" and "shape core: path" in doc.summary()
+    assert doc.regions()[0]["type"] == "path" and "feature core: path of physmat:Si" in doc.summary()
 
 
 def test_g3_6_region_complexity_counts_version_1_features():
@@ -1341,6 +1358,7 @@ def test_an_axisymmetric_waveguide_document_is_refused_at_load():
     raw = _soi_v1()
     comp = raw["geometry"]["components"]["main"]
     comp["dimension"] = "axisymmetric"
+    del comp["depth"]                                   # an axisymmetric component has no depth
     comp["domain"] = {"xmin": 0, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2}
     comp["features"][0]["x"] = 0
     with pytest.raises(DocumentError, match="em.modes2d takes 2d components only"):
@@ -1477,13 +1495,14 @@ def test_a_circle_segments_raise_is_noted_on_the_document_by_both_runners():
         "mesh.controls: circle_segments 8 of the circle of ['heater.boundary'] raised to") for d in tdoc.diagnostics)
     em = _soi_v1()
     em["geometry"]["components"]["main"]["features"].append(
-        {"name": "ring", "type": "circle", "cx": 0.0, "cy": 0.6, "r": 0.2, "material": "silicon"})
+        {"name": "ring", "type": "circle", "cx": 0.0, "cy": 0.6, "r": 0.2, "material": "physmat:Si"})
     em["geometry"]["components"]["main"]["features"].append(
-        {"name": "post", "type": "rect", "x": 0.2005, "y": 0.5, "w": 0.1, "h": 0.2, "material": "silicon"})
-    em["mesh"]["controls"] = [{"select": "ring", "circle_segments": 8}]
+        {"name": "post", "type": "rect", "x": 0.2005, "y": 0.5, "w": 0.1, "h": 0.2, "material": "physmat:Si"})
+    em["mesh"]["controls"] = [{"select": "ring", "circle_segment_count": 8}]
     doc = Document.from_dict(em)
     build_mesh(doc)
-    assert any(n.startswith("mesh.controls: circle_segments 8 of the circle of ['ring.boundary'] raised to") for n in doc.notes)
+    assert any(d.code == "I-MESH-CONTROL-RAISED" and d.path == "mesh.controls" and d.message.startswith(
+        "mesh.controls: circle_segments 8 of the circle of ['ring.boundary'] raised to") for d in doc.diagnostics)
 
 
 #: thermal_slab as format 0.2 (examples/simcase/thermal_slab.json before the units batch)
@@ -1639,11 +1658,12 @@ def test_g3_8_document_gradings_are_checked_converted_and_applied_by_both_runner
     assert size_function(handoff)(15.0, 10.0) == pytest.approx(0.2)
     assert size_function(handoff)(40.0, 10.0) == pytest.approx(2.0)
     em = _soi_v1(selections={"edge": {"boundary": {"of": "core"}}})
-    em["mesh"]["controls"] = [{"select": "edge", "near": 0.005, "far": 0.2, "distance": 0.3}]       # um
-    graded = build_mesh(Document.from_dict(em)).mesh                           # document units (um)
+    em["mesh"]["controls"] = [{"select": "edge", "near": "0.005 um", "far": "0.2 um", "refinement_distance": "0.3 um"}]
+    graded = build_mesh(Document.from_dict(em)).mesh                           # metres
     centres, lengths = _edge_lengths(graded)
-    at_edge = lengths[(np.abs(np.abs(centres[:, 0]) - 0.25) < 0.01) & (centres[:, 1] > 0.02) & (centres[:, 1] < 0.2)]
-    far_up = lengths[centres[:, 1] > 0.8]
+    at_edge = lengths[(np.abs(np.abs(centres[:, 0]) - 0.25e-6) < 0.01e-6) & (centres[:, 1] > 0.02e-6)
+                      & (centres[:, 1] < 0.2e-6)]
+    far_up = lengths[centres[:, 1] > 0.8e-6]
     assert len(graded.nodes) > len(build_mesh(Document.from_dict(_soi_v1())).mesh.nodes)
     assert len(at_edge) > 10 and at_edge.mean() < 0.3 * far_up.mean()
     for controls, message in [([{"select": "rim", "near": "0.2 mm", "far": "2 mm"}], "together"),

@@ -60,8 +60,9 @@ Path("slab.json").write_text(document)
 subprocess.run([cli, "validate", "slab.json"], check=True)
 subprocess.run([cli, "run", "slab.json", "-q", "-o", "results"], check=True)
 summary = json.loads(Path("results/summary.json").read_text())
-assert abs(summary["neff"][0][0] - 2.8487) < 2e-3, summary
-assert summary["units"] == {"length": "um"}, summary
+assert abs(summary["effective_index"]["values"][0][0] - 2.8487) < 2e-3, summary
+assert "units" not in summary and summary["field_units"]["node_coordinates"] == "m", summary
+assert summary["vacuum_wavelength"] == {"unit": "m", "values": [1.55e-6]}, summary
 for filename in ("fields.npz", "results.png", "log.txt", "model.json"):
     assert Path("results", filename).stat().st_size > 0, filename
 print("Wheel CLI, entry points, imports, metadata and saved output passed.")

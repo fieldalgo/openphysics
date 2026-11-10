@@ -14,29 +14,31 @@ PML 인공 모드가 포함될 수 있으므로 메시·물리 창·PML 두께·
 
 ```json
 {
-  "n_target": 2.85,
+  "target_effective_index": 2.85,
   "pml": {
-    "thickness": {"bottom": 0.5, "top": 0.5},
-    "strength": 3.0,
-    "order": 2,
-    "min_physical_fraction": 0.1
+    "pml_thickness": {"bottom": "0.5 um", "top": "0.5 um"},
+    "pml_strength": 3.0,
+    "pml_order": 2,
+    "pml_minimum_physical_fraction": 0.1
   },
-  "bend": {"radius": 5.0, "axis": "y", "origin": 0.0}
+  "bend": {"bend_radius": "5 um", "axis": "y", "bend_origin": "0 um"}
 }
 ```
 
-직선에서는 `bend`를 생략합니다. 두께·반경·원점은 선언한 길이 단위,
-strength와 비율은 무차원, order는 정수 2/3/4입니다. 생략한 면의 두께는
-0이며 하나 이상은 양수여야 합니다. PML 띠를 제외한 물리 창이 남아야 하고
+직선에서는 `bend`를 생략합니다. 두께·반경·원점은 단위를 붙인 길이,
+`pml_strength`와 비율은 무차원, `pml_order`는 정수 2/3/4입니다. 생략한 면의 두께는
+0이며 하나 이상은 양수여야 합니다(`"0 um"`으로 쓴 면은 거절). `pml_strength`(기본 3),
+`pml_order`(기본 2), 비율(기본 0.1, (0, 1]), `bend.axis`(기본 `x`)를 생략하면
+`defaults_applied`에 기록합니다. PML 띠를 제외한 물리 창이 남아야 하고
 메시가 두 영역을 모두 분해해야 합니다. 선언한 형상에 PML이 포함되므로
 재료를 PML까지 연장합니다. PML 외곽은 PEC, 다른 면은 기존 PEC/PMC입니다.
 두 방향 모두 재료 경계·PML·장을 충분히 분해해야 합니다. 요소를 가로지르는
 PML/물리창 경계는 요소중심 계수와 소속으로 근사하므로 메시 수렴에 포함합니다.
 
-양수 `n_target`을 명시해야 합니다. 닫힌 도파관의 유전체 구간 대신 목표
-근처를 검색합니다. vector `n_cladding`은 설명용이며 열린 후보의 분류 기준이
+양수 `target_effective_index`를 명시해야 합니다. 닫힌 도파관의 유전체 구간 대신 목표
+근처를 검색합니다. vector `effective_index_threshold`는 설명용이며 열린 후보의 분류 기준이
 아닙니다. 금속·흡수 재료는 기존 복소 재료 계약을 따릅니다. 굽힘 축은 바깥
-방향이고 origin에서의 양수 radius를 지정합니다. 전체 영역의 반경이 양수여야
+방향이고 `bend_origin`에서의 양수 `bend_radius`를 지정합니다. 전체 영역의 반경이 양수여야
 하며 전파 거리는 기준 호 길이 `z=R theta`입니다.
 
 ## API와 결과
@@ -44,29 +46,31 @@ PML/물리창 경계는 요소중심 계수와 소속으로 근사하므로 메�
 ```python
 from simcase import Document, run
 result = run(Document.load("model.json"), verbose=False)
-print(result.neff)                       # 복소수, 점 × 모드
-print(result.propagation_loss_db_cm())   # 부호를 보존한 총 전력 감쇠
-print(result.bend_loss_db_90deg())       # 직선이면 None
+print(result.effective_index)            # 복소수, 점 × 모드; Im > 0이 감쇠
+print(result.propagation_loss())         # dB/m, 부호를 보존한 총 전력 감쇠
+print(result.bend_loss())                # 90도당 dB; 직선이면 None
 print(result.open_boundary)              # 점별 전체 검색 후보
 result.save("results")
 ```
 
-`simcase.physics_em_modes2d.solve(..., n_target=2.85, pml=..., bend=...)`는
-기존 메시에서 같은 설정을 메시 길이 단위로 받습니다. `solve_point`와 `run`의
-진단 경계 좌표는 문서 단위입니다. JSON은 `openphysics.modes2d/2`, 실수부
-`neff`, `neff_imag`를 유지하고 `open_boundary`, 선택적 `bend_loss_db_90deg`를
-추가합니다. NPZ는 pickle 없이 복소 배열과 `open_boundary_json`을 저장합니다.
+`solve_point`와 `run`은 exp(−iωt)의 SI로 보고합니다. 커널 기준틀의
+`simcase.physics_em_modes2d.solve(..., n_target=2.85, pml=..., bend=...)`(마이크로미터,
+exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
+`mode_result_schema="openphysics.modes2d/3"`, `time_convention`과 함께 `re`/`im` 값 객체인
+`effective_index`, `propagation_loss`(dB/m), `open_boundary`, 굽힘이면 `bend_loss`(90도당 dB)를
+기록합니다. NPZ는 pickle 없이 복소 배열과 `open_boundary_json`을 저장합니다.
 기능 브랜치 구현이 릴리스를 뜻하지는 않습니다. PML 결과는 [닫힌 창
-결과](overview.md#모드-후처리)의 `mode_power`/`confinement`/`field_overlap`/
-`coupling_efficiency` 배열을 저장하지 않습니다. 횡 계수가 늘린 좌표의 공변
+결과](overview.md#모드-후처리)의 `unnormalized_mode_power`/`confinement_factor`/
+`unnormalized_field_overlap`/`coupling_efficiency` 배열을 저장하지 않습니다. 횡 계수가 늘린 좌표의 공변
 적분이어서 창 전체의 무손실 Poynting 식은 물리 전력이 아니며, 물리 창 변형은
 제공하지 않습니다. `results.mode_overlap` 블록은 검증만 하고 무시합니다.
 
-각 `openphysics.pml-candidates/1` 점은 전체 후보의 1부터 시작하는 번호,
-복소 지수, 원래 pencil 상대잔차, 양의 물리/PML L2 비율, 선택 번호와 이유를
-기록합니다. 검색 수는 최소 6개 또는 요청 수의 두 배이며 자유 DOF에 제한됩니다.
-적격 기준은 양수 실수부, 잔차<=1e-8, 물리 비율>=설정값(기본0.1, 허용0..1),
-허수부<=1e-10 max(1,|Re n|)입니다. 적격 후보 중 목표와 가까운 것을 선택하고
+각 `openphysics.pml-candidates/2` 점은 전체 후보의 1부터 시작하는 번호,
+복소 `effective_index`, 원래 pencil 상대잔차 `relative_residual`, 양의 물리/PML L2 비율,
+선택 번호와 이유, 미터 단위 `physical_bounds`를 기록합니다. 검색 수는 최소 6개 또는 요청 수의
+두 배이며 자유 DOF에 제한됩니다. 적격 기준은 양수 실수부, 잔차<=1e-8
+(`relative_residual_threshold`), 물리 비율>=`pml_minimum_physical_fraction`(기본 0.1, (0, 1]),
+허수부>=-1e-10 max(1,|Re n|)입니다(이득처럼 보이는 후보는 `negative_imaginary_index`로 제외). 적격 후보 중 목표와 가까운 것을 선택하고
 첫 점에서 실수부 내림차순으로 반환합니다. 제외·미선택 후보도 기록합니다.
 비유한/0 전파근은 저수준 계산을 중단하며 조용히 삭제하지 않습니다.
 
@@ -80,11 +84,11 @@ result.save("results")
 
 scalar는 물리 절점 peak=1, vector는 물리 요소중심의 최대 |E|=1입니다.
 둘 다 상대진폭이며 단위 전력이 아닙니다. 요소 소속은 중심으로 판단합니다.
-`pml-vector-edge-nodal-v1`에서 transverse는 계산 좌표의 공변 edge 선적분
+`pml-vector-edge-nodal-v2`에서 transverse는 계산 좌표의 공변 edge 선적분
 (늘림 없는 물리창에서는 실제 Et), longitudinal은 h로 나눈 실제 Ez 절점값,
 electric은 각 Jacobian 성분으로 나눈 요소중심 장입니다. PML 내부 장은
-인공적입니다. scalar 표현은 `pml-scalar-nodal-v1`입니다.
-둘 다 파일 배치 `em-modes2d-p1-node-centroid-v1`로 저장되므로 `simcase.export`는 다른 모드
+인공적입니다. scalar 표현은 `pml-scalar-nodal-v2`입니다.
+둘 다 파일 배치 `em-modes2d-p1-node-centroid-v2`로 저장되므로 `simcase.export`는 다른 모드
 결과처럼 내보냅니다. VTU는 계산 메시 전체를 담으므로 배열은 흡수층까지 덮고 그 안의 값은
 인공적입니다. `open_boundary`의 `physical_bounds`가 물리창을 표시하며 VTU에는 복사되지
 않으므로 뷰어에서 잘라 보세요.
@@ -103,14 +107,15 @@ electric은 각 Jacobian 성분으로 나눈 요소중심 장입니다. PML 내�
 
 ## 부호·감쇠·한계
 
-`exp(+i omega t-i beta z)`, `beta=k0 n_eff`입니다. 수동 재료는 Im epsilon<=0,
-수동 순방향 감쇠는 Im n_eff<0입니다. 전력 손실은
-`-40 pi Im(n_eff)/(100 ln(10) wavelength_m)` dB/cm입니다. 굽힘은 기준 반경에서
-`loss_db_90deg=loss_db_cm pi R_cm/2`입니다. 모두 흡수와 방사가 포함된 **총**
+`exp(-i omega t+i beta z)`, `beta=k0 n_eff`입니다. 수동 재료는 Im epsilon>=0,
+수동 순방향 감쇠는 Im n_eff>0입니다. 전력 손실은 미터 단위 진공 파장으로
+`40 pi Im(n_eff)/(ln(10) wavelength)` dB/m입니다. 굽힘은 기준 반경에서
+`bend_loss=propagation_loss pi R/2`(90도당 dB, R은 미터)입니다. 커널은 exp(+iωt)에서
+계산하며 simcase가 경계에서 모든 복소 값을 한 번 켤레로 바꿉니다. 모두 흡수와 방사가 포함된 **총**
 감쇠입니다. 서로 다른 계산을 빼는 것으로 재료·누설·굽힘 손실이 유일하게
 분리되지는 않습니다.
 
-Studio에서 PML 면·강도·차수·비율·목표 및 굽힘을 입력합니다. 결과는 모든
+Studio에서 PML 면·강도·차수·비율·목표 및 굽힘을 입력합니다(길이는 양 문자열). 결과는 모든
 후보 이유와 잔차를 표시하며 인공 PML 장은 회색으로 가립니다. scalar는 불변축
 TE slab 편광의 정확식이고 일반 2D 고대비 도파관에서는 근사입니다. 가변곡률,
 3D 열린 모드, 자동 PML 수렴 인증, 비Hermitian 축퇴 부분공간 추적은 범위 밖입니다.

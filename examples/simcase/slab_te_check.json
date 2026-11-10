@@ -1,10 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "220 nm Si slab, TE check against refsol",
-  "units": {
-    "length": "um"
-  },
   "geometry": {
+    "length_unit": "um",
+    "depth": null,
     "domain": {
       "xmin": -0.5,
       "xmax": 0.5,
@@ -12,7 +11,7 @@
       "ymax": 1.2
     },
     "background": {
-      "material": "SiO2"
+      "material": "physmat:SiO2"
     },
     "shapes": [
       {
@@ -22,8 +21,8 @@
         "y": 0.0,
         "w": 1.0,
         "h": 0.22,
-        "material": "Si",
-        "mesh_size": 0.01
+        "material": "physmat:Si",
+        "element_size": "0.01 um"
       }
     ]
   },
@@ -31,8 +30,8 @@
     "em1": {
       "type": "em.modes2d",
       "formulation": "scalar",
-      "wavelength": 1.55,
-      "num_modes": 1,
+      "vacuum_wavelength": "1.55 um",
+      "mode_count": 1,
       "boundary": {
         "left": "pmc",
         "right": "pmc",
@@ -42,15 +41,15 @@
     }
   },
   "mesh": {
-    "size": 0.25,
+    "element_size": "0.25 um",
     "grading": {
-      "center": [
-        0.0,
-        0.11
+      "position": [
+        "0 um",
+        "0.11 um"
       ],
-      "near": 0.01,
-      "far": 0.08,
-      "distance": 1.0
+      "near": "0.01 um",
+      "far": "0.08 um",
+      "refinement_distance": "1 um"
     }
   },
   "study": {

@@ -15,32 +15,34 @@ Add these settings to an existing `physics.em1` entry:
 
 ```json
 {
-  "n_target": 2.85,
+  "target_effective_index": 2.85,
   "pml": {
-    "thickness": {"bottom": 0.5, "top": 0.5},
-    "strength": 3.0,
-    "order": 2,
-    "min_physical_fraction": 0.1
+    "pml_thickness": {"bottom": "0.5 um", "top": "0.5 um"},
+    "pml_strength": 3.0,
+    "pml_order": 2,
+    "pml_minimum_physical_fraction": 0.1
   },
-  "bend": {"radius": 5.0, "axis": "y", "origin": 0.0}
+  "bend": {"bend_radius": "5 um", "axis": "y", "bend_origin": "0 um"}
 }
 ```
 
-Omit `bend` for a straight guide. Thickness, radius and origin use the declared
-length unit. `strength` and the fraction are dimensionless; order is integer
-2, 3 or 4. Missing face thicknesses are zero. At least one is positive, and
-the strips must leave a nonempty physical window resolved by the mesh.
+Omit `bend` for a straight guide. Thickness, radius and origin are lengths with their unit.
+`pml_strength` and the fraction are dimensionless; `pml_order` is the integer 2, 3 or 4.
+Missing face thicknesses are zero. At least one is positive (a face written as `"0 um"` is
+refused), and the strips must leave a nonempty physical window resolved by the mesh.
+`pml_strength` (default 3), `pml_order` (default 2), the fraction (default 0.1, in (0, 1]) and
+`bend.axis` (default `x`) are echoed in `defaults_applied` when omitted.
 The declared geometry includes the PML; extend materials through it. PML
 outer faces must be PEC; other faces retain PEC/PMC behavior. Refinement must
 resolve material interfaces, PML and the transverse field, in both directions.
 A face or physical-window boundary cutting elements is represented by centroid
 coefficients/membership; include this error in refinement checks.
 
-`n_target` must be explicitly positive. Search near that value replaces the
-closed-guide dielectric interval. `n_cladding` remains descriptive for vector
+`target_effective_index` must be explicitly positive. Search near that value replaces the
+closed-guide dielectric interval. `effective_index_threshold` remains descriptive for vector
 input; it does not classify open candidates. Metal/absorbing materials retain
-the complex material contract. The bend axis points outward; `radius` is the
-positive radius at `origin`, and every point in the domain must have positive
+the complex material contract. The bend axis points outward; `bend_radius` is the
+positive radius at `bend_origin`, and every point in the domain must have positive
 radius. Propagation distance is reference arc length `z=R theta`.
 
 ## API and results
@@ -48,34 +50,35 @@ radius. Propagation distance is reference arc length `z=R theta`.
 ```python
 from simcase import Document, run
 result = run(Document.load("model.json"), verbose=False)
-print(result.neff)                       # complex, point x mode
-print(result.propagation_loss_db_cm())   # signed total power attenuation
-print(result.bend_loss_db_90deg())       # None for a straight guide
+print(result.effective_index)            # complex, point x mode; Im > 0 is attenuation
+print(result.propagation_loss())         # dB/m, signed total power attenuation
+print(result.bend_loss())                # dB per 90 degrees; None for a straight guide
 print(result.open_boundary)              # all searched candidates per point
 result.save("results")
 ```
 
-`simcase.physics_em_modes2d.solve(..., n_target=2.85, pml=..., bend=...)`
-provides the same coordinate settings on an existing mesh, using mesh length
-units. `solve_point` diagnostics and `run` diagnostics use document units.
-The JSON summary retains `openphysics.modes2d/2`, real `neff` plus `neff_imag`,
-and adds `open_boundary` and optional `bend_loss_db_90deg`. NPZ retains complex
-arrays and `open_boundary_json` without pickles. No releases are implied by a
-feature-branch implementation. PML results save none of the
-`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` arrays of
+`solve_point` and `run` report in SI under exp(−iωt). The kernel-frame
+`simcase.physics_em_modes2d.solve(..., n_target=2.85, pml=..., bend=...)` (micrometres,
+exp(+iωt), the kernel's own names) is internal. The JSON summary records
+`mode_result_schema="openphysics.modes2d/3"`, `effective_index` as `re`/`im` value objects with
+`time_convention`, `propagation_loss` (dB/m), `open_boundary` and, for a bend, `bend_loss`
+(dB per 90 degrees). NPZ retains complex arrays and `open_boundary_json` without pickles. No
+releases are implied by a feature-branch implementation. PML results save none of the
+`unnormalized_mode_power`/`confinement_factor`/`unnormalized_field_overlap`/`coupling_efficiency` arrays of
 [closed-window results](overview.md#mode-post-processing): the transverse
 coefficients are covariant integrals in the stretched coordinates, so the
 lossless Poynting formula over the whole window is not the physical power and
 a physical-window variant is not offered. A `results.mode_overlap` block is
 validated but ignored for them.
 
-Each `openphysics.pml-candidates/1` point records all searched candidates,
-one-based candidate numbers, complex index, original-pencil relative residual,
-positive physical/PML L2 fractions, selected numbers, and reasons. Search uses
+Each `openphysics.pml-candidates/2` point records all searched candidates,
+one-based candidate numbers, the complex `effective_index`, the original-pencil
+`relative_residual`, positive physical/PML L2 fractions, selected numbers, reasons and
+`physical_bounds` in metres. Search uses
 at least six candidates, otherwise twice the requested count, limited by free
-DOFs. Eligible candidates have positive real index, residual <=1e-8, physical
-fraction >= the configured threshold (default0.1, permitted0..1), and imaginary
-index <=1e-10 max(1,|Re n|). The nearest eligible candidates to the target are
+DOFs. Eligible candidates have positive real index, residual <=1e-8 (`relative_residual_threshold`), physical
+fraction >= `pml_minimum_physical_fraction` (default 0.1, in (0, 1]), and imaginary
+index >= -1e-10 max(1,|Re n|) (a gain-like candidate is rejected as `negative_imaginary_index`). The nearest eligible candidates to the target are
 returned, ordered by descending real index at the seed point. Rejected and
 unselected candidates remain in diagnostics. A nonfinite/zero propagation root
 stops the low-level solve; it is not silently discarded.
@@ -92,12 +95,12 @@ alone cannot separate every PML mode from a physical pole.
 Scalar fields have unit peak over physical nodes. Vector fields have unit
 maximum centroid |E| over physical elements. Both have relative amplitude,
 not unit power. Physical membership is determined at element centroids.
-Vector representation is `pml-vector-edge-nodal-v1`: transverse edge integrals
+Vector representation is `pml-vector-edge-nodal-v2`: transverse edge integrals
 are computational covariant coefficients (physical Et in the unstretched
 window), longitudinal nodal values are physical Ez after division by h, and
 centroid electric components are divided by their Jacobian factors. Fields
-inside PML are artificial. Scalar representation is `pml-scalar-nodal-v1`.
-Both save the file layout `em-modes2d-p1-node-centroid-v1`, so `simcase.export`
+inside PML are artificial. Scalar representation is `pml-scalar-nodal-v2`.
+Both save the file layout `em-modes2d-p1-node-centroid-v2`, so `simcase.export`
 writes them like any mode result: the VTU holds the whole computational mesh,
 and its arrays cover the absorbing layer too, where they are artificial.
 `physical_bounds` in `open_boundary` marks the physical window and is not copied
@@ -118,14 +121,17 @@ velocity. Refine wavelength spacing and candidate budget too.
 
 ## Signs, attenuation and limitations
 
-The convention is `exp(+i omega t-i beta z)`, `beta=k0 n_eff`. Passive material
-has Im epsilon<=0 and passive forward attenuation has Im n_eff<0. Power loss
-is `-40 pi Im(n_eff)/(100 ln(10) wavelength_m)` dB/cm. For bends,
-`loss_db_90deg = loss_db_cm pi R_cm/2` at the specified reference radius.
+The convention is `exp(-i omega t+i beta z)`, `beta=k0 n_eff`. Passive material
+has Im epsilon>=0 and passive forward attenuation has Im n_eff>0. Power loss
+is `40 pi Im(n_eff)/(ln(10) wavelength)` dB/m with the vacuum wavelength in metres. For bends,
+`bend_loss = propagation_loss pi R/2` (dB per 90 degrees, R in metres) at the specified
+reference radius. The kernel works under exp(+iωt); simcase conjugates every complex value
+once at its boundary.
 These are **total** absorption plus radiation losses. Subtracting unrelated
 runs does not uniquely separate material, leakage and bending losses.
 
-Studio exposes PML faces, strength/order/fraction, target and bend settings.
+Studio exposes PML faces, strength/order/fraction, target and bend settings (lengths as
+quantity strings).
 Results show all candidate reasons and residuals; artificial PML fields are
 grey. Scalar is exact for the invariant-axis TE slab polarization, an
 approximation for general 2D high-contrast guides. Variable curvature, 3D open

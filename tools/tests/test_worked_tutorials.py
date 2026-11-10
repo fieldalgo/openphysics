@@ -98,10 +98,11 @@ def test_material_selection_document_checks_source_and_range():
 
 
 def test_waveguide_interpretation_document_has_passive_loss():
+    # exp(-i omega t): passive attenuation is Im n_eff > 0 and a positive loss in dB/m
     namespace = _execute_document_python('results/waveguide-modes.md')
-    assert np.all(np.isfinite(namespace['neff']))
-    assert np.all(namespace['neff'].imag < 0)
-    assert np.all(np.asarray(namespace['loss_db_cm']) > 0)
+    assert np.all(np.isfinite(namespace['effective_index']))
+    assert np.all(namespace['effective_index'].imag > 0)
+    assert np.all(np.asarray(namespace['loss_db_m']) > 0)
 
 
 def _execute_document_python(page):

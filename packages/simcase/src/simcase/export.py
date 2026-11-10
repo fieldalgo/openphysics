@@ -60,40 +60,44 @@ Supported layouts:
   adds ``temperature``, the nodal heat rates and cell ``heat_flux``; a
   temperature-dependent one adds ``evaluation_temperature``. Each name is its
   ``fields.npz`` name, and the FieldData block holds ``units`` and ``conventions``
-- waveguide modes (``em-modes2d-p1-node-centroid-v1``, the layout of
-  ``em.modes2d`` results tracked per mode): the saved ``nodes`` are in the
-  document length unit and are converted to metres with the saved
-  ``length_unit_to_m``. A scalar result writes each nodal mode ``k`` (zero-based
-  column of ``fields``) as point data ``mode_<k>``, or ``mode_<k>_real`` and
-  ``mode_<k>_imag`` when the saved array is complex (lossy materials). A vector
-  result writes the complex centroid field as cell data
-  ``electric_field_mode_<k>_real``/``_imag`` (Ex, Ey, Ez; the saved relative
-  normalization, maximum centroid |E| = 1) and the complex nodal longitudinal
-  component as point data ``longitudinal_electric_mode_<k>_real``/``_imag``.
-  Every mode VTU carries the static integer cell data ``triangle_regions``
-  (the saved ``regions``). ``export_fields`` takes a single-point result;
-  ``export_sweep`` writes one VTU per study point plus a ``.pvd`` collection
-  whose timestep is the wavelength (in the document unit) for a strictly
-  monotone wavelength sweep and the point index otherwise. PML results
-  (``field_representation`` ``pml-*``) use the same layout: the arrays cover
-  the absorbing layer too, where the fields are artificial. ``neff``, ``edges``,
-  the transverse edge coefficients, tracking and open-boundary diagnostics stay
-  in ``fields.npz``. The subspace layout ``em-modes2d-subspace-raw-v1`` (raw
-  eigenpair columns per cluster) is refused.
-- 2D linear elasticity (``mechanics2d-p1-v1``, the layout of
-  ``mechanics.elasticity2d``): point data ``displacement_m`` and the nodal
-  ``load_n_per_m``, ``reaction_n_per_m`` and ``residual_n_per_m`` arrays as
-  vectors with a zero z component; cell data one named scalar per saved
-  component, ``exx``, ``eyy``, ``gxy`` (engineering shear, dimensionless) from
-  ``strain`` and ``sxx_pa``, ``syy_pa``, ``sxy_pa`` from ``stress_pa``.
-- steady heat then thermal stress (``thermoelastic2d-p1-v1``, the layout of
-  ``mechanics.thermoelastic2d``): point data ``temperature_k`` and the nodal
-  heat arrays (W/m) as scalars, ``displacement_m`` and the nodal external,
-  thermal, body, traction, reaction and residual N/m arrays as vectors; cell
-  data ``heat_flux_w_m2`` (vector), ``sigma_zz_pa`` and ``epsilon_zz``
-  (scalars) and the named components ``total_exx``, ``total_eyy``,
-  ``total_gxy``, ``thermal_exx``, …, ``elastic_exx``, …, ``sxx_pa``,
-  ``syy_pa``, ``sxy_pa``.
+- waveguide modes (``em-modes2d-p1-node-centroid-v2``, the layout of
+  ``em.modes2d`` results tracked per mode, SI under exp(-i omega t)): points are
+  the saved ``node_coordinates`` in metres. Each array is named by its
+  ``fields.npz`` name with the per-mode suffix ``_mode_<k>`` (zero-based column)
+  and, for a complex array, the parts ``_real``/``_imag``: a scalar result
+  writes the nodal ``unnormalized_mode_field_mode_<k>`` (complex when lossy or
+  with PML); a vector result writes the complex centroid field as cell data
+  ``unnormalized_electric_field_mode_<k>_real``/``_imag`` (x, y, z; the saved
+  relative normalization, maximum centroid |E| = 1) and the complex nodal
+  longitudinal component as point data
+  ``unnormalized_electric_field_z_mode_<k>_real``/``_imag``. Every mode VTU
+  carries the static integer cell data ``regions`` and the FieldData ``units``
+  and ``conventions`` (with ``time_convention`` when an array is complex).
+  ``export_fields`` takes a single-point result; ``export_sweep`` writes one VTU
+  per study point plus a ``.pvd`` collection whose timestep is the vacuum
+  wavelength in metres for a strictly monotone wavelength sweep and the point
+  index otherwise. PML results (``field_representation`` ``pml-*``) use the same
+  layout: the arrays cover the absorbing layer too, where the fields are
+  artificial. ``effective_index``, ``edges``, the edge line integrals, tracking
+  and open-boundary diagnostics stay in ``fields.npz``. The subspace layout
+  ``em-modes2d-subspace-raw-v2`` (raw eigenpair columns per cluster) is
+  refused.
+- 2D linear elasticity (``mechanics2d-p1-v2``, the layout of
+  ``mechanics.elasticity2d``): point data ``displacement`` and the nodal
+  ``applied_force_per_depth``, ``reaction_force_per_depth`` and
+  ``residual_force_per_depth`` arrays as vectors with a zero z component; cell
+  data one named scalar per saved component, by its ``field_components`` name:
+  ``strain_xx``, ``strain_yy``, ``engineering_shear_strain_xy`` from ``strain``
+  and ``stress_xx``, ``stress_yy``, ``stress_xy`` from ``stress``.
+- steady heat then thermal stress (``thermoelastic2d-p1-v2``, the layout of
+  ``mechanics.thermoelastic2d``): point data ``temperature`` and the nodal heat
+  rates (W/m) as scalars, ``displacement`` and the nodal applied, thermal
+  equivalent, body, traction, reaction and residual force arrays (N/m) as
+  vectors; cell data ``heat_flux`` (vector), ``stress_zz`` and ``strain_zz``
+  (scalars) and the named components of ``strain``, ``thermal_strain``
+  (``thermal_strain_xx``, ..., ``engineering_shear_thermal_strain_xy``),
+  ``elastic_strain`` and ``stress``. Both mechanics layouts carry the FieldData
+  ``units`` and ``conventions``; the region mechanics layouts are not exported.
 
 Dirichlet node lists, ``metadata_json`` and the summary are not copied: the
 arrays named above are exported when the saved file holds them, nothing else.
@@ -131,6 +135,10 @@ RETIRED_LAYOUTS: dict[str, str] = {
     "electric-joule2d-p1-v1": "electric-joule2d-p1-v2",
     "electric2d-p1-node-cell-regions-v1": "electric2d-p1-node-cell-regions-v2",
     "electric-joule2d-p1-node-cell-regions-v1": "electric-joule2d-p1-node-cell-regions-v2",
+    "mechanics2d-p1-v1": "mechanics2d-p1-v2",
+    "thermoelastic2d-p1-v1": "thermoelastic2d-p1-v2",
+    "em-modes2d-p1-node-centroid-v1": "em-modes2d-p1-node-centroid-v2",
+    "em-modes2d-subspace-raw-v1": "em-modes2d-subspace-raw-v2",
 }
 
 # rectangle heat (format 0.3): arrays under registry names, SI, with VTU unit metadata
@@ -151,10 +159,11 @@ _ELECTRIC_JOULE = "electric-joule2d-p1-v2"
 _ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v2"   # electric.steady2d on material regions
 _JOULE_REGIONS = "electric-joule2d-p1-node-cell-regions-v2"   # joule.steady2d on material regions
 _ELECTRIC_LAYOUTS = (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS)
-_MODES = "em-modes2d-p1-node-centroid-v1"
-_MODES_SUBSPACE = "em-modes2d-subspace-raw-v1"
-_MECHANICS = "mechanics2d-p1-v1"
-_THERMOELASTIC = "thermoelastic2d-p1-v1"
+_MODES = "em-modes2d-p1-node-centroid-v2"
+_MODES_SUBSPACE = "em-modes2d-subspace-raw-v2"
+# mechanics (format 0.3): arrays under registry names, SI, with VTU unit metadata
+_MECHANICS = "mechanics2d-p1-v2"
+_THERMOELASTIC = "thermoelastic2d-p1-v2"
 _MECHANICS_LAYOUTS = (_MECHANICS, _THERMOELASTIC)
 _TRANSIENT_LAYOUTS = (_TRANSIENT, _TRANSIENT_REGIONS, _TRANSIENT_BOUNDARY, _TRANSIENT_AXISYMMETRIC_REGIONS)
 _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS, _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS)
@@ -179,22 +188,23 @@ _ELECTRIC_NODAL = ("electric_potential", "joule_power_per_depth", "reaction_curr
                    "applied_heat_rate_per_depth", "evaluation_temperature")
 _ELECTRIC_CELL_VECTORS = ("electric_field", "current_density", "heat_flux")
 _ELECTRIC_CELL_SCALARS = ("electrical_conductivity", "joule_power_density")
-# mechanics2d-p1-v1 and thermoelastic2d-p1-v1: (N,) nodal scalars, (N,2) nodal
+# mechanics2d-p1-v2 and thermoelastic2d-p1-v2: (N,) nodal scalars, (N,2) nodal
 # vectors, (T,2) cell vectors, (T,) cell scalars and (T,3) element arrays split
-# into named scalar cell data in the saved component order. Dirichlet node and
-# DOF lists stay in fields.npz; absent arrays are skipped.
-_MECHANICS_NODAL_SCALARS = ("temperature_k", "thermal_load_w_per_m", "thermal_reaction_w_per_m",
-                            "thermal_residual_w_per_m", "prescribed_outward_heat_w_per_m",
-                            "ambient_load_w_per_m", "convective_outward_heat_w_per_m",
-                            "thermal_system_rhs_w_per_m")
-_MECHANICS_NODAL = ("displacement_m", "load_n_per_m", "load_external_n_per_m", "load_thermal_n_per_m",
-                    "load_body_n_per_m", "load_traction_n_per_m", "reaction_n_per_m", "residual_n_per_m")
-_MECHANICS_CELL_VECTORS = ("heat_flux_w_m2",)
-_MECHANICS_CELL_SCALARS = ("sigma_zz_pa", "epsilon_zz")
-_MECHANICS_CELL = {"strain": ("exx", "eyy", "gxy"), "stress_pa": ("sxx_pa", "syy_pa", "sxy_pa"),
-                   "total_strain": ("total_exx", "total_eyy", "total_gxy"),
-                   "thermal_strain": ("thermal_exx", "thermal_eyy", "thermal_gxy"),
-                   "elastic_strain": ("elastic_exx", "elastic_eyy", "elastic_gxy")}
+# into named scalar cell data, their field_components names in the saved order.
+# Prescribed node and DOF lists stay in fields.npz; absent arrays are skipped.
+_MECHANICS_NODAL_SCALARS = ("temperature", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+                            "residual_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+                            "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                            "applied_heat_rate_per_depth")
+_MECHANICS_NODAL = ("displacement", "applied_force_per_depth", "thermal_equivalent_force_per_depth",
+                    "applied_body_force_per_depth", "applied_traction_force_per_depth", "reaction_force_per_depth",
+                    "residual_force_per_depth")
+_MECHANICS_CELL_VECTORS = ("heat_flux",)
+_MECHANICS_CELL_SCALARS = ("stress_zz", "strain_zz")
+_MECHANICS_CELL = {"strain": ("strain_xx", "strain_yy", "engineering_shear_strain_xy"),
+                   "thermal_strain": ("thermal_strain_xx", "thermal_strain_yy", "engineering_shear_thermal_strain_xy"),
+                   "elastic_strain": ("elastic_strain_xx", "elastic_strain_yy", "engineering_shear_elastic_strain_xy"),
+                   "stress": ("stress_xx", "stress_yy", "stress_xy")}
 # cavity3d-edge-complex-v1 static per-tetrahedron complex material arrays.
 _CAVITY_COMPLEX_CELL = ("tet_relative_permittivity", "tet_relative_permeability")
 
@@ -307,7 +317,7 @@ def _electric_joule(data):
 
 
 def _mechanics(data, layout):
-    points = _points(data["nodes_m"])
+    points = _points(data["node_coordinates"])
     triangles = np.asarray(data["triangles"], dtype=np.int64)
     cells = [("triangle", triangles)]
     point_data, cell_data = {}, {}
@@ -342,8 +352,8 @@ def _mechanics(data, layout):
                 raise ValueError(f"{name}: expected three components per triangle, got shape {values.shape}")
             for k, component in enumerate(components):
                 cell_data[component] = [np.ascontiguousarray(values[:, k])]
-    if "displacement_m" not in point_data:
-        raise ValueError(f"{layout} export needs the saved displacement_m array")
+    if "displacement" not in point_data:
+        raise ValueError(f"{layout} export needs the saved displacement array")
     return points, cells, point_data, cell_data
 
 
@@ -385,85 +395,103 @@ def _cavity_complex(data):
 
 
 def _modes_mesh(data):
-    """Points in metres, triangle cells and the static region IDs of a mode result.
-
-    The saved ``nodes`` are in the document length unit; ``length_unit_to_m``
-    is the saved size of that unit, so ``points == nodes * length_unit_to_m``.
-    """
-    factor = np.asarray(data["length_unit_to_m"], dtype=float)
-    if factor.shape != () or not (np.isfinite(factor) and factor > 0):
-        raise ValueError(f"length_unit_to_m must be one positive finite number, got {factor!r}")
-    points = _points(np.asarray(data["nodes"], dtype=float) * float(factor))
+    """Points in metres (the saved ``node_coordinates``), triangle cells and the static region
+    IDs of a mode result."""
+    points = _points(data["node_coordinates"])
     triangles = np.asarray(data["triangles"], dtype=np.int64)
     regions = np.asarray(data["regions"])
     if regions.shape != (len(triangles),) or regions.dtype.kind not in "iu" or np.any(regions < 0):
         raise ValueError("regions must contain one non-negative integer per triangle")
-    return points, [("triangle", triangles)], {"triangle_regions": [regions]}
+    return points, [("triangle", triangles)], {"regions": [regions]}
 
 
 def _mode_arrays(data):
     """(study points, validated per-point arrays) of a mode result.
 
-    A scalar result holds ``fields`` (points, nodes, modes); a vector result
-    ``vector_electric`` (points, triangles, modes, 3) and, when saved,
-    ``vector_longitudinal`` (points, nodes, modes).
+    A scalar result holds ``unnormalized_mode_field`` (points, nodes, modes); a vector result
+    ``unnormalized_electric_field`` (points, triangles, modes, 3) and, when saved,
+    ``unnormalized_electric_field_z`` (points, nodes, modes).
     """
-    n_nodes, n_triangles = len(data["nodes"]), len(data["triangles"])
-    if "vector_electric" in data:
-        electric = np.asarray(data["vector_electric"])
+    n_nodes, n_triangles = len(data["node_coordinates"]), len(data["triangles"])
+    if "unnormalized_electric_field" in data:
+        electric = np.asarray(data["unnormalized_electric_field"])
         if electric.ndim != 4 or electric.shape[1] != n_triangles or electric.shape[3] != 3:
-            raise ValueError("vector_electric: expected shape (points, triangles, modes, 3) with "
+            raise ValueError("unnormalized_electric_field: expected shape (points, triangles, modes, 3) with "
                              f"{n_triangles} triangles, got {electric.shape}")
         count, modes = electric.shape[0], electric.shape[2]
-        arrays = {"vector_electric": electric}
-        if "vector_longitudinal" in data:
-            longitudinal = np.asarray(data["vector_longitudinal"])
+        arrays = {"unnormalized_electric_field": electric}
+        if "unnormalized_electric_field_z" in data:
+            longitudinal = np.asarray(data["unnormalized_electric_field_z"])
             if longitudinal.shape != (count, n_nodes, modes):
-                raise ValueError(f"vector_longitudinal: expected shape {(count, n_nodes, modes)}, "
+                raise ValueError(f"unnormalized_electric_field_z: expected shape {(count, n_nodes, modes)}, "
                                  f"got {longitudinal.shape}")
-            arrays["vector_longitudinal"] = longitudinal
-    elif "fields" in data:
-        fields = np.asarray(data["fields"])
+            arrays["unnormalized_electric_field_z"] = longitudinal
+    elif "unnormalized_mode_field" in data:
+        fields = np.asarray(data["unnormalized_mode_field"])
         if fields.ndim != 3 or fields.shape[1] != n_nodes:
-            raise ValueError(f"fields: expected shape (points, nodes, modes) with {n_nodes} nodes, "
+            raise ValueError(f"unnormalized_mode_field: expected shape (points, nodes, modes) with {n_nodes} nodes, "
                              f"got {fields.shape}")
-        count, arrays = fields.shape[0], {"fields": fields}
+        count, arrays = fields.shape[0], {"unnormalized_mode_field": fields}
     else:
-        raise ValueError(f"{_MODES} export needs the saved fields (scalar) or vector_electric (vector) array")
-    values = np.asarray(data["values"])
+        raise ValueError(f"{_MODES} export needs the saved unnormalized_mode_field (scalar) or "
+                         "unnormalized_electric_field (vector) array")
+    values = np.asarray(data["vacuum_wavelength"])
     if values.shape != (count,):
-        raise ValueError(f"values: expected one study value per point, {(count,)}, got {values.shape}")
+        raise ValueError(f"vacuum_wavelength: expected one value per study point, {(count,)}, got {values.shape}")
     return count, arrays
 
 
 def _modes_at(arrays, index):
-    """Point and cell data of the modes at study point ``index``.
-
-    Scalar modes keep their saved dtype: a real array gives ``mode_<k>``, a
-    complex one ``mode_<k>_real``/``_imag``. Vector arrays are complex and
-    always written as ``_real``/``_imag`` pairs.
-    """
+    """Point and cell data of the modes at study point ``index``, named by the saved array
+    with the suffix ``_mode_<k>`` and, for a complex array, ``_real``/``_imag``."""
     point_data, cell_data = {}, {}
-    if "fields" in arrays:
-        fields = arrays["fields"][index]
+    if "unnormalized_mode_field" in arrays:
+        fields = arrays["unnormalized_mode_field"][index]
         for k in range(fields.shape[1]):
+            name = f"unnormalized_mode_field_mode_{k}"
             if fields.dtype.kind == "c":
-                point_data[f"mode_{k}_real"], point_data[f"mode_{k}_imag"] = _real_imag(fields[:, k])
+                point_data[f"{name}_real"], point_data[f"{name}_imag"] = _real_imag(fields[:, k])
             else:
-                point_data[f"mode_{k}"] = np.ascontiguousarray(fields[:, k], dtype=float)
+                point_data[name] = np.ascontiguousarray(fields[:, k], dtype=float)
         return point_data, cell_data
-    electric = arrays["vector_electric"][index]
+    electric = arrays["unnormalized_electric_field"][index]
     for k in range(electric.shape[1]):
         real, imag = _real_imag(electric[:, k, :])
-        cell_data[f"electric_field_mode_{k}_real"] = [real]
-        cell_data[f"electric_field_mode_{k}_imag"] = [imag]
-    if "vector_longitudinal" in arrays:
-        longitudinal = arrays["vector_longitudinal"][index]
+        cell_data[f"unnormalized_electric_field_mode_{k}_real"] = [real]
+        cell_data[f"unnormalized_electric_field_mode_{k}_imag"] = [imag]
+    if "unnormalized_electric_field_z" in arrays:
+        longitudinal = arrays["unnormalized_electric_field_z"][index]
         for k in range(longitudinal.shape[1]):
             real, imag = _real_imag(longitudinal[:, k])
-            point_data[f"longitudinal_electric_mode_{k}_real"] = real
-            point_data[f"longitudinal_electric_mode_{k}_imag"] = imag
+            point_data[f"unnormalized_electric_field_z_mode_{k}_real"] = real
+            point_data[f"unnormalized_electric_field_z_mode_{k}_imag"] = imag
     return point_data, cell_data
+
+
+def _modes_metadata(names):
+    """The FieldData ``units`` and ``conventions`` of exported mode arrays (``<array>_mode_<k>``
+    with ``_real``/``_imag`` parts): each name's unit is its saved array's; a complex part adds
+    the time convention."""
+    from physmat import units as registry
+    import re
+    pattern = re.compile(r"(.+)_mode_\d+(_real|_imag)?")
+    units, signs, complex_ = {}, {}, False
+    for name in names:
+        if name == "regions":
+            continue
+        found = pattern.fullmatch(name)
+        base = found.group(1)
+        quantity = registry.quantity("unnormalized_electric_field" if base == "unnormalized_electric_field_z"
+                                     else base)
+        units[name] = quantity.unit
+        if quantity.sign:
+            signs[name] = quantity.sign["en"]
+        complex_ = complex_ or found.group(2) is not None
+    conventions = {"sign": signs}
+    if complex_:
+        from .results_common import TIME_CONVENTION
+        conventions["time_convention"] = TIME_CONVENTION
+    return units, conventions
 
 
 def _modes(data):
@@ -479,10 +507,10 @@ def _modes(data):
 
 
 def _sweep_timesteps(data, count):
-    """Wavelengths (document unit) of a strictly monotone wavelength sweep, else point indices."""
-    values = np.asarray(data["values"], dtype=float)
+    """Vacuum wavelengths in metres of a strictly monotone wavelength sweep, else point indices."""
+    values = np.asarray(data["vacuum_wavelength"], dtype=float)
     steps = np.diff(values)
-    if str(data.get("study_parameter", "")).endswith(".wavelength") and (
+    if str(data.get("study_parameter", "")).endswith(".vacuum_wavelength") and (
             np.all(steps > 0) or np.all(steps < 0)):
         return [float(v) for v in values]
     return [float(i) for i in range(count)]
@@ -490,9 +518,9 @@ def _sweep_timesteps(data, count):
 
 def _refuse_subspace():
     raise ValueError(
-        f"layout {_MODES_SUBSPACE!r} holds raw eigenpair columns per cluster (raw_neff, raw_transverse, "
-        "raw_longitudinal, raw_electric, frame_transform), not tracked modes; their VTU export is deferred. "
-        "Read the raw_* arrays from fields.npz, or run the sweep with resolved-mode tracking "
+        f"layout {_MODES_SUBSPACE!r} holds raw eigenpair columns per cluster (effective_index and the "
+        "unnormalized_* fields of each column, frame_transform), not tracked modes; their VTU export is deferred. "
+        "Read them from fields.npz, or run the sweep with resolved-mode tracking "
         f"(the default) for the per-mode layout {_MODES!r}")
 
 
@@ -564,7 +592,7 @@ def export_fields(fields_npz, output, *, time_index=-1):
     properties are copied to VTU. Complex cavity fields are written as
     ``_real``/``_imag`` pairs; elasticity strain and stress components become
     named scalar cell data. ``time_index`` applies to transient layouts
-    only. A waveguide mode result (``em-modes2d-p1-node-centroid-v1``) must
+    only. A waveguide mode result (``em-modes2d-p1-node-centroid-v2``) must
     hold one study point; ``export_sweep`` writes sweeps. Refuses to overwrite
     an existing file. Returns the output path.
     """
@@ -596,9 +624,11 @@ def export_fields(fields_npz, output, *, time_index=-1):
     meshio = _meshio()
     mesh = meshio.Mesh(points, cells, point_data=point_data, cell_data=cell_data)
     meshio.vtu.write(output, mesh, binary=True, compression="zlib")
-    if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS):
+    if layout in (*_HEAT_03, *_ELECTRIC_LAYOUTS, *_MECHANICS_LAYOUTS):
         inject_field_data(output, *_unit_metadata([name for name in (*point_data, *cell_data)
                                                    if name not in _STRUCTURAL]))
+    elif layout == _MODES:
+        inject_field_data(output, *_modes_metadata([*point_data, *cell_data]))
     return output
 
 
@@ -706,16 +736,16 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
 def export_sweep(fields_npz, output_dir, *, name="fields"):
     """Write every study point of a waveguide mode result for ParaView.
 
-    Takes the layout ``em-modes2d-p1-node-centroid-v1`` with any number of
+    Takes the layout ``em-modes2d-p1-node-centroid-v2`` with any number of
     study points and writes ``<name>_<k>.vtu`` per point ``k`` (zero-padded)
     plus the collection ``<name>.pvd`` into ``output_dir``, which must be new
     or empty. Each VTU holds that point's modes as ``export_fields`` writes
-    them (points in metres, static ``triangle_regions``). The ``.pvd``
-    timestep is the swept wavelength in the document length unit
-    (``mesh_length_unit``) when the saved ``study_parameter`` is a wavelength
-    and ``values`` are strictly monotone (every vector and PML sweep), and the
-    point index otherwise (a scalar sweep of another parameter, or one whose
-    values repeat or reverse); the values themselves stay in ``fields.npz``.
+    them (points in metres, static ``regions``, the FieldData unit block). The
+    ``.pvd`` timestep is the vacuum wavelength in metres when the saved
+    ``study_parameter`` is the wavelength and the values are strictly
+    monotone (every vector and PML sweep), and the point index otherwise (a
+    scalar sweep of another parameter, or one whose values repeat or reverse);
+    the values themselves stay in ``fields.npz``.
     On failure, files written so far are removed. The subspace layout is
     refused. Returns the ``.pvd`` path.
     """
@@ -736,4 +766,4 @@ def export_sweep(fields_npz, output_dir, *, name="fields"):
             cell_data.update(static)
             yield timesteps[index], point_data, cell_data
 
-    return _write_collection(output_dir, name, points, cells, count, frames())
+    return _write_collection(output_dir, name, points, cells, count, frames(), _modes_metadata)

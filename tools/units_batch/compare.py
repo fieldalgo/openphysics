@@ -24,7 +24,10 @@ harness. ``--plan`` names, per document id, ``"identity"`` or ``"layout"``; a la
 ``maps/<old field layout>.json``, whose rules are closed: arrays map by ``=``, ``neg``, ``conj``,
 ``L1``, ``L2``, ``L1*conj``, ``L2*conj`` (and ``kernel-L1`` for nanometre and metre em fixtures),
 summary paths by ``=``, ``neg``, ``conj``, ``L1``, ``L1*conj``, ``rad``, ``qdeg`` or ``removed``
-with a check, and only the pre-registered exceptions compare within 4 ulp. Exit status 0 when
+with a check, and only the pre-registered exceptions compare within 4 ulp. The em maps add
+closed rules (README "The em.modes2d commit"): alternatives (exactly one new name present), the
+``array`` summary rule, ``json`` arrays, call rules for the D-24 names and the D-22 argument,
+the VTU transform ``imag-conj`` and the ``collection`` transform. Exit status 0 when
 every document is equal, 1 otherwise. ``--report`` writes the per-document, per-array SHA-256
 table as JSON.
 """
@@ -32,6 +35,7 @@ table as JSON.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
@@ -50,6 +54,11 @@ EXCLUDED_FILES = frozenset({"log.txt", "results.png"})
 ARRAY_TRANSFORMS = ("=", "neg", "conj", "L1", "L2", "L1*conj", "L2*conj", "kernel-L1")
 SUMMARY_TRANSFORMS = ("=", "neg", "conj", "L1", "L1*conj", "rad", "qdeg", "removed")
 REMOVED_CHECKS = ("unit-metadata", "time-tail", "equals")
+#: the VTU-only transform of an exported imaginary part: the sign flip of a conjugation (spec §5.4,
+#: "imaginary parts are -old"), which keeps a signed zero as np.conj does
+VTU_TRANSFORMS = ARRAY_TRANSFORMS + ("imag-conj",)
+#: the D-24 renames of local em material names (convert_v02.D24_RENAMES)
+D24_RENAMES = {"SiO2": "oxide", "Si": "silicon"}
 #: the only comparisons that are not bitwise (P2-1); each is within 4 ulp
 EXCEPTIONS = {"propagation_loss": 100.0, "bend_loss": 1.0, "group_index_length_frame": 1.0}
 ULP_LIMIT = 4
@@ -74,7 +83,8 @@ class Result:
         self.id, self.mode = doc_id, mode
         self.failures: list[str] = []
         self.type_differences: list[str] = []
-        self.counts = {"calls": 0, "arrays": 0, "summary_leaves": 0, "vtu_arrays": 0, "exceptions": 0}
+        self.counts = {"calls": 0, "arrays": 0, "summary_leaves": 0, "vtu_arrays": 0, "exceptions": 0,
+                       "absent_defaults": 0}
         self.arrays: list[list] = []
 
     def fail(self, message: str):
@@ -329,33 +339,72 @@ class LayoutMap:
         self.source = source
         self.old_layout, self.new_layout = data["old_layout"], data.get("new_layout")
         self.arrays = {}
+        self.json_arrays = {}
         for rule in data.get("arrays", []):
             f = ALIASES.get(rule.get("f", "="), rule.get("f", "="))
+            if f == "json":
+                # a JSON text array whose content is a summary subtree: compared through the
+                # summary rules under the given prefixes (spec §5.3.4, "content keys renamed")
+                self.json_arrays[rule["old"]] = (rule["new"], rule["prefix"], rule.get("new_prefix", rule["prefix"]))
+                continue
             if f not in ARRAY_TRANSFORMS:
                 raise ValueError(f"{source}: array transform {f!r} is not in the closed list")
-            self.arrays[rule["old"]] = (rule["new"], f)
+            new = rule["new"]
+            # alternatives: exactly one of the names is saved (a scalar or a vector result)
+            self.arrays[rule["old"]] = (tuple(new) if isinstance(new, list) else (new,), f)
         self.arrays_removed = {r["old"]: r for r in data.get("arrays_removed", [])}
         self.arrays_added = [re.compile(p) for p in data.get("arrays_added", [])]
         self.summary = []
         for rule in data.get("summary", []):
             f = ALIASES.get(rule.get("f", "="), rule.get("f", "="))
-            if f not in SUMMARY_TRANSFORMS:
+            if f not in SUMMARY_TRANSFORMS and f != "array":
                 raise ValueError(f"{source}: summary transform {f!r} is not in the closed list")
             if f == "removed" and rule.get("check", "unit-metadata") not in REMOVED_CHECKS:
                 raise ValueError(f"{source}: removed check {rule.get('check')!r} is not in the closed list")
-            self.summary.append((parse_pattern(rule["old"]), None if f == "removed" else parse_pattern(rule["new"]),
-                                 f, rule))
+            if "absent_default" in rule and (f != "=" or not isinstance(rule["absent_default"], str)):
+                raise ValueError(f"{source}: absent_default names an input key and applies to '=' rules only")
+            if f == "array" and (rule.get("part") not in ("real", "imag") or "old_array" not in rule
+                                 or "new_array" not in rule):
+                raise ValueError(f"{source}: an array rule names old_array, new_array and part (real or imag)")
+            # a list of new paths are alternatives: exactly one is present (the real or the complex
+            # form of one value)
+            news = None if f == "removed" else [parse_pattern(n) for n in
+                                                (rule["new"] if isinstance(rule["new"], list) else [rule["new"]])]
+            self.summary.append((parse_pattern(rule["old"]), news, f, rule))
         # an always-added key covers its whole subtree (resolved_inputs, diagnostics, ...)
         self.summary_added = [parse_pattern(p) for p in (*(f"{k}.**" for k in ADDED_ALWAYS),
                                                          *data.get("summary_added", []))]
         self.identifiers = [parse_pattern(p) for p in data.get("identifiers", [])]
         self.vtu = {r["old"]: (r["new"], ALIASES.get(r.get("f", "="), r.get("f", "="))) for r in data.get("vtu", [])}
+        for name, (_new, f) in self.vtu.items():
+            if f not in VTU_TRANSFORMS:
+                raise ValueError(f"{source}: VTU transform {f!r} is not in the closed list")
+        self.collection = data.get("collection", "=")
+        if self.collection not in ("=", "L1"):
+            raise ValueError(f"{source}: collection transform {self.collection!r} is not '=' or 'L1'")
+        self.calls = data.get("calls", {})
+        if set(self.calls) - {"d24_material_names", "arguments"}:
+            raise ValueError(f"{source}: unknown call rules {sorted(set(self.calls) - {'d24_material_names', 'arguments'})}")
         self.vtu_added = [re.compile(p) for p in data.get("vtu_added", [])]
-        self.exceptions = {}
+        self.exceptions = []
         for rule in data.get("exceptions", []):
             if rule["kind"] not in EXCEPTIONS:
                 raise ValueError(f"{source}: exception {rule['kind']!r} is not pre-registered")
-            self.exceptions[(rule.get("where", "summary"), rule["new"])] = rule
+            where = rule.get("where", "summary")
+            # an array exception names the array; a summary exception is a path pattern
+            self.exceptions.append((where, rule["new"] if where == "array" else parse_pattern(rule["new"]), rule))
+
+    def exception(self, where: str, new, old_record):
+        """The pre-registered exception for a new array name or summary path that applies to this
+        document (``group_index_length_frame`` to the nanometre and metre fixtures only), or None;
+        everything else compares bitwise."""
+        for kind, target, rule in self.exceptions:
+            if kind != where:
+                continue
+            hit = target == new if where == "array" else match(target, new) is not None
+            if hit and _exception_allowed(rule, old_record):
+                return rule
+        return None
 
     @classmethod
     def load(cls, maps: Path, layout: str) -> "LayoutMap":
@@ -378,8 +427,54 @@ def _metadata(arrays: dict):
     return None if value is None else json.loads(str(value))
 
 
-def compare_calls(old: dict, new: dict, result: Result):
-    a, b = old.get("calls", []), new.get("calls", [])
+def _d24_material_names(form, local: set):
+    """A recorded call form with each D-24 renamed local material (``SiO2`` -> ``oxide``, ``Si``
+    -> ``silicon``) under its new name: the physmat ``Material`` name and its model's label. Only
+    names the old document defines locally are renamed (P2-1 conversion rule; D-24)."""
+    if isinstance(form, list):
+        if len(form) == 3 and form[0] == "physmat.Material" and form[1] in local:
+            renamed = D24_RENAMES[form[1]]
+            return ["physmat.Material", renamed, _d24_label(form[2], form[1], renamed)]
+        return [_d24_material_names(v, local) for v in form]
+    if isinstance(form, dict):
+        return {k: _d24_material_names(v, local) for k, v in form.items()}
+    return form
+
+
+def _d24_label(form, old, new):
+    if isinstance(form, list):
+        if len(form) == 2 and form[0] == "label" and form[1] == old:
+            return ["label", new]
+        return [_d24_label(v, old, new) for v in form]
+    return form
+
+
+def _apply_call_rules(calls: list, rules: dict, local_materials) -> list:
+    """The old side's calls under the map's call rules (closed): ``d24_material_names`` renames
+    the D-24 local materials inside physmat Material forms; ``arguments`` replaces a positional
+    argument of a function by its new value when another argument has a given value (D-22: the
+    kernel's n_cladding on a scalar solve, which format 0.3 refuses and the kernel never reads)."""
+    if not rules:
+        return calls
+    out = copy.deepcopy(calls)
+    if rules.get("d24_material_names"):
+        local = set(local_materials) & set(D24_RENAMES)
+        if local:
+            out = [_d24_material_names(c, local) for c in out]
+    for rule in rules.get("arguments", []):
+        for call in out:
+            args = call.get("args")
+            if call.get("function") != rule["function"] or not (isinstance(args, list) and args[0] == "list"):
+                continue
+            items = args[1]
+            when = rule["when"]
+            if len(items) > max(rule["index"], when["index"]) and items[when["index"]] == when["equals"]:
+                items[rule["index"]] = rule["new"]
+    return out
+
+
+def compare_calls(old: dict, new: dict, result: Result, rules: dict | None = None, local_materials=()):
+    a, b = _apply_call_rules(old.get("calls", []), rules or {}, local_materials), new.get("calls", [])
     if len(a) != len(b):
         result.fail(f"calls: {len(a)} recorded on the old side, {len(b)} on the new side")
     for i, (x, y) in enumerate(zip(a, b)):
@@ -441,22 +536,36 @@ def compare_arrays_layout(old_arrays, new_arrays, lmap: LayoutMap, old_record, o
         if key in lmap.arrays_removed:
             _removed_array_check(key, lmap.arrays_removed[key], old_arrays, result)
             continue
+        if key in lmap.json_arrays:
+            new_key, prefix, new_prefix = lmap.json_arrays[key]
+            seen_new.add(new_key)
+            if new_key not in new_arrays:
+                result.fail(f"fields.npz {key} -> {new_key}: missing on the new side")
+                continue
+            result.counts["arrays"] += 1
+            result.arrays.append([f"{key} -> {new_key}", _sha(a.tobytes()), _sha(new_arrays[new_key].tobytes()), "json",
+                                  "compared as JSON"])
+            compare_trees_layout({prefix: json.loads(str(a))}, {new_prefix: json.loads(str(new_arrays[new_key]))},
+                                 lmap, old_record, f"fields.npz {key}", result)
+            continue
         if key not in lmap.arrays:
             result.fail(f"fields.npz {key}: not in map {lmap.source} (neither mapped nor removed)")
             continue
-        new_key, f = lmap.arrays[key]
+        names, f = lmap.arrays[key]
+        present = [n for n in names if n in new_arrays]
+        if len(present) > 1:
+            result.fail(f"fields.npz {key}: more than one alternative is saved: {present}")
+            continue
+        new_key = present[0] if present else names[0]
         seen_new.add(new_key)
         if new_key not in new_arrays:
-            result.fail(f"fields.npz {key} -> {new_key}: missing on the new side")
+            result.fail(f"fields.npz {key} -> {' | '.join(names)}: missing on the new side")
             continue
         b = new_arrays[new_key]
         result.counts["arrays"] += 1
-        rule = lmap.exceptions.get(("array", new_key))
+        rule = lmap.exception("array", new_key, old_record)
         if rule is not None:
-            if not _exception_allowed(rule, old_record):
-                result.fail(f"fields.npz {new_key}: exception {rule['kind']} does not apply to this document")
-            else:
-                _within_ulp(a * EXCEPTIONS[rule["kind"]], b, rule["kind"], f"fields.npz {new_key}", result)
+            _within_ulp(a * EXCEPTIONS[rule["kind"]], b, rule["kind"], f"fields.npz {new_key}", result)
             continue
         if f == "kernel-L1":
             units = old_record.get("load", {}).get("length_units", [])
@@ -480,7 +589,8 @@ def compare_arrays_layout(old_arrays, new_arrays, lmap: LayoutMap, old_record, o
         if not any(p.fullmatch(key) for p in lmap.arrays_added):
             result.fail(f"fields.npz {key}: added on the new side and not on the map's added list")
     if "metadata_json" in new_arrays and "metadata_json" in old_arrays:
-        compare_trees_layout(_metadata(old_arrays), _metadata(new_arrays), lmap, old_record, "metadata_json", result)
+        compare_trees_layout(_metadata(old_arrays), _metadata(new_arrays), lmap, old_record, "metadata_json", result,
+                             (old_arrays, new_arrays))
 
 
 def _removed_array_check(key, rule, old_arrays, result: Result):
@@ -495,15 +605,20 @@ def _removed_array_check(key, rule, old_arrays, result: Result):
         result.fail(f"fields.npz {key}: removed, but its check {check} failed")
 
 
-def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, result: Result):
+def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, result: Result, arrays=None):
+    """Old tree against new tree through the map's summary rules. ``arrays`` is the pair (old
+    npz, new npz) that ``array`` rules read: such a leaf is the part of a saved array (a
+    summary value object of a complex array), so the old leaf must equal the old array's entry
+    and the new leaf the new array's entry, while the arrays themselves are compared bitwise
+    by their array rule."""
     a, b = leaves(old), leaves(new)
     used_new = set()
     by_path = {}
     for path in a:
-        for pattern, new_pattern, f, rule in lmap.summary:
+        for pattern, new_patterns, f, rule in lmap.summary:
             captures = match(pattern, path)
             if captures is not None:
-                by_path[path] = (new_pattern, f, rule, captures)
+                by_path[path] = (new_patterns, f, rule, captures)
                 break
     for path, value in sorted(a.items(), key=lambda kv: [str(x) for x in kv[0]]):
         where = f"{label} {show(path)}"
@@ -512,22 +627,30 @@ def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, resu
         if path not in by_path:
             result.fail(f"{where}: not in map {lmap.source}")
             continue
-        new_pattern, f, rule, captures = by_path[path]
+        new_patterns, f, rule, captures = by_path[path]
         if f == "removed":
             _removed_leaf_check(path, value, rule, captures, a, where, result)
             continue
-        new_path = fill(new_pattern, captures)
+        candidates = [fill(p, captures) for p in new_patterns]
+        present = [c for c in candidates if c in b]
+        if len(candidates) > 1 and len(present) > 1:
+            result.fail(f"{where}: more than one alternative is present on the new side: {[show(c) for c in present]}")
+            continue
+        new_path = present[0] if present else candidates[0]
         used_new.add(new_path)
         if new_path not in b:
-            result.fail(f"{where} -> {show(new_path)}: missing on the new side")
+            if "absent_default" in rule and _absent_default(value, rule["absent_default"], new):
+                result.counts["absent_defaults"] += 1
+                continue
+            result.fail(f"{where} -> {' | '.join(show(c) for c in candidates)}: missing on the new side")
             continue
         result.counts["summary_leaves"] += 1
-        exception = lmap.exceptions.get(("summary", show(new_path)))
+        exception = lmap.exception("summary", new_path, old_record)
         if exception is not None:
-            if not _exception_allowed(exception, old_record):
-                result.fail(f"{where}: exception {exception['kind']} does not apply to this document")
-            else:
-                _within_ulp(value * EXCEPTIONS[exception["kind"]], b[new_path], exception["kind"], where, result)
+            _within_ulp(value * EXCEPTIONS[exception["kind"]], b[new_path], exception["kind"], where, result)
+            continue
+        if f == "array":
+            _array_leaf(value, b[new_path], rule, captures, arrays, f"{where} -> {show(new_path)}", result)
             continue
         try:
             expected = scalar_transform(f, value)
@@ -539,6 +662,43 @@ def compare_trees_layout(old, new, lmap: LayoutMap, old_record, label: str, resu
         if any(match(p, path) is not None for p in lmap.summary_added + lmap.identifiers):
             continue
         result.fail(f"{label} {show(path)}: added on the new side and not on the map's added list")
+
+
+def _array_leaf(old_value, new_value, rule, captures, arrays, where: str, result: Result):
+    """An ``array`` rule: the old leaf is ``part`` of ``old_array`` at the captured indices, the
+    new leaf the same part of ``new_array`` (or of the one alternative saved)."""
+    if arrays is None:
+        result.fail(f"{where}: an array rule needs the saved arrays")
+        return
+    old_arrays, new_arrays = arrays
+    names = rule["new_array"] if isinstance(rule["new_array"], list) else [rule["new_array"]]
+    saved = [n for n in names if n in new_arrays]
+    if rule["old_array"] not in old_arrays or len(saved) != 1:
+        result.fail(f"{where}: arrays {rule['old_array']} and {names} are not saved as the rule needs")
+        return
+    index = tuple(c for c in captures if isinstance(c, int))
+    part = rule["part"]
+    old_entry = float(getattr(old_arrays[rule["old_array"]][index], part))
+    new_entry = float(getattr(new_arrays[saved[0]][index], part))
+
+    def same(entry, leaf):          # a value that is not finite is written as null
+        return not math.isfinite(entry) if leaf is None else _hex(entry) == _hex(leaf)
+    if not same(old_entry, old_value):
+        result.fail(f"{where}: the old leaf {old_value!r} is not {rule['old_array']}{list(index)}.{part}")
+    if not same(new_entry, new_value):
+        result.fail(f"{where}: the new leaf {new_value!r} is not {saved[0]}{list(index)}.{part}")
+
+
+def _absent_default(value, key: str, new_tree) -> bool:
+    """An input the 0.2 reader filled with zero and echoed, and the 0.3 reader leaves absent: it
+    records the default in ``defaults_applied`` and writes nothing (hazard H9). The old leaf must
+    be +0.0 and the new tree must list a default whose path ends in ``.<key>`` (rule
+    ``absent_default``); a given input is compared under its rule as usual."""
+    if _hex(value) != float.hex(0.0) or not isinstance(new_tree, dict):
+        return False
+    applied = new_tree.get("defaults_applied")
+    return isinstance(applied, list) and any(
+        isinstance(entry, dict) and str(entry.get("path", "")).endswith("." + key) for entry in applied)
 
 
 def _removed_leaf_check(path, value, rule, captures, old_leaves, where, result: Result):
@@ -610,7 +770,9 @@ def compare_exports(old: dict, new: dict, old_dir: Path, new_dir: Path, lmap, re
         for rel in sorted(x["files"]):
             fx, fy = x["files"][rel], y["files"][rel]
             if "collection" in fx:
-                cx = [[float.hex(float(t)), f] for t, f in fx["collection"]]
+                step = (lambda t: float(t)) if not _collection_transformed(lmap, old_dir) else \
+                    (lambda t: scalar_transform(lmap.collection, float(t)))
+                cx = [[float.hex(step(t)), f] for t, f in fx["collection"]]
                 cy = [[float.hex(float(t)), f] for t, f in fy["collection"]]
                 if cx != cy:
                     result.fail(f"export {rel}: collection {cx[:3]} != {cy[:3]}")
@@ -629,8 +791,18 @@ def compare_exports(old: dict, new: dict, old_dir: Path, new_dir: Path, lmap, re
                 _compare_vtu_layout(old_dir / "export" / rel, new_dir / "export" / rel, lmap, rel, result)
 
 
+def _collection_transformed(lmap, old_dir: Path) -> bool:
+    """The map's collection transform applies to the timesteps of an old wavelength sweep only
+    (its saved ``study_parameter`` ends in ``.wavelength``); point indices compare as written."""
+    if lmap is None or lmap.collection == "=":
+        return False
+    fields = old_dir / "result" / "fields.npz"
+    return fields.exists() and str(_npz(fields).get("study_parameter", "")).endswith(".wavelength")
+
+
 def _compare_vtu_layout(old_path: Path, new_path: Path, lmap: LayoutMap, rel: str, result: Result):
     import meshio
+    import numpy as np
     a, b = meshio.read(old_path), meshio.read(new_path)
     result.counts["vtu_arrays"] += 1
     if a.points.tobytes() != b.points.tobytes():
@@ -651,7 +823,7 @@ def _compare_vtu_layout(old_path: Path, new_path: Path, lmap: LayoutMap, rel: st
             olds = value if kind == "cell_data" else [value]
             news = new_data[new_name] if kind == "cell_data" else [new_data[new_name]]
             for x, y in zip(olds, news):
-                expected = array_transform(f, x)
+                expected = np.negative(x) if f == "imag-conj" else array_transform(f, x)
                 if expected.dtype != y.dtype or expected.shape != y.shape or expected.tobytes() != y.tobytes():
                     result.fail(f"export {rel} {kind}:{name} -> {new_name} ({f}) differs")
         for name in new_data:
@@ -680,7 +852,16 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
             found = diff_forms(old.get(key), new.get(key), key, result)
             if found:
                 result.fail(found)
-    compare_calls(old, new, result)
+    rules, local, lmap = None, (), None
+    if mode == "layout":
+        lmap = _map_for(old_dir, maps, result)
+        if lmap is None:
+            return result
+        rules = lmap.calls
+        model = old_dir / "result" / "model.json"
+        if model.is_file():
+            local = tuple((_load_json(model).get("materials") or {}))
+    compare_calls(old, new, result, rules, local)
     run_a, run_b = old.get("run", {}), new.get("run", {})
     if mode == "identity" and run_a.get("after") != run_b.get("after"):
         result.fail(f"diagnostics after the run differ: {run_a.get('after')} != {run_b.get('after')}")
@@ -699,9 +880,7 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
             if mode == "identity":
                 compare_trees_identity(evidence_a, evidence_b, "failure_evidence", result)
             else:
-                lmap = _map_for(old_dir, maps, result)
-                if lmap is not None:
-                    compare_trees_layout(evidence_a, evidence_b, lmap, old, "failure_evidence", result)
+                compare_trees_layout(evidence_a, evidence_b, lmap, old, "failure_evidence", result)
         return result
     save_a, save_b = old.get("save", {}), new.get("save", {})
     if save_a.get("status") != save_b.get("status") or save_a.get("status") != "ok":
@@ -725,10 +904,7 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
         compare_arrays_identity(arrays_a, arrays_b, result)
         compare_exports(old, new, old_dir, new_dir, None, result, layout_renames(maps))
     else:
-        lmap = _map_for(old_dir, maps, result)
-        if lmap is None:
-            return result
-        compare_trees_layout(summary_a, summary_b, lmap, old, "summary.json", result)
+        compare_trees_layout(summary_a, summary_b, lmap, old, "summary.json", result, (arrays_a, arrays_b))
         compare_arrays_layout(arrays_a, arrays_b, lmap, old, old_dir, result)
         compare_exports(old, new, old_dir, new_dir, lmap, result)
     return result
@@ -789,6 +965,8 @@ def main(argv=None) -> int:
     equal = sum(r.equal for r in results)
     for r in results:
         types = f", {len(r.type_differences)} type differences" if r.type_differences else ""
+        if r.counts["absent_defaults"]:
+            types += f", {r.counts['absent_defaults']} absent defaults"
         print(f"{r.id}: {'equal' if r.equal else 'DIFFERENT'} ({r.mode}; {r.counts['calls']} calls, "
               f"{r.counts['arrays']} arrays, {r.counts['summary_leaves']} summary leaves, "
               f"{r.counts['vtu_arrays']} VTU arrays{types})")
