@@ -2,34 +2,39 @@
 # SPDX-License-Identifier: Apache-2.0
 """``electric.steady2d`` on named material regions.
 
-A steady conduction document whose geometry has regions (a version 1 block with features
-or a background material, or 0.2 ``shapes``) uses the same geometry, mesh and boundary
-names as region heat (:mod:`simcase.thermal_regions`): the conductivity of each region is
-its material's ``electrical_conductivity_s_m``; ``dirichlet_potential_v`` and
-``outward_current_a_m2`` take the domain sides, the exterior tags the geometry declares
-(``boundary_tags`` names, ``outer`` on a void border) and exterior boundary selections.
-An interior selection (an interface between two regions) is refused for both, because
-:func:`galerkin.electric.solve_steady_electric` fixes exterior nodes only. An unnamed
-exterior boundary is insulated. A rectangle document keeps the existing path
-(:mod:`simcase.electric_joule`) unchanged.
+A steady conduction document whose geometry has regions (flat ``background``/``shapes`` or a
+version 1 block with features or a background material) uses the same geometry, mesh and
+boundary names as region heat (:mod:`simcase.thermal_regions`): the conductivity of each region
+is its material's ``electrical_conductivity``; ``prescribed_electric_potential`` and
+``inward_current_density`` take the domain sides, the exterior tags the geometry declares
+(``boundary_tags`` names, ``outer`` on a void border) and exterior boundary selections. An
+interior selection (an interface between two regions) is refused for both, because
+:func:`galerkin.electric.solve_steady_electric` fixes exterior nodes only. An unnamed exterior
+boundary is electrically insulating (``I-DEFAULT-BOUNDARY`` on the domain sides). A rectangle
+document keeps the rectangle path (:mod:`simcase.electric_joule`).
+
+Format 0.3 (units batch C6): the mesh is made from the geometry hand-off of region heat
+(``thermal_regions.handoff_03``), so the mesher receives the micrometre model it received for
+format 0.2, and galerkin receives the outward current ``0.0 - inward_current_density`` (H1).
 """
 
-import copy
+import math
 import time
 
 import numpy as np
 
 from . import views
 from .schema import DocumentError
-from .steady_boundary_contract import _number, _object
-from .thermal_regions import (SIDES, _named_sides, boundary_names, build_region_mesh, covered_shapes,
-                              has_region_geometry, is_axisymmetric, region_geometry, region_materials_table,
-                              region_mesh_settings)
+from .thermal_regions import (_refuse, boundary_names, build_region_mesh, component_03, covered_shapes, depth_03,
+                              exterior_sides, handoff_03, has_region_geometry, mesh_controls_03, mesh_diagnostics_03,
+                              region_geometry_03, region_materials_table_03, region_mesh_settings_03)
 
 PHYSICS = 'electric.steady2d'
-RESULT_FORMAT = 'electric.steady2d-regions-result-v1'
-FIELD_LAYOUT = 'electric2d-p1-node-cell-regions-v1'
+RESULT_FORMAT = 'electric.steady2d-regions-result-v2'
+FIELD_LAYOUT = 'electric2d-p1-node-cell-regions-v2'
 NONLINEAR_JOULE = 'joule.temperature2d'
+#: the physics-entry keys of a region electric document
+ELECTRIC_KEYS = ('prescribed_electric_potential', 'inward_current_density')
 
 
 def is_region_electric(data):
@@ -37,116 +42,147 @@ def is_region_electric(data):
     return has_region_geometry(data, PHYSICS)
 
 
-def refuse_region_joule(data):
-    """Temperature-dependent Joule heating takes the rectangle path only; region geometry is
-    refused by name (``joule.steady2d`` on regions is :mod:`simcase.joule_regions`)."""
-    if has_region_geometry(data, NONLINEAR_JOULE):
-        raise DocumentError(f'{NONLINEAR_JOULE}: region geometry (named material regions) is supported for '
-                            f'{PHYSICS} and joule.steady2d only; a temperature-dependent Joule document takes '
-                            'the rectangle form')
+def region_joule_refusal(tree):
+    """``(path, message)`` refusing a temperature-dependent Joule document with region geometry
+    (it takes the rectangle path only; ``joule.steady2d`` on regions is
+    :mod:`simcase.joule_regions`), or None. It reads the raw tree, so the reader refuses the
+    form by name before it asks for the kind's keys (``PhysicsKind.refuse_03``)."""
+    if not has_region_geometry(tree, NONLINEAR_JOULE):
+        return None
+    name = next(n for n, p in tree['physics'].items() if isinstance(p, dict) and p.get('type') == NONLINEAR_JOULE)
+    path = f'physics.{name}.type'
+    return path, (f'{path}: {NONLINEAR_JOULE}: region geometry (named material regions) is supported for {PHYSICS} '
+                  'and joule.steady2d only; a temperature-dependent Joule document takes the rectangle form')
 
 
-def _neutral(call, *args):
-    """Run a region heat check on an electric document: its key refusals say "thermal keys"."""
-    try:
-        return call(*args)
-    except DocumentError as exc:
-        raise DocumentError(str(exc).replace('unsupported thermal keys', 'unsupported keys')) from None
+def refuse_region_joule(doc):
+    """The same refusal on a read document."""
+    refusal = region_joule_refusal(doc.data)
+    if refusal is not None:
+        path, message = refusal
+        _refuse(message, path)
+
+
+def region_entry_03(doc, label, refused):
+    """``(name, SI entry, path)`` of the one physics entry of a region document; the material
+    properties in ``refused`` are refused on it by name, and an axisymmetric component too."""
+    doc.sole_physics()
+    name, p = next(iter(doc.si['physics'].items()))
+    if not isinstance(name, str) or not name.isidentifier():
+        _refuse('physics: name must be an identifier', f'physics.{name}')
+    path = f'physics.{name}'
+    for key in refused:
+        if key in p:
+            _refuse(f'{path}.{key}: a region document takes {key} from materials.<m>', f'{path}.{key}')
+    if component_03(doc)[1].get('dimension') == 'axisymmetric':
+        _refuse(f'{p["type"]}: an axisymmetric component is not supported for {label} (galerkin.electric has no '
+                'axisymmetric measure)', 'geometry.components')
+    return name, p, path
+
+
+def positive_conductivities_03(doc, used, keys):
+    """``electrical_conductivity`` may be 0 in the registry; a conductor needs it positive."""
+    materials = doc.si.get('materials') or {}
+    for mname in used:
+        for key in keys:
+            if not materials[mname][key] > 0:
+                _refuse(f'materials.{mname}.{key}: expected a positive conductivity', f'materials.{mname}.{key}',
+                        'E-DOMAIN')
+
+
+def boundary_data_03(p, path, names):
+    """The names of the potential and current data, before meshing: sides, tags and exterior
+    selections; an interface selection is refused by name; at least one potential; no current
+    on a fixed boundary."""
+    from .thermal_regions import SIDES
+    tags, outside, inside = names
+    allowed = set(SIDES) | tags | outside
+    for label in ELECTRIC_KEYS:
+        for key in p.get(label, {}):
+            where = f'{path}.{label}.{key}'
+            if key in inside:
+                _refuse(f'{where}: selection {key!r} lies on an interface between two regions; electric data apply to '
+                        'exterior boundaries only (galerkin.electric fixes exterior nodes only)', where)
+            if key not in allowed:
+                _refuse(f'{where}: no side, boundary tag or exterior selection of that name; expected one of '
+                        f'{sorted(allowed)}', where, 'E-SELECTION-UNKNOWN')
+    if not p.get('prescribed_electric_potential'):
+        _refuse(f'{path}.prescribed_electric_potential: at least one boundary potential is required; gauge-only '
+                'inputs are unsupported', f'{path}.prescribed_electric_potential')
+    overlap = sorted(set(p['prescribed_electric_potential']) & set(p.get('inward_current_density', {})))
+    if overlap:
+        _refuse(f'{path}: a current condition overlaps a fixed potential on the same boundary ({overlap[0]})',
+                f'{path}.inward_current_density.{overlap[0]}')
 
 
 def validate_region_electric(doc):
-    d = doc.data
-    _object(d, {'openphysics', 'name', 'units', 'geometry', 'materials', 'physics', 'mesh', 'study', 'results'},
-            'document')
-    if not isinstance(d['name'], str):
-        raise DocumentError('name: expected a string')
-    physics = d['physics']
-    if not isinstance(physics, dict) or len(physics) != 1:
-        raise DocumentError('physics: exactly one electric entry required')
-    name, p = next(iter(physics.items()))
-    if not isinstance(name, str) or not name.isidentifier() or not isinstance(p, dict):
-        raise DocumentError('physics: expected identifier and settings object')
-    path = f'physics.{name}'
-    if 'conductivity_s_m' in p:
-        raise DocumentError(f'{path}.conductivity_s_m: a region document takes electrical conductivity from '
-                            'materials (electrical_conductivity_s_m)')
-    _object(p, {'type', 'dirichlet_potential_v', 'outward_current_a_m2'}, path)
-    _object(d.get('units'), {'length', 'temperature'}, 'units')
-    if 'length' not in doc.scale.declared:
-        raise DocumentError(f'{PHYSICS} requires explicit units.length')
-    if 'temperature' in d['units'] and d['units']['temperature'] != 'K':
-        raise DocumentError('units.temperature: expected K')
-    if is_axisymmetric(doc):
-        raise DocumentError(f'{PHYSICS}: an axisymmetric component is not supported for electric conduction '
-                            '(galerkin.electric has no axisymmetric measure)')
-    region_geometry(doc, 'electric')
-    _neutral(region_materials_table, doc, ('electrical_conductivity_s_m',), 'steady electric conduction')
-    _neutral(_boundary_data, p, path, boundary_names(doc))
-    _neutral(region_mesh_settings, doc)
-    if d['study'] != {'type': 'single'}:
-        raise DocumentError(f'{PHYSICS} supports only study {{"type":"single"}}')
-    _object(d['results'], {'save_fields', 'plots'}, 'results')
-    if not isinstance(d['results'].get('save_fields'), bool) or not isinstance(d['results'].get('plots'), bool):
-        raise DocumentError('results.save_fields and results.plots must be booleans')
-    if d['results']['plots']:
-        raise DocumentError(f'results.plots: {PHYSICS} is headless; plots=true is not supported')
-    doc.notes = []
+    """electric.steady2d on regions, format 0.3."""
+    from .electric_joule import default_electric_boundaries_03, single_study_03
+    name, p, path = region_entry_03(doc, 'electric conduction', ('electrical_conductivity',))
+    region_mesh_settings_03(doc)
+    h = handoff_03(doc)
+    region_geometry_03(doc, h, 'electric')
+    mesh_controls_03(doc, h)
+    used = region_materials_table_03(doc, h, ('electrical_conductivity',), 'steady electric conduction',
+                                     'electric properties')
+    positive_conductivities_03(doc, used, ('electrical_conductivity',))
+    boundary_data_03(p, path, boundary_names(h))
+    default_electric_boundaries_03(doc, name, p, exterior_sides(h)[1])
+    single_study_03(doc, PHYSICS)
 
 
-def _boundary_data(p, path, names):
-    """Names and values of the potential and current data, before meshing."""
-    tags, outside, inside = names
-    allowed = set(SIDES) | tags | outside
-    for label in ('dirichlet_potential_v', 'outward_current_a_m2'):
-        table = p.get(label, {})
-        if isinstance(table, dict):
-            for key in table:
-                if key in inside:
-                    raise DocumentError(f'{path}.{label}.{key}: selection {key!r} lies on an interface between two '
-                                        'regions; electric data apply to exterior boundaries only (galerkin.electric '
-                                        'fixes exterior nodes only)')
-        _named_sides(table, allowed, f'{path}.{label}')
-        for key, value in table.items():
-            _number(value, f'{path}.{label}.{key}')
-    bc = p.get('dirichlet_potential_v', {})
-    if not bc:
-        raise DocumentError(f'{path}.dirichlet_potential_v: at least one boundary potential is required; '
-                            'gauge-only inputs are unsupported')
-    if set(bc) & set(p.get('outward_current_a_m2', {})):
-        raise DocumentError(f'{path}: a current condition overlaps a fixed potential on the same boundary')
+def summary_lines_03(doc, label, keys):
+    """The summary text of a format 0.3 region electric or Joule document, up to its boundary data."""
+    from .thermal import _authored
+    from .thermal_regions import _plain
+    h = handoff_03(doc)
+    name, p = next(iter(doc.si['physics'].items()))
+    where = f'physics.{name}'
+    block = component_03(doc)[1]
+    dom = ', '.join(f'{k} {_plain(block["domain"][k])}' for k in ('xmin', 'xmax', 'ymin', 'ymax'))
+    out = [f'{doc.si["name"]} (openphysics 0.3)', f'  physics {name}: {label}',
+           f'  domain {dom} ({block["length_unit"]}); element_size {_authored(doc, "mesh.element_size")}',
+           f'  background: {h.background["material"]}']
+    out += [f'  region {r["name"]}: {r["type"]}, {r["material"] if r["material"] is not None else "void (hole)"}'
+            for r in h.regions()]
+    for mname, spec in doc.si['materials'].items():
+        props = ', '.join(f'{k} {_authored(doc, f"materials.{mname}.{k}")}' for k in spec if k != 'source')
+        out.append(f'  material {mname}: {props}')
+    for key in keys:
+        table = p.get(key, {})
+        if not table:
+            continue
+        if key == 'convection':
+            shown = {tag: {k: _authored(doc, f'{where}.convection.{tag}.{k}') for k in c} for tag, c in table.items()}
+        else:
+            shown = {tag: _authored(doc, f'{where}.{key}.{tag}') for tag in table}
+        out.append(f'  {key} {shown}')
+    return out
 
 
 def region_summary(doc):
-    name, p = doc.sole_physics()
-    lines = [f'{doc["name"]} (openphysics 0.2)',
-             f'  physics {name}: {PHYSICS}, steady conduction, named material regions',
-             f'  domain {doc.domain} {doc.length_unit}; mesh size {doc["mesh"]["size"]} {doc.length_unit}',
-             f'  background: {doc.background["material"]}']
-    for s in doc.regions():
-        lines.append(f'  shape {s["name"]}: {s["type"]}, {s["material"] if s["material"] is not None else "void (hole)"}')
-    for mname, spec in doc['materials'].items():
-        if 'electrical_conductivity_s_m' in spec:
-            lines.append(f'  material {mname}: sigma={spec["electrical_conductivity_s_m"]} S/m')
-    lines += [f'  potential {p.get("dirichlet_potential_v", {})} V; current {p.get("outward_current_a_m2", {})} A/m^2; '
-              'other exterior insulated',
-              '  output: coordinates m, potential V, field V/m, current density A/m^2, Joule W/m^3, '
-              'nodal current A/m and power W/m of depth, triangle regions']
-    return '\n'.join(lines)
+    out = summary_lines_03(doc, f'{PHYSICS}, steady conduction, named material regions', ELECTRIC_KEYS)
+    out += ['  other exterior boundaries electrically insulating',
+            f'  result: {RESULT_FORMAT}; layout: {FIELD_LAYOUT}',
+            '  output: SI (node_coordinates m, electric_potential V, electric_field V/m, current_density A/m^2, '
+            'joule_power_density W/m^3, nodal currents A/m and powers W/m of depth, triangle_regions)']
+    return '\n'.join(out)
 
 
-def region_inputs(doc, mesh, region_materials):
+def region_inputs(doc, mesh, region_materials, electric=None):
     """solve_steady_electric keyword arguments for a meshed region document (from its internal SI
-    view, ``simcase.views.region_electric``), and the boundary name that fixes each Dirichlet node."""
+    view, ``simcase.views.region_electric``), and the boundary name that fixes each fixed node."""
     name, _ = doc.sole_physics()
     path = f'physics.{name}'
-    electric = views.region_electric(doc)
+    electric = views.region_electric(doc) if electric is None else electric
     conductivity = {r: float(electric.conductivity[m]) for r, m in region_materials.items()}
-    for label, table, given in (('dirichlet_potential_v', mesh.boundary, electric.dirichlet),
-                                ('outward_current_a_m2', mesh.boundary_edges, electric.outward_current)):
+    for label, table, given in (('prescribed_electric_potential', mesh.boundary, electric.dirichlet),
+                                ('inward_current_density', mesh.boundary_edges, electric.outward_current)):
         for tag in given:
             if tag not in table:
                 raise DocumentError(f'{path}.{label}.{tag}: no mesh edge lies on {tag!r} (a side or boundary that '
                                     'borders a void feature only, or a selection without mesh edges)')
+
     def edge_set(edges):
         return {tuple(sorted(map(int, e))) for e in np.asarray(edges).reshape(-1, 2)}
     selected = getattr(mesh, 'selection_edges', None) or {}
@@ -157,8 +193,8 @@ def region_inputs(doc, mesh, region_materials):
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             if held[a] & held[b]:
-                raise DocumentError(f'{path}.dirichlet_potential_v: {a!r} and {b!r} share mesh edges; give that '
-                                    'boundary one entry')
+                raise DocumentError(f'{path}.prescribed_electric_potential: {a!r} and {b!r} share mesh edges; give '
+                                    'that boundary one entry')
     # a node two boundaries fix (where they meet) counts for the first name in name order, so the
     # attribution does not depend on the key order of the document
     fixed, fixed_by = {}, {}
@@ -166,8 +202,8 @@ def region_inputs(doc, mesh, region_materials):
         value = float(potentials[tag])
         for node in map(int, mesh.boundary[tag]):
             if node in fixed and fixed[node] != value:
-                raise DocumentError(f'{path}.dirichlet_potential_v: {fixed_by[node]!r} and {tag!r} share node {node} '
-                                    'with different potentials')
+                raise DocumentError(f'{path}.prescribed_electric_potential: {fixed_by[node]!r} and {tag!r} share node '
+                                    f'{node} with different potentials')
             fixed[node] = value
             fixed_by.setdefault(node, tag)
     current = {tag: float(v) for tag, v in electric.outward_current.items()}
@@ -176,13 +212,13 @@ def region_inputs(doc, mesh, region_materials):
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             if edges[a] & edges[b]:
-                raise DocumentError(f'{path}.outward_current_a_m2: {a!r} and {b!r} share mesh edges; give that '
+                raise DocumentError(f'{path}.inward_current_density: {a!r} and {b!r} share mesh edges; give that '
                                     'boundary one entry')
     for a, e in edges.items():
         # an edge whose two nodes are fixed, by one boundary or by two, takes no current
         both = sorted({fixed_by[u] for edge in e if edge[0] in fixed and edge[1] in fixed for u in edge})
         if both:
-            raise DocumentError(f'{path}.outward_current_a_m2.{a}: {a!r} has mesh edges whose nodes are fixed by '
+            raise DocumentError(f'{path}.inward_current_density.{a}: {a!r} has mesh edges whose nodes are fixed by '
                                 f'{both}; a current condition does not apply on a fixed edge')
     _refuse_floating_parts(mesh, fixed, path)
     return (dict(conductivity=conductivity, dirichlet=dict(sorted(fixed.items())), outward_current=current),
@@ -208,23 +244,42 @@ def _refuse_floating_parts(mesh, fixed, path):
     anchored = {root(n) for n in fixed}
     floating = sorted({mesh.region_names[int(r)] for tri, r in zip(t, mesh.regions) if root(int(tri[0])) not in anchored})
     if floating:
-        raise DocumentError(f'{path}.dirichlet_potential_v: a conductor part with regions {floating} touches no '
-                            'fixed potential (it is surrounded by void); give one of its boundaries a potential')
+        raise DocumentError(f'{path}.prescribed_electric_potential: a conductor part with regions {floating} touches '
+                            'no fixed potential (it is surrounded by void); give one of its boundaries a potential')
+
+
+def outward_terminal_currents(electric, fixed_by, potentials):
+    """The current leaving the conductor through each fixed boundary, A per metre of depth:
+    ``0.0 - (current the fixed potential injects)``; a node two boundaries fix counts for the
+    first of them in name order."""
+    reaction = np.asarray(electric.reaction)
+    injected = {tag: float(sum(reaction[n] for n, by in fixed_by.items() if by == tag)) for tag in potentials}
+    return {tag: 0.0 - value for tag, value in injected.items()}
+
+
+def regions_block_03(doc, mesh, region_materials, keys):
+    """``region_names`` and ``regions.<r>.{material, <property>...}`` (value objects) of a summary."""
+    from .results_common import value_object
+    materials = doc.si['materials']
+    return {'region_names': list(mesh.region_names),
+            'regions': {r: {'material': m, **{k: value_object(materials[m][k], k) for k in keys}}
+                        for r, m in region_materials.items()}}
 
 
 def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     from galerkin.electric import solve_steady_electric
-    import galerkin
-    import scipy
-    from . import __version__
-    from .electric_joule import RegionElectricRunResult
+    from .electric_joule import (RegionElectricRunResult, electric_balance, result_arrays, summary_03)
+    from .thermal import log_lines_03
     doc.validate()
     given, doc = doc, doc.copy()
     doc.validate()
     name, p = doc.sole_physics()
     t0 = time.perf_counter()
-    mesh, region_materials, tri = build_region_mesh(doc, mesh_limits)
-    given.notes.extend(n for n in doc.notes if n.startswith(('geometry.', 'mesh.controls:')) and n not in given.notes)
+    h = handoff_03(doc)
+    mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    # the mesher's findings reach the caller's document as coded diagnostics
+    for target in (given, doc):
+        mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     kwargs, fixed_by = region_inputs(doc, mesh, region_materials)
     t_mesh = time.perf_counter()-t0
     calculation_json = doc.canonical_json(separators=(',', ':'))
@@ -236,59 +291,24 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     t_solve = time.perf_counter()-t0
     if doc.canonical_json(separators=(',', ':')) != calculation_json:
         raise ValueError('electric calculation inputs changed during the solve')
-    arrays, field_units, locations = {}, {}, {}
-
-    def add(key, value, unit, location):
-        arrays[key] = np.asarray(value)
-        field_units[key], locations[key] = unit, location
-    add('nodes_m', mesh.nodes, 'm', 'nodes')
-    add('triangles', mesh.triangles, '1', 'triangle_connectivity')
-    add('triangle_regions', mesh.regions, '1', 'triangles')
-    for key, attr, unit, location in (
-        ('potential_v', 'potential', 'V', 'nodes'),
-        ('electric_field_v_m', 'electric_field', 'V/m', 'triangle_centroids'),
-        ('current_density_a_m2', 'current_density', 'A/m^2', 'triangle_centroids'),
-        ('conductivity_s_m', 'conductivity', 'S/m', 'triangle_centroids'),
-        ('joule_heating_w_m3', 'joule_heating', 'W/m^3', 'triangle_centroids'),
-        ('joule_load_w_per_m', 'joule_load', 'W/m', 'nodes'),
-        ('electric_reaction_a_per_m', 'reaction', 'A/m', 'nodes'),
-        ('prescribed_outward_current_a_per_m', 'prescribed_outward_load', 'A/m', 'nodes'),
-        ('electric_residual_a_per_m', 'residual', 'A/m', 'nodes')):
-        add(key, getattr(electric, attr), unit, location)
     fixed = kwargs['dirichlet']
-    add('electric_dirichlet_node_ids', np.array(list(fixed), dtype=int), '1', 'electric_dirichlet_nodes')
-    add('dirichlet_potential_v', list(fixed.values()), 'V', 'electric_dirichlet_nodes')
-    free = np.setdiff1d(np.arange(mesh.num_nodes), list(fixed))
-    reaction = np.asarray(electric.reaction)
-    # current injected into the conductor through each fixed boundary (positive in), A/m of
-    # depth; a node two boundaries fix counts for the first of them in name order
-    terminal = {tag: float(sum(reaction[n] for n, by in fixed_by.items() if by == tag))
-                for tag in p['dirichlet_potential_v']}
-    diagnostics = dict(
-        current_balance_a_per_m=float(np.sum(reaction-np.asarray(electric.prescribed_outward_load))),
-        electric_free_residual_a_per_m=float(np.max(abs(np.asarray(electric.residual)[free]), initial=0.)),
-        supplied_power_w_per_m=electric.supplied_power_per_length,
-        joule_power_w_per_m=electric.joule_power_per_length,
-        electric_power_defect_w_per_m=electric.supplied_power_per_length-electric.joule_power_per_length,
-        terminal_reaction_current_a_per_m=terminal,
-        mesh_min_angle_deg=float(tri.min_angle()))
-    metadata = dict(name=doc['name'], physics_name=name, physics_type=PHYSICS, status='converged',
-        result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT, mesh_length_unit='m',
-        input_units=copy.deepcopy(doc['units']), field_units=field_units, field_locations=locations,
-        field_shapes={k: list(v.shape) for k, v in arrays.items()}, region_names=list(mesh.region_names),
-        region_materials=dict(region_materials), region_conductivity_s_m=kwargs['conductivity'],
-        diagnostics=diagnostics, iterations=[], timings_s=dict(mesh=t_mesh, solve=t_solve),
-        software_versions=dict(simcase=__version__, galerkin=galerkin.__version__, numpy=np.__version__,
-                               scipy=scipy.__version__))
-    covered = covered_shapes(doc, mesh)
-    log = [region_summary(doc),
-           f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
-           *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-           f'potential V: {float(np.min(electric.potential)):.12g} to {float(np.max(electric.potential)):.12g}',
-           f'Joule power {electric.joule_power_per_length:.12g} W/m of depth']
+    arrays = result_arrays(mesh, electric, fixed, regions=mesh.regions)
+    balance = electric_balance(electric, fixed, mesh)
+    balance['outward_current_per_depth'] = outward_terminal_currents(electric, fixed_by,
+                                                                     doc.si['physics'][name]['prescribed_electric_potential'])
+    metadata = summary_03(doc, result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT, arrays=arrays, balance=balance,
+                          timings={'mesh': t_mesh, 'solve': t_solve}, mesh=mesh, depth=depth_03(doc),
+                          extra=regions_block_03(doc, mesh, region_materials, ('electrical_conductivity',)),
+                          minimum_angle=math.radians(float(tri.min_angle())))
+    covered = covered_shapes(h, mesh)
+    printed = [doc.summary(),
+               f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
+               *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
+               f'electric_potential: {float(np.min(electric.potential)):.12g} V to '
+               f'{float(np.max(electric.potential)):.12g} V',
+               f'joule_power_per_depth {electric.joule_power_per_length:.12g} W/m']
     if verbose:
-        print('\n'.join(log))
-    result = RegionElectricRunResult(doc, arrays, metadata, log)
+        print('\n'.join(printed))
+    result = RegionElectricRunResult(doc, arrays, metadata, log_lines_03(doc, printed))
     result.region_materials = region_materials
     return result
-
