@@ -15,7 +15,7 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # 버전 1 형상 블록의 영역 복합체
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"`를 유지하며 import나 배포판 이름이 아닙니다. 다가올 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)의 읽기가 들어왔으며, 아직 어떤 물리 종류도 그 형식을 읽지 않습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열 직사각형(평면 직사각형의 `thermal.steady2d`, `thermal.transient2d`)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. 다른 모든 종류와 영역 열 문서는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(선언 단위, study 지점별 n_eff, 군굴절률, 메시 통계, 시간), `fields.npz`(메시와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 문서 사본이 생성됩니다.
 
@@ -208,9 +208,9 @@ result = solve_point(model, doc.sole_physics()[1])
 
 [공진기 문서 계약](cavity3d.md)은 `em.cavity3d` 입력, 단위 변환, 탐색 한계, SI JSON/NPZ 결과 구성을 설명합니다.
 
-[thermal.steady2d 계약](thermal_steady2d.md)은 명시 형상 길이 단위와 절대 Kelvin을 쓰는 균질 직사각형 정상 열전도 문서를 설명합니다. 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 지지 열 반력은 안쪽 방향이며 그 음수가 온도 고정부의 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 외향 열유속·대류, v2 metadata와 raw 배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 v1을 유지합니다. Dirichlet이 비어 있으면 양의 Robin 고정이 필요합니다. 입력 Kelvin은 음이 아니어야 하며, 계산된 유한 음의 온도는 clamp하지 않습니다.
+[thermal.steady2d 계약](thermal_steady2d.md)은 균질 직사각형 정상 열전도 문서(형식 0.3: 형상 `length_unit`과 모든 값의 단위)를 설명합니다. 등록부 이름의 수치 SI NPZ 배열은 전용 결과 버전/구성을 쓰며 `allow_pickle=False`로 읽습니다. 구속 반력은 구속이 주입하는 열이며 그 음수가 외향 기여입니다. [정상 경계조건 계약](thermal_steady_boundary2d.md)은 변별 상수 내향 열유속·대류와 경계 식별자·배열을 추가합니다. 두 키를 모두 쓰지 않는 문서는 기본 쌍을 유지합니다. 지정 온도가 비어 있으면 양의 Robin 고정이 필요합니다. 입력 온도는 0 K보다 크며 계산된 음의 온도는 잘라내지 않습니다.
 
-[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1, 일관 질량/후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 Kelvin, 변 상수/표본 Dirichlet 값과 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환합니다. 결과는 Nt개 frame, Nt-1개 rate, SI 단위와 버전 metadata를 갖는 JSON/비객체 NPZ 이력으로 저장합니다. 초기값을 projection하지 않고 음의 K를 clamp하지 않습니다. 상수 외향 열유속·대류 변(정상 계약과 같은 키)은 step별 하중 배열 두 개를 더한 `thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1` 쌍으로 저장합니다. 시간 의존 열유속/Robin, restart, 자동 연성은 지원하지 않습니다.
+[`thermal.transient2d` 계약](thermal_transient2d.md)은 고정 직사각형/P1, 일관 질량/후진 Euler, 상수 k/c/Q, 명시 시간, 균일/affine 초기 온도, 변 상수/표본 지정 온도와 단열을 정의합니다. `run(Document)`는 `TransientThermalRunResult`를 반환합니다. 결과는 Nt개 frame, Nt-1개 rate, SI 단위와 버전 metadata를 갖는 JSON/비객체 NPZ 이력으로 저장합니다. 초기값을 projection하지 않고 계산된 음의 온도를 잘라내지 않습니다. 상수 내향 열유속·대류 변(정상 계약과 같은 키)은 step별 열 rate 배열 두 개와 함께 `thermal.transient2d-result-v4` / `thermal2d-transient-p1-node-cell-boundary-v2` 쌍을 저장합니다. 시간 의존 열유속/Robin, restart, 자동 연성은 지원하지 않습니다.
 
 ### 저장 출력
 
@@ -220,11 +220,11 @@ result = solve_point(model, doc.sole_physics()[1])
 
 선택 extra `pip install "simcase[export]"`(meshio, MIT)를 설치하면
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")`가 저장된 직사각형 정상
-열전도(Dirichlet·단열 변, 또는 열유속·대류 변이 있는 `boundary-v2` 배치와 그 절점 배열
-`prescribed_outward_load`, `ambient_load`, `convective_outward`, `system_rhs`), 직사각형 과도
-열전도(저장된 시각 하나, `time_index`, 기본값은 마지막; 열유속·대류 변이 있는
-`transient-p1-node-cell-boundary-v1` 배치는 step별 `prescribed_outward_load`·`convective_outward`
-배열을 더함), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 정상·과도 재료 영역 배치도 지원하며 정수 셀 데이터 `triangle_regions`와 저장된 정상
+열전도(지정·단열 변, 또는 열유속·대류 변이 있는 `boundary-v3` 배치와 그 절점 배열
+`outward_prescribed_`, `ambient_convective_`, `outward_convective_`, `applied_heat_rate_per_depth`),
+직사각형 과도 열전도(저장된 시각 하나, `time_index`, 기본값은 마지막; 열유속·대류 변이 있는
+`transient-p1-node-cell-boundary-v2` 배치는 step별 `outward_prescribed_`·`outward_convective_` 열 rate를
+더함), 진공 PEC 공진기 장을 VTU 사본으로 씁니다. 정상·과도 재료 영역 배치도 지원하며 정수 셀 데이터 `triangle_regions`와 저장된 정상
 flux/Robin 하중 배열을 포함합니다. 단위·영역 이름 대응·예제는
 [영역 내보내기](thermal_regions2d.md#vtu와-pvd-내보내기)를 참고하세요. 전기 전도·Joule 결과
 (`electric-joule2d-p1-v1`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`의 배치)는
@@ -263,10 +263,12 @@ writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
 과도 열전도 결과는
 `simcase.export.export_time_series("out/fields.npz", "out/paraview")`로 저장된 모든 시각을
 씁니다. `fields_00000.vtu`, `fields_00001.vtu`, …와 ParaView 컬렉션 `fields.pvd`가 생기며,
-컬렉션은 저장된 각 `time_s`(초)를 timestep으로 기록합니다. ParaView에서 `fields.pvd`를 열면
+컬렉션은 저장된 각 시각(초)을 timestep으로 기록합니다. ParaView에서 `fields.pvd`를 열면
 시간 컨트롤로 시각을 넘기거나 애니메이션을 재생할 수 있습니다. 각 VTU에는 그 시각에 저장된
-배열만 들어가므로 `reaction_w_per_m`, `residual_w_per_m`, `storage_rate_w_per_m`은 두 번째
-시각부터 나타납니다. 출력 폴더는 새것이거나 비어 있어야 하며 아무것도 덮어쓰지 않습니다.
+배열만 들어가므로 step별 rate(`reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`,
+`heat_storage_rate_per_depth`; 영역 결과는 `reaction_w_per_m` 등)는 두 번째 시각부터 나타납니다. 열
+직사각형 VTU에는 각 배열의 SI 단위와 부호 문장을 담은 FieldData `units`, `conventions`(UInt8 배열의
+UTF-8 JSON)도 있습니다. 출력 폴더는 새것이거나 비어 있어야 하며 아무것도 덮어쓰지 않습니다.
 컬렉션은 VTU 파일을 상대 경로로 가리키므로 폴더째 옮겨도 됩니다. `name="heat"`로 파일 이름
 앞부분을 바꿀 수 있습니다. `.pvd`는 일반 XML이라 meshio 외 의존성은 필요 없습니다.
 

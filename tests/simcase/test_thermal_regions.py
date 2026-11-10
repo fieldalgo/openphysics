@@ -365,12 +365,12 @@ def test_a_shape_that_clips_to_a_polygon_and_a_line_piece_meshes():
 
 def test_rectangle_documents_keep_their_original_contract():
     legacy = copy.deepcopy(examples.EXAMPLES['thermal_slab'])
-    legacy['materials'] = {'steel': {'conductivity_w_mk': 45.}}
+    legacy['materials'] = {'steel': {'thermal_conductivity': '45 W/(m K)'}}
     with pytest.raises(DocumentError, match='requires an empty object'):
         Document.from_dict(legacy)
     r = run(Document.from_dict(examples.EXAMPLES['thermal_slab']), verbose=False)
-    assert r.result_format == 'thermal.steady2d-result-v1'
-    assert r.field_layout == 'thermal2d-p1-node-cell-v1'
+    assert r.result_format == 'thermal.steady2d-result-v3'
+    assert r.field_layout == 'thermal2d-p1-node-cell-v2'
     assert r.mesh.regions is None and 'triangle_regions' not in r.summary()['field_shapes']
 
 

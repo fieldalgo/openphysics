@@ -18,8 +18,8 @@ export async function transientScenario({cdp, click, wait, sleep, snapshot, repo
   await click('#runBtn');
   await wait(() => cdp.eval('!!transientController.state().frame&&!transientController.state().readActive'), 'transient final frame');
   const manifest = await cdp.eval('transientController.result()');
-  assert.deepEqual(manifest.time_s, model.study.time_s, 'exact requested stored times');
-  assert.equal(manifest.default_frame_index, manifest.time_s.length-1);
+  assert.deepEqual(manifest.time, model.study.time.values, 'exact requested stored times');
+  assert.equal(manifest.default_frame_index, manifest.time.length-1);
   evidence.manifest = manifest;
 
   async function painted(name, canvas='#fieldCanvas') {
@@ -36,7 +36,7 @@ export async function transientScenario({cdp, click, wait, sleep, snapshot, repo
     assert.ok(parsed, 'raw current-frame time/range label');
     assert.equal(Number(parsed[1]), index); assert.equal(Number(actual.selected), index);
     assert.equal(parsed[3], view);
-    const field = view==='temperature_k' ? view : 'heat_flux_w_m2';
+    const field = view==='temperature' ? view : 'heat_flux';
     const requests = report.http.filter(x => {
       const u=new URL(x.url);return u.pathname.endsWith('/frame')&&u.searchParams.get('field')===field&&u.searchParams.get('time_index')===String(index)&&x.status===200;
     });
@@ -51,15 +51,15 @@ export async function transientScenario({cdp, click, wait, sleep, snapshot, repo
     await cdp.eval('(()=>{const field=document.querySelector("#thermalField"),time=document.querySelector("#transientTime");field.value='+JSON.stringify(view)+';time.value='+index+';time.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
     await inspect(index,view);
   }
-  const last=manifest.time_s.length-1;
-  await inspect(last,'temperature_k'); await painted('temperature-final');
-  await select(0,'temperature_k'); await painted('temperature-initial');
+  const last=manifest.time.length-1;
+  await inspect(last,'temperature'); await painted('temperature-final');
+  await select(0,'temperature'); await painted('temperature-initial');
   const middle=Math.floor(last/2);
-  if(middle!==0&&middle!==last){await select(middle,'temperature_k');await painted('temperature-middle');}
+  if(middle!==0&&middle!==last){await select(middle,'temperature');await painted('temperature-middle');}
   for(const view of ['qx','qy','magnitude']){await select(last,view);await painted(view);}
 
-  const stop=Math.min(16,manifest.time_s.length);
-  for(const [field,button,host] of [['heat_content_j_per_m','#transientReadH','#transientH'],['quadratic_functional_jk_per_m','#transientReadV','#transientV']]){
+  const stop=Math.min(16,manifest.time.length);
+  for(const [field,button,host] of [['stored_heat_per_depth','#transientReadH','#transientH'],['thermal_energy_functional_per_depth','#transientReadV','#transientV']]){
     await cdp.eval('document.querySelector("#transientPageStart").value="0"');
     await click(button);
     await wait(() => cdp.eval('!transientController.state().readActive&&!!transientController.state().pages['+JSON.stringify(field)+']'), 'explicit history page');
@@ -72,7 +72,7 @@ export async function transientScenario({cdp, click, wait, sleep, snapshot, repo
     assert.equal(rows.length,stop);
     for(let i=0;i<stop;i++){
       assert.match(rows[i][0],new RegExp('^index '+i+'(?: \\(current frame\\))?$'));
-      assert.equal(rows[i][1],'t = '+manifest.time_s[i]+' s');
+      assert.equal(rows[i][1],'t = '+manifest.time[i]+' s');
       assert.equal(rows[i][2],String(page.arrays[field][i])+' '+page.unit);
     }
     evidence.histories.push({page,rows});

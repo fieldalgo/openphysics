@@ -32,7 +32,17 @@ def rectangle(physics, length_units=None):
         "study": {"type": "single"}, "results": {"save_fields": False, "plots": False}})
 
 
-HEAT = {"type": "thermal.steady2d", "conductivity_w_mk": 2., "dirichlet_temperature_k": {"left": 300.}}
+def rectangle_03(physics):
+    """The same rectangle in format 0.3 (rectangle heat reads 0.3 since units batch C5a)."""
+    return Document.from_dict({
+        "openphysics": "0.3", "name": "views",
+        "geometry": {"length_unit": "mm", "depth": None,
+                     "domain": {"xmin": 123.456, "xmax": 133.456, "ymin": -3.2, "ymax": 2.8}},
+        "materials": {}, "physics": {"p": physics}, "mesh": {"subdivision_count": [4, 3]},
+        "study": {"type": "single"}, "results": {"save_fields": False, "plots": False}})
+
+
+HEAT = {"type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)", "prescribed_temperature": {"left": "300 K"}}
 ELECTRIC = {"type": "electric.steady2d", "conductivity_s_m": 1e6, "dirichlet_potential_v": {"left": 0., "right": 1.}}
 
 
@@ -41,7 +51,7 @@ def si(value):
 
 
 def test_rectangle_lengths_keep_each_kinds_operation_order():
-    doc = rectangle(HEAT)
+    doc = rectangle(ELECTRIC, {"length": "mm"})
     difference, corners = (views.rectangle_mesh(doc, formula) for formula in views.LENGTH_FORMULAS)
     assert difference.origin == corners.origin == (si(123.456), si(-3.2))
     assert difference.upper == corners.upper == (si(133.456), si(2.8))
@@ -56,6 +66,18 @@ def test_rectangle_lengths_keep_each_kinds_operation_order():
         views.rectangle_mesh(doc, "rounded")
 
 
+def test_a_format_0_3_rectangle_keeps_the_operation_order_on_picometres():
+    # corners pm_to_m(k), correctly rounded; lengths by the same two formulas on the pm counts
+    from physmat.units import pm_to_m
+    doc = rectangle_03(HEAT)
+    difference, corners = (views.rectangle_mesh(doc, formula) for formula in views.LENGTH_FORMULAS)
+    assert difference.origin == corners.origin == (0.123456, -0.0032) == (pm_to_m(123456000000), pm_to_m(-3200000000))
+    assert difference.upper == corners.upper == (0.133456, 0.0028)
+    assert difference.lengths == (0.01, 0.006) == (pm_to_m(10 ** 10), pm_to_m(6 * 10 ** 9))
+    assert corners.lengths == (0.133456 - 0.123456, 0.0028 - -0.0032)
+    assert difference.subdivisions == (4, 3) and all(type(n) is int for n in difference.subdivisions)
+
+
 @pytest.mark.parametrize("physics, units_, formula", [
     (HEAT, None, "difference"), (ELECTRIC, {"length": "mm"}, "corners")])
 def test_each_rectangle_runner_meshes_with_its_own_formula(monkeypatch, physics, units_, formula):
@@ -65,13 +87,13 @@ def test_each_rectangle_runner_meshes_with_its_own_formula(monkeypatch, physics,
         calls.append(args)
         return original(*args)
     monkeypatch.setattr(galerkin, "rectangle_mesh", spy)
-    doc = rectangle(physics, units_)
+    doc = rectangle_03(physics) if physics is HEAT else rectangle(physics, units_)
     before = copy.deepcopy(doc.data)
     result = run(doc, verbose=False)
     grid = views.rectangle_mesh(doc, formula)
     assert [tuple(float(v).hex() for v in c) for c in calls] == [
         tuple(float(v).hex() for v in (*grid.lengths, *grid.subdivisions))]
-    nodes = result.mesh_nodes_m if hasattr(result, "mesh_nodes_m") else result.fields["nodes_m"]
+    nodes = result.node_coordinates if physics is HEAT else result.fields["nodes_m"]
     assert nodes.min(axis=0).tolist() == list(grid.origin)
     assert doc.data == before
 

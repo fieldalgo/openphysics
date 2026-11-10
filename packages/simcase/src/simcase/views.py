@@ -7,8 +7,9 @@ frozen view here and hands its fields to today's solver and mesher signatures. T
 that turn a view into node and edge data (Dirichlet nodes, boundary edges, region maps) stay
 in the kind modules, beside the mesh they need.
 
-Every view of this module is built from a 0.2 document and holds exactly what the runners
-passed before the views existed: the same doubles, the same Python number types (an int a
+Every view of this module is built from a 0.2 document, or from the SI values of a format
+0.3 document of a kind that reads 0.3 (rectangle heat so far), and holds exactly what the
+runners passed before the views existed: the same doubles, the same Python number types (an int a
 0.2 document gives stays an int, hazard H8) and the same mapping orders (H6). Physics values
 are SI in a 0.2 document already (their keys carry the SI unit) and are copied as written,
 or as the 0.2 contract readers return them; the adapters keep their ``float()`` and
@@ -65,6 +66,8 @@ def rectangle_mesh(doc, formula: str, *, axes: str = "xy", scale=None) -> Rectan
     """
     if formula not in LENGTH_FORMULAS:
         raise ValueError(f"formula: expected one of {LENGTH_FORMULAS}, got {formula!r}")
+    if getattr(doc, "si", None) is not None:
+        return _rectangle_mesh_03(doc, formula, axes)
     scale = doc.scale if scale is None else scale
     dom = doc.domain
 
@@ -77,6 +80,21 @@ def rectangle_mesh(doc, formula: str, *, axes: str = "xy", scale=None) -> Rectan
     else:
         lengths = tuple(u - o for u, o in zip(upper, origin))
     return RectangleMesh(origin, upper, lengths, tuple(int(n) for n in doc["mesh"]["subdivisions"]), formula)
+
+
+def _rectangle_mesh_03(doc, formula: str, axes: str) -> RectangleMesh:
+    """The grid of a format 0.3 rectangle: corners ``pm_to_m(k)`` (correctly rounded), lengths
+    by the kind's own operation order on the picometre counts (hazard H17 b)."""
+    from physmat.units import pm_to_m
+    lo = [doc.pm(f"geometry.domain.{a}min") for a in axes]
+    hi = [doc.pm(f"geometry.domain.{a}max") for a in axes]
+    origin, upper = tuple(pm_to_m(k) for k in lo), tuple(pm_to_m(k) for k in hi)
+    if formula == "difference":
+        lengths = tuple(pm_to_m(b - a) for a, b in zip(lo, hi))
+    else:
+        lengths = tuple(u - o for u, o in zip(upper, origin))
+    counts = tuple(int(n) for n in doc.si["mesh"]["subdivision_count"])
+    return RectangleMesh(origin, upper, lengths, counts, formula)
 
 
 @dataclass(frozen=True)
@@ -171,6 +189,9 @@ class HeatInputs:
 
 def rectangle_heat(doc) -> HeatInputs:
     """thermal.steady2d on a rectangle without boundary data (layout v1): values as written."""
+    if getattr(doc, "si", None) is not None:
+        from .steady_boundary_contract import heat_inputs_03
+        return heat_inputs_03(doc)
     _, p = doc.sole_physics()
     return HeatInputs(conductivity=p["conductivity_w_mk"], heat_source=p["heat_source_w_m3"],
                       dirichlet=dict(p["dirichlet_temperature_k"]), outward_flux={}, convection={})
@@ -179,7 +200,11 @@ def rectangle_heat(doc) -> HeatInputs:
 def steady_rectangle(doc) -> tuple[RectangleMesh, HeatInputs]:
     """The steady rectangle boundary contract (``steady_boundary_contract``) of a document,
     read and validated without changing it: the grid (lengths by ``difference``) and the
-    heat inputs as the contract returns them (floats)."""
+    heat inputs as the contract returns them (floats). A format 0.3 document gives the same
+    from its SI values."""
+    if getattr(doc, "si", None) is not None:
+        from .steady_boundary_contract import heat_inputs_03
+        return rectangle_mesh(doc, "difference"), heat_inputs_03(doc)
     from .steady_boundary_contract import V2, _validated
     bounds, sides, k, q, flux, convection, versions = _validated(doc)
     d = doc.data
@@ -202,6 +227,9 @@ def _initial_temperature(spec):
 def transient_rectangle_heat(doc) -> HeatInputs:
     """thermal.transient2d on a rectangle, validated: the contract's values (floats), side
     Dirichlet data sampled at the requested times."""
+    if getattr(doc, "si", None) is not None:
+        from .transient_thermal_contract import transient_heat_inputs_03
+        return transient_heat_inputs_03(doc)
     from .steady_boundary_contract import has_natural_conditions, natural_conditions
     from .transient_thermal_contract import _samples
     name, p = doc.sole_physics()

@@ -22,47 +22,48 @@ from simcase import Document, run
 from simcase.thermal import _OwnedOutput
 
 
-V1 = ("thermal.steady2d-result-v1", "thermal2d-p1-node-cell-v1")
-V2 = ("thermal.steady2d-result-v2", "thermal2d-p1-node-cell-boundary-v2")
+V1 = ("thermal.steady2d-result-v3", "thermal2d-p1-node-cell-v2")
+V2 = ("thermal.steady2d-result-v4", "thermal2d-p1-node-cell-boundary-v3")
 BASE_FIELDS = {
-    "nodes_m", "triangles", "temperature_k", "heat_flux_w_m2",
-    "load_w_per_m", "reaction_w_per_m", "residual_w_per_m",
-    "dirichlet_node_ids", "dirichlet_temperature_k",
+    "node_coordinates", "triangles", "temperature", "heat_flux",
+    "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth", "residual_heat_rate_per_depth",
+    "prescribed_node_ids", "prescribed_temperature",
 }
 BOUNDARY_FIELDS = {
-    "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
-    "convective_outward_w_per_m", "system_rhs_w_per_m",
+    "outward_prescribed_heat_rate_per_depth", "ambient_convective_heat_rate_per_depth",
+    "outward_convective_heat_rate_per_depth", "applied_heat_rate_per_depth",
 }
-METADATA = {"result_format", "field_layout", "mesh_length_unit", "metadata_json"}
+STRUCTURAL = {"triangles", "prescribed_node_ids"}      # no unit
+METADATA = {"result_format", "field_layout", "metadata_json"}
 
 
 def model(kind="flux-robin", *, save_fields=True):
     physics = {
-        "type": "thermal.steady2d", "conductivity_w_mk": 2,
-        "heat_source_w_m3": 0, "dirichlet_temperature_k": {"left": 300, "right": 293},
+        "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)",
+        "heat_source_density": "0 W/m^3", "prescribed_temperature": {"left": "300 K", "right": "293 K"},
     }
     if kind == "empty-flux":
-        physics["outward_flux_w_m2"] = {}
+        physics["inward_heat_flux"] = {}
     elif kind == "empty-convection":
         physics["convection"] = {}
     elif kind in ("robin-only", "flux-robin", "negative"):
-        physics["dirichlet_temperature_k"] = {"left": 300} if kind == "flux-robin" else {}
+        physics["prescribed_temperature"] = {"left": "300 K"} if kind == "flux-robin" else {}
         physics["convection"] = {
-            "right": {"h_w_m2k": 4, "ambient_temperature_k": 290}
+            "right": {"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "290 K"}
         }
         if kind == "flux-robin":
-            physics["outward_flux_w_m2"] = {"right": 2}
+            physics["inward_heat_flux"] = {"right": "-2 W/m^2"}
         elif kind == "negative":
-            physics["outward_flux_w_m2"] = {"right": 50}
-            physics["convection"]["right"] = {"h_w_m2k": 2, "ambient_temperature_k": 10}
+            physics["inward_heat_flux"] = {"right": "-50 W/m^2"}
+            physics["convection"]["right"] = {"heat_transfer_coefficient": "2 W/(m^2 K)",
+                                              "ambient_temperature": "10 K"}
     elif kind != "legacy":
         raise AssertionError(kind)
     return {
-        "openphysics": "0.2", "name": "Steady boundary \u0394 \ud55c\uae00",
-        "units": {"length": "m", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+        "openphysics": "0.3", "name": "Steady boundary \u0394 \ud55c\uae00",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
         "materials": {}, "physics": {"heat1": physics},
-        "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
+        "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
         "results": {"save_fields": save_fields, "plots": False},
     }
 
@@ -77,17 +78,17 @@ def assert_no_pins(parent):
 
 def assert_metadata(summary, fields, n, m, d):
     assert set(summary["field_shapes"]) == fields
-    assert set(summary["field_units"]) == fields
+    assert set(summary["field_units"]) == fields - STRUCTURAL
     assert set(summary["field_locations"]) == fields
     shapes = {key: [n] for key in fields}
-    shapes.update(nodes_m=[n, 2], triangles=[m, 3], heat_flux_w_m2=[m, 2],
-                  dirichlet_node_ids=[d], dirichlet_temperature_k=[d])
+    shapes.update(node_coordinates=[n, 2], triangles=[m, 3], heat_flux=[m, 2],
+                  prescribed_node_ids=[d], prescribed_temperature=[d])
     assert summary["field_shapes"] == shapes
-    assert summary["mesh_length_unit"] == "m"
-    assert summary["field_units"]["temperature_k"] == "K"
-    assert summary["field_units"]["heat_flux_w_m2"] == "W/m^2"
-    assert summary["field_locations"]["temperature_k"] == "nodes"
-    assert summary["field_locations"]["heat_flux_w_m2"] == "triangle_centroids"
+    assert summary["field_units"]["node_coordinates"] == "m"
+    assert summary["field_units"]["temperature"] == "K"
+    assert summary["field_units"]["heat_flux"] == "W/m^2"
+    assert summary["field_locations"]["temperature"] == "nodes"
+    assert summary["field_locations"]["heat_flux"] == "triangle_centroids"
     for key in BOUNDARY_FIELDS & fields:
         assert summary["field_units"][key] == "W/m"
         assert summary["field_locations"][key] == "nodes"
@@ -113,39 +114,38 @@ def test_boundary_public_save_versions_and_numeric_fields(tmp_path, kind):
         assert all(not arrays[key].dtype.hasobject for key in arrays.files)
         assert str(arrays["result_format"]) == version[0]
         assert str(arrays["field_layout"]) == version[1]
-        assert str(arrays["mesh_length_unit"]) == "m"
         assert json.loads(str(arrays["metadata_json"])) == summary
         for key in fields:
             assert arrays[key].dtype.kind in "iuf"
             assert np.isfinite(arrays[key]).all()
-        n, m = len(arrays["nodes_m"]), len(arrays["triangles"])
-        d = len(arrays["dirichlet_node_ids"])
+        n, m = len(arrays["node_coordinates"]), len(arrays["triangles"])
+        d = len(arrays["prescribed_node_ids"])
         assert_metadata(summary, fields, n, m, d)
         if kind in ("robin-only", "negative"):
-            assert d == 0 and arrays["dirichlet_temperature_k"].shape == (0,)
-            assert arrays["dirichlet_node_ids"].dtype.kind in "iu"
+            assert d == 0 and arrays["prescribed_temperature"].shape == (0,)
+            assert arrays["prescribed_node_ids"].dtype.kind in "iu"
             expected = 290 if kind == "robin-only" else -15
-            np.testing.assert_allclose(arrays["temperature_k"], expected, rtol=1e-10, atol=1e-9)
-            np.testing.assert_allclose(arrays["reaction_w_per_m"], 0, atol=1e-9)
+            np.testing.assert_allclose(arrays["temperature"], expected, rtol=1e-10, atol=1e-9)
+            np.testing.assert_allclose(arrays["reaction_heat_rate_per_depth"], 0, atol=1e-9)
         if kind != "legacy":
             np.testing.assert_allclose(
-                arrays["system_rhs_w_per_m"],
-                arrays["load_w_per_m"] + arrays["ambient_load_w_per_m"]
-                - arrays["prescribed_outward_load_w_per_m"], rtol=1e-10, atol=1e-9,
+                arrays["applied_heat_rate_per_depth"],
+                arrays["generated_heat_rate_per_depth"] + arrays["ambient_convective_heat_rate_per_depth"]
+                - arrays["outward_prescribed_heat_rate_per_depth"], rtol=1e-10, atol=1e-9,
             )
-            total = np.sum(arrays["prescribed_outward_load_w_per_m"]
-                           + arrays["convective_outward_w_per_m"] - arrays["reaction_w_per_m"])
-            np.testing.assert_allclose(total, arrays["load_w_per_m"].sum(), rtol=1e-10, atol=1e-9)
+            total = np.sum(arrays["outward_prescribed_heat_rate_per_depth"]
+                           + arrays["outward_convective_heat_rate_per_depth"] - arrays["reaction_heat_rate_per_depth"])
+            np.testing.assert_allclose(total, arrays["generated_heat_rate_per_depth"].sum(), rtol=1e-10, atol=1e-9)
         if kind == "flux-robin":
             # T=300-7x, qx=14: right flux2 + convection12, left reaction14.
-            np.testing.assert_allclose(arrays["temperature_k"], 300 - 7*arrays["nodes_m"][:, 0],
+            np.testing.assert_allclose(arrays["temperature"], 300 - 7*arrays["node_coordinates"][:, 0],
                                        rtol=1e-10, atol=1e-9)
-            np.testing.assert_allclose(arrays["heat_flux_w_m2"], np.tile([14, 0], (m, 1)),
+            np.testing.assert_allclose(arrays["heat_flux"], np.tile([14, 0], (m, 1)),
                                        rtol=1e-10, atol=1e-9)
-            for key, expected in (("prescribed_outward_load_w_per_m", 2),
-                                  ("ambient_load_w_per_m", 1160),
-                                  ("convective_outward_w_per_m", 12),
-                                  ("reaction_w_per_m", 14)):
+            for key, expected in (("outward_prescribed_heat_rate_per_depth", 2),
+                                  ("ambient_convective_heat_rate_per_depth", 1160),
+                                  ("outward_convective_heat_rate_per_depth", 12),
+                                  ("reaction_heat_rate_per_depth", 14)):
                 np.testing.assert_allclose(arrays[key].sum(), expected, rtol=1e-10, atol=1e-9)
     assert not (out / ".incomplete").exists()
     assert not (out / "results.png").exists()
@@ -164,7 +164,7 @@ def test_boundary_fields_false_keeps_v2_metadata_without_npz(tmp_path, kind):
     summary = read_summary(out)
     assert (summary["result_format"], summary["field_layout"]) == V2
     assert set(summary["field_shapes"]) == BASE_FIELDS | BOUNDARY_FIELDS
-    assert summary["field_shapes"]["dirichlet_node_ids"] == ([0] if kind == "robin-only" else [3])
+    assert summary["field_shapes"]["prescribed_node_ids"] == ([0] if kind == "robin-only" else [3])
     assert not (out / "fields.npz").exists()
     assert not (out / ".incomplete").exists()
     assert_no_pins(tmp_path)
@@ -268,13 +268,13 @@ def test_boundary_v2_metadata_snapshot_refuses_relabelling(tmp_path, mutation):
     elif mutation == "results":
         data["results"]["save_fields"] = False
     elif mutation == "flux":
-        data["physics"]["heat1"]["outward_flux_w_m2"]["right"] = 3
+        data["physics"]["heat1"]["inward_heat_flux"]["right"] = "-3 W/m^2"
     elif mutation == "ambient":
-        data["physics"]["heat1"]["convection"]["right"]["ambient_temperature_k"] = 291
+        data["physics"]["heat1"]["convection"]["right"]["ambient_temperature"] = "291 K"
     elif mutation == "geometry":
         data["geometry"]["domain"]["xmax"] = 2
     else:
-        data["mesh"]["subdivisions"] = [3, 2]
+        data["mesh"]["subdivision_count"] = [3, 2]
     with pytest.raises(ValueError):
         result.summary()
     out = tmp_path / "changed"
@@ -345,6 +345,6 @@ def test_boundary_concurrent_writers_preserve_winner(tmp_path, monkeypatch):
     assert read_summary(out)["result_format"] == V2[0]
     assert not (out / ".incomplete").exists()
     with np.load(out / "fields.npz", allow_pickle=False) as arrays:
-        assert arrays["dirichlet_node_ids"].shape == (0,)
+        assert arrays["prescribed_node_ids"].shape == (0,)
         assert set(arrays.files) == BASE_FIELDS | BOUNDARY_FIELDS | METADATA
     assert_no_pins(tmp_path)

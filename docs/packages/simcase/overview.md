@@ -20,11 +20,12 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # the region complex of a version 1 geometry block
 ```
 
-The package and CLI are named `simcase`. The JSON version field remains
-`"openphysics": "0.2"`; it is not an import or distribution name. The reader of the coming
-format `"0.3"` (values with units, registry quantity names, a `length_unit` per geometry
-component, coded diagnostics) is in place, and no physics kind reads that format yet:
-[document format 0.3](document_format.md). The separate
+The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
+`"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
+quantity names, a `length_unit` per geometry component, coded diagnostics) is read for the heat
+rectangles (`thermal.steady2d` and `thermal.transient2d` on a flat rectangle), which no longer
+read format 0.2; every other kind and the region heat documents still read format 0.2 until
+their commit of the units batch: [document format 0.3](document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -408,24 +409,24 @@ The [cavity document contract](cavity3d.md) covers the `em.cavity3d` input,
 unit conversion, search limitations and the SI JSON/NPZ result layout.
 
 The [thermal.steady2d contract](thermal_steady2d.md) describes homogeneous
-rectangular steady heat documents with explicit geometry length units and
-absolute Kelvin. Numeric SI NPZ arrays use a dedicated result version/layout and
-load with `allow_pickle=False`; support heat reaction is inward, and its negative
-is the thermostat outward contribution. The
+rectangular steady heat documents (format 0.3: a geometry `length_unit` and a unit on every
+value). Numeric SI NPZ arrays under registry names use a dedicated result version/layout and
+load with `allow_pickle=False`; the constraint reaction is the heat it injects, and its
+negative is the outward contribution. The
 [steady boundary contract](thermal_steady_boundary2d.md) adds side-constant
-outward flux and convection, v2 metadata and raw arrays; documents that use
-neither key keep v1. Empty Dirichlet requires positive Robin anchoring. Input
-Kelvin is nonnegative; finite negative computed temperature is not clamped.
+inward heat flux and convection and the boundary identifiers and arrays; documents that use
+neither key keep the plain pair. Empty prescribed temperatures require positive Robin
+anchoring. Input temperatures are above 0 K; a negative computed temperature is not clamped.
 
 The [`thermal.transient2d` contract](thermal_transient2d.md) defines a fixed
 rectangle/P1, consistent mass/backward Euler, constant k/c/Q, explicit times,
-uniform/affine initial Kelvin, side-constant/sampled Dirichlet values and
+uniform/affine initial temperatures, side-constant/sampled prescribed temperatures and
 insulation. `run(Document)` returns `TransientThermalRunResult`. Results save
 JSON/non-object NPZ histories with Nt frames, Nt-1 rates, SI units and version
-metadata. Initial values are not projected and negative K is not clamped.
-Constant outward flux and convection sides (the steady contract's keys) save the
-`thermal.transient2d-result-v2` / `thermal2d-transient-p1-node-cell-boundary-v1`
-pair with two per-step load arrays; time-dependent flux/Robin, restart and
+metadata. Initial values are not projected and a negative computed temperature is not clamped.
+Constant inward heat flux and convection sides (the steady contract's keys) save the
+`thermal.transient2d-result-v4` / `thermal2d-transient-p1-node-cell-boundary-v2`
+pair with two per-step heat rate arrays; time-dependent flux/Robin, restart and
 automatic coupling are not supported.
 
 ### Saved output
@@ -442,12 +443,13 @@ for its save and platform limits.
 
 With the optional extra `pip install "simcase[export]"` (meshio, MIT),
 `simcase.export.export_fields("out/fields.npz", "out/view.vtu")` writes a VTU
-copy of saved rectangular steady heat (Dirichlet and insulated sides, or the
-`boundary-v2` layout with flux/convection sides and its nodal
-`prescribed_outward_load`, `ambient_load`, `convective_outward` and `system_rhs`
-arrays), rectangular transient heat (one stored time, `time_index`, default the
-last; the `transient-p1-node-cell-boundary-v1` layout with flux/convection sides
-adds its per-step `prescribed_outward_load` and `convective_outward` arrays) and
+copy of saved rectangular steady heat (prescribed and insulated sides, or the
+`boundary-v3` layout with flux/convection sides and its nodal
+`outward_prescribed_`, `ambient_convective_`, `outward_convective_` and
+`applied_heat_rate_per_depth` arrays), rectangular transient heat (one stored time,
+`time_index`, default the last; the `transient-p1-node-cell-boundary-v2` layout with
+flux/convection sides adds its per-step `outward_prescribed_` and `outward_convective_` heat
+rates) and
 vacuum PEC cavity fields. Steady/transient material-region layouts are
 also supported, with integer cell data `triangle_regions` and the saved
 steady flux/Robin load arrays. See [region export](thermal_regions2d.md#vtu-and-pvd-export)
@@ -497,11 +499,13 @@ because meshio's XDMF writer needs h5py.
 For a transient heat result,
 `simcase.export.export_time_series("out/fields.npz", "out/paraview")` writes
 every stored time: `fields_00000.vtu`, `fields_00001.vtu`, … and the ParaView
-collection `fields.pvd`, which records each stored `time_s` (seconds) as its
+collection `fields.pvd`, which records each stored time (seconds) as its
 timestep. Open `fields.pvd` in ParaView to step through time with the time
 controls or play an animation. Each VTU holds the arrays stored at its time, so
-`reaction_w_per_m`, `residual_w_per_m` and `storage_rate_w_per_m` appear from
-the second time on. The output directory must be new or empty and nothing is
+the per-step rates (`reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`,
+`heat_storage_rate_per_depth`; `reaction_w_per_m`, ... for a region result) appear from the
+second time on. The heat rectangle VTU files also carry FieldData `units` and `conventions`
+(UTF-8 JSON in a UInt8 array) with each array's SI unit and the sign sentences. The output directory must be new or empty and nothing is
 overwritten; the collection refers to its VTU files by relative paths, so the
 directory can be moved as a whole. `name="heat"` changes the file stem. No
 dependency beyond meshio is needed: the `.pvd` is plain XML.

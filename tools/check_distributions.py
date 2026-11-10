@@ -484,13 +484,12 @@ def main():
         # Small real-browser E2E uses these installed wheels, never source imports.
         browser_model = work / "studio-browser-model.json"
         browser_model.write_text(json.dumps({
-            "openphysics": "0.2", "name": "Studio browser acceptance",
-            "units": {"length": "m", "temperature": "K"},
-            "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+            "openphysics": "0.3", "name": "Studio browser acceptance",
+            "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
             "materials": {}, "physics": {"heat1": {"type": "thermal.steady2d",
-                "conductivity_w_mk": 2, "heat_source_w_m3": 0,
-                "dirichlet_temperature_k": {"left": 300, "right": 293}}},
-            "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
+                "thermal_conductivity": "2 W/(m K)", "heat_source_density": "0 W/m^3",
+                "prescribed_temperature": {"left": "300 K", "right": "293 K"}}},
+            "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
             "results": {"save_fields": True, "plots": False}
         }, allow_nan=False), encoding="utf-8")
         run("node", ROOT / "tools/studio_browser/studio_thermal_browser.mjs",

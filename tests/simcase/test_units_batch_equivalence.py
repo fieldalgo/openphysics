@@ -119,8 +119,8 @@ if HARNESS.is_dir():
         work = tmp_path_factory.mktemp("units_batch")
         source = ROOT / "examples" / "simcase" / "thermal_slab.json"
         nudged = json.loads(source.read_text(encoding="utf-8"))
-        k = nudged["physics"]["heat1"]["conductivity_w_mk"]
-        nudged["physics"]["heat1"]["conductivity_w_mk"] = float(np.nextafter(k, np.inf))
+        k = float(nudged["physics"]["heat1"]["thermal_conductivity"].split()[0])
+        nudged["physics"]["heat1"]["thermal_conductivity"] = f"{float(np.nextafter(k, np.inf))!r} W/(m K)"
         (work / "ulp").mkdir()
         (work / "ulp" / "thermal_slab.json").write_text(json.dumps(nudged), encoding="utf-8")
         for side, doc in (("a", source), ("b", source), ("ulp", work / "ulp" / "thermal_slab.json")):
@@ -134,7 +134,7 @@ if HARNESS.is_dir():
         nudged = _compare(slab_recording / "rec_a", slab_recording / "rec_ulp", "--identity")
         assert nudged.returncode == 1, nudged.stdout
         assert "galerkin.thermal.solve_steady_heat" in nudged.stdout      # the solver input
-        assert "fields.npz temperature_k" in nudged.stdout                # and a saved array
+        assert "fields.npz temperature" in nudged.stdout                  # and a saved array
         assert "0x1.9000000000001p+3" in nudged.stdout                    # 12.5 one ulp up
 
     def test_layout_maps_are_applied_and_closed(slab_recording, tmp_path):
@@ -148,8 +148,8 @@ if HARNESS.is_dir():
         with np.load(fields, allow_pickle=False) as data:
             arrays = {k: data[k] for k in data.files}
         layout = str(arrays["field_layout"])
-        renamed = {"temperature_k": ("temperature", "="), "load_w_per_m": ("applied_heat_rate_per_depth", "neg"),
-                   "nodes_m": ("node_coordinates_um_as_m", "L1")}
+        renamed = {"temperature": ("temperature_renamed", "="), "generated_heat_rate_per_depth": ("negated", "neg"),
+                   "node_coordinates": ("node_coordinates_um_as_m", "L1")}
         moved = dict(arrays)
         for old_key, (new_key, f) in renamed.items():
             value = moved.pop(old_key)
@@ -172,21 +172,22 @@ if HARNESS.is_dir():
         assert ok.returncode == 0, ok.stdout + ok.stderr
         # one bit of one mapped array
         flipped = dict(moved)
-        flipped["temperature"] = moved["temperature"].copy()
-        flipped["temperature"][3] = np.nextafter(flipped["temperature"][3], np.inf)
+        flipped["temperature_renamed"] = moved["temperature_renamed"].copy()
+        flipped["temperature_renamed"][3] = np.nextafter(flipped["temperature_renamed"][3], np.inf)
         np.savez_compressed(fields, **flipped)
         bad = _compare(old, new, "--plan", str(plan), "--maps", str(maps))
-        assert bad.returncode == 1 and "temperature_k -> temperature (=)" in bad.stdout, bad.stdout
+        assert bad.returncode == 1 and "temperature -> temperature_renamed (=)" in bad.stdout, bad.stdout
         # an array the new side adds without the map listing it
         np.savez_compressed(fields, **moved, extra_array=np.zeros(3))
         added = _compare(old, new, "--plan", str(plan), "--maps", str(maps))
         assert added.returncode == 1 and "extra_array: added" in added.stdout, added.stdout
         # an old array the map neither maps nor removes
         np.savez_compressed(fields, **moved)
-        layout_map["arrays"] = [r for r in rules if r["old"] != "residual_w_per_m"]
+        layout_map["arrays"] = [r for r in rules if r["old"] != "residual_heat_rate_per_depth"]
         (maps / f"{layout}.json").write_text(json.dumps(layout_map), encoding="utf-8")
         unmapped = _compare(old, new, "--plan", str(plan), "--maps", str(maps))
-        assert unmapped.returncode == 1 and "residual_w_per_m: not in map" in unmapped.stdout, unmapped.stdout
+        assert unmapped.returncode == 1 and "residual_heat_rate_per_depth: not in map" in unmapped.stdout, \
+            unmapped.stdout
         # a transform outside the closed list is refused
         layout_map["arrays"] = rules + [{"old": "x", "new": "y", "f": "times2"}]
         (maps / f"{layout}.json").write_text(json.dumps(layout_map), encoding="utf-8")
@@ -315,26 +316,44 @@ if HARNESS.is_dir():
         quantities = {path: quantity for path, _text, quantity, _ in writer.expected}
         _same_document(expected, new, quantities)
 
+    def _documents_02():
+        """Every 0.2 document of the corpus: the examples still in 0.2 and the 0.2 fixtures. A
+        converted example's 0.2 source is checked at the baseline (``test_converted_documents_
+        resolve_to_the_converter_output``)."""
+        examples = [p for p in sorted((ROOT / "examples" / "simcase").glob("*.json"))
+                    if json.loads(p.read_text(encoding="utf-8"))["openphysics"] == "0.2"]
+        return examples + sorted((HARNESS / "fixtures" / "v02").glob("*.json"))
+
     def test_the_converter_resolves_every_example_and_fixture_to_its_old_values():
         """Every written quantity reads back through physmat.units to the old value (the SI double
         of a unit-suffixed key, the exact old length), counts are integers, and the only accept is
-        the manufactured c = 4 J/(m^3 K) of transient_thermal_uniform and its fixture."""
+        the manufactured c = 4 J/(m^3 K) of the sampled rectangle fixture (transient_thermal_uniform,
+        the other one, is in format 0.3 since units batch C5a)."""
         convert = _module("convert_v02")
-        documents = sorted((ROOT / "examples" / "simcase").glob("*.json")) + \
-            sorted((HARNESS / "fixtures" / "v02").glob("*.json"))
         accepted = []
-        for path in documents:
+        for path in _documents_02():
             new, writer = convert.convert(json.loads(path.read_text(encoding="utf-8")))
             assert new["openphysics"] == "0.3" and "units" not in new
             assert convert.check(writer) == [], path.name
             accepted += [(path.stem, note) for note in writer.notes if "accept" in note]
         assert sorted(accepted) == [(stem, "physics.heat1.volumetric_heat_capacity: 4 J/(m^3 K) is outside "
                                             "the plausibility band; written with accept")
-                                    for stem in ("heat_transient_rectangle_sampled", "transient_thermal_uniform")]
+                                    for stem in ("heat_transient_rectangle_sampled",)]
+
+    #: thermal_boundary.json before the units batch (format 0.2), for the converter's sign rule
+    THERMAL_BOUNDARY_02 = {
+        "openphysics": "0.2", "name": "Steady additive outward flux and convection",
+        "units": {"length": "m", "temperature": "K"},
+        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}}, "materials": {},
+        "physics": {"heat1": {"type": "thermal.steady2d", "conductivity_w_mk": 2, "heat_source_w_m3": 0,
+                              "dirichlet_temperature_k": {"left": 300}, "outward_flux_w_m2": {"right": 2},
+                              "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}}}},
+        "mesh": {"subdivisions": [8, 8]}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False}}
 
     def test_the_converter_negates_the_outward_inputs_and_conjugates_the_cavity():
         convert = _module("convert_v02")
-        boundary = json.loads((ROOT / "examples" / "simcase" / "thermal_boundary.json").read_text(encoding="utf-8"))
+        boundary = copy.deepcopy(THERMAL_BOUNDARY_02)
         new, _ = convert.convert(boundary)
         assert new["physics"]["heat1"]["inward_heat_flux"] == {"right": "-2 W/m^2"}
         assert "outward_flux_w_m2" not in new["physics"]["heat1"]
@@ -359,6 +378,76 @@ if HARNESS.is_dir():
         (kind,) = {p["type"] for p in data["physics"].values()}
         return kind
 
+    def _mode(corpus: dict, path: Path) -> str:
+        """The corpus mode of a 0.2 document: per physics type, or per geometry form of that type."""
+        mode = corpus["modes"][_kind(path)]
+        if isinstance(mode, dict):
+            geometry = json.loads(path.read_text(encoding="utf-8"))["geometry"]
+            form = ("v1" if "version" in geometry else
+                    "regions" if "background" in geometry or "shapes" in geometry else "rect")
+            mode = mode[form]
+        return mode
+
+    def test_the_corpus_modes_name_every_form():
+        corpus = json.loads((HARNESS / "maps" / "corpus.json").read_text(encoding="utf-8"))
+        for kind, mode in corpus["modes"].items():
+            modes = mode.values() if isinstance(mode, dict) else [mode]
+            assert set(modes) <= {"identity", "layout"}, kind
+            if isinstance(mode, dict):
+                assert set(mode) == {"rect", "regions", "v1"}, kind
+
+    def _si_tree(document):
+        """The resolved SI tree of a 0.3 document: float.hex of every number, pm of every shape number."""
+        from simcase.resolve import resolve_tree
+
+        def canonical(node):
+            if isinstance(node, dict):
+                return {k: canonical(v) for k, v in node.items()}
+            if isinstance(node, list):
+                return [canonical(v) for v in node]
+            if isinstance(node, float):
+                return float.hex(node)
+            return node
+        result = resolve_tree(document)
+        assert not result.diagnostics.errors, [d.as_dict() for d in result.diagnostics.errors]
+        return canonical(result.si), dict(result.pm)
+
+    @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE"),
+                        reason="not run: P2-2 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
+                               "(the merge base with main); see tools/units_batch/README.md")
+    def test_converted_documents_resolve_to_the_converter_output():
+        """P2-2: every document compared in layout mode, as committed, resolves to the SI tree (float.hex
+        of every value, pm of every shape number) of convert_v02 of its 0.2 source: the example at the
+        baseline, or the fixtures/v02 document. The accept annotation is the only allowed difference
+        (D-15 spellings resolve to the same values)."""
+        baseline = _git("rev-parse", "--verify", os.environ["OPENPHYSICS_BATCH_BASELINE"] + "^{commit}")
+        corpus = json.loads((HARNESS / "maps" / "corpus.json").read_text(encoding="utf-8"))
+        convert = _module("convert_v02")
+        pairs = []
+        for path in sorted((ROOT / "examples" / "simcase").glob("*.json")):
+            old = json.loads(_git("show", f"{baseline}:examples/simcase/{path.name}"))
+            stem = path.stem
+            pairs.append((stem, old, json.loads(path.read_text(encoding="utf-8"))))
+        for path in sorted((HARNESS / "fixtures" / "v02").glob("*.json")):
+            twin = HARNESS / "fixtures" / "v03" / path.name
+            pairs.append((path.stem, json.loads(path.read_text(encoding="utf-8")),
+                          json.loads(twin.read_text(encoding="utf-8")) if twin.is_file() else None))
+        checked = 0
+        for stem, old, new in pairs:
+            kind = {p["type"] for p in old["physics"].values()}.pop()
+            mode = corpus["modes"][kind]
+            if isinstance(mode, dict):
+                g = old["geometry"]
+                mode = mode["v1" if "version" in g else "regions" if "background" in g or "shapes" in g else "rect"]
+            if mode != "layout":
+                continue
+            converted, writer = convert.convert(old)
+            assert convert.check(writer) == [], stem
+            assert _si_tree(new) == _si_tree(converted), stem
+            checked += 1
+        print(f"P2-2: {checked} documents resolve to the converter output")
+        assert checked > 0
+
     @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE"),
                         reason="not run: P2-1 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
                                "(the merge base with main); see tools/units_batch/README.md")
@@ -374,12 +463,12 @@ if HARNESS.is_dir():
             assert sorted(old_examples) == sorted(new_examples), "the examples differ between baseline and head"
             old_docs, new_docs, plan = [], [], {}
             for stem, path in old_examples.items():
-                mode = corpus["modes"][_kind(path)]
+                mode = _mode(corpus, path)
                 old_docs.append(f"{stem}={path}")
                 new_docs.append(f"{stem}={new_examples[stem]}")
                 plan[stem] = mode
             for path in sorted((HARNESS / "fixtures" / "v02").glob("*.json")):
-                mode = corpus["modes"][_kind(path)]
+                mode = _mode(corpus, path)
                 twin = HARNESS / "fixtures" / "v03" / path.name if mode == "layout" else path
                 assert twin.is_file(), f"{path.stem}: its kind is compared by layout but has no fixtures/v03 twin"
                 old_docs.append(f"{path.stem}={path}")

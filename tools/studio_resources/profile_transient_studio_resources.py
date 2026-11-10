@@ -267,11 +267,7 @@ def parent(args):
                 'limitations':['not an exhaustive producer allocation inventory',
                                'native coverage and eviction/disconnect lifecycle proof remain separate']}
             after=rpc(process,'snapshot')['snapshot']
-            getter_counts={k:after['counts'].get('getter:'+k,0) for k in [
-                'nodes_m','triangles','time_s','temperature_k','heat_flux_w_m2',
-                'source_load_w_per_m','reaction_w_per_m','residual_w_per_m',
-                'storage_rate_w_per_m','heat_content_j_per_m','quadratic_functional_jk_per_m',
-                'dirichlet_node_ids','dirichlet_temperatures_k']}
+            getter_counts={k:after['counts'].get('getter:'+k,0) for k in transient.SPEC}
             report['completed_capture_getters']=getter_counts
             if any(v!=1 for v in getter_counts.values()):
                 raise ValueError('each13 completed-capture getter must have count1')
@@ -281,8 +277,8 @@ def parent(args):
             manifest=next(finite_json((args.output/r['raw_file']).read_bytes()) for r in report['requests']
                           if r['path'].endswith('/result') and 'raw_file' in r)
             job=manifest['job']; rid=manifest['result_id']
-            path='/api/jobs/'+job+'/frame?'+urllib.parse.urlencode({'result_id':rid,'field':'temperature_k',
-                         'time_index':len(manifest['time_s'])-1,'frame_seq':77})
+            path='/api/jobs/'+job+'/frame?'+urllib.parse.urlencode({'result_id':rid,'field':'temperature',
+                         'time_index':len(manifest['time'])-1,'frame_seq':77})
             phase_started=time.perf_counter()
             before=rpc(process,'reset_peak')['snapshot']
             first_read,_=observer.request(path,save=True)

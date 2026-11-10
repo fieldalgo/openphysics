@@ -88,10 +88,10 @@ def test_real_headless_documents_rejected_without_schema_stub(monkeypatch, examp
     data = copy.deepcopy(examples.EXAMPLES[example_name])
     if sampled:
         physics = next(iter(data["physics"].values()))
-        physics["dirichlet_temperature_k"] = {
-            "left": {"values_k": [
-                physics["initial_temperature_k"] + i
-                for i in range(len(data["study"]["time_s"]))
+        assert physics["initial_temperature"] == "300 K"
+        physics["prescribed_temperature"] = {
+            "left": {"unit": "K", "values": [
+                300.0 + i for i in range(len(data["study"]["time"]["values"]))
             ]}
         }
     # The real public parser must accept the document before testing UI refusal.

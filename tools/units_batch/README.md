@@ -142,8 +142,16 @@ recorded micrometre mesher nodes times 1e-6); `arrays_removed` (`{old, check}`, 
 (`math.radians(old)`), `qdeg` (`q(f"{old!r} deg", "minimum_angle")`) or `removed` with a
 check; the first matching rule applies); `summary_added` (beside the always allowed
 `diagnostics`, `defaults_applied`, `resolved_inputs`, `extent`, `field_components`,
-`time_convention`, `propagation`); `identifiers` (identifier strings, not compared); `vtu`
-and `vtu_added`; and `exceptions`.
+`time_convention`, `propagation`, each with everything under it); `identifiers` (identifier
+strings, not compared); `vtu` and `vtu_added`; and `exceptions`.
+
+`maps/corpus.json` names the mode of each physics type. A kind whose commit converts some
+geometry forms only gives an object keyed by the 0.2 document's form instead: `rect` (a flat
+rectangle), `regions` (shapes, a background material or a materials table) and `v1` (a version 1
+geometry block). The heat rectangle commit (C5a) sets `rect` to `layout` for `thermal.steady2d`
+and `thermal.transient2d` and keeps `regions` and `v1` in identity mode; it adds the four heat
+rectangle maps and the twins `fixtures/v03/heat_transient_rectangle_sampled.json` and
+`heat_transient_rectangle_sampled_boundary.json`.
 
 The only comparisons that are not bitwise are the three pre-registered ones, each within 4
 ulp: `propagation_loss` against 100 times the old `propagation_loss_db_cm`, `bend_loss`

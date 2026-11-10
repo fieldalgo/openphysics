@@ -9,26 +9,36 @@ meshio (MIT), installed by the optional extra ``simcase[export]``. The saved
 
 Supported layouts:
 
-- steady heat (``thermal2d-p1-node-cell-v1``): point data ``temperature_k`` and
-  the nodal ``load/reaction/residual`` arrays, cell data ``heat_flux_w_m2``
-- steady heat with flux or convection sides
-  (``thermal2d-p1-node-cell-boundary-v2``): the same, plus the nodal
-  ``prescribed_outward_load``, ``ambient_load``, ``convective_outward`` and
-  ``system_rhs`` arrays (W/m)
-- transient heat (``thermal2d-transient-p1-node-cell-v1``): the same arrays at
-  one stored time (``time_index``, default the last), or every stored time with
+- rectangle heat, format 0.3 (``thermal2d-p1-node-cell-v2``; with flux or
+  convection sides ``thermal2d-p1-node-cell-boundary-v3``): point data
+  ``temperature`` and the nodal ``generated_heat_rate_per_depth``,
+  ``reaction_heat_rate_per_depth`` and ``residual_heat_rate_per_depth`` arrays,
+  plus ``outward_prescribed_heat_rate_per_depth``,
+  ``ambient_convective_heat_rate_per_depth``,
+  ``outward_convective_heat_rate_per_depth`` and ``applied_heat_rate_per_depth``
+  with boundary sides (W/m); cell data ``heat_flux``. Each name is its
+  ``fields.npz`` name, and a ``<FieldData>`` block holds two ``UInt8`` arrays
+  (UTF-8 JSON): ``units`` (each exported array's canonical unit, the same as
+  ``field_units``) and ``conventions`` (the registry sign sentence of each signed
+  array)
+- transient rectangle heat, format 0.3 (``thermal2d-transient-p1-node-cell-v2``;
+  with flux or convection sides ``thermal2d-transient-p1-node-cell-boundary-v2``):
+  the same arrays plus ``heat_storage_rate_per_depth`` at one stored time
+  (``time_index``, default the last), or every stored time with
   ``export_time_series``: one VTU per time plus a ParaView collection (``.pvd``)
-  that records each ``time_s`` as its timestep
-- transient heat with flux or convection sides
-  (``thermal2d-transient-p1-node-cell-boundary-v1``): the same, plus the nodal
-  per-step ``prescribed_outward_load_w_per_m`` and ``convective_outward_w_per_m``
-  (W/m), present from the second stored time on like the other step rates
-- region heat (``thermal2d-p1-node-cell-regions-v1``,
+  that records each ``time`` (s) as its timestep. The step rates are present from
+  the second stored time on. Each VTU carries the same FieldData block
+- the rectangle heat layouts saved before the units and naming batch
+  (``RETIRED_LAYOUTS``) are refused by name: re-create the document in format 0.3
+- region heat, still format 0.2 (``thermal2d-p1-node-cell-regions-v1``,
   ``thermal-axisymmetric-p1-node-cell-regions-v1`` with (r, z) points and its
   ``_w`` full-revolution rates, and
-  ``thermal2d-transient-p1-node-cell-regions-v1``): the same steady/transient
-  arrays plus static integer cell data ``triangle_regions``; steady boundary
-  loads are point data when present
+  ``thermal2d-transient-p1-node-cell-regions-v1``): the 0.2 arrays
+  ``temperature_k``, the nodal ``load/reaction/residual`` arrays (W/m) and cell
+  ``heat_flux_w_m2``, at one stored time or as a ``time_s`` collection, plus
+  static integer cell data ``triangle_regions``; steady boundary loads
+  (``prescribed_outward_load``, ``ambient_load``, ``convective_outward``,
+  ``system_rhs``) are point data when present
 - 3D PEC cavity (``cavity3d-edge-v1``): tetrahedra with cell data
   ``electric_field_mode_<k>`` at centroids (the saved arbitrary SI
   normalization, unit m^-3/2)
@@ -110,12 +120,19 @@ __all__ = ["export_fields", "export_time_series", "export_sweep", "SUPPORTED_LAY
 #: layout identifiers of results saved before the units and naming batch, each mapped to the
 #: identifier that replaced it; such a fields.npz is refused by name. Each kind's commit of
 #: the batch moves its identifiers here when it replaces them in SUPPORTED_LAYOUTS.
-RETIRED_LAYOUTS: dict[str, str] = {}
+RETIRED_LAYOUTS: dict[str, str] = {
+    "thermal2d-p1-node-cell-v1": "thermal2d-p1-node-cell-v2",
+    "thermal2d-p1-node-cell-boundary-v2": "thermal2d-p1-node-cell-boundary-v3",
+    "thermal2d-transient-p1-node-cell-v1": "thermal2d-transient-p1-node-cell-v2",
+    "thermal2d-transient-p1-node-cell-boundary-v1": "thermal2d-transient-p1-node-cell-boundary-v2",
+}
 
-_STEADY = "thermal2d-p1-node-cell-v1"
-_STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v2"
-_TRANSIENT = "thermal2d-transient-p1-node-cell-v1"
-_TRANSIENT_BOUNDARY = "thermal2d-transient-p1-node-cell-boundary-v1"
+# rectangle heat (format 0.3): arrays under registry names, SI, with VTU unit metadata
+_STEADY = "thermal2d-p1-node-cell-v2"
+_STEADY_BOUNDARY = "thermal2d-p1-node-cell-boundary-v3"
+_TRANSIENT = "thermal2d-transient-p1-node-cell-v2"
+_TRANSIENT_BOUNDARY = "thermal2d-transient-p1-node-cell-boundary-v2"
+_HEAT_03 = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _TRANSIENT_BOUNDARY)
 _CAVITY = "cavity3d-edge-v1"
 _CAVITY_COMPLEX = "cavity3d-edge-complex-v1"
 _STEADY_REGIONS = "thermal2d-p1-node-cell-regions-v1"
@@ -138,6 +155,11 @@ _THERMAL_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _STEADY_REGIONS, _TRA
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, _STEADY_REGIONS, _TRANSIENT_REGIONS,
                      _ELECTRIC_JOULE, _CAVITY_COMPLEX, _TRANSIENT_BOUNDARY, _MODES, *_MECHANICS_LAYOUTS,
                      _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS, _ELECTRIC_REGIONS, _JOULE_REGIONS)
+#: nodal arrays of the format 0.3 heat layouts; the steps rates start at the second stored time
+_NODAL_03 = ("temperature", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+             "residual_heat_rate_per_depth", "heat_storage_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+             "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+             "applied_heat_rate_per_depth")
 _NODAL = ("temperature_k", "load_w_per_m", "source_load_w_per_m", "reaction_w_per_m",
           "residual_w_per_m", "storage_rate_w_per_m",
           "prescribed_outward_load_w_per_m", "ambient_load_w_per_m",
@@ -214,6 +236,45 @@ def _transient_at(data, index):
             point_data[name] = history[index - offset]
     cell_data = {"heat_flux_w_m2": [_vector3(np.asarray(data["heat_flux_w_m2"])[index])]}
     return point_data, cell_data
+
+
+def _transient_at_03(data, index):
+    """Point and cell data of a format 0.3 transient heat result at the stored time ``index``."""
+    times = np.asarray(data["time"], dtype=float)
+    point_data = {}
+    for name in _NODAL_03:
+        if name not in data:
+            continue
+        history = np.asarray(data[name], dtype=float)
+        offset = len(times) - len(history)
+        if index - offset >= 0:
+            point_data[name] = history[index - offset]
+    cell_data = {"heat_flux": [_vector3(np.asarray(data["heat_flux"])[index])]}
+    return point_data, cell_data
+
+
+def _heat_03(data, layout, time_index):
+    points = _points(data["node_coordinates"])
+    cells = [("triangle", np.asarray(data["triangles"], dtype=np.int64))]
+    if layout in (_TRANSIENT, _TRANSIENT_BOUNDARY):
+        index = range(len(data["time"]))[time_index]  # IndexError for an invalid index
+        point_data, cell_data = _transient_at_03(data, index)
+    else:
+        point_data = {name: np.asarray(data[name], dtype=float) for name in _NODAL_03 if name in data}
+        cell_data = {"heat_flux": [_vector3(data["heat_flux"])]}
+    return points, cells, point_data, cell_data
+
+
+def _unit_metadata(names, complex_names=()):
+    """The FieldData ``units`` and ``conventions`` of the exported arrays: each array's
+    canonical unit and, for a signed quantity, its registry sign sentence."""
+    from physmat import units as registry
+    found = {name: registry.quantity(name) for name in names}
+    conventions = {"sign": {name: q.sign["en"] for name, q in found.items() if q.sign}}
+    if complex_names:
+        from .results_common import TIME_CONVENTION
+        conventions["time_convention"] = TIME_CONVENTION
+    return {name: q.unit for name, q in found.items()}, conventions
 
 
 def _region_cell_data(data, layout):
@@ -537,7 +598,9 @@ def export_fields(fields_npz, output, *, time_index=-1):
         raise FileExistsError(f"{output} already exists; choose a new file name")
     data = _load(fields_npz)
     layout = _layout(data)
-    if layout in _THERMAL_LAYOUTS:
+    if layout in _HEAT_03:
+        parts = _heat_03(data, layout, time_index)
+    elif layout in _THERMAL_LAYOUTS:
         parts = _thermal(data, layout, time_index)
     elif layout in (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS):
         parts = _electric_joule(data)
@@ -558,6 +621,8 @@ def export_fields(fields_npz, output, *, time_index=-1):
     meshio = _meshio()
     mesh = meshio.Mesh(points, cells, point_data=point_data, cell_data=cell_data)
     meshio.vtu.write(output, mesh, binary=True, compression="zlib")
+    if layout in _HEAT_03:
+        inject_field_data(output, *_unit_metadata([*point_data, *cell_data]))
     return output
 
 
@@ -573,11 +638,13 @@ def _collection_target(output_dir, name):
     return output_dir
 
 
-def _write_collection(output_dir, name, points, cells, count, frames):
+def _write_collection(output_dir, name, points, cells, count, frames, metadata=None):
     """Write ``<name>_<k>.vtu`` per frame and the collection ``<name>.pvd``.
 
     ``frames`` yields ``count`` tuples ``(timestep, point_data, cell_data)`` in
-    order; each timestep is written with ``repr`` so it round-trips exactly.
+    order; each timestep is written with ``repr`` so it round-trips exactly. With
+    ``metadata`` (a function of the frame's array names giving ``units`` and
+    ``conventions``), each VTU gets its FieldData unit block.
     Files are listed by relative POSIX name. On failure every file this call
     wrote, and the directory if it created it, are removed. Returns the ``.pvd``
     path.
@@ -598,6 +665,8 @@ def _write_collection(output_dir, name, points, cells, count, frames):
             mesh = meshio.Mesh(points, cells, point_data=point_data, cell_data=cell_data)
             written.append(target)
             meshio.vtu.write(target, mesh, binary=True, compression="zlib")
+            if metadata is not None:
+                inject_field_data(target, *metadata([*point_data, *cell_data]))
             ET.SubElement(datasets, "DataSet", timestep=repr(float(timestep)), group="", part="0",
                           file=file_name)
         pvd = output_dir / f"{name}.pvd"
@@ -639,6 +708,18 @@ def export_time_series(fields_npz, output_dir, *, name="fields"):
     layout = _layout(data)
     if layout not in _TRANSIENT_LAYOUTS:
         raise ValueError(f"time series export needs layout in {_TRANSIENT_LAYOUTS!r}, got {layout!r}")
+    if layout in _HEAT_03:
+        times = np.asarray(data["time"], dtype=float)
+        if times.ndim != 1 or not len(times):
+            raise ValueError("time must be a non-empty 1D array")
+        points = _points(data["node_coordinates"])
+        cells = [("triangle", np.asarray(data["triangles"], dtype=np.int64))]
+
+        def frames_03():
+            for index, time in enumerate(times):
+                yield (time, *_transient_at_03(data, index))
+
+        return _write_collection(output_dir, name, points, cells, len(times), frames_03(), _unit_metadata)
     times = np.asarray(data["time_s"], dtype=float)
     if times.ndim != 1 or not len(times):
         raise ValueError("time_s must be a non-empty 1D array")

@@ -1,11 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Steady additive outward flux and convection",
-  "units": {
-    "length": "m",
-    "temperature": "K"
-  },
   "geometry": {
+    "length_unit": "m",
+    "depth": null,
     "domain": {
       "xmin": 0,
       "xmax": 1,
@@ -17,24 +15,24 @@
   "physics": {
     "heat1": {
       "type": "thermal.steady2d",
-      "conductivity_w_mk": 2,
-      "heat_source_w_m3": 0,
-      "dirichlet_temperature_k": {
-        "left": 300
+      "thermal_conductivity": "2 W/(m K)",
+      "heat_source_density": "0 W/m^3",
+      "prescribed_temperature": {
+        "left": "300 K"
       },
-      "outward_flux_w_m2": {
-        "right": 2
+      "inward_heat_flux": {
+        "right": "-2 W/m^2"
       },
       "convection": {
         "right": {
-          "h_w_m2k": 4,
-          "ambient_temperature_k": 290
+          "heat_transfer_coefficient": "4 W/(m^2 K)",
+          "ambient_temperature": "290 K"
         }
       }
     }
   },
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       8,
       8
     ]

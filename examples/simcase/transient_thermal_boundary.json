@@ -1,12 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Convective cooling of a slab",
-  "units": {
-    "length": "m",
-    "temperature": "K",
-    "time": "s"
-  },
   "geometry": {
+    "length_unit": "m",
+    "depth": null,
     "domain": {
       "xmin": 0,
       "xmax": 0.05,
@@ -18,34 +15,37 @@
   "physics": {
     "heat1": {
       "type": "thermal.transient2d",
-      "conductivity_w_mk": 50.0,
-      "volumetric_heat_capacity_j_m3k": 3600000.0,
-      "initial_temperature_k": 400.0,
-      "dirichlet_temperature_k": {},
-      "heat_source_w_m3": 0.0,
+      "thermal_conductivity": "50 W/(m K)",
+      "volumetric_heat_capacity": "3600000 J/(m^3 K)",
+      "initial_temperature": "400 K",
+      "prescribed_temperature": {},
+      "heat_source_density": "0 W/m^3",
       "convection": {
         "right": {
-          "h_w_m2k": 500.0,
-          "ambient_temperature_k": 300.0
+          "heat_transfer_coefficient": "500 W/(m^2 K)",
+          "ambient_temperature": "300 K"
         }
       }
     }
   },
   "mesh": {
-    "subdivisions": [
+    "subdivision_count": [
       20,
       2
     ]
   },
   "study": {
     "type": "transient",
-    "time_s": [
-      0.0,
-      10.0,
-      20.0,
-      40.0,
-      80.0
-    ]
+    "time": {
+      "unit": "s",
+      "values": [
+        0.0,
+        10.0,
+        20.0,
+        40.0,
+        80.0
+      ]
+    }
   },
   "results": {
     "save_fields": true,

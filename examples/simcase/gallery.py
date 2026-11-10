@@ -50,15 +50,15 @@ def _figure_image(fig):
 
 
 def heated_plate(out, quick):
-    doc = Document.load(EXAMPLES / "gallery_heated_plate.json")
+    data = json.loads((EXAMPLES / "gallery_heated_plate.json").read_text(encoding="utf-8"))
     if quick:
-        doc["mesh"]["subdivisions"] = [12, 12]
-        doc["study"]["time_s"] = doc["study"]["time_s"][::8]
-    result = run(doc, False)
-    nodes = np.asarray(result.mesh_nodes_m) * 100.0  # cm for the axes
+        data["mesh"]["subdivision_count"] = [12, 12]
+        data["study"]["time"]["values"] = data["study"]["time"]["values"][::8]
+    result = run(Document.from_dict(data), False)
+    nodes = np.asarray(result.node_coordinates) * 100.0  # cm for the axes
     triangles = np.asarray(result.mesh_triangles)
-    times = np.asarray(result.time_s)
-    temperature = np.asarray(result.temperature_k)
+    times = np.asarray(result.time)
+    temperature = np.asarray(result.temperature)
     low, high = 300.0, float(np.ceil(temperature.max()))
 
     fig, ax = plt.subplots(figsize=(4.8, 4.0), dpi=DPI, layout="constrained")
@@ -87,9 +87,10 @@ def heated_plate(out, quick):
         saved = result.save(out / "heated_plate_result")
         paraview = export_time_series(saved / "fields.npz", out / "heated_plate_paraview")
 
-    return {"frames": len(times), "end_time_s": float(times[-1]),
-            "max_temperature_k": float(temperature.max()),
-            "max_rise_k": float(temperature.max() - 300.0),
+    # SI values under registry-style names: s and K
+    return {"frames": len(times), "end_time": float(times[-1]),
+            "maximum_temperature": float(temperature.max()),
+            "maximum_temperature_rise": float(temperature.max() - 300.0),
             "paraview": None if paraview is None else paraview.relative_to(out).as_posix()}
 
 

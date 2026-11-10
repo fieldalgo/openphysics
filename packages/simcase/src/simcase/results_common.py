@@ -33,7 +33,8 @@ from .diagnostics import render_text
 from .reader import dumps
 
 __all__ = ["TIME_CONVENTION", "value_object", "tagged_array", "complex_value", "complex_array", "timing",
-           "field_maps", "envelope", "metadata_json", "dumps_summary", "write_model_json", "log_header"]
+           "field_maps", "envelope", "metadata_json", "dumps_summary", "write_model_json", "log_header",
+           "add_depth_totals"]
 
 TIME_CONVENTION = "exp(-i omega t)"
 
@@ -104,6 +105,28 @@ def envelope(doc, *, result_format: str, field_layout: str, timing_: dict | None
     if timing_ is not None:
         out["timing"] = timing_
     return out
+
+
+def add_depth_totals(summary: dict, depth) -> None:
+    """Beside each per-depth integrated value (a ``*_per_depth`` key), the total for the
+    component's ``depth`` in metres under the plain name: ``per_depth x depth``, computed once
+    (rule 2.7). With ``depth`` None ("per metre of depth") nothing is added. Keys keep their
+    order; each total follows its per-depth value."""
+    if depth is None:
+        return
+    items = list(summary.items())
+    summary.clear()
+    for key, value in items:
+        summary[key] = value
+        if not key.endswith("_per_depth") or not isinstance(value, dict):
+            continue
+        plain = key[:-len("_per_depth")]
+        if "value" in value:
+            summary[plain] = {"value": None if value["value"] is None else _finite(value["value"] * depth),
+                              "unit": _unit(plain)}
+        elif "values" in value:
+            summary[plain] = {"unit": _unit(plain),
+                              "values": [None if v is None else _finite(v * depth) for v in value["values"]]}
 
 
 def dumps_summary(summary: dict) -> str:

@@ -1,57 +1,57 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 """Public steady boundary runtime, serialization and refusal regressions."""
+import copy
 import json
 
 import numpy as np
 import pytest
 
-from simcase import Document, ThermalRunResult, run
+from simcase import Document, DocumentError, ThermalRunResult, run
 from simcase.cli import main
 from simcase.thermal import _OwnedOutput
 
-ADDED = ('prescribed_outward_load_w_per_m', 'ambient_load_w_per_m',
-         'convective_outward_w_per_m', 'system_rhs_w_per_m')
+ADDED = ('outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
+         'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth')
+CONVECTION = {'right': {'heat_transfer_coefficient': '4 W/(m^2 K)', 'ambient_temperature': '290 K'}}
 
 
 def model(*, robin_only=False, legacy=False, empty=False, fields=True):
-    p = dict(type='thermal.steady2d', conductivity_w_mk=2., heat_source_w_m3=0.,
-             dirichlet_temperature_k={'left': 300.})
+    p = dict(type='thermal.steady2d', thermal_conductivity='2 W/(m K)', heat_source_density='0 W/m^3',
+             prescribed_temperature={'left': '300 K'})
     if not legacy:
-        p.update(outward_flux_w_m2={'right': 2.},
-                 convection={'right': {'h_w_m2k': 4., 'ambient_temperature_k': 290.}})
+        # 2 W/m^2 leaves through the right side
+        p.update(inward_heat_flux={'right': '-2 W/m^2'}, convection=copy.deepcopy(CONVECTION))
     if empty:
-        p['outward_flux_w_m2'] = {}
+        p['inward_heat_flux'] = {}
         p.pop('convection', None)
     if robin_only:
-        p.update(dirichlet_temperature_k={}, outward_flux_w_m2={},
-                 convection={'right': {'h_w_m2k': 4., 'ambient_temperature_k': 290.}})
-    return dict(openphysics='0.2', name='Boundary runtime control',
-                units={'length': 'm', 'temperature': 'K'},
-                geometry={'domain': dict(xmin=0., xmax=1., ymin=0., ymax=1.)},
-                materials={}, physics={'heat1': p}, mesh={'subdivisions': [4, 4]},
+        p.update(prescribed_temperature={}, inward_heat_flux={}, convection=copy.deepcopy(CONVECTION))
+    return dict(openphysics='0.3', name='Boundary runtime control',
+                geometry={'length_unit': 'm', 'depth': None, 'domain': dict(xmin=0., xmax=1., ymin=0., ymax=1.)},
+                materials={}, physics={'heat1': p}, mesh={'subdivision_count': [4, 4]},
                 study={'type': 'single'}, results={'save_fields': fields, 'plots': False})
 
 
 def test_additive_exact_linear_public_result():
     result = run(Document.from_dict(model()), verbose=False)
     assert isinstance(result, ThermalRunResult)
-    np.testing.assert_allclose((result.temperature_k-(300.-7.*result.mesh_nodes_m[:, 0]))/7.,
+    np.testing.assert_allclose((result.temperature-(300.-7.*result.node_coordinates[:, 0]))/7.,
                                0., rtol=0., atol=1e-10)
-    np.testing.assert_allclose((result.heat_flux_w_m2-[14., 0.])/14.,
+    np.testing.assert_allclose((result.heat_flux-[14., 0.])/14.,
                                0., rtol=0., atol=1e-10)
     s = result.summary()
-    assert s['result_format'] == 'thermal.steady2d-result-v2'
-    assert s['field_layout'] == 'thermal2d-p1-node-cell-boundary-v2'
+    assert s['result_format'] == 'thermal.steady2d-result-v4'
+    assert s['field_layout'] == 'thermal2d-p1-node-cell-boundary-v3'
     np.testing.assert_allclose(
-        [s['source_heat_w_per_m'], s['prescribed_outward_heat_w_per_m'],
-         s['convective_outward_heat_w_per_m'], s['thermostat_outward_heat_w_per_m'],
-         s['outward_heat_w_per_m']], [0., 2., 12., -14., 0.], rtol=0., atol=14e-10)
-    np.testing.assert_allclose(result.system_rhs_w_per_m,
-        result.load_w_per_m+result.ambient_load_w_per_m-result.prescribed_outward_load_w_per_m,
+        [s[key]['value'] for key in ('generated_heat_rate_per_depth', 'outward_prescribed_heat_rate_per_depth',
+                                     'outward_convective_heat_rate_per_depth', 'outward_reaction_heat_rate_per_depth',
+                                     'outward_heat_rate_per_depth')], [0., 2., 12., -14., 0.], rtol=0., atol=14e-10)
+    np.testing.assert_allclose(result.applied_heat_rate_per_depth,
+        result.generated_heat_rate_per_depth+result.ambient_convective_heat_rate_per_depth-result.outward_prescribed_heat_rate_per_depth,
         rtol=1e-12, atol=1e-12)
-    assert 'normalized_free_residual' not in s
-    assert s['free_residual_max_w_per_m'] <= 14e-10
+    assert 'relative_residual' not in s
+    assert s['maximum_residual_heat_rate_per_depth']['value'] <= 14e-10
     assert not {'wavelength', 'neff', 'normalization'} & s.keys()
 
 
@@ -69,9 +69,9 @@ def test_numeric_history_free_npz_and_summary(tmp_path, robin_only, fields):
         assert s['field_units'][key] == 'W/m'
         assert s['field_locations'][key] == 'nodes'
     if robin_only:
-        assert r.dirichlet_node_ids.shape == r.dirichlet_temperature_k.shape == (0,)
-        np.testing.assert_allclose(r.temperature_k, 290., rtol=0., atol=1e-10)
-        np.testing.assert_array_equal(r.reaction_w_per_m, 0.)
+        assert r.prescribed_node_ids.shape == r.prescribed_temperature.shape == (0,)
+        np.testing.assert_allclose(r.temperature, 290., rtol=0., atol=1e-10)
+        np.testing.assert_array_equal(r.reaction_heat_rate_per_depth, 0.)
     if fields:
         with np.load(out/'fields.npz', allow_pickle=False) as z:
             assert str(z['result_format']) == s['result_format']
@@ -87,16 +87,16 @@ def test_numeric_history_free_npz_and_summary(tmp_path, robin_only, fields):
 def test_presence_empty_preserves_physics_but_not_layout(tmp_path):
     old = run(Document.from_dict(model(legacy=True)), False)
     explicit = run(Document.from_dict(model(empty=True)), False)
-    assert old.result_format == 'thermal.steady2d-result-v1'
-    assert explicit.result_format == 'thermal.steady2d-result-v2'
+    assert old.result_format == 'thermal.steady2d-result-v3'
+    assert explicit.result_format == 'thermal.steady2d-result-v4'
     assert len(old._raw_arrays()) == 9 and len(explicit._raw_arrays()) == 13
     for key, values in old._raw_arrays().items():
         np.testing.assert_array_equal(values, explicit._raw_arrays()[key])
-    assert 'outward_flux_w_m2' not in old.doc.sole_physics()[1]
+    assert 'inward_heat_flux' not in old.doc.sole_physics()[1]
     old.save(tmp_path/'legacy')
     with np.load(tmp_path/'legacy'/'fields.npz', allow_pickle=False) as z:
         assert not set(ADDED) & set(z.files)
-        assert str(z['field_layout']) == 'thermal2d-p1-node-cell-v1'
+        assert str(z['field_layout']) == 'thermal2d-p1-node-cell-v2'
 
 
 @pytest.mark.parametrize('key', ADDED)
@@ -104,9 +104,10 @@ def test_presence_empty_preserves_physics_but_not_layout(tmp_path):
 @pytest.mark.parametrize('fields', [False, True])
 def test_added_raw_invalid_never_completes(tmp_path, key, fault, fields):
     r = run(Document.from_dict(model(fields=fields)), False)
-    attr = {'prescribed_outward_load_w_per_m': 'prescribed_outward_load',
-            'ambient_load_w_per_m': 'ambient_load', 'convective_outward_w_per_m': 'convective_outward',
-            'system_rhs_w_per_m': 'system_rhs'}[key]
+    attr = {'outward_prescribed_heat_rate_per_depth': 'prescribed_outward_load',
+            'ambient_convective_heat_rate_per_depth': 'ambient_load',
+            'outward_convective_heat_rate_per_depth': 'convective_outward',
+            'applied_heat_rate_per_depth': 'system_rhs'}[key]
     if fault == 'nan':
         getattr(r.solution, attr)[0] = np.nan
     else:
@@ -122,13 +123,13 @@ def test_added_raw_invalid_never_completes(tmp_path, key, fault, fields):
 def test_valid_document_mutation_is_not_relabelled(tmp_path, kind):
     r = run(Document.from_dict(model()), False)
     p = r.doc.sole_physics()[1]
-    if kind == 'source': p['heat_source_w_m3'] = 1.
-    elif kind == 'flux': p['outward_flux_w_m2']['right'] = 3.
-    elif kind == 'ambient': p['convection']['right']['ambient_temperature_k'] = 291.
-    elif kind == 'h': p['convection']['right']['h_w_m2k'] = 5.
+    if kind == 'source': p['heat_source_density'] = '1 W/m^3'
+    elif kind == 'flux': p['inward_heat_flux']['right'] = '-3 W/m^2'
+    elif kind == 'ambient': p['convection']['right']['ambient_temperature'] = '291 K'
+    elif kind == 'h': p['convection']['right']['heat_transfer_coefficient'] = '5 W/(m^2 K)'
     elif kind == 'domain': r.doc.data['geometry']['domain']['xmax'] = 2.
-    elif kind == 'mesh': r.doc.data['mesh']['subdivisions'] = [8, 8]
-    elif kind == 'dirichlet': p['dirichlet_temperature_k']['left'] = 301.
+    elif kind == 'mesh': r.doc.data['mesh']['subdivision_count'] = [8, 8]
+    elif kind == 'dirichlet': p['prescribed_temperature']['left'] = '301 K'
     elif kind == 'name': r.doc.data['name'] = 'Different run'
     else: r.doc.data['results']['save_fields'] = False
     r.doc.validate()  # Deliberately valid data; invalid-input refusal is separate.
@@ -154,9 +155,9 @@ def test_bound_mesh_and_prescribed_data_mutation(tmp_path, kind):
 def test_original_caller_mutation_and_dictionary_order_are_harmless():
     d = Document.from_dict(model())
     r = run(d, False)
-    d.data['physics']['heat1']['heat_source_w_m3'] = 10.
+    d.data['physics']['heat1']['heat_source_density'] = '10 W/m^3'
     r.doc.data = dict(reversed(list(r.doc.data.items())))
-    assert r.summary()['heat_source_w_m3'] == 0.
+    assert r.summary()['heat_source_density']['value'] == 0.
 
 
 def test_inputs_are_captured_before_solver_returns(monkeypatch):
@@ -174,20 +175,27 @@ def test_inputs_are_captured_before_solver_returns(monkeypatch):
 def test_negative_solved_kelvin_is_not_clamped():
     d = model()
     p = d['physics']['heat1']
-    p['dirichlet_temperature_k'] = {'left': 1.}
-    p['outward_flux_w_m2'] = {'right': 20.}
-    p['convection']['right']['ambient_temperature_k'] = 0.
+    p['prescribed_temperature'] = {'left': '1 K'}
+    p['inward_heat_flux'] = {'right': '-20 W/m^2'}
+    # an ambient of 0 K is outside the registry domain (> 0 K) since the units batch
+    p['convection']['right']['ambient_temperature'] = '0 K'
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(d)
+    assert [(x.code, x.path) for x in caught.value.diagnostics] == [
+        ('E-DOMAIN', 'physics.heat1.convection.right.ambient_temperature')]
+    # at 1 K ambient: 2 T' = -20 - 4 (T(1) - 1) gives T = 1 - 10 x / 3, below 0 K at the right side
+    p['convection']['right']['ambient_temperature'] = '1 K'
     r = run(Document.from_dict(d), False)
-    np.testing.assert_allclose(r.temperature_k, 1.-4.*r.mesh_nodes_m[:, 0],
+    np.testing.assert_allclose(r.temperature, 1.-10./3.*r.node_coordinates[:, 0],
                                rtol=0., atol=1e-10)
-    assert r.temperature_k.min() < 0.
+    assert r.temperature.min() < 0.
     r.summary()
 
 
 @pytest.mark.parametrize('unit,factor', [('m', 1.), ('mm', 1000.), ('um', 1e6)])
 def test_same_physical_si_fields(unit, factor):
     d = model()
-    d['units']['length'] = unit
+    d['geometry']['length_unit'] = unit
     d['geometry']['domain'] = {k: v*factor for k, v in d['geometry']['domain'].items()}
     r = run(Document.from_dict(d), False)
     baseline = run(Document.from_dict(model()), False)
@@ -198,7 +206,7 @@ def test_same_physical_si_fields(unit, factor):
 @pytest.mark.parametrize('fields', [False, True])
 def test_nonfinite_json_diagnostics_refuses_publication(tmp_path, fields):
     r = run(Document.from_dict(model(fields=fields)), False)
-    r.diagnostics['overflow'] = float('inf')
+    r.diagnostics['outward_heat_rate_per_depth'] = float('inf')
     with pytest.raises(ValueError):
         r.save(tmp_path/'overflow')
     assert not (tmp_path/'overflow').exists()
@@ -268,9 +276,9 @@ def test_public_cli_exit_and_fresh_preflight(tmp_path, capsys):
     assert main(['run', str(path), '-q', '-o', str(out)]) == 0
     assert main(['run', str(path), '-q', '-o', str(out)]) == 1
     s = json.loads((out/'summary.json').read_text(encoding='utf-8'))
-    assert s['result_format'] == 'thermal.steady2d-result-v2'
+    assert s['result_format'] == 'thermal.steady2d-result-v4'
     invalid = model()
-    invalid['physics']['heat1']['convection']['right']['h_w_m2k'] = -1.
+    invalid['physics']['heat1']['convection']['right']['heat_transfer_coefficient'] = '-1 W/(m^2 K)'
     path.write_text(json.dumps(invalid), encoding='utf-8')
     assert main(['run', str(path), '-o', str(tmp_path/'invalid')]) == 2
     assert not (tmp_path/'invalid').exists()
@@ -298,31 +306,29 @@ def test_public_cli_solver_and_save_errors_exit_one(tmp_path, monkeypatch, stage
 @pytest.mark.parametrize('legacy', [False, True])
 def test_result_scale_is_ready_at_return_and_caller_is_preserved(unit, factor, legacy):
     data = model(legacy=legacy)
-    data['units']['length'] = unit
+    data['geometry']['length_unit'] = unit
     data['geometry']['domain'] = {k: v*factor for k, v in data['geometry']['domain'].items()}
     doc = Document.from_dict(data)
-    before = json.loads(json.dumps(doc.data))
-    caller_scale = doc.scale.to_si(1., {'length': 1})
+    before, si = doc.canonical_json(), copy.deepcopy(doc.si)
     result = run(doc, False)
-    # Check before explicitly calling result.summary() or result.save().
-    assert result.doc.scale.to_si(1., {'length': 1}) == caller_scale == 1./factor
-    assert result.doc.data == before
-    assert doc.data == before
-    assert doc.scale.to_si(1., {'length': 1}) == caller_scale
+    # Check before explicitly calling result.summary() or result.save(): the declared unit and
+    # every SI value are the caller's.
+    assert result.doc.si['geometry']['length_unit'] == unit and result.doc.si == si
+    assert result.doc.si['geometry']['domain']['xmax'] == 1.
+    assert result.doc.canonical_json() == before == doc.canonical_json()
     # Direct public construction isolates __post_init__ from run's final summary validation.
     clone = ThermalRunResult(doc, result.mesh, result.solution, result.dirichlet_node_ids,
                              result.dirichlet_temperature_k, result.diagnostics,
                              result.timings, result.log)
-    assert clone.doc.scale.to_si(1., {'length': 1}) == caller_scale
-    assert clone.doc.data == before
+    assert clone.doc.si == si and clone.doc.canonical_json() == before
 
 
 def test_removed_default_is_detected_before_validation_can_restore_it(tmp_path):
     result = run(Document.from_dict(model()), False)
-    del result.doc.sole_physics()[1]['heat_source_w_m3']
+    del result.doc.sole_physics()[1]['heat_source_density']
     with pytest.raises(ValueError, match='document changed'):
         result.summary()
-    assert 'heat_source_w_m3' not in result.doc.sole_physics()[1]
+    assert 'heat_source_density' not in result.doc.sole_physics()[1]
     with pytest.raises(ValueError, match='document changed'):
         result.save(tmp_path/'removed')
     assert not (tmp_path/'removed').exists()

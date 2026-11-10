@@ -65,7 +65,7 @@ export async function regionScenario({cdp, click, wait, sleep, snapshot, report,
   assert.ok(evidence.steady.table, 'region table is the last child of #resTable');
   assert.equal(evidence.steady.table.rows, 3);
   evidence.steady.hover = await hover('ThermalStudio.viewModel(thermalController.result(),'
-    + 'document.querySelector("#thermalField").value||"temperature_k")', 20, 8);
+    + 'document.querySelector("#thermalField").value||"temperature")', 20, 8);
   assert.ok(evidence.steady.hover.includes('region heater (copper)'), 'hover names the heater');
 
   // A dirty edit clears every view, the legend and the region table included.
@@ -91,7 +91,7 @@ export async function regionScenario({cdp, click, wait, sleep, snapshot, report,
   await click('#runBtn');
   await wait(() => cdp.eval('!!transientController.state().frame&&!transientController.state().readActive'), 'transient region frame');
   evidence.transient.manifest = await cdp.eval('(()=>{const m=transientController.result();return {payloadFormat:m.payload_format,'
-    + 'resultFormat:m.result_format,times:m.time_s.length,regions:m.regions.rows.map(r=>[r.name,r.material,r.cells])}})()');
+    + 'resultFormat:m.result_format,times:m.times.length,regions:m.regions.rows.map(r=>[r.name,r.material,r.cells])}})()');
   assert.equal(evidence.transient.manifest.payloadFormat, 'studio-thermal-transient-regions-v1');
   await sleep(300);
   evidence.transient.label = await cdp.eval('document.querySelector("#resInfo").textContent');

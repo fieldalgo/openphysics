@@ -120,14 +120,16 @@ from simcase.studio import transient_thermal_api as transient
 
 
 def transient_model():
-    return {"openphysics": "0.2", "name": "Transient server control",
-            "units": {"length": "m", "temperature": "K", "time": "s"},
-            "geometry": {"domain": {"xmin": 0., "xmax": 1., "ymin": 0., "ymax": 1.}},
+    return {"openphysics": "0.3", "name": "Transient server control",
+            "geometry": {"length_unit": "m", "depth": None,
+                         "domain": {"xmin": 0., "xmax": 1., "ymin": 0., "ymax": 1.}},
             "materials": {}, "physics": {"heat1": {"type": "thermal.transient2d",
-                "conductivity_w_mk": 2., "volumetric_heat_capacity_j_m3k": 4.,
-                "initial_temperature_k": 300., "dirichlet_temperature_k": {},
-                "heat_source_w_m3": 8.}},
-            "mesh": {"subdivisions": [2, 2]}, "study": {"type": "transient", "time_s": [2., 3.]},
+                "thermal_conductivity": "2 W/(m K)",
+                "volumetric_heat_capacity": {"value": "4 J/(m^3 K)", "accept": {"W-MAGNITUDE": "control case"}},
+                "initial_temperature": "300 K", "prescribed_temperature": {},
+                "heat_source_density": "8 W/m^3"}},
+            "mesh": {"subdivision_count": [2, 2]},
+            "study": {"type": "transient", "time": {"unit": "s", "values": [2., 3.]}},
             "results": {"save_fields": True, "plots": False}}
 
 
@@ -158,39 +160,39 @@ def test_public_transient_uniform_run_manifest_frame_history_and_initial_rate(ht
     identity = accepted_job(http_client)
     manifest = http_client.get("/api/jobs/"+identity["job"]+"/result").json()
     assert manifest["payload_format"] == transient.MANIFEST
-    assert manifest["time_s"] == [2., 3.] and manifest["default_frame_index"] == 1
+    assert manifest["time"] == [2., 3.] and manifest["default_frame_index"] == 1
     assert len(manifest["fields"]) == 13
-    assert manifest["arrays"]["dirichlet_node_ids"] == []
+    assert manifest["arrays"]["prescribed_node_ids"] == []
     url = "/api/jobs/"+identity["job"]
-    query = {"result_id": identity["result_id"], "field": "temperature_k",
+    query = {"result_id": identity["result_id"], "field": "temperature",
              "time_index": 1, "frame_seq": 3}
     frame = http_client.get(url+"/frame", params=query)
     assert frame.status_code == 200, frame.text
     data = frame.json()
-    np.testing.assert_allclose(data["arrays"]["temperature_k"], 302., atol=1e-9, rtol=0)
+    np.testing.assert_allclose(data["arrays"]["temperature"], 302., atol=1e-9, rtol=0)
     assert data["client_revision"] == 7 and data["request_seq"] == 11 and data["frame_seq"] == 3
-    assert data["time_s"] == 3. and data["shape"] == [9]
+    assert data["time"] == 3. and data["shape"] == [9]
     assert http_client.get(url+"/frame", params=query).content == frame.content
     history = http_client.get(url+"/history", params={"result_id": identity["result_id"],
-        "field": "heat_content_j_per_m", "start": 0, "stop": 2, "frame_seq": 4})
+        "field": "stored_heat_per_depth", "start": 0, "stop": 2, "frame_seq": 4})
     assert history.status_code == 200, history.text
-    assert history.json()["time_s"] == [2., 3.]
-    np.testing.assert_allclose(history.json()["arrays"]["heat_content_j_per_m"],
+    assert history.json()["time"] == [2., 3.]
+    np.testing.assert_allclose(history.json()["arrays"]["stored_heat_per_depth"],
                                [1200., 1208.], atol=1e-8, rtol=0)
-    query.update(field="storage_rate_w_per_m", time_index=0)
+    query.update(field="heat_storage_rate_per_depth", time_index=0)
     refusal = http_client.get(url+"/frame", params=query)
     assert refusal.status_code == 422
     assert refusal.json()["error"]["code"] == "unavailable_initial_rate"
     query["time_index"] = 1
     rate = http_client.get(url+"/frame", params=query)
     assert rate.status_code == 200
-    assert rate.json()["interval_start_s"] == 2. and rate.json()["interval_end_s"] == 3.
+    assert rate.json()["interval_start"] == 2. and rate.json()["interval_end"] == 3.
 
 
 @pytest.mark.parametrize("route,status", [("validate", 200), ("run", 400)])
 def test_transient_invalid_document_status_has_no_job(http_client, route, status):
     model = transient_model()
-    model["mesh"]["subdivisions"] = [True, 2]
+    model["mesh"]["subdivision_count"] = [True, 2]
     response = http_client.post("/api/thermal/transient/"+route, json=request_body(model))
     assert response.status_code == status
     assert response.json()["ok"] is False
@@ -200,7 +202,7 @@ def test_transient_invalid_document_status_has_no_job(http_client, route, status
 @pytest.mark.parametrize("fault", ["missing", "duplicate", "fractional", "stale", "range"])
 def test_transient_query_identity_and_integer_negatives(http_client, fault):
     identity = accepted_job(http_client)
-    query = {"result_id": identity["result_id"], "field": "temperature_k",
+    query = {"result_id": identity["result_id"], "field": "temperature",
              "time_index": 1, "frame_seq": 1}
     expected = 400
     if fault == "missing": del query["result_id"]
@@ -285,8 +287,8 @@ def test_transient_combined_raw_preflight_rejects_before_public_run(http_client,
     def forbidden(*args, **kwargs): raise AssertionError("resource refusal reached solver")
     monkeypatch.setattr(server, "run", forbidden)
     data = transient_model()
-    data["mesh"]["subdivisions"] = [100, 100]
-    data["study"]["time_s"] = list(range(128))
+    data["mesh"]["subdivision_count"] = [100, 100]
+    data["study"]["time"]["values"] = list(range(128))
     response = http_client.post("/api/thermal/transient/run", json=request_body(data))
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "history_limit_exceeded"
@@ -297,14 +299,14 @@ def test_transient_combined_raw_preflight_rejects_before_public_run(http_client,
 def test_public_page_limit_and_final_scalar_frame(http_client):
     identity = accepted_job(http_client)
     base = "/api/jobs/"+identity["job"]
-    params = {"result_id": identity["result_id"], "field": "quadratic_functional_jk_per_m",
+    params = {"result_id": identity["result_id"], "field": "thermal_energy_functional_per_depth",
               "time_index": 1, "frame_seq": 9}
     frame = http_client.get(base+"/frame", params=params)
     assert frame.status_code == 200
     assert frame.json()["shape"] == []
     assert isinstance(frame.json()["arrays"][params["field"]], float)
     page = http_client.get(base+"/history", params={"result_id": identity["result_id"],
-        "field": "heat_content_j_per_m", "start": 0, "stop": 17, "frame_seq": 10})
+        "field": "stored_heat_per_depth", "start": 0, "stop": 17, "frame_seq": 10})
     assert page.status_code == 422
 
 
@@ -321,7 +323,7 @@ def test_transient_capability_contains_shared_and_history_bounds(http_client):
 def test_signed_index_range_and_opaque_result_identity(http_client):
     identity = accepted_job(http_client)
     base = "/api/jobs/"+identity["job"]
-    query = {"result_id": identity["result_id"], "field": "temperature_k",
+    query = {"result_id": identity["result_id"], "field": "temperature",
              "time_index": -1, "frame_seq": 1}
     negative = http_client.get(base+"/frame", params=query)
     assert negative.status_code == 422, negative.text
@@ -347,9 +349,9 @@ def test_malformed_public_summary_cannot_publish(http_client, monkeypatch, fault
         def summary(self):
             meta = copy.deepcopy(original.summary())
             if fault == "mesh": meta["mesh"]["nodes"] += 1
-            elif fault == "study": meta["study"]["time_s"][0] += .1
-            elif fault == "rate_axis": meta["rate_time_s"] = [2.]
-            else: meta["field_shapes"]["dirichlet_node_ids"][0] = False
+            elif fault == "study": meta["study"]["time"]["values"][0] += .1
+            elif fault == "rate_axis": meta["field_time_axes"]["reaction_heat_rate_per_depth"] = "time"
+            else: meta["field_shapes"]["prescribed_node_ids"][0] = False
             return meta
     monkeypatch.setattr(server, "run", lambda *a, **k: Probe())
     response = http_client.post("/api/thermal/transient/run", json=request_body())
