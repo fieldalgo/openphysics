@@ -1,0 +1,107 @@
+{
+  "openphysics": "0.3",
+  "name": "strip",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0,
+          "xmax": 40,
+          "ymin": 0,
+          "ymax": 20
+        },
+        "background": {
+          "material": "M"
+        },
+        "features": [
+          {
+            "name": "cut",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 40.0,
+            "h": 20.0,
+            "material": null
+          },
+          {
+            "name": "disc",
+            "type": "circle",
+            "cx": 20.0,
+            "cy": 10.0,
+            "r": 9.0,
+            "material": "M"
+          },
+          {
+            "name": "hole",
+            "type": "circle",
+            "cx": 20.0,
+            "cy": 10.0,
+            "r": 3.0,
+            "material": null
+          }
+        ],
+        "boundary_tags": [
+          {
+            "tag": "inner",
+            "select": {
+              "boundary": {
+                "of": "hole"
+              }
+            }
+          },
+          {
+            "tag": "rim",
+            "select": {
+              "boundary": {
+                "between": [
+                  "disc",
+                  "cut"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "M": {
+      "electrical_conductivity": "3 S/m"
+    }
+  },
+  "physics": {
+    "e": {
+      "type": "electric.steady2d",
+      "prescribed_electric_potential": {
+        "rim": "0 V"
+      },
+      "inward_current_density": {
+        "inner": "10 A/m^2"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "0.8 mm",
+    "controls": [
+      {
+        "select": "disc",
+        "circle_segment_count": 192
+      },
+      {
+        "select": "hole",
+        "circle_segment_count": 192
+      }
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

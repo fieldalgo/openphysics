@@ -157,7 +157,14 @@ and `v1` to `layout` as well and adds the four region maps
 `thermal-axisymmetric-p1-node-cell-regions-v1` and
 `thermal-axisymmetric-transient-p1-node-cell-regions-v1`; the achieved angle is compared
 with `rad`, and the old `outward_flux_w_m2` summary leaves with `neg`) and the twins of the
-heat region, version 1 and axisymmetric fixtures (`fixtures/v03/heat_*.json`).
+heat region, version 1 and axisymmetric fixtures (`fixtures/v03/heat_*.json`). The electric and
+Joule commit (C6) sets `electric.steady2d`, `joule.steady2d` and `joule.temperature2d` to
+`layout` for every form and adds the three electric maps (`electric-joule2d-p1-v1`,
+`electric2d-p1-node-cell-regions-v1` and `electric-joule2d-p1-node-cell-regions-v1`; the
+region terminal currents with `neg`, the region angle with `rad`) and `maps/electric_joule.json` for the failure
+evidence of a `joule.temperature2d` solve that does not converge: no result is saved, so the
+comparator takes the map named by the document's kind (`record.json` `load.kind`). Its twins
+are `fixtures/v03/electric_*.json` and `joule_*.json`.
 
 The only comparisons that are not bitwise are the three pre-registered ones, each within 4
 ulp: `propagation_loss` against 100 times the old `propagation_loss_db_cm`, `bend_loss`

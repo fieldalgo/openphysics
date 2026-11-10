@@ -16,7 +16,8 @@ entry for physics entries of that type; ``<rect>``, ``<regions>`` or ``<v1>`` af
 Entry fields: ``pattern``, ``kind`` (``SLOT_KINDS``), ``quantity`` (a registry name),
 ``forms`` (value forms, see ``FORMS``), ``values`` (an enum), ``required``, ``default``
 with ``default_reason`` and ``default_if`` (a sibling key that must be present), ``code``
-and ``message`` (a refused key), ``nullable``. ``physics_kind`` marks an entry a physics
+and ``message`` (a refused key), ``nullable``, ``model_message`` (a quantity slot that refuses a
+model object by name). ``physics_kind`` marks an entry a physics
 kind brings (``PhysicsKind.slots``); it applies to that kind's documents only. A kind entry
 of kind ``override`` changes ``default``, ``required`` and the material policy fields
 (``reads``, ``library``) of the shared slot with the same pattern, for that kind.

@@ -1,0 +1,113 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "electric_joule: the failure evidence of a joule.temperature2d solve that did not converge (no result is saved, so the map is named by the kind): the iteration records take the section 5.3.2 column names and value objects, last_temperature_k becomes last_iterate.temperature (a tagged array, non-finite entries null)",
+ "old_layout": "electric_joule",
+ "new_layout": null,
+ "arrays": [],
+ "arrays_removed": [],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "status",
+   "new": "status",
+   "f": "="
+  },
+  {
+   "old": "reason",
+   "new": "reason",
+   "f": "="
+  },
+  {
+   "old": "iterations",
+   "new": "iterations",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].iteration",
+   "new": "iterations.[].iteration_count",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].temperature_defect",
+   "new": "iterations.[].temperature_change.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].conductivity_defect",
+   "new": "iterations.[].relative_electrical_conductivity_change.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].minimum_temperature",
+   "new": "iterations.[].minimum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].maximum_temperature",
+   "new": "iterations.[].maximum_temperature.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].electric_free_residual",
+   "new": "iterations.[].maximum_residual_current_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].thermal_free_residual",
+   "new": "iterations.[].maximum_residual_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].nonlinear_heat_residual",
+   "new": "iterations.[].relative_residual.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].current_balance",
+   "new": "iterations.[].current_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].supplied_power_per_length",
+   "new": "iterations.[].inward_electric_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].joule_power_per_length",
+   "new": "iterations.[].joule_power_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].outward_heat_per_length",
+   "new": "iterations.[].outward_heat_rate_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].electric_power_defect",
+   "new": "iterations.[].electric_power_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "iterations.[].heat_power_defect",
+   "new": "iterations.[].heat_rate_imbalance_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "last_temperature_k.[]",
+   "new": "last_iterate.temperature.values.[]",
+   "f": "="
+  },
+  {
+   "old": "nonfinite_temperature_count",
+   "new": "nonfinite_temperature_count",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "iterations.[].*.unit",
+  "last_iterate.temperature.unit"
+ ],
+ "identifiers": [],
+ "vtu": [],
+ "vtu_added": []
+}

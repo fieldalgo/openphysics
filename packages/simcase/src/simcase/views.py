@@ -351,27 +351,34 @@ class ElectricInputs:
 
 
 def rectangle_electric(doc) -> ElectricInputs:
-    """electric.steady2d, joule.steady2d or joule.temperature2d on a rectangle, validated."""
-    _, p = doc.sole_physics()
+    """electric.steady2d, joule.steady2d or joule.temperature2d on a format 0.3 rectangle,
+    validated: SI values; ``inward_current_density`` is handed over as the outward current
+    ``0.0 - value`` (H1); the iteration options keyed as galerkin takes them."""
+    _, p = next(iter(doc.si["physics"].items()))
     model = initial = options = None
     if p["type"] == "joule.temperature2d":
-        from .electric_joule import _model
-        model = _model(p["conductivity_model"], "conductivity_model")
-        initial = p["initial_temperature_k"]
-        options = dict(p.get("iteration", {}))
-        if "temperature_atol_k" in options:
-            options["temperature_atol"] = options.pop("temperature_atol_k")
-    return ElectricInputs(conductivity=p.get("conductivity_s_m"), dirichlet=dict(p["dirichlet_potential_v"]),
-                          outward_current=dict(p.get("outward_current_a_m2", {})), conductivity_model=model,
-                          initial_temperature=initial, iteration=options)
+        from .electric_joule import conductivity_model_03
+        model = conductivity_model_03(p["electrical_conductivity"])
+        initial = p["initial_temperature"]
+        names = {"relaxation_factor": "relaxation", "relative_tolerance": "relative_tolerance",
+                 "iteration_limit": "max_iterations"}
+        iteration = p["iteration"]
+        # the order galerkin received before the units batch: the tolerance last
+        options = {names[k]: v for k, v in iteration.items() if k != "temperature_tolerance"}
+        options["temperature_atol"] = iteration["temperature_tolerance"]
+    return ElectricInputs(conductivity=p.get("electrical_conductivity") if model is None else None,
+                          dirichlet=dict(p["prescribed_electric_potential"]),
+                          outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()},
+                          conductivity_model=model, initial_temperature=initial, iteration=options)
 
 
 def region_electric(doc) -> ElectricInputs:
-    """electric.steady2d or joule.steady2d on regions, validated: values as written."""
-    _, p = doc.sole_physics()
-    return ElectricInputs(conductivity=_material_values(doc, "electrical_conductivity_s_m"),
-                          dirichlet=dict(p["dirichlet_potential_v"]),
-                          outward_current=dict(p.get("outward_current_a_m2", {})))
+    """electric.steady2d or joule.steady2d on format 0.3 regions, validated: SI values in document
+    order; ``inward_current_density`` handed over as the outward current ``0.0 - value`` (H1)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return ElectricInputs(conductivity=_material_values_03(doc, "electrical_conductivity"),
+                          dirichlet=dict(p["prescribed_electric_potential"]),
+                          outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()})
 
 
 # -- mechanics ------------------------------------------------------------------------------------

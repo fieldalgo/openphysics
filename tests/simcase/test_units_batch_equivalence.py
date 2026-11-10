@@ -304,6 +304,23 @@ if HARNESS.is_dir():
         else:
             assert expected == actual and type(expected) is type(actual), (path, expected, actual)
 
+    #: joule_temperature.json before the units batch (format 0.2; converted by units batch C6)
+    JOULE_TEMPERATURE_02 = {
+        "openphysics": "0.2", "name": "Temperature-dependent Joule heated rectangle",
+        "units": {"length": "m", "temperature": "K"},
+        "geometry": {"domain": {"xmin": 0.0, "xmax": 1.0, "ymin": 0.0, "ymax": 0.2}}, "materials": {},
+        "mesh": {"subdivisions": [24, 6]}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False},
+        "physics": {"electric": {
+            "type": "joule.temperature2d", "dirichlet_potential_v": {"left": 1.0, "right": 0.0},
+            "thermal_conductivity_w_mk": 1.0, "dirichlet_temperature_k": {"left": 300.0, "right": 300.0},
+            "initial_temperature_k": 300.0,
+            "conductivity_model": {"type": "linear_resistivity", "reference_conductivity_s_m": 2.0,
+                                   "reference_temperature_k": 300.0, "alpha_per_k": 0.01,
+                                   "temperature_range_k": [290.0, 400.0]},
+            "iteration": {"relaxation": 0.5, "temperature_atol_k": 1e-08, "relative_tolerance": 1e-10,
+                          "max_iterations": 100}}}}
+
     #: thermal_regions.json before the units batch (format 0.2; converted by units batch C5b)
     THERMAL_REGIONS_02 = {
         "openphysics": "0.2", "name": "Heated steel plate in insulation", "units": {"length": "mm", "temperature": "K"},
@@ -328,7 +345,8 @@ if HARNESS.is_dir():
         convert = _module("convert_v02")
         expected = (SPEC_EXAMPLES.get(name) or {"elastic_regions": _spec_elastic_regions,
                                                   "cavity_lossy_slab": _spec_cavity_lossy_slab}[name]())
-        old = copy.deepcopy(THERMAL_REGIONS_02) if name == "thermal_regions" else \
+        frozen = {"thermal_regions": THERMAL_REGIONS_02, "joule_temperature": JOULE_TEMPERATURE_02}
+        old = copy.deepcopy(frozen[name]) if name in frozen else \
             json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
         new, writer = convert.convert(old)
         assert convert.check(writer) == []

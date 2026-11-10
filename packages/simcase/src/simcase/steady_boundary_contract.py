@@ -6,7 +6,7 @@ The public document reader is connected separately. These helpers read a
 Document without mutating its data, scale or notes. They do not solve or save.
 Format 0.3 rectangle documents are read by ``simcase.resolve`` against ``heat_slots``
 and checked on their SI values here (the section at the end); the 0.2 readers stay for
-the electric, Joule and mechanics kinds until their own commits of the units batch.
+the mechanics kinds until their commit of the units batch.
 """
 import math
 from collections.abc import Mapping
@@ -180,6 +180,12 @@ def steady_boundary_inputs(doc, mesh):
     internal SI view (``simcase.views.steady_rectangle``).
     """
     grid, heat = views.steady_rectangle(doc)
+    return boundary_kwargs(grid, heat, mesh)
+
+
+def boundary_kwargs(grid, heat, mesh):
+    """``steady_boundary_inputs`` from a rectangle grid (``views.RectangleMesh``) and heat inputs
+    (``views.HeatInputs``) a caller has read: the Joule kinds read their heat stage themselves."""
     lower = np.array(grid.origin)
     upper = np.array(grid.upper)
     p, owners, expected_edges = rectangle_exterior_edges(mesh, lower, upper)
@@ -290,8 +296,9 @@ def validate_natural_edges(mesh, p, owners, expected_edges, prescribed, flux, co
 # -- format 0.3 ------------------------------------------------------------------------------------
 #
 # A format 0.3 rectangle heat document (``"openphysics": "0.3"``) is read by ``simcase.resolve``
-# against the slots below; the checks here run on its resolved SI tree (``doc.si``). Region and
-# version 1 heat documents are still read in format 0.2 (``forms_03``).
+# against the slots below; the checks here run on its resolved SI tree (``doc.si``); region documents
+# are checked in ``thermal_regions``. The electric and Joule kinds share ``rectangle_03`` and
+# ``natural_conditions_03`` for their rectangles.
 
 V1_03 = ("thermal.steady2d-result-v3", "thermal2d-p1-node-cell-v2")
 V2_03 = ("thermal.steady2d-result-v4", "thermal2d-p1-node-cell-boundary-v3")
@@ -370,9 +377,12 @@ def rect_geometry_03(doc):
     return "geometry", doc.data["geometry"], doc.si["geometry"].get("depth")
 
 
-def rectangle_03(doc, label, required=("thermal_conductivity",)):
+def rectangle_03(doc, label, required=("thermal_conductivity",), *, noun="heat",
+                 homogeneous="thermal_conductivity is homogeneous"):
     """The checks every format 0.3 rectangle heat document shares; returns ``(name, entry)``
-    of its one physics entry (SI values). ``label`` names the physics in messages."""
+    of its one physics entry (SI values). ``label`` names the physics in messages, ``noun``
+    the document kind and ``homogeneous`` its physics-entry properties (the electric and Joule
+    kinds share these checks)."""
     si = doc.si
     doc.sole_physics()                       # one physics entry; several are not coupled yet
     name, p = next(iter(si["physics"].items()))
@@ -388,7 +398,7 @@ def rectangle_03(doc, label, required=("thermal_conductivity",)):
     dom = flat["domain"]
     extra = sorted(set(dom) - {"xmin", "xmax", "ymin", "ymax"})
     if extra:
-        _refuse(f"{base}.domain: unsupported keys {extra}; a rectangle heat document is 2D")
+        _refuse(f"{base}.domain: unsupported keys {extra}; a rectangle {noun} document is 2D")
     for axis in "xy":
         lo, hi = doc.pm(f"{base}.domain.{axis}min"), doc.pm(f"{base}.domain.{axis}max")
         if not lo < hi:
@@ -396,14 +406,14 @@ def rectangle_03(doc, label, required=("thermal_conductivity",)):
                     f"{base}.domain.{axis}max")
     if si.get("materials"):
         _refuse(f"materials: {label} on a rectangle requires an empty object; "
-                "thermal_conductivity is homogeneous and given on the physics entry")
+                f"{homogeneous} and given on the physics entry")
     mesh = si.get("mesh")
     if mesh is None or "subdivision_count" not in mesh:
-        _refuse("mesh.subdivision_count: a rectangle heat document needs [nx, ny]", "mesh.subdivision_count",
+        _refuse(f"mesh.subdivision_count: a rectangle {noun} document needs [nx, ny]", "mesh.subdivision_count",
                 "E-KEY-MISSING")
     extra = sorted(set(doc.data["mesh"]) - {"subdivision_count"})
     if extra:
-        _refuse(f"mesh: a rectangle heat document takes subdivision_count only, got {extra}; element sizes "
+        _refuse(f"mesh: a rectangle {noun} document takes subdivision_count only, got {extra}; element sizes "
                 "belong to region documents")
     if len(mesh["subdivision_count"]) != 2:
         _refuse("mesh.subdivision_count: expected [nx, ny]")
