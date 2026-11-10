@@ -106,12 +106,6 @@ def is_thermal(data):
         isinstance(p, dict) and p.get('type') == PHYSICS for p in data['physics'].values())
 
 
-def defaults():
-    return {'openphysics': '0.2', 'name': 'untitled', 'geometry': {'domain': None},
-            'materials': {}, 'physics': {}, 'mesh': {}, 'study': {'type': 'single'},
-            'results': {'save_fields': True, 'plots': False}}
-
-
 def _object(value, keys, path):
     if not isinstance(value, dict):
         raise DocumentError(f'{path}: expected an object')
@@ -927,6 +921,6 @@ def _forms():
 register(PhysicsKind(
     name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
     validate=_validate, run=run_thermal, summary=_summary,
-    result_types=(ThermalRunResult,), defaults=defaults, fresh_output=True,
+    result_types=(ThermalRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d',
     accepts_mesh_limits=_accepts_mesh_limits, slots=_slots(), forms_03=_forms()))

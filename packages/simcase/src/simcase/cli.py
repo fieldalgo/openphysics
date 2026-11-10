@@ -249,10 +249,14 @@ def _geometry(path: str, component: str | None) -> int:
     except (OSError, json.JSONDecodeError, DocumentError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    if isinstance(data, dict) and data.get("openphysics") != "0.3":
+        from .resolve import format_refusal
+        print(f"error: {format_refusal(data).message}", file=sys.stderr)       # refused by name (E-FORMAT)
+        return 2
     geometry = data.get("geometry") if isinstance(data, dict) else None
     if not isinstance(geometry, dict) or "version" not in geometry:
-        print("error: the document has a 0.2 geometry block; the region complex needs a version 1 block "
-              "(see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
+        print("error: the document has a flat geometry block (no version); the region complex needs a version 1 "
+              "block (see docs/packages/simcase/geometry_document.md)", file=sys.stderr)
         return 2
     try:
         model = parse(data)

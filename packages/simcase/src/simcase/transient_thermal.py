@@ -22,7 +22,7 @@ from .steady_boundary_contract import (
     has_natural_conditions_03, heat_slots,
 )
 from .transient_thermal_contract import (
-    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, V1, V2, V1_03, V2_03, defaults, transient_solver_inputs,
+    PHYSICS, RESULT_FORMAT, FIELD_LAYOUT, V1, V2, V1_03, V2_03, transient_solver_inputs,
     transient_thermal_summary, validate_transient_rectangle_03,
 )
 from .registry import PhysicsKind, register
@@ -500,6 +500,6 @@ def _accepts_mesh_limits(data):
 register(PhysicsKind(
     name='thermal.transient2d', types=frozenset({PHYSICS}), precedence=20,
     validate=_validate, run=run_transient_thermal, summary=transient_thermal_summary,
-    result_types=(TransientThermalRunResult,), defaults=defaults, fresh_output=True,
+    result_types=(TransientThermalRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.transient2d',
     accepts_mesh_limits=_accepts_mesh_limits, slots=heat_slots(PHYSICS, transient=True), forms_03=FORMS_03))

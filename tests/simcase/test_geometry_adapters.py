@@ -6,6 +6,11 @@
 The adapters live in their own packages and emit plain dictionaries; here the simcase
 reader checks them, and shapely (a test reference only) resolves the later-wins rule
 so each region's area can be compared with the area its source defines.
+
+The adapters still declare their length unit the format 0.2 way (``units.length``, and a
+meshine feature's bare ``mesh_size``); the simcase reader reads format 0.3 only, so
+``as_document`` puts that unit on each component (``length_unit``, ``depth`` null) and a
+mesh size into an ``element_size`` with its unit, as a format 0.3 document writes them.
 """
 
 import math
@@ -21,6 +26,18 @@ from meshine import Circle, Domain, box_sides, rectangle, shapes
 from simcase.geometry_document import RESERVED_IDS, GeometryError, parse, to_v02
 from sipi import CrossSection, DielectricRegion, Layer, PolygonTrace, Trace, templates
 from sipi.polygons import trace_shape
+
+
+def as_document(out):
+    """The format 0.3 document of an adapter's ``units`` and ``geometry``."""
+    unit = out["units"]["length"]
+    geometry = {**out["geometry"], "components": {}}
+    for name, comp in out["geometry"]["components"].items():
+        features = [{**{k: v for k, v in f.items() if k != "mesh_size"},
+                     **({"element_size": f"{f['mesh_size']!r} {unit}"} if "mesh_size" in f else {})}
+                    for f in comp.get("features", [])]
+        geometry["components"][name] = {**comp, "length_unit": unit, "depth": None, "features": features}
+    return {"openphysics": "0.3", "geometry": geometry}
 
 
 def test_the_adapters_copy_the_reader_s_id_rules():
@@ -105,13 +122,13 @@ def _sipi_reference(cs):
 def test_a_cross_section_reads_with_the_areas_sipi_defines(name):
     cs = SECTIONS[name]()
     out = sipi_v1.to_geometry_v1(cs)
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
+    model = parse(as_document(out))
     comp = model.components["section"]
     assert all(abs(r.displacement_pm) <= 1e-6 for r in model.roundings)
     assert [f.name for f in comp.features] == ([lay.name for lay in cs.layers]
                                                + [r.name for r in cs.dielectric_regions]
                                                + [out["renamed"].get(t.name, t.name) for t in cs.traces])
-    got = later_wins_areas(comp, model.pm_per_unit)
+    got = later_wins_areas(comp, comp.pm_per_unit)
     for region, area in _sipi_reference(cs).items():
         assert got.get(region, 0.0) == pytest.approx(area, rel=1e-12, abs=1e-24), region
     assert out["conductors"]["signals"] == [t.name for t in cs.traces if not t.ground]
@@ -125,7 +142,7 @@ def test_a_zero_thickness_trace_is_a_segment_and_a_name_clash_is_renamed():
     (seg,) = [f for f in out["geometry"]["components"]["section"]["features"] if f.get("type") == "segment"]
     assert seg["name"] == "signal-trace" and out["renamed"] == {"signal": "signal-trace"}
     assert seg["points"] == [[-0.00015, 0.0002], [0.00015, 0.0002]] and "material" not in seg
-    parse({"units": out["units"], "geometry": out["geometry"]})
+    parse(as_document(out))
 
 
 def test_derived_coordinates_are_written_exactly():
@@ -135,7 +152,7 @@ def test_derived_coordinates_are_written_exactly():
     out = sipi_v1.to_geometry_v1(cs)
     feats = out["geometry"]["components"]["section"]["features"]
     assert feats[2]["y"] == "0.0003" or feats[2]["y"] == 0.0003
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
+    model = parse(as_document(out))
     assert model.roundings == []
     assert model.components["section"].features[2].data["y"] == 300_000_000
 
@@ -159,9 +176,9 @@ def _domain_reference(d):
 def test_the_rib_domain_reads_with_its_region_areas(slab):
     d, _namer = shapes.rib_waveguide(slab_thickness=slab, size_core=0.1, size_far=0.6)
     out = meshine_v1.to_geometry_v1(d, length_unit="um")
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
+    model = parse(as_document(out))
     assert model.roundings == []
-    got = later_wins_areas(model.components["domain"], model.pm_per_unit)
+    got = later_wins_areas(model.components["domain"], model.components["domain"].pm_per_unit)
     for region, area in _domain_reference(d).items():
         assert got[region] == pytest.approx(area, rel=1e-12), region
     assert out["mesh_size"] == 0.6
@@ -174,8 +191,8 @@ def test_a_footprint_with_a_filled_hole_needs_no_void():
     out = meshine_v1.to_geometry_v1(d, length_unit="um")
     feats = out["geometry"]["components"]["domain"]["features"]
     assert [f["name"] for f in feats] == ["rest", "die_zone"]
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
-    assert later_wins_areas(model.components["domain"], model.pm_per_unit) == {"rest": 84.0, "die_zone": 16.0}
+    model = parse(as_document(out))
+    assert later_wins_areas(model.components["domain"], model.components["domain"].pm_per_unit) == {"rest": 84.0, "die_zone": 16.0}
 
 
 def test_an_unfilled_hole_becomes_void_and_regions_inside_it_still_win():
@@ -186,8 +203,8 @@ def test_an_unfilled_hole_becomes_void_and_regions_inside_it_still_win():
     feats = out["geometry"]["components"]["domain"]["features"]
     assert [(f["name"], f["material"]) for f in feats] == [("ring", "ring"), ("ring-hole1", None),
                                                             ("island", "island")]
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
-    got = later_wins_areas(model.components["domain"], model.pm_per_unit)
+    model = parse(as_document(out))
+    got = later_wins_areas(model.components["domain"], model.components["domain"].pm_per_unit)
     assert got["ring"] == 64.0 and got["island"] == 4.0 and got["ring-hole1"] == 32.0
     with pytest.raises(GeometryError, match="void"):
         to_v02(model)
@@ -199,8 +216,8 @@ def test_the_fiber_keeps_exact_circles_and_their_vertex_counts():
     feats = out["geometry"]["components"]["domain"]["features"]
     assert [(f["name"], f["type"], f["r"]) for f in feats] == [("clad", "circle", 4.0), ("core", "circle", 1.0)]
     assert sorted(c["circle_segments"] for c in out["mesh_controls"]) == [16, 32]
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
-    got = later_wins_areas(model.components["domain"], model.pm_per_unit, quad_segs=4096)
+    model = parse(as_document(out))
+    got = later_wins_areas(model.components["domain"], model.components["domain"].pm_per_unit, quad_segs=4096)
     assert got["core"] == pytest.approx(math.pi, rel=1e-6)
     assert got["clad"] == pytest.approx(15 * math.pi, rel=1e-6)
 
@@ -214,7 +231,7 @@ def test_same_name_loops_merge_through_region_and_a_unit_is_required():
     feats = out["geometry"]["components"]["domain"]["features"]
     assert [(f["name"], f.get("region"), f["material"]) for f in feats] == [
         ("pad", None, "Cu"), ("pad-2", "pad", "Cu"), ("gap", None, "SiO2")]
-    model = parse({"units": out["units"], "geometry": out["geometry"]})
+    model = parse(as_document(out))
     assert model.components["domain"].region_names == ["pad", "gap"]
     with pytest.raises(ValueError, match="length_unit"):
         meshine_v1.to_geometry_v1(d, length_unit=None)

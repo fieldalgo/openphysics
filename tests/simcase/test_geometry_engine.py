@@ -34,10 +34,14 @@ DOMAIN_NM2 = 100 * 100 * 1e6              # the 100 nm test plate in pm^2
 
 
 def v1(features, dom=(0, 100, 0, 100), bg="SiO2", finalize="later_wins", units="nm", dimension="2d", **extra):
-    comp = {"dimension": dimension, "domain": {"xmin": dom[0], "xmax": dom[1], "ymin": dom[2], "ymax": dom[3]},
+    """A format 0.3 document with one component whose bare numbers are in ``units``."""
+    comp = {"dimension": dimension, "length_unit": units,
+            "domain": {"xmin": dom[0], "xmax": dom[1], "ymin": dom[2], "ymax": dom[3]},
             "background": {"material": bg}, "features": features, "finalize": finalize}
+    if dimension == "2d":
+        comp["depth"] = None
     comp.update(extra)
-    return {"units": {"length": units}, "geometry": {"version": 1, "components": {"xs": comp}}}
+    return {"openphysics": "0.3", "geometry": {"version": 1, "components": {"xs": comp}}}
 
 
 def rect(name, x, y, w, h, material="m", **kw):
@@ -160,8 +164,9 @@ def test_axisymmetric_components_name_the_axis():
 
 def test_the_engine_refuses_what_it_cannot_take():
     with pytest.raises(GeometryError, match="2d and axisymmetric"):
-        run({"units": {"length": "nm"}, "geometry": {"version": 1, "components": {"c": {
-            "dimension": "3d", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}}}}})
+        run({"openphysics": "0.3", "geometry": {"version": 1, "components": {"c": {
+            "dimension": "3d", "length_unit": "nm",
+            "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}}}}})
     path = {"name": "p", "type": "path", "start": [30, 40], "material": "Si",
             "segments": [{"line": [70, 40]}, {"arc": {"center": [70, 50], "to": [71, 60], "ccw": True}}]}
     with pytest.raises(GeometryError, match="not on the arc's circle"):
@@ -506,16 +511,9 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
     from simcase.geometry import resolve_regions
     doc = copy.deepcopy(CURRENT[name])
     g = doc["geometry"]
-    v03 = doc.get("openphysics") == "0.3"
-    if v03:    # a format 0.3 flat block declares its own length_unit and depth; its element sizes are quantities
-        units, g = {"length": g["length_unit"]}, {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
-        g = {**g, **({"background": {k: v for k, v in g["background"].items() if k != "element_size"}}
-                     if "background" in g else {}),
-             **({"shapes": [{k: v for k, v in s.items() if k != "element_size"} for s in g["shapes"]]}
-                if "shapes" in g else {})}
-    else:
-        units = doc["units"]
-    model = parse({"units": units, "geometry": from_v02(g)})
+    assert doc["openphysics"] == "0.3"
+    units = {"length": g["length_unit"]}       # a format 0.3 flat block declares its own length_unit and depth
+    model = parse({"openphysics": "0.3", "geometry": from_v02(g)})
     if "zmin" in g["domain"]:
         with pytest.raises(GeometryError, match="2d and axisymmetric"):
             evaluate(model)
@@ -526,7 +524,7 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
         assert cell.material is _MISSING and cell.region == "background"
         return
     read = Document.from_dict(doc)
-    if v03 and read.si is not None and "background" in g and doc["physics"]:
+    if read.si is not None and "background" in g and doc["physics"]:
         from simcase.thermal_regions import handoff_03
         kind = next(iter(doc["physics"].values()))["type"]
         if kind.startswith("thermal."):
@@ -536,7 +534,7 @@ def test_g2_6_current_documents_match_the_shapely_route(name):
             assert units == {"length": "um"}    # so the hand-off's areas are the document's
             read = kernel_document(read)
     ref = resolve_regions(read)
-    unit = float(model.pm_per_unit)
+    unit = float(model.components["main"].pm_per_unit)
     assert [r[0] for r in ref] == rc.region_names()
     circle_names = {s["name"] for s in g["shapes"] if s["type"] == "circle"}
     dom = g["domain"]
@@ -1076,14 +1074,15 @@ def test_a_segment_on_the_shared_edge_of_one_region_is_kept_symmetrically():
 
 
 def test_merged_regions_list_every_owning_feature():
-    doc = v1([rect("a", 10, 10, 30, 20, "Si", region="core", mesh_size=1), rect("b", 40, 10, 30, 20, "Si", region="core", mesh_size=7)],
+    doc = v1([rect("a", 10, 10, 30, 20, "Si", region="core", element_size="1 nm"),
+              rect("b", 40, 10, 30, 20, "Si", region="core", element_size="7 nm")],
              selections={"fa": {"region": {"feature": "a"}}, "fb": {"region": "b"}})
     rc = check_euler(run(doc))
     (cell,) = [rc.cells[i] for i in rc.cells_of_region("core")]
     assert cell.feature == "a" and cell.feature_indices == frozenset({0, 1}) and cell.mesh_size == 1000
     assert rc.selections["fa"][1] == rc.selections["fb"][1] == frozenset({cell.index})
-    rc2 = check_euler(run(v1([rect("b", 40, 10, 30, 20, "Si", region="core", mesh_size=7),
-                              rect("a", 10, 10, 30, 20, "Si", region="core", mesh_size=1)])))
+    rc2 = check_euler(run(v1([rect("b", 40, 10, 30, 20, "Si", region="core", element_size="7 nm"),
+                              rect("a", 10, 10, 30, 20, "Si", region="core", element_size="1 nm")])))
     (cell2,) = [rc2.cells[i] for i in rc2.cells_of_region("core")]
     assert cell2.feature == "b" and cell2.feature_indices == frozenset({0, 1}) and cell2.mesh_size == 1000
     assert rc.region_names() == rc2.region_names() == ["core", "background"]

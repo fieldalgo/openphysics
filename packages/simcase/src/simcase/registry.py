@@ -42,9 +42,6 @@ class PhysicsKind:
     summary: Callable[[Any], str]
     #: what ``run`` returns
     result_types: tuple[type, ...]
-    #: document defaults that ``Document.from_dict`` merges the input into;
-    #: None keeps ``schema.DEFAULTS``
-    defaults: Callable[[], dict] | None = None
     #: the command line refuses an output folder that already exists
     fresh_output: bool = False
     #: refusal for ``build_mesh`` and ``solve_point``, with ``{stage}`` for the

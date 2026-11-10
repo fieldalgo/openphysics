@@ -275,8 +275,9 @@ def validation_payload(doc_tree, found=()) -> dict:
     warnings and notes, with code and path); when valid, also the document as sent (written back
     with ``reader.dumps`` by the route) and its summary, and when refused, the refusal text."""
     # Studio's capability boundary reads the authored types, whatever the schema accepts: a headless
-    # document is not validated here, and its reply carries only the refusal
-    if physics_type := _headless_thermal_type(doc_tree):
+    # format 0.3 document is not validated here, and its reply carries only the refusal; a document
+    # of another format gets the reader's E-FORMAT refusal (units batch C11a)
+    if doc_tree.get("openphysics") == "0.3" and (physics_type := _headless_thermal_type(doc_tree)):
         return {"ok": False, "error": f"Studio unsupported: {physics_type} is headless Python/CLI only"}
     if found:
         doc, diagnostics = None, list(found)

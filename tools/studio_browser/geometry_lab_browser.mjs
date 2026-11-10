@@ -7,8 +7,9 @@
 //   python -m simcase.studio --no-browser --port 8765 &
 //   node tools/studio_browser/geometry_lab_browser.mjs http://127.0.0.1:8765 out-dir
 // It loads both starters, edits a parameter with the slider and the text field, checks the
-// lists against the server's answer, provokes a refusal, saves the document and checks that
-// the page logged no console error and no Content-Security-Policy violation.
+// lists against the server's answer, provokes a refusal, saves the document, moves the slider
+// after a unit typed in the field and checks that the page logged no console error and no
+// Content-Security-Policy violation.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -109,6 +110,27 @@ try {
   await download.saveAs(saved);
   assert.deepEqual(JSON.parse(await readFile(saved, 'utf8')), edited);
   report.stages.push({saved, equalsEditedDocument: true});
+
+  // A unit typed in the field, then the slider: the field and the document both take the slider's
+  // value in the slider's unit (um), never the typed unit (nm).
+  await page.fill('#param-w', '400 nm'); await page.press('#param-w', 'Enter'); await settled();
+  assert.equal(await page.inputValue('#param-w'), '400 nm');
+  // after "400 nm" the slider sits at its maximum (its position is the number 400), so End alone
+  // would not move it: Home first, then End
+  await slider.focus(); await page.keyboard.press('Home'); await settled();
+  const sent = page.waitForRequest(r => r.url().endsWith('/api/geometry-lab/evaluate') && r.method() === 'POST');
+  await page.keyboard.press('End');
+  const held = JSON.parse((await sent).postData()).doc.geometry.parameters.w.value;
+  await settled();
+  assert.equal(await page.inputValue('#param-w'), '0.9 um');
+  assert.equal(held, '0.9 um');
+  edited.geometry.parameters.w.value = '0.9 um';
+  assert.equal(await page.textContent('#summary'), (await api(edited)).body.summary);
+  const [again] = await Promise.all([page.waitForEvent('download'), page.click('#save-file')]);
+  const savedAgain = join(out, 'slider-' + again.suggestedFilename());
+  await again.saveAs(savedAgain);
+  assert.deepEqual(JSON.parse(await readFile(savedAgain, 'utf8')), edited);
+  report.stages.push({typedUnitThenSlider: {field: '0.9 um', document: held, saved: savedAgain}});
 
   report.cspViolations = await page.evaluate(() => window.__csp || []);
   assert.deepEqual(report.pageErrors, []);

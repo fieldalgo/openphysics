@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from physmat.units import is_quantity_text
 from simcase.geometry_document import GeometryError, parse
 from simcase.geometry_engine import Q2, evaluate
 from simcase.geometry_velocity import TopologyChange, design_velocity, exact_complex, signature
@@ -27,10 +28,16 @@ UM = 10 ** 6                                             # pm per micrometre
 
 
 def doc(features, params, domain=(0, 10, 0, 10), dimension="2d", **extra):
-    comp = {"dimension": dimension, "domain": dict(zip(("xmin", "xmax", "ymin", "ymax"), domain)),
+    """A format 0.3 document: one component in micrometres, length parameters as quantity strings."""
+    comp = {"dimension": dimension, "length_unit": "um", **({"depth": None} if dimension == "2d" else {}),
+            "domain": dict(zip(("xmin", "xmax", "ymin", "ymax"), domain)),
             "background": {"material": "air"}, "features": features, **extra}
-    return {"openphysics": "0.2", "units": {"length": "um"},
-            "geometry": {"version": 1, "parameters": params, "components": {"xs": comp}}}
+    return {"openphysics": "0.3", "geometry": {"version": 1, "parameters": params, "components": {"xs": comp}}}
+
+
+def um(x) -> str:
+    """A length parameter value in micrometres."""
+    return f"{x!r} um"
 
 
 def rel(a, b):
@@ -52,15 +59,16 @@ def exact_v(dv, v):
 
 # ---------------------------------------------------------------- D1 closed forms
 
-RECT = doc([{"name": "core", "type": "rect", "x": 2, "y": 3, "w": "w", "h": "h", "material": "Si"}],
-           {"w": {"value": 4}, "h": {"value": 2.5}})
+#: the height parameter is "t": "h" is a unit symbol (the hour), which format 0.3 refuses as a parameter name
+RECT = doc([{"name": "core", "type": "rect", "x": 2, "y": 3, "w": "w", "h": "t", "material": "Si"}],
+           {"w": {"value": "4 um"}, "t": {"value": "2.5 um"}})
 
 
 def test_d1_rect_area_and_perimeter():
     dw = design_velocity(RECT, "w")
-    dh = design_velocity(RECT, "h")
+    dh = design_velocity(RECT, "t")
     assert rel(dw.area_derivative("core"), 2.5 * UM) <= 1e-12          # dA/dw = h (pm^2 per pm)
-    assert rel(dh.area_derivative("core"), 4 * UM) <= 1e-12            # dA/dh = w
+    assert rel(dh.area_derivative("core"), 4 * UM) <= 1e-12            # dA/dt = w
     assert rel(dw.perimeter_derivative("core"), 2.0) <= 1e-12          # dP/dw = 2
     assert rel(dh.perimeter_derivative("core"), 2.0) <= 1e-12
     rc = dw.complex
@@ -74,7 +82,7 @@ def test_d1_rect_area_and_perimeter():
 
 def test_d1_trapezoid_corners():
     d = doc([{"name": "t", "type": "trapezoid", "cx": "c", "y": 2, "w": "w", "h": 3, "material": "Si"}],
-            {"c": {"value": 5}, "w": {"value": 4}})
+            {"c": {"value": "5 um"}, "w": {"value": "4 um"}})
     dw = design_velocity(d, "w")
     rc = dw.complex
     for x, y, want in ((3, 2, (Fraction(-1, 2), 0)), (7, 2, (Fraction(1, 2), 0)),
@@ -93,7 +101,7 @@ def test_d1_trapezoid_corners():
 
 def test_d1_polygon_with_expressions():
     d = doc([{"name": "tri", "type": "polygon", "points": [[1, 1], ["1 + a", 1], ["1 + a", "1 + a/2"]],
-              "material": "Si"}], {"a": {"value": 6}})
+              "material": "Si"}], {"a": {"value": "6 um"}})
     dv = design_velocity(d, "a")
     rc = dv.complex
     assert exact_v(dv, vertex_at(rc, 7 * UM, 1 * UM)) == (1, 0)
@@ -103,7 +111,7 @@ def test_d1_polygon_with_expressions():
 
 def test_d1_circle_area_and_perimeter():
     d = doc([{"name": "c", "type": "circle", "cx": "cx", "cy": 5, "r": "r", "material": "Si"}],
-            {"r": {"value": 2}, "cx": {"value": 5}})
+            {"r": {"value": "2 um"}, "cx": {"value": "5 um"}})
     dr = design_velocity(d, "r")
     assert rel(dr.area_derivative("c"), 2 * math.pi * 2 * UM) <= 1e-12   # dA/dr = 2 pi r
     assert rel(dr.perimeter_derivative("c"), 2 * math.pi) <= 1e-12       # dP/dr = 2 pi
@@ -121,7 +129,7 @@ def test_d2_line_line_intersection():
     # the hypotenuse y = H x / a of a triangle crosses the top (y = 5) and left (x = 1) sides of a rect
     d = doc([{"name": "tri", "type": "polygon", "points": [[0, 0], ["a", 0], ["a", 8]], "material": "Si"},
              {"name": "box", "type": "rect", "x": 1, "y": 0.5, "w": 6, "h": 4.5, "material": "Ge"}],
-            {"a": {"value": 8}}, domain=(0, 10, 0, 10))
+            {"a": {"value": "8 um"}}, domain=(0, 10, 0, 10))
     dv = design_velocity(d, "a")
     rc = dv.complex
     # top: x = 5 a / 8 -> dx/da = 5/8; left: y = 8 / a -> dy/da = -8 / a^2 = -1/8
@@ -133,7 +141,7 @@ def test_d2_line_circle_intersection():
     # the top y = 6 of a rect cuts the circle (5, 5), r: x = 5 +- sqrt(r^2 - 1) -> dx/dr = +- r / sqrt(r^2 - 1)
     d = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": "r", "material": "Si"},
              {"name": "lid", "type": "rect", "x": 0, "y": 6, "w": 10, "h": 4, "material": "Ge"}],
-            {"r": {"value": 2}})
+            {"r": {"value": "2 um"}})
     dv = design_velocity(d, "r")
     want = 2 / math.sqrt(3)
     found = 0
@@ -157,8 +165,8 @@ def _vertex_by_position(rc, S, approx_pm, tol_pm=0.01):
 
 
 def _exact_fd(d, param, v_pos, h_um):
-    plus, Sp = exact_complex(d, param, h_um)
-    minus, Sm = exact_complex(d, param, -h_um)
+    plus, Sp = exact_complex(d, param, Fraction(h_um) * UM)          # the offset in exact pm
+    minus, Sm = exact_complex(d, param, -Fraction(h_um) * UM)
     vp = plus.vertices[_vertex_by_position(plus, Sp, v_pos, tol_pm=abs(h_um) * UM * 2 + 0.01)]
     vm = minus.vertices[_vertex_by_position(minus, Sm, v_pos, tol_pm=abs(h_um) * UM * 2 + 0.01)]
     h = Fraction(h_um) * UM
@@ -167,7 +175,7 @@ def _exact_fd(d, param, v_pos, h_um):
 
 D2_DOC = doc([{"name": "tri", "type": "polygon", "points": [[0, 0], ["a", 0], ["a", 8]], "material": "Si"},
               {"name": "box", "type": "rect", "x": 1, "y": 0.5, "w": 6, "h": 4.5, "material": "Ge"}],
-             {"a": {"value": 8}})
+             {"a": {"value": "8 um"}})
 
 
 def test_d3_exact_fd_linear_is_exact():
@@ -194,7 +202,7 @@ def test_d3_exact_fd_nonlinear_order():
 def test_d3_exact_fd_ratio_expression():
     # x = a * (a / L): nonlinear through a ratio sub-expression; dx/da = 2 a / L
     d = doc([{"name": "r", "type": "rect", "x": 1, "y": 1, "w": "a * (a / L)", "h": 2, "material": "Si"}],
-            {"a": {"value": 4}, "L": {"value": 8}})
+            {"a": {"value": "4 um"}, "L": {"value": "8 um"}})
     dv = design_velocity(d, "a")
     v = vertex_at(dv.complex, 3 * UM, 1 * UM)
     assert exact_v(dv, v) == (1, 0)
@@ -213,7 +221,7 @@ def test_d4_rounded_area_fd_study():
     # a circle whose top is cut off by a later rect: the remaining area is nonlinear in r
     base = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": "r", "material": "Si"},
                 {"name": "lid", "type": "rect", "x": 0, "y": 6, "w": 10, "h": 4, "material": "Ge"}],
-               {"r": {"value": 3}})
+               {"r": {"value": "3 um"}})
     dv = design_velocity(base, "r")
     want = dv.area_derivative("c")
     # closed form: A(r) = pi r^2 - segment above y = 6 (distance 1): dA/dr = 2 r (pi - acos(1 / r))
@@ -225,7 +233,7 @@ def test_d4_rounded_area_fd_study():
         areas = []
         for s in (1, -1):
             d = copy.deepcopy(base)
-            d["geometry"]["parameters"]["r"]["value"] = r + s * h
+            d["geometry"]["parameters"]["r"]["value"] = um(r + s * h)
             areas.append(evaluate(parse(d)).area_of_region("c"))
         study[h] = rel((areas[0] - areas[1]) / (2 * h * UM), want)
     assert min(study.values()) <= 1e-6, study
@@ -241,20 +249,20 @@ def _refused(d, p):
 
 def test_d5a_touching_rects_refused():
     d = doc([{"name": "a", "type": "rect", "x": 2, "y": 3, "w": "w", "h": 2, "material": "Si"},
-             {"name": "b", "type": "rect", "x": 6, "y": 3, "w": 2, "h": 2, "material": "Ge"}], {"w": {"value": 4}})
+             {"name": "b", "type": "rect", "x": 6, "y": 3, "w": 2, "h": 2, "material": "Ge"}], {"w": {"value": "4 um"}})
     e = _refused(d, "w")
     assert {"a", "b"} <= set(e.features) and "a" in str(e) and "b" in str(e)
 
 
 def test_d5b_corner_leaves_domain_side():
-    d = doc([{"name": "a", "type": "rect", "x": "x0", "y": 3, "w": 2, "h": 2, "material": "Si"}], {"x0": {"value": 0}})
+    d = doc([{"name": "a", "type": "rect", "x": "x0", "y": 3, "w": 2, "h": 2, "material": "Si"}], {"x0": {"value": "0 um"}})
     e = _refused(d, "x0")
     assert {"a", "domain"} <= set(e.features)
 
 
 def test_d5c_tangent_circles_refused():
     d = doc([{"name": "c1", "type": "circle", "cx": 3, "cy": 5, "r": 2, "material": "Si"},
-             {"name": "c2", "type": "circle", "cx": 7, "cy": 5, "r": "r", "material": "Ge"}], {"r": {"value": 2}})
+             {"name": "c2", "type": "circle", "cx": 7, "cy": 5, "r": "r", "material": "Ge"}], {"r": {"value": "2 um"}})
     e = _refused(d, "r")
     assert {"c1", "c2"} <= set(e.features)
 
@@ -262,7 +270,7 @@ def test_d5c_tangent_circles_refused():
 def test_d5d_three_concurrent_curves_broken():
     # a segment through the corner (5, 5) of a rect; moving its far end breaks the concurrency
     d = doc([{"name": "a", "type": "rect", "x": 2, "y": 2, "w": 3, "h": 3, "material": "Si"},
-             {"name": "cut", "type": "segment", "points": [[3, 3], [8, "q"]]}], {"q": {"value": 8}})
+             {"name": "cut", "type": "segment", "points": [[3, 3], [8, "q"]]}], {"q": {"value": "8 um"}})
     e = _refused(d, "q")
     assert {"a", "cut"} <= set(e.features)
 
@@ -270,7 +278,7 @@ def test_d5d_three_concurrent_curves_broken():
 def test_d5e_linked_touch_is_not_refused():
     d = doc([{"name": "a", "type": "rect", "x": 2, "y": 3, "w": "w", "h": 2, "material": "Si"},
              {"name": "b", "type": "rect", "x": "2 + w", "y": 3, "w": 2, "h": 2, "material": "Ge"}],
-            {"w": {"value": 4}})
+            {"w": {"value": "4 um"}})
     dv = design_velocity(d, "w")
     assert rel(dv.area_derivative("a"), 2 * UM) <= 1e-12
     assert abs(dv.area_derivative("b")) <= 1e-12 * UM
@@ -279,7 +287,7 @@ def test_d5e_linked_touch_is_not_refused():
 
 def test_d5_far_parameter_is_zero():
     d = doc([{"name": "a", "type": "rect", "x": 2, "y": 3, "w": 2, "h": 2, "material": "Si"}],
-            {"w": {"value": 4}})
+            {"w": {"value": "4 um"}})
     dv = design_velocity(d, "w")
     assert dv.delta_pm is None and all(v == (Q2(0), Q2(0)) or (v[0].is_zero() and v[1].is_zero())
                                        for v in dv.vertices.values())
@@ -314,7 +322,7 @@ def test_d6_unchanged_without_derivative():
                 continue
             before = _complex_fingerprint(evaluate(model, cname))
             for p, spec in model.parameters.items():
-                if spec[1] == "length" and not isinstance(d["geometry"]["parameters"][p]["value"], str):
+                if spec[1] == "length" and is_quantity_text(d["geometry"]["parameters"][p]["value"]):
                     try:
                         dv = design_velocity(d, p, cname)
                     except GeometryError:
@@ -330,29 +338,29 @@ def test_d7_refusals():
     with pytest.raises(GeometryError, match="unknown parameter 'nope'"):
         design_velocity(RECT, "nope")
     ratio = doc([{"name": "r", "type": "rect", "x": 1, "y": 1, "w": "w0 * k", "h": 2, "material": "Si"}],
-                {"w0": {"value": 4}, "k": {"value": 0.5, "kind": "ratio"}})
+                {"w0": {"value": "4 um"}, "k": {"value": 0.5, "kind": "ratio"}})
     with pytest.raises(GeometryError, match="is a ratio; the contract defines V = dx/dp for length parameters"):
         design_velocity(ratio, "k")
     derived = doc([{"name": "r", "type": "rect", "x": 1, "y": 1, "w": "w2", "h": 2, "material": "Si"}],
-                  {"w": {"value": 2}, "w2": {"value": "2 * w"}})
+                  {"w": {"value": "2 um"}, "w2": {"value": "2 * w"}})
     with pytest.raises(GeometryError, match="w2 is derived from other parameters"):
         design_velocity(derived, "w2")
     assert rel(design_velocity(derived, "w").area_derivative("r"), 4 * UM) <= 1e-12     # dA/dw = 2 h
     arc = doc([{"name": "p", "type": "path", "start": [2, 2],
                 "segments": [{"line": [8, 2]}, {"arc": {"center": ["c", 2], "to": [2, 2], "ccw": True}}],
-                "material": "Si"}], {"c": {"value": 5}})
+                "material": "Si"}], {"c": {"value": "5 um"}})
     with pytest.raises(GeometryError, match="moving path arc"):
         design_velocity(arc, "c")
     # moving the start of a closed path opens a closing segment: a topology change, refused by name
     opened = copy.deepcopy(arc)
-    opened["geometry"]["parameters"] = {"s": {"value": 2}, "c": {"value": 5}}
-    opened["geometry"]["components"]["xs"]["features"][0]["start"] = ["s", 2]
+    opened["geometry"]["parameters"] = {"x0": {"value": "2 um"}, "c": {"value": "5 um"}}    # "s" is a unit symbol
+    opened["geometry"]["components"]["xs"]["features"][0]["start"] = ["x0", 2]
     opened["geometry"]["components"]["xs"]["features"][0]["segments"][1]["arc"]["to"] = [2, 2]
     with pytest.raises(TopologyChange, match="features: p"):
-        design_velocity(opened, "s")
-    three = {"openphysics": "0.2", "units": {"length": "um"},
-             "geometry": {"version": 1, "parameters": {"t": {"value": 1}}, "components": {"box": {
-                 "dimension": "3d", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": "t"},
+        design_velocity(opened, "x0")
+    three = {"openphysics": "0.3",
+             "geometry": {"version": 1, "parameters": {"t": {"value": "1 um"}}, "components": {"box": {
+                 "dimension": "3d", "length_unit": "um", "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": "t"},
                  "background": {"material": "air"}}}}}
     with pytest.raises(GeometryError, match="is 3d"):
         design_velocity(three, "t")
@@ -363,7 +371,7 @@ def test_d7_static_arc_taken():
               "segments": [{"line": [8, 2]}, {"arc": {"center": [5, 2], "to": [2, 2], "ccw": True}}],
               "material": "Si"},
              {"name": "post", "type": "rect", "x": "x0", "y": 6, "w": 1, "h": 1, "material": "Ge"}],
-            {"x0": {"value": 4.5}})
+            {"x0": {"value": "4.5 um"}})
     dv = design_velocity(d, "x0")
     # a translation keeps both areas; the arc's vertices stay put
     assert abs(dv.area_derivative("post")) <= 1e-12 * UM
@@ -378,7 +386,7 @@ def test_d8_node_velocity():
     from meshine import generate
     d = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": "r", "material": "Si"},
              {"name": "pad", "type": "rect", "x": 1, "y": 1, "w": 2, "h": 2, "material": "Ge"}],
-            {"r": {"value": 2}})
+            {"r": {"value": "2 um"}})
     dv = design_velocity(d, "r")
     domain, namer = dv.complex.to_domain(0.5)[:2]
     mesh = generate(domain, namer)
@@ -403,7 +411,7 @@ def test_d8_node_velocity():
 def test_d8_line_nodes_interpolate():
     from meshine import generate
     d = doc([{"name": "tri", "type": "polygon", "points": [[1, 1], ["1 + a", 1], ["1 + a", "1 + a/2"]],
-              "material": "Si"}], {"a": {"value": 6}})
+              "material": "Si"}], {"a": {"value": "6 um"}})
     dv = design_velocity(d, "a")
     domain, namer = dv.complex.to_domain(0.5)[:2]
     mesh = generate(domain, namer)
@@ -422,13 +430,13 @@ def test_d8_line_nodes_interpolate():
 
 def _rounded_fd_best(d, param, region, want, perimeter=False):
     """Best relative error of central differences of the rounded document (the D4 study)."""
-    p0 = d["geometry"]["parameters"][param]["value"]
+    p0 = float(d["geometry"]["parameters"][param]["value"].removesuffix(" um"))
     best = math.inf
     for h in (0.1, 0.01, 0.001):
         vals = []
         for s in (1, -1):
             dd = copy.deepcopy(d)
-            dd["geometry"]["parameters"][param]["value"] = p0 + s * h
+            dd["geometry"]["parameters"][param]["value"] = um(p0 + s * h)
             rc = evaluate(parse(dd))
             if perimeter:
                 cells = set(rc.cells_of_region(region))
@@ -451,15 +459,15 @@ def _curve_length(rc, k):
 
 def test_mixed_fields_on_one_curve():
     # the top of rect b is cut by two circles of different radicands; circle c is cut by two others
-    d = doc([{"name": "b", "type": "rect", "x": 1, "y": 1, "w": 8, "h": "h", "material": "Si"},
+    d = doc([{"name": "b", "type": "rect", "x": 1, "y": 1, "w": 8, "h": "t", "material": "Si"},
              {"name": "c1", "type": "circle", "cx": 3, "cy": 5, "r": 1.5, "material": "Ge"},
-             {"name": "c2", "type": "circle", "cx": 7, "cy": 5, "r": 1.7, "material": "Ge"}], {"h": {"value": 4.2}})
-    dv = design_velocity(d, "h")
-    assert _rounded_fd_best(d, "h", "b", dv.area_derivative("b")) <= 1e-6
-    assert _rounded_fd_best(d, "h", "b", dv.perimeter_derivative("b"), perimeter=True) <= 1e-6
+             {"name": "c2", "type": "circle", "cx": 7, "cy": 5, "r": 1.7, "material": "Ge"}], {"t": {"value": "4.2 um"}})
+    dv = design_velocity(d, "t")
+    assert _rounded_fd_best(d, "t", "b", dv.area_derivative("b")) <= 1e-6
+    assert _rounded_fd_best(d, "t", "b", dv.perimeter_derivative("b"), perimeter=True) <= 1e-6
     d2 = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": "r", "material": "Si"},
               {"name": "a1", "type": "circle", "cx": 3, "cy": 5, "r": 1.3, "material": "Ge"},
-              {"name": "a2", "type": "circle", "cx": 7.1, "cy": 5.3, "r": 1.7, "material": "Ge"}], {"r": {"value": 2}})
+              {"name": "a2", "type": "circle", "cx": 7.1, "cy": 5.3, "r": 1.7, "material": "Ge"}], {"r": {"value": "2 um"}})
     dv2 = design_velocity(d2, "r")
     assert _rounded_fd_best(d2, "r", "c", dv2.area_derivative("c")) <= 1e-6
     assert _rounded_fd_best(d2, "r", "c", dv2.perimeter_derivative("c"), perimeter=True) <= 1e-6
@@ -468,13 +476,13 @@ def test_mixed_fields_on_one_curve():
 def test_range_does_not_limit_the_probe():
     # w2 = 2 w sits at the end of its range; the derivative with respect to w is still given
     d = doc([{"name": "a", "type": "rect", "x": 1, "y": 1, "w": "w2", "h": 2, "material": "Si"}],
-            {"w": {"value": 2, "range": [1, 2]}, "w2": {"value": "2 * w", "range": [1, 4]}})
+            {"w": {"value": "2 um", "range": ["1 um", "2 um"]}, "w2": {"value": "2 * w", "range": ["1 um", "4 um"]}})
     dv = design_velocity(d, "w")
     assert rel(dv.area_derivative("a"), 4 * UM) <= 1e-12
 
 
 def test_refusal_names_features_only():
     d = doc([{"name": "c", "type": "circle", "cx": 5, "cy": 5, "r": 2, "material": "Si"},
-             {"name": "b", "type": "rect", "x": "xb", "y": 7, "w": 1, "h": 1, "material": "Ge"}], {"xb": {"value": 5}})
+             {"name": "b", "type": "rect", "x": "xb", "y": 7, "w": 1, "h": 1, "material": "Ge"}], {"xb": {"value": "5 um"}})
     e = _refused(d, "xb")
     assert "background" not in e.features and {"b", "c"} <= set(e.features)

@@ -122,11 +122,11 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     resolved twice: in that validation and for the count. ``TypeError`` for anything that
     is not a ``Document``; ``ValueError`` for a document that is not a region document (steady or
     transient heat, electric conduction, steady Joule heating or mechanics), or a limit that is not a positive int; ``DocumentError`` for an
-    unvalidated document that its validation refuses.
+    unvalidated document that its validation refuses, and for a document that is not format 0.3
+    (refused by name with ``E-FORMAT``).
     """
     import copy
-    from . import units
-    from .schema import Document
+    from .schema import Document, not_read
     limit = _limit('max_input_vertices', max_input_vertices)
     if limit is None:
         raise ValueError('max_input_vertices: expected a positive int, got None')
@@ -149,14 +149,5 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
             doc.validate()
         return _domain_from_regions(micrometre_document(handoff_03(doc), validate=False),
                                     max_input_vertices=limit)[3]
-    try:
-        declared = units.resolve(doc.data.get('units'))
-    except units.UnitError:
-        declared = None
-    if doc.scale != declared:
-        # Not validated, or changed since: its numbers have no resolved length unit, and the
-        # micrometre copy would be made with the wrong one. A run validates first; so do we,
-        # on a copy, and leave the document as it is.
-        doc = Document(copy.deepcopy(doc.data))
-        doc.validate()
-    return _domain_from_regions(micrometre_document(doc), max_input_vertices=limit)[3]
+    # a document that is not format 0.3 is refused by name, as Document.from_dict refuses it
+    raise not_read(doc.data)

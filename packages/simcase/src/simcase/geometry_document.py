@@ -593,8 +593,20 @@ def _keys(obj: dict, required: set, optional: set, path: str, reserved: set = fr
 
 
 def parse(doc: dict) -> GeometryModel:
-    """Read the version 1 ``geometry`` block of ``doc`` (which also gives ``units``)."""
+    """Read the version 1 ``geometry`` block of a format 0.3 document. A document of another
+    format is refused by name (``E-FORMAT`` at ``openphysics``, as ``Document.from_dict`` refuses
+    it; units batch C11a)."""
+    from .resolve import format_refusal
+    refusal = format_refusal(doc) if isinstance(doc, dict) else None
+    if refusal is not None:
+        raise GeometryError(refusal.message, path=refusal.path, code=refusal.code)
     return _parse(_Reader(doc), doc)
+
+
+def parse_handoff(tree: dict) -> GeometryModel:
+    """The kernel hand-off's reading of its own tree (``thermal_regions.handoff_03``), which
+    declares its length unit in a ``units`` block; internal, never a user document."""
+    return _parse(_Reader(tree), tree)
 
 
 def _parse(r: _Reader, doc: dict) -> GeometryModel:
@@ -1150,12 +1162,17 @@ def to_v02(model: GeometryModel, component: str | None = None, *, validation: bo
     elif not comp.features:
         return out
     shapes = []
-    for f in comp.features:
+    for i, f in enumerate(comp.features):
         if f.type == "segment" and validation:
             continue
         if f.region != f.name:
             raise GeometryError(f"feature {f.name!r}: merged regions need the stage 2 hand-off")
         allowed = ("box",) if comp.dimension == "3d" else ("rect", "circle", "polygon", "trapezoid")
+        if f.type not in allowed and comp.dimension == "3d" and validation:
+            # the reader's flat compile of a 3d component (em.cavity3d reads boxes only)
+            where = f"geometry.components.{comp.name}.features[{i}].type"
+            raise GeometryError(f"{where}: a 3d component is read as boxes only; feature {f.name!r} is a {f.type}",
+                                path=where)
         if f.type not in allowed:
             raise GeometryError(f"feature {f.name!r}: a {f.type} cannot go through the 0.2 builder")
         s: dict = {"name": f.name, "type": f.type, "material": f.material}

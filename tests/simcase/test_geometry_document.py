@@ -1,8 +1,9 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Geometry document version 1, stage 1: parsing, the 1 pm grid, the 0.2 adapters
-and the layer-stack compile, with analytic checks of the 2.5D route."""
+"""Geometry document version 1, stage 1: parsing, the 1 pm grid, the flat-block adapters
+and the layer-stack compile, with analytic checks of the 2.5D route. Documents are format 0.3:
+each component declares its length_unit (and a 2d one its depth)."""
 
 import copy
 import json
@@ -14,7 +15,7 @@ import pytest
 
 from meshine import Circle, Domain, box_sides, extrude, generate, rectangle
 from simcase.examples import EXAMPLES
-from simcase.geometry_document import (GeometryError, from_v02, layer_stack, parse, pm_per_unit,
+from simcase.geometry_document import (GeometryError, from_v02, layer_stack, parse, pm_per_length_unit,
                                        to_v02)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +25,7 @@ def _docs():
     docs = {f"builtin:{k}": v for k, v in EXAMPLES.items()}
     docs.update({p.name: json.loads(p.read_text(encoding="utf-8"))
                  for p in sorted((ROOT / "examples" / "simcase").glob("*.json"))})
-    # The walk covers the 0.2 documents; version 1 examples are checked below.
+    # The walk covers the flat documents; version 1 examples are checked below.
     return {k: v for k, v in docs.items() if "version" not in v.get("geometry", {})}
 
 
@@ -35,25 +36,28 @@ DOCS_CAVITY = sorted(k for k, v in DOCS.items()
                      if any(p.get("type") == "em.cavity3d" for p in v.get("physics", {}).values()))
 
 
-def _units_and_flat(doc):
-    """``(units, flat 0.2 geometry block)`` of a 0.2 document, or of a 0.3 one's flat block."""
-    g = doc["geometry"]
-    if doc.get("openphysics") == "0.3":
-        # its element sizes are quantities, which a 0.2 block does not hold: the round trip is of the shapes
-        flat = {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
-        if "background" in flat:
-            flat["background"] = {k: v for k, v in flat["background"].items() if k != "element_size"}
-        if "shapes" in flat:
-            flat["shapes"] = [{k: v for k, v in sh.items() if k != "element_size"} for sh in flat["shapes"]]
-        return {"length": g["length_unit"]}, flat
-    return doc["units"], g
+def _flat(doc):
+    """The flat geometry block of a format 0.3 document without its element sizes: the compiler
+    writes no element size (the hand-off reads its own), so the round trip is of the shapes, the
+    length unit and the depth."""
+    assert doc["openphysics"] == "0.3"
+    flat = dict(doc["geometry"])
+    if "background" in flat:
+        flat["background"] = {k: v for k, v in flat["background"].items() if k != "element_size"}
+    if "shapes" in flat:
+        flat["shapes"] = [{k: v for k, v in sh.items() if k != "element_size"} for sh in flat["shapes"]]
+    return flat
 
 
-def v1(units, components, parameters=None):
-    g = {"version": 1, "components": components}
+def v1(unit, components, parameters=None):
+    """A format 0.3 document whose components read their bare numbers in ``unit`` (a 2d one per
+    metre of depth, unless it gives its own)."""
+    comps = {name: {"length_unit": unit, **({"depth": None} if c.get("dimension") == "2d" else {}), **c}
+             for name, c in components.items()}
+    g = {"version": 1, "components": comps}
     if parameters is not None:
         g["parameters"] = parameters
-    return {"units": units, "geometry": g}
+    return {"openphysics": "0.3", "geometry": g}
 
 
 def plate(features, **extra):
@@ -63,7 +67,7 @@ def plate(features, **extra):
     return {"xs": comp}
 
 
-# ----------------------------------------------------------------- S1-1: 0.2 round trip
+# ----------------------------------------------------------------- S1-1: flat block round trip
 
 def test_all_current_documents_are_walked():
     assert len(DOCS) == 51
@@ -71,19 +75,20 @@ def test_all_current_documents_are_walked():
 
 @pytest.mark.parametrize("name", sorted(DOCS))
 def test_v02_round_trip_is_exact(name):
-    units, flat = _units_and_flat(copy.deepcopy(DOCS[name]))
-    model = parse({"units": units, "geometry": from_v02(flat)})
+    flat = _flat(copy.deepcopy(DOCS[name]))
+    model = parse({"openphysics": "0.3", "geometry": from_v02(flat)})
     assert model.roundings == []
     assert to_v02(model) == flat
 
 
 def test_v02_names_that_cannot_be_ids_get_positions():
-    g = {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}, "background": {"material": "a"},
+    g = {"length_unit": "um", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1},
+         "background": {"material": "a"},
          "shapes": [{"name": "top", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1, "material": "b"},
                     {"name": "my core", "type": "circle", "cx": 0.5, "cy": 0.5, "r": 0.1, "material": "c"}]}
     comp = from_v02(g)["components"]["main"]
     assert [f.get("id") for f in comp["features"]] == ["s0", "s1"]
-    model = parse({"units": {"length": "um"}, "geometry": from_v02(g)})
+    model = parse({"openphysics": "0.3", "geometry": from_v02(g)})
     assert [f.name for f in model.components["main"].features] == ["top", "my core"]
     assert to_v02(model) == g
 
@@ -91,9 +96,9 @@ def test_v02_names_that_cannot_be_ids_get_positions():
 # ----------------------------------------------------------------- S1-2: the 1 pm grid
 
 @pytest.mark.parametrize("unit, value, pm", [("nm", 0.5, 500), ("um", 0.22, 220000), ("m", 1.5e-6, 1500000),
-                                             ("mm", 0.035, 35000000), ({"in_m": 1e-10}, 3, 300)])
+                                             ("mm", 0.035, 35000000), ("Angstrom", 3, 300)])
 def test_decimal_units_land_on_the_grid(unit, value, pm):
-    model = parse(v1({"length": unit}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": value,
+    model = parse(v1(unit, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": value,
                                                 "h": value, "material": "Si"}])))
     assert model.components["xs"].features[0].data["w"] == pm
     assert model.roundings == []
@@ -101,7 +106,7 @@ def test_decimal_units_land_on_the_grid(unit, value, pm):
 
 def test_a_residue_is_rounded_once_and_reported():
     w = 0.1 + 0.2                                     # 0.30000000000000004 um
-    model = parse(v1({"length": "um"}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": w, "h": 1,
+    model = parse(v1("um", plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": w, "h": 1,
                                                 "material": "Si"}])))
     assert model.components["xs"].features[0].data["w"] == 300000
     (r,) = model.roundings
@@ -110,59 +115,62 @@ def test_a_residue_is_rounded_once_and_reported():
 
 
 def test_an_expression_is_exact_before_the_one_rounding():
-    model = parse(v1({"length": "um"}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": "0.1 + 0.2",
+    model = parse(v1("um", plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": "0.1 + 0.2",
                                                 "h": 1, "material": "Si"}])))
     assert model.components["xs"].features[0].data["w"] == 300000 and model.roundings == []
 
 
 @pytest.mark.parametrize("value, pm", [(0.5, 0), (1.5, 2), (2.5, 2), (-0.5, 0), (-1.5, -2)])
 def test_rounding_is_half_to_even(value, pm):
-    model = parse(v1({"length": "pm"}, plate([{"name": "a", "type": "circle", "cx": value, "cy": 5, "r": 1,
+    model = parse(v1("pm", plate([{"name": "a", "type": "circle", "cx": value, "cy": 5, "r": 1,
                                                 "material": "Si"}])))
     assert model.components["xs"].features[0].data["cx"] == pm
 
 
 def test_out_of_range_and_undeclared_units_are_refused():
     with pytest.raises(GeometryError, match="2\\^63"):
-        parse(v1({"length": "m"}, {"xs": {"dimension": "2d", "domain": {"xmin": 0, "xmax": 1e7, "ymin": 0,
-                                                                       "ymax": 1}}}))
-    with pytest.raises(GeometryError, match="units.length"):
-        parse(v1({}, plate([])))
-    with pytest.raises(GeometryError, match="unknown length unit"):
-        parse(v1({"length": "furlong"}, plate([])))
-    assert pm_per_unit({"length": "um"}) == 10 ** 6
-    # a units string instead of an object is refused by name, not an AttributeError
-    for units in ("um", ["um"], 1.0):
-        with pytest.raises(GeometryError, match="units: expected an object"):
-            parse(v1(units, plate([])))
+        parse(v1("m", {"xs": {"dimension": "2d", "domain": {"xmin": 0, "xmax": 1e7, "ymin": 0, "ymax": 1}}}))
+    undeclared = v1("um", plate([]))
+    del undeclared["geometry"]["components"]["xs"]["length_unit"]
+    with pytest.raises(GeometryError, match="length_unit") as caught:
+        parse(undeclared)
+    assert caught.value.path == "geometry.components.xs.length_unit"
+    with pytest.raises(GeometryError) as caught:
+        parse(v1("furlong", plate([])))
+    assert caught.value.path == "geometry.components.xs.length_unit"
+    assert pm_per_length_unit("um", "p") == ("um", 10 ** 6)
+    # a length_unit that is not a unit symbol is refused by name, not an AttributeError
+    for unit in (["um"], 1.0, {"in_m": 1e-6}):
+        with pytest.raises(GeometryError, match="a length_unit is one of"):
+            parse(v1(unit, plate([])))
 
 
 # ----------------------------------------------------------------- S1-3: expressions and kinds
 
 def _param_doc(params, w="w"):
-    return v1({"length": "nm"}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": w, "h": 1,
+    return v1("nm", plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": w, "h": 1,
                                          "material": "Si"}]), params)
 
 
 def test_parameters_and_kinds():
-    params = {"w": {"value": "base * f + 2 * pad"}, "base": {"value": 3}, "pad": {"value": "1/4"},
+    params = {"w": {"value": "base * f + 2 * pad"}, "base": {"value": "3 nm"}, "pad": {"value": "0.25 nm"},
               "f": {"value": "4 * pad / base", "kind": "ratio"}}
     model = parse(_param_doc(params))
     assert model.parameters["f"] == (Fraction(1, 3), "ratio")
-    assert model.parameters["w"] == (Fraction(3, 2), "length")
+    assert model.parameters["w"] == (Fraction(1500), "length")                 # exact pm
     assert model.components["xs"].features[0].data["w"] == 1500
 
 
 @pytest.mark.parametrize("params, w, message", [
     ({"a": {"value": "b"}, "b": {"value": "a"}}, "a", "cycle a -> b -> a"),
     ({"a": {"value": "1 / (2 - 2)"}}, "a", "division by zero"),
-    ({"a": {"value": 2}, "b": {"value": 3}}, "a * b", "length \\* length"),
-    ({"a": {"value": 2}, "r": {"value": 1, "kind": "ratio"}}, "a + r", "mixes kinds"),
-    ({"a": {"value": 2}}, "1 / a", "inverse length"),
-    ({"a": {"value": 2}}, "sqrt(a)", "unknown parameter 'sqrt'"),
-    ({"a": {"value": 2}}, "a ^ 2", "cannot read"),
-    ({"a": {"value": 2, "kind": "angle"}}, "a", "reserved"),
-    ({"a": {"value": 5, "range": [0, 4]}}, "a", "outside its range"),
+    ({"a": {"value": "2 nm"}, "b": {"value": "3 nm"}}, "a * b", "length \\* length"),
+    ({"a": {"value": "2 nm"}, "r": {"value": 1, "kind": "ratio"}}, "a + r", "mixes kinds"),
+    ({"a": {"value": "2 nm"}}, "1 / a", "inverse length"),
+    ({"a": {"value": "2 nm"}}, "sqrt(a)", "unknown parameter 'sqrt'"),
+    ({"a": {"value": "2 nm"}}, "a ^ 2", "cannot read"),
+    ({"a": {"value": "2 nm", "kind": "angle"}}, "a", "reserved"),
+    ({"a": {"value": "5 nm", "range": ["0 nm", "4 nm"]}}, "a", "outside its range"),
     ({"r": {"value": 2, "kind": "ratio"}}, "r", "expected a length"),
 ])
 def test_expression_errors_name_the_problem(params, w, message):
@@ -198,7 +206,7 @@ def test_expression_errors_name_the_problem(params, w, message):
 ])
 def test_validation_refuses_by_name(features, extra, message):
     with pytest.raises(GeometryError, match=message):
-        parse(v1({"length": "um"}, plate(features, **extra)))
+        parse(v1("um", plate(features, **extra)))
 
 
 def test_a_feature_below_the_mesher_tolerance_is_refused():
@@ -207,11 +215,11 @@ def test_a_feature_below_the_mesher_tolerance_is_refused():
                    "features": [{"name": "film", "type": "rect", "x": 0, "y": 0, "w": 0.1, "h": 1e-9,
                                  "material": "Si"}]}}
     with pytest.raises(GeometryError, match="'film' is 1000 pm across.*below the mesher tolerance"):
-        parse(v1({"length": "m"}, comp))
+        parse(v1("m", comp))
 
 
 def test_selections_and_tags_are_accepted():
-    model = parse(v1({"length": "um"}, plate(
+    model = parse(v1("um", plate(
         [{"name": "core", "type": "rect", "x": 1, "y": 1, "w": 2, "h": 1, "material": "Si"},
          {"name": "pad", "type": "polygon", "points": [[5, 5], [7, 5], [6, 7]], "edges": ["base", "r", "l"],
           "material": "Cu"}],
@@ -222,22 +230,22 @@ def test_selections_and_tags_are_accepted():
 
 
 def test_imprint_is_parsed_but_refused_by_the_02_compiler():
-    model = parse(v1({"length": "um"}, plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
-                                                "material": "Si"}], finalize="imprint")))
+    model = parse(v1("um", plate([{"name": "a", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
+                                   "material": "Si"}], finalize="imprint")))
     assert model.components["xs"].finalize == "imprint"
     with pytest.raises(GeometryError, match="imprint' needs the stage 2 engine"):
         to_v02(model)
 
 
 def test_void_is_parsed_but_refused_by_the_02_compiler():
-    model = parse(v1({"length": "um"}, plate([{"name": "hole", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
-                                                "material": None}])))
+    model = parse(v1("um", plate([{"name": "hole", "type": "rect", "x": 0, "y": 0, "w": 1, "h": 1,
+                                   "material": None}])))
     with pytest.raises(GeometryError, match="void .material null. needs the stage 2 engine"):
         to_v02(model)
 
 
 def test_trapezoid_compiles_to_its_exact_corners():
-    model = parse(v1({"length": "m"}, plate([{"name": "t", "type": "trapezoid", "cx": 5, "y": 1, "w": 3,
+    model = parse(v1("m", plate([{"name": "t", "type": "trapezoid", "cx": 5, "y": 1, "w": 3,
                                                "w_top": "2.8", "h": 0.035, "material": "Cu"}])))
     (s,) = to_v02(model)["shapes"]
     assert s["type"] == "polygon"
@@ -258,7 +266,7 @@ def test_layers_reproduce_the_extrude_example_exactly():
     direct = extrude(footprint, [0.0, 1.0, 1.5, 2.5],
                      {"die_zone": ["substrate", "die", "mold"], "rest": ["substrate", "mold", "mold"]}, size=0.4)
     dom = {"xmin": -5, "xmax": 5, "ymin": -5, "ymax": 5}
-    doc = v1({"length": "um"}, {
+    doc = v1("um", {
         "plan": {"dimension": "2d", "domain": dom, "background": {"material": "mold"},
                  "features": [{"name": "rest", "type": "rect", "x": -5, "y": -5, "w": 10, "h": 10, "material": "mold"},
                               {"name": "die_zone", "type": "rect", "x": -2, "y": -2, "w": 4, "h": 4,
@@ -272,7 +280,7 @@ def test_layers_reproduce_the_extrude_example_exactly():
     model = parse(doc)
     stack = layer_stack(model, "pkg")
     assert stack.levels == [0, 1000000, 1500000, 2500000]
-    compiled = extrude(footprint, [model.to_unit(z) for z in stack.levels],
+    compiled = extrude(footprint, [model.components["pkg"].to_unit(z) for z in stack.levels],
                        stack.table_for(footprint.region_names), size=0.4)
     np.testing.assert_array_equal(compiled.nodes, direct.nodes)
     np.testing.assert_array_equal(compiled.tetrahedra, direct.tetrahedra)
@@ -284,7 +292,7 @@ def test_layers_reproduce_the_extrude_example_exactly():
 
 
 def test_layer_cells_take_an_explicit_region_name():
-    doc = v1({"length": "um"}, {
+    doc = v1("um", {
         "plan": {"dimension": "2d", "domain": {"xmin": 0, "xmax": 4, "ymin": 0, "ymax": 4},
                  "background": {"material": "FR4"},
                  "features": [{"name": "via", "type": "circle", "cx": 2, "cy": 2, "r": 0.5, "material": "Cu"}]},
@@ -314,7 +322,7 @@ def _heat_flow(mesh, kappa_of_region):
 def test_series_layers_match_the_thermal_resistance():
     t = {"A": 0.3, "B": 1.2, "C": 0.5}
     k = {"A": 150.0, "B": 1.3, "C": 20.0}
-    doc = v1({"length": "um"}, {
+    doc = v1("um", {
         "pkg": {"dimension": "3d", "domain": {"xmin": 0, "xmax": 2, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 2},
                 "background": {"material": None},
                 "features": [{"name": "stack", "type": "layers", "z0": 0, "layers": [
@@ -332,7 +340,7 @@ def test_series_layers_match_the_thermal_resistance():
 
 def test_a_via_in_void_matches_its_polygon_resistance():
     r, n, length, sigma = 0.15, 32, 1.0, 5.8
-    doc = v1({"length": "um"}, {
+    doc = v1("um", {
         "plan": {"dimension": "2d", "domain": {"xmin": -1, "xmax": 1, "ymin": -1, "ymax": 1},
                  "background": {"material": None},
                  "features": [{"name": "via", "type": "circle", "cx": 0, "cy": 0, "r": r, "material": "Cu"}]},
