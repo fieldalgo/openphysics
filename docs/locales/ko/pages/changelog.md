@@ -24,6 +24,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 선형 탄성의 형상 미분. `solve_elasticity(..., motion=MeshMotion(W, t))`(plane stress·plane strain, 영역별 E·ν, 일정 체적력·traction, 노드에 붙은 Dirichlet 변위)는 노드 X₀ + t·W에서 풀고, 변위·변형률·응력·부하·반력·잔차가 JAX·PyTorch 스칼라 t에 대한 미분을 나릅니다. 콜백, motion과 함께 쓰는 live 계수·하중은 이름을 밝혀 거부하며, 열탄성은 아직 다루지 않습니다. `motion`이 없으면 결과는 그대로입니다. [문서](packages/galerkin/shape_derivative.md#선형-탄성).
 - `galerkin`: 정상 전기 전도의 형상 미분. `solve_steady_electric(..., motion=MeshMotion(W, t))`는 노드 X₀ + t·W에서 풀고, 모든 필드(전위·전기장·전류 밀도·Joule 발열과 부하·Joule·공급 전력·반력·잔차)가 JAX·PyTorch 스칼라 t에 대한 미분을 나릅니다. Dirichlet 전압과 기준 전위 게이지를 모두 받고, 이산 전력 항등식이 미분에서도 성립합니다. 콜백, `ElementConductivity`, motion과 함께 쓰는 live 계수는 이름을 밝혀 거부합니다. `motion`이 없으면 결과는 그대로입니다. [문서](packages/galerkin/shape_derivative.md#정상-전기-전도).
 - `galerkin`: 정상 열의 형상 미분(`galerkin.shape`, 2026-11-09 승인). `solve_steady_heat(..., motion=MeshMotion(W, t))`는 노드 X₀ + t·W에서 풀고, JAX·PyTorch 스칼라 t에 대한 미분(온도·열유속·부하·반력·잔차)을 나릅니다. 움직이는 메시 위 이산 해의 정확한 미분입니다. `extend_velocity`는 경계 속도(simcase `node_velocity` 등)를 조화 또는 넓이 강화 라플라스 문제로 모든 노드에 확장하고, `admissible_interval`은 요소가 뒤집히지 않는 정확한 스텝 범위를 주며, 그 밖의 스텝은 `ElementInversion`을 냅니다. NumPy t, 좌표 콜백, motion과 함께 쓰는 live 계수, 축대칭 열은 이름을 밝혀 거부합니다. `motion`이 없으면 결과는 그대로입니다. [문서](packages/galerkin/shape_derivative.md).
 - `simcase`: `units`가 객체가 아닌 버전 1 형상 문서(예: `"units": "um"`)를 이름을 밝혀 거부합니다. 전에는 형상 리더가 AttributeError로 멈춰 Studio 형상 실험 탭이 500을 돌려주고 `simcase geometry`가 traceback을 출력했습니다.

@@ -213,7 +213,7 @@ class ElasticityResult:
 
 
 def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
-                     body_force=(0., 0.), traction=None):
+                     body_force=(0., 0.), traction=None, motion=None):
     """Solve -div(sigma)=body_force with optional prescribed boundary traction.
 
     E, nu, Dirichlet displacements, body_force and traction may be JAX or
@@ -234,7 +234,14 @@ def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
     docs/packages/galerkin/elasticity_traction.md for overlap, quadrature and units.
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
     Plane strain P1 displacement elements lock as nu approaches 0.5.
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
+    t*velocity and every result carries the derivative with respect to the JAX
+    or PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
+    if motion is not None:
+        from .shape import solve_elasticity_moving
+        return solve_elasticity_moving(mesh, motion, young_modulus=young_modulus, poisson_ratio=poisson_ratio,
+                                       plane=plane, dirichlet=dirichlet, body_force=body_force, traction=traction)
     one_of(plane, PLANES, "plane")
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
