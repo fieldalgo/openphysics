@@ -42,8 +42,16 @@ manufactures spurious modes.
 
 The left matrix is singular: varying the functional with respect to e_z yields a
 constraint, not an eigenvalue equation, so beta^2 = 0 is an eigenvalue of high
-multiplicity. Guided modes sit far away from it, at n_clad < beta/k0 < n_core, and
-shift-inverting near the core index reaches them directly.
+multiplicity (every [0, e_z] satisfies A x = 0). Guided modes sit far away from it,
+at n_clad < beta/k0 < n_core, and shift-inverting near the core index reaches them
+directly. A search for more modes than lie closer to the target than this static
+family reaches it: its computed roots usually have |beta^2| at rounding level
+(about 1e-14 |sigma|, sometimes exactly 0) and E_t = e_t / beta is undefined for
+them. Roots with |beta^2| <= STATIC_ROOT_TOL |sigma|, that is |n_eff| <= 1e-5
+|n_target|, are not returned. When k0^2 is close to an eigenvalue of
+K e_z = lambda M e_z on the free nodes (a TM cutoff of the PEC box), the family is
+ill-conditioned, its computed roots can exceed the tolerance, and they are returned
+(docs/packages/galerkin/waveguide_formulation.md, section 3).
 
 Solving it
 ----------
@@ -89,6 +97,11 @@ from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (pub
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
+
+#: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
+#: beta^2 = 0 family (module docstring). Measured static roots away from a TM
+#: cutoff of the PEC box: <= 1.2e-14.
+STATIC_ROOT_TOL = 1e-10
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
@@ -333,18 +346,20 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                          ncv=min(n, max(4 * num_modes, 40)), maxiter=20000)
 
     beta2 = -(sigma + 1.0 / nu)
+    # Roots of the static beta^2 = 0 family are not modes (module docstring).
+    mode = ~(np.abs(beta2) <= STATIC_ROOT_TOL * abs(sigma))
     if complex_problem:
         beta = np.sqrt(beta2.astype(complex))
         if coordinate_factors is not None:
-            if not np.isfinite(beta).all() or np.any(beta == 0):
-                raise RuntimeError("modal coordinate search returned a nonfinite or zero propagation root")
-            keep = np.arange(len(beta))  # let the caller record every candidate and exclusion
+            if not np.isfinite(beta).all():
+                raise RuntimeError("modal coordinate search returned a nonfinite propagation root")
+            keep = np.flatnonzero(mode)  # let the caller record every candidate and exclusion
         else:
-            keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0))
+            keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0) & mode)
         keep = keep[np.lexsort((beta[keep].imag, -beta[keep].real))]
     else:
         beta2 = beta2.real
-        keep = np.where(beta2 > 0.0)[0]
+        keep = np.where((beta2 > 0.0) & mode)[0]
         keep = keep[np.argsort(beta2[keep])[::-1]]
         beta = np.sqrt(np.maximum(beta2, 0.0))
 
