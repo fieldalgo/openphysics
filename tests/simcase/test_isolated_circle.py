@@ -22,6 +22,7 @@ from shapely.geometry import Point, Polygon, box
 from simcase import Document, examples
 from simcase import geometry
 from simcase.geometry import CIRCLE_CLEARANCE, _polygonal, resolve_regions, shape_polygon
+from simcase.thermal_regions import handoff_03
 
 
 def _isolated_circle_reference(s, index, polys, clip):
@@ -58,11 +59,19 @@ def polygon(name, points, material='steel'):
     return {'name': name, 'type': 'polygon', 'points': [list(p) for p in points], 'material': material}
 
 
+def read(data):
+    """The document the geometry helpers take: a format 0.3 heat region document's mesh
+    hand-off (thermal_regions.handoff_03, its geometry in the document's length unit); a
+    format 0.2 em document as read."""
+    doc = Document.from_dict(data)
+    return doc if doc.si is None else handoff_03(doc)
+
+
 def heat_document(shapes):
     """The shipped steady region example (40 x 20 mm domain) with other shapes."""
     d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
     d['geometry']['shapes'] = shapes
-    d['physics']['heat1']['heat_source_w_m3'] = 0.
+    d['physics']['heat1']['heat_source_density'] = '0 W/m^3'
     return d
 
 
@@ -188,7 +197,7 @@ def _circles(doc):
 @pytest.mark.parametrize('case', list(CORPUS))
 def test_c3a_every_circle_gets_the_reference_answer(case):
     data, expected = CORPUS[case]
-    doc = Document.from_dict(copy.deepcopy(data))
+    doc = read(copy.deepcopy(data))
     answers = {}
     for i, s, polys, clip in _circles(doc):
         new = geometry._isolated_circle(s, i, polys, clip)
@@ -217,19 +226,19 @@ def test_the_corpus_reaches_both_answers_and_a_multipart_shape():
     """The comparison above proves little if every circle passed or every one failed."""
     answers = [v for _data, expected in CORPUS.values() for v in expected.values()]
     assert answers.count(True) >= 20 and answers.count(False) >= 12
-    legs = Document.from_dict(copy.deepcopy(CORPUS['circles at a shape clipped to two parts'][0]))
+    legs = read(copy.deepcopy(CORPUS['circles at a shape clipped to two parts'][0]))
     assert _circles(legs)[0][2][0].geom_type == 'MultiPolygon'
-    many = Document.from_dict(sixteen_circles())
+    many = read(sixteen_circles())
     assert len(shapely.get_coordinates(_circles(many)[0][2][0])) == 513     # 512 points, closed
 
 
 def test_the_exact_cases_are_ties_as_the_reference_measures_them():
     """If a GEOS release rounds these distances differently, this fails instead of the two
     exact cases silently becoming near misses."""
-    lid = Document.from_dict(copy.deepcopy(CORPUS['edge exactly at the clearance'][0]))
+    lid = read(copy.deepcopy(CORPUS['edge exactly at the clearance'][0]))
     (_i, s, polys, _clip), = _circles(lid)
     assert polys[0].exterior.distance(Point(s['cx'], s['cy'])) == s['r'] * (1 + CIRCLE_CLEARANCE)
-    diamond = Document.from_dict(copy.deepcopy(CORPUS['vertex exactly at the clearance inside'][0]))
+    diamond = read(copy.deepcopy(CORPUS['vertex exactly at the clearance inside'][0]))
     (_i, s, polys, _clip), = _circles(diamond)
     centre = Point(s['cx'], s['cy'])
     assert max(centre.distance(Point(c)) for c in polys[1].exterior.coords) == s['r'] * (1 - CIRCLE_CLEARANCE)
@@ -256,7 +265,7 @@ def test_c3a_every_ring_of_the_corpus_at_both_limits():
     ring's nearest and farthest distance to the same double."""
     limits = exact = 0
     for case, (data, _expected) in CORPUS.items():
-        doc = Document.from_dict(copy.deepcopy(data))
+        doc = read(copy.deepcopy(data))
         for i, s, polys, _clip in _circles(doc):
             centre = Point(s['cx'], s['cy'])
             for part in shapely.get_parts([p for j, p in enumerate(polys) if j != i and not p.is_empty]):
@@ -291,7 +300,7 @@ def _resolved(doc):
 @pytest.mark.parametrize('case', list(CORPUS))
 def test_c3b_resolve_regions_is_unchanged(case, monkeypatch):
     data, expected = CORPUS[case]
-    doc = Document.from_dict(copy.deepcopy(data))
+    doc = read(copy.deepcopy(data))
     new_doc, old_doc = doc.copy(), doc.copy()
     new = _resolved(new_doc)
     with monkeypatch.context() as m:

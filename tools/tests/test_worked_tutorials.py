@@ -53,13 +53,13 @@ def test_layered_wall_saved_fields_match_series_resistance(tmp_path, monkeypatch
     runpy.run_path(str(script), run_name='__main__')
     q = 50. / (.01 / 10. + .03 / 1. + 1. / 50.)
     with np.load(output / 'fields.npz', allow_pickle=False) as fields:
-        x = fields['nodes_m'][:, 0]
+        x = fields['node_coordinates'][:, 0]
         expected = 350. - q * (np.minimum(x, .01) / 10. + np.maximum(x - .01, 0.))
-        np.testing.assert_allclose(fields['temperature_k'], expected, rtol=0, atol=1e-9)
-        np.testing.assert_allclose(fields['heat_flux_w_m2'][:, 0], q, rtol=1e-9, atol=1e-8)
-        np.testing.assert_allclose(fields['heat_flux_w_m2'][:, 1], 0., rtol=0, atol=1e-8)
-        assert fields['reaction_w_per_m'].sum() == pytest.approx(q * .01, rel=1e-9)
-        assert fields['convective_outward_w_per_m'].sum() == pytest.approx(q * .01, rel=1e-9)
+        np.testing.assert_allclose(fields['temperature'], expected, rtol=0, atol=1e-9)
+        np.testing.assert_allclose(fields['heat_flux'][:, 0], q, rtol=1e-9, atol=1e-8)
+        np.testing.assert_allclose(fields['heat_flux'][:, 1], 0., rtol=0, atol=1e-8)
+        assert fields['reaction_heat_rate_per_depth'].sum() == pytest.approx(q * .01, rel=1e-9)
+        assert fields['outward_convective_heat_rate_per_depth'].sum() == pytest.approx(q * .01, rel=1e-9)
     summary = json.loads((output / 'summary.json').read_text(encoding='utf-8'))
     assert summary['regions']['left_layer']['material'] == 'high_k'
     assert summary['regions']['background']['material'] == 'low_k'
@@ -79,10 +79,10 @@ def test_saved_result_document_blocks_preserve_exported_fields(tmp_path, monkeyp
     with np.load(folder / 'fields.npz', allow_pickle=False) as fields:
         for name in ('view.vtu', 'second-view.vtu'):
             viewed = meshio.read(folder / name)
-            np.testing.assert_array_equal(viewed.points[:, :2], fields['nodes_m'])
-            np.testing.assert_array_equal(viewed.point_data['temperature_k'], fields['temperature_k'])
+            np.testing.assert_array_equal(viewed.points[:, :2], fields['node_coordinates'])
+            np.testing.assert_array_equal(viewed.point_data['temperature'], fields['temperature'])
             np.testing.assert_array_equal(viewed.cell_data['triangle_regions'][0], fields['triangle_regions'])
-            np.testing.assert_array_equal(viewed.cell_data['heat_flux_w_m2'][0][:, :2], fields['heat_flux_w_m2'])
+            np.testing.assert_array_equal(viewed.cell_data['heat_flux'][0][:, :2], fields['heat_flux'])
 
 
 def test_material_selection_document_checks_source_and_range():

@@ -33,21 +33,6 @@ BOUNDARY_FIELDS = tuple(PROPERTIES)[9:]
 STRUCTURAL = ("triangles", "prescribed_node_ids")
 FORMAT_03 = ('thermal Studio reads format 0.3 rectangle documents ("openphysics": "0.3", values with their '
              'units); format 0.2 rectangle documents are not read')
-# Region documents are still format 0.2 until their commit of the units batch (thermal_regions_api).
-PROPERTIES_02 = {
-    "nodes_m": "mesh_nodes_m", "triangles": "mesh_triangles",
-    "temperature_k": "temperature_k", "heat_flux_w_m2": "heat_flux_w_m2",
-    "load_w_per_m": "load_w_per_m", "reaction_w_per_m": "reaction_w_per_m",
-    "residual_w_per_m": "residual_w_per_m",
-    "dirichlet_node_ids": "dirichlet_node_ids",
-    "dirichlet_temperature_k": "dirichlet_temperature_k",
-    "prescribed_outward_load_w_per_m": "prescribed_outward_load_w_per_m",
-    "ambient_load_w_per_m": "ambient_load_w_per_m",
-    "convective_outward_w_per_m": "convective_outward_w_per_m",
-    "system_rhs_w_per_m": "system_rhs_w_per_m",
-}
-BASE_FIELDS_02 = tuple(PROPERTIES_02)[:9]
-BOUNDARY_FIELDS_02 = tuple(PROPERTIES_02)[9:]
 
 
 def limited_text(value, limit):
@@ -105,11 +90,6 @@ def runtime_available():
 
 def v2_available():
     return all(hasattr(ThermalRunResult, PROPERTIES[key]) for key in BOUNDARY_FIELDS)
-
-
-def v2_available_02():
-    """The boundary arrays of a format 0.2 region result (thermal_regions_api)."""
-    return all(hasattr(ThermalRunResult, PROPERTIES_02[key]) for key in BOUNDARY_FIELDS_02)
 
 
 def capabilities(limits):
@@ -285,11 +265,8 @@ def json_value(value):
 
 
 def document_body(doc):
-    """The document and its findings for a validation reply: format 0.3 gives the coded
-    ``diagnostics``; a format 0.2 region document its free-text ``notes``."""
-    if doc.si is not None:
-        return {"doc": json_value(doc.data), "diagnostics": [d.as_dict() for d in doc.diagnostics]}
-    return {"doc": doc.data, "notes": list(doc.notes)}
+    """The document and its coded ``diagnostics`` for a validation reply."""
+    return {"doc": json_value(doc.data), "diagnostics": [d.as_dict() for d in doc.diagnostics]}
 
 
 def validation_payload(spec, limits):
@@ -297,11 +274,26 @@ def validation_payload(spec, limits):
     return encode_json(body, limits.payload_bytes)
 
 
+def geometry_block(doc):
+    """``(base path, SI block)`` of a format 0.3 document's geometry: the flat block, or the one
+    component of a version 1 block (a homogeneous rectangle or a region component)."""
+    g = doc.si["geometry"]
+    if "version" not in g:
+        return "geometry", g
+    (name, block), = g["components"].items()
+    return f"geometry.components.{name}", block
+
+
 def length_unit(doc):
-    """``(length_unit, metres per unit)`` of a format 0.3 rectangle document's geometry."""
+    """``(length_unit, metres per unit)`` of a format 0.3 document's geometry."""
     from physmat.units import length_to_pm, pm_to_m
-    unit = doc.si["geometry"]["length_unit"]
+    unit = geometry_block(doc)[1]["length_unit"]
     return unit, pm_to_m(length_to_pm(1, unit).picometres)
+
+
+def domain_input(summary, doc):
+    """The ``resolved_inputs`` entry of the domain's xmin, which names the geometry's length_unit."""
+    return summary.get("resolved_inputs", {}).get(geometry_block(doc)[0] + ".domain.xmin", {})
 
 
 def _unit_03(key):
@@ -315,28 +307,6 @@ def _location_03(key):
     if key.startswith("prescribed_"):
         return "prescribed_nodes"
     if key == "heat_flux":
-        return "triangle_centroids"
-    return "nodes"
-
-
-def _units(key):
-    if key == "nodes_m":
-        return "m"
-    if key in ("triangles", "dirichlet_node_ids"):
-        return "1"
-    if key in ("temperature_k", "dirichlet_temperature_k"):
-        return "K"
-    if key == "heat_flux_w_m2":
-        return "W/m^2"
-    return "W/m"
-
-
-def _location(key):
-    if key == "triangles":
-        return "triangle_connectivity"
-    if key.startswith("dirichlet_"):
-        return "dirichlet_nodes"
-    if key == "heat_flux_w_m2":
         return "triangle_centroids"
     return "nodes"
 
@@ -423,7 +393,7 @@ def capture_result(result, identity, limits):
         _require(isinstance(shape, list) and all(type(x) is int for x in shape)
                  and shape == list(shapes[key]), key+": wrong metadata shape")
     unit, length_in_m = length_unit(result.doc)
-    _require(summary.get("resolved_inputs", {}).get("geometry.domain.xmin", {}).get("length_unit") == unit,
+    _require(domain_input(summary, result.doc).get("length_unit") == unit,
              "document/summary length_unit mismatch")
     _require(not isinstance(length_in_m, bool) and math.isfinite(length_in_m) and length_in_m > 0,
              "invalid display length scale")

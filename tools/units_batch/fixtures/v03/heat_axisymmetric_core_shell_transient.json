@@ -1,0 +1,76 @@
+{
+  "openphysics": "0.3",
+  "name": "axisymmetric core and shell transient",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "rod": {
+        "dimension": "axisymmetric",
+        "length_unit": "mm",
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 3.0,
+          "ymin": 0.0,
+          "ymax": 1.0
+        },
+        "background": {
+          "material": "pla"
+        },
+        "features": [
+          {
+            "name": "core",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 1.0,
+            "h": 1.0,
+            "material": "copperish"
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "pla": {
+      "thermal_conductivity": "0.5 W/(m K)",
+      "volumetric_heat_capacity": "1800000 J/(m^3 K)",
+      "source": "document value"
+    },
+    "copperish": {
+      "thermal_conductivity": "2 W/(m K)",
+      "volumetric_heat_capacity": "3400000 J/(m^3 K)",
+      "source": "document value"
+    }
+  },
+  "physics": {
+    "heat1": {
+      "type": "thermal.transient2d",
+      "heat_source_density": {
+        "core": "100000 W/m^3"
+      },
+      "prescribed_temperature": {
+        "right": "293.15 K"
+      },
+      "initial_temperature": "293.15 K"
+    }
+  },
+  "mesh": {
+    "element_size": "0.1 mm",
+    "minimum_angle": "28 deg"
+  },
+  "study": {
+    "type": "transient",
+    "time": {
+      "unit": "s",
+      "values": [
+        0.0,
+        1.0,
+        2.0
+      ]
+    }
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

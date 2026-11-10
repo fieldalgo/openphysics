@@ -15,9 +15,6 @@ function cap(){return {capability_format:'studio-capabilities-v1',[X.TYPE]:{supp
     terminal_jobs:2,active_jobs:1,read_encoding_slots:1}}};}
 function doc(){return {openphysics:'0.3',geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1}},
   physics:{heat:{type:X.TYPE}},study:{type:'transient',time:{unit:'s',values:[2,2.03,2.1,2.4,3]}}};}
-// Region documents are still format 0.2 until their commit of the units batch.
-function legacyDoc(){return {openphysics:'0.2',units:{length:'m',temperature:'K',time:'s'},
-  physics:{heat:{type:X.TYPE}},study:{type:'transient',time_s:[2,2.03,2.1,2.4,3]}};}
 // A format 0.3 rectangle manifest (registry names; structural arrays carry no unit or time axis).
 function manifest(Nt=5){const time=Nt===5?[2,2.03,2.1,2.4,3]:Array.from({length:Nt},(_,i)=>2+i/10);
   const n=4,m=2,d=0,shapes={node_coordinates:[n,2],triangles:[m,3],time:[Nt],temperature:[Nt,n],heat_flux:[Nt,m,2],
@@ -41,36 +38,15 @@ function manifest(Nt=5){const time=Nt===5?[2,2.03,2.1,2.4,3]:Array.from({length:
   value.history_url='/api/jobs/'+value.job+'/history?result_id='+value.result_id+'&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}';
   return value;
 }
-// The format 0.2 manifest names, which region manifests keep until their commit of the units batch.
-function legacyManifest(Nt=5){const L=X.LEGACY,time_s=Nt===5?[2,2.03,2.1,2.4,3]:Array.from({length:Nt},(_,i)=>2+i/10);
-  const n=4,m=2,d=0,shapes={nodes_m:[n,2],triangles:[m,3],time_s:[Nt],temperature_k:[Nt,n],heat_flux_w_m2:[Nt,m,2],
-    source_load_w_per_m:[Nt,n],reaction_w_per_m:[Nt-1,n],residual_w_per_m:[Nt-1,n],storage_rate_w_per_m:[Nt-1,n],
-    heat_content_j_per_m:[Nt],quadratic_functional_jk_per_m:[Nt],dirichlet_node_ids:[d],dirichlet_temperatures_k:[Nt,d]};
-  const fields={},summary={physics_type:X.TYPE,result_format:L.result,field_layout:L.layout,
-    units:{length:'m',temperature:'K',time:'s'},mesh_length_unit:'m',mesh:{nodes:n,triangles:m},
-    study:{type:'transient',time_s},field_units:{},field_shapes:{},field_locations:{},field_time_axes:{}};
-  for(const [name,[unit,location,axis]]of Object.entries(L.spec)){
-    fields[name]={shape:shapes[name],unit,location,axis,available_views:axis==='static'||name==='time_s'?[]:['frame','history'],
-      initial_available:axis!=='time_s[1:]',ui_supported:L.ui.includes(name)};
-    summary.field_units[name]=unit;summary.field_locations[name]=location;summary.field_shapes[name]=shapes[name];summary.field_time_axes[name]=axis;
-  }
-  const value={payload_format:L.manifest,kind:X.TYPE,job:'thermal-transient-test',result_id:'result-test',
-    client_revision:1,request_seq:2,result_format:L.result,field_layout:L.layout,display_length_in_m:1,
-    default_frame_index:Nt-1,time_s,arrays:{nodes_m:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],dirichlet_node_ids:[]},summary,fields};
-  value.frame_url='/api/jobs/'+value.job+'/frame?result_id='+value.result_id+'&field={field}&time_index={time_index}&frame_seq={frame_seq}';
-  value.history_url='/api/jobs/'+value.job+'/history?result_id='+value.result_id+'&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}';
-  return value;
-}
-// The layout of a raw or accepted manifest: 0.3 rectangle names, or the 0.2 (region) names.
-const layoutOf=m=>m.payload_format==='studio-thermal-transient-v2'?X.RECTANGLE:X.LEGACY;
-function frame(m,q){const L=layoutOf(m),vector=q.field===L.flux;return {...identity(m),payload_format:L.frame,
+// Rectangle and region manifests alike carry the registry names (format 0.3).
+function frame(m,q){const L=X.RECTANGLE,vector=q.field===L.flux;return {...identity(m),payload_format:L.frame,
   frame_seq:q.frame_seq,field:q.field,time_index:q.time_index,[L.time]:m[L.time][q.time_index],
   unit:vector?'W/m^2':'K',location:vector?'triangle_centroids':'nodes',shape:vector?[2,2]:[4],
   arrays:{[q.field]:vector?[[1000*q.time_index+1,-1000*q.time_index-2],[1000*q.time_index+11,-1000*q.time_index-12]]:
     Array.from({length:4},(_,n)=>100*q.time_index+n)}};}
 function identity(m){const keys=['kind','job','result_id','client_revision','request_seq','result_format','field_layout','display_length_in_m'];
   return Object.fromEntries(keys.map(k=>[k,m[k]]));}
-function history(m,q){const L=layoutOf(m);return {...identity(m),payload_format:L.history,field:q.field,
+function history(m,q){const L=X.RECTANGLE;return {...identity(m),payload_format:L.history,field:q.field,
   frame_seq:q.frame_seq,start:q.start,stop:q.stop,time_indices:Array.from({length:q.stop-q.start},(_,i)=>q.start+i),
   [L.time]:m[L.time].slice(q.start,q.stop),shape:[q.stop-q.start],unit:m.fields[q.field].unit,location:'domain',
   arrays:{[q.field]:Array.from({length:q.stop-q.start},(_,i)=>q.start+i+10)}};}
@@ -233,13 +209,13 @@ function installAPI(p,{rejectValidation=false,rejectRun=false,held=false,fixture
     'if(!url.includes("?"))return {ok:true,json:async()=>({...fixtureManifest,status:"done"})};'+
     'const u=new URL(url,"http://test"),q=Object.fromEntries(u.searchParams);'+
     'const i=Number(q.time_index),start=Number(q.start),stop=Number(q.stop),f=q.field;'+
-    'const v3=fixtureManifest.payload_format==="studio-thermal-transient-v2",tk=v3?"time":"time_s";'+
-    'const vector=f===(v3?"heat_flux":"heat_flux_w_m2");const result={kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,'+
+    'const tk="time";'+
+    'const vector=f==="heat_flux";const result={kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,'+
       'client_revision:fixtureManifest.client_revision,request_seq:fixtureManifest.request_seq,result_format:fixtureManifest.result_format,'+
       'field_layout:fixtureManifest.field_layout,display_length_in_m:1,frame_seq:Number(q.frame_seq),field:f,unit:fixtureManifest.fields[f].unit,location:fixtureManifest.fields[f].location};'+
-    'if(u.pathname.endsWith("/frame"))Object.assign(result,{payload_format:"studio-thermal-transient-frame-v"+(v3?2:1),time_index:i,[tk]:fixtureManifest[tk][i],'+
+    'if(u.pathname.endsWith("/frame"))Object.assign(result,{payload_format:"studio-thermal-transient-frame-v2",time_index:i,[tk]:fixtureManifest[tk][i],'+
       'shape:vector?[2,2]:[4],arrays:{[f]:vector?[[1000*i+1,-1000*i-2],[1000*i+11,-1000*i-12]]:[100*i,100*i+1,100*i+2,100*i+3]}});'+
-    'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v"+(v3?2:1),start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
+    'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v2",start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
       '[tk]:fixtureManifest[tk].slice(start,stop),shape:[stop-start],arrays:{[f]:Array.from({length:stop-start},(_,j)=>10+start+j)}});'+
     (held?'return new Promise((resolve,reject)=>held.push(error=>error?reject(Error(error)):resolve({ok:true,json:async()=>result})));':
       'return {ok:true,json:async()=>result};')+'};');
@@ -394,24 +370,25 @@ for(const outcome of ['success','error'])test('shipped dirty status overrides ob
 
 const REGION_LIMITS={max_shapes:64,max_circles:16,max_polygon_points:512,max_boundary_crossings:1024,max_input_vertices:2048};
 function regionBlock(){return {supported:true,run_enabled:true,result_formats:[X.RESULT_R],field_layouts:[X.LAYOUT_R],
-  payload_formats:[X.MANIFEST_R,'studio-thermal-transient-frame-v1','studio-thermal-transient-history-v1'],limits:{...REGION_LIMITS}};}
+  payload_formats:[X.MANIFEST_R,'studio-thermal-transient-frame-v2','studio-thermal-transient-history-v2'],limits:{...REGION_LIMITS}};}
 // regionCap() advertises a valid block; regionCap(undefined) advertises none.
 function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[X.TYPE].regions=b;return value;}
-function regionDoc(){return {...legacyDoc(),geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
-  shapes:[{name:'steel_plate',type:'rect',x:.5,y:0,w:.5,h:1,material:'steel'}]}};}
+function regionDoc(){return {...doc(),geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1},
+  background:{material:'insulation'},shapes:[{name:'steel_plate',type:'rect',x:.5,y:0,w:.5,h:1,material:'steel'}]}};}
 function regionManifest(Nt=5){
-  const m=legacyManifest(Nt),s=m.summary;
+  const m=manifest(Nt),s=m.summary;
   m.payload_format=X.MANIFEST_R;m.result_format=s.result_format=X.RESULT_R;m.field_layout=s.field_layout=X.LAYOUT_R;
+  // region ids are structural: a location and a shape, no unit and no time axis
   m.arrays.triangle_regions=[0,1];
-  m.fields.triangle_regions={shape:[2],unit:'1',location:'triangles',axis:'static',available_views:[],
+  m.fields.triangle_regions={shape:[2],unit:null,location:'triangles',axis:'static',available_views:[],
     initial_available:true,ui_supported:false};
-  s.field_units.triangle_regions='1';s.field_locations.triangle_regions='triangles';
-  s.field_time_axes.triangle_regions='static';s.field_shapes.triangle_regions=[2];
+  s.field_locations.triangle_regions='triangles';s.field_shapes.triangle_regions=[2];
   s.region_names=['steel_plate','background'];
-  s.regions={steel_plate:{material:'steel',triangles:1,area_m2:.5},background:{material:'insulation',triangles:1,area_m2:.5}};
-  s.materials={steel:{conductivity_w_mk:45,volumetric_heat_capacity_j_m3k:3.6e6,source:'document value'},
-    insulation:{conductivity_w_mk:.5,volumetric_heat_capacity_j_m3k:1.2e6}};
-  s.heat_source_w_m3={steel_plate:2e5,background:5e4};
+  const area=value=>({value,unit:'m^2'}),k=value=>({value,unit:'W/(m K)'}),c=value=>({value,unit:'J/(m^3 K)'});
+  s.regions={steel_plate:{material:'steel',triangles:1,area:area(.5)},background:{material:'insulation',triangles:1,area:area(.5)}};
+  s.materials={steel:{thermal_conductivity:k(45),volumetric_heat_capacity:c(3.6e6),source:'document value'},
+    insulation:{thermal_conductivity:k(.5),volumetric_heat_capacity:c(1.2e6)}};
+  s.heat_source_density={steel_plate:{value:2e5,unit:'W/m^3'},background:{value:5e4,unit:'W/m^3'}};
   return m;
 }
 const LIMITS=cap()[X.TYPE].limits;
@@ -431,9 +408,9 @@ test('J7 region manifest: 14 descriptors and 4 arrays; frames and pages only wit
   assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.rhoC,r.q,r.cells]),
     [['steel_plate','steel',45,3.6e6,2e5,1],['background','insulation',.5,1.2e6,5e4,1]]);
   const rectangle=X.manifest(manifest(),manifest(),LIMITS);
-  // region manifests keep the format 0.2 field names; the rectangle has the format 0.3 ones
-  const fq={field:'temperature_k',time_index:2,frame_seq:3},hq={field:'heat_content_j_per_m',start:0,stop:5,frame_seq:4};
-  const rq={field:'temperature',time_index:2,frame_seq:3},rh={field:'stored_heat_per_depth',start:0,stop:5,frame_seq:4};
+  // the same field names; the pair tells a region frame from a rectangle one
+  const fq={field:'temperature',time_index:2,frame_seq:3},hq={field:'stored_heat_per_depth',start:0,stop:5,frame_seq:4};
+  const rq=fq,rh=hq;
   assert.ok(X.frame(frame(accepted,fq),accepted,fq));assert.ok(X.history(history(accepted,hq),accepted,hq));
   assert.ok(X.frame(frame(rectangle,rq),rectangle,rq));assert.ok(X.history(history(rectangle,rh),rectangle,rh));
   assert.throws(()=>X.frame(frame(rectangle,rq),accepted,rq));assert.throws(()=>X.history(history(rectangle,rh),accepted,rh));
@@ -444,9 +421,12 @@ test('J7 region manifest: 14 descriptors and 4 arrays; frames and pages only wit
   assert.equal('regions' in X.meshModel(rectangle),false);
   assert.equal('regions' in X.model(rectangle,X.frame(frame(rectangle,rq),rectangle,rq),'temperature'),false);
   const faults={descriptor:m=>{m.fields.triangle_regions.ui_supported=true;},missing:m=>{delete m.fields.triangle_regions;},
-    shape:m=>{m.summary.field_shapes.triangle_regions=[3];},axis:m=>{m.summary.field_time_axes.triangle_regions='time_s';},
+    shape:m=>{m.summary.field_shapes.triangle_regions=[3];},axis:m=>{m.summary.field_time_axes.triangle_regions='static';},
+    unit:m=>{m.summary.field_units.triangle_regions='1';},descriptor_unit:m=>{m.fields.triangle_regions.unit='1';},
+    area:m=>{m.summary.regions.steel_plate.area=.5;},source:m=>{m.summary.heat_source_density.steel_plate=2e5;},
     summary_pair:m=>{m.summary.result_format=X.RESULT;},ids:m=>{m.arrays.triangle_regions=[0,2];},
-    capacity:m=>{delete m.summary.materials.steel.volumetric_heat_capacity_j_m3k;},
+    capacity:m=>{delete m.summary.materials.steel.volumetric_heat_capacity;},
+    capacity_unit:m=>{m.summary.materials.steel.volumetric_heat_capacity.unit='J/(m^3*K)';},
     count:m=>{m.summary.regions.steel_plate.triangles=2;}};
   for(const [name,fault] of Object.entries(faults)){const m=regionManifest();fault(m);
     assert.throws(()=>X.regionManifest(m,m,LIMITS,REGION_LIMITS),undefined,name);}

@@ -86,8 +86,10 @@ def _rectangle_mesh_03(doc, formula: str, axes: str) -> RectangleMesh:
     """The grid of a format 0.3 rectangle: corners ``pm_to_m(k)`` (correctly rounded), lengths
     by the kind's own operation order on the picometre counts (hazard H17 b)."""
     from physmat.units import pm_to_m
-    lo = [doc.pm(f"geometry.domain.{a}min") for a in axes]
-    hi = [doc.pm(f"geometry.domain.{a}max") for a in axes]
+    from .steady_boundary_contract import rect_geometry_03
+    base = rect_geometry_03(doc)[0]           # the flat block, or a compiled version 1 component (D-1)
+    lo = [doc.pm(f"{base}.domain.{a}min") for a in axes]
+    hi = [doc.pm(f"{base}.domain.{a}max") for a in axes]
     origin, upper = tuple(pm_to_m(k) for k in lo), tuple(pm_to_m(k) for k in hi)
     if formula == "difference":
         lengths = tuple(pm_to_m(b - a) for a, b in zip(lo, hi))
@@ -125,7 +127,7 @@ class RegionMesh:
 def region_mesh(doc) -> RegionMesh:
     """The region mesh of a validated heat, electric, Joule or mechanics region document."""
     from .runner import micrometre_document
-    canonical = micrometre_document(doc)
+    canonical = micrometre_document(doc, validate=not getattr(doc, "is_handoff", False))
     return RegionMesh(canonical, float(doc["mesh"]["min_angle"]))
 
 
@@ -277,6 +279,49 @@ def transient_region_heat(doc) -> HeatInputs:
                       dirichlet=dirichlet, outward_flux={}, convection={},
                       volumetric_heat_capacity=_material_values(doc, "volumetric_heat_capacity_j_m3k"),
                       time=times, initial_temperature=_initial_temperature(p["initial_temperature_k"]))
+
+
+def _material_values_03(doc, key) -> dict:
+    """{material name: SI value} of the materials that give ``key`` (format 0.3)."""
+    return {m: spec[key] for m, spec in (doc.si.get("materials") or {}).items() if key in spec}
+
+
+def region_heat_03(doc) -> HeatInputs:
+    """Steady heat on regions, format 0.3: SI values in document order (H6). An absent source
+    is 0.0 (H9); ``inward_heat_flux`` is handed over as the outward flux ``0.0 - value`` (H1)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    source = p.get("heat_source_density")
+    return HeatInputs(conductivity=_material_values_03(doc, "thermal_conductivity"),
+                      heat_source=0.0 if source is None else dict(source) if isinstance(source, dict) else source,
+                      dirichlet=dict(p.get("prescribed_temperature", {})),
+                      outward_flux={tag: 0.0 - value for tag, value in p.get("inward_heat_flux", {}).items()},
+                      convection={tag: (c["heat_transfer_coefficient"], c["ambient_temperature"])
+                                  for tag, c in p.get("convection", {}).items()})
+
+
+def transient_region_heat_03(doc) -> HeatInputs:
+    """Transient heat on regions, format 0.3: SI values, prescribed temperatures sampled at the
+    study times (a tagged array gives one value per time)."""
+    from .transient_thermal_contract import _initial_03, _samples_03
+    name, p = next(iter(doc.si["physics"].items()))
+    times = np.array(doc.si["study"]["time"], dtype=float, copy=True)
+    where = f"physics.{name}"
+    dirichlet = {tag: tuple(_samples_03(value, times, f"{where}.prescribed_temperature.{tag}"))
+                 for tag, value in p["prescribed_temperature"].items()}
+    source = p.get("heat_source_density")
+    return HeatInputs(conductivity=_material_values_03(doc, "thermal_conductivity"),
+                      heat_source=0.0 if source is None else dict(source) if isinstance(source, dict) else source,
+                      dirichlet=dirichlet, outward_flux={}, convection={},
+                      volumetric_heat_capacity=_material_values_03(doc, "volumetric_heat_capacity"),
+                      time=times, initial_temperature=_initial_03(p["initial_temperature"],
+                                                                  where + ".initial_temperature"))
+
+
+def region_origin_03(doc, base) -> np.ndarray:
+    """The lower domain corner of a format 0.3 region document, [x, y] in metres, by the
+    micrometre hand-back of its pm counts: ``float(Fraction(k, 10**6)) * 1e-6`` (H17 a)."""
+    from fractions import Fraction
+    return np.array([float(Fraction(doc.pm(f"{base}.domain.{a}min"), 10 ** 6)) for a in "xy"]) * units.UM_IN_SI
 
 
 def region_origin_m(doc) -> np.ndarray:

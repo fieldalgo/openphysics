@@ -109,8 +109,9 @@ def test_region_nodes_and_corners_come_back_from_micrometres():
     data["geometry"]["domain"].update(ymin=-3.2, ymax=1.8)
     data["geometry"]["shapes"][0].update(y=-3.2)
     doc = Document.from_dict(data)
-    np.testing.assert_array_equal(views.region_origin_m(doc), [0.0, -0.0031999999999999997])
-    heat = views.transient_region_heat(doc)
+    # format 0.3: from the pm counts of the corner by the same micrometre hand-back
+    np.testing.assert_array_equal(views.region_origin_03(doc, "geometry"), [0.0, -0.0031999999999999997])
+    heat = views.transient_region_heat_03(doc)
     assert heat.dirichlet == {"left": (300.,) * 9, "right": (300.,) * 9}
     assert heat.conductivity == {"steel": 45., "insulation": .5}
 
@@ -119,8 +120,9 @@ def test_meshine_receives_the_angle_as_written():
     # H3: a degree number converted to radians and back is not always the number written
     assert math.degrees(math.radians(30.)) != 30.
     data = copy.deepcopy(TRANSIENT_THERMAL_REGIONS)
-    data["mesh"]["min_angle"] = 30
-    grid = views.region_mesh(Document.from_dict(data))
+    data["mesh"]["minimum_angle"] = "30 deg"
+    from simcase.thermal_regions import handoff_03
+    grid = views.region_mesh(handoff_03(Document.from_dict(data)))      # the mesh hand-off of a 0.3 document
     assert type(grid.minimum_angle_deg) is float and grid.minimum_angle_deg == 30.
     assert grid.canonical.length_unit == "um" and grid.grading is None
     em = copy.deepcopy(examples.SLAB_TE_CHECK)

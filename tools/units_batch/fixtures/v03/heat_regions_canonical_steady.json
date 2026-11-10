@@ -1,0 +1,102 @@
+{
+  "openphysics": "0.3",
+  "name": "canonical region heat",
+  "geometry": {
+    "length_unit": "mm",
+    "depth": null,
+    "domain": {
+      "xmin": 123.456,
+      "xmax": 133.456,
+      "ymin": -3.2,
+      "ymax": 2.8
+    },
+    "background": {
+      "material": "a",
+      "element_size": "1.5 mm"
+    },
+    "shapes": [
+      {
+        "name": "plate",
+        "type": "rect",
+        "material": "b",
+        "x": 123.456,
+        "y": -3.2,
+        "w": 4.0,
+        "h": 6.0,
+        "element_size": "1 mm"
+      },
+      {
+        "name": "disk",
+        "type": "circle",
+        "material": "a",
+        "cx": 125.456,
+        "cy": -0.2,
+        "r": 0.8,
+        "element_size": "0.4 mm"
+      },
+      {
+        "name": "patch",
+        "type": "polygon",
+        "material": "b",
+        "points": [
+          [
+            129.456,
+            -2.2
+          ],
+          [
+            132.456,
+            -2.2
+          ],
+          [
+            132.456,
+            1.8
+          ],
+          [
+            129.456,
+            1.8
+          ]
+        ],
+        "element_size": "0.75 mm"
+      }
+    ]
+  },
+  "materials": {
+    "a": {
+      "thermal_conductivity": "2 W/(m K)"
+    },
+    "b": {
+      "thermal_conductivity": "9 W/(m K)"
+    }
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.steady2d",
+      "heat_source_density": {
+        "plate": "200000 W/m^3",
+        "disk": "300000 W/m^3"
+      },
+      "prescribed_temperature": {
+        "left": "300 K"
+      },
+      "inward_heat_flux": {
+        "bottom": "40 W/m^2"
+      },
+      "convection": {
+        "right": {
+          "heat_transfer_coefficient": "25 W/(m^2 K)",
+          "ambient_temperature": "290 K"
+        }
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "1.5 mm"
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}
