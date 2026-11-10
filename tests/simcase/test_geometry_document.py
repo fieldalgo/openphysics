@@ -422,8 +422,10 @@ def test_save_keeps_the_version_1_block_and_roundings_become_notes(tmp_path):
     feature = doc_v1["geometry"]["components"]["main"]["features"][0]
     feature["w"] = feature["w"] + 1e-13                     # a residue below 1 pm in micrometres
     doc = Document.from_dict(copy.deepcopy(doc_v1))
-    assert len(doc.geometry_roundings) == 1
-    assert any("onto the 1 pm grid" in n for n in doc.notes)
+    # format 0.3: the rounding is a coded diagnostic at the value's path (a shift far below 1 pm is info)
+    assert [(d.code, d.path) for d in doc.diagnostics] == [("I-PM-ROUNDING",
+                                                            "geometry.components.main.features[0].w")]
+    assert "it is stored as 500000 pm" in doc.diagnostics[0].message
     doc.save(tmp_path / "m.json")
     saved = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
     assert saved["geometry"] == doc_v1["geometry"]
@@ -434,7 +436,7 @@ def test_an_invalid_version_1_block_is_a_document_error():
     from simcase import Document, DocumentError
     doc = _as_v1("builtin:soi_strip")
     doc["geometry"]["components"]["main"]["features"][0]["rotation"] = 0.3
-    with pytest.raises(DocumentError, match="rotation: reserved"):
+    with pytest.raises(DocumentError, match="rotation is reserved"):
         Document.from_dict(doc)
 
 
@@ -445,7 +447,9 @@ def test_the_version_1_example_reads_as_the_soi_strip_example():
     reference = Document.load(ROOT / "examples" / "simcase" / "soi_strip.json")
     assert {k: v for k, v in doc.data.items() if k not in ("name", "geometry")} == \
         {k: v for k, v in reference.data.items() if k not in ("name", "geometry")}
-    assert doc.is_version_1 and doc.domain == reference.domain and doc.background == reference.background
+    assert doc.is_version_1 and doc.domain == {k: float(v) for k, v in reference.domain.items()}
+    assert doc.background == reference.background
     assert [(r["name"], r["material"], r["mesh_size"]) for r in doc.regions()] == \
-        [(s["name"], s["material"], s.get("mesh_size")) for s in reference.shapes]
+        [(s["name"], s["material"], 0.02) for s in reference.shapes]                  # element_size "0.02 um"
+    assert [s["element_size"] for s in reference.shapes] == ["0.02 um"]
     assert doc.geometry_roundings == [] and doc.to_dict()["geometry"]["version"] == 1

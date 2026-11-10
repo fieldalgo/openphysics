@@ -61,10 +61,22 @@ class DocBody(BaseModel):
 
 
 class MaterialPreview(BaseModel):
-    name: str
-    wl_min: float = 0.4
-    wl_max: float = 2.0
-    n_points: int = 100
+    """A physmat refractive index over a vacuum wavelength interval in metres (SI)."""
+    name: str                                   # "physmat:<Name>"
+    vacuum_wavelength_minimum: float = 4e-7
+    vacuum_wavelength_maximum: float = 2e-6
+    point_count: int = 100
+
+
+#: the optical window of the workspace adapters, its element sizes and wavelength band: quantity
+#: strings under registry names (format 0.3 values), as the workspace builder writes them
+_DOMAIN_UM = {"xmin": "-1.5 um", "xmax": "1.5 um", "ymin": "-1.2 um", "ymax": "1.2 um"}
+_DOMAIN_NM = {"xmin": "-1500 nm", "xmax": "1500 nm", "ymin": "-1200 nm", "ymax": "1200 nm"}
+_SETTINGS = {"domain": _DOMAIN_UM, "boundary": "PEC", "mode_count": 2}
+_WAVELENGTH_RANGE = ["1400 nm", "1700 nm"]
+_CORE_ELEMENT_SIZE_RANGE = ["20 nm", "60 nm"]
+_V4_MATERIALS = {"Silicon": "physmat:Si", "Silicon nitride": "physmat:Si3N4", "Silica": "physmat:SiO2",
+                 "Air": "physmat:vacuum"}
 
 
 # ---------------------------------------------------------------------------
@@ -92,60 +104,64 @@ def workspace_asset(filename: str):
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
+# The optical adapters write format 0.3 documents and read the section 5.3.4 result names, so each
+# capability names its family's next adapter version (optical-fixed-v1 -> v2, optical-rectangle-v2
+# and -v3 -> v4 and v5, optical-shapes-v4 and -v5 -> v6 and v7), and its values are quantity
+# strings under registry names. The endpoint paths and schema versions stay.
+
 @app.get("/api/workspace/capabilities")
 def workspace_capabilities():
     return JSONResponse({
-        "schema_version": 1, "adapter": "optical-fixed-v1", "simcase_version": __version__,
+        "schema_version": 1, "adapter": "optical-fixed-v2", "simcase_version": __version__,
         "optical": True, "coupled": False,
-        "settings": {"height_nm": 220, "wavelength_nm": 1550, "core_mesh_nm": 30,
-                     "window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+        "settings": {"core_height": "220 nm", "vacuum_wavelength": "1550 nm", "core_element_size": "30 nm",
+                     **_SETTINGS},
     }, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/workspace/capabilities/v2")
 def workspace_capabilities_v2():
     return JSONResponse({
-        "schema_version": 2, "adapter": "optical-rectangle-v2", "simcase_version": __version__,
+        "schema_version": 2, "adapter": "optical-rectangle-v4", "simcase_version": __version__,
         "server_instance": _workspace_instance,
-        "optical": True, "coupled": False, "height_range_nm": [100, 500],
-        "settings": {"wavelength_nm": 1550, "core_mesh_nm": 30,
-                     "window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+        "optical": True, "coupled": False, "core_height_range": ["100 nm", "500 nm"],
+        "settings": {"vacuum_wavelength": "1550 nm", "core_element_size": "30 nm", **_SETTINGS},
     }, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/workspace/capabilities/v3")
 def workspace_capabilities_v3():
     return JSONResponse({
-        "schema_version": 3, "adapter": "optical-rectangle-v3", "simcase_version": __version__,
+        "schema_version": 3, "adapter": "optical-rectangle-v5", "simcase_version": __version__,
         "server_instance": _workspace_instance,
-        "optical": True, "coupled": False, "height_range_nm": [100, 500],
-        "wavelength_range_nm": [1400, 1700], "core_mesh_range_nm": [20, 60],
-        "settings": {"window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+        "optical": True, "coupled": False, "core_height_range": ["100 nm", "500 nm"],
+        "vacuum_wavelength_range": _WAVELENGTH_RANGE, "core_element_size_range": _CORE_ELEMENT_SIZE_RANGE,
+        "settings": dict(_SETTINGS),
     }, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/workspace/capabilities/v4")
 def workspace_capabilities_v4():
     return JSONResponse({
-        "schema_version": 4, "adapter": "optical-shapes-v4", "simcase_version": __version__,
+        "schema_version": 4, "adapter": "optical-shapes-v6", "simcase_version": __version__,
         "server_instance": _workspace_instance,
         "optical": True, "coupled": False,
-        "wavelength_range_nm": [1400, 1700], "core_mesh_range_nm": [20, 60],
-        "window_nm": [-1500, 1500, -1200, 1200], "max_shapes": 8, "max_polygon_vertices": 12,
+        "vacuum_wavelength_range": _WAVELENGTH_RANGE, "core_element_size_range": _CORE_ELEMENT_SIZE_RANGE,
+        "domain": _DOMAIN_NM, "max_shapes": 8, "max_polygon_vertices": 12,
         "shape_types": ["rect", "circle", "polygon"],
-        "materials": {"Silicon": "Si", "Silicon nitride": "Si3N4", "Silica": "SiO2", "Air": "vacuum"},
-        "settings": {"window_um": [-1.5, 1.5, -1.2, 1.2], "boundary": "PEC", "candidates": 2},
+        "materials": _V4_MATERIALS,
+        "settings": dict(_SETTINGS),
     }, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/workspace/capabilities/v5")
 def workspace_capabilities_v5():
     caps = json.loads(workspace_capabilities_v4().body)
-    caps.update(schema_version=5, adapter="optical-shapes-v5", materials={
-        "Silicon": "Si", "Silicon nitride": "Si3N4", "Silica": "SiO2", "Air": "vacuum",
-        "Sapphire (ordinary)": "Al2O3", "Lithium niobate (ordinary)": "LiNbO3",
-        "Indium phosphide": "InP", "Gallium arsenide": "GaAs",
-        "Calcium fluoride": "CaF2", "Magnesium fluoride (ordinary)": "MgF2"})
+    caps.update(schema_version=5, adapter="optical-shapes-v7", materials={
+        **_V4_MATERIALS,
+        "Sapphire (ordinary)": "physmat:Al2O3", "Lithium niobate (ordinary)": "physmat:LiNbO3",
+        "Indium phosphide": "physmat:InP", "Gallium arsenide": "physmat:GaAs",
+        "Calcium fluoride": "physmat:CaF2", "Magnesium fluoride (ordinary)": "physmat:MgF2"})
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
 
 
@@ -164,31 +180,46 @@ def get_example(name: str):
     return doc.data
 
 
+#: physmat's own wavelength unit (its ranges and index functions take micrometres)
+_PHYSMAT_UM = 1e-6
+
+
+def _metres(um: float) -> float | None:
+    """A physmat micrometre bound in metres (None for an open bound)."""
+    return None if um == float("inf") else um * _PHYSMAT_UM
+
+
 @app.get("/api/materials")
 def list_materials():
+    """The library under the names a format 0.3 document writes ("physmat:Si"); no aliases."""
     out = []
     for n in physmat.names():
         m = physmat.get(n)
         lo, hi = m.range_um
-        out.append({"name": n, "aliases": list(m.aliases), "range_um": [lo, None if hi == float("inf") else hi],
+        out.append({"name": "physmat:" + n,
+                    "valid": {"vacuum_wavelength": {"unit": "m", "values": [_metres(lo), _metres(hi)]}},
                     "source": m.source.split(";")[0], "properties": sorted(m.properties)})
     return {"materials": out}
 
 
 @app.post("/api/materials/preview")
 def material_preview(body: MaterialPreview):
+    """n and k (n + i k, k >= 0 for loss under exp(-i omega t)) over a vacuum wavelength interval in m."""
+    if not body.name.startswith("physmat:"):
+        raise HTTPException(404, f'{body.name!r}: a library material is written "physmat:<Name>"')
     try:
-        m = physmat.get(body.name)
+        m = physmat.get(body.name.removeprefix("physmat:"))
     except KeyError as exc:
         raise HTTPException(404, str(exc))
-    lo, hi = m.range_um
-    a, b = max(body.wl_min, lo), min(body.wl_max, hi)
+    lo, hi = (v * _PHYSMAT_UM for v in m.range_um)
+    a, b = max(body.vacuum_wavelength_minimum, lo), min(body.vacuum_wavelength_maximum, hi)
     if not a < b:
-        raise HTTPException(400, f"material {body.name} has no data in [{body.wl_min}, {body.wl_max}] um")
-    wl = np.linspace(a, b, body.n_points)
-    idx = m.index(wl)
-    return {"name": m.name, "wavelength": wl.tolist(), "n": idx.real.tolist(), "k": idx.imag.tolist(),
-            "source": m.source}
+        raise HTTPException(400, f"material {body.name} has no data in [{body.vacuum_wavelength_minimum}, "
+                                 f"{body.vacuum_wavelength_maximum}] m")
+    wl = np.linspace(a, b, body.point_count)
+    idx = m.index(wl / _PHYSMAT_UM)
+    return {"name": body.name, "vacuum_wavelength": {"unit": "m", "values": wl.tolist()},
+            "refractive_index": {"n": idx.real.tolist(), "k": idx.imag.tolist()}, "source": m.source}
 
 
 def _headless_thermal_type(doc: Document):
@@ -215,7 +246,8 @@ def validate(body: DocBody, request: Request = None):
             return {'ok': False, 'error': f'Studio unsupported: {physics_type} is headless Python/CLI only'}
     except DocumentError as exc:
         return {"ok": False, "error": str(exc)}
-    return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes}
+    return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes,
+            "diagnostics": [d.as_dict() for d in doc.diagnostics]}
 
 
 @app.get("/api/units")
@@ -235,12 +267,23 @@ def mesh_preview(body: DocBody, request: Request = None):
     except (DocumentError, ValueError, RuntimeError) as exc:
         raise HTTPException(400, str(exc))
     tm, region_materials = model.tri, model.region_materials
-    return {"units": doc["units"],
-            "nodes": tm.nodes.tolist(), "triangles": tm.triangles.tolist(), "regions": tm.regions.tolist(),
+    return {"node_coordinates": tm.nodes.tolist(), "field_units": {"node_coordinates": "m"},
+            "display": _display(doc), "triangles": tm.triangles.tolist(), "regions": tm.regions.tolist(),
             "region_names": tm.region_names, "region_materials": region_materials,
             "stats": {"nodes": tm.num_nodes, "triangles": tm.num_triangles, "min_angle": round(tm.min_angle(), 2),
                       "quality_mean": round(float(tm.quality().mean()), 3)},
-            "boundary_edges": {k: v.tolist() for k, v in tm.boundary_edges.items()}}
+            "boundary_edges": {k: v.tolist() for k, v in tm.boundary_edges.items()},
+            "diagnostics": [d.as_dict() for d in doc.diagnostics]}
+
+
+def _display(doc: Document) -> dict:
+    """The length unit of the document's shape numbers (the component's length_unit) and its size in
+    metres, so a page draws SI coordinates over the document's own numbers (display only)."""
+    from physmat import units as registry
+    geometry = doc.si["geometry"]
+    block = geometry if "version" not in geometry else next(iter(geometry["components"].values()))
+    unit = block["length_unit"]
+    return {"length_unit": unit, "metres_per_length_unit": float(registry.convert(f"1 {unit}", "length").exact)}
 
 
 def _run_job(job_id: str, doc: Document):
@@ -259,20 +302,15 @@ def _run_job(job_id: str, doc: Document):
             with _jobs_lock:
                 _jobs[job_id].update(status="done", result=_subspace_payload(res, res.field_representation))
             return
-        ng = res.group_index()
-        payload = {
-            "nodes": res.mesh_nodes.tolist(), "triangles": res.mesh_triangles.tolist(),
-            "regions": res.mesh_regions.tolist(), "region_names": res.region_names,
-            "parameter": res.parameter, "values": [float(v) for v in res.values],
-            "neff": res.neff.real.tolist(), "group_index": None if ng is None else ng.real.tolist(),
-            "fields": [(abs(f) if np.iscomplexobj(f) else f).T.tolist() for f in res.fields],
-            "timings": res.timings, "summary": res.summary(),
-        }
-        if np.iscomplexobj(res.neff):
-            payload.update(neff_imag=res.neff.imag.tolist(),
-                           propagation_loss_db_cm=res.propagation_loss_db_cm().tolist(),
-                           scalar_fields_complex=[{"real": f.T.real.tolist(), "imag": f.T.imag.tolist()}
-                                                  for f in res.fields])
+        summary = res.summary()
+        payload = {**_common_payload(res, summary),
+                   # the section 5.3.4 series of summary.json: a tagged array, or {"re", "im"} when complex
+                   "effective_index": summary["effective_index"], "group_index": summary.get("group_index"),
+                   "propagation_loss": summary.get("propagation_loss"),
+                   # scalar fields per point, modes first: real parts, and imaginary parts when complex
+                   "unnormalized_mode_field": [{"real": f.T.real.tolist(),
+                                                "imag": f.T.imag.tolist() if np.iscomplexobj(f) else None}
+                                               for f in res.mode_fields]}
         if res.vector_fields is not None:
             payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:
@@ -286,23 +324,30 @@ def _run_job(job_id: str, doc: Document):
                 _jobs[job_id]["open_boundary"] = diagnostic
 
 
+def _common_payload(res, summary: dict) -> dict:
+    """The mesh (node coordinates in m), the study and the summary of an optical result."""
+    return {"node_coordinates": res.node_coordinates.tolist(), "field_units": {"node_coordinates": "m"},
+            "display": _display(res.doc), "triangles": res.triangles.tolist(), "regions": res.regions.tolist(),
+            "region_names": res.region_names, "parameter": res.parameter,
+            "vacuum_wavelength": summary["vacuum_wavelength"],
+            "study_values": None if res.study_values is None else summary["study"]["values"],
+            "timings": res.timings, "summary": summary}
+
+
 def _subspace_payload(res, representation: str) -> dict:
-    """Versioned cluster payload; legacy branch keys stay empty so old views cannot misread it."""
+    """Versioned cluster payload; per-mode keys stay empty so mode views cannot misread it."""
     summary = res.summary()
     return {
-        "nodes": res.mesh_nodes.tolist(), "triangles": res.mesh_triangles.tolist(),
-        "regions": res.mesh_regions.tolist(), "region_names": res.region_names,
-        "parameter": res.parameter, "values": [float(v) for v in res.values],
-        "neff": None, "group_index": None, "fields": [],
-        "timings": res.timings, "summary": summary,
+        **_common_payload(res, summary),
+        "effective_index": None, "group_index": None, "unnormalized_mode_field": [],
         "subspace": {
             "field_representation": representation,
             "clusters": summary["clusters"],
-            "raw_neff": res.neff.tolist(),
-            "cluster_mean_neff": res.cluster_mean_index().tolist(),
-            "cluster_mean_group_index": res.cluster_mean_group_index().tolist(),
+            "effective_index": res.effective_index.tolist(),
+            "mean_effective_index": res.mean_effective_index.tolist(),
+            "mean_group_index": res.mean_group_index.tolist(),
             "density": [[res.subspace_density(i, cid).tolist() for cid in res.cluster_ids]
-                        for i in range(len(res.values))],
+                        for i in range(len(res.vacuum_wavelength))],
             "density_label": "normalized subspace field density",
         },
     }

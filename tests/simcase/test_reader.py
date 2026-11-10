@@ -281,6 +281,11 @@ def test_dumps_writes_what_json_dumps_writes():
         reader.dumps(loop)
     # the exponent letter is written as json.dumps writes a float's (lower case)
     assert reader.dumps({"a": Decimal("1.50"), "b": Decimal("1E+5"), "c": Decimal("-0")}) == '{"a": 1.50, "b": 1e+5, "c": -0}'
+    # a float read through its repr is written back as json.dumps writes the float, exponent included
+    for x in (2e-05, 4e-06, -1.55e-06, 1e-07, 1e-10, 5e-324, 0.0001, 0.00012, 1e16, 1.5e22, 4.6477836068405064e+16,
+              1.7976931348623157e308, 123.456):
+        assert reader.dumps(reader.read(x)) == json.dumps(x), x
+    assert reader.dumps(Decimal("0.000020")) == "2.0e-05"       # its own digits, the float exponent form
 
 
 def test_paths_and_pointers():
@@ -380,7 +385,7 @@ if FIXTURES.is_dir():
         if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
             # a converted form: its 0.2 fixture is read by the baseline code only
             with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule|"
-                                                    "mechanics) documents are not read"):
+                                                    "mechanics|em.modes2d) documents are not read"):
                 Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
             return
         _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)

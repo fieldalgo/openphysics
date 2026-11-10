@@ -11,9 +11,9 @@ test('drawing and submitted document use the same nanometre coordinates',()=>{
  assert.deepEqual(toSvg(-1500,1200),[150,55]);assert.deepEqual(toSvg(1500,-1200),[450,295]);toNm(...toSvg(123,-456)).forEach((v,i)=>assert.ok(Math.abs(v-[123,-456][i])<1e-9));
  const named=shapes.map((s,i)=>({...s,name:'S'+i}));
  const svg=sectionSvg(named),d=opticalDocument({wavelength:1550,coreMesh:30,shapes:named,electric:false,heat:false,structure:false,optics:true},{materials:{Oxide:'Silica'}});
- assert.ok(svg.includes('points="150,175 450,175 450,166 150,166"'));assert.deepEqual(d.geometry.shapes[0].points,[[-1.5,0],[1.5,0],[1.5,.09],[-1.5,.09]]);
- assert.ok(svg.includes('cx="300" cy="125" r="15"'));assert.deepEqual(d.geometry.shapes[1],{name:'s2',material:'Si3N4',mesh_size:.03,type:'circle',cx:0,cy:.5,r:.15});
- assert.ok(svg.includes('points="270,235 330,235 300,205"'));assert.deepEqual(d.geometry.shapes[2],{name:'s3',material:'vacuum',type:'polygon',points:[[-.3,-.6],[.3,-.6],[0,-.3]]});
+ assert.ok(svg.includes('points="150,175 450,175 450,166 150,166"'));assert.deepEqual(d.geometry.shapes[0].points,[[-1500,0],[1500,0],[1500,90],[-1500,90]]);
+ assert.ok(svg.includes('cx="300" cy="125" r="15"'));assert.deepEqual(d.geometry.shapes[1],{name:'s2',material:'physmat:Si3N4',element_size:'30 nm',type:'circle',cx:0,cy:500,r:150});
+ assert.ok(svg.includes('points="270,235 330,235 300,205"'));assert.deepEqual(d.geometry.shapes[2],{name:'s3',material:'physmat:vacuum',type:'polygon',points:[[-300,-600],[300,-600],[0,-300]]});
 });
 test('every shape is selectable in draw order, names are escaped and boundaries stay inspectable',()=>{
  const svg=sectionSvg(shapes.map((s,i)=>i===2?{...s,name:'Wedge'}:s),{selected:1});

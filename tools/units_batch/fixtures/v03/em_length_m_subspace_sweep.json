@@ -1,0 +1,82 @@
+{
+  "openphysics": "0.3",
+  "name": "step-index fiber, HE11 pair subspace wavelength sweep",
+  "geometry": {
+    "length_unit": "m",
+    "depth": null,
+    "domain": {
+      "xmin": -2e-05,
+      "xmax": 2e-05,
+      "ymin": -2e-05,
+      "ymax": 2e-05
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "core",
+        "type": "circle",
+        "cx": 0.0,
+        "cy": 0.0,
+        "r": 4e-06,
+        "material": "core",
+        "element_size": "0.0000005 m"
+      }
+    ]
+  },
+  "materials": {
+    "core": {
+      "refractive_index": 1.45
+    },
+    "clad": {
+      "refractive_index": 1.44
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "vacuum_wavelength": "0.00000155 m",
+      "mode_count": 2,
+      "effective_index_threshold": 1.44,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "0.000003 m",
+    "grading": {
+      "position": [
+        "0 m",
+        "0 m"
+      ],
+      "near": "0.0000005 m",
+      "far": "0.000003 m",
+      "refinement_distance": "0.000012 m"
+    }
+  },
+  "study": {
+    "type": "sweep",
+    "parameter": "physics.em1.vacuum_wavelength",
+    "values": {
+      "unit": "m",
+      "values": [
+        1.5e-06,
+        1.525e-06,
+        1.55e-06,
+        1.575e-06,
+        1.6e-06
+      ]
+    },
+    "tracking": {
+      "method": "electric-l2-subspace-v1",
+      "cluster_span_tolerance": 0.0001,
+      "cluster_gap_threshold": 0.001
+    }
+  }
+}

@@ -1,0 +1,822 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "em-modes2d-p1-node-centroid-v1 (format 0.2 em.modes2d, every length in the document unit, exp(+i omega t)) -> em-modes2d-p1-node-centroid-v2 (format 0.3, SI, exp(-i omega t)); spec section 5.3.4. The kernel's micrometre values come back once: lengths x 1e-6 (L1), areas x 1e-12 (L2), every complex value conjugated (conj); a summary value of a complex array is that array's entry (f array); the JSON arrays compare through the summary rules; the losses are the three pre-registered exceptions; the old calls take the D-24 local material names and, on a scalar solve, the n_cladding the 0.3 reader refuses (D-22) and the kernel never reads; VTU imaginary parts are the conjugate's (sign flip); the PVD timestep of a wavelength sweep is the wavelength in metres (L1)",
+ "old_layout": "em-modes2d-p1-node-centroid-v1",
+ "new_layout": "em-modes2d-p1-node-centroid-v2",
+ "arrays": [
+  {
+   "old": "nodes",
+   "new": "node_coordinates",
+   "f": "L1"
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "regions",
+   "new": "regions",
+   "f": "="
+  },
+  {
+   "old": "region_names",
+   "new": "region_names",
+   "f": "="
+  },
+  {
+   "old": "edges",
+   "new": "edges",
+   "f": "="
+  },
+  {
+   "old": "values",
+   "new": "vacuum_wavelength",
+   "f": "L1"
+  },
+  {
+   "old": "neff",
+   "new": "effective_index",
+   "f": "conj"
+  },
+  {
+   "old": "group_index",
+   "new": "group_index",
+   "f": "conj"
+  },
+  {
+   "old": "fields",
+   "new": "unnormalized_mode_field",
+   "f": "conj"
+  },
+  {
+   "old": "vector_transverse",
+   "new": "unnormalized_electric_field_line_integral",
+   "f": "L1*conj"
+  },
+  {
+   "old": "vector_longitudinal",
+   "new": "unnormalized_electric_field_z",
+   "f": "conj"
+  },
+  {
+   "old": "vector_electric",
+   "new": "unnormalized_electric_field",
+   "f": "conj"
+  },
+  {
+   "old": "mode_power",
+   "new": [
+    "unnormalized_mode_power",
+    "unnormalized_mode_field_square_integral"
+   ],
+   "f": "L2*conj"
+  },
+  {
+   "old": "confinement",
+   "new": "confinement_factor",
+   "f": "="
+  },
+  {
+   "old": "field_overlap",
+   "new": "unnormalized_field_overlap",
+   "f": "L2*conj"
+  },
+  {
+   "old": "coupling_efficiency",
+   "new": "coupling_efficiency",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking_json",
+   "new": "mode_tracking_json",
+   "f": "json",
+   "prefix": "mode_tracking"
+  },
+  {
+   "old": "open_boundary_json",
+   "new": "open_boundary_json",
+   "f": "json",
+   "prefix": "open_boundary"
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "length_unit_to_m",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "units.length",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "length_unit_to_m",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "amplitude_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "phasor",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.triangles",
+   "new": "mesh.triangles",
+   "f": "="
+  },
+  {
+   "old": "study.values.[]",
+   "new": "study.values.values.[]",
+   "f": "L1"
+  },
+  {
+   "old": "neff.[].[]",
+   "new": [
+    "effective_index.values.[].[]",
+    "effective_index.re.[].[]"
+   ],
+   "f": "="
+  },
+  {
+   "old": "neff_imag.[].[]",
+   "new": "effective_index.im.[].[]",
+   "f": "neg"
+  },
+  {
+   "old": "group_index.[].[]",
+   "new": [
+    "group_index.values.[].[]",
+    "group_index.re.[].[]"
+   ],
+   "f": "="
+  },
+  {
+   "old": "group_index_imag.[].[]",
+   "new": "group_index.im.[].[]",
+   "f": "neg"
+  },
+  {
+   "old": "formulation",
+   "new": "formulation",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "n_cladding",
+   "new": "effective_index_threshold",
+   "f": "="
+  },
+  {
+   "old": "requested_modes",
+   "new": "mode_count",
+   "f": "="
+  },
+  {
+   "old": "returned_modes",
+   "new": "returned_mode_count",
+   "f": "="
+  },
+  {
+   "old": "selection",
+   "new": "selection",
+   "f": "="
+  },
+  {
+   "old": "attenuation",
+   "new": "attenuation",
+   "f": "="
+  },
+  {
+   "old": "propagation_loss_db_cm.[].[]",
+   "new": "propagation_loss.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "bend_loss_db_90deg.[].[]",
+   "new": "bend_loss.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].candidate",
+   "new": "open_boundary.[].candidates.[].candidate",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].neff_real",
+   "new": "open_boundary.[].candidates.[].effective_index.re",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].neff_imag",
+   "new": "open_boundary.[].candidates.[].effective_index.im",
+   "f": "neg"
+  },
+  {
+   "old": "open_boundary.[].candidates.[].pencil_residual",
+   "new": "open_boundary.[].candidates.[].relative_residual",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].physical_l2_fraction",
+   "new": "open_boundary.[].candidates.[].physical_l2_fraction",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].pml_l2_fraction",
+   "new": "open_boundary.[].candidates.[].pml_l2_fraction",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].selected",
+   "new": "open_boundary.[].candidates.[].selected",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].candidates.[].attenuation_status",
+   "new": "open_boundary.[].candidates.[].attenuation_status",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].classification",
+   "new": "open_boundary.[].classification",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].fraction_metric",
+   "new": "open_boundary.[].fraction_metric",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "open_boundary.[].min_physical_fraction",
+   "new": "open_boundary.[].pml_minimum_physical_fraction",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].normalization_region",
+   "new": "open_boundary.[].normalization_region",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].physical_bounds.[].[]",
+   "new": "open_boundary.[].physical_bounds.values.[].[]",
+   "f": "L1"
+  },
+  {
+   "old": "open_boundary.[].requested_modes",
+   "new": "open_boundary.[].mode_count",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].residual_limit",
+   "new": "open_boundary.[].relative_residual_threshold",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].returned_modes",
+   "new": "open_boundary.[].returned_mode_count",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].search_requested_modes",
+   "new": "open_boundary.[].search_mode_count",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].selected_candidates.[]",
+   "new": "open_boundary.[].selected_candidates.[]",
+   "f": "="
+  },
+  {
+   "old": "open_boundary.[].stability",
+   "new": "open_boundary.[].stability",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.method",
+   "new": "mode_tracking.method",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.method",
+   "new": "mode_tracking.settings.method",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.search_modes",
+   "new": "mode_tracking.settings.search_mode_count",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.min_overlap",
+   "new": "mode_tracking.settings.mode_tracking_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.min_margin",
+   "new": "mode_tracking.settings.mode_tracking_margin_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.degeneracy_tolerance",
+   "new": "mode_tracking.settings.degeneracy_tolerance",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.cluster_span_max",
+   "new": "mode_tracking.settings.cluster_span_tolerance",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.settings.external_gap_min",
+   "new": "mode_tracking.settings.cluster_gap_threshold",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.points.[].clusters.[].min_principal_squared",
+   "new": "mode_tracking.points.[].clusters.[].minimum_principal_squared",
+   "f": "="
+  },
+  {
+   "old": "mode_tracking.points.**",
+   "new": "mode_tracking.points.**",
+   "f": "="
+  },
+  {
+   "old": "mode_postprocessing.mode_power.value.[].[]",
+   "f": "array",
+   "part": "real",
+   "old_array": "mode_power",
+   "new": [
+    "mode_postprocessing.unnormalized_mode_power.re.[].[]",
+    "mode_postprocessing.unnormalized_mode_field_square_integral.values.[].[]"
+   ],
+   "new_array": [
+    "unnormalized_mode_power",
+    "unnormalized_mode_field_square_integral"
+   ]
+  },
+  {
+   "old": "mode_postprocessing.mode_power.imag.[].[]",
+   "f": "array",
+   "part": "imag",
+   "old_array": "mode_power",
+   "new": "mode_postprocessing.unnormalized_mode_power.im.[].[]",
+   "new_array": "unnormalized_mode_power"
+  },
+  {
+   "old": "mode_postprocessing.mode_power.unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mode_postprocessing.confinement.value.[].[].[]",
+   "new": "mode_postprocessing.confinement_factor.values.[].[].[]",
+   "f": "="
+  },
+  {
+   "old": "mode_postprocessing.confinement.regions.[]",
+   "new": "mode_postprocessing.confinement_factor.regions.[]",
+   "f": "="
+  },
+  {
+   "old": "mode_postprocessing.confinement.unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mode_postprocessing.field_overlap.real.[].[].[]",
+   "f": "array",
+   "part": "real",
+   "old_array": "field_overlap",
+   "new": "mode_postprocessing.unnormalized_field_overlap.re.[].[].[]",
+   "new_array": "unnormalized_field_overlap"
+  },
+  {
+   "old": "mode_postprocessing.field_overlap.imag.[].[].[]",
+   "f": "array",
+   "part": "imag",
+   "old_array": "field_overlap",
+   "new": "mode_postprocessing.unnormalized_field_overlap.im.[].[].[]",
+   "new_array": "unnormalized_field_overlap"
+  },
+  {
+   "old": "mode_postprocessing.field_overlap.unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mode_postprocessing.coupling_efficiency.value.[].[]",
+   "new": "mode_postprocessing.coupling_efficiency.values.[].[]",
+   "f": "="
+  },
+  {
+   "old": "mode_postprocessing.coupling_efficiency.gaussian.waist",
+   "new": "mode_postprocessing.coupling_efficiency.gaussian.beam_waist_radius.value",
+   "f": "L1"
+  },
+  {
+   "old": "mode_postprocessing.coupling_efficiency.gaussian.center.[]",
+   "new": "mode_postprocessing.coupling_efficiency.gaussian.position.values.[]",
+   "f": "L1"
+  },
+  {
+   "old": "mode_postprocessing.coupling_efficiency.gaussian.unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mode_postprocessing.coupling_efficiency.unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  }
+ ],
+ "summary_added": [
+  "vacuum_wavelength.**",
+  "effective_index.unit",
+  "effective_index.time_convention",
+  "group_index.unit",
+  "group_index.time_convention",
+  "study.values.unit",
+  "field_shapes.**",
+  "field_units.**",
+  "field_locations.**",
+  "propagation_loss.unit",
+  "bend_loss.unit",
+  "open_boundary.[].physical_bounds.unit",
+  "open_boundary.[].candidates.[].effective_index.unit",
+  "open_boundary.[].candidates.[].effective_index.time_convention",
+  "mode_postprocessing.unnormalized_mode_power.unit",
+  "mode_postprocessing.unnormalized_mode_power.time_convention",
+  "mode_postprocessing.unnormalized_mode_field_square_integral.unit",
+  "mode_postprocessing.confinement_factor.unit",
+  "mode_postprocessing.unnormalized_field_overlap.unit",
+  "mode_postprocessing.unnormalized_field_overlap.time_convention",
+  "mode_postprocessing.coupling_efficiency.unit",
+  "mode_postprocessing.coupling_efficiency.gaussian.beam_waist_radius.unit",
+  "mode_postprocessing.coupling_efficiency.gaussian.position.unit"
+ ],
+ "identifiers": [
+  "field_layout",
+  "field_representation",
+  "mode_result_schema",
+  "study.parameter",
+  "mesh.regions.*",
+  "open_boundary.[].schema",
+  "open_boundary.[].candidates.[].reasons.[]",
+  "mode_postprocessing.recipe",
+  "mode_postprocessing.*.description",
+  "mode_postprocessing.coupling_efficiency.gaussian.field"
+ ],
+ "vtu": [
+  {
+   "old": "triangle_regions",
+   "new": "regions",
+   "f": "="
+  },
+  {
+   "old": "mode_0",
+   "new": "unnormalized_mode_field_mode_0",
+   "f": "="
+  },
+  {
+   "old": "mode_0_real",
+   "new": "unnormalized_mode_field_mode_0_real",
+   "f": "="
+  },
+  {
+   "old": "mode_0_imag",
+   "new": "unnormalized_mode_field_mode_0_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_0_real",
+   "new": "unnormalized_electric_field_mode_0_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_0_imag",
+   "new": "unnormalized_electric_field_mode_0_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_0_real",
+   "new": "unnormalized_electric_field_z_mode_0_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_0_imag",
+   "new": "unnormalized_electric_field_z_mode_0_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_1",
+   "new": "unnormalized_mode_field_mode_1",
+   "f": "="
+  },
+  {
+   "old": "mode_1_real",
+   "new": "unnormalized_mode_field_mode_1_real",
+   "f": "="
+  },
+  {
+   "old": "mode_1_imag",
+   "new": "unnormalized_mode_field_mode_1_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_1_real",
+   "new": "unnormalized_electric_field_mode_1_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_1_imag",
+   "new": "unnormalized_electric_field_mode_1_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_1_real",
+   "new": "unnormalized_electric_field_z_mode_1_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_1_imag",
+   "new": "unnormalized_electric_field_z_mode_1_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_2",
+   "new": "unnormalized_mode_field_mode_2",
+   "f": "="
+  },
+  {
+   "old": "mode_2_real",
+   "new": "unnormalized_mode_field_mode_2_real",
+   "f": "="
+  },
+  {
+   "old": "mode_2_imag",
+   "new": "unnormalized_mode_field_mode_2_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_2_real",
+   "new": "unnormalized_electric_field_mode_2_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_2_imag",
+   "new": "unnormalized_electric_field_mode_2_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_2_real",
+   "new": "unnormalized_electric_field_z_mode_2_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_2_imag",
+   "new": "unnormalized_electric_field_z_mode_2_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_3",
+   "new": "unnormalized_mode_field_mode_3",
+   "f": "="
+  },
+  {
+   "old": "mode_3_real",
+   "new": "unnormalized_mode_field_mode_3_real",
+   "f": "="
+  },
+  {
+   "old": "mode_3_imag",
+   "new": "unnormalized_mode_field_mode_3_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_3_real",
+   "new": "unnormalized_electric_field_mode_3_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_3_imag",
+   "new": "unnormalized_electric_field_mode_3_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_3_real",
+   "new": "unnormalized_electric_field_z_mode_3_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_3_imag",
+   "new": "unnormalized_electric_field_z_mode_3_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_4",
+   "new": "unnormalized_mode_field_mode_4",
+   "f": "="
+  },
+  {
+   "old": "mode_4_real",
+   "new": "unnormalized_mode_field_mode_4_real",
+   "f": "="
+  },
+  {
+   "old": "mode_4_imag",
+   "new": "unnormalized_mode_field_mode_4_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_4_real",
+   "new": "unnormalized_electric_field_mode_4_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_4_imag",
+   "new": "unnormalized_electric_field_mode_4_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_4_real",
+   "new": "unnormalized_electric_field_z_mode_4_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_4_imag",
+   "new": "unnormalized_electric_field_z_mode_4_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_5",
+   "new": "unnormalized_mode_field_mode_5",
+   "f": "="
+  },
+  {
+   "old": "mode_5_real",
+   "new": "unnormalized_mode_field_mode_5_real",
+   "f": "="
+  },
+  {
+   "old": "mode_5_imag",
+   "new": "unnormalized_mode_field_mode_5_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_5_real",
+   "new": "unnormalized_electric_field_mode_5_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_5_imag",
+   "new": "unnormalized_electric_field_mode_5_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_5_real",
+   "new": "unnormalized_electric_field_z_mode_5_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_5_imag",
+   "new": "unnormalized_electric_field_z_mode_5_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_6",
+   "new": "unnormalized_mode_field_mode_6",
+   "f": "="
+  },
+  {
+   "old": "mode_6_real",
+   "new": "unnormalized_mode_field_mode_6_real",
+   "f": "="
+  },
+  {
+   "old": "mode_6_imag",
+   "new": "unnormalized_mode_field_mode_6_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_6_real",
+   "new": "unnormalized_electric_field_mode_6_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_6_imag",
+   "new": "unnormalized_electric_field_mode_6_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_6_real",
+   "new": "unnormalized_electric_field_z_mode_6_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_6_imag",
+   "new": "unnormalized_electric_field_z_mode_6_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "mode_7",
+   "new": "unnormalized_mode_field_mode_7",
+   "f": "="
+  },
+  {
+   "old": "mode_7_real",
+   "new": "unnormalized_mode_field_mode_7_real",
+   "f": "="
+  },
+  {
+   "old": "mode_7_imag",
+   "new": "unnormalized_mode_field_mode_7_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_7_real",
+   "new": "unnormalized_electric_field_mode_7_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_7_imag",
+   "new": "unnormalized_electric_field_mode_7_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "longitudinal_electric_mode_7_real",
+   "new": "unnormalized_electric_field_z_mode_7_real",
+   "f": "="
+  },
+  {
+   "old": "longitudinal_electric_mode_7_imag",
+   "new": "unnormalized_electric_field_z_mode_7_imag",
+   "f": "imag-conj"
+  }
+ ],
+ "vtu_added": [],
+ "collection": "L1",
+ "calls": {
+  "d24_material_names": true,
+  "arguments": [
+   {
+    "function": "simcase.physics_em_modes2d.solve",
+    "index": 6,
+    "when": {
+     "index": 5,
+     "equals": "scalar"
+    },
+    "new": null
+   }
+  ]
+ },
+ "exceptions": [
+  {
+   "where": "summary",
+   "new": "propagation_loss.values.[].[]",
+   "kind": "propagation_loss"
+  },
+  {
+   "where": "summary",
+   "new": "bend_loss.values.[].[]",
+   "kind": "bend_loss"
+  }
+ ]
+}

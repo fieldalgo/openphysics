@@ -40,8 +40,9 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 ## 보내는 것과 받는 것
 
 `POST /api/geometry-lab/evaluate`는 `{"doc": <문서>, "component": <이름 또는 null>}`을 받습니다.
-`python -m simcase geometry`처럼 `units`와 `geometry` 블록만 읽으므로 물리가 없는 문서도 받습니다. 응답은 구성
-요소의 셀, 곡선(문서 길이 단위의 점), 면적이 붙은 영역, 항목 번호가 붙은 선택, 경계 태그, 파라미터(쓴 값과 평가한
+`python -m simcase geometry`처럼 `geometry` 블록(형식 0.2 문서는 `units` 블록도)만 읽으므로 물리가 없는 문서도
+받습니다. 제공 시작 예제와 새 문서는 형식 0.3이며 구성 요소의 `length_unit`이 그림 단위를 정합니다. 응답은 구성
+요소의 셀, 곡선(구성 요소 길이 단위의 점), 면적이 붙은 영역, 항목 번호가 붙은 선택, 경계 태그, 파라미터(쓴 값과 평가한
 값), 반올림, 엔진 출력이 담긴 `{"ok": true, ...}`이거나 `{"ok": false, "refused": <메시지>}`입니다. 이 페이지를
 위한 보기이며 저장 형식이 아니고 문서 계약에 속하지 않습니다.
 
