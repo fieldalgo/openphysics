@@ -203,8 +203,9 @@ material (the engine's own rule, `simcase.has_region_geometry`,
 see [heat documents with material regions](thermal_regions2d.md)) takes
 Studio's region path on `/api/thermal/validate` and `/api/thermal/run`. A
 homogeneous rectangle written as version 1 (no features, no background
-material) is compiled to the 0.2 rectangle form at load and takes the rectangle
-path, as the 0.2 rectangle does.
+material) is compiled to the flat rectangle form at load and takes the rectangle
+path, as the flat rectangle does. Region documents are format 0.3, as rectangles are:
+a format 0.2 region document is refused by name (`invalid_document`, path `openphysics`).
 A version 1 document is accepted as written (the validation echo and the
 result record its block, not a compilation; the page applies the same rule
 to pin the document family before it validates), its features count as shapes in
@@ -213,18 +214,18 @@ the raw geometry caps (path `geometry.components`), and its mesh comes from the
 document (a void feature, a tag off the four sides) is an `invalid_document`.
 Every other document follows the rectangle path, whose code, bytes and errors
 are unchanged; `tests/simcase/test_studio_rectangle_invariants.py` pins them.
-A region document with `mesh.subdivisions` is refused (`invalid_document`,
-path `mesh.subdivisions`), and so is a rectangle document with a stray
+A region document with `mesh.subdivision_count` is refused (`invalid_document`,
+path `mesh.subdivision_count`), and so is a rectangle document with a stray
 `geometry.shapes` key, because that key makes it a region document.
 
 ### Wire format
 
 | Item | Region result |
 | --- | --- |
-| Result and layout IDs | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
-| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, the 11 top-level fields of the format 0.2 rectangle payload (no `length_unit`; arrays under their 0.2 names) |
-| `arrays` | The thirteen v2 arrays plus `triangle_regions`: one region index per triangle (unit `1`, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
-| `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area_m2`), the whole `materials` table, `heat_source_w_m3`, `conductivity_range_w_mk` and `mesh` (`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`) |
+| Result and layout IDs | `thermal.steady2d-regions-result-v2`, `thermal2d-p1-node-cell-regions-v2` (the `-v1` pair of format 0.2 is retired) |
+| Payload | `payload_format = "studio-thermal-steady-regions-v2"`, the 12 top-level fields of the rectangle payload, `length_unit` included |
+| `arrays` | The thirteen boundary arrays under their registry names (`node_coordinates`, `temperature`, `heat_flux`, ...) plus `triangle_regions`: one region index per triangle (no unit, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
+| `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area` as `{value, unit}` in m^2), the whole `materials` table with `{value, unit}` properties, `heat_source_density`, `minimum_thermal_conductivity`, `maximum_thermal_conductivity` and `mesh` (`nodes`, `triangles`) |
 | Capability | A nested `regions` key in the steady block: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats` and the five `limits` below |
 
 The region pair is not added to the block's outer `result_formats`, which the
@@ -249,13 +250,13 @@ nothing is published.
 
 | Stage | Check | Refusal |
 | --- | --- | --- |
-| Event loop, cost linear in the JSON | One `thermal.steady2d` entry; no `mesh.subdivisions` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
+| Event loop, cost linear in the JSON | One `thermal.steady2d` entry; format 0.3; no `mesh.subdivision_count` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
 | Event loop | The steady boundary (v2) result runtime is installed, since region results always carry the boundary arrays | `unsupported_result_format` (400) |
 | Event loop, run only | The public result API for region runs is available (the block's `run_enabled`) | `unsupported_public_api` (400) |
 | Worker thread, before `Document.from_dict` | At most 64 shapes, 16 circles and 512 polygon points in total, then at most 1024 boundary crossings (`simcase.region_complexity`) | `geometry_limit_exceeded` (413), path `geometry.shapes` (`geometry.components` for a version 1 block) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | At most 2048 loop vertices after the shapes' booleans (`simcase.check_mesh_limits`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
-| Worker thread | The document's name, units, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
+| Worker thread | The document's name, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
 | Job, before the solve | Meshing stops past 10201 nodes (`max_nodes`); the exact node and cell counts are then compared with 10201 and 20000 | Job error `mesh_limit_exceeded` |
 | Job | A document error found after meshing, such as a heat source on a shape that later shapes cover completely | Job error `invalid_document` |
 | Job | Any other run failure, such as a geometry meshine cannot resolve or a refinement that does not converge within meshine's 80 rounds | Job error `solver_failed` |

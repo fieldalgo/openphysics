@@ -128,8 +128,8 @@ global +y upward; arrows are view scaling. Derived overflow refuses the view.
 Transient result/layout IDs are thermal.transient2d-result-v3 and
 thermal2d-transient-p1-node-cell-v2. Manifest/frame/history use separate wire IDs:
 studio-thermal-transient-v2, studio-thermal-transient-frame-v2 and
-studio-thermal-transient-history-v2 (region documents, still format 0.2, keep the -v1
-frame and history IDs with their own pair). No optical or steady-layout fallback.
+studio-thermal-transient-history-v2 (region documents use the same frame and history IDs
+with their own pair). No optical or steady-layout fallback.
 
 The manifest contains static mesh, top-level time, length_unit, immutable summary, default
 last index and all13 field descriptors: full shape, unit, location, axis,
@@ -159,11 +159,11 @@ requested-time checks are the rectangle ones, with the same codes and messages.
 
 | Item | Region manifest |
 | --- | --- |
-| Result and layout IDs | `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1` |
-| Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, the same 16 top-level fields |
-| `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids` and `triangle_regions` (one region index per triangle) |
-| Descriptors | The 13 rectangle descriptors plus `triangle_regions`: shape `[M]`, unit `1`, location `triangles`, axis `static`, no views, `ui_supported=false` |
-| Frames and history pages | The format 0.2 frame and page IDs `studio-thermal-transient-frame-v1` and `-history-v1`, stamped with the region pair stored on the job; `triangle_regions` is not a frame or history field (400 `invalid_query`) |
+| Result and layout IDs | `thermal.transient2d-regions-result-v2`, `thermal2d-transient-p1-node-cell-regions-v2` (the `-v1` pair of format 0.2 is retired) |
+| Manifest | `payload_format = "studio-thermal-transient-regions-v2"`, the rectangle manifest's top-level fields, `time` and `length_unit` included |
+| `arrays` | `node_coordinates`, `triangles`, `prescribed_node_ids` and `triangle_regions` (one region index per triangle) |
+| Descriptors | The 13 rectangle descriptors plus `triangle_regions`: shape `[M]`, no unit (`null`), location `triangles`, axis `static`, no views, `ui_supported=false` |
+| Frames and history pages | The rectangle frame and page IDs `studio-thermal-transient-frame-v2` and `-history-v2`, stamped with the region pair stored on the job; `triangle_regions` is not a frame or history field (400 `invalid_query`) |
 | Capability | A nested `regions` key in the transient block, with the region pair, the three payload formats above and the five region `limits` |
 
 The raw history of a region job also holds the region indices (8 bytes per

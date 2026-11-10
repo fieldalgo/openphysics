@@ -35,15 +35,16 @@ Open [layered_wall.json](../../../examples/simcase/layered_wall.json).
 | `left_layer` shape | The first 10 mm of the width, material `high_k`, k=10 W/(m K) |
 | Left boundary | Temperature fixed at 350 K |
 | Right boundary | Convection h=50 W/(m² K), ambient 300 K |
-| Top and bottom | Unspecified natural edges, hence insulated |
+| Top and bottom | No condition: insulated, reported as `I-DEFAULT-BOUNDARY` |
 | Mesh | Target size 2 mm, requested minimum angle 28 degrees |
 
 A **region name** identifies geometry; a **material name** identifies its property
 record. Several regions may use one material. If you add a source map, its keys are
 region names such as `left_layer`, not material names such as `high_k`.
-Geometry and mesh sizes follow `units.length`; properties ending in `_w_mk`,
-`_w_m3`, `_w_m2k` and `_k` retain SI units. The runner sends metre coordinates to
-the thermal engine. Do not manually convert only half the document.
+Shape coordinates and the domain are numbers in `geometry.length_unit` (mm here);
+every other value carries its own unit, such as `"2 mm"` or `"10 W/(m K)"`. The
+runner converts each to SI and sends metre coordinates to the thermal engine.
+Do not manually convert only half the document.
 
 Later shapes replace overlapping parts of earlier ones. The background occupies
 the remaining domain, and mesh edges follow region interfaces. A covered shape
@@ -80,7 +81,7 @@ script always loads its neighboring repository JSON; it does not read your copy.
   the heat flow increases. Update every other input only when physically intended.
 - Move the interface by changing `left_layer.w` from 10 to 15 mm.
   The two thicknesses become 0.015 and 0.025 m; the outer width stays 40 mm.
-- Add `heat_source_w_m3: {"left_layer": 200000}` in the physics object.
+- Set `"heat_source_density": {"left_layer": "200000 W/m^3"}` in the physics object.
   The no-source formula above no longer applies. Compare total source input,
   thermostat reaction and convective output instead; then perform refinement.
 

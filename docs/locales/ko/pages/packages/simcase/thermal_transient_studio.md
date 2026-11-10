@@ -114,8 +114,8 @@ Raw좌표는m이며축은최상위display_length_in_m·문서길이선언을사�
 과도result/layoutID는thermal.transient2d-result-v3과
 thermal2d-transient-p1-node-cell-v2입니다. Manifest/frame/history는별도wireID
 studio-thermal-transient-v2,studio-thermal-transient-frame-v2,
-studio-thermal-transient-history-v2를사용합니다(아직 형식 0.2인 영역 문서는 자기 쌍과 함께 -v1
-frame·history ID를 유지). 광학/정상layoutfallback없음.
+studio-thermal-transient-history-v2를사용합니다(영역 문서도 같은 frame·history ID를 자기 쌍과
+함께 사용). 광학/정상layoutfallback없음.
 
 Manifest에는staticmesh·최상위time·length_unit·immutable summary·기본마지막index·
 13개fielddescriptor(fullshape/unit/location/axis/available_views/initial_available/
@@ -143,11 +143,11 @@ summary 하한, worker thread 검증, job 단계의 절점·요소 한도는 정
 
 | 항목 | 영역 manifest |
 | --- | --- |
-| Result·layout ID | `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1` |
-| Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, 같은 최상위 필드 16개 |
-| `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids`, `triangle_regions`(삼각형마다 영역 번호 하나) |
-| Descriptor | 직사각형 descriptor 13개와 `triangle_regions`: shape `[M]`, 단위 `1`, 위치 `triangles`, 축 `static`, view 없음, `ui_supported=false` |
-| Frame·history page | 형식 0.2 frame·page ID `studio-thermal-transient-frame-v1`·`-history-v1`에 job이 저장한 영역 쌍을 붙임; `triangle_regions`는 frame·history 필드가 아님(400 `invalid_query`) |
+| Result·layout ID | `thermal.transient2d-regions-result-v2`, `thermal2d-transient-p1-node-cell-regions-v2`(형식 0.2의 `-v1` 쌍은 은퇴) |
+| Manifest | `payload_format = "studio-thermal-transient-regions-v2"`, `time`과 `length_unit`을 포함해 직사각형 manifest와 같은 최상위 필드 |
+| `arrays` | `node_coordinates`, `triangles`, `prescribed_node_ids`, `triangle_regions`(삼각형마다 영역 번호 하나) |
+| Descriptor | 직사각형 descriptor 13개와 `triangle_regions`: shape `[M]`, 단위 없음(`null`), 위치 `triangles`, 축 `static`, view 없음, `ui_supported=false` |
+| Frame·history page | 직사각형 frame·page ID `studio-thermal-transient-frame-v2`·`-history-v2`에 job이 저장한 영역 쌍을 붙임; `triangle_regions`는 frame·history 필드가 아님(400 `invalid_query`) |
 | Capability | 과도 블록 안의 중첩 `regions` 키: 영역 쌍, 위 payload 형식 세 개, 영역 `limits` 다섯 개 |
 
 영역 job의 raw 이력은 16 MiB raw 한도 안에 영역 번호(삼각형마다 8 byte)도

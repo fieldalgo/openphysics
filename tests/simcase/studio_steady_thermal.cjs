@@ -38,25 +38,6 @@ function payload({v2=true,D=0,revision=0,sequence=1}={}){
     client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,
     length_unit:'m',display_length_in_m:1};
 }
-// The format 0.2 payload names, which region payloads keep until their commit of the units batch.
-function legacyPayload({v2=true,D=0,revision=0,sequence=1}={}){
-  const L=T.LEGACY;
-  const arrays={nodes_m:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],
-    temperature_k:[0,1,2,3],heat_flux_w_m2:[[2,0],[0,-4]],load_w_per_m:[0,0,0,0],
-    reaction_w_per_m:[0,0,0,0],residual_w_per_m:[0,0,0,0],
-    dirichlet_node_ids:Array.from({length:D},(_,i)=>i),dirichlet_temperature_k:Array(D).fill(300)};
-  if(v2)L.added.forEach(k=>arrays[k]=[0,0,0,0]);
-  const result_format='thermal.steady2d-result-v'+(v2?2:1),field_layout=L.pairs[result_format];
-  const spec={...L.base};if(v2)L.added.forEach(k=>spec[k]=['W/m','nodes',0]);
-  const summary={physics_type:T.TYPE,result_format,field_layout,units:{length:'m',temperature:'K'},
-    mesh_length_unit:'m',mesh:{nodes:4,triangles:2},field_units:{},field_locations:{},field_shapes:{}};
-  for(const[k,[unit,location,cols]]of Object.entries(spec)){
-    summary.field_units[k]=unit;summary.field_locations[k]=location;
-    summary.field_shapes[k]=cols?[arrays[k].length,cols]:[arrays[k].length];
-  }
-  return {payload_format:L.payload_format,kind:T.TYPE,job:'job1',result_id:'res1',
-    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,display_length_in_m:1};
-}
 function canvas(W=200,H=160){
   // Records paths, fills, strokes and globalAlpha assignments.
   const calls=[],ctx=new Proxy({createImageData:(w,h)=>({width:w,height:h,data:new Uint8ClampedArray(w*h*4)}),
@@ -384,25 +365,27 @@ function regionBlock(){return {supported:true,run_enabled:true,result_formats:[T
   field_layouts:[T.REGION.field_layout],payload_formats:[T.REGION.payload_format],limits:{...REGION_LIMITS}};}
 // regionCap() advertises a valid block; regionCap(undefined) advertises none.
 function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[T.TYPE].regions=b;return value;}
-function regionDoc(){return {openphysics:'0.2',name:'Regions',units:{length:'m',temperature:'K'},
-  geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
+function regionDoc(){return {openphysics:'0.3',name:'Regions',
+  geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
     shapes:[{name:'heater',type:'rect',x:.5,y:0,w:.5,h:1,material:'copper'}]},
-  materials:{copper:{conductivity_w_mk:400},insulation:{conductivity_w_mk:.04}},physics:{heat1:{type:T.TYPE}},
-  mesh:{size:.5},study:{type:'single'}};}
+  materials:{copper:{thermal_conductivity:'400 W/(m K)'},insulation:{thermal_conductivity:'0.04 W/(m K)'}},
+  physics:{heat1:{type:T.TYPE}},mesh:{element_size:'0.5 m'},study:{type:'single'}};}
 // Own properties only: a region may be named __proto__.
 const own=entries=>{const o={};for(const [k,v] of entries)Object.defineProperty(o,k,{value:v,enumerable:true,writable:true,configurable:true});return o;};
 function regionPayload({names=['heater','background'],ids=[0,1],materials=['copper','insulation'],revision=0,sequence=1}={}){
-  const p=legacyPayload({v2:true,D:0,revision,sequence});
+  const p=payload({v2:true,D:0,revision,sequence});
   p.payload_format=T.REGION.payload_format;
   p.result_format=p.summary.result_format=T.REGION.result_format;
   p.field_layout=p.summary.field_layout=T.REGION.field_layout;
+  // region ids are structural: a location and a shape, no unit
   p.arrays.triangle_regions=ids.slice();
-  p.summary.field_units.triangle_regions='1';p.summary.field_locations.triangle_regions='triangles';
-  p.summary.field_shapes.triangle_regions=[ids.length];
+  p.summary.field_locations.triangle_regions='triangles';p.summary.field_shapes.triangle_regions=[ids.length];
   p.summary.region_names=names.slice();
-  p.summary.regions=own(names.map((n,i)=>[n,{material:materials[i],triangles:ids.filter(v=>v===i).length,area_m2:.5*ids.filter(v=>v===i).length}]));
-  p.summary.materials={copper:{conductivity_w_mk:400,source:'document value'},insulation:{conductivity_w_mk:.04}};
-  p.summary.heat_source_w_m3=own([[names[0],5e6]]);
+  p.summary.regions=own(names.map((n,i)=>[n,{material:materials[i],triangles:ids.filter(v=>v===i).length,
+    area:{value:.5*ids.filter(v=>v===i).length,unit:'m^2'}}]));
+  p.summary.materials={copper:{thermal_conductivity:{value:400,unit:'W/(m K)'},source:'document value'},
+    insulation:{thermal_conductivity:{value:.04,unit:'W/(m K)'}}};
+  p.summary.heat_source_density=own([[names[0],{value:5e6,unit:'W/m^3'}]]);
   return p;
 }
 const OWNER={job:'job1',result_id:'res1',client_revision:0,request_seq:1};
@@ -430,7 +413,7 @@ test('J1 region capability is nested: rectangle fields unchanged, outer pairs re
 
 test('J2 region payload: D=0, a zero-cell region and literal hostile names are accepted; malformed ones refused',()=>{
   const accepted=T.validateRegionPayload(regionPayload(),OWNER,REGION_LIMITS);
-  assert.equal(accepted.arrays.dirichlet_node_ids.length,0);assert.equal(accepted.payload_format,T.REGION.payload_format);
+  assert.equal(accepted.arrays.prescribed_node_ids.length,0);assert.equal(accepted.payload_format,T.REGION.payload_format);
   assert.equal(accepted.result_format,T.REGION.result_format);assert.equal(accepted.summary.result_format,T.REGION.result_format);
   assert.deepEqual(accepted.regions.names,['heater','background']);assert.deepEqual(accepted.regions.ids,[0,1]);
   assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.q,r.cells,r.color]),
@@ -456,9 +439,16 @@ test('J2 region payload: D=0, a zero-cell region and literal hostile names are a
     cell_count:p=>{p.summary.regions.heater.triangles=2;},
     material_not_own:p=>{p.summary.regions.heater.material='toString';},
     metadata:p=>{p.summary.field_locations.triangle_regions='nodes';},
-    summary_pair:p=>{p.summary.result_format='thermal.steady2d-result-v2';},
-    rectangle_pair:p=>{p.payload_format='studio-thermal-steady-v1';p.result_format=p.summary.result_format='thermal.steady2d-result-v2';
-      p.field_layout=p.summary.field_layout=T.PAIRS['thermal.steady2d-result-v2'];},
+    summary_pair:p=>{p.summary.result_format='thermal.steady2d-result-v4';},
+    rectangle_pair:p=>{p.payload_format='studio-thermal-steady-v2';p.result_format=p.summary.result_format='thermal.steady2d-result-v4';
+      p.field_layout=p.summary.field_layout=T.PAIRS['thermal.steady2d-result-v4'];},
+    region_unit:p=>{p.summary.field_units.triangle_regions='1';},
+    area_unit:p=>{p.summary.regions.heater.area.unit='mm^2';},
+    area_number:p=>{p.summary.regions.heater.area=.5;},
+    conductivity_number:p=>{p.summary.materials.copper.thermal_conductivity=400;},
+    source_number:p=>{p.summary.heat_source_density.heater=5e6;},
+    old_names:p=>{p.summary.heat_source_w_m3=p.summary.heat_source_density;delete p.summary.heat_source_density;
+      for(const e of Object.values(p.summary.regions)){e.area_m2=e.area.value;delete e.area;}},
     too_many:p=>{},
   };
   for(const [name,fault] of Object.entries(faults)){
