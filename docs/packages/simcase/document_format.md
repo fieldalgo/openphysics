@@ -133,7 +133,8 @@ An annotated value acknowledges a warning: it is still printed and stored, marke
 - **Shape numbers** are bare numbers in the component's unit, put on the 1 pm integer grid
   once (`physmat.units.length_to_pm`). A value that moves is `I-PM-ROUNDING` (below
   1e-3 pm) or `W-PM-ROUNDING`. In the resolved tree a shape number is `pm_to_m` of its pm
-  count.
+  count, and the mesher receives the same grid value, so a moved number is meshed where the
+  diagnostic says it is stored.
 - **Version 1 blocks** ([geometry document](geometry_document.md)) keep their grammar, read
   per component: each component's numbers and the literals of its expressions are in its
   own `length_unit`, so two components may use different units. Geometry `parameters` stay
