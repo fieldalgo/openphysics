@@ -70,9 +70,10 @@ def _strip(size, width=0.5, height=0.22):
 
     from galerkin.interop import from_mesher
     from simcase.geometry_velocity import design_velocity
-    doc = {"openphysics": "0.2", "units": {"length": "um"},
-           "geometry": {"version": 1, "parameters": {"w": {"value": width}}, "components": {"xs": {
-               "dimension": "2d", "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.0, "ymax": 1.0},
+    doc = {"openphysics": "0.3",
+           "geometry": {"version": 1, "parameters": {"w": {"value": f"{width!r} um"}}, "components": {"xs": {
+               "dimension": "2d", "length_unit": "um", "depth": None,
+               "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.0, "ymax": 1.0},
                "background": {"material": "clad"},
                "features": [{"name": "core", "type": "rect", "x": "-w/2", "y": -height / 2, "w": "w",
                              "h": height, "material": "core"}]}}}}

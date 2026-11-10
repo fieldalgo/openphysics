@@ -40,7 +40,7 @@ from . import _old_keys, reader, slots
 from .diagnostics import DiagnosticList, acknowledge, from_exception
 from .reader import display_path
 
-__all__ = ["Resolution", "resolve_text", "resolve_tree", "FORMAT"]
+__all__ = ["Resolution", "resolve_text", "resolve_tree", "format_refusal", "FORMAT"]
 
 FORMAT = "0.3"
 _MISSING = object()
@@ -127,16 +127,13 @@ def _resolve(tree, result: Resolution) -> Resolution:
     if not isinstance(tree, dict):
         diags.append(Diagnostic("E-VALUE-FORM", "", "a document is a JSON object"))
         return result
-    if "openphysics" not in tree:
-        diags.append(Diagnostic("E-FORMAT", "openphysics", f"the document has no format key; {_FORMAT_HELP}"))
+    refusal = format_refusal(tree)
+    if refusal is not None:
+        diags.append(refusal)
         return result
-    fmt = tree["openphysics"]
-    if fmt != FORMAT or not isinstance(fmt, str):
-        shown = f'the number {fmt}' if _number(fmt) else json.dumps(fmt, default=str)
-        hint = (' The format is the JSON string "0.3", not a number.' if _number(fmt) and str(fmt) == "0.3"
-                else f" {_FORMAT_HELP}.")
-        diags.append(Diagnostic("E-FORMAT", "openphysics", f"openphysics is {shown}; this reader reads the format "
-                                                           f'"0.3".{hint}'))
+    unknown = _unknown_type(tree)
+    if unknown is not None:
+        diags.append(unknown)
         return result
     kind = kind_of(tree)
     result.kind = kind
@@ -158,6 +155,40 @@ def _resolve(tree, result: Resolution) -> Resolution:
     walker.finish()
     _build(result)
     return result
+
+
+def format_refusal(tree: dict) -> Diagnostic | None:
+    """``E-FORMAT`` at ``openphysics`` for a document object whose envelope is not the format 0.3
+    string, with the conversion hint; None for a format 0.3 envelope. Every surface that reads a
+    document refuses another format with it (``Document.from_dict``, ``parse_geometry``)."""
+    if "openphysics" not in tree:
+        return Diagnostic("E-FORMAT", "openphysics", f"the document has no format key; {_FORMAT_HELP}")
+    fmt = tree["openphysics"]
+    if fmt != FORMAT or not isinstance(fmt, str):
+        shown = f'the number {fmt}' if _number(fmt) else json.dumps(fmt, default=str)
+        hint = (' The format is the JSON string "0.3", not a number.' if _number(fmt) and str(fmt) == "0.3"
+                else f" {_FORMAT_HELP}.")
+        return Diagnostic("E-FORMAT", "openphysics", f"openphysics is {shown}; this reader reads the format "
+                                                     f'"0.3".{hint}')
+    return None
+
+
+def _unknown_type(tree) -> Diagnostic | None:
+    """``E-VALUE-FORM`` at ``physics.<name>.type`` for a type no kind claims, naming the types this
+    release reads; without it the slot walk would report every key of the entry as unknown."""
+    from .registry import physics_types
+    physics = tree.get("physics")
+    if not isinstance(physics, dict):
+        return None
+    types = sorted(physics_types())
+    for name, entry in physics.items():
+        if isinstance(entry, dict) and "type" in entry and entry["type"] not in types:
+            value = entry["type"]
+            shown = json.dumps(value) if isinstance(value, str) else str(value)
+            return Diagnostic("E-VALUE-FORM", display_path(["physics", name, "type"]),
+                              f"{shown} is not one of the physics types this release reads: "
+                              + ", ".join(f'"{t}"' for t in types) + ".")
+    return None
 
 
 def _unread_kind(tree, kind) -> Diagnostic:

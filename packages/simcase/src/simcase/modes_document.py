@@ -30,7 +30,7 @@ import physmat
 from physmat.units import Diagnostic
 
 from . import units
-from .schema import FORMAT as KERNEL_FORMAT
+from .schema import HANDOFF_FORMAT as KERNEL_FORMAT
 from .schema import Document, DocumentError
 
 TYPE = "em.modes2d"

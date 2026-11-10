@@ -244,9 +244,10 @@ def _annulus(a, b, size):
 
     from galerkin.interop import from_mesher
     from simcase.geometry_velocity import design_velocity
-    doc = {"openphysics": "0.2", "units": {"length": "um"},
-           "geometry": {"version": 1, "parameters": {"a": {"value": a}}, "components": {"xs": {
-               "dimension": "2d", "domain": {"xmin": -6, "xmax": 6, "ymin": -6, "ymax": 6},
+    doc = {"openphysics": "0.3",
+           "geometry": {"version": 1, "parameters": {"a": {"value": f"{a!r} um"}}, "components": {"xs": {
+               "dimension": "2d", "length_unit": "um", "depth": None,
+               "domain": {"xmin": -6, "xmax": 6, "ymin": -6, "ymax": 6},
                "background": {"material": None},
                "features": [{"name": "ring", "type": "circle", "cx": 0, "cy": 0, "r": b, "material": "k"},
                             {"name": "hole", "type": "circle", "cx": 0, "cy": 0, "r": "a", "material": None}]}}}}

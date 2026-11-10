@@ -9,8 +9,7 @@
 
 The registry, its unit menus, sign sentences and diagnostic codes live in physmat
 (docs/packages/physmat/units.md); simcase only maps document paths to its quantities
-(``simcase.slots``). This module replaces ``simcase.unit_vocabulary`` when the format 0.2
-reader is retired.
+(``simcase.slots``). This module replaced ``simcase.unit_vocabulary`` (units batch C11a).
 """
 
 from __future__ import annotations

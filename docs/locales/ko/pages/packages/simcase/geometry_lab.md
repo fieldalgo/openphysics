@@ -44,8 +44,8 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 ## 보내는 것과 받는 것
 
 `POST /api/geometry-lab/evaluate`는 `{"doc": <문서>, "component": <이름 또는 null>}`을 받습니다.
-`python -m simcase geometry`처럼 `geometry` 블록(형식 0.2 문서는 `units` 블록도)만 읽으므로 물리가 없는 문서도
-받습니다. 제공 시작 예제와 새 문서는 형식 0.3이며 구성 요소의 `length_unit`이 그림 단위를 정합니다. 응답은 구성
+`python -m simcase geometry`처럼 형식 0.3 문서의 `geometry` 블록만 읽으므로 물리가 없는 문서도 받고, 다른 형식의
+문서는 이름을 밝혀 거부합니다(`E-FORMAT`). 제공 시작 예제와 새 문서는 형식 0.3이며 구성 요소의 `length_unit`이 그림 단위를 정합니다. 응답은 구성
 요소의 셀, 곡선(구성 요소 길이 단위의 점), 면적이 붙은 영역, 항목 번호가 붙은 선택, 경계 태그, 파라미터(쓴 값과 평가한
 값), 반올림, 엔진 출력이 담긴 `{"ok": true, ...}`이거나 `{"ok": false, "refused": <메시지>}`입니다. 이 페이지를
 위한 보기이며 저장 형식이 아니고 문서 계약에 속하지 않습니다.
@@ -68,7 +68,7 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 |---|---|
 | GL-1 두 예제에서 엔진 출력이 `python -m simcase geometry`와 같고, 영역·선택·곡선 출처·태그가 엔진과 같음 | `tests/simcase/test_studio_geometry_lab.py` |
 | GL-2 파라미터 편집(범위 안 세 값과 식) 뒤 셀 면적·꼭짓점·곡선·선택이 새로 돌린 엔진 결과와 `==`로 같음 | 같은 파일 |
-| GL-3 거부에 엔진 메시지가 그대로 실림: 자기 교차 path, 원 위에 없는 원호 끝, `3d` 구성 요소, 빈 선택, 파라미터 순환, 0.2 블록(CLI 문구) | 같은 파일 |
+| GL-3 거부에 엔진 메시지가 그대로 실림: 자기 교차 path, 원 위에 없는 원호 끝, `3d` 구성 요소, 빈 선택, 파라미터 순환, `version` 없는 평면 블록(CLI 문구) | 같은 파일 |
 | GL-4 저장한 글이 편집한 문서와 같은 모델로 다시 파싱됨 | 같은 파일과 브라우저 검사 |
 | GL-5 실제 브라우저: 두 시작 문서, 슬라이더·입력 편집, 거부, 저장에서 콘솔 오류와 정책 위반 없음 | `tools/studio_browser/geometry_lab_browser.mjs`(로컬, Playwright 필요, CI 밖) |
 | GL-6 페이지의 순수 도우미 | `tests/simcase/studio_geometry_lab.cjs` |

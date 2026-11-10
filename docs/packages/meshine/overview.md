@@ -314,8 +314,11 @@ grading; meshine's guarantee is the angle bound.
 
 `meshine.geometry_v1.to_geometry_v1(domain, length_unit=...)` writes a `Domain`,
 before `build`, as a version 1 geometry block of the
-[simcase geometry document](../simcase/geometry_document.md). A `Domain` carries no
-unit, so `length_unit` is required. See
+[simcase geometry document](../simcase/geometry_document.md), in format 0.3, and a
+`mesh` part (the default size as `element_size`, circle vertex counts as
+`circle_segment_count` controls). A `Domain` carries no unit, so `length_unit` is
+required, one of the format 0.3 length units `pm nm Angstrom um mm cm m in mil`; it is
+written on the component, and region sizes become `element_size` strings in it. See
 [the adapters](../simcase/geometry_reader.md#adapters-from-sipi-and-meshine).
 
 ## Limits

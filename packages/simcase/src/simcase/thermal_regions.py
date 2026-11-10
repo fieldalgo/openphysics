@@ -107,15 +107,13 @@ def boundary_names(doc):
     return tags, outside, inside
 
 
-def void_area_m2(doc):
-    """The area of a version 1 document's void cells in square metres (holes in the mesh)."""
+def void_area(doc):
+    """The area of a format 0.3 version 1 document's void cells in square metres (holes in the
+    mesh); 0.0 without a version 1 block. (``void_area_m2`` before units batch C11a: no unit
+    suffix in API names.)"""
     if not getattr(doc, 'is_version_1', False):
         return 0.0
-    rc = doc.complex()
-    if doc.si is not None:                       # format 0.3: the engine works in pm
-        return sum(c.area for c in rc.cells if c.void) / 1e24
-    pm_per_m = float(doc._pm_per_unit()) / float(doc.scale.to_si(1.0, {'length': 1}))   # pm per unit / m per unit
-    return sum(c.area for c in rc.cells if c.void) / pm_per_m ** 2
+    return sum(c.area for c in doc.complex().cells if c.void) / 1e24       # the engine works in pm
 
 
 def _version_1_region_geometry(doc, label='heat'):
@@ -333,9 +331,9 @@ def handoff_03(doc):
     h = RegionHandOff(tree)
     h.scale = units.resolve(tree['units'])
     if 'version' in g:
-        from .geometry_document import GeometryError, parse
+        from .geometry_document import GeometryError, parse_handoff
         try:
-            model = parse(tree)
+            model = parse_handoff(tree)
         except GeometryError as exc:
             raise DocumentError(str(exc)) from None
         h.geometry_model, h.geometry_source = model, copy.deepcopy(geometry)
@@ -728,9 +726,9 @@ def _limited_mesh(grid, limits, generate):
 
 
 def region_inputs(doc, mesh, region_materials, heat=None, names=None):
-    """solve_steady_heat keyword arguments for a meshed region document (from its internal SI
-    view, ``simcase.views.region_heat``, or the given ``heat`` view). ``names`` maps the format
-    0.2 keys the messages name to the document's own keys (``NAMES_03`` for format 0.3)."""
+    """solve_steady_heat keyword arguments for a meshed format 0.3 region document, from its
+    ``heat`` view (``views.region_heat_03``). ``names`` maps the keys the messages name to the
+    document's own keys (``NAMES_03``)."""
     name, _ = doc.sole_physics()
     path = f'physics.{name}'
     key = (lambda k: k) if names is None else (lambda k: names.get(k, k))      # noqa: E731

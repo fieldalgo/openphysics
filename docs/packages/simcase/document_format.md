@@ -57,7 +57,8 @@ own text; for a tree without `Decimal` the bytes are identical.
 `"openphysics"` must be the JSON **string** `"0.3"`. A missing key, the number `0.3`, `"0.2"`
 or any other value is `E-FORMAT` at `openphysics`, and reading stops: format 0.2 documents are
 not read by this reader. The document's physics types choose its kind as today; a kind that
-does not read format 0.3 yet refuses with `E-CONTRACT` at `physics.<name>.type`.
+does not read format 0.3 yet refuses with `E-CONTRACT` at `physics.<name>.type`, and a type that
+no kind claims is `E-VALUE-FORM` there, naming the physics types this release reads.
 
 Top-level keys: `openphysics name geometry materials physics mesh study results
 display_units`. `units` is `E-KEY-UNKNOWN` with "units travel with each value".
@@ -255,8 +256,9 @@ python -m simcase fix model.json [--in-place]
   applies a suggestion, lists what it did, and refuses to write unless every SI value the
   document resolved before is bit-identical after. Without `--in-place` it prints the result.
 
-For a format 0.2 document `validate` and `run` behave as before; `explain` and `fix` refuse
-it.
+A format 0.2 document is refused by every command (exit code 2): `validate` and `run` print
+its `E-FORMAT` refusal with what to write instead, and `explain` and `fix` refuse it. `simcase
+geometry` refuses it by name too.
 
 ## Python
 
@@ -306,9 +308,12 @@ on which built-in kinds read format 0.3 yet.
 
 ## Not done yet
 
-- The Studio's raw-byte reading and quantities endpoint; then the retirement of the 0.2
-  reader, `simcase.units` and `simcase.unit_vocabulary`. (Every kind, `em.cavity3d` last, has
-  its physics slots, examples and results under registry names.)
+- The retirement of `simcase.units` and of the internal format 0.2 helpers that the kernel
+  hand-offs still use (the micrometre copy, the unit-declared geometry reading and the
+  `em.modes2d` 0.2 validator as the kernel contract). (Every kind, `em.cavity3d` last, has its
+  physics slots, examples and results under registry names; Studio reads raw bytes and serves
+  the quantities endpoint; the format 0.2 reader of user documents, `simcase.unit_vocabulary`
+  and `simcase.void_area_m2` are retired: `simcase.quantities` and `simcase.void_area`.)
 - Each remaining code is raised by the kind that needs it, with its step (`E-SPECTRAL` is
   raised by `em.modes2d` for an entry with more than one spectral key, `I-DEFAULT-BOUNDARY` by
   heat, electric/Joule, mechanics and `em.modes2d`, `E-OUTSIDE-VALID` by `joule.temperature2d`,

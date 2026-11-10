@@ -26,8 +26,8 @@ can mesh without solving and a caching layer can redo only what changed:
 __version__ = "0.0.2"
 __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
-           "run", "RunResult", "ElectricJouleRunResult", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError", "unit_vocabulary",
-           "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area_m2",
+           "run", "RunResult", "ElectricJouleRunResult", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError",
+           "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area",
            "GeometryError", "parse_geometry", "evaluate_geometry", "reader", "quantities"]
 
 
@@ -60,14 +60,13 @@ def _import_runner() -> None:
     from .geometry import build_domain
     from .mesh_limits import MeshLimitError, check_mesh_limits
     from .complexity import RegionComplexity, region_complexity
-    from .thermal_regions import has_region_geometry, void_area_m2
+    from .thermal_regions import has_region_geometry, void_area
     from .fields import VectorField
     from .runner import MeshedModel, RunResult, build_mesh, run, solve_point, study_points
     from .schema import FORMAT, Document, DocumentError
     from .subspace_result import SubspaceSweepResult
     from .tracking import ModeTrackingError
     from .physics_pml_modes import ModeSelectionError
-    from .units import unit_vocabulary
     from .geometry_document import GeometryError, parse as parse_geometry
     from .geometry_engine import evaluate as evaluate_geometry
     from . import quantities, reader

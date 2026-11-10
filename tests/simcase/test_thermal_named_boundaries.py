@@ -173,10 +173,10 @@ def test_g5_5_the_transient_runner_fixes_a_selection_and_refuses_an_unknown_name
 # ----------------------------------------------------------------- review findings of 2026-11-08
 
 def test_studio_runs_a_void_document_on_both_region_routes():
-    from simcase.thermal_regions import void_area_m2
+    from simcase.thermal_regions import void_area
     hole_doc = Document.from_dict(plate([HOLE], physics={"prescribed_temperature": kelvin({"left": 300.0})}))
-    assert abs(void_area_m2(hole_doc) - math.pi * 9e-6) <= 1e-9 * math.pi * 9e-6
-    assert void_area_m2(Document.from_dict(EXAMPLES["thermal_regions"])) == 0.0
+    assert abs(void_area(hole_doc) - math.pi * 9e-6) <= 1e-9 * math.pi * 9e-6
+    assert void_area(Document.from_dict(EXAMPLES["thermal_regions"])) == 0.0
     from fastapi.testclient import TestClient
     from simcase.studio import server, thermal_api
     from simcase.studio import thermal_regions_api as regions

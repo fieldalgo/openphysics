@@ -107,17 +107,18 @@ def transient_region_versions_03(doc):
 
 
 def transient_region_inputs(doc, mesh, region_materials, heat=None, origin=None, names=None):
-    """solve_transient_heat keyword arguments for a meshed region document (from its internal SI
-    view, ``simcase.views.transient_region_heat``, or the given ``heat`` view and lower corner
-    ``origin`` in metres). ``names`` maps the format 0.2 keys the messages name to the
-    document's own keys (``thermal_regions.NAMES_03``)."""
+    """solve_transient_heat keyword arguments for a meshed format 0.3 region document, from its
+    ``heat`` view (``views.transient_region_heat_03``) and lower corner ``origin`` in metres
+    (``views.region_origin_03``). ``names`` maps the keys the messages name to the document's
+    own keys (``thermal_regions.NAMES_03``)."""
     name, _ = doc.sole_physics()
     where = f'physics.{name}'
     key = (lambda k: k) if names is None else (lambda k: names.get(k, k))      # noqa: E731
-    heat = views.transient_region_heat(doc) if heat is None else heat
+    if heat is None or origin is None:
+        raise TypeError('transient_region_inputs takes the heat inputs and origin of a format 0.3 document '
+                        '(views.transient_region_heat_03, views.region_origin_03)')
     times = heat.time
     nodes = np.asarray(mesh.nodes, dtype=float)
-    origin = views.region_origin_m(doc) if origin is None else origin
     spec = heat.initial_temperature
     with np.errstate(over='ignore', invalid='ignore'):
         initial = (np.full(len(nodes), spec) if not isinstance(spec, views.AffineTemperature)

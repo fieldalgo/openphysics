@@ -40,13 +40,6 @@ def is_transient_thermal(data):
                     for p in data["physics"].values()))
 
 
-def defaults():
-    return {"openphysics": "0.2", "name": "untitled",
-            "geometry": {"domain": None}, "materials": {}, "physics": {},
-            "mesh": {}, "study": {"type": "transient"},
-            "results": {"save_fields": True, "plots": False}}
-
-
 def _object(value, allowed, path, required=()):
     if not isinstance(value, dict):
         raise DocumentError(f"{path}: expected an object")

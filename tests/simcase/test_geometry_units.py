@@ -1,12 +1,14 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Version 1 geometry blocks in format 0.3 (units batch C4, critique K8).
+"""Version 1 geometry blocks in format 0.3 (units batch C4, critique K8; C11a).
 
 A format 0.3 block declares ``length_unit`` per component (and ``depth`` on a 2d one), its
-geometry parameters carry their unit, and element sizes are quantity strings. The same
-geometry written in 0.2 and in 0.3 must give the same picometre model, the same design
-velocity, the same region-complex summary and the same geometry-lab view; every refusal
-carries its diagnostic code and path. The 0.2 parse is unchanged (its own tests).
+geometry parameters carry their unit, and element sizes are quantity strings. The kernel
+hand-off's own reading of its unit-declared tree (``parse_handoff``) gives the same picometre
+model as the format 0.3 reading; the design velocity does not depend on the length unit;
+every refusal carries its diagnostic code and path. Since C11a the public readers (``parse``,
+``design_velocity``, the geometry lab and ``simcase geometry``) refuse a format 0.2 document
+by name (``E-FORMAT``).
 """
 
 from __future__ import annotations
@@ -117,8 +119,9 @@ RECT02 = {"openphysics": "0.2", "units": {"length": "um"},
 
 @pytest.mark.parametrize("name", EXAMPLES)
 def test_the_same_geometry_gives_the_same_picometre_model(name):
+    """The kernel hand-off's unit-declared reading and the format 0.3 reading agree."""
     old = _example(name)
-    m2, m3 = gd.parse(old), gd.parse(as_v03(old))
+    m2, m3 = gd.parse_handoff(old), gd.parse(as_v03(old))
     assert (m2.format, m3.format) == ("0.2", "0.3")
     assert m3.pm_per_unit is None and m3.units_length is None
     for cname, c2 in m2.components.items():
@@ -150,30 +153,55 @@ def test_each_component_reads_its_own_unit():
     assert evaluate(model, "b").summary(model).split("\n")[0].endswith("nm")
 
 
+def _in_nanometres(doc03: dict) -> dict:
+    """The same format 0.3 geometry written in nanometres (numbers x 1000, parameters in nm)."""
+    out = copy.deepcopy(doc03)
+    for spec in out["geometry"]["parameters"].values():
+        spec["value"] = f"{Fraction(str(spec['value']).removesuffix(' um')) * 1000} nm"
+    for comp in out["geometry"]["components"].values():
+        comp["length_unit"] = "nm"
+        comp["domain"] = {k: Decimal(str(v)) * 1000 for k, v in comp["domain"].items()}
+        for f in comp["features"]:
+            for k in ("x", "y"):
+                f[k] = Decimal(str(f[k])) * 1000
+    return out
+
+
 def test_design_velocity_is_the_same_number():
+    """V = dx/dp is a ratio of picometres: the same geometry in micrometres and in nanometres gives
+    the same exact velocities, and an offset as a quantity string or as picometres the same complex.
+    (Before C11a the reference was the format 0.2 document; the 0.2 reading is retired.)"""
     new = as_v03(RECT02)
+    nm = _in_nanometres(new)
+    assert gd.parse(nm).components["xs"].features[0].data == gd.parse(new).components["xs"].features[0].data
     for p in ("w", "t"):
-        v2, v3 = design_velocity(RECT02, p), design_velocity(new, p)
-        assert v3.vertices == v2.vertices and v3.curves.keys() == v2.curves.keys()
-        assert all(vars(v3.curves[k]) == vars(v2.curves[k]) for k in v2.curves)
-        assert {k: v for k, v in v3.defining.items()} == v2.defining
-        assert v3.delta_pm == v2.delta_pm
-    rc2, s2 = exact_complex(RECT02, "w", Fraction(1, 1000))
+        v_nm, v3 = design_velocity(nm, p), design_velocity(new, p)
+        assert v3.vertices == v_nm.vertices and v3.curves.keys() == v_nm.curves.keys()
+        assert all(vars(v3.curves[k]) == vars(v_nm.curves[k]) for k in v_nm.curves)
+        assert v3.defining == {k: v for k, v in v_nm.defining.items()}
+        assert v3.delta_pm == v_nm.delta_pm
+    rc_nm, s_nm = exact_complex(nm, "w", "1 nm")
     rc3, s3 = exact_complex(new, "w", "0.001 um")
-    assert signature(rc3) == signature(rc2) and rc3.vertices == rc2.vertices and s3 == s2
+    assert signature(rc3) == signature(rc_nm) and rc3.vertices == rc_nm.vertices and s3 == s_nm
     rc3b, _ = exact_complex(new, "w", Fraction(1000))                    # pm
     assert rc3b.vertices == rc3.vertices
+    with pytest.raises(gd.GeometryError) as caught:                    # the format 0.2 reading is retired
+        design_velocity(RECT02, "w")
+    assert (caught.value.code, caught.value.path) == ("E-FORMAT", "openphysics")
 
 
 def test_the_geometry_lab_reports_the_component_unit_and_si_parameters():
     pytest.importorskip("fastapi")
     from simcase.studio.geometry_api import evaluate_view
-    old = _example("geometry_v1_soi_strip")
-    v2, v3 = evaluate_view(old), evaluate_view(as_v03(old))
-    p2, p3 = v2.pop("parameters"), v3.pop("parameters")
-    assert v3 == v2 and v3["unit"] == "um"
+    new = as_v03(_example("geometry_v1_soi_strip"))
+    v3 = evaluate_view(new)
+    p3 = v3.pop("parameters")
+    model = gd.parse(new)
+    assert v3["unit"] == "um" and v3["summary"] == evaluate(model).summary(model)
     assert [p["value"] for p in p3] == [5e-07, 2.2e-07] and [p["unit"] for p in p3] == ["m", "m"]
-    assert [p["value"] for p in p2] == [0.5, 0.22]
+    with pytest.raises(gd.GeometryError) as caught:                    # the format 0.2 reading is retired
+        evaluate_view(_example("geometry_v1_soi_strip"))
+    assert (caught.value.code, caught.value.path) == ("E-FORMAT", "openphysics")
 
 
 def test_simcase_geometry_prints_a_0_3_file(tmp_path, capsys):
@@ -181,10 +209,11 @@ def test_simcase_geometry_prints_a_0_3_file(tmp_path, capsys):
     (tmp_path / "old.json").write_text(json.dumps(old), encoding="utf-8")
     new = as_v03(old)
     (tmp_path / "new.json").write_text(_dumps(new), encoding="utf-8")
-    assert main(["geometry", str(tmp_path / "old.json")]) == 0
-    old_out = capsys.readouterr().out
     assert main(["geometry", str(tmp_path / "new.json")]) == 0
-    assert capsys.readouterr().out == old_out
+    model = gd.parse(read(json.loads((tmp_path / "new.json").read_text(encoding="utf-8"))))
+    assert capsys.readouterr().out == evaluate(model).summary(model) + "\n"
+    assert main(["geometry", str(tmp_path / "old.json")]) == 2           # the format 0.2 reading is retired
+    assert 'openphysics is "0.2"; this reader reads the format "0.3"' in capsys.readouterr().err
 
 
 def _dumps(tree) -> str:

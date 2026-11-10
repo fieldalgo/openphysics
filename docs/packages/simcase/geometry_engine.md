@@ -11,8 +11,8 @@ parsed and builds the contract's **region complex**: cells with a region name, a
 material and the feature that owns them; curves of kind `line`, `arc` or
 `circle` with exact parameters, the provenance names of every feature part whose
 source curve contains them, and the cell on each side; and the resolved
-selections and boundary tags. It replaces the shapely booleans of the 0.2 route
-for everything the complex describes, and shapely is now a test reference only.
+selections and boundary tags. It replaces the shapely booleans of the flat-block
+route for everything the complex describes, and shapely is now a test reference only.
 
 The engine imports only the standard library. Nothing in it is approximate: the
 defining values are integer picometres, intersections of lines are rational,
@@ -118,10 +118,10 @@ Every refusal names the feature.
   (micrometres by default);
 - an arc becomes a polyline whose vertices the two cells on its sides share,
   with the vertex count a whole circle would get from `max(16, int(2πr /
-  (size / 2)))`, the 0.2 rule;
+  (size / 2)))`, the flat-block rule;
 - a `circle` curve becomes one `meshine.Circle` object that the inside cell and
   the surrounding cell's hole share, so mesh nodes on it are projected onto the
-  exact circle; its vertex count is raised above the 0.2 rule when needed so
+  exact circle; its vertex count is raised above the flat-block rule when needed so
   that the sagitta of its chords stays below the distance to the nearest other
   curve (a chord may not cut across a feature inside the circle), and a circle
   that would need more than 20000 vertices is refused by name;
@@ -154,7 +154,7 @@ internal constraints of `imprint` pieces, which meshine keeps but does not
 report as interfaces, are found too. This is the contract's `provenance_edges`
 field. For a version 1 document, `build_mesh` and the region heat mesh builder
 put it on the galerkin `Mesh` they return (`mesh.provenance_edges`, node pairs,
-the same in every unit); a 0.2 document's mesh carries `None`. Nothing in
+the same in every unit); a flat-block document's mesh carries `None`. Nothing in
 galerkin reads the field yet.
 
 A document with a version 1 geometry block is meshed through this route.
@@ -165,13 +165,13 @@ through the accessors `doc.domain`, `doc.background` and `doc.regions()` (one
 entry per declared region, merged features as one entry with the smallest
 `mesh_size`, `material` None for void), the canonical micrometre copy carries
 the model without re-reading the block, and `build_domain` evaluates the
-complex once (`doc.complex()`) and hands it to meshine as above, with the 0.2
-sliver rule (a piece under `1e-12` of the domain area is left out and noted in
+complex once (`doc.complex()`) and hands it to meshine as above, with the
+flat-block route's sliver rule (a piece under `1e-12` of the domain area is left out and noted in
 `doc.notes`). The mesh-limit routes (`check_mesh_limits`, a run with
 `max_input_vertices`) take the same engine route and count the same loop
 vertices. So `imprint`, `segment`, void, merged regions and `path` documents
 load and run. A homogeneous rectangle component and a box-only 3D component are
-still compiled to the 0.2 form their kinds read (`to_v02`), losslessly.
+still compiled to the flat block their kinds read (`to_v02`), losslessly.
 
 What the runners refuse, by name: the waveguide runner takes exterior edges on
 the four domain sides only, so a `boundary_tags` entry that renames a side, a
@@ -184,12 +184,12 @@ axisymmetric component is taken by steady region heat only ([axisymmetric
 documents](thermal_regions2d.md#axisymmetric-documents)); the waveguide and
 transient runners and Studio refuse it by name (the waveguide runner at validation, whatever `xmin` is); region heat refuses a
 feature that the domain cuts away or that is a sliver (a feature later
-features cover is allowed, as a covered 0.2 shape is). Arcs reach the mesher
-with the 0.2 circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle
+features cover is allowed, as a covered flat-block shape is). Arcs reach the mesher
+with the flat-block circle vertex rule, `max(16, 2πr / (mesh.size / 2))` per circle
 from the global mesh size, so a coarse `mesh.size` gives coarse arcs unless a
-`mesh.controls` entry says otherwise (below). A 0.2 block is meshed by the
+`mesh.controls` entry says otherwise (below). A flat block is meshed by the
 shapely route as before. The loops reach meshine in a different vertex order from the
-shapely route, so a version 1 copy of a 0.2 document gives a different refined
+shapely route, so a version 1 copy of a flat-block document gives a different refined
 mesh and results that agree at discretization level, as the contract's internal
 grid section says (region heat example: 595 against 597 nodes, maximum and mean
 temperature within 6e-4 and 4e-4 of the temperature rise; waveguide examples:
@@ -198,44 +198,46 @@ effective indices within 2e-6 to 1.6e-4).
 ### `mesh.controls`
 
 The contract's optional `mesh.controls` list is read for a version 1 document
-with a 2D region component (a 0.2 block has no selections and is refused with
-it). Each entry is `{"select": <target>, <one control>}`; later entries win.
+with a 2D region component (a flat block has no selections and is refused with
+it). Each entry is `{"select": <target>, <one control>}`; later entries win. The
+keys are those of [format 0.3](document_format.md); lengths are quantity strings.
 
 - `select` names a declared selection, or is a region selector (a region name,
   a feature id, `{"feature": ..}`, `{"material": ..}`) or, failing that, a
   boundary selector (a tag, a provenance name such as `core.boundary`,
   `{"of": ..}`, `{"between": ..}`). A name that is none of these is refused at
   load.
-- `circle_segments: n` (an integer, at least 8) sets the vertex count of every
-  circle that the selected curves lie on, or that bounds a selected cell, in
-  place of the 0.2 rule. A cut circle's arcs take their share of `n`. A whole
-  circle whose chords at `n` would cut across a neighbouring curve is raised to
-  the count the clearance needs and the raise is noted in the `notes` of the
-  document given to the runner (`build_mesh`, the region heat and transient
-  region runs); a result's own document is re-validated on every read, which
-  resets its notes, so read the note on the document you ran.
-- `size: h` (a positive length in `units.length`, converted with the document)
-  sets the mesh size of the selected cells, over the feature's own `mesh_size`.
-  A size on a boundary selection is not implemented yet and is refused by name,
-  as is the contract's `z_divisions`.
-- `near: h0, far: h1, distance: d` (three positive lengths, together) is the
-  contract's distance grading: the mesh size is `h0` on the selection and grows
-  linearly with the distance from it to `h1` at `d` and beyond. The distance is
-  to a boundary selection's curves (polylines and true circles) and to a region
-  selection's cells, zero inside them. Several gradings, and the 0.2
-  `mesh.grading`, combine by minimum; meshine also takes the minimum with the
+- `circle_segment_count: n` (an integer, at least 8) sets the vertex count of
+  every circle that the selected curves lie on, or that bounds a selected cell,
+  in place of the flat-block rule. A cut circle's arcs take their share of `n`. A
+  whole circle whose chords at `n` would cut across a neighbouring curve is
+  raised to the count the clearance needs, and the raise is reported as
+  `I-MESH-CONTROL-RAISED` at `mesh.controls` in the diagnostics of the document
+  given to the runner (`build_mesh`, the region heat and transient region runs).
+- `element_size: "h"` (a positive length) sets the mesh size of the selected
+  cells, over the feature's own `element_size`. A size on a boundary selection
+  is not implemented yet and is refused by name, as is the contract's
+  `z_divisions`.
+- `near: "h0", far: "h1", refinement_distance: "d"` (three positive lengths,
+  together) is the contract's distance grading: the mesh size is `h0` on the
+  selection and grows linearly with the distance from it to `h1` at `d` and
+  beyond. The distance is to a boundary selection's curves (polylines and true
+  circles) and to a region selection's cells, zero inside them. Several
+  gradings, and `mesh.grading`, combine by minimum; meshine also takes the minimum with the
   cells' own sizes. Both runners apply it (`runner.build_mesh`, the region heat
   mesh builder, the mesh-limit routes).
 
-`rc.to_domain(size, controls=[...])` takes the same entries with lengths in
-picometres (`Document.controls_pm()`, which checks the entries first);
+`rc.to_domain(size, controls=[...])` takes the same entries under the engine's
+names (`size`, `near`, `far`, `distance`, `circle_segments`) with lengths in
+picometres (`Document.controls_pm()`);
 `rc.size_function(controls, unit_pm)` is the gradings' size function in mesher
 units after a hand-off (`geometry.size_function(doc)` for a document);
 `rc.select(expr)` resolves a target to `("region", cells)` or
 `("boundary", curves)`.
 
-The runner's micrometre copy (`runner.micrometre_document`) keeps a version 1
-block in the document's own unit while its `units.length` says micrometres (the
+The kernel hand-off's micrometre copy (`runner.micrometre_document`, internal)
+keeps a version 1 block in the component's own unit while its `units.length` says
+micrometres (the
 engine is unit-free, so nothing re-reads the block); the copy records that unit
 in `geometry_block_unit` and refuses `to_dict()` and `save()`. Results record
 the original document.
@@ -265,8 +267,9 @@ nv = dv.node_velocity(generate(domain, namer))
 nv.values, nv.curve, nv.vertex           # (N, 2) V of nodes on curves; their curve and vertex, -1 otherwise
 ```
 
-**What V is.** x and p are both lengths in the document unit, so V is
-dimensionless. V is computed at the rounded geometry, from the unrounded
+**What V is.** x and p are both exact picometres (each component reads its
+numbers in its `length_unit`, and a length parameter carries its unit), so V is
+dimensionless and does not depend on the unit. V is computed at the rounded geometry, from the unrounded
 expressions:
 - **Length fields.** The expressions are evaluated once more with p as a dual
   number.
@@ -327,7 +330,7 @@ Measured on 2026-11-04 (Linux, Python 3.12, pinned environment):
 | G2-3 Euler | on every complex the tests build: V − E + F = 1 + C, cells tile the domain within 1e-12 | pass |
 | G2-4 invariance | translation by whole picometres, 90° rotation and mirror keep the cells, curves, provenance and areas | pass |
 | G2-5 degenerate inputs | externally and internally tangent circles, concentric rings, collinear overlapping edges, a vertex on an edge, three curves through one point, the 8 × 8 grid of touching rects in nm, µm and m (64 cells, 144 curves), against hand-derived counts and areas | pass |
-| G2-6 current documents | all 51 built-in and example documents: region names, materials and face counts equal the shapely route's; areas equal except where a circle is involved | pass; circle regions differ by the 128-gon approximation (4.0e-4 of a circle's area, 1.3e-5 of a fibre cladding), one zero-area sliver part of the 0.2 route (`pml_leaky_slab`, the `0.47 + 2.0` corner) is absent |
+| G2-6 current documents | all 51 built-in and example documents: region names, materials and face counts equal the shapely route's; areas equal except where a circle is involved | pass; circle regions differ by the 128-gon approximation (4.0e-4 of a circle's area, 1.3e-5 of a fibre cladding), one zero-area sliver part of the shapely route (`pml_leaky_slab`, the `0.47 + 2.0` corner) is absent |
 | G2-7 time | Studio maximum (8 shapes × 12 vertices) under 0.2 s; a PCB-like plane with 200 features under 10 s, pure Python | 0.07–0.08 s and 2.2–2.3 s |
 
 The gate values of G2-7 are proposals confirmed after this measurement; the

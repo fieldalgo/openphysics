@@ -62,25 +62,16 @@ from .mode_postprocessing import validate_mode_overlap
 from .tracking import tracking_settings
 from .registry import kind_of, physics_types
 
-FORMAT = "0.2"
-DEFAULT_PHYSICS = "em1"
+#: the document format this release reads (``resolve.FORMAT``); another is refused by name
+FORMAT = "0.3"
+#: the envelope of the internal kernel hand-offs (``thermal_regions.handoff_03``,
+#: ``modes_document.kernel_document``), which declare their length unit in a ``units`` block and
+#: are checked by the kernel contract below (``check_format_units_and_tags``,
+#: ``validate_em_modes2d``); never a user document's, and retired with the hand-offs
+HANDOFF_FORMAT = "0.2"
 
-#: base dimensions each physics needs a declared unit for
+#: base dimensions each physics needs a declared unit for (the em kernel contract)
 PHYSICS_REQUIRES = {"em.modes2d": {"length"}}
-
-DEFAULTS: dict[str, Any] = {
-    "openphysics": FORMAT,
-    "name": "untitled",
-    "geometry": {"domain": None, "background": {"material": "vacuum"}, "shapes": []},
-    "materials": {},
-    "physics": {DEFAULT_PHYSICS: {"type": "em.modes2d", "formulation": "scalar", "wavelength": 1.55,
-                                  "num_modes": 1,
-                                  "boundary": {"left": "pec", "right": "pec", "top": "pec",
-                                               "bottom": "pec"}}},
-    "mesh": {"size": 0.2, "min_angle": 28.0, "grading": None},
-    "study": {"type": "single"},
-    "results": {"save_fields": True, "plots": True},
-}
 
 SHAPE_TYPES = {"rect": {"x", "y", "w", "h"}, "circle": {"cx", "cy", "r"}, "polygon": {"points"}}
 BOUNDARY_TYPES = {"pec", "pmc"}
@@ -96,6 +87,28 @@ def steady_boundary_requested(data) -> bool:
         for p in physics.values())
 
 
+def not_read(d: dict) -> DocumentError:
+    """The refusal of a document object that is not format 0.3: ``E-FORMAT`` at ``openphysics``
+    (the format 0.2 reader is retired, units batch C11a). A format 0.2 document (``"0.2"`` or the
+    number) of a type a kind claims gets that kind's conversion hint, which names its renamed keys;
+    any other envelope, or a 0.2 document no kind claims, gets the reader's
+    (``resolve.format_refusal``). Nothing is merged with defaults: a kind's validator, given the
+    document as written, refuses it by name before reading anything else."""
+    from .resolve import format_refusal
+    fmt = d.get("openphysics")
+    if str(fmt) == "0.2" and not isinstance(fmt, bool):            # "0.2", or the number (float or Decimal)
+        kind = kind_of(d)
+        physics = d.get("physics") if isinstance(d.get("physics"), dict) else {}
+        if any(isinstance(p, dict) and p.get("type") in kind.types for p in physics.values()):
+            try:
+                kind.validate(Document(copy.deepcopy(d)))    # each kind refuses a 0.2 document by name
+            except DocumentError as exc:
+                if exc.code == "E-FORMAT":
+                    return exc
+    refusal = format_refusal(d)
+    return DocumentError(refusal.message, path=refusal.path, code=refusal.code)
+
+
 def __getattr__(name: str):
     # Derived from the registry on access: the kinds register when their modules
     # import, and those modules import this one.
@@ -105,10 +118,11 @@ def __getattr__(name: str):
 
 
 def check_format_units_and_tags(doc: "Document") -> None:
-    """The format version, the unit system and no tagged values: shared by most kinds."""
+    """The kernel contract's envelope: the hand-off format (``HANDOFF_FORMAT``), its declared
+    unit system and no tagged values (``validate_em_modes2d`` on ``modes_document.kernel_document``)."""
     d = doc.data
-    if str(d.get("openphysics")) != FORMAT:
-        raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {FORMAT}")
+    if str(d.get("openphysics")) != HANDOFF_FORMAT:
+        raise DocumentError(f"unsupported openphysics format {d.get('openphysics')!r}; this reader handles {HANDOFF_FORMAT}")
     try:
         doc.scale = units.resolve(d.get("units"))
     except UnitError as exc:
@@ -130,19 +144,9 @@ def reject_tagged_values(node, path: str = "") -> None:
         if len(node) == 2 and isinstance(node[1], str) and isinstance(node[0], (int, float)):
             raise DocumentError(
                 f"{path}: tagged quantities ([value, unit]) are reserved and not accepted in "
-                f"openphysics {FORMAT}; write a bare number in the units the document declares")
+                f"openphysics {HANDOFF_FORMAT}; write a bare number in the units the document declares")
         for i, v in enumerate(node):
             reject_tagged_values(v, f"{path}.{i}")
-
-
-def _merge(defaults: dict, given: dict) -> dict:
-    out = copy.deepcopy(defaults)
-    for k, v in given.items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = _merge(out[k], v)
-        else:
-            out[k] = copy.deepcopy(v)
-    return out
 
 
 def _material_number(value, path: str) -> None:
@@ -200,7 +204,7 @@ def _validate_material(spec, path: str) -> None:
 
 @dataclass
 class Document:
-    data: dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULTS))
+    data: dict[str, Any] = field(default_factory=dict)
     #: resolved by validate(); the document's numbers mean nothing without it
     scale: Scale = field(default=units.SI, init=False, repr=False)
     #: magnitude warnings from validate(); a scale error is not an invalid document
@@ -242,44 +246,7 @@ class Document:
             return cls._accepted(resolve_tree(d))
         if not isinstance(d, dict):
             raise DocumentError('document: expected an object')
-        source, roundings, model, complex_ = None, [], None, None
-        geometry = d.get("geometry")
-        if isinstance(geometry, dict) and "version" in geometry:
-            # A version 1 geometry block (docs/packages/simcase/geometry_document.md) is read
-            # exactly. A 2D region component stays in ``data`` as written: the validators
-            # read it through the accessors (domain, background, regions) and the exact
-            # engine meshes it (geometry.build_domain). A homogeneous rectangle or a box-only
-            # 3D component is compiled to the 0.2 form its kind reads. The envelope stays 0.2.
-            from .geometry_document import GeometryError, _pick, parse, to_v02
-            try:
-                model = parse(d)
-                comp = _pick(model, None)
-                homogeneous = not comp.features and "material" not in comp.background
-                if comp.dimension == "3d" or homogeneous:
-                    d = {**d, "geometry": to_v02(model, validation=True)}
-                else:
-                    d = {**d, "geometry": copy.deepcopy(geometry)}
-            except GeometryError as exc:
-                raise DocumentError(str(exc)) from None
-            source, roundings = copy.deepcopy(geometry), model.roundings
-        kind = kind_of(d)
-        defaults = DEFAULTS if kind.defaults is None else kind.defaults()
-        doc = cls(_merge(defaults, d))
-        if model is not None and "version" in d["geometry"]:
-            doc.data["geometry"] = d["geometry"]            # the kind's 0.2 geometry defaults do not apply
-        doc.geometry_model = model
-        doc.validate()
-        doc.geometry_source, doc.geometry_roundings = source, list(roundings)
-        doc.check_mesh_controls()
-        if doc.is_version_1 and any(f.type == "segment" for f in doc.component.features):
-            from .geometry_engine import check_handoff
-            try:
-                check_handoff(doc.complex())
-            except GeometryError as exc:
-                raise DocumentError(str(exc)) from None
-        doc.notes.extend(f"{r.path}: {r.written} moved {float(r.displacement_pm):.3g} pm onto the 1 pm grid"
-                         for r in roundings)
-        return doc
+        raise not_read(d)
 
     @classmethod
     def load(cls, path: str | Path) -> "Document":
@@ -850,7 +817,7 @@ class Document:
         p, m, st = self.data["physics"], self.data["mesh"], self.data["study"]
         dom, bg = self.domain, self.background
         length = self.length_unit
-        lines = [f"{self.data['name']}  (openphysics {FORMAT})",
+        lines = [f"{self.data['name']}  (openphysics {HANDOFF_FORMAT})",
                  f"  domain x [{dom['xmin']}, {dom['xmax']}]  y [{dom['ymin']}, {dom['ymax']}] {length}",
                  f"  background: {bg.get('material')}"]
         for s in self.regions():

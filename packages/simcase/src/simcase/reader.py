@@ -167,7 +167,44 @@ def parse(raw) -> tuple[Any, list[Diagnostic]]:
     except RecursionError:
         return None, [Diagnostic("E-JSON", "", "the JSON nesting is too deep")]
     found: list[Diagnostic] = []
-    return _clean(tree, [], found), found
+    tree = _clean(tree, [], found)
+    broken = _unpaired_surrogates(tree)
+    if broken:
+        return None, broken
+    return tree, found
+
+
+#: an escaped unpaired surrogate (``"\\ud800"``) is valid JSON syntax but not Unicode text: no
+#: UTF-8 writer can carry it back (``simcase validate`` printing a summary, Studio's replies)
+_SURROGATE = ("holds an escaped unpaired surrogate (\\ud800 to \\udfff without its pair), which is not "
+              "Unicode text; write the character itself or its complete pair")
+
+
+def _is_text(value: str) -> bool:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _unpaired_surrogates(tree) -> list[Diagnostic]:
+    """``E-JSON`` at each string of the tree that holds an escaped unpaired surrogate; a key that
+    holds one is reported at its object (its own path could not be written either)."""
+    found, pending = [], [(tree, [])]
+    while pending:
+        node, segments = pending.pop()
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if _is_text(key):
+                    pending.append((value, [*segments, key]))
+                else:
+                    found.append(Diagnostic("E-JSON", display_path(segments), f"a key of this object {_SURROGATE}"))
+        elif isinstance(node, list):
+            pending.extend((value, [*segments, i]) for i, value in enumerate(node))
+        elif isinstance(node, str) and not _is_text(node):
+            found.append(Diagnostic("E-JSON", display_path(segments), f"the string {_SURROGATE}"))
+    return sorted(found, key=lambda d: d.path)
 
 
 def _clean(node, segments, found):
@@ -219,6 +256,9 @@ def read_with_diagnostics(obj) -> tuple[Any, list[Diagnostic]]:
 
 def _read(node, segments, found, active):
     where = display_path(segments)
+    if isinstance(node, str) and not _is_text(node):
+        found.append(Diagnostic("E-JSON", where, f"the string {_SURROGATE}"))
+        return None
     if node is None or isinstance(node, (bool, str)):
         return node
     if isinstance(node, numbers.Integral):
@@ -245,6 +285,9 @@ def _read(node, segments, found, active):
                 for k, v in node.items():
                     if not isinstance(k, str):
                         found.append(Diagnostic("E-JSON", where, f"key {k!r} is not a string; JSON keys are strings"))
+                        continue
+                    if not _is_text(k):
+                        found.append(Diagnostic("E-JSON", where, f"a key of this object {_SURROGATE}"))
                         continue
                     out[k] = _read(v, segments + [k], found, active)
                 return out

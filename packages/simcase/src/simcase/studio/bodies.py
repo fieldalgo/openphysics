@@ -7,8 +7,8 @@ Every Studio route that takes a document reads the request bytes with ``simcase.
 (``read_envelope``): a number keeps its written digits (``Decimal``), and a duplicate key,
 ``NaN``, ``Infinity``, malformed JSON, a byte that is not UTF-8 or a UTF-16/32 text is refused
 with its code (``E-JSON``, ``E-KEY-DUPLICATE``), and so is a string that holds an escaped unpaired
-surrogate (``"\\ud800"``: not Unicode text, so no UTF-8 reply could carry it back, as the heat routes
-already refused); a leading UTF-8 byte order mark is accepted.
+surrogate (``"\\ud800"``: not Unicode text, so no UTF-8 reply could carry it back; the reader refuses
+it at its path); a leading UTF-8 byte order mark is accepted.
 A reply that returns the document writes it with ``reader.dumps`` (``exact_json``), so an
 unchanged authored document comes back byte for byte apart from whitespace and the spelling of
 string escapes (``"\\u00b5"`` comes back as ``"µ"``).
@@ -20,7 +20,6 @@ import dataclasses
 import re
 
 from fastapi.responses import Response
-from physmat.units import Diagnostic
 
 from simcase import reader
 
@@ -39,39 +38,6 @@ def _in_document(d):
     if found:
         message = found.group(1) + (path or "<document>") + found.group(3)
     return dataclasses.replace(d, path=path, message=message)
-
-
-def _unpaired_surrogates(tree) -> list:
-    """``E-JSON`` at each string of the request that holds an escaped unpaired surrogate; a key that
-    holds one is reported at its object (its own path could not be written either)."""
-    found, pending = [], [(tree, [])]
-    while pending:
-        node, segments = pending.pop()
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if _is_text(key):
-                    pending.append((value, [*segments, key]))
-                else:
-                    found.append(_surrogate(segments, "a key of this object"))
-        elif isinstance(node, list):
-            pending.extend((value, [*segments, i]) for i, value in enumerate(node))
-        elif isinstance(node, str) and not _is_text(node):
-            found.append(_surrogate(segments, "the string"))
-    return sorted(found, key=lambda d: d.path)
-
-
-def _is_text(value: str) -> bool:
-    try:
-        value.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
-
-
-def _surrogate(segments, what: str):
-    return Diagnostic("E-JSON", reader.display_path(segments),
-                      f"{what} holds an escaped unpaired surrogate (\\ud800 to \\udfff without its pair), "
-                      "which is not Unicode text; write the character itself or its complete pair")
 
 
 def diagnostics(found) -> list[dict]:
@@ -105,8 +71,6 @@ def read_envelope(raw: bytes, *, optional=()) -> tuple[dict, list]:
     a duplicate key or an oversized number inside ``doc`` is returned as a diagnostic of the document,
     at its document path."""
     tree, found = reader.parse(raw)
-    if tree is not None and (broken := _unpaired_surrogates(tree)):
-        tree, found = None, broken
     if tree is None:
         raise RequestRefused("the request is not readable JSON: " + "; ".join(
             f"{d.path}: {d.message}" if d.path else d.message for d in found), found)
