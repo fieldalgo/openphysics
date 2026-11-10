@@ -13,22 +13,31 @@ import pytest
 
 from simcase import Document, DocumentError, examples, run
 from simcase.cli import main
+from simcase.thermal_regions import handoff_03
 from refsol.thermal_multilayer import layered_slab
 
 
 def wall(size=1., unit='mm', scale=1.):
     """Steel plate 10 mm + insulation 20 mm, 5 mm high, Q only in the steel."""
     s = scale
-    return {'openphysics': '0.2', 'name': 'layered wall', 'units': {'length': unit, 'temperature': 'K'},
-            'geometry': {'domain': {'xmin': 0., 'xmax': 30.*s, 'ymin': 0., 'ymax': 5.*s},
+    return {'openphysics': '0.3', 'name': 'layered wall',
+            'geometry': {'length_unit': unit, 'depth': None,
+                         'domain': {'xmin': 0., 'xmax': 30.*s, 'ymin': 0., 'ymax': 5.*s},
                          'background': {'material': 'insulation'},
                          'shapes': [{'name': 'steel_plate', 'type': 'rect', 'x': 0., 'y': 0., 'w': 10.*s,
                                      'h': 5.*s, 'material': 'steel'}]},
-            'materials': {'steel': {'conductivity_w_mk': 45.}, 'insulation': {'conductivity_w_mk': .5}},
-            'physics': {'heat1': {'type': 'thermal.steady2d', 'heat_source_w_m3': {'steel_plate': 2e5},
-                                  'dirichlet_temperature_k': {'left': 400., 'right': 300.}}},
-            'mesh': {'size': size*s}, 'study': {'type': 'single'},
+            'materials': {'steel': {'thermal_conductivity': '45 W/(m K)'},
+                          'insulation': {'thermal_conductivity': '0.5 W/(m K)'}},
+            'physics': {'heat1': {'type': 'thermal.steady2d', 'heat_source_density': {'steel_plate': '2e5 W/m^3'},
+                                  'prescribed_temperature': {'left': '400 K', 'right': '300 K'}}},
+            'mesh': {'element_size': f'{size*s!r} {unit}'}, 'study': {'type': 'single'},
             'results': {'save_fields': True, 'plots': False}}
+
+
+def handoff(data):
+    """The mesh hand-off of a heat region document (its geometry in the document's
+    length_unit), which the geometry helpers take."""
+    return handoff_03(Document.from_dict(data))
 
 
 EXACT = dict(interfaces=[.01, .03], conductivities=[45., .5], left_temperature=400.,
@@ -46,10 +55,10 @@ def _errors(result):
     points = np.einsum('qi,tij->tqj', bary, mesh.nodes[mesh.triangles])
     exact = layered_slab(points.reshape(-1, 2), **EXACT,
                          layer=np.repeat(layer_of[mesh.regions], len(weights)))
-    th = np.einsum('qi,ti->tq', bary, result.temperature_k[mesh.triangles])
+    th = np.einsum('qi,ti->tq', bary, result.temperature[mesh.triangles])
     weight = mesh.areas()[:, None]*weights[None, :]
     dt = th-exact.temperature.reshape(th.shape)
-    dq = result.heat_flux_w_m2[:, None, :]-exact.heat_flux.reshape(*th.shape, 2)
+    dq = result.heat_flux[:, None, :]-exact.heat_flux.reshape(*th.shape, 2)
     return np.sqrt(np.sum(weight*dt**2)), np.sqrt(np.sum(weight[..., None]*dq**2))
 
 
@@ -62,7 +71,7 @@ def test_layered_wall_document_converges_to_the_exact_series_wall():
         a, b = _errors(r)
         t_err.append(a)
         q_err.append(b)
-        assert r.diagnostics['normalized_heat_balance_defect'] < 1e-10
+        assert r.diagnostics['relative_conservation_residual'] < 1e-10
     t_orders = np.log2(np.array(t_err[:-1])/np.array(t_err[1:]))
     q_orders = np.log2(np.array(q_err[:-1])/np.array(q_err[1:]))
     print('region wall T L2', t_err, t_orders, 'q L2', q_err, q_orders)
@@ -77,8 +86,8 @@ def test_length_unit_changes_only_the_document_numbers():
         result = run(Document.from_dict(wall(1., unit, scale)), verbose=False)
         np.testing.assert_array_equal(result.mesh.nodes, reference.mesh.nodes)
         np.testing.assert_array_equal(result.mesh.triangles, reference.mesh.triangles)
-        np.testing.assert_array_equal(result.temperature_k, reference.temperature_k)
-        np.testing.assert_array_equal(result.heat_flux_w_m2, reference.heat_flux_w_m2)
+        np.testing.assert_array_equal(result.temperature, reference.temperature)
+        np.testing.assert_array_equal(result.heat_flux, reference.heat_flux)
         t, q = _errors(result)
         assert t < 1.1e-6 and q < .25
 
@@ -93,17 +102,17 @@ def test_region_document_equals_a_direct_engine_call_and_balances_heat():
     bc = {int(i): 300. for i in mesh.boundary['bottom']}
     direct = solve_steady_heat(mesh, conductivity=k, heat_source=q, dirichlet=dict(sorted(bc.items())),
                                convection={'top': (10., 295.)})
-    np.testing.assert_array_equal(r.temperature_k, direct.temperature)
-    np.testing.assert_array_equal(r.reaction_w_per_m, direct.reaction)
+    np.testing.assert_array_equal(r.temperature, direct.temperature)
+    np.testing.assert_array_equal(r.reaction_heat_rate_per_depth, direct.reaction)
     heater = mesh.regions == mesh.region_names.index('heater')
-    np.testing.assert_allclose(r.diagnostics['source_heat_w_per_m'], 5e6*mesh.areas()[heater].sum(), rtol=1e-12)
+    np.testing.assert_allclose(r.diagnostics['generated_heat_rate_per_depth'], 5e6*mesh.areas()[heater].sum(), rtol=1e-12)
     # Inscribed polygon of the 2 mm circle: area within the O(h^2) chord error.
     assert abs(mesh.areas()[heater].sum()/(np.pi*4e-6)-1) < .01
-    assert r.diagnostics['normalized_heat_balance_defect'] < 1e-10
+    assert r.diagnostics['relative_conservation_residual'] < 1e-10
     # The heater is the hottest region and every heat path leaves through the bottom or top.
-    centroid_t = r.temperature_k[mesh.triangles].mean(axis=1)
+    centroid_t = r.temperature[mesh.triangles].mean(axis=1)
     assert centroid_t[heater].max() == centroid_t.max()
-    np.testing.assert_allclose(r.diagnostics['outward_heat_w_per_m'], r.diagnostics['source_heat_w_per_m'],
+    np.testing.assert_allclose(r.diagnostics['outward_heat_rate_per_depth'], r.diagnostics['generated_heat_rate_per_depth'],
                                rtol=1e-10)
 
 
@@ -112,23 +121,27 @@ def test_saved_fields_summary_and_model(tmp_path):
     r = run(doc, verbose=False)
     out = r.save(tmp_path/'out')
     with np.load(out/'fields.npz', allow_pickle=False) as f:
-        assert str(f['result_format']) == 'thermal.steady2d-regions-result-v1'
-        assert str(f['field_layout']) == 'thermal2d-p1-node-cell-regions-v1'
+        assert str(f['result_format']) == 'thermal.steady2d-regions-result-v2'
+        assert str(f['field_layout']) == 'thermal2d-p1-node-cell-regions-v2'
         regions = f['triangle_regions']
         assert regions.dtype.kind == 'i' and regions.shape == (len(f['triangles']),)
         np.testing.assert_array_equal(regions, r.mesh.regions)
-        for key in ('prescribed_outward_load_w_per_m', 'convective_outward_w_per_m', 'system_rhs_w_per_m'):
-            assert f[key].shape == f['temperature_k'].shape
+        for key in ('outward_prescribed_heat_rate_per_depth', 'outward_convective_heat_rate_per_depth',
+                    'applied_heat_rate_per_depth'):
+            assert f[key].shape == f['temperature'].shape
         meta = json.loads(str(f['metadata_json']))
     summary = json.loads((out/'summary.json').read_text())
     assert summary == meta
     assert summary['region_names'] == r.mesh.region_names
     assert summary['regions']['heater']['material'] == 'copper'
-    assert summary['materials'] == doc['materials']
-    assert summary['conductivity_range_w_mk'] == [.04, 400.]
-    assert summary['field_units']['triangle_regions'] == '1'
-    assert sum(v['area_m2'] for v in summary['regions'].values()) == pytest.approx(.04*.02, rel=1e-12)
-    assert json.loads((out/'model.json').read_text()) == doc.data
+    assert summary['materials'] == {m: {'thermal_conductivity': {'value': v, 'unit': 'W/(m K)'},
+                                        'source': 'document value'}
+                                    for m, v in (('steel', 45.), ('copper', 400.), ('insulation', .04))}
+    assert summary['minimum_thermal_conductivity'] == {'value': .04, 'unit': 'W/(m K)'}
+    assert summary['maximum_thermal_conductivity'] == {'value': 400., 'unit': 'W/(m K)'}
+    assert 'triangle_regions' not in summary['field_units'] and summary['field_locations']['triangle_regions'] == 'triangles'
+    assert sum(v['area']['value'] for v in summary['regions'].values()) == pytest.approx(.04*.02, rel=1e-12)
+    assert json.loads((out/'model.json').read_text()) == examples.EXAMPLES['thermal_regions']
 
 
 def test_cli_validates_and_runs_the_shipped_example(tmp_path, capsys):
@@ -147,34 +160,54 @@ def _bad(change):
     return data
 
 
+#: case -> (change, code, path) of the refusal (format 0.3 names)
 INVALID = {
-    'conductivity in physics': lambda d: d['physics']['heat1'].update(conductivity_w_mk=1.),
-    'undefined material': lambda d: d['geometry']['shapes'][0].update(material='aluminium'),
-    'material without conductivity': lambda d: d['materials']['steel'].pop('conductivity_w_mk'),
-    'optical key in material': lambda d: d['materials']['steel'].update(n=1.5),
-    'nonpositive conductivity': lambda d: d['materials']['steel'].update(conductivity_w_mk=0.),
-    'unknown source region': lambda d: d['physics']['heat1'].update(heat_source_w_m3={'core': 1.}),
-    'subdivisions': lambda d: d['mesh'].update(subdivisions=[4, 4]),
-    'missing mesh size': lambda d: d['mesh'].pop('size'),
-    'reserved name': lambda d: d['geometry']['shapes'][0].update(name='background'),
-    'duplicate name': lambda d: d['geometry']['shapes'].append(dict(d['geometry']['shapes'][0])),
-    'self-intersecting polygon': lambda d: d['geometry']['shapes'].append(
+    'conductivity in physics': (lambda d: d['physics']['heat1'].update(thermal_conductivity='1 W/(m K)'),
+                                'E-CONTRACT', 'physics.heat1.thermal_conductivity'),
+    'undefined material': (lambda d: d['geometry']['shapes'][0].update(material='aluminium'),
+                           'E-MATERIAL-UNKNOWN', 'geometry.shapes[0].material'),
+    'material without conductivity': (lambda d: d['materials']['steel'].pop('thermal_conductivity'),
+                                      'E-PROPERTY-MISSING', 'materials.steel.thermal_conductivity'),
+    'optical key in material': (lambda d: d['materials']['steel'].update(n=1.5), 'E-KEY-UNKNOWN',
+                                'materials.steel.n'),
+    'nonpositive conductivity': (lambda d: d['materials']['steel'].update(thermal_conductivity='0 W/(m K)'),
+                                 'E-DOMAIN', 'materials.steel.thermal_conductivity'),
+    'unknown source region': (lambda d: d['physics']['heat1'].update(heat_source_density={'core': '1 W/m^3'}),
+                              'E-SELECTION-UNKNOWN', 'physics.heat1.heat_source_density.core'),
+    'subdivisions': (lambda d: d['mesh'].update(subdivision_count=[4, 4]), 'E-KEY-UNKNOWN',
+                     'mesh.subdivision_count'),
+    'missing mesh size': (lambda d: d['mesh'].pop('element_size'), 'E-KEY-MISSING', 'mesh.element_size'),
+    'reserved name': (lambda d: d['geometry']['shapes'][0].update(name='background'), 'E-ID-CLASH',
+                      'geometry.shapes[0].name'),
+    'duplicate name': (lambda d: d['geometry']['shapes'].append(dict(d['geometry']['shapes'][0])), 'E-ID-CLASH',
+                       'geometry.shapes[1].name'),
+    'self-intersecting polygon': (lambda d: d['geometry']['shapes'].append(
         {'name': 'bow', 'type': 'polygon', 'points': [[0, 0], [2, 2], [2, 0], [0, 2]], 'material': 'steel'}),
-    'corner conflict': lambda d: d['physics']['heat1']['dirichlet_temperature_k'].update(top=350.),
-    'pure Neumann': lambda d: d['physics']['heat1'].update(dirichlet_temperature_k={}, outward_flux_w_m2={'left': 1.}),
-    'natural on Dirichlet side': lambda d: d['physics']['heat1'].update(outward_flux_w_m2={'left': 1.}),
-    'plots': lambda d: d['results'].update(plots=True),
-    'sweep': lambda d: d.update(study={'type': 'sweep'}),
-    'shape key': lambda d: d['geometry']['shapes'][0].update(depth=1.),
-    'min angle': lambda d: d['mesh'].update(min_angle=40.),
-    'no temperature unit': lambda d: d['units'].pop('temperature'),
+        'E-CONTRACT', 'geometry.shapes[1].points'),
+    'corner conflict': (lambda d: d['physics']['heat1']['prescribed_temperature'].update(top='350 K'),
+                        'E-CONTRACT', 'physics.heat1.prescribed_temperature.top'),
+    'pure Neumann': (lambda d: d['physics']['heat1'].update(prescribed_temperature={},
+                                                           inward_heat_flux={'left': '1 W/m^2'}),
+                     'E-KEY-MISSING', 'physics.heat1.prescribed_temperature'),
+    'natural on prescribed side': (lambda d: d['physics']['heat1'].update(inward_heat_flux={'left': '1 W/m^2'}),
+                                   'E-CONTRACT', 'physics.heat1.left'),
+    'plots': (lambda d: d['results'].update(plots=True), 'E-CONTRACT', 'results.plots'),
+    'sweep': (lambda d: d.update(study={'type': 'sweep'}), 'E-CONTRACT', 'study.type'),
+    'shape key': (lambda d: d['geometry']['shapes'][0].update(depth=1.), 'E-KEY-UNKNOWN',
+                  'geometry.shapes[0].depth'),
+    'min angle': (lambda d: d['mesh'].update(minimum_angle='40 deg'), 'E-DOMAIN', 'mesh.minimum_angle'),
+    'bare temperature': (lambda d: d['physics']['heat1']['prescribed_temperature'].update(left=400),
+                         'E-UNIT-MISSING', 'physics.heat1.prescribed_temperature.left'),
 }
 
 
 @pytest.mark.parametrize('case', sorted(INVALID))
 def test_invalid_region_documents_are_refused(case):
-    with pytest.raises(DocumentError):
-        Document.from_dict(_bad(INVALID[case]))
+    change, code, path = INVALID[case]
+    with pytest.raises(DocumentError) as refused:
+        Document.from_dict(_bad(change))
+    found = refused.value.diagnostics or [refused.value]
+    assert (code, path) in [(d.code, d.path) for d in found], [(d.code, d.path, str(d)) for d in found]
 
 
 def test_source_on_a_fully_covered_region_is_refused_at_meshing():
@@ -201,7 +234,7 @@ def test_a_fully_covered_shape_is_named_in_the_log():
     data['geometry']['shapes'] += [
         {'name': 'hidden', 'type': 'rect', 'x': 2., 'y': 1., 'w': 2., 'h': 2., 'material': 'insulation'},
         {'name': 'cover', 'type': 'rect', 'x': 1., 'y': .5, 'w': 4., 'h': 3., 'material': 'steel'}]
-    data['physics']['heat1']['heat_source_w_m3'] = {'steel_plate': 2e5, 'cover': 2e5}
+    data['physics']['heat1']['heat_source_density'] = {'steel_plate': '2e5 W/m^3', 'cover': '2e5 W/m^3'}
     r = run(Document.from_dict(data), verbose=False)
     assert 'hidden' not in r.mesh.region_names
     assert "shapes fully covered by later shapes (no triangles): ['hidden']" in r.log
@@ -212,13 +245,14 @@ import copy, json, sys
 import simcase
 from simcase import Document, examples, run
 from simcase.geometry import resolve_regions
+from simcase.thermal_regions import handoff_03
 d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
 d['geometry']['shapes'][1]['cy'] = 11.0          # heater crosses the plate's top edge
 doc = Document.from_dict(d)
-exact = [name for name, *_, circle in resolve_regions(doc.copy()) if circle]
+exact = [name for name, *_, circle in resolve_regions(handoff_03(doc.copy())) if circle]
 r = run(doc, verbose=False)
 print(json.dumps({'exact': exact, 'regions': r.mesh.region_names, 'simcase': simcase.__file__,
-                  'balance': r.summary()['normalized_heat_balance_defect']}))
+                  'balance': r.summary()['relative_conservation_residual']['value']}))
 """
 
 
@@ -251,11 +285,11 @@ SMALL_ANGLE = """
 import copy, json, sys, time
 import meshine, simcase
 from simcase import Document, examples
-from simcase.thermal_regions import build_region_mesh
+from simcase.thermal_regions import build_region_mesh_03
 d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
 next(s for s in d['geometry']['shapes'] if s['name'] == 'heater')['cy'] = float(sys.argv[1])
 start = time.perf_counter()
-tri = build_region_mesh(Document.from_dict(d))[2]
+tri = build_region_mesh_03(Document.from_dict(d))[2]
 seconds = time.perf_counter()-start
 print(json.dumps({'seconds': seconds, 'tags': sorted(tri.boundary_edges), 'min_angle': tri.min_angle(),
                   'areas': {n: tri.region_area(n) for n in tri.region_names},
@@ -300,12 +334,12 @@ def test_a_heater_that_touches_or_crosses_an_edge_at_a_small_angle_meshes(cy, ar
     d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
     next(s for s in d['geometry']['shapes'] if s['name'] == 'heater')['cy'] = cy
     exact = {}
-    for name, _material, geom, *_ in resolve_regions(Document.from_dict(d)):
+    for name, _material, geom, *_ in resolve_regions(handoff(d)):
         exact[name] = exact.get(name, 0.)+geom.area
     assert set(result['areas']) == set(exact)
     for name, area in exact.items():
         assert abs(result['areas'][name]-area) <= area_tol, name
-    domain, namer, _ = build_domain(Document.from_dict(d))
+    domain, namer, _ = build_domain(handoff(d))
     points, segments, _ = domain.build(namer)
     around = {}
     for s in segments:
@@ -324,7 +358,7 @@ def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
     def exact(**heater):
         d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
         d['geometry']['shapes'][1].update(heater)
-        return [name for name, *_, circle in resolve_regions(Document.from_dict(d)) if circle]
+        return [name for name, *_, circle in resolve_regions(handoff(d)) if circle]
     assert exact() == ['heater']                      # inside the plate, clear of every edge
     assert exact(cy=2.) == []                         # tangent to the bottom side
     assert exact(cy=13.) == []                        # tangent to the plate's top edge from outside
@@ -333,7 +367,7 @@ def test_only_an_isolated_circle_is_meshed_as_an_exact_circle():
     d = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
     d['geometry']['shapes'].append({'name': 'pin', 'type': 'rect', 'x': 19.5, 'y': 7.5, 'w': 1., 'h': 1.,
                                     'material': 'steel'})
-    assert [name for name, *_, c in resolve_regions(Document.from_dict(d)) if c] == []   # later shape inside
+    assert [name for name, *_, c in resolve_regions(handoff(d)) if c] == []   # later shape inside
 
 
 # Concave bracket: part of it overlaps the domain, part only touches the right side from
@@ -349,11 +383,11 @@ def test_a_shape_that_clips_to_a_polygon_and_a_line_piece_meshes():
     d['geometry']['shapes'].insert(0, {'name': 'bracket', 'type': 'polygon', 'points': BRACKET,
                                        'material': 'steel'})
     doc = Document.from_dict(d)
-    regions = {name: geom for name, _m, geom, *_ in resolve_regions(doc.copy())}
+    regions = {name: geom for name, _m, geom, *_ in resolve_regions(handoff_03(doc.copy()))}
     assert regions['bracket'].geom_type == 'Polygon' and abs(regions['bracket'].area-4.) < 1e-12
     r = run(doc, verbose=False)
     assert r.mesh.region_names == ['bracket', 'plate', 'heater', 'background']
-    assert r.summary()['normalized_heat_balance_defect'] < 1e-10
+    assert r.summary()['relative_conservation_residual']['value'] < 1e-10
     fiber = copy.deepcopy(examples.EXAMPLES['fiber'])
     dom = fiber['geometry']['domain']
     fiber['geometry']['shapes'].append({'name': 'bracket', 'type': 'polygon', 'material':

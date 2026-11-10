@@ -150,7 +150,7 @@ def _solver_mesh(tri: TriMesh, provenance_edges: dict | None = None) -> Mesh:
                 boundary_edges=dict(tri.boundary_edges), provenance_edges=provenance_edges)
 
 
-def micrometre_document(doc: Document) -> Document:
+def micrometre_document(doc: Document, *, validate: bool = True) -> Document:
     """The same EM or region heat document with every length in micrometres.
 
     Each number is converted once and exactly where it is representable
@@ -158,6 +158,11 @@ def micrometre_document(doc: Document) -> Document:
     This lists geometry/mesh lengths shared by EM and region heat documents,
     plus EM wavelength and dispersion lengths. SI-suffixed thermal properties
     and study times stay unchanged. Add new length fields here.
+
+    ``validate=False`` takes the copy of a format 0.3 region hand-off
+    (``thermal_regions.handoff_03``), which holds geometry and mesh only and was
+    checked as its 0.3 document: the copy gets its unit scale and is not
+    validated as a document of its own.
     """
     d = copy.deepcopy(doc.data)
     um = lambda v, power=1: units.length_to_micrometres(v, doc.scale, power)   # noqa: E731
@@ -218,9 +223,16 @@ def micrometre_document(doc: Document) -> Document:
         out.geometry_model = doc.geometry_model
         out.geometry_complex = doc.geometry_complex
         out.geometry_source, out.geometry_roundings = doc.geometry_source, list(doc.geometry_roundings)
-        out.validate()
+        if validate:
+            out.validate()
+        else:
+            out.scale = units.resolve(d["units"])
         return out
-    out = Document.from_dict(d)
+    if validate:
+        out = Document.from_dict(d)
+    else:
+        out = Document(d)
+        out.scale = units.resolve(d["units"])
     # the exact geometry of a version 1 document is unit-free (integer pm) and travels with it
     out.geometry_model = doc.geometry_model
     out.geometry_complex = doc.geometry_complex

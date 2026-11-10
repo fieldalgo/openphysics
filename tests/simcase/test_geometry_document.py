@@ -38,7 +38,13 @@ def _units_and_flat(doc):
     """``(units, flat 0.2 geometry block)`` of a 0.2 document, or of a 0.3 one's flat block."""
     g = doc["geometry"]
     if doc.get("openphysics") == "0.3":
-        return {"length": g["length_unit"]}, {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
+        # its element sizes are quantities, which a 0.2 block does not hold: the round trip is of the shapes
+        flat = {k: v for k, v in g.items() if k not in ("length_unit", "depth")}
+        if "background" in flat:
+            flat["background"] = {k: v for k, v in flat["background"].items() if k != "element_size"}
+        if "shapes" in flat:
+            flat["shapes"] = [{k: v for k, v in sh.items() if k != "element_size"} for sh in flat["shapes"]]
+        return {"length": g["length_unit"]}, flat
     return doc["units"], g
 
 
@@ -395,7 +401,7 @@ def test_a_document_with_version_1_geometry_runs_the_same_input(name):
 
 def test_a_thermal_region_document_agrees_with_the_0_2_route():
     """The version 1 copy of the region heat example is meshed by the exact engine (stage 2),
-    the 0.2 original by the shapely route. The loops reach meshine in a different vertex
+    the flat original by the shapely route. The loops reach meshine in a different vertex
     order, so the refined meshes differ and bitwise identity is not expected (contract,
     "Internal grid"); the results agree at discretization level. Measured 2026-11-04:
     595 vs 597 nodes, maximum temperature 6e-4 and mean temperature 4e-4 of the
@@ -403,11 +409,11 @@ def test_a_thermal_region_document_agrees_with_the_0_2_route():
     from simcase import Document, run
     a = run(Document.from_dict(copy.deepcopy(DOCS["builtin:thermal_regions"])), verbose=False)
     b = run(Document.from_dict(_as_v1("builtin:thermal_regions")), verbose=False)
-    rise = a.temperature_k.max() - a.temperature_k.min()
-    assert abs(len(a.mesh_nodes_m) - len(b.mesh_nodes_m)) <= 0.05 * len(a.mesh_nodes_m)
-    assert abs(a.temperature_k.max() - b.temperature_k.max()) <= 2e-3 * rise
-    assert abs(a.temperature_k.mean() - b.temperature_k.mean()) <= 2e-3 * rise
-    assert abs(a.temperature_k.min() - b.temperature_k.min()) <= 2e-3 * rise
+    rise = a.temperature.max() - a.temperature.min()
+    assert abs(len(a.node_coordinates) - len(b.node_coordinates)) <= 0.05 * len(a.node_coordinates)
+    assert abs(a.temperature.max() - b.temperature.max()) <= 2e-3 * rise
+    assert abs(a.temperature.mean() - b.temperature.mean()) <= 2e-3 * rise
+    assert abs(a.temperature.min() - b.temperature.min()) <= 2e-3 * rise
 
 
 def test_save_keeps_the_version_1_block_and_roundings_become_notes(tmp_path):

@@ -39,9 +39,10 @@ Format 0.3 (``"openphysics": "0.3"``, docs/packages/simcase/document_format.md) 
 beside 0.2 by ``simcase.resolve``: values carry their units, keys are registry quantity names
 and each geometry component declares its ``length_unit``. A document with that exact
 envelope takes the 0.3 path; ``doc.data`` then holds the authored tree (exact ``Decimal``
-numbers, never changed) and ``doc.si`` the resolved SI tree. No physics kind reads format
-0.3 yet: each kind's document is refused with ``E-CONTRACT`` until its commit of the units
-batch. Every other document takes the 0.2 path, unchanged.
+numbers, never changed) and ``doc.si`` the resolved SI tree. Heat (``thermal.steady2d``,
+``thermal.transient2d``) reads format 0.3 in every geometry form and no longer reads 0.2; every
+other kind's 0.3 document is refused with ``E-CONTRACT`` until its commit of the units batch,
+and its 0.2 document takes the 0.2 path, unchanged.
 """
 
 from __future__ import annotations
@@ -502,6 +503,9 @@ class Document:
 
     def _pm_per_unit(self):
         from .geometry_document import pm_per_unit
+        if self.si is not None and self.geometry_model is not None:
+            # format 0.3: the component declares its own length_unit
+            return pm_per_unit({"length": self.component.length_unit})
         return pm_per_unit(self.data.get("units"))
 
     def _length(self, k) -> float:

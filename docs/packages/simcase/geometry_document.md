@@ -622,7 +622,7 @@ keeps the topology.
 - A key that names a side is a boundary string, so `boundary: {left: pec}` still
   validates (`packages/simcase/src/simcase/schema.py:316-318`).
 - A key that names a region is a region string, so
-  `heat_source_w_m3: {heater: ...}` still validates
+  `heat_source_density: {heater: ...}` (format 0.2: `heat_source_w_m3`) still validates
   (`packages/simcase/src/simcase/thermal_regions.py:189-199`).
 - Other boundary names, such as `heater_top`, are allowed by this contract but
   accepted by no runner yet. Today region heat refuses any tag that is not a side
@@ -758,8 +758,8 @@ keyword.
 ```
 
 The `physics`, `materials` and `mesh` blocks are left out and work as today.
-`dirichlet_temperature_k: {"bottom": 300}` resolves `bottom` as a mesh tag, and
-`heat_source_w_m3: {"heater": 1e15}` resolves `heater` as a region. A sweep point
+`prescribed_temperature: {"bottom": "300 K"}` resolves `bottom` as a mesh tag, and
+`heat_source_density: {"heater": "1e15 W/m^3"}` resolves `heater` as a region (format 0.3 names). A sweep point
 with `w = 501` gives `x = -250.5` nm, which is −250500 pm and lies on the grid.
 
 ### A sipi microstrip with a tapered trace

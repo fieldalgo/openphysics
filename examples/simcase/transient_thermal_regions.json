@@ -1,12 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Heating a steel and insulation wall",
-  "units": {
-    "length": "mm",
-    "temperature": "K",
-    "time": "s"
-  },
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {
       "xmin": 0.0,
       "xmax": 30.0,
@@ -30,47 +27,50 @@
   },
   "materials": {
     "steel": {
-      "conductivity_w_mk": 45.0,
-      "volumetric_heat_capacity_j_m3k": 3600000.0,
+      "thermal_conductivity": "45 W/(m K)",
+      "volumetric_heat_capacity": "3600000 J/(m^3 K)",
       "source": "document value"
     },
     "insulation": {
-      "conductivity_w_mk": 0.5,
-      "volumetric_heat_capacity_j_m3k": 1200000.0,
+      "thermal_conductivity": "0.5 W/(m K)",
+      "volumetric_heat_capacity": "1200000 J/(m^3 K)",
       "source": "document value"
     }
   },
   "physics": {
     "heat1": {
       "type": "thermal.transient2d",
-      "initial_temperature_k": 300.0,
-      "heat_source_w_m3": {
-        "steel_plate": 200000.0,
-        "background": 50000.0
+      "initial_temperature": "300 K",
+      "heat_source_density": {
+        "steel_plate": "200000 W/m^3",
+        "background": "50000 W/m^3"
       },
-      "dirichlet_temperature_k": {
-        "left": 300.0,
-        "right": 300.0
+      "prescribed_temperature": {
+        "left": "300 K",
+        "right": "300 K"
       }
     }
   },
   "mesh": {
-    "size": 2.0,
-    "min_angle": 28.0
+    "element_size": "2 mm",
+    "minimum_angle": "28 deg"
   },
   "study": {
     "type": "transient",
-    "time_s": [
-      0.0,
-      5.0,
-      10.0,
-      20.0,
-      40.0,
-      60.0,
-      90.0,
-      120.0,
-      180.0
-    ]
+    "time": {
+      "unit": "s",
+      "values": [
+        0.0,
+        5.0,
+        10.0,
+        20.0,
+        40.0,
+        60.0,
+        90.0,
+        120.0,
+        180.0
+      ]
+    }
   },
   "results": {
     "save_fields": true,

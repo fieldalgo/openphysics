@@ -627,7 +627,7 @@ function renderRegionTable(host,regions,transient) {
   for(const row of regions.rows){
     const tr=document.createElement('tr'),swatch=document.createElement('td'),mark=document.createElement('i');
     swatch.className='swatch';mark.style.background=row.color;swatch.appendChild(mark);tr.appendChild(swatch);
-    for(const value of [row.name,row.material,row.k,...(transient?[row.rhoC]:[]),row.q,row.cells,row.area_m2,row.source]){
+    for(const value of [row.name,row.material,row.k,...(transient?[row.rhoC]:[]),row.q,row.cells,row.area,row.source]){
       const td=document.createElement('td');td.textContent=String(value);tr.appendChild(td);
     }
     body.appendChild(tr);
@@ -656,7 +656,7 @@ function renderThermalSummary(result) {
   if(result.regions){
     // Region names and material text are not quantities: the region table shows them.
     const summary={...result.summary};
-    for(const key of ['regions','materials','region_names','heat_source_w_m3','conductivity_range_w_mk'])delete summary[key];
+    for(const key of ['regions','materials','region_names','heat_source_density'])delete summary[key];
     quantities(summary);
   } else quantities(result.summary);
   const details=add(host,'details','');add(details,'summary','Full result metadata');

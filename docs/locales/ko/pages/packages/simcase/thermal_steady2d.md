@@ -42,8 +42,8 @@ headless API와 CLI를 설명합니다. Studio는 전용 열 경로로 이 문�
 `{"type":"single"}`(기본값)입니다. `results`는 불리언 `save_fields`와 `plots`를 받고
 `plots`는 false(기본값)여야 합니다. 알 수 없는 키는 `E-KEY-UNKNOWN`이며,
 `conductivity_w_mk` 같은 형식 0.2 키는 새 이름과 함께 거부합니다. 형식 0.2 직사각형 열
-문서는 이름으로 거부합니다(`E-FORMAT`). 영역 문서는 단위 일괄 변경의 해당 커밋까지 형식
-0.2로 읽습니다. 자연 경계 키는 별도의 [경계 확장](thermal_steady_boundary2d.md)을 따릅니다.
+문서는 이름으로 거부하며(`E-FORMAT`), 형식 0.2 영역 문서도 마찬가지입니다([재료 영역](thermal_regions2d.md)도
+형식 0.3을 읽습니다). 자연 경계 키는 별도의 [경계 확장](thermal_steady_boundary2d.md)을 따릅니다.
 
 완전한 예제를 생성하고 실행합니다.
 

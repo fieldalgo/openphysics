@@ -7,14 +7,14 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(T) {
   'use strict';
   const TYPE='thermal.transient2d',RESULT='thermal.transient2d-result-v3',LAYOUT='thermal2d-transient-p1-node-cell-v2';
-  // Region documents: their own pair and manifest format; frames and pages keep their
-  // format IDs and carry the region pair. Region documents are still format 0.2 until their
-  // commit of the units batch, so their manifests keep the 0.2 names (LEGACY below).
-  const RESULT_R='thermal.transient2d-regions-result-v1',LAYOUT_R='thermal2d-transient-p1-node-cell-regions-v1';
-  const MANIFEST='studio-thermal-transient-v2',MANIFEST_R='studio-thermal-transient-regions-v1';
+  // Region documents (format 0.3 too): their own pair and manifest format; frames and pages
+  // keep the rectangle's format IDs and carry the region pair.
+  const RESULT_R='thermal.transient2d-regions-result-v2',LAYOUT_R='thermal2d-transient-p1-node-cell-regions-v2';
+  const MANIFEST='studio-thermal-transient-v2',MANIFEST_R='studio-thermal-transient-regions-v2';
   const REGION_CAPABILITY={result_formats:[RESULT_R],field_layouts:[LAYOUT_R],
-    payload_formats:[MANIFEST_R,'studio-thermal-transient-frame-v1','studio-thermal-transient-history-v1']};
-  const REGION_FIELD={shape:null,unit:'1',location:'triangles',axis:'static',available_views:[],
+    payload_formats:[MANIFEST_R,'studio-thermal-transient-frame-v2','studio-thermal-transient-history-v2']};
+  // the region ids are structural: no unit, no time axis
+  const REGION_FIELD={shape:null,unit:null,location:'triangles',axis:'static',available_views:[],
     initial_available:true,ui_supported:false};
   // Rectangle documents are format 0.3: registry names, SI values; a structural array has no unit.
   const UI=['temperature','heat_flux','stored_heat_per_depth','thermal_energy_functional_per_depth'];
@@ -31,19 +31,6 @@
     frame:'studio-thermal-transient-frame-v2',history:'studio-thermal-transient-history-v2',spec:SPEC,ui:UI,
     nodes:'node_coordinates',fixed:'prescribed_node_ids',time:'time',rate:'time[1:]',
     temperature:'temperature',flux:'heat_flux',histories:['stored_heat_per_depth','thermal_energy_functional_per_depth']};
-  const LEGACY={format:'0.2',result:'thermal.transient2d-result-v1',layout:'thermal2d-transient-p1-node-cell-v1',
-    manifest:'studio-thermal-transient-v1',frame:'studio-thermal-transient-frame-v1',
-    history:'studio-thermal-transient-history-v1',
-    spec:{nodes_m:['m','nodes','static'],triangles:['1','triangle_connectivity','static'],
-      time_s:['s','requested_times','time_s'],temperature_k:['K','nodes','time_s'],
-      heat_flux_w_m2:['W/m^2','triangle_centroids','time_s'],source_load_w_per_m:['W/m','nodes','time_s'],
-      reaction_w_per_m:['W/m','nodes','time_s[1:]'],residual_w_per_m:['W/m','nodes','time_s[1:]'],
-      storage_rate_w_per_m:['W/m','nodes','time_s[1:]'],heat_content_j_per_m:['J/m','domain','time_s'],
-      quadratic_functional_jk_per_m:['J K/m','domain','time_s'],dirichlet_node_ids:['1','dirichlet_nodes','static'],
-      dirichlet_temperatures_k:['K','dirichlet_nodes','time_s']},
-    ui:['temperature_k','heat_flux_w_m2','heat_content_j_per_m','quadratic_functional_jk_per_m'],
-    nodes:'nodes_m',fixed:'dirichlet_node_ids',time:'time_s',rate:'time_s[1:]',
-    temperature:'temperature_k',flux:'heat_flux_w_m2',histories:['heat_content_j_per_m','quadratic_functional_jk_per_m']};
   // View fields: 'temperature' (nodal) or the heat flux 'qx', 'qy', 'magnitude' (per cell).
   const VIEWS=['temperature','qx','qy','magnitude'];
   const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -102,7 +89,7 @@
     const x=copy(raw);typed(x,L.manifest,[L.result,L.layout]);matches(x,expected);
     if(!keys(x,['kind','job','result_id','client_revision','request_seq','result_format','field_layout',
       'display_length_in_m','payload_format','default_frame_index',L.time,'arrays','summary','fields','frame_url','history_url',
-      ...(L.format==='0.3'?['length_unit']:[])]))fail('manifest fields');
+      'length_unit']))fail('manifest fields');
     if(!keys(x.arrays,[L.nodes,'triangles',L.fixed])||!Array.isArray(x[L.time]))fail('static arrays/time catalog');
     const times=x[L.time],nt=times.length,n=x.arrays[L.nodes]?.length,m=x.arrays.triangles?.length,d=x.arrays[L.fixed]?.length;
     if(!integer(n)||n<3||n>limits.max_nodes||!integer(m)||m<1||m>limits.max_triangles||!integer(d)||d>n
@@ -124,23 +111,13 @@
     const s=x.summary;
     if(!object(s)||s.physics_type!==TYPE||s.result_format!==L.result||s.field_layout!==L.layout
         ||s.mesh?.nodes!==n||s.mesh?.triangles!==m)fail('complete summary/catalog mismatch');
-    let label;
-    if(L.format==='0.3'){
-      // The geometry's length_unit names the display unit; the summary's inputs agree with it.
-      label=x.length_unit;
-      if(s.study?.time?.unit!=='s'||!same(s.study?.time?.values,times)
-          ||typeof label!=='string'||!label.length
-          ||s.resolved_inputs?.['geometry.domain.xmin']?.length_unit!==label)fail('complete summary/catalog mismatch');
-    } else {
-      if(s.mesh_length_unit!=='m'||s.units?.temperature!=='K'||s.units?.time!=='s'||!same(s.study?.time_s,times))
-        fail('complete summary/catalog mismatch');
-      label=s.units.length;
-      if(object(label)&&keys(label,['in_m'])&&finite(label.in_m)&&label.in_m>0)label=String(label.in_m)+' m';
-      if(typeof label!=='string'||!label.length)fail('display length unit');
-    }
+    // The geometry's length_unit names the display unit; the summary's inputs agree with it.
+    const label=x.length_unit;
+    if(s.study?.time?.unit!=='s'||!same(s.study?.time?.values,times)
+        ||typeof label!=='string'||!label.length||T.domainUnit(s)!==label)fail('complete summary/catalog mismatch');
     const fields=Object.keys(L.spec);
     if(!keys(x.fields,fields))fail('13 field descriptors required');
-    const unitKeys=fields.filter(f=>L.spec[f][0]!==null),axisKeys=L.format==='0.3'?fields.filter(f=>L.spec[f][2]!=='static'):fields;
+    const unitKeys=fields.filter(f=>L.spec[f][0]!==null),axisKeys=fields.filter(f=>L.spec[f][2]!=='static');
     for(const [meta,expect] of [['field_units',unitKeys],['field_locations',fields],['field_shapes',fields],['field_time_axes',axisKeys]])
       if(!keys(s[meta],expect))fail('summary field set');
     for(const [field,[unit,location,axis]]of Object.entries(L.spec)){
@@ -151,7 +128,7 @@
           ||f.initial_available!==(axis!==L.rate)||f.ui_supported!==L.ui.includes(field)
           ||(unit===null?Object.hasOwn(s.field_units,field):s.field_units[field]!==unit)
           ||s.field_locations[field]!==location
-          ||(axis==='static'&&L.format==='0.3'?Object.hasOwn(s.field_time_axes,field):s.field_time_axes[field]!==axis)
+          ||(axis==='static'?Object.hasOwn(s.field_time_axes,field):s.field_time_axes[field]!==axis)
           ||!same(s.field_shapes[field],shapes[field]))fail('descriptor/summary '+field);
     }
     template(x.frame_url,x,'frame');template(x.history_url,x,'history');
@@ -165,22 +142,23 @@
     if(!object(x)||x.payload_format!==MANIFEST_R||x.result_format!==RESULT_R||x.field_layout!==LAYOUT_R
         ||!object(s)||s.result_format!==RESULT_R||s.field_layout!==LAYOUT_R)fail('unsupported region manifest or pair');
     if(!object(x.arrays)||!Object.hasOwn(x.arrays,'triangle_regions')||!object(x.fields)||!Object.hasOwn(x.fields,'triangle_regions')
-        ||metadata.some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))fail('missing triangle_regions');
-    // Relabel a copy as a 0.2 rectangle manifest, summary pair included, and reuse every
+        ||['field_locations','field_shapes'].some(m=>!object(s[m])||!Object.hasOwn(s[m],'triangle_regions')))
+      fail('missing triangle_regions');
+    // Relabel a copy as a rectangle manifest, summary pair included, and reuse every
     // unchanged rectangle check.
-    const rect=copy(x);rect.payload_format=LEGACY.manifest;rect.result_format=rect.summary.result_format=LEGACY.result;
-    rect.field_layout=rect.summary.field_layout=LEGACY.layout;
+    const rect=copy(x);rect.payload_format=RECTANGLE.manifest;rect.result_format=rect.summary.result_format=RECTANGLE.result;
+    rect.field_layout=rect.summary.field_layout=RECTANGLE.layout;
     delete rect.arrays.triangle_regions;delete rect.fields.triangle_regions;
     for(const m of metadata)delete rect.summary[m].triangle_regions;
-    const accepted=checkManifest(rect,expected,limits,LEGACY),m=accepted.arrays.triangles.length;
-    if(!same(x.fields.triangle_regions,{...REGION_FIELD,shape:[m]})||s.field_units.triangle_regions!=='1'
-        ||s.field_locations.triangle_regions!=='triangles'||s.field_time_axes.triangle_regions!=='static'
+    const accepted=checkManifest(rect,expected,limits,RECTANGLE),m=accepted.arrays.triangles.length;
+    if(!same(x.fields.triangle_regions,{...REGION_FIELD,shape:[m]})||Object.hasOwn(s.field_units,'triangle_regions')
+        ||s.field_locations.triangle_regions!=='triangles'||Object.hasOwn(s.field_time_axes,'triangle_regions')
         ||!same(s.field_shapes.triangle_regions,[m]))fail('triangle_regions descriptor');
     const table=T.regionTable(s,x.arrays.triangle_regions,m,true,regionLimits);
-    const edges=T.regionEdges(accepted.arrays.triangles,table.ids,accepted.arrays.nodes_m.length);
+    const edges=T.regionEdges(accepted.arrays.triangles,table.ids,accepted.arrays.node_coordinates.length);
     const out={...accepted,payload_format:MANIFEST_R,result_format:RESULT_R,field_layout:LAYOUT_R,
       fields:x.fields,summary:s,regions:Object.freeze({...table,edges})};
-    Object.defineProperty(out,'layout',{value:LEGACY});Object.defineProperty(out,'times',{value:accepted.times});
+    Object.defineProperty(out,'layout',{value:RECTANGLE});Object.defineProperty(out,'times',{value:accepted.times});
     return out;
   }
   function queryURL(man,kind,query) {
@@ -338,6 +316,6 @@
       snapshot:()=>validated?copy(validated):null,supports:doc=>!!cap&&T.soleType(doc)===TYPE,
       renderToken,renderCurrent,rejectView};
   }
-  return {TYPE,RESULT,LAYOUT,UI,SPEC,VIEWS,RECTANGLE,LEGACY,copy,capability,template,queryURL,manifest,frame,history,model,
+  return {TYPE,RESULT,LAYOUT,UI,SPEC,VIEWS,RECTANGLE,copy,capability,template,queryURL,manifest,frame,history,model,
     meshModel,createController,RESULT_R,LAYOUT_R,MANIFEST_R,regionManifest};
 });
