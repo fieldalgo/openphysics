@@ -210,12 +210,14 @@ def _summary_floor(doc, limits):
             path="materials") from exc
 
 
-def _accept(raw, kind, limits, rlimits, nt, tags, for_run):
-    """Worker-thread validation; every failure becomes a tagged ThermalAPIError."""
+def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
+    """Worker-thread validation; every failure becomes a tagged ThermalAPIError. ``raw`` holds the
+    doubles of the authored numbers (the caps read these); the document reads ``exact``, the tree
+    of the request bytes with every number as written."""
     try:
         _check_complexity(raw, rlimits)
         try:
-            doc = Document.from_dict(raw)
+            doc = Document.from_dict(raw if exact is None else exact)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
             raise common.ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
         if getattr(doc, "is_version_1", False) and doc.component.dimension == "axisymmetric":
@@ -246,11 +248,12 @@ class Route:
     def applies(self, raw):
         return applies(raw, self.kind)
 
-    async def read(self, raw, tags, *, for_run):
+    async def read(self, raw, tags, *, for_run, exact=None):
         nt = raw_preflight(raw, self.kind, self.limits)
         if for_run and not runtime_available(self.kind, self.limits):
             raise common.ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
-        return await _wait_for_thread(_accept, raw, self.kind, self.limits, self.rlimits, nt, tags, for_run)
+        return await _wait_for_thread(_accept, raw, self.kind, self.limits, self.rlimits, nt, tags, for_run,
+                                      exact)
 
 
 async def _wait_for_thread(func, *args):

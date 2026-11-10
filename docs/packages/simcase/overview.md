@@ -632,14 +632,22 @@ Used by the page, usable by anything else.
 | method | path | purpose |
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | example documents |
-| GET | `/api/units` | the declarable base dimensions and their unit symbols |
+| GET | `/api/quantities` | every registry quantity a document writes, with its canonical unit and its unit menu (from `simcase.quantities`), and the length units |
 | GET | `/api/materials` | physmat built-ins under their exact `physmat:` names: valid vacuum wavelengths (m), source |
 | POST | `/api/materials/preview` | n, k of a `physmat:` material over a vacuum wavelength interval in m |
-| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes, diagnostics}` or `{ok: false, error}` |
+| POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` or `{ok: false, error, diagnostics}`; `doc` is the document as sent, every number with its written digits |
 | POST | `/api/mesh` | `{doc}` -> `node_coordinates` (m) with `field_units`, `display`, triangles, regions, boundary edges, stats, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; runs in a background thread |
 | GET | `/api/jobs/{id}` | status and log lines |
 | GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss` (the summary's series), `vacuum_wavelength`, fields, `node_coordinates` (m), timings, summary |
+
+Every route that takes a document reads the request's raw bytes with `simcase.reader`:
+a duplicate key, `NaN`, `Infinity`, malformed JSON, text that is not UTF-8 and a string with an
+escaped unpaired surrogate (`"\ud800"`) are refused with their code (`E-KEY-DUPLICATE`, `E-JSON`;
+status 400, and a duplicate key inside the document is a diagnostic of `/api/validate`), a leading
+UTF-8 byte order mark is accepted, and a number keeps its written digits, so an unchanged document
+comes back byte for byte apart from whitespace and the spelling of string escapes (`"\u00b5"`
+comes back as `"µ"`).
 
 The steady and transient heat views use their own capability, validation, run and
 result routes; see the [steady](thermal_studio.md) and

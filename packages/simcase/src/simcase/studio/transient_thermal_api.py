@@ -117,7 +117,7 @@ async def read_request(request, limits, *, for_run, region=None):
 def validation_payload(spec, limits):
     return common.encode_json({"ok": True, "kind": KIND, **spec.tags(),
                                **common.document_body(spec.doc), "summary": spec.doc.summary()},
-                              limits.metadata_bytes)
+                              limits.metadata_bytes, exact=True)
 
 
 def runtime_available(limits):

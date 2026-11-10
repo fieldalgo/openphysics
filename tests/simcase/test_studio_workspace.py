@@ -119,6 +119,20 @@ def test_material_capability_v5_extends_v4_materials(client):
     unchanged = {k: v for k, v in caps.items() if k not in ('schema_version', 'adapter', 'materials')}
     assert unchanged == {k: v for k, v in v4.items() if k not in ('schema_version', 'adapter', 'materials')}
 
+
+def test_capability_v6_is_v5_for_project_and_session_version_6(client):
+    """Units and naming batch: /v6 is the contract of a workspace that saves project and session
+    version 6 and reads coded diagnostics; its window, ranges, materials and adapter are v5's."""
+    v5 = client.get('/api/workspace/capabilities/v5').json()
+    response = client.get('/api/workspace/capabilities/v6')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 6 and caps['adapter'] == 'optical-shapes-v7'
+    assert {k: v for k, v in caps.items() if k != 'schema_version'} == {k: v for k, v in v5.items()
+                                                                         if k != 'schema_version'}
+
+
 def test_workspace_instance_is_stable_for_server_lifetime(client):
     caps = client.get('/api/workspace/capabilities/v2').json()
     assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])

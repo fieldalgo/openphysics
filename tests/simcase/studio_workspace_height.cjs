@@ -13,13 +13,17 @@ const setup=()=>({materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperatur
 const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
 const run=(input,settings)=>({job:'abcdef12',completedAt:'2026-10-26T00:00:00Z',input,settings,effective_index:[2.5,1.8],field,origin:'local'});
 const legacyV1=()=>{const d=snapshot(model(),setup());d.version=1;for(const k of ['height','wavelength','coreMesh','shapes','thermal'])delete d.model[k];for(const k of ['height','wavelength','core_mesh','shapes','thermal_length'])delete d.units[k];return d;};
-test('earlier projects migrate their centred core to one rectangle; later fields need their version',()=>{
- const migrated=parseProject(JSON.stringify(legacyV1()));assert.equal(migrated.version,5);assert.equal(migrated.model.height,220);
- assert.deepEqual(migrated.model.shapes,[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]);
- for(const change of [d=>delete d.model.height,d=>d.model.height=99,d=>d.model.height=501,d=>d.model.height=null,d=>d.units.height='um',d=>delete d.units.shapes]){const d=snapshot(model(),setup());change(d);assert.throws(()=>parseProject(JSON.stringify(d)));}
- const v1=legacyV1();v1.model.height=300;assert.throws(()=>parseProject(JSON.stringify(v1)));
- const v3=snapshot(model(),setup());v3.version=3;delete v3.model.thermal;assert.throws(()=>parseProject(JSON.stringify(v3)),/Shapes require project version 4/);
- const unassigned=legacyV1();unassigned.setup.materials.Core='Platinum';assert.equal(parseProject(JSON.stringify(unassigned)).model.shapes[0].material,'');
+test('projects of versions 1-5 are refused by name (units and naming batch); version 6 needs every field',()=>{
+ // earlier versions were migrated (a centred core became one rectangle); since project version 6 they are not read
+ assert.throws(()=>parseProject(JSON.stringify(legacyV1())),/version 1\) was saved before the units and naming batch/);
+ for(const version of [1,2,3,4,5]){const d=snapshot(model(),setup());d.version=version;
+  assert.throws(()=>parseProject(JSON.stringify(d)),new RegExp(`version ${version}\\) was saved before the units and naming batch`));}
+ assert.equal(parseProject(JSON.stringify(snapshot(model(),setup()))).version,6);
+ // a design without a shape list is one centred core; a core material outside the optical list stays unassigned
+ const unassigned=snapshot(model(),{...setup(),materials:{...setup().materials,Core:'Platinum'}});
+ assert.deepEqual(parseProject(JSON.stringify(unassigned)).model.shapes,[{name:'Core',type:'rect',material:'',x:-250,y:0,w:500,h:300}]);
+ for(const change of [d=>delete d.model.height,d=>d.model.height=99,d=>d.model.height=501,d=>d.model.height=null,d=>d.units.height='um',d=>delete d.units.shapes,
+  d=>delete d.model.shapes,d=>delete d.model.thermal,d=>delete d.model.wavelength,d=>delete d.model.coreMesh,d=>delete d.units.thermal_length,d=>d.version=7]){const d=snapshot(model(),setup());change(d);assert.throws(()=>parseProject(JSON.stringify(d)));}
 });
 test('a migrated core is submitted as its four corners with the grading centre at mid-height',()=>{
  for(const height of [100,300.5,500]){

@@ -18,7 +18,7 @@ test('input round trip preserves configured model without importing results or a
   loaded.setup.materials.Core='Silica';assert.equal(setup.materials.Core,'Silicon');
 });
 test('unsupported schema, units and invalid material labels are rejected',()=>{
-  for(const edit of [d=>d.version=6,d=>d.units.width='m',d=>d.setup.materials.Heater='<img src=x>',d=>delete d.setup.terminal]){
+  for(const edit of [d=>d.version=5,d=>d.version=7,d=>d.units.width='m',d=>d.setup.materials.Heater='<img src=x>',d=>delete d.setup.terminal]){
     const doc=snapshot(model,setup);edit(doc);assert.throws(()=>parseProject(JSON.stringify(doc)));
   }
 });

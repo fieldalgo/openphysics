@@ -126,8 +126,11 @@ These are top-level fields; there is **no nested coordinates object**.
 document display declaration. Run identity is kind/job/result_id plus the two
 nonnegative safe-integer counters. Status adds status/log/error/has_result.
 Requests contain exactly doc/client_revision/request_seq and use UTF-8
-application/json. Duplicate keys, nonfinite JSON, malformed envelopes and
-unsupported physics are refused. No field/time selector is accepted on thermal
+application/json. The request bytes are read with `simcase.reader`, as on every
+Studio route that takes a document: duplicate keys, nonfinite JSON (also a number
+beyond a double), malformed envelopes and unsupported physics are refused, a
+leading UTF-8 byte order mark is accepted, and the validation reply returns the
+document with every number as written. No field/time selector is accepted on thermal
 status/result routes. Arrays, summary and identity use this single contract.
 
 ## Route boundaries and recovery

@@ -10,8 +10,10 @@ Playwright when these checks were added.
 
 import base64
 import hashlib
+import json
 import re
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -138,9 +140,137 @@ def test_optical_body_cap(client, no_jobs, path):
     cap = security.OPTICAL_BODY_BYTES
     r = client.post(path, content=b" " * (cap + 1), headers={"content-type": "application/json"})
     assert r.status_code == 413
-    # A body at the cap reaches the route (and fails as JSON there, not at the guard).
+    # A body at the cap reaches the route (and fails as JSON there, not at the guard): a document
+    # route reads the bytes with simcase.reader (E-JSON, 400), the material preview with pydantic.
     r = client.post(path, content=b" " * cap, headers={"content-type": "application/json"})
-    assert r.status_code == 422
+    if path == "/api/materials/preview":
+        assert r.status_code == 422
+    else:
+        assert r.status_code == 400 and [d["code"] for d in r.json()["diagnostics"]] == ["E-JSON"]
+
+
+# ---- S3b document bytes (units and naming batch, P2-19) ----------------------------
+# Every route that takes a document reads the request's raw bytes with simcase.reader: a duplicate
+# key, NaN, Infinity, malformed JSON, text that is not UTF-8 and an escaped unpaired surrogate are
+# refused with their code, and a leading UTF-8 byte order mark is accepted. pydantic once parsed these bodies, kept the last of
+# two equal keys and turned every number into a double.
+
+DOCUMENT_ROUTES = ["/api/validate", "/api/mesh", "/api/run", "/api/geometry-lab/evaluate"]
+GEOMETRY_DOC = json.loads((Path(__file__).resolve().parents[2] / "examples" / "simcase"
+                           / "geometry_v1_soi_strip.json").read_text(encoding="utf-8"))
+THERMAL_ROUTES = {"/api/thermal/validate": "thermal_slab", "/api/thermal/run": "thermal_slab",
+                  "/api/thermal/transient/validate": "transient_thermal_uniform",
+                  "/api/thermal/transient/run": "transient_thermal_uniform"}
+JSON_TYPE = {"content-type": "application/json"}
+
+
+def _compact(value) -> str:
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+
+
+UNREADABLE = {
+    "NaN": b'{"doc":{"openphysics":"0.3","x":NaN}}',
+    "Infinity": b'{"doc":{"openphysics":"0.3","x":Infinity}}',
+    "-Infinity": b'{"doc":{"openphysics":"0.3","x":-Infinity}}',
+    "malformed": b'{"doc":{"openphysics":"0.3",',
+    "not UTF-8": b'{"doc":{"openphysics":"0.3","name":"\xff"}}',
+    "UTF-16": '{"doc":{"openphysics":"0.3"}}'.encode("utf-16"),
+    # not Unicode text, so no UTF-8 reply could write it back (the heat routes refused it already)
+    "unpaired surrogate": b'{"doc":{"openphysics":"0.3","name":"x\\ud800"}}',
+    "unpaired surrogate key": b'{"doc":{"openphysics":"0.3","\\udfffname":"x"}}',
+}
+
+
+@pytest.mark.parametrize("path", DOCUMENT_ROUTES)
+@pytest.mark.parametrize("case", sorted(UNREADABLE))
+def test_document_routes_refuse_unreadable_bytes(client, no_jobs, path, case):
+    r = client.post(path, content=UNREADABLE[case], headers=JSON_TYPE)
+    assert r.status_code == 400, r.text
+    assert [d["code"] for d in r.json()["diagnostics"]] == ["E-JSON"]
+    assert r.json()["detail"].startswith("the request is not readable JSON: ")
+
+
+@pytest.mark.parametrize("path", DOCUMENT_ROUTES)
+def test_document_routes_refuse_a_duplicate_envelope_key(client, no_jobs, path):
+    doc = _compact(DOC)
+    r = client.post(path, content=f'{{"doc":{doc},"doc":{doc}}}'.encode(), headers=JSON_TYPE)
+    assert r.status_code == 400, r.text
+    found = r.json()["diagnostics"]
+    assert [(d["code"], d["path"]) for d in found] == [("E-KEY-DUPLICATE", "")]
+    assert '"doc" appears more than once' in found[0]["message"]
+
+
+@pytest.mark.parametrize("path", DOCUMENT_ROUTES)
+def test_document_routes_refuse_a_duplicate_document_key(client, no_jobs, path):
+    source = GEOMETRY_DOC if path == "/api/geometry-lab/evaluate" else DOC
+    text = _compact(source)
+    assert text.count('"type":"rect"') >= 1
+    twice = text.replace('"type":"rect"', '"type":"circle","type":"rect"', 1)  # json.loads would keep "rect"
+    r = client.post(path, content=('{"doc":' + twice + '}').encode(), headers=JSON_TYPE)
+    duplicate = "\"type\" appears more than once in geometry."
+    if path in ("/api/mesh", "/api/run"):
+        assert r.status_code == 400 and duplicate in r.json()["detail"] and "E-KEY-DUPLICATE" in r.json()["detail"]
+        return
+    assert r.status_code == 200, r.text
+    reply = r.json()
+    assert reply["ok"] is False
+    found = [d for d in reply["diagnostics"] if d["code"] == "E-KEY-DUPLICATE"]
+    assert len(found) == 1 and found[0]["path"].startswith("geometry.") and duplicate in found[0]["message"]
+
+
+def test_a_surrogate_pair_is_text_and_comes_back_as_its_character(client, no_jobs):
+    text = _compact(DOC).replace(f'"name":{json.dumps(DOC["name"])}', '"name":"core \\ud83d\\ude00"', 1)
+    assert "\\ud83d" in text
+    r = client.post("/api/validate", content=('{"doc":' + text + '}').encode(), headers=JSON_TYPE)
+    assert r.status_code == 200 and r.json()["ok"] is True, r.text
+    assert r.json()["doc"]["name"] == "core \U0001F600" and '"name":"core \U0001F600"'.encode() in r.content
+
+
+@pytest.mark.parametrize("path", ["/api/validate", "/api/geometry-lab/evaluate"])
+def test_document_routes_accept_a_utf8_byte_order_mark(client, no_jobs, path):
+    source = GEOMETRY_DOC if path == "/api/geometry-lab/evaluate" else DOC
+    body = '{"doc":' + _compact(source) + '}'
+    plain = client.post(path, content=body.encode("utf-8"), headers=JSON_TYPE)
+    marked = client.post(path, content=b"\xef\xbb\xbf" + body.encode("utf-8"), headers=JSON_TYPE)
+    assert marked.status_code == plain.status_code == 200, marked.text
+    assert marked.json()["ok"] is True and marked.content == plain.content
+
+
+def _thermal_body(name, doc_text=None, tail='"client_revision":1,"request_seq":1'):
+    doc_text = doc_text if doc_text is not None else _compact(examples.EXAMPLES[name])
+    return ('{"doc":' + doc_text + ',' + tail + '}').encode("utf-8")
+
+
+@pytest.mark.parametrize("path", sorted(THERMAL_ROUTES))
+def test_thermal_routes_refuse_duplicates_and_non_finite_numbers(client, no_jobs, path):
+    name = THERMAL_ROUTES[path]
+    text = _compact(examples.EXAMPLES[name])
+    cases = {
+        "duplicate document key": (_thermal_body(name, text.replace('{"openphysics":', '{"name":"x","openphysics":', 1)),
+                                   "duplicate JSON key"),
+        "duplicate envelope key": (_thermal_body(name, tail='"client_revision":1,"request_seq":1,"request_seq":2'),
+                                   "duplicate JSON key"),
+        "NaN": (_thermal_body(name, text.replace('{"openphysics":', '{"x":NaN,"openphysics":', 1)),
+                "JSON numbers must be finite"),
+        "Infinity": (_thermal_body(name, tail='"client_revision":1,"request_seq":Infinity'),
+                     "JSON numbers must be finite"),
+        "beyond a double": (_thermal_body(name, text.replace('{"openphysics":', '{"x":1e999,"openphysics":', 1)),
+                            "JSON numbers must be finite"),
+        "UTF-16": ('{"doc":{}}'.encode("utf-16"), "malformed finite UTF-8 JSON"),
+    }
+    for case, (body, message) in cases.items():
+        r = client.post(path, content=body, headers=JSON_TYPE)
+        assert r.status_code == 400, (case, r.text)
+        assert r.json()["error"]["code"] == "invalid_json" and r.json()["error"]["message"] == message, case
+
+
+@pytest.mark.parametrize("path", ["/api/thermal/validate", "/api/thermal/transient/validate"])
+def test_thermal_validation_accepts_a_utf8_byte_order_mark(client, no_jobs, path):
+    body = _thermal_body(THERMAL_ROUTES[path])
+    plain = client.post(path, content=body, headers=JSON_TYPE)
+    marked = client.post(path, content=b"\xef\xbb\xbf" + body, headers=JSON_TYPE)
+    assert marked.status_code == plain.status_code == 200, marked.text
+    assert marked.json()["ok"] is True and marked.content == plain.content
 
 
 def test_non_ascii_content_length_is_refused_not_crashed():

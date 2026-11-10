@@ -46,6 +46,12 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 값), 반올림, 엔진 출력이 담긴 `{"ok": true, ...}`이거나 `{"ok": false, "refused": <메시지>}`입니다. 이 페이지를
 위한 보기이며 저장 형식이 아니고 문서 계약에 속하지 않습니다.
 
+요청은 문서를 받는 다른 Studio route와 같이 원시 바이트를 `simcase.reader`로 읽으며 `application/json` 1 MiB로
+제한합니다. 숫자는 쓴 자릿수를 유지합니다. 문서 안의 중복 키는 문서 경로의 `E-KEY-DUPLICATE` 진단과 함께
+`{"ok": false, "refused": <메시지>, "diagnostics": [...]}`로 답하고, `NaN`·`Infinity`·형식이 잘못된 JSON·UTF-8이 아닌
+텍스트·짝 없는 서러게이트 이스케이프가 든 문자열·요청 자체의 중복 키는 상태 400과 `{"detail", "diagnostics"}`(`E-JSON`, `E-KEY-DUPLICATE`)로 거부합니다. 앞에
+붙은 UTF-8 BOM은 받아들입니다.
+
 페이지는 `/geometry-lab-assets/`의 자기 파일만 불러옵니다. 인라인 스크립트·스타일과 다른 출처는 없고, 페이지
 응답에 `script-src 'self'`가 든 `Content-Security-Policy`가 붙습니다. Studio는 공개 이름
 `simcase.parse_geometry`, `simcase.evaluate_geometry`, `simcase.GeometryError`로 엔진을 부릅니다.

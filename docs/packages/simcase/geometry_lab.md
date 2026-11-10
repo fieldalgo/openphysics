@@ -60,6 +60,14 @@ indices, boundary tags, parameters (written and evaluated), roundings and the
 engine listing, or `{"ok": false, "refused": <message>}`. It is a view for this
 page, not a persisted format, and it is not part of the document contract.
 
+The request is read from its raw bytes with `simcase.reader`, as on every Studio route
+that takes a document, and is limited to 1 MiB of `application/json`. A number keeps its
+written digits. A duplicate key inside the document is answered `{"ok": false, "refused":
+<message>, "diagnostics": [...]}` with its `E-KEY-DUPLICATE` diagnostic at its document
+path; `NaN`, `Infinity`, malformed JSON, text that is not UTF-8, a string with an escaped
+unpaired surrogate and a duplicate key of the request itself are refused with status 400 and `{"detail", "diagnostics"}` (`E-JSON`,
+`E-KEY-DUPLICATE`). A leading UTF-8 byte order mark is accepted.
+
 The page loads only its own files from `/geometry-lab-assets/`: no inline
 script or style and no other origin; the page response carries a
 `Content-Security-Policy` with `script-src 'self'`. Studio reaches the engine

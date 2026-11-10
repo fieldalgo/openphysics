@@ -345,14 +345,16 @@ Studio는 `http://127.0.0.1:<port>`나 `http://localhost:<port>`로 여세요. �
 | 메서드 | 경로 | 목적 |
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | 예제 문서 |
-| GET | `/api/units` | 선언 가능한 기본 차원과 단위 기호 |
+| GET | `/api/quantities` | 문서가 쓰는 모든 레지스트리 양의 표준 단위와 단위 메뉴(`simcase.quantities`), 길이 단위 |
 | GET | `/api/materials` | 정확한 `physmat:` 이름의 physmat 내장 재료: 유효 진공 파장(m), 출처 |
 | POST | `/api/materials/preview` | 미터 단위 진공 파장 구간에서 `physmat:` 재료의 n, k |
-| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes, diagnostics}` 또는 `{ok: false, error}` |
+| POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` 또는 `{ok: false, error, diagnostics}`; `doc`는 보낸 그대로의 문서이며 모든 숫자가 쓴 자릿수를 유지 |
 | POST | `/api/mesh` | `{doc}` -> `field_units`와 함께 `node_coordinates`(m), `display`, 삼각형·영역·경계 변·통계, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; 백그라운드 스레드에서 실행 |
 | GET | `/api/jobs/{id}` | 상태와 로그 줄 |
 | GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss`(summary의 계열), `vacuum_wavelength`, 장, `node_coordinates`(m), 시간, summary |
+
+문서를 받는 모든 route는 요청의 원시 바이트를 `simcase.reader`로 읽습니다. 중복 키, `NaN`, `Infinity`, 형식이 잘못된 JSON, UTF-8이 아닌 텍스트, 짝 없는 서러게이트 이스케이프(`"\ud800"`)가 든 문자열은 코드(`E-KEY-DUPLICATE`, `E-JSON`)와 함께 거부되고(상태 400, 문서 안의 중복 키는 `/api/validate`의 진단), 앞에 붙은 UTF-8 BOM은 받아들이며, 숫자는 쓴 자릿수를 유지하므로 바꾸지 않은 문서는 공백과 문자열 이스케이프 표기(`"\u00b5"`는 `"µ"`로 돌아옴)를 빼고 바이트 그대로 돌아옵니다.
 
 정상·과도 열전도 화면은 별도 capability·검증·실행·결과 route를 씁니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
 

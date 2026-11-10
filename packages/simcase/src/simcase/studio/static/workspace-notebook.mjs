@@ -33,11 +33,17 @@ export function validateRunLabel(value=''){
  if(typeof value!=='string'||value.length>80||/[\u0000-\u001f\u007f-\u009f]/.test(value))throw new Error('Run name must be at most 80 characters without control characters.');
  return value.trim();
 }
+// A value of the page's own unit in SI, by moving the decimal point of its shortest text (a correctly
+// rounded parse, not a binary product): 220 nm -> 2.2e-7 m. A text that already has an exponent
+// (1e-7) moves that exponent.
+const si=(value,exponent)=>{if(value==='')return '';const [digits,power='0']=String(value).split(/e/i);return Number(`${digits}e${Number(power)+exponent}`);};
 export function csvCell(value){const text=String(value);const safe=typeof value==='string'&&/^\s*[=+@-]/.test(text)?"'"+text:text;return '"'+safe.replaceAll('"','""')+'"';}
+// The run table (units and naming batch): every quantity column is `name [unit]` with its SI value;
+// identifier and text columns carry no unit.
 export function runTableCsv(runs){
- const rows=[['job','name','pinned','completed_at','core_width_nm','core_height_nm','wavelength_nm','core_mesh_nm','core_material','shapes','candidate','neff','origin']];
+ const rows=[['job','name','pinned','completed_at','core_width [m]','core_height [m]','vacuum_wavelength [m]','core_element_size [m]','core_material','shapes','candidate','effective_index [1]','origin']];
  for(const r of runs){const shapes=r.input.model.shapes,single=shapes.length===1&&shapes[0].type==='rect'?shapes[0]:null;
-  r.effective_index.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,single?single.w:'',single?single.h:'',r.input.model.wavelength,r.input.model.coreMesh,single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin]));}
+  r.effective_index.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,si(single?single.w:'',-9),si(single?single.h:'',-9),si(r.input.model.wavelength,-9),si(r.input.model.coreMesh,-9),single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin]));}
  return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
 }
 export function validateRun(record,imported=false){

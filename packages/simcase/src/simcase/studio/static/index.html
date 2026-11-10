@@ -948,7 +948,7 @@ async function doValidate() {
   try {
     const r=await api.post('/api/validate',{doc});
     if(revision!==documentRevision||sequence!==inputSequence)return false;
-    if(r.ok){doc=r.doc;editorDirty=false;rawDocumentText=null;refresh();log('valid:\n'+r.summary);(r.notes||[]).forEach(n=>log('warning: '+n,'err'));(r.diagnostics||[]).forEach(d=>log(`${d.severity} ${d.code} at ${d.path}: ${d.message}`,d.severity==='info'?undefined:'err'));status('valid');}
+    if(r.ok){doc=r.doc;editorDirty=false;rawDocumentText=null;refresh();log('valid:\n'+r.summary);(r.diagnostics||[]).forEach(d=>log(`${d.severity} ${d.code} at ${d.path}: ${d.message}`,d.severity==='info'?undefined:'err'));status('valid');}
     else{invalidateDocument();log('invalid: '+r.error,'err');status('invalid document');}
     return r.ok;
   } catch(error) {if(revision===documentRevision&&sequence===inputSequence){log('validation failed: '+error.message,'err');status('validation failed');}return false;}

@@ -30,13 +30,12 @@ test('numeric drafts report the editable ranges with units',()=>{
  assert.deepEqual(parseNumeric('wavelength','1600'),{ok:true,value:1600});assert.deepEqual(parseNumeric('coreMesh','20'),{ok:true,value:20});
  assert.match(parseNumeric('wavelength','1300').message,/1400–1700 nm/);assert.match(parseNumeric('coreMesh','10').message,/20–60 nm/);
 });
-test('projects carry wavelength and core mesh since version 3; earlier versions migrate to 1550 nm / 30 nm',()=>{
+test('projects (version 6) carry wavelength and core mesh; earlier versions are refused by name',()=>{
  const doc=snapshot(model({wavelength:1625,coreMesh:40}),setup());
- assert.equal(doc.version,5);assert.equal(doc.units.wavelength,'nm');assert.equal(doc.units.core_mesh,'nm');
+ assert.equal(doc.version,6);assert.equal(doc.units.wavelength,'nm');assert.equal(doc.units.core_mesh,'nm');
  const loaded=parseProject(JSON.stringify(doc));assert.equal(loaded.model.wavelength,1625);assert.equal(loaded.model.coreMesh,40);
  const v2=JSON.parse(JSON.stringify(doc));v2.version=2;for(const k of ['wavelength','coreMesh','shapes','thermal'])delete v2.model[k];for(const k of ['wavelength','core_mesh','shapes','thermal_length'])delete v2.units[k];
- const migrated=parseProject(JSON.stringify(v2));assert.equal(migrated.version,5);assert.equal(migrated.model.wavelength,1550);assert.equal(migrated.model.coreMesh,30);
- v2.model.wavelength=1600;assert.throws(()=>parseProject(JSON.stringify(v2)));
+ assert.throws(()=>parseProject(JSON.stringify(v2)),/version 2\) was saved before the units and naming batch/);
  for(const change of [d=>delete d.model.wavelength,d=>d.model.wavelength=1399,d=>d.model.wavelength=1701,d=>d.model.wavelength='1600',d=>d.model.coreMesh=19,d=>d.model.coreMesh=61,d=>d.model.coreMesh=null,d=>d.units.wavelength='um',d=>delete d.units.core_mesh]){
   const d=snapshot(model(),setup());change(d);assert.throws(()=>parseProject(JSON.stringify(d)));
  }
@@ -49,7 +48,8 @@ test('runs keep the captured wavelength and core mesh; mismatched provenance is 
  for(const change of [d=>d.runs[0].settings.vacuum_wavelength='1550 nm',d=>d.runs[0].settings.core_element_size='30 nm',d=>d.runs[0].settings.vacuum_wavelength=1600,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){
   const d=JSON.parse(JSON.stringify(session));change(d);assert.throws(()=>parseSession(JSON.stringify(d)));
  }
- const csv=runTableCsv(restored.runs);assert.ok(csv.split('\n')[0].includes('"wavelength_nm","core_mesh_nm"'));assert.ok(csv.includes('"1600","45"'));
+ // SI values under `name [unit]` headers (units and naming batch): 1600 nm and 45 nm in metres
+ const csv=runTableCsv(restored.runs);assert.ok(csv.split('\n')[0].includes('"vacuum_wavelength [m]","core_element_size [m]"'));assert.ok(csv.includes('"0.0000016","4.5e-8"'));
 });
 test('sessions with results of earlier adapters are refused by name (saved before the units and naming batch)',()=>{
  const legacy=snapshot(model(),setup());legacy.version=2;for(const k of ['wavelength','coreMesh','shapes','thermal'])delete legacy.model[k];for(const k of ['wavelength','core_mesh','shapes','thermal_length'])delete legacy.units[k];

@@ -7,8 +7,16 @@ The browser page in ``static/`` is the only client for now; other front ends
 can use the same endpoints. Everything is JSON; arrays are sent as
 plain lists (fine for the mesh sizes a 2D study uses).
 
-Imports from simcase are absolute and limited to ``simcase.__all__`` on purpose:
-this file is written as an ordinary consumer of the engine, not as a part of it.
+Imports from simcase are absolute and limited to ``simcase.__all__`` and the public modules
+``simcase.reader`` and ``simcase.quantities`` on purpose: this file is written as an ordinary
+consumer of the engine, not as a part of it.
+
+Every route that takes a document (``/api/validate``, ``/api/mesh``, ``/api/run`` and the thermal
+routes) reads the request's raw bytes with ``simcase.reader``: numbers keep their written digits,
+and a duplicate key, ``NaN``, ``Infinity``, malformed JSON, non-UTF-8 text or an escaped unpaired
+surrogate is refused with its code (a leading UTF-8 byte order mark is accepted). A reply that
+returns the document writes the authored tree with ``reader.dumps``, so an unchanged document comes
+back byte for byte apart from whitespace and the spelling of string escapes.
 """
 
 from __future__ import annotations
@@ -22,13 +30,15 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import physmat
-from simcase import (__version__, Document, DocumentError, SubspaceSweepResult, build_mesh, examples, run,
-                     unit_vocabulary)
+from simcase import __version__, Document, DocumentError, SubspaceSweepResult, build_mesh, examples, run
+from simcase import quantities, reader
+from .bodies import RequestRefused, diagnostics as _diagnostics, exact_json, read_envelope
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
@@ -54,10 +64,6 @@ app.router.routes[:] = [r for r in app.router.routes
                         if getattr(r, "path", None) not in ("/docs", "/docs/oauth2-redirect", "/redoc")]
 _thermal_jobs = thermal.ThermalJobs()
 _region_limits = regions.RegionLimits()
-
-
-class DocBody(BaseModel):
-    doc: dict
 
 
 class MaterialPreview(BaseModel):
@@ -165,6 +171,17 @@ def workspace_capabilities_v5():
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
 
 
+# Version 6 (units and naming batch): the contract of a workspace that saves project version 6 and
+# session version 6 and reads diagnostics in place of notes. Its window, ranges and materials are
+# those of version 5 (quantity strings under registry names); the document builder is unchanged,
+# so the adapter stays optical-shapes-v7.
+@app.get("/api/workspace/capabilities/v6")
+def workspace_capabilities_v6():
+    caps = json.loads(workspace_capabilities_v5().body)
+    caps.update(schema_version=6)
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
@@ -177,7 +194,7 @@ def get_example(name: str):
         raise HTTPException(404, f"no example {name}")
     doc = Document.from_dict(examples.EXAMPLES[name])
     _require_studio_physics(doc)
-    return doc.data
+    return exact_json(doc.data)
 
 
 #: physmat's own wavelength unit (its ranges and index functions take micrometres)
@@ -222,9 +239,13 @@ def material_preview(body: MaterialPreview):
             "refractive_index": {"n": idx.real.tolist(), "k": idx.imag.tolist()}, "source": m.source}
 
 
-def _headless_thermal_type(doc: Document):
-    return next((p.get("type") for p in doc["physics"].values()
-                 if p.get("type") in ("thermal.steady2d", "thermal.transient2d",
+def _headless_thermal_type(doc):
+    """The first headless physics type of a document or of its authored tree (None if none)."""
+    physics = doc["physics"] if isinstance(doc, Document) else (doc.get("physics") if isinstance(doc, dict) else None)
+    if not isinstance(physics, dict):
+        return None
+    return next((p.get("type") for p in physics.values()
+                 if isinstance(p, dict) and p.get("type") in ("thermal.steady2d", "thermal.transient2d",
                                     "electric.steady2d", "joule.steady2d", "joule.temperature2d",
                                     "mechanics.elasticity2d", "mechanics.thermoelastic2d")), None)
 
@@ -236,32 +257,61 @@ def _require_studio_physics(doc: Document):
         raise HTTPException(400, "em.cavity3d is available through Python and the CLI; Studio supports 2D only")
 
 
+# -- documents from raw request bytes ---------------------------------------------------------------
+
+async def _document_body(request: Request, *, optional=()) -> tuple[dict, list]:
+    return read_envelope(await request.body(), optional=optional)
+
+
+def _readable(tree: dict, found: list) -> Document:
+    """The document of an envelope, or a ``DocumentError`` with its diagnostics."""
+    if found:
+        raise DocumentError("the document is not readable JSON", diagnostics=found)
+    return Document.from_dict(tree["doc"])
+
+
+def validation_payload(doc_tree, found=()) -> dict:
+    """The ``/api/validate`` reply for an authored document tree: every diagnostic (errors,
+    warnings and notes, with code and path); when valid, also the document as sent (written back
+    with ``reader.dumps`` by the route) and its summary, and when refused, the refusal text."""
+    # Studio's capability boundary reads the authored types, whatever the schema accepts: a headless
+    # document is not validated here, and its reply carries only the refusal
+    if physics_type := _headless_thermal_type(doc_tree):
+        return {"ok": False, "error": f"Studio unsupported: {physics_type} is headless Python/CLI only"}
+    if found:
+        doc, diagnostics = None, list(found)
+    else:
+        doc, diagnostics = reader.check(doc_tree)
+    if doc is None:
+        return {"ok": False, "error": str(DocumentError("the document is refused", diagnostics=diagnostics)),
+                "diagnostics": _diagnostics(diagnostics)}
+    return {"ok": True, "summary": doc.summary(), "doc": doc_tree, "diagnostics": _diagnostics(diagnostics)}
+
+
 @app.post("/api/validate")
-def validate(body: DocBody, request: Request = None):
-    if request is not None:
-        _check_workspace_instance(request)
+async def validate(request: Request):
+    _check_workspace_instance(request)
     try:
-        doc = Document.from_dict(body.doc)
-        if physics_type := _headless_thermal_type(doc):
-            return {'ok': False, 'error': f'Studio unsupported: {physics_type} is headless Python/CLI only'}
-    except DocumentError as exc:
-        return {"ok": False, "error": str(exc)}
-    return {"ok": True, "summary": doc.summary(), "doc": doc.data, "notes": doc.notes,
-            "diagnostics": [d.as_dict() for d in doc.diagnostics]}
+        tree, found = await _document_body(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    return exact_json(await run_in_threadpool(validation_payload, tree["doc"], found))
 
 
-@app.get("/api/units")
-def units():
-    """The declarable units, so the page never carries a second copy of the table."""
-    return unit_vocabulary()
+@app.get("/api/quantities")
+def quantity_menus():
+    """The registry quantities a document writes: canonical unit and the units of its menu (from
+    ``simcase.quantities``), so the page never carries a second copy of the table."""
+    out = {}
+    for name in sorted(quantities.names()):
+        entry = quantities.quantity(name)
+        out[name] = {"unit": entry.unit, "menu": list(quantities.menu(name))}
+    return {"quantities": out, "length_units": list(quantities.LENGTH_UNITS)}
 
 
-@app.post("/api/mesh")
-def mesh_preview(body: DocBody, request: Request = None):
-    if request is not None:
-        _check_workspace_instance(request)
+def _mesh_reply(tree: dict, found: list) -> dict:
     try:
-        doc = Document.from_dict(body.doc)
+        doc = _readable(tree, found)
         _require_studio_physics(doc)
         model = build_mesh(doc)
     except (DocumentError, ValueError, RuntimeError) as exc:
@@ -273,7 +323,17 @@ def mesh_preview(body: DocBody, request: Request = None):
             "stats": {"nodes": tm.num_nodes, "triangles": tm.num_triangles, "min_angle": round(tm.min_angle(), 2),
                       "quality_mean": round(float(tm.quality().mean()), 3)},
             "boundary_edges": {k: v.tolist() for k, v in tm.boundary_edges.items()},
-            "diagnostics": [d.as_dict() for d in doc.diagnostics]}
+            "diagnostics": _diagnostics(doc.diagnostics)}
+
+
+@app.post("/api/mesh")
+async def mesh_preview(request: Request):
+    _check_workspace_instance(request)
+    try:
+        tree, found = await _document_body(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    return exact_json(await run_in_threadpool(_mesh_reply, tree, found))
 
 
 def _display(doc: Document) -> dict:
@@ -354,11 +414,18 @@ def _subspace_payload(res, representation: str) -> dict:
 
 
 @app.post("/api/run")
-def start_run(body: DocBody, request: Request = None):
-    if request is not None:
-        _check_workspace_instance(request)
+async def start_run(request: Request):
+    _check_workspace_instance(request)
     try:
-        doc = Document.from_dict(body.doc)
+        tree, found = await _document_body(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    return await run_in_threadpool(_start_job, tree, found)
+
+
+def _start_job(tree: dict, found: list) -> dict:
+    try:
+        doc = _readable(tree, found)
     except DocumentError as exc:
         raise HTTPException(400, str(exc))
     _require_studio_physics(doc)

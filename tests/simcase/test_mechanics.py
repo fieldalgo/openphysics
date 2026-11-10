@@ -374,7 +374,7 @@ def test_j6_studio_rejects_mechanics_documents(kind):
     from fastapi import HTTPException
     from simcase.studio import server
     doc = Document.from_dict(data(kind))
-    response = server.validate(server.DocBody(doc=doc.data))
+    response = server.validation_payload(doc.data)
     assert response['ok'] is False and 'headless' in response['error']
     with pytest.raises(HTTPException) as error:
         server._require_studio_physics(doc)

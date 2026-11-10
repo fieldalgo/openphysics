@@ -87,10 +87,17 @@ def test_materials_and_preview(client):
     assert client.post("/api/materials/preview", json={"name": "Si"}).status_code == 404     # not a library name
 
 
-def test_units_vocabulary_comes_from_the_engine(client):
-    served = client.get("/api/units").json()
-    assert served == simcase.unit_vocabulary()
-    assert "length" in served["dimensions"] and "um" in served["symbols"]["length"]
+def test_quantities_come_from_the_registry(client):
+    """/api/quantities (was /api/units, units batch C10): every registry quantity with its canonical
+    unit and its menu, from simcase.quantities."""
+    served = client.get("/api/quantities").json()
+    assert set(served["quantities"]) == set(simcase.quantities.names())
+    for name, entry in served["quantities"].items():
+        assert entry == {"unit": simcase.quantities.quantity(name).unit,
+                         "menu": list(simcase.quantities.menu(name))}, name
+    assert served["quantities"]["vacuum_wavelength"] == {"unit": "m", "menu": ["nm", "um", "m"]}
+    assert served["length_units"] == list(simcase.quantities.LENGTH_UNITS)
+    assert client.get("/api/units").status_code == 404
 
 
 def _leaves(node, path=""):

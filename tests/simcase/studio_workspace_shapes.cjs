@@ -53,15 +53,15 @@ test('summaries, overlaps and new shapes stay unique and inside the window',()=>
  const copy=S.duplicateShape(shapes[0],shapes);assert.equal(copy.name,'Slab copy 1');assert.equal(copy.x,-1500);
  const moved=S.duplicateShape(shapes[1],shapes);assert.equal(moved.x,-150);assert.equal(S.duplicateShape(moved,[...shapes,moved]).name,'Rib copy 2');
 });
-test('run tables keep legacy columns for one rectangle and describe every shape',()=>{
+test('run tables keep the single-rectangle columns in SI under `name [unit]` headers and describe every shape',()=>{
  const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
  const single=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},setup);
  const multi=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,shapes:[rect('Slab',-1500,0,3000,90),{name:'Rod',type:'circle',material:'Silicon nitride',cx:0,cy:500,r:150}]},setup);
  const run=(job,input)=>({job,completedAt:'2026-10-27T00:00:00Z',input,settings:opticalSettings(),effective_index:[2.5,1.8],field,origin:'local'});
  const rows=runTableCsv([run('aaaaaaa1',single),run('aaaaaaa2',multi)]).trim().split('\n');
- assert.ok(rows[0].includes('"core_width_nm","core_height_nm","wavelength_nm","core_mesh_nm","core_material","shapes"'));
- assert.ok(rows[1].includes('"500","220","1550","30","Silicon","Core: rect Silicon x -250…250, y 0…220 nm"'));
- assert.ok(rows[3].includes('"","","1550","30","","Slab: rect Silicon x -1500…1500, y 0…90 nm | Rod: circle Silicon nitride centre (0, 500), r 150 nm"'));
+ assert.ok(rows[0].includes('"core_width [m]","core_height [m]","vacuum_wavelength [m]","core_element_size [m]","core_material","shapes","candidate","effective_index [1]"'));
+ assert.ok(rows[1].includes('"5e-7","2.2e-7","0.00000155","3e-8","Silicon","Core: rect Silicon x -250…250, y 0…220 nm"'));
+ assert.ok(rows[3].includes('"","","0.00000155","3e-8","","Slab: rect Silicon x -1500…1500, y 0…90 nm | Rod: circle Silicon nitride centre (0, 500), r 150 nm"'));
 });
 test('alignment meets reference edges exactly and refuses leaving the window',()=>{
  const slot=rect('Slot',-50,0,100,220,'Air'),left=rect('Left',300.3,40,250.1,180),right={name:'Right',type:'polygon',material:'Silicon',points:[[0,500],[250,500],[250,720],[0,720]]};
