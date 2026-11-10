@@ -19,12 +19,12 @@ python -m simcase validate model.json
 python -m simcase run model.json                          # -> model_results/
 ```
 
-The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.2"` or
-`"0.3"`; it is not an import or distribution name. Format `"0.3"` (values with units, registry
+The package and CLI are named `simcase`. The JSON version field is `"openphysics": "0.3"`; it is
+not an import or distribution name. Format `"0.3"` (values with units, registry
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat,
-electric conduction and Joule heating, mechanics and waveguide modes (`em.modes2d`), which no
-longer read format 0.2; `em.cavity3d` still reads format 0.2 until its commit of the units batch:
-[document format 0.3](../../docs/packages/simcase/document_format.md). The separate
+electric conduction and Joule heating, mechanics, waveguide modes (`em.modes2d`) and rectangular
+cavities (`em.cavity3d`). No kind reads format 0.2 any more: a 0.2 document is refused by name
+(`E-FORMAT`): [document format 0.3](../../docs/packages/simcase/document_format.md). The separate
 `openphysics` distribution is the complete product from 0.0.2: it installs the
 OpenPhysics packages with Studio and provides the `openphysics` command; the 0.0.1
 on PyPI is an empty name reservation. See the
@@ -528,14 +528,22 @@ Used by the page, usable by anything else.
 | method | path | purpose |
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | example documents |
-| GET | `/api/units` | the declarable base dimensions and their unit symbols |
+| GET | `/api/quantities` | every registry quantity a document writes, with its canonical unit and its unit menu (from `simcase.quantities`), and the length units |
 | GET | `/api/materials` | physmat built-ins under their exact `physmat:` names: valid vacuum wavelengths (m), source |
 | POST | `/api/materials/preview` | n, k of a `physmat:` material over a vacuum wavelength interval in m |
-| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes, diagnostics}` or `{ok: false, error}` |
+| POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` or `{ok: false, error, diagnostics}`; `doc` is the document as sent, every number with its written digits |
 | POST | `/api/mesh` | `{doc}` -> `node_coordinates` (m) with `field_units`, `display`, triangles, regions, boundary edges, stats, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; runs in a background thread |
 | GET | `/api/jobs/{id}` | status and log lines |
 | GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss` (the summary's series), `vacuum_wavelength`, fields, `node_coordinates` (m), timings, summary |
+
+Every route that takes a document reads the request's raw bytes with `simcase.reader`:
+a duplicate key, `NaN`, `Infinity`, malformed JSON, text that is not UTF-8 and a string with an
+escaped unpaired surrogate (`"\ud800"`) are refused with their code (`E-KEY-DUPLICATE`, `E-JSON`;
+status 400, and a duplicate key inside the document is a diagnostic of `/api/validate`), a leading
+UTF-8 byte order mark is accepted, and a number keeps its written digits, so an unchanged document
+comes back byte for byte apart from whitespace and the spelling of string escapes (`"\u00b5"`
+comes back as `"µ"`).
 
 The steady and transient heat views use their own capability, validation, run and
 result routes; see the [steady](../../docs/packages/simcase/thermal_studio.md) and

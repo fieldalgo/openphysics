@@ -425,8 +425,22 @@ if HARNESS.is_dir():
                                     "gauge_pressure": {"inner": "10 MPa"}}}
         return data
 
+    #: cavity_lossy_slab.json before the units batch (format 0.2; converted by units batch C9)
+    CAVITY_LOSSY_SLAB_02 = {
+        "openphysics": "0.2", "name": "Copper box with a lossy dielectric slab, Q near 150 MHz",
+        "units": {"length": "m"},
+        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.6},
+                     "background": {"material": "vacuum"},
+                     "shapes": [{"type": "box", "name": "slab", "material": "lossy_dielectric",
+                                 "xmin": 0, "xmax": 1, "ymin": 0, "ymax": 0.8, "zmin": 0, "zmax": 0.3}]},
+        "materials": {"lossy_dielectric": {"relative_permittivity": [4.0, -0.04]}},
+        "physics": {"em1": {"type": "em.cavity3d", "boundary": {"conductivity_s_per_m": 58000000.0},
+                            "search": "near_target", "target_frequency_hz": 150000000.0, "num_modes": 3}},
+        "mesh": {"subdivisions": [8, 8, 8]}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False}}
+
     def _spec_cavity_lossy_slab():
-        data = json.loads((ROOT / "examples" / "simcase" / "cavity_lossy_slab.json").read_text(encoding="utf-8"))
+        data = copy.deepcopy(CAVITY_LOSSY_SLAB_02)
         data["openphysics"] = "0.3"
         del data["units"]
         data["geometry"] = {"length_unit": "m", **data["geometry"]}
@@ -501,7 +515,8 @@ if HARNESS.is_dir():
         expected = (SPEC_EXAMPLES.get(name) or {"elastic_regions": _spec_elastic_regions,
                                                   "cavity_lossy_slab": _spec_cavity_lossy_slab}[name]())
         frozen = {"thermal_regions": THERMAL_REGIONS_02, "joule_temperature": JOULE_TEMPERATURE_02,
-                  "elastic_regions": ELASTIC_REGIONS_02, "soi_strip": SOI_STRIP_02}
+                  "elastic_regions": ELASTIC_REGIONS_02, "soi_strip": SOI_STRIP_02,
+                  "cavity_lossy_slab": CAVITY_LOSSY_SLAB_02}
         old = copy.deepcopy(frozen[name]) if name in frozen else \
             json.loads((ROOT / "examples" / "simcase" / f"{name}.json").read_text(encoding="utf-8"))
         new, writer = convert.convert(old)

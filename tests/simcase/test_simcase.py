@@ -97,13 +97,22 @@ def test_unknown_or_malformed_unit_strings_are_errors(bad):
 
 
 def test_a_document_cannot_get_its_units_by_forgetting():
-    """The format 0.2 unit declaration, on the kind that still reads it (em.cavity3d)."""
+    """Format 0.3 (every kind since the cavity moved): the lengths need geometry.length_unit, and
+    a format 0.2 units block is an unknown key, not a way to declare them."""
     d = copy.deepcopy(examples.CAVITY_BOX)
-    del d["units"]
-    with pytest.raises(DocumentError, match="units.length is required"):
+    del d["geometry"]["length_unit"]
+    with pytest.raises(DocumentError) as caught:
         Document.from_dict(d)
+    assert [(e.code, e.path) for e in caught.value.diagnostics if e.severity == "error"] == [
+        ("E-KEY-MISSING", "geometry.length_unit")]
+    d["units"] = {"length": "m"}
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(d)
+    assert ("E-KEY-UNKNOWN", "units") in [(e.code, e.path) for e in caught.value.diagnostics]
 
 
+# The format 0.2 unit declaration has no document reader left (C9 moved the last kind); the kernel
+# hand-offs still build their 0.2-shaped trees through units.resolve until C11, so it is tested here.
 @pytest.mark.parametrize("block,msg", [
     ({"lenght": "um"}, "unknown key"),
     ({"length": "furlong"}, "unknown unit"),
@@ -113,21 +122,26 @@ def test_a_document_cannot_get_its_units_by_forgetting():
     ({"length": {"in_m": 0}}, "finite and positive"),
 ])
 def test_unit_declarations_that_must_be_refused(block, msg):
-    d = dict(copy.deepcopy(examples.CAVITY_BOX), units=block)
-    with pytest.raises(DocumentError, match=msg):
-        Document.from_dict(d)
+    with pytest.raises(units.UnitError, match=msg):
+        units.resolve(block)
 
 
 def test_the_escape_hatch_is_a_unit_like_any_other():
-    d = dict(copy.deepcopy(examples.CAVITY_BOX), units={"length": {"in_m": 1e-10}})   # angstrom
-    assert Document.from_dict(d).scale.size("length") == 1e-10
+    assert units.resolve({"length": {"in_m": 1e-10}}).size("length") == 1e-10   # angstrom
 
 
 def test_tagged_quantities_are_reserved():
-    d = copy.deepcopy(examples.CAVITY_BOX)
-    d["mesh"]["size"] = [0.25, "um"]
+    """Format 0.2 refused [value, unit] pairs (reserved); format 0.3 writes "250 MHz" and refuses a pair
+    by its value form."""
+    from simcase.schema import reject_tagged_values
     with pytest.raises(DocumentError, match="reserved"):
+        reject_tagged_values({"mesh": {"size": [0.25, "um"]}})
+    d = copy.deepcopy(examples.CAVITY_BOX)
+    d["physics"]["em1"]["target_frequency"] = [250, "MHz"]
+    with pytest.raises(DocumentError) as caught:
         Document.from_dict(d)
+    assert [(e.code, e.path) for e in caught.value.diagnostics if e.severity == "error"] == [
+        ("E-VALUE-FORM", "physics.em1.target_frequency")]
 
 
 def test_a_format_0_3_mode_document_takes_no_unit_declaration():

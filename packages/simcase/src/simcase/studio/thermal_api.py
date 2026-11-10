@@ -16,6 +16,7 @@ import time
 
 import numpy as np
 from simcase import Document, DocumentError, ThermalRunResult
+from simcase import reader
 
 KIND = "thermal.steady2d"
 # Rectangle documents are format 0.3: arrays under registry names, SI values.
@@ -111,8 +112,18 @@ def capabilities(limits):
     }
 
 
-def encode_json(value, limit):
-    """Count complete encoded bytes, including metadata and JSON punctuation."""
+def encode_json(value, limit, *, exact=False):
+    """Count complete encoded bytes, including metadata and JSON punctuation. ``exact`` writes a
+    tree that holds a document's ``Decimal`` numbers with ``simcase.reader.dumps`` (their digits as
+    written); a reply without a document streams through ``json``."""
+    if exact:
+        try:
+            data = reader.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except ValueError as exc:
+            raise ThermalAPIError("invalid_result", "a JSON number is finite") from exc
+        if len(data) > limit:
+            raise ThermalAPIError("payload_limit_exceeded", "encoded thermal data exceeds its byte limit", 413)
+        return data
     out = bytearray()
     encoder = json.JSONEncoder(ensure_ascii=False, allow_nan=False, separators=(",", ":"))
     for fragment in encoder.iterencode(value):
@@ -123,24 +134,18 @@ def encode_json(value, limit):
     return bytes(out)
 
 
-def _pairs(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ThermalAPIError("invalid_json", "duplicate JSON key")
-        result[key] = value
-    return result
-
-
-def _float(value):
-    number = float(value)
-    if not math.isfinite(number):
-        raise ThermalAPIError("invalid_json", "JSON numbers must be finite")
-    return number
-
-
-def _constant(value):
-    raise ThermalAPIError("invalid_json", "JSON numbers must be finite")
+def _parse(data: bytes):
+    """The request tree from its raw bytes, read with ``simcase.reader`` (numbers as written, a
+    leading UTF-8 byte order mark accepted); its refusals are ``invalid_json`` with their path."""
+    raw, found = reader.parse(data)
+    for d in found:
+        if d.code == "E-KEY-DUPLICATE":
+            raise ThermalAPIError("invalid_json", "duplicate JSON key", path=d.path or None)
+        if d.code == "E-DOMAIN":
+            raise ThermalAPIError("invalid_json", "a JSON number literal is too long", path=d.path or None)
+        message = "JSON numbers must be finite" if "finite numbers" in d.message else "malformed finite UTF-8 JSON"
+        raise ThermalAPIError("invalid_json", message)
+    return raw
 
 
 def _counter(value, name):
@@ -211,8 +216,7 @@ async def read_request(request, limits, *, for_run, preflight=None, runtime_chec
         except Exception as exc:
             raise ThermalAPIError("request_read_failed", "could not read thermal request body") from exc
         try:
-            raw = json.loads(data.decode("utf-8"), object_pairs_hook=_pairs,
-                             parse_float=_float, parse_constant=_constant)
+            raw = _parse(bytes(data))
             pending = [raw]
             while pending:
                 value = pending.pop()
@@ -231,13 +235,20 @@ async def read_request(request, limits, *, for_run, preflight=None, runtime_chec
             raise ThermalAPIError("invalid_envelope", "expected exactly doc, client_revision and request_seq")
         tags = {"client_revision": _counter(raw["client_revision"], "client_revision"),
                 "request_seq": _counter(raw["request_seq"], "request_seq")}
-        if region is not None and region.applies(raw["doc"]):
-            return await region.read(raw["doc"], tags, for_run=for_run)
-        (preflight or _preflight)(raw["doc"], limits)
+        exact = raw["doc"]
+        try:
+            # the doubles of the authored numbers (what the request reader gave before it kept their
+            # digits): the route checks and caps read these, the document reads the exact tree
+            view = json_value(exact)
+        except ValueError as exc:
+            raise ThermalAPIError("invalid_json", "JSON numbers must be finite") from exc
+        if region is not None and region.applies(view):
+            return await region.read(view, tags, for_run=for_run, exact=exact)
+        (preflight or _preflight)(view, limits)
         if for_run and not (runtime_check or runtime_available)():
             raise ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
         try:
-            doc = Document.from_dict(raw["doc"])
+            doc = Document.from_dict(exact)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
             raise ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
         return ThermalInput(doc, **tags)
@@ -256,22 +267,24 @@ def json_value(value):
     if isinstance(value, (list, tuple)):
         return [json_value(item) for item in value]
     if isinstance(value, decimal.Decimal):
-        if not value.is_finite():
-            raise ValueError("a JSON number is finite")
-        return json.loads(str(value))
+        number = json.loads(str(value)) if value.is_finite() else math.nan
+        if isinstance(number, float) and not math.isfinite(number):
+            raise ValueError("a JSON number is finite")         # also a decimal beyond the doubles (1e999)
+        return number
     if isinstance(value, float) and not math.isfinite(value):
         raise ValueError("a JSON number is finite")
     return value
 
 
 def document_body(doc):
-    """The document and its coded ``diagnostics`` for a validation reply."""
-    return {"doc": json_value(doc.data), "diagnostics": [d.as_dict() for d in doc.diagnostics]}
+    """The authored document (its numbers as written) and its coded ``diagnostics`` for a
+    validation reply, encoded with ``encode_json(..., exact=True)``."""
+    return {"doc": doc.data, "diagnostics": [d.as_dict() for d in doc.diagnostics]}
 
 
 def validation_payload(spec, limits):
     body = {"ok": True, **document_body(spec.doc), "summary": spec.doc.summary(), **spec.tags()}
-    return encode_json(body, limits.payload_bytes)
+    return encode_json(body, limits.payload_bytes, exact=True)
 
 
 def geometry_block(doc):
