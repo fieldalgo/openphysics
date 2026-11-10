@@ -123,7 +123,8 @@ def test_lengths_convert_exactly_when_the_micrometre_value_is_representable():
     assert 1.3e-8 * 1e6 != 0.013 and k["geometry"]["shapes"][0]["mesh_size"] == 0.013
     assert 9.0 * 0.001 != 0.009 and k["mesh"]["size"] == 0.009
     assert 2.2e-7 / 1e-6 != 0.22 and k["physics"]["em1"]["wavelength"] == 0.22
-    # the format 0.2 helpers (still read by em.cavity3d and the region hand-offs) keep their contract
+    # the format 0.2 helpers (no document reads 0.2 since units batch C9; the kernel and region
+    # hand-offs still use them until C11) keep their contract
     nm, m, um = (units.resolve({"length": s}) for s in ("nm", "m", "um"))
     assert units.micrometres_per_length(nm) == units.Fraction(1, 1000)
     assert units.micrometres_per_length(m) == 10 ** 6
