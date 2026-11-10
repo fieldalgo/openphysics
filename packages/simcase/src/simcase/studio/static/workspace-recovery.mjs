@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {parseProject} from './workspace-project.mjs';
-export const RECOVERY_KEY='openphysics.studio.recovery.v1';
+export const RECOVERY_KEY='openphysics.studio.recovery.v2';
 export function readRecovery(storage){
  const raw=storage.getItem(RECOVERY_KEY);if(!raw)return null;
  if(new TextEncoder().encode(raw).length>70000)throw new Error('Recovery record is too large.');

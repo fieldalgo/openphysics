@@ -357,7 +357,7 @@ def test_p2_19_studio_heat_builder_output_validates():
     script = (f"const H=await import({json.dumps(module)});"
               "const plate=(sides,extra={})=>({...H.DEFAULT_THERMAL,...extra,sides:{...H.DEFAULT_THERMAL.sides,...sides}});"
               "console.log(JSON.stringify([H.heatDocument(H.DEFAULT_THERMAL),"
-              "H.heatDocument(plate({left:{type:'flux',flux:-500},top:{type:'convection',h:10,ambient:290}},"
+              "H.heatDocument(plate({left:{type:'flux',inward_heat_flux:500},top:{type:'convection',h:10,ambient:290}},"
               "{source:1e5}))]));")
     done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True,
                           encoding="utf-8", check=True)
@@ -365,4 +365,4 @@ def test_p2_19_studio_heat_builder_output_validates():
         doc = Document.from_dict(data)
         assert not [d for d in doc.diagnostics if d.severity == "error"]
     mixed = Document.from_dict(json.loads(done.stdout)[1])
-    assert mixed.si["physics"]["heat1"]["inward_heat_flux"] == {"left": 500.0}    # the form's outward -500
+    assert mixed.si["physics"]["heat1"]["inward_heat_flux"] == {"left": 500.0}    # the form's inward 500 (project 6)
