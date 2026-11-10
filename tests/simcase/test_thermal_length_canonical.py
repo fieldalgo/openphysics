@@ -105,6 +105,9 @@ def test_region_mesh_solve_and_saved_fields_are_identical_across_units(transient
         # The achieved smallest angle is measured on the triangulation in the document's own
         # units, as before the units batch (P2-1 keeps it bitwise against format 0.2), so it is
         # the one summary value that moves by rounding across length units: compared to 1e-12.
+        # This is a stated deviation from P2-5 ("identical summary values"), not a pass of it:
+        # measured at most 335 ulp (m against mm) on this problem. P2-1 and P2-5 cannot both be
+        # bitwise for this value until the mesher step measures the angle on one frame.
         angle = summary.get('minimum_triangle_angle', {}).get('value', 0.0)   # steady only
         values = _hexed({k: v for k, v in summary.items() if k not in TEXTUAL + ('minimum_triangle_angle',)})
         with np.load(out/'fields.npz', allow_pickle=False) as fields:
