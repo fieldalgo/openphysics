@@ -324,7 +324,7 @@ def solve_thermoelasticity_moving(mesh: Mesh, temperature_snapshot, motion: Mesh
     _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k)
     _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
     p, tris, *_ = triangle_geometry(mesh, counterclockwise=False)
-    thermoelasticity._verify_snapshot(temperature_snapshot, p, tris)
+    thermoelasticity.verify_snapshot(temperature_snapshot, p, tris)
     moved = _checked_step(mesh, W, t)
     base = thermoelasticity.solve_thermoelasticity(
         moved, thermoelasticity.freeze_temperature(moved, temperature_snapshot.temperature_k),
@@ -387,11 +387,11 @@ def _thermoelastic_live(xp, mesh, moved, t, W, base, temperature, dirichlet, bod
     cells = mesh.num_triangles
     e_t, nu_t = (np.asarray(v, dtype=float) for v in elasticity.element_materials(mesh, e, nu))
     alpha_t = _per_triangle(mesh, alpha, "thermal_expansion_per_k")
-    coefficient = np.broadcast_to(thermoelasticity._thermal_coefficient(e_t, nu_t, plane), (cells,))
+    coefficient = np.broadcast_to(thermoelasticity.thermal_coefficient(e_t, nu_t, plane), (cells,))
     a = lift(xp, alpha_t)[:, None] * (temperature[mesh.triangles] - tref)        # (T, 3) nodal values per element
     q = lift(xp, np.array(coefficient))[:, None] * a
     ac, qc = xp.mean(a, axis=1), xp.mean(q, axis=1)
-    m_vector = lift(xp, thermoelasticity._M)
+    m_vector = lift(xp, thermoelasticity.ISOTROPIC_STRAIN)
     local = xp.einsum("tji,j,t->ti", live.B, m_vector, live.area * qc)
     thermal = scatter_add(xp, 2 * mesh.num_nodes, live.dofs.ravel(), xp.reshape(local, (-1,)))
     external = live.body + live.line
@@ -410,7 +410,7 @@ def _thermoelastic_live(xp, mesh, moved, t, W, base, temperature, dirichlet, bod
     else:
         zz = xp.zeros_like(qc)
         ez = ((1 + nu_l) * ac - nu_l * trace) / (1 - nu_l)
-    energy = thermoelasticity._physical_energy(xp, strain, a, live.area, live.d, e_l, nu_l, plane)
+    energy = thermoelasticity.physical_energy(xp, strain, a, live.area, live.d, e_l, nu_l, plane)
     return thermoelasticity.ThermoelasticResult(
         xp.reshape(u, (-1, 2)), strain, th, elastic, stress, zz, ez,
         *(xp.reshape(v, (-1, 2)) for v in (external, thermal, reaction, residual)),
