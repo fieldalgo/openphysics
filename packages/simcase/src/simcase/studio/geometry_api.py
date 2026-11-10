@@ -18,6 +18,10 @@ arcs and circles are sampled for drawing only, and ``summary`` is the text
 ``python -m simcase geometry`` prints. A format 0.3 parameter is reported with its
 authored value and its SI value.
 
+The request is read from its raw bytes with ``simcase.reader`` (``bodies.read_envelope``), as
+every Studio route that takes a document: numbers keep their written digits, and a duplicate
+key inside the document is a refusal like any other (``ok: false`` with its diagnostics).
+
 Imports from simcase are absolute and limited to ``simcase.__all__``.
 """
 
@@ -27,11 +31,12 @@ import math
 from fractions import Fraction
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
 
 from simcase import GeometryError, evaluate_geometry, parse_geometry
+from .bodies import RequestRefused, diagnostics, exact_json, read_envelope
 
 STATIC = Path(__file__).parent / "static"
 router = APIRouter()
@@ -49,11 +54,6 @@ PAGE_POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src
                "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 ARC_STEPS = 96      # drawing samples per whole circle; the engine's curves stay exact
-
-
-class EvaluateBody(BaseModel):
-    doc: dict
-    component: str | None = None
 
 
 @router.get("/geometry-lab")
@@ -75,12 +75,27 @@ def geometry_lab_asset(filename: str):
 
 
 @router.post("/api/geometry-lab/evaluate")
-def geometry_lab_evaluate(body: EvaluateBody):
+async def geometry_lab_evaluate(request: Request):
     try:
-        view = {"ok": True, **evaluate_view(body.doc, body.component)}
+        tree, found = read_envelope(await request.body(), optional=("component",))
+    except RequestRefused as exc:
+        return exc.reply()
+    component = tree.get("component")
+    if component is not None and not isinstance(component, str):
+        return RequestRefused("component: a component name is a string").reply()
+    if found:
+        view = {"ok": False, "refused": "; ".join(f"{d.path or '<document>'}: {d.message} ({d.code})" for d in found),
+                "diagnostics": diagnostics(found)}
+    else:
+        view = await run_in_threadpool(_evaluate, tree["doc"], component)
+    return exact_json(view)
+
+
+def _evaluate(doc: dict, component: str | None) -> dict:
+    try:
+        return {"ok": True, **evaluate_view(doc, component)}
     except GeometryError as exc:
-        view = {"ok": False, "refused": str(exc)}
-    return JSONResponse(view, headers={"Cache-Control": "no-store"})
+        return {"ok": False, "refused": str(exc)}
 
 
 def evaluate_view(doc: dict, component: str | None = None) -> dict:

@@ -101,7 +101,7 @@ const heatValue=path=>path.split('.').reduce((o,k)=>o?.[k],state.thermal);
 function heatInput(path,label,attrs=''){const draft=heatDrafts.get(path);return `<label>${label}<input data-heat="${path}" type="number" step="any" ${attrs} value="${escapeHtml(draft?draft.raw:heatValue(path))}" aria-invalid="${!!draft}"></label>${draft?`<p class="input-hint" role="alert">${escapeHtml(draft.message)} Last valid value is retained.</p>`:''}`;}
 function heatSideForm(side){
  const c=state.thermal.sides[side];
- const fields=c.type==='temperature'?heatInput(`sides.${side}.temperature`,'Temperature [K]','min="0"'):c.type==='flux'?heatInput(`sides.${side}.flux`,'Outward heat flux [W/m²] (positive leaves the plate)'):c.type==='convection'?heatInput(`sides.${side}.h`,'Heat transfer coefficient h [W/(m²·K)]','min="0"')+heatInput(`sides.${side}.ambient`,'Ambient temperature [K]','min="0"'):'';
+ const fields=c.type==='temperature'?heatInput(`sides.${side}.temperature`,'Temperature [K]','min="0"'):c.type==='flux'?heatInput(`sides.${side}.inward_heat_flux`,'Inward heat flux [W/m²] (positive enters the plate)'):c.type==='convection'?heatInput(`sides.${side}.h`,'Heat transfer coefficient h [W/(m²·K)]','min="0"')+heatInput(`sides.${side}.ambient`,'Ambient temperature [K]','min="0"'):'';
  return `<fieldset class="heat-side" data-side-box="${side}"><legend>${side[0].toUpperCase()+side.slice(1)} side</legend><label>Condition<select data-heat-type="${side}">${Object.entries(SIDE_TYPES).map(([k,v])=>`<option value="${k}" ${k===c.type?'selected':''}>${v}</option>`).join('')}</select></label>${fields}</fieldset>`;
 }
 function heatInspector(){
@@ -123,7 +123,7 @@ function bindHeatPanel(){
   heatDrafts.delete(path);setThermal(next,'Heat input updated.');
  });
  document.querySelectorAll('[data-heat-type]').forEach(el=>el.onchange=()=>{
-  const side=el.dataset.heatType,type=el.value,defaults={insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:295}};
+  const side=el.dataset.heatType,type=el.value,defaults={insulated:{type},temperature:{type,temperature:300},flux:{type,inward_heat_flux:0},convection:{type,h:10,ambient:295}};
   for(const key of [...heatDrafts.keys()])if(key.startsWith(`sides.${side}.`))heatDrafts.delete(key);
   setThermal({...state.thermal,sides:{...state.thermal.sides,[side]:defaults[type]}},`${side[0].toUpperCase()+side.slice(1)} side: ${SIDE_TYPES[type].toLowerCase()}.`);
  });
@@ -575,7 +575,7 @@ function renderOpticalStudy(){
  heading.textContent=(same?'Current inputs':'Earlier inputs or server')+' · '+(record.ok?'document accepted':'document rejected');report.append(heading);
  const captured=document.createElement('p');captured.textContent=designSummary(record.input.model)+' · λ '+record.input.model.wavelength+' nm · mesh '+record.input.model.coreMesh+' nm · '+new Date(record.checkedAt).toLocaleTimeString();report.append(captured);
  const summary=document.createElement('pre');summary.textContent=record.ok?record.summary:record.error;report.append(summary);
- for(const note of record.notes){const line=document.createElement('p');line.textContent=note;report.append(line);}host.append(report);
+ for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
  panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].detail)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
@@ -817,7 +817,7 @@ $('run-optical').onclick=async()=>{
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
- try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v5'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v5';}
+ try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v6'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v6';}
  catch(error){
   // no answer at all: say so and keep checking; any other failure is shown and checking stops
   if(connectionFailure(error)==='unreachable'){connection.message=UNREACHABLE_MESSAGE;scheduleReconnect();}
@@ -838,7 +838,7 @@ function scheduleReconnect(){
  reconnectTimer=setTimeout(async()=>{
   reconnectTimer=null;reconnecting=true;let reachable=true;
   try{
-   try{await solverApi('/api/workspace/capabilities/v5');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
+   try{await solverApi('/api/workspace/capabilities/v6');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
    if(reachable)await connectWorkspace();
   }finally{reconnecting=false;}
   if(connection.ready){notice(RECONNECTED_MESSAGE);if($('job-message').textContent===UNREACHABLE_MESSAGE)$('job-message').textContent=RECONNECTED_MESSAGE;}
