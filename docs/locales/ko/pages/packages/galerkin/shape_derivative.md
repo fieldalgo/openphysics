@@ -7,7 +7,8 @@
 `galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 Cartesian 열
 (`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
-`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 Cartesian 열(`galerkin.transient_heat.solve_transient_heat`,
+2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -85,6 +86,18 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 - 공간에 고정된 온도장을 움직이는 노드에서 다시 샘플링하는 방식은 제공하지 않습니다. 좌표 콜백이 필요하기 때문입니다(아래
   거부).
 
+## 과도 열
+
+`solve_transient_heat(mesh, ..., motion=MeshMotion(W, t))`는 영역별 전도도와 열용량, 일정 또는 영역별 열원, 경계 태그의
+outward flux와 convection(변과 함께 움직임), Dirichlet 값을 받습니다.
+- 일반 backward-Euler 풀이를 옮겨진 메시에서 한 번 돌려 모든 스텝 검사를 거칩니다.
+- 그 뒤 각 스텝에 X₀ + t·W에서 조립한 질량·강성·Robin 행렬과 하중으로 live 보정을 한 번 붙입니다. 모든 이력이 d/dt를
+  나릅니다: 온도, 열유속, 열원 하중, 반력, 잔차, 저장률, 열량, 이차 범함수, prescribed·convective outward.
+- 초기 온도와 Dirichlet 값은 열탄성처럼 노드에 붙어 함께 움직입니다.
+- 시간만의 콜백 `callback(time_s)`은 Dirichlet 값, outward flux, convection의 h와 ambient에 쓸 수 있습니다. 노드 위치와
+  무관하기 때문입니다. 시간 콜백은 NumPy 숫자를 돌려줘야 합니다. 좌표 콜백은 어디서나처럼 거부합니다.
+- motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
+
 ## 메시 속도
 
 형상의 곡선 위 노드는 설계가 움직이는 대로 움직입니다. 버전 1 형상 문서라면 `simcase.geometry_velocity.design_velocity(document,
@@ -117,11 +130,12 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·outward flux·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
-  `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다.
-- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction 값:
+  `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받습니다.
+- 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
+- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도 값:
   그런 호출에서 live 입력은 t 하나입니다.
 - 다른 메시(옮겨진 메시 포함)의 온도 스냅샷: 스냅샷은 주어진 메시의 것입니다.
-- `coordinate_system="axisymmetric"`.
+- `coordinate_system="axisymmetric"`; 과도 열의 `checkpoint_every`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
   ([거부 목록](differentiation.md#근사하지-않고-거부하는-것)).
@@ -196,3 +210,17 @@ h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값 d(ΣR_y)/
 
 사전 등록은 M4의 기준을 정했고 메시 크기는 정하지 않았습니다. 크기 0.8·0.4·0.2로 처음 돌리면 1.6e-1, 4.4e-2, 1.016e-2로 차수는 약
 2지만 최세가 1e-2를 조금 넘었습니다. 시험은 한 단계 더 고운 세 크기를 쓰며, 기준은 그대로입니다.
+
+`tests/galerkin/test_shape_derivative_transient_heat.py`에 과도 열의 검사 H1–H8이 있습니다. 2026-11-10에 H3의 메시·스텝 수까지
+사전 등록하고 같은 날 같은 버전으로 측정했습니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| H1 이산 일관성 | 두 재료·열원·불균일 초기 온도·시간에 따라 변하는 Dirichlet 변과 outward flux·움직이는 변의 convection이 있는 문제에서, 최종 탐침 온도·최종 Dirichlet 반력 합·최종 열량·온도 이력 전체의 가중합의 미분 vs 옮긴 메시 중심차분(h = 1e-4); 상대 1e-6, JAX·PyTorch | 1.2e-11 ~ 3.5e-9 |
+| H2 균일 해 | 단열, 균일 초기 온도와 열원: 이산 해는 어떤 메시에서도 T₀ + Q t_n/c이므로 dC_n/dt = (c T₀ + Q t_n) dA/dt; 상대 1e-10 | 통과 |
+| H3 사인 감쇠, 막대 길이 | 양끝 Dirichlet, 노드에 붙인 초기 sin(πx/L), 막대 늘림; 최종 열량의 d/dL을 닫힌 식과 비교; (nx, 스텝) = (10, 10), (20, 40), (40, 160); 관측 차수 ≥ 1.0, 최세 1e-2 이내 | 2.0e-2, 5.1e-3, 1.3e-3(차수 2.0, 2.0) |
+| H4 정상 극한 | 해가 정상에 이른 뒤 탐침 미분이 정상 열의 미분과 같음, 상대 1e-8 | 통과 |
+| H5 강체 이동 | dJ/dt = 0, 1e-12 · \|J\| 이내(열량, 온도 합) | 통과 |
+| H6 열수지 | 최종 스텝 d(Σ 반력)/dt = d(Σ 저장 − Σ 하중 + Σ outward)/dt, 상대 1e-10 | 통과 |
+| H7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `3afaaa6`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
+| H8 거부 | 위 목록대로 | 통과 |

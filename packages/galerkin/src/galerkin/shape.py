@@ -17,6 +17,7 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
 
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
 ``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
+``transient_heat.solve_transient_heat`` (Cartesian),
 ``thermoelasticity.solve_thermoelasticity`` and
 ``thermal_mechanical.solve_steady_thermoelasticity`` with scalar or region data and
 constant loads; the refusals are listed in docs/packages/galerkin/shape_derivative.md.
@@ -304,6 +305,190 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, po
     stress = strain @ live.d.T if live.d.ndim == 2 else xp.einsum("tij,tj->ti", live.d, strain)
     return elasticity.ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress, xp.reshape(load, (-1, 2)),
                                        xp.reshape(reaction, (-1, 2)), xp.reshape(residual, (-1, 2)), plane)
+
+
+# ----------------------------------------------------------------------------- transient heat
+
+def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, volumetric_heat_capacity, time_s,
+                                initial_temperature_k, dirichlet, heat_source=0.0, outward_flux=None, convection=None,
+                                checkpoint_every=None, coordinate_system="cartesian"):
+    """``transient_heat.solve_transient_heat`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    The ordinary solve on the moved mesh gives the numbers and every step check. The
+    initial temperatures and Dirichlet values stay attached to their nodes. Each
+    backward-Euler step then gets one live correction x_n = x0_n + A(t)^-1 (b_n(t) - A(t) x0_n),
+    with the mass, stiffness, Robin matrix and loads assembled from the live coordinates,
+    so every history carries the derivative (decision 2026-11-10 for attached nodal data)."""
+    from . import transient_heat
+    from .core.triangles import triangle_geometry
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    if coordinate_system != "cartesian":
+        raise ValueError("motion: shape derivatives cover Cartesian transient heat in this slice; axisymmetric "
+                         "is refused")
+    if checkpoint_every is not None:
+        raise ValueError("motion: checkpoint_every is not supported with a motion in this slice; every step is "
+                         "kept")
+    _coefficient(conductivity, "conductivity")
+    _coefficient(volumetric_heat_capacity, "volumetric_heat_capacity")
+    _numpy_data(heat_source, "heat_source")
+    if is_live(initial_temperature_k):
+        raise TypeError("motion: initial_temperature_k is live; in this slice only the motion's t carries a "
+                        "derivative")
+    if not isinstance(dirichlet, Mapping):
+        raise ValueError("dirichlet must map integer nodes to Kelvin values")
+    for node, value in dirichlet.items():
+        _time_only(value, "Dirichlet temperature")
+    tables = {}
+    for name, table in (("outward_flux", outward_flux), ("convection", convection)):
+        for tag, condition in _tags(table, name).items():
+            values = condition if isinstance(condition, (tuple, list)) else (condition,)
+            for value in values:
+                _time_only(value, f"{name}[{tag!r}]")
+        tables[name] = _tags(table, name)
+    moved = _checked_step(mesh, W, t)
+    base = transient_heat.solve_transient_heat(
+        moved, conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity, time_s=time_s,
+        initial_temperature_k=initial_temperature_k, dirichlet=dirichlet, heat_source=heat_source,
+        outward_flux=outward_flux, convection=convection)
+    if is_live(base.temperature_k):
+        raise TypeError("motion: a callback returned a JAX or PyTorch value; with a motion, callbacks of time "
+                        "must return NumPy numbers (t is the one live input)")
+
+    n = mesh.num_nodes
+    tris = mesh.triangles
+    times = np.asarray(base.time_s, dtype=float)
+    fixed = np.asarray(base.dirichlet_node_ids, dtype=int)
+    bc_history = np.asarray(base.dirichlet_temperatures_k, dtype=float)
+    initial = np.asarray(base.temperature_k[0], dtype=float)
+    _p, _t, _area, _exterior, count, labels = triangle_geometry(mesh)
+    representatives = np.array([np.flatnonzero(labels == c)[0] for c in range(count)])
+    offsets = initial[representatives][labels]
+
+    X = lift(xp, mesh.nodes) + t * lift(xp, W)
+    b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
+    k = _per_triangle(mesh, conductivity, "conductivity", positive=True)
+    capacity = _per_triangle(mesh, volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
+    Q = _per_triangle(mesh, heat_source, "heat_source")
+    rows, cols = np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel()
+    stiff_e = lift(xp, k)[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
+        / (4.0 * area)[:, None, None]
+    mass_e = (lift(xp, capacity) * area / 12.0)[:, None, None] * lift(xp, np.ones((3, 3)) + np.eye(3))[None]
+    K = CooMatrix(rows, cols, xp.reshape(stiff_e, (-1,)), (n, n))
+    M = CooMatrix(rows, cols, xp.reshape(mass_e, (-1,)), (n, n))
+    load = scatter_add(xp, n, tris.ravel(), xp.reshape((lift(xp, Q) * area / 3.0)[:, None]
+                                                       * xp.ones((1, 3), dtype=xp.float64), (-1,)))
+    edges_of = {}
+    for name in ("outward_flux", "convection"):
+        for tag in tables[name]:
+            if tag not in edges_of:
+                edges_of[tag] = _boundary_edges(xp, mesh, X, tag)
+
+    def at(value, now):
+        return float(value(now)) if callable(value) else float(to_numpy(value))
+
+    def natural(now):
+        """Live (H terms, G, shifted B) of the boundary data at ``now``."""
+        G = xp.zeros(n, dtype=xp.float64)
+        shifted = xp.zeros(n, dtype=xp.float64)
+        H_terms = []
+        for tag, g in tables["outward_flux"].items():
+            edges, length = edges_of[tag]
+            G = scatter_add(xp, n, edges.ravel(), xp.reshape((at(g, now) * length / 2.0)[:, None]
+                                                             * xp.ones((1, 2), dtype=xp.float64), (-1,)), base=G)
+        for tag, (h, ambient) in tables["convection"].items():
+            edges, length = edges_of[tag]
+            h_now, ambient_now = at(h, now), at(ambient, now)
+            local = h_now * length[:, None, None] * lift(xp, _EDGE_MASS)[None, :, :]
+            H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
+                                     xp.reshape(local, (-1,)), (n, n)))
+            shift = h_now * (ambient_now - offsets[edges[:, 0]])
+            shifted = scatter_add(xp, n, edges.ravel(), xp.reshape((lift(xp, shift) * length / 2.0)[:, None]
+                                                                   * xp.ones((1, 2), dtype=xp.float64), (-1,)),
+                                  base=shifted)
+        return H_terms, G, shifted
+
+    has_natural = bool(tables["outward_flux"] or tables["convection"])
+    offsets_l = lift(xp, offsets)
+
+    def centered(values):
+        return values - values[representatives][labels]
+
+    def gradient_flux(increment):
+        u = centered(increment)
+        gx = xp.sum(b * u[tris], axis=1) / (2.0 * area)
+        gy = xp.sum(c * u[tris], axis=1) / (2.0 * area)
+        return -lift(xp, k)[:, None] * xp.stack([gx, gy], axis=1)
+
+    def recorded(absolute, increment):
+        mtemp = M.matvec(absolute)
+        return absolute, gradient_flux(increment), xp.sum(mtemp), 0.5 * xp.sum(absolute * mtemp)
+
+    first_abs = lift(xp, initial)
+    history = {"T": [], "flux": [], "content": [], "quadratic": [], "storage": [], "residual": [],
+               "reaction": [], "G": [], "C": []}
+    for key, value in zip(("T", "flux", "content", "quadratic"), recorded(first_abs, first_abs - offsets_l)):
+        history[key].append(value)
+    previous = lift(xp, initial - offsets)
+    mask = np.zeros(n, dtype=bool)
+    mask[fixed] = True
+    mask_l = lift(xp, mask)
+    zero = xp.zeros(n, dtype=xp.float64)
+    for index in range(1, len(times)):
+        step = float(times[index] - times[index - 1])
+        terms = [CooMatrix(M.rows, M.cols, M.values / step + K.values, (n, n))]
+        rhs = load + M.matvec(previous) / step
+        if has_natural:
+            H_terms, G, shifted = natural(float(times[index]))
+            terms += H_terms
+            rhs = rhs + shifted - G
+        x0 = lift(xp, np.asarray(base.temperature_k[index], dtype=float) - offsets)
+        A_x0 = sum((term.matvec(x0) for term in terms[1:]), terms[0].matvec(x0))
+        target = bc_history[index] - offsets[fixed] - to_numpy(x0)[fixed]
+        delta = core_solve.solve_dirichlet(terms, rhs - A_x0, {tuple(fixed): target} if len(fixed) else {})
+        current = x0 + delta
+        stored = M.matvec((current - previous) / step)
+        residual = stored + K.matvec(centered(current)) - load
+        if has_natural:
+            convective = sum((term.matvec(current) for term in H_terms), zero) - shifted
+            residual = residual + convective + G
+            history["G"].append(G)
+            history["C"].append(convective)
+        absolute = current + offsets_l
+        for key, value in zip(("T", "flux", "content", "quadratic"), recorded(absolute, current)):
+            history[key].append(value)
+        history["storage"].append(stored)
+        history["residual"].append(residual)
+        history["reaction"].append(xp.where(mask_l, residual, zero))
+        previous = current
+    stack = xp.stack
+    loads = stack([load] * len(times))
+    extra = (stack(history["G"]), stack(history["C"])) if has_natural else ()
+    return transient_heat.TransientHeatResult(
+        times, stack(history["T"]), stack(history["flux"]), loads, stack(history["reaction"]),
+        stack(history["residual"]), stack(history["storage"]), stack(history["content"]),
+        stack(history["quadratic"]), fixed, bc_history, np.asarray(base.nodes_m), np.asarray(base.triangles),
+        base.conductivity_w_mk, base.volumetric_heat_capacity_j_m3k, *extra,
+        coordinate_system="cartesian", nodal_rate_unit=base.nodal_rate_unit)
+
+
+def _time_only(value, name):
+    """With a motion, a value is a constant or a callback of time alone (it does not depend on node positions)."""
+    import inspect
+
+    if not callable(value):
+        _numpy_data(value, name, sampled=False)
+        return
+    try:
+        parameters = list(inspect.signature(value).parameters.values())
+    except (TypeError, ValueError):
+        parameters = None
+    required = None if parameters is None else [
+        p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) and p.default is p.empty]
+    if required is None or len(required) != 1 or any(p.kind is p.VAR_POSITIONAL for p in parameters):
+        raise TypeError(f"motion: {name} is a callback of coordinates; with a moving mesh its sample points move "
+                        "too, which this slice does not differentiate. Give a constant or a callback(time_s)")
 
 
 # ----------------------------------------------------------------------------- thermoelasticity

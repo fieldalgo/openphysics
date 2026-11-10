@@ -365,7 +365,7 @@ def _checkpointed(xp, block, sizes):
 def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                          time_s, initial_temperature_k, dirichlet,
                          heat_source=0.0, outward_flux=None, convection=None,
-                         checkpoint_every=None, coordinate_system="cartesian"):
+                         checkpoint_every=None, coordinate_system="cartesian", motion=None):
     """Solve c*dT/dt-div(k*grad T)=Q, BE with consistent mass, SI units.
 
     k>0 W/(m K), c>0 J/(m^3 K), explicit increasing nonnegative seconds,
@@ -404,7 +404,19 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     Cartesian spelling), the element flux stays W/m^2, Dirichlet data on the
     axis alone and nonzero flux or h on the axis are refused, and the axis
     needs no condition. The default is bit-for-bit the Cartesian solve.
+
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
+    t*velocity; the initial and Dirichlet temperatures move with their nodes and
+    every history carries the derivative with respect to the JAX or PyTorch
+    scalar t (docs/packages/galerkin/shape_derivative.md).
     """
+    if motion is not None:
+        from .shape import solve_transient_heat_moving
+        return solve_transient_heat_moving(
+            mesh, motion, conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity,
+            time_s=time_s, initial_temperature_k=initial_temperature_k, dirichlet=dirichlet,
+            heat_source=heat_source, outward_flux=outward_flux, convection=convection,
+            checkpoint_every=checkpoint_every, coordinate_system=coordinate_system)
     if checkpoint_every is not None and (
             isinstance(checkpoint_every, (bool, np.bool_))
             or not isinstance(checkpoint_every, (int, np.integer)) or checkpoint_every < 1):
