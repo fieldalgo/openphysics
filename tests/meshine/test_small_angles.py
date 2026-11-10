@@ -372,7 +372,9 @@ def simcase_documents():
     """({name: document} that meshed before, {name: document} that hung): every simcase
     example that meshes with meshine; its thermal example with the heater moved to cross a
     side at angles that meshed before and at the angles listed as hanging; and a polygon
-    with a 35.5-degree corner in the slab example."""
+    with a 35.5-degree corner in the slab example. The documents are format 0.3: the heater is
+    a circle shape of thermal_regions (cx, cy in its length_unit, mm), and the triangle is
+    "physmat:Si" with its points in slab_te_check's length_unit (um)."""
     import copy
 
     from simcase import examples
@@ -394,7 +396,9 @@ def simcase_documents():
         return thermal(round(11 + 2 * math.cos(math.radians(t)), 6))
 
     slab = copy.deepcopy(examples.EXAMPLES["slab_te_check"])
-    slab["geometry"]["shapes"].append({"name": "tri", "type": "polygon", "material": "Si",
+    assert slab["geometry"]["length_unit"] == "um" and examples.EXAMPLES["thermal_regions"]["geometry"][
+        "length_unit"] == "mm"
+    slab["geometry"]["shapes"].append({"name": "tri", "type": "polygon", "material": "physmat:Si",
                                        "points": [list(p) for p in TRIANGLE]})
     before = {name: data for name, data in examples.EXAMPLES.items() if meshes_with_meshine(data)}
     assert len(before) >= 10, sorted(before)
@@ -408,14 +412,10 @@ def simcase_documents():
 
 
 def simcase_domain(data):
-    """(domain, namer) exactly as simcase meshes the document."""
-    from simcase import Document
-    from simcase.geometry import build_domain
-    from simcase.runner import micrometre_document
-    doc = Document.from_dict(data)
-    if {p.get("type") for p in data["physics"].values()} == {"em.modes2d"}:
-        doc = micrometre_document(doc)
-    return build_domain(doc)[:2]
+    """(domain, namer) exactly as simcase meshes the document: the public stage
+    ``simcase.build_domain``, which returns what a run hands meshine (micrometres)."""
+    import simcase
+    return simcase.build_domain(simcase.Document.from_dict(data))[:2]
 
 
 def test_the_trigger_leaves_every_input_that_meshed_before_alone():

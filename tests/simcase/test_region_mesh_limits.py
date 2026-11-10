@@ -4,8 +4,9 @@
 
 ``geometry._domain_from_regions`` builds the meshine Domain exactly as ``build_domain``
 did and also counts the loop vertices it queues: the sum of the lengths of the loops given
-to ``Domain.add_region``, each ``Circle`` counted as its ``n``. ``build_domain`` keeps its
-public three-tuple. The earlier ``build_domain`` is kept below, unchanged, as the
+to ``Domain.add_region``, each ``Circle`` counted as its ``n``. ``geometry.build_domain``, the
+internal builder a run and the public ``simcase.build_domain`` call on the hand-off, keeps its
+three-tuple. The earlier ``build_domain`` is kept below, unchanged, as the
 reference (C-2, C-3).
 
 ``run(doc, *, max_nodes, max_triangles, max_input_vertices)`` bounds a region run before
@@ -34,9 +35,10 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 
 import meshine
 from meshine import Circle, Domain, box_sides
-from simcase import Document, DocumentError, MeshLimitError, build_domain, check_mesh_limits, examples, run
+import simcase
+from simcase import Document, DocumentError, MeshLimitError, check_mesh_limits, examples, run
 from simcase import geometry, registry, units
-from simcase.geometry import _domain_from_regions, _min_area, _rings, resolve_regions
+from simcase.geometry import _domain_from_regions, _min_area, _rings, build_domain, resolve_regions
 from simcase.mesh_limits import _MeshLimits
 from simcase.runner import micrometre_document
 from simcase.thermal_regions import handoff_03
@@ -195,6 +197,9 @@ def test_build_domain_keeps_its_three_tuple():
     domain, namer, materials = result
     assert isinstance(domain, Domain) and callable(namer)
     assert materials == {'plate': 'steel', 'heater': 'copper', 'background': 'insulation'}
+    public = simcase.build_domain(Document.from_dict(F.steady_example()))    # the format 0.3 stage
+    assert isinstance(public, tuple) and len(public) == 3 and public[2] == materials
+    assert pending(public[0]) == pending(build_domain(micrometres(Document.from_dict(F.steady_example())))[0])
 
 
 def test_build_domain_still_leaves_the_resolver_notes_on_the_document():
@@ -215,7 +220,8 @@ def test_build_domain_still_leaves_the_resolver_notes_on_the_document():
     build_mesh(doc)
     assert [(x.code, x.path) for x in doc.diagnostics if "'far'" in x.message] == [
         ('W-SHAPE-DROPPED', 'geometry.shapes')]
-    assert geometry.build_domain is build_domain
+    # the public stage reads the format 0.3 document and calls this builder on its hand-off
+    assert geometry.build_domain is build_domain and simcase.build_domain is not build_domain
 
 
 # ---- C-3: check_mesh_limits counts what the domain queues -----------------------------------

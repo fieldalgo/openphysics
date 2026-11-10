@@ -406,8 +406,13 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
                                                            # unnormalized_mode_field, in SI
 ```
 
-`build_domain` returns the mesher's domain in the micrometre meshing frame (what meshine
-receives); `MeshedModel.solver_mesh` is the micrometre kernel mesh (internal). `run` and
+`build_domain(doc)` reads a format 0.3 document of a kind that meshine meshes (material
+regions of heat, electric conduction, steady Joule heating and mechanics, and every
+`em.modes2d` form) and returns `(Domain, namer, materials)` exactly as `run` hands them to
+`meshine.generate`: in the micrometre meshing frame, whatever `length_unit` the document
+declares. A rectangle or cavity box document, which galerkin meshes on its structured
+grid, is refused by name (`E-CONTRACT`), and so is a document of another format
+(`E-FORMAT`). `MeshedModel.solver_mesh` is the micrometre kernel mesh (internal). `run` and
 `solve_point` hand the mode kernel the same doubles (a test asserts it on `soi_strip`); a
 tracked sweep searches `search_mode_count` candidates where `solve_point` asks for
 `mode_count`. `simcase.physics_em_modes2d.solve` and `simcase.mode_postprocessing` are

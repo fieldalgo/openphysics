@@ -211,7 +211,7 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
                                                            # unnormalized_mode_field, in SI
 ```
 
-`build_domain`은 마이크로미터 메시 기준틀의 메시 생성기 영역(meshine이 받는 것)을 반환하고, `MeshedModel.solver_mesh`는 마이크로미터 커널 메시(내부)입니다. `run`과 `solve_point`는 모드 커널에 같은 double을 넘깁니다(`soi_strip`에서 테스트로 확인). 추적 sweep은 `search_mode_count`개 후보를 탐색하고 `solve_point`는 `mode_count`개를 요청합니다. `simcase.physics_em_modes2d.solve`와 `simcase.mode_postprocessing`은 커널 기준틀(마이크로미터, exp(+iωt))의 내부 구현이며 공개 API가 아닙니다.
+`build_domain(doc)`은 meshine이 메시하는 종류(열, 전기 전도, 정상 줄 가열, 기계의 재료 영역과 모든 `em.modes2d` 형태)의 형식 0.3 문서를 읽고, `run`이 `meshine.generate`에 넘기는 것과 똑같은 `(Domain, namer, materials)`를 문서가 선언한 `length_unit`과 관계없이 마이크로미터 메시 기준틀로 반환합니다. galerkin이 구조 격자로 메시하는 사각형·공진기 상자 문서는 이름을 밝혀 거부하고(`E-CONTRACT`), 다른 형식의 문서도 거부합니다(`E-FORMAT`). `MeshedModel.solver_mesh`는 마이크로미터 커널 메시(내부)입니다. `run`과 `solve_point`는 모드 커널에 같은 double을 넘깁니다(`soi_strip`에서 테스트로 확인). 추적 sweep은 `search_mode_count`개 후보를 탐색하고 `solve_point`는 `mode_count`개를 요청합니다. `simcase.physics_em_modes2d.solve`와 `simcase.mode_postprocessing`은 커널 기준틀(마이크로미터, exp(+iωt))의 내부 구현이며 공개 API가 아닙니다.
 
 영역이 있는 열전도 문서, 영역 전기 전도·정상 줄 가열 문서, 영역 기계 문서에서는 `run`이 선택적인 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`)도 받고, `check_mesh_limits`는 메시하지 않고 문서가 메시 생성기에 넘기는 루프 꼭짓점 수를 셉니다. 둘 다 `MeshLimitError`를 발생시킵니다. `region_complexity`는 `Document.from_dict` 전에 원시 JSON에서 도형, 원, 다각형 점, 경계 교차를 셉니다. [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을 참고하세요.
 
