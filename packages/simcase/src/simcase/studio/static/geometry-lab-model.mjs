@@ -10,15 +10,23 @@ export function isVersion1(doc){
  return !!doc&&typeof doc==='object'&&!!doc.geometry&&typeof doc.geometry==='object'&&'version' in doc.geometry;
 }
 
+/** A quantity string "<number> <unit>" as {number, unit}, else null. */
+export function quantityOf(text){
+ const m=typeof text==='string'?/^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?) (\S+)\s*$/.exec(text):null;
+ return m&&Number.isFinite(Number(m[1]))?{number:Number(m[1]),unit:m[2]}:null;
+}
+
 /**
  * A copy of `doc` with `geometry.parameters[name].value` replaced.
- * A finite number stays a JSON number; any other text is kept as an expression string,
- * which the engine evaluates or refuses by name.
+ * A finite number stays a JSON number, except for a parameter written with its unit (format 0.3,
+ * "0.5 um"): a bare number then keeps that unit. Any other text is kept as written (an
+ * expression, or a quantity string), which the engine evaluates or refuses by name.
  */
 export function setParameter(doc,name,value){
  const out=copyDocument(doc);const params=out.geometry?.parameters;
  if(!params||typeof params[name]!=='object'||params[name]===null)throw new Error('Unknown parameter '+name);
- params[name].value=parseWritten(value);
+ const written=parseWritten(value),held=quantityOf(params[name].value);
+ params[name].value=typeof written==='number'&&held?`${written} ${held.unit}`:written;
  return out;
 }
 
@@ -45,7 +53,11 @@ export function parseWritten(value){
  */
 export function sliderOf(parameter){
  const r=parameter.range;
- if(typeof parameter.written!=='number'||!Array.isArray(r)||r.length!==2)return null;
+ if(!Array.isArray(r)||r.length!==2)return null;
+ // format 0.3: the value and both bounds written with one unit ("0.5 um", ["0.3 um", "0.9 um"])
+ const q=quantityOf(parameter.written),bounds=r.map(quantityOf),unit=q?.unit;
+ if(q&&bounds.every(b=>b&&b.unit===unit)){const s=sliderOf({written:q.number,range:bounds.map(b=>b.number)});return s&&{...s,unit};}
+ if(typeof parameter.written!=='number')return null;
  const [lo,hi]=r;
  if(typeof lo!=='number'||typeof hi!=='number'||!Number.isFinite(lo)||!Number.isFinite(hi)||!(hi>lo))return null;
  const exponent=Math.floor(Math.log10((hi-lo)/200));
@@ -133,11 +145,12 @@ export function regionColor(view,name){
 /** A short area label in the document unit. */
 export function areaLabel(area,unit){return Number(area.toPrecision(6)).toString()+' '+unit+'²';}
 
-/** An empty version 1 document to start from: one rect in a 2D domain, in micrometres. */
+/** An empty version 1 document to start from (format 0.3): one rect in a 2D domain in micrometres,
+ * its length parameter written with its unit. */
 export function newDocument(){
- return {openphysics:'0.2',name:'New geometry',units:{length:'um'},geometry:{version:1,
-  parameters:{w:{value:1,range:[0.2,2]}},
-  components:{xs:{dimension:'2d',domain:{xmin:-2,xmax:2,ymin:-1,ymax:1},background:{material:'SiO2'},
-   features:[{name:'core',type:'rect',x:'-w/2',y:-0.25,w:'w',h:0.5,material:'Si'}],finalize:'later_wins',
+ return {openphysics:'0.3',name:'New geometry',geometry:{version:1,
+  parameters:{w:{value:'1 um',range:['0.2 um','2 um']}},
+  components:{xs:{dimension:'2d',length_unit:'um',depth:null,domain:{xmin:-2,xmax:2,ymin:-1,ymax:1},background:{material:'physmat:SiO2'},
+   features:[{name:'core',type:'rect',x:'-w/2',y:-0.25,w:'w',h:0.5,material:'physmat:Si'}],finalize:'later_wins',
    selections:{core_wall:{boundary:{between:['core','background']}}}}}}};
 }

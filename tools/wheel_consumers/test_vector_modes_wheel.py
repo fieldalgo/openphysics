@@ -148,42 +148,49 @@ def test_simcase_cli_vector_slab_and_pml_variant(tmp_path):
     closed = tmp_path / "closed"
     cli("run", model, "-q", "-o", closed)
     summary = json.loads((closed / "summary.json").read_text(encoding="utf-8"))
-    assert summary["formulation"] == "vector" and summary["returned_modes"] == 1
-    neff = summary["neff"][0][0]
+    assert summary["formulation"] == "vector" and summary["returned_mode_count"] == 1
+    assert example["openphysics"] == "0.3" and summary["vacuum_wavelength"] == {"unit": "m", "values": [1.55e-6]}
+    index = summary["effective_index"]
+    neff = index["values"][0][0]
     assert neff == pytest.approx(reference, rel=5e-3), (neff, reference)   # 1.8e-4 measured
-    assert "neff_imag" not in summary   # lossless closed guide keeps the numeric schema
+    assert set(index) == {"unit", "values"}   # lossless closed guide: a real tagged array
 
     # Same slab with a complex-coordinate PML on the top and bottom faces: the
     # guided mode must come back with the same real index and no resolvable loss.
     document = copy.deepcopy(example)
     document["physics"]["em1"].update(
-        n_target=2.85, pml={"thickness": {"bottom": 0.5, "top": 0.5}, "strength": 3.0,
-                            "order": 2, "min_physical_fraction": 0.1})
+        target_effective_index=2.85, pml={"pml_thickness": {"bottom": "0.5 um", "top": "0.5 um"}, "pml_strength": 3.0,
+                                          "pml_order": 2, "pml_minimum_physical_fraction": 0.1})
     pml_model = tmp_path / "vector_slab_pml.json"
     pml_model.write_text(json.dumps(document), encoding="utf-8")
     cli("validate", pml_model)
     opened = tmp_path / "open"
     cli("run", pml_model, "-q", "-o", opened)
     pml_summary = json.loads((opened / "summary.json").read_text(encoding="utf-8"))
-    assert pml_summary["mode_result_schema"] == "openphysics.modes2d/2"
-    assert pml_summary["neff"][0][0] == pytest.approx(neff, abs=1e-6)
-    assert abs(pml_summary["neff_imag"][0][0]) <= 1e-8
-    assert abs(pml_summary["propagation_loss_db_cm"][0][0]) <= 1e-3
+    assert pml_summary["mode_result_schema"] == "openphysics.modes2d/3"
+    pml_index = pml_summary["effective_index"]           # exp(-i omega t): Im n_eff >= 0 is loss
+    assert pml_index["time_convention"] == "exp(-i omega t)"
+    assert pml_index["re"][0][0] == pytest.approx(neff, abs=1e-6)
+    assert abs(pml_index["im"][0][0]) <= 1e-8
+    assert pml_summary["propagation_loss"]["unit"] == "dB/m"
+    assert abs(pml_summary["propagation_loss"]["values"][0][0]) <= 1e-1      # 1e-3 dB/cm
     [point] = pml_summary["open_boundary"]
-    assert point["schema"] == "openphysics.pml-candidates/1"
+    assert point["schema"] == "openphysics.pml-candidates/2"
     assert point["stability"] == "not_checked" and point["selected_candidates"] == [1]
-    assert point["length_unit"] == "um" and point["min_physical_fraction"] == 0.1
+    assert "length_unit" not in point and point["pml_minimum_physical_fraction"] == 0.1
     selected = [c for c in point["candidates"] if c["selected"]]
     assert len(selected) == 1 and selected[0]["candidate"] == 1
-    assert selected[0]["neff_real"] == pml_summary["neff"][0][0]
-    assert selected[0]["pencil_residual"] <= 1e-8 and selected[0]["physical_l2_fraction"] > 0.99
+    assert selected[0]["effective_index"]["re"] == pml_index["re"][0][0]
+    assert selected[0]["relative_residual"] <= 1e-8 and selected[0]["physical_l2_fraction"] > 0.99
     assert selected[0]["attenuation_status"] == "numerically_unresolved"
     assert len(point["candidates"]) >= 6
     with np.load(opened / "fields.npz", allow_pickle=False) as arrays:
         for name in arrays.files:
             assert not arrays[name].dtype.hasobject, name
-        assert np.iscomplexobj(arrays["neff"])
-        assert arrays["neff"][0][0] == pytest.approx(complex(neff, 0.0), abs=1e-6)
+        assert str(arrays["field_layout"]) == "em-modes2d-p1-node-centroid-v2"
+        assert np.iscomplexobj(arrays["effective_index"])
+        assert arrays["effective_index"][0][0] == pytest.approx(complex(neff, 0.0), abs=1e-6)
         assert json.loads(arrays["open_boundary_json"].item())[0]["selected_candidates"] == [1]
-        for name in ("vector_transverse", "vector_longitudinal", "vector_electric"):
+        for name in ("unnormalized_electric_field_line_integral", "unnormalized_electric_field_z",
+                     "unnormalized_electric_field"):
             assert np.all(np.isfinite(arrays[name])), name

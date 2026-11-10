@@ -1,0 +1,87 @@
+{
+  "openphysics": "0.3",
+  "name": "220 nm dielectric slab, vector TE",
+  "geometry": {
+    "length_unit": "um",
+    "depth": null,
+    "domain": {
+      "xmin": -0.05,
+      "xmax": 0.05,
+      "ymin": -1.5,
+      "ymax": 1.72
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -0.05,
+        "y": 0.0,
+        "w": 0.1,
+        "h": 0.22,
+        "material": "film",
+        "element_size": "0.012 um"
+      }
+    ]
+  },
+  "materials": {
+    "film": {
+      "refractive_index": {
+        "n": 3.48,
+        "k": 0.001
+      }
+    },
+    "clad": {
+      "refractive_index": 1.444
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "vector",
+      "vacuum_wavelength": "1.55 um",
+      "mode_count": 1,
+      "target_effective_index": 2.85,
+      "effective_index_threshold": 1.444,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      },
+      "pml": {
+        "pml_thickness": {
+          "bottom": "0.5 um",
+          "top": "0.5 um"
+        }
+      },
+      "bend": {
+        "bend_radius": "5 um",
+        "bend_origin": "0 um",
+        "axis": "y"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "0.06 um",
+    "minimum_angle": "28 deg",
+    "grading": {
+      "position": [
+        "0 um",
+        "0.11 um"
+      ],
+      "near": "0.012 um",
+      "far": "0.06 um",
+      "refinement_distance": "1 um"
+    }
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

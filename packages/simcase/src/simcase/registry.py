@@ -65,10 +65,10 @@ class PhysicsKind:
     #: ``E-CONTRACT`` while the kind still reads that form in format 0.2 only
     forms_03: frozenset[str] | None = None
     #: a refusal by name, checked on the raw format 0.3 tree before its slots are walked: a
-    #: ``(path, message)`` pair for a document one of this kind's types never takes (for
-    #: example a geometry form), so the reader names it before asking for that type's keys;
-    #: None (or a None result) for none
-    refuse_03: Callable[[dict], tuple[str, str] | None] | None = None
+    #: ``(path, message)`` pair (``E-CONTRACT``), or ``(path, message, code)``, for a document
+    #: one of this kind's types never takes (for example a geometry form), so the reader names
+    #: it before asking for that type's keys; None (or a None result) for none
+    refuse_03: Callable[[dict], tuple | None] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}

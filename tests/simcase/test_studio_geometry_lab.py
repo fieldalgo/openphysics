@@ -45,7 +45,10 @@ def engine_view(doc, component=None):
     """What the page must show, computed here from the engine directly."""
     model = parse(doc)
     rc = evaluate(model, component)
-    scale = float(model.pm_per_unit)
+    # format 0.2: one unit for the document; format 0.3: each component's own length_unit
+    unit_pm = model.pm_per_unit if model.pm_per_unit is not None else \
+        model.components[component or next(iter(model.components))].pm_per_unit
+    scale = float(unit_pm)
     return {
         "regions": rc.region_names(),
         "selections": [[name, kind, sorted(chosen)] for name, (kind, chosen) in rc.selections.items()],
@@ -96,24 +99,28 @@ def test_gl1_starters_are_the_shipped_examples():
 # ---- GL-2: parameter edits re-evaluate exactly ------------------------------------------
 
 @pytest.mark.parametrize("name", sorted(EXAMPLES))
-@pytest.mark.parametrize("w", [0.3, 0.61, 0.9])
+@pytest.mark.parametrize("w", ["0.3", "0.61", "0.9"])
 def test_gl2_parameter_edits_equal_a_fresh_engine_run(client, name, w):
+    from fractions import Fraction
     doc = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
-    lo, hi = doc["geometry"]["parameters"]["w"]["range"]
-    assert lo <= w <= hi
-    doc["geometry"]["parameters"]["w"]["value"] = w
+    lo, hi = doc["geometry"]["parameters"]["w"]["range"]               # format 0.3: "0.3 um", "0.9 um"
+    assert Fraction(lo.removesuffix(" um")) <= Fraction(w) <= Fraction(hi.removesuffix(" um"))
+    doc["geometry"]["parameters"]["w"]["value"] = f"{w} um"
     view = lab(client, doc)
     assert view["ok"] is True
     assert page_view(view) == engine_view(copy.deepcopy(doc))      # floats compared with ==
-    assert next(p for p in view["parameters"] if p["name"] == "w")["value"] == w
+    shown = next(p for p in view["parameters"] if p["name"] == "w")
+    assert shown["unit"] == "m" and shown["value"] == float(Fraction(w) / 10 ** 6)     # SI, from the exact value
 
 
 def test_gl2_an_expression_is_evaluated_by_the_engine(client):
     doc = json.loads(EXAMPLES["geometry_v1_soi_strip"].read_text(encoding="utf-8"))
-    doc["geometry"]["parameters"]["w"]["value"] = "2 * t + 0.1"
+    doc["geometry"]["parameters"]["gap"] = {"value": "0.1 um"}     # a bare 0.1 has no unit outside a component
+    doc["geometry"]["parameters"]["w"]["value"] = "2 * t + gap"
     view = lab(client, doc)
     assert next(p for p in view["parameters"] if p["name"] == "w") == {
-        "name": "w", "kind": "length", "value": 0.54, "written": "2 * t + 0.1", "range": [0.3, 0.9]}
+        "name": "w", "kind": "length", "value": 5.4e-07, "written": "2 * t + gap", "range": ["0.3 um", "0.9 um"],
+        "unit": "m"}
     assert page_view(view) == engine_view(doc)
 
 
@@ -183,7 +190,7 @@ def test_gl3_a_component_is_named_or_the_first_2d_one_is_shown(client):
 
 def test_gl4_saved_json_round_trips_through_the_reader(client):
     doc = json.loads(EXAMPLES["geometry_v1_imprint_rib"].read_text(encoding="utf-8"))
-    doc["geometry"]["parameters"]["w"]["value"] = 0.42
+    doc["geometry"]["parameters"]["w"]["value"] = "0.42 um"
     doc["geometry"]["parameters"]["slab"]["value"] = "t / 2"
     saved = json.dumps(doc, indent=2) + "\n"       # serializeDocument: two-space JSON and a newline
     again = json.loads(saved)

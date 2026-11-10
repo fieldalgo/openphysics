@@ -1,10 +1,9 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Hadley 2002 rib waveguide, slab 0.3 um",
-  "units": {
-    "length": "um"
-  },
   "geometry": {
+    "length_unit": "um",
+    "depth": null,
     "domain": {
       "xmin": -9.0,
       "xmax": 9.0,
@@ -12,7 +11,7 @@
       "ymax": 3.0
     },
     "background": {
-      "material": "vacuum"
+      "material": "physmat:vacuum"
     },
     "shapes": [
       {
@@ -32,7 +31,7 @@
         "w": 18.0,
         "h": 0.3,
         "material": "n3.44",
-        "mesh_size": 0.1
+        "element_size": "0.1 um"
       },
       {
         "name": "rib",
@@ -42,24 +41,24 @@
         "w": 3.0,
         "h": 1.0,
         "material": "n3.44",
-        "mesh_size": 0.1
+        "element_size": "0.1 um"
       }
     ]
   },
   "materials": {
     "n3.40": {
-      "n": 3.4
+      "refractive_index": 3.4
     },
     "n3.44": {
-      "n": 3.44
+      "refractive_index": 3.44
     }
   },
   "physics": {
     "em1": {
       "type": "em.modes2d",
       "formulation": "scalar",
-      "wavelength": 1.15,
-      "num_modes": 1,
+      "vacuum_wavelength": "1.15 um",
+      "mode_count": 1,
       "boundary": {
         "left": "pec",
         "right": "pec",
@@ -69,15 +68,15 @@
     }
   },
   "mesh": {
-    "size": 0.6,
+    "element_size": "0.6 um",
     "grading": {
-      "center": [
-        0.0,
-        0.5
+      "position": [
+        "0 um",
+        "0.5 um"
       ],
-      "near": 0.1,
-      "far": 0.6,
-      "distance": 3.0
+      "near": "0.1 um",
+      "far": "0.6 um",
+      "refinement_distance": "3 um"
     }
   },
   "study": {

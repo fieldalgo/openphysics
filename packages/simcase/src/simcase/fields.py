@@ -13,7 +13,8 @@ class VectorField:
     """One study point; all components share one normalization per mode.
 
     edges: (E, 2), oriented from the lower to the higher node index.
-    transverse: (E, modes), line integrals of E_t in document length units.
+    transverse: (E, modes), line integrals of E_t: in metres in a public result (SI, exp(-i omega t)),
+        in micrometres inside the mode kernel (exp(+i omega t)).
     longitudinal: (N, modes), complex E_z at nodes (including its relative phase).
     electric: (T, modes, 3), complex Ex/Ey/Ez at triangle centroids.
 
@@ -31,8 +32,10 @@ class VectorField:
     normalization: str = "max_centroid_magnitude"
 
     def to_dict(self) -> dict:
-        """JSON-safe display samples, with shape (modes, triangles, components)."""
+        """JSON-safe display samples of a public field, with shape (modes, triangles, components):
+        ``unnormalized_electric_field`` at the centroids, components x, y, z, unit 1 (relative
+        amplitude), exp(-i omega t)."""
         values = self.electric.transpose(1, 0, 2)
-        return {"location": "triangle_centroids", "components": ["Ex", "Ey", "Ez"],
-                "normalization": self.normalization, "amplitude_unit": "relative",
-                "real": values.real.tolist(), "imag": values.imag.tolist()}
+        return {"name": "unnormalized_electric_field", "location": "triangle_centroids",
+                "components": ["x", "y", "z"], "unit": "1", "normalization": self.normalization,
+                "time_convention": "exp(-i omega t)", "real": values.real.tolist(), "imag": values.imag.tolist()}

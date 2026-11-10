@@ -79,7 +79,9 @@ def test_every_example_document_is_claimed_by_the_kind_of_its_type(path):
 
 
 def test_unknown_type_error_lists_every_registered_type():
-    data = copy.deepcopy(examples.EXAMPLES["soi_strip"])
+    # the format 0.2 reader names the type (em.cavity3d is the kind that still reads format 0.2); a
+    # format 0.3 document reports the keys its slot table cannot place instead
+    data = copy.deepcopy(examples.EXAMPLES["cavity_box"])
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
     assert len(listed) == 9

@@ -10,18 +10,18 @@ full-vector를 사용하세요. PML·방사/누설·일정 반경 굽힘은 [별
 
 ## 부호·입력·단위
 
-기존 장 규약 `exp(+i omega t-i beta z)`, `beta=(2*pi/lambda0)*n_eff`를
-유지합니다. +z 수동 감쇠는 **Im n_eff < 0**입니다.
-저수준 `galerkin.solve_modes`의 `eps_r`와
-`simcase.physics_em_modes2d.solve`의 `eps_tri`도 이 규약으로 입력하므로
-손실 유전율의 허수부는 음수입니다. JSON/physmat의 재료는 양의 소멸계수
-`n+ik`를 사용하며 문서 runner가 해석기 경계에서 유전율을 켤레 변환합니다.
-문서 재료를 사용자가 다시 켤레 변환하지 마세요.
+문서와 결과는 `exp(-i omega t+i beta z)`, `beta=(2*pi/lambda0)*n_eff` 규약을 씁니다.
++z 수동 감쇠는 **Im n_eff > 0**이고, `n + i k`로 쓴 재료는 k ≥ 0이면 흡수입니다(음수 k는
+이득이며 `E-GAIN`으로 거절). 모드 커널, 저수준 `galerkin.solve_modes(..., eps_r, ...)`, 커널
+기준틀의 `simcase.physics_em_modes2d.solve(..., eps_tri, ...)`는 `exp(+i omega t-i beta z)`를
+유지하며 여기서 손실 유전율의 허수부는 음수입니다. simcase는 들어갈 때 모든 재료 값을, 나올 때
+모든 복소 결과를 한 번씩 켤레로 바꿉니다. 문서 재료나 결과를 사용자가 다시 켤레 변환하지
+마세요.
 
-beta의 단위가 1/m일 때 진폭은 `exp(-a*z)`, `a=-Im beta`로 감소하고,
+beta의 단위가 1/m일 때 진폭은 `exp(-a*z)`, `a=Im beta`로 감소하고,
 전력은 `exp(-alpha*z)`, `alpha=2*a`로 감소합니다.
-`loss_dB_cm=10*alpha/(100*ln(10))`이며 양수는 감쇠입니다.
-`RunResult.propagation_loss_db_cm()`이 파장을 SI로 변환합니다.
+`propagation_loss=10*alpha/ln(10)` dB/m `=(40 pi / ln 10) Im(n_eff) / lambda0`(진공 파장은
+미터)이며 양수는 감쇠입니다. `RunResult.propagation_loss()`가 study 지점과 모드마다 돌려줍니다.
 굴절률은 무차원이며 장은 상대 진폭으로, V/m 또는 단위 전력이 아닙니다.
 
 ## Python·JSON
@@ -31,51 +31,53 @@ import copy
 from simcase import Document, examples, run
 
 data = copy.deepcopy(examples.VECTOR_SLAB)
-data["materials"]["film"] = {"n": 3.48, "k": 0.01}
+data["materials"]["film"] = {"refractive_index": {"n": 3.48, "k": 0.01}}
 data["study"] = {"type": "single"}
 result = run(Document.from_dict(data), verbose=False)
-print(result.neff)
-print(result.propagation_loss_db_cm())
+print(result.effective_index)            # complex, Im > 0
+print(result.propagation_loss())         # dB/m, positive power attenuation
 result.save("absorbing_slab")
 ```
 
-Python/NPZ의 `neff`, scalar `fields`, vector 장 배열은 복소수를 유지합니다.
-복소 결과 JSON은 `mode_result_schema: "openphysics.modes2d/2"`와 `phasor`를
-명시하고, 기존 숫자 배열 `neff`를 **실수부**로 유지하면서 같은 모양의
-`neff_imag`·`propagation_loss_db_cm`를 추가합니다. 복소 군지수도
-`group_index`·`group_index_imag`로 분리합니다. 입력 문서 버전과 기존
-무손실 숫자 출력은 유지합니다.
+Python/NPZ의 `effective_index`, scalar `unnormalized_mode_field`, vector 선적분·z·요소중심
+배열은 복소수를 유지합니다. 복소 결과 JSON은 `mode_result_schema: "openphysics.modes2d/3"`을
+명시하고 `effective_index`를 `{"unit": "1", "re": [...], "im": [...], "time_convention":
+"exp(-i omega t)"}`로 쓰며 옆에 `propagation_loss`(dB/m)를 둡니다. `time_convention`과
+`propagation`이 부호 규약을 기록합니다. 복소 군지수도 같은 `re`/`im` 형식입니다. 무손실 숫자
+출력은 기본 태그 형식(`{"unit": "1", "values": [...]}`)을 씁니다.
 
-Studio는 모드별 Re n_eff·Im n_eff·dB/cm를 표시합니다. Scalar 장 화면은
-크기이며 응답의 `scalar_fields_complex`가 실수부·허수부 절점장을 보존합니다.
-Vector 성분은 기존 복소 인코딩을 유지합니다.
+Studio는 모드별 Re n_eff·Im n_eff·dB/m를 표시합니다. Scalar 장 화면은
+크기이며 응답의 `unnormalized_mode_field`가 실수부·허수부 절점장을 보존합니다.
+Vector 성분은 별도의 `real`/`imag` 배열입니다.
 
 저장 PNG의 sweep 곡선은 유효굴절률·군지수의 실수부를 Re 축 이름으로 표시한다.
 JSON/NPZ는 복소수의 두 성분을 모두 보존한다.
 
 VTK에도 복소 배열이 없으므로 `simcase.export`는 복소 스칼라 모드를 점 데이터
-`mode_<k>_real`·`mode_<k>_imag`로, 벡터 모드를 `electric_field_mode_<k>_real`/`_imag`
-(요소중심 셀 데이터)와 `longitudinal_electric_mode_<k>_real`/`_imag`(절점 점 데이터)로
-저장값 그대로 씁니다. `neff`와 감쇠는 summary와 NPZ에 남습니다.
+`unnormalized_mode_field_mode_<k>_real`·`_imag`로, 벡터 모드를
+`unnormalized_electric_field_mode_<k>_real`/`_imag`(요소중심 셀 데이터)와
+`unnormalized_electric_field_z_mode_<k>_real`/`_imag`(절점 점 데이터)로 저장값 그대로 씁니다.
+`effective_index`와 감쇠는 summary와 NPZ에 남습니다.
 
 저장되는 후처리([개요](overview.md#모드-후처리))는 장이 복소이면 복소입니다. 손실
-벡터 모드의 `mode_power`는 허수부(무효 전력)가 0이 아니고 `Re`가 +z 전력이며, 손실
-모드들은 전력 직교하지 않습니다. 손실 스칼라 결과의 `mode_power`는 실수
-(`int |phi|^2 dA`)이고 `field_overlap`은 복소 Hermitian입니다.
+벡터 모드의 `unnormalized_mode_power`는 허수부(무효 전력)가 0이 아니고 `Re`가 +z 전력이며,
+손실 모드들은 전력 직교하지 않습니다. 손실 스칼라 결과의
+`unnormalized_mode_field_square_integral`은 실수(`int |phi|^2 dA`)이고
+`unnormalized_field_overlap`은 복소 Hermitian입니다.
 [ParaView로 보기](overview.md#paraview로-보기)를 참고하세요.
 
 ## 선택·정규화·추적
 
-기본 vector 유전체 검색은 `n_cladding < Re n_eff < sqrt(max Re epsilon)`
+기본 vector 유전체 검색은 `effective_index_threshold < Re n_eff < sqrt(max Re epsilon)`
 범위에서 Re n_eff 내림차순입니다. 구속이나 검색 완전성의 증명은 아닙니다.
-Re epsilon이 양수가 아닌 매질은 physics에 양의 실수 `n_target`을 명시합니다.
+Re epsilon이 양수가 아닌 매질은 physics에 양의 실수 `target_effective_index`를 명시합니다.
 목표에 가까운 후보를 선택한 후 Re n_eff 순으로 정렬하며 유전체 상한을
-적용하지 않습니다. Vector 문서는 `n_cladding`도 계속 필요합니다.
+적용하지 않습니다. Vector 문서는 `effective_index_threshold`도 계속 필요합니다.
 저수준 `galerkin.solve_modes`는 복소 목표값도 받습니다. 메시와 계산창을
 각각 수렴시켜야 하며 자동 손실 상한 필터는 없습니다.
 
 Scalar는 최대 계수를 1로, vector는 최대 중심점 |E|를 1로 정규화합니다.
-저수준 물리장 `Ez=i*ez`와 성분 비율을 유지하고 전체 위상은 임의입니다.
+저수준(커널 기준틀) 물리장 `Ez=i*ez`와 성분 비율을 유지하고 전체 위상은 임의입니다.
 가까운 고유장을 섞어 직교 고유기저를 만들지 않습니다.
 
 분리된 vector sweep과 흡수 scalar 파장 sweep은 고정 메시의 양의 켤레

@@ -122,6 +122,7 @@ def test_g4_4_the_waveguide_runner_refuses_an_axisymmetric_component_by_name():
         em["geometry"] = from_v02(em["geometry"])
         comp = em["geometry"]["components"]["main"]
         comp["dimension"] = "axisymmetric"
+        del comp["depth"]                             # an axisymmetric component has no depth
         shift = xmin - comp["domain"]["xmin"]
         comp["domain"]["xmin"] += shift
         comp["domain"]["xmax"] += shift

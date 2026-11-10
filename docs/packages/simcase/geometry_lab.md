@@ -51,10 +51,11 @@ the routes of each physics page.
 ## What it sends and answers
 
 `POST /api/geometry-lab/evaluate` takes `{"doc": <document>, "component":
-<name or null>}`. It reads only the `units` and `geometry` blocks, as
-`python -m simcase geometry` does, so a document without physics is accepted.
-The answer is `{"ok": true, ...}` with the component's cells, curves (points in
-the document's length unit), regions with areas, selections with their entry
+<name or null>}`. It reads only the `geometry` block (and the `units` block of a
+format 0.2 document), as `python -m simcase geometry` does, so a document without
+physics is accepted. The shipped starters and a new document are format 0.3, whose
+component `length_unit` sets the drawing unit. The answer is `{"ok": true, ...}` with
+the component's cells, curves (points in the component's length unit), regions with areas, selections with their entry
 indices, boundary tags, parameters (written and evaluated), roundings and the
 engine listing, or `{"ok": false, "refused": <message>}`. It is a view for this
 page, not a persisted format, and it is not part of the document contract.

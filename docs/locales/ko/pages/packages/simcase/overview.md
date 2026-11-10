@@ -15,9 +15,9 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # 버전 1 형상 블록의 영역 복합체
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. em 종류(`em.modes2d`, `em.cavity3d`)는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.2"` 또는 `"0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역), 도파 모드(`em.modes2d`: 평면 형상과 버전 1 블록, 스칼라, 벡터, PML, 굽힘, 추적·부분공간 sweep)에서 읽으며, 이들은 더 이상 형식 0.2를 읽지 않습니다. `em.cavity3d`는 단위 일괄 변경의 해당 커밋까지 형식 0.2를 읽습니다: [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
-`model_results/`에는 `summary.json`(선언 단위, study 지점별 n_eff, 군굴절률, 메시 통계, 시간), `fields.npz`(메시와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 문서 사본이 생성됩니다.
+`model_results/`에는 `summary.json`(단위를 붙인 SI 값: study 지점별 진공 파장과 유효 굴절률, 군굴절률, 메시 통계, 시간, 진단), `fields.npz`(미터 단위 절점 좌표와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 작성한 그대로의 문서(`model.json`)가 생성됩니다.
 
 ## 지원하는 문서
 
@@ -45,32 +45,36 @@ Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "SOI strip waveguide 500 x 220 nm",
-  "units": {"length": "um"},
   "geometry": {
+    "length_unit": "um", "depth": null,
     "domain": {"xmin": -1.5, "xmax": 1.5, "ymin": -1.2, "ymax": 1.2},
-    "background": {"material": "SiO2"},
+    "background": {"material": "physmat:SiO2"},
     "shapes": [
-      {"name": "core", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22, "material": "Si", "mesh_size": 0.02}
+      {"name": "core", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22, "material": "physmat:Si",
+       "element_size": "0.02 um"}
     ]
   },
-  "materials": {"myglass": {"n": 1.5}},
+  "materials": {"myglass": {"refractive_index": 1.5}},
   "physics": {
-    "em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55, "num_modes": 2,
-            "n_cladding": 1.45,
+    "em1": {"type": "em.modes2d", "formulation": "vector", "vacuum_wavelength": "1.55 um", "mode_count": 2,
+            "effective_index_threshold": 1.45,
             "boundary": {"left": "pec", "right": "pec", "top": "pec", "bottom": "pec"}}
   },
-  "mesh": {"size": 0.25, "grading": {"center": [0.0, 0.11], "near": 0.02, "far": 0.16, "distance": 1.0}},
-  "study": {"type": "sweep", "parameter": "physics.em1.wavelength", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}
+  "mesh": {"element_size": "0.25 um",
+           "grading": {"position": ["0 um", "0.11 um"], "near": "0.02 um", "far": "0.16 um",
+                       "refinement_distance": "1 um"}},
+  "study": {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
+            "values": {"unit": "um", "values": [1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7]}}
 }
 ```
 
-`units`는 물리에 필요한 SI 기본 차원마다 기호 하나를 선언합니다. 문서의 모든 수는 이 단위계의 순수 숫자이며, 물리가 요구하는 차원을 문서가 선언하지 않으면 묵시적으로 m를 쓰지 않고 오류를 냅니다. `physics`는 이름 있는 물리의 맵이고 sweep 매개변수는 그중 하나를 지정합니다.
+`geometry.length_unit`은 형상과 영역 숫자의 뜻을 정합니다. 그 밖의 모든 길이는 자기 단위를 함께 씁니다(`"1.55 um"`, `"1550 nm"`, `"1.55e-6 m"`. 진공 파장은 nm, um, m를 받습니다). 단위 없는 차원 값은 거절합니다(`E-UNIT-MISSING`). `depth`는 `null`(단면)입니다. 라이브러리 재료는 physmat의 정확한 이름으로 씁니다(`"physmat:Si"`). 접두어 없는 이름은 `materials`의 로컬 기록이며, 그 `refractive_index`는 숫자, `{"n": .., "k": ..}`(exp(−iωt)에서 n + i k: k ≥ 0은 흡수, 음수 k는 `E-GAIN`으로 거절), 또는 분산 모델입니다. `physics`는 이름 있는 물리의 맵이고 sweep 매개변수는 그중 하나를 지정합니다. 결과는 exp(−iωt)의 SI입니다: 절점 좌표와 진공 파장은 미터, 전파 손실은 dB/m입니다.
 
-CLI 요약, 저장 그림, Studio 형상/메시/결과 라벨은 선언 길이 단위를 사용하며 `{"length": {"in_m": 1e-10}}` 같은 수치 선언도 포함합니다. 바뀌는 것은 라벨이지 저장 숫자가 아닙니다. 선언만 바꾸면 모델을 재해석하므로 단위를 바꿀 때 차원 입력도 함께 환산하세요. 내장 재료 미리보기는 physmat 고유의 마이크로미터를 쓰며 그렇게 표시합니다. `em.modes2d`의 형상과 메시는 문서가 선언한 단위와 관계없이 마이크로미터에서 만듭니다. 모든 길이를 한 번의 정확한 반올림으로 환산하고, 메시 좌표는 결과·CLI 출력·Studio를 위해 문서 단위로 되돌립니다. 그래서 같은 소자를 `nm`, `um`, `m`로 써도 숫자가 정확히 환산되면(예: 1550 nm, 1.55 um, 1.55e-6 m) 같은 메시와 비트 단위로 같은 결과를 냅니다. 정확히 환산되지 않는 숫자는 마지막 비트가 다를 수 있고 입력 1 ulp 차이로도 메시가 바뀔 수 있습니다. 이때 답은 비트 단위가 아니라 이산화 오차 안에서 일치합니다. schema는 여러 항목을 표현할 수 있지만 현재 runner는 정확히 하나만 요구하고 연성·다중물리 실행을 거절합니다.
+CLI 요약, 저장 그림, Studio 형상/메시/결과 라벨은 구성 요소의 길이 단위(또는 `display_units.length`)를 사용합니다. 바뀌는 것은 라벨이지 저장 숫자가 아닙니다. 내장 재료 미리보기는 미터 단위 진공 파장을 받고 돌려줍니다. `em.modes2d`의 형상·메시·모드 풀이는 문서가 선언한 단위와 관계없이 마이크로미터(커널 기준틀, exp(+iωt))에서 합니다. 모든 길이는 정확한 값에서 한 번 마이크로미터로 바꾸고(`float(exact × 10⁶)`), 결과는 마이크로미터 값에 1e-6을 곱해 SI로 돌려주며 모든 복소 값은 한 번 켤레를 취합니다. 그래서 같은 소자를 `nm`, `um`, `m`로 써도 숫자가 같은 십진수이면(예: 1550 nm, 1.55 um, 1.55e-6 m) 비트 단위로 같은 메시와 결과를 냅니다(P2-5). 되돌린 값은 커널의 마이크로미터 double에 1e-6을 곱한 값입니다(`"0.22 um"`으로 쓴 2.2e-07은 `resolved_inputs`에서는 2.2e-07이지만, 커널 값으로 계산한 결과에서는 2.1999999999999998e-07입니다). schema는 여러 항목을 표현할 수 있지만 현재 runner는 정확히 하나만 요구하고 연성·다중물리 실행을 거절합니다.
 
-형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료 이름은 `materials`에서 먼저 찾고 다음으로 physmat 내장 재료(`"Si"`, `"SiO2"`, `"Au"`, ...)에서 찾으므로 sweep의 각 파장에 분산이 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다.
+형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료는 `materials`의 로컬 기록이거나 정확한 이름으로 쓴 physmat 내장 재료(`"physmat:Si"`, `"physmat:SiO2"`, `"physmat:Au"`, ...)이며, 내장 재료의 분산은 sweep의 각 파장에 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 파장은 `physics.<name>.vacuum_wavelength`이고 값은 태그 배열(`{"unit": "um", "values": [...]}`)입니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다.
 
 광학 모드 물리는 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 제공 예제 `soi_strip`은 `vector`를 씁니다. 이런 코어에서 스칼라 근사는 크게 어긋납니다. 같은 문서를 `scalar`로 풀면 1.55 um에서 n_eff가 2.444가 아니라 2.611입니다. 저대비 Hadley 리브에서 `hadley_rib`(스칼라)은 자기 메시에서 출판값과 4e-5 차이지만 메시를 세분화하면 멀어지고(0.65배에서 1.4e-4), `hadley_rib_vector`는 출판값보다 2.0e-4 낮고 세분화하면 다가갑니다(0.65배에서 1.1e-4). 두 경로 모두 수동 흡수를 받습니다. 부호·복소 출력·단위·선택은 [흡수 모드](lossy_modes.md)를 참고하세요. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
 
@@ -83,47 +87,47 @@ python -m simcase run vector.json -o vector_results
 
 `vector_slab`은 전기 측벽으로 TE 군을 선택하는 220 nm 유전체 슬랩입니다. TM 군에는 좌우 경계를 `pmc`로 바꾸세요. `vector_fiber`는 축퇴 상대를 포함해 여섯 장을 요청합니다.
 
-물리 항목에는 `"formulation": "vector"`와 유한 양수 `n_cladding`이 필요합니다. 이 무차원 수는 선택 파장에서 유도모드 탐색 구간의 사용자가 지정한 하한입니다. 단순 비대칭 슬랩에는 기판/덮개 굴절률 중 큰 값을, 광섬유에는 외부 클래딩 굴절률을 쓰세요. 일반 구조에는 더 높은 유효 굴절률의 슬랩/복사 채널이 있어 그에 맞는 하한이 필요할 수 있습니다. 상한은 메시의 최대 재료 굴절률입니다. 최소 재료 굴절률에서 자동 추론하지 않습니다.
+물리 항목에는 `"formulation": "vector"`와 유한 양수 `effective_index_threshold`가 필요합니다. 이 무차원 수는 선택 파장에서 유도모드 탐색 구간의 사용자가 지정한 하한입니다. 단순 비대칭 슬랩에는 기판/덮개 굴절률 중 큰 값을, 광섬유에는 외부 클래딩 굴절률을 쓰세요. 일반 구조에는 더 높은 유효 굴절률의 슬랩/복사 채널이 있어 그에 맞는 하한이 필요할 수 있습니다. 상한은 메시의 최대 재료 굴절률입니다. 최소 재료 굴절률에서 자동 추론하지 않습니다.
 
-실수·유한·양수 유전율의 등방 비자성 유전체만 지원합니다. 최대 굴절률 근처에서 모드를 탐색하고 열린 구간 `(n_cladding, n_max)`으로 거른 뒤 n_eff 내림차순으로 정렬합니다. 발견 모드가 `num_modes`보다 적으면 실제 개수와 로그 경고를 반환하며, 0개면 오류입니다. 이는 제한된 탐색이지 모든 유도모드를 찾았다는 증명이 아닙니다. 유한 PEC/PMC 계산벽은 열린 경계가 아니므로 형상에 대해 메시 수렴과 영역 여백을 모두 확인하세요.
+실수·유한·양수 유전율의 등방 비자성 유전체만 지원합니다. 최대 굴절률 근처에서 모드를 탐색하고 열린 구간 `(effective_index_threshold, n_max)`으로 거른 뒤 n_eff 내림차순으로 정렬합니다. 발견 모드가 `mode_count`보다 적으면 실제 개수와 로그 경고를 반환하며, 0개면 오류입니다. 이는 제한된 탐색이지 모든 유도모드를 찾았다는 증명이 아닙니다. 유한 PEC/PMC 계산벽은 열린 경계가 아니므로 형상에 대해 메시 수렴과 영역 여백을 모두 확인하세요.
 
 독립 지점에는 `"study": {"type": "single"}`을 사용하세요. 파장 sweep에는 아래 분리 모드 추적 계약이 필요하며 다른 벡터 sweep은 거절합니다.
 
-`RunResult.fields`는 스칼라 결과의 기존 절점 스칼라 구성을 유지하고 벡터 결과에서는 비어 있습니다. 벡터 데이터는 `RunResult.vector_fields`에 있으며 study 지점마다 공개 `VectorField` 객체 하나가 있습니다.
+`RunResult.mode_fields`는 스칼라 결과의 절점 스칼라 장을 담고 벡터 결과에서는 비어 있습니다. 벡터 데이터는 `RunResult.vector_fields`에 있으며 study 지점마다 공개 `VectorField` 객체 하나가 있습니다(SI, exp(−iωt)).
 
 | 속성 | 형상 | 의미 |
 |---|---|---|
 | `edges` | `(edges, 2)` | 작은 노드 인덱스에서 큰 인덱스로 향하는 노드 쌍 |
-| `transverse` | `(edges, modes)` | 문서 길이 단위의 횡방향 전기장 선적분 |
+| `transverse` | `(edges, modes)` | 미터 단위의 횡방향 전기장 선적분 |
 | `longitudinal` | `(nodes, modes)` | Ex/Ey 대비 위상을 포함하는 복소 Ez |
 | `electric` | `(triangles, modes, 3)` | 삼각형 중심의 복소 Ex/Ey/Ez |
 
 각 모드는 하나의 공통 척도, 즉 중심점 최대 `|E| = 1`을 사용합니다. 진폭은 상대값이며 V/m 또는 정규화 전력이 아닙니다. 모든 성분은 이 척도를 공유하고 이 무손실 모드의 Ez는 횡방향 장과 직교 위상입니다. 중심값은 요소별로 유지되어 경계면 불연속을 보존합니다. 원시 변/절점 계수는 다른 곳에서 복원할 수 있도록 유한요소 장을 유지합니다.
 
-벡터 `fields.npz`는 `edges`, `vector_transverse`, `vector_longitudinal`, `vector_electric`을 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `fields` 키가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v1"`이 이 구성을 식별합니다. summary에는 요청/반환 모드 수, 정규화, 선언 좌표 단위가 포함됩니다. 모든 `em.modes2d` 결과(스칼라·벡터)는 두 파일에 저장 파일 배치 `field_layout="em-modes2d-p1-node-centroid-v1"`(P1 절점 장, 벡터 결과는 요소중심 전기장을 더함), `mesh_length_unit`(`nodes`의 선언 단위), `length_unit_to_m`(그 단위의 미터 크기)을, archive에는 `study_parameter`(sweep 경로, 단일 지점이면 `""`)를 함께 기록합니다. subspace sweep은 대신 `field_layout="em-modes2d-subspace-raw-v1"`을 기록합니다. 기존 키의 의미는 바뀌지 않습니다. 모델 JSON 형식은 `"openphysics": "0.2"`를 유지합니다.
+벡터 `fields.npz`는 `edges`, `unnormalized_electric_field_line_integral`(m), `unnormalized_electric_field_z`, `unnormalized_electric_field`(x, y, z; 단위 1)를 담으며 세 장 배열에는 앞쪽 study 지점 축이 추가됩니다. `numpy.load(..., allow_pickle=False)`로 읽습니다. 벡터 데이터에는 스칼라 `unnormalized_mode_field`가 없습니다. archive와 summary의 `field_representation="vector-edge-nodal-v2"`가 이 구성을 식별합니다. summary metadata에는 `mode_count`, `returned_mode_count`, 정규화, `field_units`(모든 배열의 단위, `node_coordinates`는 m)가 포함됩니다. 모든 `em.modes2d` 결과(스칼라·벡터)는 저장 파일 배치 `field_layout="em-modes2d-p1-node-centroid-v2"`(P1 절점 장, 벡터 결과는 요소중심 전기장을 더함), 미터 단위 `node_coordinates`, `vacuum_wavelength`(m, study 지점마다 하나), `effective_index`(손실이 있거나 PML이면 복소, Im n_eff ≥ 0이 손실), `study_parameter`(sweep 경로, 단일 지점이면 `""`)를 기록하며, 다른 슬롯의 sweep은 `study_values`를 더합니다. subspace sweep은 대신 `field_layout="em-modes2d-subspace-raw-v2"`를 기록합니다. 단위 일괄 변경 전에 저장한 결과(배치 `-v1`)는 내보내기 도구가 이름을 밝혀 거절합니다.
 
 ### 모드 후처리
 
-PML이 없는 모든 스칼라·벡터 `em.modes2d` 결과는 study 지점 `p`와 모드 `m`마다 세 개의 배열을 추가로 저장합니다. 값은 문서 길이 단위의 저장 메시 위에서 [`galerkin.mode_overlap`](../galerkin/mode_overlap.md)을 직접 호출한 것이며(`simcase.mode_postprocessing`이 정확한 절차를 적고, `tests/simcase/test_modes_postprocessing.py`가 저장값이 그 호출과 바이트 단위로 같음을 확인합니다):
+PML이 없는 모든 스칼라·벡터 `em.modes2d` 결과는 study 지점 `p`와 모드 `m`마다 세 개의 배열을 추가로 저장합니다. 값은 커널 기준틀(마이크로미터 메시, exp(+iωt))에서 [`galerkin.mode_overlap`](../galerkin/mode_overlap.md)으로 계산한 뒤 exp(−iωt)의 SI로 한 번 바꾼 것입니다. 면적은 1e-12를 곱하고 복소 값은 켤레를 취합니다(`simcase.mode_postprocessing`이 정확한 절차를 적고, `tests/simcase/test_modes_postprocessing.py`가 저장값이 그 호출을 한 번 변환한 값임을 확인합니다):
 
 | 키 | 모양 | 의미 |
 |---|---|---|
-| `mode_power` | `(points, modes)` | 벡터: 저장 장의 복소 Poynting 적분 `P = 1/2 int (E x H*) . z dA`(`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); 스칼라: `int |phi|^2 dA`(`scalar_power`, 실수) |
-| `confinement` | `(points, modes, regions)` | `region_names` 순서의 영역별 에너지 비율 `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2`(`confinement_factor`); 스칼라: `int_R |phi|^2 / int |phi|^2`. 행의 합은 1 |
-| `field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA`(`overlap_matrix(..., "field")`, Hermitian; 스칼라: `scalar_overlap`); 대각은 `int |E|^2 dA`이며 스칼라 결과에서는 `mode_power`와 같음 |
+| `unnormalized_mode_power`(벡터, W) 또는 `unnormalized_mode_field_square_integral`(스칼라, m^2) | `(points, modes)` | 벡터: 저장 장을 V/m로 읽은 복소 Poynting 적분 `P = 1/2 int (E x H*) . z dA`(`vector_power`, `k0 = 2 pi / wavelength`, `mu_r = 1`); 스칼라: `int |phi|^2 dA`(`scalar_power`, 실수) |
+| `confinement_factor` | `(points, modes, regions)` | `region_names` 순서의 영역별 에너지 비율 `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2`(`confinement_factor`); 스칼라: `int_R |phi|^2 / int |phi|^2`. 행의 합은 1 |
+| `unnormalized_field_overlap` | `(points, modes, modes)` | m^2 단위의 `<E_a, E_b> = int conj(E_a) . E_b dA`(`overlap_matrix(..., "field")`, Hermitian; 스칼라: `scalar_overlap`); 대각은 `int |E|^2 dA`이며 스칼라 결과에서는 제곱 적분과 같음 |
 | `coupling_efficiency` | `(points, modes)` | `results.mode_overlap.gaussian`이 있을 때만: Gaussian 입력의 `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)`(`interpolate_vector_field` 뒤 `coupling_efficiency`; 스칼라: 절점에서 `scalar_coupling_efficiency`) |
 
-저장 진폭은 상대값이므로 `mode_power` 자체에는 절대 단위가 없습니다. 정확한 뜻은 다음과 같습니다. 벡터 진폭을 문서 길이 단위당 볼트(마이크로미터 문서면 V/um)로 읽으면 `mode_power`는 그 장의 전력(와트)이고 `Re`는 +z로 전달되는 시간 평균 전력입니다. V/m로 읽으면 와트 전력은 `mode_power * length_unit_to_m**2`입니다. 저장 모드를 `sqrt(Re mode_power)`로 나누면 1 W를 전달하는 장(문서 단위당 V 진폭)이 됩니다. 무손실 모드에서는 허수부가 반올림 오차이고, 손실 모드(복소 `neff`)에서는 무효 전력이며 모드들은 전력 직교하지 않습니다. 스칼라 `mode_power`와 `field_overlap`은 (문서 단위)^2이고 `confinement`·`coupling_efficiency`는 무차원입니다. `summary.json`은 `mode_postprocessing` 아래에 키마다 `unit`과 `description`을 붙여 같은 값을 반복합니다(`field_overlap`은 `real`/`imag`, 벡터 `mode_power`는 `imag` 목록, `confinement`는 영역 이름 포함).
+저장 진폭은 상대값이므로 이름에 "unnormalized"가 붙습니다. 벡터 진폭을 V/m로 읽으면 `unnormalized_mode_power`는 그 장의 전력(와트)이고 `Re`는 +z로 전달되는 시간 평균 전력입니다. 저장 모드를 `sqrt(Re unnormalized_mode_power)`로 나누면 1 W를 전달하는 장이 됩니다. 무손실 모드에서는 허수부가 반올림 오차이고, 손실 모드(복소 `effective_index`)에서는 무효 전력이며 모드들은 전력 직교하지 않습니다. `confinement_factor`와 `coupling_efficiency`는 무차원입니다. `summary.json`은 `mode_postprocessing` 아래에 키마다 `unit`과 `description`을 붙인 값 객체로 같은 값을 반복합니다(복소 값은 `time_convention`과 함께 `re`/`im`, `confinement_factor`는 영역 이름 포함).
 
 선택적 문서 블록
 
 ```json
-"results": {"mode_overlap": {"gaussian": {"waist": 0.22, "center": [0.0, 0.11]}}}
+"results": {"mode_overlap": {"gaussian": {"beam_waist_radius": "0.22 um", "position": ["0 um", "0.11 um"]}}}
 ```
 
-은 입력 장 `exp(-((x - cx)^2 + (y - cy)^2) / waist^2)`(`waist`는 1/e 장 반지름, `center`는 문서 길이 단위)에 대한 `coupling_efficiency`를 추가합니다. 벡터 결과에서는 x 편광 입력을 모드의 횡 장과만 비교하고, 스칼라 결과에서는 스칼라 진폭입니다. waist는 양수, 중심은 기하 창 안이어야 하며 `mode_overlap`과 `gaussian` 아래의 다른 키는 거절됩니다. PML 결과와 subspace sweep에는 이 키들이 없습니다. PML 계수는 늘린 좌표의 공변 적분이어서 창 전체의 무손실 Poynting 식이 물리 전력이 아니고, subspace 프레임은 모드가 아니기 때문입니다([PML 모드](pml_modes.md), [subspace 추적](vector_subspace_tracking.md)). VTU 내보내기는 바뀌지 않고 장만 쓰므로 후처리 값은 `fields.npz`나 `summary.json`에서 읽습니다.
+은 입력 장 `exp(-((x - x0)^2 + (y - y0)^2) / w^2)`(`w = beam_waist_radius`는 1/e 장 반지름, `position = [x0, y0]`, 각각 단위를 붙인 길이)에 대한 `coupling_efficiency`를 추가합니다. 벡터 결과에서는 x 편광 입력을 모드의 횡 장과만 비교하고, 스칼라 결과에서는 스칼라 진폭입니다. waist는 양수, 중심은 기하 창 안이어야 하며 `mode_overlap`과 `gaussian` 아래의 다른 키는 거절됩니다. PML 결과와 subspace sweep에는 이 키들이 없습니다. PML 계수는 늘린 좌표의 공변 적분이어서 창 전체의 무손실 Poynting 식이 물리 전력이 아니고, subspace 프레임은 모드가 아니기 때문입니다([PML 모드](pml_modes.md), [subspace 추적](vector_subspace_tracking.md)). VTU 내보내기는 바뀌지 않고 장만 쓰므로 후처리 값은 `fields.npz`나 `summary.json`에서 읽습니다.
 
-Studio는 지점마다 `location="triangle_centroids"`, 성분 이름, `(modes, triangles, 3)` 형상의 별도 `real`/`imag` 배열을 가진 `vector_fields`를 받습니다. 기존 스칼라 HTTP `fields` 구성은 그대로이며 벡터에서는 비어 있습니다. `|E|`, `|Ex|`, `|Ey|`, `|Ez|`를 골라 공통 |E| 색 척도의 크기를 표시합니다. 저장 PNG는 |E|를 표시하고 archive는 복소 성분을 보존합니다. `VectorField.to_dict()`는 같은 JSON 안전 표시 표본을 만듭니다.
+Studio는 지점마다 `name="unnormalized_electric_field"`, `location="triangle_centroids"`, 성분 `x`, `y`, `z`, 단위 `1`, `time_convention`, `(modes, triangles, 3)` 형상의 별도 `real`/`imag` 배열을 가진 `vector_fields`와 미터 단위 절점 좌표를 받습니다. 스칼라 결과는 `unnormalized_mode_field`(지점마다 실수부와, 복소이면 허수부)로 오며 벡터에서는 비어 있습니다. `|E|`, `|Ex|`, `|Ey|`, `|Ez|`를 골라 공통 |E| 색 척도의 크기를 표시합니다. 저장 PNG는 |E|를 표시하고 archive는 복소 성분을 보존합니다. `VectorField.to_dict()`는 같은 JSON 안전 표시 표본을 만듭니다.
 
 ### 추적 벡터 파장 sweep
 
@@ -132,9 +136,9 @@ python -m simcase example vector_slab_sweep > sweep.json
 python -m simcase run sweep.json -o sweep_results
 ```
 
-벡터 물리의 sweep 매개변수는 정확히 `physics.<name>.wavelength`여야 합니다. 유한 양수 값을 적어도 세 개 제공하고 엄격한 증가 또는 감소 순서를 지켜야 합니다. 불균등 간격도 지원합니다. 메시·재료·경계조건·요청 모드 수·`n_cladding`은 고정됩니다. 재료 분산은 각 파장에서 계산합니다. 고정 `n_cladding`은 분산 클래딩을 포함한 **전체 구간**의 외부/슬랩 복사 채널 하한을 만족해야 합니다. 보수적인 상한 포락선은 약하게 유도된 모드를 제외할 수 있으며 시작 파장의 클래딩 값만 쓰면 나중에 원하지 않는 외부 모드를 포함할 수 있습니다.
+벡터 물리의 sweep 매개변수는 정확히 `physics.<name>.vacuum_wavelength`여야 합니다. 유한 양수 값을 적어도 세 개, 엄격한 증가 또는 감소 순서의 태그 배열로 제공해야 합니다(예: `{"unit": "nm", "values": [1450, 1500, 1550]}`). 불균등 간격도 지원합니다. 메시·재료·경계조건·`mode_count`·`effective_index_threshold`는 고정됩니다. 재료 분산은 각 파장에서 계산합니다. 고정 `effective_index_threshold`는 분산 클래딩을 포함한 **전체 구간**의 외부/슬랩 복사 채널 하한을 만족해야 합니다. 보수적인 상한 포락선은 약하게 유도된 모드를 제외할 수 있으며 시작 파장의 클래딩 값만 쓰면 나중에 원하지 않는 외부 모드를 포함할 수 있습니다.
 
-첫 지점은 n_eff 내림차순으로 `num_modes`개 분지의 시작값을 정합니다. 이후 지점에서는 추가 유도 후보를 탐색하고, 제곱 정규화 overlap 합을 최대화하는 전역 일대일 할당으로 해당 분지에 대응시킵니다.
+첫 지점은 n_eff 내림차순으로 `mode_count`개 분지의 시작값을 정합니다. 이후 지점에서는 추가 유도 후보를 탐색하고, 제곱 정규화 overlap 합을 최대화하는 전역 일대일 할당으로 해당 분지에 대응시킵니다.
 
 ```text
 <E_a,E_b> = transverse_a^H M_edge transverse_b + Ez_a^H M_node Ez_b
@@ -147,36 +151,40 @@ score(a,b) = |<E_a,E_b>|^2 / (<E_a,E_a> <E_b,E_b>)
 
 | 설정 | 기본값 | 의미 |
 |---|---|---|
-| `search_modes` | `max(2*num_modes, num_modes+4)` | 유도 후보 수 한도, `num_modes`보다 큰 정수 |
-| `min_overlap` | `0.8` | 선택된 제곱 정규화 overlap의 최솟값, `(0,1]` |
-| `min_margin` | `0.1` | 전체 할당 점수 간격의 최솟값, `(0,1]` |
+| `search_mode_count` | `max(2*mode_count, mode_count+4)` | 유도 후보 수 한도, `mode_count`보다 큰 정수 |
+| `mode_tracking_threshold` | `0.8` | 선택된 제곱 정규화 overlap의 최솟값, `(0,1]` |
+| `mode_tracking_margin_threshold` | `0.1` | 전체 할당 점수 간격의 최솟값, `(0,1]` |
 | `degeneracy_tolerance` | `1e-5` | 음수가 아닌 절대 n_eff 분리 허용치 |
+
+적용된 기본값은 이유와 함께 `summary.json`의 `defaults_applied`에 되풀이됩니다.
 
 선택된 각 대응의 margin은 최상 전체 할당 점수와 그 대응을 제외한 최상 완전 할당 점수를 비교합니다. 대안이 없으면 `null`입니다. 설정은 수치 진단이지 오차 경계가 아닙니다. 특히 축퇴 허용치는 메시의 굴절률 정확도를 반영해야 하며, 값을 낮춘다고 물리적 축퇴 쌍이 분리되지 않습니다.
 
-요청 개수를 유지하지 못하거나 overlap이 약하거나 할당이 모호하거나 선택 후보에 근축퇴 상대가 있으면(미선택 후보 포함) `ModeTrackingError`를 냅니다. 후보 한도를 모두 사용한 탐색에서 선택 모드가 마지막 순위여도 실패합니다. 보이지 않은 상대를 검사하려면 `search_modes`를 늘리세요. 탐색은 제한돼 있으며 전체 스펙트럼의 증명이 아닙니다. 차단을 가로지르는 연속 추적은 미구현입니다. 광섬유의 두 HE11 상대는 하나만 요청해도 기본 추적기가 의도적으로 거절합니다. 독립 단일 study로 확인하거나 선택형 [부분공간 방법](vector_subspace_tracking.md)으로 그 span을 추적하세요.
+요청 개수를 유지하지 못하거나 overlap이 약하거나 할당이 모호하거나 선택 후보에 근축퇴 상대가 있으면(미선택 후보 포함) `ModeTrackingError`를 냅니다. 후보 한도를 모두 사용한 탐색에서 선택 모드가 마지막 순위여도 실패합니다. 보이지 않은 상대를 검사하려면 `search_mode_count`를 늘리세요. 탐색은 제한돼 있으며 전체 스펙트럼의 증명이 아닙니다. 차단을 가로지르는 연속 추적은 미구현입니다. 광섬유의 두 HE11 상대는 하나만 요청해도 기본 추적기가 의도적으로 거절합니다. 독립 단일 study로 확인하거나 선택형 [부분공간 방법](vector_subspace_tracking.md)으로 그 span을 추적하세요.
 
 추적 실패는 파장·원인·다음 조치를 알립니다. 수치 솔버 실패도 파장과 원인을 유지합니다. CLI는 새 결과를 쓰지 않고 0이 아닌 코드로 종료합니다. Studio는 결과 없는 실패 작업을 보고하고 이전 표시 장을 지웁니다. 부분 군굴절률 배열, 누락 모드를 채운 값, 축퇴를 임의로 통과하는 분지는 반환하지 않습니다.
 
-모든 지점이 성공하면 `group_index()`가 각 추적 열에서 `n_g = n_eff - wavelength * d(n_eff)/d(wavelength)`를 끝점 포함 2차 유한차분으로 계산합니다. 기존 스칼라 미분 동작은 그대로입니다. **메시/영역과 파장 간격 수렴을 모두 확인하세요.** 높은 끝점 overlap만으로 성긴 표본 사이의 회피 교차나 차단을 배제하거나 미분 정확도를 인증할 수 없습니다.
+모든 지점이 성공하면 `group_index()`가 각 추적 열에서 `n_g = n_eff - wavelength * d(n_eff)/d(wavelength)`를 끝점 포함 2차 유한차분으로 계산합니다(커널의 마이크로미터 파장에서 계산하므로 어느 길이 단위에서도 같습니다). 기존 스칼라 미분 동작은 그대로입니다. **메시/영역과 파장 간격 수렴을 모두 확인하세요.** 높은 끝점 overlap만으로 성긴 표본 사이의 회피 교차나 차단을 배제하거나 미분 정확도를 인증할 수 없습니다.
 
 `RunResult.mode_tracking`과 `summary.json.mode_tracking`은 `method="electric-l2-assignment-v1"`, 해석된 설정, 지점별 후보 수·선택된 1부터 시작하는 후보 순위·overlap·할당 margin을 담습니다. 시작 지점의 overlap/margin은 `null`입니다. 후보 순위는 분지 식별자가 아닙니다. Studio는 summary로 이 metadata를 받아 분지 라벨과 overlap, 모든 추적 분지의 n_g를 표시합니다.
 
-벡터 장 구성은 `vector-edge-nodal-v1`을 유지하며 sweep 지점마다 항목 하나와 일정한 추적 모드 수를 가집니다. NPZ는 `group_index`와 Unicode 스칼라 `mode_tracking_json`을 추가합니다(`json.loads(str(array))`로 해석). 원시 복소 장·표본·neff는 모두 추적 열 순서를 공유합니다. 스칼라와 벡터 단일 결과에는 이 추적 항목이 없습니다.
+벡터 장 구성은 `vector-edge-nodal-v2`이며 sweep 지점마다 항목 하나와 일정한 추적 모드 수를 가집니다. NPZ는 `group_index`와 Unicode 스칼라 `mode_tracking_json`을 추가합니다(`json.loads(str(array))`로 해석. 설정은 위 이름을 쓰며 이름이 바뀐 증거 키는 `minimum_principal_squared` 하나입니다). 원시 복소 장·표본·`effective_index`는 모두 추적 열 순서를 공유합니다. 스칼라와 벡터 단일 결과에는 이 추적 항목이 없습니다.
 
 ### 사용자 정의 광학 재료
 
-사용자 재료는 상수 `{"n": 1.5, "k": 0}`(유한하고 음수가 아닌 `n`, `k`; `k` 기본값 0) 또는 Sellmeier 모델입니다.
+사용자 재료의 `refractive_index`는 상수(`1.5`), 복소 상수 `{"n": 1.5, "k": 0.01}`(exp(−iωt)에서 n + i k: 유한 양수 n, k ≥ 0은 흡수, 음수 k는 이득이며 `E-GAIN`으로 거절), 또는 Sellmeier 모델입니다.
 
 ```json
-{"glass": {"source": "coefficient reference", "sellmeier": {
-  "A": 1.0, "B": [0.7, 0.4], "C": [0.01, 0.04], "range": [0.5, 2.0]
+{"glass": {"source": "coefficient reference", "refractive_index": {
+  "model": "sellmeier", "constant": 1.0,
+  "terms": [{"strength": 0.7, "resonance_wavelength_squared": "0.01 um^2"},
+            {"strength": 0.4, "resonance_wavelength_squared": "0.04 um^2"}],
+  "valid": {"vacuum_wavelength": ["0.5 um", "2 um"]},
+  "reference_medium": "vacuum"
 }}}
 ```
 
-위 예제는 `um` 문서의 `materials` 항목입니다. 식은 `n² = A + sum(B[i] * wavelength² / (wavelength² - C[i]))`입니다. `A`(기본 1)와 `B`는 무차원이고 `C`는 문서 길이 단위의 제곱이며 선택적 유효 `range`는 길이 단위입니다. `nm`에서 같은 `C`는 `[10000, 40000]`, range는 `[500, 2000]`입니다. resolver는 재료 경계에서 이 값들을 physmat의 마이크로미터 규약으로 한 번 환산합니다.
-
-`B`와 `C`는 길이가 같은 비어 있지 않은 유한 수치 배열이어야 하며 `A`도 유한해야 합니다. range가 있으면 `0 <= minimum < maximum`의 두 유한 경계가 필요하고 없으면 범위를 제한하지 않습니다. `source`는 선택 문자열입니다. Sellmeier에는 `n`, `k`가 필요하지 않습니다. 어느 하나라도 `sellmeier`와 섞으면 상숫값을 조용히 버리는 문제가 있어 오류를 냅니다. 예전 우회 문서의 임시 `n`은 제거하세요. 예전 `range_um` 표기는 거절하며 선언 길이 단위의 `range`를 사용합니다. 잘못된 모델은 메시 생성·실행 전 문서 검증에서 실패합니다.
+식은 `n² = constant + sum(strength[i] * wavelength² / (wavelength² - C[i]))`이며 `C[i]`는 `resonance_wavelength_squared`(또는 `resonance_wavelength`의 제곱; 항마다 둘 중 정확히 하나)입니다. `constant`(기본 1, `defaults_applied`에 기록)와 strength는 무차원이고 모든 길이는 단위를 함께 쓰므로 같은 모델을 nm로 쓰면 `"10000 nm^2"`, `["500 nm", "2000 nm"]`입니다. resolver는 각 값을 정확한 값에서 physmat의 마이크로미터로 한 번 환산합니다. `valid.vacuum_wavelength`는 lo > 0인 `[lo, hi]` 또는 아래가 열린 `[null, hi]`이며, `valid`를 생략하면 범위를 제한하지 않습니다. `reference_medium`은 필수이고 이번 릴리스는 `"vacuum"`만 읽습니다. `rii_formula` 모델은 이름을 밝혀 거절합니다. 모델에는 항이 적어도 하나 필요합니다. 형식 0.2 키(`n`, `k`, `sellmeier`, `A`, `B`, `C`, `range`)는 새 이름을 알려 주며 거절합니다. 잘못된 모델은 메시 생성·실행 전 문서 검증에서 실패합니다.
 
 ## Python에서 사용
 
@@ -184,19 +192,26 @@ score(a,b) = |<E_a,E_b>|^2 / (<E_a,E_a> <E_b,E_b>)
 from simcase import Document, run
 doc = Document.load("model.json")
 res = run(doc)
-res.neff                 # (study points, modes)
-res.group_index()        # when sweeping wavelength
+res.effective_index      # (study points, modes); Im >= 0 is loss under exp(-i omega t)
+res.vacuum_wavelength    # (study points,), metres
+res.group_index()        # when sweeping the wavelength
+res.propagation_loss()   # dB/m: (40 pi / ln 10) Im(n_eff) / lambda0
 res.save("out/")
 ```
 
-`run`은 각각 공개 API인 단계들의 조합입니다. 따라서 프런트엔드는 풀이 없이 메시를 만들 수 있고 캐시 계층은 바뀐 부분만 다시 실행할 수 있습니다.
+`run`은 각각 공개 API인 단계들의 조합입니다. 따라서 프런트엔드는 풀이 없이 메시를 만들 수 있고 캐시 계층은 바뀐 부분만 다시 실행할 수 있습니다. 단계 API는 SI를 씁니다.
 
 ```python
 from simcase import build_mesh, solve_point, study_points
-model = build_mesh(doc)                  # geometry -> mesh -> materials
-parameter, values = study_points(doc)
-result = solve_point(model, doc.sole_physics()[1])
+model = build_mesh(doc)                  # geometry -> mesh -> materials; model.tri.nodes in metres
+eps = model.relative_permittivity(1.55e-6)   # per triangle, exp(-i omega t), at a vacuum wavelength in m
+parameter, values = study_points(doc)    # ("physics.em1.vacuum_wavelength", [SI values]) for a sweep
+point = doc if parameter is None else doc.with_value(parameter, values[0])
+result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vector_field or
+                                                           # unnormalized_mode_field, in SI
 ```
+
+`build_domain`은 마이크로미터 메시 기준틀의 메시 생성기 영역(meshine이 받는 것)을 반환하고, `MeshedModel.solver_mesh`는 마이크로미터 커널 메시(내부)입니다. `run`과 `solve_point`는 모드 커널에 같은 double을 넘깁니다(`soi_strip`에서 테스트로 확인). 추적 sweep은 `search_mode_count`개 후보를 탐색하고 `solve_point`는 `mode_count`개를 요청합니다. `simcase.physics_em_modes2d.solve`와 `simcase.mode_postprocessing`은 커널 기준틀(마이크로미터, exp(+iωt))의 내부 구현이며 공개 API가 아닙니다.
 
 영역이 있는 열전도 문서, 영역 전기 전도·정상 줄 가열 문서, 영역 기계 문서에서는 `run`이 선택적인 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`)도 받고, `check_mesh_limits`는 메시하지 않고 문서가 메시 생성기에 넘기는 루프 꼭짓점 수를 셉니다. 둘 다 `MeshLimitError`를 발생시킵니다. `region_complexity`는 `Document.from_dict` 전에 원시 JSON에서 도형, 원, 다각형 점, 경계 교차를 셉니다. [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을 참고하세요.
 
@@ -250,19 +265,21 @@ result = solve_point(model, doc.sole_physics()[1])
 `exp(+j*omega*t)` 규약; VTK에는 복소 배열이 없음)를, 재료는
 `tet_relative_permittivity_real`/`_imag`과 `tet_relative_permeability_real`/`_imag`으로
 내보냅니다. 주파수·Q 값·벽 전도도는 `fields.npz`와 `summary.json`에 남습니다. 단일 지점
-도파관 모드 결과(`em-modes2d-p1-node-centroid-v1`, `em.modes2d`)는 절점을 미터로 바꿔
-(`nodes * length_unit_to_m`) 내보냅니다. 스칼라 결과는 모드 `k`(0부터)마다 점 데이터
-`mode_<k>`를, 저장된 `fields`가 복소(손실 재료)이면 `mode_<k>_real`/`mode_<k>_imag`를
-씁니다. 벡터 결과는 셀 데이터 `electric_field_mode_<k>_real`/`_imag`(요소중심의 Ex, Ey,
-Ez, 저장된 상대 정규화로 가장 큰 요소중심 |E| = 1)과 점 데이터
-`longitudinal_electric_mode_<k>_real`/`_imag`(절점 Ez)를 씁니다. 모든 모드 VTU에는 정수
-셀 데이터 `triangle_regions`(저장된 `regions`, summary의 `regions` 색인)가 들어갑니다.
+도파관 모드 결과(`em-modes2d-p1-node-centroid-v2`, `em.modes2d`; exp(−iωt)의 SI)는 미터 단위
+`node_coordinates` 위에 내보냅니다. 각 배열은 `fields.npz` 이름에 모드별 접미사 `_mode_<k>`(0부터)를,
+복소이면 `_real`/`_imag`를 붙여 이름을 짓습니다. 스칼라 결과는 점 데이터
+`unnormalized_mode_field_mode_<k>`(손실이 있거나 PML이면 복소)를, 벡터 결과는 셀 데이터
+`unnormalized_electric_field_mode_<k>_real`/`_imag`(요소중심의 x, y, z, 저장된 상대 정규화로 가장
+큰 요소중심 |E| = 1)와 점 데이터 `unnormalized_electric_field_z_mode_<k>_real`/`_imag`(절점 Ez)를
+씁니다. 모든 모드 VTU에는 정수 셀 데이터 `regions`(summary의 `regions` 색인)와 FieldData
+`units`·`conventions` 블록(복소부에는 `time_convention` 포함)이 들어갑니다.
 PML 결과도 같은 배치를 쓰며, 메시와 배열은 흡수층까지 덮고 그 안의 장은 인공적입니다.
-`neff`, `edges`, transverse edge 계수, 추적·open boundary 진단은 `fields.npz`에 남습니다.
+`effective_index`, `edges`, 변 선적분, 추적·open boundary 진단은 `fields.npz`에 남습니다.
 study 지점이 여럿인 결과는 여기서 거절하고 `export_sweep`으로 내보냅니다. subspace 배치
-`em-modes2d-subspace-raw-v1`(추적한 모드가 아닌 원시 고유쌍 열)은 둘 다 거절하며,
-`field_layout` 배열이 없는 `fields.npz`(배치를 기록하기 전에 저장한 `em.modes2d` 결과 등)도
-거절합니다(그 `model.json`을 다시 실행). 2D 메시는 z = 0으로 두고
+`em-modes2d-subspace-raw-v2`(추적한 모드가 아닌 원시 고유쌍 열)는 둘 다 거절하며,
+`field_layout` 배열이 없는 `fields.npz`도 거절합니다. 단위 일괄 변경 전에 저장한 결과
+(`em-modes2d-p1-node-centroid-v1`, `em-modes2d-subspace-raw-v1`)는 이름을 밝혀 거절하므로 그 문서를
+형식 0.3으로 다시 실행하세요. 2D 메시는 z = 0으로 두고
 2D 벡터에는 z 성분 0을 붙입니다. 기준 결과는 여전히 `fields.npz`이며, 시각·주파수·단위는
 그 파일과 `summary.json`에 남습니다. 이미 있는 VTU는 덮어쓰지 않습니다. meshio의 XDMF
 writer는 h5py가 필요하므로 XDMF는 제공하지 않습니다.
@@ -282,7 +299,7 @@ UTF-8 JSON)도 있습니다. 출력 폴더는 새것이거나 비어 있어야 �
 도파관 모드 sweep은 `simcase.export.export_sweep("out/fields.npz", "out/paraview")`가
 study 지점마다 VTU 하나(`fields_00000.vtu`, …, 단일 지점에서 `export_fields`가 쓰는 배열과
 같음)와 컬렉션 `fields.pvd`를 씁니다. timestep은 저장된 `study_parameter`가 파장이고 값이
-엄격히 단조이면(모든 벡터·PML sweep) 문서 길이 단위(`mesh_length_unit`)의 파장이고, 다른
+엄격히 단조이면(모든 벡터·PML sweep) 미터 단위의 진공 파장이고, 다른
 매개변수의 스칼라 sweep이나 값이 반복·역행하는 sweep이면 지점 색인입니다. 값 자체는
 `fields.npz`에 남습니다. 디렉터리·이름·rollback 규칙은 같습니다.
 
@@ -307,10 +324,10 @@ Studio는 `http://127.0.0.1:<port>`나 `http://localhost:<port>`로 여세요. �
 ![결과](../../../../../packages/simcase/results.png)
 
 - 예제를 읽고, 디스크의 `.json`을 열고, 편집 문서를 다운로드합니다.
-- 모델 트리: Units, Domain, Background, 형상(rect / circle / polygon 추가·순서변경·삭제), 사용자 재료, Physics, Mesh, Study, Results. 노드를 선택하면 편집 폼이 나타나고 모든 편집이 형상 보기와 JSON 탭에 즉시 반영되며 검증기의 크기 경고가 옆에 표시됩니다.
-- 재료: 출처·유효 범위를 갖는 physmat 내장 재료와 문서 상수 재료. 사용자 Sellmeier 모델은 JSON 탭에 입력합니다. 트리/속성 항목이 모델을 식별하고 계수 편집을 JSON으로 안내하며 상수 `n`, `k`를 추가하지 않습니다.
+- 모델 트리: Domain(형상 `length_unit` 포함), Background, 형상(rect / circle / polygon 추가·순서변경·삭제), 사용자 재료, Physics, Mesh, Study, Results. 노드를 선택하면 편집 폼이 나타나고, 길이는 단위를 붙인 양 문자열(`"1.55 um"`)로 편집합니다. 모든 편집이 형상 보기와 JSON 탭에 즉시 반영되며 검증기의 코드 진단(`W-GEOMETRY-SCALE` 등)이 로그에 표시됩니다.
+- 재료: 정확한 이름(`physmat:Si`)으로 쓰고 출처·유효 범위를 갖는 physmat 내장 재료와 문서 상수 재료(exp(−iωt)에서 n과 k ≥ 0). 사용자 Sellmeier 모델은 JSON 탭에 입력합니다. 트리/속성 항목이 모델을 식별하고 계수 편집을 JSON으로 안내합니다.
 - 메시 생성: 서버를 통해 meshine으로 생성하고 영역별로 그리며 노드·삼각형 수, 최소각, 평균 품질을 표시합니다.
-- 실행(광학 모델): 백그라운드 작업 후 study 지점·모드를 선택하는 모드 장, n_eff 대 매개변수 차트, 파장 sweep 군굴절률 표를 제공합니다. 벡터 결과는 성분 선택과 상대 진폭을 추가하고 추적 sweep은 분지를 식별해 overlap과 군굴절률을 표시합니다.
+- 실행(광학 모델): 백그라운드 작업 후 study 지점·모드를 선택하는 모드 장, n_eff 대 매개변수 차트, 파장 sweep 군굴절률 표를 제공합니다. 벡터 결과는 성분 선택과 상대 진폭을 추가하고 추적 sweep은 분지를 식별해 overlap과 군굴절률을 표시합니다. 손실 결과는 Im n_eff(exp(−iωt)에서 양수가 감쇠)와 dB/m 전파 손실을 표시합니다.
 - JSON 탭: 문서를 직접 편집하고 적용합니다.
 - 열전도: `thermal.steady2d`·`thermal.transient2d` 문서용 전용 화면. 정상 열전도는 결과 메시, 절점 Kelvin, 요소 열유속을 보여 주고, 과도 열전도는 요청 시간 선택과 페이지 단위 열량(H)·이차 범함수(V) 이력을 더합니다. 재료 영역이 있는 문서는 영역 색과 경계, 범례, 영역 표, 커서 아래 영역도 보여 줍니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
 
@@ -326,13 +343,13 @@ Studio는 `http://127.0.0.1:<port>`나 `http://localhost:<port>`로 여세요. �
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | 예제 문서 |
 | GET | `/api/units` | 선언 가능한 기본 차원과 단위 기호 |
-| GET | `/api/materials` | physmat 내장 재료 이름·별칭·범위·출처 |
-| POST | `/api/materials/preview` | 파장 범위에 따른 재료 n, k |
-| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes}` 또는 `{ok: false, error}` |
-| POST | `/api/mesh` | `{doc}` -> 노드·삼각형·영역·경계 변·통계 |
+| GET | `/api/materials` | 정확한 `physmat:` 이름의 physmat 내장 재료: 유효 진공 파장(m), 출처 |
+| POST | `/api/materials/preview` | 미터 단위 진공 파장 구간에서 `physmat:` 재료의 n, k |
+| POST | `/api/validate` | `{doc}` -> `{ok, summary, doc, notes, diagnostics}` 또는 `{ok: false, error}` |
+| POST | `/api/mesh` | `{doc}` -> `field_units`와 함께 `node_coordinates`(m), `display`, 삼각형·영역·경계 변·통계, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; 백그라운드 스레드에서 실행 |
 | GET | `/api/jobs/{id}` | 상태와 로그 줄 |
-| GET | `/api/jobs/{id}/result` | n_eff·군굴절률·장·메시·시간 |
+| GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss`(summary의 계열), `vacuum_wavelength`, 장, `node_coordinates`(m), 시간, summary |
 
 정상·과도 열전도 화면은 별도 capability·검증·실행·결과 route를 씁니다. [정상](thermal_studio.md)·[과도](thermal_transient_studio.md) Studio 가이드를 참고하세요.
 

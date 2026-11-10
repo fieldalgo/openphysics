@@ -393,7 +393,7 @@ def test_a_shape_that_clips_to_a_polygon_and_a_line_piece_meshes():
     fiber['geometry']['shapes'].append({'name': 'bracket', 'type': 'polygon', 'material':
                                         fiber['geometry']['shapes'][0]['material'],
                                         'points': [[x-40+dom['xmax'], y] for x, y in BRACKET]})
-    em = resolve_regions(Document.from_dict(fiber))
+    em = resolve_regions(handoff_03(Document.from_dict(fiber)))      # format 0.3 (units batch C8)
     assert [name for name, *_, c in em if c] == ['core']
 
 

@@ -31,20 +31,27 @@ def crosscheck_helpers():
 
 
 def document(inputs, factor):
+    """The strip from the record's inputs (lengths in um, so the stored record is untouched)."""
     window, core = inputs["window_um"], inputs["core_um"]
+
+    def um(x):
+        return f"{x!r} um"
+    materials = {name: f"physmat:{inputs[name]}" for name in ("background_material", "core_material")}
     return {
-        "openphysics": "0.2",
+        "openphysics": "0.3",
         "name": "SOI strip, modesolver comparison",
-        "units": {"length": "um"},
-        "geometry": {"domain": dict(window), "background": {"material": inputs["background_material"]},
-                     "shapes": [{"name": "core", "type": "rect", **core, "material": inputs["core_material"],
-                                 "mesh_size": 0.02 * factor}]},
-        "physics": {"em1": {"type": "em.modes2d", "formulation": "vector", "wavelength": 1.55,
-                            "num_modes": len(inputs["modes"]), "n_cladding": 1.45,
+        "geometry": {"length_unit": "um", "depth": None, "domain": dict(window),
+                     "background": {"material": materials["background_material"]},
+                     "shapes": [{"name": "core", "type": "rect", **core, "material": materials["core_material"],
+                                 "element_size": um(0.02 * factor)}]},
+        "physics": {"em1": {"type": "em.modes2d", "formulation": "vector", "vacuum_wavelength": "1.55 um",
+                            "mode_count": len(inputs["modes"]), "effective_index_threshold": 1.45,
                             "boundary": {side: "pec" for side in ("left", "right", "top", "bottom")}}},
-        "mesh": {"size": 0.25 * factor, "grading": {"center": [0.0, 0.11], "near": 0.02 * factor,
-                                                    "far": 0.16 * factor, "distance": 1.0}},
-        "study": {"type": "sweep", "parameter": "physics.em1.wavelength", "values": inputs["wavelengths_um"]},
+        "mesh": {"element_size": um(0.25 * factor),
+                 "grading": {"position": ["0 um", "0.11 um"], "near": um(0.02 * factor), "far": um(0.16 * factor),
+                             "refinement_distance": "1 um"}},
+        "study": {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
+                  "values": {"unit": "um", "values": list(inputs["wavelengths_um"])}},
     }
 
 
@@ -73,8 +80,8 @@ def test_soi_strip_against_stored_modesolver_values():
     with stopwatch("openphysics"):
         results = {f: run(Document.from_dict(document(ref.inputs, f)), verbose=False) for f in (1.0, 0.5)}
     fine = results[0.5]
-    assert list(fine.values) == list(wavelengths)
-    neff = fine.neff[1]
+    assert list(fine.vacuum_wavelength) == [w * 1e-6 for w in wavelengths]    # the kernel's um times 1e-6
+    neff = fine.effective_index[1]
     ng = fine.group_index()[1]
 
     observables = [
@@ -82,7 +89,7 @@ def test_soi_strip_against_stored_modesolver_values():
         crosscheck.observable("TE0 n_g at 1.55 um", "1", "absolute difference", abs(ng[0] - reference_ng[0])),
         crosscheck.observable("TM0 n_eff at 1.55 um", "1", "absolute difference", abs(neff[1] - reference_neff[1])),
         crosscheck.observable("TE0 n_eff at 1.55 um, example mesh", "1", "absolute difference",
-                              abs(results[1.0].neff[1, 0] - reference_neff[0])),
+                              abs(results[1.0].effective_index[1, 0] - reference_neff[0])),
     ]
     record = crosscheck.make_record(
         case=ref.record["case"], physics=ref.record["physics"], api="simcase.run (em.modes2d vector)",

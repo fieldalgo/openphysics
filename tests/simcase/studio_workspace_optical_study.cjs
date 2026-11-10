@@ -11,18 +11,19 @@ before(async()=>{
 });
 const model=(extra={})=>({width:500,height:220,wavelength:1510,coreMesh:25,voltage:1,electric:false,heat:false,structure:false,optics:true,...extra});
 const setup=()=>({materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''});
-const field={nodes:[[0,0],[1,0],[0,1]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
-const run=(input,settings=opticalSettings(input.model.wavelength,input.model.coreMesh))=>({job:'abcdef12',completedAt:'2026-10-26T00:00:00Z',input,settings,neff:[2.5,1.8],field,origin:'local'});
+const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
+const run=(input,settings=opticalSettings(input.model.wavelength,input.model.coreMesh))=>({job:'abcdef12',completedAt:'2026-10-26T00:00:00Z',input,settings,effective_index:[2.5,1.8],field,origin:'local'});
 
 test('wavelength and core mesh size drive the submitted solver document',()=>{
  for(const [wavelength,coreMesh] of [[1400,20],[1512.5,33.3],[1700,60]]){
-  const d=opticalDocument(model({wavelength,coreMesh}),setup());
-  assert.equal(d.physics.em1.wavelength,wavelength/1000);
-  assert.equal(d.geometry.shapes[0].mesh_size,coreMesh/1000);assert.equal(d.mesh.grading.near,coreMesh/1000);
-  assert.equal(d.physics.em1.num_modes,2);assert.equal(d.mesh.grading.far,0.16);assert.deepEqual(d.geometry.domain,{xmin:-1.5,xmax:1.5,ymin:-1.2,ymax:1.2});
+  const d=opticalDocument(model({wavelength,coreMesh}),setup());          // quantity strings, as typed
+  assert.equal(d.physics.em1.vacuum_wavelength,wavelength+' nm');
+  assert.equal(d.geometry.shapes[0].element_size,coreMesh+' nm');assert.equal(d.mesh.grading.near,coreMesh+' nm');
+  assert.equal(d.physics.em1.mode_count,2);assert.equal(d.mesh.grading.far,'160 nm');assert.equal(d.mesh.element_size,'250 nm');
+  assert.equal(d.mesh.grading.refinement_distance,'1000 nm');assert.deepEqual(d.geometry.domain,{xmin:-1500,xmax:1500,ymin:-1200,ymax:1200});
  }
  const legacy=opticalDocument({width:500,height:220,electric:false,heat:false,structure:false,optics:true},setup());
- assert.equal(legacy.physics.em1.wavelength,1.55);assert.equal(legacy.geometry.shapes[0].mesh_size,0.03);
+ assert.equal(legacy.physics.em1.vacuum_wavelength,'1550 nm');assert.equal(legacy.geometry.shapes[0].element_size,'30 nm');
  for(const [w,m] of [[1399,30],[1701,30],[1550,19],[1550,61],[NaN,30],[1550,Infinity]])assert.throws(()=>opticalStudy(w,m));
 });
 test('numeric drafts report the editable ranges with units',()=>{
@@ -42,20 +43,18 @@ test('projects carry wavelength and core mesh since version 3; earlier versions 
 });
 test('runs keep the captured wavelength and core mesh; mismatched provenance is rejected',()=>{
  const input=snapshot(model({wavelength:1600,coreMesh:45}),setup()),r=run(input);
- assert.equal(r.settings.adapter,'optical-shapes-v5');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.wavelength_nm,1600);assert.equal(r.settings.core_mesh_nm,45);
- const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,5);
- const restored=parseSession(JSON.stringify(session));assert.equal(restored.runs[0].input.model.wavelength,1600);assert.equal(restored.runs[0].settings.core_mesh_nm,45);
- for(const change of [d=>d.runs[0].settings.wavelength_nm=1550,d=>d.runs[0].settings.core_mesh_nm=30,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){
+ assert.equal(r.settings.adapter,'optical-shapes-v7');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.vacuum_wavelength,'1600 nm');assert.equal(r.settings.core_element_size,'45 nm');
+ const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,6);
+ const restored=parseSession(JSON.stringify(session));assert.equal(restored.runs[0].input.model.wavelength,1600);assert.equal(restored.runs[0].settings.core_element_size,'45 nm');
+ for(const change of [d=>d.runs[0].settings.vacuum_wavelength='1550 nm',d=>d.runs[0].settings.core_element_size='30 nm',d=>d.runs[0].settings.vacuum_wavelength=1600,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){
   const d=JSON.parse(JSON.stringify(session));change(d);assert.throws(()=>parseSession(JSON.stringify(d)));
  }
  const csv=runTableCsv(restored.runs);assert.ok(csv.split('\n')[0].includes('"wavelength_nm","core_mesh_nm"'));assert.ok(csv.includes('"1600","45"'));
 });
-test('results from earlier adapters import at their fixed 1550 nm / 30 nm settings',()=>{
+test('sessions with results of earlier adapters are refused by name (saved before the units and naming batch)',()=>{
  const legacy=snapshot(model(),setup());legacy.version=2;for(const k of ['wavelength','coreMesh','shapes','thermal'])delete legacy.model[k];for(const k of ['wavelength','core_mesh','shapes','thermal_length'])delete legacy.units[k];
- const v2settings={...OPTICAL_SETTINGS,adapter:'optical-rectangle-v2',height_nm:220};
- const session={format:'openphysics-studio-session',version:2,input:legacy,runs:[run(legacy,v2settings)],selected:'abcdef12',comparison:['abcdef12',null]};
- const imported=parseSession(JSON.stringify(session));assert.equal(imported.runs[0].input.model.wavelength,1550);assert.equal(imported.runs[0].input.model.coreMesh,30);assert.equal(imported.runs[0].settings.adapter,'optical-rectangle-v2');
- const v3input=snapshot(model({wavelength:1600}),setup());session.runs=[run(v3input,v2settings)];assert.throws(()=>parseSession(JSON.stringify(session)));
- const v3settings={...OPTICAL_SETTINGS,adapter:'optical-rectangle-v3',height_nm:220,wavelength_nm:1600,core_mesh_nm:25};session.runs=[run(v3input,v3settings)];
- assert.equal(parseSession(JSON.stringify(session)).runs[0].settings.adapter,'optical-rectangle-v3');
+ const v2settings={adapter:'optical-rectangle-v2',height_nm:220,wavelength_nm:1550,core_mesh_nm:30,window_um:[-1.5,1.5,-1.2,1.2],boundary:'PEC',candidates:2,solver_version:'not reported'};
+ const session={format:'openphysics-studio-session',version:2,input:legacy,runs:[{...run(legacy,v2settings),neff:[2.5,1.8]}],selected:'abcdef12',comparison:['abcdef12',null]};
+ assert.throws(()=>parseSession(JSON.stringify(session)),/version 2\) was saved before the units and naming batch/);
+ assert.equal(OPTICAL_SETTINGS.adapter,'optical-shapes-v7');
 });

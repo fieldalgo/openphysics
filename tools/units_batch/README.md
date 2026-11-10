@@ -177,12 +177,69 @@ removed) and the `absent_default` rule above for the 0.2 echoes `body_force_n_m3
 on regions, `heat_source_w_m3` (`0`) of a document that gives none. Its twins are
 `fixtures/v03/mechanics_*.json`.
 
+The em.modes2d commit (C8) sets `em.modes2d` to `layout` and adds the maps
+`em-modes2d-p1-node-centroid-v1` and `em-modes2d-subspace-raw-v1` and the twins
+`fixtures/v03/em_*.json`. The kernel keeps its micrometre frame and exp(+i omega t), so every
+length the result reports is the kernel's micrometre value times 1e-6 (`L1`, the hand-back of
+hazard H11), every area times 1e-12 (`L2`) and every complex value is conjugated (`conj`). It
+adds these closed rules, each implementing a mapping of the phase-2 specification (its section
+and line numbers are cited):
+
+- **alternatives**: an array or summary rule may name a list of new names; exactly one must be
+  present (a value is a tagged array when real and the complex list form when complex, §5.3.4
+  l.1339–1341; `mode_power` is `unnormalized_mode_power` for vector and
+  `unnormalized_mode_field_square_integral` for scalar results, l.1331–1332);
+- **`array`** summary rule (`old_array`, `new_array`, `part` real or imag): the summary leaf is
+  the value object of a saved array, so the old leaf must equal the old array's entry and the
+  new leaf the new array's entry, while the arrays are compared bitwise under their own rule.
+  The summary transforms of l.1733 have no `L2`, and `0.0 - x` cannot give the signed zeros of
+  `np.conj(z) * 1e-12` (§5.3.4 l.1346);
+- **`json`** array rule (`prefix`): `mode_tracking_json` and `open_boundary_json` are compared
+  through the summary rules under that prefix (l.1336, "content keys renamed; values =");
+- **call rules** (`calls`): `d24_material_names` reads the D-24 local material names (`SiO2`,
+  `Si` of `geometry_v1_imprint_rib`) as `oxide` and `silicon` inside recorded physmat
+  `Material` forms (D-24, l.137; conversion rule l.1699; P2-2 l.1766), and `arguments` maps the
+  `n_cladding` argument of `simcase.physics_em_modes2d.solve` on a scalar solve to `None`
+  (D-22, l.135: refused on scalar documents; the kernel passes it to the vector solver only);
+- the VTU-only transform **`imag-conj`** (`np.negative`): an exported imaginary part is minus
+  the old one (§5.4 l.1402); `neg` (`0.0 - x`) differs from a conjugate's sign at a signed zero;
+- **`collection`** `L1`: the PVD timestep of a wavelength sweep is the vacuum wavelength in
+  metres (§5.4 l.1404); other collections compare as written.
+
 The only comparisons that are not bitwise are the three pre-registered ones, each within 4
 ulp: `propagation_loss` against 100 times the old `propagation_loss_db_cm`, `bend_loss`
 against the old `bend_loss_db_90deg`, and `group_index_length_frame` (the group index of the
-nanometre and metre em fixtures only). Each is also to be checked bitwise against its
-defining formula on the new arrays; that check is added with the em commit, which writes the
-formula. `compare.py` refuses any other transform or exception.
+nanometre and metre em fixtures only). A map lists them under `exceptions` by new array name
+or summary path pattern, and these are all of them:
+
+| Map | Where | Pattern | Exception |
+|---|---|---|---|
+| `em-modes2d-p1-node-centroid-v1` | summary | `propagation_loss.values.[].[]` | `propagation_loss` |
+| `em-modes2d-p1-node-centroid-v1` | summary | `bend_loss.values.[].[]` | `bend_loss` |
+| `em-modes2d-subspace-raw-v1` | array | `mean_group_index` | `group_index_length_frame` |
+| `em-modes2d-subspace-raw-v1` | summary | `mean_group_index.values.[].[]` | `group_index_length_frame` |
+
+`group_index_length_frame` applies to the nanometre and metre fixtures only (the old
+`length_units` of the record); on any other document the leaf compares bitwise.
+`tests/simcase/test_units_batch_equivalence.py` checks that the patterns match no other leaf of
+the em corpus and that each exception holds bitwise against its defining formula on the new
+arrays. `compare.py` refuses any other transform or exception.
+
+**Stated deviation: the eight nanometre and metre em fixtures** (`em_length_nm_*`,
+`em_length_m_*`). Their old run post-processed in the document unit (the `galerkin.mode_overlap`
+calls received nanometre or metre nodes) and saved `values` and the edge line integrals in that
+unit; the new run post-processes in the micrometre kernel frame (spec §3.8, l.711–712). They
+stay in the comparison under the rules above and are reported as different. The gated test then
+asserts five substitute checks instead of a P2-1 pass: (i) every mesher, material, kernel-solve,
+eigensolver and tracker call is bitwise equal, old against new; (ii) `node_coordinates` equals
+the recorded micrometre mesher nodes times 1e-6 (l.1749); (iii) every saved array, summary leaf
+(inputs, extent, name, diagnostics and timing aside) and VTU array of the new nanometre and
+metre run equals that of the new run of its micrometre twin (`fiber`, `em_sellmeier_range`,
+`vector_slab`, `vector_fiber_subspace_sweep`; the rib fixtures' Sellmeier coefficients are not
+exactly the micrometre ones, so their physmat inputs differ by one ulp while every output is
+equal); (iv) each twin passes the comparison; (v) every difference from the old run lies in the
+post-processing calls and the outputs that depend on them, a listed set. The founder decides
+how these eight are reported; until then the total reads 79 equal, 8 different.
 
 ## The converter
 

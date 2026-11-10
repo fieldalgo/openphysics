@@ -26,11 +26,13 @@ test('rectangles, circles and polygons are checked against the window, size and 
  assert.deepEqual(S.validateShape(rect('Edge',-1500,-1200,3000,2400)),rect('Edge',-1500,-1200,3000,2400));
 });
 test('touching rectangles reach the solver with identical shared coordinates',()=>{
+ // format 0.3: the design's nanometres as written (geometry.length_unit "nm"), sizes as quantity strings
  const slot=[rect('Left',-300,0,250,220),rect('Right',50,0,250,220),rect('Slot',-50,0,100,220,'Air')];
  const d=opticalDocument(state(slot),setup),[a,b,c]=d.geometry.shapes;
- assert.equal(a.points[1][0],c.points[0][0]);assert.equal(c.points[1][0],b.points[0][0]);assert.equal(a.points[1][0],-0.05);
- assert.equal(c.material,'vacuum');assert.equal(c.mesh_size,undefined);assert.equal(a.mesh_size,.03);
- assert.deepEqual(d.mesh.grading.center,[0,.11]);
+ assert.equal(d.geometry.length_unit,'nm');
+ assert.equal(a.points[1][0],c.points[0][0]);assert.equal(c.points[1][0],b.points[0][0]);assert.equal(a.points[1][0],-50);
+ assert.equal(c.material,'physmat:vacuum');assert.equal(c.element_size,undefined);assert.equal(a.element_size,'30 nm');
+ assert.deepEqual(d.mesh.grading.position,['0 nm','110 nm']);
  assert.notEqual(100.1+200.2,300.3);const decimal=opticalDocument(state([rect('A',100.1,0,200.2,100),rect('B',300.3,0,100,100)]),setup).geometry.shapes;
  assert.equal(decimal[0].points[1][0],decimal[1].points[0][0]);
 });
@@ -52,10 +54,10 @@ test('summaries, overlaps and new shapes stay unique and inside the window',()=>
  const moved=S.duplicateShape(shapes[1],shapes);assert.equal(moved.x,-150);assert.equal(S.duplicateShape(moved,[...shapes,moved]).name,'Rib copy 2');
 });
 test('run tables keep legacy columns for one rectangle and describe every shape',()=>{
- const field={nodes:[[0,0],[1,0],[0,1]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
+ const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
  const single=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},setup);
  const multi=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,shapes:[rect('Slab',-1500,0,3000,90),{name:'Rod',type:'circle',material:'Silicon nitride',cx:0,cy:500,r:150}]},setup);
- const run=(job,input)=>({job,completedAt:'2026-10-27T00:00:00Z',input,settings:opticalSettings(),neff:[2.5,1.8],field,origin:'local'});
+ const run=(job,input)=>({job,completedAt:'2026-10-27T00:00:00Z',input,settings:opticalSettings(),effective_index:[2.5,1.8],field,origin:'local'});
  const rows=runTableCsv([run('aaaaaaa1',single),run('aaaaaaa2',multi)]).trim().split('\n');
  assert.ok(rows[0].includes('"core_width_nm","core_height_nm","wavelength_nm","core_mesh_nm","core_material","shapes"'));
  assert.ok(rows[1].includes('"500","220","1550","30","Silicon","Core: rect Silicon x -250…250, y 0…220 nm"'));
@@ -74,19 +76,20 @@ test('alignment meets reference edges exactly and refuses leaving the window',()
  assert.throws(()=>S.alignShape(rect('Wide',-1500,0,3000,100),'right-of',slot),/outside the window/);
  assert.throws(()=>S.alignShape(slot,'left-of'),/reference/);assert.throws(()=>S.alignShape(slot,'spin',left));
 });
-test('added materials map to physmat, guide only above silica and keep v4 runs honest',async()=>{
+test('added materials map to physmat names, guide only above silica and keep runs to the current adapter',async()=>{
  const {createSession,parseSession}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs');
- const expected={Silicon:'Si','Silicon nitride':'Si3N4',Silica:'SiO2',Air:'vacuum','Sapphire (ordinary)':'Al2O3','Lithium niobate (ordinary)':'LiNbO3','Indium phosphide':'InP','Gallium arsenide':'GaAs','Calcium fluoride':'CaF2','Magnesium fluoride (ordinary)':'MgF2'};
+ const expected={Silicon:'physmat:Si','Silicon nitride':'physmat:Si3N4',Silica:'physmat:SiO2',Air:'physmat:vacuum','Sapphire (ordinary)':'physmat:Al2O3','Lithium niobate (ordinary)':'physmat:LiNbO3','Indium phosphide':'physmat:InP','Gallium arsenide':'physmat:GaAs','Calcium fluoride':'physmat:CaF2','Magnesium fluoride (ordinary)':'physmat:MgF2'};
  assert.deepEqual({...S.SHAPE_MATERIALS},expected);
  for(const [name,id] of Object.entries(expected)){
   const shapes=[rect('Core',-250,0,500,220,name)],block=opticalBlock(state(shapes),setup);
   assert.equal(block==='',S.GUIDING_MATERIALS.includes(name),name);
-  if(!block){const s=opticalDocument(state(shapes),setup).geometry.shapes[0];assert.equal(s.material,id);assert.equal(s.mesh_size,.03);}
+  if(!block){const s=opticalDocument(state(shapes),setup).geometry.shapes[0];assert.equal(s.material,id);assert.equal(s.element_size,'30 nm');}
  }
  assert.deepEqual([...S.GUIDING_MATERIALS].sort(),['Gallium arsenide','Indium phosphide','Lithium niobate (ordinary)','Sapphire (ordinary)','Silicon','Silicon nitride']);
- const field={nodes:[[0,0],[1,0],[0,1]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
- const make=material=>{const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,shapes:[rect('Core',-250,0,500,220,material)]},setup);return {input,run:{job:'abcdef12',completedAt:'2026-10-27T00:00:00Z',input,settings:{...opticalSettings(),adapter:'optical-shapes-v4'},neff:[2,1.8],field,origin:'local'}};};
- const ok=make('Silicon nitride');assert.equal(parseSession(JSON.stringify(createSession(ok.input,[ok.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v4');
- const newer=make('Lithium niobate (ordinary)');assert.throws(()=>createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]));
- newer.run.settings=opticalSettings();assert.equal(parseSession(JSON.stringify(createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v5');
+ const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
+ const make=material=>{const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,shapes:[rect('Core',-250,0,500,220,material)]},setup);return {input,run:{job:'abcdef12',completedAt:'2026-10-27T00:00:00Z',input,settings:{...opticalSettings(),adapter:'optical-shapes-v4'},effective_index:[2,1.8],field,origin:'local'}};};
+ // an earlier adapter's run is refused (its sessions, versions 1-5, are refused by name)
+ const old=make('Silicon nitride');assert.throws(()=>createSession(old.input,[old.run],'abcdef12',['abcdef12',null]),/Unsupported run settings/);
+ const newer=make('Lithium niobate (ordinary)');newer.run.settings=opticalSettings();
+ assert.equal(parseSession(JSON.stringify(createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v7');
 });

@@ -4,11 +4,14 @@
 
 Pre-registered gates (kept as written; every measured value is printed):
 
-Q1  the saved ``mode_power``, ``confinement``, ``field_overlap`` and ``coupling_efficiency``
-    are byte-identical to direct ``galerkin.mode_overlap`` calls on the saved mesh, edges
-    and fields (the recipe of ``simcase.mode_postprocessing``), for scalar and vector results;
-Q2  the saved key set is the former one plus exactly the new keys, PML results gain none
-    (the other mode test modules keep passing unchanged);
+Q1  the saved ``unnormalized_mode_power`` (vector; ``unnormalized_mode_field_square_integral``
+    for scalar results), ``confinement_factor``, ``unnormalized_field_overlap`` and
+    ``coupling_efficiency`` are byte-identical to direct ``galerkin.mode_overlap`` calls in
+    the kernel frame (the micrometre mesh, edges and fields of the solve), converted once:
+    areas x 1e-12 and complex values conjugated (the recipe of ``simcase.mode_postprocessing``;
+    format 0.3 re-registered the frame, units batch C8), for scalar and vector results;
+Q2  the saved key set is the result's plus exactly the post-processing keys, PML results gain
+    none (the other mode test modules keep passing unchanged);
 Q3  a 220 nm SOI slab (materials n = 3.48 / 1.444, as the galerkin mode_overlap tests):
     the film confinement against the quad integral of ``refsol.slab.field_te`` converges
     at order >= 1.8 over mesh sizes 0.04, 0.02, 0.01 um with the finest error <= 1e-3,
@@ -36,41 +39,57 @@ from galerkin.mode_overlap import (confinement_factor, coupling_efficiency, inte
                                    overlap_matrix, scalar_confinement_factor, scalar_coupling_efficiency,
                                    scalar_overlap, scalar_power, vector_field_overlap, vector_power)
 from simcase import Document, DocumentError
-from simcase.runner import build_mesh, micrometre_document, run
+from simcase.runner import _kernel_solve, build_mesh, run
 
 ROOT = Path(__file__).resolve().parents[2]
 N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55
 PAD, HALF_WIDTH = 1.1, 0.05
 SIZES = (0.04, 0.02, 0.01)
 WAIST, CENTER = THICKNESS, (0.0, THICKNESS / 2)
-NEW_KEYS = {"mode_power", "confinement", "field_overlap"}
-COMMON_KEYS = {"nodes", "triangles", "regions", "region_names", "values", "neff", "field_layout",
-               "mesh_length_unit", "length_unit_to_m", "study_parameter"}
-VECTOR_KEYS = {"field_representation", "edges", "vector_transverse", "vector_longitudinal", "vector_electric"}
+POST_KEYS = {"vector": {"unnormalized_mode_power", "confinement_factor", "unnormalized_field_overlap"},
+             "scalar": {"unnormalized_mode_field_square_integral", "confinement_factor", "unnormalized_field_overlap"}}
+COMMON_KEYS = {"node_coordinates", "triangles", "regions", "region_names", "vacuum_wavelength", "effective_index",
+               "field_layout", "study_parameter", "metadata_json"}
+VECTOR_KEYS = {"field_representation", "edges", "unnormalized_electric_field_line_integral",
+               "unnormalized_electric_field_z", "unnormalized_electric_field"}
 
 
 def slab_document(formulation, size, *, unit="um", gaussian=True, lossy=False, modes=1):
-    """The SOI slab along y in a thin strip; lengths in ``unit`` (um or nm)."""
-    f = 1000.0 if unit == "nm" else 1.0
-    d = {"openphysics": "0.2", "name": f"slab {formulation}", "units": {"length": unit},
-         "geometry": {"domain": {"xmin": -HALF_WIDTH * f, "xmax": HALF_WIDTH * f, "ymin": -PAD * f,
-                                 "ymax": (THICKNESS + PAD) * f},
+    """The SOI slab along y in a thin strip; shape numbers in ``unit`` (um or nm), every tagged
+    length in um."""
+    from decimal import Decimal
+    f = Decimal(1000) if unit == "nm" else Decimal(1)
+
+    def n(x):                       # the same length, written exactly in ``unit``
+        return float(Decimal(repr(x)) * f)
+    d = {"openphysics": "0.3", "name": f"slab {formulation}",
+         "geometry": {"length_unit": unit, "depth": None,
+                      "domain": {"xmin": n(-HALF_WIDTH), "xmax": n(HALF_WIDTH), "ymin": n(-PAD),
+                                 "ymax": n(THICKNESS + PAD)},
                       "background": {"material": "clad"},
-                      "shapes": [{"name": "film", "type": "rect", "x": -HALF_WIDTH * f, "y": 0.0,
-                                  "w": 2 * HALF_WIDTH * f, "h": THICKNESS * f, "material": "film"}]},
-         "materials": {"film": {"n": N_FILM, **({"k": 1e-3} if lossy else {})}, "clad": {"n": N_CLAD}},
-         "physics": {"em1": {"type": "em.modes2d", "formulation": formulation, "wavelength": WAVELENGTH * f,
-                             "num_modes": modes,
+                      "shapes": [{"name": "film", "type": "rect", "x": n(-HALF_WIDTH), "y": 0.0,
+                                  "w": n(2 * HALF_WIDTH), "h": n(THICKNESS), "material": "film"}]},
+         "materials": {"film": {"refractive_index": {"n": N_FILM, "k": 1e-3} if lossy else N_FILM},
+                       "clad": {"refractive_index": N_CLAD}},
+         "physics": {"em1": {"type": "em.modes2d", "formulation": formulation, "vacuum_wavelength": "1.55 um",
+                             "mode_count": modes,
                              "boundary": {"left": "pec" if formulation == "vector" else "pmc",
                                           "right": "pec" if formulation == "vector" else "pmc",
                                           "top": "pec", "bottom": "pec"}}},
-         "mesh": {"size": size * f}, "study": {"type": "single"},
+         "mesh": {"element_size": f"{size!r} um"}, "study": {"type": "single"},
          "results": {"plots": False}}
     if formulation == "vector":
-        d["physics"]["em1"]["n_cladding"] = N_CLAD
+        d["physics"]["em1"]["effective_index_threshold"] = N_CLAD
     if gaussian:
-        d["results"]["mode_overlap"] = {"gaussian": {"waist": WAIST * f, "center": [CENTER[0] * f, CENTER[1] * f]}}
+        d["results"]["mode_overlap"] = {"gaussian": {"beam_waist_radius": "0.22 um", "position": ["0 um", "0.11 um"]}}
     return d
+
+
+def kernel_point(doc):
+    """(model, kernel answer) of the document's one solve, in the kernel frame (micrometres,
+    exp(+i omega t)): what the post-processing calls receive."""
+    model = build_mesh(doc)
+    return model, _kernel_solve(model, model.kernel_doc.sole_physics()[1])
 
 
 @pytest.fixture(scope="module")
@@ -120,12 +139,13 @@ def study(request, reference, tmp_path_factory):
         film = result.region_names.index("film")
         gamma_ref = reference["gamma_eps"] if formulation == "vector" else reference["gamma"]
         rows.append({"size": size, "doc": doc, "result": result, "saved": saved, "out": out,
-                     "gamma_err": abs(pp["confinement"][0, 0, film] - gamma_ref),
+                     "gamma_err": abs(pp["confinement_factor"][0, 0, film] - gamma_ref),
                      "eta_err": abs(pp["coupling_efficiency"][0, 0] - reference["eta"]),
-                     "neff_rel": abs(result.neff[0, 0] - reference["n_eff"]) / reference["n_eff"]})
-        print(f"{formulation} slab h={size}: {len(result.mesh_triangles)} triangles, n_eff rel err "
+                     "neff_rel": abs(result.effective_index[0, 0] - reference["n_eff"]) / reference["n_eff"]})
+        power = pp.get("unnormalized_mode_power", pp.get("unnormalized_mode_field_square_integral"))
+        print(f"{formulation} slab h={size}: {len(result.triangles)} triangles, n_eff rel err "
               f"{rows[-1]['neff_rel']:.3e}, |Gamma - ref| {rows[-1]['gamma_err']:.3e}, "
-              f"|eta - ref| {rows[-1]['eta_err']:.3e}, mode_power {pp['mode_power'][0, 0]}")
+              f"|eta - ref| {rows[-1]['eta_err']:.3e}, mode power {power[0, 0]}")
     return formulation, rows
 
 
@@ -135,36 +155,43 @@ def test_q1_saved_values_are_byte_identical_to_galerkin_calls(study):
     formulation, rows = study
     for row in rows:
         saved, doc = row["saved"], row["doc"]
-        mesh = Mesh(saved["nodes"], saved["triangles"], {})
+        model, res = kernel_point(doc)
+        tri = model.kernel_tri
+        mesh = Mesh(tri.nodes, tri.triangles, {})
+        assert (tri.nodes * 1e-6).tobytes() == saved["node_coordinates"].tobytes()
         regions, names = saved["regions"], list(saved["region_names"])
         masks = [regions == r for r in range(len(names))]
-        wavelength = float(doc.sole_physics()[1]["wavelength"])
-        gauss = doc["results"]["mode_overlap"]["gaussian"]
+        wavelength = model.kernel_doc.sole_physics()[1]["wavelength"]       # micrometres
+        gauss = model.kernel_doc["results"]["mode_overlap"]["gaussian"]
         w0, (cx, cy) = gauss["waist"], gauss["center"]
 
         def g(x, y):
             return np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / w0 ** 2)
         if formulation == "scalar":
-            phi = saved["fields"][0].T
+            phi = res["fields"].T
             power = np.array([scalar_power(mesh, p) for p in phi])
             conf = np.array([[scalar_confinement_factor(mesh, p, m) for m in masks] for p in phi])
             overlap = np.array([[scalar_overlap(mesh, a, b) for b in phi] for a in phi])
             eta = np.array([scalar_coupling_efficiency(mesh, p, g(mesh.nodes[:, 0], mesh.nodes[:, 1])) for p in phi])
+            converted = {"unnormalized_mode_field_square_integral": power * 1e-12}
         else:
             space = EdgeSpace(mesh)
+            vf = res["vector_field"]
             assert np.array_equal(space.edges, saved["edges"])
-            et, ez = saved["vector_transverse"][0].T, -1j * saved["vector_longitudinal"][0].T
+            et, ez = vf.transverse.T, -1j * vf.longitudinal.T
             k0 = 2 * np.pi / wavelength
-            eps = build_mesh(doc).eps_per_triangle(wavelength)
-            power = np.array([vector_power(space, et[m], ez[m], saved["neff"][0, m], k0, 1.0) for m in range(len(et))])
+            eps = model.relative_permittivity(1.55e-6)
+            power = np.array([vector_power(space, et[m], ez[m], res["neff"][m], k0, 1.0) for m in range(len(et))])
             conf = np.array([[confinement_factor(space, et[m], ez[m], eps.real, mask) for mask in masks]
                              for m in range(len(et))])
             overlap = overlap_matrix(space, et, ez, "field")
             et_in, ez_in = interpolate_vector_field(space, lambda x, y: np.stack([g(x, y), np.zeros_like(x)], axis=-1))
             assert ez_in is None
             eta = np.array([coupling_efficiency(space, et[m], ez[m], et_in) for m in range(len(et))])
-        for key, direct in (("mode_power", power), ("confinement", conf), ("field_overlap", overlap),
-                            ("coupling_efficiency", eta)):
+            converted = {"unnormalized_mode_power": np.conj(power) * 1e-12}
+        converted.update(confinement_factor=conf, unnormalized_field_overlap=np.conj(overlap) * 1e-12,
+                         coupling_efficiency=eta)
+        for key, direct in converted.items():
             assert saved[key][0].dtype == direct.dtype, key
             assert saved[key][0].tobytes() == direct.tobytes(), key
             assert np.array_equal(row["result"].postprocessing[key][0], direct), key
@@ -175,43 +202,49 @@ def test_q1_saved_values_are_byte_identical_to_galerkin_calls(study):
 def test_q2_saved_keys_gain_exactly_the_new_ones(study):
     formulation, rows = study
     saved = rows[0]["saved"]
-    former = COMMON_KEYS | (VECTOR_KEYS if formulation == "vector" else {"fields"})
-    assert set(saved) == former | NEW_KEYS | {"coupling_efficiency"}
+    former = COMMON_KEYS | (VECTOR_KEYS if formulation == "vector" else {"unnormalized_mode_field"})
+    assert set(saved) == former | POST_KEYS[formulation] | {"coupling_efficiency"}
     summary = json.loads((rows[0]["out"] / "summary.json").read_text(encoding="utf-8"))
     block = summary["mode_postprocessing"]
-    assert set(block) == NEW_KEYS | {"coupling_efficiency", "recipe"}
-    for key in NEW_KEYS | {"coupling_efficiency"}:
+    assert set(block) == POST_KEYS[formulation] | {"coupling_efficiency", "recipe"}
+    for key in POST_KEYS[formulation] | {"coupling_efficiency"}:
         assert "unit" in block[key] and "description" in block[key], key
-    assert block["confinement"]["regions"] == list(saved["region_names"])
-    assert block["coupling_efficiency"]["gaussian"]["waist"] == WAIST
+        assert summary["field_units"][key] == block[key]["unit"], key
+    assert block["confinement_factor"]["regions"] == list(saved["region_names"])
+    # the Gaussian the kernel used, in metres: its micrometre waist times 1e-6
+    assert block["coupling_efficiency"]["gaussian"]["beam_waist_radius"] == {"value": WAIST * 1e-6, "unit": "m"}
+    assert block["coupling_efficiency"]["gaussian"]["position"] == {"unit": "m",
+                                                                     "values": [0.0, CENTER[1] * 1e-6]}
     if formulation == "vector":
-        assert block["mode_power"]["unit"] == "W for amplitudes in V/um (x length_unit_to_m^2 for V/m)"
-        assert np.array_equal(block["mode_power"]["imag"], saved["mode_power"].imag)
+        assert block["unnormalized_mode_power"]["unit"] == "W"
+        assert np.array_equal(block["unnormalized_mode_power"]["im"], saved["unnormalized_mode_power"].imag)
     else:
-        assert block["mode_power"]["unit"] == "um^2" and "imag" not in block["mode_power"]
-    assert summary["field_layout"] == str(saved["field_layout"]) == "em-modes2d-p1-node-centroid-v1"
+        assert block["unnormalized_mode_field_square_integral"]["unit"] == "m^2"
+        assert "im" not in block["unnormalized_mode_field_square_integral"]
+    assert summary["field_layout"] == str(saved["field_layout"]) == "em-modes2d-p1-node-centroid-v2"
     assert summary["normalization"] == "max_centroid_magnitude" if formulation == "vector" else "normalization" not in summary
 
 
 def test_q2_no_gaussian_means_no_coupling_key(tmp_path):
     result = run(Document.from_dict(slab_document("scalar", 0.04, gaussian=False)), verbose=False)
-    assert set(result.postprocessing) == NEW_KEYS
+    assert set(result.postprocessing) == POST_KEYS["scalar"]
     result.save(tmp_path)
     with np.load(tmp_path / "fields.npz", allow_pickle=False) as archive:
-        assert set(archive.files) == COMMON_KEYS | {"fields"} | NEW_KEYS
+        assert set(archive.files) == COMMON_KEYS | {"unnormalized_mode_field"} | POST_KEYS["scalar"]
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert "coupling_efficiency" not in summary["mode_postprocessing"]
 
 
 def test_q2_pml_results_gain_no_keys(tmp_path):
     d = json.loads((ROOT / "examples/simcase/pml_leaky_slab.json").read_text(encoding="utf-8"))
-    d["results"] = {"plots": False, "mode_overlap": {"gaussian": {"waist": 0.22, "center": [0.0, 0.11]}}}
-    d["mesh"]["size"] = 0.1
+    d["results"] = {"plots": False, "mode_overlap": {"gaussian": {"beam_waist_radius": "0.22 um",
+                                                                  "position": ["0 um", "0.11 um"]}}}
+    d["mesh"]["element_size"] = "0.1 um"
     result = run(Document.from_dict(d), verbose=False)
     assert result.postprocessing is None and result.open_boundary is not None
     result.save(tmp_path)
     with np.load(tmp_path / "fields.npz", allow_pickle=False) as archive:
-        assert not (set(archive.files) & (NEW_KEYS | {"coupling_efficiency"}))
+        assert not (set(archive.files) & (POST_KEYS["vector"] | POST_KEYS["scalar"] | {"coupling_efficiency"}))
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert "mode_postprocessing" not in summary
 
@@ -243,26 +276,30 @@ def test_q5_confinement_rows_sum_to_one_and_overlap_diagonal_is_the_mass_norm(st
     formulation, rows = study
     for row in rows:
         pp, saved = row["result"].postprocessing, row["saved"]
-        sums = pp["confinement"].sum(axis=-1)
+        sums = pp["confinement_factor"].sum(axis=-1)
         print(f"Q5 {formulation} h={row['size']}: confinement row sums - 1 = {sums - 1.0}")
         assert np.all(np.abs(sums - 1.0) <= 1e-12), sums
-        diagonal = np.einsum("pmm->pm", pp["field_overlap"])
+        diagonal = np.einsum("pmm->pm", pp["unnormalized_field_overlap"])
         assert np.all(diagonal.imag == 0.0)
         if formulation == "scalar":
-            assert pp["mode_power"].dtype == float
-            assert np.array_equal(diagonal.real, pp["mode_power"])
+            assert pp["unnormalized_mode_field_square_integral"].dtype == float
+            assert np.array_equal(diagonal.real, pp["unnormalized_mode_field_square_integral"])
             continue
-        mesh = Mesh(saved["nodes"], saved["triangles"], {})
-        space = EdgeSpace(mesh)
-        et, ez = saved["vector_transverse"][0, :, 0], -1j * saved["vector_longitudinal"][0, :, 0]
-        assert diagonal[0, 0] == vector_field_overlap(space, et, ez, et, ez)
-        k0, n_eff, p = 2 * np.pi / WAVELENGTH, saved["neff"][0, 0], pp["mode_power"][0, 0]
+        # the mass norm and the power normalization in the kernel frame (micrometres)
+        model, res = kernel_point(row["doc"])
+        space = EdgeSpace(Mesh(model.kernel_tri.nodes, model.kernel_tri.triangles, {}))
+        vf = res["vector_field"]
+        et, ez = vf.transverse[:, 0], -1j * vf.longitudinal[:, 0]
+        kernel_diagonal = vector_field_overlap(space, et, ez, et, ez)
+        assert diagonal[0, 0] == np.conj(kernel_diagonal) * 1e-12
+        k0, n_eff, p = 2 * np.pi / WAVELENGTH, res["neff"][0], np.conj(pp["unnormalized_mode_power"][0, 0])
         assert p.real > 0 and abs(p.imag) <= 1e-12 * p.real, p
-        scale = np.sqrt(p.real)
+        scale = np.sqrt(p.real / 1e-12)                 # the kernel's power, in W for V/um
         unit = vector_power(space, et / scale, ez / scale, n_eff, k0, 1.0)
         print(f"Q5 vector h={row['size']}: Re P after dividing by sqrt(Re P) = {unit.real!r}")
         assert abs(unit.real - 1.0) <= 1e-12, unit
-        # TE slab: E_z ~ 0, so P = beta/(2 omega mu0) int |E_t|^2 = n_eff/(2 Z0) <E, E> (Z0 = c mu0, ohm)
+        # TE slab: E_z ~ 0, so P = beta/(2 omega mu0) int |E_t|^2 = n_eff/(2 Z0) <E, E> (Z0 = c mu0, ohm):
+        # both saved values are SI (W and m^2), so their ratio is in siemens
         ratio = p.real / diagonal[0, 0].real
         expected = n_eff.real / (2 * C_LIGHT * MU_0)
         print(f"Q5 vector h={row['size']}: P/<E,E> = {ratio:.6e} S, n_eff/(2 Z0) = {expected:.6e}")
@@ -271,67 +308,75 @@ def test_q5_confinement_rows_sum_to_one_and_overlap_diagonal_is_the_mass_norm(st
 
 def test_q5_lossy_vector_power_is_complex_and_scalar_power_real(tmp_path):
     result = run(Document.from_dict(slab_document("vector", 0.04, lossy=True)), verbose=False)
-    assert np.iscomplexobj(result.neff) and result.neff[0, 0].imag < 0
-    p = result.postprocessing["mode_power"][0, 0]
-    print(f"lossy vector slab (k = 1e-3): n_eff {result.neff[0, 0]}, mode_power {p}")
+    assert np.iscomplexobj(result.effective_index) and result.effective_index[0, 0].imag > 0
+    p = result.postprocessing["unnormalized_mode_power"][0, 0]
+    print(f"lossy vector slab (k = 1e-3): n_eff {result.effective_index[0, 0]}, mode power {p}")
     assert p.dtype == complex and p.real > 0 and p.imag != 0.0
     result.save(tmp_path)
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
-    assert summary["mode_postprocessing"]["mode_power"]["imag"][0][0] == p.imag
+    assert summary["mode_postprocessing"]["unnormalized_mode_power"]["im"][0][0] == p.imag
     scalar = run(Document.from_dict(slab_document("scalar", 0.04, lossy=True)), verbose=False)
-    assert np.iscomplexobj(scalar.fields[0])
-    assert scalar.postprocessing["mode_power"].dtype == float
-    assert scalar.postprocessing["field_overlap"].dtype == complex
+    assert np.iscomplexobj(scalar.mode_fields[0])
+    assert scalar.postprocessing["unnormalized_mode_field_square_integral"].dtype == float
+    assert scalar.postprocessing["unnormalized_field_overlap"].dtype == complex
 
 
-def test_unit_statement_holds_for_a_nanometre_document():
-    """The same slab in nm: dimensionless values equal, powers and overlaps scale with the unit."""
-    um = run(Document.from_dict(slab_document("vector", 0.04)), verbose=False).postprocessing
-    nm = run(Document.from_dict(slab_document("vector", 0.04, unit="nm")), verbose=False).postprocessing
-    assert np.allclose(nm["confinement"], um["confinement"], rtol=0, atol=1e-9)
-    assert np.allclose(nm["coupling_efficiency"], um["coupling_efficiency"], rtol=0, atol=1e-9)
-    # amplitudes in V/nm are 1e3 V/um: W for V/nm = 1e6 W for V/um; (nm)^2 = 1e6 (um)^2
-    assert np.allclose(nm["mode_power"], 1e6 * um["mode_power"], rtol=1e-9)
-    assert np.allclose(nm["field_overlap"], 1e6 * um["field_overlap"], rtol=1e-9)
-    canonical = micrometre_document(Document.from_dict(slab_document("vector", 0.04, unit="nm")))
-    assert canonical["results"]["mode_overlap"]["gaussian"] == {"waist": WAIST, "center": list(CENTER)}
+def test_a_nanometre_document_gives_the_same_values():
+    """The same slab with its shape numbers in nm: every saved value is the same SI double
+    (check P2-5; format 0.2 saved powers and overlaps per document unit squared)."""
+    um = run(Document.from_dict(slab_document("vector", 0.04)), verbose=False)
+    nm = run(Document.from_dict(slab_document("vector", 0.04, unit="nm")), verbose=False)
+    for key, value in um.postprocessing.items():
+        assert nm.postprocessing[key].tobytes() == value.tobytes(), key
+    assert nm.summary()["mode_postprocessing"] == um.summary()["mode_postprocessing"]
 
 
 def test_two_mode_results_have_a_hermitian_overlap_matrix():
     result = run(Document.from_dict(slab_document("scalar", 0.04, modes=2)), verbose=False)
     pp = result.postprocessing
-    assert pp["field_overlap"].shape == (1, 2, 2) and pp["confinement"].shape == (1, 2, 2)
-    o = pp["field_overlap"][0]
-    assert np.allclose(o, o.conj().T)
+    assert pp["unnormalized_field_overlap"].shape == (1, 2, 2) and pp["confinement_factor"].shape == (1, 2, 2)
+    o = pp["unnormalized_field_overlap"][0]
+    assert np.allclose(o, o.conj().T, rtol=1e-5, atol=1e-8 * 1e-12)
     assert abs(o[0, 1]) <= 1e-8 * np.sqrt(o[0, 0].real * o[1, 1].real)   # distinct scalar modes are mass-orthogonal
 
 
 # -- Q6 -----------------------------------------------------------------------------
 
-@pytest.mark.parametrize("spec, message", [
-    ({"gaussian": {"waist": 0.2, "center": [0.0, 0.1]}, "extra": 1}, "unknown key"),
-    ({"gaussian": {"waist": 0.2, "center": [0.0, 0.1], "power": 1}}, "unknown key"),
-    ({"gaussian": {"waist": 0.2}}, "missing"),
-    ({"gaussian": {"waist": 0.0, "center": [0.0, 0.1]}}, "positive finite"),
-    ({"gaussian": {"waist": "0.2", "center": [0.0, 0.1]}}, "positive finite"),
-    ({"gaussian": {"waist": True, "center": [0.0, 0.1]}}, "positive finite"),
-    ({"gaussian": {"waist": 0.2, "center": [0.0]}}, r"\[x, y\]"),
-    ({"gaussian": {"waist": 0.2, "center": [0.0, float("nan")]}}, r"\[x, y\]"),
-    ({"gaussian": {"waist": 0.2, "center": [0.0, 5.0]}}, "outside the geometry window"),
-    ({"gaussian": {"waist": 0.2, "center": [-0.0501, 0.1]}}, "outside the geometry window"),
-    ({"gaussian": [0.2, 0.0, 0.1]}, "must be an object"),
-    ({"lorentzian": {"waist": 0.2}}, "unknown key"),
-    ({}, "needs 'gaussian'"),
-    ([], "must be an object"),
+GAUSSIAN = {"beam_waist_radius": "0.2 um", "position": ["0 um", "0.1 um"]}
+
+
+@pytest.mark.parametrize("spec, code, path", [
+    ({"gaussian": GAUSSIAN, "extra": 1}, "E-KEY-UNKNOWN", "results.mode_overlap.extra"),
+    ({"gaussian": {**GAUSSIAN, "power": 1}}, "E-KEY-UNKNOWN", "results.mode_overlap.gaussian.power"),
+    ({"gaussian": {"beam_waist_radius": "0.2 um"}}, "E-KEY-MISSING", "results.mode_overlap.gaussian.position"),
+    ({"gaussian": {**GAUSSIAN, "beam_waist_radius": "0 um"}}, "E-DOMAIN",
+     "results.mode_overlap.gaussian.beam_waist_radius"),
+    ({"gaussian": {**GAUSSIAN, "beam_waist_radius": 0.2}}, "E-UNIT-MISSING",
+     "results.mode_overlap.gaussian.beam_waist_radius"),
+    ({"gaussian": {**GAUSSIAN, "beam_waist_radius": True}}, "E-VALUE-FORM",
+     "results.mode_overlap.gaussian.beam_waist_radius"),
+    ({"gaussian": {**GAUSSIAN, "waist": "0.2 um"}}, "E-KEY-UNKNOWN", "results.mode_overlap.gaussian.waist"),
+    ({"gaussian": {**GAUSSIAN, "position": ["0 um"]}}, "E-VALUE-FORM", "results.mode_overlap.gaussian.position"),
+    ({"gaussian": {**GAUSSIAN, "position": ["0 um", "5 um"]}}, "E-CONTRACT",
+     "results.mode_overlap.gaussian.position"),
+    ({"gaussian": {**GAUSSIAN, "position": ["-0.0501 um", "0.1 um"]}}, "E-CONTRACT",
+     "results.mode_overlap.gaussian.position"),
+    ({"gaussian": [0.2, 0.0, 0.1]}, "E-VALUE-FORM", "results.mode_overlap.gaussian"),
+    ({"lorentzian": GAUSSIAN}, "E-KEY-UNKNOWN", "results.mode_overlap.lorentzian"),
+    ({}, "E-KEY-MISSING", "results.mode_overlap.gaussian"),
+    ([], "E-VALUE-FORM", "results.mode_overlap"),
 ])
-def test_q6_schema_refusals(spec, message):
+def test_q6_schema_refusals(spec, code, path):
     d = slab_document("scalar", 0.04, gaussian=False)
     d["results"]["mode_overlap"] = spec
-    with pytest.raises(DocumentError, match=message):
+    with pytest.raises(DocumentError) as caught:
         Document.from_dict(d)
+    found = [(x.code, x.path) for x in caught.value.diagnostics] or [(caught.value.code, caught.value.path)]
+    assert (code, path) in found, found
 
 
 def test_q6_window_edges_are_inside():
     d = slab_document("scalar", 0.04, gaussian=False)
-    d["results"]["mode_overlap"] = {"gaussian": {"waist": 0.2, "center": [HALF_WIDTH, -PAD]}}
+    d["results"]["mode_overlap"] = {"gaussian": {"beam_waist_radius": "0.2 um",
+                                                 "position": [f"{HALF_WIDTH!r} um", f"{-PAD!r} um"]}}
     Document.from_dict(d)

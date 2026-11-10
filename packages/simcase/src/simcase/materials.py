@@ -133,10 +133,12 @@ def check_record_model(model: dict, path: str) -> list[Diagnostic]:
 
     Each value was converted on its own already (the reader also checks that a
     ``valid.vacuum_wavelength`` range has ``lo < hi``, or ``null`` for an open lower bound);
-    here: one wavelength form per Sellmeier term."""
+    here: at least one Sellmeier term, and one wavelength form per term."""
     found = []
     if model.get("model") == "rii_formula":
         return found
+    if model.get("terms") == []:                 # format 0.2 refused an empty B and C too
+        found.append(Diagnostic("E-DOMAIN", f"{path}.terms", "a Sellmeier model needs at least one term"))
     for i, term in enumerate(model.get("terms") or []):
         if not isinstance(term, dict):
             continue

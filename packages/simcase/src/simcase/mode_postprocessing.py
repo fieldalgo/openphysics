@@ -3,56 +3,59 @@
 
 """Mode power, confinement, overlaps and Gaussian coupling saved with ``em.modes2d`` results.
 
-Every number here is a direct call of ``galerkin.mode_overlap`` on the arrays
-that ``RunResult.save`` writes to ``fields.npz``, so a reader can recompute it
-from the archive alone (tests/simcase/test_modes_postprocessing.py checks that
-the saved values are byte-identical to those calls). The recipe, per study point:
+This module runs in the kernel frame (micrometres, exp(+i omega t)): every number is a direct
+call of ``galerkin.mode_overlap`` on the kernel's mesh and fields, and ``runner._to_public``
+converts the results to SI under exp(-i omega t) once (areas times 1e-12, complex values
+conjugated). A reader can recompute them from ``fields.npz`` alone, after taking the saved
+arrays back to the kernel frame (tests/simcase/test_modes_postprocessing.py checks that the
+saved values are those calls, converted once). The recipe, per study point ``p``:
 
-    mesh  = galerkin.Mesh(nodes, triangles, {})          nodes in the document length unit
+    nodes = node_coordinates / 1e-6                       the kernel's micrometre mesh
+    mesh  = galerkin.Mesh(nodes, triangles, {})
     space = galerkin.EdgeSpace(mesh)                      its edges equal the saved ``edges``
-    et    = vector_transverse[p, :, m]                    line integrals of E_t in the document unit
-    ez    = -1j * vector_longitudinal[p, :, m]            E_z = 1j * ez, the solve_modes gauge
-    k0    = 2 * pi / wavelength                           wavelength in the document unit (um -> 1/um)
+    et    = conj(unnormalized_electric_field_line_integral[p, :, m]) / 1e-6   (line integrals in um)
+    ez    = -1j * conj(unnormalized_electric_field_z[p, :, m])                E_z = 1j * ez, the solve_modes gauge
+    neff  = conj(effective_index[p, m])
+    k0    = 2 * pi / wavelength                           the kernel's wavelength in um (1/um)
 
-vector results
-    mode_power[p, m]          = vector_power(space, et, ez, neff[p, m], k0, mu_r=1)
+vector results (kernel names; saved as)
+    mode_power[p, m]          = vector_power(space, et, ez, neff, k0, mu_r=1)
+                                -> unnormalized_mode_power = conj(mode_power) * 1e-12
     confinement[p, m, r]      = confinement_factor(space, et, ez, Re eps_r(triangles, wavelength), regions == r)
+                                -> confinement_factor
     field_overlap[p]          = overlap_matrix(space, et of all modes, ez of all modes, "field")
+                                -> unnormalized_field_overlap = conj(field_overlap) * 1e-12
     coupling_efficiency[p, m] = coupling_efficiency(space, et, ez, et_gauss) with
                                 et_gauss, _ = interpolate_vector_field(space, x-polarised Gaussian)
-scalar results (``fields[p, :, m]`` = phi)
+scalar results (phi = conj(unnormalized_mode_field[p, :, m]))
     mode_power[p, m]          = scalar_power(mesh, phi)
+                                -> unnormalized_mode_field_square_integral = mode_power * 1e-12
     confinement[p, m, r]      = scalar_confinement_factor(mesh, phi, regions == r)
     field_overlap[p, a, b]    = scalar_overlap(mesh, phi_a, phi_b)
+                                -> unnormalized_field_overlap = conj(field_overlap) * 1e-12
     coupling_efficiency[p, m] = scalar_coupling_efficiency(mesh, phi, Gaussian at the nodes)
 
-Units. The saved fields are relative: the largest centroid |E| (vector) or the
-nodal peak (scalar) is 1, in no physical unit. Read the vector amplitudes as
-volts per document length unit (V/um for a micrometre document): then
-``mode_power`` is the complex Poynting integral P = 1/2 int (E x H^*) . zhat dA
-of that field in watts, Re P the time-averaged power carried in +z. Read them
-as V/m instead and the power in watts is ``mode_power * length_unit_to_m**2``.
-Dividing a saved mode by ``sqrt(Re mode_power)`` gives a field that carries 1 W
-(amplitudes in V per document unit). The imaginary part is reactive and is
-roundoff for a lossless mode; a lossy mode (complex ``neff``) has a nonzero
-imaginary part and its modes are not power-orthogonal. The scalar
-``mode_power`` is int |phi|^2 dA in (document unit)^2 of the relative field.
-``field_overlap`` carries (document unit)^2 too: its diagonal is int |E|^2 dA,
-the mass norm, which for scalar results equals ``mode_power`` exactly.
-``confinement`` (energy fraction Re eps_r |E|^2 per region, plain |phi|^2 for
-scalar results) and ``coupling_efficiency`` are dimensionless; the rows of
-``confinement`` sum to 1 because the regions tile the window.
+Units. The saved fields are relative: the largest centroid |E| (vector) or the nodal peak
+(scalar) is 1, in no physical unit. Read the vector amplitudes as V/m: then
+``unnormalized_mode_power`` is the complex Poynting integral P = 1/2 int (E x H^*) . zhat dA of
+that field in watts, Re P the time-averaged power carried in +z; dividing a saved mode by
+``sqrt(Re P)`` gives a field that carries 1 W. The imaginary part is reactive and is roundoff
+for a lossless mode; a lossy mode (complex ``effective_index``) has a nonzero imaginary part and
+its modes are not power-orthogonal. ``unnormalized_mode_field_square_integral`` is int |phi|^2
+dA in m^2; ``unnormalized_field_overlap`` is in m^2 too, its diagonal the mass norm int |E|^2
+dA (for scalar results equal to the square integral). ``confinement_factor`` (energy fraction
+Re eps_r |E|^2 per region, plain |phi|^2 for scalar results) and ``coupling_efficiency`` are
+dimensionless; the rows of ``confinement_factor`` sum to 1 because the regions tile the window.
 
-The Gaussian input is E(x, y) = exp(-((x - cx)^2 + (y - cy)^2) / w0^2) with
-``waist`` w0 the 1/e field radius and ``center`` (cx, cy) in the document unit;
-it is x-polarised for vector results (compared with E_t of each mode alone) and
-a scalar amplitude for scalar results.
+The Gaussian input is E(x, y) = exp(-((x - x0)^2 + (y - y0)^2) / w^2) with the document's
+``beam_waist_radius`` w (the 1/e field radius) and ``position`` (x0, y0), handed to this module
+in micrometres as ``waist`` and ``center``; it is x-polarised for vector results (compared with
+E_t of each mode alone) and a scalar amplitude for scalar results.
 
-Not computed: PML results (the saved transverse coefficients are covariant
-integrals in complex-stretched coordinates, so the lossless Poynting formula
-on the whole window is not the physical power and the window is not the
-physical one) and subspace sweeps (cluster frames, not modes). Those results
-gain no new keys.
+Not computed: PML results (the saved transverse coefficients are covariant integrals in
+complex-stretched coordinates, so the lossless Poynting formula on the whole window is not the
+physical power and the window is not the physical one) and subspace sweeps (cluster frames, not
+modes). Those results gain no post-processing keys.
 """
 
 from __future__ import annotations
@@ -82,10 +85,11 @@ def _finite_number(value) -> bool:
 
 
 def validate_mode_overlap(results: dict, domain: dict, error: type[Exception]) -> None:
-    """``results.mode_overlap`` is absent or ``{"gaussian": {"waist": w0, "center": [x, y]}}``.
+    """``results.mode_overlap`` of the kernel hand-off (micrometres) is absent or
+    ``{"gaussian": {"waist": w0, "center": [x, y]}}``.
 
     Unknown keys at either level are refused, the waist must be a positive finite
-    number and the centre must lie inside the geometry window (document units).
+    number and the centre must lie inside the geometry window.
     """
     if "mode_overlap" not in results:
         return
@@ -110,11 +114,11 @@ def validate_mode_overlap(results: dict, domain: dict, error: type[Exception]) -
         raise error(f"results.mode_overlap.gaussian: missing {missing}")
     if not _finite_number(g["waist"]) or g["waist"] <= 0:
         raise error("results.mode_overlap.gaussian.waist must be a positive finite number (the 1/e field "
-                    "radius, in the document length unit)")
+                    "radius, in micrometres in the kernel hand-off)")
     c = g["center"]
     if not (isinstance(c, list) and len(c) == 2 and all(_finite_number(v) for v in c)):
-        raise error("results.mode_overlap.gaussian.center must be [x, y], two finite numbers in the document "
-                    "length unit")
+        raise error("results.mode_overlap.gaussian.center must be [x, y], two finite numbers in micrometres "
+                    "(the kernel hand-off)")
     if not (domain["xmin"] <= c[0] <= domain["xmax"] and domain["ymin"] <= c[1] <= domain["ymax"]):
         raise error(f"results.mode_overlap.gaussian.center {c} lies outside the geometry window "
                     f"x [{domain['xmin']}, {domain['xmax']}], y [{domain['ymin']}, {domain['ymax']}]")
@@ -150,9 +154,9 @@ def vector_postprocessing(nodes, triangles, edges, transverse, longitudinal, nef
                           regions, num_regions, gaussian: dict | None = None) -> dict:
     """One study point of a vector result (module docstring for the recipe).
 
-    transverse (E, M) and longitudinal (N, M) as ``VectorField`` holds them, in the
-    document length unit; ``wavelength`` in the same unit; ``eps_r`` (T,) complex
-    permittivity (only its real part weights the confinement); ``regions`` (T,)
+    transverse (E, M) and longitudinal (N, M) as the kernel's ``VectorField`` holds them, in
+    micrometres under exp(+i omega t); ``wavelength`` in micrometres; ``eps_r`` (T,) the kernel's
+    complex permittivity (only its real part weights the confinement); ``regions`` (T,)
     indices below ``num_regions``.
     """
     mesh = _mesh(nodes, triangles)
@@ -214,38 +218,50 @@ def stack_points(points: list[dict]) -> dict:
     return {key: np.stack([p[key] for p in points]) for key in points[0]}
 
 
-def summary_block(arrays: dict, *, vector: bool, length_unit: str, region_names: list[str],
-                  gaussian: dict | None) -> dict:
-    """The ``mode_postprocessing`` entry of ``summary.json``: values, unit and description per key."""
-    unit2 = f"{length_unit}^2"
-    power = arrays["mode_power"]
+def _part(values):
+    """Nested lists of doubles; a value that is not finite is null (value objects, spec §5.1)."""
+    a = np.asarray(values)
+    if a.ndim == 0:
+        x = float(a)
+        return x if math.isfinite(x) else None
+    return [_part(v) for v in a]
+
+
+def summary_block(arrays: dict, *, vector: bool, region_names: list[str], gaussian: dict | None) -> dict:
+    """The ``mode_postprocessing`` entry of ``summary.json`` from the public arrays (SI, exp(-i
+    omega t); ``runner._to_public``): value objects with a description each."""
+    from .results_common import TIME_CONVENTION
     out = {
-        "recipe": "galerkin.mode_overlap on the saved nodes (document length unit), triangles, edges and fields "
-                  "with k0 = 2 pi / wavelength; see simcase.mode_postprocessing",
-        "mode_power": {
-            "value": power.real.tolist(),
-            "unit": f"W for amplitudes in V/{length_unit} (x length_unit_to_m^2 for V/m)" if vector else unit2,
-            "description": ("complex Poynting integral 1/2 int (E x H*).z dA of the saved relative field (max "
-                            "centroid |E| = 1); Re is the +z time-averaged power, Im reactive (roundoff when "
-                            "lossless); divide the field by sqrt(Re mode_power) for 1 W" if vector
-                            else "int |phi|^2 dA of the saved relative field (nodal peak 1)")},
-        "confinement": {
-            "value": arrays["confinement"].tolist(), "regions": list(region_names), "unit": "1",
-            "description": ("energy fraction int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2 per region" if vector
-                            else "fraction int_R |phi|^2 / int |phi|^2 per region") + "; rows sum to 1"},
-        "field_overlap": {
-            "real": arrays["field_overlap"].real.tolist(), "imag": arrays["field_overlap"].imag.tolist(),
-            "unit": unit2,
-            "description": "<E_a, E_b> = int conj(E_a) . E_b dA of the saved fields (Hermitian); the diagonal "
-                           "is the mass norm int |E|^2 dA" + ("" if vector else ", equal to mode_power")},
-    }
+        "recipe": "galerkin.mode_overlap in the kernel frame (the micrometre mesh whose nodes times 1e-6 are "
+                  "node_coordinates, the conjugated saved fields under exp(+i omega t), k0 = 2 pi / wavelength "
+                  "in 1/um), then areas times 1e-12 and complex values conjugated once; on node_coordinates in "
+                  "metres the same calls agree to rounding; see simcase.mode_postprocessing"}
     if vector:
-        out["mode_power"]["imag"] = power.imag.tolist()
+        power = arrays["unnormalized_mode_power"]
+        out["unnormalized_mode_power"] = {
+            "unit": "W", "re": _part(power.real), "im": _part(power.imag), "time_convention": TIME_CONVENTION,
+            "description": "complex Poynting integral 1/2 int (E x H*).z dA of the saved relative field read as "
+                           "V/m (max centroid |E| = 1); Re is the +z time-averaged power, Im reactive (roundoff "
+                           "when lossless); divide the field by sqrt(Re P) for 1 W"}
+    else:
+        out["unnormalized_mode_field_square_integral"] = {
+            "unit": "m^2", "values": _part(arrays["unnormalized_mode_field_square_integral"]),
+            "description": "int |phi|^2 dA of the saved relative field (nodal peak 1)"}
+    overlap = arrays["unnormalized_field_overlap"]
+    out["confinement_factor"] = {
+        "unit": "1", "values": _part(arrays["confinement_factor"]), "regions": list(region_names),
+        "description": ("energy fraction int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2 per region" if vector
+                        else "fraction int_R |phi|^2 / int |phi|^2 per region") + "; rows sum to 1"}
+    out["unnormalized_field_overlap"] = {
+        "unit": "m^2", "re": _part(overlap.real), "im": _part(overlap.imag), "time_convention": TIME_CONVENTION,
+        "description": "<E_a, E_b> = int conj(E_a) . E_b dA of the saved fields (Hermitian); the diagonal is the "
+                       "mass norm int |E|^2 dA" + ("" if vector else ", equal to "
+                                                   "unnormalized_mode_field_square_integral")}
     if gaussian is not None:
         out["coupling_efficiency"] = {
-            "value": arrays["coupling_efficiency"].tolist(), "unit": "1",
-            "gaussian": {"waist": gaussian["waist"], "center": list(gaussian["center"]), "unit": length_unit,
-                         "field": "exp(-((x-cx)^2+(y-cy)^2)/waist^2)" + (", x-polarised" if vector else "")},
+            "unit": "1", "values": _part(arrays["coupling_efficiency"]),
+            "gaussian": {**gaussian, "field": "exp(-((x-x0)^2+(y-y0)^2)/beam_waist_radius^2)"
+                         + (", x-polarised" if vector else "")},
             "description": "|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>) of the Gaussian into each mode"
                            + (" (transverse field only)" if vector else "")}
     return out

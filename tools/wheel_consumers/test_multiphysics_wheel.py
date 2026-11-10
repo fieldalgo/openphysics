@@ -107,6 +107,8 @@ def test_installed_vector_solver_and_complex_serialization(tmp_path):
     neff, _, et, ez = waveguide.solve_modes(mesh, eps, 2 * np.pi / 1.5, 1.45, 2)
     assert len(neff) == 2 and np.isfinite(neff).all()
     assert np.iscomplexobj(et) and np.iscomplexobj(ez)
+    # physics_em_modes2d.solve is the kernel (micrometres, exp(+i omega t)); RunResult holds SI under
+    # exp(-i omega t), so the kernel values enter it as simcase's _to_public writes them
     point = solve(mesh, eps, 1.5, {"outer": "pec"}, 2, "vector", 1.44)
     original = point["vector_field"]
     assert original.electric.shape[1] == 2
@@ -118,29 +120,34 @@ def test_installed_vector_solver_and_complex_serialization(tmp_path):
     for array in (field.transverse, field.longitudinal, field.electric):
         assert np.iscomplexobj(array) and np.max(np.abs(array.imag)) > 1e-12
     doc_data = copy.deepcopy(examples.VECTOR_FIBER)
-    doc_data["physics"]["em1"].update(wavelength=1.5, num_modes=2)
+    doc_data["physics"]["em1"].update(vacuum_wavelength="1.5 um", mode_count=2)
     doc_data.setdefault("results", {}).update(plots=False, save_fields=True)
     doc = Document.from_dict(doc_data)
     names = ["core_region", "clad_region", "outer_region"]
     material_names = dict(zip(names, ["core", "clad", "clad"]))
-    result = RunResult(doc, mesh.nodes, mesh.triangles, mesh.regions, names,
-                       material_names, None, [1.5], point["neff"][None, :], [],
-                       vector_fields=[field])
+    public = VectorField(field.edges, np.conj(field.transverse) * 1e-6, np.conj(field.longitudinal),
+                         np.conj(field.electric), field.normalization)
+    result = RunResult(doc, mesh.nodes * 1e-6, mesh.triangles, mesh.regions, names,
+                       material_names, None, np.array([1.5e-6]), np.conj(point["neff"])[None, :], [],
+                       vector_fields=[public])
     output = result.save(tmp_path / "complex-vector")
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
-        for key, expected in (("vector_transverse", field.transverse),
-                              ("vector_longitudinal", field.longitudinal),
-                              ("vector_electric", field.electric)):
+        assert str(arrays["field_layout"]) == "em-modes2d-p1-node-centroid-v2"
+        for key, expected in (("unnormalized_electric_field_line_integral", public.transverse),
+                              ("unnormalized_electric_field_z", public.longitudinal),
+                              ("unnormalized_electric_field", public.electric)):
             assert arrays[key].dtype.kind == "c" and not arrays[key].dtype.hasobject
             np.testing.assert_array_equal(arrays[key][0], expected)
-        space = EdgeSpace(mesh)
+        space = EdgeSpace(mesh)                                   # the micrometre mesh: line integrals / 1e-6
         for j in range(2):
-            np.testing.assert_allclose(eval_edge_field(space, arrays["vector_transverse"][0, :, j]),
-                                       arrays["vector_electric"][0, :, j, :2], atol=1e-13)
-        np.testing.assert_allclose(arrays["vector_longitudinal"][0][mesh.triangles].mean(axis=1),
-                                   arrays["vector_electric"][0, :, :, 2], atol=1e-13)
-    payload = json.loads(json.dumps(field.to_dict()))
+            np.testing.assert_allclose(
+                eval_edge_field(space, arrays["unnormalized_electric_field_line_integral"][0, :, j] / 1e-6),
+                arrays["unnormalized_electric_field"][0, :, j, :2], atol=1e-13)
+        np.testing.assert_allclose(arrays["unnormalized_electric_field_z"][0][mesh.triangles].mean(axis=1),
+                                   arrays["unnormalized_electric_field"][0, :, :, 2], atol=1e-13)
+    payload = json.loads(json.dumps(public.to_dict()))
+    assert payload["components"] == ["x", "y", "z"] and payload["time_convention"] == "exp(-i omega t)"
     decoded = np.array(payload["real"]) + 1j * np.array(payload["imag"])
-    np.testing.assert_array_equal(decoded.transpose(1, 0, 2), field.electric)
+    np.testing.assert_array_equal(decoded.transpose(1, 0, 2), public.electric)
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
-    assert summary["field_representation"] == "vector-edge-nodal-v1"
+    assert summary["field_representation"] == "vector-edge-nodal-v2"

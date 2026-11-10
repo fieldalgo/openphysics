@@ -15,26 +15,26 @@ python -m simcase run fiber_pair.json -o fiber_pair_results
 ```
 
 ```json
-"study": {"type": "sweep", "parameter": "physics.em1.wavelength",
-          "values": [1.5, 1.525, 1.55, 1.575, 1.6],
+"study": {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
+          "values": {"unit": "um", "values": [1.5, 1.525, 1.55, 1.575, 1.6]},
           "tracking": {"method": "electric-l2-subspace-v1",
-                       "cluster_span_max": 1e-4, "external_gap_min": 1e-3}}
+                       "cluster_span_tolerance": 1e-4, "cluster_gap_threshold": 1e-3}}
 ```
 
 The sweep rules of the default tracker still apply: one vector physics entry,
 at least three finite positive strictly monotone wavelengths, a fixed mesh and
-a conservative `n_cladding` over the whole interval.
+a conservative `effective_index_threshold` over the whole interval.
 
 ## Settings
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `method` | `electric-l2-assignment-v1` | `electric-l2-subspace-v1` selects this tracker |
-| `cluster_span_max` | required | Largest absolute n_eff span of one cluster; neighbours closer than this are joined |
-| `external_gap_min` | required | Smallest absolute n_eff gap to every neighbouring candidate; must exceed `cluster_span_max` |
-| `search_modes` | `max(2*num_modes, num_modes+4)` | Guided candidate budget; integer greater than `num_modes` |
-| `min_overlap` | `0.8` | Minimum of the **smallest** squared principal value of each cluster |
-| `min_margin` | `0.1` | Minimum loss of the best alternative complete cluster assignment |
+| `cluster_span_tolerance` | required | Largest absolute n_eff span of one cluster; neighbours closer than this are joined |
+| `cluster_gap_threshold` | required | Smallest absolute n_eff gap to every neighbouring candidate; must exceed `cluster_span_tolerance` |
+| `search_mode_count` | `max(2*mode_count, mode_count+4)` | Guided candidate budget; integer greater than `mode_count` |
+| `mode_tracking_threshold` | `0.8` | Minimum of the **smallest** squared principal value of each cluster |
+| `mode_tracking_margin_threshold` | `0.1` | Minimum loss of the best alternative complete cluster assignment |
 
 The two n_eff thresholds have no default because no value is right for every
 guide, mesh and interval. `degeneracy_tolerance` belongs to the default method
@@ -43,22 +43,22 @@ and is rejected together with this one.
 ## What is tracked
 
 At every wavelength the guided candidates, in descending n_eff, are joined into
-clusters wherever adjacent candidates are at most `cluster_span_max` apart.
-`num_modes` counts **vectors**: the first `num_modes` candidates must consist of
+clusters wherever adjacent candidates are at most `cluster_span_tolerance` apart.
+`mode_count` counts **vectors**: the first `mode_count` candidates must consist of
 complete clusters. A cluster member is never selected alone.
 
 A selected cluster is accepted only if:
 
-- its span is at most `cluster_span_max` (a chain of near neighbours wider than
+- its span is at most `cluster_span_tolerance` (a chain of near neighbours wider than
   that is refused rather than split or merged);
-- its gap to each neighbouring candidate is greater than `external_gap_min`;
+- its gap to each neighbouring candidate is greater than `cluster_gap_threshold`;
 - a **lower guard** candidate is observed below it. Without one the search
   boundary is unresolved and the sweep fails, even when the candidate budget was
   not exhausted. For the example fiber this means the pair must be followed by
   the observed TE01/TM01/HE21 family; a fundamental-only interval is refused.
 
 Each cluster's raw fields `U` are whitened in the electric L2 metric of the
-fixed document mesh, `W = diag(M_edge, M_node)`: with `G = U^H W U`, the frame
+fixed mesh (in the kernel's micrometres), `W = diag(M_edge, M_node)`: with `G = U^H W U`, the frame
 `Q = U G^(-1/2)` satisfies `Q^H W Q = I`. A rank-deficient or ill-conditioned
 Gram matrix (condition number above 1e6) fails; there is no pseudoinverse
 (see [Numerical guards](#numerical-guards)).
@@ -66,7 +66,7 @@ Gram matrix (condition number above 1e6) fails; there is no pseudoinverse
 Against the previous frame `P`, the cross Gram `P^H W Q = L diag(sigma) V^H`
 gives cosines of the principal angles. Equal-rank clusters are matched by a
 global one-to-one assignment maximizing the mean of `sigma^2` per cluster.
-A match must keep its smallest `sigma^2` at least `min_overlap`, so one lost
+A match must keep its smallest `sigma^2` at least `mode_tracking_threshold`, so one lost
 direction fails even when the mean is high. For every match the margin is the
 score lost by the best complete assignment that excludes it (`null` when none
 exists). A cluster that loses or gains a member, merges with a neighbour or
@@ -84,14 +84,14 @@ default tracker's squared normalized overlap and `R` is its phase factor.
 
 | Object | Access | Meaning |
 |---|---|---|
-| Raw eigenpairs | `neff`, `vector_fields` | Solver eigenfields with the usual max-centroid normalization; columns in seed cluster order, members by descending n_eff **at each point**. Member columns are not branch identities. |
+| Raw eigenpairs | `effective_index`, `vector_fields` | Solver eigenfields (SI, exp(−iωt)) with the usual max-centroid normalization; columns in seed cluster order, members by descending n_eff **at each point**. Member columns are not branch identities. |
 | Clusters | `cluster_ids`, `cluster_ranks`, `cluster_offsets` | Constant ranks and column ranges |
-| Transport frames | `frame_transforms`, `frame_fields(i)` | Block-diagonal `T` with `frame = raw @ T`; electric-L2-orthonormal in document length coordinates. **Not eigenmodes.** |
+| Transport frames | `frame_transforms`, `frame_fields(i)` | Block-diagonal `T` with `frame = raw @ T`; electric-L2-orthonormal on the kernel's micrometre mesh. **Not eigenmodes.** |
 
 Cluster quantities:
 
-- `cluster_mean_index()`: mean raw n_eff per cluster, shape (points, clusters).
-- `cluster_mean_group_index()`: `n_bar - lambda * d(n_bar)/d(lambda)` with the
+- `mean_effective_index`: mean raw n_eff per cluster, shape (points, clusters).
+- `mean_group_index`: `n_bar - lambda * d(n_bar)/d(lambda)` with the
   same second-order differences as the default tracker. This is the derivative
   of the cluster mean index; it is not the group index of any frame column and
   not a power-weighted average. For rank one it is the ordinary group index
@@ -101,34 +101,36 @@ Cluster quantities:
   centroids, divided by its maximum. It is invariant under unitary changes of
   frame. It is not electromagnetic energy density or a polarized mode.
 
-`summary.json` uses `field_representation="vector-subspace-edge-nodal-v1"` and
-contains `clusters`, `raw_neff`, `cluster_mean_neff`, `cluster_mean_group_index`
-and `mode_tracking`. Per point and cluster, tracking evidence records candidate
+`summary.json` uses `field_representation="vector-subspace-edge-nodal-v2"` and
+contains `clusters`, `effective_index` (the raw columns), `mean_effective_index`,
+`mean_group_index` and `mode_tracking` (settings under the names above;
+`minimum_principal_squared` is the one renamed evidence key). Per point and cluster, tracking evidence records candidate
 ranks, span, upper/lower gaps, guard rank, Gram condition, orthonormality defect
 of the committed frame,
 all squared principal values, the score, margin and the sine of the largest
-angle. There is no `neff` or `group_index` key, so a consumer of the default
+angle. There is no `group_index` key, so a consumer of the default
 layout cannot misread raw member columns as branches.
 
-`fields.npz` (loadable with `allow_pickle=False`) contains the mesh,
-`values`, `cluster_ids`, `cluster_offsets`, `raw_neff`, `edges`,
-`raw_transverse`, `raw_longitudinal`, `raw_electric`, `frame_transform`
-(points x vectors x vectors, complex), `cluster_mean_neff`,
-`cluster_mean_group_index` and `mode_tracking_json`. `save_fields=false` omits
+`fields.npz` (loadable with `allow_pickle=False`) contains the mesh
+(`node_coordinates` in metres), `vacuum_wavelength` (m), `cluster_ids`, `cluster_offsets`,
+`effective_index` (the raw columns), `edges`, `unnormalized_electric_field_line_integral` (m),
+`unnormalized_electric_field_z`, `unnormalized_electric_field`, `frame_transform`
+(points x vectors x vectors, complex), `mean_effective_index`,
+`mean_group_index` and `mode_tracking_json`. `save_fields=false` omits
 the file. `save` and the CLI refuse an existing output path so new metadata is
 never mixed with fields from an earlier run. Both files record the layout
-`field_layout="em-modes2d-subspace-raw-v1"` with `mesh_length_unit` and
-`length_unit_to_m`; `simcase.export` refuses this layout, because raw member
-columns are not tracked modes, and their VTU export is deferred. Read the
-`raw_*` arrays and `frame_transform` from `fields.npz` instead. For the same
+`field_layout="em-modes2d-subspace-raw-v2"`; `simcase.export` refuses this layout, because raw member
+columns are not tracked modes, and their VTU export is deferred (the format 0.2 layout
+`em-modes2d-subspace-raw-v1` is refused by name). Read the
+raw field arrays and `frame_transform` from `fields.npz` instead. For the same
 reason a subspace sweep saves none of the per-mode
-`mode_power`/`confinement`/`field_overlap`/`coupling_efficiency` arrays of
+`unnormalized_mode_power`/`confinement_factor`/`unnormalized_field_overlap`/`coupling_efficiency` arrays of
 [tracked results](overview.md#mode-post-processing): frame columns are
 arbitrary unitary mixtures within a cluster.
 
-`simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
-boundary, neff, field)` evaluates each column as an eigenpair of the original
-vector pencil, with the same wavelength scaling and PEC constraints as the
+The kernel-frame `simcase.physics_em_modes2d.vector_pencil_residuals(mesh, eps_tri, wavelength,
+boundary, neff, field)` (micrometres, exp(+iωt), kernel fields) evaluates each column as an
+eigenpair of the original vector pencil, with the same wavelength scaling and PEC constraints as the
 solve. Raw columns are eigenpairs to roundoff (about 1e-14 on the example).
 A frame column that mixes members with different n_eff is not: its residual is
 about the members' relative eigenvalue spread, for example 2e-6 inside the
@@ -203,7 +205,8 @@ band, mean, mean-index derivative and the smallest squared principal value at
 the selected wavelength. The sweep chart plots cluster mean n_eff. The table
 lists the mean n_eff, band width and mean-index n_g per cluster; no member group
 index is shown. The HTTP result carries a separate `subspace` object with
-`field_representation="vector-subspace-edge-nodal-v1"`; `neff` and
+`field_representation="vector-subspace-edge-nodal-v2"`, `effective_index`,
+`mean_effective_index`, `mean_group_index` and `density`; the top-level `effective_index` and
 `group_index` are null, so the branch views cannot display it. The page refuses
 any other layout version, and a failed run clears the previous display.
 
@@ -220,11 +223,14 @@ any other layout version, and a failed run clears the previous display.
   the domain to 8a or 10a changed the result by 1e-11. Halving or doubling the
   wavelength step changed it exactly as the analytic stencil truncation
   predicts (about 1e-7). A larger candidate budget and random rotations of the
-  solver's degenerate bases changed nothing beyond roundoff. Writing the
-  same fixture's coordinates and wavelengths in nm or m instead of um changed
-  the result by about 1e-13. The example document written in nm or m agrees
-  with the um document to 5e-8; its mesh differs slightly, because the
-  mesher's refinement rounds differently at another scale. The FEM HE11
+  solver's degenerate bases changed nothing beyond roundoff. In format 0.2,
+  writing the same fixture's coordinates and wavelengths in nm or m instead of
+  um changed the result by about 1e-13, and the example document written in nm
+  or m agreed with the um document to 5e-8 on a slightly different mesh. In
+  format 0.3 every length reaches the kernel as `float(exact × 10⁶)`, so the example
+  written in nm or m with the same decimals gives the um document's mesh, raw
+  fields, frames and tracking evidence bit for bit
+  (`tests/simcase/test_length_canonical.py`). The FEM HE11
   eigenvector span approaches the exact two-polarization field span
   (`refsol.fiber.vector_mode_field`) at first order: sin of the largest
   principal angle 0.097, 0.049 and 0.033 at scales 1 to 3. A dispersive
@@ -239,7 +245,7 @@ any other layout version, and a failed run clears the previous display.
   polarization labels and individual slopes inside a cluster are out of scope.
 - The candidate search is bounded. A guard shows only that something was
   observed below the cluster, not that the spectrum is complete. Repeat with
-  two larger `search_modes` before relying on a cluster identification.
+  two larger `search_mode_count` values before relying on a cluster identification.
 - Sampled overlaps cannot certify behavior between samples; refine the
   wavelength step. Identity is field continuity at the samples. Near an
   avoided crossing between clusters, a coarse step follows the field

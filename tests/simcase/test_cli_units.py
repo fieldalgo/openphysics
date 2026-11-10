@@ -271,6 +271,8 @@ def test_a_retired_layout_is_refused_by_name(tmp_path, monkeypatch):
         with pytest.raises(ValueError, match=r"saved before the units and naming batch \(layout old-layout-v1\); "
                                              "re-create the document in format 0.3 and run it"):
             call()
-    # each retired identifier names the layout that replaced it, which is supported
-    assert set(export.RETIRED_LAYOUTS.values()) - {"old-layout-v2"} <= set(export.SUPPORTED_LAYOUTS)
+    # each retired identifier names the layout that replaced it: supported, or (the raw subspace layout,
+    # whose VTU export is deferred) refused by name with that reason (test_export_modes)
+    assert set(export.RETIRED_LAYOUTS.values()) - {"old-layout-v2"} <= \
+        set(export.SUPPORTED_LAYOUTS) | {"em-modes2d-subspace-raw-v2"}
     assert not set(export.RETIRED_LAYOUTS) & set(export.SUPPORTED_LAYOUTS)
