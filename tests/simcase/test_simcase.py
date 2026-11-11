@@ -343,7 +343,7 @@ def test_document_and_saved_results_display_the_declared_unit(symbol, factor_tex
         assert [ax.get_xlabel() for ax in fig.axes] == [f"x ({symbol})"] * 2
         assert [ax.get_ylabel() for ax in fig.axes] == [f"y ({symbol})"] * 2
         assert f"vacuum_wavelength = {1.55e-6 / per_unit:g} {symbol}:" in fig.axes[1].get_title()
-        assert fig.axes[0].get_xlim()[1] >= 1e-6 / per_unit * (1 - 1e-12)
+        assert fig.axes[0].get_xlim()[1] >= 1e-6 / per_unit
         saved = json.loads((out / "summary.json").read_text(encoding="utf-8"))
         assert "units" not in saved and saved["field_units"]["node_coordinates"] == "m"
         assert saved["study"]["values"] == {"unit": "m", "values": [1.55e-6]}
