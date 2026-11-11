@@ -97,6 +97,7 @@ from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (pub
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
+from .core.spaces import TRI_LOCAL_EDGES
 
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
@@ -182,7 +183,8 @@ def _free_dofs(mesh, space, pec_nodes, pec_edges):
 
 
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
-                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None):
+                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None,
+                motion=None):
     """Guided modes with effective index near n_target.
 
     eps_r, mu_r and k0 may be JAX or PyTorch values; n_eff, et and ez are then
@@ -223,7 +225,15 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     the longitudinal component sits in quadrature with the transverse one; a
     complex combination of degenerate modes need not have that componentwise
     phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
+
+    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 + t*velocity
+    and n_eff, et and ez carry the derivative with respect to the JAX or PyTorch
+    scalar t (a shape derivative; docs/packages/galerkin/shape_derivative.md).
+    Degenerate modes get NaN derivatives and a DegenerateModeWarning, as above.
     """
+    if motion is not None:
+        return _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_nodes, pec_edges,
+                                   coordinate_factors)
     if contains_live(coordinate_factors):
         raise TypeError("coordinate_factors: derivatives with respect to modal coordinates are "
                         "not provided; pass NumPy factors")
@@ -237,7 +247,11 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
 
 def _live_blocks(xp, space, eps_r, mu_r, k0, coordinate_factors):
     """(A, B) of ``assemble_mode_system`` in ``xp`` as coalesced CooMatrix, from ``_mode_blocks``."""
-    blocks = _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors)
+    return _joined_system(xp, _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors), space, k0)
+
+
+def _joined_system(xp, blocks, space, k0):
+    """(A, B) of the mode system from its six blocks, as coalesced CooMatrix in ``xp``."""
     n_e, n_n = space.num_edges, space.mesh.num_nodes
     g = blocks["G"]
     blocks_a = [(blocks["S"], 0, 0, 1.0), (blocks["Mt_eps"], 0, 0, -k0**2)]
@@ -275,7 +289,6 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
     """The NumPy modes with derivatives: a bordered Newton step per mode (module docstring)."""
     leaves = live_inputs.leaves(eps_r, k0, mu_r)
     xp = live_namespace(*leaves)
-    complex_dtype = xp.complex128
     n_e, n_n = space.num_edges, mesh.num_nodes
     free = _free_dofs(mesh, space, pec_nodes, pec_edges)
     position = np.full(n_e + n_n, -1)
@@ -284,6 +297,18 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
     k0_live = lift(xp, k0, xp.float64)
     A, B = (_restricted(m, position, n) for m in _live_blocks(xp, space, eps_r, mu_r, k0_live,
                                                               coordinate_factors))
+    return _refined_modes(xp, A, B, leaves, free, space, k0_live, n_eff0, et0, ez0)
+
+
+def _refined_modes(xp, A, B, leaves, free, space, k0, n_eff0, et0, ez0):
+    """The NumPy modes with the derivatives carried by the live restricted A and B.
+
+    ``leaves`` are the live inputs (for NaN derivatives of degenerate modes); ``k0`` is
+    a number or a live scalar (it divides beta).
+    """
+    complex_dtype = xp.complex128
+    n_e, n_n = space.num_edges, space.mesh.num_nodes
+    k0_live = k0
     A_numbers, B_numbers = eigen.scipy_matrix(A), eigen.scipy_matrix(B)
     real_problem = np.isrealobj(n_eff0)
     k0_number = float(to_numpy(k0_live))
@@ -292,7 +317,7 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
     if degenerate:
         warnings.warn(f"modes {degenerate} belong to degenerate eigenvalues (relative gap <= "
                       f"{DEGENERATE_GAP:g}); their derivatives are NaN", DegenerateModeWarning,
-                      stacklevel=3)
+                      stacklevel=4)
     n_eff, et, ez = [], [], []
     for i in range(len(lam0)):
         beta0 = k0_number * n_eff0[i]
@@ -315,6 +340,70 @@ def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
                  xp.zeros((0, n_e), dtype=complex_dtype), xp.zeros((0, n_n), dtype=complex_dtype))
         return empty[0], space, empty[1], empty[2]
     return xp.stack(n_eff), space, xp.stack(et), xp.stack(ez)
+
+
+_MIDPOINT_LAMBDA = 0.5 * (np.ones((3, 3)) - np.eye(3))     # lambda_i at the edge midpoints q
+
+
+def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_nodes, pec_edges,
+                        coordinate_factors):
+    """``solve_modes`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    The NumPy eigensolve runs on the moved mesh; each mode then takes the bordered
+    Newton step of the live-input path with A(t) and B(t) assembled from the live node
+    coordinates: the same element matrices as galerkin.core.kernels, written in the
+    barycentric gradients and areas of X0 + t W."""
+    from .shape import live_triangle_geometry, motion_step
+
+    if coordinate_factors is not None:
+        raise ValueError("motion: coordinate_factors (PML, bends) depend on node positions and are refused "
+                         "with a motion in this slice")
+    for name, value in (("eps_r", eps_r), ("mu_r", mu_r), ("k0", k0), ("n_target", n_target)):
+        if callable(value):
+            raise TypeError(f"motion: {name} must be a number or a per-element array")
+        if contains_live(value):
+            raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
+    step = motion_step(mesh, motion)
+    xp, t = step.xp, step.t
+    n_eff0, space, et0, ez0 = _solve_modes_numpy(step.moved, eps_r, k0, n_target, num_modes, mu_r, pec_nodes,
+                                                 pec_edges=pec_edges)
+    cells = space.mesh.triangles
+    b, c, area = live_triangle_geometry(xp, mesh, cells, step)
+    g = xp.stack([b, c], axis=2) / (2.0 * area)[:, None, None]                      # (T, 3, 2)
+    signs = lift(xp, np.asarray(space.signs, dtype=float))
+    count = len(cells)
+    eps = np.broadcast_to(np.asarray(eps_r), (count,))
+    inv_mu = np.broadcast_to(1.0 / np.asarray(mu_r), (count,))
+    if not (np.any(np.iscomplex(eps)) or np.any(np.iscomplex(inv_mu))):
+        eps, inv_mu = eps.real, inv_mu.real
+    eps, inv_mu = lift(xp, np.array(eps)), lift(xp, np.array(inv_mu))
+    pairs = list(zip(*TRI_LOCAL_EDGES))
+    curls = xp.stack([2.0 * (g[:, i, 0] * g[:, j, 1] - g[:, i, 1] * g[:, j, 0]) for i, j in zip(*pairs)],
+                     axis=1) * signs
+    lam = _MIDPOINT_LAMBDA
+    W = xp.stack([float(lam[q, i]) * g[:, j, :] - float(lam[q, j]) * g[:, i, :]
+                  for i, j in zip(*pairs) for q in range(3)], axis=1)
+    W = xp.reshape(W, (count, 3, 3, 2)) * signs[:, :, None, None]                   # (T, edge, q, 2)
+    WW = xp.sum(W[:, :, None, :, :] * W[:, None, :, :, :], axis=(3, 4))             # (T, e, f)
+    diff = xp.stack([g[:, j, :] - g[:, i, :] for i, j in zip(*pairs)], axis=1)       # (T, 3, 2)
+    Gd = xp.sum(diff[:, :, None, :] * g[:, None, :, :], axis=3) * signs[:, :, None]  # (T, e, node)
+    bb = b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]
+    p1_mass = lift(xp, (np.ones((3, 3)) + np.eye(3)) / 12.0)
+    te, n_e, n_n = space.tri_edges, space.num_edges, mesh.num_nodes
+    blocks = {
+        "S": forms.matrix(te, te, (inv_mu * area)[:, None, None] * curls[:, :, None] * curls[:, None, :],
+                          (n_e, n_e)),
+        "Mt_eps": forms.matrix(te, te, WW * (eps * area / 3.0)[:, None, None], (n_e, n_e)),
+        "Mt_mu": forms.matrix(te, te, WW * (inv_mu * area / 3.0)[:, None, None], (n_e, n_e)),
+        "G": forms.matrix(te, cells, Gd * (inv_mu * area / 3.0)[:, None, None], (n_e, n_n)),
+        "K": forms.matrix(cells, cells, (inv_mu / (4.0 * area))[:, None, None] * bb, (n_n, n_n)),
+        "M": forms.matrix(cells, cells, (eps * area)[:, None, None] * p1_mass[None], (n_n, n_n)),
+    }
+    free = _free_dofs(step.moved, space, pec_nodes, pec_edges)
+    position = np.full(n_e + n_n, -1)
+    position[free] = np.arange(len(free))
+    A, B = (_restricted(m, position, len(free)) for m in _joined_system(xp, blocks, space, float(k0)))
+    return _refined_modes(xp, A, B, (t,), free, space, float(k0), n_eff0, et0, ez0)
 
 
 def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,

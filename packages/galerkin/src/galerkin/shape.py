@@ -17,7 +17,8 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
 
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
 ``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
-``transient_heat.solve_transient_heat`` (Cartesian),
+``transient_heat.solve_transient_heat`` (Cartesian), ``waveguide.solve_modes``
+(without coordinate factors),
 ``thermoelasticity.solve_thermoelasticity`` and
 ``thermal_mechanical.solve_steady_thermoelasticity`` with scalar or region data and
 constant loads; the refusals are listed in docs/packages/galerkin/shape_derivative.md.
@@ -305,6 +306,36 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, po
     stress = strain @ live.d.T if live.d.ndim == 2 else xp.einsum("tij,tj->ti", live.d, strain)
     return elasticity.ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress, xp.reshape(load, (-1, 2)),
                                        xp.reshape(reaction, (-1, 2)), xp.reshape(residual, (-1, 2)), plane)
+
+
+# ----------------------------------------------------------------------------- public helpers for solver modules
+
+@dataclass(frozen=True)
+class MotionStep:
+    """A checked motion: the live namespace ``xp`` and float64 ``t``, the NumPy velocity and the moved mesh."""
+
+    xp: object
+    t: object
+    velocity: np.ndarray
+    moved: Mesh
+
+
+def motion_step(mesh: Mesh, motion: MeshMotion) -> MotionStep:
+    """Check ``motion`` against ``mesh`` (live float64 t, finite velocity, no inverted element) and move it.
+
+    For solver modules that assemble their own live system on X0 + t W."""
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.velocity)
+    return MotionStep(xp, t, W, _checked_step(mesh, W, t))
+
+
+def live_triangle_geometry(xp, mesh: Mesh, triangles, step: MotionStep):
+    """Live P1 coefficients b, c (T, 3) and positive areas (T,) of ``triangles`` on X0 + t W.
+
+    grad lambda_i = (b_i, c_i) / (2 area); the orientation is taken from the moved mesh."""
+    triangles = np.asarray(triangles, dtype=int)
+    X = lift(xp, mesh.nodes) + step.t * lift(xp, step.velocity)
+    return _live_bc(xp, X, triangles, np.sign(_signed_area(step.moved.nodes, triangles)))
 
 
 # ----------------------------------------------------------------------------- transient heat

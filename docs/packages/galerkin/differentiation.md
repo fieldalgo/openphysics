@@ -39,7 +39,7 @@ numbers at the first time and live values later is refused.
 
 Mesh coordinates, connectivity, boundary tags and region ids are fixed structure;
 derivatives with respect to node positions are not provided, except along a
-design motion of steady heat, steady electric conduction, linear elasticity, thermoelasticity or transient heat (`motion=`,
+design motion of steady heat, steady electric conduction, linear elasticity, thermoelasticity, transient heat or waveguide modes (`motion=`,
 [shape derivatives](shape_derivative.md)). `ElementHeatSource`
 and `ElementConductivity` hold NumPy values. A callback receives NumPy coordinates
 and normals and may return live values; lift the coordinates into the same library
