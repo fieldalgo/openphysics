@@ -841,15 +841,102 @@ def test_p2_11_mechanics_result_names_and_units(tmp_path, kind, name):
     assert not {"displacement_components", "strain_components", "stress_components"} & set(summary)
 
 
+#: the energies' tolerance (relative; no absolute slack)
+REL_ENERGY = 1e-11
+
+
+def _recomputed_physical_energy(doc, fields):
+    """The physical elastic energy per metre of depth (D-30, ``strain_energy_per_depth``) of a
+    plane-stress thermoelastic result, recomputed from its saved arrays (node coordinates,
+    triangles, displacement, nodal temperature) and the document's materials, geometry and
+    stress-free temperature, with the P1 algebra written here (no galerkin or simcase assembly
+    or energy function): the integral of the 3D elastic energy density
+    1/2 (lambda tr(e)^2 + 2 mu e:e) of the elastic strain e = total strain - alpha (T - Tref) in
+    the plane, with e_zz from sigma_zz = 0. The density is quadratic over a triangle (alpha
+    (T - Tref) is linear there), so the edge-midpoint rule integrates it exactly; galerkin uses
+    the reduced 2D form and an interior three-point rule."""
+    assert doc["physics"]["strip"]["plane"] == "stress"
+    materials, physics = doc.si["materials"], doc.si["physics"]["strip"]
+    component = doc["geometry"]["components"]["main"]
+    assert component["length_unit"] == "mm" and component["finalize"] == "later_wins"
+    (feature,) = component["features"]
+    assert feature["type"] == "rect"
+    x, t, u = fields["node_coordinates"], fields["triangles"], fields["displacement"]
+    temperature = fields["temperature"]
+    p = x[t]                                                        # (T, 3, 2), m
+    centroid = p.mean(axis=1)
+    # the document's later-wins rule: the rect's material inside it, the background's elsewhere
+    x0, y0, w, h = (float(feature[k])*1e-3 for k in ("x", "y", "w", "h"))   # mm, as written
+    inside = ((centroid[:, 0] >= x0) & (centroid[:, 0] <= x0 + w) & (centroid[:, 1] >= y0) & (centroid[:, 1] <= y0 + h))
+    for region in np.unique(fields["triangle_regions"]):            # the saved regions agree
+        assert len(set(inside[fields["triangle_regions"] == region])) == 1
+    names = np.where(inside, feature["material"], component["background"]["material"])
+    e = np.array([materials[n]["youngs_modulus"] for n in names])
+    nu = np.array([materials[n]["poisson_ratio"] for n in names])
+    alpha = np.array([materials[n]["linear_expansion_coefficient"] for n in names])
+    # P1 strains (exx, eyy, gamma_xy), constant per triangle
+    xa, ya = p[:, :, 0], p[:, :, 1]
+    b = np.stack([ya[:, 1] - ya[:, 2], ya[:, 2] - ya[:, 0], ya[:, 0] - ya[:, 1]], axis=1)
+    c = np.stack([xa[:, 2] - xa[:, 1], xa[:, 0] - xa[:, 2], xa[:, 1] - xa[:, 0]], axis=1)
+    twice = xa[:, 0]*b[:, 0] + xa[:, 1]*b[:, 1] + xa[:, 2]*b[:, 2]           # signed 2 * area
+    area = np.abs(twice)/2
+    ux, uy = u[t, 0], u[t, 1]
+    exx, eyy = (b*ux).sum(axis=1)/twice, (c*uy).sum(axis=1)/twice
+    gxy = (c*ux + b*uy).sum(axis=1)/twice
+    # the 3D elastic energy density at the three edge midpoints, weight area/3 each
+    lam, mu = e*nu/((1 + nu)*(1 - 2*nu)), e/(2*(1 + nu))
+    nodal = alpha[:, None]*(temperature[t] - physics["stress_free_temperature"])     # (T, 3)
+    physical = 0.0
+    for i, j in ((0, 1), (1, 2), (2, 0)):
+        a = 0.5*(nodal[:, i] + nodal[:, j])
+        xx, yy = exx - a, eyy - a
+        zz = -nu/(1 - nu)*(xx + yy)                                 # sigma_zz = 0
+        trace = xx + yy + zz
+        density = 0.5*(lam*trace**2 + 2*mu*(xx**2 + yy**2 + zz**2 + 0.5*gxy**2))
+        physical += float(np.sum(area/3*density))
+    return physical
+
+
+def _defined_stiffness_functional(fields):
+    """``stiffness_energy_functional_per_depth`` by its documented definition
+    (docs/packages/simcase/mechanics2d.md: the solver's 1/2 u^T K u), 1/2 sum u (load + residual)
+    with load = applied + thermal-equivalent force, evaluated here from the saved arrays
+    (galerkin's residual is K u - load)."""
+    load = fields["applied_force_per_depth"] + fields["thermal_equivalent_force_per_depth"]
+    return float(0.5*np.sum(fields["displacement"]*(load + fields["residual_force_per_depth"])))
+
+
 def test_p2_11_the_thermoelastic_energies_take_their_registry_meanings():
     """D-30: strain_energy_per_depth is the physical elastic energy; the solver's quadratic
     functional (which includes the thermal load term) is stiffness_energy_functional_per_depth.
-    The two numbers are format 0.2's physical_elastic_energy_j_per_m and strain_energy_j_per_m of
-    this example at the batch baseline (bitwise equal in P2-1; compared here within 1e-11 because
-    the default suite runs on every platform)."""
-    balance = run(Document.from_dict(example("thermoelastic_regions")), verbose=False).summary()["balance"]
-    assert balance["strain_energy_per_depth"]["value"] == pytest.approx(0.148381520049, rel=1e-11)
-    assert balance["stiffness_energy_functional_per_depth"]["value"] == pytest.approx(11.9030577121, rel=1e-11)
+
+    strain_energy_per_depth is recomputed independently from the result's saved arrays and the
+    document (``_recomputed_physical_energy``) and compared within REL_ENERGY on whatever mesh
+    this machine makes. stiffness_energy_functional_per_depth is compared within REL_ENERGY with
+    its documented definition, 1/2 sum u (load + residual), re-evaluated from the saved arrays
+    (``_defined_stiffness_functional``): this check ties the name to its definition and is not
+    independent. An independent 1/2 u^T K u is not compared at REL_ENERGY because the summary's
+    functional is accurate only to about 2e-11 relative here: the saved load + residual
+    reproduces K u only up to galerkin's rounding of a strongly cancelling K u (the bending
+    strip's displacement is mostly near-rigid motion). Measured against an independent
+    1/2 sum area eps^T D eps: 6.2e-12 (default), 7.4e-12 (OpenBLAS Haswell), 2.0e-11 (OpenBLAS
+    Sandybridge), 1.2e-11 (numpy limited to AVX2, Haswell).
+
+    This replaces two pinned numbers (format 0.2's physical_elastic_energy_j_per_m and
+    strain_energy_j_per_m of the batch baseline, within 1e-11): they assumed a CPU-independent
+    mesh, but meshine's mesh of this example depends on numpy's SIMD level (on an AVX2 CPU 42 of
+    its 3414 nodes move, by up to 0.12 mm), and the functional also moves by 4.3e-11 relative
+    with the OpenBLAS kernel on the same mesh. That this code gives the baseline's two numbers
+    bitwise stays the job of P2-1, whose thermoelastic maps include both energies."""
+    doc = Document.from_dict(example("thermoelastic_regions"))
+    result = run(doc, verbose=False)
+    balance = result.summary()["balance"]
+    physical = _recomputed_physical_energy(doc, result.fields)
+    functional = _defined_stiffness_functional(result.fields)
+    assert balance["strain_energy_per_depth"]["value"] == pytest.approx(physical, rel=REL_ENERGY, abs=0)
+    assert balance["stiffness_energy_functional_per_depth"]["value"] == pytest.approx(functional, rel=REL_ENERGY,
+                                                                                         abs=0)
+    assert abs(functional - physical) > 1e-3*max(functional, physical)    # a swap of the names fails
     elastic = run(Document.from_dict(example("elastic_plate")), verbose=False).summary()["balance"]
     assert "stiffness_energy_functional_per_depth" not in elastic and "strain_energy_per_depth" in elastic
 
