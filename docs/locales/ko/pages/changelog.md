@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `meshloom`: `mesh_plc(..., region_points=[(점, 이름), ...])`가 regions 모드에서 영역에 이름을 붙입니다. 점을 품은 경계로 닫힌 성분이 영역 `이름`이 되고(여러 성분이 한 이름을 나눌 수 있음), `이름=None`은 메시를 만들지 않는 구멍이며, 영역 번호는 이름이 처음 나온 순서입니다. 각 점은 반올림 전 점으로 정확히 위치를 찾고, 어느 영역에도 없거나 면 위에 있는 점, 한 영역의 이름 둘, 점이 없는 영역은 `RegionError`입니다. [문서](packages/meshloom/overview.md#커널-구성-요소)
+
 - `meshloom`: `mesh_plc`가 double 반올림으로 납작해지거나 뒤집힌 사면체를 고치는 수리가 이제 실제로 돕니다(사면체마다 다른 label을 받아 flip을 한 번도 하지 못했음). 변 제거는 방향이 한결같은 부채꼴만 쓰고(사면체마다 따로 방향을 정하면 이웃과 겹칠 수 있었음), 한 면 안의 변 제거와 꼭짓점이나 새 점 하나(`node_source` −1)에서의 공동 다시 채우기가 더해졌습니다. 인증은 모든 면의 두 사면체가 면의 양쪽에 있는지와 경계가 그대로인지도 확인합니다. 면에서 1e-13 안에 점이 있는 회전한 각기둥 seed 입력 60개 중 42개가 메시가 되고(전에는 18개), 모든 메시가 V1–V4를 통과합니다. [문서](packages/meshloom/overview.md#커널-구성-요소)
 
 - `galerkin`: 과도 열의 형상 미분. `solve_transient_heat(..., motion=MeshMotion(W, t))`는 노드 X₀ + t·W에서 backward-Euler 이력을 풀고(초기·Dirichlet 온도는 노드에 붙음), 모든 이력(온도·열유속·하중·반력·잔차·저장·열량·이차 범함수·outward)이 JAX·PyTorch 스칼라 t에 대한 미분을 나릅니다. 영역별 k·c, 일정 또는 영역별 열원, 움직이는 변의 outward flux·convection을 받고, 시간만의 콜백을 허용합니다. 좌표 콜백, motion과 함께 쓰는 live 입력, 축대칭 열, `checkpoint_every`는 이름을 밝혀 거부합니다. `motion`이 없으면 결과는 그대로입니다. [문서](packages/galerkin/shape_derivative.md#과도-열).

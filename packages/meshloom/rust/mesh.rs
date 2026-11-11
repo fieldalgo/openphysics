@@ -26,7 +26,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::facetrec::Boundary;
-use crate::mixed::Mixed;
+use crate::mixed::{Mixed, MixedCounters, Pt};
 use crate::predicates::{orient3d_exact, P3};
 
 const NONE: u32 = u32::MAX;
@@ -54,6 +54,14 @@ pub struct TetMesh {
     pub repair: RepairStats,
 }
 
+/// A region seed: a point and the region it names (`label`, an index into the caller's
+/// names), or a hole (`label` < 0: the component holding it is not meshed).
+#[derive(Debug, Clone, Copy)]
+pub struct Seed {
+    pub p: P3,
+    pub label: i64,
+}
+
 /// Why `build` produced no mesh.
 #[derive(Debug, Clone)]
 pub enum MeshError {
@@ -62,6 +70,8 @@ pub enum MeshError {
     NotClosed { segment: [u32; 2], facets: Vec<u32> },
     /// rounding to doubles left points equal or tetrahedra that flips cannot repair
     Rounding(String),
+    /// a region seed that names no single bounded component, or a component without one
+    Seed(String),
     Internal(String),
 }
 
@@ -71,7 +81,7 @@ impl std::fmt::Display for MeshError {
             MeshError::NotClosed { segment, facets } => write!(f,
                 "the segment {}-{} is on the boundary of {} facets {:?}: the surface is not closed", segment[0], segment[1],
                 facets.len(), facets),
-            MeshError::Rounding(m) | MeshError::Internal(m) => write!(f, "{m}"),
+            MeshError::Rounding(m) | MeshError::Seed(m) | MeshError::Internal(m) => write!(f, "{m}"),
         }
     }
 }
@@ -86,13 +96,22 @@ fn face(t: &[u32; 4], i: usize) -> [u32; 3] {
     INWARD[i].map(|j| t[j])
 }
 
-/// Labels, rounds and certifies the result of boundary recovery.
-pub fn build(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, MeshError> {
+/// Labels, rounds and certifies the result of boundary recovery. With `seeds` (regions
+/// mode only), each bounded component takes the label of the seeds inside it, or is
+/// dropped if they mark a hole; every bounded component needs a seed, and a seed must lie
+/// strictly inside one bounded component (exactly, against the unrounded points). Regions
+/// are then numbered by label.
+pub fn build(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> Result<TetMesh, MeshError> {
     if domain == Domain::Parity {
+        if !seeds.is_empty() {
+            return Err(MeshError::Seed("region seeds need domain 'regions'".into()));
+        }
         closed(points.len(), b)?;
     }
-    build_inner(points, b, domain).map_err(|e| {
-        if e.starts_with("rounding") || e.contains("repair") {
+    build_inner(points, b, domain, seeds).map_err(|e| {
+        if let Some(m) = e.strip_prefix("seed: ") {
+            MeshError::Seed(m.to_string())
+        } else if e.starts_with("rounding") || e.contains("repair") {
             MeshError::Rounding(e)
         } else {
             MeshError::Internal(e)
@@ -131,7 +150,47 @@ fn closed(n: usize, b: &Boundary) -> Result<(), MeshError> {
     Ok(())
 }
 
-fn build_inner(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, String> {
+/// The bounded component that each seed lies strictly inside, exactly: a seed is located
+/// in every tetrahedron whose closed region holds it (all four orientations >= 0), with
+/// the S points unrounded; one component must hold it.
+fn locate_seeds(points: &[P3], b: &Boundary, comp: &[u32], outside: &[bool], seeds: &[Seed])
+                -> Result<Vec<u32>, String> {
+    let n = points.len() as u32;
+    let mut ext = points.to_vec();
+    ext.extend(seeds.iter().map(|s| s.p));
+    let m = Mixed { input: &ext, s: &b.plc.rec.s };
+    let orig = Mixed { input: points, s: &b.plc.rec.s };
+    let mut cnt = MixedCounters::default();
+    let mut out = Vec::with_capacity(seeds.len());
+    for (j, sd) in seeds.iter().enumerate() {
+        if !sd.p.iter().all(|x| x.is_finite()) {
+            return Err(format!("seed: region seed {j} has a coordinate that is not finite"));
+        }
+        let q = Pt::In(n + j as u32);
+        let mut found: Vec<u32> = Vec::new();
+        for (t, v) in b.tets.iter().enumerate() {
+            let p = v.map(|g| orig.from_id(g));
+            // the tetrahedron's faces with the seed in place of each vertex in turn
+            let inside = (0..4).all(|i| {
+                let mut w = p;
+                w[i] = q;
+                m.orient3d(w, &mut cnt) >= 0
+            });
+            if inside && !found.contains(&comp[t]) {
+                found.push(comp[t]);
+            }
+        }
+        match found.as_slice() {
+            [] => return Err(format!("seed: region seed {j} at {:?} lies outside the input's convex hull", sd.p)),
+            [c] if !outside[*c as usize] => out.push(*c),
+            [_] => return Err(format!("seed: region seed {j} at {:?} lies outside every closed region", sd.p)),
+            _ => return Err(format!("seed: region seed {j} at {:?} lies on a facet between regions", sd.p)),
+        }
+    }
+    Ok(out)
+}
+
+fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> Result<TetMesh, String> {
     let tets = &b.tets;
     // the facets of each subfacet (two facets can share one, e.g. touching shells)
     // facets per subfacet: a face shared by two touching shells is crossed twice
@@ -196,11 +255,35 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, S
     }
     // 2. the domain: region index per component, NONE outside
     let mut region_of = vec![NONE; ncomp as usize];
+    // with seeds, each bounded component's label (NONE for a hole), and regions are numbered
+    // by label instead of by first appearance
+    let mut label_of: Vec<Option<i64>> = vec![None; ncomp as usize];
+    if !seeds.is_empty() {
+        let at = locate_seeds(points, b, &comp, &outside, seeds)?;
+        for (j, (&c, sd)) in at.iter().zip(seeds).enumerate() {
+            match label_of[c as usize] {
+                Some(l) if l != sd.label.max(-1) => {
+                    return Err(format!("seed: region seeds in one region name two regions (seed {j} at {:?})", sd.p));
+                }
+                _ => label_of[c as usize] = Some(sd.label.max(-1)),
+            }
+        }
+        if let Some(c) = (0..ncomp as usize).find(|&c| !outside[c] && label_of[c].is_none()) {
+            let t = comp.iter().position(|&x| x == c as u32).unwrap();
+            let m = Mixed { input: points, s: &b.plc.rec.s };
+            let q = tets[t].map(|g| m.rounded(m.from_id(g)));
+            let w = [0, 1, 2].map(|k| (q[0][k] + q[1][k] + q[2][k] + q[3][k]) / 4.0);
+            return Err(format!("seed: a region has no seed (one of its points: {w:?})"));
+        }
+    }
     match domain {
         Domain::Regions => {
             for c in 0..ncomp as usize {
                 if !outside[c] {
-                    region_of[c] = 0; // numbered below by first appearance
+                    region_of[c] = match label_of[c] {
+                        Some(l) if l < 0 => NONE, // a hole
+                        _ => 0,                   // numbered below
+                    };
                 }
             }
         }
@@ -255,16 +338,30 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain) -> Result<TetMesh, S
         if region_of[c as usize] == NONE {
             continue;
         }
-        let key_c = if domain == Domain::Parity { 0 } else { c };
-        let n = number.len() as u32;
-        let r = *number.entry(key_c).or_insert(n);
+        let r = if let Some(Some(l)) = label_of.get(c as usize) {
+            *l as u32 // by label
+        } else {
+            let key_c = if domain == Domain::Parity { 0 } else { c };
+            let n = number.len() as u32;
+            *number.entry(key_c).or_insert(n)
+        };
         kept.push(t);
         regions.push(r);
     }
     if kept.is_empty() {
         return Err("the domain is empty".into());
     }
-    let region_count = number.len() as u32;
+    let region_count = if seeds.is_empty() {
+        number.len() as u32
+    } else {
+        // labels 0..k-1, every one named by a seed in a meshed component
+        let k = seeds.iter().map(|s| s.label + 1).max().unwrap_or(0).max(0) as u32;
+        let used: HashSet<u32> = regions.iter().copied().collect();
+        if (0..k).any(|l| !used.contains(&l)) {
+            return Err("seed: a region name has no seed inside a meshed region".into());
+        }
+        k
+    };
     // 3. rounding and renumbering
     let m = Mixed { input: points, s: &b.plc.rec.s };
     let mut new_id: HashMap<u32, u32> = HashMap::new();
@@ -1007,14 +1104,14 @@ mod tests {
     fn nested_boxes_in_both_modes() {
         let plc = boxes(true);
         let b = crate::facetrec::recover_boundary(&plc, 60).unwrap();
-        let m = build(&plc.points, &b, Domain::Regions).unwrap();
+        let m = build(&plc.points, &b, Domain::Regions, &[]).unwrap();
         assert_eq!(m.region_count, 2);
         let vols: Vec<f64> = (0..2).map(|r| volume(&m, r)).collect();
         let near = |x: f64, y: f64| (x - y).abs() <= 1e-12 * y;
         assert!(vols.iter().any(|&v| near(v, 1.0)) && vols.iter().any(|&v| near(v, 63.0)), "{vols:?}");
         assert_eq!(m.interfaces.len(), 12); // the inner box's 6 squares, 2 triangles each
         assert_eq!(m.boundary.len(), 12);
-        let p = build(&plc.points, &b, Domain::Parity).unwrap();
+        let p = build(&plc.points, &b, Domain::Parity, &[]).unwrap();
         assert_eq!(p.region_count, 1);
         assert!(near(volume(&p, 0), 63.0)); // the shell between the boxes
         assert!(p.interfaces.is_empty());

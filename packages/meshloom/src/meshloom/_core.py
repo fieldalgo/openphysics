@@ -177,7 +177,8 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
             "subfacet_facet": i64(owner, -1), "stats": stats}
 
 
-def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60) -> dict:
+def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
+             region_points=None) -> dict:
     """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
     regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
@@ -195,9 +196,18 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     ``node_source`` (each node's global point index: input points first, then S points;
     -1 for a point the repair added), with ``stats`` counting the repair's operations.
 
+    ``region_points`` (regions mode only) names the regions: a sequence of ``(point,
+    name)`` pairs. The bounded component that holds a point is the region ``name``
+    (several components may share a name); ``name=None`` marks a hole, which is not meshed.
+    Every bounded component then needs a point, and each point must lie strictly inside one
+    bounded component, decided exactly against the unrounded points. Regions are numbered
+    in the order the names first appear, and ``region_names`` lists them. Without it,
+    regions are named ``"region i"`` by first appearance.
+
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
-    witness type 6), ``RecoveryError``, ``RoundingError``, or ``MeshError`` for an
-    internal failure; all are ``ValueError``.
+    witness type 6), ``RecoveryError``, ``RoundingError``, ``RegionError`` (a region point
+    outside every region, on a facet, two names in one region, or a region without a
+    point), or ``MeshError`` for an internal failure; all are ``ValueError``.
     """
     kernel = _require()
     if domain not in ("regions", "parity"):
@@ -205,10 +215,32 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     p = _points(points)
     s = np.ascontiguousarray(np.asarray(np.zeros((0, 2)) if segments is None else segments,
                                         dtype="<i8").reshape(-1, 2))
+    names, seed_xyz, seed_label = [], [], []
+    if region_points is not None:
+        if domain != "regions":
+            raise ValueError("region_points needs domain='regions'")
+        for item in region_points:
+            try:
+                point, name = item
+            except (TypeError, ValueError):
+                raise ValueError("region_points holds (point, name) pairs") from None
+            xyz = np.asarray(point, dtype=np.float64).reshape(-1)
+            if xyz.shape != (3,) or not np.isfinite(xyz).all():
+                raise ValueError(f"a region point must be 3 finite coordinates, got {point!r}")
+            if name is not None and not isinstance(name, str):
+                raise ValueError(f"a region name must be a string or None (a hole), got {name!r}")
+            if name is not None and name not in names:
+                names.append(name)
+            seed_xyz.append(xyz)
+            seed_label.append(-1 if name is None else names.index(name))
+        if not seed_xyz:
+            raise ValueError("region_points is empty")
     check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
+    seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
+              np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
-        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds)
     except ValueError as e:
         if len(e.args) != 3:
             raise
@@ -216,6 +248,8 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         if kind == "NotClosed":
             raise NotClosed(msg, {"type": 6, "segment": (int(ids[0]), int(ids[1])),
                                   "facets": tuple(int(x) for x in ids[2:])}) from None
+        if kind == "RegionSeed":
+            raise RegionError(msg) from None
         cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError}.get(kind, MeshError)
         raise cls(msg) from None
 
@@ -231,7 +265,7 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     for (a, b), face in zip(ipair.tolist(), ifaces):
         interfaces.setdefault((a, b), []).append(face)
     return {"nodes": nodes, "tetrahedra": tets, "regions": regions,
-            "region_names": [f"region {i}" for i in range(stats["region_count"])],
+            "region_names": names if names else [f"region {i}" for i in range(stats["region_count"])],
             "boundary_faces": boundary, "boundary_nodes": {k: np.unique(v) for k, v in boundary.items()},
             "interfaces": {k: np.array(v, dtype=np.int64).reshape(-1, 3) for k, v in interfaces.items()},
             "node_source": i64(out[7], -1), "stats": stats}
@@ -334,9 +368,15 @@ class RecoveryError(MeshError):
 
 
 class RoundingError(MeshError):
-    """Rounding to doubles made points equal or tetrahedra that flips cannot repair."""
+    """Rounding to doubles made points equal or tetrahedra that repair cannot fix."""
 
     kind = "RoundingFail"
+
+
+class RegionError(ValueError):
+    """``region_points`` does not name the regions: a point outside every region or on a
+    facet between regions, two names (or a name and a hole) in one region, or a region
+    without a point. The message says which and where."""
 
 
 def _sub(a, b):
