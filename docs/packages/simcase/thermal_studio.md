@@ -351,10 +351,11 @@ the crossing cap.
   Certain overflows are refused at validation; the rest end as a job error.
   Each refusal names the limit it exceeds.
 - meshine can fail closed with "cannot resolve" (`solver_failed`), for example
-  for acute star polygons, crossing polygons with near-coincident boundaries or
-  a sawtooth with 1-degree tips. That sawtooth fails only on the micrometre
-  copy simcase meshes; in millimetres, or scaled by other factors, it reaches the
-  node cap instead (see the
+  for acute star polygons or crossing polygons with near-coincident boundaries.
+  A sawtooth with 1-degree tips did so on the micrometre copy simcase meshed
+  before flat shape numbers reached the mesher on the 1 pm grid; it now reaches
+  the node cap (`mesh_limit_exceeded`), and simcase's own run without limits
+  ends with "refinement did not converge in 80 rounds" (see the
   [region resource observation](../../region_resource_probe.md)).
 - Colours repeat after eight regions; the legend, boundaries, table and hover
   still name every region.
