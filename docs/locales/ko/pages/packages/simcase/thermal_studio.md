@@ -69,9 +69,9 @@ Editor는 중복키 검출을 포함한 엄격 검증을 위해 원래 JSON텍�
 
 | 표시/데이터 | 계약 |
 | --- | --- |
-| 좌표 | raw `arrays.nodes_m`는 m; 축은 최상위 `display_length_in_m`(캡처 문서의 양수 metres-per-document-length-unit scale)로 나눔 |
-| 온도 | `temperature_k`, 절점 P1, K; 선형 보간·단위 colorbar |
-| Flux | `heat_flux_w_m2`, 삼각형별 상수, W/m²; 전역 qx/qy 또는 크기 |
+| 좌표 | raw `arrays.node_coordinates`는 m; 축은 최상위 `display_length_in_m`(형상 `length_unit` 한 단위의 미터 값, `length_unit`이 이름을 줌)로 나눔 |
+| 온도 | `temperature`, 절점 P1, K; 선형 보간·단위 colorbar |
+| Flux | `heat_flux`, 삼각형별 상수, W/m^2; 전역 qx/qy 또는 크기 |
 | 화살표 | 실제 요소 중심·전역 방향; 명시한 view gain이며 물리값 재조정 아님 |
 | 열원/반력/rate | 면외 깊이당 절점 W/m이며 W/m² flux와 구분 |
 
@@ -98,11 +98,11 @@ V1 raw배열은 9개, v2는 13개이며 Robin-only v2의 Dirichlet 절점 수는
 ## 고정 wire envelope
 
 ```text
-payload_format = "studio-thermal-steady-v1"
+payload_format = "studio-thermal-steady-v2"
 kind = "thermal.steady2d"
 job, result_id, client_revision, request_seq
 result_format, field_layout
-display_length_in_m
+length_unit, display_length_in_m
 summary
 arrays
 ```
@@ -114,8 +114,10 @@ arrays
 문서 표시 단위 선언입니다. Run identity는 kind/job/result_id와 비음수
 safe-integer counter 두 개입니다. Status는 status/log/error/has_result를
 추가합니다. 요청은 정확히 doc/client_revision/request_seq를 포함하고 UTF-8
-application/json을 사용합니다. 중복키·비유한 JSON·잘못된 envelope·미지원
-physics를 거절합니다. 열 status/result route에는 field/time selector를
+application/json을 사용합니다. 요청 바이트는 문서를 받는 다른 Studio route와
+같이 `simcase.reader`로 읽습니다. 중복키·비유한 JSON(double 범위를 넘는 숫자
+포함)·잘못된 envelope·미지원 physics를 거절하고, 앞에 붙은 UTF-8 BOM은
+받아들이며, 검증 응답은 모든 숫자를 쓴 그대로 둔 문서를 돌려줍니다. 열 status/result route에는 field/time selector를
 허용하지 않습니다. Arrays·summary·identity는 이 단일 계약을 사용합니다.
 
 ## Route 경계와 회복
@@ -157,7 +159,9 @@ Localhost/auth/CORS 동작이 다중 사용자 격리 서비스로 강화되는 
 요청1 MiB, N<=10201절점, M<=20000요소, 인코딩결과16 MiB,
 활성 열 작업1개, terminal 열 기록 최대2개·합계32 MiB,
 terminal 최대 보존300 s입니다. Log상한64 KiB·error4 KiB·summary metadata64 KiB·
-status encoding128 KiB도 적용합니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
+status encoding128 KiB도 적용합니다. Summary metadata는 `diagnostics`와 `resolved_inputs`를 뺀
+결과 summary입니다. 이 두 목록은 문서와 함께 커지므로 인코딩한 결과(16 MiB, 과도 manifest는 4 MiB)에
+셉니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
 필수 정책이 미설정이면 열 run은 비활성 상태를 유지합니다.
 신규 admission/publication에 count/byte 공간이 필요하면 가장 오래된 terminal
 기록(done **또는** error)을 회수하며 활성 열 작업과 모든 광학 작업은 보존합니다.
@@ -186,7 +190,8 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 `thermal.steady2d` 문서는(엔진과 같은 규칙 `simcase.has_region_geometry`,
 [재료 영역이 있는 열전도 문서](thermal_regions2d.md) 참고)
 `/api/thermal/validate`와 `/api/thermal/run`에서 Studio의 영역 경로를 따릅니다. 피처도 배경 재료도 없는 균질
-사각형을 버전 1로 쓴 문서는 읽을 때 0.2 사각형 형식으로 컴파일되어 0.2 사각형처럼 직사각형 경로를 따릅니다.
+사각형을 버전 1로 쓴 문서는 읽을 때 평면 사각형 형식으로 컴파일되어 평면 사각형처럼 직사각형 경로를 따릅니다.
+영역 문서도 직사각형처럼 형식 0.3입니다. 형식 0.2 영역 문서는 이름으로 거절합니다(`invalid_document`, 경로 `openphysics`).
 버전 1 문서는 쓴 그대로 받습니다(검증 응답과 결과는 컴파일이 아니라 그 블록을 기록, 화면도 검증 전에 문서 종류를 같은
 규칙으로 정함). raw 형상
 한도에서는 피처를 도형으로 셉니다(경로 `geometry.components`). 메시는
@@ -194,18 +199,18 @@ encoded cap으로 Python/solver peak memory를 제한했다고 볼 수 없습니
 네 변 밖 태그)은 `invalid_document`입니다.
 그 밖의 문서는 직사각형 경로를 따르며 그 코드·byte·오류는 바뀌지 않습니다.
 `tests/simcase/test_studio_rectangle_invariants.py`가 이를 고정합니다.
-`mesh.subdivisions`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
-`mesh.subdivisions`). `geometry.shapes` 키가 남은 직사각형 문서도 그 키 때문에 영역
+`mesh.subdivision_count`가 있는 영역 문서는 거절합니다(`invalid_document`, 경로
+`mesh.subdivision_count`). `geometry.shapes` 키가 남은 직사각형 문서도 그 키 때문에 영역
 문서가 되므로 같은 이유로 거절합니다.
 
 ### Wire 형식
 
 | 항목 | 영역 결과 |
 | --- | --- |
-| Result·layout ID | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
-| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, 직사각형 payload와 같은 최상위 필드 11개 |
-| `arrays` | v2 배열 13개와 `triangle_regions`(삼각형마다 영역 번호 하나, 단위 `1`, 위치 `triangles`, shape `[M]`); D=0 허용(Robin만으로 고정) |
-| `summary` | 생산자 summary 그대로이며 `region_names`(번호 순서), `regions`(이름마다 `material`, `triangles`, `area_m2`), 전체 `materials` 표, `heat_source_w_m3`, `conductivity_range_w_mk`, `mesh`(`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`)를 포함 |
+| Result·layout ID | `thermal.steady2d-regions-result-v2`, `thermal2d-p1-node-cell-regions-v2`(형식 0.2의 `-v1` 쌍은 은퇴) |
+| Payload | `payload_format = "studio-thermal-steady-regions-v2"`, `length_unit`을 포함해 직사각형 payload와 같은 최상위 필드 12개 |
+| `arrays` | 등록부 이름(`node_coordinates`, `temperature`, `heat_flux`, ...)의 경계 배열 13개와 `triangle_regions`(삼각형마다 영역 번호 하나, 단위 없음, 위치 `triangles`, shape `[M]`); D=0 허용(Robin만으로 고정) |
+| `summary` | 생산자 summary 그대로이며 `region_names`(번호 순서), `regions`(이름마다 `material`, `triangles`, m^2 단위 `{value, unit}`인 `area`), `{value, unit}` 물성을 담은 전체 `materials` 표, `heat_source_density`, `minimum_thermal_conductivity`, `maximum_thermal_conductivity`, `mesh`(`nodes`, `triangles`)를 포함 |
 | Capability | 정상 블록 안의 중첩 `regions` 키: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats`와 아래 `limits` 다섯 개 |
 
 영역 쌍은 직사각형 client가 읽는 블록 바깥 `result_formats`에 넣지 않습니다.
@@ -227,13 +232,14 @@ job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
 
 | 단계 | 검사 | 거절 |
 | --- | --- | --- |
-| Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; `mesh.subdivisions` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
+| Event loop, JSON 크기에 선형인 비용 | `thermal.steady2d` 항목 하나; 형식 0.3; `mesh.subdivision_count` 없음 | `unsupported_physics`(400); `invalid_document`(validate는 200·`ok=false`, run은 400) |
 | Event loop | 정상 경계(v2) 결과 runtime이 설치되어 있음(영역 결과는 항상 경계 배열을 담으므로) | `unsupported_result_format`(400) |
 | Event loop, run만 | 영역 실행용 공개 결과 API를 쓸 수 있음(블록의 `run_enabled`) | `unsupported_public_api`(400) |
 | Worker thread, `Document.from_dict` 전 | 도형 64개, 원 16개, 다각형 점 합계 512개 이하, 다음으로 경계 교차 1024개 이하(`simcase.region_complexity`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes`(버전 1 블록은 `geometry.components`) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | 도형 boolean 뒤 루프 꼭짓점 2048개 이하(`simcase.check_mesh_limits`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
-| Worker thread | 문서의 이름·단위·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
+| Worker thread | 문서의 이름·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
+| Worker thread | 문서의 진단과 해석한 입력이 결과 한도(`payload_bytes` 16 MiB, 과도 manifest는 `manifest_bytes` 4 MiB) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413); 메시지에 두 개수와 한도 이름이 있음 |
 | Job, 해석 전 | 메시 생성은 절점 10201개(`max_nodes`)를 넘으면 멈추고, 이어서 정확한 절점·요소 수를 10201·20000과 비교 | Job 오류 `mesh_limit_exceeded` |
 | Job | 메시 생성 뒤 드러나는 문서 오류(예: 뒤 도형이 완전히 덮은 도형의 열원) | Job 오류 `invalid_document` |
 | Job | 그 밖의 실행 실패(예: meshine이 풀지 못하는 형상, meshine의 80 round 안에 수렴하지 않는 세분) | Job 오류 `solver_failed` |
@@ -301,12 +307,16 @@ worker thread에서 돌므로 긴 형상 계산이 event loop를 막지 않습�
 - 루프 꼭짓점 수는 메시 생성기가 T자 접점에서 루프를 나누기 전에 세므로, 생성기는
   센 것보다 조금 더 많은 점을 처리할 수 있습니다.
 - 영역 결과에는 항상 배열 14개가 있으며 D=0도 유효합니다.
-- Summary는 쓰지 않는 재료와 그 `source` 문구까지 재료 표 전체를 복사하며 64 KiB 안에
-  들어가야 합니다. 확실한 초과는 검증에서 거절하고 나머지는 job 오류로 끝납니다.
-- meshine은 예각 별 모양 다각형, 경계가 거의 겹치는 교차 다각형, 끝 각이 1도인 톱니 같은 입력에서
-  "cannot resolve"로 안전하게 실패할 수 있습니다(`solver_failed`). 이 톱니는 simcase가 메시하는
-  마이크로미터 사본에서만 실패하고, 밀리미터나 다른 배율에서는 대신 절점 한도에 닿습니다
-  ([영역 자원 관측](../../region_resource_probe.md) 참고).
+- Summary는 쓰지 않는 재료와 그 `source` 문구까지 재료 표 전체를 복사하며, 진단과 해석한 입력을
+  빼고 64 KiB 안에 들어가야 합니다. 이 두 목록은 문서와 함께 커지고(1 pm 격자를 벗어난 다각형
+  좌표마다 약 250바이트의 반올림 진단과 약 80바이트의 해석한 입력) 결과 한도에 셉니다. 512점 다각형과
+  도형 63개가 더 있는 문서의 summary는 약 415 kB입니다. 확실한 초과는 검증에서 거절하고 나머지는
+  job 오류로 끝납니다. 거절마다 넘은 한도의 이름을 밝힙니다.
+- meshine은 예각 별 모양 다각형, 경계가 거의 겹치는 교차 다각형 같은 입력에서 "cannot resolve"로
+  안전하게 실패할 수 있습니다(`solver_failed`). 끝 각이 1도인 톱니는 평면 형상 숫자가 1 pm 격자 값으로
+  메시 생성기에 가기 전, simcase가 메시하던 마이크로미터 사본에서 그렇게 실패했습니다. 이제는 절점
+  한도에 닿고(`mesh_limit_exceeded`), 상한 없이 simcase로 실행하면 "refinement did not converge in
+  80 rounds"로 끝납니다([영역 자원 관측](../../region_resource_probe.md) 참고).
 - 영역이 여덟 개를 넘으면 색이 반복됩니다. 범례·경계·표·커서 표시는 여전히 모든 영역의
   이름을 밝힙니다.
 - 영역 지원 전에 캐시한 페이지는 job이 끝난 뒤 영역 결과를 거절합니다(`/static`에

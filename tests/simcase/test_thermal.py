@@ -76,11 +76,11 @@ def test_thermal_partial_failure_safe_cleanup_link_foreign_pin(tmp_path):
 
 def model(source=0., n=8, unit='mm'):
     data=copy.deepcopy(examples.THERMAL_SLAB)
-    data['mesh']['subdivisions']=[n,n]
-    data['physics']['heat1']['heat_source_w_m3']=source
+    data['mesh']['subdivision_count']=[n,n]
+    data['physics']['heat1']['heat_source_density']=f'{source!r} W/m^3'
     factor={'m':.001,'mm':1.,'um':1000.}[unit]
     data['geometry']['domain']={k:v*factor for k,v in data['geometry']['domain'].items()}
-    data['units']['length']=unit
+    data['geometry']['length_unit']=unit
     return data
 
 
@@ -88,31 +88,31 @@ def test_thermal_affine_slab_and_no_optical_defaults():
     d=Document.from_dict(model());r=run(d,False)
     assert isinstance(r,ThermalRunResult)
     assert list(d['physics'])==['heat1'] and 'background' not in d['geometry']
-    x=r.mesh_nodes_m[:,0]
-    np.testing.assert_allclose((r.temperature_k-(280+35*x/.03))/35,0,atol=1e-10)
-    np.testing.assert_allclose((r.heat_flux_w_m2-[-12.5*35/.03,0])/14583.3333333333,0,atol=1e-10)
+    x=r.node_coordinates[:,0]
+    np.testing.assert_allclose((r.temperature-(280+35*x/.03))/35,0,atol=1e-10)
+    np.testing.assert_allclose((r.heat_flux-[-12.5*35/.03,0])/14583.3333333333,0,atol=1e-10)
     left=r.mesh.boundary['left'];right=r.mesh.boundary['right'];heat=12.5*35*.02/.03
-    np.testing.assert_allclose([r.reaction_w_per_m[left].sum()/heat,r.reaction_w_per_m[right].sum()/heat],[-1,1],atol=1e-10)
+    np.testing.assert_allclose([r.reaction_heat_rate_per_depth[left].sum()/heat,r.reaction_heat_rate_per_depth[right].sum()/heat],[-1,1],atol=1e-10)
     assert not {'neff','wavelength','normalization','group_index'}&r.summary().keys()
 
 
 def test_thermal_numeric_npz_and_metadata(tmp_path):
     r=run(Document.from_dict(model(1e5)),False);out=r.save(tmp_path/'heat')
-    s=json.loads((out/'summary.json').read_text());assert abs(s['outward_heat_w_per_m']-60)/60<1e-10
+    s=json.loads((out/'summary.json').read_text());assert abs(s['outward_heat_rate_per_depth']['value']-60)/60<1e-10
     assert not (out/'.incomplete').exists()
     with np.load(out/'fields.npz',allow_pickle=False) as z:
-        np.testing.assert_array_equal(z['temperature_k'],r.temperature_k)
-        assert str(z['field_layout'])=='thermal2d-p1-node-cell-v1'
+        np.testing.assert_array_equal(z['temperature'],r.temperature)
+        assert str(z['field_layout'])=='thermal2d-p1-node-cell-v2'
         assert json.loads(str(z['metadata_json']))==s
     with pytest.raises(FileExistsError):r.save(out)
 
 
 def test_thermal_corner_conflict_and_equal_dedup():
-    d=model();d['physics']['heat1']['dirichlet_temperature_k']={'left':300.,'top':300.}
+    d=model();d['physics']['heat1']['prescribed_temperature']={'left':'300 K','top':'300 K'}
     r=run(Document.from_dict(d),False)
-    assert len(r.dirichlet_node_ids)==17
-    np.testing.assert_allclose(r.temperature_k,300.,atol=1e-10)
-    d['physics']['heat1']['dirichlet_temperature_k']['top']=301.
+    assert len(r.prescribed_node_ids)==17
+    np.testing.assert_allclose(r.temperature,300.,atol=1e-10)
+    d['physics']['heat1']['prescribed_temperature']['top']='301 K'
     with pytest.raises(DocumentError,match='corner'):Document.from_dict(d)
 
 
@@ -121,17 +121,17 @@ def test_thermal_si_invariance_and_direct_api(unit):
     from galerkin.thermal import solve_steady_heat
     r=run(Document.from_dict(model(1e5,unit=unit)),False)
     base=run(Document.from_dict(model(1e5,unit='m')),False)
-    np.testing.assert_allclose(r.mesh_nodes_m,base.mesh_nodes_m,atol=1e-16,rtol=1e-12)
+    np.testing.assert_allclose(r.node_coordinates,base.node_coordinates,atol=1e-16,rtol=1e-12)
     direct=solve_steady_heat(r.mesh,conductivity=12.5,heat_source=1e5,
-        dirichlet=dict(zip(r.dirichlet_node_ids,r.dirichlet_temperature_k)))
-    for actual,expected,scale in [(r.temperature_k,base.temperature_k,35.),
-        (r.heat_flux_w_m2,base.heat_flux_w_m2,12.5*35/.03),
-        (r.load_w_per_m,base.load_w_per_m,12.5*35*.02/.03),
-        (r.reaction_w_per_m,base.reaction_w_per_m,12.5*35*.02/.03),
-        (r.residual_w_per_m,base.residual_w_per_m,12.5*35*.02/.03)]:
+        dirichlet=dict(zip(r.prescribed_node_ids,r.prescribed_temperature)))
+    for actual,expected,scale in [(r.temperature,base.temperature,35.),
+        (r.heat_flux,base.heat_flux,12.5*35/.03),
+        (r.generated_heat_rate_per_depth,base.generated_heat_rate_per_depth,12.5*35*.02/.03),
+        (r.reaction_heat_rate_per_depth,base.reaction_heat_rate_per_depth,12.5*35*.02/.03),
+        (r.residual_heat_rate_per_depth,base.residual_heat_rate_per_depth,12.5*35*.02/.03)]:
         assert np.max(abs(actual-expected))/scale<=1e-9
-    for a,b in [(r.temperature_k,direct.temperature),(r.heat_flux_w_m2,direct.heat_flux),
-        (r.load_w_per_m,direct.load),(r.reaction_w_per_m,direct.reaction),(r.residual_w_per_m,direct.residual)]:
+    for a,b in [(r.temperature,direct.temperature),(r.heat_flux,direct.heat_flux),
+        (r.generated_heat_rate_per_depth,direct.load),(r.reaction_heat_rate_per_depth,direct.reaction),(r.residual_heat_rate_per_depth,direct.residual)]:
         np.testing.assert_array_equal(a,b)
 
 
@@ -143,31 +143,31 @@ def test_thermal_mixed_convergence_and_refsol_slab():
     weights=(w[:,None]*w[None,:]*a).ravel()
     for n in (8,16,32,64):
         r=run(Document.from_dict(model(1e5,n)),False)
-        vertices=r.mesh_nodes_m[r.mesh_triangles];p=np.einsum('qi,tic->tqc',bary,vertices)
+        vertices=r.node_coordinates[r.mesh_triangles];p=np.einsum('qi,tic->tqc',bary,vertices)
         x=p[:,:,0];exact=280+35*x/.03+1e5*x*(.03-x)/(2*12.5)
         flux=np.stack((-12.5*35/.03-1e5*.03/2+1e5*x,np.zeros_like(x)),axis=-1)
-        T=np.einsum('qi,ti->tq',bary,r.temperature_k[r.mesh_triangles])
+        T=np.einsum('qi,ti->tq',bary,r.temperature[r.mesh_triangles])
         v=vertices[:,1:]-vertices[:,:1];det=abs(v[:,0,0]*v[:,1,1]-v[:,0,1]*v[:,1,0]);measure=det[:,None]*weights
-        errors=[np.sqrt(np.sum(measure*(T-exact)**2)),np.sqrt(np.sum(measure[...,None]*(r.heat_flux_w_m2[:,None]-flux)**2))]
-        assert r.summary()['normalized_heat_balance_defect']<=1e-10
-        assert abs(r.load_w_per_m.sum()-60)/60<=1e-10
+        errors=[np.sqrt(np.sum(measure*(T-exact)**2)),np.sqrt(np.sum(measure[...,None]*(r.heat_flux[:,None]-flux)**2))]
+        assert r.summary()['relative_conservation_residual']['value']<=1e-10
+        assert abs(r.generated_heat_rate_per_depth.sum()-60)/60<=1e-10
         results.append(errors)
     e=np.array(results);rates=np.log(e[:-1]/e[1:])/np.log(2)
     print(json.dumps({'mixed_errors':e.tolist(),'orders':rates.tolist()}))
     assert np.all(np.diff(e,axis=0)<0)
     assert np.all(rates[-2:,0]>=1.8) and np.all(rates[-2:,1]>=.9)
     r=run(Document.from_dict(model()),False)
-    exact=slab(r.mesh_nodes_m,length=.03,conductivity=12.5,left_temperature=280,right_temperature=315)
-    assert max(abs(r.temperature_k-exact.temperature))/35<=1e-10
+    exact=slab(r.node_coordinates,length=.03,conductivity=12.5,left_temperature=280,right_temperature=315)
+    assert max(abs(r.temperature-exact.temperature))/35<=1e-10
 
 
 @pytest.mark.parametrize('path,value',[
-    ('physics.heat1.conductivity_w_mk',0),('physics.heat1.conductivity_w_mk',True),
-    ('physics.heat1.heat_source_w_m3',float('nan')),('physics.heat1.wavelength',1.),
-    ('physics.heat1.dirichlet_temperature_k',{}),('physics.heat1.dirichlet_temperature_k',{'left':-1}),
-    ('physics.heat1.dirichlet_temperature_k',{'unknown':300}),
+    ('physics.heat1.thermal_conductivity','0 W/(m K)'),('physics.heat1.thermal_conductivity',True),
+    ('physics.heat1.heat_source_density',float('nan')),('physics.heat1.wavelength',1.),
+    ('physics.heat1.prescribed_temperature',{}),('physics.heat1.prescribed_temperature',{'left':'-1 K'}),
+    ('physics.heat1.prescribed_temperature',{'unknown':'300 K'}),
     ('units.temperature','C'),('units.temperature',{'in_K':1}),('units.mass','g'),
-    ('mesh.subdivisions',[2,0]),('mesh.subdivisions',[True,2]),('mesh.size',1),
+    ('mesh.subdivision_count',[2,0]),('mesh.subdivision_count',[True,2]),('mesh.element_size','1 mm'),
     ('geometry.shapes',[]),('geometry.background',{'material':'vacuum'}),
     ('materials',{'solid':{'n':1.}}),('study',{'type':'sweep','values':[1,2]}),
     ('results.plots',True),('results.save_fields',1),('geometry.domain.xmax',0),
@@ -181,17 +181,28 @@ def test_thermal_invalid_document(path,value):
 
 
 def test_thermal_schema_boundary_cases():
-    for key in ['length','temperature']:
-        d=model();del d['units'][key]
-        with pytest.raises(DocumentError):Document.from_dict(d)
-    d=model();d['physics']['em1']={'type':'em.modes2d'}
+    for key in ['length_unit','depth']:
+        d=model();del d['geometry'][key]
+        with pytest.raises(DocumentError) as caught:Document.from_dict(d)
+        assert [(x.code,x.path) for x in caught.value.diagnostics]==[('E-KEY-MISSING','geometry.'+key)]
+    d=model();d['physics']['heat2']=copy.deepcopy(d['physics']['heat1'])
     with pytest.raises(DocumentError,match='more than one'):Document.from_dict(d)
-    d=model();del d['physics']['heat1']['heat_source_w_m3']
-    assert Document.from_dict(d)['physics']['heat1']['heat_source_w_m3']==0
-    d=model();d['physics']['heat1']['dirichlet_temperature_k']={'left':0.}
-    r=run(Document.from_dict(d),False);np.testing.assert_array_equal(r.temperature_k,0)
-    for temperatures in [{'left':280.,'top':315.},{'top':315.,'left':280.}]:
-        d=model();d['physics']['heat1']['dirichlet_temperature_k']=temperatures
+    # an entry of a type the document's kind does not read is an unknown key (rule 2.10)
+    d=model();d['physics']['em1']={'type':'em.modes2d'}
+    with pytest.raises(DocumentError) as caught:Document.from_dict(d)
+    assert ('E-KEY-UNKNOWN','physics.em1.type') in [(x.code,x.path) for x in caught.value.diagnostics]
+    d=model();del d['physics']['heat1']['heat_source_density']
+    doc=Document.from_dict(d)
+    assert 'heat_source_density' not in doc.si['physics']['heat1']
+    assert [x['path'] for x in doc.defaults_applied if x['value'] is None]==['physics.heat1.heat_source_density']
+    # absolute temperatures are above 0 K (registry domain); a uniform 300 K is exact
+    d=model();d['physics']['heat1']['prescribed_temperature']={'left':'0 K'}
+    with pytest.raises(DocumentError) as caught:Document.from_dict(d)
+    assert [(x.code,x.path) for x in caught.value.diagnostics]==[('E-DOMAIN','physics.heat1.prescribed_temperature.left')]
+    d=model();d['physics']['heat1']['prescribed_temperature']={'left':'300 K'}
+    r=run(Document.from_dict(d),False);assert np.all(r.temperature==300.0)
+    for temperatures in [{'left':'280 K','top':'315 K'},{'top':'315 K','left':'280 K'}]:
+        d=model();d['physics']['heat1']['prescribed_temperature']=temperatures
         with pytest.raises(DocumentError,match='corner'):Document.from_dict(d)
 
 
@@ -276,7 +287,7 @@ def test_thermal_simultaneous_writers_preserve_winner(tmp_path,monkeypatch):
         except FileExistsError:return 'loser'
     with ThreadPoolExecutor(max_workers=2) as pool:answers=list(pool.map(lambda _:write(),range(2)))
     assert sorted(answers)==['loser','winner'] and (out/'summary.json').exists()
-    with np.load(out/'fields.npz',allow_pickle=False) as z:np.testing.assert_array_equal(z['temperature_k'],r.temperature_k)
+    with np.load(out/'fields.npz',allow_pickle=False) as z:np.testing.assert_array_equal(z['temperature'],r.temperature)
 
 
 def test_thermal_fields_disabled_cli_and_expected_errors(tmp_path,capsys,monkeypatch):
@@ -312,19 +323,20 @@ def test_thermal_studio_capability_rejection(monkeypatch):
 
 def test_thermal_all_raw_metadata(tmp_path):
     r=run(Document.from_dict(model()),False);s=r.summary();arrays=r._raw_arrays()
-    assert set(s['field_units'])==set(arrays)==set(s['field_locations'])==set(s['field_shapes'])
+    structural={'triangles','prescribed_node_ids'}          # no unit: connectivity and node indices
+    assert set(s['field_units'])==set(arrays)-structural and set(arrays)==set(s['field_locations'])==set(s['field_shapes'])
     for key,a in arrays.items():assert s['field_shapes'][key]==list(a.shape)
-    assert s['field_units']['nodes_m']=='m' and s['field_units']['dirichlet_temperature_k']=='K'
-    assert s['field_units']['triangles']==s['field_units']['dirichlet_node_ids']=='1'
+    assert s['field_units']['node_coordinates']=='m' and s['field_units']['prescribed_temperature']=='K'
+    assert s['field_components']=={'node_coordinates':['x','y'],'heat_flux':['x','y']}
 
 
-@pytest.mark.parametrize('key',['nodes_m','triangles','temperature_k','heat_flux_w_m2','load_w_per_m','reaction_w_per_m','residual_w_per_m','dirichlet_node_ids','dirichlet_temperature_k'])
+@pytest.mark.parametrize('key',['node_coordinates','triangles','temperature','heat_flux','generated_heat_rate_per_depth','reaction_heat_rate_per_depth','residual_heat_rate_per_depth','prescribed_node_ids','prescribed_temperature'])
 def test_thermal_all_raw_nonfinite_rejected_even_without_fields(tmp_path,key):
     data=model();data['results']['save_fields']=False
     r=run(Document.from_dict(data),False)
-    owners={'nodes_m':(r.mesh,'nodes'),'triangles':(r.mesh,'triangles'),
-            'dirichlet_node_ids':(r,'dirichlet_node_ids'),'dirichlet_temperature_k':(r,'dirichlet_temperature_k')}
-    owner,attr=owners.get(key,(r.solution,{'temperature_k':'temperature','heat_flux_w_m2':'heat_flux','load_w_per_m':'load','reaction_w_per_m':'reaction','residual_w_per_m':'residual'}.get(key)))
+    owners={'node_coordinates':(r.mesh,'nodes'),'triangles':(r.mesh,'triangles'),
+            'prescribed_node_ids':(r,'dirichlet_node_ids'),'prescribed_temperature':(r,'dirichlet_temperature_k')}
+    owner,attr=owners.get(key,(r.solution,{'temperature':'temperature','heat_flux':'heat_flux','generated_heat_rate_per_depth':'load','reaction_heat_rate_per_depth':'reaction','residual_heat_rate_per_depth':'residual'}.get(key)))
     a=np.asarray(getattr(owner,attr),dtype=float).copy();a.flat[0]=np.nan;setattr(owner,attr,a)
     with pytest.raises(ValueError,match='finite'):r.save(tmp_path/'bad')
     assert not (tmp_path/'bad').exists()
@@ -349,7 +361,7 @@ def test_thermal_raw_structure_rejected(tmp_path,damage):
 
 def test_thermal_json_integer_policy():
     for value in [4.0,True,0,-1,'4']:
-        d=model();d['mesh']['subdivisions']=[value,4]
+        d=model();d['mesh']['subdivision_count']=[value,4]
         with pytest.raises(DocumentError):Document.from_dict(d)
     Document.from_dict(model(n=4))
 
@@ -358,8 +370,8 @@ def test_thermal_cli_nonfinite_summary_exit1(tmp_path,capsys,monkeypatch):
     import simcase.cli as cli
     data=model();data['results']['save_fields']=False
     r=run(Document.from_dict(data),False)
-    r.diagnostics['injected_nonfinite']=float('nan')
     # Put a nonfinite value in a metadata field actually emitted by summary().
+    r.diagnostics['outward_heat_rate_per_depth']=float('nan')
     r.timings['solve']=float('nan')
     f=tmp_path/'model.json';r.doc.save(f)
     monkeypatch.setattr(cli,'run',lambda *a,**kw:r)

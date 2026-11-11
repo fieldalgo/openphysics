@@ -1,0 +1,411 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "mechanics2d-p1-v1 (format 0.2 rectangle mechanics.elasticity2d) -> mechanics2d-p1-v2 (format 0.3): every array keeps its bytes under its registry name; the numeric diagnostics move to balance; a body force the 0.2 reader filled with zero is absent from the new summary when the document gives none (absent_default); unit, location and component metadata, the sign text and the input echoes of the mesh block are rewritten, not compared (the inputs are compared by P2-2)",
+ "old_layout": "mechanics2d-p1-v1",
+ "new_layout": "mechanics2d-p1-v2",
+ "arrays": [
+  {
+   "old": "nodes_m",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "triangles",
+   "new": "triangles",
+   "f": "="
+  },
+  {
+   "old": "displacement_m",
+   "new": "displacement",
+   "f": "="
+  },
+  {
+   "old": "strain",
+   "new": "strain",
+   "f": "="
+  },
+  {
+   "old": "stress_pa",
+   "new": "stress",
+   "f": "="
+  },
+  {
+   "old": "load_n_per_m",
+   "new": "applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "reaction_n_per_m",
+   "new": "reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "residual_n_per_m",
+   "new": "residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_node_ids",
+   "new": "prescribed_node_ids",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_components",
+   "new": "prescribed_components",
+   "f": "="
+  },
+  {
+   "old": "dirichlet_displacement_m",
+   "new": "prescribed_displacement",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_name",
+   "new": "physics_name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "status",
+   "new": "status",
+   "f": "="
+  },
+  {
+   "old": "plane",
+   "new": "plane",
+   "f": "="
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "input_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "diagnostic_units.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "displacement_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "strain_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "stress_components.**",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_units.nodes_m",
+   "new": "field_units.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_locations.nodes_m",
+   "new": "field_locations.node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.nodes_m.[]",
+   "new": "field_shapes.node_coordinates.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.triangles",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.triangles",
+   "new": "field_locations.triangles",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.triangles.[]",
+   "new": "field_shapes.triangles.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.displacement_m",
+   "new": "field_units.displacement",
+   "f": "="
+  },
+  {
+   "old": "field_locations.displacement_m",
+   "new": "field_locations.displacement",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.displacement_m.[]",
+   "new": "field_shapes.displacement.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.strain",
+   "new": "field_units.strain",
+   "f": "="
+  },
+  {
+   "old": "field_locations.strain",
+   "new": "field_locations.strain",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.strain.[]",
+   "new": "field_shapes.strain.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.stress_pa",
+   "new": "field_units.stress",
+   "f": "="
+  },
+  {
+   "old": "field_locations.stress_pa",
+   "new": "field_locations.stress",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.stress_pa.[]",
+   "new": "field_shapes.stress.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.load_n_per_m",
+   "new": "field_units.applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.load_n_per_m",
+   "new": "field_locations.applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.load_n_per_m.[]",
+   "new": "field_shapes.applied_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.reaction_n_per_m",
+   "new": "field_units.reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.reaction_n_per_m",
+   "new": "field_locations.reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.reaction_n_per_m.[]",
+   "new": "field_shapes.reaction_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.residual_n_per_m",
+   "new": "field_units.residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_locations.residual_n_per_m",
+   "new": "field_locations.residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "field_shapes.residual_n_per_m.[]",
+   "new": "field_shapes.residual_force_per_depth.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.dirichlet_node_ids",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_node_ids.[]",
+   "new": "field_shapes.prescribed_node_ids.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_components",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_locations.dirichlet_components",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_components.[]",
+   "new": "field_shapes.prescribed_components.[]",
+   "f": "="
+  },
+  {
+   "old": "field_units.dirichlet_displacement_m",
+   "new": "field_units.prescribed_displacement",
+   "f": "="
+  },
+  {
+   "old": "field_locations.dirichlet_displacement_m",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "field_shapes.dirichlet_displacement_m.[]",
+   "new": "field_shapes.prescribed_displacement.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.support_reaction_n_per_m.[]",
+   "new": "balance.reaction_force_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.force_balance_n_per_m.[]",
+   "new": "balance.force_imbalance_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.free_residual_n_per_m",
+   "new": "balance.maximum_residual_force_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.max_displacement_m",
+   "new": "balance.maximum_displacement.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.max_abs_stress_pa",
+   "new": "balance.maximum_stress.value",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.applied_load_n_per_m.[]",
+   "new": "balance.applied_force_per_depth.values.[]",
+   "f": "="
+  },
+  {
+   "old": "diagnostics.strain_energy_j_per_m",
+   "new": "balance.strain_energy_per_depth.value",
+   "f": "="
+  },
+  {
+   "old": "body_force_n_m3.[]",
+   "new": "body_force_density.values.[]",
+   "f": "=",
+   "absent_default": "body_force_density"
+  },
+  {
+   "old": "young_modulus_pa",
+   "new": "youngs_modulus.value",
+   "f": "="
+  },
+  {
+   "old": "poisson_ratio",
+   "new": "poisson_ratio",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "study.type",
+  "balance.*.unit",
+  "body_force_density.unit",
+  "field_locations.prescribed_node_ids",
+  "field_locations.prescribed_components",
+  "field_locations.prescribed_displacement",
+  "mesh.nodes",
+  "mesh.triangles",
+  "youngs_modulus.unit"
+ ],
+ "identifiers": [
+  "result_format",
+  "field_layout"
+ ],
+ "vtu": [
+  {
+   "old": "displacement_m",
+   "new": "displacement",
+   "f": "="
+  },
+  {
+   "old": "load_n_per_m",
+   "new": "applied_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "reaction_n_per_m",
+   "new": "reaction_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "residual_n_per_m",
+   "new": "residual_force_per_depth",
+   "f": "="
+  },
+  {
+   "old": "exx",
+   "new": "strain_xx",
+   "f": "="
+  },
+  {
+   "old": "eyy",
+   "new": "strain_yy",
+   "f": "="
+  },
+  {
+   "old": "gxy",
+   "new": "engineering_shear_strain_xy",
+   "f": "="
+  },
+  {
+   "old": "sxx_pa",
+   "new": "stress_xx",
+   "f": "="
+  },
+  {
+   "old": "syy_pa",
+   "new": "stress_yy",
+   "f": "="
+  },
+  {
+   "old": "sxy_pa",
+   "new": "stress_xy",
+   "f": "="
+  }
+ ],
+ "vtu_added": []
+}

@@ -67,9 +67,10 @@ print(k_w_mk)
 [두 재료 벽 튜토리얼](../packages/simcase/layered_wall_tutorial.md)에서 저장된 영역
 배정과 열유속을 확인할 수 있습니다.
 
-온도 의존 Joule 발열에는 [Joule 계약](../packages/simcase/electric_joule.md)이나
-[Python 워크플로](../packages/galerkin/temperature_joule_tutorial.md)가 지원하는 법칙을
-입력합니다. 광학 열광학 계수가 있다고 자동 연성 해석이 활성화되지는 않습니다.
+온도 의존 Joule 발열에는 `electrical_conductivity`를 [Joule 계약](../packages/simcase/electric_joule.md)의
+`linear_resistivity` 모델(`reference_conductivity`, `reference_temperature`,
+`resistivity_temperature_coefficient`와 그 `valid.temperature` 범위, 각각 단위와 함께)로 주거나,
+[Python 워크플로](../packages/galerkin/temperature_joule_tutorial.md)에 법칙을 입력합니다. 광학 열광학 계수가 있다고 자동 연성 해석이 활성화되지는 않습니다.
 
 ## 선택을 재현할 정보 보존하기
 

@@ -32,45 +32,55 @@ def _doc(**study):
 
 
 def _scaled(data, ratio, unit):
+    """The same document with its shape numbers in ``unit`` (tagged lengths keep their units,
+    and the reader takes each to the kernel's micrometres from its exact value)."""
+    from decimal import Decimal
+
+    def exact(v):              # the same length written exactly in the other unit
+        return float(Decimal(repr(v)) * Decimal(repr(ratio)))
     d = copy.deepcopy(data)
-    d["units"] = {"length": unit}
-    d["geometry"]["domain"] = {k: v * ratio for k, v in d["geometry"]["domain"].items()}
+    d["geometry"]["length_unit"] = unit
+    d["geometry"]["domain"] = {k: exact(v) for k, v in d["geometry"]["domain"].items()}
     for shape in d["geometry"]["shapes"]:
-        for key in ("cx", "cy", "r", "mesh_size"):
-            shape[key] *= ratio
-    d["mesh"]["size"] *= ratio
-    grading = d["mesh"]["grading"]
-    grading["center"] = [v * ratio for v in grading["center"]]
-    for key in ("near", "far", "distance"):
-        grading[key] *= ratio
-    d["physics"]["em1"]["wavelength"] *= ratio
-    d["study"]["values"] = [v * ratio for v in d["study"]["values"]]
+        for key in ("cx", "cy", "r"):
+            shape[key] = exact(shape[key])
     return d
+
+
+def _kernel_field(field):
+    """A public vector field back in the kernel's frame (exp(+i omega t), micrometres)."""
+    from simcase.fields import VectorField
+    return VectorField(field.edges, np.conj(field.transverse) / 1e-6, np.conj(field.longitudinal),
+                       np.conj(field.electric), field.normalization)
 
 
 def test_he11_pair_is_tracked_as_one_rank_two_cluster(result):
     assert isinstance(result, SubspaceSweepResult)
     assert result.cluster_ranks == [2] and result.cluster_ids == [1]
     assert result.group_index() is None and result.singleton_group_index() == {}
-    assert result.neff.shape == (5, 2)
-    mean = result.cluster_mean_index()[:, 0]
-    np.testing.assert_allclose(mean, result.neff.mean(axis=1))
+    assert result.effective_index.shape == (5, 2)
+    mean = result.mean_effective_index[:, 0]
+    np.testing.assert_allclose(mean, result.effective_index.mean(axis=1))
     assert np.all(np.diff(mean) < 0)                          # n_eff falls with wavelength here
-    assert np.all((1.44 < result.neff) & (result.neff < 1.45))
+    assert np.all((1.44 < result.effective_index) & (result.effective_index < 1.45))
     for point in result.mode_tracking["points"]:
         cluster = point["clusters"][0]
         assert cluster["rank"] == 2 and cluster["lower_guard_rank"] == 3
         assert cluster["span"] <= 1e-4 < 1e-3 < cluster["lower_gap"]
     for point in result.mode_tracking["points"][1:]:
-        assert point["clusters"][0]["min_principal_squared"] >= 0.8
+        assert point["clusters"][0]["minimum_principal_squared"] >= 0.8
 
 
 def test_raw_eigenfields_are_kept_and_frames_reconstruct(result):
-    metric = ElectricMetric(Mesh(result.mesh_nodes, result.mesh_triangles, {}))
+    metric = ElectricMetric(Mesh(result.node_coordinates, result.triangles, {}))
     for i, raw in enumerate(result.vector_fields):
         np.testing.assert_allclose(np.linalg.norm(raw.electric, axis=2).max(axis=0), 1.0)
         frame = result.frame_fields(i)
-        np.testing.assert_allclose(metric.product(frame, frame), np.eye(2), atol=1e-10)
+        # the frame is electric-L2 orthonormal on the micrometre mesh: on the saved metres the
+        # Gram matrix is the identity times (1e-6)^2 for the line integrals' part
+        gram = ElectricMetric(Mesh(result.node_coordinates / 1e-6, result.triangles, {})).product(
+            _kernel_field(frame), _kernel_field(frame))
+        np.testing.assert_allclose(gram, np.eye(2), atol=1e-10)
         if i:
             cross = metric.product(result.frame_fields(i - 1), frame)
             np.testing.assert_allclose(cross, cross.conj().T, atol=1e-10)      # aligned: Hermitian PSD
@@ -89,98 +99,55 @@ def test_density_is_invariant_under_a_unitary_change_of_frame(result):
 
 
 def test_reversed_wavelengths_give_the_same_cluster_statistics(result):
-    values = examples.VECTOR_FIBER_SUBSPACE_SWEEP["study"]["values"][::-1]
+    values = {"unit": "um", "values": examples.VECTOR_FIBER_SUBSPACE_SWEEP["study"]["values"]["values"][::-1]}
     reverse = run(Document.from_dict(_doc(values=values)), False)
-    np.testing.assert_allclose(reverse.cluster_mean_index()[::-1], result.cluster_mean_index(), atol=1e-12)
-    np.testing.assert_allclose(reverse.cluster_mean_group_index()[::-1], result.cluster_mean_group_index(),
-                               atol=1e-10)
-
-
-@pytest.mark.parametrize("ratio, unit", [(1e3, "nm"), (1e-6, "m")])
-def test_scaled_document_is_consistent(result, ratio, unit):
-    """End to end in another unit: the mesh may differ, the answer may not beyond mesh noise.
-
-    The mesher rounds differently at another scale, so connectivity may legally
-    differ (meshine test_meshine_scale.py); only the triangle-count band is an
-    invariant. An equal count, asserted here earlier for nm, was a coincidence:
-    m gives 1806 against 1792 triangles (a pre-registered equal-count criterion
-    failed for m). The value tolerance 5e-6 covers that mesh noise (observed
-    4e-7 nm, 3e-8 m). Unit handling itself is checked on one mesh below.
-    """
-    other = run(Document.from_dict(_scaled(examples.VECTOR_FIBER_SUBSPACE_SWEEP, ratio, unit)), False)
-    assert other.cluster_ranks == result.cluster_ranks
-    assert len(other.mesh_triangles) == pytest.approx(len(result.mesh_triangles), rel=0.1)
-    np.testing.assert_allclose(other.cluster_mean_index(), result.cluster_mean_index(), atol=5e-6)
-    np.testing.assert_allclose(other.cluster_mean_group_index(), result.cluster_mean_group_index(), atol=5e-6)
+    np.testing.assert_allclose(reverse.mean_effective_index[::-1], result.mean_effective_index, atol=1e-12)
+    np.testing.assert_allclose(reverse.mean_group_index[::-1], result.mean_group_index, atol=1e-10)
 
 
 def _dispersive(data):
     """The example fiber with physmat built-in dispersive materials (SiO2 core, CaF2 cladding)."""
     d = copy.deepcopy(data)
     d["materials"] = {}
-    d["geometry"]["background"]["material"] = "CaF2"
-    d["geometry"]["shapes"][0]["material"] = "SiO2"
-    d["physics"]["em1"]["n_cladding"] = 1.427       # above CaF2 and below SiO2 over 1.5-1.6 um
+    d["geometry"]["background"]["material"] = "physmat:CaF2"
+    d["geometry"]["shapes"][0]["material"] = "physmat:SiO2"
+    d["physics"]["em1"]["effective_index_threshold"] = 1.427       # above CaF2 and below SiO2 over 1.5-1.6 um
     return d
-
-
-def _on_the_same_mesh(base, ratio, unit, monkeypatch):
-    """Run the scaled document on the um document's mesh, scaled exactly; return (scaled, um) results."""
-    import simcase.runner as runner
-    from meshine import TriMesh
-    from simcase.materials import material_table
-
-    um_model = runner.build_mesh(Document.from_dict(copy.deepcopy(base)))
-    doc = Document.from_dict(_scaled(base, ratio, unit))
-    t = um_model.tri
-    tri = TriMesh(t.nodes * ratio, t.triangles.copy(), t.regions.copy(), list(t.region_names),
-                  {k: v.copy() for k, v in t.boundary_edges.items()},
-                  {k: v.copy() for k, v in t.boundary_nodes.items()},
-                  {k: v.copy() for k, v in t.interfaces.items()})
-    mesh = Mesh(tri.nodes, tri.triangles, boundary=dict(tri.boundary_nodes),
-                boundary_edges=dict(tri.boundary_edges))
-    model = runner.MeshedModel(doc, tri, mesh, dict(um_model.region_materials),
-                               material_table(doc, um_model.region_materials))
-    used = []
-    monkeypatch.setattr(runner, "build_mesh", lambda d: used.append(d) or model)
-    scaled = run(doc, False)
-    assert used, "the scaled mesh was not used"
-    monkeypatch.undo()
-    return scaled, run(Document.from_dict(copy.deepcopy(base)), False)
 
 
 @pytest.mark.parametrize("materials", ["constant", "dispersive"])
 @pytest.mark.parametrize("ratio, unit", [(1e3, "nm"), (1e-6, "m")])
-def test_scaled_document_on_the_same_mesh_matches_to_roundoff(ratio, unit, materials, monkeypatch):
-    """Unit handling isolated from meshing.
-
-    The um mesh, scaled exactly into the other unit, removes the mesher's
-    rounding differences, so any remaining difference is unit handling. Observed:
-    mean index <= 2.2e-16 and mean-index derivative <= 3.6e-14 under the default,
-    Haswell and Sandybridge kernels. The dispersive case also exercises the
-    material wavelength conversion, which the constant-index example cannot.
-    The mesher-in-loop test above cannot resolve a relative wavelength error
-    below about 3e-4; this one resolves about 2e-10.
-    """
+def test_scaled_document_gives_the_same_bits(result, ratio, unit, materials):
+    """End to end in another length_unit (check P2-5). The shape numbers reach the micrometre
+    kernel frame from their exact picometre counts and every tagged length from its exact
+    value, so the mesher, physmat and the solver receive the same doubles and every saved
+    value is bitwise equal. (Format 0.2 meshed each unit's own doubles: the answers then
+    differed by mesh noise, 5e-6, and by about 2e-10 on one mesh.) The dispersive case also
+    exercises physmat's wavelength, which the constant-index example cannot."""
     assert ratio != 1.0
     base = examples.VECTOR_FIBER_SUBSPACE_SWEEP
-    base = _dispersive(base) if materials == "dispersive" else base
-    scaled, um = _on_the_same_mesh(base, ratio, unit, monkeypatch)
-    np.testing.assert_array_equal(scaled.mesh_triangles, um.mesh_triangles)
-    np.testing.assert_allclose(scaled.mesh_nodes, um.mesh_nodes * ratio, rtol=1e-15, atol=0)
-    assert scaled.cluster_ranks == um.cluster_ranks
-    np.testing.assert_allclose(scaled.cluster_mean_index(), um.cluster_mean_index(), atol=1e-12, rtol=0)
-    np.testing.assert_allclose(scaled.cluster_mean_group_index(), um.cluster_mean_group_index(), atol=1e-10, rtol=0)
+    if materials == "dispersive":
+        base = _dispersive(base)
+        um = run(Document.from_dict(base), False)
+    else:
+        um = result
+    other = run(Document.from_dict(_scaled(base, ratio, unit)), False)
+    assert other.cluster_ranks == um.cluster_ranks
+    for name in ("node_coordinates", "triangles", "effective_index", "mean_effective_index", "mean_group_index",
+                 "vacuum_wavelength"):
+        assert getattr(other, name).tobytes() == getattr(um, name).tobytes(), name
+    for a, b in zip(other.vector_fields, um.vector_fields):
+        assert a.transverse.tobytes() == b.transverse.tobytes() and a.electric.tobytes() == b.electric.tobytes()
 
 
-@pytest.mark.parametrize("num_modes, message", [
+@pytest.mark.parametrize("mode_count, message", [
     (1, r"cut the observed cluster at candidate ranks 1-2; include all 2 vectors or fewer \(0\)"),
     (3, "cut the observed cluster at candidate ranks 3-6"),
     (6, "no observed lower guard candidate"),
 ])
-def test_incomplete_clusters_and_unresolved_guards_fail(num_modes, message):
+def test_incomplete_clusters_and_unresolved_guards_fail(mode_count, message):
     d = _doc()
-    d["physics"]["em1"]["num_modes"] = num_modes
+    d["physics"]["em1"]["mode_count"] = mode_count
     with pytest.raises(ModeTrackingError, match=f"wavelength 1.5 um.*{message}"):
         run(Document.from_dict(d), False)
 
@@ -195,21 +162,23 @@ def test_default_method_still_rejects_the_same_fiber_pair():
 def test_save_writes_a_fresh_versioned_layout(result, tmp_path):
     output = result.save(tmp_path / "out")
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
-    assert summary["field_representation"] == "vector-subspace-edge-nodal-v1"
-    assert summary["field_layout"] == "em-modes2d-subspace-raw-v1"  # not the per-mode layout
-    assert summary["mesh_length_unit"] == "um" and summary["length_unit_to_m"] == 1e-6
+    assert summary["field_representation"] == "vector-subspace-edge-nodal-v2"
+    assert summary["field_layout"] == "em-modes2d-subspace-raw-v2"  # not the per-mode layout
+    assert "mesh_length_unit" not in summary and "length_unit_to_m" not in summary
+    assert summary["field_units"]["unnormalized_electric_field_line_integral"] == "m"
+    assert summary["frame_normalization"].startswith("electric-L2 orthonormal on the micrometre solver mesh")
     assert summary["clusters"] == [{"id": 1, "rank": 2, "columns": [0, 2]}]
     assert "neff" not in summary and "group_index" not in summary
     assert summary["mode_tracking"] == result.mode_tracking
-    np.testing.assert_allclose(summary["cluster_mean_group_index"], result.cluster_mean_group_index())
+    assert summary["mean_group_index"]["values"] == result.mean_group_index.tolist()
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
-        assert str(arrays["field_representation"]) == "vector-subspace-edge-nodal-v1"
-        assert str(arrays["field_layout"]) == "em-modes2d-subspace-raw-v1"
-        assert str(arrays["study_parameter"]) == "physics.em1.wavelength"
+        assert str(arrays["field_representation"]) == "vector-subspace-edge-nodal-v2"
+        assert str(arrays["field_layout"]) == "em-modes2d-subspace-raw-v2"
+        assert str(arrays["study_parameter"]) == "physics.em1.vacuum_wavelength"
         assert arrays["cluster_offsets"].tolist() == [0, 2]
-        np.testing.assert_array_equal(arrays["raw_neff"], result.neff)
+        np.testing.assert_array_equal(arrays["effective_index"], result.effective_index)
         assert arrays["frame_transform"].shape == (5, 2, 2)
-        frame = arrays["raw_transverse"][3] @ arrays["frame_transform"][3]
+        frame = arrays["unnormalized_electric_field_line_integral"][3] @ arrays["frame_transform"][3]
         np.testing.assert_allclose(frame, result.frame_fields(3).transverse)
         assert json.loads(str(arrays["mode_tracking_json"])) == result.mode_tracking
     with pytest.raises(FileExistsError, match="choose a fresh output directory"):
@@ -232,7 +201,7 @@ def test_cli_writes_results_and_refuses_existing_or_failed_output(tmp_path, caps
     assert main(["run", str(model), "-q", "-o", str(output)]) == 1
     assert "subspace sweep output already exists" in capsys.readouterr().err
     bad = _doc()
-    bad["physics"]["em1"]["num_modes"] = 1
+    bad["physics"]["em1"]["mode_count"] = 1
     Document.from_dict(bad).save(model)
     assert main(["run", str(model), "-q", "-o", str(tmp_path / "bad")]) == 1
     error = capsys.readouterr().err
@@ -258,13 +227,13 @@ def test_studio_returns_a_versioned_cluster_payload(result):
         time.sleep(0.1)
     assert status == "done"
     payload = client.get(f"/api/jobs/{job}/result").json()
-    assert payload["neff"] is None and payload["group_index"] is None and "vector_fields" not in payload
+    assert payload["effective_index"] is None and payload["group_index"] is None and "vector_fields" not in payload
     sub = payload["subspace"]
-    assert sub["field_representation"] == payload["summary"]["field_representation"] == "vector-subspace-edge-nodal-v1"
+    assert sub["field_representation"] == payload["summary"]["field_representation"] == "vector-subspace-edge-nodal-v2"
     assert sub["clusters"] == [{"id": 1, "rank": 2, "columns": [0, 2]}]
-    np.testing.assert_allclose(sub["cluster_mean_group_index"], result.cluster_mean_group_index())
+    np.testing.assert_allclose(sub["mean_group_index"], result.mean_group_index)
     density = np.array(sub["density"])
-    assert density.shape == (5, 1, len(result.mesh_triangles))
+    assert density.shape == (5, 1, len(result.triangles))
     np.testing.assert_allclose(density[2, 0], result.subspace_density(2, 1))
     assert np.allclose(density.max(axis=2), 1.0)
 
@@ -275,21 +244,25 @@ def test_raw_eigenpairs_satisfy_the_original_pencil_and_rotated_mixtures_do_not(
     from simcase.runner import build_mesh, solve_point
     from simcase.subspace_tracking import columns
 
+    # vector_pencil_residuals is a kernel-frame internal (micrometres, exp(+i omega t)): the
+    # public results go back to that frame first
     doc = Document.from_dict(examples.VECTOR_FIBER_SUBSPACE_SWEEP)
     model = build_mesh(doc)
-    physics = doc.sole_physics()[1]
-    for i, wl in enumerate(result.values):
-        eps = model.eps_per_triangle(wl)
-        raw = vector_pencil_residuals(model.mesh, eps, wl, physics["boundary"], result.neff[i], result.vector_fields[i])
+    physics = doc.si["physics"]["em1"]
+    for i, wl in enumerate(result.vacuum_wavelength):
+        eps = np.conj(model.relative_permittivity(wl))
+        raw = vector_pencil_residuals(model.solver_mesh, eps, wl / 1e-6, physics["boundary"],
+                                      np.conj(result.effective_index[i]), _kernel_field(result.vector_fields[i]))
         assert raw.max() < 1e-10
-    solved = solve_point(model, dict(physics, num_modes=6))
-    eps = model.eps_per_triangle(physics["wavelength"])
-    base = vector_pencil_residuals(model.mesh, eps, physics["wavelength"], physics["boundary"],
-                                   solved["neff"], solved["vector_field"])
-    mix = np.eye(len(solved["neff"]), dtype=complex)
+    solved = solve_point(model, dict(physics, mode_count=6))
+    wl = physics["vacuum_wavelength"]
+    eps = np.conj(model.relative_permittivity(wl))
+    neff, field = np.conj(solved["effective_index"]), _kernel_field(solved["vector_field"])
+    base = vector_pencil_residuals(model.solver_mesh, eps, wl / 1e-6, physics["boundary"], neff, field)
+    mix = np.eye(len(neff), dtype=complex)
     mix[1:3, 1:3] = [[np.cos(0.7), -np.sin(0.7)], [np.sin(0.7), np.cos(0.7)]]       # HE11 member with TE01
-    mixed = vector_pencil_residuals(model.mesh, eps, physics["wavelength"], physics["boundary"],
-                                    solved["neff"], columns(solved["vector_field"], mix))
+    mixed = vector_pencil_residuals(model.solver_mesh, eps, wl / 1e-6, physics["boundary"], neff,
+                                    columns(field, mix))
     assert base.max() < 1e-10
     assert mixed[1:3].min() > 1e6 * base.max()
 

@@ -24,11 +24,18 @@ python -m simcase.studio            # then open http://127.0.0.1:8765/geometry-l
   (`examples/simcase/geometry_v1_soi_strip.json`,
   `geometry_v1_imprint_rib.json`, built into the page), a new one-rectangle
   document, or **Open file** with any JSON document.
-- **Parameters** are listed with their evaluated value. A parameter written as
-  a plain number with a `range` gets a slider, whose step is a power of ten
-  (at least 200 steps over the range) so that saved values stay short decimals;
-  every parameter has a text field that takes a number or an expression
-  (`2 * t + 0.1`). A number a double cannot hold (`1e999`, `1e-400`) is refused
+- **Parameters** are listed with their evaluated value. A parameter with a
+  `range` gets a slider when its value and range are plain numbers, or quantity
+  strings in one unit (`"0.5 um"` with `["0.3 um", "0.9 um"]`); its step is a
+  power of ten (at least 200 steps over the range) so that saved values stay
+  short decimals. Every parameter has a text field that takes a number, a
+  quantity (`0.4 um`) or an expression (`2 * t + 0.1`). In a format 0.3
+  document a bare number takes the parameter's unit: the unit of the value it
+  replaces, else the one unit its range is written in, so a number typed after
+  an expression keeps the unit; a dimensionless parameter, or a length
+  parameter without a range, gets the number as typed, and the engine names a
+  missing unit. The slider writes its value with the unit it shows (`0.9 um`),
+  whatever unit the field held before. A number a double cannot hold (`1e999`, `1e-400`) is refused
   in the page and the field returns to the value the document holds.
 - Every edit sends the whole document to the server, which parses it and
   evaluates one component. The drawing shows the cells filled by region (void
@@ -51,13 +58,23 @@ the routes of each physics page.
 ## What it sends and answers
 
 `POST /api/geometry-lab/evaluate` takes `{"doc": <document>, "component":
-<name or null>}`. It reads only the `units` and `geometry` blocks, as
-`python -m simcase geometry` does, so a document without physics is accepted.
-The answer is `{"ok": true, ...}` with the component's cells, curves (points in
-the document's length unit), regions with areas, selections with their entry
+<name or null>}`. It reads only the `geometry` block of a format 0.3 document, as
+`python -m simcase geometry` does, so a document without physics is accepted; a
+document of another format is refused by name (`E-FORMAT`). The shipped starters
+and a new document are format 0.3, whose component `length_unit` sets the drawing
+unit. The answer is `{"ok": true, ...}` with
+the component's cells, curves (points in the component's length unit), regions with areas, selections with their entry
 indices, boundary tags, parameters (written and evaluated), roundings and the
 engine listing, or `{"ok": false, "refused": <message>}`. It is a view for this
 page, not a persisted format, and it is not part of the document contract.
+
+The request is read from its raw bytes with `simcase.reader`, as on every Studio route
+that takes a document, and is limited to 1 MiB of `application/json`. A number keeps its
+written digits. A duplicate key inside the document is answered `{"ok": false, "refused":
+<message>, "diagnostics": [...]}` with its `E-KEY-DUPLICATE` diagnostic at its document
+path; `NaN`, `Infinity`, malformed JSON, text that is not UTF-8, a string with an escaped
+unpaired surrogate and a duplicate key of the request itself are refused with status 400 and `{"detail", "diagnostics"}` (`E-JSON`,
+`E-KEY-DUPLICATE`). A leading UTF-8 byte order mark is accepted.
 
 The page loads only its own files from `/geometry-lab-assets/`: no inline
 script or style and no other origin; the page response carries a
@@ -73,7 +90,7 @@ Registered before the page was written:
 |---|---|
 | GL-1 the engine listing equals `python -m simcase geometry` for both examples; regions, selections, curve provenance and tags equal the engine's | `tests/simcase/test_studio_geometry_lab.py` |
 | GL-2 after a parameter edit (three values in the range, and an expression) cell areas, vertices, curves and selections equal a fresh engine run, compared with `==` | same |
-| GL-3 refusals carry the engine's message: a self-crossing path, an arc end off its circle, a `3d` component, an empty selection, a parameter cycle, a 0.2 block (the CLI's words) | same |
+| GL-3 refusals carry the engine's message: a self-crossing path, an arc end off its circle, a `3d` component, an empty selection, a parameter cycle, a flat block without `version` (the CLI's words) | same |
 | GL-4 the saved text parses back to the edited document and the same model | same, and the browser check |
 | GL-5 real browser: both starters, slider and text edits, a refusal and a save, with no console error and no policy violation | `tools/studio_browser/geometry_lab_browser.mjs` (local; needs Playwright, not in CI) |
 | GL-6 the page's pure helpers | `tests/simcase/studio_geometry_lab.cjs` |

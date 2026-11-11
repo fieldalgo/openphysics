@@ -98,7 +98,10 @@ Each package's pages (contracts and validation reports) are in
 the pinned validation environments, the reviewed license inventory and
 maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
-them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
+them required CI runs. `physmat/unit_tables.json` is generated from
+`physmat/quantities.json` by `python -m physmat.units --write` (`--check`
+compares); the generator ships in the package, so that
+`tests/physmat/test_units.py` (R3) checks it against installed wheels too. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
 [studies/](../studies/README.md) diagnostic scripts; people run them and
 required CI does not. The `openphysics` meta distribution has no code, tests or examples; it requires seven packages (`simcase` with its `studio` and `export` extras, `physmat` with `rii`) and provides the `openphysics` command, which opens Studio.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
@@ -220,8 +223,10 @@ wheel from its sdist, and checks the archives with the same rules as the
 distribution check. All nine wheels are installed, each with every extra its
 metadata declares, into a fresh environment in a temporary directory outside the
 checkout. Next to it, the script copies the tracked files under `tests/`,
-`examples/` and `docs/` and the root `pyproject.toml`, but nothing under
-`packages/`; their hashes are recorded in `suite-file-hashes.json`. Every
+`examples/` and `docs/`, the units batch's fixture documents
+(`tools/units_batch/fixtures/`, JSON data the tests read) and the root
+`pyproject.toml`, but nothing under `packages/` and no other file under `tools/`;
+their hashes are recorded in `suite-file-hashes.json`. Every
 Python test in `tests/` then runs with `python -I -m pytest`; no test is
 selected by name. Besides any failing test, the run fails if a first-party
 module does not load from the installed environment, if any test is skipped or
@@ -276,6 +281,17 @@ Timing and profiling commands for the solvers are in the
 [electric](benchmark_electric.md) and [derivative](benchmark_derivatives.md)
 benchmark guides.
 
+**Units-batch equivalence (manual dispatch only).** The `units-batch-equivalence`
+job runs `tests/simcase/test_units_batch_equivalence.py` with
+`OPENPHYSICS_BATCH_BASELINE` set to the merge base with `main`, on Ubuntu 24.04,
+macOS 15 and Windows 2022, one platform at a time. It records every
+`examples/simcase` document and frozen fixture on the baseline and on the
+dispatched commit and requires the same solver and mesher inputs and saved bytes,
+under the transforms of the [units-batch harness](../tools/units_batch/README.md).
+Only a manual dispatch runs it (`gh workflow run validate.yml --ref <branch>`);
+pushes and pull requests skip it. It is not part of `tests`, so each platform's
+result is read on its own, from the run of the commit it is claimed for.
+
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
 `queue: single`, so a new push supersedes the older run.
@@ -327,6 +343,9 @@ Each job uploads its artifacts, even after a failure:
 - Installed platforms: `installed-packages-<os>-<run_id>` with every command's
   exit and log, environment details, checksums, installed origins, JUnit XML and
   `numeric-runtime.json`.
+- Units-batch equivalence (manual dispatch only):
+  `units-batch-equivalence-<os>-<run_id>` with the comparison report (a SHA-256
+  table per document and array), the plan and both recording manifests.
 
 Some stages store the stdout of passing tests in JUnit `system-out`
 (`-o junit_logging=all -o junit_log_passing_tests=true`). This keeps numerical

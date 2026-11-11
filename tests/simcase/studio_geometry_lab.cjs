@@ -17,23 +17,57 @@ test('starters are the shipped version 1 examples',()=>{
 });
 
 test('a parameter edit changes exactly that value and leaves the input untouched',()=>{
+ // format 0.3: a length parameter is written with its unit, and a bare number keeps that unit
  const doc=example('geometry_v1_imprint_rib'),before=JSON.stringify(doc);
+ assert.equal(doc.geometry.parameters.w.value,'0.5 um');
  const edited=M.setParameter(doc,'w',0.61);
  assert.equal(JSON.stringify(doc),before);
- const hand=JSON.parse(before);hand.geometry.parameters.w.value=0.61;
+ const hand=JSON.parse(before);hand.geometry.parameters.w.value='0.61 um';
  assert.deepEqual(edited,hand);
  assert.deepEqual(M.setParameter(doc,'w','0.61'),hand);
  assert.deepEqual(M.setParameter(doc,'w',' 6.1e-1 '),hand);
+ assert.equal(M.setParameter(doc,'w','610 nm').geometry.parameters.w.value,'610 nm');     // a quantity as written
  assert.equal(M.setParameter(doc,'slab','t / 2').geometry.parameters.slab.value,'t / 2');
- assert.equal(M.setParameter(doc,'slab','-.5').geometry.parameters.slab.value,-0.5);
+ assert.equal(M.setParameter(doc,'slab','-.5').geometry.parameters.slab.value,'-0.5 um');
+ const plain={geometry:{parameters:{w:{value:0.5}}}};                 // format 0.2 numbers stay numbers
+ assert.equal(M.setParameter(plain,'w','-.5').geometry.parameters.w.value,-0.5);
  assert.throws(()=>M.setParameter(doc,'nope',1),/Unknown parameter nope/);
  assert.throws(()=>M.setParameter(doc,'w',''),/empty/);
  assert.throws(()=>M.setParameter(doc,'w',Infinity),/finite/);
  assert.throws(()=>M.setParameter(doc,'w','1e999'),/too large/);
  assert.throws(()=>M.setParameter(doc,'w','-1e999'),/too large/);
  assert.throws(()=>M.setParameter(doc,'w','1e-400'),/too small/);
- assert.equal(M.setParameter(doc,'w','0e5').geometry.parameters.w.value,0);
- assert.equal(M.setParameter(doc,'w','0.000').geometry.parameters.w.value,0);
+ assert.equal(M.setParameter(doc,'w','0e5').geometry.parameters.w.value,'0 um');
+ assert.equal(M.setParameter(plain,'w','0.000').geometry.parameters.w.value,0);
+});
+
+test('a typed bare number takes the unit of the value it replaces, else the one unit of the range',()=>{
+ // format 0.3: w is "0.5 um" with range ["0.3 um", "0.9 um"]; t is "0.22 um" with no range
+ const doc=example('geometry_v1_imprint_rib'),w=d=>d.geometry.parameters.w.value;
+ // an expression, then a bare number (the field or the slider): the unit comes from the range
+ const expression=M.setParameter(doc,'w','nope * 2');assert.equal(w(expression),'nope * 2');
+ assert.equal(w(M.setParameter(expression,'w','0.4')),'0.4 um');
+ assert.equal(w(M.setParameter(expression,'w',0.4)),'0.4 um');
+ // a bare number, then a bare number: the unit of the value it replaces, as before
+ const typed=M.setParameter(doc,'w','0.4');assert.equal(w(typed),'0.4 um');
+ assert.equal(w(M.setParameter(typed,'w','0.45')),'0.45 um');
+ // a value held without its unit (a document written so) takes the range's unit too
+ const held=JSON.parse(JSON.stringify(doc));held.geometry.parameters.w.value=0.4;
+ assert.equal(w(M.setParameter(held,'w','0.45')),'0.45 um');
+ // text with a unit stays as written
+ assert.equal(w(M.setParameter(expression,'w','400 nm')),'400 nm');
+ // a dimensionless parameter with a bare range stays bare, also after an expression
+ const ratio=JSON.parse(JSON.stringify(doc));ratio.geometry.parameters.k={value:2,range:[1,4]};
+ const k=d=>d.geometry.parameters.k.value;
+ assert.equal(k(M.setParameter(ratio,'k','3')),3);
+ assert.equal(k(M.setParameter(M.setParameter(ratio,'k','w / t'),'k','3')),3);
+ // a length parameter with no range, after an expression: the number as typed (the engine names
+ // the missing unit); pinned as the current behaviour
+ const t=M.setParameter(doc,'t','w / 2');assert.equal(t.geometry.parameters.t.value,'w / 2');
+ assert.equal(M.setParameter(t,'t','0.3').geometry.parameters.t.value,0.3);
+ // a range in two units names no one unit (the slider refuses it too): the number as typed
+ const mixed=JSON.parse(JSON.stringify(doc));mixed.geometry.parameters.w={value:'w0',range:['300 nm','0.9 um']};
+ assert.equal(w(M.setParameter(mixed,'w','0.4')),0.4);
 });
 
 test('a slider is offered only for a plain number with a numeric range, in short decimal steps',()=>{
@@ -47,6 +81,9 @@ test('a slider is offered only for a plain number with a numeric range, in short
  assert.equal(M.sliderOf({written:0.5,range:null}),null);
  assert.equal(M.sliderOf({written:0.5,range:[0.9,0.3]}),null);
  assert.equal(M.sliderOf({written:0.5,range:['a',1]}),null);
+ // format 0.3: the value and its bounds in one unit give a slider in that unit
+ assert.deepEqual(M.sliderOf({written:'0.5 um',range:['0.3 um','0.9 um']}),{min:0.3,max:0.9,step:0.001,decimals:3,unit:'um'});
+ assert.equal(M.sliderOf({written:'0.5 um',range:['300 nm','0.9 um']}),null);
 });
 
 test('only documents with a version 1 geometry block are read',()=>{

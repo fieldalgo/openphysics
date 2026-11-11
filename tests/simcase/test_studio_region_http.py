@@ -21,9 +21,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 import region_studio_fixtures as fx
-from simcase import (Document, MeshLimitError, ThermalRunResult, TransientThermalRunResult, check_mesh_limits,
-                     examples, region_complexity, run)
-from simcase.geometry_document import from_v02
+from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult, TransientThermalRunResult,
+                     check_mesh_limits, examples, region_complexity, run)
+from simcase.geometry_document import from_flat
 from simcase.studio import server
 from simcase.studio import thermal_api as thermal
 from simcase.studio import thermal_regions_api as regions
@@ -32,17 +32,17 @@ from simcase.studio import transient_thermal_api as transient
 ROUTES = {thermal.KIND: '/api/thermal/', transient.KIND: '/api/thermal/transient/'}
 STEADY_BLOCK = {
     'supported': True, 'run_enabled': True,
-    'result_formats': ['thermal.steady2d-regions-result-v1'],
-    'field_layouts': ['thermal2d-p1-node-cell-regions-v1'],
-    'payload_formats': ['studio-thermal-steady-regions-v1'],
+    'result_formats': ['thermal.steady2d-regions-result-v2'],
+    'field_layouts': ['thermal2d-p1-node-cell-regions-v2'],
+    'payload_formats': ['studio-thermal-steady-regions-v2'],
     'limits': {'max_shapes': 64, 'max_circles': 16, 'max_polygon_points': 512,
                'max_boundary_crossings': 1024, 'max_input_vertices': 2048}}
 TRANSIENT_BLOCK = {
     'supported': True, 'run_enabled': True,
-    'result_formats': ['thermal.transient2d-regions-result-v1'],
-    'field_layouts': ['thermal2d-transient-p1-node-cell-regions-v1'],
-    'payload_formats': ['studio-thermal-transient-regions-v1', 'studio-thermal-transient-frame-v1',
-                        'studio-thermal-transient-history-v1'],
+    'result_formats': ['thermal.transient2d-regions-result-v2'],
+    'field_layouts': ['thermal2d-transient-p1-node-cell-regions-v2'],
+    'payload_formats': ['studio-thermal-transient-regions-v2', 'studio-thermal-transient-frame-v2',
+                        'studio-thermal-transient-history-v2'],
     'limits': STEADY_BLOCK['limits']}
 
 
@@ -52,6 +52,28 @@ def envelope(doc, revision=3, sequence=5):
 
 def example(name):
     return copy.deepcopy(examples.EXAMPLES[name])
+
+
+# The format 0.2 rectangles of thermal_slab and transient_thermal_uniform (the shipped examples
+# are format 0.3 now): refused by name, as is any format 0.2 heat document.
+LEGACY_RECTANGLES = {
+    'thermal_slab': {
+        'openphysics': '0.2', 'name': 'Steady heat slab', 'units': {'length': 'mm', 'temperature': 'K'},
+        'geometry': {'domain': {'xmin': 0.0, 'xmax': 30.0, 'ymin': 0.0, 'ymax': 20.0}}, 'materials': {},
+        'physics': {'heat1': {'type': 'thermal.steady2d', 'conductivity_w_mk': 12.5, 'heat_source_w_m3': 0.0,
+                              'dirichlet_temperature_k': {'left': 280.0, 'right': 315.0}}},
+        'mesh': {'subdivisions': [32, 16]}, 'study': {'type': 'single'},
+        'results': {'save_fields': True, 'plots': False}},
+    'transient_thermal_uniform': {
+        'openphysics': '0.2', 'name': 'Insulated constant-source transient heat',
+        'units': {'length': 'm', 'temperature': 'K', 'time': 's'},
+        'geometry': {'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}}, 'materials': {},
+        'physics': {'heat1': {'type': 'thermal.transient2d', 'conductivity_w_mk': 2.5,
+                              'volumetric_heat_capacity_j_m3k': 4.0, 'initial_temperature_k': 300.0,
+                              'dirichlet_temperature_k': {}, 'heat_source_w_m3': 8.0}},
+        'mesh': {'subdivisions': [4, 4]}, 'study': {'type': 'transient', 'time_s': [0.0, 0.1, 0.3]},
+        'results': {'save_fields': True, 'plots': False}},
+}
 
 
 def kind_of(doc):
@@ -139,7 +161,7 @@ def test_s2_examples_validate_off_the_event_loop_without_meshing(client, monkeyp
     assert response.status_code == 200, response.text
     body = response.json()
     assert body['ok'] is True and body['client_revision'] == 3 and body['request_seq'] == 5
-    assert set(body) == ({'ok', 'doc', 'summary', 'notes', 'client_revision', 'request_seq'}
+    assert set(body) == ({'ok', 'doc', 'summary', 'diagnostics', 'client_revision', 'request_seq'}
                          | ({'kind'} if name.startswith('transient') else set()))
     assert len(seen['read']) == 1
     for key in ('from_dict', 'check_mesh_limits', 'region_complexity'):
@@ -293,13 +315,14 @@ def test_s4_defensive_raw_preflight_matches_the_rectangle_preflight(kind):
 def test_s4b_time_refusals_match_rectangle_bodies(client, monkeypatch, times):
     forbid(monkeypatch, server, 'run')
     region_doc, rectangle_doc = fx.transient_example(), example('transient_thermal_uniform')
-    region_doc['study']['time_s'] = rectangle_doc['study']['time_s'] = times
+    region_doc['study']['time']['values'] = times
+    rectangle_doc['study']['time']['values'] = times
     for action in ('validate', 'run'):
         region = post(client, region_doc, action)
         rectangle = post(client, rectangle_doc, action)
-        assert region.status_code == rectangle.status_code
-        assert region.json()['error'] == rectangle.json()['error']
-        assert region.content == rectangle.content
+        # the same refusal, body for body (both read study.time, a tagged array)
+        assert (region.status_code, region.json()) == (rectangle.status_code, rectangle.json())
+        assert 'requested times' in region.json()['error']['message']
     assert_idle(server._thermal_jobs)
 
 
@@ -364,7 +387,7 @@ def test_s6_tiny_global_size_is_refused_by_its_isolated_circle_vertices(client, 
     forbid(monkeypatch, meshine, 'generate')
     doc = fx.tiny_global_size(0.0246)
     heater = doc['geometry']['shapes'][1]
-    expected = 2*int(4*np.pi*heater['r']/doc['mesh']['size'])+12   # heater and its hole, 3 rectangles
+    expected = 2*int(4*np.pi*heater['r']/0.0246)+12   # heater and its hole, 3 rectangles (mm)
     assert check_mesh_limits(Document.from_dict(doc), max_input_vertices=10**6) == expected > 2048
     response = post(client, doc, 'validate')
     assert response.status_code == 413
@@ -380,13 +403,13 @@ def test_s7_subdivisions_in_a_region_document(client, monkeypatch, kind):
     forbid(monkeypatch, server, 'run')
     forbid(monkeypatch, regions, '_accept')
     doc = fx.steady_example() if kind == thermal.KIND else fx.transient_example()
-    doc['mesh']['subdivisions'] = [4, 4]
+    doc['mesh']['subdivision_count'] = [4, 4]
     for action, status in (('validate', 200), ('run', 400)):
         response = post(client, doc, action)
         assert response.status_code == status
         body = response.json()
         assert body['ok'] is False and body['error'] == {
-            'code': 'invalid_document', 'message': regions.SUBDIVISIONS, 'path': 'mesh.subdivisions'}
+            'code': 'invalid_document', 'message': regions.SUBDIVISIONS, 'path': 'mesh.subdivision_count'}
         assert body['client_revision'] == 3 and body['request_seq'] == 5
     assert_idle(server._thermal_jobs)
 
@@ -407,8 +430,8 @@ def test_s7_malformed_mesh_is_a_tagged_document_error(client, monkeypatch, mesh)
 
 def test_s7_rectangle_document_with_a_stray_empty_shapes_list_takes_the_region_path(client, monkeypatch):
     """geometry.shapes alone makes a region document (the engine's own rule), so a
-    rectangle document with a stray empty list now gets the subdivisions refusal; before
-    region support it got the engine's conductivity message."""
+    rectangle document with a stray empty list gets the subdivision_count refusal; a format
+    0.2 one is refused by name first."""
     forbid(monkeypatch, server, 'run')
     doc = example('thermal_slab')
     doc['geometry']['shapes'] = []
@@ -416,8 +439,14 @@ def test_s7_rectangle_document_with_a_stray_empty_shapes_list_takes_the_region_p
     assert response.status_code == 200
     assert response.content == thermal.encode_json({
         'ok': False, 'error': {'code': 'invalid_document', 'message': regions.SUBDIVISIONS,
-                               'path': 'mesh.subdivisions'},
+                               'path': 'mesh.subdivision_count'},
         'client_revision': 3, 'request_seq': 5}, 1 << 20)
+    doc = copy.deepcopy(LEGACY_RECTANGLES['thermal_slab'])
+    doc['geometry']['shapes'] = []
+    response = post(client, doc, 'validate')
+    assert response.status_code == 200
+    assert response.json()['error'] == {'code': 'invalid_document', 'message': regions.FORMAT_03,
+                                        'path': 'openphysics'}
 
 
 # ---- S8: the summary floor ------------------------------------------------------------
@@ -437,11 +466,80 @@ def test_s8_oversized_material_text_is_refused_at_validation(client, monkeypatch
     assert_idle(server._thermal_jobs)
 
 
+# ---- S8b: the summary's document lists count against the result limit ------------------
+
+def lists_document(kind):
+    """A 128-gon computed in millimetres: its coordinates lie off the 1 pm grid, so the summary
+    copies about 250 rounding diagnostics and 270 resolved inputs, more than metadata_bytes."""
+    doc = fx.with_shapes([fx.polygon('p0', fx.regular_polygon(20.0, 10.0, 6.0, 128))])
+    if kind == transient.KIND:          # the same geometry on the transient example's physics
+        moving = fx.transient_example()
+        moving['geometry'] = doc['geometry']
+        moving['materials'] = {name: dict(material, volumetric_heat_capacity='3600000 J/(m^3 K)')
+                               for name, material in doc['materials'].items()}
+        heat = moving['physics']['heat1']
+        heat['heat_source_density'], heat['prescribed_temperature'] = '0 W/m^3', {'bottom': '300 K'}
+        doc = moving
+    return doc
+
+
+def document_lists(doc):
+    """The document's diagnostics and resolved inputs as a summary writes them."""
+    read = Document.from_dict(json.loads(json.dumps(doc)))
+    return [d.as_dict() for d in read.diagnostics], thermal.json_value(read.resolved_inputs())
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s8b_document_lists_beyond_metadata_bytes_reach_the_result(client, kind):
+    doc = lists_document(kind)
+    diagnostics, inputs = document_lists(doc)
+    limits = server._thermal_jobs.limits
+    assert len(thermal.encode_json({'diagnostics': diagnostics, 'resolved_inputs': inputs}, 1 << 30)) \
+        > limits.metadata_bytes
+    response = post(client, doc, 'validate')
+    assert response.status_code == 200, response.text
+    assert response.json()['ok'] is True and response.json()['diagnostics'] == diagnostics
+    identity, status = finished(client, doc)
+    assert status['status'] == 'done', status
+    result = client.get('/api/jobs/'+identity['job']+'/result')
+    assert result.status_code == 200
+    summary = result.json()['summary']
+    assert summary['diagnostics'][:len(diagnostics)] == diagnostics
+    assert len(summary['diagnostics']) == len(diagnostics)
+    assert summary['resolved_inputs'] == inputs
+    rest = {key: value for key, value in summary.items() if key not in thermal.DOCUMENT_LISTS}
+    assert len(thermal.encode_json(rest, 1 << 30)) <= limits.metadata_bytes
+    assert len(thermal.encode_json(summary, 1 << 30)) > limits.metadata_bytes
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s8b_document_lists_over_the_result_limit_are_refused_at_validation(client, monkeypatch, kind):
+    forbid(monkeypatch, server, 'run')
+    doc = lists_document(kind)
+    diagnostics, inputs = document_lists(doc)
+    size = len(thermal.encode_json({'diagnostics': diagnostics, 'resolved_inputs': inputs}, 1 << 30))
+    if kind == thermal.KIND:
+        server._thermal_jobs.limits = dataclasses.replace(server._thermal_jobs.limits, payload_bytes=size-1)
+        name = 'payload_bytes'
+    else:
+        monkeypatch.setattr(transient, 'ENCODED_BYTES', size-1)
+        name = 'manifest_bytes'
+    for action in ('validate', 'run'):
+        response = post(client, doc, action)
+        assert response.status_code == 413, response.text
+        error = response.json()['error']
+        assert error['code'] == 'payload_limit_exceeded'
+        assert error['message'] == (f"the result summary copies the document's {len(diagnostics)} diagnostics "
+                                    f"and {len(inputs)} resolved inputs, which encode to more than {name}={size-1}")
+    assert not server._thermal_jobs._records
+    assert_idle(server._thermal_jobs)
+
+
 # ---- S9 / S10: job-time node, triangle and history caps --------------------------------
 
 def mesh_counts(doc):
     result = run(Document.from_dict(doc), verbose=False)
-    return len(result.mesh_nodes_m), len(result.mesh_triangles)
+    return len(result.node_coordinates), len(result.mesh_triangles)
 
 
 def assert_job_refused(client, doc, code):
@@ -537,7 +635,7 @@ def test_s10_region_jobs_pass_their_caps_to_run(client, monkeypatch, doc, expect
     identity, status = finished(client, doc)
     assert seen == [dict(zip(('max_nodes', 'max_triangles', 'max_input_vertices'), expected), verbose=False)]
     assert status['error']['code'] == 'solver_failed'
-    nt = len(doc['study']['time_s']) if 'study' in doc and 'time_s' in doc['study'] else None
+    nt = len(doc['study']['time']['values']) if 'time' in doc.get('study', {}) else None
     if nt == 128:
         n_hist = (transient.RAW_BYTES//8-3*nt)//(10*nt+8)
         assert expected[:2] == (n_hist, 2*n_hist)
@@ -563,9 +661,9 @@ def s11_fixtures(kind):
     two_physics = copy.deepcopy(region)
     two_physics['physics']['second'] = copy.deepcopy(next(iter(region['physics'].values())))
     version_1 = copy.deepcopy(region)
-    version_1['geometry'] = from_v02(region['geometry'])
+    version_1['geometry'] = from_flat(region['geometry'])
     version_1_rectangle = copy.deepcopy(rectangle)
-    version_1_rectangle['geometry'] = from_v02(rectangle['geometry'])
+    version_1_rectangle['geometry'] = from_flat(version_1_rectangle['geometry'])
     return {'rectangle': rectangle, 'region': region, 'shapes_only': shapes_only,
             'background_only': background_only, 'geometry_list': geometry_list, 'no_geometry': no_geometry,
             'physics_not_dict': physics_not_dict, 'two_physics': two_physics, 'version_1': version_1,
@@ -583,11 +681,21 @@ def test_s11_applies_agrees_with_the_engine_rule(kind):
 
 
 @pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
-def test_s11_a_homogeneous_version_1_rectangle_validates_on_the_rectangle_path(client, kind):
+def test_s11_a_homogeneous_version_1_rectangle_takes_the_rectangle_path(client, kind):
+    # Format 0.3 (D-1): it compiles to the flat rectangle and the rectangle path validates it
     doc = s11_fixtures(kind)['version_1_rectangle']
     response = post(client, doc, 'validate')
     assert response.status_code == 200 and response.json()['ok'] is True, response.text
-    assert 'version' in response.json()['doc']['geometry'] or 'shapes' not in response.json()['doc']['geometry']
+    assert Document.from_dict(doc).geometry_flat is not None
+    # format 0.2: the rectangle path refuses it by name, not taken as a region document
+    legacy = copy.deepcopy(LEGACY_RECTANGLES['thermal_slab' if kind == thermal.KIND else 'transient_thermal_uniform'])
+    legacy['geometry'] = from_flat(legacy['geometry'])
+    response = post(client, legacy, 'validate')
+    assert response.status_code == 200 and response.json()['ok'] is False, response.text
+    assert 'format 0.2 rectangle documents are not read' in response.json()['error']['message']
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(legacy)
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [('E-FORMAT', 'openphysics')]
 
 
 # ---- S15: version 1 geometry documents take the region path as written -------------------
@@ -596,7 +704,7 @@ def version_1_copy(doc, merge=None):
     """``doc`` with its geometry rewritten as a version 1 block; with ``merge`` = (a, b, name),
     the two named rectangles become one region ``name`` (same material)."""
     out = copy.deepcopy(doc)
-    out['geometry'] = from_v02(doc['geometry'])
+    out['geometry'] = from_flat(doc['geometry'])
     if merge:
         a, b, name = merge
         comp = out['geometry']['components']['main']
@@ -604,7 +712,7 @@ def version_1_copy(doc, merge=None):
             if f['name'] in (a, b):
                 f['region'] = name
         physics = next(iter(out['physics'].values()))
-        source = physics.get('heat_source_w_m3')
+        source = physics.get('heat_source_density')
         if isinstance(source, dict) and (a in source or b in source):
             value = source.pop(a, source.pop(b, 0.0))
             source.pop(b, None)
@@ -640,7 +748,7 @@ def test_s15_a_merged_region_document_runs_on_the_steady_route(client):
     summary = client.get('/api/jobs/'+identity['job']+'/result').json()['summary']
     assert summary['region_names'] == ['heater', 'background']
     assert summary['regions']['heater']['material'] == 'copper'
-    assert abs(summary['regions']['heater']['area_m2'] - 200e-6) <= 1e-9 * 200e-6
+    assert abs(summary['regions']['heater']['area']['value'] - 200e-6) <= 1e-9 * 200e-6
     assert_idle(server._thermal_jobs)
 
 
@@ -708,7 +816,7 @@ def probe(result, kind, edit=None):
 
 def region_spec(result, kind, n_cap=None):
     doc = result.accepted
-    nt = len(doc['study']['time_s']) if kind == transient.KIND else None
+    nt = len(doc.si['study']['time']) if kind == transient.KIND else None
     plan = regions.plan(kind, thermal.ThermalLimits(), nt)
     if n_cap is not None:
         plan = dataclasses.replace(plan, n_cap=n_cap)
@@ -742,20 +850,21 @@ def drop_last_triangle(kind):
     """A consistent result without its last triangle: only the domain area is short."""
     def edit(state):
         values, summary = state['values'], state['summary']
-        tri_key = 'mesh_triangles' if kind == thermal.KIND else 'triangles'
+        tri_key = 'triangles'
         flux_axis = 0 if kind == thermal.KIND else 1
         values[tri_key] = values[tri_key][:-1]
-        values['heat_flux_w_m2'] = np.delete(values['heat_flux_w_m2'], -1, axis=flux_axis)
+        values['heat_flux'] = np.delete(values['heat_flux'], -1, axis=flux_axis)
         values[ids_key(kind)] = values[ids_key(kind)][:-1]
         m = len(values[tri_key])
-        nodes = values['mesh_nodes_m' if kind == thermal.KIND else 'nodes_m']
+        nodes = values['node_coordinates']
         areas = regions._cell_areas(nodes, values[tri_key], kind)
         ids = values[ids_key(kind)]
         for i, name in enumerate(state['names']):
-            summary['regions'][name].update(triangles=int(np.sum(ids == i)), area_m2=float(areas[ids == i].sum()))
+            summary['regions'][name].update(triangles=int(np.sum(ids == i)),
+                                            area={'value': float(areas[ids == i].sum()), 'unit': 'm^2'})
         summary['mesh']['triangles'] = m
-        for key in ('triangles', 'heat_flux_w_m2', 'triangle_regions'):
-            summary['field_shapes'][key][0 if key != 'heat_flux_w_m2' or kind == thermal.KIND else 1] = m
+        for key in ('triangles', 'heat_flux', 'triangle_regions'):
+            summary['field_shapes'][key][0 if key != 'heat_flux' or kind == thermal.KIND else 1] = m
     return edit
 
 
@@ -778,15 +887,14 @@ REGION_FAULTS = {
                        'region triangle count disagrees'),
     'triangle_count_float': (lambda s: first_region(s).__setitem__('triangles', float(first_region(s)['triangles'])),
                              'region triangle count disagrees'),
-    'area_one_ulp': (lambda s: first_region(s).__setitem__('area_m2', float(np.nextafter(first_region(s)['area_m2'],
-                                                                                        np.inf))),
-                     'region area disagrees'),
-    'area_negative': (lambda s: first_region(s).__setitem__('area_m2', -first_region(s)['area_m2']),
+    'area_one_ulp': (lambda s: first_region(s)['area'].__setitem__(
+        'value', float(np.nextafter(first_region(s)['area']['value'], np.inf))), 'region area disagrees'),
+    'area_negative': (lambda s: first_region(s)['area'].__setitem__('value', -first_region(s)['area']['value']),
                       'region area disagrees'),
     'material': (lambda s: first_region(s).__setitem__('material', 'unobtainium'), 'region material disagrees'),
     'summary_materials': (lambda s: s['summary']['materials']['steel'].__setitem__('source', 'changed'),
                           'summary materials disagree'),
-    'summary_heat_source': (lambda s: s['summary'].__setitem__('heat_source_w_m3', 1.0),
+    'summary_heat_source': (lambda s: s['summary'].__setitem__('heat_source_density', {'value': 1.0, 'unit': 'W/m^3'}),
                             'summary heat sources disagree'),
 }
 
@@ -861,7 +969,7 @@ def test_s12_region_ids_are_checked_before_they_are_copied(real, kind, fault):
 
 @pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
 def test_s12_more_nodes_than_the_plan_allows_is_invalid(real, kind):
-    n = len(real[kind].mesh_nodes_m)
+    n = len(real[kind].node_coordinates)
     with pytest.raises(thermal.ThermalAPIError, match='oversized') as caught:
         capture(probe(real[kind], kind), kind, n_cap=n-1)
     assert caught.value.code == 'invalid_result'
@@ -893,15 +1001,15 @@ def test_s13_region_frames_and_histories_carry_the_region_pair(client):
     assert manifest['payload_format'] == regions.TRANSIENT_MANIFEST
     assert (manifest['result_format'], manifest['field_layout']) == regions.TRANSIENT_PAIR
     assert len(manifest['fields']) == 14 and set(manifest['arrays']) == {
-        'nodes_m', 'triangles', 'dirichlet_node_ids', 'triangle_regions'}
+        'node_coordinates', 'triangles', 'prescribed_node_ids', 'triangle_regions'}
     assert manifest['fields']['triangle_regions'] == {
-        'shape': [len(manifest['arrays']['triangles'])], 'unit': '1', 'location': 'triangles', 'axis': 'static',
+        'shape': [len(manifest['arrays']['triangles'])], 'unit': None, 'location': 'triangles', 'axis': 'static',
         'available_views': [], 'initial_available': True, 'ui_supported': False}
     base = '/api/jobs/'+identity['job']
-    frame = client.get(base+'/frame', params={'result_id': identity['result_id'], 'field': 'temperature_k',
+    frame = client.get(base+'/frame', params={'result_id': identity['result_id'], 'field': 'temperature',
                                               'time_index': 2, 'frame_seq': 1})
     history = client.get(base+'/history', params={'result_id': identity['result_id'],
-                                                  'field': 'heat_content_j_per_m', 'start': 0, 'stop': 4,
+                                                  'field': 'stored_heat_per_depth', 'start': 0, 'stop': 4,
                                                   'frame_seq': 2})
     for view, payload_format in ((frame, transient.FRAME), (history, transient.HISTORY)):
         assert view.status_code == 200, view.text
@@ -914,7 +1022,7 @@ def test_s13_region_frames_and_histories_carry_the_region_pair(client):
     rectangle, status = finished(client, example('transient_thermal_uniform'))
     assert 'pair' not in server._thermal_jobs._records[rectangle['job']]
     frame = client.get('/api/jobs/'+rectangle['job']+'/frame', params={
-        'result_id': rectangle['result_id'], 'field': 'temperature_k', 'time_index': 1, 'frame_seq': 1}).json()
+        'result_id': rectangle['result_id'], 'field': 'temperature', 'time_index': 1, 'frame_seq': 1}).json()
     assert (frame['result_format'], frame['field_layout']) == transient.PAIR
 
 
@@ -1012,6 +1120,6 @@ def test_s15_heat_source_on_a_fully_covered_shape_is_a_job_document_error(client
     forbid(monkeypatch, galerkin.thermal, 'solve_steady_heat')
     doc = fx.steady_example()
     doc['geometry']['shapes'] += [fx.rect('hidden', 10.0, 6.0, 2.0, 2.0), fx.rect('cover', 9.0, 5.5, 4.0, 3.0)]
-    doc['physics']['heat1']['heat_source_w_m3'] = {'heater': 5e6, 'hidden': 1e5}
+    doc['physics']['heat1']['heat_source_density'] = {'heater': '5e6 W/m^3', 'hidden': '1e5 W/m^3'}
     message = assert_job_refused(client, doc, 'invalid_document')
     assert 'hidden' in message and 'not in the meshed geometry' in message

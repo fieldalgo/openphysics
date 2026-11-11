@@ -6,7 +6,8 @@
 
 Status: **Accepted on 2026-11-03.** The
 [stage 1 reader](geometry_reader.md) reads version 1 geometry blocks in
-documents and gives the runners the 0.2 form for validation and recording; the
+[format 0.3](document_format.md) documents, where each component declares its
+`length_unit` (amended 2026-11-10, see [Units](#units)); the
 [stage 2 engine](geometry_engine.md) builds the region complex, selectors and
 provenance of 2D and axisymmetric components and meshes version 1 documents
 (2026-11-04); the runners do not read the complex itself yet. The stage 4 amendment
@@ -23,7 +24,11 @@ How the page is organised:
 - JSON contract (decided 2026-11-03): the envelope stays `"openphysics": "0.2"`,
   and only the `geometry` block carries `"version": 1`. A block without `version`
   is the 0.2 form and keeps working unchanged; no document is migrated. Studio
-  projects and sipi JSON keep their own formats for now.
+  projects and sipi JSON keep their own formats for now. **Superseded on
+  2026-11-10** by the units and naming batch: the envelope is `"openphysics":
+  "0.3"`, a format 0.2 document is refused by name (`E-FORMAT`), and a block
+  without `version` is one of the flat forms of
+  [format 0.3](document_format.md#geometry-three-forms-one-length_unit-each).
 
 ## Purpose and scope
 
@@ -120,33 +125,33 @@ The other envelope keys keep their meaning: `units`, `materials`, `physics`,
 block without `version` is the 0.2 form, and an adapter reads it (see the
 [mapping](#mapping-of-current-representations-frozen)).
 
+Amended 2026-11-10 (format 0.3): there is no `units` key. Each component
+declares `length_unit`, and a `2d` component its `depth` (a length, or `null`
+for per metre of depth); a length parameter carries its unit and an element size
+is a quantity string ([document format 0.3](document_format.md)).
+
 ### Version
 
 `version` is an integer. It belongs to the geometry block and does not replace
 the envelope's `openphysics` string. The envelope stays `"0.2"` and moves only
-when a change breaks compatibility.
+when a change breaks compatibility. It moved to `"0.3"` with the units and
+naming batch (2026-11-10).
 
 ### Units
 
-Geometry numbers are in the document's `units.length`.
+**Superseded on 2026-11-10** by the units and naming batch. Each component
+declares its own `length_unit` (one of `pm nm Angstrom um mm cm m in mil`), in
+which its bare shape numbers are read, and a `2d` component declares its
+`depth`; an undeclared unit is refused at the component's path
+(`E-KEY-MISSING`). There is no document-wide `units` block, no `{"in_m": x}`
+unit and no default unit. Geometry parameters of kind `length` carry their unit
+(`"0.5 um"`), and element sizes are quantity strings. See
+[document format 0.3](document_format.md#geometry-three-forms-one-length_unit-each).
 
-**Declared unit required.** A document with a version 1 geometry block must
-declare `units.length`. An undeclared length is refused. `units.resolve` treats
-an absent dimension as SI (`packages/simcase/src/simcase/units.py:103-104`), but
-every kind that reads geometry already refuses an undeclared length:
-- `em.modes2d`: `packages/simcase/src/simcase/schema.py:55,333-341`
-- `thermal.steady2d`: `packages/simcase/src/simcase/thermal.py:63-65`
-- region heat: `packages/simcase/src/simcase/thermal_regions.py:229-231`
-- `em.cavity3d`: `packages/simcase/src/simcase/cavity.py:169-170`
-
-**Default for new documents.** New documents written by Studio and the API
-declare `"m"`.
-
-**Unchanged rules:**
-- The unit symbols and the `{"in_m": x}` escape hatch
-  (`packages/simcase/src/simcase/units.py:35-37,124-146`).
-- Tagged `[value, "unit"]` pairs are refused
-  (`packages/simcase/src/simcase/schema.py:110-118`).
+As accepted, this section read: geometry numbers are in the document's
+`units.length`, which a document with a version 1 block must declare; new
+documents written by Studio and the API declare `"m"`; the `{"in_m": x}` escape
+hatch stays and tagged `[value, "unit"]` pairs are refused.
 
 **No angles.** Version 1 has no angle quantities.
 
@@ -622,7 +627,7 @@ keeps the topology.
 - A key that names a side is a boundary string, so `boundary: {left: pec}` still
   validates (`packages/simcase/src/simcase/schema.py:316-318`).
 - A key that names a region is a region string, so
-  `heat_source_w_m3: {heater: ...}` still validates
+  `heat_source_density: {heater: ...}` (format 0.2: `heat_source_w_m3`) still validates
   (`packages/simcase/src/simcase/thermal_regions.py:189-199`).
 - Other boundary names, such as `heater_top`, are allowed by this contract but
   accepted by no runner yet. Today region heat refuses any tag that is not a side
@@ -758,8 +763,8 @@ keyword.
 ```
 
 The `physics`, `materials` and `mesh` blocks are left out and work as today.
-`dirichlet_temperature_k: {"bottom": 300}` resolves `bottom` as a mesh tag, and
-`heat_source_w_m3: {"heater": 1e15}` resolves `heater` as a region. A sweep point
+`prescribed_temperature: {"bottom": "300 K"}` resolves `bottom` as a mesh tag, and
+`heat_source_density: {"heater": "1e15 W/m^3"}` resolves `heater` as a region (format 0.3 names). A sweep point
 with `w = 501` gives `x = -250.5` nm, which is −250500 pm and lies on the grid.
 
 ### A sipi microstrip with a tapered trace
@@ -858,7 +863,8 @@ that every name maps to an `id` without renaming.
 including the thermal and electric examples it registers) and the 25
 `examples/simcase/*.json` files: 45 documents, 364 numbers inside their
 `geometry` blocks.
-- All 45 declare `units.length`.
+- All 45 declare `units.length` (format 0.2; since 2026-11-10 each component
+  declares its `length_unit`, see [Units](#units)).
 - All 364 numbers are integer numbers of pm. No rounding is needed.
 - No shape name needs a generated `id`.
 - One rounding-level corner change is known: `pml_leaky_slab.json` (see the
@@ -965,3 +971,10 @@ listed here too.
   "Parameters, sweeps and derivatives". The earlier frozen text is unchanged.
   Also: a consumers row and a status sentence (not frozen sections).
 - 2026-11-08: The consumers table names region mechanics (not frozen sections).
+- 2026-11-10: Units and naming batch (format 0.3): the Units section is
+  superseded by each component's `length_unit` and `depth`, the top-level
+  structure and the version section say so, and the JSON contract note says that
+  the envelope is `"0.3"` and a format 0.2 document is refused by name. The
+  accepted text of the Units section is summarised in place; the rest of the
+  frozen text is unchanged. Also: the status sentence and the appendix (not
+  frozen sections).

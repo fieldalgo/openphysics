@@ -83,7 +83,7 @@ function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[
 
 // ---- Steady heat plate: a form over the public thermal.steady2d routes (thermal.js controller). ----
 const HEAT_NODES=['Geometry','Materials','Heat transfer','Mesh','Study'];
-const heatDrafts=new Map();let heatSide='left',heatField='temperature_k',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
+const heatDrafts=new Map();let heatSide='left',heatField='temperature',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
 const heatController=globalThis.ThermalStudio?.createController({
  request:async(method,url,body)=>{const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;},
  onState:next=>{heatState=next;refreshHeatControls();},
@@ -101,7 +101,7 @@ const heatValue=path=>path.split('.').reduce((o,k)=>o?.[k],state.thermal);
 function heatInput(path,label,attrs=''){const draft=heatDrafts.get(path);return `<label>${label}<input data-heat="${path}" type="number" step="any" ${attrs} value="${escapeHtml(draft?draft.raw:heatValue(path))}" aria-invalid="${!!draft}"></label>${draft?`<p class="input-hint" role="alert">${escapeHtml(draft.message)} Last valid value is retained.</p>`:''}`;}
 function heatSideForm(side){
  const c=state.thermal.sides[side];
- const fields=c.type==='temperature'?heatInput(`sides.${side}.temperature`,'Temperature [K]','min="0"'):c.type==='flux'?heatInput(`sides.${side}.flux`,'Outward heat flux [W/m²] (positive leaves the plate)'):c.type==='convection'?heatInput(`sides.${side}.h`,'Heat transfer coefficient h [W/(m²·K)]','min="0"')+heatInput(`sides.${side}.ambient`,'Ambient temperature [K]','min="0"'):'';
+ const fields=c.type==='temperature'?heatInput(`sides.${side}.temperature`,'Temperature [K]','min="0"'):c.type==='flux'?heatInput(`sides.${side}.inward_heat_flux`,'Inward heat flux [W/m²] (positive enters the plate)'):c.type==='convection'?heatInput(`sides.${side}.h`,'Heat transfer coefficient h [W/(m²·K)]','min="0"')+heatInput(`sides.${side}.ambient`,'Ambient temperature [K]','min="0"'):'';
  return `<fieldset class="heat-side" data-side-box="${side}"><legend>${side[0].toUpperCase()+side.slice(1)} side</legend><label>Condition<select data-heat-type="${side}">${Object.entries(SIDE_TYPES).map(([k,v])=>`<option value="${k}" ${k===c.type?'selected':''}>${v}</option>`).join('')}</select></label>${fields}</fieldset>`;
 }
 function heatInspector(){
@@ -123,7 +123,7 @@ function bindHeatPanel(){
   heatDrafts.delete(path);setThermal(next,'Heat input updated.');
  });
  document.querySelectorAll('[data-heat-type]').forEach(el=>el.onchange=()=>{
-  const side=el.dataset.heatType,type=el.value,defaults={insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:295}};
+  const side=el.dataset.heatType,type=el.value,defaults={insulated:{type},temperature:{type,temperature:300},flux:{type,inward_heat_flux:0},convection:{type,h:10,ambient:295}};
   for(const key of [...heatDrafts.keys()])if(key.startsWith(`sides.${side}.`))heatDrafts.delete(key);
   setThermal({...state.thermal,sides:{...state.thermal.sides,[side]:defaults[type]}},`${side[0].toUpperCase()+side.slice(1)} side: ${SIDE_TYPES[type].toLowerCase()}.`);
  });
@@ -164,19 +164,19 @@ function heatResults(){
  const same=heatRun.signature===heatSignature(),run=heatRun,s=run.payload.summary||{};
  host.innerHTML='<h2>Steady temperature and heat flux</h2>';
  const desc=document.createElement('p');desc.textContent=`${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${thermalSummary(run.input)} · ${SIDES.map(side=>side+': '+sideText(run.input.sides[side])).join(' · ')} · ${run.input.nx} × ${run.input.ny} divisions`;host.append(desc);
- const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature_k','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
+ const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
  const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='heat-field-canvas';canvas.style.cssText='display:block;width:100%;height:360px;cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
  const probe=document.createElement('p');probe.id='heat-probe';probe.setAttribute('role','status');host.append(probe);
  const note=document.createElement('p');note.textContent='Temperature is interpolated linearly inside each triangle (P1); heat flux is constant per triangle. Colours span this result\'s own minimum to maximum. Click the plot to read a value. Heat results are kept in this tab only; save the input file to keep the design.';host.append(note);
  const T=globalThis.ThermalStudio;
  const draw=()=>{if(!canvas.isConnected)return;try{const model=T.viewModel(run.payload,heatField);T.draw(canvas,model,{arrows:heatArrows});canvas.setAttribute('aria-label',`${model.field} ${model.min} to ${model.max} ${model.unit}`);
-  if(heatProbe){const v=T.sample(model,heatProbe);probe.textContent=v===null?'No triangle contains this point.':`At (${heatProbe[0].toFixed(4)}, ${heatProbe[1].toFixed(4)}) ${model.lengthLabel}: ${heatField==='temperature_k'?'T':heatField==='magnitude'?'|q|':heatField} = ${v.toPrecision(6)} ${model.unit}${model.nodal?' (P1 interpolation)':' (triangle value)'}`;}else probe.textContent='No point selected.';
+  if(heatProbe){const v=T.sample(model,heatProbe);probe.textContent=v===null?'No triangle contains this point.':`At (${heatProbe[0].toFixed(4)}, ${heatProbe[1].toFixed(4)}) ${model.lengthLabel}: ${heatField==='temperature'?'T':heatField==='magnitude'?'|q|':heatField} = ${v.toPrecision(6)} ${model.unit}${model.nodal?' (P1 interpolation)':' (triangle value)'}`;}else probe.textContent='No point selected.';
   canvas.onclick=event=>{const r=canvas.getBoundingClientRect(),tr=T.transform(model,Math.round(r.width),Math.round(r.height));heatProbe=tr.inverse(event.clientX-r.left,event.clientY-r.top);draw();};
  }catch(error){probe.textContent='Plot unavailable: '+error.message;}};
  $('heat-field').onchange=()=>{heatField=$('heat-field').value;draw();};$('heat-arrows').onchange=()=>{heatArrows=$('heat-arrows').checked;draw();};
  heatResize=new ResizeObserver(draw);heatResize.observe(canvas);draw();
- const t=run.payload.arrays.temperature_k;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
- $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',run.payload.arrays.nodes_m.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
+ const named=globalThis.ThermalStudio.named(run.payload.arrays),t=named.temperature;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+ $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',named.nodes.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
  const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>setThermal(run.input,'Heat inputs restored from the run.');$('inspector').append(restore);
 }
 function renderHeat(){
@@ -546,7 +546,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Results'&&solverRun){
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Run provenance</h2>'+pair('Computation','Optical modes only')+pair('Input',same?'Current snapshot':'Earlier snapshot')+'<p>Selected completed run. Save session includes fields; Save inputs only does not.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';
   const desc=document.createElement('p');desc.textContent=`Job ${solverRun.job}${solverRun.serverVersion?' · simcase '+solverRun.serverVersion:''}${Number.isInteger(solverRun.inputRevision)?' · input revision '+solverRun.inputRevision:''} · ${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
-  renderField();solverRun.neff.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
+  renderField();solverRun.effective_index.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Browser recovery result — not recomputed or authenticated. ':'Imported file result — not recomputed or authenticated. ')+' Ranked candidates are not mode-matched between designs. Save session to keep results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Applications → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
@@ -575,7 +575,7 @@ function renderOpticalStudy(){
  heading.textContent=(same?'Current inputs':'Earlier inputs or server')+' · '+(record.ok?'document accepted':'document rejected');report.append(heading);
  const captured=document.createElement('p');captured.textContent=designSummary(record.input.model)+' · λ '+record.input.model.wavelength+' nm · mesh '+record.input.model.coreMesh+' nm · '+new Date(record.checkedAt).toLocaleTimeString();report.append(captured);
  const summary=document.createElement('pre');summary.textContent=record.ok?record.summary:record.error;report.append(summary);
- for(const note of record.notes){const line=document.createElement('p');line.textContent=note;report.append(line);}host.append(report);
+ for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
  panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].detail)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
@@ -620,7 +620,7 @@ function probeOutput(host,id){const output=document.createElement('p');output.id
 
 function renderField(){
  if(fieldResize)fieldResize.disconnect();
- const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${solverRun.neff[i].toFixed(6)}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:340px"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
+ const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${solverRun.effective_index[i].toFixed(6)}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:340px"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
  $('canvas').append(host);
  for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();profileRedraw();};
  probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();renderLineProfile(host,[solverRun]);
@@ -729,7 +729,7 @@ function renderComparison(){
  for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=`${r.label?r.label+' · ':''}${designSummary(r.input.model)} · λ ${r.input.model.wavelength} nm · ${r.job}`;o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
  const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label>Candidate rank <select id="compare-mode"><option value="0" ${fieldView.mode===0?'selected':''}>1</option><option value="1" ${fieldView.mode===1?'selected':''}>2</option></select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
- const description=document.createElement('p');const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.neff[fieldView.mode]-a.neff[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}Candidate ranks are not matched modes.`;host.append(description);
+ const description=document.createElement('p');const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.effective_index[fieldView.mode]-a.effective_index[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}Candidate ranks are not matched modes.`;host.append(description);
  const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${run.label?run.label+' · ':''}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm · ${run.origin}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
  const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
@@ -770,9 +770,9 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(state.phase==='done')setPending(null);
  notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
 },onResult:(result,pending)=>{
- if(!Array.isArray(result.neff?.[0])||result.neff[0].length!==2||!result.neff[0].every(Number.isFinite))throw new Error('Unsupported optical result.');
+ const index=result.effective_index?.values?.[0];if(result.effective_index?.unit!=='1'||!Array.isArray(index)||index.length!==2||!index.every(Number.isFinite))throw new Error('Unsupported optical result.');
  const input=pending.input;
- const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.wavelength,input.model.coreMesh),input,neff:[...result.neff[0]],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
+ const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.wavelength,input.model.coreMesh),input,effective_index:[...index],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
 }});
 function refreshJobControls(){
@@ -817,7 +817,7 @@ $('run-optical').onclick=async()=>{
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
- try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v5'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v5';}
+ try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v6'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v6';}
  catch(error){
   // no answer at all: say so and keep checking; any other failure is shown and checking stops
   if(connectionFailure(error)==='unreachable'){connection.message=UNREACHABLE_MESSAGE;scheduleReconnect();}
@@ -838,7 +838,7 @@ function scheduleReconnect(){
  reconnectTimer=setTimeout(async()=>{
   reconnectTimer=null;reconnecting=true;let reachable=true;
   try{
-   try{await solverApi('/api/workspace/capabilities/v5');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
+   try{await solverApi('/api/workspace/capabilities/v6');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
    if(reachable)await connectWorkspace();
   }finally{reconnecting=false;}
   if(connection.ready){notice(RECONNECTED_MESSAGE);if($('job-message').textContent===UNREACHABLE_MESSAGE)$('job-message').textContent=RECONNECTED_MESSAGE;}

@@ -23,54 +23,74 @@ def test_cavity_defaults_do_not_import_2d_settings_or_an_extra_physics():
     data["physics"] = {"resonator": data["physics"]["em1"]}
     del data["results"]
     doc = Document.from_dict(data)
-    assert list(doc["physics"]) == ["resonator"]
-    assert "wavelength" not in doc.sole_physics()[1]
-    assert "formulation" not in doc.sole_physics()[1]
-    assert doc["mesh"] == {"subdivisions": [6, 6, 6]}
-    assert doc["results"] == {"save_fields": True, "plots": False}
-    assert "Hz" in doc.summary() and "output coordinates m" in doc.summary()
+    assert list(doc.si["physics"]) == ["resonator"]
+    assert sorted(doc.sole_physics()[1]) == ["boundary", "mode_count", "search", "target_frequency", "type"]
+    assert doc.si["mesh"] == {"subdivision_count": [6, 6, 6]}
+    assert doc.si["results"] == {"save_fields": True, "plots": False}
+    assert "results" in [entry["path"] for entry in doc.defaults_applied]
+    assert "250 MHz" in doc.summary() and "output coordinates m" in doc.summary()
 
 
-@pytest.mark.parametrize("path,value", [
-    ("physics.em1.target_frequency_hz", 0), ("physics.em1.target_frequency_hz", float("nan")),
-    ("physics.em1.target_frequency_hz", True), ("physics.em1.target_frequency_hz", float("inf")),
-    ("physics.em1.num_modes", 0), ("physics.em1.num_modes", 1.2), ("physics.em1.num_modes", True),
-    ("physics.em1.search", "lowest"), ("physics.em1.boundary", "pmc"),
-    ("physics.em1.wavelength", 1), ("physics.em1.formulation", "scalar"),
-    ("geometry.domain.zmax", 0), ("geometry.domain.zmax", float("inf")),
-    ("geometry.domain.zmax", True), ("geometry.domain.xmin", "zero"),
-    ("geometry.background.material", "Si"), ("geometry.shapes", [{}]),
-    ("materials", {"vacuum": {"n": 2}}),
-    ("mesh.subdivisions", [0, 3, 3]), ("mesh.subdivisions", [2.5, 3, 3]),
-    ("mesh.subdivisions", [True, 3, 3]), ("mesh.subdivisions", [3, 3]),
-    ("mesh.size", 0.2), ("mesh.grading", None),
-    ("study", {"type": "sweep", "parameter": "physics.em1.target_frequency_hz", "values": [1e8, 2e8]}),
-    ("results.plots", True), ("results.save_fields", "yes"),
-    ("units", {}), ("physics.other", {"type": "em.cavity3d"}),
+P = "physics.em1."
+SWEEP = {"type": "sweep", "parameter": P + "target_frequency", "values": {"unit": "MHz", "values": [100, 200]}}
+
+
+@pytest.mark.parametrize("path,value,code,where", [
+    (P + "target_frequency", "0 Hz", "E-DOMAIN", None), (P + "target_frequency", "nan Hz", "E-UNIT-UNKNOWN", None),
+    (P + "target_frequency", True, "E-VALUE-FORM", None), (P + "target_frequency", "inf Hz", "E-UNIT-UNKNOWN", None),
+    (P + "target_frequency", 250e6, "E-UNIT-MISSING", None), (P + "target_frequency", "1.55 um", "E-UNIT-DIMENSION", None),
+    (P + "mode_count", 0, "E-DOMAIN", None), (P + "mode_count", 1.2, "E-DOMAIN", None),
+    (P + "mode_count", 2.0, "E-DOMAIN", None), (P + "mode_count", True, "E-VALUE-FORM", None),
+    (P + "search", "lowest", "E-VALUE-FORM", None), (P + "boundary", "pmc", "E-VALUE-FORM", None),
+    (P + "vacuum_wavelength", "1 um", "E-KEY-UNKNOWN", None), (P + "formulation", "scalar", "E-KEY-UNKNOWN", None),
+    (P + "target_frequency_hz", 250e6, "E-KEY-UNKNOWN", None), (P + "num_modes", 5, "E-KEY-UNKNOWN", None),
+    (P + "allow_gain", True, "E-CONTRACT", None),
+    ("geometry.domain.zmax", 0, "E-DOMAIN", None), ("geometry.domain.zmax", float("inf"), "E-JSON", None),
+    ("geometry.domain.zmax", True, "E-VALUE-FORM", None), ("geometry.domain.xmin", "zero", "E-VALUE-FORM", None),
+    ("geometry.depth", None, "E-KEY-UNKNOWN", None), ("geometry.depth", "1 m", "E-KEY-UNKNOWN", None),
+    ("geometry.background.material", "Si", "E-MATERIAL-UNKNOWN", None),
+    ("geometry.background.material", "physmat:Si", "E-CONTRACT", None),
+    ("geometry.shapes", [{}], "E-KEY-MISSING", "geometry.shapes[0].material"),
+    ("materials", {"glass": {"refractive_index": 2}}, "E-KEY-MISSING", "materials.glass.relative_permittivity"),
+    ("mesh.subdivision_count", [0, 3, 3], "E-DOMAIN", "mesh.subdivision_count[0]"),
+    ("mesh.subdivision_count", [2.5, 3, 3], "E-DOMAIN", "mesh.subdivision_count[0]"),
+    ("mesh.subdivision_count", [True, 3, 3], "E-VALUE-FORM", "mesh.subdivision_count[0]"),
+    ("mesh.subdivision_count", [3, 3], "E-VALUE-FORM", None),
+    ("mesh.subdivisions", [6, 6, 6], "E-KEY-UNKNOWN", None),
+    ("mesh.element_size", "0.2 m", "E-CONTRACT", None), ("mesh.grading", None, "E-VALUE-FORM", None),
+    ("study", SWEEP, "E-CONTRACT", "study.type"),
+    ("results.plots", True, "E-CONTRACT", None), ("results.save_fields", "yes", "E-VALUE-FORM", None),
+    ("units", {}, "E-KEY-UNKNOWN", None), ("physics.other", {"type": "em.cavity3d"}, "E-KEY-MISSING", "physics.other.boundary"),
+    ("openphysics", "0.2", "E-FORMAT", None),
 ])
-def test_cavity_rejects_unsupported_or_invalid_inputs(path, value):
+def test_cavity_rejects_unsupported_or_invalid_inputs(path, value, code, where):
     data = cavity_document()
     node = data
     parts = path.split(".")
     for part in parts[:-1]:
         node = node[part]
     node[parts[-1]] = value
-    with pytest.raises(DocumentError):
+    with pytest.raises(DocumentError) as caught:
         Document.from_dict(data)
+    first = [d for d in caught.value.diagnostics if d.severity == "error"][0]
+    assert (first.code, first.path) == (code, where or path)
 
 
-@pytest.mark.parametrize("path", ["units", "mesh.subdivisions", "physics.em1.target_frequency_hz",
-                                  "physics.em1.search", "physics.em1.boundary", "physics.em1.num_modes",
-                                  "geometry.domain.zmin"])
-def test_cavity_requires_explicit_physical_and_search_inputs(path):
+@pytest.mark.parametrize("path,where", [
+    ("geometry.length_unit", None), ("mesh.subdivision_count", None), (P + "target_frequency", None),
+    (P + "search", None), (P + "boundary", None), (P + "mode_count", None), ("geometry.domain.zmin", None),
+    ("geometry.background", "geometry.background.material")])
+def test_cavity_requires_explicit_physical_and_search_inputs(path, where):
     data = cavity_document()
     node = data
     parts = path.split(".")
     for part in parts[:-1]:
         node = node[part]
     del node[parts[-1]]
-    with pytest.raises(DocumentError):
+    with pytest.raises(DocumentError) as caught:
         Document.from_dict(data)
+    first = [d for d in caught.value.diagnostics if d.severity == "error"][0]
+    assert (first.code, first.path) == ("E-KEY-MISSING", where or path)
 
 
 def test_cavity_does_not_enter_the_2d_stages():
@@ -106,15 +126,18 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
     result = _result(save_fields)
     out = result.save(tmp_path / "output")
     summary = json.loads((out / "summary.json").read_text())
-    assert summary["frequency_unit"] == "Hz" and summary["mesh_length_unit"] == "m"
-    assert summary["edge_coefficient_unit"] == "m^-1/2"
-    assert summary["electric_field_unit"] == "m^-3/2"
-    assert summary["frequencies_hz"] == result.frequencies_hz.tolist()
-    assert summary["relative_residuals"] == [1e-12]
-    assert summary["field_layout"] == "cavity3d-edge-v1"
+    units = summary["field_units"]
+    assert units["resonant_frequency"] == "Hz" and units["node_coordinates"] == "m"
+    assert units["mass_normalized_electric_field_line_integral"] == "1/m^(1/2)"
+    assert units["mass_normalized_electric_field"] == "1/m^(3/2)"
+    assert summary["resonant_frequency"] == {"unit": "Hz", "values": result.resonant_frequency.tolist()}
+    assert summary["relative_residual"] == {"unit": "1", "values": [1e-12]}
+    assert summary["field_layout"] == "cavity3d-edge-v2"
     assert summary["cluster_completeness"] == result.cluster_completeness == "not_certified"
     assert summary["mode_count_policy"] == result.mode_count_policy == "exact_count_may_split_cluster"
+    assert summary["returned_mode_count"] == 1 and summary["mode_count"] == 5
     assert "neff" not in summary and "triangles" not in summary["mesh"]
+    assert not any(key.endswith("_unit") or key.endswith("_hz") for key in summary)
     assert Document.load(out / "model.json").data == result.doc.data
     assert not (out / "results.png").exists()
     assert (out / "fields.npz").exists() == save_fields
@@ -127,13 +150,16 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
             assert str(arrays["electric_field_location"]) == "tetrahedron_centroid"
             assert str(arrays["cluster_completeness"]) == "not_certified"
             assert str(arrays["mode_count_policy"]) == "exact_count_may_split_cluster"
-            assert str(arrays["field_layout"]) == "cavity3d-edge-v1"
-            assert int(arrays["returned_modes"]) == summary["returned_modes"] == 1
-            assert arrays["electric_field"].shape == (1, 1, 3)
-            assert arrays["edge_coefficients"].shape == (2, 1)
+            assert str(arrays["field_layout"]) == "cavity3d-edge-v2"
+            metadata = json.loads(str(arrays["metadata_json"]))
+            assert metadata["returned_mode_count"] == 1 and metadata["field_units"]["node_coordinates"] == "m"
+            assert arrays["mass_normalized_electric_field"].shape == (1, 1, 3)
+            assert arrays["mass_normalized_electric_field_line_integral"].shape == (2, 1)
             np.testing.assert_array_equal(arrays["pec_edge_ids"], [1])
-            np.testing.assert_array_equal(arrays["edge_coefficients"], result.cavity.edge_coefficients)
-            assert str(arrays["mesh_length_unit"]) == "m"
+            np.testing.assert_array_equal(arrays["mass_normalized_electric_field_line_integral"],
+                                          result.cavity.edge_coefficients)
+            assert not any(key.endswith("_unit") or key in ("returned_modes", "requested_modes")
+                           for key in arrays.files)
 
 
 def test_cavity_reused_output_rejected_without_mixing_results(tmp_path):
@@ -220,12 +246,15 @@ def test_studio_rejects_cavity_before_starting_a_2d_job():
         assert client.get("/api/examples/cavity_box").status_code == 400
 
 
-def test_cavity_guards_preserve_2d_multiphysics_mesh_preview():
+def test_cavity_guards_preserve_2d_mesh_preview():
     data = copy.deepcopy(examples.SLAB_TE_CHECK)
-    data["physics"]["second"] = copy.deepcopy(data["physics"]["em1"])
-    doc = Document.from_dict(data)
-    model = build_mesh(doc)
+    model = build_mesh(Document.from_dict(copy.deepcopy(data)))
     assert model.tri.num_triangles > 0
+    # format 0.3 takes one physics entry per document (every 0.3 kind): a second entry is refused at
+    # read, before any mesh, where format 0.2 meshed the document and refused only the solve
+    data["physics"]["second"] = copy.deepcopy(data["physics"]["em1"])
+    with pytest.raises(DocumentError, match="2 physics .em1, second.; solving more than one"):
+        Document.from_dict(data)
 
 
 @pytest.mark.parametrize("unit,ratio", [("m", 1), ("mm", 1000), ("um", 1e6), ("nm", 1e9)])
@@ -233,7 +262,7 @@ def test_cavity_adapter_converts_lengths_and_translation_to_si(unit, ratio, monk
     import galerkin
     from simcase import run
     data = cavity_document()
-    data["units"] = {"length": unit, "time": "ns"}
+    data["geometry"]["length_unit"] = unit
     data["geometry"]["domain"] = {
         "xmin": ratio * 2, "xmax": ratio * 3,
         "ymin": ratio * -3, "ymax": ratio * -1,
@@ -247,13 +276,16 @@ def test_cavity_adapter_converts_lengths_and_translation_to_si(unit, ratio, monk
         return expected
     monkeypatch.setattr(galerkin, "solve_cavity_box", solve, raising=False)
     result = run(Document.from_dict(data), verbose=False)
-    np.testing.assert_allclose(captured["lengths_m"], [1, 2, 3], atol=1e-14)
+    # the lengths are differences of exact picometre corners: [1, 2, 3] m in every unit
+    assert captured["lengths_m"] == [1.0, 2.0, 3.0]
     assert captured["subdivisions"] == [6, 6, 6]
     assert captured["target_frequency_hz"] == 250000000.0
-    assert captured["num_modes"] == 5
-    np.testing.assert_allclose(result.cavity.mesh.nodes, original_nodes + [2, -3, 4], atol=1e-14)
-    assert result.summary()["units"] == {"length": unit, "time": "ns"}
-    assert result.summary()["mesh_length_unit"] == "m"
+    assert captured["num_modes"] == 5 and type(captured["num_modes"]) is int
+    np.testing.assert_array_equal(result.cavity.mesh.nodes, original_nodes + [2, -3, 4])
+    summary = result.summary()
+    assert summary["resolved_inputs"]["geometry.domain.xmin"]["length_unit"] == unit
+    assert summary["resolved_inputs"]["geometry.domain.xmin"]["value"] == 2.0
+    assert summary["field_units"]["node_coordinates"] == "m"
 
 
 def test_cavity_cli_reports_missing_engine_api_without_a_traceback(tmp_path, monkeypatch, capsys):

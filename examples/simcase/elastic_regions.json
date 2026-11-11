@@ -1,14 +1,13 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Quarter of a thick steel pipe under 10 MPa inner pressure",
-  "units": {
-    "length": "mm"
-  },
   "geometry": {
     "version": 1,
     "components": {
       "main": {
         "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
         "domain": {
           "xmin": 0.0,
           "xmax": 9.0,
@@ -72,13 +71,13 @@
   },
   "materials": {
     "steel": {
-      "young_modulus_pa": 200000000000.0,
+      "youngs_modulus": "200 GPa",
       "poisson_ratio": 0.3,
       "source": "document value"
     }
   },
   "mesh": {
-    "size": 0.5
+    "element_size": "0.5 mm"
   },
   "study": {
     "type": "single"
@@ -91,16 +90,16 @@
     "pipe": {
       "type": "mechanics.elasticity2d",
       "plane": "strain",
-      "displacement_m": {
+      "prescribed_displacement": {
         "left": {
-          "x": 0.0
+          "x": "0 mm"
         },
         "bottom": {
-          "y": 0.0
+          "y": "0 mm"
         }
       },
-      "pressure_pa": {
-        "inner": 10000000.0
+      "gauge_pressure": {
+        "inner": "10 MPa"
       }
     }
   }

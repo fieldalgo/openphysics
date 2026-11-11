@@ -19,31 +19,35 @@ shows these documents through its own heat routes (see
 
 ## Input
 
-Use document format `"openphysics": "0.2"`. Declare `units.length` (for example
-`m`, `mm`, or `um`) and `units.temperature: "K"`. Geometry bounds use that length
-unit. The adapter converts geometry to metres before meshing and assembly.
-Fixed suffixes have SI meaning regardless of the document length unit:
+Use document format `"openphysics": "0.3"`, where every value carries its unit
+([document format](document_format.md) has the reader rules). The flat rectangle
+geometry declares `length_unit` (for example `m`, `mm` or `um`); the four `domain` bounds are
+plain numbers in that unit, converted exactly to metres (through picometre counts) before
+meshing. `depth` is `null` (results per metre of depth) or a length such as `"40 mm"`, which
+adds totals beside the per-depth values. The physics entry holds:
 
-- `conductivity_w_mk`: finite positive constant, W/(m K).
-- `heat_source_w_m3`: finite signed constant, W/m³; default zero.
-- `dirichlet_temperature_k`: nonempty mapping from `left`, `right`, `bottom`,
-  or `top` to finite nonnegative kelvin. Unspecified exterior sides are insulated.
+- `thermal_conductivity`: positive, a quantity string such as `"12.5 W/(m K)"`.
+- `heat_source_density`: signed, such as `"100000 W/m^3"`; absent means no source (the reader
+  echoes it in `defaults_applied` and writes nothing into the document).
+- `prescribed_temperature`: nonempty mapping from `left`, `right`, `bottom` or `top` to an
+  absolute temperature above 0 K, such as `"280 K"` or `"25 degC"`. Unspecified exterior sides
+  are insulated.
 
 Adjacent prescribed sides share corner nodes. Equal corner values are deduplicated;
-conflicting values are rejected, independent of mapping order. Zero kelvin is a
-valid prescribed value. The rectangle is connected and the nonempty Dirichlet set
-removes its constant nullspace. The underlying engine also checks component
-constraints; arbitrary disconnected meshes are outside this document format.
+conflicting values are rejected, independent of mapping order. Since the units batch an
+absolute temperature must be above 0 K (`E-DOMAIN`); the solved temperature itself is not
+clamped. The rectangle is connected and the nonempty set of prescribed sides removes its
+constant nullspace. The underlying engine also checks component constraints; arbitrary
+disconnected meshes are outside this document format.
 
-`mesh` contains only `subdivisions: [nx, ny]`, with nonboolean positive JSON
-integers. `4` is accepted; `4.0`, `true`, zero and negative counts are rejected.
-`geometry` contains only four finite, strictly ordered `domain` bounds.
-`materials` is empty, there is exactly one physics, and `study` is
-`{"type":"single"}`. `results` accepts boolean `save_fields` and `plots`;
-`plots` must be false (the default). Optical material/dispersion/wavelength keys,
-shapes, sweeps, extra keys, region-dependent k, transient, coupled
-and 3D requests are rejected on this steady path. Natural boundary keys use the
-separate boundary-extension contract, rather than the legacy v1 validator.
+`mesh` contains only `subdivision_count: [nx, ny]`, positive JSON integers (`4.0`, `true`,
+zero and negative counts are refused). `materials` is empty, there is exactly one physics,
+and `study` is `{"type":"single"}` (its default). `results` accepts boolean `save_fields` and
+`plots`; `plots` must be false (the default). Unknown keys are `E-KEY-UNKNOWN`; a format 0.2
+key such as `conductivity_w_mk` is refused with its new name. A format 0.2 rectangle heat
+document is refused by name (`E-FORMAT`), as is a format 0.2 region document
+([material regions](thermal_regions2d.md) read format 0.3 too). Natural boundary keys use the separate
+[boundary extension](thermal_steady_boundary2d.md).
 
 Generate the complete examples and run them:
 
@@ -75,39 +79,45 @@ assert isinstance(result, ThermalRunResult)
 result.save("fresh_results")
 ```
 
-`result_format` is `thermal.steady2d-result-v1`; `field_layout` is
-`thermal2d-p1-node-cell-v1`. These identify the thermal output independently of
-input format 0.2 and optical/cavity result formats. No neff, wavelength or modal
-normalization is attached to temperature.
+`result_format` is `thermal.steady2d-result-v3`; `field_layout` is
+`thermal2d-p1-node-cell-v2` (the format 0.2 identifiers `-result-v1` and `-cell-v1` are
+retired; `simcase export` refuses them by name). No neff, wavelength or modal normalization
+is attached to temperature.
 
 | NPZ key | Shape | Location | Unit |
 | --- | --- | --- | --- |
-| `nodes_m` | (N,2) | nodes, SI coordinates | m |
-| `triangles` | (M,3) | integer node connectivity, CCW | 1 |
-| `temperature_k` | (N,) | nodes | K |
-| `heat_flux_w_m2` | (M,2) | triangle centroids, q=-k grad T | W/m² |
-| `load_w_per_m` | (N,) | nodal assembled source | W/m |
-| `reaction_w_per_m` | (N,) | nodes, inward support reaction | W/m |
-| `residual_w_per_m` | (N,) | full assembled K T - load residual | W/m |
-| `dirichlet_node_ids` | (D,) | sorted unique prescribed node indices | 1 |
-| `dirichlet_temperature_k` | (D,) | matching prescribed values | K |
+| `node_coordinates` | (N,2) | nodes, SI coordinates | m |
+| `triangles` | (M,3) | integer node connectivity, CCW | (structural) |
+| `temperature` | (N,) | nodes | K |
+| `heat_flux` | (M,2) | triangle centroids, q=-k grad T | W/m^2 |
+| `generated_heat_rate_per_depth` | (N,) | nodal assembled source | W/m |
+| `reaction_heat_rate_per_depth` | (N,) | nodes, heat the constraint injects | W/m |
+| `residual_heat_rate_per_depth` | (N,) | full assembled K T - load residual | W/m |
+| `prescribed_node_ids` | (D,) | sorted unique prescribed node indices | (structural) |
+| `prescribed_temperature` | (D,) | matching prescribed values | K |
 
-The result properties are `mesh_nodes_m`, `mesh_triangles`, and the seven physical
-or Dirichlet array names above. Reactions equal `K T - load` on prescribed nodes;
+The result properties have the same names. Reactions equal `K T - load` on prescribed nodes;
 free reactions are zero. The full residual retains the fixed-node reactions and
 roundoff-sized free entries. Net outward heat is the **negative** sum of reactions on
-unique prescribed nodes. Nodal W/m quantities integrate per unit depth; flux is
-W/m². Element flux is discontinuous across element boundaries and is not a nodal
-field. Flux/residual use the engine's equivalent component-offset coordinates.
+unique prescribed nodes. Per-depth quantities integrate per metre of depth; flux is W/m^2.
+Element flux is discontinuous across element boundaries and is not a nodal field.
+Flux/residual use the engine's equivalent component-offset coordinates.
 
-`summary.json` records the format/layout IDs, original document units, SI mesh
-unit, all nine array units/locations/shapes, fixed-node count, temperatures,
-source/outward/balance diagnostics and timings. Numeric values must be finite.
-`fields.npz` also contains Unicode scalar identifiers and `metadata_json`, without
-object arrays. Consumers must use `numpy.load(path, allow_pickle=False)` and
-validate identifiers before interpreting arrays. `save_fields=false` omits the
-entire NPZ while retaining summary, model and log; raw numeric/shape checks and
-finite-JSON validation still apply. Stored geometry is SI, not document units.
+`summary.json` carries the identifiers, the `diagnostics` list, `defaults_applied`,
+`resolved_inputs` (authored text, SI value and unit of each input), the `extent` line,
+`timing.wall_time`, the `field_units` (structural arrays have none), `field_locations`,
+`field_shapes` and `field_components` maps, and every value as `{"value", "unit"}`:
+`thermal_conductivity`, `minimum_temperature`, `maximum_temperature`,
+`generated_heat_rate_per_depth`, `outward_heat_rate_per_depth`,
+`heat_rate_imbalance_per_depth`, `relative_conservation_residual` and `relative_residual`.
+With a `depth` each `*_per_depth` value is followed by its total (`generated_heat_rate`, ...,
+`per_depth x depth`). Numeric values must be finite. `fields.npz` also contains the scalar
+identifiers and `metadata_json`, without object arrays; `mesh_length_unit` is gone (the
+coordinates are SI and `field_units` says so). Consumers must use
+`numpy.load(path, allow_pickle=False)` and validate identifiers before interpreting arrays.
+`save_fields=false` omits the entire NPZ while retaining summary, model and log.
+`model.json` holds the authored document bytes; `log.txt` starts with the extent line and
+ends with every diagnostic.
 
 ## Output ownership and failures
 

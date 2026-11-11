@@ -1,26 +1,25 @@
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "SOI strip waveguide 500 x 220 nm, version 1 geometry",
-  "units": {
-    "length": "um"
-  },
   "geometry": {
     "version": 1,
     "parameters": {
       "w": {
-        "value": 0.5,
+        "value": "0.5 um",
         "range": [
-          0.3,
-          0.9
+          "0.3 um",
+          "0.9 um"
         ]
       },
       "t": {
-        "value": 0.22
+        "value": "0.22 um"
       }
     },
     "components": {
       "xs": {
         "dimension": "2d",
+        "length_unit": "um",
+        "depth": null,
         "domain": {
           "xmin": -1.5,
           "xmax": 1.5,
@@ -28,7 +27,7 @@
           "ymax": 1.2
         },
         "background": {
-          "material": "SiO2"
+          "material": "physmat:SiO2"
         },
         "features": [
           {
@@ -38,8 +37,8 @@
             "y": 0.0,
             "w": "w",
             "h": "t",
-            "material": "Si",
-            "mesh_size": 0.02
+            "material": "physmat:Si",
+            "element_size": "0.02 um"
           }
         ],
         "finalize": "later_wins"
@@ -50,9 +49,9 @@
     "em1": {
       "type": "em.modes2d",
       "formulation": "vector",
-      "wavelength": 1.55,
-      "num_modes": 2,
-      "n_cladding": 1.45,
+      "vacuum_wavelength": "1.55 um",
+      "mode_count": 2,
+      "effective_index_threshold": 1.45,
       "boundary": {
         "left": "pec",
         "right": "pec",
@@ -62,28 +61,31 @@
     }
   },
   "mesh": {
-    "size": 0.25,
+    "element_size": "0.25 um",
     "grading": {
-      "center": [
-        0.0,
-        0.11
+      "position": [
+        "0 um",
+        "0.11 um"
       ],
-      "near": 0.02,
-      "far": 0.16,
-      "distance": 1.0
+      "near": "0.02 um",
+      "far": "0.16 um",
+      "refinement_distance": "1 um"
     }
   },
   "study": {
     "type": "sweep",
-    "parameter": "physics.em1.wavelength",
-    "values": [
-      1.4,
-      1.45,
-      1.5,
-      1.55,
-      1.6,
-      1.65,
-      1.7
-    ]
+    "parameter": "physics.em1.vacuum_wavelength",
+    "values": {
+      "unit": "um",
+      "values": [
+        1.4,
+        1.45,
+        1.5,
+        1.55,
+        1.6,
+        1.65,
+        1.7
+      ]
+    }
   }
 }

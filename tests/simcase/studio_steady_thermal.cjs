@@ -14,27 +14,29 @@ const tick=()=>new Promise(r=>setImmediate(r));
 function cap(){return {capability_format:'studio-capabilities-v1','thermal.steady2d':{
   supported:true,run_enabled:true,resource_policy:'candidate-unmeasured',validate:'/api/thermal/validate',run:'/api/thermal/run',input:'json',mesh_preview:false,
   mesh_from_result:true,time_navigation:false,result_formats:Object.keys(T.PAIRS),
-  field_layouts:Object.values(T.PAIRS),fields:['temperature_k','heat_flux_w_m2'],
+  field_layouts:Object.values(T.PAIRS),fields:['temperature','heat_flux'],
   limits:{request_bytes:1048576,max_nodes:10201,max_triangles:20000,payload_bytes:16777216,active_jobs:1,terminal_jobs:2,terminal_bytes:33554432,ttl_seconds:300,log_bytes:65536,error_bytes:4096,metadata_bytes:65536,status_bytes:131072}}};}
-function doc(){return {openphysics:'0.2',name:'Heat',units:{length:'m',temperature:'K'},
-  geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1}},physics:{heat1:{type:T.TYPE}},
-  mesh:{subdivisions:[1,1]},study:{type:'single'}};}
+function doc(){return {openphysics:'0.3',name:'Heat',geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1}},
+  physics:{heat1:{type:T.TYPE}},mesh:{subdivision_count:[1,1]},study:{type:'single'}};}
+// A format 0.3 rectangle payload (registry names; structural arrays carry no unit).
 function payload({v2=true,D=0,revision=0,sequence=1}={}){
-  const arrays={nodes_m:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],
-    temperature_k:[0,1,2,3],heat_flux_w_m2:[[2,0],[0,-4]],load_w_per_m:[0,0,0,0],
-    reaction_w_per_m:[0,0,0,0],residual_w_per_m:[0,0,0,0],
-    dirichlet_node_ids:Array.from({length:D},(_,i)=>i),dirichlet_temperature_k:Array(D).fill(300)};
+  const arrays={node_coordinates:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],
+    temperature:[0,1,2,3],heat_flux:[[2,0],[0,-4]],generated_heat_rate_per_depth:[0,0,0,0],
+    reaction_heat_rate_per_depth:[0,0,0,0],residual_heat_rate_per_depth:[0,0,0,0],
+    prescribed_node_ids:Array.from({length:D},(_,i)=>i),prescribed_temperature:Array(D).fill(300)};
   if(v2)T.ADDED.forEach(k=>arrays[k]=[0,0,0,0]);
-  const result_format='thermal.steady2d-result-v'+(v2?2:1),field_layout=T.PAIRS[result_format];
+  const result_format='thermal.steady2d-result-v'+(v2?4:3),field_layout=T.PAIRS[result_format];
   const spec={...T.BASE};if(v2)T.ADDED.forEach(k=>spec[k]=['W/m','nodes',0]);
-  const summary={physics_type:T.TYPE,result_format,field_layout,units:{length:'m',temperature:'K'},
-    mesh_length_unit:'m',mesh:{nodes:4,triangles:2},field_units:{},field_locations:{},field_shapes:{}};
+  const summary={physics_type:T.TYPE,result_format,field_layout,
+    resolved_inputs:{'geometry.domain.xmin':{authored:0,value:0,unit:'m',length_unit:'m'}},
+    mesh:{nodes:4,triangles:2},field_units:{},field_locations:{},field_shapes:{}};
   for(const[k,[unit,location,cols]]of Object.entries(spec)){
-    summary.field_units[k]=unit;summary.field_locations[k]=location;
+    if(unit!==null)summary.field_units[k]=unit;summary.field_locations[k]=location;
     summary.field_shapes[k]=cols?[arrays[k].length,cols]:[arrays[k].length];
   }
-  return {payload_format:'studio-thermal-steady-v1',kind:T.TYPE,job:'job1',result_id:'res1',
-    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,display_length_in_m:1};
+  return {payload_format:'studio-thermal-steady-v2',kind:T.TYPE,job:'job1',result_id:'res1',
+    client_revision:revision,request_seq:sequence,result_format,field_layout,summary,arrays,
+    length_unit:'m',display_length_in_m:1};
 }
 function canvas(W=200,H=160){
   // Records paths, fills, strokes and globalAlpha assignments.
@@ -79,7 +81,7 @@ test('strict raw parser rejects nested, escaped duplicate keys and overflow',()=
   assert.deepEqual(T.strictParse(' \n{"a":[1,true,null,"\\\\"]}'),{a:[1,true,null,'\\']});
 });
 test('v1/v2 exact physical arrays, paired IDs and Robin-only D0',()=>{
-  assert.equal(T.validatePayload(payload()).arrays.dirichlet_node_ids.length,0);
+  assert.equal(T.validatePayload(payload()).arrays.prescribed_node_ids.length,0);
   assert.equal(Object.keys(T.validatePayload(payload({v2:false,D:1})).arrays).length,9);
   assert.throws(()=>T.validatePayload(payload({v2:false,D:0})));
 });
@@ -87,13 +89,13 @@ for(const mutation of ['pair','units','shape','bool','nonfinite','connectivity',
 test('malformed payload refuses '+mutation,()=>{
   const p=payload();
   if(mutation==='pair')p.field_layout=T.PAIRS['thermal.steady2d-result-v1'];
-  if(mutation==='units')p.summary.field_units.temperature_k='relative';
-  if(mutation==='shape')p.arrays.temperature_k=[1,2];
-  if(mutation==='bool')p.arrays.temperature_k[0]=true;
-  if(mutation==='nonfinite')p.arrays.heat_flux_w_m2[0][0]=Infinity;
+  if(mutation==='units')p.summary.field_units.temperature='relative';
+  if(mutation==='shape')p.arrays.temperature=[1,2];
+  if(mutation==='bool')p.arrays.temperature[0]=true;
+  if(mutation==='nonfinite')p.arrays.heat_flux[0][0]=Infinity;
   if(mutation==='connectivity')p.arrays.triangles[0][0]=.5;
   if(mutation==='ccw')p.arrays.triangles[0].reverse();
-  if(mutation==='missing')delete p.arrays.ambient_load_w_per_m;
+  if(mutation==='missing')delete p.arrays.ambient_convective_heat_rate_per_depth;
   if(mutation==='extra')p.arrays.neff=[1];
   if(mutation==='owner')p.job='other';
   if(mutation==='display')p.display_length_in_m=0;
@@ -106,17 +108,18 @@ test('nodal P1 interpolation differs from flat-cell flux, no nodal averaging',()
   assert.equal(T.sample(T.viewModel(p,'qx'),[.25,.75]),0);
   assert.equal(T.sample(T.viewModel(p,'qy'),[.25,.75]),-4);
   assert.equal(T.sample(T.viewModel(p,'magnitude'),[.25,.75]),4);
-  assert.deepEqual(p.arrays.temperature_k,[0,1,2,3]);
+  assert.deepEqual(p.arrays.temperature,[0,1,2,3]);
 });
 test('raw negative constant K and explicit length conversion remain unchanged',()=>{
-  const p=payload();p.arrays.temperature_k.fill(-10);p.display_length_in_m=.001;p.summary.units.length='mm';
+  const p=payload();p.arrays.temperature.fill(-10);p.display_length_in_m=.001;p.length_unit='mm';
+  p.summary.resolved_inputs['geometry.domain.xmin'].length_unit='mm';
   const accepted=T.validatePayload(p),m=T.viewModel(accepted);
   assert.equal(m.min,-10);assert.equal(m.max,-10);assert.equal(m.nodes[1][0],1000);
-  assert.deepEqual(accepted.arrays.nodes_m[1],[1,0]);assert.equal(m.lengthLabel,'mm');
+  assert.deepEqual(accepted.arrays.node_coordinates[1],[1,0]);assert.equal(m.lengthLabel,'mm');
   assert.doesNotThrow(()=>T.draw(canvas(),m));
 });
 test('pixels commit only for current render; arrows use centroids and screen-y',()=>{
-  const p=payload();p.arrays.heat_flux_w_m2=[[0,4],[0,4]];
+  const p=payload();p.arrays.heat_flux=[[0,4],[0,4]];
   const m=T.viewModel(T.validatePayload(p),'qy'),cv=canvas(),X=T.transform(m,200,160);
   assert.equal(T.draw(cv,m,{current:()=>false}),false);assert.equal(cv.calls.length,0);
   assert.equal(T.draw(cv,m),true);
@@ -193,7 +196,7 @@ test('actual shipped DOM: run installs result mesh and typed fields, late render
   await p.run('doRun()');await tick();
   assert.equal(p.element('thermalControls').hidden,false);
   assert.match(p.element('meshInfo').textContent,/Actual result mesh/);
-  assert.match(p.element('resInfo').textContent,/temperature_k/);
+  assert.match(p.element('resInfo').textContent,/temperature/);
   p.element('thermalField').value='qy';p.element('thermalField').onchange();
   for(const id of ['resInfo','meshInfo','meshLegend'])p.element(id).textContent='old result '+id;
   p.element('json').value='{';p.element('json').oninput();
@@ -236,8 +239,8 @@ test('explicit supported=false disables capability despite complete routes',()=>
   const value=cap();value[T.TYPE].supported=false;assert.equal(T.capability(value),null);
 });
 test('finite huge flux arrows and constant high Kelvin stay finite in display',()=>{
-  const value=payload();value.arrays.heat_flux_w_m2=[[1e308,0],[0,1e308]];
-  value.arrays.temperature_k.fill(Number.MAX_VALUE);
+  const value=payload();value.arrays.heat_flux=[[1e308,0],[0,1e308]];
+  value.arrays.temperature.fill(Number.MAX_VALUE);
   const p=T.validatePayload(value),m=T.viewModel(p);
   assert.equal(T.sample(m,[.75,.25]),Number.MAX_VALUE);
   const cv=canvas();T.draw(cv,T.viewModel(p,'magnitude'));
@@ -292,15 +295,15 @@ test('absent run-enabled keeps validated JSON from starting a job',async()=>{
 
 test('settled wire rejects nested coordinates and runs independently of measurement',()=>{const p=payload();assert.equal(T.validatePayload(p).display_length_in_m,1);p.coordinates={raw_unit:'m',display_unit:'m',display_length_in_m:1};assert.throws(()=>T.validatePayload(p));assert.equal(T.capability(cap()).run_enabled,true);assert.equal(T.capability(cap()).resource_policy,'candidate-unmeasured');});
 
-test('shipped result panel shows physical diagnostics and collapsible metadata',()=>{const p=page();p.run("renderThermalSummary({arrays:{temperature_k:[-2,4],nodes_m:[[],[],[]],triangles:[[]]},summary:{diagnostics:{source_heat_w_per_m:60,outward_heat_w_per_m:60,normalized_heat_balance_defect:0}}})");const host=p.element('resTable');assert.equal(host.children[0].children.length,5);assert.equal(host.children[1].children[0].textContent,'Full result metadata');assert.equal(host.children[0].children[0].children[1].textContent,'-2 … 4');});
+test('shipped result panel shows physical diagnostics and collapsible metadata',()=>{const p=page();p.run("renderThermalSummary({arrays:{temperature:[-2,4],node_coordinates:[[],[],[]],triangles:[[]]},summary:{diagnostics:{source_heat_w_per_m:60,outward_heat_w_per_m:60,normalized_heat_balance_defect:0}}})");const host=p.element('resTable');assert.equal(host.children[0].children.length,5);assert.equal(host.children[1].children[0].textContent,'Full result metadata');assert.equal(host.children[0].children[0].children[1].textContent,'-2 … 4');});
 
 test('shipped page current derived overflow clears only field; stale render cannot clear newer view',async()=>{
-  const p=page(),wire=payload();wire.arrays.heat_flux_w_m2=[[Number.MAX_VALUE,Number.MAX_VALUE],[0,1]];
+  const p=page(),wire=payload();wire.arrays.heat_flux=[[Number.MAX_VALUE,Number.MAX_VALUE],[0,1]];
   p.run('globalThis.wire='+JSON.stringify(wire)+';thermalSupported=()=>true;'
     +'thermalController.result=()=>wire;globalThis.renderSeq=0;'
     +'thermalController.renderToken=field=>({seq:++renderSeq,field});'
     +'thermalController.renderCurrent=t=>t.seq===renderSeq;');
-  p.element('thermalField').value='temperature_k';p.run('drawThermalViews()');await tick();
+  p.element('thermalField').value='temperature';p.run('drawThermalViews()');await tick();
   assert.ok(p.element('fieldCanvas').onmousemove);
   p.element('fieldCanvas').getContext('2d').clearRect=()=>p.element('fieldCanvas').calls.push(['clear']);
   p.element('thermalField').value='magnitude';p.run('drawThermalViews()');await tick();
@@ -320,13 +323,13 @@ test('shipped page current derived overflow clears only field; stale render cann
   p.run('Promise.resolve().then(()=>{globalThis.afterStale={trace:frameTrace.slice(),'
     +'label:document.getElementById("resInfo").textContent,'
     +'hover:document.getElementById("fieldCanvas").onmousemove===null};})');
-  p.element('thermalField').value='temperature_k';p.run('drawThermalViews()');await tick();
+  p.element('thermalField').value='temperature';p.run('drawThermalViews()');await tick();
   assert.equal(p.run('JSON.stringify(afterStale.trace)'),'[]');
   assert.equal(p.run('afterStale.label'),failedLabel);
   assert.equal(p.run('afterStale.hover'),true);
   assert.equal(p.run('JSON.stringify(frameTrace)'),JSON.stringify(['clear','pixels']));
   assert.equal(typeof p.element('fieldCanvas').onmousemove,'function');
-  assert.match(p.element('resInfo').textContent,/temperature_k/);
+  assert.match(p.element('resInfo').textContent,/temperature/);
   assert.doesNotMatch(p.element('resInfo').textContent,/view error/);
 });
 
@@ -362,11 +365,11 @@ function regionBlock(){return {supported:true,run_enabled:true,result_formats:[T
   field_layouts:[T.REGION.field_layout],payload_formats:[T.REGION.payload_format],limits:{...REGION_LIMITS}};}
 // regionCap() advertises a valid block; regionCap(undefined) advertises none.
 function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[T.TYPE].regions=b;return value;}
-function regionDoc(){return {openphysics:'0.2',name:'Regions',units:{length:'m',temperature:'K'},
-  geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
+function regionDoc(){return {openphysics:'0.3',name:'Regions',
+  geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
     shapes:[{name:'heater',type:'rect',x:.5,y:0,w:.5,h:1,material:'copper'}]},
-  materials:{copper:{conductivity_w_mk:400},insulation:{conductivity_w_mk:.04}},physics:{heat1:{type:T.TYPE}},
-  mesh:{size:.5},study:{type:'single'}};}
+  materials:{copper:{thermal_conductivity:'400 W/(m K)'},insulation:{thermal_conductivity:'0.04 W/(m K)'}},
+  physics:{heat1:{type:T.TYPE}},mesh:{element_size:'0.5 m'},study:{type:'single'}};}
 // Own properties only: a region may be named __proto__.
 const own=entries=>{const o={};for(const [k,v] of entries)Object.defineProperty(o,k,{value:v,enumerable:true,writable:true,configurable:true});return o;};
 function regionPayload({names=['heater','background'],ids=[0,1],materials=['copper','insulation'],revision=0,sequence=1}={}){
@@ -374,13 +377,15 @@ function regionPayload({names=['heater','background'],ids=[0,1],materials=['copp
   p.payload_format=T.REGION.payload_format;
   p.result_format=p.summary.result_format=T.REGION.result_format;
   p.field_layout=p.summary.field_layout=T.REGION.field_layout;
+  // region ids are structural: a location and a shape, no unit
   p.arrays.triangle_regions=ids.slice();
-  p.summary.field_units.triangle_regions='1';p.summary.field_locations.triangle_regions='triangles';
-  p.summary.field_shapes.triangle_regions=[ids.length];
+  p.summary.field_locations.triangle_regions='triangles';p.summary.field_shapes.triangle_regions=[ids.length];
   p.summary.region_names=names.slice();
-  p.summary.regions=own(names.map((n,i)=>[n,{material:materials[i],triangles:ids.filter(v=>v===i).length,area_m2:.5*ids.filter(v=>v===i).length}]));
-  p.summary.materials={copper:{conductivity_w_mk:400,source:'document value'},insulation:{conductivity_w_mk:.04}};
-  p.summary.heat_source_w_m3=own([[names[0],5e6]]);
+  p.summary.regions=own(names.map((n,i)=>[n,{material:materials[i],triangles:ids.filter(v=>v===i).length,
+    area:{value:.5*ids.filter(v=>v===i).length,unit:'m^2'}}]));
+  p.summary.materials={copper:{thermal_conductivity:{value:400,unit:'W/(m K)'},source:'document value'},
+    insulation:{thermal_conductivity:{value:.04,unit:'W/(m K)'}}};
+  p.summary.heat_source_density=own([[names[0],{value:5e6,unit:'W/m^3'}]]);
   return p;
 }
 const OWNER={job:'job1',result_id:'res1',client_revision:0,request_seq:1};
@@ -408,7 +413,7 @@ test('J1 region capability is nested: rectangle fields unchanged, outer pairs re
 
 test('J2 region payload: D=0, a zero-cell region and literal hostile names are accepted; malformed ones refused',()=>{
   const accepted=T.validateRegionPayload(regionPayload(),OWNER,REGION_LIMITS);
-  assert.equal(accepted.arrays.dirichlet_node_ids.length,0);assert.equal(accepted.payload_format,T.REGION.payload_format);
+  assert.equal(accepted.arrays.prescribed_node_ids.length,0);assert.equal(accepted.payload_format,T.REGION.payload_format);
   assert.equal(accepted.result_format,T.REGION.result_format);assert.equal(accepted.summary.result_format,T.REGION.result_format);
   assert.deepEqual(accepted.regions.names,['heater','background']);assert.deepEqual(accepted.regions.ids,[0,1]);
   assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.q,r.cells,r.color]),
@@ -434,9 +439,16 @@ test('J2 region payload: D=0, a zero-cell region and literal hostile names are a
     cell_count:p=>{p.summary.regions.heater.triangles=2;},
     material_not_own:p=>{p.summary.regions.heater.material='toString';},
     metadata:p=>{p.summary.field_locations.triangle_regions='nodes';},
-    summary_pair:p=>{p.summary.result_format='thermal.steady2d-result-v2';},
-    rectangle_pair:p=>{p.payload_format='studio-thermal-steady-v1';p.result_format=p.summary.result_format='thermal.steady2d-result-v2';
-      p.field_layout=p.summary.field_layout=T.PAIRS['thermal.steady2d-result-v2'];},
+    summary_pair:p=>{p.summary.result_format='thermal.steady2d-result-v4';},
+    rectangle_pair:p=>{p.payload_format='studio-thermal-steady-v2';p.result_format=p.summary.result_format='thermal.steady2d-result-v4';
+      p.field_layout=p.summary.field_layout=T.PAIRS['thermal.steady2d-result-v4'];},
+    region_unit:p=>{p.summary.field_units.triangle_regions='1';},
+    area_unit:p=>{p.summary.regions.heater.area.unit='mm^2';},
+    area_number:p=>{p.summary.regions.heater.area=.5;},
+    conductivity_number:p=>{p.summary.materials.copper.thermal_conductivity=400;},
+    source_number:p=>{p.summary.heat_source_density.heater=5e6;},
+    old_names:p=>{p.summary.heat_source_w_m3=p.summary.heat_source_density;delete p.summary.heat_source_density;
+      for(const e of Object.values(p.summary.regions)){e.area_m2=e.area.value;delete e.area;}},
     too_many:p=>{},
   };
   for(const [name,fault] of Object.entries(faults)){
@@ -455,7 +467,7 @@ test('J3 a rectangle view model keeps its exact keys',()=>{
 });
 
 // Rectangle draw calls recorded on the commit before region support (thermal.js then).
-const RECTANGLE_CALLS={"mesh":[["move",62.5,117.5],["line",137.5,117.5],["line",137.5,42.5],["move",62.5,117.5],["line",137.5,42.5],["line",62.5,42.5],["text","x / y (m); +y upward",100,148],["text","Actual result mesh",12,18]],"temperature":[["text","x / y (m); +y upward",100,148],["text","temperature_k [K] 0 … 3",12,18],["text","0 … 3 K",12,51]],"qx":[["move",112.5,92.5],["line",123.5,92.5],["move",119.11208719054814,94.89712769302102],["line",123.5,92.5],["line",119.11208719054814,90.10287230697898],["move",87.5,67.5],["line",87.5,89.5],["move",85.10287230697898,85.11208719054814],["line",87.5,89.5],["line",89.89712769302102,85.11208719054814],["text","x / y (m); +y upward",100,148],["text","qx [W/m²] 0 … 2",12,18],["text","0 … 2 W/m²",12,51],["text","Cell flux; arrows max 22 px (view only), global +y upward",12,129]]};
+const RECTANGLE_CALLS={"mesh":[["move",62.5,117.5],["line",137.5,117.5],["line",137.5,42.5],["move",62.5,117.5],["line",137.5,42.5],["line",62.5,42.5],["text","x / y (m); +y upward",100,148],["text","Actual result mesh",12,18]],"temperature":[["text","x / y (m); +y upward",100,148],["text","temperature [K] 0 … 3",12,18],["text","0 … 3 K",12,51]],"qx":[["move",112.5,92.5],["line",123.5,92.5],["move",119.11208719054814,94.89712769302102],["line",123.5,92.5],["line",119.11208719054814,90.10287230697898],["move",87.5,67.5],["line",87.5,89.5],["move",85.10287230697898,85.11208719054814],["line",87.5,89.5],["line",89.89712769302102,85.11208719054814],["text","x / y (m); +y upward",100,148],["text","qx [W/m²] 0 … 2",12,18],["text","0 … 2 W/m²",12,51],["text","Cell flux; arrows max 22 px (view only), global +y upward",12,129]]};
 const kinds=(cv,...names)=>cv.calls.filter(c=>names.includes(c[0]));
 function sameCalls(actual,expected){
   assert.equal(actual.length,expected.length);
@@ -503,7 +515,7 @@ async function runPage(p){
   await p.run('doRun()');await tick();
 }
 function hover(p,x,y){
-  const model=p.run('ThermalStudio.viewModel(thermalController.result(),document.getElementById("thermalField").value||"temperature_k")');
+  const model=p.run('ThermalStudio.viewModel(thermalController.result(),document.getElementById("thermalField").value||"temperature")');
   const t=T.transform(model,320,240);p.element('fieldCanvas').onmousemove({clientX:t.X(x),clientY:t.Y(y)});
   return p.element('resInfo').textContent;
 }
@@ -513,7 +525,7 @@ test('J5 region hover names the region and material; rectangle hover is unchange
   assert.ok(hover(p,.75,.25).endsWith('; region heater (copper)'));
   assert.ok(hover(p,.25,.75).endsWith('; region background (insulation)'));
   const r=regionPage(payload(),{capability:cap(),regionDocument:doc()});await runPage(r);
-  assert.equal(hover(r,.75,.25),'temperature_k = 1 K (raw P1 interpolation)');
+  assert.equal(hover(r,.75,.25),'temperature = 1 K (raw P1 interpolation)');
 });
 
 test('J6 region summary: no region name becomes a quantity row; metadata second, region table third',async()=>{
@@ -578,7 +590,7 @@ test('J10 hasRegionGeometry on the server rule fixtures (two physics entries: fa
   const noGeometry=copy(region);delete noGeometry.geometry;
   const physicsNotDict=copy(region);physicsNotDict.physics=['heat1'];
   const twoPhysics=copy(region);twoPhysics.physics.second={type:T.TYPE};
-  // version 1 blocks, as the server's from_v02 writes them (the numbers do not matter to the rule)
+  // version 1 blocks, as geometry_document.from_flat writes them (the numbers do not matter to the rule)
   const component=(extra)=>({dimension:'2d',domain:{xmin:0,xmax:40,ymin:0,ymax:20},finalize:'later_wins',...extra});
   const versionOne=copy(region);versionOne.geometry={version:1,components:{main:component({background:{material:'steel'},
     features:[{name:'heater',type:'rect',x:1,y:1,w:2,h:2,material:'copper'}]})}};

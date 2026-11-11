@@ -78,9 +78,9 @@ visible Mesh/Results tab redraws the current accepted result without solving.
 
 | Display/data | Contract |
 | --- | --- |
-| Coordinates | Raw `arrays.nodes_m` in m; axes divide by top-level `display_length_in_m`, the captured positive metres-per-document-length-unit scale |
-| Temperature | `temperature_k`, nodal P1, K; linear interpolation and labelled colorbar |
-| Flux | `heat_flux_w_m2`, constant per triangle, W/m²; global qx/qy or magnitude |
+| Coordinates | Raw `arrays.node_coordinates` in m; axes divide by top-level `display_length_in_m`, the metres per unit of the geometry's `length_unit` (named by `length_unit`) |
+| Temperature | `temperature`, nodal P1, K; linear interpolation and labelled colorbar |
+| Flux | `heat_flux`, constant per triangle, W/m^2; global qx/qy or magnitude |
 | Arrows | Actual cell centroids and global directions; labelled view gain, no physical rescaling |
 | Source/reaction/rates | Nodal W/m of out-of-plane depth, distinct from W/m² flux |
 
@@ -110,11 +110,11 @@ missing fields and malformed payloads must not reach the display.
 ## Fixed wire envelope
 
 ```text
-payload_format = "studio-thermal-steady-v1"
+payload_format = "studio-thermal-steady-v2"
 kind = "thermal.steady2d"
 job, result_id, client_revision, request_seq
 result_format, field_layout
-display_length_in_m
+length_unit, display_length_in_m
 summary
 arrays
 ```
@@ -126,8 +126,11 @@ These are top-level fields; there is **no nested coordinates object**.
 document display declaration. Run identity is kind/job/result_id plus the two
 nonnegative safe-integer counters. Status adds status/log/error/has_result.
 Requests contain exactly doc/client_revision/request_seq and use UTF-8
-application/json. Duplicate keys, nonfinite JSON, malformed envelopes and
-unsupported physics are refused. No field/time selector is accepted on thermal
+application/json. The request bytes are read with `simcase.reader`, as on every
+Studio route that takes a document: duplicate keys, nonfinite JSON (also a number
+beyond a double), malformed envelopes and unsupported physics are refused, a
+leading UTF-8 byte order mark is accepted, and the validation reply returns the
+document with every number as written. No field/time selector is accepted on thermal
 status/result routes. Arrays, summary and identity use this single contract.
 
 ## Route boundaries and recovery
@@ -171,7 +174,9 @@ All limits remain **candidate settings, not measured capacity**:
 request 1 MiB; N<=10201 nodes; M<=20000 cells; encoded result 16 MiB;
 one active thermal job; at most two terminal thermal records and 32 MiB total;
 terminal retention at most 300 s. Logs are capped at 64 KiB, errors at 4 KiB,
-summary metadata at 64 KiB and status encoding at 128 KiB. Final capabilities must expose the actual configured
+summary metadata at 64 KiB and status encoding at 128 KiB. The summary metadata is the result summary
+without its `diagnostics` and `resolved_inputs`: those two lists grow with the document and count
+against the encoded result (16 MiB; a transient manifest's 4 MiB). Final capabilities must expose the actual configured
 policy. Thermal run stays disabled if required policy is not configured.
 Admission/publication reclaim the oldest terminal records (done **or** error)
 when count/byte space is needed, preserving active thermal and all optical jobs.
@@ -203,8 +208,9 @@ material (the engine's own rule, `simcase.has_region_geometry`,
 see [heat documents with material regions](thermal_regions2d.md)) takes
 Studio's region path on `/api/thermal/validate` and `/api/thermal/run`. A
 homogeneous rectangle written as version 1 (no features, no background
-material) is compiled to the 0.2 rectangle form at load and takes the rectangle
-path, as the 0.2 rectangle does.
+material) is compiled to the flat rectangle form at load and takes the rectangle
+path, as the flat rectangle does. Region documents are format 0.3, as rectangles are:
+a format 0.2 region document is refused by name (`invalid_document`, path `openphysics`).
 A version 1 document is accepted as written (the validation echo and the
 result record its block, not a compilation; the page applies the same rule
 to pin the document family before it validates), its features count as shapes in
@@ -213,18 +219,18 @@ the raw geometry caps (path `geometry.components`), and its mesh comes from the
 document (a void feature, a tag off the four sides) is an `invalid_document`.
 Every other document follows the rectangle path, whose code, bytes and errors
 are unchanged; `tests/simcase/test_studio_rectangle_invariants.py` pins them.
-A region document with `mesh.subdivisions` is refused (`invalid_document`,
-path `mesh.subdivisions`), and so is a rectangle document with a stray
+A region document with `mesh.subdivision_count` is refused (`invalid_document`,
+path `mesh.subdivision_count`), and so is a rectangle document with a stray
 `geometry.shapes` key, because that key makes it a region document.
 
 ### Wire format
 
 | Item | Region result |
 | --- | --- |
-| Result and layout IDs | `thermal.steady2d-regions-result-v1`, `thermal2d-p1-node-cell-regions-v1` |
-| Payload | `payload_format = "studio-thermal-steady-regions-v1"`, the same 11 top-level fields as the rectangle payload |
-| `arrays` | The thirteen v2 arrays plus `triangle_regions`: one region index per triangle (unit `1`, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
-| `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area_m2`), the whole `materials` table, `heat_source_w_m3`, `conductivity_range_w_mk` and `mesh` (`nodes`, `triangles`, `size`, `min_angle_deg`, `size_unit`) |
+| Result and layout IDs | `thermal.steady2d-regions-result-v2`, `thermal2d-p1-node-cell-regions-v2` (the `-v1` pair of format 0.2 is retired) |
+| Payload | `payload_format = "studio-thermal-steady-regions-v2"`, the 12 top-level fields of the rectangle payload, `length_unit` included |
+| `arrays` | The thirteen boundary arrays under their registry names (`node_coordinates`, `temperature`, `heat_flux`, ...) plus `triangle_regions`: one region index per triangle (no unit, location `triangles`, shape `[M]`); D=0 is allowed (Robin-only anchoring) |
+| `summary` | The producer's summary, including `region_names` (the order of the indices), `regions` (per name: `material`, `triangles`, `area` as `{value, unit}` in m^2), the whole `materials` table with `{value, unit}` properties, `heat_source_density`, `minimum_thermal_conductivity`, `maximum_thermal_conductivity` and `mesh` (`nodes`, `triangles`) |
 | Capability | A nested `regions` key in the steady block: `supported`, `run_enabled`, `result_formats`, `field_layouts`, `payload_formats` and the five `limits` below |
 
 The region pair is not added to the block's outer `result_formats`, which the
@@ -249,13 +255,14 @@ nothing is published.
 
 | Stage | Check | Refusal |
 | --- | --- | --- |
-| Event loop, cost linear in the JSON | One `thermal.steady2d` entry; no `mesh.subdivisions` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
+| Event loop, cost linear in the JSON | One `thermal.steady2d` entry; format 0.3; no `mesh.subdivision_count` | `unsupported_physics` (400); `invalid_document` (200 with `ok=false` on validate, 400 on run) |
 | Event loop | The steady boundary (v2) result runtime is installed, since region results always carry the boundary arrays | `unsupported_result_format` (400) |
 | Event loop, run only | The public result API for region runs is available (the block's `run_enabled`) | `unsupported_public_api` (400) |
 | Worker thread, before `Document.from_dict` | At most 64 shapes, 16 circles and 512 polygon points in total, then at most 1024 boundary crossings (`simcase.region_complexity`) | `geometry_limit_exceeded` (413), path `geometry.shapes` (`geometry.components` for a version 1 block) |
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | At most 2048 loop vertices after the shapes' booleans (`simcase.check_mesh_limits`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
-| Worker thread | The document's name, units, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
+| Worker thread | The document's name, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
+| Worker thread | The document's diagnostics and resolved inputs encode within the result's limit (`payload_bytes`, 16 MiB; a transient manifest's `manifest_bytes`, 4 MiB); the summary copies them | `payload_limit_exceeded` (413); the message gives both counts and names the limit |
 | Job, before the solve | Meshing stops past 10201 nodes (`max_nodes`); the exact node and cell counts are then compared with 10201 and 20000 | Job error `mesh_limit_exceeded` |
 | Job | A document error found after meshing, such as a heat source on a shape that later shapes cover completely | Job error `invalid_document` |
 | Job | Any other run failure, such as a geometry meshine cannot resolve or a refinement that does not converge within meshine's 80 rounds | Job error `solver_failed` |
@@ -336,13 +343,19 @@ the crossing cap.
   so the mesher can process somewhat more points than counted.
 - Region results always carry 14 arrays; D=0 is legal.
 - The summary copies the whole materials table, including unused materials and
-  their `source` text, and must fit in 64 KiB. Certain overflows are refused at
-  validation; the rest end as a job error.
+  their `source` text, and must fit in 64 KiB without its diagnostics and
+  resolved inputs. Those two lists grow with the document (each polygon
+  coordinate off the 1 pm grid adds a rounding diagnostic of about 250 bytes
+  and a resolved input of about 80) and count against the result's limit: a
+  512-point polygon with 63 more shapes gives a summary of about 415 kB.
+  Certain overflows are refused at validation; the rest end as a job error.
+  Each refusal names the limit it exceeds.
 - meshine can fail closed with "cannot resolve" (`solver_failed`), for example
-  for acute star polygons, crossing polygons with near-coincident boundaries or
-  a sawtooth with 1-degree tips. That sawtooth fails only on the micrometre
-  copy simcase meshes; in millimetres, or scaled by other factors, it reaches the
-  node cap instead (see the
+  for acute star polygons or crossing polygons with near-coincident boundaries.
+  A sawtooth with 1-degree tips did so on the micrometre copy simcase meshed
+  before flat shape numbers reached the mesher on the 1 pm grid; it now reaches
+  the node cap (`mesh_limit_exceeded`), and simcase's own run without limits
+  ends with "refinement did not converge in 80 rounds" (see the
   [region resource observation](../../region_resource_probe.md)).
 - Colours repeat after eight regions; the legend, boundaries, table and hover
   still name every region.

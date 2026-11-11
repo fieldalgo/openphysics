@@ -89,6 +89,9 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   Recover the last session, an earlier one, or open a session file.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
+- Input and session files are version 6. Files saved by a Studio from before the units
+  and naming batch (versions 1 to 5) are refused with a message that names their version,
+  and a browser draft from that Studio is not offered: enter the design again and save it.
 
 ## Tested platforms
 
@@ -98,4 +101,8 @@ built from the repository: the plain `openphysics==0.0.2` install in a new envir
 serving the workspace page, steps 4 and 5, **Ctrl+C**, a restart and recovery from the
 start page, which restored the comparison unchanged. **macOS and Windows are not verified
 for these steps yet**; earlier Windows checks are listed in the
-[acceptance checklist](workspace_acceptance.md).
+[acceptance checklist](workspace_acceptance.md). On 2026-11-10, after the units and naming
+batch moved the file versions and the capability check to version 6, steps 4 and 5, a restart
+and the recovery were checked again on Linux with
+`tools/studio_browser/studio_workspace_browser.mjs` against an installed simcase wheel
+(headless Chrome), not through the `openphysics` installation above.

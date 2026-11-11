@@ -1,0 +1,110 @@
+{
+  "openphysics": "0.3",
+  "name": "Quarter of a thick steel pipe under 10 MPa inner pressure",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 9.0,
+          "ymin": 0.0,
+          "ymax": 9.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "outside",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 9.0,
+            "h": 9.0,
+            "material": null
+          },
+          {
+            "name": "wall",
+            "type": "circle",
+            "cx": 0.0,
+            "cy": 0.0,
+            "r": 9.0,
+            "material": "steel"
+          },
+          {
+            "name": "bore",
+            "type": "circle",
+            "cx": 0.0,
+            "cy": 0.0,
+            "r": 3.0,
+            "material": null
+          }
+        ],
+        "finalize": "later_wins",
+        "boundary_tags": [
+          {
+            "tag": "inner",
+            "select": {
+              "boundary": {
+                "of": "bore"
+              }
+            }
+          },
+          {
+            "tag": "outer_wall",
+            "select": {
+              "boundary": {
+                "between": [
+                  "wall",
+                  "outside"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "youngs_modulus": "200000000000 Pa",
+      "poisson_ratio": 0.3,
+      "source": "document value"
+    }
+  },
+  "mesh": {
+    "element_size": "0.5 mm"
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "pipe": {
+      "type": "mechanics.elasticity2d",
+      "plane": "strain",
+      "prescribed_displacement": {
+        "left": {
+          "x": "1e-07 m"
+        },
+        "bottom": {
+          "y": "0 m"
+        }
+      },
+      "gauge_pressure": {
+        "inner": "10000000 Pa"
+      },
+      "body_force_density": [
+        "100000 N/m^3",
+        "-2000000 N/m^3"
+      ]
+    }
+  }
+}

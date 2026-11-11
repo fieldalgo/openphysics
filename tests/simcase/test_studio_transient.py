@@ -30,7 +30,9 @@ class AcceptedDocument(dict):
 def test_headless_type_refused_after_schema_acceptance(monkeypatch, physics_type, mixed):
     # Isolate the Studio capability boundary from the evolving JSON contract:
     # a schema accepting a new type must never implicitly enable the UI.
-    data = {"physics": {"heat": {"type": physics_type}}}
+    # format 0.3: since units batch C11a a document of another format is refused by name (E-FORMAT)
+    # before this boundary is reached
+    data = {"openphysics": "0.3", "physics": {"heat": {"type": physics_type}}}
     if mixed:
         data["physics"]["optical"] = {"type": "em.modes2d"}
     monkeypatch.setattr(server.Document, "from_dict", lambda raw: AcceptedDocument(raw))
@@ -88,10 +90,10 @@ def test_real_headless_documents_rejected_without_schema_stub(monkeypatch, examp
     data = copy.deepcopy(examples.EXAMPLES[example_name])
     if sampled:
         physics = next(iter(data["physics"].values()))
-        physics["dirichlet_temperature_k"] = {
-            "left": {"values_k": [
-                physics["initial_temperature_k"] + i
-                for i in range(len(data["study"]["time_s"]))
+        assert physics["initial_temperature"] == "300 K"
+        physics["prescribed_temperature"] = {
+            "left": {"unit": "K", "values": [
+                300.0 + i for i in range(len(data["study"]["time"]["values"]))
             ]}
         }
     # The real public parser must accept the document before testing UI refusal.

@@ -38,6 +38,16 @@ glass = physmat.constant(1.5, name="my glass")
 custom = physmat.Material("doped SiO2", physmat.Sellmeier(B=[...], C=[...], range_um=(0.3, 2.0)))
 ```
 
+## Units and the quantity registry
+
+`physmat.units` is the quantity registry and exact unit converter of the
+OpenPhysics units convention: `physmat.units.q("200 GPa", "youngs_modulus")`
+gives `2e11` (Pa), and `"10 mPa"` for a pressure is refused by name. It uses
+only the Python standard library. Nothing uses it yet: model documents and the
+solvers keep their current units, and the functions on this page keep their
+current arguments (wavelengths in micrometres, temperatures in kelvin, and Celsius
+`temperature_c` for the Ciddor air model). See [physmat.units](units.md).
+
 ## Built-in materials
 
 | name | model | source |
@@ -60,6 +70,28 @@ attached to Si, SiO2, Si3N4 and the metals as handbook-level starting values;
 each carries its `source` string. Check them before relying on them. The
 exception is the thermal conductivity of Cu and Al, which is a function of
 temperature from a published equation ([below](#thermal-conductivity-of-metals-versus-temperature-hust--lankford-1984)).
+
+Each record also states the temperature of its optical data,
+`Material.datum_temperature` in K, as its refractiveindex.info record gives it (the
+pinned database revision of `tools/rii-revision.txt`). Where the source says only
+"room temperature" or gives none, `datum_temperature` is `None` and
+`datum_assumed` is True, so that a reader can report the assumption (units
+convention, answer 3.8). `vacuum` has neither: n = 1 holds at every temperature.
+`standard_air(...)` states the temperature it is built for.
+
+| Datum | Records |
+|---|---|
+| 288.15 K (15 °C) | `standard_air` |
+| 292.15 K (19 °C) | `MgF2` |
+| 293.15 K (20 °C) | `SiO2`, `Al2O3` |
+| 294.15 K (21 °C) | `LiNbO3` |
+| 295 K | `Ge` (database conditions) |
+| 295.15 K (22 °C) | `GaAs` |
+| 297.15 K (24 °C) | `CaF2` |
+| 298.15 K (25 °C) | `H2O` |
+| 299.15 K (26 °C) | `Si` |
+| 300 K | `Si_visible` |
+| assumed ("room temperature" or none stated) | `Si3N4`, `InP`, `TiO2`, `Au`, `Ag`, `Cu`, `Al` |
 
 ## Air (Ciddor 1996)
 

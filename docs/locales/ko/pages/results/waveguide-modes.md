@@ -10,11 +10,11 @@
 
 ## 유효굴절률과 감쇠
 
-도파로 장의 규약은 `exp(+iωt − iβz)`이며 `β = 2π n_eff / λ₀`입니다.
-따라서 순방향 수동 감쇠에서는 `Im(n_eff) < 0`입니다. JSON 재료 소광계수 `k`와
-`physmat`은 흡수에 양의 `k`를 쓰는 `n + ik` 규약입니다. 문서 runner가 solver
-경계에서 변환하므로 JSON 입력을 직접 켤레 변환하지 마세요. 저수준 유전율 직접
-호출은 solver 규약을 사용합니다. [흡수 모드](../packages/simcase/lossy_modes.md)를
+문서와 결과의 규약은 `exp(−iωt + iβz)`이며 `β = 2π n_eff / λ₀`입니다.
+따라서 순방향 수동 감쇠에서는 `Im(n_eff) > 0`입니다. JSON 재료 소광계수 `k`와
+`physmat`은 흡수에 양의 `k`를 쓰는 `n + ik` 규약입니다(음수 `k`는 `E-GAIN`으로 거절). 모드
+커널은 `exp(+iωt − iβz)`를 유지하고 simcase가 경계에서 한 번 켤레로 바꾸므로 JSON 입력이나
+결과를 직접 켤레 변환하지 마세요. 저수준(커널 기준틀) 유전율 직접 호출은 커널 규약을 사용합니다. [흡수 모드](../packages/simcase/lossy_modes.md)를
 참고하세요.
 
 simcase 설치 후 작은 흡수 슬래브를 실행합니다.
@@ -25,24 +25,24 @@ import numpy as np
 from simcase import Document, examples, run
 
 data = copy.deepcopy(examples.VECTOR_SLAB)
-data["materials"]["film"] = {"n": 3.48, "k": 0.01}
+data["materials"]["film"] = {"refractive_index": {"n": 3.48, "k": 0.01}}
 data["study"] = {"type": "single"}
 result = run(Document.from_dict(data), verbose=False)
-neff = np.asarray(result.neff)
-loss_db_cm = result.propagation_loss_db_cm()
-print(neff)
-print(loss_db_cm)
+effective_index = np.asarray(result.effective_index)
+loss_db_m = result.propagation_loss()
+print(effective_index)
+print(loss_db_m)
 
-wavelength_m = 1.55e-6
-beta_per_m = 2 * np.pi * neff / wavelength_m
-power_decay_per_m = -2 * beta_per_m.imag
-expected_db_cm = 10 * power_decay_per_m / (100 * np.log(10))
-np.testing.assert_allclose(loss_db_cm, expected_db_cm)
+wavelength_m = result.vacuum_wavelength[0]
+beta_per_m = 2 * np.pi * effective_index / wavelength_m
+power_decay_per_m = 2 * beta_per_m.imag
+expected_db_m = 10 * power_decay_per_m / np.log(10)
+np.testing.assert_allclose(loss_db_m, expected_db_m)
 ```
 
-전파 거리 `z`의 단위가 m일 때 장 진폭은 `exp(−a z)`로 감소하며 `a = −Im(β)`입니다.
-전력은 `exp(−2a z)`로 감소합니다. 위 변환은 전력 감쇠계수를 사용하며 단위는 dB/m가
-아닌 **dB/cm**입니다. 슬래브의 반환 굴절률은 유한 창과 메시에 의존합니다. 위 검사는
+전파 거리 `z`의 단위가 m일 때 장 진폭은 `exp(−a z)`로 감소하며 `a = Im(β)`입니다.
+전력은 `exp(−2a z)`로 감소합니다. 위 변환은 전력 감쇠계수를 사용하며 단위는
+`propagation_loss`의 SI 단위인 **dB/m**입니다. 슬래브의 반환 굴절률은 유한 창과 메시에 의존합니다. 위 검사는
 단위·부호 변환을 확인하며 고유값 solver의 독립적인 정확도 검증은 아닙니다.
 
 ## 장에 임의의 전력 척도 부여하지 않기
@@ -52,11 +52,12 @@ np.testing.assert_allclose(loss_db_cm, expected_db_cm)
 임의적입니다. 위상을 고려해 장 패턴을 비교하고, 독립적으로 정규화한 모드 그림의
 같은 색을 같은 광학 전력으로 해석하지 마세요.
 
-저수준 벡터 종방향 좌표에는 문서에 정의된 `Ez = i*ez` 변환이 필요합니다. 상위 API의
+저수준(커널 기준틀) 벡터 종방향 좌표에는 문서에 정의된 `Ez = i*ez` 변환이 필요합니다. 상위 API의
 물리 전기장 배열은 이미 해당 장 표현을 따릅니다. 계수를 변환하기 전에
 [모드 좌표](../packages/galerkin/modal_coordinates.md)를 확인하세요. 저장 PNG sweep 곡선은 유효굴절률과 군굴절률의 실수부를
-표시하고 JSON/NPZ는 복소 정보를 보존합니다. 버전 2 summary의 `neff`와 `neff_imag`는
-별도 배열이므로 `neff`만 읽으면 흡수 정보가 빠집니다. NPZ의 `neff`는 복소 배열입니다.
+표시하고 JSON/NPZ는 복소 정보를 보존합니다. summary(`openphysics.modes2d/3`)는 복소
+`effective_index`를 `time_convention`과 함께 `re`·`im` 목록으로 쓰므로 `re`만 읽으면 흡수 정보가
+빠집니다. NPZ의 `effective_index`는 복소 배열입니다.
 
 ## 실행 간 같은 모드 찾기
 

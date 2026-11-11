@@ -72,12 +72,13 @@ def region_complexity(data, *, max_shapes: int | None = None, max_circles: int |
     make the count fail.
 
     The coordinates are the document's own, the numbers ``Document.from_dict`` resolves; a
-    run resolves the shapes again on the micrometre copy it meshes
-    (``runner.micrometre_document``). A decimal unit factor can re-round exact contacts
-    there, a touch becoming a crossing or the reverse, so the copy's crossings can differ
-    from this count by such contacts. Measured: equal on 22 valid millimetre documents;
-    in other units valid documents differ too (an 8 x 8 grid of touching rects written in
-    metres counts 4 here and 0 on its micrometre copy).
+    run resolves the shapes again on the micrometre frame it meshes (``views.region_mesh``,
+    each shape number its pm grid value in micrometres). A decimal unit factor can re-round
+    exact contacts there, a touch becoming a crossing or the reverse, so the frame's crossings
+    can differ from this count by such contacts. Measured on the micrometre copy that runs
+    meshed before units batch C11b: equal on 22 valid millimetre documents; in other units
+    valid documents differ too (an 8 x 8 grid of touching rects written in metres counted 4
+    here and 0 on that copy).
 
     A maximum that is not a positive int or None is a ValueError.
     """
@@ -102,7 +103,7 @@ def _shape_list(data) -> list:
 
 
 def _version_1_shapes(geometry) -> list:
-    """The area features of a raw version 1 block as 0.2-shaped dicts for counting: a
+    """The area features of a raw version 1 block as flat shape dicts for counting: a
     trapezoid and a path count as polygons of their corner points, a segment not at all.
     A field written as an expression is not a number and contributes no segment."""
     comps = geometry.get('components')

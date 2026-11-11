@@ -1,0 +1,527 @@
+# Copyright 2026 Yongha Kim (FieldAlgo)
+# SPDX-License-Identifier: Apache-2.0
+"""Internal SI views between documents and the solvers and the mesher. Not public API.
+
+A runner does not read document numbers on its way to galerkin or meshine: it builds one
+frozen view here and hands its fields to today's solver and mesher signatures. The adapters
+that turn a view into node and edge data (Dirichlet nodes, boundary edges, region maps) stay
+in the kind modules, beside the mesh they need.
+
+Every view of this module is built from the resolved SI values and exact values of a format
+0.3 document (region and em.modes2d meshes through its region view, ``thermal_regions.handoff_03``,
+and em.modes2d solve points through its kernel hand-off, ``modes_document.kernel_document``) and
+holds exactly what the runners passed before the views existed: the same doubles, the same Python
+number types (counts are ints, hazard H8) and the same mapping orders (H6); the adapters keep
+their ``float()`` and ``int()`` calls at the hand-off. Lengths are converted here, once:
+
+- a structured rectangle or box (``RectangleMesh``): corners in metres, and side lengths by
+  the operation order of the kind that uses them (hazard H17 b);
+- a region mesh (``RegionMesh``): the document's micrometre frame (``MicrometreFrame``), which
+  the geometry is built from, and the angle number meshine receives (H2, H3). Each shape
+  number reaches the mesher from its pm grid value, ``float(Fraction(k, 10**6))``, and each
+  element size or control length from its exact value, ``float(exact * 10**6)``; never as a
+  product of a document-unit double. Mesh nodes come back as micrometres times 1e-6
+  (``handback_m``, H11), and so does every corner a region kind uses in a solver input or a
+  contract check (``region_origin_03``, H17 a);
+- an em.modes2d solve point (``ModesInputs``): the wavelength, PML and bend lengths in
+  micrometres, the kernel frame (H13).
+
+The micrometre helpers are private to this module. Containers in a view are built fresh for
+each view and are not shared with the document (the micrometre frame of a version 1 document
+shares its exact geometry model).
+"""
+
+from __future__ import annotations
+
+import copy
+from dataclasses import dataclass
+from fractions import Fraction
+
+import numpy as np
+
+from .schema import Document
+
+#: the mesher's and the mode kernel's micrometre, in metres: a mesher length comes back as
+#: ``x_um * 1e-6`` (hazard H11)
+UM_IN_SI = 1e-6
+
+#: how a kind computes a rectangle side length from the document (hazard H17 b):
+#: ``difference`` converts ``max - min``; ``corners`` subtracts the converted corners
+LENGTH_FORMULAS = ("difference", "corners")
+
+
+# -- meshes -------------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class RectangleMesh:
+    """A structured rectangle (axes x, y) or box (x, y, z) in metres.
+
+    ``origin`` and ``upper`` are the converted corners; ``lengths`` are the side lengths by
+    ``formula`` (one of ``LENGTH_FORMULAS``); ``subdivisions`` are Python ints.
+    """
+    origin: tuple
+    upper: tuple
+    lengths: tuple
+    subdivisions: tuple
+    formula: str
+
+
+def rectangle_mesh(doc, formula: str, *, axes: str = "xy") -> RectangleMesh:
+    """The structured grid of a validated format 0.3 rectangle (or box, ``axes="xyz"``) document."""
+    if formula not in LENGTH_FORMULAS:
+        raise ValueError(f"formula: expected one of {LENGTH_FORMULAS}, got {formula!r}")
+    return _rectangle_mesh_03(doc, formula, axes)
+
+
+def _rectangle_mesh_03(doc, formula: str, axes: str) -> RectangleMesh:
+    """The grid of a format 0.3 rectangle: corners ``pm_to_m(k)`` (correctly rounded), lengths
+    by the kind's own operation order on the picometre counts (hazard H17 b)."""
+    from physmat.units import pm_to_m
+    from .steady_boundary_contract import rect_geometry_03
+    base = rect_geometry_03(doc)[0]           # the flat block, or a compiled version 1 component (D-1)
+    lo = [doc.pm(f"{base}.domain.{a}min") for a in axes]
+    hi = [doc.pm(f"{base}.domain.{a}max") for a in axes]
+    origin, upper = tuple(pm_to_m(k) for k in lo), tuple(pm_to_m(k) for k in hi)
+    if formula == "difference":
+        lengths = tuple(pm_to_m(b - a) for a, b in zip(lo, hi))
+    else:
+        lengths = tuple(u - o for u, o in zip(upper, origin))
+    counts = tuple(int(n) for n in doc.si["mesh"]["subdivision_count"])
+    return RectangleMesh(origin, upper, lengths, counts, formula)
+
+
+@dataclass(frozen=True)
+class RadialGrading:
+    """em.modes2d ``mesh.grading`` in micrometres: ``near`` at ``center``, growing to ``far``
+    at ``distance`` from it (``meshine.shapes.size_graded``)."""
+    near: object
+    far: object
+    distance: object
+    center: tuple
+
+
+@dataclass(frozen=True)
+class RegionMesh:
+    """What a region mesh is made from.
+
+    ``canonical`` is the document's micrometre frame (``MicrometreFrame``): the geometry, the
+    element size and the mesh controls the mesher receives, in micrometres (a version 1 model
+    travels with it in integer pm). ``minimum_angle_deg`` is the number
+    meshine receives as ``min_angle``, in degrees as the document wrote it (hazard H3).
+    ``grading`` is an em.modes2d radial grading, None otherwise.
+    """
+    canonical: object
+    minimum_angle_deg: object
+    grading: RadialGrading | None = None
+
+
+def region_mesh(view) -> RegionMesh:
+    """The region mesh of a validated heat, electric, Joule or mechanics region document, from
+    its region view (``thermal_regions.handoff_03``): the micrometre frame of the document
+    (``micrometre_frame``) and the angle number meshine receives (H3)."""
+    canonical = micrometre_frame(view.source, view)
+    return RegionMesh(canonical, float(canonical["mesh"]["min_angle"]))
+
+
+def modes_mesh(handoff) -> RegionMesh:
+    """The mesh of the micrometre kernel hand-off of an em.modes2d document
+    (``modes_document.kernel_document``, already in micrometres): the angle as written, 28 when
+    absent."""
+    mesh = handoff["mesh"]
+    grading = None
+    if mesh.get("grading"):
+        g = mesh["grading"]
+        grading = RadialGrading(g["near"], g["far"], g["distance"], tuple(g["center"]))
+    return RegionMesh(handoff, mesh.get("min_angle", 28.0), grading)
+
+
+def handback_m(values_um) -> np.ndarray:
+    """Mesher coordinates in micrometres, in metres: ``x_um * 1e-6`` elementwise (hazard H11)."""
+    return np.asarray(values_um, dtype=float) * UM_IN_SI
+
+
+# -- the micrometre frame -------------------------------------------------------------------------
+
+def _um_of_pm(k) -> float:
+    """A shape number's micrometre double from its pm count: ``float(Fraction(k, 10**6))`` (H2)."""
+    return float(Fraction(k, 10 ** 6))
+
+
+def _um_of_exact(exact) -> float:
+    """A tagged length's micrometre double from its exact metres: ``float(exact * 10**6)`` (H2)."""
+    return float(Fraction(exact) * 10 ** 6)
+
+
+def _exact(doc, path):
+    """The exact SI value at ``path``, or at ``path.value`` for an annotated value."""
+    value = doc.exact(path)
+    return doc.exact(path + ".value") if value is None else value
+
+
+def _plain(value):
+    """An authored tree with each decimal as the double its JSON text gives (integers stay)."""
+    from decimal import Decimal
+    if isinstance(value, dict):
+        return {k: _plain(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_plain(v) for v in value]
+    if isinstance(value, Decimal):
+        return float(value)
+    return copy.deepcopy(value)
+
+
+class MicrometreFrame(Document):
+    """The geometry and mesh block of a format 0.3 region or em.modes2d document in the
+    micrometre frame that meshine and the mode kernel receive (internal; never written or read
+    by a user). Built by ``micrometre_frame`` from the document's exact values: a flat shape or
+    domain number as ``float(Fraction(k, 10**6))`` of its pm count, an element size, a control
+    length or a grading length as ``float(exact * 10**6)`` (hazard H2); a version 1 block keeps
+    its exact pm model (``geometry_model``, shared with the region view). The block uses the
+    geometry builder's keys (``mesh_size``, ``mesh.size``, ``min_angle``)."""
+    is_handoff = True
+    #: the format 0.3 document this frame was built from
+    source = None
+
+    @property
+    def length_unit(self) -> str:
+        return "um"
+
+    def _pm_per_unit(self):
+        return Fraction(10 ** 6)
+
+    def controls_pm(self) -> list[dict]:
+        """The ``mesh.controls`` entries in integer pm, from the document's exact values."""
+        return self.source.controls_pm()
+
+
+def micrometre_frame(doc, view, cls=MicrometreFrame) -> MicrometreFrame:
+    """The ``MicrometreFrame`` of a validated format 0.3 region or em.modes2d document ``doc``,
+    whose region view (``thermal_regions.handoff_03``) is ``view``; ``cls`` is the frame class
+    (the em kernel hand-off subclasses it)."""
+    pm = doc._need_v03("micrometre_frame()").pm
+    g = doc.data["geometry"]
+
+    def sized(item, path, keep):
+        out = {k: _plain(v) for k, v in item.items() if k in keep}
+        if "element_size" in item:
+            out["mesh_size"] = _um_of_exact(_exact(doc, f"{path}.element_size"))
+        return out
+
+    def on_grid(value, path):
+        # a shape number reaches the mesher as its pm grid value (spec §2 rule 4); the other
+        # leaves (names, types, materials) as written
+        if isinstance(value, dict):
+            return {k: on_grid(v, f"{path}.{k}") for k, v in value.items()}
+        if isinstance(value, list):
+            return [on_grid(v, f"{path}[{i}]") for i, v in enumerate(value)]
+        k = pm.get(path)
+        return _plain(value) if k is None else _um_of_pm(k)
+
+    if "version" in g:
+        geometry = _plain(g)                          # read through the exact model, never re-read
+    else:
+        geometry = {"domain": on_grid(g["domain"], "geometry.domain")}
+        if "background" in g:
+            geometry["background"] = sized(g["background"], "geometry.background", {"material"})
+        geometry["shapes"] = [on_grid(sized(s, f"geometry.shapes[{i}]", set(s) - {"element_size"}),
+                                      f"geometry.shapes[{i}]")
+                              for i, s in enumerate(g.get("shapes") or [])]
+    m = doc.data.get("mesh") or {}
+    mesh = {"size": _um_of_exact(_exact(doc, "mesh.element_size")),
+            "min_angle": doc.degrees("mesh.minimum_angle") if "minimum_angle" in m else 28.0}
+    if m.get("controls"):
+        names = {"element_size": "size", "near": "near", "far": "far", "refinement_distance": "distance"}
+        controls = []
+        for i, entry in enumerate(m["controls"]):
+            item = {"select": _plain(entry["select"])}
+            for key, engine in names.items():
+                if key in entry:
+                    item[engine] = _um_of_exact(_exact(doc, f"mesh.controls[{i}].{key}"))
+            if "circle_segment_count" in entry:
+                item["circle_segments"] = int(entry["circle_segment_count"])
+            controls.append(item)
+        mesh["controls"] = controls
+    frame = cls({"name": doc.si.get("name", "untitled"), "geometry": geometry, "mesh": mesh})
+    frame.source = doc
+    # a version 1 model is unit-free (integer pm): the frame reads it in micrometres
+    frame.geometry_model = view.geometry_model
+    frame.geometry_complex = view.geometry_complex
+    return frame
+
+
+def from_micrometres(values_um, unit: str) -> np.ndarray:
+    """Micrometre lengths in the length unit ``unit`` (a component's ``length_unit``):
+    elementwise, one multiply or divide by the exact integer the ratio allows, so a micrometre
+    component gets the same array back (the diagnostic triangulation of a region run)."""
+    from physmat.units import convert
+    ratio = Fraction(convert(f"1 {unit}", "length").exact) * 10 ** 6         # micrometres per unit
+    values = np.asarray(values_um)
+    if ratio == 1:
+        return values
+    if ratio.numerator == 1:
+        return values * float(ratio.denominator)
+    if ratio.denominator == 1:
+        return values / float(ratio.numerator)
+    return values * float(ratio.denominator) / float(ratio.numerator)
+
+
+# -- heat -----------------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class AffineTemperature:
+    """``T(x) = origin_temperature + gradient . (x - origin)``; the origin is the domain's
+    lower corner, taken from the mesh view of the kind (K, K/m)."""
+    origin_temperature: object
+    gradient: np.ndarray
+
+
+@dataclass(frozen=True)
+class HeatInputs:
+    """Heat-stage inputs in SI.
+
+    On a rectangle ``conductivity`` (W/(m K)) and ``volumetric_heat_capacity`` (J/(m^3 K))
+    are numbers; on regions they map material names to numbers, and the adapter maps the
+    meshed regions to them. ``heat_source`` (W/m^3) is a number or {region: number}.
+    ``dirichlet`` maps boundary names to K (steady) or to a tuple of K per requested time
+    (transient); ``outward_flux`` to W/m^2; ``convection`` to (W/(m^2 K), K). ``time`` (s)
+    and ``initial_temperature`` (K, or ``AffineTemperature``) are set for transient heat.
+    ``boundary_layout`` is True when a rectangle document selects the boundary result layout
+    (a region result always carries the boundary fields).
+    """
+    conductivity: object
+    heat_source: object
+    dirichlet: dict
+    outward_flux: dict
+    convection: dict
+    boundary_layout: bool = False
+    volumetric_heat_capacity: object = None
+    time: np.ndarray | None = None
+    initial_temperature: object = None
+
+
+def rectangle_heat(doc) -> HeatInputs:
+    """thermal.steady2d on a format 0.3 rectangle without boundary data (layout v1): SI values."""
+    from .steady_boundary_contract import heat_inputs_03
+    return heat_inputs_03(doc)
+
+
+def steady_rectangle(doc) -> tuple[RectangleMesh, HeatInputs]:
+    """The steady rectangle boundary contract (``steady_boundary_contract``) of a format 0.3
+    document, read and validated without changing it: the grid (lengths by ``difference``) and
+    the heat inputs as the contract returns them (floats). A format 0.2 document is refused by
+    name (its reader is gone since units batch C7)."""
+    if getattr(doc, "si", None) is None:
+        from .thermal import refuse_format_02
+        refuse_format_02(doc, "thermal_steady2d")
+    from .steady_boundary_contract import heat_inputs_03
+    return rectangle_mesh(doc, "difference"), heat_inputs_03(doc)
+
+
+def transient_rectangle_heat(doc) -> HeatInputs:
+    """thermal.transient2d on a format 0.3 rectangle, validated: the contract's values (floats),
+    side prescribed temperatures sampled at the requested times."""
+    from .transient_thermal_contract import transient_heat_inputs_03
+    return transient_heat_inputs_03(doc)
+
+
+def _material_values_03(doc, key) -> dict:
+    """{material name: SI value} of the materials that give ``key`` (format 0.3)."""
+    return {m: spec[key] for m, spec in (doc.si.get("materials") or {}).items() if key in spec}
+
+
+def region_heat_03(doc) -> HeatInputs:
+    """Steady heat on regions, format 0.3: SI values in document order (H6). An absent source
+    is 0.0 (H9); ``inward_heat_flux`` is handed over as the outward flux ``0.0 - value`` (H1)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    source = p.get("heat_source_density")
+    return HeatInputs(conductivity=_material_values_03(doc, "thermal_conductivity"),
+                      heat_source=0.0 if source is None else dict(source) if isinstance(source, dict) else source,
+                      dirichlet=dict(p.get("prescribed_temperature", {})),
+                      outward_flux={tag: 0.0 - value for tag, value in p.get("inward_heat_flux", {}).items()},
+                      convection={tag: (c["heat_transfer_coefficient"], c["ambient_temperature"])
+                                  for tag, c in p.get("convection", {}).items()})
+
+
+def transient_region_heat_03(doc) -> HeatInputs:
+    """Transient heat on regions, format 0.3: SI values, prescribed temperatures sampled at the
+    study times (a tagged array gives one value per time)."""
+    from .transient_thermal_contract import _initial_03, _samples_03
+    name, p = next(iter(doc.si["physics"].items()))
+    times = np.array(doc.si["study"]["time"], dtype=float, copy=True)
+    where = f"physics.{name}"
+    dirichlet = {tag: tuple(_samples_03(value, times, f"{where}.prescribed_temperature.{tag}"))
+                 for tag, value in p["prescribed_temperature"].items()}
+    source = p.get("heat_source_density")
+    return HeatInputs(conductivity=_material_values_03(doc, "thermal_conductivity"),
+                      heat_source=0.0 if source is None else dict(source) if isinstance(source, dict) else source,
+                      dirichlet=dirichlet, outward_flux={}, convection={},
+                      volumetric_heat_capacity=_material_values_03(doc, "volumetric_heat_capacity"),
+                      time=times, initial_temperature=_initial_03(p["initial_temperature"],
+                                                                  where + ".initial_temperature"))
+
+
+def region_origin_03(doc, base) -> np.ndarray:
+    """The lower domain corner of a format 0.3 region document, [x, y] in metres, by the
+    micrometre hand-back of its pm counts: ``float(Fraction(k, 10**6)) * 1e-6`` (H17 a)."""
+    return np.array([float(Fraction(doc.pm(f"{base}.domain.{a}min"), 10 ** 6)) for a in "xy"]) * UM_IN_SI
+
+
+# -- electric conduction and Joule heating ------------------------------------------------------
+
+@dataclass(frozen=True)
+class ElectricInputs:
+    """Electric-stage inputs in SI, as written.
+
+    ``conductivity`` (S/m) is a number on a rectangle (None for ``joule.temperature2d``) and
+    {material name: number} on regions. ``dirichlet`` maps boundary names to V,
+    ``outward_current`` to A/m^2. ``joule.temperature2d`` adds its conductivity model
+    (``galerkin.temperature_joule_heating.ConductivityModel``), its initial temperature (K)
+    and its iteration options, keyed as galerkin takes them.
+    """
+    conductivity: object
+    dirichlet: dict
+    outward_current: dict
+    conductivity_model: object = None
+    initial_temperature: object = None
+    iteration: dict | None = None
+
+
+def rectangle_electric(doc) -> ElectricInputs:
+    """electric.steady2d, joule.steady2d or joule.temperature2d on a format 0.3 rectangle,
+    validated: SI values; ``inward_current_density`` is handed over as the outward current
+    ``0.0 - value`` (H1); the iteration options keyed as galerkin takes them."""
+    _, p = next(iter(doc.si["physics"].items()))
+    model = initial = options = None
+    if p["type"] == "joule.temperature2d":
+        from .electric_joule import conductivity_model_03
+        model = conductivity_model_03(p["electrical_conductivity"])
+        initial = p["initial_temperature"]
+        names = {"relaxation_factor": "relaxation", "relative_tolerance": "relative_tolerance",
+                 "iteration_limit": "max_iterations"}
+        iteration = p["iteration"]
+        # the order galerkin received before the units batch: the tolerance last
+        options = {names[k]: v for k, v in iteration.items() if k != "temperature_tolerance"}
+        options["temperature_atol"] = iteration["temperature_tolerance"]
+    return ElectricInputs(conductivity=p.get("electrical_conductivity") if model is None else None,
+                          dirichlet=dict(p["prescribed_electric_potential"]),
+                          outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()},
+                          conductivity_model=model, initial_temperature=initial, iteration=options)
+
+
+def region_electric(doc) -> ElectricInputs:
+    """electric.steady2d or joule.steady2d on format 0.3 regions, validated: SI values in document
+    order; ``inward_current_density`` handed over as the outward current ``0.0 - value`` (H1)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return ElectricInputs(conductivity=_material_values_03(doc, "electrical_conductivity"),
+                          dirichlet=dict(p["prescribed_electric_potential"]),
+                          outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()})
+
+
+# -- mechanics ------------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class MechanicsInputs:
+    """Mechanical-stage inputs in SI.
+
+    ``young_modulus`` (Pa), ``poisson_ratio`` and ``thermal_expansion`` (1/K) are numbers on
+    a rectangle and {material name: number} on regions. ``displacement`` maps boundary names
+    to {component: m}, ``traction`` to [tx, ty] in Pa, ``pressure`` to the gauge pressure in Pa
+    (regions only); ``body_force`` is [fx, fy] in N/m^3 ([0.0, 0.0] when the document gives none,
+    hazard H8). ``thermoelastic`` documents add the ``reference_temperature`` (K, the document's
+    ``stress_free_temperature``); their heat stage has its own ``HeatInputs``.
+    """
+    thermoelastic: bool
+    plane: str
+    young_modulus: object
+    poisson_ratio: object
+    displacement: dict
+    traction: dict
+    pressure: dict
+    body_force: list
+    thermal_expansion: object = None
+    reference_temperature: object = None
+
+
+def _mechanics_03(p, young_modulus, poisson_ratio, thermal_expansion) -> MechanicsInputs:
+    thermoelastic = p["type"] == "mechanics.thermoelastic2d"
+    body_force = p.get("body_force_density")
+    return MechanicsInputs(
+        thermoelastic=thermoelastic, plane=p["plane"], young_modulus=young_modulus, poisson_ratio=poisson_ratio,
+        displacement={tag: dict(components) for tag, components in p["prescribed_displacement"].items()},
+        traction={tag: list(vector) for tag, vector in p.get("traction", {}).items()},
+        pressure=dict(p.get("gauge_pressure", {})),
+        body_force=[0.0, 0.0] if body_force is None else list(body_force),
+        thermal_expansion=thermal_expansion if thermoelastic else None,
+        reference_temperature=p["stress_free_temperature"] if thermoelastic else None)
+
+
+def rectangle_mechanics(doc) -> MechanicsInputs:
+    """mechanics.elasticity2d or mechanics.thermoelastic2d on a format 0.3 rectangle, validated:
+    SI values in document order (H6)."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return _mechanics_03(p, p["youngs_modulus"], p["poisson_ratio"], p.get("linear_expansion_coefficient"))
+
+
+def region_mechanics(doc) -> MechanicsInputs:
+    """mechanics.elasticity2d or mechanics.thermoelastic2d on format 0.3 regions, validated: the
+    material values {material name: SI value}; the adapter maps the meshed regions to them."""
+    _, p = next(iter(doc.si["physics"].items()))
+    return _mechanics_03(p, _material_values_03(doc, "youngs_modulus"), _material_values_03(doc, "poisson_ratio"),
+                         _material_values_03(doc, "linear_expansion_coefficient"))
+
+
+# -- em.modes2d -----------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ModesInputs:
+    """One em.modes2d solve point in the kernel frame.
+
+    ``wavelength`` and the PML thicknesses and bend radius and origin are in micrometres, as the
+    kernel hand-off (``modes_document.kernel_document``) or ``modes_document.stage_point`` gives
+    them. ``num_modes`` is a Python int; the rest is as given. ``pml`` and ``bend`` are copies.
+    """
+    wavelength: object
+    boundary: dict
+    num_modes: int
+    formulation: str
+    n_cladding: object
+    n_target: object
+    pml: dict | None
+    bend: dict | None
+
+
+def modes_inputs(physics: dict) -> ModesInputs:
+    """The solve point of one em.modes2d physics entry in the kernel's keys and micrometres."""
+    pml, bend = copy.deepcopy(physics.get("pml")), copy.deepcopy(physics.get("bend"))
+    return ModesInputs(wavelength=physics["wavelength"], boundary=dict(physics["boundary"]), num_modes=int(physics["num_modes"]),
+                       formulation=physics["formulation"], n_cladding=physics.get("n_cladding"),
+                       n_target=physics.get("n_target"), pml=pml, bend=bend)
+
+
+# -- em.cavity3d ----------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class CavityInputs:
+    """A rectangular cavity in SI.
+
+    ``box`` is the domain (lengths by ``difference``). ``wall_conductivity`` is None (PEC
+    walls), a number or {galerkin wall name: number} in S/m. ``materials`` maps names to
+    (relative permittivity, relative permeability) as complex numbers under the kernel's
+    exp(+j omega t); ``background`` is a local material name or ``"physmat:vacuum"``; ``boxes`` are the
+    shape boxes as ((min, max) per axis in metres from the domain origin, material name).
+    ``material_solver`` is True when the complex material cavity solver runs.
+    """
+    box: RectangleMesh
+    num_modes: int
+    target_frequency: object
+    wall_conductivity: object
+    materials: dict
+    background: str
+    boxes: list
+    material_solver: bool
+
+
+def cavity_inputs(doc) -> CavityInputs:
+    """em.cavity3d, validated: a format 0.3 document through ``cavity.kernel_inputs``."""
+    from .cavity import kernel_inputs
+    return kernel_inputs(doc)

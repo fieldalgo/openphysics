@@ -50,15 +50,15 @@ def _figure_image(fig):
 
 
 def heated_plate(out, quick):
-    doc = Document.load(EXAMPLES / "gallery_heated_plate.json")
+    data = json.loads((EXAMPLES / "gallery_heated_plate.json").read_text(encoding="utf-8"))
     if quick:
-        doc["mesh"]["subdivisions"] = [12, 12]
-        doc["study"]["time_s"] = doc["study"]["time_s"][::8]
-    result = run(doc, False)
-    nodes = np.asarray(result.mesh_nodes_m) * 100.0  # cm for the axes
+        data["mesh"]["subdivision_count"] = [12, 12]
+        data["study"]["time"]["values"] = data["study"]["time"]["values"][::8]
+    result = run(Document.from_dict(data), False)
+    nodes = np.asarray(result.node_coordinates) * 100.0  # cm for the axes
     triangles = np.asarray(result.mesh_triangles)
-    times = np.asarray(result.time_s)
-    temperature = np.asarray(result.temperature_k)
+    times = np.asarray(result.time)
+    temperature = np.asarray(result.temperature)
     low, high = 300.0, float(np.ceil(temperature.max()))
 
     fig, ax = plt.subplots(figsize=(4.8, 4.0), dpi=DPI, layout="constrained")
@@ -87,9 +87,10 @@ def heated_plate(out, quick):
         saved = result.save(out / "heated_plate_result")
         paraview = export_time_series(saved / "fields.npz", out / "heated_plate_paraview")
 
-    return {"frames": len(times), "end_time_s": float(times[-1]),
-            "max_temperature_k": float(temperature.max()),
-            "max_rise_k": float(temperature.max() - 300.0),
+    # SI values under registry-style names: s and K
+    return {"frames": len(times), "end_time": float(times[-1]),
+            "maximum_temperature": float(temperature.max()),
+            "maximum_temperature_rise": float(temperature.max() - 300.0),
             "paraview": None if paraview is None else paraview.relative_to(out).as_posix()}
 
 
@@ -141,15 +142,15 @@ def coax(out, quick):
 def box_cavity(out, quick):
     from refsol.cavity import rectangular_cavity_modes
 
-    doc = Document.load(EXAMPLES / "gallery_box_cavity.json")
+    data = json.loads((EXAMPLES / "gallery_box_cavity.json").read_text(encoding="utf-8"))
     if quick:
-        doc["mesh"]["subdivisions"] = [10, 6, 4]
-    domain = doc["geometry"]["domain"]
+        data["mesh"]["subdivision_count"] = [10, 6, 4]
+    doc = Document.from_dict(data)
+    domain = doc.si["geometry"]["domain"]                      # metres
     lengths = tuple(domain[f"{a}max"] - domain[f"{a}min"] for a in "xyz")
-    target = doc["physics"]["em1"]["target_frequency_hz"]
+    target = doc.si["physics"]["em1"]["target_frequency"]      # Hz
     result = run(doc, False)
-    cavity = result.cavity
-    computed = np.asarray(cavity.frequencies_hz)
+    computed = np.asarray(result.resonant_frequency)
 
     # Analytical modes nearest the same target, one entry per independent mode.
     analytic = rectangular_cavity_modes(lengths, 2.0 * computed.max())
@@ -162,13 +163,13 @@ def box_cavity(out, quick):
     if np.max(np.abs(relative)) > 0.01:
         raise RuntimeError(f"cavity frequencies differ by {np.max(np.abs(relative)):.2%}")
 
-    nodes = np.asarray(cavity.mesh.nodes)
-    tets = np.asarray(cavity.mesh.tets)
+    nodes = np.asarray(result.node_coordinates)
+    tets = np.asarray(result.arrays()["tetrahedra"])
     centroids = nodes[tets].mean(axis=1)
-    nx, ny, nz = doc["mesh"]["subdivisions"]
+    nx, ny, nz = doc.si["mesh"]["subdivision_count"]
     z_mid = domain["zmin"] + lengths[2] / 2
     near = np.abs(centroids[:, 2] - z_mid) < lengths[2] / nz / 2
-    fields = np.asarray(cavity.electric_field)  # (modes, tetrahedra, 3)
+    fields = np.asarray(result.mass_normalized_electric_field)  # (modes, tetrahedra, 3)
 
     fig, axes = plt.subplots(2, 2, figsize=(8.4, 5.2), dpi=DPI, layout="constrained")
     for k, ax in enumerate(axes.flat):
@@ -191,9 +192,10 @@ def box_cavity(out, quick):
     fig.suptitle(f"|E| at z = {z_mid:g} m, normalized per mode", fontsize=10)
     fig.savefig(out / "box_cavity.png")
     plt.close(fig)
-    return {"lengths_m": list(lengths), "subdivisions": [nx, ny, nz],
+    # SI values under registry-style names: m and Hz
+    return {"lengths": list(lengths), "subdivision_count": [nx, ny, nz],
             "indices": [list(m.indices) for m in analytic],
-            "frequencies_hz": computed.tolist(), "exact_hz": exact.tolist(),
+            "resonant_frequency": computed.tolist(), "analytical_resonant_frequency": exact.tolist(),
             "relative_error": relative.tolist()}
 
 

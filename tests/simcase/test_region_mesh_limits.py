@@ -4,8 +4,9 @@
 
 ``geometry._domain_from_regions`` builds the meshine Domain exactly as ``build_domain``
 did and also counts the loop vertices it queues: the sum of the lengths of the loops given
-to ``Domain.add_region``, each ``Circle`` counted as its ``n``. ``build_domain`` keeps its
-public three-tuple. The earlier ``build_domain`` is kept below, unchanged, as the
+to ``Domain.add_region``, each ``Circle`` counted as its ``n``. ``geometry.build_domain``, the
+internal builder a run and the public ``simcase.build_domain`` call on the hand-off, keeps its
+three-tuple. The earlier ``build_domain`` is kept below, unchanged, as the
 reference (C-2, C-3).
 
 ``run(doc, *, max_nodes, max_triangles, max_input_vertices)`` bounds a region run before
@@ -13,15 +14,19 @@ the solve, ``check_mesh_limits`` counts the loop vertices without building the d
 both raise ``MeshLimitError`` (C-1, C-4 to C-10). Node and triangle counts are never
 written down: each test meshes uncapped first and takes N and M from that mesh.
 
-A run meshes the document's micrometre copy (``runner.micrometre_document``), so the loop
-vertices the limits count are those of that copy. The region documents here are written in
-millimetres; the tests marked "port" were added when the limits moved onto that copy and
-onto the physics registry, and were not pre-registered.
+A run meshes the document's micrometre frame (``views.region_mesh``, made from the document's
+exact values), so the loop vertices the limits count are those of that frame. The builder is
+compared on the frame and on the document's own numbers (``in_document_units``: its region view,
+``thermal_regions.handoff_03``, with the element size in the document's length unit). The region
+documents here are written in millimetres; the tests marked "port" were added when the limits
+moved onto the micrometre copy of that time (the frame since units batch C11b) and onto the
+physics registry, and were not pre-registered.
 
 The pass criteria were fixed before the change. Nothing is stored: every comparison is
 between two computations made here.
 """
 import copy
+from fractions import Fraction
 import json
 import math
 import pickle
@@ -32,13 +37,35 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 
 import meshine
 from meshine import Circle, Domain, box_sides
-from simcase import Document, DocumentError, MeshLimitError, build_domain, check_mesh_limits, examples, run
-from simcase import geometry, registry, units
-from simcase.geometry import _domain_from_regions, _min_area, _rings, resolve_regions
+import simcase
+from simcase import Document, DocumentError, MeshLimitError, check_mesh_limits, examples, run
+from physmat.units import convert
+from simcase import geometry, registry, views
+from simcase.geometry import _domain_from_regions, _min_area, _rings, build_domain, resolve_regions
 from simcase.mesh_limits import _MeshLimits
-from simcase.runner import micrometre_document
+from simcase.thermal_regions import handoff_03
 
 import region_studio_fixtures as F
+
+
+def H(doc):
+    """The region view of a format 0.3 heat region document, a fresh one each call."""
+    return handoff_03(doc.copy())
+
+
+def micrometres(doc):
+    """The micrometre frame a run of the document meshes, a fresh one each call."""
+    return views.region_mesh(H(doc)).canonical
+
+
+def in_document_units(doc):
+    """The document's own numbers for the flat builder: its region view's flat block (each
+    shape number its pm grid value in the document's length unit) with the global element size
+    in that unit, from its exact value."""
+    view = H(doc)
+    per_unit = Fraction(convert(f'1 {view.length_unit}', 'length').exact)
+    size = float(Fraction(doc.exact('mesh.element_size')) / per_unit)
+    return Document({'geometry': copy.deepcopy(view.data['geometry']), 'mesh': {'size': size}})
 
 
 def _build_domain_reference(doc):
@@ -143,21 +170,26 @@ def boundary_samples(doc):
 @pytest.mark.parametrize('case', list(CORPUS))
 def test_c2_the_domain_is_the_one_build_domain_built(case):
     doc = Document.from_dict(CORPUS[case]())
-    reference, ref_namer, ref_materials = _build_domain_reference(doc.copy())
-    for new, namer, materials in (_domain_from_regions(doc.copy(), resolve_regions(doc.copy()))[:3],
-                                  _domain_from_regions(doc.copy())[:3], build_domain(doc.copy())):
-        assert new.default_size == reference.default_size
-        assert pending(new) == pending(reference)
-        assert materials == ref_materials
-        assert [namer(p) for p in boundary_samples(doc)] == [ref_namer(p) for p in boundary_samples(doc)]
+    for given in (micrometres, in_document_units):
+        reference, ref_namer, ref_materials = _build_domain_reference(given(doc))
+        built = [_domain_from_regions(given(doc), resolve_regions(given(doc)))[:3], _domain_from_regions(given(doc))[:3]]
+        if given is micrometres:
+            built.append(build_domain(given(doc)))            # the builder takes the micrometre frame
+        for new, namer, materials in built:
+            assert new.default_size == reference.default_size
+            assert pending(new) == pending(reference)
+            assert materials == ref_materials
+            samples = boundary_samples(given(doc))
+            assert [namer(p) for p in samples] == [ref_namer(p) for p in samples]
 
 
 @pytest.mark.parametrize('case', list(CORPUS))
 def test_c3_the_count_is_the_sum_of_the_queued_loops(case):
     doc = Document.from_dict(CORPUS[case]())
-    domain, _namer, _materials, count = _domain_from_regions(doc)
-    assert type(count) is int
-    assert count == loop_vertices(domain) == loop_vertices(_build_domain_reference(doc.copy())[0])
+    for given in (micrometres, in_document_units):
+        domain, _namer, _materials, count = _domain_from_regions(given(doc))
+        assert type(count) is int
+        assert count == loop_vertices(domain) == loop_vertices(_build_domain_reference(given(doc))[0])
 
 
 def test_the_corpus_reaches_circles_holes_and_split_parts():
@@ -166,52 +198,63 @@ def test_the_corpus_reaches_circles_holes_and_split_parts():
     shared = parts = 0
     for build in CORPUS.values():
         doc = Document.from_dict(build())
-        domain = _domain_from_regions(doc)[0]
+        domain = _domain_from_regions(micrometres(doc))[0]
         loops = [lp for _name, region_loops, _size in domain._pending for lp in region_loops]
         shared += sum(1 for lp in loops if isinstance(lp, Circle)) - len({id(lp) for lp in loops if isinstance(lp, Circle)})
         names = [name for name, _loops, _size in domain._pending]
         parts += len(names) - len(set(names))
     assert shared >= 16 and parts >= 2
-    combs = _domain_from_regions(Document.from_dict(F.crossing_combs(14)))[0]
+    combs = _domain_from_regions(micrometres(Document.from_dict(F.crossing_combs(14))))[0]
     assert len(combs._pending) > 100                                      # the combs cut each other
 
 
 def test_build_domain_keeps_its_three_tuple():
-    result = build_domain(Document.from_dict(F.steady_example()))
+    result = build_domain(micrometres(Document.from_dict(F.steady_example())))
     assert isinstance(result, tuple) and len(result) == 3
     domain, namer, materials = result
     assert isinstance(domain, Domain) and callable(namer)
     assert materials == {'plate': 'steel', 'heater': 'copper', 'background': 'insulation'}
+    public = simcase.build_domain(Document.from_dict(F.steady_example()))    # the format 0.3 stage
+    assert isinstance(public, tuple) and len(public) == 3 and public[2] == materials
+    assert pending(public[0]) == pending(build_domain(micrometres(Document.from_dict(F.steady_example())))[0])
 
 
 def test_build_domain_still_leaves_the_resolver_notes_on_the_document():
     """build_mesh copies the notes resolve_regions leaves on its micrometre document; an
-    electromagnetic document with a shape outside the domain must keep its note."""
-    from simcase import examples
+    electromagnetic document with a shape outside the domain must keep its note (format 0.3: a
+    coded diagnostic on the document)."""
+    from simcase import build_mesh, examples
+    from simcase.modes_document import kernel_document
+    from simcase.views import modes_mesh
     d = copy.deepcopy(examples.EXAMPLES['soi_strip'])
     d['geometry']['shapes'].append({'name': 'far', 'type': 'rect', 'x': 10.0, 'y': 10.0, 'w': 1.0, 'h': 1.0,
-                                    'material': 'Si'})
+                                    'material': 'physmat:Si'})
     doc = Document.from_dict(d)
-    doc.notes = []
-    build_domain(doc)
-    assert any("'far'" in note for note in doc.notes)
-    assert geometry.build_domain is build_domain
+    canonical = modes_mesh(kernel_document(doc)).canonical
+    canonical.notes = []
+    build_domain(canonical)
+    assert any("'far'" in note for note in canonical.notes)
+    build_mesh(doc)
+    assert [(x.code, x.path) for x in doc.diagnostics if "'far'" in x.message] == [
+        ('W-SHAPE-DROPPED', 'geometry.shapes')]
+    # the public stage reads the format 0.3 document and calls this builder on its hand-off
+    assert geometry.build_domain is build_domain and simcase.build_domain is not build_domain
 
 
 # ---- C-3: check_mesh_limits counts what the domain queues -----------------------------------
 
 @pytest.mark.parametrize('case', list(CORPUS))
 def test_c3_check_mesh_limits_returns_the_queued_loop_count(case):
-    """The count is the reference domain's of the micrometre copy a run meshes. On this
+    """The count is the reference domain's of the micrometre frame a run meshes. On this
     corpus, written in millimetres, it is also the count of the document itself (measured
     at the port; the next test shows a document where the two differ)."""
     doc = Document.from_dict(CORPUS[case]())
-    before = json.dumps(doc.data, sort_keys=True)
+    before = doc.canonical_json()
     count = check_mesh_limits(doc, max_input_vertices=10 ** 6)
     assert type(count) is int
-    assert count == loop_vertices(_build_domain_reference(micrometre_document(doc))[0])
-    assert count == loop_vertices(_build_domain_reference(doc.copy())[0])
-    assert json.dumps(doc.data, sort_keys=True) == before and doc.notes == []
+    assert count == loop_vertices(_build_domain_reference(micrometres(doc))[0])
+    assert count == loop_vertices(_build_domain_reference(in_document_units(doc))[0])
+    assert doc.canonical_json() == before and doc.notes == []
 
 
 # ---- helpers for the runs ---------------------------------------------------------------------
@@ -222,7 +265,7 @@ def saved(result, path):
     with np.load(out / 'fields.npz', allow_pickle=False) as fields:
         arrays = {key: fields[key] for key in fields.files if key != 'metadata_json'}
     summary = json.loads((out / 'summary.json').read_text())
-    summary.pop('timings_s')
+    summary.pop('timing')
     return arrays, summary
 
 
@@ -284,9 +327,9 @@ def test_c4_a_tiny_global_size_is_refused_by_its_loop_vertex_count(monkeypatch):
     """The heater is isolated, so its Circle gets max(16, int(4 pi r / mesh.size)) vertices
     and is queued twice (itself and the plate's hole); the plate's ring, the background box
     and the plate's ring again as the background's hole are 4 each. At mesh.size 0.0246 mm,
-    24.6 um in the micrometre copy that is meshed, that is 2054 (computed below)."""
+    24.6 um in the micrometre frame that is meshed, that is 2054 (computed below)."""
     doc = Document.from_dict(F.tiny_global_size(0.0246))
-    r, size = (units.length_to_micrometres(v, doc.scale) for v in (2.0, 0.0246))
+    r, size = views._um_of_pm(2 * 10 ** 9), views._um_of_exact(Fraction('0.0246') / 1000)   # 2 mm, 0.0246 mm
     expected = 2 * max(16, int(4 * math.pi * r / size)) + 3 * 4
     assert expected > 2048
     with pytest.raises(MeshLimitError) as refused:
@@ -304,25 +347,30 @@ def test_c4_a_tiny_global_size_is_refused_by_its_loop_vertex_count(monkeypatch):
 
 @pytest.mark.parametrize('size', [5e-324, 1e-320, 1e-300])
 def test_c5_a_global_size_near_zero_is_refused_before_any_circle_is_made(monkeypatch, size):
+    """The reader refuses such a document first: the size in metres is below 1e-300, where a
+    double is subnormal or 0 (E-DOMAIN at mesh.element_size). The mesher's own guard still
+    holds for the micrometre frame it meshes (here the frame of a document read at 2 mm,
+    given the size, in mm, in micrometres)."""
+    with pytest.raises(DocumentError) as read:
+        Document.from_dict(F.tiny_global_size(size))
+    assert [(d.code, d.path) for d in read.value.diagnostics] == [('E-DOMAIN', 'mesh.element_size')]
+
     class NoCircle(Circle):
         def __init__(self, *args, **kwargs):
             raise AssertionError('a Circle was made for an over-limit circle')
-    doc = Document.from_dict(F.tiny_global_size(size))
+    frame = micrometres(Document.from_dict(F.tiny_global_size(2.0)))
+    size_um = views._um_of_exact(Fraction(repr(size)) / 1000)                # the size in mm, in um
+    frame.data['mesh']['size'] = size_um
     monkeypatch.setattr(geometry, 'Circle', NoCircle)
     with pytest.raises(MeshLimitError) as refused:
-        check_mesh_limits(doc, max_input_vertices=2048)
+        _domain_from_regions(frame, max_input_vertices=2048)
     assert type(refused.value) is MeshLimitError
     assert (refused.value.quantity, refused.value.count, refused.value.limit) == ('input_vertices', None, 2048)
-    r, size_um = (units.length_to_micrometres(v, doc.scale) for v in (2.0, size))   # what is meshed
+    r = views._um_of_pm(2 * 10 ** 9)                                         # the 2 mm radius, what is meshed
     assert f'radius {r:g} um' in str(refused.value) and '2048' in str(refused.value)
     half = size_um / 2                                    # the circle's own estimate is named
     estimate = math.inf if half == 0 else 2 * math.pi * r / half
     assert f'= {estimate:.4g} loop vertices' in str(refused.value)
-    forbid(monkeypatch, meshine.Domain, 'build')
-    forbid_solvers(monkeypatch)
-    with pytest.raises(MeshLimitError) as in_run:
-        run(Document.from_dict(F.tiny_global_size(size)), verbose=False, max_input_vertices=2048)
-    assert type(in_run.value) is MeshLimitError and in_run.value.count is None
 
 
 # ---- C-6, C-6b, C-7: nodes and triangles -------------------------------------------------------
@@ -333,7 +381,7 @@ def test_c6_limits_at_the_mesh_size_change_nothing_and_one_less_refuses(monkeypa
     and max_triangles = M give every saved array and the summary of the unlimited run; N - 1
     and M - 1 are refused before the solve."""
     unlimited = run(Document.from_dict(RUNS[case]()), verbose=False)
-    n, m = len(unlimited.mesh_nodes_m), len(unlimited.mesh_triangles)
+    n, m = len(unlimited.node_coordinates), len(unlimited.mesh_triangles)
     vertices = check_mesh_limits(Document.from_dict(RUNS[case]()), max_input_vertices=10 ** 6)
     both = run(Document.from_dict(RUNS[case]()), verbose=False, max_nodes=n, max_triangles=m,
                max_input_vertices=vertices)
@@ -359,7 +407,7 @@ def test_c6b_each_limit_alone(monkeypatch, tmp_path, limit):
     unlimited arrays, meshine gets max_points only from max_nodes, and one less refuses."""
     build = RUNS['steady example, size 1.0']
     unlimited = run(Document.from_dict(build()), verbose=False)
-    exact = {'max_nodes': len(unlimited.mesh_nodes_m), 'max_triangles': len(unlimited.mesh_triangles),
+    exact = {'max_nodes': len(unlimited.node_coordinates), 'max_triangles': len(unlimited.mesh_triangles),
              'max_input_vertices': check_mesh_limits(Document.from_dict(build()), max_input_vertices=10 ** 6)}[limit]
     calls = spy_generate(monkeypatch)
     alone = run(Document.from_dict(build()), verbose=False, **{limit: exact})
@@ -456,7 +504,7 @@ def test_c10_crossing_combs_are_refused_without_building_the_domain(monkeypatch)
     data = F.crossing_combs(63)
     assert sum(len(s['points']) for s in data['geometry']['shapes']) == 510
     doc = Document.from_dict(data)
-    exact = loop_vertices(_build_domain_reference(doc.copy())[0])
+    exact = loop_vertices(_build_domain_reference(micrometres(doc))[0])
     assert exact > 2048
     forbid(monkeypatch, meshine.Domain, 'build')
     forbid_solvers(monkeypatch)
@@ -468,7 +516,7 @@ def test_c10_crossing_combs_are_refused_without_building_the_domain(monkeypatch)
     assert in_run.value.count == exact
 
 
-# ---- port: the micrometre copy and the registry ---------------------------------------------
+# ---- port: the micrometre frame and the registry ---------------------------------------------
 
 def spy_domains(monkeypatch):
     """The loop-vertex count of every Domain handed to meshine.generate, before it is built."""
@@ -483,20 +531,18 @@ def spy_domains(monkeypatch):
 
 
 def in_unit(data, unit, factor):
-    """A region document rewritten in another length unit: every length times ``factor``."""
+    """A region document rewritten in another length unit: every shape number times ``factor``;
+    the element sizes are quantities with their own unit and stay."""
     d = copy.deepcopy(data)
-    d['units']['length'] = unit
     g = d['geometry']
+    g['length_unit'] = unit
     g['domain'] = {k: v * factor for k, v in g['domain'].items()}
-    if 'mesh_size' in g['background']:
-        g['background']['mesh_size'] *= factor
     for shape in g['shapes']:
-        for key in ('x', 'y', 'w', 'h', 'cx', 'cy', 'r', 'mesh_size'):
+        for key in ('x', 'y', 'w', 'h', 'cx', 'cy', 'r'):
             if key in shape:
                 shape[key] *= factor
         if 'points' in shape:
             shape['points'] = [[x * factor, y * factor] for x, y in shape['points']]
-    d['mesh']['size'] *= factor
     return d
 
 
@@ -517,13 +563,13 @@ def test_port_the_count_is_that_of_the_domain_a_run_meshes(monkeypatch, case):
 def test_port_the_micrometre_copy_is_counted_where_the_units_change_the_count(monkeypatch, tmp_path):
     """Port, not pre-registered. At mesh.size 4 pi 2 / 20 mm the heater's 4 pi r / mesh.size
     is 20 when computed in millimetres and rounds just below 20 in micrometres, so the
-    document itself would queue two loop vertices more than the micrometre copy that is
-    meshed (52 against 50 here). check_mesh_limits and the run's limit count the copy: the
+    document itself would queue two loop vertices more than the micrometre frame that is
+    meshed (52 against 50 here). check_mesh_limits and the run's limit count the frame: the
     run passes at that count with the unlimited output and one less refuses it."""
     data = F.tiny_global_size(4 * math.pi * 2.0 / 20)
     doc = Document.from_dict(data)
-    in_document = _domain_from_regions(doc.copy())[3]
-    meshed = loop_vertices(_build_domain_reference(micrometre_document(doc))[0])
+    in_document = _domain_from_regions(in_document_units(doc))[3]
+    meshed = loop_vertices(_build_domain_reference(micrometres(doc))[0])
     assert in_document != meshed
     assert check_mesh_limits(doc, max_input_vertices=10 ** 6) == meshed
     counts = spy_domains(monkeypatch)
@@ -539,45 +585,45 @@ def test_port_the_micrometre_copy_is_counted_where_the_units_change_the_count(mo
 
 @pytest.mark.parametrize('k', [20, 23])
 def test_port_an_unvalidated_document_is_counted_as_its_run_counts_it(monkeypatch, k):
-    """Port, not pre-registered. Document.copy() and Document(data) have no resolved length
-    unit until they are validated, and a run validates them first. At mesh.size 4 pi 2 / k mm
-    (k = 20, 23) the document's own numbers and its micrometre copy give different counts;
-    check_mesh_limits gives such a document the count of the validated one, which is the
-    count of the Domain its run hands to meshine, and leaves it unvalidated."""
+    """Port, not pre-registered. A Document(data) that was never read has no resolved values
+    until it is validated, and a run validates it first. At mesh.element_size 4 pi 2 / k mm
+    (k = 20, 23) the document's own numbers and its micrometre frame give different counts;
+    check_mesh_limits gives such a document the count of the read one, which is the count of
+    the Domain its run hands to meshine, and leaves it unread."""
     data = F.tiny_global_size(4 * math.pi * 2.0 / k)
     validated = Document.from_dict(copy.deepcopy(data))
     expected = check_mesh_limits(validated, max_input_vertices=10 ** 6)
-    assert expected != _domain_from_regions(validated.copy())[3]
+    assert expected != _domain_from_regions(in_document_units(validated))[3]
     for doc in (validated.copy(), Document(copy.deepcopy(validated.data)), Document(copy.deepcopy(data))):
-        before = (doc.scale, list(doc.notes), copy.deepcopy(doc.data))
+        before = (doc.si, list(doc.notes), copy.deepcopy(doc.data))
         assert check_mesh_limits(doc, max_input_vertices=10 ** 6) == expected
-        assert (doc.scale, doc.notes, doc.data) == before
+        assert (doc.si, doc.notes, doc.data) == before
         counts = spy_domains(monkeypatch)
         run(doc, verbose=False, max_input_vertices=expected)
         assert counts == [expected]
         monkeypatch.undo()
 
 
-def test_port_only_an_unvalidated_document_is_validated_before_its_copy(monkeypatch):
-    """Port, not pre-registered: a validated document costs one validation, that of its
-    micrometre copy; an unvalidated one costs one more, of its own copy; one that its
-    validation refuses raises DocumentError."""
+def test_port_only_an_unread_document_is_read_before_it_is_counted(monkeypatch):
+    """Port, not pre-registered: a read format 0.3 document is not validated again and its
+    micrometre frame is not validated as a document of its own (it holds the geometry and mesh
+    only); a Document(data) never read is read once, on a copy; one that
+    the reader refuses raises DocumentError."""
     doc = Document.from_dict(F.steady_example())
-    lengths = []
+    calls = []
     real = Document.validate
 
     def validate(self):
-        lengths.append(self.data['units']['length'])
+        calls.append(self.data.get('openphysics'))
         return real(self)
     monkeypatch.setattr(Document, 'validate', validate)
     check_mesh_limits(doc, max_input_vertices=10 ** 6)
-    assert lengths == ['um']
-    lengths.clear()
-    check_mesh_limits(doc.copy(), max_input_vertices=10 ** 6)
-    assert lengths == ['mm', 'um']
-    bad = doc.copy()
-    bad.data['units']['length'] = 'parsec'
-    with pytest.raises(DocumentError, match='units.length'):
+    assert calls == []
+    check_mesh_limits(Document(copy.deepcopy(F.steady_example())), max_input_vertices=10 ** 6)
+    assert calls == ['0.3']
+    bad = Document(copy.deepcopy(F.steady_example()))
+    bad.data['geometry']['length_unit'] = 'parsec'
+    with pytest.raises(DocumentError, match='length_unit'):
         check_mesh_limits(bad, max_input_vertices=10 ** 6)
 
 
@@ -610,12 +656,16 @@ def test_port_limits_reach_a_runner_only_through_its_kind(monkeypatch, accepts):
 
     def validate(doc):
         doc.notes = []
+    # format 0.3 (units batch C11a): the kind brings its physics slots instead of a 0.2 defaults merge
     registry.register(registry.PhysicsKind(
         name='test.limits', types=frozenset({'test.limits'}), precedence=50, validate=validate,
         run=lambda doc, **kwargs: _Echo(doc, kwargs), summary=lambda doc: 'test.limits',
-        result_types=(_Echo,), defaults=lambda: {'study': {'type': 'single'}},
-        accepts_mesh_limits=(lambda data: True) if accepts else None))
-    doc = Document.from_dict({'physics': {'p': {'type': 'test.limits'}}})
+        result_types=(_Echo,), accepts_mesh_limits=(lambda data: True) if accepts else None,
+        slots=({'pattern': 'physics.*{test.limits}.type', 'kind': 'enum', 'values': ['test.limits'],
+                'required': True},)))
+    doc = Document.from_dict({'openphysics': '0.3', 'geometry': {
+        'length_unit': 'm', 'depth': None, 'domain': {'xmin': 0, 'xmax': 1, 'ymin': 0, 'ymax': 1}},
+        'physics': {'p': {'type': 'test.limits'}}, 'study': {'type': 'single'}})
     assert run(doc, verbose=False).kwargs == {'verbose': False}
     if accepts:
         assert run(doc, verbose=False, max_nodes=7, max_input_vertices=9).kwargs == {

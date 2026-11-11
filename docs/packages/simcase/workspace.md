@@ -126,9 +126,9 @@ Choose **Applications → Steady heat conduction** to edit a steady heat problem
 without JSON. The plate is one homogeneous rectangle with its lower-left corner at
 (0, 0), sized in mm, with constant isotropic conductivity k [W/(m·K)] and a uniform
 heat source Q [W/m³]. Select a side in the drawing or open **Heat transfer** to give
-each side one condition: insulated (zero flux), a fixed temperature [K], an outward
-heat flux [W/m²] (positive leaves the plate) or convection with h [W/(m²·K)] and an
-ambient temperature [K]. **Mesh** sets the structured divisions along x and y and
+each side one condition: insulated (zero flux), a fixed temperature [K], an inward
+heat flux [W/m²] (positive enters the plate, as the document's `inward_heat_flux`) or
+convection with h [W/(m²·K)] and an ambient temperature [K]. **Mesh** sets the structured divisions along x and y and
 shows the node and triangle counts against this server's limits.
 
 Run is enabled when the inputs determine the temperature level (a fixed temperature
@@ -144,7 +144,7 @@ clicked point. A result keeps the inputs it was computed with; after an edit it 
 labelled as an earlier snapshot and **Restore run inputs** brings them back.
 
 Heat inputs are saved in input files, drafts, browser input recovery and undo
-history (project version 5, plate lengths in mm). Heat results stay in the tab:
+history (project version 6, plate lengths in mm, a flux side as its inward heat flux). Heat results stay in the tab:
 sessions, run history, comparison and browser notebook recovery remain optical-only.
 Transient heat, region-wise or temperature-dependent materials and arbitrary
 geometry are not part of this application; the classic page keeps the JSON
@@ -169,38 +169,47 @@ and session indicators compare against the last save/open snapshot or download
 request; an unchanged indicator does not certify download completion. Browser
 recovery reports its own committed storage state separately.
 
-Version-1 inputs and sessions remain readable: their fixed core height becomes
-220 nm. New files record height and its nm unit explicitly; older editors reject
-version 2 instead of silently ignoring height. Each result retains its captured
-height, including field outlines, comparisons and CSV/PNG exports.
+Input files are version 6, written since the units and naming batch. They record the
+core height, wavelength, core mesh size and shape list in nm and the heat plate in mm,
+each with its unit, and a flux side of the heat plate as its inward heat flux (version 5
+stored the outward flux). Input files of versions 1 to 5 are refused by version with a
+message instead of being read under another meaning; enter their inputs again and save a
+new file. Browser drafts and input recovery use new storage keys
+(`openphysics.studio.workspace.v2`, `openphysics.studio.recovery.v2`), so a draft an earlier
+Studio saved is not offered. Each result retains its captured inputs, including field
+outlines, comparisons and CSV/PNG exports.
 
-Version-3 inputs and sessions add the wavelength and core mesh size with nm units.
-Version-1 and version-2 files open at 1550 nm and 30 nm, the settings their results
-were computed with; older editors reject version 3 instead of ignoring the new
-values. Results keep their captured wavelength and core mesh in history labels,
-comparisons and CSV/PNG exports.
+The run table CSV (`studio-runs.csv`) writes every quantity column as `name [unit]` with
+its SI value: `core_width [m]` and `core_height [m]` (single-rectangle designs),
+`vacuum_wavelength [m]`, `core_element_size [m]` and `effective_index [1]`; job, name, pin,
+completion time, `core_material`, a `shapes` column describing every shape (in nm, as the
+page shows it) and the candidate number carry no unit.
 
-Version-4 inputs and sessions store the shape list with nm units. Version-1 to
-version-3 files open as one centred rectangular core resting on y = 0 with their
-width, height and core material, which is the geometry their results were computed
-with. Results from the earlier adapters stay valid only with that single core;
-older editors reject version 4 instead of ignoring the shapes. The run table CSV
-keeps the core width, height and material columns for single-rectangle designs and
-adds a `shapes` column describing every shape. Results computed with the
-`optical-shapes-v4` adapter (silicon, silicon nitride, silica and air only) keep that
-adapter name; new results record `optical-shapes-v5`.
+Session files are version 6, written since the units and naming batch: the workspace
+builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
+under their exact `physmat:` names) and each run record keeps the result's
+`effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in
+metres, and its input as an input file of version 6. Sessions of versions 1 to 5 hold
+results under the earlier names and the document length unit; the workspace refuses them
+by version with a message instead of reading them under another meaning. Enter the design
+again, run it and save a new session.
 
-The workspace checks `/api/workspace/capabilities/v5` before enabling Run. Contract
-version 5 and adapter `optical-shapes-v5` declare the window in nm, at most eight
-shapes and twelve polygon vertices, the shape types and the ten materials, the
-1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
-and candidate settings,
+The workspace checks `/api/workspace/capabilities/v6` before enabling Run. Contract
+version 6 (the content of version 5, for a workspace that saves input and session files of
+version 6 and reads the coded `diagnostics` of a document check) and adapter
+`optical-shapes-v7` declare the window in nm, at most eight
+shapes and twelve polygon vertices, the shape types and the ten materials with their
+`physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
+strings), the fixed window, boundary and candidate settings (`mode_count`),
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
-The earlier capability endpoints remain available for older clients.
-This is not a complete engine dependency or Git provenance record. Older
-version-1 sessions without this field remain readable with unknown provenance.
+The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v5`) remain
+available at the same paths and schema versions;
+because every adapter now writes format 0.3 documents and reads the new result names, each
+names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,
+`optical-shapes-v6` and `-v7`), with its values as quantity strings.
+This is not a complete engine dependency or Git provenance record.
 
 ## Scope and validation
 
@@ -326,16 +335,21 @@ status labels update. The workflow is shown for the optical application only.
 Study → Check inputs calls the public document validation endpoint without meshing
 or starting a job. The report retains its input snapshot and server identity;
 editing inputs or reconnecting to another server makes the report earlier evidence.
+It lists every coded diagnostic the server returns (severity, code, path and message:
+errors, warnings and notes) in place of the earlier free-text notes.
 A transport failure retains the previous report alongside the new error. Validation
 acceptance is not material-accuracy, mesh-convergence or solver acceptance. Run
 always validates its own captured document again.
 
-Export solver JSON downloads the actual simcase `openphysics: "0.2"` input with
-lengths in micrometres. It can be read by the simcase Python/CLI APIs; it is not a
+Export solver JSON downloads the actual simcase `openphysics: "0.3"` input: its
+geometry in nm (`length_unit`) and its other lengths as quantity strings. It can be read by the simcase Python/CLI APIs; it is not a
 workspace project/session and does not contain computed results. The expandable
 solver document shows the same payload; with an invalid editor draft it shows the
 last valid inputs and export is disabled.
 
+The server reads these requests from their raw bytes: a number keeps its written digits,
+and a duplicate key, `NaN`, `Infinity`, text that is not UTF-8 or a string with an escaped
+unpaired surrogate is refused with its code.
 Workspace validate, mesh and run requests carry the connected server instance.
 A restarted/different server rejects stale requests before parsing the model or
 starting a job; old jobs do not migrate between server processes. When Run meets a
@@ -357,8 +371,11 @@ Changing candidate/component updates the profile. Line choices are view state sa
 Each plotted step is the stored centroid value of the triangle intersected by
 that interval. There is no field interpolation, smoothing, absolute-power estimate
 or mode tracking. Shared/coincident edges follow the last painted triangle; mesh
-gaps remain gaps. CSV exports interval endpoints, triangle number, centroid,
-normalized value, job, origin and candidate/component. Values at an interval's
+gaps remain gaps. The CSV (`studio-profile.csv`) exports job, origin, candidate,
+component, axis, the fixed coordinate, interval endpoints, triangle number, centroid and
+normalized value; every quantity column is `name [unit]` with its SI value
+(`fixed_coordinate [m]`, `start [m]`, `end [m]`, `centroid_x [m]`, `centroid_y [m]`,
+`relative_amplitude [1]`), while the panel takes and shows micrometres. Values at an interval's
 isolated endpoints are not a separate point-probe claim.
 
 Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
@@ -456,10 +473,11 @@ normalization, candidate, line location, job IDs, geometry, materials and origin
 Field PNG exports also annotate an active profile line. Comparison plot rows stay
 aligned when run labels wrap to multiple lines.
 
-Session view metadata now also preserves the probe coordinates/visibility and
-profile direction, fixed coordinate and expanded state. These settings do not
-change model revisions or run a solver. Legacy sessions without these optional
-fields restore a hidden probe at (0, 0.15) µm and a closed horizontal profile at
+Session view metadata also preserves the probe coordinates/visibility and
+profile direction, fixed coordinate and expanded state; the coordinates are quantity
+strings such as `"0.15 um"`, and a bare number is refused. These settings do not
+change model revisions or run a solver. A session without these optional
+fields restores a hidden probe at (0, 0.15) µm and a closed horizontal profile at
 y = 0.15 µm. Invalid/out-of-domain saved view metadata rejects the whole import
 before changing current inputs or results.
 

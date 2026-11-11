@@ -39,13 +39,16 @@ summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
 print(summary["field_layout"])
 print(summary["regions"])
 with np.load(folder / "fields.npz", allow_pickle=False) as fields:
-    print("Temperature (K):", fields["temperature_k"].min(), fields["temperature_k"].max())
-    print("Thermostat input (W/m):", fields["reaction_w_per_m"].sum())
-    print("Convection out (W/m):", fields["convective_outward_w_per_m"].sum())
+    print(summary["field_units"]["temperature"])           # K
+    print("Temperature (K):", fields["temperature"].min(), fields["temperature"].max())
+    print("Thermostat input (W/m):", fields["reaction_heat_rate_per_depth"].sum())
+    print("Convection out (W/m):", fields["outward_convective_heat_rate_per_depth"].sum())
 ```
 
-`temperature_k` is nodal; `heat_flux_w_m2` is a cell vector. `triangle_regions`
-is a cell ID into `summary["region_names"]`, not a material ID or a temperature.
+Array names carry no unit: `summary["field_units"]` gives each array's unit
+(`temperature` in K, `heat_flux` in W/m^2, the `_per_depth` rates in W/m).
+`temperature` is nodal; `heat_flux` is a cell vector. `triangle_regions`
+is a cell ID into `summary["region_names"]` (no unit), not a material ID or a temperature.
 The region entry then names its material. Two regions may share a material.
 Read `field_units`, `field_locations`, `field_shapes` and `field_layout` before
 writing a general consumer; not every physics produces the same arrays.
@@ -60,9 +63,10 @@ from simcase.export import export_fields
 export_fields("out/wall-base/fields.npz", "out/wall-base/second-view.vtu")
 ```
 
-In ParaView, open the VTU and Apply. Color by point data `temperature_k`, then by
+In ParaView, open the VTU and Apply. Color by point data `temperature`, then by
 cell data `triangle_regions` to inspect interfaces. Show mesh edges if necessary.
-For flux choose cell data `heat_flux_w_m2`, its x component or magnitude.
+For flux choose cell data `heat_flux`, its x component or magnitude. The VTU's
+FieldData `units` and `conventions` record each array's unit and sign sentence.
 Changing cell data to point data smooths a derived display; it does not improve
 solver accuracy. Compare runs using the same color range. Region names, properties
 and boundary tags are not all copied into VTU; keep the NPZ and summary.
@@ -82,16 +86,19 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Saved layout family | VTU / PVD |
 |---|---|
 | Rectangular steady heat, Dirichlet/insulated | VTU |
-| Rectangular steady heat with flux/convection (`boundary-v2`), including its load arrays | VTU |
-| Steady material-region heat, including its flux/Robin fields | VTU |
+| Rectangular steady heat with flux/convection (`thermal2d-p1-node-cell-boundary-v3`), including its load arrays | VTU |
+| Steady material-region heat (`thermal2d-p1-node-cell-regions-v2`, axisymmetric `thermal-axisymmetric-p1-node-cell-regions-v2`), including its flux/convection fields | VTU |
 | Rectangular or region transient heat | VTU for one time, PVD for all stored times |
-| Rectangular transient heat with flux/convection (`transient-p1-node-cell-boundary-v1`), including its two per-step load arrays | VTU for one time, PVD for all stored times |
-| Vacuum PEC cavity | VTU |
-| Electric conduction and Joule heating (`electric-joule2d-p1-v1`) | VTU |
-| Cavity with materials and lossy walls (`cavity3d-edge-complex-v1`) | VTU, complex fields as `_real`/`_imag` pairs |
-| Waveguide modes (`em.modes2d`, `em-modes2d-p1-node-centroid-v1`) | VTU for a single point, PVD for a sweep (`export_sweep`); nodes converted to metres, complex modes as `_real`/`_imag` pairs; subspace sweeps (`em-modes2d-subspace-raw-v1`) and results saved without `field_layout` refused |
+| Rectangular transient heat with flux/convection (`thermal2d-transient-p1-node-cell-boundary-v2`), including its two per-step load arrays | VTU for one time, PVD for all stored times |
+| Heat, electric, Joule, mechanics, waveguide-mode and cavity layouts saved before format 0.3 (`RETIRED_LAYOUTS`, such as `thermal2d-p1-node-cell-regions-v1`, `electric-joule2d-p1-v1`, `mechanics2d-p1-v1`, `em-modes2d-p1-node-centroid-v1` or `cavity3d-edge-v1`) | Refused by name; re-create the document in format 0.3 and run it again |
+| Vacuum PEC cavity (`cavity3d-edge-v2`) | VTU, `node_coordinates` in metres |
+| Electric conduction and Joule heating (`electric-joule2d-p1-v2`; regions `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`) | VTU |
+| Rectangular elasticity and thermoelasticity (`mechanics2d-p1-v2`, `thermoelastic2d-p1-v2`), strain and stress as named component scalars | VTU |
+| Region elasticity and thermoelasticity (`mechanics2d-p1-regions-v2`, `thermoelastic2d-p1-regions-v2`) | Not exported yet (refused as an unsupported layout); read `fields.npz` |
+| Cavity with materials and lossy walls (`cavity3d-edge-complex-v2`) | VTU, complex fields as `_real`/`_imag` pairs under exp(−iωt) |
+| Waveguide modes (`em.modes2d`, `em-modes2d-p1-node-centroid-v2`) | VTU for a single point, PVD for a sweep (`export_sweep`); `node_coordinates` in metres, complex modes as `_real`/`_imag` pairs under exp(−iωt); subspace sweeps (`em-modes2d-subspace-raw-v2`) and results saved without `field_layout` refused |
 
-The region path and rectangle boundary-v2 path have different layouts despite
+The region path and rectangle boundary-v3 path have different layouts despite
 similar physical conditions. Unsupported export does not mean the solver failed.
 See [region export](../packages/simcase/thermal_regions2d.md#vtu-and-pvd-export)
 and [result reliability](index.md) for exact scope and interpretation.

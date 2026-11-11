@@ -13,37 +13,42 @@ function cap(){return {capability_format:'studio-capabilities-v1',[X.TYPE]:{supp
   limits:{request_bytes:1048576,max_nodes:10201,max_triangles:20000,max_times:128,raw_bytes:16777216,
     manifest_bytes:4194304,frame_page_bytes:4194304,page_rows:16,terminal_bytes:33554432,
     terminal_jobs:2,active_jobs:1,read_encoding_slots:1}}};}
-function doc(){return {openphysics:'0.2',units:{length:'m',temperature:'K',time:'s'},
-  physics:{heat:{type:X.TYPE}},study:{type:'transient',time_s:[2,2.03,2.1,2.4,3]}};}
-function manifest(Nt=5){const time_s=Nt===5?[2,2.03,2.1,2.4,3]:Array.from({length:Nt},(_,i)=>2+i/10);
-  const n=4,m=2,d=0,shapes={nodes_m:[n,2],triangles:[m,3],time_s:[Nt],temperature_k:[Nt,n],heat_flux_w_m2:[Nt,m,2],
-    source_load_w_per_m:[Nt,n],reaction_w_per_m:[Nt-1,n],residual_w_per_m:[Nt-1,n],storage_rate_w_per_m:[Nt-1,n],
-    heat_content_j_per_m:[Nt],quadratic_functional_jk_per_m:[Nt],dirichlet_node_ids:[d],dirichlet_temperatures_k:[Nt,d]};
+function doc(){return {openphysics:'0.3',geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1}},
+  physics:{heat:{type:X.TYPE}},study:{type:'transient',time:{unit:'s',values:[2,2.03,2.1,2.4,3]}}};}
+// A format 0.3 rectangle manifest (registry names; structural arrays carry no unit or time axis).
+function manifest(Nt=5){const time=Nt===5?[2,2.03,2.1,2.4,3]:Array.from({length:Nt},(_,i)=>2+i/10);
+  const n=4,m=2,d=0,shapes={node_coordinates:[n,2],triangles:[m,3],time:[Nt],temperature:[Nt,n],heat_flux:[Nt,m,2],
+    generated_heat_rate_per_depth:[Nt,n],reaction_heat_rate_per_depth:[Nt-1,n],residual_heat_rate_per_depth:[Nt-1,n],
+    heat_storage_rate_per_depth:[Nt-1,n],stored_heat_per_depth:[Nt],thermal_energy_functional_per_depth:[Nt],
+    prescribed_node_ids:[d],prescribed_temperature:[Nt,d]};
   const fields={},summary={physics_type:X.TYPE,result_format:X.RESULT,field_layout:X.LAYOUT,
-    units:{length:'m',temperature:'K',time:'s'},mesh_length_unit:'m',mesh:{nodes:n,triangles:m},
-    study:{type:'transient',time_s},field_units:{},field_shapes:{},field_locations:{},field_time_axes:{}};
+    resolved_inputs:{'geometry.domain.xmin':{authored:0,value:0,unit:'m',length_unit:'m'}},mesh:{nodes:n,triangles:m},
+    study:{type:'transient',time:{unit:'s',values:time}},field_units:{},field_shapes:{},field_locations:{},field_time_axes:{}};
   for(const [name,[unit,location,axis]]of Object.entries(X.SPEC)){
-    fields[name]={shape:shapes[name],unit,location,axis,available_views:axis==='static'||name==='time_s'?[]:['frame','history'],
-      initial_available:axis!=='time_s[1:]',ui_supported:X.UI.includes(name)};
-    summary.field_units[name]=unit;summary.field_locations[name]=location;summary.field_shapes[name]=shapes[name];summary.field_time_axes[name]=axis;
+    fields[name]={shape:shapes[name],unit,location,axis,available_views:axis==='static'||name==='time'?[]:['frame','history'],
+      initial_available:axis!=='time[1:]',ui_supported:X.UI.includes(name)};
+    if(unit!==null)summary.field_units[name]=unit;
+    if(axis!=='static')summary.field_time_axes[name]=axis;
+    summary.field_locations[name]=location;summary.field_shapes[name]=shapes[name];
   }
-  const value={payload_format:'studio-thermal-transient-v1',kind:X.TYPE,job:'thermal-transient-test',result_id:'result-test',
-    client_revision:1,request_seq:2,result_format:X.RESULT,field_layout:X.LAYOUT,display_length_in_m:1,
-    default_frame_index:Nt-1,time_s,arrays:{nodes_m:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],dirichlet_node_ids:[]},summary,fields};
+  const value={payload_format:'studio-thermal-transient-v2',kind:X.TYPE,job:'thermal-transient-test',result_id:'result-test',
+    client_revision:1,request_seq:2,result_format:X.RESULT,field_layout:X.LAYOUT,length_unit:'m',display_length_in_m:1,
+    default_frame_index:Nt-1,time,arrays:{node_coordinates:[[0,0],[1,0],[1,1],[0,1]],triangles:[[0,1,2],[0,2,3]],prescribed_node_ids:[]},summary,fields};
   value.frame_url='/api/jobs/'+value.job+'/frame?result_id='+value.result_id+'&field={field}&time_index={time_index}&frame_seq={frame_seq}';
   value.history_url='/api/jobs/'+value.job+'/history?result_id='+value.result_id+'&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}';
   return value;
 }
-function frame(m,q){const vector=q.field==='heat_flux_w_m2';return {...identity(m),payload_format:'studio-thermal-transient-frame-v1',
-  frame_seq:q.frame_seq,field:q.field,time_index:q.time_index,time_s:m.time_s[q.time_index],
+// Rectangle and region manifests alike carry the registry names (format 0.3).
+function frame(m,q){const L=X.RECTANGLE,vector=q.field===L.flux;return {...identity(m),payload_format:L.frame,
+  frame_seq:q.frame_seq,field:q.field,time_index:q.time_index,[L.time]:m[L.time][q.time_index],
   unit:vector?'W/m^2':'K',location:vector?'triangle_centroids':'nodes',shape:vector?[2,2]:[4],
   arrays:{[q.field]:vector?[[1000*q.time_index+1,-1000*q.time_index-2],[1000*q.time_index+11,-1000*q.time_index-12]]:
     Array.from({length:4},(_,n)=>100*q.time_index+n)}};}
 function identity(m){const keys=['kind','job','result_id','client_revision','request_seq','result_format','field_layout','display_length_in_m'];
   return Object.fromEntries(keys.map(k=>[k,m[k]]));}
-function history(m,q){return {...identity(m),payload_format:'studio-thermal-transient-history-v1',field:q.field,
+function history(m,q){const L=X.RECTANGLE;return {...identity(m),payload_format:L.history,field:q.field,
   frame_seq:q.frame_seq,start:q.start,stop:q.stop,time_indices:Array.from({length:q.stop-q.start},(_,i)=>q.start+i),
-  time_s:m.time_s.slice(q.start,q.stop),shape:[q.stop-q.start],unit:m.fields[q.field].unit,location:'domain',
+  [L.time]:m[L.time].slice(q.start,q.stop),shape:[q.stop-q.start],unit:m.fields[q.field].unit,location:'domain',
   arrays:{[q.field]:Array.from({length:q.stop-q.start},(_,i)=>q.start+i+10)}};}
 function boot({deferReads=false}={}) {
   const reads=[],states=[];let current,runs=0,active=0,maxActive=0;
@@ -63,36 +68,36 @@ function boot({deferReads=false}={}) {
 }
 test('typed manifest preserves nonzero/nonuniform exact catalog and final default',()=>{
   const m=manifest(),accepted=X.manifest(m,m,cap()[X.TYPE].limits);
-  assert.equal(accepted.default_frame_index,4);assert.deepEqual(accepted.time_s,[2,2.03,2.1,2.4,3]);
-  assert.deepEqual(accepted.fields.reaction_w_per_m.shape,[4,4]);assert.equal(accepted.fields.reaction_w_per_m.initial_available,false);
+  assert.equal(accepted.default_frame_index,4);assert.deepEqual(accepted.time,[2,2.03,2.1,2.4,3]);
+  assert.deepEqual(accepted.fields.reaction_heat_rate_per_depth.shape,[4,4]);assert.equal(accepted.fields.reaction_heat_rate_per_depth.initial_available,false);
 });
 for(const actor of ['times','default','descriptor','summary','ccw','bool','D','scale','nonfinite'])
-test('manifest refuses '+actor,()=>{const m=manifest();if(actor==='times')m.time_s[1]=2;if(actor==='default')m.default_frame_index=0;
-  if(actor==='descriptor')m.fields.heat_flux_w_m2.location='nodes';if(actor==='summary')m.summary.field_units.temperature_k='C';
-  if(actor==='ccw')m.arrays.triangles[0]=[0,2,1];if(actor==='bool')m.arrays.nodes_m[0][0]=true;
-  if(actor==='D')m.arrays.dirichlet_node_ids=[1,1];if(actor==='scale')m.display_length_in_m=0;
+test('manifest refuses '+actor,()=>{const m=manifest();if(actor==='times')m.time[1]=2;if(actor==='default')m.default_frame_index=0;
+  if(actor==='descriptor')m.fields.heat_flux.location='nodes';if(actor==='summary')m.summary.field_units.temperature='C';
+  if(actor==='ccw')m.arrays.triangles[0]=[0,2,1];if(actor==='bool')m.arrays.node_coordinates[0][0]=true;
+  if(actor==='D')m.arrays.prescribed_node_ids=[1,1];if(actor==='scale')m.display_length_in_m=0;
   if(actor==='nonfinite')m.summary.temperature_min_k=[Infinity];assert.throws(()=>X.manifest(m,m,cap()[X.TYPE].limits));});
 test('same-origin templates bind job/result and exact placeholders',()=>{
-  const m=manifest();assert.match(X.queryURL(m,'frame',{field:'temperature_k',time_index:4,frame_seq:2}),/result_id=result-test/);
+  const m=manifest();assert.match(X.queryURL(m,'frame',{field:'temperature',time_index:4,frame_seq:2}),/result_id=result-test/);
   for(const bad of ['https://evil.test/a','//evil.test/a','/api/jobs/thermal-transient-test/../frame?x=1',
     m.frame_url+'&frame_seq={frame_seq}',m.frame_url.replace('result-test','other'),m.frame_url+'#x',
     m.frame_url.replace('{time_index}','0')])assert.throws(()=>X.template(bad,m,'frame'));
 });
 test('frame exact index/axis/row, signed K and distinct cell vectors',()=>{
-  const m=manifest(),q={field:'temperature_k',time_index:4,frame_seq:3},f=X.frame(frame(m,q),m,q);
-  assert.equal(f.arrays.temperature_k[3],403);assert.equal(f.time_s,3);
-  const fq={field:'heat_flux_w_m2',time_index:2,frame_seq:4},v=X.frame(frame(m,fq),m,fq);
-  assert.deepEqual(v.arrays.heat_flux_w_m2[1],[2011,-2012]);
-  const man=X.manifest(m,m,cap()[X.TYPE].limits);assert.equal(X.model(man,v,'qy').values[1],-2012);
-  f.arrays.temperature_k.fill(-10);assert.equal(X.model(man,f,'temperature_k').min,-10);
-  const wrong=frame(m,q);wrong.time_s=2.4;assert.throws(()=>X.frame(wrong,m,q));
+  const m=X.manifest(manifest(),manifest(),cap()[X.TYPE].limits),q={field:'temperature',time_index:4,frame_seq:3},f=X.frame(frame(m,q),m,q);
+  assert.equal(f.arrays.temperature[3],403);assert.equal(f.time,3);
+  const fq={field:'heat_flux',time_index:2,frame_seq:4},v=X.frame(frame(m,fq),m,fq);
+  assert.deepEqual(v.arrays.heat_flux[1],[2011,-2012]);
+  const man=m;assert.equal(X.model(man,v,'qy').values[1],-2012);
+  f.arrays.temperature.fill(-10);assert.equal(X.model(man,f,'temperature').min,-10);
+  const wrong=frame(m,q);wrong.time=2.4;assert.throws(()=>X.frame(wrong,m,q));
 });
 test('H/V half-open pages, Nt17 final partial and wrong indices',()=>{
-  const m=manifest(17),q={field:'heat_content_j_per_m',start:16,stop:17,frame_seq:3};
+  const m=X.manifest(manifest(17),manifest(17),cap()[X.TYPE].limits),q={field:'stored_heat_per_depth',start:16,stop:17,frame_seq:3};
   assert.deepEqual(X.history(history(m,q),m,q).time_indices,[16]);
   assert.throws(()=>X.history(history(m,{...q,start:0}),m,{...q,start:0}));
   const v=history(m,q);v.time_indices=[15];assert.throws(()=>X.history(v,m,q));
-  assert.equal(history(m,{...q,field:'quadratic_functional_jk_per_m'}).unit,'J K/m');
+  assert.equal(history(m,{...q,field:'thermal_energy_functional_per_depth'}).unit,'J K/m');
 });
 test('capability refuses absent/false/invalid configuration',()=>{
   assert.ok(X.capability(cap()));const c=cap();c[X.TYPE].supported=false;assert.equal(X.capability(c),null);
@@ -101,7 +106,7 @@ test('capability refuses absent/false/invalid configuration',()=>{
 test('default last frame only, no automatic H/V page or additional solve',async()=>{
   const {c,reads,runs}=boot({deferReads:true});await c.loadCapability();await c.validate(doc());await c.run();
   assert.equal(reads.length,1);assert.equal(reads[0].q.time_index,4);reads[0].resolve();await tick();
-  assert.equal(c.state().frame.arrays.temperature_k[3],403);assert.deepEqual(c.state().pages,{});assert.equal(runs(),1);
+  assert.equal(c.state().frame.arrays.temperature[3],403);assert.deepEqual(c.state().pages,{});assert.equal(runs(),1);
 });
 test('one read active, coalesced explicit index and stale success/finally cannot install',async()=>{
   const {c,reads,maxActive}=boot({deferReads:true});await c.loadCapability();await c.validate(doc());await c.run();
@@ -123,10 +128,10 @@ test('dirty invalidation ignores pending reads and prevents prior snapshot run',
 });
 test('history explicit only and globally serialized with frame, no automatic next page',async()=>{
   const {c,reads,maxActive}=boot({deferReads:true});await c.loadCapability();await c.validate(doc());await c.run();
-  assert.equal(c.loadHistory('heat_content_j_per_m',0,5),false);reads[0].resolve();await tick();
-  assert.equal(c.loadHistory('heat_content_j_per_m',0,5),true);
-  assert.equal(c.loadHistory('quadratic_functional_jk_per_m',0,5),false);
-  reads[1].resolve();await tick();assert.ok(c.state().pages.heat_content_j_per_m);
+  assert.equal(c.loadHistory('stored_heat_per_depth',0,5),false);reads[0].resolve();await tick();
+  assert.equal(c.loadHistory('stored_heat_per_depth',0,5),true);
+  assert.equal(c.loadHistory('thermal_energy_functional_per_depth',0,5),false);
+  reads[1].resolve();await tick();assert.ok(c.state().pages.stored_heat_per_depth);
   assert.equal(reads.length,2);assert.equal(maxActive(),1);
 });
 test('duplicates and validation200 okfalse never approve, run400 never installs',async()=>{
@@ -204,13 +209,14 @@ function installAPI(p,{rejectValidation=false,rejectRun=false,held=false,fixture
     'if(!url.includes("?"))return {ok:true,json:async()=>({...fixtureManifest,status:"done"})};'+
     'const u=new URL(url,"http://test"),q=Object.fromEntries(u.searchParams);'+
     'const i=Number(q.time_index),start=Number(q.start),stop=Number(q.stop),f=q.field;'+
-    'const vector=f==="heat_flux_w_m2";const result={kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,'+
+    'const tk="time";'+
+    'const vector=f==="heat_flux";const result={kind:fixtureManifest.kind,job:fixtureManifest.job,result_id:fixtureManifest.result_id,'+
       'client_revision:fixtureManifest.client_revision,request_seq:fixtureManifest.request_seq,result_format:fixtureManifest.result_format,'+
       'field_layout:fixtureManifest.field_layout,display_length_in_m:1,frame_seq:Number(q.frame_seq),field:f,unit:fixtureManifest.fields[f].unit,location:fixtureManifest.fields[f].location};'+
-    'if(u.pathname.endsWith("/frame"))Object.assign(result,{payload_format:"studio-thermal-transient-frame-v1",time_index:i,time_s:fixtureManifest.time_s[i],'+
+    'if(u.pathname.endsWith("/frame"))Object.assign(result,{payload_format:"studio-thermal-transient-frame-v2",time_index:i,[tk]:fixtureManifest[tk][i],'+
       'shape:vector?[2,2]:[4],arrays:{[f]:vector?[[1000*i+1,-1000*i-2],[1000*i+11,-1000*i-12]]:[100*i,100*i+1,100*i+2,100*i+3]}});'+
-    'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v1",start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
-      'time_s:fixtureManifest.time_s.slice(start,stop),shape:[stop-start],arrays:{[f]:Array.from({length:stop-start},(_,j)=>10+start+j)}});'+
+    'else Object.assign(result,{payload_format:"studio-thermal-transient-history-v2",start,stop,time_indices:Array.from({length:stop-start},(_,j)=>start+j),'+
+      '[tk]:fixtureManifest[tk].slice(start,stop),shape:[stop-start],arrays:{[f]:Array.from({length:stop-start},(_,j)=>10+start+j)}});'+
     (held?'return new Promise((resolve,reject)=>held.push(error=>error?reject(Error(error)):resolve({ok:true,json:async()=>result})));':
       'return {ok:true,json:async()=>result};')+'};');
 }
@@ -245,7 +251,7 @@ test('shipped dirty transient JSON clears controller/hover/labels and pending re
   p.tab('results');await tick();assert.equal(p.run('transientController.state().frame'),null);
 });
 test('shipped transient original duplicate raw keys never approve or run',async()=>{
-  const p=await readyPage();p.element('json').value=JSON.stringify(doc()).replace('"openphysics":"0.2"','"openphysics":"0.2","openphysics":"0.2"');
+  const p=await readyPage();p.element('json').value=JSON.stringify(doc()).replace('"openphysics":"0.3"','"openphysics":"0.3","openphysics":"0.3"');
   p.element('json').oninput();await p.element('applyJson').onclick();
   assert.equal(p.element('runBtn').disabled,true);assert.match(p.element('status').textContent,/duplicate/);
   await p.element('runBtn').onclick();assert.equal(p.run('apiCalls.filter(u=>u.endsWith("/run")).length'),0);
@@ -278,16 +284,16 @@ test('manifest rejects illustrative comments and abbreviated public summaries',(
   assert.throws(()=>X.manifest(m,m,cap()[X.TYPE].limits));
 });
 test('nearby saved times never select by rounded text or accept bool/string/fractional indices',async()=>{
-  const m=manifest();m.time_s=[2,2+1e-12,2.1,2.4,3];m.summary.study.time_s=m.time_s;
-  const valid=X.manifest(m,m,cap()[X.TYPE].limits),q={field:'temperature_k',time_index:1,frame_seq:1};
-  assert.equal(X.frame(frame(valid,q),valid,q).time_s,2+1e-12);
+  const m=manifest();m.time=[2,2+1e-12,2.1,2.4,3];m.summary.study.time.values=m.time;
+  const valid=X.manifest(m,m,cap()[X.TYPE].limits),q={field:'temperature',time_index:1,frame_seq:1};
+  assert.equal(X.frame(frame(valid,q),valid,q).time,2+1e-12);
   const b=boot();await b.c.loadCapability();await b.c.validate(doc());await b.c.run();await tick();
   for(const i of [true,'1',.5,-1,5])assert.throws(()=>b.c.select(i));
 });
 test('shipped current magnitude overflow clears field only and newer temperature restores exact label/hover',async()=>{
   const p=await readyPage();
   p.run('const normalFetch=fetch;globalThis.fetch=async(...args)=>{const response=await normalFetch(...args);return {...response,json:async()=>{const value=await response.json();'
-    +'if(value.payload_format==="studio-thermal-transient-frame-v1"&&value.field==="heat_flux_w_m2")value.arrays.heat_flux_w_m2=[[Number.MAX_VALUE,Number.MAX_VALUE],[1,0]];return value;}};};');
+    +'if(value.payload_format==="studio-thermal-transient-frame-v2"&&value.field==="heat_flux")value.arrays.heat_flux=[[Number.MAX_VALUE,Number.MAX_VALUE],[1,0]];return value;}};};');
   await p.element('runBtn').onclick();await tick();
   p.element('transientReadH').onclick();await tick();
   const marker=()=>p.element('transientH').children.at(-1).children.some(row=>row.children[0].children[0].textContent.includes('(current frame)'));
@@ -298,7 +304,7 @@ test('shipped current magnitude overflow clears field only and newer temperature
   assert.doesNotMatch(p.element('status').textContent,/frame ready/);
   assert.equal(marker(),false);
   assert.ok(p.run('transientController.result()'));p.tab('mesh');await tick();assert.match(p.element('meshInfo').textContent,/Actual transient result mesh/);
-  p.element('thermalField').value='temperature_k';p.element('thermalField').onchange();p.tab('results');await tick();
+  p.element('thermalField').value='temperature';p.element('thermalField').onchange();p.tab('results');await tick();
   assert.match(p.element('resInfo').textContent,/index 4.*raw 400 … 403/);
   assert.equal(typeof p.element('fieldCanvas').onmousemove,'function');
   assert.equal(marker(),true);
@@ -331,7 +337,7 @@ test('shipped canvas failure rejects accepted frame and clears history current m
 test('shipped mesh display overflow clears stale field and mesh rather than falling outside rejection',async()=>{
   const p=await readyPage();p.run('fixtureManifest.display_length_in_m=Number.MIN_VALUE;'
     +'const fetchBeforeScale=fetch;globalThis.fetch=async(...args)=>{const response=await fetchBeforeScale(...args);'
-    +'return {...response,json:async()=>{const value=await response.json();if(value.payload_format==="studio-thermal-transient-frame-v1")value.display_length_in_m=Number.MIN_VALUE;return value;}};};');
+    +'return {...response,json:async()=>{const value=await response.json();if(value.payload_format==="studio-thermal-transient-frame-v2")value.display_length_in_m=Number.MIN_VALUE;return value;}};};');
   await p.element('runBtn').onclick();await tick();
   const fieldClears=p.element('fieldCanvas').calls.filter(x=>x==='clear').length;
   const meshClears=p.element('meshCanvas').calls.filter(x=>x==='clear').length;
@@ -364,24 +370,25 @@ for(const outcome of ['success','error'])test('shipped dirty status overrides ob
 
 const REGION_LIMITS={max_shapes:64,max_circles:16,max_polygon_points:512,max_boundary_crossings:1024,max_input_vertices:2048};
 function regionBlock(){return {supported:true,run_enabled:true,result_formats:[X.RESULT_R],field_layouts:[X.LAYOUT_R],
-  payload_formats:[X.MANIFEST_R,'studio-thermal-transient-frame-v1','studio-thermal-transient-history-v1'],limits:{...REGION_LIMITS}};}
+  payload_formats:[X.MANIFEST_R,'studio-thermal-transient-frame-v2','studio-thermal-transient-history-v2'],limits:{...REGION_LIMITS}};}
 // regionCap() advertises a valid block; regionCap(undefined) advertises none.
 function regionCap(...block){const value=cap(),b=block.length?block[0]:regionBlock();if(b!==undefined)value[X.TYPE].regions=b;return value;}
-function regionDoc(){return {...doc(),geometry:{domain:{xmin:0,xmax:1,ymin:0,ymax:1},background:{material:'insulation'},
-  shapes:[{name:'steel_plate',type:'rect',x:.5,y:0,w:.5,h:1,material:'steel'}]}};}
+function regionDoc(){return {...doc(),geometry:{length_unit:'m',depth:null,domain:{xmin:0,xmax:1,ymin:0,ymax:1},
+  background:{material:'insulation'},shapes:[{name:'steel_plate',type:'rect',x:.5,y:0,w:.5,h:1,material:'steel'}]}};}
 function regionManifest(Nt=5){
   const m=manifest(Nt),s=m.summary;
   m.payload_format=X.MANIFEST_R;m.result_format=s.result_format=X.RESULT_R;m.field_layout=s.field_layout=X.LAYOUT_R;
+  // region ids are structural: a location and a shape, no unit and no time axis
   m.arrays.triangle_regions=[0,1];
-  m.fields.triangle_regions={shape:[2],unit:'1',location:'triangles',axis:'static',available_views:[],
+  m.fields.triangle_regions={shape:[2],unit:null,location:'triangles',axis:'static',available_views:[],
     initial_available:true,ui_supported:false};
-  s.field_units.triangle_regions='1';s.field_locations.triangle_regions='triangles';
-  s.field_time_axes.triangle_regions='static';s.field_shapes.triangle_regions=[2];
+  s.field_locations.triangle_regions='triangles';s.field_shapes.triangle_regions=[2];
   s.region_names=['steel_plate','background'];
-  s.regions={steel_plate:{material:'steel',triangles:1,area_m2:.5},background:{material:'insulation',triangles:1,area_m2:.5}};
-  s.materials={steel:{conductivity_w_mk:45,volumetric_heat_capacity_j_m3k:3.6e6,source:'document value'},
-    insulation:{conductivity_w_mk:.5,volumetric_heat_capacity_j_m3k:1.2e6}};
-  s.heat_source_w_m3={steel_plate:2e5,background:5e4};
+  const area=value=>({value,unit:'m^2'}),k=value=>({value,unit:'W/(m K)'}),c=value=>({value,unit:'J/(m^3 K)'});
+  s.regions={steel_plate:{material:'steel',triangles:1,area:area(.5)},background:{material:'insulation',triangles:1,area:area(.5)}};
+  s.materials={steel:{thermal_conductivity:k(45),volumetric_heat_capacity:c(3.6e6),source:'document value'},
+    insulation:{thermal_conductivity:k(.5),volumetric_heat_capacity:c(1.2e6)}};
+  s.heat_source_density={steel_plate:{value:2e5,unit:'W/m^3'},background:{value:5e4,unit:'W/m^3'}};
   return m;
 }
 const LIMITS=cap()[X.TYPE].limits;
@@ -401,20 +408,25 @@ test('J7 region manifest: 14 descriptors and 4 arrays; frames and pages only wit
   assert.deepEqual(accepted.regions.rows.map(r=>[r.name,r.material,r.k,r.rhoC,r.q,r.cells]),
     [['steel_plate','steel',45,3.6e6,2e5,1],['background','insulation',.5,1.2e6,5e4,1]]);
   const rectangle=X.manifest(manifest(),manifest(),LIMITS);
-  const fq={field:'temperature_k',time_index:2,frame_seq:3},hq={field:'heat_content_j_per_m',start:0,stop:5,frame_seq:4};
+  // the same field names; the pair tells a region frame from a rectangle one
+  const fq={field:'temperature',time_index:2,frame_seq:3},hq={field:'stored_heat_per_depth',start:0,stop:5,frame_seq:4};
+  const rq=fq,rh=hq;
   assert.ok(X.frame(frame(accepted,fq),accepted,fq));assert.ok(X.history(history(accepted,hq),accepted,hq));
-  assert.ok(X.frame(frame(rectangle,fq),rectangle,fq));assert.ok(X.history(history(rectangle,hq),rectangle,hq));
-  assert.throws(()=>X.frame(frame(rectangle,fq),accepted,fq));assert.throws(()=>X.history(history(rectangle,hq),accepted,hq));
+  assert.ok(X.frame(frame(rectangle,rq),rectangle,rq));assert.ok(X.history(history(rectangle,rh),rectangle,rh));
+  assert.throws(()=>X.frame(frame(rectangle,rq),accepted,rq));assert.throws(()=>X.history(history(rectangle,rh),accepted,rh));
   assert.throws(()=>X.frame(frame(accepted,fq),rectangle,fq));assert.throws(()=>X.history(history(accepted,hq),rectangle,hq));
   assert.throws(()=>X.manifest(raw,raw,LIMITS));assert.throws(()=>X.regionManifest(manifest(),manifest(),LIMITS));
-  const model=X.model(accepted,X.frame(frame(accepted,fq),accepted,fq),'temperature_k');
+  const model=X.model(accepted,X.frame(frame(accepted,fq),accepted,fq),'temperature');
   assert.equal(model.regions,accepted.regions);assert.equal(X.meshModel(accepted).regions,accepted.regions);
   assert.equal('regions' in X.meshModel(rectangle),false);
-  assert.equal('regions' in X.model(rectangle,X.frame(frame(rectangle,fq),rectangle,fq),'temperature_k'),false);
+  assert.equal('regions' in X.model(rectangle,X.frame(frame(rectangle,rq),rectangle,rq),'temperature'),false);
   const faults={descriptor:m=>{m.fields.triangle_regions.ui_supported=true;},missing:m=>{delete m.fields.triangle_regions;},
-    shape:m=>{m.summary.field_shapes.triangle_regions=[3];},axis:m=>{m.summary.field_time_axes.triangle_regions='time_s';},
+    shape:m=>{m.summary.field_shapes.triangle_regions=[3];},axis:m=>{m.summary.field_time_axes.triangle_regions='static';},
+    unit:m=>{m.summary.field_units.triangle_regions='1';},descriptor_unit:m=>{m.fields.triangle_regions.unit='1';},
+    area:m=>{m.summary.regions.steel_plate.area=.5;},source:m=>{m.summary.heat_source_density.steel_plate=2e5;},
     summary_pair:m=>{m.summary.result_format=X.RESULT;},ids:m=>{m.arrays.triangle_regions=[0,2];},
-    capacity:m=>{delete m.summary.materials.steel.volumetric_heat_capacity_j_m3k;},
+    capacity:m=>{delete m.summary.materials.steel.volumetric_heat_capacity;},
+    capacity_unit:m=>{m.summary.materials.steel.volumetric_heat_capacity.unit='J/(m^3*K)';},
     count:m=>{m.summary.regions.steel_plate.triangles=2;}};
   for(const [name,fault] of Object.entries(faults)){const m=regionManifest();fault(m);
     assert.throws(()=>X.regionManifest(m,m,LIMITS,REGION_LIMITS),undefined,name);}

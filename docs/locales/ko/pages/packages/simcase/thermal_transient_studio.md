@@ -30,8 +30,8 @@ View변경이solver를다시실행하거나문서를바꾸지않습니다.
 재료 영역이 있는 과도 문서는 같은 route에서 별도 경로를 따르며
 [영역 문서](#영역-문서)에서 설명합니다.
 
-`outward_flux_w_m2`나 `convection`이 있는 headless 문서는 경계 layout
-`thermal2d-transient-p1-node-cell-boundary-v1`로 저장합니다([headless 가이드](thermal_transient2d.md#외향-열유속과-대류-변)).
+`inward_heat_flux`나 `convection`이 있는 headless 문서는 경계 layout
+`thermal2d-transient-p1-node-cell-boundary-v2`로 저장합니다([headless 가이드](thermal_transient2d.md#내향-열유속과-대류-변)).
 과도 validate·run route는 키 존재만으로 검증·실행 전에 거절하며(`unsupported_physics`,
 HTTP 400, job 없음) capability는 v1 쌍만 유지합니다. 이런 문서는 headless로 실행하세요.
 
@@ -48,13 +48,13 @@ python -m simcase.studio --no-browser
 않습니다.
 
 1. 완전한과도JSON을열거나붙여넣고명시적으로적용합니다. 엄격중복키/유한JSON검사를
-   위해원문을유지합니다. 길이/K/s·양수k/c·초기장·BC·증가하는비음수time_s를
-   선언합니다. 0아닌첫시간도유효하며dirty/invalid텍스트는old검증·결과를무효화합니다.
+   위해원문을유지합니다. 형식0.3(형상length_unit과모든값의단위)·양수k/c·초기장·BC·증가하는
+   비음수study.time을씁니다. 0아닌첫시간도유효하며dirty/invalid텍스트는old검증·결과를무효화합니다.
 2. 전용과도capability로현재입력을검증합니다. HTTP200도bodyok=true여야유효합니다.
    Run은재검증·snapshot캡처·공개simcaseAPI를사용하며광학mesh-only preview는없습니다.
 3. 명시적으로실행합니다. 완료후실제staticmesh·정확요청시간·descriptor를가진typed
    manifest를수용합니다. 기본선택은time0/반올림시간조회가아닌마지막정수index Nt-1.
-4. 정확time_s[i]의온도K·요소qx/qy/크기를고릅니다. 현재frame min/max·단위를
+4. 정확time[i]의온도K·요소qx/qy/크기를고릅니다. 현재frame min/max·단위를
    표시합니다. 시간이다르면같은색이같은절대값을뜻하지않을수있습니다.
    Globalextrema scan/API를추가하지않습니다.
 5. 최대16행H/Vhistorypage를명시적으로엽니다. Page는정수halfopen[start,stop)이며
@@ -73,19 +73,19 @@ N절점,M삼각형,Nt요청시간,D중복없는지정절점입니다.
 
 | 양 | Shape | 축 / 단위 |
 |---|---|---|
-| nodes_m, triangles | (N,2), (M,3) | static / m, 정수CCW연결 |
-| time_s | (Nt,) | 요청시간 / s |
-| temperature_k | (Nt,N) | time_s / 절점K |
-| heat_flux_w_m2 | (Nt,M,2) | time_s / 요소중심W/m² |
-| source_load_w_per_m | (Nt,N) | time_s / 깊이당절점W/m |
-| reaction_w_per_m, residual_w_per_m, storage_rate_w_per_m | (Nt-1,N) | time_s[1:] / 절점W/m |
-| heat_content_j_per_m | (Nt,) | time_s / H[J/m] |
-| quadratic_functional_jk_per_m | (Nt,) | time_s / V[J K/m] |
-| dirichlet_node_ids | (D,) | static / 정렬중복없는정수ID |
-| dirichlet_temperatures_k | (Nt,D) | time_s / K; D0는(Nt,0) |
+| node_coordinates, triangles | (N,2), (M,3) | static / m, 정수CCW연결 |
+| time | (Nt,) | 요청시간 / s |
+| temperature | (Nt,N) | time / 절점K |
+| heat_flux | (Nt,M,2) | time / 요소중심W/m^2 |
+| generated_heat_rate_per_depth | (Nt,N) | time / 깊이당절점W/m |
+| reaction_, residual_, heat_storage_rate_per_depth | (Nt-1,N) | time[1:] / 절점W/m |
+| stored_heat_per_depth | (Nt,) | time / H[J/m] |
+| thermal_energy_functional_per_depth | (Nt,) | time / V[J K/m] |
+| prescribed_node_ids | (D,) | static / 정렬중복없는정수ID |
+| prescribed_temperature | (Nt,D) | time / K; D0는(Nt,0) |
 
 Index0에는T/flux/진단열원f0가있고reaction/residual-step/storage rate는없습니다.
-i>=1의rate행은i-1이고구간[time_s[i-1],time_s[i]]입니다.
+i>=1의rate행은i-1이고구간[time[i-1],time[i]]입니다(frame에서는 `interval_start`, `interval_end`).
 초기rateAPI는0을만들지않고422를반환합니다.
 [2,2.03,2.1,2.4,3]에서기본i4는정확3s,i2는2.1s입니다.
 포맷label이같은인접시간도서로다른index입니다.
@@ -111,16 +111,20 @@ Raw좌표는m이며축은최상위display_length_in_m·문서길이선언을사�
 
 ## Typed 조회·응답 소유권
 
-과도result/layoutID는thermal.transient2d-result-v1과
-thermal2d-transient-p1-node-cell-v1입니다. Manifest/frame/history는별도wireID
-studio-thermal-transient-v1,studio-thermal-transient-frame-v1,
-studio-thermal-transient-history-v1를사용합니다. 광학/정상layoutfallback없음.
+과도result/layoutID는thermal.transient2d-result-v3과
+thermal2d-transient-p1-node-cell-v2입니다. Manifest/frame/history는별도wireID
+studio-thermal-transient-v2,studio-thermal-transient-frame-v2,
+studio-thermal-transient-history-v2를사용합니다(영역 문서도 같은 frame·history ID를 자기 쌍과
+함께 사용). 광학/정상layoutfallback없음.
 
-Manifest에는staticmesh·최상위time_s·immutable summary·기본마지막index·
+Manifest에는staticmesh·최상위time·length_unit·immutable summary·기본마지막index·
 13개fielddescriptor(fullshape/unit/location/axis/available_views/initial_available/
 ui_supported)가있습니다. 초기UIfield는T/q/HV만입니다.
 Frame은캡처행하나,H/Vframe은scalarshape[],page는[rows],vectorpage는[rows,M,2].
 Staticmesh를매frame복제하지않습니다.
+Summary의 `diagnostics`와 `resolved_inputs`는 문서와 함께 커지므로 4 MiB manifest에 세고, summary의
+나머지는 64 KiB summary metadata 한도 안에 있습니다. 검증 응답도 같은 방식으로 문서의 진단은 4 MiB,
+나머지는 64 KiB 안에 둡니다.
 
 Frame/history는result_id와정확정수index/range가필수입니다.
 Run counterclient_revision/request_seq와view frame_seq는별개입니다.
@@ -142,11 +146,11 @@ summary 하한, worker thread 검증, job 단계의 절점·요소 한도는 정
 
 | 항목 | 영역 manifest |
 | --- | --- |
-| Result·layout ID | `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1` |
-| Manifest | `payload_format = "studio-thermal-transient-regions-v1"`, 같은 최상위 필드 16개 |
-| `arrays` | `nodes_m`, `triangles`, `dirichlet_node_ids`, `triangle_regions`(삼각형마다 영역 번호 하나) |
-| Descriptor | 직사각형 descriptor 13개와 `triangle_regions`: shape `[M]`, 단위 `1`, 위치 `triangles`, 축 `static`, view 없음, `ui_supported=false` |
-| Frame·history page | 직사각형 ID `studio-thermal-transient-frame-v1`·`-history-v1`에 job이 저장한 영역 쌍을 붙임; `triangle_regions`는 frame·history 필드가 아님(400 `invalid_query`) |
+| Result·layout ID | `thermal.transient2d-regions-result-v2`, `thermal2d-transient-p1-node-cell-regions-v2`(형식 0.2의 `-v1` 쌍은 은퇴) |
+| Manifest | `payload_format = "studio-thermal-transient-regions-v2"`, `time`과 `length_unit`을 포함해 직사각형 manifest와 같은 최상위 필드 |
+| `arrays` | `node_coordinates`, `triangles`, `prescribed_node_ids`, `triangle_regions`(삼각형마다 영역 번호 하나) |
+| Descriptor | 직사각형 descriptor 13개와 `triangle_regions`: shape `[M]`, 단위 없음(`null`), 위치 `triangles`, 축 `static`, view 없음, `ui_supported=false` |
+| Frame·history page | 직사각형 frame·page ID `studio-thermal-transient-frame-v2`·`-history-v2`에 job이 저장한 영역 쌍을 붙임; `triangle_regions`는 frame·history 필드가 아님(400 `invalid_query`) |
 | Capability | 과도 블록 안의 중첩 `regions` 키: 영역 쌍, 위 payload 형식 세 개, 영역 `limits` 다섯 개 |
 
 영역 job의 raw 이력은 16 MiB raw 한도 안에 영역 번호(삼각형마다 8 byte)도

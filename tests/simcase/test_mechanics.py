@@ -11,6 +11,9 @@ steady heat + freeze_temperature + solve_thermoelasticity), K2 (refsol
 ``thermoelastic_traction.uniform_combined`` without shear across length units), K3 (mesh
 convergence of a confined bar with a linear temperature) and K4 (refusals); J5 and J6 run
 for both types. Thresholds are gates: never loosen them.
+
+The documents are format 0.3 (units batch C7): every value carries its unit, the geometry its
+length_unit; galerkin receives the same SI values as before.
 """
 import copy
 import json
@@ -38,19 +41,34 @@ def data(kind='elastic_plate'):
     return copy.deepcopy(examples.EXAMPLES[kind])
 
 
+def q(value, unit):
+    """A quantity string with the exact double: ``repr`` digits and a unit."""
+    return f'{float(value)!r} {unit}'
+
+
+def displacements(sides):
+    """{side: {component: metres}} -> prescribed_displacement quantity strings."""
+    return {side: {c: q(v, 'm') for c, v in components.items()} for side, components in sides.items()}
+
+
+def vectors(sides, unit='Pa'):
+    return {side: [q(v, unit) for v in vector] for side, vector in sides.items()}
+
+
 def document(unit='m', factor=1., *, plane='stress', nu=.3, size=(1., .4), subdivisions=(10, 4),
              displacement, traction=None, body_force=None, young=2e11):
     d = data()
-    d['units']['length'] = unit
+    d['geometry']['length_unit'] = unit
     d['geometry']['domain'] = dict(xmin=0., xmax=size[0]*factor, ymin=0., ymax=size[1]*factor)
-    d['mesh']['subdivisions'] = list(subdivisions)
+    d['mesh']['subdivision_count'] = list(subdivisions)
     p = d['physics']['plate']
-    p.update(plane=plane, poisson_ratio=nu, young_modulus_pa=young, displacement_m=displacement)
-    p.pop('traction_pa', None)
+    p.update(plane=plane, poisson_ratio=nu, youngs_modulus=q(young, 'Pa'),
+             prescribed_displacement=displacements(displacement))
+    p.pop('traction', None)
     if traction is not None:
-        p['traction_pa'] = traction
+        p['traction'] = vectors(traction)
     if body_force is not None:
-        p['body_force_n_m3'] = body_force
+        p['body_force_density'] = [q(v, 'N/m^3') for v in body_force]
     return d
 
 
@@ -78,20 +96,21 @@ def test_j1_document_run_matches_direct_solve_byte_for_byte(plane):
                               dirichlet=dict(sorted(fixed.items())), body_force=(0., -7.7e4),
                               traction={'right': [3e6, 0.], 'top': [0., -1e5]})
     f = result.fields
-    assert f['nodes_m'].tobytes() == mesh.nodes.tobytes()
+    assert f['node_coordinates'].tobytes() == mesh.nodes.tobytes()
     assert f['triangles'].tobytes() == mesh.triangles.tobytes()
-    for key, attr in (('displacement_m', 'displacement'), ('strain', 'strain'), ('stress_pa', 'stress'),
-                      ('load_n_per_m', 'load'), ('reaction_n_per_m', 'reaction'), ('residual_n_per_m', 'residual')):
+    for key, attr in (('displacement', 'displacement'), ('strain', 'strain'), ('stress', 'stress'),
+                      ('applied_force_per_depth', 'load'), ('reaction_force_per_depth', 'reaction'),
+                      ('residual_force_per_depth', 'residual')):
         value = np.asarray(getattr(direct, attr))
         assert f[key].shape == value.shape and f[key].dtype == value.dtype, key
         assert f[key].tobytes() == value.tobytes(), key
     summary = result.summary()
-    assert summary['result_format'] == 'mechanics.elasticity2d-result-v1'
-    assert summary['field_layout'] == 'mechanics2d-p1-v1'
-    assert summary['strain_components'] == ['exx', 'eyy', 'gxy']
-    assert summary['stress_components'] == ['sxx', 'syy', 'sxy']
-    assert summary['field_units']['stress_pa'] == 'Pa' and summary['field_units']['load_n_per_m'] == 'N/m'
-    assert summary['field_locations']['displacement_m'] == 'nodes'
+    assert summary['result_format'] == 'mechanics.elasticity2d-result-v2'
+    assert summary['field_layout'] == 'mechanics2d-p1-v2'
+    assert summary['field_components']['strain'] == ['strain_xx', 'strain_yy', 'engineering_shear_strain_xy']
+    assert summary['field_components']['stress'] == ['stress_xx', 'stress_yy', 'stress_xy']
+    assert summary['field_units']['stress'] == 'Pa' and summary['field_units']['applied_force_per_depth'] == 'N/m'
+    assert summary['field_locations']['displacement'] == 'nodes'
     assert summary['field_shapes']['strain'] == [mesh.num_triangles, 3]
     assert summary['status'] == 'solved'
 
@@ -106,18 +125,19 @@ def test_j2_uniaxial_refsol_across_length_units(unit, factor, plane):
                  traction={'right': [applied, 0.]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    exact = refsol.uniaxial(f['nodes_m'], applied, young_modulus=2e11, poisson_ratio=.3, plane=plane)
-    centroids = f['nodes_m'][f['triangles']].mean(axis=1)
+    exact = refsol.uniaxial(f['node_coordinates'], applied, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    centroids = f['node_coordinates'][f['triangles']].mean(axis=1)
     exact_cells = refsol.uniaxial(centroids, applied, young_modulus=2e11, poisson_ratio=.3, plane=plane)
-    du = relative(f['displacement_m'], exact.displacement, np.max(abs(exact.displacement)))
-    ds = relative(f['stress_pa'], exact_cells.stress, applied)
+    du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
+    ds = relative(f['stress'], exact_cells.stress, applied)
     de = relative(f['strain'], exact_cells.strain, np.max(abs(exact_cells.strain)))
     print(dict(unit=unit, plane=plane, displacement_relative=du, stress_relative=ds, strain_relative=de))
     assert du <= 1e-10 and ds <= 1e-10 and de <= 1e-10
-    diag = r.summary()['diagnostics']
-    assert diag['applied_load_n_per_m'] == pytest.approx([applied*.4, 0.], rel=1e-12, abs=1e-12*applied*.4)
-    assert np.max(abs(np.asarray(diag['force_balance_n_per_m']))) <= 1e-10*applied*.4
-    assert r.summary()['input_units'] == {'length': unit}
+    balance = r.summary()['balance']
+    assert balance['applied_force_per_depth']['values'] == pytest.approx([applied*.4, 0.], rel=1e-12,
+                                                                         abs=1e-12*applied*.4)
+    assert np.max(abs(np.asarray(balance['force_imbalance_per_depth']['values']))) <= 1e-10*applied*.4
+    assert f'length_unit {unit}' in r.summary()['extent'][0]
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -128,11 +148,11 @@ def test_j2_shear_refsol_across_length_units(unit, factor, plane):
                  traction={'top': [tau, 0.], 'left': [0., -tau], 'right': [0., tau]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    exact = refsol.shear(f['nodes_m'], tau, young_modulus=2e11, poisson_ratio=.3, plane=plane)
-    centroids = f['nodes_m'][f['triangles']].mean(axis=1)
+    exact = refsol.shear(f['node_coordinates'], tau, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    centroids = f['node_coordinates'][f['triangles']].mean(axis=1)
     exact_cells = refsol.shear(centroids, tau, young_modulus=2e11, poisson_ratio=.3, plane=plane)
-    du = relative(f['displacement_m'], exact.displacement, np.max(abs(exact.displacement)))
-    ds = relative(f['stress_pa'], exact_cells.stress, tau)
+    du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
+    ds = relative(f['stress'], exact_cells.stress, tau)
     print(dict(unit=unit, plane=plane, displacement_relative=du, stress_relative=ds))
     assert du <= 1e-10 and ds <= 1e-10
 
@@ -155,12 +175,12 @@ def test_j3_constant_body_force_bar_mesh_convergence(plane):
                      body_force=[f, 0.])
         r = run(Document.from_dict(d), verbose=False)
         fields = r.fields
-        x = fields['nodes_m'][fields['triangles']].mean(axis=1)[:, 0]
+        x = fields['node_coordinates'][fields['triangles']].mean(axis=1)[:, 0]
         exact = np.column_stack([f/(lam+2*mu)*(length*x-x*x/2), np.zeros_like(x)])
-        approx = fields['displacement_m'][fields['triangles']].mean(axis=1)
+        approx = fields['displacement'][fields['triangles']].mean(axis=1)
         errors.append(float(np.sqrt(np.mean(np.sum((approx-exact)**2, axis=1)))))
         exact_stress = np.column_stack([f*(length-x), lam/(lam+2*mu)*f*(length-x), np.zeros_like(x)])
-        stress_errors.append(float(np.sqrt(np.mean(np.sum((fields['stress_pa']-exact_stress)**2, axis=1))))/(f*length))
+        stress_errors.append(float(np.sqrt(np.mean(np.sum((fields['stress']-exact_stress)**2, axis=1))))/(f*length))
     orders = [float(np.log2(errors[i]/errors[i+1])) for i in range(2)]
     stress_orders = [float(np.log2(stress_errors[i]/stress_errors[i+1])) for i in range(2)]
     print(dict(plane=plane, rms_displacement_errors_m=errors, displacement_orders=orders,
@@ -171,39 +191,41 @@ def test_j3_constant_body_force_bar_mesh_convergence(plane):
 
 # J4 ------------------------------------------------------------------------------------------
 
+PD = ('physics', 'plate', 'prescribed_displacement')
 INVALID = {
-    'hinge': (('physics', 'plate', 'displacement_m'), {'bottom': {'x': 0.}, 'left': {'y': 0.}}),
-    'x_only': (('physics', 'plate', 'displacement_m'), {'left': {'x': 0.}}),
-    'y_only': (('physics', 'plate', 'displacement_m'), {'bottom': {'y': 0.}, 'top': {'y': 0.}}),
-    'hinge_right': (('physics', 'plate', 'displacement_m'), {'bottom': {'x': 0.}, 'right': {'y': 0.}}),
-    'no_sides': (('physics', 'plate', 'displacement_m'), {}),
-    'empty_side': (('physics', 'plate', 'displacement_m'), {'left': {}, 'bottom': {'y': 0.}}),
-    'corner_conflict': (('physics', 'plate', 'displacement_m'), {'left': {'x': 0.}, 'bottom': {'x': 1e-3, 'y': 0.}}),
-    'unknown_component': (('physics', 'plate', 'displacement_m'), {'left': {'x': 0., 'z': 0.}, 'bottom': {'y': 0.}}),
-    'boolean_value': (('physics', 'plate', 'displacement_m'), {'left': {'x': False}, 'bottom': {'y': 0.}}),
-    'missing_units': (('units',), {}),
-    'temperature_unit': (('units', 'temperature'), 'K'),
-    'unknown_length_unit': (('units', 'length'), 'parsec'),
+    'hinge': (PD, {'bottom': {'x': '0 m'}, 'left': {'y': '0 m'}}),
+    'x_only': (PD, {'left': {'x': '0 m'}}),
+    'y_only': (PD, {'bottom': {'y': '0 m'}, 'top': {'y': '0 m'}}),
+    'hinge_right': (PD, {'bottom': {'x': '0 m'}, 'right': {'y': '0 m'}}),
+    'no_sides': (PD, {}),
+    'empty_side': (PD, {'left': {}, 'bottom': {'y': '0 m'}}),
+    'corner_conflict': (PD, {'left': {'x': '0 m'}, 'bottom': {'x': '0.001 m', 'y': '0 m'}}),
+    'unknown_component': (PD, {'left': {'x': '0 m', 'z': '0 m'}, 'bottom': {'y': '0 m'}}),
+    'boolean_value': (PD, {'left': {'x': False}, 'bottom': {'y': '0 m'}}),
+    'bare_displacement': (PD, {'left': {'x': 0.}, 'bottom': {'y': 0.}}),
+    'units_block': (('units',), {'length': 'mm'}),
+    'missing_length_unit': (('geometry', 'length_unit'), None),
+    'unknown_length_unit': (('geometry', 'length_unit'), 'parsec'),
     'bad_plane': (('physics', 'plate', 'plane'), 'axisymmetric'),
     'poisson_half': (('physics', 'plate', 'poisson_ratio'), .5),
     'poisson_minus_one': (('physics', 'plate', 'poisson_ratio'), -1.),
     'poisson_nan': (('physics', 'plate', 'poisson_ratio'), float('nan')),
-    'zero_modulus': (('physics', 'plate', 'young_modulus_pa'), 0.),
-    'body_force_scalar': (('physics', 'plate', 'body_force_n_m3'), 1.),
-    'body_force_length': (('physics', 'plate', 'body_force_n_m3'), [1., 2., 3.]),
-    'traction_scalar': (('physics', 'plate', 'traction_pa'), {'right': 1e6}),
-    'traction_unknown_side': (('physics', 'plate', 'traction_pa'), {'front': [1e6, 0.]}),
-    'traction_on_fixed_component': (('physics', 'plate', 'traction_pa'), {'left': [1e6, 0.]}),
-    'unknown_physics_key': (('physics', 'plate', 'thickness_m'), 1e-3),
-    'missing_modulus': (('physics', 'plate', 'young_modulus_pa'), None),
+    'zero_modulus': (('physics', 'plate', 'youngs_modulus'), '0 Pa'),
+    'body_force_scalar': (('physics', 'plate', 'body_force_density'), '1 N/m^3'),
+    'body_force_length': (('physics', 'plate', 'body_force_density'), ['1 N/m^3', '2 N/m^3', '3 N/m^3']),
+    'traction_scalar': (('physics', 'plate', 'traction'), {'right': '1 MPa'}),
+    'traction_unknown_side': (('physics', 'plate', 'traction'), {'front': ['1 MPa', '0 MPa']}),
+    'traction_on_fixed_component': (('physics', 'plate', 'traction'), {'left': ['1 MPa', '0 MPa']}),
+    'unknown_physics_key': (('physics', 'plate', 'thickness'), '1 mm'),
+    'missing_modulus': (('physics', 'plate', 'youngs_modulus'), None),
     'unknown_top_key': (('mystery',), 1),
     'shapes': (('geometry', 'shapes'), []),
     'materials': (('materials', 'steel'), {}),
-    'too_many_triangles': (('mesh', 'subdivisions'), [1000, 1000]),
-    'boolean_subdivision': (('mesh', 'subdivisions'), [True, 2]),
+    'too_many_triangles': (('mesh', 'subdivision_count'), [1000, 1000]),
+    'boolean_subdivision': (('mesh', 'subdivision_count'), [True, 2]),
     'sweep': (('study', 'type'), 'sweep'),
     'plots': (('results', 'plots'), True),
-    'tagged_quantity': (('physics', 'plate', 'young_modulus_pa'), [200, 'GPa']),
+    'tagged_quantity': (('physics', 'plate', 'youngs_modulus'), [200, 'GPa']),
 }
 
 
@@ -259,7 +281,7 @@ def test_j4_adjacent_sides_may_share_a_corner_value_and_zero_traction_on_fixed_c
                  traction={'left': [0., 2e5], 'right': [1e6, 0.]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    np.testing.assert_allclose(f['displacement_m'][f['dirichlet_node_ids'][f['dirichlet_components'] == 0], 0], 1e-6, rtol=0, atol=1e-18)
+    np.testing.assert_allclose(f['displacement'][f['prescribed_node_ids'][f['prescribed_components'] == 0], 0], 1e-6, rtol=0, atol=1e-18)
 
 
 # J5 ------------------------------------------------------------------------------------------
@@ -275,11 +297,11 @@ def test_j5_cli_validate_run_save_and_fresh_output(tmp_path, capsys, monkeypatch
     assert sorted(p.name for p in out.iterdir()) == ['fields.npz', 'log.txt', 'model.json', 'summary.json']
     summary = json.loads((out/'summary.json').read_text(encoding='utf-8'))
     physics_type = data(kind)['physics'][next(iter(data(kind)['physics']))]['type']
-    assert summary['status'] == 'solved' and summary['result_format'] == physics_type+'-result-v1'
+    assert summary['status'] == 'solved' and summary['result_format'] == physics_type+'-result-v2'
     with np.load(out/'fields.npz', allow_pickle=False) as fields:
         assert str(fields['field_layout']) == mechanics.FIELD_LAYOUTS[physics_type]
-        assert str(fields['mesh_length_unit']) == 'm'
-        assert str(fields['result_format']) == physics_type+'-result-v1'
+        assert 'mesh_length_unit' not in fields.files                  # coordinates are SI metres
+        assert str(fields['result_format']) == physics_type+'-result-v2'
         assert json.loads(str(fields['metadata_json'])) == summary
         restored = run(Document.load(out/'model.json'), verbose=False).fields
         for key, array in restored.items():
@@ -316,14 +338,14 @@ def test_j5_save_partial_failure_cleanup(tmp_path, monkeypatch, kind):
 def test_j5_snapshot_immutability(tmp_path, kind):
     doc = Document.from_dict(data(kind))
     r = run(doc, verbose=False)
-    old = r.fields['displacement_m']
+    old = r.fields['displacement']
     doc.data['name'] = 'changed caller'
-    r.fields['displacement_m'][:] = 999.
-    r.summary()['diagnostics']['strain_energy_j_per_m'] = 999.
-    np.testing.assert_array_equal(r.fields['displacement_m'], old)
-    assert r.summary()['diagnostics']['strain_energy_j_per_m'] != 999.
+    r.fields['displacement'][:] = 999.
+    r.summary()['balance']['strain_energy_per_depth']['value'] = 999.
+    np.testing.assert_array_equal(r.fields['displacement'], old)
+    assert r.summary()['balance']['strain_energy_per_depth']['value'] != 999.
     with pytest.raises(ValueError):  # the owned arrays are read-only; fields are copies
-        r._arrays['displacement_m'][0, 0] = 1.
+        r._arrays['displacement'][0, 0] = 1.
     out = tmp_path/'out'
     out.mkdir()
     (out/'keep').write_text('original', encoding='utf-8')
@@ -352,7 +374,7 @@ def test_j6_studio_rejects_mechanics_documents(kind):
     from fastapi import HTTPException
     from simcase.studio import server
     doc = Document.from_dict(data(kind))
-    response = server.validate(server.DocBody(doc=doc.data))
+    response = server.validation_payload(doc.data)
     assert response['ok'] is False and 'headless' in response['error']
     with pytest.raises(HTTPException) as error:
         server._require_studio_physics(doc)
@@ -367,26 +389,28 @@ MATERIAL = dict(young_modulus=70e9, poisson_ratio=.3, thermal_expansion_per_k=12
 def thermo_document(unit='m', factor=1., *, plane='stress', nu=.3, domain=(0., 1., 0., .4), subdivisions=(10, 4),
                     temperatures, displacement, traction=None, body_force=None, alpha=12e-6, tref=293.15, **heat):
     d = data('thermoelastic_bar')
-    d['units']['length'] = unit
+    d['geometry']['length_unit'] = unit
     xmin, xmax, ymin, ymax = (v*factor for v in domain)
     d['geometry']['domain'] = dict(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-    d['mesh']['subdivisions'] = list(subdivisions)
+    d['mesh']['subdivision_count'] = list(subdivisions)
     p = d['physics']['bar']
-    p.update(plane=plane, poisson_ratio=nu, young_modulus_pa=70e9, thermal_expansion_per_k=alpha,
-             reference_temperature_k=tref, dirichlet_temperature_k=temperatures, displacement_m=displacement, **heat)
-    p.pop('traction_pa', None)
+    p.update(plane=plane, poisson_ratio=nu, youngs_modulus=q(70e9, 'Pa'), linear_expansion_coefficient=q(alpha, '1/K'),
+             stress_free_temperature=q(tref, 'K'), prescribed_temperature={s: q(t, 'K') for s, t in temperatures.items()},
+             prescribed_displacement=displacements(displacement), **heat)
+    p.pop('traction', None)
     if traction is not None:
-        p['traction_pa'] = traction
+        p['traction'] = vectors(traction)
     if body_force is not None:
-        p['body_force_n_m3'] = body_force
+        p['body_force_density'] = [q(v, 'N/m^3') for v in body_force]
     return d
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
 def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
     d = thermo_document('mm', 1e3, plane=plane, domain=(-.5, .5, .1, .5),
-                        temperatures={'left': 293.15, 'right': 353.15}, convection={'top': dict(h_w_m2k=25., ambient_temperature_k=300.)},
-                        outward_flux_w_m2={'bottom': 150.}, heat_source_w_m3=2e4,
+                        temperatures={'left': 293.15, 'right': 353.15},
+                        convection={'top': dict(heat_transfer_coefficient='25 W/(m^2 K)', ambient_temperature='300 K')},
+                        inward_heat_flux={'bottom': '-150 W/m^2'}, heat_source_density='20000 W/m^3',
                         displacement={'left': {'x': 0.}, 'bottom': {'y': 0.}}, traction={'right': [3e6, 0.], 'top': [0., -1e5]},
                         body_force=[0., -2.7e4])
     result = run(Document.from_dict(d), verbose=False)
@@ -405,23 +429,27 @@ def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
                                     dirichlet=dict(sorted(fixed.items())), body_force=(0., -2.7e4),
                                     traction={'right': [3e6, 0.], 'top': [0., -1e5]})
     f = result.fields
-    assert f['temperature_k'].tobytes() == np.asarray(heat.temperature).tobytes()
-    assert f['heat_flux_w_m2'].tobytes() == np.asarray(heat.heat_flux).tobytes()
-    assert f['convective_outward_heat_w_per_m'].tobytes() == np.asarray(heat.convective_outward).tobytes()
-    for key, attr in (('displacement_m', 'displacement'), ('total_strain', 'total_strain'), ('thermal_strain', 'thermal_strain'),
-                      ('elastic_strain', 'elastic_strain'), ('stress_pa', 'stress'), ('sigma_zz_pa', 'sigma_zz'),
-                      ('epsilon_zz', 'epsilon_zz'), ('load_external_n_per_m', 'load_external'),
-                      ('load_thermal_n_per_m', 'load_thermal'), ('load_body_n_per_m', 'load_body'),
-                      ('load_traction_n_per_m', 'load_traction'), ('reaction_n_per_m', 'reaction'), ('residual_n_per_m', 'residual')):
+    assert f['temperature'].tobytes() == np.asarray(heat.temperature).tobytes()
+    assert f['heat_flux'].tobytes() == np.asarray(heat.heat_flux).tobytes()
+    assert f['outward_convective_heat_rate_per_depth'].tobytes() == np.asarray(heat.convective_outward).tobytes()
+    for key, attr in (('displacement', 'displacement'), ('strain', 'total_strain'), ('thermal_strain', 'thermal_strain'),
+                      ('elastic_strain', 'elastic_strain'), ('stress', 'stress'), ('stress_zz', 'sigma_zz'),
+                      ('strain_zz', 'epsilon_zz'), ('applied_force_per_depth', 'load_external'),
+                      ('thermal_equivalent_force_per_depth', 'load_thermal'), ('applied_body_force_per_depth', 'load_body'),
+                      ('applied_traction_force_per_depth', 'load_traction'), ('reaction_force_per_depth', 'reaction'),
+                      ('residual_force_per_depth', 'residual')):
         value = np.asarray(getattr(direct, attr))
         assert f[key].shape == value.shape and f[key].dtype == value.dtype, key
         assert f[key].tobytes() == value.tobytes(), key
     summary = result.summary()
-    assert summary['result_format'] == 'mechanics.thermoelastic2d-result-v1'
-    assert summary['field_layout'] == 'thermoelastic2d-p1-v1'
+    assert summary['result_format'] == 'mechanics.thermoelastic2d-result-v2'
+    assert summary['field_layout'] == 'thermoelastic2d-p1-v2'
     assert summary['temperature_snapshot']['snapshot_hash'] == direct.temperature_snapshot.snapshot_hash
-    assert summary['diagnostics']['physical_elastic_energy_j_per_m'] == float(direct.physical_elastic_energy)
-    assert summary['input_units'] == {'length': 'mm', 'temperature': 'K'}
+    # D-30: strain_energy_per_depth is the physical elastic energy; the solver's quadratic
+    # functional is stiffness_energy_functional_per_depth
+    assert summary['balance']['strain_energy_per_depth']['value'] == float(direct.physical_elastic_energy)
+    assert summary['balance']['stiffness_energy_functional_per_depth']['unit'] == 'J/m'
+    assert 'length_unit mm' in summary['extent'][0]
 
 
 def _combined(points, plane, nu):
@@ -443,20 +471,20 @@ def test_k2_uniform_combined_refsol_across_length_units(unit, factor, plane):
                         traction={'right': [8e6, 0.], 'top': [0., -2e6]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    exact = _combined(f['nodes_m'], plane, .3)
-    cells = _combined(f['nodes_m'][f['triangles']].mean(axis=1), plane, .3)
+    exact = _combined(f['node_coordinates'], plane, .3)
+    cells = _combined(f['node_coordinates'][f['triangles']].mean(axis=1), plane, .3)
     stress = np.column_stack([cells.stress[:, 0, 0], cells.stress[:, 1, 1], cells.stress[:, 0, 1]])
-    dt = relative(f['temperature_k'], exact.temperature_k, 313.15)
-    du = relative(f['displacement_m'], exact.displacement, np.max(abs(exact.displacement)))
-    ds = relative(f['stress_pa'], stress, 8e6)
-    dz = relative(f['sigma_zz_pa'], cells.stress[:, 2, 2], 8e6)
-    de = relative(f['total_strain'], cells.total_strain[:, [0, 1, 0], [0, 1, 1]]*[1, 1, 2], np.max(abs(cells.total_strain)))
+    dt = relative(f['temperature'], exact.temperature_k, 313.15)
+    du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
+    ds = relative(f['stress'], stress, 8e6)
+    dz = relative(f['stress_zz'], cells.stress[:, 2, 2], 8e6)
+    de = relative(f['strain'], cells.total_strain[:, [0, 1, 0], [0, 1, 1]]*[1, 1, 2], np.max(abs(cells.total_strain)))
     print(dict(unit=unit, plane=plane, temperature_relative=dt, displacement_relative=du, stress_relative=ds,
                sigma_zz_relative=dz, strain_relative=de))
     assert dt <= 1e-10 and du <= 1e-10 and ds <= 1e-10 and dz <= 1e-10 and de <= 1e-10
     area = .1*.04
     energy = float(np.mean(cells.energy_density))*area
-    assert r.summary()['diagnostics']['physical_elastic_energy_j_per_m'] == pytest.approx(energy, rel=1e-10)
+    assert r.summary()['balance']['strain_energy_per_depth']['value'] == pytest.approx(energy, rel=1e-10)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -477,20 +505,20 @@ def test_k3_confined_bar_with_linear_temperature_mesh_convergence(plane):
                             displacement={'left': {'x': 0., 'y': 0.}, 'bottom': {'y': 0.}, 'top': {'y': 0.}})
         r = run(Document.from_dict(d), verbose=False)
         f = r.fields
-        x = f['nodes_m'][:, 0]
-        np.testing.assert_allclose(f['temperature_k'], t1+g*x, rtol=0, atol=1e-9)
-        centroids = f['nodes_m'][f['triangles']].mean(axis=1)
+        x = f['node_coordinates'][:, 0]
+        np.testing.assert_allclose(f['temperature'], t1+g*x, rtol=0, atol=1e-9)
+        centroids = f['node_coordinates'][f['triangles']].mean(axis=1)
         xc = centroids[:, 0]
         exact = np.column_stack([k*alpha*((t1-tref)*xc+g*xc*xc/2), np.zeros_like(xc)])
-        approx = f['displacement_m'][f['triangles']].mean(axis=1)
+        approx = f['displacement'][f['triangles']].mean(axis=1)
         errors.append(float(np.sqrt(np.mean(np.sum((approx-exact)**2, axis=1)))))
         theta = t1-tref+g*xc
         stress, _, _ = thermo_refsol.parent_state(np.column_stack([k*alpha*theta, 0*theta, 0*theta]), tref+theta,
                                                    **dict(MATERIAL, plane=plane))
         exact_stress = np.column_stack([stress[:, 0, 0], stress[:, 1, 1], stress[:, 0, 1]])
         scale = np.max(abs(exact_stress))
-        stress_errors.append(float(np.sqrt(np.mean(np.sum((f['stress_pa']-exact_stress)**2, axis=1))))/scale)
-        np.testing.assert_allclose(f['sigma_zz_pa'], stress[:, 2, 2], rtol=0, atol=stress_errors[-1]*scale*4)
+        stress_errors.append(float(np.sqrt(np.mean(np.sum((f['stress']-exact_stress)**2, axis=1))))/scale)
+        np.testing.assert_allclose(f['stress_zz'], stress[:, 2, 2], rtol=0, atol=stress_errors[-1]*scale*4)
     orders = [float(np.log2(errors[i]/errors[i+1])) for i in range(2)]
     stress_orders = [float(np.log2(stress_errors[i]/stress_errors[i+1])) for i in range(2)]
     print(dict(plane=plane, rms_displacement_errors_m=errors, displacement_orders=orders,
@@ -500,20 +528,21 @@ def test_k3_confined_bar_with_linear_temperature_mesh_convergence(plane):
 
 
 THERMO_INVALID = {
-    'missing_temperature_unit': (('units',), {'length': 'mm'}),
-    'celsius': (('units', 'temperature'), 'C'),
-    'missing_conductivity': (('physics', 'bar', 'thermal_conductivity_w_mk'), None),
-    'zero_conductivity': (('physics', 'bar', 'thermal_conductivity_w_mk'), 0.),
-    'missing_alpha': (('physics', 'bar', 'thermal_expansion_per_k'), None),
-    'nan_alpha': (('physics', 'bar', 'thermal_expansion_per_k'), float('nan')),
-    'negative_reference': (('physics', 'bar', 'reference_temperature_k'), -1.),
-    'missing_reference': (('physics', 'bar', 'reference_temperature_k'), None),
-    'pure_neumann_heat': (('physics', 'bar', 'dirichlet_temperature_k'), {}),
-    'negative_temperature': (('physics', 'bar', 'dirichlet_temperature_k'), {'left': -5.}),
-    'temperature_corner_conflict': (('physics', 'bar', 'dirichlet_temperature_k'), {'left': 293.15, 'bottom': 300.}),
-    'flux_on_fixed_side': (('physics', 'bar', 'outward_flux_w_m2'), {'left': 10.}),
-    'bad_convection': (('physics', 'bar', 'convection'), {'top': {'h_w_m2k': -1., 'ambient_temperature_k': 300.}}),
-    'hinge': (('physics', 'bar', 'displacement_m'), {'bottom': {'x': 0.}, 'left': {'y': 0.}}),
+    'units_block': (('units',), {'length': 'mm', 'temperature': 'K'}),
+    'fahrenheit': (('physics', 'bar', 'stress_free_temperature'), '68 degF'),
+    'missing_conductivity': (('physics', 'bar', 'thermal_conductivity'), None),
+    'zero_conductivity': (('physics', 'bar', 'thermal_conductivity'), '0 W/(m K)'),
+    'missing_alpha': (('physics', 'bar', 'linear_expansion_coefficient'), None),
+    'nan_alpha': (('physics', 'bar', 'linear_expansion_coefficient'), float('nan')),
+    'negative_reference': (('physics', 'bar', 'stress_free_temperature'), '-1 K'),
+    'missing_reference': (('physics', 'bar', 'stress_free_temperature'), None),
+    'pure_neumann_heat': (('physics', 'bar', 'prescribed_temperature'), {}),
+    'negative_temperature': (('physics', 'bar', 'prescribed_temperature'), {'left': '-5 K'}),
+    'temperature_corner_conflict': (('physics', 'bar', 'prescribed_temperature'), {'left': '293.15 K', 'bottom': '300 K'}),
+    'flux_on_fixed_side': (('physics', 'bar', 'inward_heat_flux'), {'left': '-10 W/m^2'}),
+    'bad_convection': (('physics', 'bar', 'convection'), {'top': {'heat_transfer_coefficient': '-1 W/(m^2 K)',
+                                                                  'ambient_temperature': '300 K'}}),
+    'hinge': (('physics', 'bar', 'prescribed_displacement'), {'bottom': {'x': '0 m'}, 'left': {'y': '0 m'}}),
     'conductivity_model': (('physics', 'bar', 'conductivity_model'), {}),
     'iteration': (('physics', 'bar', 'iteration'), {}),
 }
@@ -540,9 +569,11 @@ def test_k4_invalid_thermoelastic_documents_are_refused_without_output(tmp_path,
 
 
 def test_k4_elastic_document_refuses_heat_keys():
-    for key, value in (('thermal_conductivity_w_mk', 1.), ('dirichlet_temperature_k', {'left': 300.}),
-                       ('thermal_expansion_per_k', 1e-5), ('reference_temperature_k', 300.)):
+    for key, value in (('thermal_conductivity', '1 W/(m K)'), ('prescribed_temperature', {'left': '300 K'}),
+                       ('linear_expansion_coefficient', '10 ppm/K'), ('stress_free_temperature', '300 K')):
         d = data()
         d['physics']['plate'][key] = value
-        with pytest.raises(DocumentError, match='unsupported keys'):
+        with pytest.raises(DocumentError, match='has no thermal stage; use mechanics.thermoelastic2d') as caught:
             Document.from_dict(d)
+        assert [(e.code, e.path) for e in caught.value.diagnostics if e.severity == 'error'] == [
+            ('E-CONTRACT', f'physics.plate.{key}')]

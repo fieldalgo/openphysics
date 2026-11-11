@@ -11,13 +11,13 @@ selection settings before identifying it as the physical mode of interest.
 
 ## Effective index and attenuation
 
-The retained waveguide field convention is `exp(+iωt − iβz)`, with
+Documents and results use `exp(−iωt + iβz)`, with
 `β = 2π n_eff / λ₀`. Forward passive attenuation therefore has
-`Im(n_eff) < 0`. JSON material extinction `k` and `physmat` use `n + ik` with
-positive `k` for absorption. The document runner performs the conversion at the
-solver boundary; do not conjugate JSON inputs yourself. Direct low-level
-permittivity calls use the solver convention: see
-[absorbing modes](../packages/simcase/lossy_modes.md).
+`Im(n_eff) > 0`. JSON material extinction `k` and `physmat` use `n + ik` with
+positive `k` for absorption (a negative `k` is refused with `E-GAIN`). The mode kernel keeps
+`exp(+iωt − iβz)`; simcase conjugates once at its boundary, so do not conjugate JSON
+inputs or results yourself. Direct low-level (kernel-frame) permittivity calls use the
+kernel convention: see [absorbing modes](../packages/simcase/lossy_modes.md).
 
 Run this small absorbing slab after installing simcase:
 
@@ -27,24 +27,25 @@ import numpy as np
 from simcase import Document, examples, run
 
 data = copy.deepcopy(examples.VECTOR_SLAB)
-data["materials"]["film"] = {"n": 3.48, "k": 0.01}
+data["materials"]["film"] = {"refractive_index": {"n": 3.48, "k": 0.01}}
 data["study"] = {"type": "single"}
 result = run(Document.from_dict(data), verbose=False)
-neff = np.asarray(result.neff)
-loss_db_cm = result.propagation_loss_db_cm()
-print(neff)
-print(loss_db_cm)
+effective_index = np.asarray(result.effective_index)
+loss_db_m = result.propagation_loss()
+print(effective_index)
+print(loss_db_m)
 
-wavelength_m = 1.55e-6
-beta_per_m = 2 * np.pi * neff / wavelength_m
-power_decay_per_m = -2 * beta_per_m.imag
-expected_db_cm = 10 * power_decay_per_m / (100 * np.log(10))
-np.testing.assert_allclose(loss_db_cm, expected_db_cm)
+wavelength_m = result.vacuum_wavelength[0]
+beta_per_m = 2 * np.pi * effective_index / wavelength_m
+power_decay_per_m = 2 * beta_per_m.imag
+expected_db_m = 10 * power_decay_per_m / np.log(10)
+np.testing.assert_allclose(loss_db_m, expected_db_m)
 ```
 
 For propagation distance `z` in metres, field amplitude decays as
-`exp(−a z)`, where `a = −Im(β)`. Power decays as `exp(−2a z)`.
-The conversion above uses the power coefficient and reports **dB/cm**, not dB/m.
+`exp(−a z)`, where `a = Im(β)`. Power decays as `exp(−2a z)`.
+The conversion above uses the power coefficient and reports **dB/m**, the SI unit of
+`propagation_loss`.
 The slab's returned index depends on its finite window and mesh; the check
 verifies the unit/sign conversion, not independent accuracy of the eigensolver.
 
@@ -56,12 +57,13 @@ or one-watt modes. Global complex phase is arbitrary. Compare field patterns
 after accounting for phase, and do not equate identical plot colors across
 independently normalized modes with identical optical power.
 
-The low-level longitudinal vector coordinate needs the documented `Ez = i*ez`
+The low-level (kernel-frame) longitudinal vector coordinate needs the documented `Ez = i*ez`
 conversion. High-level physical electric arrays already follow their documented
 field representation: consult [modal coordinates](../packages/galerkin/modal_coordinates.md)
 before transforming coefficients. Saved PNG sweep curves show real effective and group indices; JSON/NPZ
-preserve complex information. In the version-2 summary, `neff` and `neff_imag` are separate
-arrays; reading only `neff` drops absorption. NPZ retains complex `neff`.
+preserve complex information. In the summary (`openphysics.modes2d/3`) a complex
+`effective_index` is written as `re` and `im` lists with its `time_convention`; reading only
+`re` drops absorption. NPZ retains complex `effective_index`.
 
 ## Identify a mode across runs
 

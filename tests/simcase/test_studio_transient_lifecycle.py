@@ -339,13 +339,13 @@ def test_actual_raw_and_encoded_record_pins_survive_expiry_until_last_reader(
     lease = attach_cache_record(life)
     pins = []
     try:
-        raw = {"temperature_k": np.arange(12, dtype=np.float64).reshape(3, 4)}
+        raw = {"temperature": np.arange(12, dtype=np.float64).reshape(3, 4)}
         assert jobs.complete_transient(lease, b"{}", raw, [], 1.0)
         jobs.release(lease)
         pins = [jobs.pin("thermal-store-probe", result=result_pin,
                          result_id="result-store-probe") for _ in range(2)]
         record = pins[0].record
-        expected = len(record["status_bytes"]) + len(record["result"]) + raw["temperature_k"].nbytes
+        expected = len(record["status_bytes"]) + len(record["result"]) + raw["temperature"].nbytes
         assert pins[1].record is record
         assert jobs._retained_bytes() == expected
         del record, raw  # leave ownership exclusively with the store and its pins
@@ -372,11 +372,11 @@ def test_released_pin_drops_its_own_raw_and_encoded_references(isolated_store):
     life = isolated_store
     jobs = life.jobs
     lease = attach_cache_record(life)
-    raw = {"temperature_k": np.arange(12, dtype=np.float64).reshape(3, 4)}
+    raw = {"temperature": np.arange(12, dtype=np.float64).reshape(3, 4)}
     assert jobs.complete_transient(lease, b"{}", raw, [], 1.0)
     jobs.release(lease)
     pin = jobs.pin("thermal-store-probe", result=True)
-    array_reference = weakref.ref(raw["temperature_k"])
+    array_reference = weakref.ref(raw["temperature"])
     del raw
     life.clock.value = jobs.limits.ttl_seconds
     with pytest.raises(life.thermal.ThermalAPIError):
@@ -403,8 +403,8 @@ def transient_cache_record(life, monkeypatch):
     spec = SimpleNamespace(kind="thermal.transient2d",
                            tags=lambda: {"client_revision": 7, "request_seq": 11})
     identity = life.jobs.attach(lease, "thermal-transient-route-probe", "result-route-probe", spec)
-    raw = {"time_s": np.array([2., 3.5]),
-           "temperature_k": np.arange(8, dtype=float).reshape(2, 4)}
+    raw = {"time": np.array([2., 3.5]),
+           "temperature": np.arange(8, dtype=float).reshape(2, 4)}
     for value in raw.values():
         value.flags.writeable = False
     assert life.jobs.complete_transient(lease, b"{}", MappingProxyType(raw), [], 1.)
@@ -414,7 +414,7 @@ def transient_cache_record(life, monkeypatch):
 
 def view_exchange(identity, view):
     from urllib.parse import urlencode
-    query = {"result_id": identity["result_id"], "field": "temperature_k", "frame_seq": 3}
+    query = {"result_id": identity["result_id"], "field": "temperature", "frame_seq": 3}
     query.update({"start": 0, "stop": 2} if view == "history" else {"time_index": 1})
     return Exchange("/api/jobs/"+identity["job"]+"/"+view, method="GET",
                     query=urlencode(query).encode("ascii"))
@@ -442,7 +442,7 @@ def test_actual_view_slow_send_pins_eviction_read_competition_and_final_release(
             assert exchange.status == 200
             payload = exchange.json()
             assert payload["frame_seq"] == 3
-            assert payload["arrays"]["temperature_k"] == (
+            assert payload["arrays"]["temperature"] == (
                 [[0., 1., 2., 3.], [4., 5., 6., 7.]] if view == "history"
                 else [4., 5., 6., 7.])
             record = life.jobs._records[identity["job"]]
@@ -511,7 +511,7 @@ def test_actual_view_production_fault_releases_pin_workspace_and_permit(
         # Production encode_view performs the actual frame/page indexing.
         original = record["raw"]
         record["raw"] = dict(original)
-        record["raw"]["temperature_k"] = original["temperature_k"].view(FailedSlice)
+        record["raw"]["temperature"] = original["temperature"].view(FailedSlice)
     elif stage == "encode":
         original_encode = server.transient.common.encode_json
         def failed_encode(value, limit):

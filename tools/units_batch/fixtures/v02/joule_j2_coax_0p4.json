@@ -1,0 +1,112 @@
+{
+  "openphysics": "0.2",
+  "name": "joule strip",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0,
+          "xmax": 40,
+          "ymin": 0,
+          "ymax": 20
+        },
+        "background": {
+          "material": "M"
+        },
+        "features": [
+          {
+            "name": "cut",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 40.0,
+            "h": 20.0,
+            "material": null
+          },
+          {
+            "name": "disc",
+            "type": "circle",
+            "cx": 20.0,
+            "cy": 10.0,
+            "r": 9.0,
+            "material": "M"
+          },
+          {
+            "name": "hole",
+            "type": "circle",
+            "cx": 20.0,
+            "cy": 10.0,
+            "r": 3.0,
+            "material": null
+          }
+        ],
+        "boundary_tags": [
+          {
+            "tag": "inner",
+            "select": {
+              "boundary": {
+                "of": "hole"
+              }
+            }
+          },
+          {
+            "tag": "rim",
+            "select": {
+              "boundary": {
+                "between": [
+                  "disc",
+                  "cut"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "M": {
+      "electrical_conductivity_s_m": 3.0,
+      "conductivity_w_mk": 0.5
+    }
+  },
+  "physics": {
+    "j": {
+      "type": "joule.steady2d",
+      "dirichlet_potential_v": {
+        "inner": 1.0,
+        "rim": 0.0
+      },
+      "dirichlet_temperature_k": {
+        "inner": 300.0,
+        "rim": 300.0
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.4,
+    "controls": [
+      {
+        "select": "disc",
+        "circle_segments": 192
+      },
+      {
+        "select": "hole",
+        "circle_segments": 192
+      }
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

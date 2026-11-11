@@ -9,14 +9,21 @@ reserved keywords, evaluates parameter expressions in exact rational arithmetic,
 and moves every defining value onto the fixed 1 pm integer grid, rounding at most
 once per value and reporting each rounding.
 
-Stage 1 does not resolve booleans itself. ``to_v02`` compiles a 2D component (or a
-box-only 3D component) back to the 0.2 ``geometry`` form, so the existing builder
-keeps doing the later-wins arithmetic until the exact 2D engine of stage 2 replaces
-it. ``from_v02`` reads a 0.2 block as version 1. ``layer_stack`` compiles a
-``layers`` feature to the levels and material table that ``meshine.extrude`` takes.
+Stage 1 does not resolve booleans itself: the exact 2D engine (``simcase.geometry_engine``)
+does. ``to_flat`` compiles a 2D component (or a box-only 3D component) to the flat
+``geometry`` block of format 0.3, which the reader keeps for the kinds that read flat blocks
+(``Document.geometry_flat``); ``from_flat`` writes a flat block as version 1. ``layer_stack``
+compiles a ``layers`` feature to the levels and material table that ``meshine.extrude`` takes.
 
-Only the standard library is imported here, apart from the unit table of
-``simcase.units``.
+The block is read in format 0.3 (``"openphysics": "0.3"``). Each component declares its own
+``length_unit`` (and ``depth`` when it is ``2d``); its bare shape numbers and the literals of
+its expressions are read in that unit. Geometry parameters stay outside every component and
+carry their unit (``"value": "0.5 um"``); their values are exact picometres (length) or exact
+rationals (ratio). Element sizes are quantity strings (``"element_size": "0.25 um"``), never
+expressions. Refusals carry a diagnostic code and a JSON path (``GeometryError.code``,
+``.path``).
+
+Only the standard library is imported here, apart from ``physmat.units``.
 """
 
 from __future__ import annotations
@@ -24,9 +31,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
+from decimal import Decimal
 from typing import Any
 
-from .units import BASE_UNITS
+from physmat import units as qty
+from physmat.units import Diagnostic
+
+from .diagnostics import CodedError
 
 #: Grid points per metre: the grid step is 1 pm.
 PM_PER_M = 10 ** 12
@@ -45,7 +56,7 @@ RESERVED_IDS = frozenset(
     + [f"{a}{b}" for a in "xyz" for b in "01"]
     + [f"{a}{b}" for a in "xyz" for b in ("min", "max")])
 
-_COMMON = {"id", "name", "region", "type", "material", "mesh_size"}
+_COMMON = {"id", "name", "region", "type", "material", "element_size"}
 _FIELDS_2D = {
     "rect": ({"x", "y", "w", "h"}, set()),
     "circle": ({"cx", "cy", "r"}, set()),
@@ -72,8 +83,11 @@ _DOMAIN_KEYS = {"2d": ("xmin", "xmax", "ymin", "ymax"),
 _MISSING = object()
 
 
-class GeometryError(ValueError):
-    """A geometry document that version 1 does not accept. The message names the path."""
+class GeometryError(CodedError):
+    """A geometry document that version 1 does not accept. The message names the path.
+
+    ``GeometryError(message, *, path=None, code="E-CONTRACT", diagnostics=())``: a format 0.3
+    refusal carries its diagnostic code and path; ``str()`` is the message."""
 
 
 @dataclass(frozen=True)
@@ -106,6 +120,17 @@ class Component:
     finalize: str
     selections: dict
     boundary_tags: list
+    #: the unit its bare numbers are written in (its ``length_unit`` symbol), and grid points
+    #: per that unit, exactly
+    length_unit: Any = None
+    pm_per_unit: Fraction | None = None
+    #: format 0.3: the ``depth`` of a 2d component in metres (None: per metre of depth), as written
+    depth: float | None = None
+    depth_written: Any = None
+
+    def to_unit(self, k) -> float:
+        """An integer pm count in this component's length unit, rounded once to a double."""
+        return float(Fraction(k) / self.pm_per_unit)
 
     @property
     def region_names(self) -> list[str]:
@@ -118,17 +143,19 @@ class Component:
 
 @dataclass
 class GeometryModel:
-    """A parsed version 1 geometry block, with all lengths in integer pm."""
+    """A parsed version 1 geometry block, with all lengths in integer pm.
 
-    units_length: Any
-    pm_per_unit: Fraction
-    parameters: dict                  # name -> (value in document units, kind)
+    Each component has its own length unit (``Component.length_unit``, ``.pm_per_unit``);
+    parameter values are exact pm (length) or exact rationals (ratio). The model keeps the pm
+    count of every shape number by JSON path (``pm_values``) and the rounding diagnostics
+    (``diagnostics``)."""
+
+    parameters: dict                  # name -> (value: exact pm for a length, kind)
     components: dict
     roundings: list[Rounding] = field(default_factory=list)
-
-    def to_unit(self, k: int) -> float:
-        """An integer pm count in the document's length unit, rounded once to a double."""
-        return float(Fraction(k) / self.pm_per_unit)
+    format: str = "0.3"
+    pm_values: dict = field(default_factory=dict)
+    diagnostics: list = field(default_factory=list)
 
     def to_um(self, k: int) -> float:
         """An integer pm count in micrometres, rounded once (the meshine hand-off)."""
@@ -137,34 +164,39 @@ class GeometryModel:
 
 # --------------------------------------------------------------------------- units
 
-def pm_per_unit(units) -> Fraction:
-    """Grid points per document length unit, exactly."""
-    if units is not None and not isinstance(units, dict):
-        raise GeometryError(f'units: expected an object such as {{"length": "um"}}, got {units!r}')
-    length = (units or {}).get("length", _MISSING)
-    if length is _MISSING:
-        raise GeometryError("units.length: a version 1 geometry block needs a declared length unit")
-    if isinstance(length, dict):
-        if set(length) != {"in_m"}:
-            raise GeometryError("units.length: a numeric unit is {\"in_m\": <metres>}")
-        value = _number(length["in_m"], "units.length.in_m")
-        if value <= 0:
-            raise GeometryError("units.length.in_m must be positive")
-        return value * PM_PER_M
-    if not isinstance(length, str) or length not in BASE_UNITS["length"]:
-        raise GeometryError(f"units.length: unknown length unit {length!r}")
-    return Fraction(repr(BASE_UNITS["length"][length])) * PM_PER_M
+def pm_per_length_unit(unit, path: str) -> tuple[str, Fraction]:
+    """``(symbol, grid points per unit)`` of a format 0.3 ``length_unit``; raises ``GeometryError``."""
+    if isinstance(unit, dict):
+        raise GeometryError(f"{path}: a length_unit is one of {' '.join(qty.LENGTH_UNITS)}; a numeric unit "
+                            "such as {\"in_m\": ...} is not read", path=path, code="E-VALUE-FORM")
+    if not isinstance(unit, str):
+        raise GeometryError(f"{path}: a length_unit is one of {' '.join(qty.LENGTH_UNITS)}", path=path,
+                            code="E-VALUE-FORM")
+    grid = qty.length_to_pm(1, unit, path=path)
+    if grid.error is not None:
+        raise GeometryError(f"{path}: {grid.error.message}", path=path, code=grid.error.code)
+    return grid.unit, Fraction(grid.picometres)
 
 
 def _number(value, path: str) -> Fraction:
-    """A JSON number, read as the shortest decimal that round-trips its double."""
+    """A JSON number, read as the shortest decimal that round-trips its double (a ``Decimal``
+    of the exact reader, exactly)."""
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise GeometryError(f"{path}: {value} is not finite", path=path, code="E-JSON")
+        return Fraction(value)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise GeometryError(f"{path}: expected a number, got {value!r}")
+        raise GeometryError(f"{path}: expected a number, got {value!r}", path=path, code="E-VALUE-FORM")
     if isinstance(value, int):
         return Fraction(value)
     if value != value or value in (float("inf"), float("-inf")):
-        raise GeometryError(f"{path}: {value!r} is not finite")
+        raise GeometryError(f"{path}: {value!r} is not finite", path=path, code="E-JSON")
     return Fraction(repr(value))
+
+
+def is_unit_symbol(name: str) -> bool:
+    """True for a name that is an accepted or known-refused unit spelling (``nm``, ``m``, ``bar``)."""
+    return qty.is_quantity_text(f"1 {name}")
 
 
 # --------------------------------------------------------------------------- expressions
@@ -191,37 +223,78 @@ def _tokens(text: str, path: str):
 
 
 class _Evaluator:
+    """Evaluates parameter expressions exactly.
+
+    Length values are exact picometres. A length parameter's value is a quantity string (on the
+    pm grid) or an expression of other parameters; a literal that is added to a length is read
+    in the component's length unit (``ppu``, grid points per unit), and has no unit at geometry
+    level, outside every component."""
+
     def __init__(self, parameters: dict):
         self.raw = parameters
         self.values: dict[str, tuple[Fraction, str]] = {}
         self.active: list[str] = []
+        self.ppu = None
+        self.diagnostics: list = []
 
     def parameter(self, name: str, path: str) -> tuple[Fraction, str]:
         if name in self.values:
             return self.values[name]
         if name not in self.raw:
-            raise GeometryError(f"{path}: unknown parameter {name!r}")
+            if is_unit_symbol(name):
+                raise _unit_in_expression(path, name)
+            raise GeometryError(f"{path}: unknown parameter {name!r}", path=path, code="E-KEY-UNKNOWN")
         if name in self.active:
             cycle = " -> ".join(self.active[self.active.index(name):] + [name])
-            raise GeometryError(f"geometry.parameters.{name}: cycle {cycle}")
+            raise GeometryError(f"geometry.parameters.{name}: cycle {cycle}", path=f"geometry.parameters.{name}")
         self.active.append(name)
         spec = self.raw[name]
         kind = spec.get("kind", "length")
-        value, vkind = self.value(spec["value"], f"geometry.parameters.{name}.value")
-        if vkind not in (_LITERAL, kind):
-            raise GeometryError(f"geometry.parameters.{name}: value is a {vkind}, the parameter is a {kind}")
-        lo_hi = spec.get("range")
-        if lo_hi is not None:
-            lo, hi = (self.value(v, f"geometry.parameters.{name}.range[{i}]")[0] for i, v in enumerate(lo_hi))
-            if not lo <= value <= hi:
-                raise GeometryError(f"geometry.parameters.{name}: value {float(value)} is outside its range "
-                                    f"[{float(lo)}, {float(hi)}]")
+        saved, self.ppu = self.ppu, None                 # parameters are read outside every component
+        try:
+            value, vkind = self.parameter_value(spec["value"], f"geometry.parameters.{name}.value", kind)
+            if vkind not in (_LITERAL, kind):
+                raise GeometryError(f"geometry.parameters.{name}: value is a {vkind}, the parameter is a {kind}",
+                                    path=f"geometry.parameters.{name}.value", code="E-EXPRESSION-KIND")
+            lo_hi = spec.get("range")
+            if lo_hi is not None:
+                lo, hi = (self.parameter_value(v, f"geometry.parameters.{name}.range[{i}]", kind)[0]
+                          for i, v in enumerate(lo_hi))
+                if not lo <= value <= hi:
+                    shown = (lambda x: float(x) / 10 ** 12) if kind == "length" else float
+                    unit = " m" if kind == "length" else ""
+                    raise GeometryError(f"geometry.parameters.{name}: value {shown(value)}{unit} is outside its "
+                                        f"range [{shown(lo)}, {shown(hi)}]{unit}",
+                                        path=f"geometry.parameters.{name}.value", code="E-DOMAIN")
+        finally:
+            self.ppu = saved
         self.active.pop()
         self.values[name] = (value, kind)
         return self.values[name]
 
+    def parameter_value(self, raw, path: str, kind: str):
+        """A parameter's value or range bound: a length takes a quantity string."""
+        if isinstance(raw, str) and qty.is_quantity_text(raw):
+            if kind != "length":
+                raise GeometryError(f"{path}: a {kind} parameter is a bare number or an expression, not "
+                                    f"{raw!r}", path=path, code="E-VALUE-FORM")
+            grid = qty.length_to_pm(raw, path=path)
+            if grid.error is not None:
+                raise GeometryError(f"{path}: {grid.error.message}", path=path, code=grid.error.code)
+            self.diagnostics.extend(grid.diagnostics)
+            return Fraction(grid.picometres), "length"
+        value, vkind = self.value(raw, path)
+        if kind == "length" and vkind == _LITERAL:
+            raise GeometryError(f"{path}: a length parameter carries its unit, such as \"0.5 um\"; "
+                                f"{_shown(raw)} has none", path=path, code="E-UNIT-MISSING")
+        return value, vkind
+
     def value(self, raw, path: str) -> tuple[Fraction, str]:
         if isinstance(raw, str):
+            if qty.is_quantity_text(raw):
+                raise GeometryError(f"{path}: {raw!r}: a shape number is bare, read in its component's "
+                                    "length_unit; give a tagged length to a parameter and use its name",
+                                    path=path, code="E-VALUE-FORM")
             return self.expression(raw, path)
         return _number(raw, path), _LITERAL
 
@@ -229,6 +302,9 @@ class _Evaluator:
         toks = _tokens(text, path)
         if not toks:
             raise GeometryError(f"{path}: empty expression")
+        for kind, tok in toks:
+            if kind == "name" and tok not in self.raw and is_unit_symbol(tok):
+                raise _unit_in_expression(path, tok)
         self._toks, self._i, self._path, self._text = toks, 0, path, text
         result = self._sum()
         if self._i != len(toks):
@@ -245,8 +321,20 @@ class _Evaluator:
             self._i += 1
             right = self._product()
             kind = _add_kind(left[1], right[1], self._path, op)
+            if kind == "length" and _LITERAL in (left[1], right[1]):
+                left, right = (self._scaled(x) for x in (left, right))
             left = (left[0] + right[0] if op == "+" else left[0] - right[0], kind)
         return left
+
+    def _scaled(self, operand):
+        """A literal added to a length, read in the component's unit."""
+        value, kind = operand
+        if kind != _LITERAL:
+            return operand
+        if self.ppu is None:
+            raise GeometryError(f"{self._path}: a bare number added to a length has no unit outside a component; "
+                                "write it as a parameter with its unit", path=self._path, code="E-UNIT-MISSING")
+        return value * self.ppu, "length"
 
     def _product(self):
         left = self._unary()
@@ -293,6 +381,16 @@ class _Evaluator:
         raise GeometryError(f"{self._path}: unexpected {tok!r} in expression {self._text!r}")
 
 
+def _shown(raw) -> str:
+    return repr(raw) if isinstance(raw, str) else str(raw)
+
+
+def _unit_in_expression(path: str, name: str) -> GeometryError:
+    return GeometryError(f"{path}: {name!r} is a unit; an expression holds bare numbers in the component's "
+                         "length_unit and parameter names: declare a parameter with the tagged value",
+                         path=path, code="E-EXPRESSION-KIND")
+
+
 def _add_kind(a: str, b: str, path: str, op: str) -> str:
     if a == _LITERAL:
         return b
@@ -321,26 +419,38 @@ def _div_kind(a: str, b: str, path: str) -> str:
 # --------------------------------------------------------------------------- parsing
 
 class _Reader:
-    """Reads lengths of one document; ``evaluator`` evaluates its parameters (the design
-    velocity pass, ``simcase.geometry_velocity``, passes one that also carries derivatives)."""
+    """Reads lengths of one format 0.3 document; ``evaluator`` evaluates its parameters (the
+    design velocity pass, ``simcase.geometry_velocity``, passes one that also carries
+    derivatives). ``ppu`` is set per component as each is read."""
 
     def __init__(self, doc: dict, evaluator=None):
         g = doc.get("geometry")
         if not isinstance(g, dict):
-            raise GeometryError("geometry: expected an object")
+            raise GeometryError("geometry: expected an object", path="geometry", code="E-VALUE-FORM")
         if g.get("version") != 1:
             raise GeometryError("geometry.version: this reader takes version 1; a block without "
-                                "version is the 0.2 form (see from_v02)")
+                                "version is the flat form (see from_flat)", path="geometry.version")
+        self.pm_values: dict[str, int] = {}
+        self.diagnostics: list = []
+        for key in ("length_unit", "depth"):
+            if key in g:
+                raise GeometryError(f"geometry.{key}: a version 1 block gives {key} on each component "
+                                    f"(geometry.components.<c>.{key})", path=f"geometry.{key}",
+                                    code="E-KEY-UNKNOWN")
         _keys(g, {"version", "components"}, {"parameters"}, "geometry")
-        self.ppu = pm_per_unit(doc.get("units"))
-        self.units_length = doc["units"]["length"]
+        self.ppu, self.unit = None, None
         params = g.get("parameters", {})
         if not isinstance(params, dict):
-            raise GeometryError("geometry.parameters: expected an object")
+            raise GeometryError("geometry.parameters: expected an object", path="geometry.parameters",
+                                code="E-VALUE-FORM")
         for name, spec in params.items():
             path = f"geometry.parameters.{name}"
             if not PARAM_RE.match(name):
-                raise GeometryError(f"{path}: a parameter name matches [A-Za-z_][A-Za-z0-9_]*")
+                raise GeometryError(f"{path}: a parameter name matches [A-Za-z_][A-Za-z0-9_]*", path=path,
+                                    code="E-ID-CLASH")
+            if is_unit_symbol(name):
+                raise GeometryError(f"{path}: {name!r} is a unit symbol; a parameter name that reads as a unit "
+                                    "would make expressions ambiguous, so rename it", path=path, code="E-ID-CLASH")
             if not isinstance(spec, dict):
                 raise GeometryError(f"{path}: expected {{\"value\": ..., \"kind\": ..., \"range\": ...}}")
             _keys(spec, {"value"}, {"kind", "range"}, path)
@@ -356,45 +466,103 @@ class _Reader:
             self.ev.parameter(name, f"geometry.parameters.{name}")
         self.roundings: list[Rounding] = []
 
+    def set_component(self, unit, ppu) -> None:
+        """Read the next component's numbers in ``unit`` (``ppu`` grid points each)."""
+        self.unit, self.ppu = unit, ppu
+        self.ev.ppu = ppu
+
+    def exact_pm(self, value, kind: str, path: str):
+        """The exact pm value of an evaluated length field."""
+        if kind == "ratio":
+            raise GeometryError(f"{path}: expected a length, the expression is a ratio", path=path,
+                                code="E-EXPRESSION-KIND")
+        if kind == "length":
+            return value                       # parameters and their expressions are pm already
+        return value * self.ppu
+
     def length(self, raw, path: str) -> int:
         """A length field as an integer pm count, rounded at most once with a report."""
         value, kind = self.ev.value(raw, path)
-        if kind == "ratio":
-            raise GeometryError(f"{path}: expected a length, the expression is a ratio")
-        exact = value * self.ppu
+        exact = self.exact_pm(value, kind, path)
+        return self.on_grid(exact, raw, path)
+
+    def on_grid(self, exact, raw, path: str) -> int:
         k = round(exact)                       # Fraction rounds half to even
         if k != exact:
             self.roundings.append(Rounding(path, raw if isinstance(raw, str) else repr(raw), Fraction(k) - exact))
+            self.diagnostics.append(_rounding(path, raw, self.unit, exact, k))
         if abs(k) >= GRID_LIMIT:
-            raise GeometryError(f"{path}: {raw!r} is outside the grid range |k| < 2^63 pm")
+            raise GeometryError(f"{path}: {raw!r} is outside the grid range |k| < 2^63 pm", path=path,
+                                code="E-DOMAIN")
+        self.pm_values[path] = k
         return k
+
+    def element_size(self, raw, path: str) -> int:
+        """An element size, a quantity string (or an annotated one), on the pm grid."""
+        accept = {}
+        if isinstance(raw, dict) and "value" in raw:
+            accept = raw.get("accept") or {}
+            path, raw = f"{path}.value", raw["value"]
+        if not isinstance(raw, (str, int, float, Decimal)) or isinstance(raw, bool):
+            raise GeometryError(f"{path}: an element size is a quantity string such as \"0.5 um\"", path=path,
+                                code="E-VALUE-FORM")
+        c = qty.convert(raw, "element_size", path=path)
+        if c.error is not None:
+            raise GeometryError(f"{path}: {c.error.message}", path=path, code=c.error.code)
+        for d in c.diagnostics:
+            self.diagnostics.append(d if d.code not in accept else
+                                    Diagnostic(d.code, d.path, d.message, d.fix, d.suggestions, str(accept[d.code])))
+        grid = qty.length_to_pm(raw, path=path)
+        self.diagnostics.extend(grid.diagnostics)
+        if abs(grid.picometres) >= GRID_LIMIT:
+            raise GeometryError(f"{path}: {raw!r} is outside the grid range |k| < 2^63 pm", path=path,
+                                code="E-DOMAIN")
+        self.pm_values[path] = grid.picometres
+        return grid.picometres
 
     def point(self, raw, path: str) -> tuple[int, int]:
         if not isinstance(raw, list) or len(raw) != 2:
-            raise GeometryError(f"{path}: expected [x, y]")
+            raise GeometryError(f"{path}: expected [x, y]", path=path, code="E-VALUE-FORM")
         return self.length(raw[0], f"{path}[0]"), self.length(raw[1], f"{path}[1]")
+
+
+def _rounding(path: str, raw, unit, exact, k) -> Diagnostic:
+    """I-PM-ROUNDING (below 1e-3 pm) or W-PM-ROUNDING for a format 0.3 shape number."""
+    shift = Fraction(k) - Fraction(exact)
+    code = "I-PM-ROUNDING" if abs(shift) < Fraction(1, 1000) else "W-PM-ROUNDING"
+    written = raw if isinstance(raw, str) else str(raw)
+    return Diagnostic(code, path, f"{written} ({unit}) is {float(exact):.17g} pm; it is stored as {k} pm, a shift of "
+                                  f"{float(shift):.3g} pm.")
 
 
 def _keys(obj: dict, required: set, optional: set, path: str, reserved: set = frozenset()) -> None:
     missing = required - set(obj)
     if missing:
-        raise GeometryError(f"{path}: missing {sorted(missing)}")
+        first = sorted(missing)[0]
+        raise GeometryError(f"{path}: missing {sorted(missing)}", path=f"{path}.{first}", code="E-KEY-MISSING")
     for k in obj:
         if k in reserved:
-            raise GeometryError(f"{path}.{k}: reserved for a later version")
+            raise GeometryError(f"{path}.{k}: reserved for a later version", path=f"{path}.{k}")
         if k not in required and k not in optional:
-            raise GeometryError(f"{path}: unknown key {k!r}")
+            raise GeometryError(f"{path}: unknown key {k!r}", path=f"{path}.{k}", code="E-KEY-UNKNOWN")
 
 
 def parse(doc: dict) -> GeometryModel:
-    """Read the version 1 ``geometry`` block of ``doc`` (which also gives ``units``)."""
+    """Read the version 1 ``geometry`` block of a format 0.3 document. A document of another
+    format is refused by name (``E-FORMAT`` at ``openphysics``, as ``Document.from_dict`` refuses
+    it; units batch C11a)."""
+    from .resolve import format_refusal
+    refusal = format_refusal(doc) if isinstance(doc, dict) else None
+    if refusal is not None:
+        raise GeometryError(refusal.message, path=refusal.path, code=refusal.code)
     return _parse(_Reader(doc), doc)
 
 
 def _parse(r: _Reader, doc: dict) -> GeometryModel:
     comps = doc["geometry"]["components"]
     if not isinstance(comps, dict) or not comps:
-        raise GeometryError("geometry.components: expected a non-empty object")
+        raise GeometryError("geometry.components: expected a non-empty object", path="geometry.components",
+                            code="E-VALUE-FORM")
     components = {}
     for cname, c in comps.items():
         components[cname] = _component(r, cname, c)
@@ -402,20 +570,35 @@ def _parse(r: _Reader, doc: dict) -> GeometryModel:
         for f in comp.features:
             if f.type == "layers":
                 _check_footprints(cname, f, comp, components)
-    return GeometryModel(r.units_length, r.ppu, dict(r.ev.values), components, r.roundings)
+    return GeometryModel(dict(r.ev.values), components, r.roundings, "0.3", dict(r.pm_values),
+                         list(r.ev.diagnostics) + list(r.diagnostics))
 
 
 def _component(r: _Reader, cname: str, c: dict) -> Component:
     path = f"geometry.components.{cname}"
     if not ID_RE.match(cname):
-        raise GeometryError(f"{path}: a component name matches [A-Za-z_][A-Za-z0-9_-]{{0,63}}")
+        raise GeometryError(f"{path}: a component name matches [A-Za-z_][A-Za-z0-9_-]{{0,63}}", path=path,
+                            code="E-ID-CLASH")
     if not isinstance(c, dict):
-        raise GeometryError(f"{path}: expected an object")
-    _keys(c, {"dimension", "domain"}, {"background", "features", "finalize", "selections", "boundary_tags"},
-          path, reserved={"periodic"})
+        raise GeometryError(f"{path}: expected an object", path=path, code="E-VALUE-FORM")
+    _keys(c, {"dimension", "domain", "length_unit"}, {"background", "features", "finalize", "selections",
+                                                      "boundary_tags", "depth", "accept"}, path,
+          reserved={"periodic"})
     dim = c["dimension"]
     if dim not in _DOMAIN_KEYS:
-        raise GeometryError(f"{path}.dimension: expected '2d', 'axisymmetric' or '3d'")
+        raise GeometryError(f"{path}.dimension: expected '2d', 'axisymmetric' or '3d'", path=f"{path}.dimension",
+                            code="E-VALUE-FORM")
+    depth = depth_written = None
+    r.set_component(*pm_per_length_unit(c["length_unit"], f"{path}.length_unit"))
+    if dim == "2d" and "depth" not in c:
+        raise GeometryError(f"{path}.depth: a 2d component gives its depth, a length or null (per metre of "
+                            "depth)", path=f"{path}.depth", code="E-KEY-MISSING")
+    if dim != "2d" and "depth" in c:
+        raise GeometryError(f"{path}.depth: an {dim} component has no depth", path=f"{path}.depth",
+                            code="E-KEY-UNKNOWN")
+    if dim == "2d":
+        depth_written = c["depth"]
+        depth = _depth(depth_written, f"{path}.depth")
     dkeys = _DOMAIN_KEYS[dim]
     if not isinstance(c["domain"], dict):
         raise GeometryError(f"{path}.domain: expected an object")
@@ -433,15 +616,16 @@ def _component(r: _Reader, cname: str, c: dict) -> Component:
         raise GeometryError(f"{path}.finalize: 3D imprint is reserved for a later version")
     bg_raw = c.get("background", {})
     if not isinstance(bg_raw, dict):
-        raise GeometryError(f"{path}.background: expected an object")
-    _keys(bg_raw, set(), {"material", "mesh_size"}, f"{path}.background")
+        raise GeometryError(f"{path}.background: expected an object", path=f"{path}.background",
+                            code="E-VALUE-FORM")
+    _keys(bg_raw, set(), {"material", "element_size"}, f"{path}.background")
     background = {}
     if "material" in bg_raw:
         _material(bg_raw["material"], f"{path}.background.material")
         background["material"] = bg_raw["material"]
-    if "mesh_size" in bg_raw:
-        background["mesh_size"] = _positive(r.length(bg_raw["mesh_size"], f"{path}.background.mesh_size"),
-                                            f"{path}.background.mesh_size")
+    if "element_size" in bg_raw:
+        background["mesh_size"] = _positive(r.element_size(bg_raw["element_size"], f"{path}.background.element_size"),
+                                            f"{path}.background.element_size")
     raw_features = c.get("features", [])
     if not isinstance(raw_features, list):
         raise GeometryError(f"{path}.features: expected a list")
@@ -450,7 +634,7 @@ def _component(r: _Reader, cname: str, c: dict) -> Component:
                             "(a name, or null for void)")
     features = [_feature(r, dim, f, f"{path}.features[{i}]", i) for i, f in enumerate(raw_features)]
     _check_names(features, path)
-    comp = Component(cname, dim, domain, background, features, finalize, {}, [])
+    comp = Component(cname, dim, domain, background, features, finalize, {}, [], r.unit, r.ppu, depth, depth_written)
     comp.selections = _selections(c.get("selections", {}), comp, f"{path}.selections")
     comp.boundary_tags = _boundary_tags(c.get("boundary_tags", []), comp, f"{path}.boundary_tags")
     for name in set(comp.selections) & {e["tag"] for e in comp.boundary_tags}:
@@ -459,14 +643,29 @@ def _component(r: _Reader, cname: str, c: dict) -> Component:
     return comp
 
 
+def _depth(raw, path: str):
+    """Format 0.3: a 2d component's depth in metres, or None (per metre of depth)."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict) and "value" in raw:
+        raw, path = raw["value"], f"{path}.value"
+    if not isinstance(raw, (str, int, float, Decimal)) or isinstance(raw, bool):
+        raise GeometryError(f"{path}: a depth is a quantity string such as \"40 mm\", or null", path=path,
+                            code="E-VALUE-FORM")
+    c = qty.convert(raw, "depth", path=path)
+    if c.error is not None:
+        raise GeometryError(f"{path}: {c.error.message}", path=path, code=c.error.code)
+    return c.value
+
+
 def _material(value, path: str) -> None:
     if value is not None and (not isinstance(value, str) or not value):
-        raise GeometryError(f"{path}: expected a material name or null")
+        raise GeometryError(f"{path}: expected a material name or null", path=path, code="E-VALUE-FORM")
 
 
 def _positive(k: int, path: str) -> int:
     if k <= 0:
-        raise GeometryError(f"{path}: must be positive")
+        raise GeometryError(f"{path}: must be positive", path=path, code="E-DOMAIN")
     return k
 
 
@@ -507,8 +706,8 @@ def _feature(r: _Reader, dim: str, f: dict, path: str, index: int) -> Feature:
             raise GeometryError(f"{path}: needs 'material' (a name, or null for void)")
         _material(material, f"{path}.material")
     mesh_size = None
-    if "mesh_size" in f:
-        mesh_size = _positive(r.length(f["mesh_size"], f"{path}.mesh_size"), f"{path}.mesh_size")
+    if "element_size" in f:
+        mesh_size = _positive(r.element_size(f["element_size"], f"{path}.element_size"), f"{path}.element_size")
     data = _feature_data(r, t, f, path)
     return Feature(fid, name, region, t, material, mesh_size, data)
 
@@ -830,20 +1029,24 @@ def _check_footprints(cname: str, f: Feature, comp: Component, components: dict)
                 raise GeometryError(f"{lp}.map.{k}: not a region of footprint {lay['footprint']!r}")
 
 
-# --------------------------------------------------------------------------- 0.2 adapters
+# --------------------------------------------------------------------------- flat blocks
 
-def from_v02(geometry: dict) -> dict:
-    """The version 1 block that expresses a 0.2 ``geometry`` block exactly.
+def from_flat(geometry: dict) -> dict:
+    """The version 1 block that expresses a flat ``geometry`` block exactly.
 
-    Numbers are copied unchanged. A shape name that cannot be an id gets the id
-    ``s<i>`` (its list position). A 0.2 block without a background is a rectangle
-    document: a component without features whose background has no material key.
+    Numbers are copied unchanged, and so are the block's ``length_unit`` and ``depth``. A shape
+    name that cannot be an id gets the id ``s<i>`` (its list position). A flat block without a
+    background is a rectangle document: a component without features whose background has no
+    material key.
     """
     if not isinstance(geometry, dict) or "version" in geometry:
-        raise GeometryError("geometry: expected a 0.2 block (no 'version')")
+        raise GeometryError("geometry: expected a flat block (no 'version')")
     dom = geometry["domain"]
     dim = "3d" if "zmin" in dom else "2d"
     comp: dict = {"dimension": dim, "domain": dict(dom)}
+    for key in ("length_unit", "depth"):                 # the flat block's own declarations
+        if key in geometry:
+            comp[key] = geometry[key]
     if "background" in geometry:
         comp["background"] = dict(geometry["background"])
     features = []
@@ -859,47 +1062,54 @@ def from_v02(geometry: dict) -> dict:
     return {"version": 1, "components": {"main": comp}}
 
 
-def to_v02(model: GeometryModel, component: str | None = None, *, validation: bool = False) -> dict:
-    """Compile a 2D component, or a box-only 3D component, to the 0.2 ``geometry`` form.
+def to_flat(model: GeometryModel, component: str | None = None, *, validation: bool = False) -> dict:
+    """Compile a 2D component, or a box-only 3D component, to a flat ``geometry`` block.
 
-    Values come back in the document unit, each rounded once from its pm count; a
-    trapezoid becomes the polygon of its exact corners. Features the 0.2 builder
-    cannot express (merged regions, segments, paths, 2.5D and curved 3D features)
-    are refused with their names.
+    Values come back in the component's length unit, each rounded once from its pm count,
+    beside the component's ``length_unit`` and ``depth``; a trapezoid becomes the polygon of
+    its exact corners. Features a flat block cannot express (merged regions, segments, paths,
+    2.5D and curved 3D features) are refused with their names.
 
     With ``validation`` the result is the form the document validators read and the
-    results record while the exact engine (stage 2) does the meshing: ``finalize:
-    "imprint"`` is accepted (the shapes are the same, the engine keeps the covered
-    boundaries) and ``segment`` features are left out (they have no area and no
-    material; the engine imprints them). Without it the result is what the 0.2 builder
-    meshes, which would drop both silently, so both are refused by name.
+    results record (``Document.geometry_flat``) while the exact engine (stage 2) does the
+    meshing: ``finalize: "imprint"`` is accepted (the shapes are the same, the engine keeps
+    the covered boundaries) and ``segment`` features are left out (they have no area and no
+    material; the engine imprints them). Without it the result is what the flat block's
+    shapely builder meshes, which would drop both silently, so both are refused by name.
     """
     comp = _pick(model, component)
-    u = model.to_unit
+    u = comp.to_unit
     if comp.finalize == "imprint" and not validation:
-        raise GeometryError(f"component {comp.name!r}: finalize 'imprint' needs the stage 2 engine; the 0.2 "
-                            "builder would remove the covered boundaries")
+        raise GeometryError(f"component {comp.name!r}: finalize 'imprint' needs the stage 2 engine; the flat "
+                            "block's builder would remove the covered boundaries")
     if comp.dimension == "axisymmetric":
-        raise GeometryError(f"component {comp.name!r}: no 0.2 runner takes an axisymmetric component")
-    out: dict = {"domain": {k: u(v) for k, v in comp.domain.items()}}
+        raise GeometryError(f"component {comp.name!r}: a flat block has no axisymmetric form")
+    out: dict = {"length_unit": comp.length_unit, **({"depth": comp.depth} if comp.dimension == "2d" else {}),
+                 "domain": {k: u(v) for k, v in comp.domain.items()}}
     if comp.background.get("material", "") is None or any(f.material is None for f in comp.features):
-        raise GeometryError(f"component {comp.name!r}: void (material null) needs the stage 2 engine; the 0.2 "
-                            "builder meshes every region")
+        raise GeometryError(f"component {comp.name!r}: void (material null) needs the stage 2 engine; the flat "
+                            "block's builder meshes every region")
     if "material" in comp.background:
         out["background"] = {"material": comp.background["material"]}
         if "mesh_size" in comp.background:
-            raise GeometryError(f"component {comp.name!r}: the 0.2 builder has no background mesh_size")
+            raise GeometryError(f"component {comp.name!r}: a flat block compiled from a component has no background "
+                                "element_size")
     elif not comp.features:
         return out
     shapes = []
-    for f in comp.features:
+    for i, f in enumerate(comp.features):
         if f.type == "segment" and validation:
             continue
         if f.region != f.name:
             raise GeometryError(f"feature {f.name!r}: merged regions need the stage 2 hand-off")
         allowed = ("box",) if comp.dimension == "3d" else ("rect", "circle", "polygon", "trapezoid")
+        if f.type not in allowed and comp.dimension == "3d" and validation:
+            # the reader's flat compile of a 3d component (em.cavity3d reads boxes only)
+            where = f"geometry.components.{comp.name}.features[{i}].type"
+            raise GeometryError(f"{where}: a 3d component is read as boxes only; feature {f.name!r} is a {f.type}",
+                                path=where)
         if f.type not in allowed:
-            raise GeometryError(f"feature {f.name!r}: a {f.type} cannot go through the 0.2 builder")
+            raise GeometryError(f"feature {f.name!r}: a {f.type} has no flat-block form")
         s: dict = {"name": f.name, "type": f.type, "material": f.material}
         d = f.data
         if f.type in ("rect", "circle", "box"):
@@ -910,7 +1120,7 @@ def to_v02(model: GeometryModel, component: str | None = None, *, validation: bo
             cx, y, w, h, wt = (Fraction(d[k]) for k in ("cx", "y", "w", "h", "w_top"))
             corners = [(cx - w / 2, y), (cx + w / 2, y), (cx + wt / 2, y + h), (cx - wt / 2, y + h)]
             s["type"] = "polygon"
-            s["points"] = [[float(px / model.pm_per_unit), float(py / model.pm_per_unit)] for px, py in corners]
+            s["points"] = [[float(px / comp.pm_per_unit), float(py / comp.pm_per_unit)] for px, py in corners]
         if f.mesh_size is not None:
             s["mesh_size"] = u(f.mesh_size)
         shapes.append(s)

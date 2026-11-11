@@ -278,3 +278,50 @@ jobs:
           test "$INSTALLED_RESULT" = success
           test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success
+
+  units-batch-equivalence:
+    # Check P2-1 of the units and naming batch (tools/units_batch/README.md): every example and
+    # frozen fixture, as an old document on the merge-base code, against its twin on this
+    # commit, bit for bit, on each OS in turn. Manual dispatch only
+    # (gh workflow run validate.yml --ref <branch>), so pushes and pull requests allocate no
+    # runner for it; outside the tests gate, so each platform is reported on its own.
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    # Two recordings of 87 documents took about 2.5 min on a Linux workstation (2026-11-09);
+    # the limit only stops hung jobs.
+    timeout-minutes: 60
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12.10"
+      - name: Install the portable validation pins
+        run: python -m pip install -r tools/requirements-py312-windows-thermal.txt
+      - name: Name the baseline (the merge base with main) and the commit under test
+        shell: bash
+        run: |
+          baseline="$(git merge-base HEAD origin/main)"
+          echo "OPENPHYSICS_BATCH_BASELINE=$baseline" >> "$GITHUB_ENV"
+          echo "baseline $baseline; HEAD $(git rev-parse HEAD); github.sha $GITHUB_SHA"
+      - name: Compare old documents on the baseline with new documents on this commit
+        env:
+          OPENPHYSICS_BATCH_REPORT: ${{ runner.temp }}/units-batch-equivalence
+        run: python -X utf8 -m pytest -q -ra -s tests/simcase/test_units_batch_equivalence.py
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: units-batch-equivalence-${{ matrix.os }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/units-batch-equivalence/
+          if-no-files-found: warn

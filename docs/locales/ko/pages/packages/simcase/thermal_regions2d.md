@@ -6,7 +6,9 @@
 문서는 여러 재료를 기술합니다. 전자기 문서와 같은 기하를 씁니다: 이름 있는 도형마다 재료 이름을 달고,
 배경 위에 순서대로 그립니다(나중 도형이 앞 도형을 자릅니다). 열 물성은 `materials` 표에서
 옵니다. 메시는 모든 영역 경계를 따릅니다. headless API와 CLI가 이 문서를 실행하며,
-Studio도 영역 한도 안에서 검증·실행·표시합니다(아래 한계 참고).
+Studio도 영역 한도 안에서 검증·실행·표시합니다(아래 한계 참고). 영역 문서는
+[형식 0.3](document_format.md)입니다. 모든 값에 단위를 함께 쓰고 키는 등록부 물리량 이름이며,
+형식 0.2 영역 문서는 이름으로 거부합니다(`E-FORMAT`).
 
 `background`/`shapes`가 없는 사각형 문서는 [원래 계약](thermal_steady2d.md)과
 [경계 확장](thermal_steady_boundary2d.md)을 그대로 따릅니다.
@@ -19,29 +21,30 @@ Studio도 영역 한도 안에서 검증·실행·표시합니다(아래 한계 
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Heated steel plate in insulation",
-  "units": {"length": "mm", "temperature": "K"},
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {"xmin": 0, "xmax": 40, "ymin": 0, "ymax": 20},
     "background": {"material": "insulation"},
     "shapes": [
       {"name": "plate", "type": "rect", "x": 5, "y": 5, "w": 30, "h": 6, "material": "steel"},
-      {"name": "heater", "type": "circle", "cx": 20, "cy": 8, "r": 2, "material": "copper", "mesh_size": 0.5}
+      {"name": "heater", "type": "circle", "cx": 20, "cy": 8, "r": 2, "material": "copper", "element_size": "0.5 mm"}
     ]
   },
   "materials": {
-    "steel": {"conductivity_w_mk": 45, "source": "document value"},
-    "copper": {"conductivity_w_mk": 400, "source": "document value"},
-    "insulation": {"conductivity_w_mk": 0.04, "source": "document value"}
+    "steel": {"thermal_conductivity": "45 W/(m K)", "source": "document value"},
+    "copper": {"thermal_conductivity": "400 W/(m K)", "source": "document value"},
+    "insulation": {"thermal_conductivity": "0.04 W/(m K)", "source": "document value"}
   },
   "physics": {"heat1": {
     "type": "thermal.steady2d",
-    "heat_source_w_m3": {"heater": 5e6},
-    "dirichlet_temperature_k": {"bottom": 300},
-    "convection": {"top": {"h_w_m2k": 10, "ambient_temperature_k": 295}}
+    "heat_source_density": {"heater": "5000000 W/m^3"},
+    "prescribed_temperature": {"bottom": "300 K"},
+    "convection": {"top": {"heat_transfer_coefficient": "10 W/(m^2 K)", "ambient_temperature": "295 K"}}
   }},
-  "mesh": {"size": 2, "min_angle": 28},
+  "mesh": {"element_size": "2 mm", "minimum_angle": "28 deg"},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
@@ -54,41 +57,46 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
 
 ## 입력
 
-- `units`: 사각형 문서처럼 `length`와 `temperature: "K"`를 명시합니다. 기하·도형 크기·
-  메시 크기는 길이 단위를 쓰고, SI 접미어(`_w_mk`, `_w_m3`, `_w_m2`, `_w_m2k`, `_k`)가
-  붙은 물성은 SI입니다.
+- `geometry.length_unit`: domain과 도형 숫자의 단위입니다(모든 형식 0.3 기하처럼 숫자만 씀).
+  `geometry.depth`: `"40 mm"` 같은 길이, 또는 깊이 1 m당 결과이면 `null`.
 - `geometry.domain`: 사각형. 네 변이 경계 태그 `left`, `right`, `bottom`, `top`입니다.
-- `geometry.background`: `material`과 선택 `mesh_size`. 배경 영역 이름은 `background`입니다.
+- `geometry.background`: `material`과 선택 `element_size`(`"0.5 mm"` 같은 길이). 배경 영역 이름은
+  `background`입니다.
 - `geometry.shapes`: `rect`(`x`, `y`, `w`, `h`), `circle`(`cx`, `cy`, `r`), `polygon`
   (`points`, `[x, y]` 세 개 이상, 자기 교차 없음)의 목록. 각각 고유한 비어 있지 않은
-  `name`(`background` 제외), `material`, 선택 `mesh_size`를 가지며 다른 키는 받지 않습니다.
+  `name`(`background` 제외), `material`, 선택 `element_size`를 가지며 다른 키는 받지 않습니다.
   도형은 영역 안으로 잘립니다. 영역 밖에 있거나 영역 면적의 1e-12보다 작은 도형은 거부합니다(전자기
   문서는 실행 기록에 아무 말 없이 버림). 나중 도형에 완전히 덮인 도형은 삼각형이 없으며 실행 기록에
   이름이 나옵니다. 자르고 남은 면적 0인 조각(도형이 영역이나 다른 도형에 바깥에서 닿기만 한 곳)은
   메시하지 않습니다.
-- `materials`: `{재료 이름: {...}}`. 사용하는 모든 재료에 `conductivity_w_mk` > 0(필수),
-  선택 `volumetric_heat_capacity_j_m3k` > 0(정상 열전도는 쓰지 않음), 선택 `source` 메모.
-  표는 영역 기계와 공유하므로 `young_modulus_pa`, `poisson_ratio`, `thermal_expansion_per_k`도 있으면 받아
-  검사합니다(열 해석은 쓰지 않음; [기계](mechanics2d.md#재료-영역과-이름-있는-경계)).
-  열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야 합니다.
-  쓰지 않는 재료는 허용합니다. 같은 표에 [영역 전기 전도](electric_joule.md#재료-영역-전기-정상-전도)용
-  `electrical_conductivity_s_m` > 0을 둘 수 있고 열은 이를 무시합니다(2026-11-08부터; 전에는 모르는
-  키로 거부).
-- `physics.<name>`: `type`, `heat_source_w_m3`(숫자 하나, 또는 `{영역 이름: 숫자}`이며
-  적지 않은 영역은 0), 사각형 문서와 같은 변 규칙의 `dirichlet_temperature_k`,
-  `outward_flux_w_m2`, `convection`(모서리 충돌 거부, Dirichlet 변이나 양의 Robin 고정 필요,
-  Dirichlet 변에 자연 조건 금지). 여기의 `conductivity_w_mk`는 거부합니다(`materials`에서 옴).
+- `materials`: `{재료 이름: {...}}`. 사용하는 모든 재료에 `thermal_conductivity` > 0(`"45 W/(m K)"` 같은 값,
+  필수), `volumetric_heat_capacity` > 0(과도 열전도에 필수), 선택 `source` 메모. 표는 영역 기계·영역 전기
+  전도와 공유하므로 `youngs_modulus`, `poisson_ratio`, `linear_expansion_coefficient`,
+  `electrical_conductivity`도 있으면 받아 검사합니다. 열이 읽지 않는 물성은 `I-UNUSED-PROPERTY`(검사만 하고
+  쓰지 않음)로 알립니다. 열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야
+  합니다(`E-MATERIAL-UNKNOWN`, `E-PROPERTY-MISSING`). 쓰지 않는 재료는 허용합니다.
+- `physics.<name>`: `type`, `heat_source_density`(`"5e6 W/m^3"` 같은 값 하나, 또는 `{영역 이름: 값}`이며
+  적지 않은 영역은 0; 모르는 영역은 `E-SELECTION-UNKNOWN`), 사각형 문서와 같은 변 규칙의
+  `prescribed_temperature`, `inward_heat_flux`, `convection`(`heat_transfer_coefficient`,
+  `ambient_temperature`)(모서리 충돌 거부, 온도 고정 변이나 양의 대류 고정 필요, 온도 고정 변에 자연 조건
+  금지). 조건이 없는 변은 단열이며 `physics.<name>.inward_heat_flux.<side>`에서 `I-DEFAULT-BOUNDARY`로 한 번
+  알립니다. 여기의 `thermal_conductivity`는 거부합니다(`materials`에서 옴).
   [버전 1 형상 블록](geometry_document.md)은 더 많은 경계에 이름을 붙일 수 있습니다([이름 붙은 경계](#이름-붙은-경계)).
-- `mesh`: `size` > 0(길이 단위, 필수), `min_angle`(도, 기본 28, 최대 33).
-  `subdivisions`와 `grading`은 거부합니다.
+- `mesh`: `element_size`(길이, 필수), `minimum_angle`(기본 `"28 deg"`, 최대 33도);
+  `element_count_limit`(기본 600000)보다 추정 요소 수가 큰 메시는 거부합니다(`E-MESH-ESTIMATE`).
+  `subdivision_count`와 `grading`은 거부합니다. 버전 1 블록은 `mesh.controls`(선택마다 `element_size`,
+  `refinement_distance`, `circle_segment_count`)를 더할 수 있습니다.
 - `study` `{"type": "single"}`; `results.plots`는 false여야 합니다.
+
+Reader는 모든 기본값을 `defaults_applied`에, 읽은 모든 값을 `resolved_inputs`(쓴 글, SI 값, 단위)에
+기록합니다.
 
 메시 후 남지 않은 영역(나중 도형에 완전히 덮임)의 이름으로 준 열원은 실행할 때 거부합니다.
 
 ## 메시와 풀이
 
-기하와 전역·영역별 메시 크기를 전자기 문서와 같은 십진 비율 환산으로 먼저 마이크로미터로
-바꿉니다. meshine이 요청한 최소각으로 제약 Delaunay 세분을 한 뒤, 정규화된 좌표를 문서
+기하와 전역·영역별 요소 크기를 전자기 문서처럼 문서의 정확한 값에서 먼저 마이크로미터로
+옮깁니다. 도형 수는 그 pm 개수에서, 크기는 그 정확한 값에서 옮깁니다. meshine이 요청한 최소각으로 제약 Delaunay 세분을 한 뒤, 정규화된 좌표를 문서
 단위로 되돌리는 과정 없이 SI 미터로 직접 환산해 열 솔버에 넘깁니다. 모든 도형 경계가 요소 변으로 이어지므로 삼각형마다 한 영역에 속합니다.
 곡선 경계는 내접 다각형이라 원의 메시 면적은 pi r^2보다 O(h^2)만큼 작습니다. 메시한 문제는
 열전도율과 열원을 영역 이름으로 연결해 `galerkin.thermal.solve_steady_heat`에 넘깁니다
@@ -134,11 +142,12 @@ meshine이 여전히 처리하지 못하는 입력은 계속 돌지 않고 오�
 놓으세요). 도형을 다른 경계에서 떼어 두면 여전히 가장 좋은 삼각형을 얻습니다. 전자기 문서도 같은
 메시 생성기를 쓰므로 똑같이 동작합니다.
 
-같은 마이크로미터 숫자로 환산되는 입력은 같은 수치 환경에서 mm, m, um, nm 및 사용자 정의
-길이 단위에 관계없이 SI 절점·연결·영역·경계 태그와 정상·과도 해석 필드가 동일합니다.
-과도 affine 초기 온도장의 영역 원점도 메시와 같은 정규화→SI 경로를 사용합니다. SI 접미어가
-있는 재료·하중·온도 값과 해석 시각은 바뀌지 않습니다. 저장 `nodes_m`은 미터이며
-`model.json`은 원래 문서 단위를 유지합니다.
+같은 마이크로미터 숫자로 환산되는 입력은 같은 수치 환경에서 길이 단위 mm, m, um, nm에 관계없이
+SI 절점·연결·영역·경계 태그와 정상·과도 해석 필드가 동일합니다. 과도 affine 초기 온도장의 영역
+원점도 메시와 같은 정규화→SI 경로를 사용합니다. 재료·하중·온도 값과 해석 시각은 각자의 단위에서
+환산하므로 길이 단위에 의존하지 않습니다. 저장 `node_coordinates`는 미터이며 `model.json`은 쓴
+문서를 그대로 유지합니다. 길이 단위에 따라 반올림으로 움직일 수 있는 요약 값은 문서 숫자의
+삼각분할에서 재는 `minimum_triangle_angle` 하나입니다(아래 회귀에서 1e-12로 비교).
 
 환산 후 한 ulp라도 다른 입력이나 서로 다른 라이브러리 버전·플랫폼 사이의 동일성을 보장하지는
 않습니다. 정규화로 기존 um 이외 문서의 이산화가 달라질 수 있으며, 해석해 정확도·수렴 기준은
@@ -146,28 +155,33 @@ meshine이 여전히 처리하지 못하는 입력은 계속 돌지 않고 오�
 
 ## 결과
 
-`result_format`은 `thermal.steady2d-regions-result-v1`, `field_layout`은
-`thermal2d-p1-node-cell-regions-v1`입니다. 저장 필드는 경계 v2 배치(`nodes_m`, `triangles`,
-`temperature_k`, `heat_flux_w_m2`, `load_w_per_m`, `reaction_w_per_m`, `residual_w_per_m`,
-`dirichlet_node_ids`, `dirichlet_temperature_k`, `prescribed_outward_load_w_per_m`,
-`ambient_load_w_per_m`, `convective_outward_w_per_m`, `system_rhs_w_per_m`)에
-`triangle_regions`(삼각형별 정수 영역 번호)를 더한 것입니다. 경계 필드는 항상 있습니다(자연
-조건이 없으면 0). 요약에는 `region_names`(`triangle_regions`의 번호 순서), `regions`(영역별
-재료, 삼각형 수, m^2 단위 메시 면적), `materials` 표, `conductivity_range_w_mk`, 메시 크기,
-달성한 최소각이 더해집니다. 부호와 단위는 경계 계약과 같습니다: 반력은 안쪽으로 들어오는
-thermostat 열, 전체 바깥 열은 `sum(prescribed_outward_load + convective_outward - reaction)`,
+`result_format`은 `thermal.steady2d-regions-result-v2`, `field_layout`은
+`thermal2d-p1-node-cell-regions-v2`입니다(형식 0.2 쌍 `-result-v1`·`-regions-v1`은 은퇴했으며
+그 쌍으로 저장한 결과는 이름으로 거부). 저장 필드는 직사각형 경계 배치를 등록부 이름으로 쓴 것
+(`node_coordinates`, `triangles`, `temperature`, `heat_flux`, `generated_heat_rate_per_depth`,
+`reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`, `prescribed_node_ids`,
+`prescribed_temperature`, `outward_prescribed_heat_rate_per_depth`,
+`ambient_convective_heat_rate_per_depth`, `outward_convective_heat_rate_per_depth`,
+`applied_heat_rate_per_depth`)에 `triangle_regions`(삼각형별 정수 영역 번호, 단위 없음)를 더한
+것입니다. 경계 필드는 항상 있습니다(자연 조건이 없으면 0). 각 배열의 단위는 `field_units`에
+있습니다. 요약에는 `region_names`(`triangle_regions`의 번호 순서), `regions`(영역별 재료, 삼각형
+수, 메시 `area`), `materials` 표, `minimum_thermal_conductivity`, `maximum_thermal_conductivity`,
+메시 개수, 달성한 `minimum_triangle_angle`(rad)이 더해집니다. 물리 값은 모두 `{value, unit}`이며
+요약은 `resolved_inputs`, `defaults_applied`, `diagnostics`, `extent`, `timing.wall_time`을
+유지합니다. 부호와 단위는 경계 계약과 같습니다: 반력은 안쪽으로 들어오는 thermostat 열, 전체
+바깥 열(`outward_heat_rate_per_depth`)은 `sum(outward_prescribed + outward_convective - reaction)`,
 절점 열량은 모두 깊이당 W/m입니다.
 
 ## 이름 붙은 경계
 
-[버전 1 형상 블록](geometry_document.md)을 가진 문서는 `dirichlet_temperature_k`·`outward_flux_w_m2`·`convection`
-항목(과도 러너는 `dirichlet_temperature_k`)을 도메인 네 변 밖의 경계에도 줄 수 있습니다.
+[버전 1 형상 블록](geometry_document.md)을 가진 문서는 `prescribed_temperature`·`inward_heat_flux`·`convection`
+항목(과도 러너는 `prescribed_temperature`)을 도메인 네 변 밖의 경계에도 줄 수 있습니다.
 
 - [2단계 엔진](geometry_engine.md)이 선언하는 외부 태그: `boundary_tags` 이름, 빈 공간 피처(`material: null`)나
   sliver 틈의 경계에 붙는 `outer`.
 - 구성 요소의 경계 선택(`selections`). 메시는 선택 이름으로 절점을 이름 짓고(`mesh.boundary[이름]`), 선택의 곡선이
   모두 외부(도메인이나 빈 공간)에 놓이면 같은 변이 가진 변 태그나 `outer` 태그 옆에 변 태그도 붙입니다
-  (`mesh.boundary_edges[이름]`). `dirichlet_temperature_k`는 어떤 선택이든, 두 영역 사이 경계면도 이름 지을 수
+  (`mesh.boundary_edges[이름]`). `prescribed_temperature`는 어떤 선택이든, 두 영역 사이 경계면도 이름 지을 수
   있습니다(내부 표면의 처방 온도; galerkin이 내부 절점을 고정, 2026-11-08). flux·convection은 외부 변이 필요하므로
   경계면 선택은 이름 밝혀 거부합니다.
 
@@ -181,7 +195,7 @@ convection 항목 하나를 받습니다. 같은 변에 변 태그와 선택이 
 Python 3.12 고정 환경에서 측정): 빈 판 속 빈 구멍이 있는 강철 원판에 `boundary_tags`와 선택으로 두 원에 Dirichlet을
 주면 중간 반지름에서 대수 분포와 온도 차의 1e-3 이내; 구멍 벽의 flux는 정확히 `g`×벽 다각형 길이, convection은 직렬
 저항 열량과 2e-3 이내, 둘 다 열 균형 1e-10 이내; 이름 없는 구멍은 단열(균형 1e-10); 거부(경계면 선택·모르는 이름·영역
-선택·겹친 변); 과도 러너의 선택 Dirichlet과 거부; 0.2 문서는 네 변만.
+선택·겹친 변); 과도 러너의 선택 Dirichlet과 거부; 버전 1 블록이 없는 문서는 네 변만.
 
 ## 축대칭 문서
 
@@ -193,21 +207,22 @@ Python 3.12 고정 환경에서 측정): 빈 판 속 빈 구멍이 있는 강철
 [축대칭 과도 열](../galerkin/transient_heat.md#축대칭-과도-열))로 풉니다.
 
 - **변.** `xmin == 0`이면 r = 0 변은 메시 태그 `axis`이며 대칭축입니다. 자연 정칙성을 가지므로
-  `dirichlet_temperature_k`·`outward_flux_w_m2`·`convection` 항목을 받지 않습니다(이름 밝혀 거부; 그런 도메인에 없는
+  `prescribed_temperature`·`inward_heat_flux`·`convection` 항목을 받지 않습니다(이름 밝혀 거부; 그런 도메인에 없는
   `left`도 거부). 물리적 변은 `right`(바깥 반지름)·`bottom`·`top`입니다. 환형(`xmin > 0`)은 `left`를 안쪽 반지름으로
   유지합니다.
-- **결과.** 실행은 `AxisymmetricRegionThermalRunResult`를 돌려주며 식별자는 `thermal.axisymmetric-regions-result-v1`과
-  `thermal-axisymmetric-p1-node-cell-regions-v1`입니다. 절점 열량은 **전체 회전의 전력 W**이고 필드 이름은 `load_w`·
-  `reaction_w`·`residual_w`·`prescribed_outward_load_w`·`ambient_load_w`·`convective_outward_w`·`system_rhs_w`입니다.
-  요약의 진단은 `_w`로 끝나고(`source_heat_w`·`outward_heat_w` 등) `coordinate_system: "axisymmetric"`·
-  `nodal_heat_rate_unit: "W"`를 기록합니다. 온도(K)·열유속(W/m²)·삼각형 영역·넓이(`area_m2`, 자오면 단면)는 Cartesian
-  실행과 같습니다. Cartesian 식별자와 `_w_per_m` 이름은 이런 결과에 쓰지 않습니다.
+- **결과.** 실행은 `AxisymmetricRegionThermalRunResult`를 돌려주며 식별자는 `thermal.axisymmetric-regions-result-v2`와
+  `thermal-axisymmetric-p1-node-cell-regions-v2`입니다. 절점 열량은 **전체 회전의 전력 W**이고 필드 이름은 `_per_depth`
+  없는 등록부 이름 `generated_heat_rate`·`reaction_heat_rate`·`residual_heat_rate`·`outward_prescribed_heat_rate`·
+  `ambient_convective_heat_rate`·`outward_convective_heat_rate`·`applied_heat_rate`입니다. 요약의 합계도 같은 이름이고
+  (`generated_heat_rate`·`outward_heat_rate` 등) `coordinate_system: "axisymmetric"`을 기록합니다. 온도(K)·열유속(W/m²)·
+  삼각형 영역은 Cartesian 실행과 같고, 영역 넓이는 `meridional_area`(자오면 단면)입니다. Cartesian 식별자와 `_per_depth`
+  이름은 이런 결과에 쓰지 않으며 `geometry.depth`는 거부합니다(회전체에는 깊이가 없음).
 - **과도 결과.** `thermal.transient2d` 문서는 `AxisymmetricTransientRegionRunResult`를 돌려주며 식별자는
-  `thermal.axisymmetric-transient-regions-result-v1`과 `thermal-axisymmetric-transient-p1-node-cell-regions-v1`입니다.
-  [과도 영역 결과](#과도-문서)의 이력에서 절점 열량은 W의 `source_load_w`·`reaction_w`·`residual_w`·`storage_rate_w`,
-  열량은 J의 `heat_content_j`, 이차 functional은 J K의 `quadratic_functional_jk`입니다. 요약의 합계도 같은 꼴로 끝나고
-  (`source_heat_w`·`storage_heat_w`·`outward_heat_w`·`heat_balance_defect_w`·`heat_content_j`·`quadratic_functional_jk`)
-  `coordinate_system: "axisymmetric"`·`nodal_heat_rate_unit: "W"`를 기록합니다. Dirichlet 이름은 정상과 같고(`axis`와
+  `thermal.axisymmetric-transient-regions-result-v2`와 `thermal-axisymmetric-transient-p1-node-cell-regions-v2`입니다.
+  [과도 영역 결과](#과도-문서)의 이력에서 절점 열량은 W의 `generated_heat_rate`·`reaction_heat_rate`·`residual_heat_rate`·
+  `heat_storage_rate`, 저장 열은 J의 `stored_heat`, 이차 functional은 J K의 `thermal_energy_functional`입니다. 요약의
+  합계도 같은 이름이고(`generated_heat_rate`·`heat_storage_rate`·`outward_heat_rate`·`heat_rate_imbalance`·`stored_heat`·
+  `thermal_energy_functional`) `coordinate_system: "axisymmetric"`을 기록합니다. 온도 고정 이름은 정상과 같고(`axis`와
   r = 0의 `left`는 이름 밝혀 거부), 초기장·표본 이력·열원 map은 Cartesian 과도 규칙 그대로입니다.
 - **받지 않는 곳.** 도파관 러너(회전체는 그 물리가 아님; `xmin`과 무관하게 검증에서 거부)와 Studio(정상·과도 모두 축대칭
   payload 없음)는 축대칭 구성 요소를 이름 밝혀 거부합니다. `export_fields`·`export_time_series`는 저장한 결과를 (r, z)
@@ -219,7 +234,7 @@ Python 3.12 고정 환경에서 측정): 균일 가열 속찬 원통(반지름 3
 속 가열 코어가 해석적 축·경계면 상승과 2e-3 이내; 열원 없는 환형이 중간 반지름에서 온도 차의 1e-3 이내로 대수 전도;
 축·left 거부, 다른 러너·Studio 거부, 결과 식별자·필드 이름.
 
-검사 G7-5(같은 파일, 2026-11-08 사전 등록·같은 날 측정): 과도 원통 문서가 과도 축대칭 식별자와 `_w`/`_j`/`_jk` 이름만으로
+검사 G7-5(같은 파일, 2026-11-08 사전 등록·같은 날 측정): 과도 원통 문서가 과도 축대칭 식별자와 `_per_depth` 없는 이름만으로
 돌아오고 저장·내보내기(시각 index의 VTU와 PVD 시계열)되며, 열원 전력은 `Q π R² L`의 1e-12, t0의 열량은 `c T0 π R² L`의
 1e-12, 단계별 열수지 결함은 열량의 1e-10 이내; 기하급수로 커지는 단계로 같은 메시의 정상 축대칭 문서 온도에 상승의 1e-6
 이내(reaction 1e-6)로 도달; 축·left 거부와 과도 문서의 Studio 거부. 엔진 수준 검사 G7-1~G7-4(Bessel 급수 냉각 수렴·
@@ -258,21 +273,23 @@ Python 3.12 고정 환경에서 측정): 균일 가열 속찬 원통(반지름 3
 ## 과도 문서
 
 `background`/`shapes`가 있는 `thermal.transient2d` 문서는 정상 영역 문서와 같은 기하,
-`materials` 표, `mesh`(`size`, `min_angle`)를 쓰고, 시간 규칙은
-[thermal_transient2d](thermal_transient2d.md)와 같습니다: `units.time: "s"`, 증가하는 명시적
-초의 `study: {"type": "transient", "time_s": [...]}`, `initial_temperature_k`(균일 숫자 또는
-`affine` 객체), 변별 `dirichlet_temperature_k`(상수 또는 요청 시각마다의 `{"values_k": [...]}`,
-t0에서 초기장과 일치). 사용하는 모든 재료에 `conductivity_w_mk`와
-`volumetric_heat_capacity_j_m3k`가 필요하고, `heat_source_w_m3`는 숫자 또는
-`{영역 이름: 숫자}`입니다. physics 수준의 `conductivity_w_mk`나
-`volumetric_heat_capacity_j_m3k`는 거부합니다. 배포 예제는 `transient_thermal_regions`
+`materials` 표, `mesh`(`element_size`, `minimum_angle`)를 쓰고, 시간 규칙은
+[thermal_transient2d](thermal_transient2d.md)와 같습니다: 증가하는 명시적 시각의
+`study: {"type": "transient", "time": {"unit": "s", "values": [...]}}`, `initial_temperature`
+(`"300 K"` 같은 균일 값 또는 `affine` 객체), 변별 `prescribed_temperature`(값 하나 또는 요청
+시각마다 표본을 둔 tagged array, t0에서 초기장과 일치). 사용하는 모든 재료에
+`thermal_conductivity`와 `volumetric_heat_capacity`가 필요하고, `heat_source_density`는 값 하나
+또는 `{영역 이름: 값}`입니다. physics 수준의 `thermal_conductivity`나 `volumetric_heat_capacity`는
+거부합니다. 배포 예제는 `transient_thermal_regions`
 (`examples/simcase/transient_thermal_regions.json`)입니다.
 
-결과는 `thermal.transient2d-regions-result-v1`, `thermal2d-transient-p1-node-cell-regions-v1`로
-사각형 과도 필드에 정적 `triangle_regions`를 더합니다. 요약에는 `region_names`, `regions`,
-`materials`, 메시 크기가 더해집니다. `heat_content_j_per_m`는 영역별 열용량을 쓴 `1^T M T`입니다.
-전체 이력을 메모리에 둡니다(O(단계 수 x (절점 + 삼각형))). 아래 수렴 연구의 최대 메모리는 약
-825 MiB였습니다.
+결과는 `thermal.transient2d-regions-result-v2`, `thermal2d-transient-p1-node-cell-regions-v2`
+(`-v1` 쌍은 은퇴)로 사각형 과도 필드를 등록부 이름(`time`, `temperature`, `heat_flux`,
+`generated_heat_rate_per_depth`, `reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`,
+`heat_storage_rate_per_depth`, `stored_heat_per_depth`, `thermal_energy_functional_per_depth` 등)으로
+쓰고 정적 `triangle_regions`를 더합니다. 요약에는 `region_names`, `regions`, `materials`, 메시 개수가
+더해집니다. `stored_heat_per_depth`는 영역별 열용량을 쓴 `1^T M T`입니다. 전체 이력을 메모리에
+둡니다(O(단계 수 x (절점 + 삼각형))). 아래 수렴 연구의 최대 메모리는 약 825 MiB였습니다.
 
 검증(`tests/simcase/test_transient_thermal_regions.py`):
 
@@ -332,8 +349,8 @@ except MeshLimitError as exc:
 
 메시 전 작업을 제한하는 것은 `max_input_vertices`뿐입니다. `max_nodes`와 `max_triangles`는 meshine이
 영역을 만든 뒤에 작동하는데, 영역 만들기는 모든 루프 꼭짓점을 앞선 모든 꼭짓점과 비교하므로 O(V²)이고,
-고립된 원은 그보다 먼저 꼭짓점을 만들거나 0에 가까운 `mesh.size`에서는 만드는 중에 실패합니다.
-`max_input_vertices` 없이 영역 크기를 2 mm로 두고 전역 `mesh.size`를 0.004로 한 정상 예제는 `max_nodes`
+고립된 원은 그보다 먼저 꼭짓점을 만들거나 0에 가까운 `mesh.element_size`에서는 만드는 중에 실패합니다.
+`max_input_vertices` 없이 영역 크기를 2 mm로 두고 전역 `mesh.element_size`를 0.004 mm로 한 정상 예제는 `max_nodes`
 10,201이 수십 초 뒤에야 거절하고(Linux에서 두 번 측정해 28 s와 45 s), 5e-324에서는 상한이 없을 때처럼
 `OverflowError`로 끝납니다. 다른 사람이 쓴 문서에는 `max_input_vertices`도 주세요.
 
@@ -344,24 +361,25 @@ except MeshLimitError as exc:
 - 나중 도형이 앞 도형을 여러 조각으로 자를 수 있고, 조각마다 루프가 따로 있습니다. 각각 255점인 두
   빗 모양 다각형이 서로 가로지르면 32,776입니다.
 - 다른 경계가 닿거나 가로지르는 원, 또는 나중 도형과 겹치는 원은 128각형입니다.
-- 정확한 meshine `Circle`로 메시하는 고립된 원은 자기 `mesh_size`가 있어도 **전역** `mesh.size`로
-  max(16, int(4πr / `mesh.size`))개를 세고, 둘러싼 영역의 구멍으로 한 번 더 셉니다. 배포된 정상 예제는
-  `mesh.size` 0.0246에서 루프 꼭짓점이 2054개이고, 그중 2042개가 히터입니다.
+- 정확한 meshine `Circle`로 메시하는 고립된 원은 자기 `element_size`가 있어도 **전역**
+  `mesh.element_size`로 max(16, int(4πr / `mesh.element_size`))개를 세고, 둘러싼 영역의 구멍으로 한 번 더
+  셉니다. 배포된 정상 예제는 `mesh.element_size` 0.0246 mm에서 루프 꼭짓점이 2054개이고, 그중 2042개가
+  히터입니다.
 
 이 수는 meshine 자체의 T자 접합 분할 전에 세므로, meshine이 처리하는 루프는 더 길 수 있습니다.
 이 수는 실제로 메시하는 것, 곧 문서의 마이크로미터 사본(메시와 풀이 참고)의 수입니다. 도형의 불리언
 연산과 원 규칙은 단위에 의존하지 않으므로 보통 문서 자체의 숫자로 센 수와 같고, 시험이 쓰는 밀리미터
-문서 22개에서도 같습니다. 4πr / `mesh.size`가 정수에서 반올림 오차 이내에 있으면 다를 수 있습니다.
-영역 크기를 2 mm로 둔 정상 예제는 `mesh.size` 4π·2/20 mm에서 밀리미터로는 루프 꼭짓점이 52개,
+문서 22개에서도 같습니다. 4πr / `mesh.element_size`가 정수에서 반올림 오차 이내에 있으면 다를 수 있습니다.
+영역 크기를 2 mm로 둔 정상 예제는 `mesh.element_size` 4π·2/20 mm에서 밀리미터로는 루프 꼭짓점이 52개,
 메시하는 마이크로미터 사본에서는 50개이며, 세는 수는 50입니다.
 `check_mesh_limits(doc, *, max_input_vertices)`는 영역 문서의 이 수를 영역을 만들거나 문서를
-바꾸지 않고 반환하거나, `MeshLimitError`를 발생시킵니다. 실행처럼 마이크로미터 사본을 검증하므로 도형의
-불리언 연산을 그 검증에서 한 번, 수를 세며 한 번, 두 번 계산합니다. 검증하지 않은 `Document`
-(`Document(data)`, `Document.copy()`)에는 아직 해석된 길이 단위가 없으므로, 그 실행이 먼저 검증하듯
-검증한 사본으로 세며 불리언 연산을 한 번 더 계산합니다. 자기 수만으로 상한을 넘는 고립된 원은
+바꾸지 않고 반환하거나, `MeshLimitError`를 발생시킵니다. 실행이 메시하는 마이크로미터 사본을 셉니다.
+문서의 정확한 값으로 만든 µm 프레임(`views.region_mesh`)입니다. 읽지
+않은 `Document`(`Document(data)`, `Document.copy()`)는 그 실행처럼 먼저 읽습니다. 자기 수만으로 상한을 넘는 고립된 원은
 꼭짓점을 만들기 전에 거절하고 메시지에 그 수의 추정값을(마이크로미터로) 적으므로, `max_input_vertices`를
-주면 0에 가까운 `mesh.size`(5e-324)는 나눗셈, 오버플로, 메모리 오류가 아니라 `MeshLimitError`를
-발생시킵니다.
+주면 0에 가까운 `mesh.element_size`는 나눗셈, 오버플로, 메모리 오류가 아니라 `MeshLimitError`를
+발생시킵니다. 1e-300 m보다 작은 요소 크기는 reader가 거부하고(`mesh.element_size`의 `E-DOMAIN`),
+추정 요소 수가 `mesh.element_count_limit`를 넘는 메시는 `E-MESH-ESTIMATE`로 거부합니다.
 
 **`MeshLimitError`**는 `DocumentError`가 아닌 `ValueError`입니다. 문서는 유효하고, 호출자의 상한이
 거절하는 것입니다. `quantity`는 `'input_vertices'`, `'nodes'`, `'triangles'` 중 하나이고, `limit`은
@@ -474,25 +492,28 @@ meshine에 넘기는 영역의 수와 같은지, 검증하지 않은 문서가 �
 - 다른 경계에 닿거나 얕게 가로지르는 원, 뾰족한 다각형 꼭짓점 옆의 삼각형은 어느 영역에서든 입력
   모서리만큼, 또는 조금 더 날카로울 수 있습니다(14° 다각형 모서리 옆에서 13.0° 측정). meshine이
   해결하지 못하는 입력은 오류로 끝납니다(메시와 풀이 참고).
-- 단위 깊이 평면 기하. 내장 재료의 열 물성 없음.
+- 단위 깊이(`depth: null`) 또는 `geometry.depth`로 준 깊이의 평면 기하. 내장 재료의 열 물성 없음.
 
 ### 길이 정규화 회귀
 
 `tests/simcase/test_thermal_length_canonical.py`는 원점이 이동된 영역에 직사각형·고립 원·다각형,
-배경·도형별 메시 크기를 넣고 mm, m, um, nm 및 사용자 정의 `in_m` 단위를 비교합니다.
-정상 열유속·대류 하중과 과도 affine 초기장을 통해 두 풀이 경로를 검사합니다. 모든 수치 저장
-배열·영역/재료 배정·경계 태그가 정확히 같아야 하며 원문 모델과 선언 단위를 보존해야 합니다.
+배경·도형별 요소 크기를 넣고 도형 숫자를 mm, m, um, nm으로 쓴 경우를 비교합니다(형식 0.3에는 사용자
+정의 길이 단위가 없음). 정상 열유속·대류 하중과 과도 affine 초기장을 통해 두 풀이 경로를 검사합니다.
+모든 수치 저장 배열·영역/재료 배정·경계 태그·요약 값이 정확히 같아야 하며(`minimum_triangle_angle`만
+1e-12 이내, 메시와 풀이 참고) 원문 모델을 보존해야 합니다.
 기존 층상 벽 해석해 수렴 시험도 계속 필수입니다.
 
 ## VTU와 PVD 내보내기
 
 `simcase[export]`(meshio, MIT)를 설치하면 저장한 영역 결과를 ParaView에서 볼 수 있습니다.
 `export_fields(fields_npz, output, *, time_index=-1)`는
-`thermal2d-p1-node-cell-regions-v1`, `thermal-axisymmetric-p1-node-cell-regions-v1`(점은 (r, z), 열량은 `_w`
-전체 회전 전력) 및 `thermal2d-transient-p1-node-cell-regions-v1`을 받습니다.
+`thermal2d-p1-node-cell-regions-v2`, `thermal-axisymmetric-p1-node-cell-regions-v2`(점은 (r, z), 열량은
+W 단위 전체 회전 전력) 및 과도 `thermal2d-transient-p1-node-cell-regions-v2`,
+`thermal-axisymmetric-transient-p1-node-cell-regions-v2`를 받습니다.
 `export_time_series(fields_npz, output_dir, *, name="fields")`는 과도 배치를 받아
-저장된 시각마다 VTU를 만들고 정확한 `time_s`(초)를 기록한 PVD 컬렉션으로 연결합니다.
-두 함수 모두 솔버를 다시 실행하거나 저장 결과를 바꾸지 않습니다.
+저장된 시각마다 VTU를 만들고 정확한 `time`(초)을 기록한 PVD 컬렉션으로 연결합니다.
+두 함수 모두 솔버를 다시 실행하거나 저장 결과를 바꾸지 않습니다. 형식 0.3 이전에 저장한 결과
+(`-regions-v1` 배치)는 이름으로 거부합니다(`RETIRED_LAYOUTS`).
 
 ```python
 from simcase import Document, run
@@ -510,32 +531,34 @@ export_time_series(transient_dir / "fields.npz", "out/region-transient/paraview"
 
 ParaView에서 `view.vtu` 또는 `paraview/fields.pvd`를 엽니다. **셀** 배열
 `triangle_regions`로 색을 지정하면 같은 재료를 쓰는 영역도 구분할 수 있고,
-`temperature_k`로 색을 지정하면 절점 온도를 봅니다. ID는 원래
+`temperature`로 색을 지정하면 절점 온도를 봅니다. ID는 원래
 `summary.json["region_names"]`의 0부터 시작하는 인덱스이며,
 `summary.json["regions"][name]["material"]`이 재료를 가리킵니다. 같은 summary가 NPZ
-메타데이터에도 있습니다. 이름·물성·경계 태그는 VTU에 복사하지 않으므로 의미를 확인하려면
-원래 NPZ/summary를 보관하십시오.
+메타데이터에도 있습니다. 각 VTU의 FieldData에는 `units`(내보낸 각 배열의 단위, `field_units`와 같음)와
+`conventions`(부호가 있는 배열의 부호 문장)가 있습니다. 이름·물성·경계 태그는 VTU에 복사하지
+않으므로 의미를 확인하려면 원래 NPZ/summary를 보관하십시오.
 
 | VTU 위치 | 배열과 단위 |
 |---|---|
-| 점 좌표 | `nodes_m`, z = 0으로 확장; 문서 길이 단위와 무관하게 m |
-| 점 데이터 | `temperature_k`(K); 저장된 절점 하중·반력·잔차·저장률(단위 깊이당 W/m) |
-| 셀 데이터 | `heat_flux_w_m2`(W/m², z 성분 0); `triangle_regions`(무차원 정수) |
+| 점 좌표 | `node_coordinates`, z = 0으로 확장; 기하 길이 단위와 무관하게 m |
+| 점 데이터 | `temperature`(K); 저장된 절점 열량·반력·잔차·저장률(단위 깊이당 W/m; 축대칭 결과는 W) |
+| 셀 데이터 | `heat_flux`(W/m², z 성분 0); `triangle_regions`(정수, 단위 없음) |
 
-정상 영역 내보내기는 `load_w_per_m`, `reaction_w_per_m`, `residual_w_per_m`,
-`prescribed_outward_load_w_per_m`, `ambient_load_w_per_m`, `convective_outward_w_per_m`,
-`system_rhs_w_per_m`을 포함합니다. flux/Robin 부호 및 바깥 변 경계조건은 위 설명과 같습니다.
-과도 내보내기는 `source_load_w_per_m`을 포함하며 반력·잔차·저장률은 두 번째 저장 시각부터만
-존재합니다. 초기 시각의 율을 만들어 넣지 않습니다. 열함량 같은 영역 전체 이력, 경계 절점
-부분집합, 이름·단위는 NPZ/summary에 남습니다. 점/셀 보간이나 영역 번호 변경은 없습니다.
+정상 영역 내보내기는 `generated_heat_rate_per_depth`, `reaction_heat_rate_per_depth`,
+`residual_heat_rate_per_depth`, `outward_prescribed_heat_rate_per_depth`,
+`ambient_convective_heat_rate_per_depth`, `outward_convective_heat_rate_per_depth`,
+`applied_heat_rate_per_depth`를 포함합니다. flux/대류 부호 및 바깥 변 경계조건은 위 설명과 같습니다.
+과도 내보내기는 `generated_heat_rate_per_depth`를 포함하며 반력·잔차·`heat_storage_rate_per_depth`는
+두 번째 저장 시각부터만 존재합니다. 초기 시각의 율을 만들어 넣지 않습니다. 저장 열 같은 영역 전체
+이력, 경계 절점 부분집합, 이름은 NPZ/summary에 남습니다. 점/셀 보간이나 영역 번호 변경은 없습니다.
 
 기존 VTU는 거부하고 시계열 폴더는 새것이거나 비어 있어야 합니다. 시계열 쓰기에 실패하면
 이번 호출이 만든 파일을 정리합니다. `triangle_regions`가 없거나 정수가 아니거나 음수이거나
 크기가 맞지 않으면 출력 생성 전에 거부합니다. 유효한 `save()` 결과를 위한 내보내기이며
 임의 NPZ의 전체 검증기는 아닙니다. restart·XDMF·과도 flux/Robin 입력은 지원하지 않습니다.
-별도 직사각형 정상 `boundary-v2` 배치는 같은 함수가 자체 배열로 내보냅니다([개요](overview.md#paraview로-보기)).
+별도 직사각형 정상 `boundary-v3` 배치는 같은 함수가 자체 배열로 내보냅니다([개요](overview.md#paraview로-보기)).
 
 `tests/simcase/test_export_regions.py`는 내보낸 모든 배열과 NPZ, 모든 저장 시각, 초기율
-부재, 재료 ID와 구별되는 영역 ID, 기존 출력 보호와 실패 정리를 검증합니다. 같은 수치 환경에서
-위 길이 정규화 조건을 충족하는 mm/m/um/nm/사용자 단위 문제는 정확히 같은 SI 내보내기
+부재, 재료 ID와 구별되는 영역 ID, FieldData 블록, 기존 출력 보호와 실패 정리를 검증합니다. 같은
+수치 환경에서 위 길이 정규화 조건을 충족하는 mm/m/um/nm 문제는 정확히 같은 SI 내보내기
 배열을 내야 합니다. 이 소비자 시험은 Linux·macOS·Windows 설치 휠에서도 실행합니다.

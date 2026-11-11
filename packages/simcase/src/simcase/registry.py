@@ -42,9 +42,6 @@ class PhysicsKind:
     summary: Callable[[Any], str]
     #: what ``run`` returns
     result_types: tuple[type, ...]
-    #: document defaults that ``Document.from_dict`` merges the input into;
-    #: None keeps ``schema.DEFAULTS``
-    defaults: Callable[[], dict] | None = None
     #: the command line refuses an output folder that already exists
     fresh_output: bool = False
     #: refusal for ``build_mesh`` and ``solve_point``, with ``{stage}`` for the
@@ -56,6 +53,19 @@ class PhysicsKind:
     #: (``simcase.mesh_limits``); the runner then gets them as ``mesh_limits``.
     #: None for a kind that takes them for no document
     accepts_mesh_limits: Callable[[Any], bool] | None = None
+    #: the slots this kind's format 0.3 documents add to the shared ones (``simcase.slots``):
+    #: data only, one dict per entry. None for a kind that does not read format 0.3 yet,
+    #: whose 0.3 documents are refused with ``E-CONTRACT``
+    slots: tuple[dict, ...] | None = None
+    #: the geometry forms (``simcase.slots.GEOMETRY_FORMS``) whose format 0.3 documents this
+    #: kind reads; None for every form. A 0.3 document of another form is refused with
+    #: ``E-CONTRACT`` while the kind still reads that form in format 0.2 only
+    forms_03: frozenset[str] | None = None
+    #: a refusal by name, checked on the raw format 0.3 tree before its slots are walked: a
+    #: ``(path, message)`` pair (``E-CONTRACT``), or ``(path, message, code)``, for a document
+    #: one of this kind's types never takes (for example a geometry form), so the reader names
+    #: it before asking for that type's keys; None (or a None result) for none
+    refuse_03: Callable[[dict], tuple | None] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}

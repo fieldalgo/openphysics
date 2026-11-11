@@ -8,7 +8,9 @@ documents: named shapes, each naming a material, drawn in order over a
 background (later shapes cut earlier ones). Thermal properties come from the
 `materials` table. The mesh follows every region boundary. The headless API and
 CLI run these documents, and Studio validates, runs and shows them within its
-region limits (see Limits below).
+region limits (see Limits below). Region documents are
+[format 0.3](document_format.md): every value carries its unit and keys are registry
+quantity names; a format 0.2 region document is refused by name (`E-FORMAT`).
 
 Rectangle documents without `background`/`shapes` keep the
 [original contract](thermal_steady2d.md) and its
@@ -22,29 +24,30 @@ heater in insulation, cooled at the bottom and by convection at the top:
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Heated steel plate in insulation",
-  "units": {"length": "mm", "temperature": "K"},
   "geometry": {
+    "length_unit": "mm",
+    "depth": null,
     "domain": {"xmin": 0, "xmax": 40, "ymin": 0, "ymax": 20},
     "background": {"material": "insulation"},
     "shapes": [
       {"name": "plate", "type": "rect", "x": 5, "y": 5, "w": 30, "h": 6, "material": "steel"},
-      {"name": "heater", "type": "circle", "cx": 20, "cy": 8, "r": 2, "material": "copper", "mesh_size": 0.5}
+      {"name": "heater", "type": "circle", "cx": 20, "cy": 8, "r": 2, "material": "copper", "element_size": "0.5 mm"}
     ]
   },
   "materials": {
-    "steel": {"conductivity_w_mk": 45, "source": "document value"},
-    "copper": {"conductivity_w_mk": 400, "source": "document value"},
-    "insulation": {"conductivity_w_mk": 0.04, "source": "document value"}
+    "steel": {"thermal_conductivity": "45 W/(m K)", "source": "document value"},
+    "copper": {"thermal_conductivity": "400 W/(m K)", "source": "document value"},
+    "insulation": {"thermal_conductivity": "0.04 W/(m K)", "source": "document value"}
   },
   "physics": {"heat1": {
     "type": "thermal.steady2d",
-    "heat_source_w_m3": {"heater": 5e6},
-    "dirichlet_temperature_k": {"bottom": 300},
-    "convection": {"top": {"h_w_m2k": 10, "ambient_temperature_k": 295}}
+    "heat_source_density": {"heater": "5000000 W/m^3"},
+    "prescribed_temperature": {"bottom": "300 K"},
+    "convection": {"top": {"heat_transfer_coefficient": "10 W/(m^2 K)", "ambient_temperature": "295 K"}}
   }},
-  "mesh": {"size": 2, "min_angle": 28},
+  "mesh": {"element_size": "2 mm", "minimum_angle": "28 deg"},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
@@ -57,52 +60,60 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
 
 ## Input
 
-- `units`: explicit `length` and `temperature: "K"`, as for rectangle documents.
-  Geometry, shape sizes and mesh sizes use the length unit; property names with
-  an SI suffix (`_w_mk`, `_w_m3`, `_w_m2`, `_w_m2k`, `_k`) are SI.
+- `geometry.length_unit`: the unit of the domain and shape numbers, which are plain
+  numbers (as in every format 0.3 geometry); `geometry.depth`: a length such as
+  `"40 mm"`, or `null` for results per metre of depth.
 - `geometry.domain`: the rectangle; its four sides are the boundary tags
   `left`, `right`, `bottom`, `top`.
-- `geometry.background`: `material` and optional `mesh_size`. The background
-  region is named `background`.
+- `geometry.background`: `material` and optional `element_size` (a length such as
+  `"0.5 mm"`). The background region is named `background`.
 - `geometry.shapes`: list of `rect` (`x`, `y`, `w`, `h`), `circle` (`cx`, `cy`,
   `r`) or `polygon` (`points`, at least three `[x, y]`, not self-intersecting),
   each with a unique nonempty `name` (not `background`), a `material` and an
-  optional `mesh_size`. No other keys are accepted. Shapes are clipped to the
+  optional `element_size`. No other keys are accepted. Shapes are clipped to the
   domain. A shape that lies outside the domain or is smaller than 1e-12 of the
   domain area is refused (electromagnetic documents drop it without a message in
   the run log). A shape that later shapes cover completely gets no triangles; the
   run log names it. Zero-area pieces left by clipping (where a shape only touches
   the domain or another shape from outside) are not meshed.
-- `materials`: `{material name: {...}}` with `conductivity_w_mk` > 0 (required
-  for every material used), optional `volumetric_heat_capacity_j_m3k` > 0 (not
-  used by steady heat) and an optional `source` note. The table is shared with region
-  mechanics, so `young_modulus_pa`, `poisson_ratio` and `thermal_expansion_per_k` are
-  accepted and checked when present (not used by heat;
-  [mechanics](mechanics2d.md#material-regions-and-named-boundaries)). Thermal properties are
-  never taken from built-in optical materials; every used material must be
-  defined here. Unused materials are allowed. The same table may hold
-  `electrical_conductivity_s_m` > 0 for [region electric
-  conduction](electric_joule.md#material-regions-electric-steady-conduction); heat
-  ignores it (since 2026-11-08; before, it was refused as an unknown key).
-- `physics.<name>`: `type`, `heat_source_w_m3` (one number, or `{region name:
-  number}` with regions not listed at zero), `dirichlet_temperature_k`,
-  `outward_flux_w_m2` and `convection` with the side rules of the rectangle
-  documents (corner conflicts refused, a Dirichlet side or positive Robin anchor
-  required, no natural condition on a Dirichlet side). `conductivity_w_mk` here
-  is refused: it comes from `materials`. A [version 1 geometry
-  block](geometry_document.md) may name more boundaries, see
+- `materials`: `{material name: {...}}` with `thermal_conductivity` > 0 (such as
+  `"45 W/(m K)"`, required for every material used), `volumetric_heat_capacity` > 0
+  (required by transient heat) and an optional `source` note. The table is shared with
+  region mechanics and region electric conduction, so `youngs_modulus`, `poisson_ratio`,
+  `linear_expansion_coefficient` and `electrical_conductivity` are accepted and checked
+  when present. A property heat does not read is reported as `I-UNUSED-PROPERTY` (checked,
+  not used). Thermal properties are never taken from built-in optical materials; every used
+  material must be defined here (`E-MATERIAL-UNKNOWN`, `E-PROPERTY-MISSING`). Unused
+  materials are allowed.
+- `physics.<name>`: `type`, `heat_source_density` (one quantity such as
+  `"5e6 W/m^3"`, or `{region name: quantity}` with regions not listed at zero; an
+  unknown region is `E-SELECTION-UNKNOWN`), `prescribed_temperature`,
+  `inward_heat_flux` and `convection` (`heat_transfer_coefficient`,
+  `ambient_temperature`) with the side rules of the rectangle documents (corner
+  conflicts refused, a prescribed side or positive convection anchor required, no
+  natural condition on a prescribed side). A side with no condition is insulated and
+  reported once as `I-DEFAULT-BOUNDARY` at `physics.<name>.inward_heat_flux.<side>`.
+  `thermal_conductivity` here is refused: it comes from `materials`. A [version 1
+  geometry block](geometry_document.md) may name more boundaries, see
   [Named boundaries](#named-boundaries).
-- `mesh`: `size` > 0 (length unit, required) and `min_angle` (degrees, default
-  28, at most 33). `subdivisions` and `grading` are refused.
+- `mesh`: `element_size` (a length, required) and `minimum_angle` (default `"28 deg"`,
+  at most 33 degrees); `element_count_limit` (default 600000) refuses a mesh whose
+  estimated element count is larger (`E-MESH-ESTIMATE`). `subdivision_count` and
+  `grading` are refused. A version 1 block may add `mesh.controls`
+  (`element_size`, `refinement_distance`, `circle_segment_count` on its selections).
 - `study` `{"type": "single"}`; `results.plots` must be false.
+
+The reader records every default in `defaults_applied` and every value it read in
+`resolved_inputs` (authored text, SI value and unit).
 
 A source named for a region that does not survive meshing (fully covered by a
 later shape) is refused when the document runs.
 
 ## Mesh and solve
 
-Geometry and global/per-region mesh sizes are first converted to micrometres
-with the same decimal-ratio conversion used by electromagnetic documents.
+Geometry and global/per-region element sizes first go to micrometres from the
+document's exact values, as for electromagnetic documents: each shape number from
+its picometre count, each size from its exact value.
 meshine then performs constrained Delaunay refinement with the requested
 minimum angle. Its canonical coordinates are converted directly to SI metres
 for the heat solver, without a round trip through the document unit.
@@ -161,13 +172,16 @@ onto the edge or clear of it). Shapes clear of other boundaries still give the
 best triangles. Electromagnetic documents use the same mesher and behave the
 same way.
 
-For inputs that convert to the same micrometre numbers, mm, m, um, nm and
-custom length units now produce identical SI nodes, connectivity, region and
-boundary tags, and steady/transient fields in the same numerical environment.
-This includes an affine transient initial temperature: its domain origin uses
-the same canonical-to-SI conversion as the mesh. SI-suffixed material, load and
-temperature values and study times are unchanged. Saved `nodes_m` remain in
-metres, and `model.json` retains the original document units.
+For inputs that convert to the same micrometre numbers, the length units mm,
+m, um and nm produce identical SI nodes, connectivity, region and boundary tags,
+and steady/transient fields in the same numerical environment. This includes an
+affine transient initial temperature: its domain origin uses the same
+canonical-to-SI conversion as the mesh. Material, load and temperature values and
+study times are resolved from their own units and do not depend on the length
+unit. Saved `node_coordinates` are in metres, and `model.json` keeps the document
+as written. The one summary value that can move by rounding across length units is
+`minimum_triangle_angle`, measured on the triangulation in the document's numbers
+(compared to 1e-12 in the regression below).
 
 This is not a promise for inputs that differ after conversion (even by one
 ulp), or across library versions/platforms. Canonical meshing can change a
@@ -177,27 +191,33 @@ positions.
 
 ## Results
 
-`result_format` is `thermal.steady2d-regions-result-v1` and `field_layout`
-`thermal2d-p1-node-cell-regions-v1`. The saved fields are those of the
-boundary v2 layout (`nodes_m`, `triangles`, `temperature_k`, `heat_flux_w_m2`,
-`load_w_per_m`, `reaction_w_per_m`, `residual_w_per_m`, `dirichlet_node_ids`,
-`dirichlet_temperature_k`, `prescribed_outward_load_w_per_m`,
-`ambient_load_w_per_m`, `convective_outward_w_per_m`, `system_rhs_w_per_m`)
-plus `triangle_regions` (integer region id per triangle). Boundary fields are
-always present (zero when no natural condition is given). The summary adds
-`region_names` (index order of `triangle_regions`), `regions` (material,
-triangle count and meshed area in m^2 per region), the `materials` table,
-`conductivity_range_w_mk`, the mesh size and the achieved minimum angle.
-Signs and units are those of the boundary contract: reaction is inward
-thermostat heat, total outward heat is
-`sum(prescribed_outward_load + convective_outward - reaction)`, all nodal
-rates are W/m of depth.
+`result_format` is `thermal.steady2d-regions-result-v2` and `field_layout`
+`thermal2d-p1-node-cell-regions-v2` (the format 0.2 pair `-result-v1` and
+`-regions-v1` is retired: a saved result with it is refused by name). The saved
+fields are those of the rectangle boundary layout under their registry names
+(`node_coordinates`, `triangles`, `temperature`, `heat_flux`,
+`generated_heat_rate_per_depth`, `reaction_heat_rate_per_depth`,
+`residual_heat_rate_per_depth`, `prescribed_node_ids`, `prescribed_temperature`,
+`outward_prescribed_heat_rate_per_depth`, `ambient_convective_heat_rate_per_depth`,
+`outward_convective_heat_rate_per_depth`, `applied_heat_rate_per_depth`) plus
+`triangle_regions` (integer region id per triangle, no unit). Boundary fields are
+always present (zero when no natural condition is given). `field_units` gives each
+array's unit. The summary adds `region_names` (index order of `triangle_regions`),
+`regions` (material, triangle count and meshed `area` per region), the `materials`
+table, `minimum_thermal_conductivity`, `maximum_thermal_conductivity`, the mesh counts
+and the achieved `minimum_triangle_angle` (rad); every physical value is
+`{value, unit}`, and the summary keeps `resolved_inputs`, `defaults_applied`,
+`diagnostics`, `extent` and `timing.wall_time`. Signs and units are those of the
+boundary contract: reaction is inward thermostat heat, total outward heat
+(`outward_heat_rate_per_depth`) is
+`sum(outward_prescribed + outward_convective - reaction)`, all nodal rates are W/m
+of depth.
 
 ## Named boundaries
 
 A document with a [version 1 geometry block](geometry_document.md) may give
-`dirichlet_temperature_k`, `outward_flux_w_m2` and `convection` entries (and
-the transient runner its `dirichlet_temperature_k`) to boundaries beyond the
+`prescribed_temperature`, `inward_heat_flux` and `convection` entries (and
+the transient runner its `prescribed_temperature`) to boundaries beyond the
 four domain sides:
 
 - the exterior tags the [stage 2 engine](geometry_engine.md) declares: a
@@ -207,7 +227,7 @@ four domain sides:
   nodes under the selection's name (`mesh.boundary[name]`) and, when every
   curve of the selection lies on the exterior (the domain or a void), tags its
   edges too (`mesh.boundary_edges[name]`), beside the side or `outer` tag the
-  same edges carry. `dirichlet_temperature_k` may name any selection, an
+  same edges carry. `prescribed_temperature` may name any selection, an
   interface between two regions included (a prescribed temperature on an
   internal surface; galerkin fixes interior nodes, 2026-11-08); flux and
   convection need exterior edges, so an interface selection is refused by name
@@ -232,8 +252,8 @@ the wall's polygon length and a convection on it the series-resistance rate
 within 2e-3, both with heat balance within 1e-10; an unnamed hole is insulated
 with the balance within 1e-10; the refusals (interface selections for flux and
 convection, unknown names, a region selection, doubled edges); the transient
-runner's Dirichlet on a selection and its refusals; a 0.2 document keeps its
-four sides. G6-2 and G6-3 (2026-11-08): an interface selection fixed at a
+runner's Dirichlet on a selection and its refusals; a document without a
+version 1 block keeps its four sides. G6-2 and G6-3 (2026-11-08): an interface selection fixed at a
 temperature gives the same outward heat on the domain sides as the same
 rectangle cut out as a void with that temperature on its wall, within 1e-3, and
 the fixed region sits at that temperature within 1e-9; the transient runner's
@@ -253,33 +273,34 @@ runner through [axisymmetric transient heat](../galerkin/transient_heat.md#axisy
 
 - **Sides.** With `xmin == 0` the r = 0 side is the mesh tag `axis`, which is
   the symmetry axis: it carries natural regularity and takes no
-  `dirichlet_temperature_k`, `outward_flux_w_m2` or `convection` entry
+  `prescribed_temperature`, `inward_heat_flux` or `convection` entry
   (refused by name, as is `left`, which such a domain does not have). The
   physical sides are `right` (the outer radius), `bottom` and `top`. An annulus
   (`xmin > 0`) keeps `left` as its inner radius.
 - **Result.** The run returns an `AxisymmetricRegionThermalRunResult`, whose
-  identifiers are `thermal.axisymmetric-regions-result-v1` and
-  `thermal-axisymmetric-p1-node-cell-regions-v1`. Its nodal rates are
-  **full-revolution powers in W**, under the field names `load_w`,
-  `reaction_w`, `residual_w`, `prescribed_outward_load_w`, `ambient_load_w`,
-  `convective_outward_w` and `system_rhs_w`; the summary's diagnostics end in
-  `_w` (`source_heat_w`, `outward_heat_w`, ...) and it records
-  `coordinate_system: "axisymmetric"` and `nodal_heat_rate_unit: "W"`.
-  Temperature (K), heat flux (W/m²), triangle regions and areas (`area_m2`,
-  the meridional section) are as in a Cartesian run. The Cartesian
-  identifiers and `_w_per_m` names are never used for such a result.
+  identifiers are `thermal.axisymmetric-regions-result-v2` and
+  `thermal-axisymmetric-p1-node-cell-regions-v2`. Its nodal rates are
+  **full-revolution powers in W**, under the registry names without
+  `_per_depth`: `generated_heat_rate`, `reaction_heat_rate`, `residual_heat_rate`,
+  `outward_prescribed_heat_rate`, `ambient_convective_heat_rate`,
+  `outward_convective_heat_rate` and `applied_heat_rate`; the summary's totals are
+  named the same way (`generated_heat_rate`, `outward_heat_rate`, ...) and it records
+  `coordinate_system: "axisymmetric"`. Temperature (K), heat flux (W/m²) and triangle
+  regions are as in a Cartesian run; each region's area is its `meridional_area`.
+  The Cartesian identifiers and `_per_depth` names are never used for such a result,
+  and `geometry.depth` is refused (a body of revolution has no depth).
 - **Transient result.** A `thermal.transient2d` document returns an
   `AxisymmetricTransientRegionRunResult` with the identifiers
-  `thermal.axisymmetric-transient-regions-result-v1` and
-  `thermal-axisymmetric-transient-p1-node-cell-regions-v1`: the histories of
+  `thermal.axisymmetric-transient-regions-result-v2` and
+  `thermal-axisymmetric-transient-p1-node-cell-regions-v2`: the histories of
   a [transient region result](#transient-documents) with the nodal rates in W
-  under `source_load_w`, `reaction_w`, `residual_w` and `storage_rate_w`, the
-  heat content in J as `heat_content_j` and the quadratic functional in J K as
-  `quadratic_functional_jk`; the summary's totals end the same way
-  (`source_heat_w`, `storage_heat_w`, `outward_heat_w`, `heat_balance_defect_w`,
-  `heat_content_j`, `quadratic_functional_jk`) and it records
-  `coordinate_system: "axisymmetric"` and `nodal_heat_rate_unit: "W"`. The
-  Dirichlet names are those of the steady case (`axis` and a `left` at r = 0
+  under `generated_heat_rate`, `reaction_heat_rate`, `residual_heat_rate` and
+  `heat_storage_rate`, the stored heat in J as `stored_heat` and the quadratic
+  functional in J K as `thermal_energy_functional`; the summary's totals are named
+  the same way (`generated_heat_rate`, `heat_storage_rate`, `outward_heat_rate`,
+  `heat_rate_imbalance`, `stored_heat`, `thermal_energy_functional`) and it records
+  `coordinate_system: "axisymmetric"`. The prescribed-temperature names are those of
+  the steady case (`axis` and a `left` at r = 0
   refused by name); the initial field, sampled histories and source map are
   the Cartesian transient contract.
 - **Not taken.** The waveguide runner (a body of revolution is not its
@@ -301,7 +322,7 @@ runners' and Studio's refusals, and the result identifiers and field names.
 
 Checks G7-5 (same file, pre-registered on 2026-11-08 and measured the same
 day): the transient cylinder document returns the transient axisymmetric
-identifiers with `_w`/`_j`/`_jk` names only, saves and exports them (VTU at a
+identifiers with the plain (no `_per_depth`) names only, saves and exports them (VTU at a
 time index and the PVD series), its source power is `Q π R² L` within 1e-12,
 its heat content at t0 `c T0 π R² L` within 1e-12 and its per-step balance
 defect within 1e-10 of the rates; with geometrically growing steps it reaches
@@ -346,24 +367,28 @@ interface heat rates, is in [multimaterial](../galerkin/multimaterial.md).
 ## Transient documents
 
 A `thermal.transient2d` document with `background`/`shapes` uses the same
-geometry, `materials` table and `mesh` (`size`, `min_angle`) as the steady
-region documents, with the transient time contract of
-[thermal_transient2d](thermal_transient2d.md): `units.time: "s"`,
-`study: {"type": "transient", "time_s": [...]}` with explicit increasing
-seconds, `initial_temperature_k` (uniform number or `affine` object) and
-`dirichlet_temperature_k` per side (constant or `{"values_k": [...]}` sampled at
-the requested times, agreeing with the initial field at t0). Every used
-material needs `conductivity_w_mk` and `volumetric_heat_capacity_j_m3k`;
-`heat_source_w_m3` is a number or a `{region name: number}` map. Physics-level
-`conductivity_w_mk` or `volumetric_heat_capacity_j_m3k` is refused. The shipped
-example is `transient_thermal_regions` (`examples/simcase/transient_thermal_regions.json`).
+geometry, `materials` table and `mesh` (`element_size`, `minimum_angle`) as the
+steady region documents, with the transient time contract of
+[thermal_transient2d](thermal_transient2d.md): `study: {"type": "transient",
+"time": {"unit": "s", "values": [...]}}` with explicit increasing times,
+`initial_temperature` (a uniform quantity such as `"300 K"`, or an `affine` object)
+and `prescribed_temperature` per side (a quantity, or a tagged array sampled at the
+requested times, agreeing with the initial field at t0). Every used material needs
+`thermal_conductivity` and `volumetric_heat_capacity`; `heat_source_density` is a
+quantity or a `{region name: quantity}` map. Physics-level `thermal_conductivity` or
+`volumetric_heat_capacity` is refused. The shipped example is
+`transient_thermal_regions` (`examples/simcase/transient_thermal_regions.json`).
 
-Results use `thermal.transient2d-regions-result-v1` and
-`thermal2d-transient-p1-node-cell-regions-v1`: the rectangle transient fields
-plus static `triangle_regions`. The summary adds `region_names`, `regions`,
-`materials` and the mesh size. `heat_content_j_per_m` is `1^T M T` with each
-region's capacity. Full histories are kept in memory (O(steps x (nodes +
-triangles))); the convergence study below peaked at about 825 MiB.
+Results use `thermal.transient2d-regions-result-v2` and
+`thermal2d-transient-p1-node-cell-regions-v2` (the `-v1` pair is retired): the
+rectangle transient fields under their registry names (`time`, `temperature`,
+`heat_flux`, `generated_heat_rate_per_depth`, `reaction_heat_rate_per_depth`,
+`residual_heat_rate_per_depth`, `heat_storage_rate_per_depth`,
+`stored_heat_per_depth`, `thermal_energy_functional_per_depth`, ...) plus static
+`triangle_regions`. The summary adds `region_names`, `regions`, `materials` and the
+mesh counts. `stored_heat_per_depth` is `1^T M T` with each region's capacity. Full
+histories are kept in memory (O(steps x (nodes + triangles))); the convergence study
+below peaked at about 825 MiB.
 
 Validation (`tests/simcase/test_transient_thermal_regions.py`):
 
@@ -432,9 +457,9 @@ that sets it raises `ImportError`, and every other run is unchanged.
 Only `max_input_vertices` bounds the work before meshing. `max_nodes` and
 `max_triangles` act once meshine has built the domain, which compares every
 loop vertex with every earlier one (O(V²)), and an isolated circle makes its
-vertices before that, or fails while making them at a `mesh.size` near zero.
+vertices before that, or fails while making them at a `mesh.element_size` near zero.
 Without `max_input_vertices`, the steady example with its regions sized 2 mm
-and a global `mesh.size` of 0.004 is refused by `max_nodes` 10,201 only after
+and a global `mesh.element_size` of 0.004 mm is refused by `max_nodes` 10,201 only after
 tens of seconds (28 s and 45 s in two measurements on Linux), and at 5e-324 it
 still ends in an `OverflowError`, as with no limit.
 For documents from others, give `max_input_vertices` too.
@@ -449,10 +474,10 @@ For documents from others, give `max_input_vertices` too.
 - a circle that another boundary touches or crosses, or that a later shape
   overlaps, is a 128-gon;
 - an isolated circle, meshed as an exact meshine `Circle`, counts
-  max(16, int(4πr / `mesh.size`)) with the **global** `mesh.size`, even when it
-  sets its own `mesh_size`, and counts again as the hole of the region around
-  it. The shipped steady example at `mesh.size` 0.0246 has 2054 loop vertices,
-  2042 of them from the heater.
+  max(16, int(4πr / `mesh.element_size`)) with the **global** `mesh.element_size`,
+  even when it sets its own `element_size`, and counts again as the hole of the
+  region around it. The shipped steady example at `mesh.element_size` 0.0246 mm has
+  2054 loop vertices, 2042 of them from the heater.
 
 The count is taken before meshine's own T-junction splits, so the loops meshine
 processes can be longer. It is the count of what is meshed: the document's
@@ -460,21 +485,22 @@ micrometre copy (see Mesh and solve). The shapes' booleans and the circle rule
 do not depend on the unit, so the count is usually the same as in the
 document's own numbers, and it is the same on the 22 millimetre documents the
 tests use.
-Where 4πr / `mesh.size` lies within rounding of an integer it can differ: the
-steady example with regions sized 2 mm at `mesh.size` 4π·2/20 mm has 52 loop
+Where 4πr / `mesh.element_size` lies within rounding of an integer it can differ: the
+steady example with regions sized 2 mm at `mesh.element_size` 4π·2/20 mm has 52 loop
 vertices in millimetres and 50 in the micrometre copy that is meshed, and 50 is
 what is counted. `check_mesh_limits(doc, *, max_input_vertices)` returns the
 count of a region document without building the domain or changing the
-document, or raises `MeshLimitError`. It validates the micrometre copy, as a run
-does, so it resolves the shapes' booleans twice: in that validation and to
-count. A `Document` that was never validated (`Document(data)`,
-`Document.copy()`) has no resolved length unit yet; it is counted on a validated
-copy, as its run would validate it first, which resolves them once more.
+document, or raises `MeshLimitError`. It counts the micrometre copy a run meshes:
+the micrometre frame made from the document's exact values (`views.region_mesh`).
+A `Document` that was never read
+(`Document(data)`, `Document.copy()`) is read first, as its run would read it.
 An isolated circle whose own count is
 over the limit is refused before its vertices are made, with that count's
 estimate (in micrometres) in the message, so under `max_input_vertices` a
-`mesh.size` near zero (5e-324) raises `MeshLimitError`, not a division,
-overflow or memory error.
+`mesh.element_size` near zero raises `MeshLimitError`, not a division,
+overflow or memory error; an element size below 1e-300 m is refused by the reader
+(`E-DOMAIN` at `mesh.element_size`), and a mesh estimated above
+`mesh.element_count_limit` elements by `E-MESH-ESTIMATE`.
 
 **`MeshLimitError`** is a `ValueError`, not a `DocumentError`: the document is
 valid, and the caller's limit refuses it. `quantity` is `'input_vertices'`,
@@ -630,29 +656,34 @@ work, not time: the time per pair depends on the machine.
   sharp polygon corner, triangles in either region can be as sharp as the input
   corner or a little sharper (measured 13.0° beside a 14° polygon corner); an
   input meshine cannot resolve ends with an error (see Mesh and solve).
-- Plane geometry of unit depth; no thermal properties from built-in materials.
+- Plane geometry of unit depth (`depth: null`) or a stated `geometry.depth`; no
+  thermal properties from built-in materials.
 
 ### Canonical length regression
 
 `tests/simcase/test_thermal_length_canonical.py` compares a translated domain
-with rectangles, an isolated circle, a polygon, background and per-shape mesh
-sizes in mm, m, um, nm and a custom `in_m` unit. Steady flux/Robin loads and
-transient affine initial data exercise both solve paths. Every numeric saved
-array, region/material assignment and boundary tag must be identical; the
-original model and declared units must be preserved. Existing layered-wall
+with rectangles, an isolated circle, a polygon, background and per-shape element
+sizes with the shape numbers in mm, m, um and nm (format 0.3 has no custom length
+unit). Steady flux/Robin loads and transient affine initial data exercise both
+solve paths. Every numeric saved array, region/material assignment, boundary tag
+and summary value must be identical, except `minimum_triangle_angle` (within 1e-12,
+see Mesh and solve); the original model must be preserved. Existing layered-wall
 analytical convergence tests remain required.
 
 ## VTU and PVD export
 
 Install `simcase[export]` (meshio, MIT) to view saved region results in ParaView.
 `export_fields(fields_npz, output, *, time_index=-1)` accepts
-`thermal2d-p1-node-cell-regions-v1`,
-`thermal-axisymmetric-p1-node-cell-regions-v1` (points are (r, z), the
-rates are the `_w` full-revolution powers) and
-`thermal2d-transient-p1-node-cell-regions-v1`. `export_time_series(fields_npz,
-output_dir, *, name="fields")` accepts the transient layout and writes one VTU
-per stored time plus a PVD collection with exact `time_s` values in seconds.
-Neither function reruns the solver or changes the saved result.
+`thermal2d-p1-node-cell-regions-v2`,
+`thermal-axisymmetric-p1-node-cell-regions-v2` (points are (r, z), the
+rates are the full-revolution powers in W) and the transient
+`thermal2d-transient-p1-node-cell-regions-v2` and
+`thermal-axisymmetric-transient-p1-node-cell-regions-v2`.
+`export_time_series(fields_npz, output_dir, *, name="fields")` accepts the
+transient layouts and writes one VTU per stored time plus a PVD collection with
+exact `time` values in seconds. Neither function reruns the solver or changes the
+saved result. A result saved before format 0.3 (the `-regions-v1` layouts) is
+refused by name (`RETIRED_LAYOUTS`).
 
 ```python
 from simcase import Document, run
@@ -670,38 +701,42 @@ export_time_series(transient_dir / "fields.npz", "out/region-transient/paraview"
 
 Open `view.vtu` or `paraview/fields.pvd` in ParaView. Color by the **cell**
 array `triangle_regions` to distinguish regions (even when they use the same
-material), or by `temperature_k` to inspect the nodal temperature. IDs are the
+material), or by `temperature` to inspect the nodal temperature. IDs are the
 unchanged zero-based indices into `summary.json["region_names"]`;
 `summary.json["regions"][name]["material"]` identifies each material. The same
-summary is in the NPZ metadata. Names, properties and boundary tags are not
-copied into VTU; keep the original NPZ/summary for their meaning.
+summary is in the NPZ metadata. Each VTU's FieldData holds `units` (every exported
+array's unit, as `field_units`) and `conventions` (the sign sentence of each signed
+array). Names, properties and boundary tags are not copied into VTU; keep the
+original NPZ/summary for their meaning.
 
 | VTU association | Arrays and units |
 |---|---|
-| Points | `nodes_m`, embedded at z = 0, in metres regardless of document length unit |
-| Point data | `temperature_k` (K); stored nodal loads, reactions, residuals and storage rates (W/m of depth) |
-| Cell data | `heat_flux_w_m2` (W/m², zero z component); `triangle_regions` (dimensionless integer) |
+| Points | `node_coordinates`, embedded at z = 0, in metres regardless of the geometry's length unit |
+| Point data | `temperature` (K); stored nodal heat rates, reactions, residuals and storage rates (W/m of depth; W for an axisymmetric result) |
+| Cell data | `heat_flux` (W/m², zero z component); `triangle_regions` (integer, no unit) |
 
-Steady region exports include `load_w_per_m`, `reaction_w_per_m`,
-`residual_w_per_m`, `prescribed_outward_load_w_per_m`, `ambient_load_w_per_m`,
-`convective_outward_w_per_m` and `system_rhs_w_per_m`. Their flux/Robin signs
-and outer-side boundary conditions remain those described above. Transient
-exports include `source_load_w_per_m`; reaction, residual and storage-rate
-arrays exist only from the second stored time. No initial rate is invented.
-Domain histories such as heat content, boundary-node subsets, names and units
-remain in NPZ/summary. No point/cell interpolation or region renumbering occurs.
+Steady region exports include `generated_heat_rate_per_depth`,
+`reaction_heat_rate_per_depth`, `residual_heat_rate_per_depth`,
+`outward_prescribed_heat_rate_per_depth`, `ambient_convective_heat_rate_per_depth`,
+`outward_convective_heat_rate_per_depth` and `applied_heat_rate_per_depth`. Their
+flux/convection signs and outer-side boundary conditions remain those described
+above. Transient exports include `generated_heat_rate_per_depth`; reaction, residual
+and `heat_storage_rate_per_depth` arrays exist only from the second stored time. No
+initial rate is invented. Domain histories such as stored heat, boundary-node
+subsets and names remain in NPZ/summary. No point/cell interpolation or region
+renumbering occurs.
 
 An existing VTU is refused; a series directory must be new or empty. Series
 failures remove files created by that call. Missing, non-integer, negative or
 incorrectly shaped `triangle_regions` arrays are rejected before output is
 created. This is an exporter for valid `save()` results, not a full validator
 for arbitrary NPZ archives. It does not support restart, XDMF or transient
-flux/Robin input. The separate rectangular steady `boundary-v2` layout is
+flux/Robin input. The separate rectangular steady `boundary-v3` layout is
 exported by the same function with its own arrays ([overview](overview.md#viewing-in-paraview)).
 
 `tests/simcase/test_export_regions.py` checks all exported arrays against NPZ,
 all stored timesteps, initial-rate absence, region IDs distinct from material
-IDs, output protection and failure cleanup. Equivalent mm/m/um/nm/custom-unit
-problems must give exactly equal SI export arrays in the same numerical
+IDs, the FieldData block, output protection and failure cleanup. Equivalent
+mm/m/um/nm problems must give exactly equal SI export arrays in the same numerical
 environment, subject to the canonical-length condition above. These consumers
 also run against installed wheels on Linux, macOS and Windows.

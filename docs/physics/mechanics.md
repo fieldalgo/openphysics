@@ -12,12 +12,13 @@ Choose plane stress or plane strain and define displacement constraints and load
 
 ## Execution routes and limits
 
-Static linear elasticity of one homogeneous rectangle, and steady heat followed by thermal
-stress on the same rectangle, also run headless from JSON/CLI
-([linear elasticity and thermoelastic documents](../packages/simcase/mechanics2d.md): plane
-stress or strain, side displacement components, Cartesian side tractions, constant body
-force, side-constant heat data); prescribed-temperature and transient heat-to-mechanics
-stay Python-only, and Studio has no mechanics forms.
+Static linear elasticity of one homogeneous rectangle or of named material regions, and steady
+heat followed by thermal stress on the same mesh, also run headless from JSON/CLI
+([linear elasticity and thermoelastic documents](../packages/simcase/mechanics2d.md), format
+0.3, every value with its unit: plane stress or strain, prescribed displacement components,
+Cartesian tractions, gauge pressures on named region boundaries, constant body force, heat data
+per side or boundary); prescribed-temperature and transient heat-to-mechanics stay
+Python-only, and Studio has no mechanics forms.
 Mechanics is linear and small-strain; heat-to-mechanics is one-way, with no mechanical feedback to heat. The steady coupled workflow does not inherit the separate flux/Robin/traction extensions. Transient snapshots are quasistatic, not structural dynamics.
 
 ## JSON/CLI documents

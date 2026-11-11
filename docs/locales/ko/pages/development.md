@@ -92,7 +92,9 @@ NumPy·JAX).
 `docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 저장소 검사, 고정한 검증
 환경, 검토한 라이선스 목록, 관리용 스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는
 physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
-있습니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
+있습니다. `physmat/unit_tables.json`은 `python -m physmat.units --write`로
+`physmat/quantities.json`에서 생성합니다(`--check`는 비교). 생성기가 패키지 안에 들어 있어
+`tests/physmat/test_units.py`(R3)가 설치한 휠에서도 이 파일을 검사합니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
 [studies/](../../../../studies/README.md)에는 진단 스크립트가 있습니다. 사람이 돌리며 필수 CI는 돌리지
 않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고, 일곱 패키지(`studio`·`export` extra를 포함한 `simcase`, `rii`를 포함한 `physmat`)를 요구하며 Studio를 여는 `openphysics` 명령을 제공합니다. 루트에서 `python -m pytest`를
 실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
@@ -196,8 +198,9 @@ Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다.
 **설치 시험** (`tools/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
 sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 아홉 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
-`tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
-`packages/` 아래는 복사하지 않습니다. 복사한 파일의 해시는
+`tests/`, `examples/`, `docs/` 아래의 추적 파일, 단위 배치의 고정 문서(`tools/units_batch/fixtures/`,
+시험이 읽는 JSON 데이터)와 루트 `pyproject.toml`만 복사하고 `packages/` 아래와 `tools/`의 다른
+파일은 복사하지 않습니다. 복사한 파일의 해시는
 `suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
 실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가
@@ -239,6 +242,15 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 [벡터](benchmark_vector.md)·[공동](benchmark_cavity.md)·[열전도](benchmark_thermal.md)·
 [탄성](benchmark_elasticity.md)·[전기](benchmark_electric.md)·[미분](benchmark_derivatives.md)
 벤치마크 안내에 있습니다.
+
+**단위 배치 동등성(수동 실행 전용).** `units-batch-equivalence` job은
+`OPENPHYSICS_BATCH_BASELINE`을 `main`과의 merge base로 두고
+`tests/simcase/test_units_batch_equivalence.py`를 Ubuntu 24.04, macOS 15, Windows 2022에서
+한 플랫폼씩 실행합니다. `examples/simcase`의 모든 문서와 고정 fixture를 기준 커밋과 실행한
+커밋에서 각각 기록해, [단위 배치 비교 도구](../../../../tools/units_batch/README.md)의 변환을
+거쳐 solver·mesher 입력과 저장 바이트가 같은지 봅니다. 수동 실행(`gh workflow run
+validate.yml --ref <branch>`)에서만 돌고 push와 pull request에서는 건너뜁니다. `tests`에
+들어 있지 않으므로 플랫폼마다 결과를 따로, 주장하는 커밋의 실행에서 읽습니다.
 
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
@@ -282,6 +294,8 @@ notices, slow 연구.
   `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
   환경 정보, 체크섬, 설치 위치, JUnit XML, `numeric-runtime.json`이 들어 있습니다.
+- 단위 배치 동등성(수동 실행 전용): `units-batch-equivalence-<os>-<run_id>`. 비교
+  보고서(문서와 배열마다의 SHA-256 표), 실행 계획, 양쪽 기록의 manifest가 들어 있습니다.
 
 일부 단계는 통과한 시험의 stdout도 JUnit `system-out`에 남깁니다
 (`-o junit_logging=all -o junit_log_passing_tests=true`). 통과한 시험이 출력한 수치

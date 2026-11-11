@@ -1,0 +1,109 @@
+{
+  "openphysics": "0.2",
+  "name": "canonical region heat",
+  "units": {
+    "length": "mm",
+    "temperature": "K",
+    "time": "s"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": 123.456,
+      "xmax": 133.456,
+      "ymin": -3.2,
+      "ymax": 2.8
+    },
+    "background": {
+      "material": "a",
+      "mesh_size": 1.5
+    },
+    "shapes": [
+      {
+        "name": "plate",
+        "type": "rect",
+        "material": "b",
+        "x": 123.456,
+        "y": -3.2,
+        "w": 4.0,
+        "h": 6.0,
+        "mesh_size": 1.0
+      },
+      {
+        "name": "disk",
+        "type": "circle",
+        "material": "a",
+        "cx": 125.456,
+        "cy": -0.2,
+        "r": 0.8,
+        "mesh_size": 0.4
+      },
+      {
+        "name": "patch",
+        "type": "polygon",
+        "material": "b",
+        "points": [
+          [
+            129.456,
+            -2.2
+          ],
+          [
+            132.456,
+            -2.2
+          ],
+          [
+            132.456,
+            1.8
+          ],
+          [
+            129.456,
+            1.8
+          ]
+        ],
+        "mesh_size": 0.75
+      }
+    ]
+  },
+  "materials": {
+    "a": {
+      "conductivity_w_mk": 2.0,
+      "volumetric_heat_capacity_j_m3k": 2000000.0
+    },
+    "b": {
+      "conductivity_w_mk": 9.0,
+      "volumetric_heat_capacity_j_m3k": 4000000.0
+    }
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.transient2d",
+      "heat_source_w_m3": {
+        "plate": 200000.0,
+        "disk": 300000.0
+      },
+      "dirichlet_temperature_k": {},
+      "initial_temperature_k": {
+        "type": "affine",
+        "origin_temperature_k": 300.0,
+        "gradient_k_per_m": [
+          100000000.0,
+          200000000.0
+        ]
+      }
+    }
+  },
+  "mesh": {
+    "size": 1.5
+  },
+  "study": {
+    "type": "transient",
+    "time_s": [
+      0.0,
+      0.1,
+      0.3
+    ]
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

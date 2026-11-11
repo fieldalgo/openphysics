@@ -13,79 +13,90 @@ import pytest
 from simcase.schema import Document, DocumentError
 from simcase.transient_thermal import TransientThermalRunResult, run_transient_thermal as run
 from simcase.examples import TRANSIENT_THERMAL_UNIFORM
-from simcase.transient_thermal import _FIELD_SPEC
+from simcase.transient_thermal import _FIELD_SPEC, FIELDS_03
 import simcase.transient_thermal as adapter
 import simcase.thermal as storage
 
 
-def document():
+#: the arrays of a result without boundary keys (layout thermal2d-transient-p1-node-cell-v2)
+ARRAYS = [key for key in FIELDS_03 if not key.startswith('outward_')]
+
+
+def raw():
     data = copy.deepcopy(TRANSIENT_THERMAL_UNIFORM)
-    data['mesh']['subdivisions'] = [2, 2]
-    return Document.from_dict(data)
+    data['mesh']['subdivision_count'] = [2, 2]
+    return data
+
+
+def document():
+    return Document.from_dict(raw())
+
+
+def heat(d):
+    """The authored physics entry; a change is read again at the next validation."""
+    return d.data['physics']['heat1']
 
 
 def test_uniform_history_and_independent_heat_accounting():
     r = run(document(), verbose=False)
     assert isinstance(r, TransientThermalRunResult)
-    t = r.time_s
-    np.testing.assert_allclose(r.temperature_k, np.broadcast_to(300+2*t[:, None], (3, 9)),
+    t = r.time
+    np.testing.assert_allclose(r.temperature, np.broadcast_to(300+2*t[:, None], (3, 9)),
                                rtol=0, atol=1e-10)
-    np.testing.assert_allclose(r.heat_flux_w_m2, 0, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(r.source_load_w_per_m.sum(1), 8, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(r.storage_rate_w_per_m.sum(1), 8, rtol=0, atol=1e-10)
-    assert r.dirichlet_temperatures_k.shape == (3, 0)
-    assert r.reaction_w_per_m.shape == r.residual_w_per_m.shape == (2, 9)
-    assert not r.reaction_w_per_m.any()
+    np.testing.assert_allclose(r.heat_flux, 0, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(r.generated_heat_rate_per_depth.sum(1), 8, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(r.heat_storage_rate_per_depth.sum(1), 8, rtol=0, atol=1e-10)
+    assert r.prescribed_temperature.shape == (3, 0)
+    assert r.reaction_heat_rate_per_depth.shape == r.residual_heat_rate_per_depth.shape == (2, 9)
+    assert not r.reaction_heat_rate_per_depth.any()
     # Domain area1, c4: analytic H and V, independent of adapter diagnostics.
-    np.testing.assert_allclose(r.heat_content_j_per_m, 4*(300+2*t), rtol=0, atol=1e-9)
-    np.testing.assert_allclose(r.quadratic_functional_jk_per_m, 2*(300+2*t)**2,
+    np.testing.assert_allclose(r.stored_heat_per_depth, 4*(300+2*t), rtol=0, atol=1e-9)
+    np.testing.assert_allclose(r.thermal_energy_functional_per_depth, 2*(300+2*t)**2,
                                rtol=0, atol=1e-8)
+    with pytest.raises(AttributeError, match='format 0.2 name; read temperature'):
+        r.temperature_k
 
 
 def test_sampled_boundary_and_affine_initial_are_not_projected():
     d = document()
-    p = d.sole_physics()[1]
-    p['dirichlet_temperature_k'] = {side: {'values_k': [300., 300.2, 300.6]}
-                                    for side in ('left', 'right')}
+    heat(d)['prescribed_temperature'] = {side: {'unit': 'K', 'values': [300., 300.2, 300.6]}
+                                         for side in ('left', 'right')}
     r = run(d, verbose=False)
-    np.testing.assert_allclose(r.temperature_k, 300+2*r.time_s[:, None]+np.zeros((3, 9)),
+    np.testing.assert_allclose(r.temperature, 300+2*r.time[:, None]+np.zeros((3, 9)),
                                rtol=0, atol=1e-10)
-    assert len(r.dirichlet_node_ids) == 6
-    np.testing.assert_allclose(r.residual_w_per_m, 0, rtol=0, atol=1e-10)
+    assert len(r.prescribed_node_ids) == 6
+    np.testing.assert_allclose(r.residual_heat_rate_per_depth, 0, rtol=0, atol=1e-10)
     d = document()
-    p = d.sole_physics()[1]
-    p.update(initial_temperature_k={'type': 'affine', 'origin_temperature_k': 300.,
-                                    'gradient_k_per_m': [10., 0.]}, heat_source_w_m3=0.,
-             dirichlet_temperature_k={'left': 300., 'right': 310.})
+    heat(d).update(initial_temperature={'type': 'affine', 'reference_temperature': '300 K',
+                                        'temperature_gradient': {'unit': 'K/m', 'values': [10., 0.]}},
+                   heat_source_density='0 W/m^3',
+                   prescribed_temperature={'left': '300 K', 'right': '310 K'})
     r = run(d, verbose=False)
-    expected = 300+10*r.nodes_m[:, 0]
-    np.testing.assert_allclose(r.temperature_k, np.broadcast_to(expected, (3, 9)), rtol=0, atol=1e-10)
-    np.testing.assert_allclose(r.heat_flux_w_m2,
+    expected = 300+10*r.node_coordinates[:, 0]
+    np.testing.assert_allclose(r.temperature, np.broadcast_to(expected, (3, 9)), rtol=0, atol=1e-10)
+    np.testing.assert_allclose(r.heat_flux,
                                np.broadcast_to([-25., 0.], (3, 8, 2)), rtol=0, atol=1e-9)
 
 
-def test_explicit_si_length_conversion_and_negative_kelvin():
+def test_negative_kelvin_is_refused():
+    # Absolute temperatures are above 0 K since the units batch (registry domain); the
+    # length-conversion half of this test is the length_unit invariance test (P2-5).
     d = document()
-    d.sole_physics()[1].update(initial_temperature_k=-10., heat_source_w_m3=-8.)
-    a = run(d, verbose=False)
-    converted = d.copy()
-    converted.data['units']['length'] = 'mm'
-    for key in converted.domain:
-        converted.domain[key] *= 1000
-    b = run(converted, verbose=False)
-    for key in _FIELD_SPEC:
-        np.testing.assert_allclose(getattr(a, key), getattr(b, key), rtol=0, atol=1e-9)
-    assert a.temperature_k[-1].max() < -10
+    heat(d).update(initial_temperature='-10 K', heat_source_density='-8 W/m^3')
+    with pytest.raises(DocumentError) as caught:
+        run(d, verbose=False)
+    assert [(e.code, e.path) for e in caught.value.diagnostics if e.severity == 'error'] == [
+        ('E-DOMAIN', 'physics.heat1.initial_temperature')]
 
 
 def test_document_and_input_lifetime_and_no_em_attributes():
     d = document()
     r = run(d, verbose=False)
-    d.data['study']['time_s'][1] = 99
-    d.domain['xmax'] = 99
-    assert r.doc['study']['time_s'][1] == .1
-    assert r.doc.domain['xmax'] == 1
-    for key in _FIELD_SPEC:
+    d.data['study']['time']['values'][1] = 99
+    d.data['geometry']['domain']['xmax'] = 99
+    assert r.doc.si['study']['time'][1] == .1
+    assert r.doc['geometry']['domain']['xmax'] == 1
+    for key in ARRAYS:
         a = getattr(r, key)
         assert not a.flags.writeable
     for attr in ('neff', 'wavelength', 'group_index'):
@@ -110,18 +121,21 @@ def test_npz_no_pickle_and_json_shape_unit_time_metadata(tmp_path, fields):
     out = r.save(tmp_path/'fresh')
     meta = json.loads((out/'summary.json').read_text(encoding='utf-8'))
     assert not (out/'.incomplete').exists()
-    assert meta['result_format'] == 'thermal.transient2d-result-v1'
-    assert meta['field_layout'] == 'thermal2d-transient-p1-node-cell-v1'
-    assert meta['field_shapes']['reaction_w_per_m'] == [2, 9]
-    assert meta['field_time_axes']['reaction_w_per_m'] == 'time_s[1:]'
-    assert meta['field_time_axes']['temperature_k'] == 'time_s'
-    assert meta['field_units']['heat_content_j_per_m'] == 'J/m'
-    assert meta['field_units']['quadratic_functional_jk_per_m'] == 'J K/m'
-    assert meta['rate_time_s'] == [.1, .3]
+    assert meta['result_format'] == 'thermal.transient2d-result-v3'
+    assert meta['field_layout'] == 'thermal2d-transient-p1-node-cell-v2'
+    assert meta['field_shapes']['reaction_heat_rate_per_depth'] == [2, 9]
+    # the rates belong to the interval ends; rate_time_s is gone (it was time_s[1:])
+    assert meta['field_time_axes']['reaction_heat_rate_per_depth'] == 'time[1:]'
+    assert meta['field_time_axes']['temperature'] == 'time'
+    assert meta['field_units']['stored_heat_per_depth'] == 'J/m'
+    assert meta['field_units']['thermal_energy_functional_per_depth'] == 'J K/m'
+    assert 'rate_time_s' not in meta and 'timings_s' not in meta
+    assert meta['study']['time'] == {'unit': 's', 'values': [0., .1, .3]}
     assert (out/'fields.npz').exists() == fields
     if fields:
         with np.load(out/'fields.npz', allow_pickle=False) as archive:
-            for key in _FIELD_SPEC:
+            assert 'mesh_length_unit' not in archive
+            for key in ARRAYS:
                 np.testing.assert_array_equal(archive[key], getattr(r, key))
                 assert not archive[key].dtype.hasobject
                 assert list(archive[key].shape) == meta['field_shapes'][key]
@@ -131,7 +145,7 @@ def test_npz_no_pickle_and_json_shape_unit_time_metadata(tmp_path, fields):
 @pytest.mark.parametrize('key', list(_FIELD_SPEC))
 def test_nonfinite_public_result_is_refused_without_complete_output(tmp_path, key):
     d = document()
-    d.sole_physics()[1]['dirichlet_temperature_k'] = {'left': 300.}
+    heat(d)['prescribed_temperature'] = {'left': '300 K'}
     r = run(d, verbose=False)
     bad = getattr(r.solution, key).astype(float).copy()
     bad.flat[0] = np.nan
@@ -232,19 +246,19 @@ def test_two_writers_one_fresh_target(tmp_path):
 def test_finite_json_failure_and_cli_exit_codes(tmp_path, monkeypatch, capsys):
     from simcase.cli import main
     model = tmp_path/'model.json'
-    model.write_text(json.dumps(document().data), encoding='utf-8')
+    model.write_text(json.dumps(raw()), encoding='utf-8')
     assert main(['validate', str(model)]) == 0
     assert main(['run', str(model), '-o', str(tmp_path/'ok'), '-q']) == 0
     # Preflight must stop before solving on reuse.
     monkeypatch.setattr('simcase.cli.run', lambda *a, **k: (_ for _ in ()).throw(AssertionError('must not solve')))
     assert main(['run', str(model), '-o', str(tmp_path/'ok'), '-q']) == 1
     r = run(document(), verbose=False)
-    r.timings['bad'] = float('nan')
+    r.timings['solve'] = float('nan')     # saved as timing.wall_time.solve
     monkeypatch.setattr('simcase.cli.run', lambda *a, **k: r)
     assert main(['run', str(model), '-o', str(tmp_path/'bad'), '-q']) == 1
     assert not (tmp_path/'bad').exists()
-    data = document().data
-    data['study']['time_s'] = [0, 0]
+    data = raw()
+    data['study']['time']['values'] = [0, 0]
     model.write_text(json.dumps(data), encoding='utf-8')
     assert main(['run', str(model), '-o', str(tmp_path/'invalid'), '-q']) == 2
     assert not (tmp_path/'invalid').exists()
@@ -253,13 +267,13 @@ def test_finite_json_failure_and_cli_exit_codes(tmp_path, monkeypatch, capsys):
 
 @pytest.mark.parametrize('path,value', [
     ('name', 'Relabelled result'),
-    ('units.length', 'mm'),
+    ('geometry.length_unit', 'mm'),
     ('geometry.domain.xmax', 2.),
-    ('mesh.subdivisions', [3, 2]),
-    ('physics.heat1.initial_temperature_k', 301.),
-    ('physics.heat1.dirichlet_temperature_k', {'left': {'values_k': [300., 301., 302.]}}),
-    ('physics.heat1.heat_source_w_m3', 9.),
-    ('study.time_s', [0., .2, .4]),
+    ('mesh.subdivision_count', [3, 2]),
+    ('physics.heat1.initial_temperature', '301 K'),
+    ('physics.heat1.prescribed_temperature', {'left': {'unit': 'K', 'values': [300., 301., 302.]}}),
+    ('physics.heat1.heat_source_density', '9 W/m^3'),
+    ('study.time', {'unit': 's', 'values': [0., .2, .4]}),
     ('results.save_fields', False),
 ])
 def test_result_document_changes_cannot_relabel_old_histories(tmp_path, path, value):
@@ -277,16 +291,16 @@ def test_result_document_changes_cannot_relabel_old_histories(tmp_path, path, va
 def test_original_input_mutation_and_mapping_order_are_not_result_mutation(tmp_path):
     d = document()
     r = run(d, verbose=False)
-    d.sole_physics()[1]['heat_source_w_m3'] = 9.
+    heat(d)['heat_source_density'] = '9 W/m^3'
     d.data['name'] = 'New caller model'
     # JSON mapping order is irrelevant, while its captured values stay fixed.
     r.doc.data = dict(reversed(list(r.doc.data.items())))
     out = r.save(tmp_path/'original')
     saved = json.loads((out/'model.json').read_text(encoding='utf-8'))
-    assert saved['physics']['heat1']['heat_source_w_m3'] == 8.
+    assert saved['physics']['heat1']['heat_source_density'] == '8 W/m^3'
     assert saved['name'] == TRANSIENT_THERMAL_UNIFORM['name']
     with np.load(out/'fields.npz', allow_pickle=False) as arrays:
-        np.testing.assert_allclose(arrays['source_load_w_per_m'].sum(1), 8.,
+        np.testing.assert_allclose(arrays['generated_heat_rate_per_depth'].sum(1), 8.,
                                    rtol=0, atol=1e-10)
 
 

@@ -6,8 +6,9 @@ A region document (a heat document whose ``geometry`` has ``shapes`` or ``backgr
 or is a version 1 geometry block) takes this path on the same routes as rectangle documents, which keep their own code
 unchanged. Each stage bounds the cost of the next:
 
-1. on the event loop, O(JSON size): the physics entry, a stray ``mesh.subdivisions`` and,
-   for transient documents, the requested times (the rectangle checks, copied);
+1. on the event loop, O(JSON size): the format 0.3 envelope, the physics entry, a stray
+   ``mesh.subdivision_count`` and, for transient documents, the requested times (the rectangle
+   checks, copied);
 2. in a worker thread: ``region_complexity`` on the raw JSON (shapes, circles, polygon
    points, then boundary crossings), ``Document.from_dict``, ``check_mesh_limits`` (loop
    vertices after the shapes' booleans), the summary floor and, for a run, the run copy;
@@ -30,19 +31,22 @@ import numpy as np
 from fastapi.concurrency import run_in_threadpool
 from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult,
                      TransientThermalRunResult, check_mesh_limits, has_region_geometry, region_complexity,
-                     void_area_m2)
+                     void_area)
 
 from . import thermal_api as common
 from . import transient_thermal_api as transient
 
-STEADY_PAIR = ("thermal.steady2d-regions-result-v1", "thermal2d-p1-node-cell-regions-v1")
-TRANSIENT_PAIR = ("thermal.transient2d-regions-result-v1", "thermal2d-transient-p1-node-cell-regions-v1")
-STEADY_PAYLOAD = "studio-thermal-steady-regions-v1"
-TRANSIENT_MANIFEST = "studio-thermal-transient-regions-v1"   # frames and histories keep their IDs
-REGION_KEYS = ("material", "triangles", "area_m2")
-MESH_KEYS = {"nodes", "triangles", "size", "min_angle_deg", "size_unit"}
-SUBDIVISIONS = ("region documents (geometry.shapes or geometry.background) set mesh.size; "
-                "mesh.subdivisions belongs to rectangle documents")
+# Region documents are format 0.3: arrays under registry names, SI values (units batch C5b).
+STEADY_PAIR = ("thermal.steady2d-regions-result-v2", "thermal2d-p1-node-cell-regions-v2")
+TRANSIENT_PAIR = ("thermal.transient2d-regions-result-v2", "thermal2d-transient-p1-node-cell-regions-v2")
+STEADY_PAYLOAD = "studio-thermal-steady-regions-v2"
+TRANSIENT_MANIFEST = "studio-thermal-transient-regions-v2"   # frames and histories: the rectangle's v2 IDs
+REGION_KEYS = ("material", "triangles", "area")
+MESH_KEYS = {"nodes", "triangles"}
+SUBDIVISIONS = ("region documents (geometry.shapes or geometry.background) set mesh.element_size; "
+                "mesh.subdivision_count belongs to rectangle documents")
+FORMAT_03 = ('thermal Studio reads format 0.3 region documents ("openphysics": "0.3", values with their units, '
+             'element_size quantities); format 0.2 region documents are not read')
 
 
 @dataclass(frozen=True)
@@ -66,9 +70,8 @@ def applies(raw, kind):
     simcase's own choice of the region path (``simcase.has_region_geometry``):
     a physics entry of that type and a ``geometry`` object with ``shapes`` or ``background``,
     or a version 1 block whose component has features or a background material (a
-    homogeneous rectangle written as version 1 is compiled to the 0.2 rectangle form at load
-    and takes the rectangle path). Thermal defaults add only ``geometry.domain``, so the raw
-    and the merged document agree."""
+    homogeneous rectangle written as version 1 is compiled to the flat rectangle form at load
+    and takes the rectangle path)."""
     return has_region_geometry(raw, kind)
 
 
@@ -93,23 +96,26 @@ def raw_preflight(raw, kind, limits):
                           and isinstance(next(iter(physics.values())), dict)
                           and next(iter(physics.values())).get("type") == transient.KIND,
                           "transient route accepts one thermal.transient2d entry", code="unsupported_physics")
+    if raw.get("openphysics") != "0.3":
+        raise common.ThermalAPIError("invalid_document", FORMAT_03, path="openphysics")
     mesh = raw.get("mesh")
-    if isinstance(mesh, dict) and "subdivisions" in mesh:
-        raise common.ThermalAPIError("invalid_document", SUBDIVISIONS, path="mesh.subdivisions")
+    if isinstance(mesh, dict) and "subdivision_count" in mesh:
+        raise common.ThermalAPIError("invalid_document", SUBDIVISIONS, path="mesh.subdivision_count")
     if kind == common.KIND:
         return None
     # The rectangle time checks (transient_thermal_api.preflight), same codes and messages.
     study = raw.get("study")
-    times = study.get("time_s") if isinstance(study, dict) else None
+    time = study.get("time") if isinstance(study, dict) else None
+    times = time.get("values") if isinstance(time, dict) else None
     transient.require(isinstance(times, list) and len(times) >= 2,
-                      "study.time_s must contain at least two requested times", code="invalid_document")
+                      "study.time must be a tagged array of at least two requested times", code="invalid_document")
     transient.require(len(times) <= transient.MAX_TIMES, "too many requested times", 413, "history_limit_exceeded")
     try:
         valid = (all(type(x) in (int, float) and math.isfinite(x) and x >= 0 for x in times)
                  and all(b > a and math.isfinite(b-a) for a, b in zip(times, times[1:])))
     except OverflowError:
         valid = False
-    transient.require(valid, "requested times must be finite strictly increasing seconds", code="invalid_document")
+    transient.require(valid, "requested times must be finite strictly increasing values", code="invalid_document")
     return len(times)
 
 
@@ -191,25 +197,35 @@ def _check_complexity(raw, rlimits):
 
 
 def _summary_floor(doc, limits):
-    """Refuse a document whose summary cannot fit: the summary copies these four values."""
-    _, physics = doc.sole_physics()
-    floor = {"name": doc["name"], "units": doc["units"], "materials": doc["materials"],
-             "heat_source_w_m3": physics.get("heat_source_w_m3")}
+    """Refuse a document whose summary cannot fit: the summary copies these three values."""
+    _, physics = next(iter(doc.si["physics"].items()))
+    floor = {"name": doc.si["name"], "materials": doc.si["materials"],
+             "heat_source_density": physics.get("heat_source_density")}
     try:
         common.encode_json(floor, limits.metadata_bytes)
     except common.ThermalAPIError as exc:
         raise common.ThermalAPIError(
-            "payload_limit_exceeded", "the result summary copies the document's name, units, materials and heat "
+            "payload_limit_exceeded", "the result summary copies the document's name, materials and heat "
             f"sources, which encode to more than metadata_bytes={limits.metadata_bytes}", 413,
             path="materials") from exc
 
 
-def _accept(raw, kind, limits, rlimits, nt, tags, for_run):
-    """Worker-thread validation; every failure becomes a tagged ThermalAPIError."""
+def result_limit(kind, limits):
+    """``(bytes, capability name)`` of the result a summary's diagnostics and resolved inputs count
+    against: the steady payload, or the transient manifest."""
+    if kind == common.KIND:
+        return limits.payload_bytes, "payload_bytes"
+    return transient.ENCODED_BYTES, "manifest_bytes"
+
+
+def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
+    """Worker-thread validation; every failure becomes a tagged ThermalAPIError. ``raw`` holds the
+    doubles of the authored numbers (the caps read these); the document reads ``exact``, the tree
+    of the request bytes with every number as written."""
     try:
         _check_complexity(raw, rlimits)
         try:
-            doc = Document.from_dict(raw)
+            doc = Document.from_dict(raw if exact is None else exact)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
             raise common.ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
         if getattr(doc, "is_version_1", False) and doc.component.dimension == "axisymmetric":
@@ -218,6 +234,7 @@ def _accept(raw, kind, limits, rlimits, nt, tags, for_run):
                                          400 if for_run else 200)
         count = check_mesh_limits(doc, max_input_vertices=rlimits.max_input_vertices)
         _summary_floor(doc, limits)
+        common.check_document_lists(doc, *result_limit(kind, limits))
         run_doc = None
         if for_run:
             run_doc = doc.copy()        # copy() resets the scale; validate() restores it
@@ -240,11 +257,12 @@ class Route:
     def applies(self, raw):
         return applies(raw, self.kind)
 
-    async def read(self, raw, tags, *, for_run):
+    async def read(self, raw, tags, *, for_run, exact=None):
         nt = raw_preflight(raw, self.kind, self.limits)
         if for_run and not runtime_available(self.kind, self.limits):
             raise common.ThermalAPIError("unsupported_public_api", "matching public result IDs are required")
-        return await _wait_for_thread(_accept, raw, self.kind, self.limits, self.rlimits, nt, tags, for_run)
+        return await _wait_for_thread(_accept, raw, self.kind, self.limits, self.rlimits, nt, tags, for_run,
+                                      exact)
 
 
 async def _wait_for_thread(func, *args):
@@ -309,6 +327,26 @@ def _cell_areas(nodes, triangles, kind):
     return .5*(v[:, 0, 0]*v[:, 1, 1]-v[:, 0, 1]*v[:, 1, 0])
 
 
+def _value_objects(tree):
+    """A resolved SI subtree as the summary writes it: each number a ``{value, unit}`` object
+    of the quantity its key names, text as is."""
+    from physmat.units import quantity
+
+    def walk(node, name):
+        if isinstance(node, dict):
+            return {k: walk(v, k if isinstance(v, (dict, int, float)) and not isinstance(v, bool) and k in
+                            _QUANTITIES else name) for k, v in node.items()}
+        if isinstance(node, (int, float)) and not isinstance(node, bool):
+            return {"value": float(node), "unit": quantity(name).unit}
+        return copy.deepcopy(node)
+    return walk(tree, None)
+
+
+#: the quantity names under which a region summary echoes material and source values
+_QUANTITIES = ("thermal_conductivity", "volumetric_heat_capacity", "electrical_conductivity", "youngs_modulus",
+               "poisson_ratio", "linear_expansion_coefficient")
+
+
 def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
     """Region names, ids, per-region counts, areas and materials against the document."""
     _require(isinstance(names, (list, tuple)) and 1 <= len(names) <= rlimits.max_shapes+1
@@ -319,7 +357,7 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
     count = len(names)
     _require(ids.ndim == 1 and len(ids) == len(triangles) and ids.dtype.kind in "iu"
              and not np.any(ids < 0) and not np.any(ids >= count), "triangle region ids outside the regions")
-    # doc.regions() and doc.background read a 0.2 block's shapes or a version 1 block's features
+    # doc.regions() and doc.background read a flat block's shapes or a version 1 block's features
     assigned = {entry["name"]: entry["material"] for entry in doc.regions()}
     assigned["background"] = doc.background["material"]
     regions = summary.get("regions")
@@ -333,56 +371,67 @@ def check_regions(summary, names, ids, nodes, triangles, doc, rlimits, kind):
         _require(name in assigned and entry["material"] == assigned[name], name+": region material disagrees")
         _require(type(entry["triangles"]) is int and entry["triangles"] == int(cells[i]),
                  name+": region triangle count disagrees")
-        area = entry["area_m2"]
-        _require(type(area) is float and math.isfinite(area) and area >= 0
+        area = entry["area"].get("value") if isinstance(entry["area"], dict) else None
+        _require(isinstance(entry["area"], dict) and entry["area"].get("unit") == "m^2"
+                 and type(area) is float and math.isfinite(area) and area >= 0
                  and area == float(areas[ids == i].sum()), name+": region area disagrees")
         total += area
-    domain = doc.domain
-    scale = doc.scale.to_si(1., {"length": 1})
-    expected = (domain["xmax"]-domain["xmin"])*(domain["ymax"]-domain["ymin"])*scale*scale
+    domain = common.geometry_block(doc)[1]["domain"]
+    expected = (domain["xmax"]-domain["xmin"])*(domain["ymax"]-domain["ymin"])
     void = 0.0
     if getattr(doc, "is_version_1", False):
         # a void feature is a hole: its cells are not meshed, so the regions tile the domain
-        # minus the void area (simcase.thermal_regions.void_area_m2, exact). A round border
+        # minus the void area (simcase.thermal_regions.void_area, exact). A round border
         # between material and void is meshed as an inscribed polygon, which moves area from
         # one side to the other: within 1e-2 of the void area either way (a 16-gon leaves
         # 2.5e-2 of a disc; the mesher's circles have at least 16 vertices and the hand-off's
         # count grows with the mesh size).
-        void = void_area_m2(doc)
+        void = void_area(doc)
     low = expected - void
     _require(math.isfinite(expected) and low > 0 and abs(total-low) <= 1e-2*void + 1e-9*expected,
              "region areas do not add up to the domain minus its void features")
-    _, physics = doc.sole_physics()
-    _require(_exact_json(summary.get("materials")) == _exact_json(doc["materials"]),
+    physics = next(iter(doc.si["physics"].values()))
+    _require(_exact_json(summary.get("materials")) == _exact_json(_value_objects(doc.si["materials"])),
              "summary materials disagree with the document")
-    _require(_exact_json(summary.get("heat_source_w_m3")) == _exact_json(physics["heat_source_w_m3"]),
+    source = physics.get("heat_source_density")
+    expected_source = (None if source is None else {r: {"value": float(v), "unit": "W/m^3"} for r, v in source.items()}
+                       if isinstance(source, dict) else {"value": float(source), "unit": "W/m^3"})
+    _require(_exact_json(summary.get("heat_source_density")) == _exact_json(expected_source),
              "summary heat sources disagree with the document")
 
 
 def _mesh_summary(summary, n, m, doc):
     mesh = summary.get("mesh")
+    size = summary.get("resolved_inputs", {}).get("mesh.element_size", {})
     _require(isinstance(mesh, dict) and set(mesh) == MESH_KEYS
              and type(mesh["nodes"]) is int and mesh["nodes"] == n
              and type(mesh["triangles"]) is int and mesh["triangles"] == m
-             and _exact_json(mesh["size"]) == _exact_json(doc["mesh"]["size"])
-             and _exact_json(mesh["min_angle_deg"]) == _exact_json(doc["mesh"]["min_angle"])
-             and mesh["size_unit"] == doc.length_unit, "summary mesh disagrees with the result")
+             and size.get("value") == doc.si["mesh"]["element_size"], "summary mesh disagrees with the result")
+
+
+def _length(summary, doc):
+    """The display length unit: the geometry's, as the summary's inputs give it."""
+    unit, length_in_m = common.length_unit(doc)
+    _require(common.domain_input(summary, doc).get("length_unit") == unit, "document/summary length_unit mismatch")
+    _require(not isinstance(length_in_m, bool) and math.isfinite(length_in_m) and length_in_m > 0,
+             "invalid display length scale")
+    return unit, float(length_in_m)
 
 
 def capture_steady(result, identity, limits, rlimits, spec):
     """Read each public array once and encode the steady region payload (14 arrays)."""
     plan_ = spec.plan
     _require(isinstance(result, ThermalRunResult), "expected public ThermalRunResult")
-    summary = copy.deepcopy(result.summary())
+    summary = common.json_value(result.summary())
     _require(isinstance(summary, dict), "thermal summary must be an object")
-    common.encode_json(summary, limits.metadata_bytes)
+    common.check_summary(summary, limits)
     pair = (result.result_format, result.field_layout)
     _require(pair == STEADY_PAIR and summary.get("physics_type") == common.KIND,
              "unsupported public thermal region result/layout pair")
     _require(pair == (summary.get("result_format"), summary.get("field_layout")),
              "public and summary result/layout pair disagree")
     doc = result.doc
-    _require(_exact_json(doc.data) == _exact_json(spec.run_doc.data),
+    _require(doc.canonical_json() == spec.run_doc.canonical_json(),
              "public result document does not match accepted snapshot")
     keys = common.BASE_FIELDS+common.BOUNDARY_FIELDS
     arrays = {}
@@ -390,21 +439,21 @@ def capture_steady(result, identity, limits, rlimits, spec):
         value = getattr(result, common.PROPERTIES[key])  # one property read
         _require(isinstance(value, np.ndarray), key+": expected a numeric ndarray")
         _require(value.dtype.kind in "iuf", key+": expected real nonboolean dtype")
-        if key == "nodes_m":
+        if key == "node_coordinates":
             _require(value.ndim == 2 and value.shape[1] == 2 and 3 <= len(value) <= plan_.n_cap,
-                     "invalid or oversized nodes_m")
+                     "invalid or oversized node_coordinates")
             node_count = len(value)
         elif key == "triangles":
             _require(value.dtype.kind in "iu" and value.ndim == 2 and value.shape[1] == 3
                      and 1 <= len(value) <= plan_.m_cap, "invalid or oversized triangles")
             cell_count = len(value)
-        elif key == "heat_flux_w_m2":
-            _require(value.shape == (cell_count, 2), "invalid heat_flux_w_m2 shape before copy")
-        elif key == "dirichlet_node_ids":
+        elif key == "heat_flux":
+            _require(value.shape == (cell_count, 2), "invalid heat_flux shape before copy")
+        elif key == "prescribed_node_ids":
             _require(value.dtype.kind in "iu" and value.ndim == 1 and len(value) <= node_count,
-                     "invalid Dirichlet IDs before copy")
+                     "invalid prescribed node IDs before copy")
             fixed_count = len(value)
-        elif key == "dirichlet_temperature_k":
+        elif key == "prescribed_temperature":
             _require(value.shape == (fixed_count,), "invalid prescribed temperature shape before copy")
         else:
             _require(value.shape == (node_count,), key+": invalid nodal shape before copy")
@@ -416,47 +465,45 @@ def capture_steady(result, identity, limits, rlimits, spec):
              "invalid triangle_regions before copy")
     arrays["triangle_regions"] = np.array(ids, dtype=np.int64, copy=True, order="C")
     names = result.region_names
-    nodes, triangles, fixed = arrays["nodes_m"], arrays["triangles"], arrays["dirichlet_node_ids"]
+    nodes, triangles, fixed = arrays["node_coordinates"], arrays["triangles"], arrays["prescribed_node_ids"]
     n, m = len(nodes), len(triangles)
     _require(not np.any(triangles < 0) and not np.any(triangles >= n), "triangle index outside nodes")
-    _require(not np.any(fixed < 0) and not np.any(fixed >= n), "Dirichlet index outside nodes")
-    _require(not np.any(np.diff(fixed.astype(np.int64)) <= 0), "Dirichlet IDs must be sorted unique")
-    shapes = {"nodes_m": (n, 2), "triangles": (m, 3), "heat_flux_w_m2": (m, 2),
-              "dirichlet_node_ids": (len(fixed),), "dirichlet_temperature_k": (len(fixed),),
+    _require(not np.any(fixed < 0) and not np.any(fixed >= n), "prescribed node index outside nodes")
+    _require(not np.any(np.diff(fixed.astype(np.int64)) <= 0), "prescribed node IDs must be sorted unique")
+    shapes = {"node_coordinates": (n, 2), "triangles": (m, 3), "heat_flux": (m, 2),
+              "prescribed_node_ids": (len(fixed),), "prescribed_temperature": (len(fixed),),
               "triangle_regions": (m,)}
     for key in keys:
         shapes.setdefault(key, (n,))
-    _require(not np.any(arrays["dirichlet_temperature_k"] < 0), "negative prescribed Kelvin")
+    _require(not np.any(arrays["prescribed_temperature"] <= 0), "prescribed temperature must be above 0 K")
     with np.errstate(over="ignore", invalid="ignore"):
         v = nodes[triangles][:, 1:]-nodes[triangles][:, :1]
         det = v[:, 0, 0]*v[:, 1, 1]-v[:, 0, 1]*v[:, 1, 0]
     _require(np.isfinite(det).all() and np.all(det > 0), "triangles must be finite nondegenerate CCW")
     fields = keys+("triangle_regions",)
-    for meta in ("field_units", "field_locations", "field_shapes"):
-        _require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(fields),
+    structural = common.STRUCTURAL+("triangle_regions",)
+    for meta, expected in (("field_units", [k for k in fields if k not in structural]),
+                           ("field_locations", fields), ("field_shapes", fields)):
+        _require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(expected),
                  "invalid "+meta+" field set")
     for key in fields:
-        unit, location = ("1", "triangles") if key == "triangle_regions" else (common._units(key),
-                                                                               common._location(key))
-        _require(summary["field_units"][key] == unit, key+": wrong unit")
+        if key not in structural:
+            _require(summary["field_units"][key] == common._unit_03(key), key+": wrong unit")
+        location = "triangles" if key == "triangle_regions" else common._location_03(key)
         _require(summary["field_locations"][key] == location, key+": wrong location")
         shape = summary["field_shapes"][key]
         _require(isinstance(shape, list) and all(type(x) is int for x in shape)
                  and shape == list(shapes[key]), key+": wrong metadata shape")
     _mesh_summary(summary, n, m, doc)
-    _require(summary.get("units") == doc["units"] and summary.get("mesh_length_unit") == "m",
-             "document/summary unit mismatch")
-    length_in_m = doc.scale.to_si(1., {"length": 1})
-    _require(not isinstance(length_in_m, bool) and math.isfinite(length_in_m) and length_in_m > 0,
-             "invalid display length scale")
+    unit, length_in_m = _length(summary, doc)
     check_regions(summary, names, arrays["triangle_regions"], nodes, triangles, doc, rlimits, common.KIND)
     payload = {
         "payload_format": STEADY_PAYLOAD, **identity,
         "result_format": pair[0], "field_layout": pair[1],
-        "display_length_in_m": float(length_in_m),
+        "length_unit": unit, "display_length_in_m": length_in_m,
         "summary": summary, "arrays": {key: arrays[key].tolist() for key in fields},
     }
-    return common.encode_json(payload, limits.payload_bytes)
+    return common.encode_json(payload, limits.payload_bytes, name="payload_bytes")
 
 
 def capture_transient(result, identity, limits, rlimits, spec):
@@ -466,48 +513,45 @@ def capture_transient(result, identity, limits, rlimits, spec):
     document = spec.run_doc
     require = transient.require
     require(isinstance(result, TransientThermalRunResult), "public transient result required")
-    original = _exact_json(document.data)
-    summary = copy.deepcopy(result.summary())
-    common.encode_json(summary, limits.metadata_bytes)
+    original = document.canonical_json()
+    summary = common.json_value(result.summary())
+    common.check_summary(summary, limits)
     pair = (result.result_format, result.field_layout)
     require(isinstance(summary, dict) and summary.get("physics_type") == transient.KIND
             and pair == TRANSIENT_PAIR
             and (summary.get("result_format"), summary.get("field_layout")) == TRANSIENT_PAIR,
             "unsupported transient region summary/result pair")
-    require(_exact_json(result.doc.data) == original, "public result document does not match accepted snapshot")
-    require(summary.get("units") == document["units"] and summary.get("mesh_length_unit") == "m",
-            "transient document/SI units mismatch")
-    nt = len(document["study"]["time_s"])
-    spec_fields = dict(transient.SPEC, triangle_regions=("1", "triangles", "static"))
-    order = ("nodes_m", "triangles", "time_s", "dirichlet_node_ids")+tuple(
-        k for k in transient.SPEC if k not in {"nodes_m", "triangles", "time_s", "dirichlet_node_ids"})
+    require(result.doc.canonical_json() == original, "public result document does not match accepted snapshot")
+    nt = len(document.si["study"]["time"])
+    spec_fields = dict(transient.SPEC, triangle_regions=(None, "triangles", "static"))
+    order = transient.STATIC+tuple(k for k in transient.SPEC if k not in transient.STATIC)
     captured, total = {}, 0
     n = m = fixed_count = None
     for key in order+("triangle_regions",):
         value = result.region_ids if key == "triangle_regions" else getattr(result, key)
         require(isinstance(value, np.ndarray) and value.dtype.kind in "iuf",
                 "transient "+key+" requires real nonboolean ndarray")
-        if key == "nodes_m":
+        if key == "node_coordinates":
             require(value.ndim == 2 and value.shape[1] == 2 and 3 <= len(value) <= plan_.n_cap,
-                    "invalid or oversized transient nodes_m")
+                    "invalid or oversized transient node_coordinates")
             n = len(value)
         elif key == "triangles":
             require(value.dtype.kind in "iu" and value.ndim == 2 and value.shape[1] == 3
                     and 1 <= len(value) <= plan_.m_cap, "invalid or oversized transient triangles")
             m = len(value)
-        elif key == "dirichlet_node_ids":
+        elif key == "prescribed_node_ids":
             require(value.ndim == 1 and len(value) <= n and value.dtype.kind in "iu",
-                    "invalid transient Dirichlet IDs")
+                    "invalid transient prescribed node IDs")
             fixed_count = len(value)
         elif key == "triangle_regions":
             require(value.dtype.kind in "iu", "invalid transient triangle_regions")
-        shapes = {"nodes_m": (n, 2), "triangles": (m, 3), "time_s": (nt,),
-                  "dirichlet_node_ids": (fixed_count,), "temperature_k": (nt, n),
-                  "heat_flux_w_m2": (nt, m, 2), "source_load_w_per_m": (nt, n),
-                  "reaction_w_per_m": (nt-1, n), "residual_w_per_m": (nt-1, n),
-                  "storage_rate_w_per_m": (nt-1, n), "heat_content_j_per_m": (nt,),
-                  "quadratic_functional_jk_per_m": (nt,),
-                  "dirichlet_temperatures_k": (nt, fixed_count), "triangle_regions": (m,)}
+        shapes = {"node_coordinates": (n, 2), "triangles": (m, 3), "time": (nt,),
+                  "prescribed_node_ids": (fixed_count,), "temperature": (nt, n),
+                  "heat_flux": (nt, m, 2), "generated_heat_rate_per_depth": (nt, n),
+                  "reaction_heat_rate_per_depth": (nt-1, n), "residual_heat_rate_per_depth": (nt-1, n),
+                  "heat_storage_rate_per_depth": (nt-1, n), "stored_heat_per_depth": (nt,),
+                  "thermal_energy_functional_per_depth": (nt,),
+                  "prescribed_temperature": (nt, fixed_count), "triangle_regions": (m,)}
         require(value.shape == shapes[key], "transient "+key+" shape mismatch")
         require(np.isfinite(value).all(), "nonfinite transient "+key)
         require(value.dtype.itemsize <= 8, "unsupported transient numeric width")
@@ -517,61 +561,62 @@ def capture_transient(result, identity, limits, rlimits, spec):
         require(np.isfinite(owned).all(), "nonfinite captured transient "+key)
         owned.flags.writeable = False
         captured[key] = owned
-    x, tri, fixed, ids = (captured[k] for k in ("nodes_m", "triangles", "dirichlet_node_ids", "triangle_regions"))
+    x, tri, fixed, ids = (captured[k] for k in ("node_coordinates", "triangles", "prescribed_node_ids",
+                                                "triangle_regions"))
     require(tri.dtype.kind in "iu" and np.all(tri >= 0) and np.all(tri < n), "transient triangle indices invalid")
     require(np.all(fixed >= 0) and np.all(fixed < n) and np.all(fixed[1:] > fixed[:-1]),
-            "transient Dirichlet IDs invalid")
+            "transient prescribed node IDs invalid")
     a, b, c = x[tri[:, 0]], x[tri[:, 1]], x[tri[:, 2]]
     with np.errstate(over="ignore", invalid="ignore"):
         area = (b[:, 0]-a[:, 0])*(c[:, 1]-a[:, 1])-(b[:, 1]-a[:, 1])*(c[:, 0]-a[:, 0])
     require(np.isfinite(area).all() and np.all(area > 0), "transient mesh must be CCW")
-    require(np.array_equal(captured["time_s"], np.asarray(document["study"]["time_s"])),
+    require(np.array_equal(captured["time"], np.asarray(document.si["study"]["time"])),
             "transient requested time axis mismatch")
-    for meta in ("field_units", "field_locations", "field_time_axes", "field_shapes"):
-        require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(spec_fields),
+    expected = {"field_units": [k for k, v in spec_fields.items() if v[0] is not None],
+                "field_locations": list(spec_fields), "field_shapes": list(spec_fields),
+                "field_time_axes": [k for k, v in spec_fields.items() if v[2] != "static"]}
+    for meta, keys in expected.items():
+        require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(keys),
                 "transient metadata field set mismatch")
     _mesh_summary(summary, n, m, document)
     study_meta = summary.get("study")
-    declared_times = study_meta.get("time_s") if isinstance(study_meta, dict) else None
+    declared = study_meta.get("time") if isinstance(study_meta, dict) else None
+    declared_times = declared.get("values") if isinstance(declared, dict) else None
     require(isinstance(study_meta, dict) and study_meta.get("type") == "transient"
-            and isinstance(declared_times, list)
+            and declared.get("unit") == "s" and isinstance(declared_times, list)
             and all(type(v) in (int, float) and math.isfinite(v) for v in declared_times)
-            and np.array_equal(np.asarray(declared_times), captured["time_s"]),
+            and np.array_equal(np.asarray(declared_times), captured["time"]),
             "transient summary study disagrees with captured times")
-    rate_times = summary.get("rate_time_s")
-    require(isinstance(rate_times, list)
-            and all(type(v) in (int, float) and math.isfinite(v) for v in rate_times)
-            and np.array_equal(np.asarray(rate_times), captured["time_s"][1:]),
-            "transient summary rate times disagree")
-    require(type(summary.get("dirichlet_nodes")) is int and summary["dirichlet_nodes"] == fixed_count,
-            "transient summary Dirichlet count disagrees")
+    require(type(summary.get("prescribed_nodes")) is int and summary["prescribed_nodes"] == fixed_count,
+            "transient summary prescribed node count disagrees")
     descriptors = {}
     for key, (unit, location, axis) in spec_fields.items():
         declared_shape = summary["field_shapes"][key]
         require(isinstance(declared_shape, list) and all(type(v) is int for v in declared_shape)
-                and summary["field_units"][key] == unit and summary["field_locations"][key] == location
-                and summary["field_time_axes"][key] == axis
+                and summary["field_units"].get(key) == unit and summary["field_locations"][key] == location
+                and summary["field_time_axes"].get(key, "static") == axis
                 and declared_shape == list(captured[key].shape),
                 "transient metadata mismatch: "+key)
         descriptors[key] = {"shape": list(captured[key].shape), "unit": unit,
                             "location": location, "axis": axis,
                             "available_views": ["frame", "history"] if key in transient.DYNAMIC else [],
-                            "initial_available": axis != "time_s[1:]",
+                            "initial_available": axis != "time[1:]",
                             "ui_supported": key in transient.UI_FIELDS}
     check_regions(summary, result.region_names, ids, x, tri, document, rlimits, transient.KIND)
-    scale = document.scale.to_si(1., {"length": 1})
-    require(type(scale) in (int, float) and math.isfinite(scale) and scale > 0,
-            "transient display scale invalid")
+    try:
+        unit, scale = _length(summary, document)
+    except common.ThermalAPIError:
+        require(False, "transient document/summary length_unit mismatch")
     base = {**identity, "result_format": TRANSIENT_PAIR[0], "field_layout": TRANSIENT_PAIR[1],
-            "display_length_in_m": scale}
+            "length_unit": unit, "display_length_in_m": scale}
     job, rid = identity["job"], identity["result_id"]
     payload = {**base, "payload_format": TRANSIENT_MANIFEST, "summary": summary, "fields": descriptors,
-               "time_s": captured["time_s"].tolist(), "default_frame_index": nt-1,
+               "time": captured["time"].tolist(), "default_frame_index": nt-1,
                "arrays": {k: captured[k].tolist()
-                          for k in ("nodes_m", "triangles", "dirichlet_node_ids", "triangle_regions")},
+                          for k in ("node_coordinates", "triangles", "prescribed_node_ids", "triangle_regions")},
                "frame_url": "/api/jobs/"+job+"/frame?result_id="+rid
                             +"&field={field}&time_index={time_index}&frame_seq={frame_seq}",
                "history_url": "/api/jobs/"+job+"/history?result_id="+rid
                               +"&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}"}
-    encoded = common.encode_json(payload, transient.ENCODED_BYTES)
+    encoded = common.encode_json(payload, transient.ENCODED_BYTES, name="manifest_bytes")
     return encoded, MappingProxyType(captured), scale
